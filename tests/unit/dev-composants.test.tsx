@@ -22,6 +22,7 @@ const COMPONENTS = [
   "SegmentedControl",
   "OtpInput",
   "StatusBanner",
+  "Ligne",
 ];
 
 describe("/dev/composants", () => {
@@ -41,7 +42,7 @@ describe("/dev/composants", () => {
     expect(screen.getByRole("heading", { level: 1, name: messages.dev.composants.titre })).toBeInTheDocument();
   });
 
-  it("montre chacun des huit composants dans une section", () => {
+  it("montre chacun des huit composants de F2 et la section Ligne de F3", () => {
     render(<ComposantsShowcase />);
     for (const name of COMPONENTS) {
       expect(screen.getByRole("region", { name })).toBeInTheDocument();
@@ -78,6 +79,30 @@ describe("/dev/composants", () => {
     const options = messages.dev.composants.exemples.segmente.options;
     fireEvent.click(screen.getByRole("radio", { name: options.a }));
     expect(screen.getByRole("radio", { name: options.a })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("section Ligne : pastilles, deux rangées de jours, ligne du jour, segment en voiture, marqueurs", () => {
+    render(<ComposantsShowcase />);
+    const ligne = screen.getByRole("region", { name: "Ligne" });
+    const navs = within(ligne).getAllByRole("navigation", { name: /^Jours du séjour/ });
+    expect(navs).toHaveLength(2);
+    expect(within(navs[0]!).getByRole("link", { name: messages.ligne.jours.sejour })).toHaveAttribute("aria-current", "page");
+    expect(within(navs[1]!).getByRole("link", { name: /^Jour 9/ })).toHaveAttribute("aria-current", "page");
+    const lists = ligne.querySelectorAll("ol");
+    expect(lists).toHaveLength(2);
+    expect(Array.from(lists[0]!.children).map((li) => (li as HTMLElement).dataset.type)).toEqual([
+      "terminus",
+      "segment",
+      "stop",
+      "segment",
+      "stop",
+      "free",
+      "segment",
+      "terminus",
+    ]);
+    expect(lists[1]).toHaveTextContent("En voiture, 15 min");
+    const markers = Array.from(ligne.querySelectorAll("[data-variant]"));
+    expect(markers.filter((marker) => !marker.closest("ol"))).toHaveLength(6);
   });
 
   it("n'a aucune violation axe", async () => {
