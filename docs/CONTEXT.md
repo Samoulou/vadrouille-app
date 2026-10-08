@@ -25,7 +25,8 @@ Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en
 
 ## Règles du studio
 - Cycle toutes les 3 heures ; jusqu'à 3 tâches par cycle, sur des fichiers distincts (régime fixé par Samuel le 2026-10-08).
-- Verrou : le libellé `in-progress` est posé sur le ticket dès la prise de la tâche et retiré à l'ouverture de la PR ; un ticket `in-progress` n'est pas repris par un autre agent.
+- Verrou : le libellé `in-progress` est posé sur le ticket dès la prise de la tâche et retiré à l'ouverture de la PR ; un ticket `in-progress` n'est pas repris par un autre agent (consigne de Samuel, prompt de la routine R1, étapes 3 et 4, dans `docs/studio/mise-en-place.md`).
+- Une tâche dont le ticket est déjà référencé par une PR ouverte (« Closes # » ou « Refs # ») est en revue : elle n'est pas « prête » au sens du prompt R1 et n'est pas reprise (ordre des tâches, décidé par le CEO).
 - Rien n'entre dans `main` sans CI verte et validation du Tech Lead.
 - Le contexte vit dans le dépôt : `STATUS.md` est mis à jour à la fin de chaque cycle.
 
