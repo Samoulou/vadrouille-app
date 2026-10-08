@@ -30,14 +30,14 @@ test("carte simulée, vue d'ensemble", async ({ page }) => {
 test("état de remplacement : hors ligne", async ({ page, context }) => {
   await openSimulated(page);
   await context.setOffline(true);
-  await expect(mapRegion(page).getByRole("status")).toBeVisible();
+  await expect(mapRegion(page).locator("[data-fallback]")).toBeVisible();
   await capture(page, "carte-hors-ligne.png");
   await context.setOffline(false);
 });
 
 test("état de remplacement : configuration absente", async ({ page }) => {
   await page.goto("/dev/carte?rendu=google&config=absente");
-  await expect(mapRegion(page).getByRole("status")).toBeVisible();
+  await expect(mapRegion(page).locator("[data-fallback]")).toBeVisible();
   await capture(page, "carte-configuration-absente.png");
 });
 

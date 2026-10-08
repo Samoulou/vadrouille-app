@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react";
 
 import type { Day, DayMap as DayMapData } from "@/contracts";
 import { format, messages } from "@/i18n";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { isMapConfigComplete, useCarteInjection } from "./config";
 import { GoogleMapRenderer } from "./GoogleMapRenderer";
-import { MapFallback } from "./MapFallback";
+import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
 import { buildDayRoute, buildOverview } from "./route";
 import type { FitPadding, MapView } from "./types";
 
@@ -69,6 +69,7 @@ function useOnline(): boolean {
  */
 export function DayMap(props: DayMapProps) {
   const online = useOnline();
+  const [loadError, setLoadError] = useState(false);
   const { config, simulated: Simulated } = useCarteInjection();
   const configComplete = isMapConfigComplete(config);
 
@@ -103,9 +104,12 @@ export function DayMap(props: DayMapProps) {
   }, [needsConfig, configComplete]);
 
   let content;
+  let cause: MapFallbackCause | null = null;
   if (!online) {
+    cause = "offline";
     content = <MapFallback cause="offline" placesFromGoogle={props.placesFromGoogle} />;
   } else if (!view || !hasPositions || (needsConfig && !configComplete)) {
+    cause = "unavailable";
     content = <MapFallback cause="unavailable" placesFromGoogle={props.placesFromGoogle} />;
   } else if (Simulated) {
     content = <Simulated view={view} />;
@@ -115,8 +119,10 @@ export function DayMap(props: DayMapProps) {
         view={view}
         config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
         placesFromGoogle={props.placesFromGoogle}
+        onErrorChange={setLoadError}
       />
     );
+    cause = loadError ? "error" : null;
   }
 
   const regionLabel = props.mode === "day" ? format(t.regionJour, { n: props.day.index }) : t.regionSejour;
@@ -147,6 +153,11 @@ export function DayMap(props: DayMapProps) {
         </a>
       ) : null}
       <div role="region" aria-label={regionLabel} className="h-full">
+        {/* Région live persistante (F4-PO-8) : toujours montée, seul son texte change, pour que chaque
+            entrée dans un état de remplacement soit annoncée ; vide quand la carte s'affiche. */}
+        <p role="status" data-part="annonce" className="sr-only">
+          {cause ? MAP_FALLBACK_TEXTS[cause] : null}
+        </p>
         {content}
       </div>
     </div>

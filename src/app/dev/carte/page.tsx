@@ -24,6 +24,7 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
  * Paramètres (pages de développement seulement) :
  * - `rendu=google` : rendu Google au lieu de la carte simulée (par défaut) ;
  * - `config=absente` ou `config=factice` : configuration injectée (vide, ou `test-key` / `test-map`) ;
+ *   sans ce paramètre : configuration de l'environnement en développement, vide en build de production ;
  * - `vue=ensemble` : vue d'ensemble du séjour.
  */
 export default async function DevCartePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -39,7 +40,10 @@ export default async function DevCartePage({ searchParams }: { searchParams: Pro
   }
   const renderer: DemoRenderer = first(params.rendu) === "google" ? "google" : "simulee";
   const configParam = first(params.config);
-  const config: DemoConfig = configParam === "absente" || configParam === "factice" ? configParam : "environnement";
+  // En build de production (pages de développement ouvertes par VADROUILLE_DEV_PAGES=1), /dev/carte n'utilise
+  // jamais la configuration de l'environnement : sans `config` explicite, elle est vide (revue de la PR #35).
+  const fallbackConfig: DemoConfig = process.env.NODE_ENV === "production" ? "absente" : "environnement";
+  const config: DemoConfig = configParam === "absente" || configParam === "factice" ? configParam : fallbackConfig;
   const vue: DemoVue = first(params.vue) === "ensemble" ? "ensemble" : "jour";
   return <CarteDemo days={trip.days} maps={maps} renderer={renderer} config={config} vue={vue} />;
 }

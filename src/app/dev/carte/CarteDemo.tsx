@@ -78,7 +78,8 @@ export function CarteDemo({ days, maps, renderer, config, vue }: CarteDemoProps)
                   variant="secondary"
                   size="sm"
                   aria-pressed={candidate.index === day?.index}
-                  className="min-w-(--touch-target) px-2"
+                  // Jour actif : mêmes tokens que la pastille DayBadge active (plein `line`, texte `on-line`).
+                  className="min-w-(--touch-target) px-2 aria-pressed:border-line aria-pressed:bg-line aria-pressed:text-on-line"
                   onClick={() => {
                     setDayIndex(candidate.index);
                     setSelectedStopId(undefined);

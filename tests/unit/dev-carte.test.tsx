@@ -27,4 +27,19 @@ describe("/dev/carte", () => {
     expect(element.props.days).toHaveLength(6);
     expect(element.props.maps).toHaveLength(6);
   });
+
+  it("en build de production, n'utilise jamais la configuration de l'environnement (vide sans paramètre)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VADROUILLE_DEV_PAGES", "1");
+    for (const config of [undefined, "environnement"]) {
+      const element = await DevCartePage({ searchParams: Promise.resolve({ rendu: "google", config }) });
+      expect(element.props).toMatchObject({ renderer: "google", config: "absente" });
+    }
+  });
+
+  it("en développement, utilise la configuration de l'environnement sans paramètre", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const element = await DevCartePage({ searchParams: Promise.resolve({ rendu: "google" }) });
+    expect(element.props).toMatchObject({ renderer: "google", config: "environnement" });
+  });
 });

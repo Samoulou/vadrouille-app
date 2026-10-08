@@ -225,12 +225,28 @@ describe("GoogleMapRenderer (bibliothèque simulée)", () => {
   it("échec du chargement : état « erreur » avec Réessayer, qui relance un chargement", async () => {
     loader.importLibrary.mockRejectedValue(new Error("script bloqué"));
     await renderReady(dayView());
-    const status = await screen.findByRole("status");
-    expect(status).toHaveTextContent(messages.carte.erreur);
+    const fallback = await screen.findByText(messages.carte.erreur);
+    expect(fallback.closest("[data-fallback='error']")).not.toBeNull();
     const calls = loader.importLibrary.mock.calls.length;
-    fireEvent.click(within(status).getByRole("button", { name: messages.carte.reessayer }));
+    fireEvent.click(screen.getByRole("button", { name: messages.carte.reessayer }));
     await act(async () => {});
     expect(loader.importLibrary.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it("signale l'entrée dans l'état « erreur » et la sortie (onErrorChange), pour la région live de DayMap", async () => {
+    loader.importLibrary.mockRejectedValue(new Error("script bloqué"));
+    const onErrorChange = vi.fn();
+    const { unmount } = render(
+      <GoogleMapRenderer view={dayView()} config={CONFIG} placesFromGoogle={false} onErrorChange={onErrorChange} />,
+    );
+    await act(async () => {});
+    expect(onErrorChange).toHaveBeenLastCalledWith(true);
+    loader.importLibrary.mockReturnValue(new Promise(() => {}));
+    fireEvent.click(screen.getByRole("button", { name: messages.carte.reessayer }));
+    await act(async () => {});
+    expect(onErrorChange).toHaveBeenLastCalledWith(false);
+    unmount();
+    expect(onErrorChange).toHaveBeenLastCalledWith(false);
   });
 
   it("délai de 10 s dépassé : état « erreur »", async () => {
@@ -240,11 +256,11 @@ describe("GoogleMapRenderer (bibliothèque simulée)", () => {
     await act(async () => {
       vi.advanceTimersByTime(LOAD_TIMEOUT_MS - 1);
     });
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.querySelector("[data-fallback]")).toBeNull();
     await act(async () => {
       vi.advanceTimersByTime(1);
     });
-    expect(screen.getByRole("status")).toHaveTextContent(messages.carte.erreur);
+    expect(document.querySelector("[data-fallback='error']")).toHaveTextContent(messages.carte.erreur);
   });
 
   it("clé refusée signalée par l'API (gm_authFailure) : état « erreur »", async () => {
@@ -252,6 +268,6 @@ describe("GoogleMapRenderer (bibliothèque simulée)", () => {
     await act(async () => {
       (window as Window & { gm_authFailure?: () => void }).gm_authFailure?.();
     });
-    expect(screen.getByRole("status")).toHaveTextContent(messages.carte.erreur);
+    expect(document.querySelector("[data-fallback='error']")).toHaveTextContent(messages.carte.erreur);
   });
 });

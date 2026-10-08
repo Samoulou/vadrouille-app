@@ -34,14 +34,14 @@ test("carte: aucune violation axe, étape sélectionnée", async ({ page }) => {
 test("carte: aucune violation axe, hors ligne", async ({ page, context }) => {
   await openSimulated(page);
   await context.setOffline(true);
-  await expect(mapRegion(page).getByRole("status")).toBeVisible();
+  await expect(mapRegion(page).locator("[data-fallback]")).toBeVisible();
   await expectNoViolations(page);
   await context.setOffline(false);
 });
 
 test("carte: aucune violation axe, configuration absente", async ({ page }) => {
   await page.goto("/dev/carte?rendu=google&config=absente");
-  await expect(mapRegion(page).getByRole("status")).toBeVisible();
+  await expect(mapRegion(page).locator("[data-fallback]")).toBeVisible();
   await expectNoViolations(page);
   expect(googleRequests).toEqual([]);
 });

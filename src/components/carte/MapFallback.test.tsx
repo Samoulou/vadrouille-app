@@ -15,11 +15,13 @@ describe("MapFallback", () => {
     ["offline", t.horsLigne],
     ["unavailable", t.indisponible],
     ["error", t.erreur],
-  ] as [MapFallbackCause, string][])("%s : texte, role status, fond muted, texte ink-2", async (cause, text) => {
+  ] as [MapFallbackCause, string][])("%s : texte, fond muted, texte ink-2, sans rôle live (annonce par DayMap)", async (cause, text) => {
     const { container } = render(<MapFallback cause={cause} onRetry={() => {}} placesFromGoogle={false} />);
-    const status = screen.getByRole("status");
-    expect(status).toHaveTextContent(text);
-    expect(status).toHaveClass("bg-muted", "text-ink-2", "size-full");
+    const fallback = container.querySelector<HTMLElement>(`[data-fallback='${cause}']`)!;
+    expect(fallback).toHaveTextContent(text);
+    expect(fallback).toHaveClass("bg-muted", "text-ink-2", "size-full");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByText(text)).toHaveAttribute("aria-hidden", "true");
     expect(await axeViolations(container)).toEqual([]);
   });
 

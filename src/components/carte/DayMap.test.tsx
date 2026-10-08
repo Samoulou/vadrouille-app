@@ -78,7 +78,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     act(() => setOnline(true));
     await act(async () => {});
     expect(loader.importLibrary).toHaveBeenCalled();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it.each([
@@ -90,7 +90,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     const { container } = renderMap(injection);
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(t.indisponible);
-    expect(within(status).queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
     expect(loader.setOptions).not.toHaveBeenCalled();
     expect(loader.importLibrary).not.toHaveBeenCalled();
     expect(document.querySelector("script")).toBeNull();
@@ -132,11 +132,47 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
   });
 });
 
+describe("DayMap : région live persistante (annonce des états de remplacement)", () => {
+  it("une seule région live, toujours montée, dont seul le texte change", () => {
+    const setOnline = stubOnline(true);
+    renderMap(SIMULATED_EMPTY);
+    const live = screen.getByRole("status");
+    expect(live).toBeEmptyDOMElement();
+    act(() => setOnline(false));
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live).toHaveTextContent(t.horsLigne);
+    act(() => setOnline(true));
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live).toBeEmptyDOMElement();
+  });
+
+  it("l'état de remplacement visible n'a pas de rôle live et son texte n'est pas lu deux fois", () => {
+    stubOnline(false);
+    const { container } = renderMap(SIMULATED_EMPTY);
+    const fallback = container.querySelector("[data-fallback='offline']")!;
+    expect(fallback).not.toHaveAttribute("role");
+    expect(within(fallback as HTMLElement).getByText(t.horsLigne)).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("erreur de chargement du rendu Google : annoncée par la même région live", async () => {
+    stubOnline(true);
+    loader.importLibrary.mockRejectedValue(new Error("bloqué"));
+    renderMap(FAKE);
+    const live = screen.getByRole("status");
+    expect(live).toBeEmptyDOMElement();
+    await act(async () => {});
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live).toHaveTextContent(t.erreur);
+    expect(screen.getByRole("button", { name: t.reessayer })).toBeInTheDocument();
+  });
+});
+
 describe("DayMap : carte simulée injectée", () => {
   it("s'affiche avec une configuration vide (aucun état de remplacement, aucun chargement Google)", () => {
     stubOnline(true);
     renderMap(SIMULATED_EMPTY);
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(document.querySelector("[data-renderer='simulated']")).not.toBeNull();
     expect(loader.importLibrary).not.toHaveBeenCalled();
   });
@@ -148,7 +184,7 @@ describe("DayMap : carte simulée injectée", () => {
     expect(screen.getByRole("status")).toHaveTextContent(t.horsLigne);
     expect(document.querySelector("[data-renderer='simulated']")).toBeNull();
     act(() => setOnline(true));
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(document.querySelector("[data-renderer='simulated']")).not.toBeNull();
   });
 });

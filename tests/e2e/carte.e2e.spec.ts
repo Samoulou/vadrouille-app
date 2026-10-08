@@ -10,7 +10,7 @@ import { blockGoogle, cameraOf, list, mapRegion, markers, openSimulated, simulat
 /** Critères F4 sur /dev/carte, carte simulée sauf mention contraire, en 390 × 844. */
 
 const TEXTS = {
-  horsLigne: "Carte indisponible hors ligne",
+  horsLigne: "Carte indisponible hors ligne. La liste reste utilisable.",
   indisponible: "Carte indisponible. La liste contient tout le programme.",
   erreur: "La carte n'a pas pu être chargée. La liste contient tout le programme.",
 };
@@ -178,13 +178,15 @@ test.describe("carte simulée", () => {
     await expect(list(page).locator("ol > li")).toHaveCount(items);
     await expect(listStops(page).first()).toBeVisible();
     await context.setOffline(false);
-    await expect(mapRegion(page).getByRole("status")).toHaveCount(0);
+    await expect(mapRegion(page).getByRole("status")).toHaveText("");
+    await expect(mapRegion(page).locator("[data-fallback]")).toHaveCount(0);
     await expect(simulated(page)).toBeVisible();
   });
 
   test("avec une configuration vide injectée, la carte simulée s'affiche", async ({ page }) => {
     await openSimulated(page, "?config=absente");
-    await expect(mapRegion(page).getByRole("status")).toHaveCount(0);
+    await expect(mapRegion(page).getByRole("status")).toHaveText("");
+    await expect(mapRegion(page).locator("[data-fallback]")).toHaveCount(0);
     await expect(markers(page)).toHaveCount(5);
   });
 
@@ -281,7 +283,8 @@ test.describe("rendu Google", () => {
     await page.goto("/dev/carte?rendu=google&config=absente");
     const status = mapRegion(page).getByRole("status");
     await expect(status).toHaveText(TEXTS.indisponible);
-    await expect(status.getByRole("button")).toHaveCount(0);
+    await expect(mapRegion(page).locator("[data-fallback='unavailable']")).toHaveText(TEXTS.indisponible);
+    await expect(mapRegion(page).getByRole("button")).toHaveCount(0);
     expect(await page.content()).not.toMatch(/NEXT_PUBLIC|GOOGLE_MAPS/);
     expect(googleRequests).toEqual([]);
   });
@@ -297,7 +300,7 @@ test.describe("rendu Google", () => {
     expect(await top()).toBe(reference);
     const attempts = googleRequests.length;
     expect(attempts).toBeGreaterThan(0);
-    await status.getByRole("button", { name: "Réessayer" }).click();
+    await mapRegion(page).getByRole("button", { name: "Réessayer" }).click();
     await expect.poll(() => googleRequests.length).toBeGreaterThan(attempts);
     await expect(mapRegion(page).getByRole("status")).toContainText(TEXTS.erreur, { timeout: 10_000 });
     // Aucun appel Places ni Routes : seule la Maps JavaScript API est demandée.

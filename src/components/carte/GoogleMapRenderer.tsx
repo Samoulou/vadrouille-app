@@ -72,6 +72,8 @@ export interface GoogleMapRendererProps {
   /** Configuration complète (vérifiée par `DayMap` avant tout chargement). */
   config: Required<MapConfig>;
   placesFromGoogle: boolean;
+  /** Signale l'entrée dans l'état « erreur de chargement » et la sortie, pour la région live de `DayMap`. */
+  onErrorChange?: (error: boolean) => void;
 }
 
 /**
@@ -80,7 +82,7 @@ export interface GoogleMapRendererProps {
  * polylignes droites. L'attribution native de Google n'est jamais masquée ni recouverte.
  * Aucune donnée n'est écrite côté client.
  */
-export function GoogleMapRenderer({ view, config, placesFromGoogle }: GoogleMapRendererProps) {
+export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChange }: GoogleMapRendererProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const librariesRef = useRef<Libraries | null>(null);
@@ -104,6 +106,17 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle }: GoogleMapR
   useEffect(() => {
     onMarkerPressRef.current = view.mode === "day" ? view.onMarkerPress : undefined;
   });
+
+  // L'état d'erreur est annoncé par l'enveloppe ; au démontage, il n'y a plus d'erreur à annoncer.
+  const onErrorChangeRef = useRef(onErrorChange);
+  useEffect(() => {
+    onErrorChangeRef.current = onErrorChange;
+  });
+  const failed = status === "error";
+  useEffect(() => {
+    onErrorChangeRef.current?.(failed);
+  }, [failed]);
+  useEffect(() => () => onErrorChangeRef.current?.(false), []);
 
   // Chargement de l'API, avec délai et refus de la clé signalé par l'API (gm_authFailure).
   useEffect(() => {

@@ -49,7 +49,7 @@
     "regionSejour": "Carte du séjour",
     "evitement": "Aller à la liste des étapes",
     "marqueur": "Étape {numero} : {name}",
-    "horsLigne": "Carte indisponible hors ligne",
+    "horsLigne": "Carte indisponible hors ligne. La liste reste utilisable.",
     "indisponible": "Carte indisponible. La liste contient tout le programme.",
     "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
     "reessayer": "Réessayer",
