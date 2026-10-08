@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  // Décision 0005 : le build vérifie les types sans les tests (absents de l'image Docker).
+  // `pnpm typecheck` garde le tsconfig.json complet.
+  typescript: { tsconfigPath: "tsconfig.build.json" },
 };
 
 export default nextConfig;
