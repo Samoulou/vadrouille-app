@@ -1,1 +1,1 @@
-Composants du design system Ligne (handover § 5), à construire à partir de F2.
+Composants du design system Ligne (handover § 5). F2 : Button, IconButton, Tag, Counter, Chip, SegmentedControl, OtpInput, StatusBanner, démontrés sur /dev/composants. Aucune chaîne en dur (`react/jsx-no-literals`) ; valeurs sans token dans `provisoire.css` uniquement.

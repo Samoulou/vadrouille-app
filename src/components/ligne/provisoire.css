@@ -1,0 +1,11 @@
+/*
+ * Valeurs provisoires des composants Ligne, sans token dans le handover § 4.1.
+ * Seul fichier de src/components/ligne qui contient des mesures en dur ; chaque
+ * déclaration cite la question qui la tranchera. À retirer quand la question est tranchée.
+ */
+:root {
+  /* Q13 : contour 1,5 px des boutons secondaires, des tags « À confirmer » et des chips (Button et Tag, preview.html). */
+  --ligne-trait-controle: 1.5px;
+  /* Q13 : taille du texte des boutons principal et secondaire (16 px dans Button/preview.html, aucun style nommé). */
+  --ligne-bouton-texte: 16px;
+}
