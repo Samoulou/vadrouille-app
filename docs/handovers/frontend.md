@@ -3,7 +3,7 @@
 Destinataire : l'agent de développement front-end (Claude Code ou équivalent) et les agents qui le relaient.
 Émetteur : Samuel Coppey, avec l'appui de Claude. Date : 7 octobre 2026.
 
-Ce document est conçu pour être exécuté par des agents automatisés : chaque tâche a ses fichiers attendus, ses critères d'acceptation vérifiables et ses commandes de contrôle. Quand une information manque, l'agent ne l'invente pas : il l'inscrit dans `QUESTIONS.md` et continue sur ce qui est défini.
+Ce document est conçu pour être exécuté par des agents automatisés : chaque tâche a ses fichiers attendus, ses critères d'acceptation vérifiables et ses commandes de contrôle. Quand une information manque, l'agent ne l'invente pas : il l'inscrit dans la description de sa PR (le CEO la reporte dans `QUESTIONS.md` via la PR « chore: status ») et continue sur ce qui est défini.
 
 ---
 
@@ -479,7 +479,7 @@ pnpm test:visual    # captures comparées à tests/visual
 3. Aucune valeur de style en dur, aucune chaîne hors `fr.json`.
 4. Les captures mobiles (390 × 844) des écrans touchés sont jointes à la PR, à côté de la maquette correspondante.
 5. Les écarts volontaires avec la maquette sont listés dans la PR.
-6. `QUESTIONS.md` est à jour.
+6. Les nouvelles questions sont listées dans la description de la PR (le CEO les reporte dans `QUESTIONS.md`).
 
 **Budgets :** Lighthouse mobile ≥ 90 en performance et 100 en accessibilité sur `/voyages/[id]` avec données simulées ; JavaScript initial de la route Journée < 200 Ko compressé hors carte.
 
@@ -535,7 +535,7 @@ Back-end, agent de recherche, ancrage Google côté serveur, paiement réel et w
 ## Avant de coder
 - Lis docs/handover-frontend.md (ce document) et la tâche assignée.
 - Ouvre la maquette correspondante dans docs/ux/maquettes/.
-- Si une information manque : ajoute-la à QUESTIONS.md, ne l'invente pas.
+- Si une information manque : note-la dans la description de ta PR (le CEO la reporte dans QUESTIONS.md), ne l'invente pas.
 
 ## Toujours
 - Styles uniquement via les tokens Ligne (globals.css). Aucune couleur, taille ou rayon en dur.
@@ -577,6 +577,6 @@ F? — titre
 ## Vérifications
 - [ ] typecheck  - [ ] lint  - [ ] test  - [ ] a11y  - [ ] e2e  - [ ] visual
 
-## Questions ajoutées à QUESTIONS.md
+## Nouvelles questions (reportées par le CEO dans QUESTIONS.md)
 - …
 ```

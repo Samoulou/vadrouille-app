@@ -29,13 +29,18 @@ Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en
 - Régime actuel : **Veille** (2 cycles par jour) jusqu'à décision de Samuel.
 - Le contexte vit dans le dépôt : `STATUS.md` est mis à jour à la fin de chaque cycle.
 
-## Décisions réservées à Samuel
-- Décisions ouvertes du cadrage (D1 à D14) et toute nouvelle décision produit.
-- Mise en production, clés réelles, comptes et services payants.
-- Création d'un rôle d'agent, changement de régime ou de budget.
-- Juridique : conditions Google, données personnelles, conditions générales.
+## Qui décide quoi
+**Réservé à Samuel** : stratégie produit (cible, offre, prix, phases G0 à G3), argent, comptes externes et clés, mise en production, juridique, création de rôle, modification de ces règles.
+Ces questions vont dans `#studio` et dans `QUESTIONS.md` (par le CEO) ; le studio continue sur autre chose en attendant.
 
-Pose-les dans `QUESTIONS.md` et dans `#studio`, puis continue sur autre chose.
+**Délégué** :
+- Tech Lead : architecture, bibliothèques, outillage, tests.
+- UX/UI : écrans non maquettés, dans les règles de Ligne.
+- Product Owner : détails fonctionnels, dans le cadre du cadrage.
+- CEO : ordre des tâches.
+
+Une décision déléguée est écrite dans `docs/decisions/` ou dans la spécification, listée dans la note de version suivante (rubrique « Décisions prises par le studio ») et devient définitive sans veto de Samuel sous 2 jours.
+Tout ce qui engage de l'argent, un compte externe ou des données personnelles hors UE remonte à Samuel, même dans un domaine délégué.
 
 ## Où trouver quoi
 | Besoin | Document |

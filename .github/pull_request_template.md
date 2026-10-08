@@ -15,5 +15,8 @@ F? — titre (specs/…)
 ## Vérifications
 - [ ] typecheck  - [ ] lint  - [ ] test  - [ ] a11y  - [ ] e2e  - [ ] visual
 
-## Questions ajoutées à QUESTIONS.md
-- …
+## Nouvelles questions (reportées par le CEO dans QUESTIONS.md)
+- … (destinataire, ce qu'elle bloque)
+
+## Décisions prises (rôle délégué)
+- … (ou « aucune »)
