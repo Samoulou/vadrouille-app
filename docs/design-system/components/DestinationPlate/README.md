@@ -10,7 +10,7 @@ Plaque qui porte le nom de la destination dans sa couleur : le seul endroit où 
 
 ## Règles
 
-- Une plaque par écran au maximum : en tête de l'aperçu du séjour, dans « Mes voyages » et sur le souvenir partageable.
+- Une plaque par écran au maximum : en tête de l'écran Séjour, dans « Mes voyages » et sur le souvenir partageable.
 - La couleur est attribuée à la destination une fois pour toutes, à partir de la palette fermée ; on n'invente pas de nouvelle couleur sans vérifier un contraste d'au moins 4,5:1 avec `on-line`.
 - La couleur de destination ne remplace jamais `line` : le tracé et les actions restent bleus.
 

@@ -40,7 +40,7 @@ Une seule famille, **Hanken Grotesk**, servie par Google Fonts en 400, 600, 700 
 
 ## Espacement et rayons
 
-Échelle de 4 px (`space-1` à `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré.
+Échelle de 4 px (`space-1` à `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré (`radius-terminus`, `radius-mini` pour les petits éléments de 24 à 26 px). Les contours suivent l'échelle `trait-*` (1, 1,5, 2 et 3 px).
 
 Pas d'ombres : la profondeur vient des aplats (`page`, `raised`, `muted`) et des contours fins.
 
@@ -48,15 +48,15 @@ Pas d'ombres : la profondeur vient des aplats (`page`, `raised`, `muted`) et des
 
 La ligne du jour est l'élément central du système (composant DayLine) :
 
-- Trois colonnes : heure (52 px, alignée à droite), rail (28 px), contenu ; 8 px d'écart.
+- Trois colonnes : heure (`col-heure`, 52 px, alignée à droite), rail (`col-rail`, 28 px), contenu ; 8 px d'écart.
 - Le rail fait `rail` (4 px) en `line`. Il est plein pour un trajet en transport, pointillé (`rail-dash` / `rail-gap`) pour la marche, fin (`rail-free`) en `track-free` pendant le temps libre.
-- Un arrêt est un anneau `stop` (20 px) d'épaisseur `stop-ring`, fond `raised`. Le terminus (hôtel) est un carré `terminus` en `ink`, coins 5 px, au départ comme au retour.
+- Un arrêt est un anneau `stop` (20 px) d'épaisseur `stop-ring`, fond `raised`. Le terminus (hôtel) est un carré `terminus` en `ink`, coins `radius-terminus` (5 px), au départ comme au retour.
 - Sur la carte, les mêmes arrêts sont numérotés (`stop-map`, 26 px) ; l'arrêt sélectionné grossit (`stop-map-selected`) et passe en plein `line`.
 - Une journée commence et finit toujours par un terminus.
 
 ## Iconographie
 
-Icônes au trait, sur une grille de 24 px, trait de 2,2 px, extrémités et angles arrondis, sans remplissage, en `ink` ou en `ink-soft`. Seul le terminus utilise une icône blanche sur aplat (maison). Jeu actuel : retour, partager, fermer, à pied, bus, maison, cadenas, cœur, itinéraire (repère), coche, plus. Pas d'emoji, nulle part. Les fichiers d'icônes restent à extraire en SVG.
+Icônes au trait, sur une grille de 24 px, trait de 2,2 px, extrémités et angles arrondis, sans remplissage, en `ink` ou en `ink-soft`. Seul le terminus utilise une icône blanche sur aplat (maison). Jeu actuel : retour, partager, fermer, à pied, bus, maison, cadenas, cœur, itinéraire (repère), coche, plus. Pas d'emoji, nulle part. Les fichiers d'icônes restent à extraire en SVG ; d'ici là, le front dessine les icônes manquantes (dont voiture) selon ces règles et les soumet à la revue UX/UI (décision 0010, Q13).
 
 ## Mouvement
 
