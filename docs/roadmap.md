@@ -17,7 +17,7 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 2 | F1 | Contrats Zod et données simulées Édimbourg | frontend | F0 | À spécifier |
 | 3 | F2 | Composants de base | frontend | F0 | À spécifier |
 | 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, comparaison Claude et Gemini) | ia-recherche | Q3, Q9 | À spécifier |
-| 5 | F3 | Composants de la ligne du jour | frontend | F2 | À spécifier |
+| 5 | F3 | Composants de la ligne du jour | frontend | F1, F2 | Spécification en revue |
 | 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | — | À écrire |
 | 7 | F4 | Carte Google Maps | frontend | F3, Q3 | Bloqué par Q3 |
 | 8 | F5 à F12 | Suite du handover front-end | frontend | voir handover | Après G0 |
