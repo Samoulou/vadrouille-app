@@ -41,7 +41,7 @@ Une seule famille, **Hanken Grotesk**, servie par Google Fonts en 400, 600, 700 
 
 ## Espacement et rayons
 
-Échelle de 4 px (`space-1` à `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré (`radius-terminus`, `radius-mini` pour les petits éléments de 24 à 26 px). Les contours suivent l'échelle `trait-*` (1, 1,5, 2 et 3 px).
+Échelle de 4 px (`space-1` à `space-6` et `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré (`radius-terminus`, `radius-mini` pour les petits éléments de 24 à 26 px). Les contours suivent l'échelle `trait-*` (1, 1,5, 2 et 3 px).
 
 Pas d'ombres : la profondeur vient des aplats (`page`, `raised`, `muted`) et des contours fins.
 
