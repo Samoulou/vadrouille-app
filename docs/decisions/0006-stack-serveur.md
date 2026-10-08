@@ -29,7 +29,7 @@ Raisons :
 | Zod | 4.6.5 (déjà en place) | Validation des entrées et des sorties de chaque action et route |
 | Paquet `server-only` | dernière stable au moment de B1 | Importé par `src/server`, `db/`, `src/ai`, `src/research`, `src/grounding`, `src/workflows` |
 
-Versions vérifiées sur le registre npm et Docker Hub le 2026-10-08. La tâche B1 les installe telles quelles ou, si une version plus récente est sortie, la note dans un amendement de cette décision (même règle que la décision 0003).
+Versions vérifiées sur le registre npm et Docker Hub le 2026-10-08 ; pour Drizzle ORM, `npm view drizzle-orm version` renvoie 0.45.4 (étiquette `latest`) et `npm view drizzle-orm@0.45.4 version` la confirme ; les versions 1.0 ne sont publiées qu'en préversion (`beta`, `rc`) et ne sont pas retenues. La tâche B1 les installe telles quelles ou, si une version plus récente est sortie, la note dans un amendement de cette décision (même règle que la décision 0003).
 
 Conventions :
 1. Tables et colonnes en `snake_case` ; contrats en `camelCase` ; la conversion se fait dans `src/server` (jamais dans l'interface).

@@ -27,9 +27,9 @@ Ce document est le pendant du handover front-end (`docs/handovers/frontend.md`).
 
 | Document | Contenu | Autorité |
 |---|---|---|
-| `QUESTIONS.md` (questions tranchées par Samuel) et `docs/decisions/` dont le décideur est Samuel | Q2 = 29 CHF, Q3 = clés Maps navigateur, Q4 = Better Auth ; décisions 0001, 0002, 0003 | Samuel |
+| `QUESTIONS.md` (questions tranchées par Samuel) et `docs/decisions/` dont le décideur est Samuel | Q2 = 29 CHF, Q3 = clés Maps navigateur, Q4 = Better Auth ; décisions 0001 et 0002 | Samuel |
 | `docs/produit/cadrage-v5.md` | Produit, architecture, données, conformité, règles R1 à R10, tests de sortie | Samuel (points « tranché » ou « confirmé par Samuel » : D4, D7…) |
-| `docs/decisions/` du Tech Lead (0004, 0006 à 0011) | Architecture, bibliothèques, outillage, tests | Tech Lead, dans le cadre du cadrage |
+| `docs/decisions/` déléguées : 0003 (agent frontend, validée par le Tech Lead en revue de #3), 0004 et 0006 à 0011 (Tech Lead) | Versions, architecture, bibliothèques, outillage, tests | Rôle délégué, dans le cadre du cadrage |
 | Rubriques « Décisions » des spécifications (`specs/B0-handover-backend.md`, PO-1 à PO-7) | Détails fonctionnels | Product Owner, dans le cadre du cadrage |
 | `docs/handovers/backend.md` (ce document), puis `docs/handovers/frontend.md` pour les données | Mise en œuvre | Applique les sources ci-dessus |
 | `src/contracts`, `src/adapters` (F1) | Contrats et adaptateurs existants | Évoluent seulement par une tâche qui cite sa décision (§ 4) |
@@ -37,7 +37,7 @@ Ce document est le pendant du handover front-end (`docs/handovers/frontend.md`).
 **Ordre de priorité en cas de conflit** (fondé sur « Qui décide quoi », `docs/CONTEXT.md`) :
 1. les décisions écrites de Samuel postérieures au cadrage (`QUESTIONS.md` tranchées, `docs/decisions/` dont le décideur est Samuel) ;
 2. le cadrage, y compris ses points tranchés ou confirmés par Samuel ;
-3. les décisions déléguées écrites (Tech Lead dans `docs/decisions/`, Product Owner dans les spécifications), chacune dans le périmètre de son auteur ;
+3. les décisions déléguées écrites (`docs/decisions/` 0003, 0004 et 0006 à 0011 ; Product Owner dans les spécifications), chacune dans le périmètre de son auteur ;
 4. les handovers (back, puis front pour les données).
 
 Une décision déléguée ne contredit jamais le cadrage ni une décision de Samuel et ne tranche aucune question réservée à Samuel ; entre deux décisions de même rang, la plus récente l'emporte si son auteur a autorité sur le sujet. Un conflit qui touche une question réservée à Samuel est listé au § 17, pas tranché.
@@ -121,7 +121,7 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 | tout sauf `src/ai` | SDK de modèles (`ai`, `@ai-sdk/*`, SDK des fournisseurs) |
 | tout sauf `src/workflows` | directives `"use workflow"` et `"use step"`, paquet `workflow` |
 | tout sauf `src/grounding` et `src/server/env.ts` | lecture de `GOOGLE_MAPS_SERVER_KEY` |
-| `src/server`, `db/`, `src/ai`, `src/research`, `src/grounding`, `src/workflows` | absence de `import "server-only"` (règle inverse : l'import est obligatoire) |
+| `src/server`, `db/`, `src/ai`, `src/research`, `src/grounding`, `src/workflows` | `import "server-only"` obligatoire (règle inverse : son absence est signalée) |
 
 ---
 
@@ -378,7 +378,7 @@ Décisions 0006 et 0007. Région UE exigée ; fournisseur et compte : Samuel (§
 | `share_links` | `id`, `organization_id`, `trip_id`, `token_hash` (SHA-256 d'un jeton aléatoire de 32 octets), `created_by`, `created_at`, `expires_at` (fin du voyage + 30 jours, PO-7), `revoked_at` | `token_hash` unique ; unique `(trip_id) WHERE revoked_at IS NULL` (un lien actif par voyage) | oui | type ; lecture par la fonction `resolve_share_link` (décision 0007) | indirecte |
 | `usage_ledger` | `id`, `organization_id`, `trip_id`, `generation_run_id`, `step`, `provider`, `sku`, `units`, `cost_estimate_micros`, `created_at` | `(organization_id, created_at)` ; `(trip_id)` | oui | type ; ajout seulement | non |
 | `checkouts` | `id`, `organization_id`, `trip_id`, `request_id`, `stripe_checkout_session_id`, `amount_cents`, `currency`, `method`, `status`, `created_by`, `created_at` | unique `stripe_checkout_session_id` ; unique `(organization_id, request_id)` | oui | type ; organisation retrouvée par `checkout_organization` pour le webhook | indirecte |
-| `billing` | `id`, `organization_id`, `stripe_event_id`, `type`, `checkout_id`, `amount_cents`, `currency`, `received_at`, `processed_at` | **unique `stripe_event_id`** (idempotence) | oui | type ; ajout seulement | indirecte |
+| `billing` | `id`, `organization_id`, `stripe_event_id`, `type`, `checkout_id`, `amount_cents`, `currency`, `received_at` (la ligne insérée vaut traitement ; le droit est dans `entitlements`) | **unique `stripe_event_id`** (idempotence) | oui | type ; ajout seulement | indirecte |
 | `entitlements` | `id`, `organization_id`, `trip_id`, `kind` (`preview`, `tripUnlocked`), `billing_id`, `granted_at` | **unique `(organization_id, trip_id, kind)`** (PO-4) | oui | type ; `vadrouille_share` en lecture | non |
 | `place_memory` (**bêta**, cadrage § 6.7, non créée au MVP) | `place_id`, `summary`, `tags`, `sources`, `last_confirmed_at`, `keep_rate`, `reject_rate`, `expires_at` (60 à 90 jours) | `place_id` unique | exception justifiée : mémoire mutualisée, agrégée et anonyme ; accès réservé aux étapes de workflow | à concevoir en bêta | non |
 
@@ -600,7 +600,7 @@ Aucun compte n'a été ouvert pour B0. Tous les engagements sont **à décider p
 | Décision | Objet |
 |---|---|
 | 0006 | Stack serveur : actions serveur, Drizzle ORM 0.45.4, drizzle-kit 0.31.11, `pg` 8.23.1, Postgres 17 en conteneur local et en CI |
-| 0007 | RLS : rôles dédiés, contexte de transaction `app.organization_id`, fonctions pour le lien privé et le webhook, ajout seulement |
+| 0007 | RLS : rôles dédiés, contexte de transaction `app.organization_id`, fonctions pour le lien privé et le webhook, ajout seulement (`trip_versions`, `billing`, `usage_ledger`) |
 | 0008 | Better Auth 1.7.7 : code à 6 chiffres (10 min, 3 essais), limitation des envois, rôles, organisation personnelle, contexte de session, Mailpit |
 | 0009 | Exécution durable : Workflow SDK isolé, état réduit aux identifiants, mondes local, Vercel et Postgres, région de l'état à vérifier (Q28) |
 | 0010 | Répartition des champs (Q14), instantané dérivé de `TripSchema`, formes de PO-2 et PO-6 |
@@ -609,7 +609,7 @@ Aucun compte n'a été ouvert pour B0. Tous les engagements sont **à décider p
 ### Backlog (ordre de construction du cadrage § 7)
 | # | Tâche | Rôle | Prérequis | Critères d'acceptation |
 |---|---|---|---|---|
-| B1 | Socle base de données : Docker Compose et conteneur CI Postgres 17, Drizzle, migrations, rôles, RLS, tables du § 6 (sauf `place_memory`), fonctions `resolve_share_link`, `checkout_organization`, `purge_organization_data` — après G0 | data | G0, B0 ; Q24 seulement pour la base de staging | `pnpm test:db` dans `pnpm verify` et en CI ; tests `schéma: RLS activée et forcée partout`, `isolation: une organisation ne lit ni ne modifie les voyages d'une autre`, `rôles: le rôle applicatif ne contourne pas la RLS`, `versions: trip_versions est en ajout seulement`, `schéma: aucune colonne de contenu Google`, `schéma: coordonnées expirées sous 30 jours`, `schéma: colonnes dérivées de Google recensées (provisoire, suit Q5)` verts |
+| B1 | Socle base de données : Docker Compose et conteneur CI Postgres 17, Drizzle, migrations, rôles, RLS, tables du § 6 (sauf `place_memory`), fonctions `resolve_share_link`, `checkout_organization`, `purge_organization_data` — après G0 | data | G0, B0 ; Q24 seulement pour la base de staging | `pnpm test:db` dans `pnpm verify` et en CI ; tests `schéma: RLS activée et forcée partout`, `isolation: une organisation ne lit ni ne modifie les voyages d'une autre`, `rôles: le rôle applicatif ne contourne pas la RLS`, `versions: trip_versions est en ajout seulement`, `registres: billing et usage_ledger sont en ajout seulement`, `schéma: aucune colonne de contenu Google`, `schéma: coordonnées expirées sous 30 jours`, `schéma: colonnes dérivées de Google recensées (provisoire, suit Q5)` verts |
 | B2 | Évolutions des contrats E1 à E7 et contrats communs (`ApiError`, `ActionResult`, `TripPatch`, `PatchResult`, `TripSnapshot`, `ChecklistMoment`, `StopFacts`, `ProposalNeighbours`, `PreviewSlot`), mocks et composants adaptés — après G0 | backend | G0, B0, F1 ; composants concernés livrés (F3, F6) ou adaptés dans leur tâche | Script du critère § 5 de B0 rejoué sur les nouveaux contrats (une catégorie par champ) ; `ChecklistItemSchema` refuse un texte libre dans `when` ; un aperçu de moins de 8 propositions renvoie des cases `noOption` ; aucun texte d'interface dans les données simulées ; `pnpm verify` vert |
 | B3 | Authentification Better Auth et organisations (§ 7), adaptateur `auth`, Mailpit en local et en CI — après G0 | backend | B1, B2 ; Q25 seulement pour l'envoi réel | Tests `auth: code à 6 chiffres valable 10 minutes, 3 essais`, `auth: limitation des envois`, `auth: organisation personnelle créée à la première connexion`, `auth: le contexte vient de la session, jamais du client`, `journaux: aucun email ni code dans les journaux` ; scénario e2e de connexion avec le code lu dans Mailpit |
 | B4 | Paiement en mode test (§ 9) : adaptateur simulé, webhook signé et idempotent, droits ; Stripe quand Samuel aura ouvert le compte — après G0 | backend | B1, B3 ; Q26 pour Stripe | Tests `paiement: un événement rejoué ne crédite pas deux fois`, `paiement: signature invalide refusée sans écriture`, `paiement: le droit n'est accordé que par le webhook`, `paiement: prix lu dans la configuration` ; PO-4 vérifiée (second paiement sans second droit) |
