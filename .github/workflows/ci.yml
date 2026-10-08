@@ -26,6 +26,16 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - if: steps.diff.outputs.code == 'true'
         run: pnpm verify
+      - if: failure() && steps.diff.outputs.code == 'true'
+        name: Envoyer les résultats de test en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -41,3 +51,15 @@ jobs:
           fi
       - if: steps.diff.outputs.code == 'true'
         run: docker build -t app:ci .
+      - if: steps.diff.outputs.code == 'true'
+        name: Démarrer l'image et vérifier le port 3000
+        run: |
+          docker run -d --name app -p 3000:3000 app:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:3000/ || { docker logs app; exit 1; }
+          # Pages de développement désactivées en production.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/tokens)" = "404"
+          docker rm -f app
