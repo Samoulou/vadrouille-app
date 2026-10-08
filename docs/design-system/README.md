@@ -34,13 +34,14 @@ Exemple : un tag « À réserver » est un aplat `quai` avec du texte `ink` en s
 Une seule famille, **Hanken Grotesk**, servie par Google Fonts en 400, 600, 700 et 800. Elle est nette, lisible en petit et dehors, sans effet. La personnalité vient de la graisse 800 des titres, légèrement resserrés, et de l'alignement des chiffres.
 
 - Titres : `destination`, `titre-fiche`, `titre-jour` en 800 ; `section`, `arret`, `bloc` pour structurer un écran.
-- Texte : `corps` pour expliquer, `corps-s` pour les métadonnées, `legende` pour les trajets et les aides.
-- Données : `heure`, `heure-l`, `montant`, `pastille`, `etiquette`, toujours en chiffres tabulaires.
+- Texte : `corps` pour expliquer, `corps-fort` (même taille en 700) pour le terminus et les noms de liste, `corps-s` pour les métadonnées, `legende` pour les trajets et les aides.
+- Contrôles : `bouton` pour le texte des boutons principal (800) et secondaire (700).
+- Données : `heure`, `heure-l`, `montant`, `pastille`, `numero-carte`, `etiquette`, toujours en chiffres tabulaires.
 - Ni capitales pour les libellés, ni italique, ni mot isolé mis en couleur dans un titre.
 
 ## Espacement et rayons
 
-Échelle de 4 px (`space-1` à `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré.
+Échelle de 4 px (`space-1` à `space-6` et `space-8`). Marge latérale des écrans : `space-5`. Les rayons suivent la taille de l'élément : petits et presque carrés pour ce qui informe (`radius-tag`, `radius-badge`), plus doux pour ce qui se touche (`radius-control`), plus amples pour ce qui contient (`radius-block`, `radius-plate`, `radius-sheet`). Les arrêts sont ronds (`radius-round`), le terminus est carré (`radius-terminus`, `radius-mini` pour les petits éléments de 24 à 26 px). Les contours suivent l'échelle `trait-*` (1, 1,5, 2 et 3 px).
 
 Pas d'ombres : la profondeur vient des aplats (`page`, `raised`, `muted`) et des contours fins.
 
@@ -48,10 +49,11 @@ Pas d'ombres : la profondeur vient des aplats (`page`, `raised`, `muted`) et des
 
 La ligne du jour est l'élément central du système (composant DayLine) :
 
-- Trois colonnes : heure (52 px, alignée à droite), rail (28 px), contenu ; 8 px d'écart.
+- Trois colonnes : heure (`col-heure`, 52 px, alignée à droite), rail (`col-rail`, 28 px), contenu ; écart `space-2` (8 px).
 - Le rail fait `rail` (4 px) en `line`. Il est plein pour un trajet en transport, pointillé (`rail-dash` / `rail-gap`) pour la marche, fin (`rail-free`) en `track-free` pendant le temps libre.
-- Un arrêt est un anneau `stop` (20 px) d'épaisseur `stop-ring`, fond `raised`. Le terminus (hôtel) est un carré `terminus` en `ink`, coins 5 px, au départ comme au retour.
-- Sur la carte, les mêmes arrêts sont numérotés (`stop-map`, 26 px) ; l'arrêt sélectionné grossit (`stop-map-selected`) et passe en plein `line`.
+- Un arrêt est un anneau `stop` (20 px) d'épaisseur `stop-ring`, fond `raised`. Le terminus (hôtel) est un carré `terminus` en `ink`, coins `radius-terminus` (5 px), au départ comme au retour.
+- Sur la carte, les mêmes arrêts sont numérotés (`stop-map`, 26 px, anneau `stop-map-ring`) ; l'arrêt sélectionné grossit (`stop-map-selected`) et passe en plein `line`. Le terminus de carte fait `terminus-map` (24 px) ; la vue d'ensemble utilise des anneaux `stop-overview` (12 px).
+- Les pastilles de jour réduites font `badge-s` (26 px de haut).
 - Une journée commence et finit toujours par un terminus.
 
 ## Iconographie

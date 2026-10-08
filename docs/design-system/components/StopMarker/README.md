@@ -5,10 +5,10 @@ Marqueur d'arrêt et de terminus, sur la ligne du jour et sur la carte, avec la 
 ## Variantes
 
 - **Arrêt (ligne)** : anneau `stop` (20 px), épaisseur `stop-ring`, fond `raised`, anneau `line`.
-- **Terminus** : carré `terminus` (20 px) en `ink`, coins 5 px ; sur la carte, 24 px avec une maison `on-line`.
-- **Arrêt numéroté (carte)** : `stop-map` (26 px), anneau 3 px `line`, numéro `ink` 12 px 800.
-- **Arrêt sélectionné (carte)** : `stop-map-selected` (38 px), plein `line`, numéro `on-line`, anneau 3 px `page` pour le détacher du fond.
-- **Vue d'ensemble** : anneau de 12 px sans numéro, pour l'aperçu du séjour.
+- **Terminus** : carré `terminus` (20 px) en `ink`, coins `radius-terminus` ; sur la carte, `terminus-map` (24 px), coins `radius-mini`, avec une maison `on-line`.
+- **Arrêt numéroté (carte)** : `stop-map` (26 px), anneau `stop-map-ring` (3 px) `line`, numéro `ink` en style `numero-carte`.
+- **Arrêt sélectionné (carte)** : `stop-map-selected` (38 px), plein `line`, numéro `on-line` en style `pastille`, anneau `stop-map-ring` `page` pour le détacher du fond.
+- **Vue d'ensemble** : anneau `stop-overview` (12 px) sans numéro, pour l'écran Séjour.
 
 ## Règles
 
