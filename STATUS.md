@@ -1,73 +1,87 @@
-# État du studio — 2026-10-08 (5e cycle)
+# État du studio — 2026-10-08 (6e cycle)
 
-Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31, appliquée par #16)
+Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
 ## Fait
-- **Consignes de Samuel du 16:31 et du 16:33 (S2, PR #16, ticket #13) : fusionnée.**
-  - `docs/CONTEXT.md` : cycle de 3 h, 3 tâches, verrou `in-progress`, périmètre de phase 0 élargi (F1 à F12 sur données simulées, handover back-end) ; restent interdits avant G0 les comptes et services payants, les clés de production et la mise en production.
-  - `docs/roadmap.md` : statuts et périmètre à jour.
-  - `.github/pull_request_template.md` : `Closes #<numéro>` en tête (« Refs # » si la PR ne termine pas la tâche : ajout du CEO).
-  - `docs/studio/mise-en-place.md` et ADR 0001 (section « Évolution ») alignés.
-  - Deux corrections sur les revues Tech Lead. Source de la clause « in-progress retiré à l'ouverture de la PR », que la revue jugeait non vérifiable : le prompt de la routine du CEO enregistré par Samuel, étape 3, texte exact : « Pose in-progress sur leur ticket dès que tu les prends. […] Retire in-progress quand la PR est ouverte. » Voir Q23.
-- **Tickets #8 (F1) et #9 (S1)** : déjà fermés ; commentaire de renvoi vers #11 et #10 ajouté (consigne du 16:33).
-- **Spec B0 — handover back-end (ticket #15, reste ouvert pour la rédaction du handover) : prête et fusionnée.**
-  - `specs/B0-handover-backend.md` : #17, puis deux suites de revue (#18 et #20). Les deux revues R2 de #20 sont conformes.
-  - Leurs remarques non bloquantes sont à reprendre lors de la rédaction du handover : sens des verdicts, durées Routes API dans l'état des workflows, critères PO-2 et PO-6, historique de revue à retirer de PO-1.
-  - Décisions du Product Owner, définitives sans veto de Samuel avant le 2026-10-10 :
-    - PO-1 (Q8) : budget de trajet de 60, 90 ou 150 min ; réduction d'un quart arrondie vers le bas à 5 min ; plancher retiré ;
-    - PO-2 (Q22) ;
-    - PO-3 à PO-7 ;
-    - verdicts d'ancrage limités à une énumération ;
-    - extension signalée du test de sortie § 9.
-  - Questions nouvelles : Q24 à Q29.
+- **F2 — Composants de base (#19) : fusionnée** après la revue R2. Ticket #14 fermé avec un renvoi vers la PR. L'ADR 0005 (Tech Lead) est donc en vigueur, sauf veto de Samuel avant le 2026-10-10.
+- **Status du 5e cycle (#21) : fusionnée.**
+- Tickets fermés avec un renvoi vers leur PR (consigne du 16:33) :
+  - #13 (S2, #16) ;
+  - #15 (spec B0, #17, #18 et #20).
+  - La rédaction du handover B0 est suivie dans le nouveau ticket #22.
+- Roadmap mise à jour (ce PR) : F2 faite, F3 prête, prérequis de B0 = F1 (écart signalé dans #18 et #20), F4 spécifiée et en revue.
 
-## En cours
-- **F2 — Composants de base (PR #19, ticket #14).**
-  - Les 8 composants, `/dev/composants`, les tests unitaires, a11y, e2e et de contraste sont livrés ; `docker` est vert depuis la 1re correction (`tsconfig.build.json`).
-  - Décisions du Tech Lead (ADR 0005) : `@radix-ui/react-slot` 1.4.0, `axe-core` 4.13.0, tokens Ligne dans `cn()`, `tsconfig.build.json`.
-  - 1re correction :
-    - `docker` est réparé par `tsconfig.build.json` ;
-    - l'ADR 0005 est ajoutée ;
-    - la référence `dev-composants.png` vient maintenant de l'artefact CI : cette fois, le téléchargement n'a pas reçu de 403.
-  - `verify` et `docker` sont verts. `needs-review` est reposé : la revue R2 est relancée.
+## En cours (3 tâches prises ce cycle, sur des fichiers distincts)
+- **B0 — Handover back-end (PR #27, ticket #22)** :
+  - livrables : `docs/handovers/backend.md` (§ 0 à § 17) et les décisions du Tech Lead 0006 à 0011 :
+    - 0006 : stack serveur, Drizzle, Postgres 17 en conteneur ;
+    - 0007 : RLS forcée ;
+    - 0008 : Better Auth ;
+    - 0009 : exécution durable ;
+    - 0010 : répartition des champs (Q14) ;
+    - 0011 : verdicts d'ancrage.
+  - La revue R2 a demandé des changements : priorité des sources (0003 est déléguée), `billing.processed_at`, `usage_ledger` en ajout seulement. **1re correction en cours.**
+- **U1 — Décisions UX/UI déléguées (PR #26, ticket #23)** :
+  - décision `docs/decisions/0012-decisions-ux-ui-f2-f3.md` : Q10, Q11, Q13, Q15 à Q19 (partie UX/UI de Q17), Q30 ;
+  - **1re correction faite** sur la revue R2 :
+    - les conventions de code deviennent des propositions au Tech Lead ;
+    - les changements de règles de Ligne sont retirés du design system et soumis à Samuel (Q37) ;
+    - le nom accessible de `DayBadge` commence par le libellé visible ;
+    - la décision est renumérotée de 0010 en 0012, à cause d'une collision avec #27.
+  - `needs-review` est reposé.
+- **Spec F4 — Carte (PR #25, ticket #24)** :
+  - 11 décisions fonctionnelles, dont F4-PO-1 et F4-PO-11, devenues des propositions au Tech Lead (F4-TL-1 à F4-TL-3) ;
+  - **1re correction faite** : terminus non focusable, numérotation au rang dans `day.items`, carte simulée déterministe, configuration injectable, test anti-Places en liste blanche ;
+  - `needs-review` est reposé.
 
 ## Bloqué
-- F3 : attend F2 (#19).
 - P0 : attend Q9 (clé Gemini) et la clé serveur Places/Routes.
-- F4 : attend F3.
-- Références visuelles : tant que l'ADR 0004 n'est pas implémenté, chaque nouvelle capture se télécharge à la main depuis l'artefact `test-results` de la CI. Ce cycle, le téléchargement a fonctionné. Localement, les tests visuels échouent toujours à cause des glyphes : seule la CI fait foi.
+- F4 (code) : attend F3 et la fusion de sa spec (#25).
+- Références visuelles : l'ADR 0004 n'est pas encore implémenté. Localement, `dev-tokens.visual` échoue toujours (glyphes, 3 %) : seule la CI fait foi.
 
 ## Décisions attendues de Samuel
-- Q5 et Q6 : juridique (règles Google, photos). Q29 (verdicts d'ancrage dérivés de Google) suit Q5.
-- Q9 : clé Gemini (dépense).
+- Juridique, suit Q5 :
+  - Q5 et Q6 ;
+  - Q29 : verdicts d'ancrage ;
+  - Q34 : cache de 30 jours des coordonnées contre la règle de `CLAUDE.md` ;
+  - Q38 : `Segment.minutes` dans les versions.
+- Argent et comptes :
+  - Q9 : clé Gemini ;
+  - Q24 à Q26 : Postgres UE, envoi des codes, Stripe test avec TWINT ;
+  - Q39 : plafonds de coût.
+- Q27 : durées de conservation.
 - Q12 : export des maquettes.
-- Q23 : moment du retrait du verrou `in-progress`.
-- Q24 à Q27 : Postgres UE, envoi des codes, Stripe test avec TWINT, durées de conservation.
-- Configuration de la routine R1 sur claude.ai : intervalle de 3 h et prompt de l'annexe B de `docs/studio/mise-en-place.md` (à faire par Samuel).
+- Q23 : moment du retrait de `in-progress`.
+- Q31 : la clé Maps accepte-t-elle les aperçus `*.vercel.app` ?
+- Q37 : modifications de Ligne proposées par UX/UI (S-0 à S-7).
+- Q40 : Docker dans les sessions des agents.
+- Configuration de la routine R1 sur 3 h (à faire par Samuel).
 - Veto possible avant le 2026-10-10 sur les décisions déléguées :
-  - CEO : ticket référencé par une PR ouverte = en revue, non repris (ADR 0001, « Évolution ») ;
-  - Product Owner : PO-1 à PO-7 de la spec B0 ;
-  - Tech Lead : ADR 0005 (dépendances F2, typage du build), si #19 est fusionnée.
-
-## Constat sur le processus
-- La routine R2 (revue) se déclenche à chaque pose de `needs-review`. Ce cycle, le CEO a aussi lancé des revues Tech Lead dans sa session. Résultat : la fusion automatique part dès la première approbation et R2 publie ensuite des demandes de changements sur des PR déjà fusionnées (#17, #18). Désormais, le CEO laisse la revue à R2 seule.
+  - ADR 0005 (Tech Lead, F2) ;
+  - PO-1 à PO-7 (spec B0) ;
+  - ADR 0001, section « Évolution » (CEO) ;
+  - si leurs PR sont fusionnées : ADR 0006 à 0011 (#27), décision 0012 (#26), F4-PO (#25).
 
 ## Prochain cycle
-1. F2 (#19) : suivre la revue R2 (2e et dernière tentative de correction si besoin), puis F3 dès que F2 est fusionnée.
-2. Rédaction du handover B0 (`docs/handovers/backend.md`, Product Owner et Tech Lead), avec les remarques non bloquantes des revues de #20.
-3. Décisions déléguées à UX/UI (Q10, Q11, Q13, Q15 à Q19, Q30), qui débloquent la validation de F2 et F3 ; ADR 0004 tranché et implémenté par le Tech Lead.
-4. Roadmap : prérequis de B0 « — » à remplacer par « F1 » (écart signalé dans #18 et #20).
+1. Suivre #25, #26 et #27 en revue R2 (2e et dernière tentative de correction si besoin).
+2. F3 (spec prête, F1 et F2 fusionnées) : créer le ticket et le confier à frontend, en appliquant les choix provisoires de la décision 0012.
+3. Décisions déléguées restantes :
+  - Q32, Q35 et Q41 : UX/UI et Product Owner ;
+  - Q33 et Q36 : Tech Lead ;
+  - Q42 : Product Owner ;
+  - partie Product Owner de Q17.
+4. ADR 0004 tranché et implémenté par le Tech Lead.
 
 ## Part d'usage estimée
-- 5e cycle du 2026-10-08 : environ 1 400 000 jetons.
+- 6e cycle du 2026-10-08 : environ 1 000 000 de jetons (estimation, correction de B0 en cours).
 
 | Poste | Jetons |
 |---|---|
-| F2 et sa correction | ≈ 260 000 |
-| Spec B0 et 2 suites | ≈ 270 000 |
-| S2 et 2 corrections | ≈ 170 000 |
-| Revues Tech Lead (session) | ≈ 410 000 |
-| Pilotage | ≈ 250 000 |
+| B0 handover et correction | ≈ 350 000 |
+| U1 décisions UX/UI et correction | ≈ 330 000 |
+| Spec F4 et correction | ≈ 290 000 |
+| Pilotage | ≈ 60 000 |
 
-- Cumul de la journée : environ 2 700 000 jetons.
+- Cumul de la journée : environ 3 700 000 jetons.
 - Part de l'abonnement : non mesurable depuis la routine.
+- Messages de Samuel dans #studio depuis le 5e cycle (17:08) : aucun.
