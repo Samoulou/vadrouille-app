@@ -51,8 +51,8 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | Styles | Tailwind CSS v4, tokens dans `@theme` | Aucune valeur arbitraire `[#hex]` |
 | Composants de base | shadcn/ui, adaptés à Ligne | Utiliser le serveur MCP et les skills shadcn si disponibles |
 | Police | Hanken Grotesk 400, 600, 700, 800 via `next/font/google` | Chiffres tabulaires pour heures, dates, montants |
-| Carte | Google Maps JavaScript API, bibliothèque React officielle `@vis.gl/react-google-maps` | Map ID avec style cloud (§ 8) |
-| Gestes | `motion` (ex-Framer Motion) pour le glisser des cartes de présentation | Ou équivalent maintenu |
+| Carte | Google Maps JavaScript API, chargée par `@googlemaps/js-api-loader` (chargeur officiel de Google) ; types `@types/google.maps` | Map ID avec style cloud (§ 8). `@vis.gl/react-google-maps` non retenue : décision 0013 |
+| Gestes | Pointer Events natifs pour le glisser des cartes de présentation (seuils et rotation en fonctions pures) | `motion` non retenu pour F6 : décision 0013 |
 | Panneau coulissant | Drawer de shadcn/ui avec points d'arrêt | Vérifier que la dépendance sous-jacente est maintenue, sinon `motion` |
 | Validation | Zod, schémas partagés avec le back-end | `src/contracts` |
 | Données serveur | Server Actions et route handlers derrière des adaptateurs | Mocks au MVP front |
@@ -62,7 +62,7 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | PWA | Manifest + service worker | Hors-ligne du § 13 |
 | Hébergement | Vercel ; portabilité préservée : `output: "standalone"`, `Dockerfile` construit en CI, aucun stockage propre à Vercel (KV, Edge Config) | Décision 0002 |
 
-Versions : dernière version stable de chaque outil au démarrage, notée dans `docs/decisions/0001-versions.md`. L'agent vérifie la documentation officielle avant d'utiliser une API qu'il ne connaît pas avec certitude.
+Versions : dernière version stable de chaque outil au démarrage, notée dans `docs/decisions/0003-versions.md`. L'agent vérifie la documentation officielle avant d'utiliser une API qu'il ne connaît pas avec certitude.
 
 ---
 
@@ -297,7 +297,7 @@ Numéros = titres des écrans sur la page « Direction Ligne ». « W » = écra
 
 ## 8. Carte (Google Maps)
 
-- `@vis.gl/react-google-maps`, carte vectorielle avec **Map ID** et style cloud selon la section Carte du design system : terre `map-land`, eau `map-water`, parcs `map-park`, routes blanches de toutes catégories, points d'intérêt Google masqués, lignes de transport masquées, libellés en gris.
+- Carte vectorielle chargée par `@googlemaps/js-api-loader` (décision 0013), avec **Map ID** et style cloud selon la section Carte du design system : terre `map-land`, eau `map-water`, parcs `map-park`, routes blanches de toutes catégories, points d'intérêt Google masqués, lignes de transport masquées, libellés en gris.
 - Marqueurs avancés en HTML : `StopMarker` numérotés, terminus carré, arrêt sélectionné 38 px plein `line`.
 - Tracé du jour : polyligne `line` 4 px, extrémités arrondies ; retour à pied vers l'hôtel en pointillé.
 - **Conformité :** les données de lieux Google (noms, horaires, notes) ne s'affichent que sur cette carte ou, sans carte, avec la mention « Données de lieux : Google ». Aucune autre carte n'affiche ces données.
