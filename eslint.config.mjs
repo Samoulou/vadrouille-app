@@ -24,6 +24,31 @@ export default defineConfig([
     },
   },
   {
+    // F1 : les jeux simulés ne passent que par les adaptateurs (handover § 9).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: [
+      "src/adapters/**",
+      "src/mocks/**",
+      "tests/**",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/mocks", "@/mocks/**", "**/mocks", "**/mocks/**"],
+              message:
+                "src/mocks ne s'importe que depuis src/adapters et les tests : passe par getTripAdapter() de @/adapters.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },
