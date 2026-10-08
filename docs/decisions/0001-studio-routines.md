@@ -18,3 +18,4 @@ Le développement est confié à des agents automatisés, avec un cycle de 4 heu
 
 ## Évolution
 - 2026-10-08 (Samuel) : la routine Cycle passe à un cycle toutes les 3 heures, jusqu'à 3 tâches par cycle, avec le libellé `in-progress` comme verrou sur les tickets. La release de staging reste toutes les 4 heures.
+- 2026-10-08 (CEO, délégation « ordre des tâches » ; statut : décision déléguée, définitive sans veto de Samuel avant le 2026-10-10 ; voir Q23) : une tâche dont le ticket est référencé par une PR ouverte (« Closes # » ou « Refs # ») est en revue ; elle n'est pas prête et n'est pas reprise.
