@@ -1,6 +1,6 @@
 # F1 — Contrats Zod et données simulées Édimbourg
 
-Rôle : frontend · Prérequis : F0 · Référence : `docs/handovers/frontend.md` (§ 0 règles 2 à 4, § 3, § 8, § 9, § 10 formats, § 15 F1), `docs/produit/cadrage-v5.md` (§ 2 benchmark Édimbourg, § 3.3, § 3.4, § 3.7, § 6.5, § 6.8), `docs/CONTEXT.md` (principes techniques 2 et 3), maquettes `docs/ux/maquettes/` (voir Q10)
+Rôle : frontend · Prérequis : F0 · Référence : `docs/handovers/frontend.md` (§ 0 règles 2 à 4, § 3, § 8, § 9, § 10 formats, § 15 F1), `docs/produit/cadrage-v5.md` (§ 2 benchmark Édimbourg, § 3.3, § 3.4, § 3.7, § 6.5, § 6.8), `docs/CONTEXT.md` (principes techniques 2 et 3), maquettes `docs/ux/maquettes/` (voir Q12)
 
 ## Objectif
 Donner aux écrans une source de données unique et typée : les schémas Zod du handover § 9 dans `src/contracts`, un jeu de données simulé d'un voyage à Édimbourg dans `src/mocks`, et un adaptateur `mock` dans `src/adapters`, pour que le back-end branche plus tard l'adaptateur `api` sans toucher à l'interface.
@@ -61,5 +61,5 @@ Donner aux écrans une source de données unique et typée : les schémas Zod du
 - Aucun écran ni composant.
 
 ## Questions ouvertes
-- Q10 : maquettes et Dossier UX non exportés dans `docs/ux/` ; en attendant, le jeu suit le cadrage et le handover, contenus non vérifiés entre crochets, et la PR liste ce qui devra être aligné sur les maquettes (couleur de destination comprise).
-- Q12 : les champs `name`, `meta` et `verifiedAt` de `Stop` et les textes `Day.title`, `Proposal.context` ; F1 reprend la forme du handover sur des données simulées, sans donnée Google.
+- Q12 : maquettes et Dossier UX non exportés dans `docs/ux/` ; en attendant, le jeu suit le cadrage et le handover, contenus non vérifiés entre crochets, et la PR liste ce qui devra être aligné sur les maquettes (couleur de destination comprise).
+- Q14 : les champs `name`, `meta` et `verifiedAt` de `Stop` et les textes `Day.title`, `Proposal.context` ; F1 reprend la forme du handover sur des données simulées, sans donnée Google.
