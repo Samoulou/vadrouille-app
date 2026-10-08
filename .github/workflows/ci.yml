@@ -10,7 +10,9 @@ jobs:
         name: Détecter une PR de documentation seule
         run: |
           git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
-          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/)' files.txt; then
+          # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
+          # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
+          if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -44,7 +46,9 @@ jobs:
       - id: diff
         run: |
           git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
-          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/)' files.txt; then
+          # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
+          # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
+          if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"

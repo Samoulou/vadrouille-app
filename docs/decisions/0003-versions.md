@@ -1,6 +1,6 @@
 # 0003 — Versions retenues pour le socle front (F0)
 
-Statut : accepté · Date : 2026-10-08 · Décideur : agent frontend (tâche F0), à valider par le Tech Lead
+Statut : accepté · Date : 2026-10-08 · Décideur : agent frontend (tâche F0), validé par le Tech Lead lors de la revue de la PR #3
 
 ## Contexte
 Le handover front-end (§ 2) demande la dernière version stable de chaque outil au démarrage, notée dans une décision (le handover cite `0001-versions.md`, numéro déjà pris : la spécification F0 fixe `0003-versions.md`). Versions vérifiées sur le registre npm le 2026-10-08.
