@@ -11,8 +11,12 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 - **Roadmap à jour (#32) : fusionnée.** Elle reprend la partie roadmap de la PR de statut #28, que la porte `techlead-gate` bloquait (libellé `techlead-approved` exigé hors `STATUS.md`, `QUESTIONS.md` et `docs/releases/`). Cette PR-ci remplace #28.
 
 ## En cours
-- **F4 — Carte Google Maps, code (ticket #34)** : confié à frontend (voir la fin de ce fichier pour l'état à la clôture du cycle).
-- **Spec F6 — Présentation (#33, ticket #31)** : en revue R2.
+- **F4 — Carte Google Maps (PR #35, ticket #34)** : en revue R2.
+  - Livré : contrat `DayMap` et `validateDayMap`, positions simulées des 6 jours, enveloppe `DayMap` (hors ligne, puis configuration absente, puis erreur de chargement), rendu Google (Maps JavaScript API seule) et carte simulée déterministe, `PlacesAttribution`, `/dev/carte`, tests de la spec.
+  - CI verte (`verify` avec 8 tests visuels, `docker`). Références visuelles prises depuis l'artefact de la CI, sans 403.
+  - Nouvelles dépendances en versions exactes : `@googlemaps/js-api-loader` 2.1.3 et `@types/google.maps` 3.66.4.
+  - Choix soumis au Tech Lead (Q60) et à UX/UI (Q61). Aucune capture de la vraie carte : attend Q31.
+- **Spec F6 — Présentation (#33, ticket #31)** : 1re correction faite (jeu simulé de l'écran 6b : J6 en préparation sans proposition, 7 propositions des jours 3 et 4 ; session = instance de la page). `needs-review` reposé, revue R2 relancée.
   - Décisions du Product Owner F6-PO-1 à F6-PO-16 : ordre du paquet, « Passer », « Tout garder pour le jour N », seuils du geste, clavier, annulation 5 s, repas, questions de préférence et de distance, catégories provisoires, contenu de la carte, écrans de fin sans prix, événements, aucune persistance en phase 0.
   - Propositions au Tech Lead F6-TL-1 à F6-TL-6 (Q58). Questions Q54 à Q57, Q59.
 
@@ -71,17 +75,17 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
   - F6-PO-1 à F6-PO-16, si #33 est fusionnée.
 
 ## Prochain cycle
-1. Suivre F4 (#34) et la spec F6 (#33) en revue R2 (au plus 2 corrections chacune).
+1. Suivre F4 (#35) et la spec F6 (#33) en revue R2 (au plus 2 corrections chacune).
 2. Code de F6 dès que sa spec est fusionnée (prérequis F1 et F2 faits) ; F5 dès que F4 est fusionnée.
 3. #26 et #27 : appliquer la réponse de Samuel à Q43.
 4. Décisions déléguées en attente :
-  - Tech Lead : Q33, Q36, Q52, Q58 ;
-  - UX/UI : Q32, Q51, Q53 à Q55 ;
+  - Tech Lead : Q33, Q36, Q52, Q58, Q60 ;
+  - UX/UI : Q32, Q51, Q53 à Q55, Q61 ;
   - Product Owner : Q35, Q41, Q42, Q49, Q50, partie Product Owner de Q17.
 5. ADR 0004 tranché et implémenté par le Tech Lead.
 
 ## Part d'usage estimée
-- 7e cycle du 2026-10-08 : environ 1 150 000 jetons (estimation).
+- 7e cycle du 2026-10-08 : environ 1 450 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
@@ -90,9 +94,9 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 | Spec F4, 2e correction | ≈ 80 000 |
 | F3 | ≈ 225 000 |
 | Spec F6 | ≈ 200 000 |
-| F4 (code) | voir la fin de ce fichier |
+| F4 (code) | ≈ 295 000 |
 | Pilotage | ≈ 150 000 |
 
-- Cumul de la journée : environ 4 900 000 jetons.
+- Cumul de la journée : environ 5 200 000 jetons.
 - Part de l'abonnement : non mesurable depuis la routine.
 - Messages de Samuel dans #studio depuis le 6e cycle (17:39) : aucun.
