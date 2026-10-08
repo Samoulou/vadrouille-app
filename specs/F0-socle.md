@@ -6,7 +6,8 @@ Rôle : frontend · Prérequis : aucun · Référence : `docs/handovers/frontend
 Poser le socle sur lequel toutes les tâches front s'appuieront, sans aucun écran métier.
 
 ## À livrer
-- Next.js (App Router), TypeScript strict, gestionnaire `pnpm`.
+- Next.js (App Router), TypeScript strict, gestionnaire `pnpm` déclaré dans le champ `packageManager` de `package.json` (requis par la CI).
+- Nom du produit (« Vadrouille ») dans une seule constante de configuration.
 - Tailwind CSS v4 avec le bloc `@theme` et les variables du handover § 4.1 dans `src/styles/globals.css`.
 - Police Hanken Grotesk 400, 600, 700, 800 via `next/font/google`.
 - shadcn/ui initialisé avec la correspondance de variables du handover § 4.1.

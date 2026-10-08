@@ -1,0 +1,18 @@
+name: release-notify
+on:
+  release:
+    types: [published]
+jobs:
+  slack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Envoyer la note de version dans #studio
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_STUDIO }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          TEXT=$(printf '*%s*  %s\n\n%s' "$NAME" "$URL" "${BODY:0:3000}")
+          jq -n --arg t "$TEXT" '{text: $t}' > payload.json
+          curl -sS -X POST -H 'Content-type: application/json' --data @payload.json "$WEBHOOK"

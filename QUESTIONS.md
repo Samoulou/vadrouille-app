@@ -2,7 +2,7 @@
 
 | ID | Question | Pour | Ouverte le | Bloque | Statut |
 |---|---|---|---|---|---|
-| Q1 | Nom de travail du produit et domaine (D1) | Samuel | 2026-10-07 | Page d'offre, en-têtes | Ouverte |
+| Q1 | Nom de travail du produit et domaine (D1) | Samuel | 2026-10-07 | Page d'offre, en-têtes | Provisoire : **Vadrouille** ; marque et domaine à vérifier |
 | Q2 | Prix affichés à la place de [PRIX] (D9) | Samuel | 2026-10-07 | Écran Débloquer | Ouverte |
 | Q3 | Clé Google Maps restreinte au staging et Map ID avec le style de la section Carte | Samuel | 2026-10-07 | F4, ancrage de P0 | Ouverte |
 | Q4 | Fournisseur d'authentification avec organisations (D8) | Samuel | 2026-10-07 | Compte | Ouverte |

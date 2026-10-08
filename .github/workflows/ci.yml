@@ -5,14 +5,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+        with: { fetch-depth: 0 }
+      - id: diff
+        name: Détecter une PR de documentation seule
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/)' files.txt; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.code == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.diff.outputs.code == 'true'
+        uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm verify
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm verify
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t app:ci .
+        with: { fetch-depth: 0 }
+      - id: diff
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/)' files.txt; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.code == 'true'
+        run: docker build -t app:ci .

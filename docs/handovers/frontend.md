@@ -517,7 +517,7 @@ Back-end, agent de recherche, ancrage Google côté serveur, paiement réel et w
 
 ## 17. Questions ouvertes (à ne pas trancher par l'agent)
 
-1. Nom du produit et logo : utiliser `[Nom]` et un texte en Hanken Grotesk 800 en attendant.
+1. Nom du produit : **Vadrouille** (provisoire, centralisé dans la configuration pour pouvoir changer). Logo : texte « Vadrouille » en Hanken Grotesk 800 en attendant.
 2. Prix : afficher `[PRIX]` depuis la configuration, jamais en dur.
 3. Fournisseur d'authentification (organisations natives) : décision D8 du cadrage ; le front passe par un adaptateur `auth`.
 4. Validation juridique des règles Google (données dérivées, interdiction liée à l'IA) : en cours ; appliquer les règles du § 8 en attendant.

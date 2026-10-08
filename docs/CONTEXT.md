@@ -1,9 +1,9 @@
-# Contexte du studio
+# Contexte du studio — Vadrouille
 
 À lire au début de chaque session. Les détails sont dans les documents liés en bas de page.
 
 ## Le produit
-Planificateur de voyages IA, application web mobile d'abord. Promesse : « Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour. »
+**Vadrouille** (nom provisoire) : planificateur de voyages IA, application web mobile d'abord. Promesse : « Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour. »
 On découvre avant de payer : 8 propositions offertes dans la présentation, puis paiement unique (TWINT ou carte).
 Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en Europe. Plus tard : agences de voyages, abonnement par conseiller.
 

@@ -12,7 +12,7 @@
 - `docs/templates/release-note.md` : modèle de note de version.
 - `specs/F0-socle.md` : première spécification, prête pour le premier cycle.
 - `.claude/agents/` : les 11 rôles.
-- `.github/` : CI, porte Tech Lead, modèle de PR.
+- `.github/` : CI, construction Docker, porte Tech Lead, fusion automatique, notification Slack des releases, modèle de PR.
 - `STATUS.md`, `QUESTIONS.md` : état initial et questions ouvertes.
 
 ## Ce que tu ajoutes avant le premier commit
