@@ -1,6 +1,6 @@
 # Kit de démarrage du studio
 
-À copier à la racine du dépôt GitHub du planificateur de voyages IA.
+À copier à la racine du dépôt GitHub du planificateur de voyages IA. (test CI)
 
 ## Ce que contient le kit
 - `CLAUDE.md` : règles communes à tous les agents.
