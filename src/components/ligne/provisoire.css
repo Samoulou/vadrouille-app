@@ -9,3 +9,50 @@
   /* Q13 : taille du texte des boutons principal et secondaire (16 px dans Button/preview.html, aucun style nommé). */
   --ligne-bouton-texte: 16px;
 }
+
+/*
+ * F3, ligne du jour. Tokens de tokens.json absents du handover § 4.1 (Q11) et mesures
+ * des preview.html sans token (Q19). Noms préfixés par --ligne- comme la géométrie du handover.
+ */
+:root {
+  /* Q11 : espacement space-2 de tokens.json (écart entre colonnes de la ligne du jour, entre pastilles). */
+  --ligne-espace-2: 8px;
+  /* Q11 : rayon radius-round de tokens.json (arrêts et marqueurs). */
+  --ligne-rayon-rond: 999px;
+  /* Q11 : style de texte heure de tokens.json (15/22, 700, tabulaire). */
+  --ligne-texte-heure: 15px;
+  /* Q11 : interligne du style heure. */
+  --ligne-texte-heure-interligne: 22px;
+  /* Q11 : style de texte pastille de tokens.json (15/20, 800, tabulaire). */
+  --ligne-texte-pastille: 15px;
+  /* Q11 : interligne du style pastille. */
+  --ligne-texte-pastille-interligne: 20px;
+  /* Q19 : colonne heure de la ligne du jour (DayLine/preview.html). */
+  --ligne-col-heure: 52px;
+  /* Q19 : colonne rail de la ligne du jour (DayLine/preview.html). */
+  --ligne-col-rail: 28px;
+  /* Q19 : décalage vertical du marqueur dans la première ligne de 22 px (DayLine/preview.html, top: 1px). */
+  --ligne-marqueur-decalage: 1px;
+  /* Q19 : coins du carré terminus de la ligne (DayLine et StopMarker/preview.html). */
+  --ligne-rayon-terminus: 5px;
+  /* Q19 : coins du terminus de carte et de la pastille réduite (StopMarker/preview.html, README DayBadge). */
+  --ligne-rayon-mini: 6px;
+  /* Q19 : côté du terminus de carte, avec la maison (StopMarker/preview.html). */
+  --ligne-terminus-carte: 24px;
+  /* Q19 : taille de l'icône maison du terminus de carte (StopMarker/preview.html). */
+  --ligne-icone-terminus-carte: 14px;
+  /* Q19 : anneau des marqueurs de carte, du sélectionné et de la vue d'ensemble (StopMarker/preview.html). */
+  --ligne-anneau-carte: 3px;
+  /* Q19 : numéro d'un arrêt de carte (StopMarker/preview.html, 12 px 800). */
+  --ligne-numero-carte: 12px;
+  /* Q19 : numéro de l'arrêt sélectionné (StopMarker/preview.html, 15 px 800). */
+  --ligne-numero-carte-selection: 15px;
+  /* Q19 : arrêt de la vue d'ensemble (StopMarker/preview.html). */
+  --ligne-stop-ensemble: 12px;
+  /* Q19 : trait sous l'onglet « Séjour » actif (DayBadge/preview.html). */
+  --ligne-trait-onglet: 3px;
+  /* Q19 : coins du bloc temps libre (DayLine/preview.html). */
+  --ligne-rayon-temps-libre: 10px;
+  /* Q19 : hauteur de la pastille réduite (README DayBadge). */
+  --ligne-pastille-reduite: 26px;
+}

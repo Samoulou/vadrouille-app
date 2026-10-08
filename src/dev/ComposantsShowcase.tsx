@@ -6,16 +6,21 @@ import {
   Button,
   Chip,
   Counter,
+  DayBadge,
+  DayLine,
+  DayTabs,
   IconButton,
   IconPartager,
   IconRetour,
   OtpInput,
   SegmentedControl,
   StatusBanner,
+  StopMarker,
   Tag,
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
+import type { DayLineItem, Stop, Weekday } from "@/contracts";
 import { messages } from "@/i18n";
 
 const t = messages.dev.composants;
@@ -29,6 +34,38 @@ const SEGMENT_OPTIONS = [
   { value: "c", label: ex.segmente.options.c },
 ] as const;
 type SegmentValue = (typeof SEGMENT_OPTIONS)[number]["value"];
+
+const lx = ex.ligne;
+const WEEKDAYS: Weekday[] = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+const TEN_DAYS = Array.from({ length: 10 }, (_, i) => ({
+  index: i + 1,
+  href: `#ligne-j${i + 1}`,
+  weekday: WEEKDAYS[i % WEEKDAYS.length],
+}));
+
+/** Séquence du preview.html de DayLine : données de démonstration propres à la page (pas de src/mocks). */
+const DEMO_STOP_BASE: Pick<Stop, "kind" | "exceptions" | "locked"> = { kind: "activity", exceptions: [], locked: false };
+const DEMO_LINE: DayLineItem[] = [
+  { type: "terminus", role: "start", time: "09:15", label: lx.hotel },
+  { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
+  {
+    type: "stop",
+    stop: { ...DEMO_STOP_BASE, id: "demo-1", name: lx.arret1.nom, start: "09:30", meta: lx.arret1.meta, reason: lx.arret1.raison },
+  },
+  { type: "segment", segment: { mode: "transit", minutes: 25, estimated: true } },
+  {
+    type: "stop",
+    stop: { ...DEMO_STOP_BASE, id: "demo-2", name: lx.arret2.nom, start: "15:00", meta: lx.arret2.meta, exceptions: ["toReserve"] },
+  },
+  { type: "free", from: "17:00", to: "19:00" },
+  { type: "segment", segment: { mode: "walk", minutes: 6, estimated: false } },
+  { type: "terminus", role: "end", time: "22:30", label: lx.hotel },
+];
+const DEMO_CAR: DayLineItem[] = [{ type: "segment", segment: { mode: "car", minutes: 15, estimated: false } }];
+const stopHref = (stop: Stop) => `#arret-${stop.id}`;
+
+/** Fond de carte des marqueurs de démonstration (StopMarker/preview.html). */
+const MAP_CELL = "flex h-14 w-16 items-center justify-center rounded-control bg-map-land";
 
 /** Anneau de focus affiché en permanence, pour montrer l'état « focus » sans clavier. */
 const FOCUS_DEMO = "outline-2 outline-offset-2 outline-line";
@@ -53,7 +90,7 @@ function State({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Chaque composant de base Ligne (F2) dans chacun de ses états. */
+/** Chaque composant Ligne (F2, puis F3 dans la section « Ligne ») dans chacun de ses états. */
 export function ComposantsShowcase() {
   const [segment, setSegment] = useState<SegmentValue>("b");
 
@@ -173,6 +210,45 @@ export function ComposantsShowcase() {
         {BANNER_KINDS.map((kind) => (
           <StatusBanner key={kind} kind={kind} message={ex.bandeaux[kind]} />
         ))}
+      </Section>
+
+      <Section id="ligne" title="Ligne">
+        <State label={t.etats.pastilles}>
+          <DayBadge day={1} weekday="dim." href="#ligne-j1" />
+          <DayBadge day={2} weekday="lun." href="#ligne-j2" active />
+          <DayBadge day={3} weekday="mar." href="#ligne-j3" disabled />
+          <DayBadge day={4} weekday="mer." size="sm" />
+        </State>
+        <State label={t.etats.rangeeSejour}>
+          <DayTabs days={TEN_DAYS} current="sejour" sejourHref="#ligne-sejour" label={lx.rangeeSejour} className="w-full" />
+        </State>
+        <State label={t.etats.rangeeJour}>
+          <DayTabs days={TEN_DAYS} current={9} sejourHref="#ligne-sejour" label={lx.rangeeJour} className="w-full" />
+        </State>
+        <State label={t.etats.ligneDuJour}>
+          <DayLine items={DEMO_LINE} getStopHref={stopHref} ideasHref="#idees" className="w-full" />
+        </State>
+        <State label={t.etats.voiture}>
+          <DayLine items={DEMO_CAR} getStopHref={stopHref} className="w-full" />
+        </State>
+        <State label={t.etats.marqueursLigne}>
+          <StopMarker kind="stop" variant="ligne" />
+          <StopMarker kind="terminus" variant="ligne" />
+        </State>
+        <State label={t.etats.marqueursCarte}>
+          <span className={MAP_CELL}>
+            <StopMarker kind="stop" number={2} />
+          </span>
+          <span className={MAP_CELL}>
+            <StopMarker kind="stop" number={2} selected />
+          </span>
+          <span className={MAP_CELL}>
+            <StopMarker kind="terminus" number={1} />
+          </span>
+          <span className={MAP_CELL}>
+            <StopMarker kind="overview" />
+          </span>
+        </State>
       </Section>
     </main>
   );

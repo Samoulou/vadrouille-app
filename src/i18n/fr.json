@@ -11,6 +11,37 @@
     "otp": {
       "groupe": "Code à {length} chiffres",
       "position": "Chiffre {position} sur {length}"
+    },
+    "duree": {
+      "minutes": "{minutes} min",
+      "heures": "{heures} h",
+      "heuresMinutes": "{heures} h {minutes}"
+    },
+    "jour": {
+      "pastille": "J{day}",
+      "nom": "Jour {day}",
+      "nomAvecJour": "Jour {day}, {weekday}",
+      "complet": "complet",
+      "nomComplet": "{nom}, complet"
+    },
+    "jours": {
+      "navigation": "Jours du séjour",
+      "sejour": "Séjour"
+    },
+    "terminus": {
+      "start": "Départ de {label}",
+      "end": "Retour à {label}"
+    },
+    "segment": {
+      "walk": "À pied",
+      "transit": "Bus",
+      "car": "En voiture",
+      "libelle": "{mode}, {duree}",
+      "libelleEstime": "{mode}, environ {duree} (estimation)"
+    },
+    "tempsLibre": {
+      "texte": "Temps libre jusqu'à {to}",
+      "idees": "Idées"
     }
   },
   "dev": {
@@ -38,7 +69,14 @@
         "selection": "Non sélectionnée, sélectionnée",
         "deduit": "Déduite, non sélectionnée et sélectionnée",
         "vide": "Vide",
-        "rempli": "Rempli"
+        "rempli": "Rempli",
+        "pastilles": "Inactive, active, désactivée, réduite",
+        "rangeeSejour": "« Séjour » actif",
+        "rangeeJour": "J9 actif",
+        "ligneDuJour": "Séquence du preview.html de DayLine",
+        "voiture": "Segment en voiture",
+        "marqueursLigne": "Arrêt et terminus de la ligne",
+        "marqueursCarte": "Carte : arrêt numéroté, sélectionné, terminus, vue d'ensemble"
       },
       "exemples": {
         "garder": "Garder",
@@ -73,6 +111,20 @@
           "noOption": "[Aucune option : message fourni par l'écran]",
           "error": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
           "generating": "[Génération en cours : message fourni par l'écran]"
+        },
+        "ligne": {
+          "hotel": "[Nom de l'hôtel]",
+          "arret1": {
+            "nom": "Calton Hill",
+            "meta": "Balade, 45 min, gratuit",
+            "raison": "La ville entière vue d'en haut, à 10 min de l'hôtel."
+          },
+          "arret2": {
+            "nom": "[Distillerie]",
+            "meta": "Visite et dégustation, 1 h 30"
+          },
+          "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
+          "rangeeJour": "Jours du séjour, démonstration J9 actif"
         }
       }
     }
