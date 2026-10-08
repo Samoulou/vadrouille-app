@@ -20,7 +20,12 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
     - 0009 : exécution durable ;
     - 0010 : répartition des champs (Q14) ;
     - 0011 : verdicts d'ancrage.
-  - La revue R2 a demandé des changements : priorité des sources (0003 est déléguée), `billing.processed_at`, `usage_ledger` en ajout seulement. **1re correction en cours.**
+  - **1re correction faite** sur la revue R2 :
+    - 0003 classée parmi les décisions déléguées ;
+    - `billing.processed_at` retiré ;
+    - `usage_ledger` protégé en ajout seulement dans 0007 (droits, déclencheur, test) ;
+    - drizzle-orm 0.45.4 confirmée sur npm.
+  - `needs-review` est reposé.
 - **U1 — Décisions UX/UI déléguées (PR #26, ticket #23)** :
   - décision `docs/decisions/0012-decisions-ux-ui-f2-f3.md` : Q10, Q11, Q13, Q15 à Q19 (partie UX/UI de Q17), Q30 ;
   - **1re correction faite** sur la revue R2 :
@@ -73,15 +78,15 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 4. ADR 0004 tranché et implémenté par le Tech Lead.
 
 ## Part d'usage estimée
-- 6e cycle du 2026-10-08 : environ 1 000 000 de jetons (estimation, correction de B0 en cours).
+- 6e cycle du 2026-10-08 : environ 1 050 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| B0 handover et correction | ≈ 350 000 |
+| B0 handover et correction | ≈ 400 000 |
 | U1 décisions UX/UI et correction | ≈ 330 000 |
 | Spec F4 et correction | ≈ 290 000 |
 | Pilotage | ≈ 60 000 |
 
-- Cumul de la journée : environ 3 700 000 jetons.
+- Cumul de la journée : environ 3 750 000 jetons.
 - Part de l'abonnement : non mesurable depuis la routine.
 - Messages de Samuel dans #studio depuis le 5e cycle (17:08) : aucun.
