@@ -1,0 +1,140 @@
+/*
+ * Tokens Ligne : copie du handover front-end § 4.1.
+ * Seul écart : --font-sans commence par la variable générée par next/font
+ * (la police est auto-hébergée sous un nom de famille interne).
+ */
+@import "tailwindcss";
+
+/* Les tests et la règle ESLint citent des classes interdites : ne pas les générer. */
+@source not "../../tests";
+@source not "../../eslint-rules";
+
+@theme {
+  /* Couleurs */
+  --color-page: #fcfdfe;
+  --color-raised: #ffffff;
+  --color-muted: #f1f4f8;
+  --color-ink: #0e1b30;
+  --color-ink-2: #1d2939;
+  --color-ink-soft: #475467;
+  --color-line: #2a55d4;
+  --color-on-line: #ffffff;
+  --color-quai: #f6c744;
+  --color-hairline: #e3e8ef;
+  --color-outline: #d5dce6;
+  --color-outline-strong: #c5ceda;
+  --color-border-control: #848fa1;
+  --color-track-free: #98a3b3;
+  --color-map-land: #edf0f4;
+  --color-map-water: #d3e1ee;
+  --color-map-park: #e0eadf;
+  --color-map-road: #ffffff;
+  --color-dest-bruyere: #5e4290;
+  --color-dest-azulejo: #1f5fa8;
+  --color-dest-ocre: #8f5a14;
+  --color-dest-granit: #3e4a57;
+
+  /* Police */
+  --font-sans: var(--font-hanken-grotesk), "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+
+  /* Rayons */
+  --radius-tag: 4px;
+  --radius-badge: 8px;
+  --radius-control: 12px;
+  --radius-block: 14px;
+  --radius-plate: 16px;
+  --radius-sheet: 22px;
+
+  /* Styles de texte */
+  --text-destination: 36px;   --text-destination--line-height: 40px;
+  --text-titre-fiche: 30px;   --text-titre-fiche--line-height: 34px;
+  --text-titre-jour: 28px;    --text-titre-jour--line-height: 32px;
+  --text-montant: 24px;       --text-montant--line-height: 30px;
+  --text-section: 20px;       --text-section--line-height: 26px;
+  --text-arret: 18px;         --text-arret--line-height: 22px;
+  --text-heure-l: 17px;       --text-heure-l--line-height: 22px;
+  --text-corps: 15px;         --text-corps--line-height: 22px;
+  --text-corps-s: 14px;       --text-corps-s--line-height: 20px;
+  --text-legende: 13px;       --text-legende--line-height: 18px;
+  --text-etiquette: 12px;     --text-etiquette--line-height: 24px;
+}
+
+:root {
+  /* Géométrie de la ligne */
+  --ligne-rail: 4px;
+  --ligne-rail-free: 2px;
+  --ligne-rail-dash: 4px;
+  --ligne-rail-gap: 5px;
+  --ligne-stop: 20px;
+  --ligne-stop-ring: 4px;
+  --ligne-stop-map: 26px;
+  --ligne-stop-map-selected: 38px;
+  --ligne-terminus: 20px;
+  --touch-target: 44px;
+
+  /* Correspondance shadcn/ui */
+  --background: var(--color-page);
+  --foreground: var(--color-ink);
+  --primary: var(--color-line);
+  --primary-foreground: var(--color-on-line);
+  --secondary: var(--color-raised);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-muted);
+  --muted-foreground: var(--color-ink-soft);
+  --accent: var(--color-muted);
+  --accent-foreground: var(--color-ink);
+  --border: var(--color-outline);
+  --input: var(--color-border-control);
+  --ring: var(--color-line);
+  --radius: 12px;
+}
+
+/*
+ * Utilitaires shadcn/ui (bg-background, text-primary-foreground, border-input…)
+ * branchés sur la correspondance ci-dessus. Les variables shadcn absentes du
+ * handover (card, popover, destructive…) ne sont pas définies : voir QUESTIONS.md.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Focus visible sur tous les éléments interactifs (§ 4.2). */
+  :focus-visible {
+    outline: 2px solid var(--color-line);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

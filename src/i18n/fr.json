@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "description": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
+  },
+  "accueil": {
+    "promesse": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
+  },
+  "dev": {
+    "tokens": {
+      "titre": "Tokens Ligne",
+      "intro": "Page de développement, désactivée en production.",
+      "couleurs": "Couleurs",
+      "textes": "Styles de texte",
+      "rayons": "Rayons",
+      "exemple": "Ton voyage, de l'hôtel à la soirée",
+      "chiffres": "10:45 – 11:45"
+    }
+  }
+}
