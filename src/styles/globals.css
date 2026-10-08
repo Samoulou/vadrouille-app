@@ -4,6 +4,8 @@
  * (la police est auto-hébergée sous un nom de famille interne).
  */
 @import "tailwindcss";
+/* Valeurs provisoires des composants (Q13), hors tokens. */
+@import "../components/ligne/provisoire.css";
 
 /* Les tests et la règle ESLint citent des classes interdites : ne pas les générer. */
 @source not "../../tests";

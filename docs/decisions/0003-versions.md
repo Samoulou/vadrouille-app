@@ -22,6 +22,8 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 | Testing Library | `@testing-library/react` 16.3.3, `dom` 10.4.2, `jest-dom` 7.0.1 | |
 | Playwright | `@playwright/test` 1.56.1 | **Pas 1.64.0** (dernière) : version alignée sur le Chromium préinstallé des sessions d'agents (révision 1194), pour que les captures de référence soient produites et comparées avec le même navigateur en local et en CI |
 | axe | `@axe-core/playwright` 4.13.0 | Règles WCAG 2.0/2.1/2.2 A et AA + bonnes pratiques |
+| `@radix-ui/react-slot` | 1.4.0 | Ajouté en F2 (`asChild` des composants Ligne) : voir la décision 0005 |
+| `axe-core` (dev) | 4.13.0 | Ajouté en F2 (axe dans Vitest) ; **pas 4.14.0**, aligné sur `@axe-core/playwright` : voir la décision 0005 |
 
 ## Conséquences
 - Revoir TypeScript 7 et ESLint 10 quand `typescript-eslint` et `eslint-config-next` les prendront en charge.

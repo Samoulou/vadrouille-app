@@ -49,6 +49,15 @@ export default defineConfig([
     },
   },
   {
+    // F2 : aucun texte en dur dans les composants Ligne, tout vient de src/i18n/fr.json (handover § 10).
+    // Les valeurs d'attributs (classes, rôles) restent permises ; les textes affichés passent par fr.json.
+    files: ["src/components/ligne/**/*.{jsx,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },

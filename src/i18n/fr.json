@@ -2,6 +2,17 @@
   "produit": {
     "promesse": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
   },
+  "ligne": {
+    "tag": {
+      "toReserve": "À réserver",
+      "toConfirm": "À confirmer",
+      "unconfirmed": "Non confirmé"
+    },
+    "otp": {
+      "groupe": "Code à {length} chiffres",
+      "position": "Chiffre {position} sur {length}"
+    }
+  },
   "dev": {
     "tokens": {
       "titre": "Tokens Ligne",
@@ -11,6 +22,59 @@
       "rayons": "Rayons",
       "exemple": "Ton voyage, de l'hôtel à la soirée",
       "chiffres": "10:45 – 11:45"
+    },
+    "composants": {
+      "titre": "Composants Ligne",
+      "intro": "Page de développement, désactivée en production. Les contenus entre crochets ne sont pas vérifiés.",
+      "etats": {
+        "variantes": "Variantes, taille md (52 px)",
+        "tailles": "Taille sm (44 px), texte ink-soft",
+        "desactive": "Désactivé",
+        "focus": "Focus",
+        "lien": "Lien (asChild)",
+        "formes": "Carré et rond",
+        "types": "Types",
+        "compteur": "Compteur (rien à 0)",
+        "selection": "Non sélectionnée, sélectionnée",
+        "deduit": "Déduite, non sélectionnée et sélectionnée",
+        "vide": "Vide",
+        "rempli": "Rempli"
+      },
+      "exemples": {
+        "garder": "Garder",
+        "remplacer": "Remplacer",
+        "appliquer": "Appliquer",
+        "passer": "Passer",
+        "plusTard": "Plus tard",
+        "reserver": "Réserver",
+        "debloquer": "Débloquer",
+        "retour": "Retour",
+        "partager": "Partager",
+        "compteurTitre": "À faire avant de partir",
+        "compteurLabel": "[4 réservations à faire]",
+        "compteurZeroLabel": "[Aucune réservation à faire]",
+        "chips": {
+          "histoire": "Histoire",
+          "balades": "Balades en ville",
+          "musees": "[Musées]",
+          "marches": "[Marchés]"
+        },
+        "segmente": {
+          "label": "[Rythme]",
+          "options": {
+            "a": "[Option 1]",
+            "b": "[Option 2]",
+            "c": "[Option 3]"
+          }
+        },
+        "bandeaux": {
+          "offline": "Carte indisponible hors ligne",
+          "conflict": "[Conflit : message fourni par l'écran]",
+          "noOption": "[Aucune option : message fourni par l'écran]",
+          "error": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+          "generating": "[Génération en cours : message fourni par l'écran]"
+        }
+      }
     }
   }
 }
