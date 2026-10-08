@@ -36,7 +36,7 @@ export function TokensShowcase() {
                 style={{ backgroundColor: `var(--color-${name})` }}
               />
               <span className="flex flex-col">
-                <span className="text-corps-s font-semibold text-ink">{name}</span>
+                <span className="text-corps-s font-bold text-ink">{name}</span>
                 <TokenValue variable={`--color-${name}`} />
               </span>
             </li>
@@ -70,7 +70,7 @@ export function TokensShowcase() {
                 aria-hidden="true"
                 className={`size-16 border-2 border-ink bg-muted ${RADIUS_CLASSES[name]}`}
               />
-              <span className="text-corps-s font-semibold text-ink">{name}</span>
+              <span className="text-corps-s font-bold text-ink">{name}</span>
               <TokenValue variable={`--radius-${name}`} />
             </li>
           ))}

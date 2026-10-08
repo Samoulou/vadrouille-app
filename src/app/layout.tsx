@@ -15,7 +15,7 @@ const hankenGrotesk = Hanken_Grotesk({
 
 export const metadata: Metadata = {
   title: PRODUCT_NAME,
-  description: messages.meta.description,
+  description: messages.produit.promesse,
 };
 
 export const viewport: Viewport = {
