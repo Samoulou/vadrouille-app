@@ -1,0 +1,22 @@
+name: techlead-gate
+on:
+  pull_request:
+    types: [opened, synchronize, labeled, unlabeled]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: diff
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/releases/)' files.txt; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.code == 'true' && !contains(github.event.pull_request.labels.*.name, 'techlead-approved')
+        run: |
+          echo "Validation du Tech Lead manquante (libellé techlead-approved)."
+          exit 1

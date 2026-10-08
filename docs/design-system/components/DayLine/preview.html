@@ -1,0 +1,39 @@
+<!-- @dsCard group="La ligne" height=620 subtitle="Terminus, arrêts, segments, temps libre" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>DayLine</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.line{max-width:390px;padding:var(--space-5) var(--space-4) var(--space-5) var(--space-3)}
+.r{display:grid;grid-template-columns:52px 28px minmax(0,1fr);column-gap:var(--space-2)}
+.t{font-size:15px;line-height:22px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.rail{position:relative;align-self:stretch}
+.rail i{position:absolute;left:12px;top:0;bottom:0;width:var(--rail);background:var(--line)}
+.rail i.walk{background:repeating-linear-gradient(to bottom,var(--line) 0 var(--rail-dash),transparent var(--rail-dash) calc(var(--rail-dash) + var(--rail-gap)))}
+.rail i.free{left:13px;width:var(--rail-free);background:repeating-linear-gradient(to bottom,var(--track-free) 0 2px,transparent 2px 7px)}
+.rail i.first{top:12px}.rail i.last{bottom:auto;height:12px}
+.rail b{position:absolute;left:4px;top:1px;width:var(--stop);height:var(--stop);box-sizing:border-box;border-radius:var(--radius-round);background:var(--raised);border:var(--stop-ring) solid var(--line)}
+.rail b.term{border:none;border-radius:5px;background:var(--ink)}
+.c{display:flex;flex-direction:column;gap:3px;padding-bottom:14px}
+.name{font-size:18px;line-height:22px;font-weight:700}
+.meta{font-size:14px;line-height:20px;color:var(--ink-soft)}
+.why{font-size:14px;line-height:20px}
+.seg{min-height:40px;display:flex;align-items:center;gap:6px;font-size:13px;line-height:18px;color:var(--ink-soft)}
+.tag{align-self:flex-start;margin-top:4px;height:24px;padding:0 8px;border-radius:var(--radius-tag);background:var(--quai);color:var(--on-quai);font-size:12px;line-height:24px;font-weight:700}
+.freebox{display:flex;align-items:center;justify-content:space-between;margin:8px 0;padding:0 4px 0 12px;border-radius:10px;background:var(--muted);font-size:14px;color:var(--ink-2)}
+.freebox a{min-height:44px;display:flex;align-items:center;padding:0 8px;font-weight:700;color:var(--ink)}
+</style></head>
+<body>
+<div id="root" class="line">
+<div class="r"><div class="t">09:15</div><div class="rail"><i class="first"></i><b class="term"></b></div><div class="c"><span style="font-size:15px;line-height:22px;font-weight:700">Départ de [Nom de l'hôtel]</span></div></div>
+<div class="r"><div></div><div class="rail"><i class="walk"></i></div><div class="seg">À pied, 10 min</div></div>
+<div class="r"><div class="t">09:30</div><div class="rail"><i></i><b></b></div><div class="c"><span class="name">Calton Hill</span><span class="meta">Balade, 45 min, gratuit</span><span class="why">La ville entière vue d'en haut, à 10 min de l'hôtel.</span></div></div>
+<div class="r"><div></div><div class="rail"><i></i></div><div class="seg">Bus, environ 25 min (estimation)</div></div>
+<div class="r"><div class="t">15:00</div><div class="rail"><i></i><b></b></div><div class="c"><span class="name">[Distillerie]</span><span class="meta">Visite et dégustation, 1 h 30</span><span class="tag">À réserver</span></div></div>
+<div class="r" style="min-height:64px"><div class="t" style="font-size:13px;font-weight:600;color:var(--ink-soft);padding-top:12px">17:00</div><div class="rail"><i class="free"></i></div><div class="freebox"><span>Temps libre jusqu'à 19:00</span><a href="#">Idées</a></div></div>
+<div class="r"><div></div><div class="rail"><i class="walk"></i></div><div class="seg">À pied, 6 min</div></div>
+<div class="r"><div class="t">22:30</div><div class="rail"><i class="last"></i><b class="term"></b></div><div class="c" style="padding-bottom:0"><span style="font-size:15px;line-height:22px;font-weight:700">Retour à [Nom de l'hôtel]</span></div></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!-- @dsCard group="La ligne" height=120 subtitle="Arrêt, terminus, carte, sélection, vue d'ensemble" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>StopMarker</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.row{display:flex;align-items:center;gap:var(--space-6);padding:var(--space-5)}
+.cell{display:flex;flex-direction:column;align-items:center;gap:var(--space-2);font-size:12px;color:var(--ink-soft)}
+.mapbg{display:flex;align-items:center;justify-content:center;width:64px;height:56px;border-radius:var(--radius-control);background:var(--map-land)}
+.stop{width:var(--stop);height:var(--stop);box-sizing:border-box;border-radius:var(--radius-round);background:var(--raised);border:var(--stop-ring) solid var(--line)}
+.term{width:var(--terminus);height:var(--terminus);border-radius:5px;background:var(--ink)}
+.num{width:var(--stop-map);height:var(--stop-map);box-sizing:border-box;border-radius:var(--radius-round);background:var(--raised);border:3px solid var(--line);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.sel{width:var(--stop-map-selected);height:var(--stop-map-selected);box-sizing:border-box;border-radius:var(--radius-round);background:var(--line);border:3px solid var(--page);color:var(--on-line);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.mini{width:12px;height:12px;box-sizing:border-box;border-radius:var(--radius-round);background:var(--raised);border:3px solid var(--line)}
+.termmap{width:24px;height:24px;border-radius:6px;background:var(--ink);display:flex;align-items:center;justify-content:center}
+</style></head>
+<body>
+<div id="root" class="row">
+<div class="cell"><span class="stop"></span>Arrêt</div>
+<div class="cell"><span class="term"></span>Terminus</div>
+<div class="cell"><span class="mapbg"><span class="num">2</span></span>Carte</div>
+<div class="cell"><span class="mapbg"><span class="sel">2</span></span>Sélectionné</div>
+<div class="cell"><span class="mapbg"><span class="termmap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"></path><path d="M6 10v10h12V10"></path></svg></span></span>Hôtel</div>
+<div class="cell"><span class="mapbg"><span class="mini"></span></span>Ensemble</div>
+</div>
+</body>
+</html>

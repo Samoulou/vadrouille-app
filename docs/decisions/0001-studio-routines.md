@@ -1,0 +1,17 @@
+# 0001 — Le studio tourne sur les Routines Claude Code
+
+Statut : accepté · Date : 2026-10-07 · Décideur : Samuel
+
+## Contexte
+Le développement est confié à des agents automatisés, avec un cycle de 4 heures et une release de staging toutes les 4 heures, dans un budget compatible avec la phase 0.
+
+## Décision
+- Quatre routines Claude Code (Cycle, Revue, Release, Hebdo) sur l'abonnement Claude, crédits d'usage désactivés.
+- Rôles sous forme de sous-agents dans `.claude/agents/`.
+- Passage au Project Claude Code « Studio » dès que la fonction est disponible sur le compte.
+- CI GitHub sans IA et porte « techlead-approved » comme conditions de fusion.
+
+## Conséquences
+- Pas de serveur ni d'ordinateur allumé ; coût plafonné par l'abonnement.
+- Actions visibles au nom de Samuel sur GitHub et Slack.
+- Si l'abonnement ne suffit plus : spécialistes sur GitHub Actions avec une clé API, sans changer le reste.

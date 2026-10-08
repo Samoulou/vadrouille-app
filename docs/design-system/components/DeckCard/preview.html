@@ -1,0 +1,52 @@
+<!-- @dsCard group="Présentation" height=720 subtitle="Proposition 4 sur 8" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>DeckCard</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.wrap{max-width:390px;padding:var(--space-4) var(--space-5) var(--space-5);display:flex;flex-direction:column;gap:var(--space-4)}
+.top{display:flex;align-items:center;gap:var(--space-3)}
+.prog{flex:1;position:relative;height:16px}
+.prog i{position:absolute;left:6px;right:6px;top:6px;height:4px;background:var(--outline-strong)}
+.prog i.done{right:auto;width:44%;background:var(--line)}
+.prog span{position:absolute;top:2px;width:12px;height:12px;box-sizing:border-box;border-radius:var(--radius-round);background:var(--raised);border:3px solid var(--outline-strong)}
+.prog span.on{border-color:var(--line)}
+.prog span.now{background:var(--line);border-color:var(--line)}
+.skip{height:44px;padding:0 4px;border:none;background:transparent;font:inherit;font-size:15px;font-weight:600;color:var(--ink);text-decoration:underline}
+.card{padding:0;border:1px solid var(--outline-strong);border-radius:var(--radius-plate);overflow:hidden;background:var(--raised);font:inherit;color:var(--ink);text-align:left;display:flex;flex-direction:column}
+.photo{height:220px;align-self:stretch;background:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-soft);font-size:13px}
+.body{padding:16px;display:flex;flex-direction:column;gap:6px}
+.when{display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.when b{height:24px;min-width:30px;padding:0 6px;box-sizing:border-box;border-radius:6px;background:var(--line);color:var(--on-line);font-size:12px;line-height:24px;font-weight:800;text-align:center}
+.name{font-size:22px;line-height:28px;font-weight:800;letter-spacing:-0.01em}
+.meta{font-size:14px;line-height:20px;color:var(--ink-soft)}
+.why{font-size:15px;line-height:22px}
+.actions{display:flex;justify-content:center;gap:56px}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px}
+.round{width:68px;height:68px;border-radius:var(--radius-round);display:flex;align-items:center;justify-content:center;padding:0}
+.no{border:2px solid var(--ink);background:var(--raised);color:var(--ink)}
+.yes{border:none;background:var(--line);color:var(--on-line)}
+</style></head>
+<body>
+<div id="root" class="wrap">
+<div class="top">
+<div class="prog" aria-label="Proposition 4 sur 8"><i></i><i class="done"></i><span class="on" style="left:0"></span><span class="on" style="left:14%"></span><span class="on" style="left:28%"></span><span class="now" style="left:42%"></span><span style="left:56%"></span><span style="left:70%"></span><span style="left:84%"></span><span style="right:0"></span></div>
+<button class="skip">Passer</button>
+</div>
+<button class="card" aria-label="Voir le détail de National Museum of Scotland">
+<span class="photo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg>Photo du lieu</span>
+<span class="body">
+<span class="when"><b>J2</b>vers 14:00</span>
+<span class="name">National Museum of Scotland</span>
+<span class="meta">Musée, 1 h 30, gratuit</span>
+<span class="why">L'histoire de l'Écosse en un seul lieu, à 5 min de ton déjeuner.</span>
+</span>
+</button>
+<div class="actions">
+<div class="act"><button class="round no" aria-label="Pas pour moi"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>Pas pour moi</div>
+<div class="act"><button class="round yes" aria-label="J'aime"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"></path></svg></button>J'aime</div>
+</div>
+</div>
+</body>
+</html>

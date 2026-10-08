@@ -1,0 +1,25 @@
+<!-- @dsCard group="Listes" height=200 subtitle="À faire et fait" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>ChecklistRow</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.list{max-width:390px;padding:var(--space-4) var(--space-5);display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--hairline)}
+.row:last-child{border-bottom:none;color:var(--ink-soft)}
+.box{width:44px;height:44px;flex-shrink:0;border:none;background:transparent;display:flex;align-items:center;justify-content:center;padding:0}
+.box span{width:22px;height:22px;box-sizing:border-box;border:2px solid var(--ink);border-radius:5px;display:flex;align-items:center;justify-content:center}
+.box.done span{background:var(--ink)}
+.txt{flex:1;display:flex;flex-direction:column;gap:1px}
+.txt b{font-size:15px;line-height:20px;font-weight:700}
+.txt small{font-size:13px;line-height:18px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.go{min-height:44px;padding:0 4px;display:flex;align-items:center;font-size:14px;font-weight:800;color:var(--line)}
+</style></head>
+<body>
+<div id="root" class="list">
+<div class="row"><button class="box" aria-pressed="false" aria-label="Marquer comme réservé"><span></span></button><div class="txt"><b>[Distillerie], visite</b><small>J2, 15:00, 2 personnes</small></div><a class="go" href="#">Réserver</a></div>
+<div class="row"><button class="box done" aria-pressed="true" aria-label="Réservé"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"></path></svg></span></button><div class="txt"><b style="font-weight:600;text-decoration:line-through">Military Tattoo</b><small>J1, 21:30, déjà réservé</small></div></div>
+</div>
+</body>
+</html>

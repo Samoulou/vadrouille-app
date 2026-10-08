@@ -1,0 +1,21 @@
+<!-- @dsCard group="Identité" height=300 subtitle="Palette fermée de quatre couleurs" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>DestinationPlate</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3);padding:var(--space-5);max-width:760px}
+.plate{padding:var(--space-5);border-radius:var(--radius-plate);color:var(--on-line);display:flex;flex-direction:column;gap:6px}
+.plate b{font-size:36px;line-height:40px;font-weight:800;letter-spacing:-0.02em}
+.plate span{font-size:15px;line-height:20px;font-variant-numeric:tabular-nums}
+</style></head>
+<body>
+<div id="root" class="grid">
+<div class="plate" style="background:var(--dest-bruyere)"><b>Édimbourg</b><span>6 jours, du 29.08 au 03.09</span></div>
+<div class="plate" style="background:var(--dest-azulejo)"><b>Lisbonne</b><span>5 jours, 2 adultes</span></div>
+<div class="plate" style="background:var(--dest-ocre)"><b>Séville</b><span>4 jours, 2 adultes</span></div>
+<div class="plate" style="background:var(--dest-granit)"><b>Porto</b><span>7 jours, 2 adultes</span></div>
+</div>
+</body>
+</html>

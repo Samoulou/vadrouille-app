@@ -1,0 +1,26 @@
+<!-- @dsCard group="Actions" height=150 subtitle="Principal, secondaire, texte, icône" -->
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Button</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--page)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);padding:var(--space-5)}
+.btn{height:52px;padding:0 var(--space-5);border-radius:var(--radius-control);font:inherit;font-size:16px;cursor:pointer}
+.primary{border:none;background:var(--line);color:var(--on-line);font-weight:800}
+.secondary{border:1.5px solid var(--ink);background:var(--raised);color:var(--ink);font-weight:700}
+.text{height:44px;padding:0 var(--space-2);border:none;background:transparent;color:var(--ink);font:inherit;font-size:15px;text-decoration:underline}
+.icon{width:44px;height:44px;border:1px solid var(--outline);border-radius:var(--radius-control);background:var(--raised);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:0}
+.focus{box-shadow:0 0 0 2px var(--page),0 0 0 4px var(--focus)}
+</style></head>
+<body>
+<div id="root" class="row">
+<button class="btn primary">Garder</button>
+<button class="btn secondary">Remplacer</button>
+<button class="btn primary focus">Appliquer</button>
+<button class="text">Passer</button>
+<button class="icon" aria-label="Retour"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+<button class="icon" aria-label="Partager"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="M7 8l5-5 5 5"></path><path d="M5 14v6h14v-6"></path></svg></button>
+</div>
+</body>
+</html>
