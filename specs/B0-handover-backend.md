@@ -1,6 +1,6 @@
 # B0 — Handover back-end
 
-Rôles : product-owner (fonctionnel) et tech-lead (architecture, Q14) · Prérequis : aucun (roadmap, ligne 6) ; s'appuie sur F1 livrée dans `main` (#11) · Ticket : #15 · Référence : `docs/produit/cadrage-v5.md` (§ 1 D4 à D14, § 3.1, § 3.3, § 3.4, § 3.7, § 4, § 6.1 à § 6.11, § 7 « Ordre de construction de la phase 1 », § 8, § 9), `docs/handovers/frontend.md` (§ 0, § 3, § 6, § 8, § 9, § 12, § 13, § 16, § 17), `src/contracts` et `src/adapters` (livrés par F1), `specs/F1-contrats-donnees-simulees.md`, `docs/decisions/0002-hebergement-vercel.md`, `docs/CONTEXT.md` (principes techniques, « Qui décide quoi »), `QUESTIONS.md` (Q2, Q3, Q4, Q5, Q6, Q8, Q9, Q14, Q17, Q22)
+Rôles : product-owner (fonctionnel) et tech-lead (architecture, Q14) · Prérequis : F1 livrée (#11) (la roadmap, ligne 6, indique « — » : écart signalé, non corrigé ici) · Ticket : #15 · Référence : `docs/produit/cadrage-v5.md` (§ 1 D4 à D14, § 3.1, § 3.3, § 3.4, § 3.7, § 4, § 6.1 à § 6.11, § 7 « Ordre de construction de la phase 1 », § 8, § 9), `docs/handovers/frontend.md` (§ 0, § 3, § 6, § 8, § 9, § 12, § 13, § 16, § 17), `src/contracts` et `src/adapters` (livrés par F1), `specs/F1-contrats-donnees-simulees.md`, `docs/decisions/0002-hebergement-vercel.md`, `docs/CONTEXT.md` (principes techniques, « Qui décide quoi »), `QUESTIONS.md` (Q2, Q3, Q4, Q5, Q6, Q8, Q9, Q14, Q17, Q22)
 
 ## Objectif
 Écrire `docs/handovers/backend.md`, le pendant back-end du handover front-end : un document qui permet à des agents `backend`, `data` et `ia-recherche` de construire, après G0, l'API, la base, l'authentification, les workflows et le paiement en mode test, et de brancher l'adaptateur `api` sans toucher à l'interface ni aux contrats sans décision écrite.
@@ -14,7 +14,7 @@ B0 est une tâche de documentation. Elle ne produit ni code, ni migration, ni co
 | Stack, structure, schéma, RLS, intégration Better Auth, workflows, adaptateurs, répartition des champs (Q14), tests | Tech Lead | Tech Lead, par décisions écrites dans `docs/decisions/` (statut, date, décideur) |
 | Comptes externes, dépenses, juridique (Q5, Q6), conservation des données, production | — | Samuel : le handover les liste dans un tableau « Engagements externes » et ne les tranche pas |
 
-Une même PR porte le handover et les décisions du Tech Lead. Elle reçoit la revue du Tech Lead (libellé `techlead-approved`) ; le Product Owner relit la partie fonctionnelle.
+Une même PR porte le handover et les décisions du Tech Lead. Elle reçoit la revue du Tech Lead (libellé `techlead-approved`), faite par une autre instance que celle qui a rédigé le handover et les décisions ; le Product Owner relit la partie fonctionnelle.
 
 ## À livrer
 - `docs/handovers/backend.md`, avec les sections ci-dessous, dans cet ordre.
@@ -32,7 +32,12 @@ Une même PR porte le handover et les décisions du Tech Lead. Elle reçoit la r
 6. Aucun stockage ni API propres à Vercel (KV, Edge Config) : Postgres pour les données (ADR 0002).
 7. Toute écriture du programme est un patch sur une version identifiée (R10) ; l'historique est en ajout seulement.
 
-**§ 1. Sources de vérité.** Tableau des documents et ordre de priorité en cas de conflit (cadrage > décisions `docs/decisions/` > handover back > handover front pour ce qui concerne les données).
+**§ 1. Sources de vérité.** Tableau des documents et ordre de priorité en cas de conflit :
+1. décisions écrites de Samuel postérieures au cadrage (`QUESTIONS.md` tranchées, `docs/decisions/` dont le décideur est Samuel, par exemple Q2 = 29 CHF, Q4 = Better Auth, ADR 0002) et décisions déléguées écrites (`docs/decisions/` du Tech Lead, rubriques « Décisions » des spécifications), chacune dans le périmètre que « Qui décide quoi » (`docs/CONTEXT.md`) donne à son auteur ;
+2. le cadrage (`docs/produit/cadrage-v5.md`) ;
+3. les handovers (back, puis front pour ce qui concerne les données).
+
+Règle de conflit : entre deux décisions écrites, la plus récente l'emporte si son auteur a autorité sur le sujet ; une décision déléguée ne peut pas contredire une décision de Samuel ni trancher une question qui lui est réservée. Tout conflit relevé est cité au § 1 (documents, passage, source retenue) ; un conflit qui touche une question réservée à Samuel n'est pas tranché, il est listé au § 17.
 
 **§ 2. Stack et conventions (Tech Lead).** Route handlers ou actions serveur Next.js, ORM et outil de migration, base Postgres locale pour le développement et la CI (sans compte externe), version de chaque outil (décision écrite), conventions de nommage (tables en `snake_case`, contrats en `camelCase`), gestion des variables d'environnement (serveur sans préfixe `NEXT_PUBLIC_`).
 
@@ -72,17 +77,20 @@ Le tableau tranche au minimum `Stop.name`, `Stop.meta`, `Stop.verifiedAt`, `Stop
 **§ 8. Workflows durables (Tech Lead pour l'exécution, Product Owner pour les règles).** Un tableau d'étapes par workflow, avec pour chaque étape : type (déterministe, IA, appel externe), contrat d'entrée et de sortie, présence de données Google (oui ou non : « oui » interdit pour une étape IA), plafond de coût vérifié avant l'appel (`usage_ledger`), relances bornées, idempotence, état publié dans `GenerationStatus`. Workflows couverts :
 1. **Recherche et génération de l'aperçu** (cadrage § 6.5, étapes 1 à 9) : 8 propositions, cible de moins de 60 s, budget d'appels propre ;
 2. **Ancrage** : résolution « IDs only » puis vérification Place Details, côté serveur, avec la clé serveur Places/Routes (prévue avec P0, Q3) ; candidat non résolu ou fermé définitivement écarté ;
-3. **Planification et validation** : moteur `src/domain`, règles R1 à R10 (cadrage § 8), au plus un appel de réparation ;
+3. **Planification et validation** : moteur `src/domain`, règles R1 à R10 (cadrage § 8), au plus un appel de réparation ; un plafond de coût ou un quota atteint arrête le workflow et conserve le dernier programme valide (aucune version partielle publiée, test de sortie du cadrage § 9) ;
 4. **Génération du voyage complet** après déblocage, en tâche de fond ;
 5. **Recalcul par lot** après la présentation et **révision unitaire** (cadrage § 6.6), avec les cibles de durée (moins de 5 s depuis la réserve) ;
 6. **Paiement en mode test** (§ 9 ci-dessous).
 
 Exécution durable : Vercel Workflows (cadrage D7) isolé derrière `src/workflows`, portabilité selon ADR 0002 (où vit l'état des étapes, comment le remplacer hors Vercel, région de cet état). Le prototype P0 (ia-recherche) alimente ce chapitre sans être recopié.
 
+État persistant des workflows : les entrées et sorties d'étapes sont sérialisées et conservées par le moteur d'exécution durable ; elles sont donc traitées comme un stockage durable. Règle : une étape ne reçoit et ne retransmet, en fait de lieu, que `placeId` et un verdict daté de nos contrôles (par exemple « ouvert le jour prévu : oui, vérifié le … », « fermé définitivement »), jamais une donnée Google (horaires, prix, statut brut, note, adresse, coordonnées hors cache autorisé par le § 5, photo, téléphone). Une étape qui a besoin d'une donnée Google la recharge côté serveur à l'intérieur de l'étape et ne la renvoie pas. Les contrats d'entrée et de sortie de chaque étape sont des types maison qui n'ont pas de champ pour ces données. Test nommé (`workflows: aucune donnée Google dans l'état sérialisé`) : pour chaque étape, l'entrée et la sortie sérialisées sont validées par leur contrat strict et parcourues à la recherche des clés et motifs interdits du § 6.
+
 **§ 9. Paiement en mode test.** Stripe Checkout, TWINT et carte (cadrage § 6.4) : création de la session côté serveur, prix lu dans la configuration (29 CHF, Q2, jamais en dur), montants en centimes et devise CHF dans les données, webhook à signature vérifiée, traitement idempotent par identifiant d'événement, droit « voyage débloqué » accordé seulement par le webhook. Clés de test uniquement, et seulement quand Samuel aura ouvert le compte. Jusque-là, un adaptateur de paiement simulé (celui de F9) suit le même contrat.
 
 **§ 10. Règles Google.** Reprise du cadrage § 6.5 et du handover front § 8, chaque règle avec le test qui la vérifie :
 - seul `placeId` est stocké durablement (test de schéma : aucune colonne interdite) ;
+- l'état persistant des workflows ne contient que `placeId` et des verdicts datés de nos contrôles (test `workflows: aucune donnée Google dans l'état sérialisé`, § 8) ;
 - aucun prompt ne contient de donnée Google : le constructeur de prompts n'accepte que des types maison (identifiants internes et résumés de la recherche web), et un test parcourt les prompts journalisés ;
 - aucun jeu d'évaluation (`evals/`) ne contient de donnée Google ;
 - données de lieux affichées seulement avec la carte Google ou la mention « Données de lieux : Google » ;
@@ -102,28 +110,37 @@ Exécution durable : Vercel Workflows (cadrage D7) isolé derrière `src/workflo
 **§ 16. Hors périmètre** et **§ 17. Questions ouvertes** (sans les trancher).
 
 ## Décisions (Product Owner, définitives sans veto de Samuel sous 2 jours)
-- **PO-1 — Budget de trajet par rythme (Q8).** Valeurs de départ, hors excursion : 60 min par jour pour un rythme tranquille, 90 min pour un rythme équilibré, 150 min pour un rythme intense (cadrage § 3.7). Elles sont lues dans une configuration serveur, recopiées dans `Day.travelBudgetMinutes`, jamais codées dans l'interface ni dans le moteur. Une réponse « oui » à « On reste plus près de ton hôtel ? » réduit le budget du voyage d'un quart (arrondi aux 5 min), une seule fois par voyage, de façon visible et annulable. Calibrage en bêta.
+- **PO-1 — Budget de trajet par rythme (Q8).** Valeurs de départ, hors excursion : 60 min par jour pour un rythme tranquille, 90 min pour un rythme équilibré, 150 min pour un rythme intense (cadrage § 3.7). Elles sont lues dans une configuration serveur, recopiées dans `Day.travelBudgetMinutes`, jamais codées dans l'interface ni dans le moteur. Une réponse « oui » à « On reste plus près de ton hôtel ? » réduit le budget du voyage d'un quart (arrondi aux 5 min), une seule fois par voyage, de façon visible et annulable ; le budget réduit n'est jamais inférieur au plancher journalier lu dans la même configuration (valeur de départ : 45 min par jour) ; s'il passerait dessous, il est ramené à ce plancher. Calibrage en bêta.
 - **PO-2 — Moment d'un élément « À faire avant de partir » (Q22).** Un élément de la liste a un moment d'un de ces trois genres : une date limite (date ISO, par exemple la date d'ouverture d'une billetterie), « avant le départ » (sans date), ou un jour du voyage (indice du jour, avec « à l'arrivée » pour le J1). Les données portent ce moment sous forme structurée ; les libellés (« la veille », « à l'arrivée », « avant le 15.08 ») sont produits par l'interface. La forme exacte du contrat est fixée par le Tech Lead au § 5 ; F1 garde son texte libre en attendant.
 - **PO-3 — Organisation personnelle.** À la première connexion, une organisation personnelle est créée ; la personne en est propriétaire. Au MVP, l'interface ne montre ni nom d'organisation ni sélecteur ; l'espace agence reste hors périmètre.
 - **PO-4 — Déblocage par voyage.** Le paiement débloque un voyage, pas un compte. Les 8 propositions offertes restent accessibles sans paiement (handover front, écran 9). Un second paiement du même voyage ne crée pas un second droit.
 - **PO-5 — Annuler.** Annuler une modification (5 secondes) crée une nouvelle version identique à la précédente ; aucune version n'est supprimée.
-- **PO-6 — Aperçu incomplet.** Si moins de 8 propositions sont ancrées, l'aperçu montre celles qui existent et un état « aucune option compatible » pour le reste ; il n'est jamais complété par un lieu non ancré (R1).
+- **PO-6 — Aperçu incomplet.** Si moins de 8 propositions sont ancrées, l'aperçu montre celles qui existent et, pour le reste, un état « aucune option compatible » ; il n'est jamais complété par un lieu non ancré (R1). Les données portent cet état sous forme structurée (nombre de propositions manquantes), sans libellé : le texte affiché relève de l'UX/UI (règle d'or n° 4 du § 0 ci-dessus, handover front § 9).
 - **PO-7 — Lien privé.** Un lien privé est en lecture seule, valable jusqu'à 30 jours après la fin du voyage, révocable ; en créer un nouveau révoque le précédent.
 
 ## Critères d'acceptation
 Chaque critère se vérifie par une commande ou par une lecture ciblée, notée dans la PR de B0.
 - [ ] `docs/handovers/backend.md` existe et contient les sections § 0 à § 17 dans l'ordre ci-dessus (`grep -n '^## ' docs/handovers/backend.md`).
-- [ ] Chaque contrat cité au § 4 est exporté par `src/contracts/index.ts` ou figure dans le tableau « Contrats à créer » avec sa tâche (vérification par script : liste des noms en `PascalCase` du § 4 comparée aux exports).
-- [ ] Le tableau du § 5 compte une ligne par champ de chaque schéma exporté par `src/contracts` (vérification par script qui lit les formes Zod et cherche `Schéma.champ` dans le tableau), chacune avec une seule catégorie ; les champs de Q14 cités ci-dessus sont tranchés.
+- [ ] Chaque contrat cité au § 4 est exporté par `src/contracts/index.ts` ou figure dans le tableau « Contrats à créer » avec sa tâche. Vérification par script :
+  - extraction : dans le texte du § 4 (de `## 4.` exclu jusqu'à `## 5.` exclu), chaque mot entre accents graves qui correspond à `^[A-Z][A-Za-z0-9]*$` ; un suffixe `Schema` est retiré (`TripSchema` → `Trip`) ; les chemins de champ (`Stop.placeId`) et les constantes en majuscules (`DETOUR_THRESHOLD_MINUTES`) ne correspondent pas au motif et sont ignorés ;
+  - comparaison : chaque nom extrait est un type exporté par `src/contracts/index.ts` (ou `<nom>Schema` y est exporté), ou est la première colonne d'une ligne du tableau « Contrats à créer » dont la colonne « tâche » n'est pas vide ;
+  - le script et sa sortie figurent dans la description de la PR de B0.
+- [ ] Le tableau du § 5 compte une ligne par champ de chaque schéma objet exporté par `src/contracts`, chacune avec une seule catégorie ; les champs de Q14 cités ci-dessus sont tranchés. Notation de la première colonne (clé), sans le suffixe `Schema` :
+  - champ d'un objet : `Schéma.champ` (`Stop.placeId`) ; objet imbriqué non exporté : `Schéma.chemin.du.champ`, une ligne par feuille (`Trip.travellers.adults`, `Trip.travellers.children`, `Proposal.option.index`, `Proposal.option.total`) ;
+  - union discriminée : `Schéma[variante].champ`, une ligne par champ de chaque variante, discriminant compris (`DayLineItem[terminus].role`, `DayLineItem[stop].stop`, `Change[budget].deltaPerPerson`) ;
+  - champ dont le type est un autre schéma exporté, seul ou en liste (`Day.items`, `Day.events`, `Trip.days`, `Proposal.stop`) : une ligne pour le champ lui-même ; ses sous-champs sont couverts par les lignes du schéma référencé (`Day.events` renvoie à `Stop.*`, le raffinement `kind = event` ne crée pas de clé) ;
+  - les schémas scalaires ou énumérés (`Time`, `IsoDate`, `Weekday`, `Exception`) n'ont pas de ligne propre ;
+  - vérification par script : il parcourt les formes Zod des schémas exportés selon ces règles, produit la liste des clés attendues et la compare, à l'identique, aux clés de la première colonne du tableau (aucune clé manquante, aucune en trop, aucune en double) ; le script et sa sortie figurent dans la description de la PR de B0.
 - [ ] Chaque table métier du § 6 a `organization_id NOT NULL` et une politique RLS décrite ; toute exception est justifiée.
 - [ ] Le § 6 interdit nommément les colonnes de contenu Google ; aucune colonne `rating`, `opening_hours`, `photos`, `phone`, `price_level` ou équivalent n'apparaît dans le schéma décrit.
 - [ ] Chaque workflow du § 8 a son tableau d'étapes ; aucune étape de type IA n'a « oui » dans la colonne « données Google ».
+- [ ] Le § 8 énonce la règle sur l'état persistant des workflows (une étape ne retransmet que `placeId` et un verdict daté de nos contrôles, jamais de donnée Google), et le § 10 la rattache au test nommé `workflows: aucune donnée Google dans l'état sérialisé` (entrée et sortie sérialisées de chaque étape) et à une tâche du backlog.
 - [ ] Chaque règle du § 10 et chaque test de sortie du cadrage § 9 est rattaché à un test nommé et à une tâche du backlog.
 - [ ] Le § 7 décrit la connexion par code à 6 chiffres, les rôles `propriétaire` et `conseiller`, la création de l'organisation personnelle et le passage de l'organisation de la session à `AdapterContext` et à la RLS.
 - [ ] Le § 9 n'accorde le droit « voyage débloqué » que par le webhook signé, idempotent par identifiant d'événement ; le prix vient de la configuration.
 - [ ] Chaque décision du Tech Lead est un fichier de `docs/decisions/` avec statut, date et décideur.
 - [ ] Le tableau du § 14 liste au moins les sept engagements cités, tous au statut « à décider par Samuel » ; aucun compte n'a été ouvert pour B0.
-- [ ] KV et Edge Config n'apparaissent que comme interdits (`grep -n -i 'kv\|edge config' docs/handovers/backend.md`).
+- [ ] KV et Edge Config n'apparaissent que comme interdits (`grep -n -i -E '\bKV\b|edge config' docs/handovers/backend.md` : chaque ligne renvoyée est une interdiction).
 - [ ] Aucun secret ni clé dans le document (`grep -n -E 'sk_(test|live)_|AIza|whsec_' docs/handovers/backend.md` ne renvoie rien).
 - [ ] Toutes les tâches du backlog du § 15 portent la mention « après G0 », un rôle, des prérequis et des critères.
 - [ ] Les décisions PO-1 à PO-7 sont reprises au § 15 ; aucune question réservée à Samuel (Q5, Q6, Q9, comptes, dépenses, conservation des données) n'est tranchée.
