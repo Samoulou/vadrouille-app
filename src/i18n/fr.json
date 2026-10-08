@@ -44,6 +44,17 @@
       "idees": "Idées"
     }
   },
+  "carte": {
+    "regionJour": "Carte du jour {n}",
+    "regionSejour": "Carte du séjour",
+    "evitement": "Aller à la liste des étapes",
+    "marqueur": "Étape {numero} : {name}",
+    "horsLigne": "Carte indisponible hors ligne",
+    "indisponible": "Carte indisponible. La liste contient tout le programme.",
+    "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
+    "reessayer": "Réessayer",
+    "attribution": "Données de lieux : Google"
+  },
   "dev": {
     "tokens": {
       "titre": "Tokens Ligne",
@@ -126,6 +137,18 @@
           "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
           "rangeeJour": "Jours du séjour, démonstration J9 actif"
         }
+      }
+    },
+    "carte": {
+      "titre": "Carte",
+      "intro": "Page de développement, désactivée en production. Carte simulée sur données simulées : aucun fond de carte, aucune donnée Google.",
+      "jours": "Jour affiché",
+      "liste": "Étapes du jour {n}",
+      "sejour": "Jours du séjour",
+      "attribution": {
+        "titre": "Mention d'attribution",
+        "avec": "Avec placesFromGoogle vrai :",
+        "sans": "Avec placesFromGoogle faux : aucune mention (phase 0)."
       }
     }
   }

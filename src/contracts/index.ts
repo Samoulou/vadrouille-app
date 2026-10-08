@@ -27,3 +27,11 @@ export type {
   Trip,
   Weekday,
 } from "./trip";
+export {
+  DayMapSchema,
+  MapPointRefSchema,
+  MapPointSchema,
+  mapPointKey,
+  validateDayMap,
+} from "./map";
+export type { DayMap, MapPoint, MapPointRef } from "./map";
