@@ -13,10 +13,10 @@ Phase : 0 — Valider · Régime : Veille (2 cycles par jour)
   - handover front et `docs/studio/mise-en-place.md` alignés ;
   - ADR 0004 proposé (références visuelles régénérées sur la CI) ; ADR 0003 corrigé.
   - Une correction a été nécessaire (1re tentative) sur la revue Tech Lead.
-- **F1 — Contrats Zod et données simulées Édimbourg (PR #11, ticket #8) : prête.**
+- **F1 — Contrats Zod et données simulées Édimbourg (PR #11, ticket #8) : fusionnée.**
   - Approuvée par le Tech Lead (`techlead-approved`), 145 tests.
   - zod 4.6.5 validé par le Tech Lead.
-  - `verify` vert sur la CI. `docker` a échoué une fois au téléchargement de la police Google (`next/font/google`, dans `layout.tsx`, que F1 ne touche pas) ; une relance unique est en cours. La fusion automatique est active.
+  - `verify` vert sur la CI. `docker` a échoué une fois au téléchargement de la police Google (`next/font/google`, dans `layout.tsx`, que F1 ne touche pas) ; la relance unique est verte, et la PR a été fusionnée automatiquement.
 - **Point 3 de la consigne du 15:53, questions reclassées** (ce PR) :
   - restent à Samuel : Q5, Q6, Q9 et Q12 ;
   - délégués : Q7, Q10, Q11, Q13, Q15, Q16, Q18 et Q19 à UX/UI ; Q8 et Q22 au Product Owner ; Q17 au Product Owner et à UX/UI ; Q14 au Tech Lead.
@@ -29,7 +29,6 @@ Phase : 0 — Valider · Régime : Veille (2 cycles par jour)
   - Q21 est levée.
 
 ## En cours
-- PR #11 (F1) : fusion automatique dès que `docker` est vert.
 - Suivi de #10 : une revue Tech Lead postée **après** la fusion (commentaire du 14:06:57) demande, dans l'ADR 0004 :
   - « proposé par le CEO, à trancher par le Tech Lead » ;
   - `pull-requests: write` ;
@@ -37,7 +36,7 @@ Phase : 0 — Valider · Régime : Veille (2 cycles par jour)
   - À reprendre quand le Tech Lead tranchera l'ADR 0004, avec deux autres points : `--no-renames` dans les 3 workflows et une regex partagée entre les jobs de `ci.yml`.
 
 ## Bloqué
-- F3 : attend F1 (#11) et F2.
+- F3 : attend F2 (F1 est fusionnée).
 - P0 : attend Q9 (clé Gemini) et la clé serveur Places/Routes annoncée par Samuel avec P0.
 - F4 : Q3 est levée, mais F4 attend F3.
 - B0 : attend Q14 (déléguée au Tech Lead ; la partie juridique suit Q5).
