@@ -45,3 +45,13 @@ export function IconPartager(props: IconProps) {
     </Icon>
   );
 }
+
+/** Maison du terminus de carte (StopMarker/preview.html). Les tracés à pied, bus et voiture attendent l'export SVG (Q13). */
+export function IconMaison(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 11l9-7 9 7" />
+      <path d="M6 10v10h12V10" />
+    </Icon>
+  );
+}

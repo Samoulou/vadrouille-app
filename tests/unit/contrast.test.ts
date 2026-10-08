@@ -45,7 +45,8 @@ const TEXT_PAIRS: [ColorToken, ColorToken][] = [
   ["ink-soft", "page"],
   ["ink-soft", "muted"], // état désactivé
   ["ink", "raised"], // Button secondaire, IconButton, Chip, OtpInput
-  ["ink-2", "muted"], // StatusBanner, SegmentedControl
+  ["ink-2", "muted"], // StatusBanner, SegmentedControl, bloc temps libre (F3)
+  ["ink", "muted"], // lien « Idées » du temps libre (F3)
 ];
 
 describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {

@@ -1,92 +1,98 @@
-# État du studio — 2026-10-08 (6e cycle)
+# État du studio — 2026-10-08 (7e cycle)
 
 Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
 ## Fait
-- **F2 — Composants de base (#19) : fusionnée** après la revue R2. Ticket #14 fermé avec un renvoi vers la PR. L'ADR 0005 (Tech Lead) est donc en vigueur, sauf veto de Samuel avant le 2026-10-10.
-- **Status du 5e cycle (#21) : fusionnée.**
-- Tickets fermés avec un renvoi vers leur PR (consigne du 16:33) :
-  - #13 (S2, #16) ;
-  - #15 (spec B0, #17, #18 et #20).
-  - La rédaction du handover B0 est suivie dans le nouveau ticket #22.
-- Roadmap mise à jour (ce PR) : F2 faite, F3 prête, prérequis de B0 = F1 (écart signalé dans #18 et #20), F4 spécifiée et en revue.
+- **F3 — Composants de la ligne du jour (#30, ticket #29) : fusionnée** dès la 1re revue R2 (Tech Lead et UX/UI conformes). CI verte, références visuelles prises depuis l'artefact de la CI (pas de 403). Ticket #29 fermé avec un renvoi.
+  - Écarts listés dans la PR : icônes « à pied » et « bus » omises (absentes des `preview.html`, Q51), prop `label` de `DayTabs` (règle axe `landmark-unique`), durées « 1 h 05 » (Q53), lien « Idées » souligné.
+  - **Point pour Samuel** : le soulignement du lien « Idées » est la proposition S-3 de Q37, réservée à Samuel. La revue l'a accepté dans F3. À confirmer ou à retirer (Q37).
+  - Choix à consigner par le Tech Lead dans `docs/decisions/` (Q52).
+- **Spec F4 — Carte (#25, ticket #24) : fusionnée** après la 2e correction (précédence des états de remplacement, `config.mapId`, O1 à O6). Ticket #24 fermé avec un renvoi vers #25 et #34. Décisions F4-PO définitives sans veto de Samuel avant le 2026-10-10.
+- **Roadmap à jour (#32) : fusionnée.** Elle reprend la partie roadmap de la PR de statut #28, que la porte `techlead-gate` bloquait (libellé `techlead-approved` exigé hors `STATUS.md`, `QUESTIONS.md` et `docs/releases/`). Cette PR-ci remplace #28.
 
-## En cours (3 tâches prises ce cycle, sur des fichiers distincts)
-- **B0 — Handover back-end (PR #27, ticket #22)** :
-  - livrables : `docs/handovers/backend.md` (§ 0 à § 17) et les décisions du Tech Lead 0006 à 0011 :
-    - 0006 : stack serveur, Drizzle, Postgres 17 en conteneur ;
-    - 0007 : RLS forcée ;
-    - 0008 : Better Auth ;
-    - 0009 : exécution durable ;
-    - 0010 : répartition des champs (Q14) ;
-    - 0011 : verdicts d'ancrage.
-  - **1re correction faite** sur la revue R2 :
-    - 0003 classée parmi les décisions déléguées ;
-    - `billing.processed_at` retiré ;
-    - `usage_ledger` protégé en ajout seulement dans 0007 (droits, déclencheur, test) ;
-    - drizzle-orm 0.45.4 confirmée sur npm.
-  - `needs-review` est reposé.
-- **U1 — Décisions UX/UI déléguées (PR #26, ticket #23)** :
-  - décision `docs/decisions/0012-decisions-ux-ui-f2-f3.md` : Q10, Q11, Q13, Q15 à Q19 (partie UX/UI de Q17), Q30 ;
-  - **1re correction faite** sur la revue R2 :
-    - les conventions de code deviennent des propositions au Tech Lead ;
-    - les changements de règles de Ligne sont retirés du design system et soumis à Samuel (Q37) ;
-    - le nom accessible de `DayBadge` commence par le libellé visible ;
-    - la décision est renumérotée de 0010 en 0012, à cause d'une collision avec #27.
-  - `needs-review` est reposé.
-- **Spec F4 — Carte (PR #25, ticket #24)** :
-  - 11 décisions fonctionnelles, dont F4-PO-1 et F4-PO-11, devenues des propositions au Tech Lead (F4-TL-1 à F4-TL-3) ;
-  - **1re correction faite** : terminus non focusable, numérotation au rang dans `day.items`, carte simulée déterministe, configuration injectable, test anti-Places en liste blanche ;
-  - `needs-review` est reposé.
+## En cours
+- **F4 — Carte Google Maps, code (ticket #34)** : confié à frontend (voir la fin de ce fichier pour l'état à la clôture du cycle).
+- **Spec F6 — Présentation (#33, ticket #31)** : en revue R2.
+  - Décisions du Product Owner F6-PO-1 à F6-PO-16 : ordre du paquet, « Passer », « Tout garder pour le jour N », seuils du geste, clavier, annulation 5 s, repas, questions de préférence et de distance, catégories provisoires, contenu de la carte, écrans de fin sans prix, événements, aucune persistance en phase 0.
+  - Propositions au Tech Lead F6-TL-1 à F6-TL-6 (Q58). Questions Q54 à Q57, Q59.
 
-## Bloqué
+## Bloqué (2 tentatives de correction épuisées, étape 5 du prompt R1)
+- **B0 — Handover back-end (#27, ticket #22)** :
+  - 2e correction faite ce cycle : fonctions SECURITY DEFINER à rôles dédiés, purge limitée, IP de confiance, paiement en une transaction, données Google « calculées, non stockées » en base.
+  - La revue R2 suivante : Tech Lead conforme, Sécurité non conforme sur 5 points.
+    1. Verdicts et dates de contrôle dans l'état durable des workflows.
+    2. Codes dérivés des horaires Google dans le prompt de réparation.
+    3. Codes R4 et `toConfirm` stockés dans des versions non modifiables.
+    4. Vues partagées `security_invoker`.
+    5. Routes Better Auth exposées sans liste blanche.
+  - Les points 1 à 3 relèvent de Q5, juridique (Q44). Les points 4 et 5 sont techniques.
+  - En attente de Q43.
+- **U1 — Décisions UX/UI déléguées (#26, ticket #23)** :
+  - 2e correction faite ce cycle : `border-control` gardé, S-3 en proposition, « Conséquences » exactes, ARIA, textes.
+  - La revue R2 suivante : Tech Lead conforme, UX/UI 3 points.
+    1. Interlignes de `bouton` et `numero-carte`, et usage de `pastille` : à proposer à Samuel.
+    2. Usage de `corps-fort`.
+    3. Écart WCAG 1.4.1 du provisoire « Idées » à écrire.
+  - En attente de Q43.
 - P0 : attend Q9 (clé Gemini) et la clé serveur Places/Routes.
-- F4 (code) : attend F3 et la fusion de sa spec (#25).
-- Références visuelles : l'ADR 0004 n'est pas encore implémenté. Localement, `dev-tokens.visual` échoue toujours (glyphes, 3 %) : seule la CI fait foi.
+- F5 : attend F4.
 
 ## Décisions attendues de Samuel
-- Juridique, suit Q5 :
+- **Règles du studio** :
+  - Q43 : 3e tentative de correction pour #26 et #27, découpage, ou attente ;
+  - Q23 : moment du retrait de `in-progress`.
+- **Juridique, suit Q5** :
   - Q5 et Q6 ;
-  - Q29 : verdicts d'ancrage ;
-  - Q34 : cache de 30 jours des coordonnées contre la règle de `CLAUDE.md` ;
-  - Q38 : `Segment.minutes` dans les versions.
-- Argent et comptes :
+  - Q29, Q34, Q38 ;
+  - Q44 : données dérivées de Google hors base, dont le prompt de réparation ;
+  - Q46 : fournisseurs de modèles sans entraînement sur nos données ;
+  - Q47 : IP dans les sessions, si besoin ;
+  - Q48 : conservation comptable de `billing`.
+- **Argent et comptes** :
   - Q9 : clé Gemini ;
   - Q24 à Q26 : Postgres UE, envoi des codes, Stripe test avec TWINT ;
-  - Q39 : plafonds de coût.
-- Q27 : durées de conservation.
-- Q12 : export des maquettes.
-- Q23 : moment du retrait de `in-progress`.
-- Q31 : la clé Maps accepte-t-elle les aperçus `*.vercel.app` ?
-- Q37 : modifications de Ligne proposées par UX/UI (S-0 à S-7).
-- Q40 : Docker dans les sessions des agents.
+  - Q39 et Q45 : plafonds de coût ;
+  - Q56 : PostHog UE et consentement.
+- **Offre** : Q57, ce que comptent les 8 propositions offertes.
+- **Durées et documents** :
+  - Q27 : durées de conservation ;
+  - Q12 : export des maquettes ;
+  - Q59 : `docs/ux/dossier-ux.md` absent du dépôt.
+- **Clés et environnement** :
+  - Q31 : la clé Maps accepte-t-elle les aperçus `*.vercel.app` ?
+  - Q40 : Docker dans les sessions.
+- **Ligne** : Q37 (S-0 à S-7), dont le soulignement du lien « Idées » déjà appliqué par F3.
 - Configuration de la routine R1 sur 3 h (à faire par Samuel).
-- Veto possible avant le 2026-10-10 sur les décisions déléguées :
+- **Veto possible avant le 2026-10-10** sur les décisions déléguées :
   - ADR 0005 (Tech Lead, F2) ;
   - PO-1 à PO-7 (spec B0) ;
   - ADR 0001, section « Évolution » (CEO) ;
-  - si leurs PR sont fusionnées : ADR 0006 à 0011 (#27), décision 0012 (#26), F4-PO (#25).
+  - F4-PO (spec F4, #25, fusionnée) ;
+  - F6-PO-1 à F6-PO-16, si #33 est fusionnée.
 
 ## Prochain cycle
-1. Suivre #25, #26 et #27 en revue R2 (2e et dernière tentative de correction si besoin).
-2. F3 (spec prête, F1 et F2 fusionnées) : créer le ticket et le confier à frontend, en appliquant les choix provisoires de la décision 0012.
-3. Décisions déléguées restantes :
-  - Q32, Q35 et Q41 : UX/UI et Product Owner ;
-  - Q33 et Q36 : Tech Lead ;
-  - Q42 : Product Owner ;
-  - partie Product Owner de Q17.
-4. ADR 0004 tranché et implémenté par le Tech Lead.
+1. Suivre F4 (#34) et la spec F6 (#33) en revue R2 (au plus 2 corrections chacune).
+2. Code de F6 dès que sa spec est fusionnée (prérequis F1 et F2 faits) ; F5 dès que F4 est fusionnée.
+3. #26 et #27 : appliquer la réponse de Samuel à Q43.
+4. Décisions déléguées en attente :
+  - Tech Lead : Q33, Q36, Q52, Q58 ;
+  - UX/UI : Q32, Q51, Q53 à Q55 ;
+  - Product Owner : Q35, Q41, Q42, Q49, Q50, partie Product Owner de Q17.
+5. ADR 0004 tranché et implémenté par le Tech Lead.
 
 ## Part d'usage estimée
-- 6e cycle du 2026-10-08 : environ 1 050 000 jetons (estimation).
+- 7e cycle du 2026-10-08 : environ 1 150 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| B0 handover et correction | ≈ 400 000 |
-| U1 décisions UX/UI et correction | ≈ 330 000 |
-| Spec F4 et correction | ≈ 290 000 |
-| Pilotage | ≈ 60 000 |
+| B0, 2e correction | ≈ 200 000 |
+| U1, 2e correction | ≈ 90 000 |
+| Spec F4, 2e correction | ≈ 80 000 |
+| F3 | ≈ 225 000 |
+| Spec F6 | ≈ 200 000 |
+| F4 (code) | voir la fin de ce fichier |
+| Pilotage | ≈ 150 000 |
 
-- Cumul de la journée : environ 3 750 000 jetons.
+- Cumul de la journée : environ 4 900 000 jetons.
 - Part de l'abonnement : non mesurable depuis la routine.
-- Messages de Samuel dans #studio depuis le 5e cycle (17:08) : aucun.
+- Messages de Samuel dans #studio depuis le 6e cycle (17:39) : aucun.
