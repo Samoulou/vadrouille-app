@@ -15,3 +15,6 @@ Le développement est confié à des agents automatisés, avec un cycle de 4 heu
 - Pas de serveur ni d'ordinateur allumé ; coût plafonné par l'abonnement.
 - Actions visibles au nom de Samuel sur GitHub et Slack.
 - Si l'abonnement ne suffit plus : spécialistes sur GitHub Actions avec une clé API, sans changer le reste.
+
+## Évolution
+- 2026-10-08 (Samuel) : la routine Cycle passe à un cycle toutes les 3 heures, jusqu'à 3 tâches par cycle, avec le libellé `in-progress` comme verrou sur les tickets. La release de staging reste toutes les 4 heures.

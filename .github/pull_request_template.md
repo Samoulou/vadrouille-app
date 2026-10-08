@@ -1,3 +1,6 @@
+Closes #<numéro>
+<!-- Si la PR ne termine pas la tâche, écris plutôt « Refs #<numéro> ». -->
+
 ## Tâche
 F? — titre (specs/…)
 

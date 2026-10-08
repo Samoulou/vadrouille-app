@@ -21,12 +21,12 @@ Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en
 4. TypeScript de bout en bout, Next.js, Tailwind v4 avec les tokens Ligne, Postgres en région UE, Vercel.
 
 ## Phase en cours
-**Phase 0 — Valider.** Autorisé pour le studio : socle front F0 à F3 sur données simulées, prototype de l'agent de recherche (P0). Interdit tant que la condition G0 n'est pas franchie : tout engagement de dépense externe, toute mise en production.
+**Phase 0 — Valider.** Autorisé pour le studio (périmètre élargi par Samuel le 2026-10-08) : tout le front F1 à F12 sur données simulées, le handover back-end (B0), le prototype de l'agent de recherche (P0). Interdit tant que la condition G0 n'est pas franchie : comptes et services payants (tout engagement de dépense externe), clés de production, mise en production.
 
 ## Règles du studio
-- Cycle de 4 heures ; au plus 2 tâches par cycle, sur des fichiers distincts.
+- Cycle toutes les 3 heures ; jusqu'à 3 tâches par cycle, sur des fichiers distincts (régime fixé par Samuel le 2026-10-08).
+- Verrou : le libellé `in-progress` est posé sur le ticket dès la prise de la tâche et retiré à l'ouverture de la PR ; un ticket `in-progress` n'est pas repris par un autre agent.
 - Rien n'entre dans `main` sans CI verte et validation du Tech Lead.
-- Régime actuel : **Veille** (2 cycles par jour) jusqu'à décision de Samuel.
 - Le contexte vit dans le dépôt : `STATUS.md` est mis à jour à la fin de chaque cycle.
 
 ## Qui décide quoi

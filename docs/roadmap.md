@@ -13,13 +13,13 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 ## Backlog ordonné du studio
 | Ordre | ID | Tâche | Rôle | Prérequis | Statut |
 |---|---|---|---|---|---|
-| 1 | F0 | Socle front (handover § 15) | frontend | — | Spécification prête |
-| 2 | F1 | Contrats Zod et données simulées Édimbourg | frontend | F0 | À spécifier |
-| 3 | F2 | Composants de base | frontend | F0 | À spécifier |
-| 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, comparaison Claude et Gemini) | ia-recherche | Q3, Q9 | À spécifier |
-| 5 | F3 | Composants de la ligne du jour | frontend | F1, F2 | Spécification en revue |
-| 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | — | À écrire |
-| 7 | F4 | Carte Google Maps | frontend | F3, Q3 | Bloqué par Q3 |
-| 8 | F5 à F12 | Suite du handover front-end | frontend | voir handover | Après G0 |
+| 1 | F0 | Socle front (handover § 15) | frontend | — | Fait (#3) |
+| 2 | F1 | Contrats Zod et données simulées Édimbourg | frontend | F0 | Fait (#11) |
+| 3 | F2 | Composants de base | frontend | F0 | Spécifiée — en cours (#14) |
+| 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, comparaison Claude et Gemini) | ia-recherche | Q9, clé serveur Places/Routes | Attend Q9 et la clé serveur Places/Routes |
+| 5 | F3 | Composants de la ligne du jour | frontend | F1, F2 | Spécifiée — attend F2 |
+| 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | — | Spécification en cours (#15) |
+| 7 | F4 | Carte Google Maps | frontend | F3 | Attend F3 (Q3 levée) |
+| 8 | F5 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 
-Le CEO ne dépasse pas la ligne 6 en phase 0.
+En phase 0 (périmètre élargi par Samuel le 2026-10-08), le CEO peut engager tout le front F1 à F12 sur données simulées et le handover back-end. Restent interdits avant G0 : comptes et services payants, clés de production, mise en production.
