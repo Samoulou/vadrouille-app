@@ -1,39 +1,39 @@
-# État du studio — 2026-10-09 (16e cycle)
+# État du studio — 2026-10-09 (17e cycle)
 
 Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
-Cette PR reprend #77 (état du 15e cycle, non fusionnée) et la remplace.
+Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 
 ## Messages de Samuel traités
-- Aucun nouveau message dans #studio depuis le résumé du 15e cycle (17:28 CEST).
+- Aucun nouveau message dans #studio depuis le résumé du 16e cycle (20:26 CEST).
 
 ## Fait
-- **Spec F9 — Débloquer et Programme ajusté (#73) : fusionnée** (1352222). Ticket #70 fermé avec un renvoi.
+- **Spec F11 — Mes voyages, Après le voyage, états transverses (#81) : fusionnée** (c303ee7). Ticket #79 fermé avec un renvoi.
+- **T11 — Décisions Tech Lead pour F9 (#80) : fusionnée** (15f39f5, décision 0020). Ticket #78 fermé avec un renvoi.
 
-## En cours (toutes en `needs-review`, `docs-only`)
-- **Spec F10 — Pendant le voyage, hors-ligne, vue partagée (PR #76, ticket #75)** : 1re correction faite (f7d6887, après fusion de `main`), à la suite des deux revues Tech Lead de 15:29 UTC.
-  - Service worker : il intercepte les navigations de l'origine, `/p/` compris, seulement pour servir la coquille `R-repli` en cas d'échec réseau, sans rien écrire (C39). Les requêtes RSC et les actions serveur ne sont jamais interceptées.
-  - R15 hors ligne : coquille statique sans donnée, précachée ; le document de R15 n'est jamais enregistré (C17, C18, C20 alignés).
-  - Schémas dérivés (`pick`/`omit`) ; `zod/mini` seulement pour la lecture de la copie, avec un test de parité.
-  - `DayLine` à types étroits (F10-TL-12), nouveau composant `ActionBanner` au lieu d'un bandeau `quai`, partage simulé refusé en production sans drapeau (C42), critères C35 à C42 ajoutés.
-  - Nouvelle question : Q146 (Tech Lead).
-- **T11 — Décisions Tech Lead pour F9 (PR #80, ticket #78)** : nouvelle, décision 0020 (F9-TL-1 à F9-TL-11, Q132).
-  - Contrats `billing`, `checkoutId` de 128 bits, garde `paymentDemoAllowed` fermée par défaut et toujours fausse en production, décorateur `getTripReader()`, prix dans `src/server/config/offer.ts`.
-  - Toutes les actions serveur (F8 et F9) vont dans `src/server/actions/` : amende 0016 § 3.1 règle 4. La première PR qui crée `src/server/` livre la règle de lint et `parse-input.ts`.
-  - Rien de réservé à Samuel n'est tranché (Q127 à Q131 restent ouvertes). Questions : Q147 (Product Owner), Q148 (Sécurité).
-- **Spec F11 — Mes voyages, Après le voyage, états transverses (PR #81, ticket #79)** : nouvelle, Product Owner.
-  - F11a Mes voyages (4 sections, voyages simulés Lisbonne et Porto) ; F11b Après le voyage (avis en 3 choix, lieux découverts, « Retenir mes goûts » sur consentement explicite, mémoire dans l'onglet en phase 0) ; F11c pages 404 et erreur en Ligne, catalogue `/dev/etats`.
-  - F11-PO-1 à F11-PO-20, F11-TL-1 à F11-TL-11.
-  - Questions : Q149 à Q152 et Q157 (Samuel), Q153 et Q156 (CEO, tranchées), Q154 (UX/UI), Q155 (Tech Lead). Numéros provisoires Q160 à Q168 de la PR renumérotés ici en Q149 à Q157 ; ceux de T11 (Q150, Q151) en Q147, Q148.
-- **T8 — Décision 0019 (PR #72, ticket #71)** : 1re correction faite (ffa013e), toujours en attente de revue.
-- **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : 2e et dernière correction faite ; aucune nouvelle revue depuis 09:55 UTC.
-- **État du 15e cycle (#77)** : remplacée par cette PR.
-- Note : `pnpm verify` en session échoue sur `test:visual` (17 captures sur 20, rendu des polices), comme prévu par la décision 0004 ; tout le reste passe (774 tests, 25 a11y, 74 e2e) sur #76, #80 et #81.
+## En cours (toutes en `needs-review`)
+- **F9a — Débloquer, paiement simulé, confirmation, état débloqué (PR #86, ticket #83)** : nouvelle, frontend. CI `verify` et `docker` verte sur d7df9a3 ; références visuelles prises sur la CI (décision 0004).
+  - Cible de réussite `R11` (F9-PO-18). Garde `paymentDemoAllowed` fermée par défaut et fausse en production ; actions serveur dans `src/server/actions/`, avec `parse-input.ts` et la règle de lint.
+  - Prérequis absents de `main` créés selon la spec (l. 285) et 0020 : `values.ts`, `errors.ts`, portée de simulation (`R-sim`), `DestinationPlate`.
+  - Budget JavaScript de la Journée : 194 633 o → 196 742 o, sous 200 000 o (mesure hors dépôt, T4 n'étant pas fusionnée).
+  - 5e entrée « Débloquer » sur l'accueil de démonstration ; tests de D1 adaptés, aucun test désactivé.
+  - Questions : Q160, Q161 (Tech Lead), Q162 (UX/UI) ; avis Sécurité Q148 attendu à la revue.
+- **T12 — Décisions Tech Lead pour F11 (PR #85, ticket #84)** : nouvelle, `docs-only`, décision 0021.
+  - F11-TL-1 à F11-TL-11 retenues, TL-1 et TL-3 amendées (Q155).
+  - Amende 0020 : § 3 (le décorateur fournit aussi `listTrips`), § 7 (`RetainedPreference` dans `src/contracts/preference.ts`), § 8 (`TripSessionProvider` monté dans `src/app/voyages/layout.tsx` ; F11a supprime le layout `[id]` de F9a).
+  - Rien de réservé à Samuel n'est tranché. Questions : Q158, Q159 (Product Owner).
+- **Spec F10 (PR #76, ticket #75)** : 2e et dernière correction faite (1edace2, après fusion de `main`), à la suite de la revue Tech Lead de 18:27 UTC.
+  - `SharedDay` sans `events` complets ; C37 limité au balisage rendu avant hydratation ; F10-Q3 (Q139) étendue à `name` et `meta` (dépendance à Q14) ; attribution Google F10-PO-20 et C43 ; non bloquants N1 à N9 traités.
+  - `changes-requested` retiré, `needs-review` reposé. Si une 3e correction est demandée, la tâche passe en bloqué (règle des 2 tentatives).
+- **T8 — Décision 0019 (PR #72, ticket #71)** et **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : toujours en attente de revue, sans changement.
+- **État du 16e cycle (#82)** : remplacée par cette PR.
+- Note : `pnpm verify` en session échoue sur `test:visual` (rendu des polices), comme prévu par la décision 0004 ; tout le reste passe sur #76, #85 et #86.
+- Incident : pendant F9a, un `pkill -f serve-standalone.mjs` a pu couper un serveur Playwright d'un autre worktree. Aucun effet constaté sur les livrables.
 
 ## Bloqué
 - **F5b — Fiche étape (PR #66, ticket #61)** : la revue de 10:09 UTC demande une 3e correction. Bloquant moyen : `openedFromPanel` n'est pas remis à zéro, donc « Fermer » fait `router.back()` après un retour du navigateur. Mineurs : toast sur « Retour » à 92 %, coche dans un bouton à libellé. 2 tentatives épuisées : **Q119**.
 - **T5 — Décision 0017 (PR #65, ticket #62)** : la revue de 09:56 UTC demande une 3e correction. Bloquant : § 11.0 ajoute une commande `docker run` avec les drapeaux dans `.github/workflows/ci.yml`, alors que § 11.3 interdit ces drapeaux dans les workflows. 2 tentatives épuisées : **Q119**.
-- En conséquence, toute la suite du code attend Q119 : T4, F5c, F7a, T6 (après F5b) ; T7, F8a (après #65).
+- En conséquence, la suite du code attend Q119 : T4, F5c, F7a, T6 (après F5b) ; T7, F8a (après #65). F9a, indépendante, a pu avancer.
 - **B0 (#27, ticket #22)** et **U1 (#26, ticket #23)** : en attente de Q43, sans changement.
 - **Release** : tag et release GitHub (Q118).
 - **P0** : attend Q9 (clé Gemini) et la clé serveur Places/Routes (Q103).
@@ -86,24 +86,25 @@ Cette PR reprend #77 (état du 15e cycle, non fusionnée) et la remplace.
   - si #65 est fusionnée : décision 0017 (Tech Lead), dans les 2 jours qui suivent ;
   - si #72 et #73 sont fusionnées : décision 0019 (Tech Lead), F9-PO-1 à F9-PO-20, Q125 et Q134 (CEO) ;
   - si #76 est fusionnée : F10-PO-1 à F10-PO-19 (dont Q50) et Q143 (CEO) ;
-  - si #80 est fusionnée : décision 0020 (Tech Lead) ;
-  - si #81 est fusionnée : F11-PO-1 à F11-PO-20, Q153 et Q156 (CEO).
+  - avant le 2026-10-11 : décision 0020 (Tech Lead, #80 fusionnée) ; F11-PO-1 à F11-PO-20, Q153 et Q156 (CEO, #81 fusionnée) ;
+  - si #85 est fusionnée : décision 0021 (Tech Lead) ;
+  - si #86 est fusionnée : écarts de F9a listés dans la PR (Product Owner et frontend).
 
 ## Prochain cycle
 1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
-2. Suivre #67, #72, #76, #80 et #81. Après #72 : T9 (garde de revue) en tête. Après #80 : F9a. Après #76 : décisions F10-TL (Q144, Q146). Après #81 : décisions F11-TL (Q155), puis F11c.
-3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136 et Q147.
+2. Suivre #86 (F9a), #85 (T12), #76 (spec F10, dernière correction), #72 et #67. Après #72 : T9 en tête. Après #85 : F11c. Après #76 : décisions F10-TL (Q144, Q146).
+3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136, Q147, Q158 et Q159.
 4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
 
 ## Part d'usage estimée
-- 16e cycle (2026-10-09) : environ 700 000 jetons (estimation).
+- 17e cycle (2026-10-09) : environ 870 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| Spec F11 | ≈ 265 000 |
-| T11, décision 0020 | ≈ 200 000 |
-| Correction 1 de la spec F10 | ≈ 170 000 |
-| Pilotage, état | ≈ 65 000 |
+| F9a, code et tests | ≈ 485 000 |
+| T12, décision 0021 | ≈ 195 000 |
+| Correction 2 de la spec F10 | ≈ 135 000 |
+| Pilotage, état | ≈ 55 000 |
 
 - Part de l'abonnement : non mesurable depuis la routine.
-- Messages de Samuel dans #studio depuis le 15e cycle (17:28 CEST) : aucun.
+- Messages de Samuel dans #studio depuis le 16e cycle (20:26 CEST) : aucun.
