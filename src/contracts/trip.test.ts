@@ -22,7 +22,7 @@ import {
   type Weekday,
 } from "./index";
 
-// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013) ---
+// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise : décision 0015) ---
 type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "dim.";
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
@@ -57,6 +57,18 @@ interface HandoverDay {
   generating: boolean;
   travelMinutes: number;
   travelBudgetMinutes: number;
+  /** Ajout signalé (décision 0015, § 3), comme Trip.organizationId. */
+  surprise?: HandoverSurpriseIdea;
+}
+/** Ajout signalé (décision 0015, § 3) : idée « Surprends-moi », hors handover § 9. */
+interface HandoverSurpriseIdea {
+  id: string;
+  placeId?: string;
+  name: string;
+  meta: string;
+  reason: string;
+  source: HandoverSource;
+  verifiedAt?: string;
 }
 interface HandoverChecklistItem { id: string; label: string; when: string; done: boolean; bookingUrl?: string; sponsored: boolean }
 interface HandoverTrip {
@@ -159,9 +171,44 @@ describe("types exportés", () => {
       "PreferencePromptSchema",
       "PreferenceAnswerSchema",
       "PreferenceReasonSchema",
+      "SurpriseIdeaSchema",
     ]) {
       expect(contracts).toHaveProperty(name);
     }
+  });
+});
+
+describe("SurpriseIdeaSchema (décision 0015, § 3)", () => {
+  const idea = {
+    id: "idee-1",
+    name: "[Idée]",
+    meta: "[1 h, gratuit]",
+    reason: "[Tu as choisi les balades]",
+    source: { label: "[Source]", url: "https://example.org/mock/idee" },
+  };
+
+  it("accepte une idée avec justification et source", () => {
+    expect(contracts.SurpriseIdeaSchema.safeParse(idea).success).toBe(true);
+    expect(contracts.SurpriseIdeaSchema.safeParse({ ...idea, placeId: "mock_place", verifiedAt: "2026-08-15" }).success).toBe(true);
+  });
+
+  it.each(["reason", "source"])("refuse une idée sans %s", (key) => {
+    const without: Record<string, unknown> = { ...idea };
+    delete without[key];
+    expect(contracts.SurpriseIdeaSchema.safeParse(without).success).toBe(false);
+  });
+
+  it.each([
+    ["start", "10:00"],
+    ["locked", false],
+    ["rating", 4.5],
+    ["location", { lat: 55.95, lng: -3.19 }],
+  ])("refuse le champ inconnu %s", (key, value) => {
+    expect(contracts.SurpriseIdeaSchema.safeParse({ ...idea, [key]: value }).success).toBe(false);
+  });
+
+  it("est facultative sur Day", () => {
+    expect(DaySchema.shape.surprise.safeParse(undefined).success).toBe(true);
   });
 });
 

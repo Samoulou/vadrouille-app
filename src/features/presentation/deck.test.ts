@@ -13,7 +13,6 @@ import {
   initDeck,
   isLastOption,
   preferencePromptFor,
-  releaseVelocity,
   resolveSwipe,
   swipeRotation,
   type DeckEvent,
@@ -193,15 +192,6 @@ describe("presentation: seuils et rotation du geste", () => {
     expect(swipeRotation(0, width)).toBe(0);
   });
 
-  it("calcule la vitesse sur les 100 dernières millisecondes", () => {
-    const samples = [
-      { x: 0, t: 0 },
-      { x: 10, t: 900 },
-      { x: 30, t: 950 },
-    ];
-    expect(releaseVelocity(samples, { x: 60, t: 1000 })).toBeCloseTo(0.5);
-    expect(releaseVelocity(samples, { x: 30, t: 2000 })).toBe(0);
-  });
 });
 
 describe("préférences: aucune généralisation sans réponse (règle pure)", () => {

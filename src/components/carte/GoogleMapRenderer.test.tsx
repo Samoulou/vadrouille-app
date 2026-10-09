@@ -7,7 +7,7 @@ import { messages } from "@/i18n";
 import { applyTokens, day2, day4, map2, map4, maps } from "../../../tests/unit/carte-fixtures";
 
 import { GoogleMapRenderer, LOAD_TIMEOUT_MS, MAPS_LIBRARIES } from "./GoogleMapRenderer";
-import { buildDayRoute, buildOverview } from "./route";
+import { buildDayRoute, buildOverview, offsetCenter } from "./route";
 import type { MapView } from "./types";
 
 /** Bibliothèque de chargement simulée : aucune requête, classes Google factices. */
@@ -31,6 +31,7 @@ class FakeMap {
   panTo = vi.fn();
   setCenter = vi.fn();
   setZoom = vi.fn();
+  getZoom = vi.fn(() => 14);
   constructor(
     public element: HTMLElement,
     public options: google.maps.MapOptions,
@@ -192,6 +193,42 @@ describe("GoogleMapRenderer (bibliothèque simulée)", () => {
     expect(created.maps[0]?.setCenter).toHaveBeenCalledTimes(1);
     expect(created.maps[0]?.panTo).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it("visibleInsets : un seul panTo vers le centre décalé (étape au milieu de la zone non couverte, décision 0015 § 4)", async () => {
+    const insets = { top: 0, right: 0, bottom: 464, left: 0 };
+    const { rerender } = await renderReady(dayView(day2, map2, { visibleInsets: insets }));
+    const map = created.maps[0]!;
+    rerender(
+      <GoogleMapRenderer
+        view={dayView(day2, map2, { visibleInsets: insets, selectedStopId: "j2-dean-village" })}
+        config={CONFIG}
+        placesFromGoogle={false}
+      />,
+    );
+    await act(async () => {});
+    const point = map2.points.find((p) => p.ref.type === "stop" && p.ref.stopId === "j2-dean-village")!;
+    expect(map.panTo).toHaveBeenCalledTimes(1);
+    expect(map.panTo).toHaveBeenCalledWith(offsetCenter({ lat: point.lat, lng: point.lng }, insets, 14));
+    const center = map.panTo.mock.calls[0]?.[0] as { lat: number; lng: number };
+    expect(center.lat).toBeLessThan(point.lat);
+    expect(map.fitBounds).toHaveBeenCalledTimes(1);
+  });
+
+  it("changer visibleInsets ne recadre ni ne recentre", async () => {
+    const { rerender } = await renderReady(dayView(day2, map2, { visibleInsets: { top: 0, right: 0, bottom: 200, left: 0 } }));
+    const map = created.maps[0]!;
+    rerender(
+      <GoogleMapRenderer
+        view={dayView(day2, map2, { visibleInsets: { top: 0, right: 0, bottom: 700, left: 0 } })}
+        config={CONFIG}
+        placesFromGoogle={false}
+      />,
+    );
+    await act(async () => {});
+    expect(map.fitBounds).toHaveBeenCalledTimes(1);
+    expect(map.panTo).not.toHaveBeenCalled();
+    expect(map.setCenter).not.toHaveBeenCalled();
   });
 
   it("un changement de jour recadre ; une nouvelle sélection non", async () => {

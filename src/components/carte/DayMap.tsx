@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
 import type { Day, DayMap as DayMapData } from "@/contracts";
 import { format, messages } from "@/i18n";
@@ -27,8 +27,17 @@ export type DayMapProps =
       onMarkerPress?: (stopId: string) => void;
       /** Id de la liste des étapes, cible du lien d'évitement ; l'appelant y pose `tabindex="-1"` (F4-PO-10). */
       listId: string;
-      /** Marge de cadrage ; par défaut `--touch-target` de chaque côté. */
+      /** Marge de cadrage ; par défaut `--touch-target` de chaque côté. Objet stable : le changer recadre. */
       fitPadding?: FitPadding;
+      /**
+       * Partie de la carte couverte par d'autres éléments (le panneau, en bas), décision 0015 § 4 :
+       * le recentrage sur `selectedStopId` place l'étape au milieu du reste. La changer ne recadre ni ne recentre.
+       */
+      visibleInsets?: FitPadding;
+      /** Appelée quand le lien d'évitement est activé, avant que le focus aille sur la liste (F5 : relever le panneau). */
+      onSkipToList?: () => void;
+      /** Contrôles posés sur la carte (« Retour »), après le lien d'évitement dans l'ordre de tabulation. */
+      controls?: ReactNode;
       /** F4-PO-9 ; `false` avec l'adaptateur mock. */
       placesFromGoogle: boolean;
       className?: string;
@@ -37,6 +46,10 @@ export type DayMapProps =
       mode: "overview";
       days: Day[];
       maps: DayMapData[];
+      /** Contrôles posés sur la carte (« Retour »), en tête de l'ordre de tabulation. */
+      controls?: ReactNode;
+      /** Marge de cadrage (panneau du Séjour en bas) ; par défaut `--touch-target` de chaque côté. */
+      fitPadding?: FitPadding;
       placesFromGoogle: boolean;
       className?: string;
     };
@@ -81,16 +94,17 @@ export function DayMap(props: DayMapProps) {
 
   const selectedStopId = props.mode === "day" ? props.selectedStopId : undefined;
   const onMarkerPress = props.mode === "day" ? props.onMarkerPress : undefined;
-  const fitPadding = props.mode === "day" ? props.fitPadding : undefined;
+  const fitPadding = props.fitPadding;
+  const visibleInsets = props.mode === "day" ? props.visibleInsets : undefined;
   const view = useMemo<MapView | null>(() => {
     if (route && day) {
-      return { mode: "day", fitKey: `jour-${day.index}`, route, selectedStopId, onMarkerPress, fitPadding };
+      return { mode: "day", fitKey: `jour-${day.index}`, route, selectedStopId, onMarkerPress, fitPadding, visibleInsets };
     }
     if (rings) {
-      return { mode: "overview", fitKey: "sejour", rings };
+      return { mode: "overview", fitKey: "sejour", rings, fitPadding };
     }
     return null;
-  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding]);
+  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets]);
 
   const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.rings.length > 0) : false;
   const needsConfig = !Simulated;
@@ -135,6 +149,7 @@ export function DayMap(props: DayMapProps) {
     if (target) {
       // Le focus va sur la liste sans changer l'adresse de la page.
       event.preventDefault();
+      props.onSkipToList?.();
       target.focus();
       target.scrollIntoView?.({ block: "start" });
     }
@@ -152,6 +167,7 @@ export function DayMap(props: DayMapProps) {
           {t.evitement}
         </a>
       ) : null}
+      {props.controls}
       <div role="region" aria-label={regionLabel} className="h-full">
         {/* Région live persistante (F4-PO-8) : toujours montée, seul son texte change, pour que chaque
             entrée dans un état de remplacement soit annoncée ; vide quand la carte s'affiche. */}

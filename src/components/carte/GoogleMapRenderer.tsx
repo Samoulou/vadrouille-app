@@ -10,7 +10,7 @@ import type { MapConfig } from "./config";
 import { cssLength, cssVar, defaultFitPadding, prefersReducedMotion } from "./css";
 import { MapFallback } from "./MapFallback";
 import { MarkerButton } from "./MarkerButton";
-import { boundsOf, type LatLng, type StopMarkerSpec } from "./route";
+import { boundsOf, offsetCenter, type LatLng, type StopMarkerSpec } from "./route";
 import type { MapView } from "./types";
 
 /**
@@ -91,6 +91,8 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
   const selectedStopId = view.mode === "day" ? view.selectedStopId : undefined;
   const lastSelection = useRef(selectedStopId);
   const onMarkerPressRef = useRef(view.mode === "day" ? view.onMarkerPress : undefined);
+  // Lu au recentrage seulement : changer la zone couverte ne recadre ni ne recentre (décision 0015 § 4).
+  const visibleInsetsRef = useRef(view.mode === "day" ? view.visibleInsets : undefined);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const ready = status === "ready";
@@ -105,6 +107,7 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
 
   useEffect(() => {
     onMarkerPressRef.current = view.mode === "day" ? view.onMarkerPress : undefined;
+    visibleInsetsRef.current = view.mode === "day" ? view.visibleInsets : undefined;
   });
 
   // L'état d'erreur est annoncé par l'enveloppe ; au démontage, il n'y a plus d'erreur à annoncer.
@@ -236,10 +239,12 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
     if (!target) {
       return;
     }
+    // Un seul appel : l'étape au milieu de la zone non couverte par le panneau (pas panTo puis panBy).
+    const center = offsetCenter(target.position, visibleInsetsRef.current, map.getZoom() ?? 0);
     if (prefersReducedMotion()) {
-      map.setCenter(target.position);
+      map.setCenter(center);
     } else {
-      map.panTo(target.position);
+      map.panTo(center);
     }
   }, [ready, selectedStopId, route, hosts]);
 

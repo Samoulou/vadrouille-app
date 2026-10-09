@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type StatusBannerKind = "offline" | "conflict" | "noOption" | "error" | "generating";
+export type StatusBannerKind = "offline" | "conflict" | "noOption" | "error" | "generating" | "travel";
 
 export interface StatusBannerProps {
   kind: StatusBannerKind;
@@ -25,6 +25,8 @@ const RAIL_CLASSES: Record<StatusBannerKind, string> = {
   error: "bg-ink",
   // La ligne qui se dessine : seule animation, absente sous prefers-reduced-motion.
   generating: "bg-line motion-safe:animate-pulse",
+  // Temps de trajet du jour au-delà du budget du rythme (décision 0015 § 7) ; filet provisoire (F5-Q1, Q62).
+  travel: "bg-ink-soft",
 };
 
 /**

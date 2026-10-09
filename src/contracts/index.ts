@@ -10,6 +10,7 @@ export {
   SegmentSchema,
   SourceSchema,
   StopSchema,
+  SurpriseIdeaSchema,
   TimeSchema,
   TripSchema,
   WeekdaySchema,
@@ -24,6 +25,7 @@ export type {
   Segment,
   Source,
   Stop,
+  SurpriseIdea,
   Trip,
   Weekday,
 } from "./trip";

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Day, DayLineItem, DayMap, MapPoint, Segment } from "@/contracts";
 
-import { boundsOf, buildDayRoute, buildOverview } from "./route";
+import { boundsOf, buildDayRoute, buildOverview, offsetCenter } from "./route";
 
 const stopItem = (id: string): DayLineItem => ({
   type: "stop",
@@ -117,6 +117,35 @@ describe("buildOverview", () => {
     const rings = buildOverview([mapOf(ALL), other]);
     // 4 + 1 étapes ; terminus distincts : (0, 0) et (7, 7).
     expect(rings).toHaveLength(7);
+  });
+});
+
+describe("offsetCenter (décision 0015 § 4)", () => {
+  const target = { lat: 55.95, lng: -3.19 };
+
+  it("inserts nuls ou absents : centre inchangé", () => {
+    expect(offsetCenter(target, undefined, 14)).toEqual(target);
+    expect(offsetCenter(target, { top: 0, right: 0, bottom: 0, left: 0 }, 14)).toEqual(target);
+    expect(offsetCenter(target, { top: 100, right: 30, bottom: 100, left: 30 }, 14)).toEqual(target);
+  });
+
+  it("panneau en bas : centre au sud de la cible, même longitude", () => {
+    const center = offsetCenter(target, { top: 0, right: 0, bottom: 464, left: 0 }, 14);
+    expect(center.lat).toBeLessThan(target.lat);
+    expect(center.lng).toBeCloseTo(target.lng, 12);
+  });
+
+  it("décale de (bottom − top) / 2 pixels en Web Mercator au zoom courant", () => {
+    const zoom = 14;
+    const size = 256 * 2 ** zoom;
+    const y = (lat: number) => {
+      const sin = Math.sin((lat * Math.PI) / 180);
+      return (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size;
+    };
+    const center = offsetCenter(target, { top: 0, right: 0, bottom: 464, left: 0 }, zoom);
+    expect(y(center.lat) - y(target.lat)).toBeCloseTo(232, 6);
+    const east = offsetCenter(target, { top: 0, right: 0, bottom: 0, left: 100 }, zoom);
+    expect(((east.lng - target.lng) / 360) * size).toBeCloseTo(-50, 6);
   });
 });
 

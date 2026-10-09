@@ -13,13 +13,13 @@ import { DETOUR_THRESHOLD_MINUTES, type Exception, type Proposal } from "@/contr
 import {
   MAX_ROTATION,
   TAP_MAX_DISTANCE,
-  releaseVelocity,
   resolveSwipe,
   swipeRotation,
   type Decision,
   type Gesture,
 } from "@/features/presentation/deck";
 import { format, messages } from "@/i18n";
+import { releaseVelocity, type PointerSample } from "@/lib/pointer";
 import { cn } from "@/lib/utils";
 
 import { segmentLabel } from "./DayLine";
@@ -114,7 +114,7 @@ interface Drag {
   startX: number;
   width: number;
   reducedMotion: boolean;
-  samples: { x: number; t: number }[];
+  samples: PointerSample[];
 }
 
 const EXIT_MS = 200;
@@ -204,7 +204,7 @@ function SwipeCard({
       startX: event.clientX,
       width: event.currentTarget.getBoundingClientRect().width,
       reducedMotion,
-      samples: [{ x: event.clientX, t: event.timeStamp }],
+      samples: [{ pos: event.clientX, t: event.timeStamp }],
     };
     setReduced(reducedMotion);
     setWidth(drag.current.width);
@@ -215,7 +215,7 @@ function SwipeCard({
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     const delta = event.clientX - current.startX;
-    current.samples = [...current.samples.slice(-15), { x: event.clientX, t: event.timeStamp }];
+    current.samples = [...current.samples.slice(-15), { pos: event.clientX, t: event.timeStamp }];
     if (!dragging && Math.abs(delta) < TAP_MAX_DISTANCE) return;
     setDragging(true);
     setDx(delta);
@@ -227,7 +227,7 @@ function SwipeCard({
     drag.current = null;
     setDragging(false);
     const delta = event.clientX - current.startX;
-    const velocity = releaseVelocity(current.samples, { x: event.clientX, t: event.timeStamp });
+    const velocity = releaseVelocity(current.samples, { pos: event.clientX, t: event.timeStamp });
     const outcome = resolveSwipe({ dx: delta, velocity, width: current.width });
     if (outcome === "tap") {
       setDx(0);

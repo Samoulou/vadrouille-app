@@ -6,7 +6,7 @@ import { StopMarker } from "@/components/ligne";
 
 import { defaultFitPadding } from "./css";
 import { MarkerButton } from "./MarkerButton";
-import type { LatLng } from "./route";
+import { offsetCenter, type LatLng } from "./route";
 import { drag, fitCamera, project, type Camera, type Size } from "./simulated-model";
 import type { MapView } from "./types";
 
@@ -61,7 +61,9 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
     setPreviousSelection(selectedStopId);
     const target = view.mode === "day" ? view.route.stops.find((stop) => stop.stopId === selectedStopId) : undefined;
     if (next && target) {
-      next = { ...next, center: target.position };
+      // Étape au milieu de la zone non couverte par le panneau (décision 0015 § 4).
+      const insets = view.mode === "day" ? view.visibleInsets : undefined;
+      next = { ...next, center: offsetCenter(target.position, insets, next.zoom) };
     }
   }
   if (next !== camera) {

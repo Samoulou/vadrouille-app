@@ -18,6 +18,19 @@ export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
+export { ReasonBlock, type ReasonBlockProps } from "./ReasonBlock";
+export { Sheet, type SheetProps } from "./Sheet";
+export {
+  DEFAULT_SNAP,
+  SNAP_POINTS,
+  handleReduces,
+  handleTarget,
+  nearestSnap,
+  nextSnapDown,
+  nextSnapUp,
+  snapAfterRelease,
+  type SnapPoint,
+} from "./sheet-model";
 export {
   SegmentedControl,
   type SegmentedControlProps,

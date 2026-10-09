@@ -74,6 +74,22 @@ export const DayLineItemSchema = z.discriminatedUnion("type", [
 ]);
 export type DayLineItem = z.infer<typeof DayLineItemSchema>;
 
+/**
+ * Idée « Surprends-moi » d'un jour (décision 0015 § 3) : hors programme, choisie côté serveur
+ * (sélection de B6). Justification et source obligatoires : une idée sans source n'existe pas
+ * (principe produit 2). Seul `placeId` peut venir de Google ; `name` suit la règle de `Stop.name`.
+ */
+export const SurpriseIdeaSchema = z.strictObject({
+  id: TextSchema,
+  placeId: TextSchema.optional(),
+  name: TextSchema,
+  meta: z.string(),
+  reason: TextSchema,
+  source: SourceSchema,
+  verifiedAt: IsoDateSchema.optional(),
+});
+export type SurpriseIdea = z.infer<typeof SurpriseIdeaSchema>;
+
 const EventStopSchema = StopSchema.refine((stop) => stop.kind === "event", {
   message: "Day.events ne contient que des étapes de kind « event »",
   path: ["kind"],
@@ -95,6 +111,8 @@ export const DaySchema = z.strictObject({
   travelMinutes: MinutesSchema,
   /** Budget du rythme choisi, fourni par les données (à calibrer, Q8). */
   travelBudgetMinutes: MinutesSchema,
+  /** Idée « Surprends-moi » du jour, facultative (décision 0015 § 3) : ajout au handover § 9, signalé. */
+  surprise: SurpriseIdeaSchema.optional(),
 });
 export type Day = z.infer<typeof DaySchema>;
 
