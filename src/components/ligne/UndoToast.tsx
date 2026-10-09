@@ -39,8 +39,11 @@ export function UndoToastRegion({ children, className }: UndoToastRegionProps) {
 /**
  * Annulation de la dernière action pendant 5 s (handover § 5 et § 7). Se place dans une
  * `UndoToastRegion` (`role="status"`) : le message est annoncé sans prendre le focus. Le délai est suspendu tant que le toast a le focus ou est survolé, et
- * reprend à la sortie (WCAG 2.2.1). Rendu provisoire (F6-Q1) : aplat `ink`, texte `page`, « Annuler »
- * souligné en 700. Remonter le composant (clé) pour une nouvelle action relance le délai.
+ * reprend à la sortie (WCAG 2.2.1). Rendu : aplat `ink`, texte `page`, « Annuler »
+ * souligné en 700, retenu par la décision 0014 (§ 1.3). Au focus clavier, « Annuler » prend un aplat
+ * `page` et un texte `ink` (décision 0014, § 1.2) : le contour standard `line` seul n'atteint que
+ * 2,75:1 contre l'aplat `ink` (WCAG 1.4.11). Remonter le composant (clé) pour une nouvelle action
+ * relance le délai.
  */
 export function UndoToast({ message, onUndo, onExpire, duration = 5000, className }: UndoToastProps) {
   const [paused, setPaused] = useState({ focus: false, hover: false });
@@ -80,7 +83,7 @@ export function UndoToast({ message, onUndo, onExpire, duration = 5000, classNam
       <button
         type="button"
         onClick={onUndo}
-        className="inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 cursor-pointer items-center justify-center rounded-control px-3 font-bold text-page underline underline-offset-2"
+        className="inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 cursor-pointer items-center justify-center rounded-control px-3 font-bold text-page underline underline-offset-2 focus-visible:bg-page focus-visible:text-ink"
       >
         {messages.presentation.toast.annuler}
       </button>

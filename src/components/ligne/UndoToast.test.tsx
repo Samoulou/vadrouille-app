@@ -89,6 +89,15 @@ describe("UndoToast", () => {
     expect(onExpire).toHaveBeenCalledTimes(1);
   });
 
+  it("UndoToast: « Annuler » en aplat page et texte ink au focus clavier (décision 0014, § 1.2)", () => {
+    render(<UndoToast message="[Château] écarté." onUndo={() => {}} onExpire={() => {}} />);
+    const annuler = screen.getByRole("button", { name: "Annuler" });
+    // Le rendu calculé au focus clavier est vérifié dans le navigateur (presentation.a11y.spec.ts).
+    expect(annuler).toHaveClass("focus-visible:bg-page", "focus-visible:text-ink", "text-page");
+    // Le contour global (globals.css) n'est pas remplacé.
+    expect(annuler.className).not.toMatch(/(^|\s)(focus-visible:)?(outline|ring)/);
+  });
+
   it("aucune violation axe", async () => {
     vi.useRealTimers();
     const { container } = render(

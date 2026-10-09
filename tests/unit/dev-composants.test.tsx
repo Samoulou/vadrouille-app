@@ -53,7 +53,9 @@ describe("/dev/composants", () => {
     render(<ComposantsShowcase />);
     const section = screen.getByRole("region", { name: "Présentation" });
     const p = messages.dev.composants.exemples.presentation;
-    expect(within(section).getByRole("progressbar", { name: "Proposition 4 sur 8" })).toBeInTheDocument();
+    const bar = within(section).getByRole("progressbar", { name: "Proposition 4 sur 8" });
+    expect(bar.nextElementSibling).toHaveTextContent(/^4 sur 8$/);
+    expect(bar.nextElementSibling).toHaveAttribute("aria-hidden", "true");
     expect(within(section).getByRole("button", { name: `Voir le détail de ${p.activite.nom}` })).toHaveTextContent(
       "Bus, environ 50 min (estimation)",
     );

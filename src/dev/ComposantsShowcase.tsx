@@ -298,7 +298,12 @@ export function ComposantsShowcase() {
 
       <Section id="presentation" title="Présentation">
         <State label={t.etats.progression}>
-          <DeckProgress current={4} total={8} label={format(messages.presentation.progression, { current: 4, total: 8 })} />
+          <DeckProgress
+            current={4}
+            total={8}
+            label={format(messages.presentation.progression, { current: 4, total: 8 })}
+            text={format(messages.presentation.progressionVisible, { current: 4, total: 8 })}
+          />
         </State>
         <State label={t.etats.deckActivite}>
           <DeckCard proposal={DEMO_ACTIVITE} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />

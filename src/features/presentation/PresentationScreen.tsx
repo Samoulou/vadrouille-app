@@ -223,7 +223,12 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
           className="grid min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,auto)_auto_auto] content-start gap-4 [&_[data-part=carte]]:col-start-1 [&_[data-part=carte]]:row-start-2 [&_[data-part=carte]]:max-h-full [&_[data-part=carte]]:self-start [&_[data-part=actions]]:col-start-1 [&_[data-part=actions]]:row-start-3"
         >
           <div className="col-start-1 row-start-1 flex items-center gap-3">
-            <DeckProgress current={position} total={state.cards.length} label={format(t.progression, { current: position, total: state.cards.length })} />
+            <DeckProgress
+              current={position}
+              total={state.cards.length}
+              label={format(t.progression, { current: position, total: state.cards.length })}
+              text={format(t.progressionVisible, { current: position, total: state.cards.length })}
+            />
             <Button asChild variant="text" size="sm" className="min-w-(--touch-target) font-semibold">
               <Link
                 href={programme}

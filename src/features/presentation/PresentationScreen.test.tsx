@@ -29,6 +29,8 @@ function setup(props: Partial<PresentationScreenProps> = {}) {
 const card = () => document.querySelector<HTMLButtonElement>("[data-part='carte']")!;
 const cardName = () => card().getAttribute("aria-label")!.replace("Voir le détail de ", "");
 const progress = () => screen.getByRole("progressbar");
+/** Texte visible « 4 sur 8 » sous la ligne (décision 0014, § 3). */
+const progressText = () => document.querySelector("[data-part='progression'] [data-part='texte']");
 const button = (name: string) => screen.getByRole("button", { name });
 const toast = () => document.querySelector("[data-undo-toast]");
 /** Laisse se résoudre les promesses de DeckActions. */
@@ -66,6 +68,7 @@ describe("PresentationScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Tes premières propositions" })).toBeInTheDocument();
     expect(cardName()).toBe("[Château d'Édimbourg]");
     expect(progress()).toHaveAccessibleName("Proposition 1 sur 8");
+    expect(progressText()).toHaveTextContent(/^1 sur 8$/);
     expect(screen.getByRole("link", { name: "Passer" })).toHaveAttribute("href", "/voyages/mock_trip_edimbourg");
     expect(button("Pas pour moi")).toBeInTheDocument();
     expect(button("J'aime")).toBeInTheDocument();
@@ -118,10 +121,13 @@ describe("PresentationScreen", () => {
     await click("J'aime");
     await click("Je choisis");
     expect(progress()).toHaveAccessibleName("Proposition 3 sur 7");
+    expect(progressText()).toHaveTextContent(/^3 sur 7$/);
+    expect(progressText()).toHaveAttribute("aria-hidden", "true");
     fireEvent.click(within(toast() as HTMLElement).getByRole("button", { name: "Annuler" }));
     await flush();
     expect(cardName()).toBe("[Bonne table de l'Old Town]");
     expect(progress()).toHaveAccessibleName("Proposition 2 sur 8");
+    expect(progressText()).toHaveTextContent(/^2 sur 8$/);
     expect(document.activeElement).toBe(card());
     expect(events("deck_undo").at(-1)?.properties).toEqual({ position: 2 });
     expect(toast()).toBeNull();

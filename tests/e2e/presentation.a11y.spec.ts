@@ -97,3 +97,37 @@ test("presentation: contour de focus 2 px line décalé de 2 px", async ({ page 
   }, style.color);
   expect(hex).toBe(line);
 });
+
+test("presentation: « Annuler » en aplat page et texte ink au focus clavier (décision 0014, § 1.2)", async ({ page }) => {
+  await openDeck(page);
+  await press(page, "J'aime");
+  const annuler = page.locator("[data-undo-toast]").getByRole("button", { name: "Annuler" });
+  await expect(annuler).toBeVisible();
+  await page.locator("[data-action='keep-day']").focus();
+  await page.keyboard.press("Tab");
+  await expect(annuler).toBeFocused();
+  const tokens = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    return {
+      page: root.getPropertyValue("--color-page").trim(),
+      ink: root.getPropertyValue("--color-ink").trim(),
+      line: root.getPropertyValue("--color-line").trim(),
+    };
+  });
+  const style = await annuler.evaluate((el) => {
+    const s = getComputedStyle(el);
+    const hex = (color: string) =>
+      `#${color
+        .match(/\d+/g)!
+        .slice(0, 3)
+        .map((c) => Number(c).toString(16).padStart(2, "0"))
+        .join("")}`;
+    return { bg: hex(s.backgroundColor), color: hex(s.color), outline: hex(s.outlineColor), width: s.outlineWidth, offset: s.outlineOffset };
+  });
+  expect(style.bg).toBe(tokens.page);
+  expect(style.color).toBe(tokens.ink);
+  // Le contour standard est conservé autour du bouton.
+  expect(style.outline).toBe(tokens.line);
+  expect(style.width).toBe("2px");
+  expect(style.offset).toBe("2px");
+});

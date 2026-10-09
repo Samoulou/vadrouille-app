@@ -6,54 +6,64 @@ export interface DeckProgressProps {
   total: number;
   /** Nom accessible et valeur textuelle, « Proposition 4 sur 8 » (fr.json, fourni par l'appelant). */
   label: string;
+  /** Texte visible sous la ligne, « 4 sur 8 » (fr.json, fourni par l'appelant ; décision 0014, § 3). */
+  text: string;
   className?: string;
 }
 
 /**
  * Progression de la présentation, dessinée comme une ligne (DeckCard/preview.html) : un arrêt par
  * carte, pleins jusqu'à la carte en cours. Les arrêts sont décoratifs ; l'information est portée par
- * `role="progressbar"` et son nom (F6-PO-16). Pas de texte visible (provisoire, F6-Q1).
+ * `role="progressbar"` et son nom (F6-PO-16). Sous la ligne, le texte visible « 4 sur 8 » (handover
+ * § 5, décision 0014, § 3) : `legende` `ink-soft`, chiffres tabulaires, aligné à gauche, masqué aux
+ * lecteurs d'écran qui lisent déjà le nom de la barre. Arrêts et texte tiennent dans la hauteur d'une
+ * cible tactile, celle de la rangée de « Passer ».
  */
-export function DeckProgress({ current, total, label, className }: DeckProgressProps) {
+export function DeckProgress({ current, total, label, text, className }: DeckProgressProps) {
   const safeTotal = Math.max(total, 1);
   const now = Math.min(Math.max(current, 1), safeTotal);
   const done = safeTotal > 1 ? ((now - 1) / (safeTotal - 1)) * 100 : 0;
   return (
-    <div
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={1}
-      aria-valuemax={safeTotal}
-      aria-valuenow={now}
-      aria-valuetext={label}
-      data-current={now}
-      data-total={safeTotal}
-      className={cn("relative flex h-(--ligne-deck-arret) min-w-0 flex-1 items-center", className)}
-    >
-      <span aria-hidden="true" className="absolute inset-x-0 h-(--ligne-rail) bg-outline-strong" />
-      <span
-        aria-hidden="true"
-        data-part="fait"
-        className="absolute left-0 h-(--ligne-rail) bg-line"
-        style={{ width: `calc(var(--ligne-deck-arret) / 2 + (100% - var(--ligne-deck-arret)) * ${done / 100})` }}
-      />
-      <span aria-hidden="true" className="relative flex w-full items-center justify-between">
-        {Array.from({ length: safeTotal }, (_, i) => {
-          const rank = i + 1;
-          return (
-            <span
-              key={rank}
-              data-part="arret"
-              data-state={rank < now ? "fait" : rank === now ? "en-cours" : "a-venir"}
-              className={cn(
-                "size-(--ligne-deck-arret) shrink-0 rounded-(--ligne-rayon-rond) border-(length:--ligne-deck-anneau)",
-                rank < now && "border-line bg-raised",
-                rank === now && "border-line bg-line",
-                rank > now && "border-outline-strong bg-raised",
-              )}
-            />
-          );
-        })}
+    <div data-part="progression" className={cn("flex min-w-0 flex-1 flex-col gap-1", className)}>
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={1}
+        aria-valuemax={safeTotal}
+        aria-valuenow={now}
+        aria-valuetext={label}
+        data-current={now}
+        data-total={safeTotal}
+        className="relative flex h-(--ligne-deck-arret) w-full items-center"
+      >
+        <span aria-hidden="true" className="absolute inset-x-0 h-(--ligne-rail) bg-outline-strong" />
+        <span
+          aria-hidden="true"
+          data-part="fait"
+          className="absolute left-0 h-(--ligne-rail) bg-line"
+          style={{ width: `calc(var(--ligne-deck-arret) / 2 + (100% - var(--ligne-deck-arret)) * ${done / 100})` }}
+        />
+        <span aria-hidden="true" className="relative flex w-full items-center justify-between">
+          {Array.from({ length: safeTotal }, (_, i) => {
+            const rank = i + 1;
+            return (
+              <span
+                key={rank}
+                data-part="arret"
+                data-state={rank < now ? "fait" : rank === now ? "en-cours" : "a-venir"}
+                className={cn(
+                  "size-(--ligne-deck-arret) shrink-0 rounded-(--ligne-rayon-rond) border-(length:--ligne-deck-anneau)",
+                  rank < now && "border-line bg-raised",
+                  rank === now && "border-line bg-line",
+                  rank > now && "border-outline-strong bg-raised",
+                )}
+              />
+            );
+          })}
+        </span>
+      </div>
+      <span aria-hidden="true" data-part="texte" className="text-legende text-ink-soft tabular-nums">
+        {text}
       </span>
     </div>
   );

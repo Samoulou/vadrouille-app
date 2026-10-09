@@ -186,6 +186,7 @@
     "passer": "Passer",
     "toutGarder": "Tout garder pour le jour {n}",
     "progression": "Proposition {current} sur {total}",
+    "progressionVisible": "{current} sur {total}",
     "generation": "Jour {n} en préparation",
     "carte": {
       "photo": "Photo du lieu",

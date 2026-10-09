@@ -131,8 +131,11 @@ test("presentation: boutons et clavier", async ({ page }) => {
 test("presentation: commandes toujours visibles", async ({ page }) => {
   await openDeck(page);
   for (let i = 0; i < 8; i += 1) {
+    const progressText = page.locator("[data-part='progression'] [data-part='texte']");
+    await expect(progressText).toHaveText(`${i + 1} sur 8`);
     const controls = [
       progress(page),
+      progressText,
       page.getByRole("link", { name: "Passer" }),
       card(page),
       page.locator("[data-action='dislike']"),
@@ -142,7 +145,15 @@ test("presentation: commandes toujours visibles", async ({ page }) => {
     for (const control of controls) {
       await expect(control).toBeInViewport({ ratio: 1 });
     }
-    for (const control of controls.slice(1)) {
+    // Texte « {current} sur {total} » sous la ligne, aligné à gauche, dans la hauteur de la rangée (décision 0014, § 3).
+    const bar = (await progress(page).boundingBox())!;
+    const text = (await progressText.boundingBox())!;
+    const row = (await page.locator("[data-part='progression']").locator("..").boundingBox())!;
+    expect(text.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+    expect(Math.abs(text.x - bar.x)).toBeLessThan(1);
+    expect(text.y + text.height).toBeLessThanOrEqual(row.y + row.height + 0.5);
+    expect(row.height).toBeLessThan(44.5);
+    for (const control of controls.slice(2)) {
       const box = (await control.boundingBox())!;
       expect(box.width, (await control.textContent()) ?? "").toBeGreaterThanOrEqual(44);
       expect(box.height).toBeGreaterThanOrEqual(44);
