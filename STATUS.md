@@ -10,6 +10,11 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 ## Fait
 - **Spec F11 — Mes voyages, Après le voyage, états transverses (#81) : fusionnée** (c303ee7). Ticket #79 fermé avec un renvoi.
 - **T11 — Décisions Tech Lead pour F9 (#80) : fusionnée** (15f39f5, décision 0020). Ticket #78 fermé avec un renvoi.
+- **T12 — Décisions Tech Lead pour F11 (#85, ticket #84) : ouverte et fusionnée dans le cycle** (373a63c, décision 0021). Ticket #84 fermé par la PR.
+  - F11-TL-1 à F11-TL-11 retenues, TL-1 et TL-3 amendées (Q155).
+  - Amende 0020 : § 3 (le décorateur fournit aussi `listTrips`), § 7 (`RetainedPreference` dans `src/contracts/preference.ts`), § 8 (`TripSessionProvider` monté dans `src/app/voyages/layout.tsx` ; F11a supprime le layout `[id]` de F9a).
+  - Rien de réservé à Samuel n'est tranché. Questions : Q158, Q159 (Product Owner).
+- **Release v2026.10.09-21 (#87) : fusionnée** (b20c259) ; elle liste 0020 et 0021 dans « Décisions prises par le studio ».
 
 ## En cours (toutes en `needs-review`)
 - **F9a — Débloquer, paiement simulé, confirmation, état débloqué (PR #86, ticket #83)** : nouvelle, frontend. CI `verify` et `docker` verte sur d7df9a3 ; références visuelles prises sur la CI (décision 0004).
@@ -18,10 +23,6 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
   - Budget JavaScript de la Journée : 194 633 o → 196 742 o, sous 200 000 o (mesure hors dépôt, T4 n'étant pas fusionnée).
   - 5e entrée « Débloquer » sur l'accueil de démonstration ; tests de D1 adaptés, aucun test désactivé.
   - Questions : Q160, Q161 (Tech Lead), Q162 (UX/UI) ; avis Sécurité Q148 attendu à la revue.
-- **T12 — Décisions Tech Lead pour F11 (PR #85, ticket #84)** : nouvelle, `docs-only`, décision 0021.
-  - F11-TL-1 à F11-TL-11 retenues, TL-1 et TL-3 amendées (Q155).
-  - Amende 0020 : § 3 (le décorateur fournit aussi `listTrips`), § 7 (`RetainedPreference` dans `src/contracts/preference.ts`), § 8 (`TripSessionProvider` monté dans `src/app/voyages/layout.tsx` ; F11a supprime le layout `[id]` de F9a).
-  - Rien de réservé à Samuel n'est tranché. Questions : Q158, Q159 (Product Owner).
 - **Spec F10 (PR #76, ticket #75)** : 2e et dernière correction faite (1edace2, après fusion de `main`), à la suite de la revue Tech Lead de 18:27 UTC.
   - `SharedDay` sans `events` complets ; C37 limité au balisage rendu avant hydratation ; F10-Q3 (Q139) étendue à `name` et `meta` (dépendance à Q14) ; attribution Google F10-PO-20 et C43 ; non bloquants N1 à N9 traités.
   - `changes-requested` retiré, `needs-review` reposé. Si une 3e correction est demandée, la tâche passe en bloqué (règle des 2 tentatives).
@@ -76,23 +77,22 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 - **Veto possible** :
   - avant le 2026-10-10 : ADR 0005, PO-1 à PO-7 (B0), ADR 0001 « Évolution », F4-PO, F6-PO-1 à F6-PO-16, ADR 0013, Q66, F5-PO-1 à F5-PO-18 sauf F5-PO-10 ;
   - avant le 2026-10-11 :
-    - décisions 0014, 0015 et 0016 ;
-    - F7-PO-1 à F7-PO-19 ;
-    - F8-PO-1 à F8-PO-17 ;
-    - D1-PO-1 à D1-PO-6 ;
-    - décision 0018 (UX/UI, #64 et #67) ;
-    - Q81, Q93, Q105 ;
-    - Q113 (CEO) : T7 dès la fusion de #65, puis T6 après F5b ;
+  - décisions 0014, 0015 et 0016 ;
+  - F7-PO-1 à F7-PO-19 ;
+  - F8-PO-1 à F8-PO-17 ;
+  - D1-PO-1 à D1-PO-6 ;
+  - décision 0018 (UX/UI, #64 et #67) ;
+  - Q81, Q93, Q105 ;
+  - Q113 (CEO) : T7 dès la fusion de #65, puis T6 après F5b ;
   - si #65 est fusionnée : décision 0017 (Tech Lead), dans les 2 jours qui suivent ;
   - si #72 et #73 sont fusionnées : décision 0019 (Tech Lead), F9-PO-1 à F9-PO-20, Q125 et Q134 (CEO) ;
   - si #76 est fusionnée : F10-PO-1 à F10-PO-19 (dont Q50) et Q143 (CEO) ;
-  - avant le 2026-10-11 : décision 0020 (Tech Lead, #80 fusionnée) ; F11-PO-1 à F11-PO-20, Q153 et Q156 (CEO, #81 fusionnée) ;
-  - si #85 est fusionnée : décision 0021 (Tech Lead) ;
+  - avant le 2026-10-11 : décision 0020 (Tech Lead, #80 fusionnée) ; F11-PO-1 à F11-PO-20, Q153 et Q156 (CEO, #81 fusionnée) ; décision 0021 (Tech Lead, #85 fusionnée) ;
   - si #86 est fusionnée : écarts de F9a listés dans la PR (Product Owner et frontend).
 
 ## Prochain cycle
 1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
-2. Suivre #86 (F9a), #85 (T12), #76 (spec F10, dernière correction), #72 et #67. Après #72 : T9 en tête. Après #85 : F11c. Après #76 : décisions F10-TL (Q144, Q146).
+2. Suivre #86 (F9a), #76 (spec F10, dernière correction), #72 et #67. Après #72 : T9 en tête. F11c est prête (0021 fusionnée). Après #76 : décisions F10-TL (Q144, Q146).
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136, Q147, Q158 et Q159.
 4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
 
