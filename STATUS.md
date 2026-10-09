@@ -1,29 +1,32 @@
-# État du studio — 2026-10-09 (14e cycle)
+# État du studio — 2026-10-09 (15e cycle)
 
 Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
-Cette PR reprend #69 (état du 13e cycle, non fusionnée) et la remplace.
+Cette PR reprend #74 (état du 14e cycle, non fusionnée) et la remplace.
 
 ## Messages de Samuel traités
-- Aucun nouveau message dans #studio depuis le résumé du 13e cycle (12:05 CEST).
+- Aucun nouveau message dans #studio depuis le résumé du 14e cycle (14:35 CEST).
 
 ## Fait
-- Rien n'a été fusionné depuis le 13e cycle. La release v2026.10.09-09 (#68) est fusionnée (1366f09) ; le tag et la release GitHub attendent toujours Q118.
+- Rien n'a été fusionné depuis le 13e cycle. La porte de fusion attend toujours le Tech Lead pour les PR en revue.
 
-## En cours (toutes en `needs-review`, CI `verify` et `docker` verte)
-- **Spec F9 — Débloquer et Programme ajusté (PR #73, ticket #70, `docs-only`)** : nouvelle, Product Owner.
-  - Paiement simulé uniquement : page interne qui se dit simulée, sans champ ni marque de prestataire ; TWINT puis carte ; prix lu dans la configuration (29 CHF, Q2).
-  - Rien n'est bloqué sans paiement ; le serveur fait foi et le déblocage simulé est idempotent.
-  - F9-PO-1 à F9-PO-18 ; propositions F9-TL-1 à F9-TL-10 au Tech Lead (Q132) ; découpage F9a, puis F9b après F7a.
-  - Questions : Q126 (UX/UI), Q127 à Q131, Q133, Q135 (Samuel), Q132 (Tech Lead), Q134 (CEO, tranchée), Q136 (Product Owner).
-- **T8 — Décisions Tech Lead : `DayBadge`, marqueurs, revue (PR #72, ticket #71, `docs-only`)** : nouvelle, décision 0019.
-  - Q111 : `DayBadge` passe en groupe radio (amende 0016 § 8).
-  - Q116 : chevauchement du jour 5 accepté en phase 0 ; regroupement durable par la tâche T10.
-  - Q117 : une seule revue consolidée par head, `techlead-approved` après tous les spécialistes, revue exhaustive dès la 1re passe. Deux failles relevées dans la porte : elle ignore `changes-requested`, et l'approbation survit à un nouveau push. Correction par la tâche T9.
-  - Questions : Q120 à Q122 (Samuel), Q123 (Product Owner), Q124 (UX/UI), Q125 (CEO, tranchée) ; Q110 complétée.
-- **U2 — Correction de la décision 0018 (PR #67, ticket #63, `docs-only`)** : 2e et dernière correction faite (a41064d) ; pas de nouvelle revue depuis 09:55 UTC.
-- **État du 13e cycle (#69)** : remplacée par cette PR.
-- Note : `pnpm verify` en session échoue sur `test:visual` (environ 3 % de pixels, rendu des polices), comme prévu par la décision 0004 ; la CI, qui fait référence, est verte.
+## En cours (toutes en `needs-review`)
+- **Spec F9 — Débloquer et Programme ajusté (PR #73, ticket #70, `docs-only`)** : 1re correction faite (b21a738), à la suite des deux revues Tech Lead de 12:35 UTC.
+  - Découpage : F9a mène à `R11`, F9b à `R10` ; chaque critère est étiqueté [a] ou [b] ; le fournisseur d'onglet et le layout passent dans F9a.
+  - Garde de production : 404 (jamais 500) sans adaptateur de paiement autorisé, `not_found` pour les actions, `curl` de `R9`, `R9-sim` et `R9-retour` dans le job `docker` (F9-PO-19).
+  - Variantes de prix en liste fermée dans `@/contracts/values` ; F9-PO-3 ramenée à la structure de l'écran (liste des inclusions en attente de Samuel, Q128) ; démonstration du paiement fiable seulement en local, en CI et en docker tant que Q131 est ouverte.
+  - Nouvelles F9-PO-19, F9-PO-20 et F9-TL-11 ; aucune nouvelle question pour Samuel. Observation au Tech Lead : les actions serveur de F8 sont prévues dans `src/features/**`, où la règle 4 de 0016 § 3.1 interdit `zod`.
+- **T8 — Décision 0019 (PR #72, ticket #71, `docs-only`)** : 1re correction faite (ffa013e).
+  - Bloquant traité : « bloquant tardif » pour tout écart de fond relevé tard ; « mineur, relevé tardif » réservé à la forme et à la gravité 1 ; le décompte des 2 tentatives ne change pas tant que Samuel n'a pas tranché Q122.
+  - 13 mineurs des deux revues traités. Nouvelle question : Q145 (UX/UI).
+- **Spec F10 — Pendant le voyage, hors-ligne, vue partagée (PR #76, ticket #75, `docs-only`)** : nouvelle, Product Owner, CI en cours.
+  - F10-PO-1 à F10-PO-19, F10-TL-1 à F10-TL-11, 34 critères étiquetés [a] écran 15, [b] hors-ligne, [c] partage, [t] transverse.
+  - Aucune donnée Google en cache ; Q50 proposée (aucune information de logement dans la vue partagée).
+  - Contradiction relevée : le cadrage § 3.5 range le hors-ligne après le MVP, le handover l'inclut (Q137, Samuel).
+  - Questions : Q137 à Q140 (Samuel), Q141 (UX/UI), Q142 (Tech Lead, Sécurité), Q143 (CEO, tranchée), Q144 (Tech Lead).
+- **U2 — Correction de la décision 0018 (PR #67, ticket #63, `docs-only`)** : 2e et dernière correction faite (a41064d) ; toujours aucune nouvelle revue depuis 09:55 UTC.
+- **État du 14e cycle (#74)** : remplacée par cette PR.
+- Note : `pnpm verify` en session échoue sur `test:visual` (17 captures sur 20, rendu des polices), comme prévu par la décision 0004 ; tout le reste passe (774 tests, 25 a11y, 74 e2e).
 
 ## Bloqué
 - **F5b — Fiche étape (PR #66, ticket #61)** : la revue de 10:09 UTC demande une 3e correction. Bloquant moyen : `openedFromPanel` n'est pas remis à zéro, donc « Fermer » fait `router.back()` après un retour du navigateur. Mineurs : toast sur « Retour » à 92 %, coche dans un bouton à libellé. 2 tentatives épuisées : **Q119**.
@@ -42,7 +45,8 @@ Cette PR reprend #69 (état du 13e cycle, non fusionnée) et la remplace.
   - **Q120 à Q122 (nouvelles, décision 0019)** : règle de revue dans le prompt R2, libellés `ux-approved` et `secu-approved`, correction due à un bloquant signalé tard non comptée comme tentative ;
   - Q43 : 3e tentative de correction pour #26 et #27, découpage, ou attente ;
   - Q23 : moment du retrait de `in-progress`.
-- **Juridique, à la suite de Q5** : Q5, Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q48, Q75 ; **Q127 (nouvelle)** : mentions avant paiement.
+- **Phases** : **Q137 (nouvelle)** : le hors-ligne fait-il partie du MVP mis en service ? Le cadrage le range après le MVP, le handover l'inclut.
+- **Juridique, à la suite de Q5** : Q5, Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q48, Q75, Q127 ; **Q139 (nouvelle)** : durées de trajet et « À confirmer » dans la copie hors ligne.
 - **Argent et comptes** :
   - Q9 : clé Gemini ;
   - Q24 à Q26 ;
@@ -51,8 +55,9 @@ Cette PR reprend #69 (état du 13e cycle, non fusionnée) et la remplace.
   - Q84 : longueur maximale du récit ;
   - Q103 : compte Google Cloud et clé Places ;
   - **Q129 (nouvelle)** : remboursement d'un second paiement ;
+  - **Q140 (nouvelle)** : carte Google facturée à chaque visite de la vue partagée ;
   - Q118 : tag et release GitHub de v2026.10.09-09, ou droits de la routine release.
-- **Offre et cadrage** : Q57, Q63, Q67, Q76, Q78, Q88, Q89, Q90 (partie Google) ; **nouvelles (spec F9)** : Q128 « Ce qui est inclus », Q133 autres entrées « Débloquer », Q135 « un aperçu actif à la fois ».
+- **Offre et cadrage** : Q57, Q63, Q67, Q76, Q78, Q88, Q89, Q90 (partie Google) ; **nouvelles (spec F9)** : Q128 « Ce qui est inclus », Q133 autres entrées « Débloquer », Q135 « un aperçu actif à la fois » ; **Q138 (nouvelle, spec F10)** : partage et écran 15 réservés au voyage débloqué, durée des liens.
 - **Durées et documents** : Q27, Q12 (maquettes), Q59 (Dossier UX).
 - **Clés et environnement** :
   - Q31 : `*.vercel.app`, dont dépend la carte de la démonstration ;
@@ -76,21 +81,24 @@ Cette PR reprend #69 (état du 13e cycle, non fusionnée) et la remplace.
     - Q81, Q93, Q105 ;
     - Q113 (CEO) : T7 dès la fusion de #65, puis T6 après F5b ;
   - si #65 est fusionnée : décision 0017 (Tech Lead), dans les 2 jours qui suivent ;
-  - si #72 et #73 sont fusionnées : décision 0019 (Tech Lead), F9-PO-1 à F9-PO-18, Q125 et Q134 (CEO).
+  - si #72 et #73 sont fusionnées : décision 0019 (Tech Lead), F9-PO-1 à F9-PO-20, Q125 et Q134 (CEO) ;
+  - si #76 est fusionnée : F10-PO-1 à F10-PO-19 (dont Q50) et Q143 (CEO).
 
 ## Prochain cycle
 1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
-2. Suivre #67, #72 et #73. Après #72 : T9 (garde de revue) en tête. Après #73 : décisions F9-TL (Q132), puis F9a.
+2. Suivre #67, #72, #73 et #76. Après #72 : T9 (garde de revue) en tête. Après #73 : décisions F9-TL (Q132), puis F9a. Après #76 : décisions F10-TL (Q144).
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136.
+4. S'il reste de la place : spec F11 (Mes voyages, Après le voyage, états transverses).
 
 ## Part d'usage estimée
-- 14e cycle (2026-10-09) : environ 500 000 jetons (estimation).
+- 15e cycle (2026-10-09) : environ 640 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| Spec F9 | ≈ 245 000 |
-| T8, décision 0019 | ≈ 170 000 |
-| Pilotage, état | ≈ 90 000 |
+| Spec F10 | ≈ 310 000 |
+| Correction 1 de la spec F9 | ≈ 155 000 |
+| Correction 1 de T8 | ≈ 90 000 |
+| Pilotage, état | ≈ 85 000 |
 
 - Part de l'abonnement : non mesurable depuis la routine.
-- Messages de Samuel dans #studio depuis le 13e cycle (12:05 CEST) : aucun.
+- Messages de Samuel dans #studio depuis le 14e cycle (14:35 CEST) : aucun.

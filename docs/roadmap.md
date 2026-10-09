@@ -29,7 +29,8 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 10 quinquies | T9 | Garde de revue dans `techlead-gate` : échec si `techlead-approved` et `changes-requested` coexistent ou après un nouveau push, logique dans `scripts/ci/` testée (décision 0019, Q117) | backend | fusion de #72 | En tête de la file dès la fusion de #72 (Q125, CEO) |
 | 10 sexies | T10 | Marqueurs proches sur la carte : fonction pure `groupMarkers` commune aux deux rendus (décision 0019, Q116) | frontend | F5b, T4, Q123, Q124 | Priorité basse (Q125, CEO) |
 | 10 septies | F9 | Débloquer (9) et Programme ajusté (10), paiement simulé : décisions F9-TL (Q132), puis F9a, puis F9b | product-owner, tech-lead, frontend | F6 ; F9b après F7a | Spec en revue (#73) ; F9a jamais dans le même cycle que T4, T6 ou une tâche qui touche `src/contracts` ou `src/adapters` (Q134, CEO) |
-| 11 | F7, F10 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
+| 10 octies | F10 | Pendant le voyage (15), hors-ligne PWA, vue partagée : décisions F10-TL (Q144), puis F10a, F10b, F10c | product-owner, tech-lead, frontend | F5c | Spec en revue (#76) ; ordre fixé par Q143 (CEO) |
+| 11 | F7, F11, F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
 
 En phase 0 (périmètre élargi par Samuel le 2026-10-08), le CEO peut engager tout le front F1 à F12 sur données simulées et le handover back-end. Restent interdits avant G0 : comptes et services payants, clés de production, mise en production.
