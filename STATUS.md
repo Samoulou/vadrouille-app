@@ -8,7 +8,7 @@ Cette PR reprend #77 (état du 15e cycle, non fusionnée) et la remplace.
 - Aucun nouveau message dans #studio depuis le résumé du 15e cycle (17:28 CEST).
 
 ## Fait
-- **Spec F9 — Débloquer et Programme ajusté (#73) : fusionnée** (1352222). Le ticket #70 reste à fermer avec un renvoi.
+- **Spec F9 — Débloquer et Programme ajusté (#73) : fusionnée** (1352222). Ticket #70 fermé avec un renvoi.
 
 ## En cours (toutes en `needs-review`, `docs-only`)
 - **Spec F10 — Pendant le voyage, hors-ligne, vue partagée (PR #76, ticket #75)** : 1re correction faite (f7d6887, après fusion de `main`), à la suite des deux revues Tech Lead de 15:29 UTC.
@@ -93,8 +93,7 @@ Cette PR reprend #77 (état du 15e cycle, non fusionnée) et la remplace.
 1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
 2. Suivre #67, #72, #76, #80 et #81. Après #72 : T9 (garde de revue) en tête. Après #80 : F9a. Après #76 : décisions F10-TL (Q144, Q146). Après #81 : décisions F11-TL (Q155), puis F11c.
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136 et Q147.
-4. Fermer le ticket #70 (spec F9 fusionnée) avec un renvoi vers #73.
-5. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
+4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
 
 ## Part d'usage estimée
 - 16e cycle (2026-10-09) : environ 700 000 jetons (estimation).
