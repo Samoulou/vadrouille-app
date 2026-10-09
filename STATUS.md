@@ -23,15 +23,21 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
   - Budget JavaScript de la Journée : 194 633 o → 196 742 o, sous 200 000 o (mesure hors dépôt, T4 n'étant pas fusionnée).
   - 5e entrée « Débloquer » sur l'accueil de démonstration ; tests de D1 adaptés, aucun test désactivé.
   - Questions : Q160, Q161 (Tech Lead), Q162 (UX/UI) ; avis Sécurité Q148 attendu à la revue.
-- **Spec F10 (PR #76, ticket #75)** : 2e et dernière correction faite (1edace2, après fusion de `main`), à la suite de la revue Tech Lead de 18:27 UTC.
-  - `SharedDay` sans `events` complets ; C37 limité au balisage rendu avant hydratation ; F10-Q3 (Q139) étendue à `name` et `meta` (dépendance à Q14) ; attribution Google F10-PO-20 et C43 ; non bloquants N1 à N9 traités.
-  - `changes-requested` retiré, `needs-review` reposé. Si une 3e correction est demandée, la tâche passe en bloqué (règle des 2 tentatives).
 - **T8 — Décision 0019 (PR #72, ticket #71)** et **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : toujours en attente de revue, sans changement.
 - **État du 16e cycle (#82)** : remplacée par cette PR.
 - Note : `pnpm verify` en session échoue sur `test:visual` (rendu des polices), comme prévu par la décision 0004 ; tout le reste passe sur #76, #85 et #86.
 - Incident : pendant F9a, un `pkill -f serve-standalone.mjs` a pu couper un serveur Playwright d'un autre worktree. Aucun effet constaté sur les livrables.
 
 ## Bloqué
+- **Spec F10 (PR #76, ticket #75)** : 2e et dernière correction faite (1edace2), mais la revue de 21:23 UTC demande une 3e correction. 2 tentatives épuisées : **Q163**.
+  - La correction 2 a traité les 4 bloquants de 18:27 UTC : `SharedDay` sans `events` complets, C37 avant hydratation, F10-Q3 (Q139) étendue à `name` et `meta`, attribution Google (F10-PO-20, C43).
+  - Les 5 nouveaux bloquants viennent tous de la décision 0020 (F9), fusionnée après la rédaction de la spec :
+    - actions de partage dans `src/server/actions/partage.ts`, et non dans `src/features/` ;
+    - contrat `Result<T>` / `API_ERROR_CODES` ;
+    - garde de démonstration fermée par défaut (`isProductionDeployment`) ;
+    - `getTripReader()` ;
+    - portée de simulation de 0020 § 6.
+  - Ce sont des bloquants d'alignement, pas des erreurs de fond. Ce cas relève de Q122, encore ouverte : une correction due à un bloquant signalé tard ne compterait pas comme tentative.
 - **F5b — Fiche étape (PR #66, ticket #61)** : la revue de 10:09 UTC demande une 3e correction. Bloquant moyen : `openedFromPanel` n'est pas remis à zéro, donc « Fermer » fait `router.back()` après un retour du navigateur. Mineurs : toast sur « Retour » à 92 %, coche dans un bouton à libellé. 2 tentatives épuisées : **Q119**.
 - **T5 — Décision 0017 (PR #65, ticket #62)** : la revue de 09:56 UTC demande une 3e correction. Bloquant : § 11.0 ajoute une commande `docker run` avec les drapeaux dans `.github/workflows/ci.yml`, alors que § 11.3 interdit ces drapeaux dans les workflows. 2 tentatives épuisées : **Q119**.
 - En conséquence, la suite du code attend Q119 : T4, F5c, F7a, T6 (après F5b) ; T7, F8a (après #65). F9a, indépendante, a pu avancer.
@@ -44,6 +50,7 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 
 ## Décisions attendues de Samuel
 - **Règles du studio** :
+  - **Q163 (nouvelle)** : 3e tentative pour la spec F10 (#76), dont les 5 bloquants restants sont un alignement sur 0020, fusionnée après sa rédaction ; ou attente de Q122 ;
   - **Q119 (la plus urgente)** : 3e tentative pour #65 et #66, découpage, ou attente. Toute la suite du code en dépend ;
   - Q120 à Q122 (décision 0019) : règle de revue dans le prompt R2, libellés `ux-approved` et `secu-approved`, correction due à un bloquant signalé tard non comptée comme tentative ;
   - Q43 : 3e tentative de correction pour #26 et #27, découpage, ou attente ;
@@ -92,7 +99,7 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 
 ## Prochain cycle
 1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
-2. Suivre #86 (F9a), #76 (spec F10, dernière correction), #72 et #67. Après #72 : T9 en tête. F11c est prête (0021 fusionnée). Après #76 : décisions F10-TL (Q144, Q146).
+2. Suivre #86 (F9a), #72 et #67. Après #72 : T9 en tête. F11c est prête (0021 fusionnée). #76 : appliquer la réponse à Q163 ; ensuite, décisions F10-TL (Q144, Q146).
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136, Q147, Q158 et Q159.
 4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
 
