@@ -8,7 +8,7 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 
 ## En cours
 - **F6 — Présentation « J'aime / Pas pour moi » (PR #44, ticket #42)** : 1re correction faite après la revue Tech Lead + UX/UI du 2026-10-09 00:44Z.
-  - Code (ba73950) :
+  - Code (ba73950, puis d1ba4bb) :
     - région de toast persistante (`UndoToastRegion`) ;
     - mouvement réduit sur le retour de la carte ;
     - garde contre le double appui ;
@@ -18,8 +18,12 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
     - date « 15 août 2026 ».
   - Les références visuelles sont reprises de la CI : l'artefact se télécharge désormais, sans 403.
   - CI `verify` et `docker` verte ; `gate` attend `techlead-approved`.
-  - Rendus non maquettés : décision UX/UI 0014 sur la même branche (__UX0014__).
-  - « 4 sur 8 » visible non ajouté : la spec (F6-PO-16) l'exclut, le handover § 5 le demande (Q72).
+  - Rendus non maquettés : décision UX/UI 0014 sur la même branche (b96b590), qui tranche Q54, Q55, Q68, Q69, Q72 et Q73.
+  - La décision 0014 impose 2 changements, appliqués en d1ba4bb :
+    - fond `page` au focus de « Annuler », le contour faisant 2,75:1 ;
+    - texte visible « {current} sur {total} » sous la progression.
+  - CI sur d1ba4bb : `verify` et `docker` verts.
+  - Les captures de la PR ne montrent pas encore ce texte : elles restent sous la tolérance (Q83).
   - `changes-requested` est retiré et `needs-review` reposé ; la revue R2 est relancée.
 - **T2 — Décisions Tech Lead pour F5 (PR #48, ticket #46)** : `needs-review`. Décision 0015 :
   - Q65 : F5-TL-1 à F5-TL-8 retenues, dont 5 amendées ;
@@ -92,15 +96,15 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 4. #26 et #27 : appliquer la réponse de Samuel à Q43.
 
 ## Part d'usage estimée
-- 10e cycle (2026-10-09) : environ __USAGE__ jetons (estimation).
+- 10e cycle (2026-10-09) : environ 950 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| Correction de F6 (code) | ≈ 190 000 |
-| Décision UX/UI 0014 (F6) | ≈ __UXTOK__ |
+| Correction de F6 (code, 2 passes) | ≈ 350 000 |
+| Décision UX/UI 0014 (F6) | ≈ 145 000 |
 | T2, décisions Tech Lead F5 | ≈ 150 000 |
 | Spec F8 | ≈ 220 000 |
-| Pilotage, état | ≈ 80 000 |
+| Pilotage, état | ≈ 85 000 |
 
 - Part de l'abonnement : non mesurable depuis la routine.
 - Messages de Samuel dans #studio depuis le 9e cycle (2026-10-09 03:08 CEST) : aucun.
