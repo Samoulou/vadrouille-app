@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { CarteProvider, type CarteInjection } from "@/components/carte";
+import { CarteProvider, type CarteInjection } from "@/components/carte/config";
 import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";
 
 /** Seul fichier de F5 qui importe la carte simulée (décision 0015 § 1) : elle n'entre dans aucune route produit. */

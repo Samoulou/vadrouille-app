@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Tag } from "@/components/ligne";
+import { Tag } from "@/components/ligne/Tag";
 import type { Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
 

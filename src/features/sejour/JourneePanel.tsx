@@ -1,5 +1,6 @@
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
-import { DayLine, StatusBanner } from "@/components/ligne";
+import { DayLine } from "@/components/ligne/DayLine";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { Day } from "@/contracts";
 import { format, messages } from "@/i18n";
 

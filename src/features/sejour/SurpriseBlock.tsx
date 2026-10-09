@@ -2,7 +2,8 @@
 
 import { useId, useState } from "react";
 
-import { Button, ReasonBlock } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
+import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import type { SurpriseIdea } from "@/contracts";
 import { messages } from "@/i18n";
 

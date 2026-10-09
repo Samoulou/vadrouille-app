@@ -4,7 +4,7 @@ import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { StopMarker } from "@/components/ligne";
+import { StopMarker } from "@/components/ligne/StopMarker";
 
 import type { MapConfig } from "./config";
 import { cssLength, cssVar, defaultFitPadding, prefersReducedMotion } from "./css";

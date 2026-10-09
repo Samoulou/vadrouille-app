@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import { StopMarker } from "@/components/ligne";
+import { StopMarker } from "@/components/ligne/StopMarker";
 
 import { defaultFitPadding } from "./css";
 import { MarkerButton } from "./MarkerButton";

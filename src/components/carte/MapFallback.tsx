@@ -1,4 +1,4 @@
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import { messages } from "@/i18n";
 import { cn } from "@/lib/utils";
 

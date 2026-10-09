@@ -14,8 +14,11 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 
-import { DayMap, type FitPadding } from "@/components/carte";
-import { DayTabs, IconRetour, Sheet } from "@/components/ligne";
+import { DayMap } from "@/components/carte/DayMap";
+import type { FitPadding } from "@/components/carte/types";
+import { DayTabs } from "@/components/ligne/DayTabs";
+import { IconRetour } from "@/components/ligne/icons";
+import { Sheet } from "@/components/ligne/Sheet";
 import { DEFAULT_SNAP, type SnapPoint } from "@/components/ligne/sheet-model";
 import type { DayMap as DayMapData, Trip } from "@/contracts";
 import { messages } from "@/i18n";
