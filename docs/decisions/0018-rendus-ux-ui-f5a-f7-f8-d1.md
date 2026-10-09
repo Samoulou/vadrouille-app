@@ -1,6 +1,6 @@
 # 0018 — Rendus et textes non maquettés de F5a, F7, F8 et D1
 
-Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09 · Décideur : UX/UI (écrans non maquettés, dans les règles de Ligne ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #63 · PR #64, fusionnée avant la fin de sa revue, puis correction 1 (revue « tech-lead + ux-ui » du head 8bea560)
+Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09 · Décideur : UX/UI (écrans non maquettés, dans les règles de Ligne ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #63 · PR #64, fusionnée avant la fin de sa revue, puis PR #67 : correction 1 (revue « tech-lead + ux-ui » du head 8bea560) et correction 2 sur 2 (revue Tech Lead du head b9c26c0)
 
 Numérotation : le numéro 0017 est pris par la décision de la PR #65.
 
@@ -32,6 +32,7 @@ Rien ici n'engage d'argent, de compte externe ni de donnée personnelle.
 ### Gravité
 - **Code déjà livré :** 3 majeur, 2 mineur, 1 cosmétique.
 - **Code à venir (F7, F8) :** un écart à cette décision relevé en revue compte 2, ou 3 s'il touche l'accessibilité, le vocabulaire fixe ou les règles Google.
+- **Exception :** une PR F7b conforme à la décision 0016 § 8 (`DayBadge` en mode bouton avec `aria-pressed`) n'est pas un écart à cette décision tant que U2-Q4 est ouverte (§ 10).
 
 ### Maquettes
 Si Samuel exporte une maquette qui contredit cette décision, la maquette prime et la décision est amendée. C'est surtout vrai pour l'écran 14, déjà maquetté.
@@ -81,7 +82,9 @@ Concerne les champs texte, email, recherche, nombre, date, heure et les zones de
 
 ### Texte sur `muted`
 - Tout texte posé sur un aplat `muted` (blocs, squelette, lignes d'événements, bandeaux) est en `ink-2`, secondaire compris (README, « Couleurs »). Le secondaire se distingue alors par la taille et la graisse.
-- Seule exception : l'état désactivé (`muted` et `ink-soft`), règle du handover § 5.
+- Deux exceptions :
+  - l'état désactivé (`muted` et `ink-soft`), règle du handover § 5 ;
+  - le texte d'une étape pendant son surlignage de 2 s, qui reste en `ink` (§ 9).
 
 ### Attente
 - Squelette en blocs `muted`, coins `radius-block`, de la forme du contenu attendu, **immobile**. Ligne n'a qu'une animation signature (le tracé de génération), et un scintillement n'en fait pas partie. Le squelette est `aria-hidden="true"`.
@@ -98,11 +101,15 @@ Concerne les champs texte, email, recherche, nombre, date, heure et les zones de
 - **Choisir une valeur parmi plusieurs** (raison, moment, résultat de recherche) : sémantique radio (`role="radiogroup"`, `role="radio"`, `aria-checked`), jamais `aria-pressed`.
 - **Bouton qui déclenche une action** (« Placer ici… ») : un bouton simple. La dernière cible choisie porte `aria-current="true"`.
 - `aria-pressed` reste réservé aux bascules indépendantes (`Chip`, case de la liste).
-- Pour `DayBadge` en mode bouton, que la décision 0016 § 8 prévoit avec `aria-pressed`, voir § 10 et U2-Q4.
+- Pour `DayBadge` en mode bouton, que la décision 0016 § 8 prévoit avec `aria-pressed`, voir § 10 et U2-Q4. Tant que U2-Q4 est ouverte, `aria-pressed` y est conforme.
 
 ### Position de « Retour »
 - **Sur une page pleine sans carte** (écrans 1 à 5) : `IconButton` « Retour » en haut à gauche, à la place qu'il occupe sur la carte (`carte.md`).
-- **Dans le panneau d'un voyage** (écran 14, « Ajouter un lieu ») : le « Retour » de la carte reste en haut à gauche et mène au niveau supérieur. Le bouton qui referme le contenu du panneau se place en haut à droite du panneau, comme « Fermer » de la fiche (F5, F7-PO-2).
+- **Dans le panneau d'un voyage** (écran 14, « Ajouter un lieu ») : le « Retour » de la carte reste en haut à gauche et mène au niveau supérieur. Le bouton qui referme le contenu du panneau se place en haut à droite du panneau, comme « Fermer » de la fiche (F5, F7-PO-2). Il porte l'icône « fermer » et un nom qui dit où il mène, jamais « Retour » seul :
+  - « Retour à la fiche » à l'écran 14 ;
+  - « Retour à la Journée » sur « Ajouter un lieu ».
+
+  Ainsi, aucun écran n'a deux boutons qui portent le même nom accessible pour deux destinations différentes.
 
   Ce sont deux niveaux différents : les mettre au même endroit les confondrait.
 
@@ -188,10 +195,12 @@ Ces rendus complètent les décisions 0016 § 8 et § 9.
 ### 5. Mise en page de l'écran 14 et d'« Ajouter un lieu »
 - Contenu du panneau, comme la fiche (F5-PO-8), en marges `space-5`.
 - En tête :
-  - « Retour » (`IconButton` carré, icône « retour ») en haut à droite du panneau (règles communes, « Position de « Retour » ») ;
+  - en haut à droite du panneau, un `IconButton` carré avec l'icône « fermer » : « Retour à la fiche » à l'écran 14, « Retour à la Journée » sur « Ajouter un lieu » (règles communes, « Position de « Retour » ») ;
   - titre de niveau 1 en `titre-fiche` 800 ;
   - moment en `corps-s` `ink-soft` tabulaire.
 - Les blocs suivent l'ordre de la spécification, à `space-6` d'écart.
+- **Écran 14, retour à la fiche (F7-PO-2).** « Retour à la fiche » (en haut à droite, toujours présent) et « Annuler » (sous l'aperçu, présent seulement quand une proposition est affichée) ont le même effet. Ils reviennent à la fiche de l'étape, focus sur son titre, programme inchangé. Le critère C16 de la spécification F7 se lit comme deux cas, un par bouton (U2-Q3).
+- **« Ajouter un lieu ».** « Retour à la Journée » et « Annuler » reviennent tous deux à la Journée, focus sur l'élément d'origine.
 - Étape verrouillée :
   - le titre ;
   - le message en `corps` `ink-2` ;
@@ -206,7 +215,7 @@ Ces rendus complètent les décisions 0016 § 8 et § 9.
   - une **coche de 20 px** en `on-line` avant le libellé.
 - **Options non choisies :** transparentes, texte `ink-2` 600, avec une place de 20 px réservée à gauche pour que les libellés restent alignés.
 - **Sans option choisie** (`value: null`) : aucune rangée n'est en aplat.
-- La coche est une icône du jeu Ligne (README, « Iconographie »).
+- La coche est une icône du jeu Ligne. En `on-line` sur aplat `line`, elle s'écarte du README (« Iconographie » : icônes en `ink` ou `ink-soft`, seul le terminus est blanc sur aplat). C'est une **exception provisoire**, déclarée ici et soumise à Samuel avec U2-Q1. Elle vaut pour toutes les coches sur aplat `line` de cette décision (§ 6, § 11, § 12) et suit la `Chip` choisie de 0012.
 - La version horizontale (`SegmentedControl` de F2) suit 0012.
 - Sémantique radio (règles communes). « Choisis une raison. » suit la règle des erreurs : focus sur le groupe.
 - Moments : « Temps libre 15:00 – 18:30 », « Déjeuner pas encore choisi », « Dîner pas encore choisi », chiffres tabulaires.
@@ -241,9 +250,10 @@ Ces rendus complètent les décisions 0016 § 8 et § 9.
 ### 8. `ChangeSet`
 - **Liste :** sans puces, une ligne par changement, `corps` `ink`, `space-2` entre les lignes.
 - **Heure :** en 700 tabulaire, en tête de ligne.
-- **Valeur remplacée :** `<del>` en `ink-soft`, barré, précédé de « avant : » masqué visuellement. Le barré ne porte jamais seul l'information.
+- **Valeur remplacée** (`replaced`) : `<del>` en `ink-soft`, barré, après le texte écrit « à la place de », qui suffit. Pas de « avant : » masqué : il ferait doublon.
+- **Formats à flèche** (`moved`, `segment`) : l'ancienne valeur est un `<del>` précédé de « avant : » masqué visuellement. Le barré ne porte jamais seul l'information.
 - **Flèche « → » :** `aria-hidden="true"`, suivie de « après : » masqué visuellement. Un lecteur d'écran lit « avant : J2 13:25 après : J4 15:45 », pas « flèche droite ».
-- **Trajet estimé :** « (estimation) » après la nouvelle durée, au format de F3 (« Trajet vers [Café de Stockbridge] : 15 min → 10 min (estimation) »). Sans `estimated`, rien n'est ajouté.
+- **Trajet estimé :** la nouvelle durée prend le format de F3, « environ {durée} (estimation) ». Exemple : « Trajet vers [Café de Stockbridge] : 15 min → environ 10 min (estimation) ». Sans `estimated`, ni « environ » ni « (estimation) ». La règle « environ / (estimation) » suit Q37.
 - **Budget :** signe « + » ou « − » (U+2212). Montant formaté à la mode suisse (`fr-CH`, préconisation : `Intl.NumberFormat`).
 - **Formats retenus :**
   - « {heure} {après} à la place de {avant} » ;
@@ -269,7 +279,7 @@ Ces rendus complètent les décisions 0016 § 8 et § 9.
   - Titres « Quel jour ? », « Vers quel jour ? », « Quel moment ? » : niveau 3, en `bloc`.
 - **Sémantique.** Choisir un jour est un choix exclusif.
   - UX/UI préconise une sémantique radio : groupe `role="radiogroup"` nommé par le titre, chaque pastille en `role="radio"` avec `aria-checked` ; une pastille « complet » reste atteignable avec `aria-disabled="true"`.
-  - La décision 0016 § 8 retient `aria-pressed`. Changer cette forme relève du Tech Lead (U2-Q4). D'ici là, 0016 s'applique.
+  - La décision 0016 § 8 retient `aria-pressed`. Changer cette forme relève du Tech Lead (U2-Q4). D'ici là, 0016 s'applique, et une PR F7b qui la suit n'est pas un écart à cette décision (échelle de gravité, en tête).
 
 ### 11. Feuille « Déplacer » (F7b)
 - **Feuille.** Feuille modale de F6 : fond `raised`, coins supérieurs `radius-sheet`, voile et hauteur maximale de `provisoire.css`.
@@ -298,7 +308,7 @@ Ces rendus complètent les décisions 0016 § 8 et § 9.
     - `suggestedName`, issu de notre recherche web ;
     - ou `SurpriseIdea.name`.
 
-    **Jamais par un nom venu de Google** (F7-PO-10). Une source future qui donnerait un `suggestedName` tiré de Google ne le préremplit pas : le champ reste vide. La question « prérempli par un nom Google, avec attribution » ne se pose donc jamais.
+    **Jamais par un nom venu de Google** (F7-PO-10). L'écran ne peut pas savoir d'où vient un nom : c'est le **contrat** qui le garantit. Par contrat (F7-TL-1, décision 0016), `suggestedName` et `SurpriseIdea.name` sont des noms maison, jamais dérivés d'un `displayName` Google. L'adaptateur `api` de B11 et ses tests font respecter cette garantie ; l'écran préremplit sans autre contrôle. Une source qui ne peut pas tenir cette garantie ne fournit pas de `suggestedName`, et le champ reste vide.
   - Le champ n'a **jamais** de texte indicatif. Aucun bouton « Reprendre ce nom » ou équivalent n'existe.
   - Un nom prérempli n'a **pas** de marque « déduit » : ce n'est pas une déduction du récit (0012).
 - **« Choisir » d'un repas pas encore choisi.**
@@ -371,7 +381,7 @@ Préconisation d'affectation :
     - en-tête en bouton pleine largeur, au moins 44 px, `aria-expanded` ;
     - titre en `section` 800 ;
     - « Facultatif » ou le résumé en `corps-s` `ink-soft` ;
-    - à droite, l'icône « retour » tournée vers le bas ou vers le haut (icône existante), 20 px, `ink-soft`, décorative ;
+    - à droite, un chevron de 20 px, `ink-soft`, décoratif : en attendant U2-Q1, c'est l'icône « retour » tournée vers le bas ou vers le haut. Si Samuel ajoute un chevron au jeu Ligne, il remplace cette icône tournée ;
     - filet `hairline` entre deux sections.
   - **Envies, déplacements, à limiter :** `Chip` qui passent à la ligne, écart `space-2`.
   - **« À limiter » :**
@@ -444,7 +454,7 @@ Préconisation d'affectation :
 - **Actions :** « Voir mes propositions » (`primary` `md`), puis « Passer, voir le programme » (`text`), à l'état prêt ou incomplet.
 - **Aperçu incomplet :** singulier « 1 proposition n'a pas trouvé de lieu compatible. ».
 - **Erreurs :** textes retenus.
-- **Pas de `StatusBanner` `generating`** sur cet écran : la mini-ligne et l'état de chaque jour portent l'avancement. Cette décision prime sur la spécification F8 (l. 189), qui citait le bandeau immobile de 0012 ; mise à jour par le Product Owner (U2-Q3).
+- **Pas de `StatusBanner` `generating`** sur cet écran : la mini-ligne et l'état de chaque jour portent l'avancement. Cette décision prime sur la spécification F8 (l. 189), qui citait le bandeau immobile de 0012. Le Product Owner valide ce retrait au regard de F8-PO-12 et met la spécification à jour (U2-Q3).
 
 ### 20. Textes de F8
 Les textes provisoires de la spécification sont retenus, sauf :
@@ -464,7 +474,7 @@ Les textes provisoires de la spécification sont retenus, sauf :
 |---|---|---|---|
 | `--ligne-champ-min` | 160px | F8-Q1, F7-Q1 | largeur minimale d'un champ côte à côte avant empilement |
 | `--ligne-champ-montant` | 6rem | F8-Q1 | champ du budget par repas, quatre chiffres et marges |
-| `--ligne-icone-petite` | 20px | U2-Q1 | coche, « plus », « moins », chevron des sections |
+| `--ligne-icone-petite` | 20px | U2-Q1 | coche, « plus », « moins », chevron des sections (icône « retour » tournée) |
 | `--ligne-mini-terminus` | 12px | U2-Q1 | terminus de la mini-ligne de l'écran 5 |
 
 Valeurs déjà présentes, réutilisées :
@@ -488,7 +498,10 @@ Valeurs qui ont déjà un token ou une classe :
 
 ## Nouvelles questions
 - **U2-Q1 (Samuel, complète Q37, modification de Ligne).**
-  - Demande : ajouter au jeu d'icônes « moins » et un chevron ; créer des tokens pour les valeurs du tableau `provisoire.css` ci-dessus (icône 20 px, terminus de 12 px de la mini-ligne, champs).
+  - Demande :
+    - ajouter au jeu d'icônes « moins » et un chevron, qui remplacerait l'icône « retour » tournée des sections repliées (§ 16) ;
+    - admettre la coche en `on-line` sur aplat `line` comme exception au README, « Iconographie » (§ 6) ;
+    - créer des tokens pour les valeurs du tableau `provisoire.css` ci-dessus (icône 20 px, terminus de 12 px de la mini-ligne, champs).
   - Bloque : rien. Les tracés et valeurs provisoires s'appliquent en attendant.
 - **U2-Q2 (Tech Lead).**
   - Demande : `GenerationStatus` (F8-TL-2) peut-il donner le nombre de propositions prêtes par jour ?
@@ -496,7 +509,7 @@ Valeurs qui ont déjà un token ou une classe :
 - **U2-Q3 (Product Owner).**
   - Demande : mettre les spécifications à jour d'après cette décision.
     - F8 : « Récit » devient « Revenir à mon récit » (l. 142) ; aide du récit au tutoiement ; pas de `StatusBanner` `generating` sur l'écran 5 (l. 189) ; régions live et focus des erreurs.
-    - F7 : compteur du souhait au format « {n} sur 200 caractères » ; résultats de recherche en groupe radio ; point d'insertion en `aria-current`.
+    - F7 : compteur du souhait au format « {n} sur 200 caractères » ; résultats de recherche en groupe radio ; point d'insertion en `aria-current` ; noms « Retour à la fiche » et « Retour à la Journée » ; C16 lu comme deux cas.
   - Bloque : rien. La décision prime, et les PR de F7 et F8 la citent.
 - **U2-Q4 (Tech Lead).**
   - Demande : `DayBadge` en mode bouton passe-t-il de `aria-pressed` (0016 § 8) à une sémantique radio (`radiogroup`, `aria-checked`, `aria-disabled` pour « complet »), comme UX/UI le préconise pour un choix exclusif (§ 10) ?
