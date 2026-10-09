@@ -42,6 +42,32 @@
     "tempsLibre": {
       "texte": "Temps libre jusqu'à {to}",
       "idees": "Idées"
+    },
+    "panneau": {
+      "agrandir": "Agrandir le panneau",
+      "reduire": "Réduire le panneau"
+    },
+    "raison": {
+      "titre": "Pourquoi pour toi",
+      "source": "Source : {label}",
+      "consultee": "Source consultée le {date}"
+    },
+    "dates": {
+      "longue": "{day} {month} {year}",
+      "mois": [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre"
+      ]
     }
   },
   "carte": {
@@ -92,7 +118,10 @@
         "deckRepas": "Carte repas, option 1 sur 2",
         "deckDerniere": "Carte repas, dernière option",
         "progression": "Progression, 4 sur 8",
-        "toast": "Toast d'annulation"
+        "toast": "Toast d'annulation",
+        "panneau": "Panneau à 25 %, 55 % et 92 % de son cadre",
+        "raison": "Avec date de consultation, sans date",
+        "bandeauTrajet": "Bandeau de trajet (type travel)"
       },
       "exemples": {
         "garder": "Garder",
@@ -126,7 +155,8 @@
           "conflict": "[Conflit : message fourni par l'écran]",
           "noOption": "[Aucune option : message fourni par l'écran]",
           "error": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
-          "generating": "[Génération en cours : message fourni par l'écran]"
+          "generating": "[Génération en cours : message fourni par l'écran]",
+          "travel": "[Bandeau de trajet : message composé par l'écran]"
         },
         "ligne": {
           "hotel": "[Nom de l'hôtel]",
@@ -161,6 +191,16 @@
             "meta": "[Bistrot, 1 h 30]"
           },
           "toast": "[Distillerie] écarté."
+        },
+        "programme": {
+          "panneaux": {
+            "petit": "[Panneau de démonstration à 25 %]",
+            "moyen": "[Panneau de démonstration à 55 %]",
+            "grand": "[Panneau de démonstration à 92 %]"
+          },
+          "contenu": "[Contenu du panneau, qui défile à l'intérieur]",
+          "raison": "[Tu as choisi Histoire et Balades en ville. Ancien village de meuniers au bord de la rivière.]",
+          "source": "[Office du tourisme]"
         }
       }
     },
@@ -175,6 +215,9 @@
         "avec": "Avec placesFromGoogle vrai :",
         "sans": "Avec placesFromGoogle faux : aucune mention (phase 0)."
       }
+    },
+    "voyages": {
+      "titre": "Voyage (carte simulée)"
     }
   },
   "presentation": {
@@ -235,7 +278,20 @@
       "moment": "Jour {day}, {weekday}, vers {time}",
       "source": "Source : ",
       "verifie": "Informations vérifiées le {date}",
-      "mois": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
+      "mois": [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre"
+      ],
       "fermer": "Fermer"
     },
     "fin": {
@@ -244,6 +300,29 @@
       "vide": "Aucune proposition à trier",
       "debloquer": "Débloquer",
       "programme": "Voir le programme"
+    }
+  },
+  "sejour": {
+    "titreDocument": {
+      "sejour": "{destination} · Séjour",
+      "jour": "{destination} · Jour {n}"
+    },
+    "region": "Programme",
+    "retour": "Retour",
+    "journee": {
+      "trajet": "{duree} de trajet",
+      "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
+      "enPreparation": "Jour {n} en préparation",
+      "etapes": "Étapes du jour {n}",
+      "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
+      "bandeauPlusLong": "Le plus long : {segment}, vers {name}."
+    },
+    "evenements": {
+      "titreJour": "Événements du jour",
+      "plage": "{start} – {end}"
+    },
+    "surprise": {
+      "bouton": "Surprends-moi"
     }
   }
 }

@@ -53,7 +53,7 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | Police | Hanken Grotesk 400, 600, 700, 800 via `next/font/google` | Chiffres tabulaires pour heures, dates, montants |
 | Carte | Google Maps JavaScript API, chargée par `@googlemaps/js-api-loader` (chargeur officiel de Google) ; types `@types/google.maps` | Map ID avec style cloud (§ 8). `@vis.gl/react-google-maps` non retenue : décision 0013 |
 | Gestes | Pointer Events natifs pour le glisser des cartes de présentation (seuils et rotation en fonctions pures) | `motion` non retenu pour F6 : décision 0013 |
-| Panneau coulissant | Drawer de shadcn/ui avec points d'arrêt | Vérifier que la dépendance sous-jacente est maintenue, sinon `motion` |
+| Panneau coulissant | `Sheet` de Ligne sur les Pointer Events natifs, points d'arrêt en fonctions pures (`sheet-model.ts`), transition CSS | Drawer de shadcn/ui (`vaul`, non maintenu) et `motion` non retenus : décision 0015 § 5 |
 | Validation | Zod, schémas partagés avec le back-end | `src/contracts` |
 | Données serveur | Server Actions et route handlers derrière des adaptateurs | Mocks au MVP front |
 | Tests | Vitest, Testing Library, Playwright, axe | § 14 |

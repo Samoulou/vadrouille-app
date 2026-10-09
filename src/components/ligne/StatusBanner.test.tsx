@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { StatusBanner, type StatusBannerKind } from "./StatusBanner";
+import { StatusBanner, statusBannerRole, type StatusBannerKind } from "./StatusBanner";
 
-const KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating"];
+const KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
 
 describe("StatusBanner", () => {
   it("utilise role=alert pour error et role=status pour les autres types (provisoire, Q13)", () => {
@@ -32,6 +32,14 @@ describe("StatusBanner", () => {
     const rail = screen.getByRole("status").querySelector("[data-rail]");
     expect(rail).toHaveClass("motion-safe:animate-pulse");
     expect(rail?.className).not.toMatch(/(^|\s)animate-/);
+  });
+
+  it("type travel (décision 0015 § 7) : role=status, filet ink-soft fixe", () => {
+    expect(statusBannerRole("travel")).toBe("status");
+    render(<StatusBanner kind="travel" message="2 h 45 de trajet ce jour" />);
+    const rail = screen.getByRole("status").querySelector("[data-rail]");
+    expect(rail).toHaveClass("bg-ink-soft");
+    expect(rail?.className).not.toMatch(/animate-/);
   });
 
   it("affiche une action éventuelle sous le message", () => {

@@ -55,7 +55,15 @@ export function fitCamera(positions: LatLng[], size: Size, padding: FitPadding):
       break;
     }
   }
-  return { center, zoom };
+  // Marge asymétrique (panneau en bas, F5) : la boîte est centrée dans la zone hors marge, comme fitBounds.
+  const scale = scaleAt(zoom);
+  return {
+    center: {
+      lat: center.lat - (padding.bottom - padding.top) / 2 / scale,
+      lng: center.lng + (padding.right - padding.left) / 2 / scale,
+    },
+    zoom,
+  };
 }
 
 /** Glisser de (dx, dy) pixels : le centre se déplace de l'opposé, converti par l'échelle. */

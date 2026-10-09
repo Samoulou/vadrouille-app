@@ -99,3 +99,24 @@
   /* F6-Q1 : hauteur maximale de la feuille modale, 92 % de la fenêtre (rendu non maquetté). */
   --ligne-feuille-hauteur-max: 92dvh;
 }
+
+/*
+ * F5, panneau coulissant, Journée et « Surprends-moi ». Rendus non maquettés (F5-Q1, Q62) et
+ * style de texte de tokens.json absent du handover § 4.1 (Q11).
+ */
+:root {
+  /* F5-Q1 : largeur de la barre de la poignée du panneau (rendu non maquetté). */
+  --ligne-poignee-largeur: 40px;
+  /* F5-Q1 : épaisseur de la barre de la poignée du panneau (rendu non maquetté). */
+  --ligne-poignee-epaisseur: 4px;
+  /* F5-Q1 : largeur minimale du bouton de la poignée, plus large que la cible de 44 px (rendu non maquetté). */
+  --ligne-poignee-zone: 88px;
+  /* Q11 : style de texte bloc de tokens.json (15/20, 800), titre du ReasonBlock (ReasonBlock/preview.html). */
+  --ligne-texte-bloc: 15px;
+  /* Q11 : interligne du style bloc. */
+  --ligne-texte-bloc-interligne: 20px;
+  /* Q19 : marge intérieure verticale du ReasonBlock (14 px, ReasonBlock/preview.html). */
+  --ligne-bloc-marge-v: 14px;
+  /* Q19 : marge intérieure horizontale du ReasonBlock (16 px, ReasonBlock/preview.html). */
+  --ligne-bloc-marge-h: 16px;
+}

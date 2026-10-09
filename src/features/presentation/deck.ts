@@ -193,8 +193,6 @@ export const SWIPE_FLICK_MIN_DISTANCE = 24;
 export const TAP_MAX_DISTANCE = 10;
 /** Rotation maximale (degrés). */
 export const MAX_ROTATION = 8;
-/** Fenêtre de temps (ms) des derniers mouvements qui servent au calcul de la vitesse. */
-export const VELOCITY_WINDOW_MS = 100;
 
 export type SwipeOutcome = Decision | "return" | "tap";
 
@@ -214,17 +212,6 @@ export function swipeRotation(dx: number, width: number): number {
   if (dx === 0 || width <= 0) return 0;
   const ratio = Math.min(Math.abs(dx) / (SWIPE_DISTANCE_RATIO * width), 1);
   return Math.sign(dx) * MAX_ROTATION * ratio;
-}
-
-/**
- * Vitesse horizontale (px/ms) au relâchement, sur les mouvements des `VELOCITY_WINDOW_MS` dernières
- * millisecondes ; nulle si le pointeur n'a pas bougé dans la fenêtre.
- */
-export function releaseVelocity(samples: readonly { x: number; t: number }[], release: { x: number; t: number }): number {
-  const recent = samples.filter((sample) => release.t - sample.t <= VELOCITY_WINDOW_MS);
-  const first = recent[0];
-  if (!first || release.t <= first.t) return 0;
-  return (release.x - first.x) / (release.t - first.t);
 }
 
 // --- Question de préférence (F6-PO-8, F6-PO-9) -------------------------------------

@@ -26,6 +26,16 @@ describe("modèle de la carte simulée", () => {
     expect(camera.zoom).toBe(14);
   });
 
+  it("marge asymétrique (panneau en bas) : la boîte est centrée dans la zone hors marge", () => {
+    const positions = [{ lat: 55.95, lng: -3.2 }, { lat: 55.96, lng: -3.18 }];
+    const size = { width: 390, height: 844 };
+    const camera = fitCamera(positions, size, { top: 44, right: 44, bottom: 464, left: 44 })!;
+    // Centre de la boîte projeté au milieu de la zone visible : (844 − 464 + 44) / 2 = 212 px depuis le haut.
+    const { x, y } = project({ lat: 55.955, lng: -3.19 }, camera);
+    expect(x).toBeCloseTo(0);
+    expect(size.height / 2 - y).toBeCloseTo((44 + (844 - 464)) / 2);
+  });
+
   it("plafonne le zoom pour une seule position et renvoie null sans position", () => {
     expect(fitCamera([{ lat: 1, lng: 1 }], { width: 390, height: 320 }, PADDING)?.zoom).toBe(MAX_ZOOM);
     expect(fitCamera([], { width: 390, height: 320 }, PADDING)).toBeNull();
