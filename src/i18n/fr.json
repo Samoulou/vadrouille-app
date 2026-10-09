@@ -2,6 +2,31 @@
   "produit": {
     "promesse": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
   },
+  "accueil": {
+    "demo": {
+      "titre": "Démonstration",
+      "mention": "Données simulées. Les lieux entre crochets ne sont pas vérifiés.",
+      "voyage": "Voyage d'exemple : {destination}",
+      "liens": {
+        "presentation": {
+          "libelle": "Tes premières propositions",
+          "precision": "J'aime / Pas pour moi, avant de débloquer"
+        },
+        "suite": {
+          "libelle": "Suite du tri",
+          "precision": "Voyage débloqué"
+        },
+        "sejour": {
+          "libelle": "Séjour",
+          "precision": "Le programme jour par jour"
+        },
+        "jour": {
+          "libelle": "Jour 1",
+          "precision": "Étapes et trajets du jour"
+        }
+      }
+    }
+  },
   "ligne": {
     "tag": {
       "toReserve": "À réserver",
