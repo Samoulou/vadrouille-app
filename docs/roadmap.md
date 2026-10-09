@@ -21,9 +21,11 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | F1 | Spécifiée (#17, #18, #20) — handover en revue (#27), bloqué après 2 corrections (Q43) |
 | 7 | F4 | Carte Google Maps | frontend | F3 | Fait (spec #25, code #35) |
 | 8 | T1 | Décisions déléguées du Tech Lead (Q33, Q36, Q52, Q58, Q60) | tech-lead | — | Fait (#39, ADR 0013) |
-| 9 | F6 | Présentation « J'aime / Pas pour moi » | frontend | F1, F2, ADR 0013 | Spécifiée (#33) — code en cours (ticket #42) |
-| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | Spécification en revue (#40) ; ordre F6 puis F5 (Q66, CEO) |
+| 9 | F6 | Présentation « J'aime / Pas pour moi » | frontend | F1, F2, ADR 0013 | Fait (spec #33, code #44) |
+| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | F5a fait (#54) ; F5b en revue (#66) ; F5c après T4 |
 | 10 bis | T4 | JavaScript initial de la Journée sous le budget de 200 Ko (Q95) : valeurs des contrats sans Zod côté client, mesure en `zod/mini`, règle de lint, test e2e de budget | frontend | F5b ; avant F5c | Décidée (décision 0016 § 3) ; place exacte fixée par le CEO |
+| 10 ter | T7 | Un port Playwright par worktree, `reuseExistingServer: false` (Q107, décision 0017) | frontend | fusion de #65 | Jamais dans le même cycle que F8b (Q113, CEO) |
+| 10 quater | T6 | Positions simulées du voyage débloqué d'Édimbourg, pour la carte de la démonstration (Q100, décision 0017) | frontend | fusion de #65 et de F5b (#66) | Jamais dans le même cycle qu'une tâche qui touche `src/mocks` ou `src/adapters` (Q113, CEO) |
 | 11 | F7 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
 
