@@ -190,3 +190,28 @@ Aucune de ces décisions n'engage d'argent, de compte externe, de point juridiqu
 - **Q63** et **Q67** (Samuel) : ce que montre un voyage non débloqué, et « Garder » sur la fiche. Aucune décision technique ici n'en préjuge.
 - **Q62** (UX/UI, F5-Q1) : rendus provisoires, dont le filet du type `travel`.
 - **Q5** et **Q14** (Samuel, juridique) : origine et conservation des données de lieux. Elles concernent aussi `Day.surprise` quand les données seront réelles.
+
+## Amendement F5b (proposé par le front, confirmé par la revue Tech Lead)
+Date : 2026-10-09 · PR #66 (F5b, ticket #61), revue Tech Lead du 2026-10-09. Cet amendement modifie le § 5.3 et le § 6, et précise le § 5.1.
+
+- **(a) Implémentation en mémoire de `ProgrammeActions` (amende § 6).**
+  - Le layout ne l'injecte pas : un objet de fonctions ne traverse pas la frontière serveur/client (même raison que la décision 0016 § 1.2).
+  - `TripShell` la crée par `createMemoryProgramme(trip, dispatch)`, sous `useMemo`.
+  - Une prop facultative `actions?: ProgrammeActions` la remplace, pour les tests puis pour B11.
+  - Le réducteur, `applyProgramme` et l'interface asynchrone (`setStopLocked`, `undo`) ne changent pas.
+- **(b) État de la fiche dans `TripShell` (précise § 5.3).**
+  - Ces éléments vivent dans `TripShell` et son contexte, et non dans la page :
+    - la fiche ouverte, déduite de `?etape=` par `useSearchParams` ;
+    - son origine : ouverte depuis le panneau du jour, ou directement ;
+    - la fiche fermée, dont le lien doit reprendre le focus ;
+    - la sélection laissée par un marqueur ;
+    - l'annonce d'étape absente.
+  - Raison : Next.js peut remonter la page quand ses paramètres de recherche changent, et cet état serait alors perdu.
+  - La page (`JourneeView`) se contente de lire le contexte et de rendre le focus.
+- **(c) Prop `Sheet.above` (précise § 5.1).**
+  - `Sheet` gagne `above?: ReactNode`, affiché en position absolue juste au-dessus du bord supérieur du panneau. Ce contenu suit les changements de hauteur et le glisser.
+  - Le toast d'annulation unique de `TripShell` (décision 0016 § 9) y est placé.
+  - La zone porte `pointer-events-none`, pour ne pas bloquer la carte.
+- **(d) `scroll={false}` sur les liens d'étape et d'événement.**
+  - Les `Link` des arrêts de `DayLine` et des lignes d'événement (`EventLines`) ouvrent la fiche sans le défilement automatique de Next.js.
+  - L'écran garde la main sur le défilement du contenu du panneau (marqueur, retour du focus).

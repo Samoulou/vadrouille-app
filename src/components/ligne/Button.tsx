@@ -4,6 +4,8 @@ import type { ComponentPropsWithRef } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { IconCoche } from "./icons";
+
 /**
  * Bouton d'action Ligne, adapté du Button de shadcn/ui (cva, Slot, cn) sans ses variantes
  * hors Ligne (destructive, ombres). Design system : components/Button.
@@ -15,7 +17,7 @@ export const buttonVariants = cva(
       variant: {
         primary: "bg-line px-5 text-(length:--ligne-bouton-texte) font-extrabold text-on-line",
         secondary:
-          "border-(length:--ligne-trait-controle) border-ink bg-raised px-5 text-(length:--ligne-bouton-texte) font-bold text-ink disabled:border-muted",
+          "border-(length:--ligne-trait-controle) border-ink bg-raised px-5 text-(length:--ligne-bouton-texte) font-bold text-ink disabled:border-muted aria-pressed:bg-ink aria-pressed:text-page",
         text: "bg-transparent px-2 text-corps font-normal underline underline-offset-2",
       },
       tone: {
@@ -56,11 +58,24 @@ export function Button({
   tone = "ink",
   asChild = false,
   type,
+  children,
   ...props
 }: ButtonProps) {
   const classes = cn(buttonVariants({ variant, size, tone }), className);
   if (asChild) {
-    return <Slot className={classes} {...props} />;
+    return (
+      <Slot className={classes} {...props}>
+        {children}
+      </Slot>
+    );
   }
-  return <button type={type ?? "button"} className={classes} {...props} />;
+  // Bouton bascule enfoncé (`aria-pressed`) : aplat `ink` et texte `page` (variante secondaire), plus une coche
+  // devant le libellé, pour que l'état ne repose pas sur la couleur seule (WCAG 1.4.1 ; rendu provisoire, UX/UI).
+  const pressed = props["aria-pressed"] === true || props["aria-pressed"] === "true";
+  return (
+    <button type={type ?? "button"} className={classes} {...props}>
+      {pressed ? <IconCoche data-part="coche" /> : null}
+      {children}
+    </button>
+  );
 }

@@ -199,6 +199,8 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
   });
   if (ficheKey !== tracked.ficheKey || dayIndex !== tracked.dayIndex) {
     setTracked({ ficheKey, fiche: fiche && day ? { dayIndex: day.index, stopId: fiche.stop.id } : undefined, dayIndex });
+    // L'annonce d'étape absente ne vaut que pour le jour où elle a été faite : un changement de jour l'efface.
+    if (dayIndex !== tracked.dayIndex) setMissingNoticeDay(null);
     if (ficheKey && ficheKey !== tracked.ficheKey) {
       setMarkerSelection(null);
       setMissingNoticeDay(null);

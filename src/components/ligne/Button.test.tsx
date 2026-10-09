@@ -69,6 +69,26 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Passer" })).toHaveClass("text-corps", "text-ink-soft");
   });
 
+  it("bouton bascule : enfoncé, aplat ink, texte page et coche ; libellé et nom accessible inchangés", () => {
+    const { rerender } = render(
+      <Button variant="secondary" aria-pressed={false}>
+        Verrouiller
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Verrouiller" });
+    expect(button).toHaveClass("aria-pressed:bg-ink", "aria-pressed:text-page");
+    expect(button.querySelector("[data-part='coche']")).toBeNull();
+    rerender(
+      <Button variant="secondary" aria-pressed>
+        Verrouiller
+      </Button>,
+    );
+    expect(screen.getByRole("button", { name: "Verrouiller", pressed: true })).toBeInTheDocument();
+    const check = button.querySelector("[data-part='coche']");
+    expect(check).not.toBeNull();
+    expect(check).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("n'a aucune violation axe", async () => {
     const { container } = render(
       <>

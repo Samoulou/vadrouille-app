@@ -153,6 +153,25 @@ test.describe("Fiche étape", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Dimanche 30 août");
     await expect(sheet(page).locator("[data-part='annonce-etape']")).toHaveText("Cette étape n'est plus dans ce jour.");
     await expect(sheet(page).locator("[data-part='annonce-etape']")).toHaveAttribute("role", "status");
+    // L'annonce ne vaut que pour ce jour : un aller-retour J3 puis J2 ne la réaffiche pas.
+    await sheet(page).getByRole("link", { name: "Jour 3, lun." }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lundi 31 août");
+    await expect(sheet(page).locator("[data-part='annonce-etape']")).toHaveText("");
+    await sheet(page).getByRole("link", { name: "Jour 2, dim." }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Dimanche 30 août");
+    await expect(sheet(page).locator("[data-part='annonce-etape']")).toHaveText("");
+  });
+
+  test("fiche: « Verrouiller » enfoncé visible sans la couleur seule (coche)", async ({ page }) => {
+    await page.goto(`${JOUR2}?etape=${DEAN}`);
+    const lock = fiche(page).getByRole("button", { name: "Verrouiller" });
+    await expect(lock.locator("[data-part='coche']")).toHaveCount(0);
+    const before = await lock.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await lock.click();
+    await expect(lock).toHaveAttribute("aria-pressed", "true");
+    await expect(lock.locator("[data-part='coche']")).toBeVisible();
+    await expect(lock).toHaveText("Verrouiller");
+    expect(await lock.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
   });
 
   test("fiche: verrouiller et annuler", async ({ page }) => {
