@@ -352,7 +352,11 @@ test("presentation: mouvement réduit", async ({ page }) => {
       for (const record of records) {
         const el = record.target as HTMLElement;
         if (el.dataset.exit) {
-          const keyframes = el.getAnimations().flatMap((a) => (a.effect as KeyframeEffect).getKeyframes());
+          // Animation de sortie seulement (API Web Animations), hors transitions CSS.
+          const keyframes = el
+            .getAnimations()
+            .filter((a) => !(a instanceof CSSTransition))
+            .flatMap((a) => (a.effect as KeyframeEffect).getKeyframes());
           seen.push(`${el.dataset.exit}:${keyframes.map((k) => `${k.opacity}|${k.transform}`).join(";")}`);
         }
       }
@@ -361,7 +365,7 @@ test("presentation: mouvement réduit", async ({ page }) => {
   await page.mouse.up();
   await expect.poll(() => page.evaluate(() => (window as unknown as { exits: string[] }).exits.length)).toBeGreaterThan(0);
   const [exit] = await page.evaluate(() => (window as unknown as { exits: string[] }).exits);
-  expect(exit).toMatch(/^fade:/);
+  expect(exit).toMatch(/^fade:1\|translateX\([^)]*\);0\|translateX\([^)]*\)$/);
   expect(exit).not.toContain("rotate");
   await expect.poll(() => cardName(page)).toBe("[Bonne table de l'Old Town]");
 

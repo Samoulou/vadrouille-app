@@ -274,7 +274,7 @@ function SwipeCard({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onClick={handleClick}
-      style={dx !== 0 ? { transform: `translateX(${dx}px) rotate(${rotation}deg)` } : undefined}
+      style={dx !== 0 ? { transform: reduced ? `translateX(${dx}px)` : `translateX(${dx}px) rotate(${rotation}deg)` } : undefined}
       className={cn(
         "relative flex min-h-0 shrink cursor-grab touch-pan-y select-none flex-col overflow-hidden rounded-plate border border-outline-strong bg-raised text-left text-ink",
         !dragging && "transition-transform duration-200 ease-out",
