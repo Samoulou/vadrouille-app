@@ -1,6 +1,6 @@
 # 0017 — Décisions du Tech Lead pour F8 (création du voyage et connexion) et suites de D1
 
-Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #62 · Correction 1 : revues Tech Lead et Sécurité de #65
+Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #62 · Corrections 1 et 2 après les revues de #65
 
 ## Contexte
 Six questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` :
@@ -139,7 +139,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - **Contexte d'organisation** :
   - `structureBrief`, `suggestLodging`, `requestCode` et `verifyCode` sont anonymes : ils ne prennent pas de contexte (handover, lignes des écrans 2 à 4) ;
   - pour `createTrip`, `ctx` est construit par l'action depuis la session, `{ organizationId: session.organizationId }`, avec la session lue par `getSession()`. Il n'est jamais reçu du navigateur ;
-  - pour `getGenerationStatus`, `ctx` vient en phase 0 de `getRequestContext()`, comme la page de l'écran 5 (0013 § 3.6). B3 remplace les deux par la session.
+  - pour `getGenerationStatus`, `ctx` vient en phase 0 de `getRequestContext()`, comme la page de l'écran 5 (0013 § 3.6). L'action est donc appelable sans session en phase 0. **Elle ne doit jamais être branchée sur un adaptateur réel avant B3** : `getRequestContext()` lève déjà une erreur hors `mock`, et B3 la remplace par la session avec le contrôle d'appartenance du § 3.6.
 - **Choix** : `getCreationAdapter(options?)` lit `DATA_ADAPTER` et `getAuthAdapter(options?)` lit `AUTH_ADAPTER`. Ce sont des variables serveur, sans préfixe `NEXT_PUBLIC_`. Les deux fonctions reprennent la normalisation `adapterChoice` de D1 (absente ou vide = `mock`) et lèvent une erreur pour une valeur inconnue, comme `getTripAdapter`. `options.scope` est la portée de simulation (§ 10), ignorée par les adaptateurs réels.
 
 #### 3.2 Implémentations simulées
@@ -178,7 +178,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - l'écran 4 affiche un avertissement visible tant que l'adaptateur `auth` est `mock`. Le texte relève de UX/UI. Il dit en substance que la connexion est simulée, partagée et qu'il ne faut pas saisir d'adresse réelle ;
   - l'avertissement est piloté par une valeur serveur (`authMode: "simulated"`), transmise à la page. Il n'est pas déduit côté client.
 - **Minimisation du magasin de portée** :
-  - l'adresse n'y est jamais gardée en clair. La clé des codes et des compteurs est un HMAC-SHA-256 de l'adresse normalisée, avec une clé aléatoire tirée au démarrage du processus (`crypto.randomBytes`, jamais écrite). Cela suffit à appliquer les limites par adresse ;
+  - l'adresse n'y est jamais gardée en clair. La clé des codes et des compteurs est un HMAC-SHA-256 de l'adresse normalisée, avec une clé aléatoire tirée une fois par processus (`crypto.randomBytes`, jamais écrite), gardée sur `globalThis` avec le magasin de portée (§ 10.1) pour que le rechargement à chaud ne la change pas et ne rende pas les compteurs incohérents. Cela suffit à appliquer les limites par adresse ;
   - le magasin ne garde ni le récit, ni le brouillon, ni le brief. `createTrip` simulé ne garde que (organisation, `requestId`) → `tripId` et l'instant de lancement ;
   - le code simulé n'y est pas recopié : il est comparé à la constante.
 - **Principe « l'agent cherche, l'ancrage vérifie, le moteur planifie »** : en phase 0, rien n'est cherché ni planifié. Les réponses sont précalculées.
@@ -221,7 +221,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - Un journal serveur ne porte que `code` et `field` (spécification, « Données personnelles »).
   - Un test envoie une clé inconnue au nom hostile (`"<script>"`, une adresse email) et vérifie qu'elle n'apparaît ni dans `field` ni dans la réponse.
 - **`unauthenticated`** : l'interface y répond par `R4(R-lancer)`, comme le handover le prévoit.
-- **Énumération de comptes, exigence pour B3** : pour une adresse inconnue et une adresse connue, `requestCode` et `verifyCode` donnent la même réponse, à l'octet près hors identifiant de session. Ils prennent aussi le même temps (même chemin de calcul, sans court-circuit pour une adresse inconnue) et tiennent les mêmes compteurs. Les valeurs simulées (§ 2 de la spécification, écran 4) ne sont pas reprises telles quelles en production : les seuils réels relèvent de Q86.
+- **Énumération de comptes, exigence pour B3** : pour une adresse inconnue et une adresse connue, `requestCode` et `verifyCode` donnent la même réponse, à l'octet près hors identifiant de session. Ils prennent aussi le même temps (même chemin de calcul, sans court-circuit pour une adresse inconnue) et tiennent les mêmes compteurs. Les valeurs simulées (§ 2 de la spécification, écran 4) ne sont pas reprises telles quelles en production : les seuils réels relèvent de Q86. **Compteurs durables** : B3 ne reprend pas le magasin borné de la simulation (§ 10.4), où soumettre 50 autres adresses retire le compteur de la plus ancienne. Ses compteurs par adresse et par adresse IP survivent au redémarrage et ne s'évincent pas avant la fin de leur fenêtre.
 - **Lien avec 0016 § 4.4** : `RevisionError` de F7 garde ses codes d'écran en `camelCase`. L'adaptateur `api` de B11 convertit les codes du serveur dans une seule table, comme prévu. F8 n'a pas de type d'écran intermédiaire : ses actions sont déjà nos actions serveur et renvoient `ApiError` tel quel.
 - PR : **F8a** (`errors.ts`, `validation_failed`, `provider_error`, `rate_limited`, `cost_cap_reached`, test de `field`), complété par F8b et F8c pour leurs codes.
 
@@ -243,7 +243,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - Il est gardé dans un module client minuscule, `src/features/creation/launch-timing.ts` : `markLaunch(tripId, t)` et `takeLaunch(tripId)`, avec une horloge injectable, `performance.now` par défaut.
   - C'est une variable de module, en mémoire de l'onglet, perdue au rechargement : c'est exactement la règle de F8-PO-15 (propriété absente après un rechargement).
   - Aucun stockage navigateur n'est utilisé.
-- **Q79** : la mémoire de l'onglet est retenue pour la phase 0 (F8-PO-1), avec l'avis favorable de la Sécurité (revue de #65). Le stockage navigateur de C6 est écarté : il garderait sur l'appareil un récit personnel. Revenir dessus demande un amendement écrit de cette décision et un nouvel avis de la Sécurité.
+- **Q79** : la mémoire de l'onglet est retenue pour la phase 0 (F8-PO-1). Avis de la Sécurité, rendu à la revue de #65 sur `142f902` : la mémoire d'onglet est validée, rien n'est persisté côté appareil. Le stockage navigateur de C6 est écarté : il garderait sur l'appareil un récit personnel. Revenir dessus demande un amendement écrit de cette décision et un nouvel avis de la Sécurité.
 - PR : **F8a** (fournisseur, réducteur, groupe `(creation)`) ; **F8c** (`R-lancer`, `launch-timing.ts`).
 
 ### 6. F8-TL-4 — Marque « déduit » hors `Chip`
@@ -305,7 +305,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - **Horloge injectée** : `mock-auth.ts` et `mock-creation.ts` reçoivent `now` à leur construction et n'appellent jamais `Date.now()`. Une règle de lint le vérifie sur ces deux fichiers (`no-restricted-syntax` sur `Date.now`), avec son test dans `tests/unit/lint/`.
 
 #### 10.2 Lecture de la portée
-- `getSimulationScope()` lit l'en-tête `x-vadrouille-simulation` (`headers()` de Next.js) seulement si `devPagesEnabled()` est vrai (§ 11, garde fermée par défaut).
+- `getSimulationScope()` est exporté par `src/adapters/simulation.ts`, module serveur. Il appelle `headers()` de `next/headers`, ce qui suffit à le rendre inutilisable côté client. Les actions de `src/server/actions/` et les pages serveur l'importent depuis `@/adapters`. La règle de lint du § 3.3 sur `@/server/*` ne le concerne donc pas. Une règle `no-restricted-imports` interdit `@/adapters/simulation` dans `src/features/**` et `src/components/**`, avec son test.
+- Il lit l'en-tête `x-vadrouille-simulation` (`headers()` de Next.js) seulement si `devPagesEnabled()` est vrai (§ 11, garde fermée par défaut).
 - La valeur doit correspondre à `^[A-Za-z0-9_-]{1,64}$`, et n'être ni le nom réservé de la portée par défaut (`default`), ni `__proto__`, `constructor` ou `prototype`. Sinon, c'est la portée par défaut, sans erreur.
 - En build de production sans pages de développement, l'en-tête n'a donc aucun effet.
 - Les actions serveur et la page de l'écran 5 l'appellent, puis passent la portée à `getCreationAdapter` et `getAuthAdapter`. Les tests unitaires passent une portée directement, sans en-tête.
@@ -337,33 +338,43 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 ### 11. F8-TL-10 — Garde des environnements déployés
 **Retenue, renforcée. Les deux gardes échouent fermées par défaut.**
 
+#### 11.0 Déploiement de production : une condition indépendante de l'hébergeur
+- `isProductionDeployment(env)`, fonction pure de `src/dev/flags.ts`, est vraie si **l'une** de ces conditions est remplie :
+  - `VADROUILLE_ENV` vaut `production` ;
+  - `VERCEL_ENV` vaut `production`.
+- **`VADROUILLE_ENV=production` est fixé dans le `Dockerfile`** (étape d'exécution, à côté de `NODE_ENV=production`). Toute image de production refuse donc la connexion simulée et les pages de développement, quel que soit l'hébergeur (décision 0002, portabilité). `VERCEL_ENV` n'est qu'une seconde condition, propre à Vercel.
+- Le `webServer` de Playwright (build autonome, hors image) ne pose pas `VADROUILLE_ENV`. Le job `docker` vérifie au contraire que l'image le porte : les 404 de `/dev` et de `R-sim` y tiennent même si `VADROUILLE_DEV_PAGES=1` est passé au conteneur (ligne `docker run -e VADROUILLE_DEV_PAGES=1 -e VADROUILLE_DEMO_AUTH=1` ajoutée au job, 404 attendu sur `R3-dev`).
+- `VADROUILLE_ENV` n'est pas un drapeau d'ouverture : il ne peut que fermer. `dev-pages-env.test.ts` (§ 11.3) ne l'interdit donc pas, et vérifie au contraire que le `Dockerfile` le pose à `production`.
+
 #### 11.1 Pages de développement et portée (amende `devPagesEnabled` de `src/dev/flags.ts`, utilisé par 0013 § 1.6 et 0015 § 1)
-- `devPagesEnabled(env)` devient vrai **seulement** si l'une de ces conditions est remplie :
+- `devPagesEnabled(env)` est **toujours faux** si `isProductionDeployment(env)` est vrai.
+- Sinon, il est vrai **seulement** si l'une de ces conditions est remplie :
   - `NODE_ENV` vaut `development` ou `test` ;
   - `VADROUILLE_DEV_PAGES` vaut exactement `1`.
-- Elle reste fausse dans tous les cas si `VERCEL_ENV` vaut `production`.
 - Aujourd'hui, toute valeur autre que `production` (absente, `staging`, faute de frappe) ouvre `/dev`, la portée et `R-sim`. Ce n'est plus le cas.
-- `tests/unit/dev-flags.test.ts` couvre :
+- **F8b met à jour `tests/unit/dev-flags.test.ts`**. Cette décision écrite vaut autorisation de changer ses attentes (CLAUDE.md : aucun test désactivé ni supprimé sans décision écrite ; ici, des attentes changent). Le test couvre :
   - `NODE_ENV` absent, vide ou inconnu : faux ;
   - `development` et `test` : vrai ;
   - drapeau à `1` : vrai ;
   - drapeau à `true` ou à ` 1` : faux ;
-  - `VERCEL_ENV=production` avec le drapeau : faux.
+  - `VERCEL_ENV=production` ou `VADROUILLE_ENV=production`, avec le drapeau, et aussi avec `NODE_ENV` à `development` ou `test` : faux.
 
 #### 11.2 Adaptateur `auth` simulé
 - `getAuthAdapter()` lève une erreur à l'appel, et non à l'import ni au build, si l'adaptateur retenu est `mock` et que l'une de ces conditions est remplie :
-  - `NODE_ENV` n'est ni `development` ni `test`, et `VADROUILLE_DEMO_AUTH` ne vaut pas exactement `1` ;
-  - **`VERCEL_ENV` vaut `production`**, même avec le drapeau. Les prévisualisations et la production Vercel ont toutes deux `NODE_ENV=production` : un drapeau mal posé ne suffit donc pas à ouvrir la fausse connexion sur le déploiement de production.
-- La garde ne se replie jamais vers un mode permissif. L'écran qui l'appelle affiche l'erreur générique.
-- Test unitaire :
-  - lève une erreur en production sans le drapeau, et avec `VERCEL_ENV=production` même avec le drapeau ;
-  - ne lève pas avec le drapeau hors `VERCEL_ENV=production` ;
-  - ne lève pas en `development` ou `test`.
-- Si Samuel décide d'ouvrir la démonstration sur le déploiement de `main` (environnement que Vercel nomme « Production », D1-Q1), cette garde se lève par un amendement écrit de cette décision, après sa décision. Elle ne se lève pas par une variable.
+  - **`isProductionDeployment(env)` est vrai**, quels que soient `NODE_ENV` et le drapeau. Les prévisualisations et la production Vercel ont toutes deux `NODE_ENV=production`, et une image Docker n'a pas `VERCEL_ENV` : un drapeau mal posé ne suffit donc à ouvrir la fausse connexion ni sur la production Vercel ni sur une image de production ;
+  - `NODE_ENV` n'est ni `development` ni `test`, et `VADROUILLE_DEMO_AUTH` ne vaut pas exactement `1`.
+- **Aucun repli vers `mock`** : `getAuthAdapter()` lève aussi pour un `AUTH_ADAPTER` inconnu ou non encore implémenté (`better-auth` avant B3). La garde ne se replie jamais vers un mode permissif. L'écran qui l'appelle affiche l'erreur générique.
+- **F8b met à jour `src/adapters/index.test.ts`** pour ces cas (même valeur de décision écrite que pour `dev-flags.test.ts`). Test unitaire :
+  - lève une erreur avec `VERCEL_ENV=production` ou `VADROUILLE_ENV=production`, avec ou sans le drapeau, **y compris avec `NODE_ENV` à `development` ou `test`** ;
+  - lève une erreur avec `NODE_ENV=production` sans le drapeau ;
+  - ne lève pas avec `NODE_ENV=production` et le drapeau, hors déploiement de production ;
+  - ne lève pas en `development` ou `test` hors déploiement de production ;
+  - lève une erreur pour `AUTH_ADAPTER` inconnu ou `better-auth`.
+- Si Samuel décide d'ouvrir la démonstration sur un déploiement de production (par exemple celui de `main`, que Vercel nomme « Production », D1-Q1), cette garde se lève par un amendement écrit de cette décision, après sa décision. Elle ne se lève pas par une variable.
 
 #### 11.3 Playwright et configuration versionnée
 - **Playwright** : `playwright.config.ts` pose `VADROUILLE_DEMO_AUTH: "1"` dans `webServer.env`, à côté de `VADROUILLE_DEV_PAGES`.
-- **Configuration versionnée** : `tests/unit/dev-pages-env.test.ts` lit `Dockerfile`, `vercel.json` s'il existe et chaque fichier `.env*` suivi par Git (aujourd'hui `.env.example`). Il échoue si l'un d'eux pose `VADROUILLE_DEV_PAGES` ou `VADROUILLE_DEMO_AUTH`.
+- **Configuration versionnée** : `tests/unit/dev-pages-env.test.ts` lit `Dockerfile`, `vercel.json` s'il existe et chaque fichier `.env*` suivi par Git (aujourd'hui `.env.example`). Il lit aussi `.github/workflows/*`, les fichiers compose (`compose*.y*ml`, `docker-compose*.y*ml`) s'il en existe, et `next.config.*`. Il échoue si l'un d'eux pose `VADROUILLE_DEV_PAGES` ou `VADROUILLE_DEMO_AUTH`. **Exception unique** : `playwright.config.ts`, qui n'est pas dans cette liste, les pose pour les tests (ci-dessus).
   - **Plus strict que la spécification**, qui ne visait que `VADROUILLE_DEV_PAGES` : poser la connexion simulée dans un fichier versionné reviendrait à l'ouvrir sur tout déploiement de l'image, ce qui relève de Samuel (Q101).
   - Aucun des deux drapeaux n'a de préfixe `NEXT_PUBLIC_`.
 - Le 404 des pages de développement dans l'image de production reste vérifié par le job `docker` (0013 § 1.6), avec les lignes de `R3-dev` et de `R-sim`.
@@ -371,7 +382,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 #### 11.4 Réservé à Samuel
 - **Q101, F8-Q12** : poser ou non `VADROUILLE_DEMO_AUTH=1` sur un environnement Vercel, et vérifier hors dépôt que `VADROUILLE_DEV_PAGES` n'y est posé nulle part. Ce sont des réglages de compte externe, que le studio ne touche pas.
 - La connexion simulée fonctionne en local et en CI. Son ouverture sur un déploiement est décidée par Samuel.
-- **Limite à connaître pour cette décision** : une fois ouverte, la session simulée est partagée par tous les visiteurs d'une même instance (§ 3.5). Une connexion vaut pour tous. Le code est connu de tous et ne protège rien.
+- **Limite à connaître pour cette décision** : une fois ouverte, la session simulée est partagée par tous les visiteurs d'une même instance (§ 3.5). Une connexion vaut pour tous. Le code est connu de tous et ne protège rien. Là où les pages de développement sont ouvertes, **le nom d'une portée n'est pas un secret** : quiconque le connaît ou le devine peut en remettre la session à zéro ou en avancer l'horloge par `R-sim`. Ce n'est acceptable que pour des tests.
 
 - PR : **F8b**.
 
@@ -430,7 +441,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - `src/contracts/auth.ts`, `AuthAdapter`, `mock-auth.ts` (magasin minimisé, HMAC) et `src/server/actions/compte.ts` ;
   - avertissement du mode simulé ;
   - `simulation.ts` et `R-sim` (bornes du § 10) ;
-  - `devPagesEnabled` fermé par défaut et garde `VADROUILLE_DEMO_AUTH` avec `VERCEL_ENV` ;
+  - `isProductionDeployment`, `VADROUILLE_ENV=production` dans le `Dockerfile` et sa ligne `docker` ;
+  - `devPagesEnabled` fermé par défaut et garde `VADROUILLE_DEMO_AUTH` ; mise à jour de `dev-flags.test.ts` et de `src/adapters/index.test.ts` ;
   - `dev-pages-env.test.ts`, lignes `docker` de `R3-dev` et de `R-sim`, règle de lint sur `Date.now`.
 - **F8c** (lancement et écran 5) :
   - `creationRoutes.preparation` ;
@@ -467,7 +479,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - **CEO** (2026-10-09) : inscrire T6 (positions simulées du voyage débloqué) et T7 (serveur Playwright isolé par worktree) dans `docs/roadmap.md` et fixer leur place. T6 n'est pas dans le même cycle que F8b, F8c ou F7a ; T7 pas dans le même cycle que F8b. **Bloque** : rien pour F8a.
 
 **Questions déjà ouvertes, rappelées** :
-- **Q101** (Samuel, comptes et environnements) : connexion simulée sur un déploiement, et contrôle de `VADROUILLE_DEV_PAGES` hors dépôt (§ 11). **Limite à connaître** : la session simulée est partagée par tous les visiteurs d'une instance, une connexion vaut pour tous, et le code est connu de tous. La garde refuse en tout cas `VERCEL_ENV=production` tant que cette décision n'est pas amendée.
+- **Q101** (Samuel, comptes et environnements) : connexion simulée sur un déploiement, et contrôle de `VADROUILLE_DEV_PAGES` hors dépôt (§ 11). **Limite à connaître** : la session simulée est partagée par tous les visiteurs d'une instance, une connexion vaut pour tous, et le code est connu de tous. La garde refuse en tout cas tout déploiement de production (`VADROUILLE_ENV=production`, posé par le `Dockerfile`, ou `VERCEL_ENV=production`) tant que cette décision n'est pas amendée. Là où `/dev` est ouvert, le nom d'une portée n'est pas un secret.
 - **Données personnelles hors UE** (Samuel) : non évalué ici ; à soumettre à Samuel avec B9 et B3 (fournisseur de modèle, fournisseur d'envoi Q25, hébergeur).
 - **Q86** (Tech Lead et Sécurité) : seuils réels de la connexion par code, pour B3.
 - **Q25**, **F8-Q2**, **F8-Q3** et **F8-Q9** (Samuel) : aucune décision technique ici n'en préjuge.
