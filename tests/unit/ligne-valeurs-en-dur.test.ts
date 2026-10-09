@@ -19,7 +19,18 @@ const PX = /\d(?:\.\d+)?px\b/;
 
 describe("valeurs en dur dans src/components/ligne", () => {
   it("couvre les composants de F2 et F3", () => {
-    expect(files).toEqual(expect.arrayContaining(["DayBadge.tsx", "DayLine.tsx", "DayTabs.tsx", "StopMarker.tsx", "Tag.tsx"]));
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "DayBadge.tsx",
+        "DayLine.tsx",
+        "DayTabs.tsx",
+        "StopMarker.tsx",
+        "Tag.tsx",
+        "DeckCard.tsx",
+        "DeckProgress.tsx",
+        "UndoToast.tsx",
+      ]),
+    );
   });
 
   for (const name of files) {
@@ -39,7 +50,7 @@ describe("valeurs en dur dans src/components/ligne", () => {
       .filter(({ line }) => /^\s*--[\w-]+\s*:/.test(line));
     expect(declarations.length).toBeGreaterThan(0);
     for (const { line, index } of declarations) {
-      expect(lines[index - 1] ?? "", line).toMatch(/\/\* Q(11|13|19)\b.*\*\//);
+      expect(lines[index - 1] ?? "", line).toMatch(/\/\* (?:Q(?:11|13|19)|F6-Q[12])\b.*\*\//);
     }
   });
 });

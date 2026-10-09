@@ -8,7 +8,14 @@ import {
   type Proposal,
   type Trip,
 } from "@/contracts";
-import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, edimbourg, propositions } from "@/mocks/edimbourg";
+import {
+  EDIMBOURG_TRIP_ID,
+  MOCK_ORGANIZATION_ID,
+  edimbourg,
+  edimbourgDebloque,
+  propositions,
+  propositionsDebloque,
+} from "@/mocks/edimbourg";
 import { edimbourgCarte } from "@/mocks/edimbourg-carte";
 
 import type { AdapterContext, TripAdapter } from "./types";
@@ -20,7 +27,14 @@ interface MockEntry {
   maps?: DayMap[];
 }
 
-const DEFAULT_ENTRIES: MockEntry[] = [{ trip: edimbourg, proposals: propositions, maps: edimbourgCarte }];
+const DEFAULT_ENTRIES: MockEntry[] = [
+  { trip: edimbourg, proposals: propositions, maps: edimbourgCarte },
+  // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué, sans positions simulées.
+  { trip: edimbourgDebloque, proposals: propositionsDebloque },
+];
+
+/** Organisation simulée, lue seulement par `getRequestContext` quand DATA_ADAPTER vaut `mock`. */
+export const MOCK_REQUEST_CONTEXT: AdapterContext = { organizationId: MOCK_ORGANIZATION_ID };
 
 /**
  * Voyage simulé de démonstration, pour les pages de développement qui ne peuvent pas

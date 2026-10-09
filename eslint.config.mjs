@@ -4,6 +4,22 @@ import { defineConfig, globalIgnores } from "eslint/config";
 
 import ligne from "./eslint-rules/index.mjs";
 
+const STORAGES = ["localStorage", "sessionStorage", "indexedDB", "caches"];
+
+/** Interdit tout stockage côté client (Web Storage, IndexedDB, Cache Storage, cookies, service worker). */
+function noClientStorage(scope, reference, serviceWorkerText) {
+  const message = `${scope} : aucune donnée persistée côté client (${reference}).`;
+  return {
+    "no-restricted-globals": ["error", ...STORAGES.map((name) => ({ name, message }))],
+    "no-restricted-properties": [
+      "error",
+      ...["window", "globalThis", "self"].flatMap((object) => STORAGES.map((property) => ({ object, property, message }))),
+      { object: "document", property: "cookie", message: `${scope} : aucun cookie (${reference}).` },
+      { object: "navigator", property: "serviceWorker", message: `${scope} : ${serviceWorkerText} (${reference}).` },
+    ],
+  };
+}
+
 export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -69,35 +85,34 @@ export default defineConfig([
     // F4 : aucune persistance côté client dans la carte (handover § 8 ; données Google, même simulées).
     files: ["src/components/carte/**/*.{js,jsx,ts,tsx}", "src/app/dev/carte/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}"],
+    rules: noClientStorage("Carte", "handover § 8, spécification F4", "aucun service worker ni cache de tuiles"),
+  },
+  {
+    // F6 : aucun texte en dur dans la présentation, sa route, la feuille modale et la mesure (handover § 10).
+    files: [
+      "src/features/presentation/**/*.{jsx,tsx}",
+      "src/app/voyages/**/*.{jsx,tsx}",
+      "src/components/ui/**/*.{jsx,tsx}",
+      "src/analytics/**/*.{jsx,tsx}",
+    ],
+    ignores: ["**/*.test.{ts,tsx}"],
     rules: {
-      "no-restricted-globals": [
-        "error",
-        ...["localStorage", "sessionStorage", "indexedDB", "caches"].map((name) => ({
-          name,
-          message: "Carte : aucune donnée persistée côté client (handover § 8, spécification F4).",
-        })),
-      ],
-      "no-restricted-properties": [
-        "error",
-        ...["window", "globalThis", "self"].flatMap((object) =>
-          ["localStorage", "sessionStorage", "indexedDB", "caches"].map((property) => ({
-            object,
-            property,
-            message: "Carte : aucune donnée persistée côté client (handover § 8, spécification F4).",
-          })),
-        ),
-        {
-          object: "document",
-          property: "cookie",
-          message: "Carte : aucun cookie (handover § 8, spécification F4).",
-        },
-        {
-          object: "navigator",
-          property: "serviceWorker",
-          message: "Carte : aucun service worker ni cache de tuiles (handover § 8, spécification F4).",
-        },
-      ],
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
     },
+  },
+  {
+    // F6 : aucune persistance côté client dans la présentation (F6-PO-15 ; règles Google de la spécification F6).
+    files: [
+      "src/features/presentation/**/*.{js,jsx,ts,tsx}",
+      "src/app/voyages/**/*.{js,jsx,ts,tsx}",
+      "src/analytics/**/*.{js,jsx,ts,tsx}",
+      "src/components/ui/dialog.tsx",
+      "src/components/ligne/DeckCard.tsx",
+      "src/components/ligne/DeckProgress.tsx",
+      "src/components/ligne/UndoToast.tsx",
+    ],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: noClientStorage("Présentation", "spécification F6, F6-PO-15", "aucun service worker"),
   },
   {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { CategorySchema } from "./category";
+
 /**
  * Contrats du programme de voyage (handover front-end § 9).
  *
@@ -138,6 +140,8 @@ export const ProposalSchema = z
     /** « Entre ton déjeuner et [Distillerie] ». */
     context: TextSchema,
     stop: StopSchema,
+    /** Catégorie (décision 0013, § 3.1) : ajout au handover § 9, signalé comme `Trip.organizationId`. */
+    category: CategorySchema,
     /** Repas : option 1 sur 3 au plus (cadrage § 3.4). */
     option: z
       .strictObject({

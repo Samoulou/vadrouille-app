@@ -49,6 +49,23 @@ describe("/dev/composants", () => {
     }
   });
 
+  it("montre la section Présentation de F6 : DeckCard (activité avec trajet, repas, dernière option), DeckProgress, UndoToast", () => {
+    render(<ComposantsShowcase />);
+    const section = screen.getByRole("region", { name: "Présentation" });
+    const p = messages.dev.composants.exemples.presentation;
+    const bar = within(section).getByRole("progressbar", { name: "Proposition 4 sur 8" });
+    expect(bar.nextElementSibling).toHaveTextContent(/^4 sur 8$/);
+    expect(bar.nextElementSibling).toHaveAttribute("aria-hidden", "true");
+    expect(within(section).getByRole("button", { name: `Voir le détail de ${p.activite.nom}` })).toHaveTextContent(
+      "Bus, environ 50 min (estimation)",
+    );
+    expect(within(section).getByRole("button", { name: `Voir le détail de ${p.repas.nom}` })).toHaveTextContent("option 1 sur 2");
+    expect(within(section).getByRole("button", { name: `Voir le détail de ${p.repas2.nom}` })).toHaveTextContent("option 2 sur 2");
+    expect(within(section).getAllByRole("button", { name: "Option suivante" })).toHaveLength(1);
+    expect(within(section).getAllByRole("button", { name: "Je choisis" })).toHaveLength(2);
+    expect(within(section).getByRole("status")).toHaveTextContent(p.toast);
+  });
+
   it("montre chaque type de Tag et de StatusBanner, et le compteur seulement quand il vaut plus de 0", () => {
     render(<ComposantsShowcase />);
     const ex = messages.dev.composants.exemples;
