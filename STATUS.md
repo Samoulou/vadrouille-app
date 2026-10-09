@@ -17,12 +17,15 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 - **Release v2026.10.09-21 (#87) : fusionnée** (b20c259) ; elle liste 0020 et 0021 dans « Décisions prises par le studio ».
 
 ## En cours (toutes en `needs-review`)
-- **F9a — Débloquer, paiement simulé, confirmation, état débloqué (PR #86, ticket #83)** : nouvelle, frontend. CI `verify` et `docker` verte sur d7df9a3 ; références visuelles prises sur la CI (décision 0004).
+- **F9a — Débloquer, paiement simulé, confirmation, état débloqué (PR #86, ticket #83)** : nouvelle, frontend.
+  - La revue Tech Lead de 21:52 UTC n'a trouvé aucun bloquant de code. Elle demandait une description complète, la mesure du budget et une CI verte.
+  - 1re correction faite (65b44b0, après fusion de `main`) : description complétée et retours UX intégrés. Nouvelle note `docs/deploiement/variables-environnement.md` sur les drapeaux interdits en production.
+  - CI `verify` et `docker` verte sur 65b44b0. Références visuelles prises sur la CI (décision 0004).
   - Cible de réussite `R11` (F9-PO-18). Garde `paymentDemoAllowed` fermée par défaut et fausse en production ; actions serveur dans `src/server/actions/`, avec `parse-input.ts` et la règle de lint.
   - Prérequis absents de `main` créés selon la spec (l. 285) et 0020 : `values.ts`, `errors.ts`, portée de simulation (`R-sim`), `DestinationPlate`.
   - Budget JavaScript de la Journée : 194 633 o → 196 742 o, sous 200 000 o (mesure hors dépôt, T4 n'étant pas fusionnée).
   - 5e entrée « Débloquer » sur l'accueil de démonstration ; tests de D1 adaptés, aucun test désactivé.
-  - Questions : Q160, Q161 (Tech Lead), Q162 (UX/UI) ; avis Sécurité Q148 attendu à la revue.
+  - Questions : Q160, Q161, Q164 (Tech Lead), Q165 (Tech Lead, Sécurité), Q162 (UX/UI) ; Q128 complétée (Samuel) ; avis Sécurité Q148 attendu à la revue.
 - **T8 — Décision 0019 (PR #72, ticket #71)** et **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : toujours en attente de revue, sans changement.
 - **État du 16e cycle (#82)** : remplacée par cette PR.
 - Note : `pnpm verify` en session échoue sur `test:visual` (rendu des polices), comme prévu par la décision 0004 ; tout le reste passe sur #76, #85 et #86.
@@ -104,11 +107,11 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
 
 ## Part d'usage estimée
-- 17e cycle (2026-10-09) : environ 870 000 jetons (estimation).
+- 17e cycle (2026-10-09) : environ 1,1 M de jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| F9a, code et tests | ≈ 485 000 |
+| F9a, code, tests et correction 1 | ≈ 700 000 |
 | T12, décision 0021 | ≈ 195 000 |
 | Correction 2 de la spec F10 | ≈ 135 000 |
 | Pilotage, état | ≈ 55 000 |

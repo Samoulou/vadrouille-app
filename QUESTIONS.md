@@ -129,7 +129,7 @@
 | Q125 | T8 (#72, 0019) : créer et placer les tâches « Garde de revue dans `techlead-gate` » et « Marqueurs proches sur la carte » | CEO | 2026-10-09 | Tickets de T9 et T10 | Tranchée par le CEO (2026-10-09, 14e cycle) : T9 (back-end) en tête de la file dès la fusion de #72 ; T10 (frontend, priorité basse) après F5b, T4, Q123 et Q124 |
 | Q126 | Spec F9 (#73, F9-Q1) : rendus et textes des écrans 9 et 10, de la page de paiement simulé et de la confirmation (non maquettés) | UX/UI | 2026-10-09 | Validation visuelle de F9 (pas le code) | Délégué |
 | Q127 | Spec F9 (#73, F9-Q2) : mentions avant paiement (vendeur, conditions de vente, rétractation, remboursement, TVA, reçu) | Samuel | 2026-10-09 | Paiement réel | Ouverte (juridique) |
-| Q128 | Spec F9 (#73, F9-Q3) : texte exact de « Ce qui est inclus » à l'écran 9 (liée à Q57, Q63, Q88) | Samuel | 2026-10-09 | Texte définitif de l'écran 9 | Ouverte (offre) |
+| Q128 | Spec F9 (#73, F9-Q3) : texte exact de « Ce qui est inclus » à l'écran 9 (liée à Q57, Q63, Q88) | Samuel | 2026-10-09 | Texte définitif de l'écran 9 | Ouverte (offre) — 17e cycle : F9a (#86) relève que la ligne `calendarAndSharing` de « Ce qui est inclus » promet F10 |
 | Q129 | Spec F9 (#73, F9-Q4) : remboursement d'un second paiement réel pour le même voyage | Samuel | 2026-10-09 | Paiement réel | Ouverte (argent) |
 | Q130 | Spec F9 (#73, F9-Q5) : logos TWINT et réseaux de cartes sur les boutons de paiement (aucun en attendant) | Samuel | 2026-10-09 | Rien | Ouverte (marque) |
 | Q131 | Spec F9 (#73, F9-Q6) : activer le paiement simulé sur la démonstration Vercel, avec un état partagé entre visiteurs (liée à Q98, Q101) | Samuel, avec le Tech Lead | 2026-10-09 | Parcours « Débloquer » de la démonstration | Ouverte (environnement) |
@@ -165,3 +165,5 @@
 | Q161 | F9a (#86) : créer dès maintenant le test de budget de la Journée (vert aujourd'hui, 196 742 o) ou le laisser à T4 ? | Tech Lead | 2026-10-09 | Rien | Délégué |
 | Q162 | F9a (#86) : rendus et textes provisoires de `R9`, `R9-sim` et `R9-retour` (aucune maquette, Q12) | UX/UI | 2026-10-09 | Validation visuelle de F9a, pas le code | Délégué |
 | Q163 | Spec F10 (#76) : 2 corrections épuisées ; la revue de 21:23 UTC demande une 3e correction, avec 5 bloquants d'alignement sur la décision 0020 (fusionnée après la rédaction de la spec : `src/server/actions/`, `Result<T>`, garde fermée par défaut, `getTripReader()`, portée de simulation). 3e tentative, ou attente de Q122 ? | Samuel | 2026-10-09 | Spec F10, décisions F10-TL, code de F10 | Ouverte (règles du studio) |
+| Q164 | F9a (#86) : garder ou retirer le `curl` POST sur `/dev/api/simulation` du job `docker`, non listé par 0020 | Tech Lead | 2026-10-09 | Rien | Délégué |
+| Q165 | F9a (#86) : `devPagesEnabled` accepte `VADROUILLE_DEV_PAGES=1` même en production : ajouter `!isProductionDeployment()` (amendement de 0017 § 11.1, dans F8b) ? | Tech Lead, Sécurité | 2026-10-09 | Rien | Délégué |
