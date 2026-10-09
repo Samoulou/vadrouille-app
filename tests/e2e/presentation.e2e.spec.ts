@@ -176,8 +176,11 @@ test("presentation: annuler restaure l'état exact", async ({ page }) => {
 test("presentation: le toast disparaît après 5 s", async ({ page }) => {
   await page.clock.install();
   await openDeck(page);
+  // Région live montée avant toute décision, le toast y est injecté ensuite.
+  await expect(page.locator("[data-undo-region]")).toHaveAttribute("role", "status");
+  await expect(toast(page)).toHaveCount(0);
   await press(page, "Pas pour moi");
-  await expect(toast(page)).toHaveAttribute("role", "status");
+  await expect(page.locator("[data-undo-region] [data-undo-toast]")).toHaveCount(1);
   await expect(toast(page)).toContainText("[Château d'Édimbourg] écarté.");
   await expect(page.locator("[data-action='dislike']")).toBeFocused();
   await page.clock.runFor(4_900);

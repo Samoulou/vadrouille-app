@@ -20,6 +20,7 @@ import {
   StopMarker,
   Tag,
   UndoToast,
+  UndoToastRegion,
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
@@ -309,7 +310,9 @@ export function ComposantsShowcase() {
           <DeckCard proposal={DEMO_REPAS_2} isLastOption onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
         </State>
         <State label={t.etats.toast}>
-          <UndoToast message={px.toast} onUndo={noop} onExpire={noop} className="w-full" />
+          <UndoToastRegion className="w-full">
+            <UndoToast message={px.toast} onUndo={noop} onExpire={noop} />
+          </UndoToastRegion>
         </State>
       </Section>
     </main>

@@ -9,10 +9,10 @@ import { format, messages } from "@/i18n";
 
 const t = messages.presentation;
 
-/** « 2026-08-15 » → « 15.08.2026 » (formats de redaction.md). */
+/** « 2026-08-15 » → « 15 août 2026 » : date dans une phrase, comme « 30 août » en titre (redaction.md). */
 export function formatVerifiedAt(iso: string): string {
-  const [year, month, day] = iso.split("-");
-  return `${day}.${month}.${year}`;
+  const [year = 0, month = 1, day = 1] = iso.split("-").map(Number);
+  return `${day} ${t.detail.mois[month - 1]} ${year}`;
 }
 
 export interface ProposalDetailSheetProps {

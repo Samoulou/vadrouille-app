@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder } from "@/analytics/track";
 import type { Category, Proposal } from "@/contracts";
@@ -7,6 +7,7 @@ import { edimbourgDebloque, propositions, propositionsDebloque } from "@/mocks/e
 
 import { axeViolations } from "../../../tests/unit/axe";
 
+import { createLocalDeckActions } from "./actions";
 import { PresentationScreen, type PresentationScreenProps } from "./PresentationScreen";
 
 function setup(props: Partial<PresentationScreenProps> = {}) {
@@ -95,10 +96,14 @@ describe("PresentationScreen", () => {
 
   it("après chaque décision, un toast role=status sans déplacer le focus, remplacé par la suivante", async () => {
     setup();
+    const region = document.querySelector("[data-undo-region]");
+    expect(region).toHaveAttribute("role", "status");
+    expect(region).toBeEmptyDOMElement();
     const pasPourMoi = button("Pas pour moi");
     pasPourMoi.focus();
     await click("Pas pour moi");
-    expect(toast()).toHaveAttribute("role", "status");
+    expect(document.querySelector("[data-undo-region]")).toBe(region);
+    expect(toast()?.parentElement).toBe(region);
     expect(toast()).toHaveTextContent("[Château d'Édimbourg] écarté.");
     expect(document.activeElement).toBe(pasPourMoi);
     await click("Je choisis");
@@ -156,6 +161,28 @@ describe("PresentationScreen", () => {
     expect(toast()).toHaveTextContent("[Musée national d'Écosse] écarté.");
   });
 
+  it("presentation: un double appui sur « Oui » ne répond qu'une fois", async () => {
+    const proposals = [
+      activity("m1", 1, "09:00", "museum"),
+      activity("m2", 1, "10:00", "museum"),
+      activity("m3", 1, "11:00", "museum"),
+      activity("w1", 1, "12:00", "walk"),
+    ];
+    const local = createLocalDeckActions();
+    const answerPrompt = vi.spyOn(local, "answerPrompt");
+    const { events } = setup({ proposals, actions: local });
+    await click("Pas pour moi");
+    await click("Pas pour moi");
+    const oui = within(screen.getByRole("dialog")).getByRole("button", { name: "Oui" });
+    fireEvent.click(oui);
+    fireEvent.click(oui);
+    await flush();
+    expect(answerPrompt).toHaveBeenCalledTimes(1);
+    expect(events("preference_prompt_answered")).toHaveLength(1);
+    expect(cardName()).toBe("[w1]");
+    expect(document.querySelector("[data-announce]")).toHaveTextContent("1 proposition retirée");
+  });
+
   it("préférences: aucune généralisation sans réponse", async () => {
     const proposals = [
       activity("m1", 1, "09:00", "museum"),
@@ -173,7 +200,8 @@ describe("PresentationScreen", () => {
     await flush();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(events("preference_prompt_answered")).toEqual([]);
-    expect(document.activeElement).toBe(button("Pas pour moi"));
+    // Radix rend le focus dans un setTimeout après la fermeture : on attend le retour.
+    await waitFor(() => expect(document.activeElement).toBe(button("Pas pour moi")));
     await click("Pas pour moi"); // m3 : pas de nouvelle question
     expect(screen.queryByRole("dialog")).toBeNull();
     await click("Pas pour moi"); // n1
@@ -305,7 +333,7 @@ describe("PresentationScreen", () => {
     const dialog = screen.getByRole("dialog", { name: "[Distillerie accessible en bus]" });
     expect(document.activeElement).toBe(within(dialog).getByRole("heading"));
     expect(within(dialog).getByRole("link", { name: "[Site de la distillerie]" })).toHaveAttribute("href", "https://example.org/mock/distillerie");
-    expect(dialog).toHaveTextContent("Informations vérifiées le 15.08.2026");
+    expect(dialog).toHaveTextContent("Informations vérifiées le 15 août 2026");
     expect(within(dialog).queryByRole("button", { name: "J'aime" })).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
     await flush();

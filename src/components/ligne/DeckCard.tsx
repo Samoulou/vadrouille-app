@@ -277,14 +277,14 @@ function SwipeCard({
       style={dx !== 0 ? { transform: reduced ? `translateX(${dx}px)` : `translateX(${dx}px) rotate(${rotation}deg)` } : undefined}
       className={cn(
         "relative flex min-h-0 shrink cursor-grab touch-pan-y select-none flex-col overflow-hidden rounded-plate border border-outline-strong bg-raised text-left text-ink",
-        !dragging && "transition-transform duration-200 ease-out",
+        !dragging && "transition-transform duration-200 ease-out motion-reduce:transition-none",
       )}
     >
       <span
         aria-hidden="true"
         className="flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink flex-col items-center justify-center gap-1 self-stretch bg-muted text-legende text-ink-soft"
       >
-        <IconPhoto className="size-8" />
+        <IconPhoto className="size-(--ligne-deck-icone-photo)" />
         {t.carte.photo}
       </span>
       <span className="flex shrink-0 flex-col gap-1 p-4">
@@ -301,7 +301,7 @@ function SwipeCard({
             </span>
           ) : null}
         </span>
-        <span className="text-(length:--ligne-deck-nom) leading-(--ligne-deck-nom-interligne) font-extrabold tracking-[-0.01em]">
+        <span className="text-(length:--ligne-deck-nom) leading-(--ligne-deck-nom-interligne) font-extrabold tracking-(--ligne-deck-nom-approche)">
           {stop.name}
         </span>
         <span id={id("meta")} className="text-corps-s text-ink-soft">

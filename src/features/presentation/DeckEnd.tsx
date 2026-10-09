@@ -25,7 +25,7 @@ export function DeckEnd({ variant, tripId, titleRef }: DeckEndProps) {
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
   return (
     <section data-deck-end={variant} aria-labelledby="fin-titre" className="flex flex-1 flex-col justify-center gap-6">
-      <h2 id="fin-titre" ref={titleRef} tabIndex={-1} className="text-titre-jour font-extrabold tracking-[-0.015em] text-ink">
+      <h2 id="fin-titre" ref={titleRef} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
         {TITLES[variant]}
       </h2>
       <div className="flex flex-col gap-3">

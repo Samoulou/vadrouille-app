@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { UndoToast } from "./UndoToast";
+import { UndoToast, UndoToastRegion } from "./UndoToast";
+
+const toast = () => document.querySelector<HTMLElement>("[data-undo-toast]")!;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -19,7 +21,9 @@ describe("UndoToast", () => {
     render(
       <>
         <button type="button">Avant</button>
-        <UndoToast message="[Château] écarté." onUndo={onUndo} onExpire={onExpire} />
+        <UndoToastRegion>
+          <UndoToast message="[Château] écarté." onUndo={onUndo} onExpire={onExpire} />
+        </UndoToastRegion>
       </>,
     );
     const before = screen.getByRole("button", { name: "Avant" });
@@ -38,14 +42,16 @@ describe("UndoToast", () => {
     const onExpire = vi.fn();
     render(
       <>
-        <UndoToast message="Jour 1 gardé." onUndo={() => {}} onExpire={onExpire} />
+        <UndoToastRegion>
+          <UndoToast message="Jour 1 gardé." onUndo={() => {}} onExpire={onExpire} />
+        </UndoToastRegion>
         <button type="button">Après</button>
       </>,
     );
     act(() => vi.advanceTimersByTime(3000));
     const annuler = screen.getByRole("button", { name: "Annuler" });
     act(() => annuler.focus());
-    expect(screen.getByRole("status")).toHaveAttribute("data-paused", "true");
+    expect(toast()).toHaveAttribute("data-paused", "true");
     act(() => vi.advanceTimersByTime(10_000));
     expect(onExpire).not.toHaveBeenCalled();
     act(() => screen.getByRole("button", { name: "Après" }).focus());
@@ -55,20 +61,41 @@ describe("UndoToast", () => {
     expect(onExpire).toHaveBeenCalledTimes(1);
   });
 
+  it("UndoToast: région live persistante, contenu injecté ensuite", () => {
+    const { rerender } = render(<UndoToastRegion />);
+    const region = screen.getByRole("status");
+    expect(region).toBeEmptyDOMElement();
+    rerender(
+      <UndoToastRegion>
+        <UndoToast message="[Château] écarté." onUndo={() => {}} onExpire={() => {}} />
+      </UndoToastRegion>,
+    );
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region).toHaveTextContent("[Château] écarté.");
+    expect(toast()).not.toHaveAttribute("role");
+    rerender(<UndoToastRegion />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region).toBeEmptyDOMElement();
+  });
+
   it("suspendu au survol", () => {
     const onExpire = vi.fn();
     render(<UndoToast message="Jour 1 gardé." onUndo={() => {}} onExpire={onExpire} duration={1000} />);
-    fireEvent.mouseEnter(screen.getByRole("status"));
+    fireEvent.mouseEnter(toast());
     act(() => vi.advanceTimersByTime(5000));
     expect(onExpire).not.toHaveBeenCalled();
-    fireEvent.mouseLeave(screen.getByRole("status"));
+    fireEvent.mouseLeave(toast());
     act(() => vi.advanceTimersByTime(1000));
     expect(onExpire).toHaveBeenCalledTimes(1);
   });
 
   it("aucune violation axe", async () => {
     vi.useRealTimers();
-    const { container } = render(<UndoToast message="[Château] écarté." onUndo={() => {}} onExpire={() => {}} />);
+    const { container } = render(
+      <UndoToastRegion>
+        <UndoToast message="[Château] écarté." onUndo={() => {}} onExpire={() => {}} />
+      </UndoToastRegion>,
+    );
     expect(await axeViolations(container)).toEqual([]);
   });
 });

@@ -14,8 +14,8 @@ import {
 import { AnalyticsProvider, useTrack } from "@/analytics/context";
 import { EVENT_REASON } from "@/analytics/events";
 import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
-import { Button, DeckCard, DeckProgress, StatusBanner, UndoToast } from "@/components/ligne";
-import type { PreferenceAnswer, Proposal } from "@/contracts";
+import { Button, DeckCard, DeckProgress, StatusBanner, UndoToast, UndoToastRegion } from "@/components/ligne";
+import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
 import { format, messages } from "@/i18n";
 
 import { createLocalDeckActions, type DeckActions } from "./actions";
@@ -82,6 +82,8 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
   const endTitleRef = useRef<HTMLHeadingElement>(null);
   /** Élément du paquet qui avait le focus avant l'ouverture d'une feuille ; `null` = carte en cours. */
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  /** Question dont la réponse est en cours d'envoi : un second appui sur « Oui » ou « Non » est ignoré. */
+  const answeringRef = useRef<PreferencePrompt | null>(null);
 
   const card = currentCard(state);
   const position = state.index + 1;
@@ -146,7 +148,8 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
 
   function answer(value: PreferenceAnswer) {
     const prompt = state.prompt;
-    if (!prompt) return;
+    if (!prompt || answeringRef.current === prompt) return;
+    answeringRef.current = prompt;
     const removed =
       prompt.kind === "category" && value.answer === "yes"
         ? state.cards.filter((c, i) => i >= state.index && c.kind === "activity" && c.category === prompt.category).length
@@ -160,6 +163,7 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
       },
     });
     void actions.answerPrompt(prompt, value).then(({ next }) => {
+      answeringRef.current = null;
       dispatch({ type: "answer", prompt, answer: value, next });
       if (removed > 0) {
         setAnnouncement(removed === 1 ? t.question.retiree : format(t.question.retirees, { nombre: removed }));
@@ -190,6 +194,16 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
 
   const endVariant: DeckEndVariant = state.cards.length === 0 ? "vide" : unlocked ? "suite" : "apercu";
   const showToast = state.undo !== null && state.prompt === null && !state.pending;
+  // Un seul toast, dans une région montée en permanence sous le paquet (F6-Q1, place provisoire : Q68).
+  const toast =
+    showToast && state.undo ? (
+      <UndoToast
+        key={`${state.decisions.length}-${state.keptDays.length}`}
+        message={toastMessage(state.undo.toast)}
+        onUndo={undo}
+        onExpire={() => dispatch({ type: "expireUndo" })}
+      />
+    ) : null;
 
   return (
     <main className="mx-auto flex h-dvh w-full max-w-md flex-col gap-3 px-5 pt-3 pb-4">
@@ -206,11 +220,11 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
           aria-label={t.paquet}
           role="group"
           onKeyDown={handleKeyDown}
-          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,auto)_auto_auto_auto] content-start gap-4 [&_[data-part=carte]]:col-start-1 [&_[data-part=carte]]:row-start-2 [&_[data-part=carte]]:max-h-full [&_[data-part=carte]]:self-start [&_[data-part=actions]]:col-start-1 [&_[data-part=actions]]:row-start-3"
+          className="grid min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,auto)_auto_auto] content-start gap-4 [&_[data-part=carte]]:col-start-1 [&_[data-part=carte]]:row-start-2 [&_[data-part=carte]]:max-h-full [&_[data-part=carte]]:self-start [&_[data-part=actions]]:col-start-1 [&_[data-part=actions]]:row-start-3"
         >
           <div className="col-start-1 row-start-1 flex items-center gap-3">
             <DeckProgress current={position} total={state.cards.length} label={format(t.progression, { current: position, total: state.cards.length })} />
-            <Button asChild variant="text" size="sm" className="min-w-(--touch-target) font-semibold no-underline">
+            <Button asChild variant="text" size="sm" className="min-w-(--touch-target) font-semibold">
               <Link
                 href={programme}
                 prefetch={false}
@@ -235,29 +249,11 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
           <Button variant="text" size="sm" className="col-start-1 row-start-4 self-center justify-self-center" onClick={keepDay} data-action="keep-day">
             {format(t.toutGarder, { n: card.day })}
           </Button>
-          {showToast && state.undo ? (
-            <UndoToast
-              key={`${state.decisions.length}-${state.keptDays.length}`}
-              message={toastMessage(state.undo.toast)}
-              onUndo={undo}
-              onExpire={() => dispatch({ type: "expireUndo" })}
-              className="col-start-1 row-start-5"
-            />
-          ) : null}
         </div>
       ) : (
-        <>
-          <DeckEnd variant={endVariant} tripId={tripId} titleRef={endTitleRef} />
-          {showToast && state.undo ? (
-            <UndoToast
-              key={`${state.decisions.length}-${state.keptDays.length}`}
-              message={toastMessage(state.undo.toast)}
-              onUndo={undo}
-              onExpire={() => dispatch({ type: "expireUndo" })}
-            />
-          ) : null}
-        </>
+        <DeckEnd variant={endVariant} tripId={tripId} titleRef={endTitleRef} />
       )}
+      <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PreferenceSheet
         prompt={state.prompt}
         onAnswer={answer}

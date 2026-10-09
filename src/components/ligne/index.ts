@@ -26,4 +26,4 @@ export {
 export { StatusBanner, statusBannerRole, type StatusBannerKind, type StatusBannerProps } from "./StatusBanner";
 export { StopMarker, type StopMarkerKind, type StopMarkerProps } from "./StopMarker";
 export { Tag, type TagKind, type TagProps } from "./Tag";
-export { UndoToast, type UndoToastProps } from "./UndoToast";
+export { UndoToast, UndoToastRegion, type UndoToastProps, type UndoToastRegionProps } from "./UndoToast";

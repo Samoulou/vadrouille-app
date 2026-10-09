@@ -88,4 +88,14 @@
   --ligne-deck-anneau: 3px;
   /* F6-Q2 : icônes des boutons ronds (26 px). */
   --ligne-deck-icone: 26px;
+  /* F6-Q2 : icône du bloc « Photo du lieu » (30 px, DeckCard/preview.html). */
+  --ligne-deck-icone-photo: 30px;
+  /* F6-Q2 : approche du nom de la carte (letter-spacing -0.01em, DeckCard/preview.html). */
+  --ligne-deck-nom-approche: -0.01em;
+  /* Q11 : approche du style titre-jour de tokens.json (-0.015em), absente du handover § 4.1 (titre des fins de paquet). */
+  --ligne-titre-jour-approche: -0.015em;
+  /* F6-Q1 : voile des feuilles modales, ink à 40 % (rendu non maquetté, en attendant Q10). */
+  --ligne-voile: color-mix(in oklab, var(--color-ink) 40%, transparent);
+  /* F6-Q1 : hauteur maximale de la feuille modale, 92 % de la fenêtre (rendu non maquetté). */
+  --ligne-feuille-hauteur-max: 92dvh;
 }

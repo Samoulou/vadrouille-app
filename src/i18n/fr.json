@@ -227,12 +227,14 @@
       "museum": "les musées et monuments",
       "walk": "les balades en ville",
       "nature": "la nature et les points de vue",
-      "tasting": "les dégustations"
+      "tasting": "les dégustations",
+      "restaurant": "les restaurants"
     },
     "detail": {
       "moment": "Jour {day}, {weekday}, vers {time}",
-      "source": "Source : ",
+      "source": "Source : ",
       "verifie": "Informations vérifiées le {date}",
+      "mois": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
       "fermer": "Fermer"
     },
     "fin": {

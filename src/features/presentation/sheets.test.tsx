@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { CategorySchema } from "@/contracts";
+import { messages } from "@/i18n";
 import { propositions } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
@@ -21,7 +23,16 @@ describe("PreferenceSheet", () => {
     expect(promptTitle({ kind: "category", category: "walk" })).toBe("On arrête les balades en ville pour ce voyage ?");
     expect(promptTitle({ kind: "category", category: "nature" })).toBe("On arrête la nature et les points de vue pour ce voyage ?");
     expect(promptTitle({ kind: "category", category: "tasting" })).toBe("On arrête les dégustations pour ce voyage ?");
+    expect(promptTitle({ kind: "category", category: "restaurant" })).toBe("On arrête les restaurants pour ce voyage ?");
     expect(promptTitle({ kind: "distance" })).toBe("On reste plus près de ton hôtel ?");
+  });
+
+  it("chaque code de catégorie a son libellé dans fr.json, jamais le code brut", () => {
+    for (const category of CategorySchema.options) {
+      const title = promptTitle({ kind: "category", category });
+      expect(messages.presentation.categories[category]).toMatch(/^l/);
+      expect(title).toContain(messages.presentation.categories[category]);
+    }
   });
 
   it("feuille modale nommée par son titre, focus sur le titre, raisons dans l'ordre", () => {
@@ -71,11 +82,12 @@ describe("ProposalDetailSheet", () => {
     expect(dialog).toHaveTextContent(distillerie.stop.meta);
     expect(dialog).toHaveTextContent(distillerie.stop.reason!);
     expect(within(dialog).getByRole("link", { name: "[Site de la distillerie]" })).toBeInTheDocument();
-    expect(dialog).toHaveTextContent("Informations vérifiées le 15.08.2026");
+    expect(dialog).toHaveTextContent("Informations vérifiées le 15 août 2026");
     expect(within(dialog).getAllByRole("button").map((b) => b.textContent)).toEqual(["Fermer"]);
     fireEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
     expect(onClose).toHaveBeenCalled();
-    expect(formatVerifiedAt("2026-08-20")).toBe("20.08.2026");
+    expect(formatVerifiedAt("2026-08-20")).toBe("20 août 2026");
+    expect(formatVerifiedAt("2026-01-05")).toBe("5 janvier 2026");
   });
 
   it("fermé sans proposition ; aucune violation axe", async () => {

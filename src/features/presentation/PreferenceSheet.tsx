@@ -4,10 +4,13 @@ import { useRef, useState } from "react";
 
 import { Button, Chip } from "@/components/ligne";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
-import { PreferenceReasonSchema, type PreferenceAnswer, type PreferencePrompt, type PreferenceReason } from "@/contracts";
+import { PreferenceReasonSchema, type Category, type PreferenceAnswer, type PreferencePrompt, type PreferenceReason } from "@/contracts";
 import { format, messages } from "@/i18n";
 
 const t = messages.presentation;
+
+/** Libellé de chaque catégorie (fr.json) ; un code sans libellé ne compile pas. */
+const CATEGORY_LABELS: Record<Category, string> = t.categories;
 
 /** Raisons, dans l'ordre imposé (handover § 6 écran 14, § 10). */
 const REASONS: readonly PreferenceReason[] = PreferenceReasonSchema.options;
@@ -16,8 +19,7 @@ export function promptTitle(prompt: PreferencePrompt): string {
   if (prompt.kind === "distance") {
     return t.question.distance;
   }
-  const label = prompt.category === "restaurant" ? undefined : t.categories[prompt.category];
-  return format(t.question.categorie, { categorie: label ?? prompt.category });
+  return format(t.question.categorie, { categorie: CATEGORY_LABELS[prompt.category] });
 }
 
 export interface PreferenceSheetProps {
@@ -105,7 +107,7 @@ function PromptContent({
         </Button>
       </div>
       <DialogClose asChild>
-        <Button variant="text" size="sm" tone="soft" className="self-center">
+        <Button variant="text" size="sm" className="self-center">
           {t.question.fermer}
         </Button>
       </DialogClose>

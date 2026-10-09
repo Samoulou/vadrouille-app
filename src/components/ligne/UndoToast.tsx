@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { messages } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -16,9 +16,29 @@ export interface UndoToastProps {
   className?: string;
 }
 
+export interface UndoToastRegionProps {
+  /** Le `UndoToast` en cours, ou rien. */
+  children?: ReactNode;
+  className?: string;
+}
+
 /**
- * Annulation de la dernière action pendant 5 s (handover § 5 et § 7). `role="status"` : le message est
- * annoncé sans prendre le focus. Le délai est suspendu tant que le toast a le focus ou est survolé, et
+ * Région `role="status"` du toast, montée en permanence (avant toute décision) : le toast y est
+ * injecté ensuite, pour que les lecteurs d'écran annoncent chaque message sans prendre le focus. Sa
+ * hauteur minimale (une cible tactile) réserve la place du toast : son apparition ne décale pas le
+ * contenu qui précède.
+ */
+export function UndoToastRegion({ children, className }: UndoToastRegionProps) {
+  return (
+    <div role="status" data-undo-region="" className={cn("flex min-h-(--touch-target) flex-col", className)}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Annulation de la dernière action pendant 5 s (handover § 5 et § 7). Se place dans une
+ * `UndoToastRegion` (`role="status"`) : le message est annoncé sans prendre le focus. Le délai est suspendu tant que le toast a le focus ou est survolé, et
  * reprend à la sortie (WCAG 2.2.1). Rendu provisoire (F6-Q1) : aplat `ink`, texte `page`, « Annuler »
  * souligné en 700. Remonter le composant (clé) pour une nouvelle action relance le délai.
  */
@@ -44,7 +64,6 @@ export function UndoToast({ message, onUndo, onExpire, duration = 5000, classNam
 
   return (
     <div
-      role="status"
       data-undo-toast=""
       data-paused={isPaused || undefined}
       onFocus={() => setPaused((p) => ({ ...p, focus: true }))}
