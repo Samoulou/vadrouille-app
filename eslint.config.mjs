@@ -153,6 +153,14 @@ export default defineConfig([
     rules: noClientStorage("Programme", "spécification F5, F5-PO-16", "aucun service worker"),
   },
   {
+    // D1 : aucun texte en dur sur la page d'accueil et sa section « Démonstration » (handover § 10).
+    files: ["src/app/page.tsx", "src/features/accueil/**/*.{jsx,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },
