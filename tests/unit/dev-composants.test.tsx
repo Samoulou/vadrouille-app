@@ -66,6 +66,18 @@ describe("/dev/composants", () => {
     expect(within(section).getByRole("status")).toHaveTextContent(p.toast);
   });
 
+  it("montre la section Programme de F5a : Sheet à 25, 55 et 92 %, ReasonBlock avec et sans date, bandeau travel", () => {
+    render(<ComposantsShowcase />);
+    const section = screen.getByRole("region", { name: "Programme" });
+    const pg = messages.dev.composants.exemples.programme;
+    expect(within(section).getByRole("region", { name: pg.panneaux.petit })).toHaveAttribute("data-snap", "0.25");
+    expect(within(section).getByRole("region", { name: pg.panneaux.moyen })).toHaveAttribute("data-snap", "0.55");
+    expect(within(section).getByRole("region", { name: pg.panneaux.grand })).toHaveAttribute("data-snap", "0.92");
+    expect(within(section).getAllByText("Pourquoi pour toi")).toHaveLength(2);
+    expect(within(section).getAllByText(/^Source consultée le/)).toHaveLength(1);
+    expect(within(section).getByRole("status")).toHaveAttribute("data-kind", "travel");
+  });
+
   it("montre chaque type de Tag et de StatusBanner, et le compteur seulement quand il vaut plus de 0", () => {
     render(<ComposantsShowcase />);
     const ex = messages.dev.composants.exemples;
@@ -74,7 +86,7 @@ describe("/dev/composants", () => {
       expect(within(tags).getByText(text)).toBeInTheDocument();
     }
     const banners = screen.getByRole("region", { name: "StatusBanner" });
-    expect(within(banners).getAllByRole("status")).toHaveLength(4);
+    expect(within(banners).getAllByRole("status")).toHaveLength(5);
     expect(within(banners).getByRole("alert")).toHaveTextContent(ex.bandeaux.error);
     expect(screen.getByRole("img", { name: ex.compteurLabel })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: ex.compteurZeroLabel })).not.toBeInTheDocument();

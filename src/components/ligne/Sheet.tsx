@@ -187,7 +187,7 @@ export function Sheet({
       style={style}
       className={cn(
         "absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-t-sheet border border-b-0 border-outline bg-page",
-        dragging ? "transition-none" : "transition-[height,transform] duration-200 ease-in-out motion-reduce:transition-none",
+        dragging ? "transition-none" : "transition-all duration-200 ease-in-out motion-reduce:transition-none",
         className,
       )}
     >
