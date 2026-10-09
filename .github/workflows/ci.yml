@@ -67,4 +67,5 @@ jobs:
           # Pages de développement désactivées en production.
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/tokens)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/composants)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte)" = "404"
           docker rm -f app

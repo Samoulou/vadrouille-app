@@ -58,6 +58,48 @@ export default defineConfig([
     },
   },
   {
+    // F4 : aucun texte en dur dans la carte et sa démonstration, tout vient de src/i18n/fr.json.
+    files: ["src/components/carte/**/*.{jsx,tsx}", "src/app/dev/carte/**/*.{jsx,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
+    // F4 : aucune persistance côté client dans la carte (handover § 8 ; données Google, même simulées).
+    files: ["src/components/carte/**/*.{js,jsx,ts,tsx}", "src/app/dev/carte/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...["localStorage", "sessionStorage", "indexedDB", "caches"].map((name) => ({
+          name,
+          message: "Carte : aucune donnée persistée côté client (handover § 8, spécification F4).",
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["window", "globalThis", "self"].flatMap((object) =>
+          ["localStorage", "sessionStorage", "indexedDB", "caches"].map((property) => ({
+            object,
+            property,
+            message: "Carte : aucune donnée persistée côté client (handover § 8, spécification F4).",
+          })),
+        ),
+        {
+          object: "document",
+          property: "cookie",
+          message: "Carte : aucun cookie (handover § 8, spécification F4).",
+        },
+        {
+          object: "navigator",
+          property: "serviceWorker",
+          message: "Carte : aucun service worker ni cache de tuiles (handover § 8, spécification F4).",
+        },
+      ],
+    },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },
