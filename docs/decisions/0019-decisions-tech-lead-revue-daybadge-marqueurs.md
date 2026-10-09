@@ -2,10 +2,10 @@
 
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #71
 
-Numérotation : 0006 à 0012 sont réservés par #26 et #27, 0017 par #65.
+Numérotation : 0006 à 0012 sont réservés par #26 et #27, 0017 par #65 (descriptions de ces PR, non vérifiable dans `main` ; même convention que 0013 et 0016). Si l'une d'elles change de numéro, le CEO le signale avant de fusionner cette PR.
 
 ## Contexte
-Trois questions déléguées au Tech Lead sont ouvertes :
+Trois questions déléguées au Tech Lead sont ouvertes. Elles ne figurent pas encore dans `QUESTIONS.md` de `main` (dernière : Q107) : elles viennent des descriptions de PR (#67 pour Q111, #66 pour Q116) et des constats du CEO au 14e cycle (Q117), et sont numérotées dans le ticket #71. Le CEO les reporte dans `QUESTIONS.md` par la PR « chore: status ».
 - **Q111** (U2-Q4, décision 0018 § 10, correction en revue dans #67) : `DayBadge` en mode bouton, prévu avec `aria-pressed` par la décision 0016 § 8, doit-il passer en sémantique radio, comme UX/UI le préconise pour un choix exclusif ? À trancher avant F7b.
 - **Q116** (F5b, #66) : sur la carte simulée du jour 5, des marqueurs se chevauchent. C'est la suite de F4-Q3 (`specs/F4-carte.md`, « zone active de 44 px autour d'un marqueur de 26 px quand deux étapes sont proches »).
 - **Q117** (outillage de revue) : constats du CEO au 14e cycle :
@@ -27,7 +27,7 @@ Cette PR ne contient ni code ni workflow. Les changements décidés sont décrit
 
 ### 1.1 Raisons
 - **C'est un choix exclusif.** Un seul jour est choisi à la fois. `aria-pressed` décrit des bascules indépendantes. Avec `aria-pressed`, un lecteur d'écran annonce six boutons « enfoncé / non enfoncé » sans dire qu'ils s'excluent, ni combien il y en a (« 4 sur 6 »). Il n'annonce pas non plus qu'enfoncer J4 relâche J2. C'est le cas d'usage de `radiogroup` dans la pratique WAI-ARIA.
-- **Cohérence avec le reste du studio.** La règle commune de la décision 0018 (« Choix exclusif et action ») réserve `aria-pressed` aux bascules indépendantes (`Chip`, case de la liste, « Verrouiller » de F5b). La raison et le moment de F7 sont déjà des groupes radio (`SegmentedControl`, 0016 § 8). Si le jour était le seul choix exclusif en `aria-pressed`, deux sémantiques différentes cohabiteraient sur le même écran (« Ajouter un lieu » : jour, puis moment).
+- **Cohérence avec le reste du studio.** La règle commune de la décision 0018 dans sa correction en revue dans #67 (« Choix exclusif et action », absente du 0018 de `main` tant que #67 n'est pas fusionnée) réserve `aria-pressed` aux bascules indépendantes (`Chip`, case de la liste, « Verrouiller » de F5b). La raison et le moment de F7 sont déjà des groupes radio (`SegmentedControl`, 0016 § 8). Si le jour était le seul choix exclusif en `aria-pressed`, deux sémantiques différentes cohabiteraient sur le même écran (« Ajouter un lieu » : jour, puis moment).
 - **Coût faible maintenant, élevé plus tard.** F7b n'est pas codée. Changer la forme avant le code ne coûte qu'un amendement. Après, il faudrait réécrire le composant, ses tests et C21.
 
 ### 1.2 Forme technique (amende 0016 § 8, « `DayBadge` en mode bouton »)
@@ -48,8 +48,9 @@ Cette PR ne contient ni code ni workflow. Les changements décidés sont décrit
   - `useRadioGroup` gère ce cas par une option `isDisabled(index)`. `SegmentedControl` ne s'en sert pas aujourd'hui.
 - **Arrêt de tabulation** : le jour coché. Sans jour coché, le premier jour qui n'est pas complet. Si tous sont complets, le premier jour.
 - **La sélection suit le focus, et c'est permis à une condition** : cocher un jour ne déclenche aucune demande ni aucun aperçu. Il ne fait qu'afficher ce qui est déjà chargé : les points d'insertion de `MoveOptions` (F7b, `getMoveOptions` appelé une fois à l'ouverture), ou les moments du résultat (F7c). L'aperçu ne part que de « Placer ici, vers {heure} » (F7b) ou de « Voir l'effet » (F7c). Si une PR a besoin d'une demande au changement de jour, il faut un amendement de cette décision.
-- **Erreur de choix** (aucun jour choisi alors qu'un choix est exigé) : le focus va sur le groupe, selon la règle des erreurs de 0018 (« Message d'erreur et annonces »).
+- **Erreur de choix** (aucun jour choisi alors qu'un choix est exigé) : le focus va sur le groupe, selon la règle des erreurs de 0018 (« Message d'erreur et annonces » dans la correction #67 ; dans `main`, « Règles communes aux écrans de F7 et F8 »).
 - **Rendu** : celui de 0018 § 10, inchangé. Le jour coché a le rendu de la pastille active de F3 (plein `line`, texte `on-line`), les pastilles passent à la ligne, et le jour complet a l'état désactivé de F3.
+- **Hors périmètre : les points « Placer ici, vers {heure} » de la feuille « Déplacer »** (0018 § 11). Le point choisi y garde `aria-pressed="true"`, alors que c'est aussi un choix exclusif. Cette décision ne le change pas : ce sont des boutons d'action qui lancent un aperçu, et leur sémantique relève du rendu de 0018 § 11. La question est posée à UX/UI (« Nouvelles questions ») ; si UX/UI retient un groupe radio, il réutilise `useRadioGroup` par un amendement de cette décision, sans seconde implémentation.
 
 ### 1.3 Conséquences sur F7 et sur les tests
 - **C21** (`specs/F7-remplacer-ajouter-deplacer.md`) se lit désormais ainsi : « J4 choisie (`role="radio"`, `aria-checked="true"`, dans le groupe « Vers quel jour ? ») : … ; tout le parcours se fait au clavier ». Le test `déplacer: sans glisser` garde son nom et vérifie :
@@ -58,7 +59,7 @@ Cette PR ne contient ni code ni workflow. Les changements décidés sont décrit
   - un parcours **au clavier seulement** : Tab jusqu'au groupe, flèches jusqu'à J4, Tab jusqu'à « Placer ici, vers 15:45 », Entrée. On vérifie ensuite l'aperçu du critère : « [Jardin botanique royal] : J2 13:25 → J4 15:45 », « J2 13:25 » barré, « avant : » lu.
 
   Aucun test existant n'est désactivé ni supprimé : F7b n'est pas codée.
-- **Autres lignes de la spécification F7 à mettre à jour** par le Product Owner : l. 127 (« en mode bouton (`aria-pressed`, F7-TL-5) »), l. 139, l. 231 (F7-TL-5) et C10 (« `DayBadge` en mode bouton »), qui deviennent « groupe radio `DayBadgeGroup` ». D'ici là, **cette décision prime**, et les PR F7b et F7c la citent (nouvelle question au Product Owner, à joindre à Q110 / U2-Q3).
+- **Autres lignes de la spécification F7 à mettre à jour** par le Product Owner : l. 39, 47 et 53 (« `DayBadge` en mode bouton », F7-TL-5), l. 127 (« en mode bouton (`aria-pressed`, F7-TL-5) »), l. 139, l. 231 (F7-TL-5), l. 284 (F7-Q1), l. 289 (F7-Q6) et C10 (« `DayBadge` en mode bouton »), qui deviennent « groupe radio `DayBadgeGroup` ». Les mentions de 0016 (§ 8, l. 196 à 206 ; « Conséquences », l. 292 ; « Questions liées », l. 306) sont amendées par cette décision sans réécriture de 0016. D'ici là, **cette décision prime**, et les PR F7b et F7c la citent (nouvelle question au Product Owner, à joindre à Q110 / U2-Q3).
 - **Tests à écrire par F7b**, en plus de C21 :
   - unitaires de `useRadioGroup` : arrêt de tabulation (coché, aucun, tous désactivés), flèches dans les deux axes, Début et Fin, bouclage, focus sans coche sur une option désactivée ;
   - unitaires de `DayBadgeGroup` :
@@ -70,7 +71,7 @@ Cette PR ne contient ni code ni workflow. Les changements décidés sont décrit
   - axe (mêmes étiquettes WCAG 2.2 AA que les autres tests a11y) sur la feuille « Déplacer » ouverte, avec un jour complet ;
   - visuel : `/dev/composants` montre le groupe avec un jour coché, un jour non coché, un jour complet, et le focus sur un jour complet (C10 ; références par la CI, décision 0004).
 - **F7c** réutilise `DayBadgeGroup` pour « Quel jour ? », sans le modifier, et ajoute ses propres tests de parcours.
-- **Décision 0018** : la correction en revue dans #67 prévoit, au § 10 et dans « Gravité », une exception pour `aria-pressed` « tant que U2-Q4 est ouverte ». Elle cesse de s'appliquer quand cette décision devient définitive. Une PR F7b qui utiliserait `aria-pressed` pour le jour serait alors un écart, de gravité 3 (accessibilité) selon l'échelle de 0018. Rien n'est à modifier dans #67 : l'exception tombe d'elle-même. UX/UI pourra la retirer à sa prochaine révision de 0018.
+- **Décision 0018** : la correction en revue dans #67 (pas encore dans `main`) prévoit, au § 10 et dans « Gravité », une exception pour `aria-pressed` « tant que U2-Q4 est ouverte ». Elle cesse de s'appliquer quand cette décision devient définitive. Une PR F7b qui utiliserait `aria-pressed` pour le jour serait alors un écart, de gravité 3 (accessibilité) selon l'échelle de 0018. Rien n'est à modifier dans #67 : l'exception tombe d'elle-même. UX/UI pourra la retirer à sa prochaine révision de 0018.
 - PR : **F7b** (`useRadioGroup`, `DayBadgeGroup`, rendu radio de `DayBadge`, C21) ; **F7c** (réutilisation).
 
 ## 2. Q116 — Marqueurs qui se chevauchent sur la carte du jour 5
@@ -90,7 +91,7 @@ Ce n'est **pas un effet de la conversion équirectangulaire** de Q96 (0016 § 2,
 ### 2.2 Décision pour la phase 0 : chevauchement accepté, sans décalage ni regroupement sur la carte simulée
 - **Pas de décalage des marqueurs** (« éventail », déplacement de quelques pixels) :
   - il afficherait une étape là où elle n'est pas (principe produit 2, fiabilité) ;
-  - il éloignerait la carte simulée du rendu Google, qu'elle doit refléter pour que les tests valent (0013 § 1.4).
+  - il éloignerait la carte simulée du rendu Google. La carte simulée est injectée à la place de Google dans `/dev` et les tests (0013 § 1.4, `CarteProvider`) : ce qu'elle affiche de propre à elle ne serait vérifié pour aucun utilisateur, et ce qu'elle cacherait ne serait plus testé.
 - **Pas de regroupement propre à la carte simulée** : même raison. Le regroupement, s'il vient, est commun aux deux rendus (§ 2.4).
 - **Conformité** :
   - la carte n'est jamais la seule source d'information, et la liste contient tout (handover § 11) ;
@@ -143,13 +144,13 @@ Le rendu d'un groupe de marqueurs et la texture des trajets à pied restent à U
 - R2 se déclenche à chaque ajout de `needs-review`. Plusieurs déclenchements sur le même head donnent plusieurs revues indépendantes, et chaque revue partielle publiée devient un verdict (cas de #67).
 - Les revues ne suivent pas de liste commune. Chaque passe relit tout le texte et découvre de nouveaux points (cas de #65 et #66).
 
-### 3.2 Décision A — Conduite de la revue (règle du Tech Lead, en vigueur dès maintenant)
-Ces règles décrivent la manière dont le Tech Lead fait et conclut une revue, ce qui relève de son domaine (outillage, tests). Elles s'appliquent à toute revue qu'il conduit ou consolide, avec les sous-agents UX/UI et Sécurité quand R2 les appelle.
+### 3.2 Décision A — Conduite de la revue (règle du Tech Lead, en vigueur dès la fusion de cette PR, sous réserve du veto de Samuel)
+Ces règles décrivent la manière dont le Tech Lead fait et conclut une revue, ce qui relève de son domaine (outillage, tests). Elles s'appliquent à toute revue qu'il conduit ou consolide, avec les sous-agents UX/UI et Sécurité quand R2 les appelle. Sans P1 (§ 3.4), elles n'engagent que le sous-agent Tech Lead : l'orchestrateur R2 n'y est pas tenu. Elles ne changent ni la règle de fusion ni le décompte des 2 tentatives.
 
 1. **Une seule revue consolidée par head.**
    - Elle est publiée en un seul commentaire, titré « Revue consolidée — head `<sha court>` ».
    - Elle donne le verdict de chaque rôle consulté (Tech Lead ; UX/UI si l'interface est touchée ; Sécurité si un chemin sensible l'est), puis la liste unique des points.
-   - Les sous-agents ne publient rien eux-mêmes.
+   - Les sous-agents UX/UI et Sécurité appelés par le Tech Lead ne publient rien eux-mêmes ; le Tech Lead publie pour eux. Ce que fait l'orchestrateur R2 dépend de P1.
    - **Idempotence** : avant de publier, la revue vérifie s'il existe déjà une revue consolidée pour ce head. Si oui, elle ne publie rien et ne touche à aucun libellé.
    - Si le head a changé pendant la revue, elle ne publie pas de verdict pour l'ancien head : elle s'arrête, et le nouveau head sera relu au prochain déclenchement.
 2. **Sens de `techlead-approved`.**
@@ -164,7 +165,11 @@ Ces règles décrivent la manière dont le Tech Lead fait et conclut une revue, 
    - le diff entre le dernier head relu et le nouveau ;
    - la correction de chaque bloquant de la revue précédente.
 
-   Ce qu'elle trouve **sur du texte inchangé** depuis le head déjà relu est un **mineur**, avec la mention « relevé tardif ». Seule exception : une violation d'une règle « Jamais » de `CLAUDE.md` (données Google, secret, clé de production, fusion, production), une faille de sécurité ou un point juridique. Elle reste bloquante, avec la mention « bloquant tardif, omis à la revue du head `<sha>` », pour que le CEO la distingue dans `STATUS.md`.
+   Ce qu'elle trouve **sur du texte inchangé** depuis le head déjà relu garde sa gravité du point 3 et porte une mention qui le distingue :
+   - un écart de fond (tout ce que le point 3 classe bloquant : contrat, décision, spécification, règle « Jamais » de `CLAUDE.md`, test manquant, gravité 2 ou 3 de 0018, ainsi qu'une faille de sécurité ou un point juridique) **reste bloquant**, avec la mention « bloquant tardif, omis à la revue du head `<sha>` », pour que le CEO le distingue dans `STATUS.md` ;
+   - un point de forme ou de gravité 1 est un **mineur**, avec la mention « relevé tardif ».
+
+   La mention ne change pas le décompte des 2 tentatives : une correction demandée par un bloquant tardif compte comme aujourd'hui, tant que Samuel n'a pas tranché P3 (§ 3.4). Une non-conformité réelle ne peut donc pas fusionner au motif qu'elle a été vue tard.
 6. **Libellés** : la revue n'utilise que `techlead-approved` et `changes-requested`, et laisse `needs-review` et `docs-only` en place.
 
 ### 3.3 Décision B — Garde dans `techlead-gate` (outillage, tâche à venir)
@@ -178,13 +183,15 @@ Le workflow est modifié par une tâche à venir. Il n'est pas modifié dans cet
 4. **Tests.**
    - La décision de la porte est une fonction pure, sur l'action de l'événement, les libellés et le caractère code ou documentation. Elle est placée dans `scripts/ci/techlead-gate.mjs` et appelée par le workflow avec `node`, sans installation.
    - Elle est testée par Vitest dans `tests/unit/ci/` : toutes les combinaisons d'action (`opened`, `synchronize`, `labeled`, `unlabeled`) et de libellés, et l'exemption de documentation.
+   - **Cas de course à traiter par la tâche** : une revue lit le head X et pose `techlead-approved` après qu'un push a créé le head Y. L'événement `synchronize` de Y peut être traité avant le `labeled` : le libellé se retrouve sur Y, jamais relu. Le § 3.2 point 1 (ne rien publier si le head a changé) réduit ce risque sans le fermer (lecture puis écriture). La tâche choisit et teste une garde, par exemple : sur `labeled`, la porte ne passe que si la dernière « Revue consolidée — head `<sha court>` » porte le head courant ; sinon, elle échoue et retire le libellé comme au point 2.
+   - **Retrait par `GITHUB_TOKEN`** : un libellé retiré par le workflow avec `GITHUB_TOKEN` ne déclenche pas de nouvelle exécution (`unlabeled`), donc ne relance pas la porte. Le résultat reste juste, puisque l'exécution qui retire le libellé est elle-même en échec. La tâche ne s'appuie donc pas sur une relance après retrait, le dit dans le workflow, et ses tests ne supposent aucun événement `unlabeled` consécutif au retrait.
 5. **Droits.**
    - Le job a besoin de `pull-requests: write` et `issues: write` pour retirer un libellé et commenter.
    - Si le jeton de la routine ne peut pas pousser un fichier de `.github/workflows/` (droit `workflows` de l'application GitHub), la tâche le signale et la question remonte à Samuel (compte externe).
 6. **Documentation** : la tâche met à jour la copie de `techlead-gate.yml` dans `docs/studio/mise-en-place.md`, annexe D, et **seulement elle**. Les prompts de l'annexe B ne sont pas touchés.
 7. **Tâche** : « Garde de revue dans `techlead-gate` (Q117) », rôle back-end (outillage CI), à créer et à placer par le CEO. Elle n'est jamais dans le même cycle qu'une autre tâche qui touche `.github/workflows/`. Elle est prioritaire sur les tâches de code : elle ferme un risque de fusion d'un head non relu.
 
-**Pourquoi B ne change pas la règle de fusion.** La règle reste « CI verte + validation du Tech Lead ». B fait seulement que le libellé reflète une validation du head courant, que rien ne contredit. Un libellé périmé ou contredit n'est pas une validation. Si Samuel lit B autrement, son veto s'applique comme pour toute décision déléguée.
+**Pourquoi A et B ne changent pas la règle de fusion.** La règle reste « CI verte + validation du Tech Lead ». A (point 2 en particulier) dit seulement quand le Tech Lead considère sa validation acquise : après avoir consolidé les avis qu'il a lui-même demandés, sans créer de libellé ni de condition de porte pour les spécialistes, ce qui serait P2. B fait seulement que le libellé reflète une validation du head courant, que rien ne contredit. Un libellé périmé ou contredit n'est pas une validation. Si Samuel lit A ou B autrement, son veto s'applique comme pour toute décision déléguée.
 
 ### 3.4 Propositions à Samuel (règles réservées, non appliquées ici)
 - **P1 — Prompt R2.** Ajouter au prompt R2 :
@@ -202,11 +209,11 @@ Le workflow est modifié par une tâche à venir. Il n'est pas modifié dans cet
 ## Conséquences
 - **F7b** : `useRadioGroup` (extrait de `SegmentedControl`), `DayBadgeGroup`, rendu radio de `DayBadge`, C21 lu comme au § 1.3, et les tests du § 1.3. **F7c** : réutilisation de `DayBadgeGroup`.
 - **Décision 0016 § 8** : le mode bouton à `aria-pressed` est remplacé par le groupe radio du § 1.2. Le reste du § 8 (`ChangeSet`, `SegmentedControl`) ne change pas.
-- **Décision 0018** (correction #67) : l'exception d'`aria-pressed` pour F7b tombe quand cette décision devient définitive.
+- **Décision 0018** (correction #67, non fusionnée) : l'exception d'`aria-pressed` pour F7b tombe quand cette décision devient définitive.
 - **F5b (#66)** : aucun changement demandé au titre de Q116.
 - **Nouvelle tâche frontend** « Marqueurs proches sur la carte » (§ 2.4), après F5b, T4, F4-Q3 (UX/UI) et le comportement fixé par le Product Owner. Le CEO la crée et la place.
 - **Nouvelle tâche back-end** « Garde de revue dans `techlead-gate` » (§ 3.3), prioritaire. Le CEO la crée et la place.
-- **Revues du Tech Lead** : le § 3.2 s'applique dès la fusion de cette PR, y compris aux nouvelles passes de #26, #27, #65, #66 et #67.
+- **Revues du Tech Lead** : le § 3.2 s'applique dès la fusion de cette PR, sous réserve du veto de Samuel, y compris aux nouvelles passes de #26, #27, #65, #66 et #67. Il ne modifie ni la règle de fusion ni le décompte des tentatives (P3 reste à Samuel).
 - La note de version suivante liste cette décision dans « Décisions prises par le studio ».
 
 ## Nouvelles questions
@@ -214,9 +221,10 @@ Le workflow est modifié par une tâche à venir. Il n'est pas modifié dans cet
   - P1, modification du prompt R2 (§ 3.4). Bloque : l'application de la règle de revue par l'orchestrateur R2 ; ne bloque pas la tâche du § 3.3 ;
   - P2, validations spécialisées exigées par la porte (§ 3.4). Le Tech Lead recommande de ne pas l'adopter pour l'instant. Bloque : rien ;
   - P3, décompte des 2 tentatives quand une correction n'est due qu'à des bloquants tardifs, et tentative supplémentaire pour #65 et #66 (§ 3.4). Bloque : la reprise de #65 et #66.
-- **Product Owner** : mettre `specs/F7-remplacer-ajouter-deplacer.md` en accord avec le § 1 (l. 127, 139, 231, C10 et C21 : groupe radio `DayBadgeGroup` au lieu d'`aria-pressed`). À joindre à Q110 / U2-Q3. Bloque : rien, la décision prime d'ici là.
+- **Product Owner** : mettre `specs/F7-remplacer-ajouter-deplacer.md` en accord avec le § 1 (l. 39, 47, 53, 127, 139, 231, 284, 289, C10 et C21 : groupe radio `DayBadgeGroup` au lieu d'`aria-pressed`). À joindre à Q110 / U2-Q3. Bloque : rien, la décision prime d'ici là.
 - **Product Owner** : comportement au toucher d'un groupe de marqueurs (§ 2.3). Bloque : la tâche « Marqueurs proches sur la carte ».
 - **UX/UI** (complète F4-Q3) : rendu et nom accessible du marqueur de groupe (§ 2.3). Bloque : la même tâche.
+- **UX/UI** : les points « Placer ici, vers {heure} » de la feuille « Déplacer » (0018 § 11) gardent-ils `aria-pressed` pour le point choisi, ou passent-ils en groupe radio comme le jour (§ 1.2, « Hors périmètre ») ? Bloque : rien ; F7b suit 0018 § 11 d'ici là.
 - **CEO** : créer et placer les tâches « Garde de revue dans `techlead-gate` » (prioritaire) et « Marqueurs proches sur la carte » (priorité basse). Bloque : leurs tickets.
 
 ## Questions liées
