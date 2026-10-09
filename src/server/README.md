@@ -1,0 +1,1 @@
+Code serveur seulement (décision 0020 § 11) : actions serveur dans `actions/` (fichiers « use server », seuls importables hors de `src/server`), configuration de l'offre dans `config/`, `parse-input.ts`.

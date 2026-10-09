@@ -15,6 +15,7 @@ export {
 export { DayTabs, type DayTabsDay, type DayTabsProps } from "./DayTabs";
 export { DeckCard, deckCardLabels, deckCardTag, type DeckCardProps } from "./DeckCard";
 export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
+export { DestinationPlate, type DestinationPlateProps } from "./DestinationPlate";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";

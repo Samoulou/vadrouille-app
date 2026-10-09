@@ -23,6 +23,10 @@
         "jour": {
           "libelle": "Jour 1",
           "precision": "Étapes et trajets du jour"
+        },
+        "debloquer": {
+          "libelle": "Débloquer",
+          "precision": "Écran 9, paiement simulé"
         }
       }
     }
@@ -348,6 +352,96 @@
     },
     "surprise": {
       "bouton": "Surprends-moi"
+    }
+  },
+  "debloquer": {
+    "titreDocument": {
+      "debloquer": "{destination} · Débloquer",
+      "simule": "Paiement simulé",
+      "confirmation": "{destination} · Confirmation du paiement"
+    },
+    "retour": "Retour",
+    "plaque": {
+      "ligne": "{debut} – {fin} · {voyageurs}",
+      "date": "{jour} {date}",
+      "jours": [
+        "dim.",
+        "lun.",
+        "mar.",
+        "mer.",
+        "jeu.",
+        "ven.",
+        "sam."
+      ],
+      "adultes": {
+        "un": "1 adulte",
+        "plusieurs": "{n} adultes"
+      },
+      "enfants": {
+        "un": "1 enfant",
+        "plusieurs": "{n} enfants"
+      },
+      "separateur": ", "
+    },
+    "offre": {
+      "titre": "Débloquer ton voyage",
+      "titreDebloque": "Ton voyage est débloqué",
+      "paiementUnique": "Paiement unique pour ce voyage, sans abonnement.",
+      "simulation": "Démonstration : le paiement est simulé, aucun montant n'est débité.",
+      "inclusTitre": "Ce qui est inclus",
+      "inclus": {
+        "allDays": "Toutes les journées de ton voyage, du {debut} au {fin}",
+        "mealsAndEvenings": "Les repas et les soirées",
+        "events": "Les événements pendant ton séjour",
+        "replacements": "Des remplacements pour ajuster ton programme",
+        "checklist": "La liste à réserver avant de partir",
+        "calendarAndSharing": "Le calendrier et le partage avec tes proches",
+        "access": "Accès jusqu'au {date}"
+      },
+      "remplacementsLimite": "Jusqu'à {n} remplacements pour ajuster ton programme",
+      "jourMois": "{day} {month}",
+      "payer": {
+        "twint": "Payer avec TWINT",
+        "card": "Payer par carte"
+      },
+      "paiements": "Moyens de paiement",
+      "sansDebloquer": "Continuer sans débloquer",
+      "restentAccessibles": "Tes premières propositions restent accessibles, même sans payer.",
+      "preparation": "Préparation du paiement…",
+      "erreurDebut": "Le paiement n'a pas pu commencer.",
+      "reessayer": "Réessayer",
+      "echec": {
+        "declined": "Le paiement n'a pas abouti. Aucun montant n'a été débité.",
+        "cancelled": "Paiement annulé.",
+        "expired": "Ce paiement a expiré. Tu peux recommencer."
+      },
+      "voirProgramme": "Voir le programme"
+    },
+    "simule": {
+      "titre": "Paiement simulé",
+      "mention": "Démonstration : aucun paiement n'est effectué et aucune donnée de paiement n'est demandée.",
+      "recapitulatif": "Récapitulatif",
+      "voyage": "Voyage : {destination}",
+      "montant": "Montant : {prix}",
+      "moyen": {
+        "twint": "Moyen : TWINT",
+        "card": "Moyen : carte"
+      },
+      "reussi": "Simuler un paiement réussi",
+      "refus": "Simuler un refus",
+      "annuler": "Annuler",
+      "envoi": "Envoi de la simulation…",
+      "erreur": "La simulation n'a pas pu être envoyée.",
+      "reessayer": "Réessayer"
+    },
+    "confirmation": {
+      "titre": "On confirme ton paiement",
+      "attente": "Confirmation du paiement en cours.",
+      "attenteLongue": "La confirmation prend plus de temps que prévu. Ton voyage sera débloqué dès qu'elle arrivera.",
+      "propositions": "Voir mes premières propositions",
+      "verifier": "Vérifier de nouveau",
+      "reussi": "Paiement confirmé.",
+      "echec": "Paiement non abouti."
     }
   }
 }

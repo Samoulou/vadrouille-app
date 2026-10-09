@@ -34,6 +34,13 @@ const ARRIVALS: { name: string; check: (page: Page) => Promise<void> }[] = [
       await expect(page).toHaveTitle(/Jour 1/);
     },
   },
+  // F9a (F9-PO-17) : cinquième entrée, paiement simulé ouvert pour les tests (VADROUILLE_DEMO_PAYMENT=1).
+  {
+    name: "Débloquer Écran 9, paiement simulé",
+    check: async (page) => {
+      await expect(page.getByRole("heading", { level: 1, name: "Débloquer ton voyage" })).toBeVisible();
+    },
+  },
 ];
 
 let googleRequests: string[] = [];
@@ -51,8 +58,8 @@ test("accueil: section « Démonstration », mention et voyage d'exemple", async
   await expect(demoSection(page).getByRole("heading", { level: 2, name: "Démonstration" })).toBeVisible();
   await expect(demoSection(page).getByText("Données simulées. Les lieux entre crochets ne sont pas vérifiés.")).toBeVisible();
   await expect(demoSection(page).getByText("Voyage d'exemple : Édimbourg")).toBeVisible();
-  await expect(demoSection(page).getByRole("list").getByRole("listitem")).toHaveCount(4);
-  await expect(demoLinks(page)).toHaveCount(4);
+  await expect(demoSection(page).getByRole("list").getByRole("listitem")).toHaveCount(ARRIVALS.length);
+  await expect(demoLinks(page)).toHaveCount(ARRIVALS.length);
   for (const [index, arrival] of ARRIVALS.entries()) {
     await expect(demoLinks(page).nth(index)).toHaveAccessibleName(arrival.name);
   }
@@ -78,7 +85,7 @@ test("accueil: chaque lien mène à un écran livré (200, pas de 404), puis ret
 
     await page.goBack();
     await expect(page).toHaveURL("/");
-    await expect(demoLinks(page)).toHaveCount(4);
+    await expect(demoLinks(page)).toHaveCount(ARRIVALS.length);
   }
 });
 
@@ -98,7 +105,7 @@ test("accueil: chaque lien en chargement direct, statut 200", async ({ page }) =
 test("accueil: chaque lien mesure au moins 44 × 44 px", async ({ page }) => {
   await page.goto("/");
   const count = await demoLinks(page).count();
-  expect(count).toBe(4);
+  expect(count).toBe(ARRIVALS.length);
   for (let index = 0; index < count; index += 1) {
     const box = await demoLinks(page).nth(index).boundingBox();
     expect(box).not.toBeNull();
@@ -111,7 +118,7 @@ test("accueil: contour de focus 2 px line décalé de 2 px sur chaque lien", asy
   await page.goto("/");
   const line = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-line").trim());
   await page.keyboard.press("Tab");
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < ARRIVALS.length; index += 1) {
     const link = demoLinks(page).nth(index);
     await expect(link).toBeFocused();
     const style = await link.evaluate((el) => {

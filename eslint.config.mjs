@@ -38,9 +38,37 @@ const SIMULATED_MAP_PATTERN = {
     "La carte simulée ne s'importe que depuis src/app/dev et les tests (décisions 0013 § 1.4 et 0015 § 1) : aucune route produit ne l'embarque.",
 };
 
+/**
+ * F9a : hors de `src/server`, un import de `@/server/*` n'est permis que vers `@/server/actions/*`
+ * (modules « use server » : Next.js n'envoie au navigateur que des références d'appel). Tout autre module
+ * de `src/server` (`parse-input.ts`, `config/offer.ts`) est refusé (décision 0020 § 11, amende 0016 § 3.1).
+ */
+const SERVER_PATTERN = {
+  regex: "^(@/server/(?!actions/[^/]+$)|(\\.{1,2}/)+(.*/)?server/(?!actions/[^/]+$))",
+  message:
+    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) : la configuration et parse-input restent côté serveur.",
+};
+
+/** F9a : la portée des simulations lit les en-têtes de la requête ; jamais dans un écran (décision 0017 § 10.2). */
+const SIMULATION_PATTERN = {
+  group: ["@/adapters/simulation", "**/adapters/simulation"],
+  message: "La portée des simulations ne s'importe pas dans un écran (décision 0017 § 10.2) : passe par une page serveur.",
+};
+
+/** F9a : pas de Zod complet dans un écran (décision 0016 § 3.1 règle 4, test exigé par 0020 § 11). */
+const ZOD_PATH = {
+  name: "zod",
+  message: "Pas de zod dans le code chargé par le navigateur (décision 0016 § 3.1) : valeurs par @/contracts/values.",
+};
+
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
 function restrictedImports(...patterns) {
   return { "no-restricted-imports": ["error", { patterns }] };
+}
+
+/** Variante avec des chemins interdits (`paths`), dans la même règle. */
+function restrictedImportsWithPaths(paths, ...patterns) {
+  return { "no-restricted-imports": ["error", { paths, patterns }] };
 }
 
 export default defineConfig([
@@ -75,10 +103,51 @@ export default defineConfig([
     rules: restrictedImports(MOCKS_PATTERN),
   },
   {
-    // F5 : ni src/mocks ni la carte simulée dans les routes du voyage et les écrans (décision 0015 § 1).
-    files: ["src/app/voyages/**/*.{js,jsx,ts,tsx}", "src/features/**/*.{js,jsx,ts,tsx}"],
+    // F9a : src/server ne s'importe que par ses actions dans les routes (décision 0020 § 11) ; F1 tient toujours.
+    files: ["src/app/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN),
+    rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN),
+  },
+  {
+    // F9a : composants et bibliothèque : ni src/server hors actions, ni la portée des simulations, ni zod.
+    files: ["src/components/**/*.{js,jsx,ts,tsx}", "src/lib/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: restrictedImportsWithPaths([ZOD_PATH], MOCKS_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
+    // F5 : ni src/mocks ni la carte simulée dans les routes du voyage (décision 0015 § 1) ; F9a : ni src/server hors actions.
+    files: ["src/app/voyages/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN),
+  },
+  {
+    // F5 : ni src/mocks ni la carte simulée dans les écrans (décision 0015 § 1) ; F9a : ni src/server hors
+    // actions, ni la portée des simulations, ni zod (décisions 0017 § 10.2 et 0020 § 11).
+    files: ["src/features/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: restrictedImportsWithPaths([ZOD_PATH], MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
+    // F9a : aucun journal dans le paiement simulé (ni montant ni identifiant de paiement, décision 0020 § 11).
+    files: ["src/server/actions/paiement.ts", "src/adapters/mock-payment.ts", "src/adapters/mock-unlock.ts"],
+    rules: { "no-console": "error" },
+  },
+  {
+    // F9a : horloge injectée, jamais l'horloge système dans l'adaptateur de paiement simulé (0017 § 10.1, 0020 § 2.2).
+    files: ["src/adapters/mock-payment.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[object.name='Date'][property.name='now']",
+          message: "Horloge de la portée seulement (option now) : pas de Date.now (décision 0020 § 2.2).",
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: "Horloge de la portée seulement (option now) : pas de new Date() (décision 0020 § 2.2).",
+        },
+      ],
+    },
   },
   {
     // F2 : aucun texte en dur dans les composants Ligne, tout vient de src/i18n/fr.json (handover § 10).
@@ -151,6 +220,20 @@ export default defineConfig([
     ],
     ignores: ["**/*.test.{ts,tsx}"],
     rules: noClientStorage("Programme", "spécification F5, F5-PO-16", "aucun service worker"),
+  },
+  {
+    // F9a : aucun texte en dur dans le fournisseur de l'onglet et les écrans partagés du voyage (handover § 10).
+    files: ["src/features/voyage/**/*.{jsx,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
+    // F9a : aucune persistance côté client dans le fournisseur de l'onglet ni le parcours « Débloquer » (décision 0020 § 8).
+    files: ["src/features/voyage/**/*.{js,jsx,ts,tsx}", "src/components/ligne/DestinationPlate.tsx"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: noClientStorage("Voyage", "spécification F9, F9-PO-14, décision 0020 § 8", "aucun service worker"),
   },
   {
     // D1 : aucun texte en dur sur la page d'accueil et sa section « Démonstration » (handover § 10).

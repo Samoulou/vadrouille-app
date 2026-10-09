@@ -43,6 +43,8 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    env: { VADROUILLE_DEV_PAGES: "1", PORT: String(PORT), HOSTNAME: "127.0.0.1" },
+    // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ; seul
+    // fichier versionné qui le pose (tests/unit/dev-pages-env.test.ts).
+    env: { VADROUILLE_DEV_PAGES: "1", VADROUILLE_DEMO_PAYMENT: "1", PORT: String(PORT), HOSTNAME: "127.0.0.1" },
   },
 });
