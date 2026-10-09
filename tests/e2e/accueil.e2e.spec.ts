@@ -36,7 +36,7 @@ const ARRIVALS: { name: string; check: (page: Page) => Promise<void> }[] = [
   },
   // F9a (F9-PO-17) : cinquième entrée, paiement simulé ouvert pour les tests (VADROUILLE_DEMO_PAYMENT=1).
   {
-    name: "Débloquer Écran 9, paiement simulé",
+    name: "Débloquer L'offre et le paiement simulé",
     check: async (page) => {
       await expect(page.getByRole("heading", { level: 1, name: "Débloquer ton voyage" })).toBeVisible();
     },

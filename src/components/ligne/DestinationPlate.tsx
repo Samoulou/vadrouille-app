@@ -31,7 +31,7 @@ const COLORS: Record<Trip["destinationColor"], string> = {
 export function DestinationPlate({ name, meta, color, as: Name = "h1", className }: DestinationPlateProps) {
   return (
     <div data-destination-plate={color} className={cn("flex flex-col gap-1.5 rounded-plate p-5 text-on-line", COLORS[color], className)}>
-      <Name className="text-destination font-extrabold tracking-[-0.02em]">{name}</Name>
+      <Name className="text-destination font-extrabold tracking-(--ligne-destination-approche)">{name}</Name>
       <p className="text-corps tabular-nums">{meta}</p>
     </div>
   );

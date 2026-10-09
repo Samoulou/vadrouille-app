@@ -124,6 +124,10 @@ describe("attente", () => {
     await act(async () => vi.advanceTimersByTimeAsync(CHECKOUT_POLL_STOP_AFTER_MS));
     const stopped = poll.mock.calls.length;
     expect(screen.getByRole("button", { name: "Vérifier de nouveau" })).toBeInTheDocument();
+    // Interrogation arrêtée : le texte ne promet plus une mise à jour automatique.
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "La confirmation n'est pas encore arrivée. Ton voyage sera débloqué dès qu'elle arrivera : vérifie de nouveau dans un moment.",
+    );
     await act(async () => vi.advanceTimersByTimeAsync(60_000));
     expect(poll.mock.calls.length).toBe(stopped);
     expect(maxInFlight).toBe(1);
@@ -132,6 +136,7 @@ describe("attente", () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(poll.mock.calls.length).toBe(stopped + 1);
     expect(screen.queryByRole("button", { name: "Vérifier de nouveau" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("La confirmation prend plus de temps que prévu.");
   });
 
   it("arrêt au démontage", async () => {

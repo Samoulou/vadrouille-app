@@ -135,7 +135,7 @@ function Confirmation({
         <div className="h-5 w-1/2 rounded-block bg-muted" />
       </div>
       <p role="status" className="text-corps-s text-ink-soft">
-        {phase === "waiting" ? t.attente : t.attenteLongue}
+        {phase === "waiting" ? t.attente : phase === "long" ? t.attenteLongue : t.attenteArretee}
       </p>
       {phase !== "waiting" ? (
         <div className="flex flex-col items-start gap-3">

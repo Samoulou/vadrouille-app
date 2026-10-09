@@ -154,6 +154,9 @@ describe("paiement", () => {
     expect(screen.getByRole("button", { name: "Payer avec TWINT" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Payer par carte" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Préparation du paiement…");
+    // Texte d'attente visible (décision 0018, « Attente »), pas seulement annoncé.
+    expect(screen.getByRole("status")).not.toHaveClass("sr-only");
+    expect(screen.getByRole("status")).toHaveClass("text-corps-s", "text-ink-soft");
     await act(async () => resolve({ ok: true, value: { checkoutId: "c".repeat(22), redirectUrl: "/voyages/x/debloquer/paiement-simule/c" } }));
     expect(recorder.events.at(-1)).toEqual({ name: "payment_started", properties: { method: "twint", price_variant: "chf_29" } });
     expect(router.push).toHaveBeenCalledWith("/voyages/x/debloquer/paiement-simule/c");

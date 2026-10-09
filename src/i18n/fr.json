@@ -26,7 +26,7 @@
         },
         "debloquer": {
           "libelle": "Débloquer",
-          "precision": "Écran 9, paiement simulé"
+          "precision": "L'offre et le paiement simulé"
         }
       }
     }
@@ -440,8 +440,7 @@
       "attenteLongue": "La confirmation prend plus de temps que prévu. Ton voyage sera débloqué dès qu'elle arrivera.",
       "propositions": "Voir mes premières propositions",
       "verifier": "Vérifier de nouveau",
-      "reussi": "Paiement confirmé.",
-      "echec": "Paiement non abouti."
+      "attenteArretee": "La confirmation n'est pas encore arrivée. Ton voyage sera débloqué dès qu'elle arrivera : vérifie de nouveau dans un moment."
     }
   }
 }

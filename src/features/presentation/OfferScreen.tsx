@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AnalyticsProvider, useTrack } from "@/analytics/context";
 import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
-import { Button, DestinationPlate, StatusBanner } from "@/components/ligne";
+import { Button, DestinationPlate, StatusBanner, iconButtonClassName } from "@/components/ligne";
 import { IconRetour } from "@/components/ligne/icons";
 import type { Offer, Trip } from "@/contracts";
 import type { CheckoutFailure, OfferInclusion, PaymentMethod, PriceVariant } from "@/contracts/values";
@@ -85,7 +85,7 @@ function BackLink({ href }: { href: string }) {
     <Link
       href={href}
       aria-label={t.retour}
-      className="inline-flex size-(--touch-target) items-center justify-center self-start rounded-control border border-outline bg-raised text-ink"
+      className={iconButtonClassName("square", "self-start")}
     >
       <IconRetour />
     </Link>
@@ -221,7 +221,8 @@ function OfferContent({
           </Button>
         ))}
       </div>
-      <p role="status" className="sr-only">
+      {/* Texte d'attente visible et annoncé (décision 0018, « Attente ») ; la région existe avant l'annonce. */}
+      <p role="status" className="text-corps-s text-ink-soft">
         {pending ? t.offre.preparation : ""}
       </p>
       <div className="flex flex-col items-center gap-2 text-center">
