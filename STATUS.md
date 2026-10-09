@@ -15,9 +15,9 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
   - La fusion automatique est partie avant la fin de la revue UX/UI, qui demandait des corrections. Celles-ci sont dans #67 (voir Q117).
 
 ## En cours (toutes en `needs-review`)
-- **F5b — Fiche étape, verrou, `ReasonBlock`, ajouts à `DayLine` (PR #66, ticket #61)** : 2e et dernière correction en cours.
+- **F5b — Fiche étape, verrou, `ReasonBlock`, ajouts à `DayLine` (PR #66, ticket #61)** : 2e et dernière correction faite (84bfe8e), CI `verify` et `docker` verte.
   - Revue Tech Lead conforme.
-  - Reste le point UX/UI : capture de l'état enfoncé de « Verrouiller ».
+  - Correction 2 : l'état enfoncé de « Verrouiller » est montré sur `/dev/composants` et dans la capture `sejour-fiche-tattoo-92.png`.
   - Inclut la conversion équirectangulaire de la carte simulée (Q96) et l'amendement F5b de la décision 0015.
   - JavaScript initial de la Journée : 200 344 octets gzip pour un budget de 200 000. C'est T4 qui le traite.
   - Questions : Q114 (Product Owner), Q115 (UX/UI), Q116 (Tech Lead).
@@ -87,7 +87,7 @@ Si une 3e correction est demandée sur #65, #66 ou #67, la tâche passe en bloqu
   - si #65 est fusionnée : décision 0017 (Tech Lead), dans les 2 jours qui suivent.
 
 ## Prochain cycle
-1. Suivre #65, #66 et #67, toutes en dernière correction.
+1. Suivre #65, #66 et #67 : les 2 corrections sont faites, la prochaine demande de changement les fait passer en bloqué.
 2. Après la fusion de F5b : T4, puis F5c. Après la fusion de #65 : T7, puis F8a. T6 ensuite.
 3. Product Owner : Q110 (specs F7 et F8 d'après 0018), Q104, Q114.
 4. #26 et #27 : appliquer la réponse de Samuel à Q43.
