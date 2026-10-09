@@ -70,6 +70,11 @@ describe("jeu Édimbourg : calendrier", () => {
     expect(tattoo?.locked).toBe(true);
   });
 
+  it("marque le Tattoo comme seul engagement (billets, décision 0015 § 9)", () => {
+    const committed = edimbourg.days.flatMap((day) => [...stopsOf(day), ...day.events]).filter((stop) => stop.commitment);
+    expect(committed.map((stop) => [stop.id, stop.commitment, stop.locked])).toEqual([["j1-tattoo", "ticket", true]]);
+  });
+
   it("commence le J1 à midi", () => {
     const first = edimbourg.days[0]?.items[0];
     expect(first?.type === "terminus" && first.time).toBe("12:00");

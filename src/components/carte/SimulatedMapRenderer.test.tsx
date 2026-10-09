@@ -4,8 +4,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { axeViolations } from "../../../tests/unit/axe";
 import { applyTokens, day2, day4, map2, map4, stubLayout } from "../../../tests/unit/carte-fixtures";
 
-import { buildDayRoute, offsetCenter } from "./route";
-import { fitCamera, scaleAt } from "./simulated-model";
+import { buildDayRoute } from "./route";
+import { fitCamera, project, scaleAt } from "./simulated-model";
 import { SimulatedMapRenderer } from "./SimulatedMapRenderer";
 import type { MapView } from "./types";
 
@@ -85,16 +85,25 @@ describe("SimulatedMapRenderer", () => {
     expect(selected[0]?.querySelector("[data-selected='true']")).not.toBeNull();
   });
 
-  it("visibleInsets : la sélection place l'étape au centre décalé (offsetCenter), zoom inchangé (décision 0015 § 4)", () => {
-    const insets = { top: 0, right: 0, bottom: 200, left: 0 };
-    const { rerender } = render(<SimulatedMapRenderer view={view({ visibleInsets: insets })} />);
-    const { zoom } = camera();
-    rerender(<SimulatedMapRenderer view={view({ visibleInsets: insets, selectedStopId: "j2-dejeuner" })} />);
-    const target = map2.points.find((p) => p.ref.type === "stop" && p.ref.stopId === "j2-dejeuner")!;
-    const expected = offsetCenter({ lat: target.lat, lng: target.lng }, insets, zoom);
-    expect(camera()).toEqual({ lat: expected.lat, lng: expected.lng, zoom });
-    expect(camera().lat).toBeLessThan(target.lat);
-  });
+  it.each([0.25, 0.55, 0.92])(
+    "visibleInsets, panneau à %s : l'étape sélectionnée tombe au milieu de la zone non couverte à 10⁻⁶ px près, zoom inchangé (décision 0016 § 2)",
+    (part) => {
+      const size = { width: 390, height: 844 };
+      stubLayout(size.width, size.height);
+      const insets = { top: 0, right: 0, bottom: part * size.height, left: 0 };
+      const { rerender } = render(<SimulatedMapRenderer view={view({ visibleInsets: insets })} />);
+      const { zoom } = camera();
+      rerender(<SimulatedMapRenderer view={view({ visibleInsets: insets, selectedStopId: "j2-dejeuner" })} />);
+      const point = map2.points.find((p) => p.ref.type === "stop" && p.ref.stopId === "j2-dejeuner")!;
+      const target = { lat: point.lat, lng: point.lng };
+      const after = camera();
+      expect(after.zoom).toBe(zoom);
+      expect(after.lat).toBeLessThan(target.lat);
+      const { x, y } = project(target, { center: { lat: after.lat, lng: after.lng }, zoom: after.zoom });
+      expect(Math.abs(x)).toBeLessThan(1e-6);
+      expect(Math.abs(size.height / 2 - y - (size.height - insets.bottom) / 2)).toBeLessThan(1e-6);
+    },
+  );
 
   it("glisser déplace le centre de l'opposé du geste, sans rappel ni changement de zoom", () => {
     const onMarkerPress = vi.fn();

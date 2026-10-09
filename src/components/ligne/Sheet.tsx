@@ -42,6 +42,11 @@ export interface SheetProps {
   header?: ReactNode;
   /** Zone qui défile à l'intérieur du panneau. */
   bodyRef?: Ref<HTMLDivElement>;
+  /**
+   * Contenu posé juste au-dessus du bord supérieur du panneau, qui suit ses hauteurs et le glisser (par
+   * exemple la région du toast d'annulation). Placé après le contenu dans l'ordre de lecture.
+   */
+  above?: ReactNode;
   children: ReactNode;
   className?: string;
 }
@@ -78,6 +83,7 @@ export function Sheet({
   label,
   header,
   bodyRef,
+  above,
   children,
   className,
 }: SheetProps) {
@@ -214,6 +220,11 @@ export function Sheet({
       <div ref={bodyRef} data-part="contenu" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {children}
       </div>
+      {above ? (
+        <div data-part="au-dessus" className="pointer-events-none absolute inset-x-0 bottom-full">
+          {above}
+        </div>
+      ) : null}
     </section>
   );
 }

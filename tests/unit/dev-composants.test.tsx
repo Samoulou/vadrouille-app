@@ -78,6 +78,16 @@ describe("/dev/composants", () => {
     expect(within(section).getByRole("status")).toHaveAttribute("data-kind", "travel");
   });
 
+  it("montre les ajouts de F5b à DayLine : étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage", () => {
+    render(<ComposantsShowcase />);
+    const section = screen.getByRole("region", { name: "Programme" });
+    const pg = messages.dev.composants.exemples.programme;
+    expect(within(section).getByRole("link", { name: new RegExp(`${pg.verrouillee.nom.replace(/[[\]]/g, "\\$&")}.*Verrouillée`) })).toBeInTheDocument();
+    expect(within(section).getByText("Déjeuner pas encore choisi")).toBeInTheDocument();
+    expect(within(section).getByText("Dîner pas encore choisi")).toBeInTheDocument();
+    expect(within(section).getByRole("link", { name: "Idées" })).toHaveAttribute("href", "#idees-14:00-18:30");
+  });
+
   it("montre chaque type de Tag et de StatusBanner, et le compteur seulement quand il vaut plus de 0", () => {
     render(<ComposantsShowcase />);
     const ex = messages.dev.composants.exemples;

@@ -56,8 +56,17 @@ describe("sejour: 404 hors organisation ou hors limites (routes)", () => {
 
   it("titres du document : « Édimbourg · Séjour », « Édimbourg · Jour 2 »", async () => {
     expect((await sejourMetadata({ params: params({ id: TRIP }) })).title).toBe("Édimbourg · Séjour");
-    expect((await journeeMetadata({ params: params({ id: TRIP, n: "2" }) })).title).toBe("Édimbourg · Jour 2");
-    expect((await journeeMetadata({ params: params({ id: TRIP, n: "9" }) })).title).toBeUndefined();
+    expect((await journeeMetadata({ params: params({ id: TRIP, n: "2" }), searchParams: params({}) })).title).toBe("Édimbourg · Jour 2");
+    expect((await journeeMetadata({ params: params({ id: TRIP, n: "9" }), searchParams: params({}) })).title).toBeUndefined();
+  });
+
+  it("titre du document, fiche ouverte : « {nom de l'étape} · Jour {n} » ; étape absente du jour : titre du jour", async () => {
+    const title = async (etape: string) =>
+      (await journeeMetadata({ params: params({ id: TRIP, n: "2" }), searchParams: params({ etape }) })).title;
+    expect(await title("j2-dean-village")).toBe("[Dean Village] · Jour 2");
+    expect(await title("j2-concert-orgue")).toBe("[Concert d'orgue à St Giles] · Jour 2");
+    expect(await title("j5-distillerie")).toBe("Édimbourg · Jour 2");
+    expect(await title("inconnue")).toBe("Édimbourg · Jour 2");
   });
 });
 
@@ -68,7 +77,7 @@ describe("/dev/voyages (F5-TL-1)", () => {
     await expect(serverRender(DevTripLayout({ params: params({ id: TRIP }), children: null }))).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(serverRender(DevSejourPage({ params: params({ id: TRIP }) }))).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(serverRender(DevJourneePage({ params: params({ id: TRIP, n: "2" }) }))).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(await devJourneeMetadata({ params: params({ id: TRIP, n: "2" }) })).toEqual({});
+    expect(await devJourneeMetadata({ params: params({ id: TRIP, n: "2" }), searchParams: params({}) })).toEqual({});
   });
 
   it("s'affiche en développement, avec les mêmes 404 que les routes produit", async () => {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { DayLineItem, Segment, Stop } from "@/contracts";
+import type { DayLineItem, Meal, Segment, Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
 import { cn } from "@/lib/utils";
@@ -99,19 +99,29 @@ export interface DayLineStopProps {
   href: string;
 }
 
-/** Arrêt : anneau line, nom, métadonnées, justification et tags ; toute la zone ouvre la fiche étape. */
+/**
+ * Arrêt : anneau line, nom, métadonnées, mention de verrou, justification et tags ; toute la zone ouvre
+ * la fiche étape. Étape verrouillée (F5-PO-14) : « Verrouillée » en `legende` `ink-soft` sous les
+ * métadonnées, texte seul tant que le tracé du cadenas manque (Q13, Q51) ; ce n'est pas une `Tag`.
+ */
 function StopRow({ stop, href }: DayLineStopProps) {
   return (
-    <li data-type="stop" className={ROW}>
+    <li data-type="stop" data-locked={stop.locked ? "true" : undefined} className={ROW}>
       <Heure>{stop.start}</Heure>
       <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" />} />
       <Link
         href={href}
+        scroll={false}
         data-part="arret"
         className="flex min-h-(--touch-target) min-w-0 flex-col items-start gap-1 rounded-badge pb-4"
       >
         <span className="text-arret font-bold text-ink">{stop.name}</span>
         <span className="text-corps-s text-ink-soft">{stop.meta}</span>
+        {stop.locked ? (
+          <span data-part="verrou" className="text-legende text-ink-soft">
+            {t.verrouillee}
+          </span>
+        ) : null}
         {stop.reason ? <span className="text-corps-s text-ink">{stop.reason}</span> : null}
         {stop.exceptions.length > 0 ? (
           <span className="mt-1 flex flex-wrap gap-(--ligne-espace-2)">
@@ -175,12 +185,35 @@ function FreeTime({ from, to, ideasHref }: DayLineFreeTimeProps) {
   );
 }
 
+export interface DayLineOpenMealProps {
+  time: string;
+  meal: Meal;
+}
+
+/**
+ * Créneau de repas pas encore choisi (F5-PO-13, décision 0015 § 2 ; provisoire UX/UI) : heure, anneau et
+ * rail comme un arrêt, « Déjeuner pas encore choisi » ou « Dîner pas encore choisi » en `arret` `ink-2`.
+ * Sans lieu : ni lien, ni fiche, ni marqueur sur la carte ; signalé par son texte, sans badge.
+ */
+function OpenMeal({ time, meal }: DayLineOpenMealProps) {
+  return (
+    <li data-type="openMeal" data-meal={meal} className={ROW}>
+      <Heure>{time}</Heure>
+      <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" />} />
+      <p className="flex min-h-(--touch-target) items-start pb-4 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
+    </li>
+  );
+}
+
 export interface DayLineProps {
   items: DayLineItem[];
-  /** Proposition : adresse de la fiche étape d'un arrêt. */
+  /** Adresse de la fiche étape d'un arrêt. */
   getStopHref: (stop: Stop) => string;
-  /** Proposition : destination du lien « Idées » du temps libre (Q17). */
-  ideasHref?: string;
+  /**
+   * Destination du lien « Idées » d'une plage de temps libre (F5-TL-8, décision 0015 § 8) ; sans
+   * fonction, pas de lien. Remplace l'ancienne prop `ideasHref`.
+   */
+  getIdeasHref?: (free: { from: string; to: string }) => string;
   className?: string;
 }
 
@@ -188,7 +221,7 @@ export interface DayLineProps {
  * La ligne du jour, du terminus de départ au terminus de retour. Design system : components/DayLine.
  * Liste ordonnée sémantique ; rail et marqueurs décoratifs.
  */
-function DayLineRoot({ items, getStopHref, ideasHref, className }: DayLineProps) {
+function DayLineRoot({ items, getStopHref, getIdeasHref, className }: DayLineProps) {
   return (
     <ol className={cn("flex flex-col", className)}>
       {items.map((item, index) => {
@@ -200,7 +233,16 @@ function DayLineRoot({ items, getStopHref, ideasHref, className }: DayLineProps)
           case "segment":
             return <SegmentRow key={`segment-${index}`} segment={item.segment} />;
           case "free":
-            return <FreeTime key={`free-${index}`} from={item.from} to={item.to} ideasHref={ideasHref} />;
+            return (
+              <FreeTime
+                key={`free-${index}`}
+                from={item.from}
+                to={item.to}
+                ideasHref={getIdeasHref?.({ from: item.from, to: item.to })}
+              />
+            );
+          case "openMeal":
+            return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
         }
       })}
     </ol>
@@ -212,4 +254,5 @@ export const DayLine = Object.assign(DayLineRoot, {
   Stop: StopRow,
   Segment: SegmentRow,
   FreeTime,
+  OpenMeal,
 });

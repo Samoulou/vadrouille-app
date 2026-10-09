@@ -68,6 +68,11 @@
         "novembre",
         "décembre"
       ]
+    },
+    "verrouillee": "Verrouillée",
+    "repasNonChoisi": {
+      "lunch": "Déjeuner pas encore choisi",
+      "dinner": "Dîner pas encore choisi"
     }
   },
   "carte": {
@@ -121,7 +126,8 @@
         "toast": "Toast d'annulation",
         "panneau": "Panneau à 25 %, 55 % et 92 % de son cadre",
         "raison": "Avec date de consultation, sans date",
-        "bandeauTrajet": "Bandeau de trajet (type travel)"
+        "bandeauTrajet": "Bandeau de trajet (type travel)",
+        "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage"
       },
       "exemples": {
         "garder": "Garder",
@@ -200,7 +206,11 @@
           },
           "contenu": "[Contenu du panneau, qui défile à l'intérieur]",
           "raison": "[Tu as choisi Histoire et Balades en ville. Ancien village de meuniers au bord de la rivière.]",
-          "source": "[Office du tourisme]"
+          "source": "[Office du tourisme]",
+          "verrouillee": {
+            "nom": "[Billets du concert]",
+            "meta": "[Concert, 1 h 30, billets réservés]"
+          }
         }
       }
     },
@@ -305,7 +315,8 @@
   "sejour": {
     "titreDocument": {
       "sejour": "{destination} · Séjour",
-      "jour": "{destination} · Jour {n}"
+      "jour": "{destination} · Jour {n}",
+      "etape": "{name} · Jour {n}"
     },
     "region": "Programme",
     "retour": "Retour",
@@ -323,6 +334,21 @@
     },
     "surprise": {
       "bouton": "Surprends-moi"
+    },
+    "regionFiche": "Fiche étape",
+    "fiche": {
+      "fermer": "Fermer",
+      "moment": "J{n} · {title} · {range}",
+      "verrou": "Étape verrouillée : elle ne bougera pas quand tu modifies ton programme.",
+      "evenement": "Proposé pendant ton séjour, pas dans ton programme.",
+      "pourYAller": "Pour y aller",
+      "pourYAllerDepuis": "{segment} depuis {origin}",
+      "actions": "Actions",
+      "remplacer": "Remplacer",
+      "verrouiller": "Verrouiller",
+      "toastVerrouillee": "Étape verrouillée.",
+      "toastDeverrouillee": "Verrou retiré.",
+      "absente": "Cette étape n'est plus dans ce jour."
     }
   }
 }

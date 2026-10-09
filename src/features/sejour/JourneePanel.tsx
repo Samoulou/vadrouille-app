@@ -42,7 +42,11 @@ export function JourneePanel({ day, routes }: JourneePanelProps) {
       {day.generating ? null : (
         <div id={DAY_LIST_ID} tabIndex={-1} className="rounded-block">
           <h2 className="sr-only">{format(t.journee.etapes, { n: day.index })}</h2>
-          <DayLine items={day.items} getStopHref={(stop) => routes.etape(day.index, stop.id)} />
+          <DayLine
+            items={day.items}
+            getStopHref={(stop) => routes.etape(day.index, stop.id)}
+            getIdeasHref={(free) => routes.ajouter(day.index, free)}
+          />
         </div>
       )}
 
