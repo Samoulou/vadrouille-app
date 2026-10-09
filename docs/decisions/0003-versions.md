@@ -26,7 +26,7 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 | `axe-core` (dev) | 4.13.0 | Ajouté en F2 (axe dans Vitest) ; **pas 4.14.0**, aligné sur `@axe-core/playwright` : voir la décision 0005 |
 | `@googlemaps/js-api-loader` | 2.1.3 | Ajouté en F4 (chargement de la carte Google) ; **remplace `@vis.gl/react-google-maps`** nommée par le handover : voir la décision 0013 |
 | `@types/google.maps` (dev) | 3.66.4 | Ajouté en F4, déclaré dans `types` de `tsconfig.json` ; monte avec le chargeur : voir la décision 0013 |
-| `@radix-ui/react-dialog` | 1.2.0 | Retenu pour la feuille modale de F6 (`Dialog` de shadcn/ui), **ajouté par la PR de F6** ; `vaul` (`Drawer`) non retenu : voir la décision 0013 |
+| `@radix-ui/react-dialog` | 1.2.0 | Feuille modale de F6 (`Dialog` de shadcn/ui, `src/components/ui/dialog.tsx`) ; `vaul` (`Drawer`) non retenu : voir la décision 0013 |
 
 ## Conséquences
 - Revoir TypeScript 7 et ESLint 10 quand `typescript-eslint` et `eslint-config-next` les prendront en charge.

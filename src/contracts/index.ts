@@ -35,3 +35,7 @@ export {
   validateDayMap,
 } from "./map";
 export type { DayMap, MapPoint, MapPointRef } from "./map";
+export { CategorySchema } from "./category";
+export type { Category } from "./category";
+export { PreferenceAnswerSchema, PreferencePromptSchema, PreferenceReasonSchema } from "./deck";
+export type { PreferenceAnswer, PreferencePrompt, PreferenceReason } from "./deck";

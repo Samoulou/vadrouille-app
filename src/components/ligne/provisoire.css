@@ -56,3 +56,36 @@
   /* Q19 : hauteur de la pastille réduite (README DayBadge). */
   --ligne-pastille-reduite: 26px;
 }
+
+/*
+ * F6, présentation. Mesures du preview.html de DeckCard sans token (F6-Q2, complète Q19)
+ * et rendus non maquettés (F6-Q1).
+ */
+:root {
+  /* F6-Q2 : nom de la carte, 22 px en 800 (DeckCard/preview.html). */
+  --ligne-deck-nom: 22px;
+  /* F6-Q2 : interligne du nom de la carte (28 px). */
+  --ligne-deck-nom-interligne: 28px;
+  /* F6-Q2 : hauteur de la photo (220 px), réduite quand la fenêtre manque de place. */
+  --ligne-deck-photo: 220px;
+  /* F6-Q1 : hauteur minimale de la photo réduite (rendu non maquetté). */
+  --ligne-deck-photo-min: 72px;
+  /* F6-Q2 : boutons ronds « Pas pour moi » et « J'aime » (68 px). */
+  --ligne-deck-bouton: 68px;
+  /* F6-Q2 : écart entre les deux boutons ronds (56 px). */
+  --ligne-deck-ecart-boutons: 56px;
+  /* F6-Q2 : contour du bouton « Pas pour moi » (2 px ink). */
+  --ligne-deck-trait-bouton: 2px;
+  /* F6-Q2 : hauteur de la pastille du jour (24 px). */
+  --ligne-deck-pastille: 24px;
+  /* F6-Q2 : largeur minimale de la pastille du jour (30 px). */
+  --ligne-deck-pastille-largeur: 30px;
+  /* F6-Q2 : coins de la pastille du jour (6 px). */
+  --ligne-deck-pastille-rayon: 6px;
+  /* F6-Q2 : arrêts de la progression (12 px). */
+  --ligne-deck-arret: 12px;
+  /* F6-Q2 : anneau des arrêts de la progression (3 px). */
+  --ligne-deck-anneau: 3px;
+  /* F6-Q2 : icônes des boutons ronds (26 px). */
+  --ligne-deck-icone: 26px;
+}

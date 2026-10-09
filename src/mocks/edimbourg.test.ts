@@ -6,11 +6,18 @@ import {
   ProposalSchema,
   TripSchema,
   type Day,
+  type Proposal,
   type Stop,
   type Weekday,
 } from "@/contracts";
 
-import { edimbourg, propositions } from "./edimbourg";
+import {
+  EDIMBOURG_DEBLOQUE_TRIP_ID,
+  edimbourg,
+  edimbourgDebloque,
+  propositions,
+  propositionsDebloque,
+} from "./edimbourg";
 
 const WEEKDAYS: Weekday[] = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 
@@ -259,5 +266,101 @@ describe("jeu Édimbourg : aucune donnée Google, montants en nombres", () => {
       ),
     ];
     for (const text of texts) expect(text).toMatch(/^\[.*\]$/);
+  });
+});
+
+/** Créneaux de repas : même jour, même heure ; `option.total` = nombre d'options présentes (F6-PO-7). */
+function mealSlots(list: Proposal[]) {
+  const slots = new Map<string, Proposal[]>();
+  for (const proposal of list.filter((p) => p.kind === "meal")) {
+    const key = `${proposal.day}-${proposal.time}`;
+    slots.set(key, [...(slots.get(key) ?? []), proposal]);
+  }
+  return [...slots.values()];
+}
+
+describe("jeu Édimbourg : présentation (F6)", () => {
+  it("mock: options de repas présentes (total égal au nombre d'options du créneau)", () => {
+    for (const list of [propositions, propositionsDebloque]) {
+      for (const slot of mealSlots(list)) {
+        const withOption = slot.filter((p) => p.option !== undefined);
+        if (withOption.length === 0) continue;
+        expect(withOption).toHaveLength(slot.length);
+        expect(slot.map((p) => p.option?.index)).toEqual(slot.map((_, i) => i + 1));
+        for (const p of slot) expect(p.option?.total, p.id).toBe(slot.length);
+      }
+    }
+    const diner = propositions.filter((p) => p.id.startsWith("prop-j1-diner"));
+    expect(diner.map((p) => p.option)).toEqual([
+      { index: 1, total: 2 },
+      { index: 2, total: 2 },
+    ]);
+  });
+
+  it("classe chaque proposition (F6-PO-10) : château et musée museum, Dean Village walk, jardin et Arthur's Seat nature, distillerie tasting, dîners restaurant", () => {
+    const byId = Object.fromEntries(propositions.map((p) => [p.id, p.category]));
+    expect(byId).toEqual({
+      "prop-j1-chateau": "museum",
+      "prop-j1-diner-1": "restaurant",
+      "prop-j1-diner-2": "restaurant",
+      "prop-j2-dean-village": "walk",
+      "prop-j2-jardin-botanique": "nature",
+      "prop-j4-arthurs-seat": "nature",
+      "prop-j5-musee-national": "museum",
+      "prop-j5-distillerie": "tasting",
+    });
+    for (const p of [...propositions, ...propositionsDebloque]) {
+      expect(p.category === "restaurant", p.id).toBe(p.kind === "meal");
+    }
+  });
+
+  it("le detour de la distillerie ne contient que la justification (F6-PO-11)", () => {
+    const distillerie = propositions.find((p) => p.id === "prop-j5-distillerie");
+    expect(distillerie?.detour).toBe("[La distillerie la plus proche accessible sans voiture]");
+    expect(distillerie?.detour).not.toMatch(/\d+\s*min/);
+  });
+});
+
+describe("jeu Édimbourg débloqué (écran 6b, décision 0013 § 3.6)", () => {
+  it("est dérivé du voyage d'Édimbourg : débloqué, J6 en préparation, reste identique", () => {
+    expect(() => TripSchema.parse(edimbourgDebloque)).not.toThrow();
+    expect(edimbourgDebloque.id).toBe(EDIMBOURG_DEBLOQUE_TRIP_ID);
+    expect(edimbourgDebloque.unlocked).toBe(true);
+    expect(edimbourgDebloque.days.filter((d) => d.generating).map((d) => d.index)).toEqual([6]);
+    expect(edimbourgDebloque.days.slice(0, 5)).toEqual(edimbourg.days.slice(0, 5));
+    expect(edimbourgDebloque.organizationId).toBe(edimbourg.organizationId);
+    expect(edimbourg.unlocked).toBe(false);
+  });
+
+  it("a au moins 7 propositions des jours 3 et 4, hors aperçu, entre crochets, valides", () => {
+    expect(() => ProposalSchema.array().parse(propositionsDebloque)).not.toThrow();
+    expect(propositionsDebloque.length).toBeGreaterThanOrEqual(7);
+    expect(new Set(propositionsDebloque.map((p) => p.day))).toEqual(new Set([3, 4]));
+    const preview = new Set(propositions.map((p) => p.stop.id));
+    for (const p of propositionsDebloque) {
+      expect(preview.has(p.stop.id), p.id).toBe(false);
+      expect(p.stop.locked).toBe(false);
+      expect(p.context).toMatch(/^\[.*\]$/);
+      expect(p.stop.name).toMatch(/^\[.*\]$/);
+      if (p.stop.placeId) expect(p.stop.placeId).toMatch(/^mock_/);
+    }
+    const ids = [...propositions, ...propositionsDebloque].map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("contient un créneau de repas à 3 options et deux activités d'une même catégorie, aucune du J6", () => {
+    expect(mealSlots(propositionsDebloque).some((slot) => slot.length === 3)).toBe(true);
+    const nature = propositionsDebloque.filter((p) => p.kind === "activity" && p.category === "nature");
+    expect(nature.length).toBeGreaterThanOrEqual(2);
+    expect(propositionsDebloque.some((p) => p.day === 6)).toBe(false);
+  });
+
+  it("est cohérent avec le programme : jour, weekday, heure", () => {
+    for (const proposal of propositionsDebloque) {
+      const day = edimbourgDebloque.days.find((candidate) => candidate.index === proposal.day);
+      expect(proposal.weekday).toBe(day?.weekday);
+      expect(proposal.time).toBe(proposal.stop.start);
+      expect(proposal.stop.kind).toBe(proposal.kind);
+    }
   });
 });

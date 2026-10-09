@@ -579,6 +579,7 @@ export const propositions: Proposal[] = [
     time: j1Chateau.start,
     context: "[Après ton déjeuner au Grassmarket]",
     stop: j1Chateau,
+    category: "museum",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
   },
   {
@@ -589,7 +590,8 @@ export const propositions: Proposal[] = [
     time: j1Diner.start,
     context: "[Avant le Tattoo]",
     stop: j1Diner,
-    option: { index: 1, total: 3 },
+    category: "restaurant",
+    option: { index: 1, total: 2 },
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
   },
   {
@@ -600,7 +602,8 @@ export const propositions: Proposal[] = [
     time: j1DinerOption2.start,
     context: "[Avant le Tattoo]",
     stop: j1DinerOption2,
-    option: { index: 2, total: 3 },
+    category: "restaurant",
+    option: { index: 2, total: 2 },
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
   },
   {
@@ -611,6 +614,7 @@ export const propositions: Proposal[] = [
     time: j2DeanVillage.start,
     context: "[Entre le Royal Mile et ton déjeuner]",
     stop: j2DeanVillage,
+    category: "walk",
     travelFromPrevious: { mode: "walk", minutes: 20, estimated: false },
   },
   {
@@ -621,6 +625,7 @@ export const propositions: Proposal[] = [
     time: j2Jardin.start,
     context: "[Après ton déjeuner à Stockbridge]",
     stop: j2Jardin,
+    category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
   },
   {
@@ -631,6 +636,7 @@ export const propositions: Proposal[] = [
     time: j4ArthursSeat.start,
     context: "[Entre ton déjeuner et ton temps libre]",
     stop: j4ArthursSeat,
+    category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
   },
   {
@@ -641,6 +647,7 @@ export const propositions: Proposal[] = [
     time: j5Musee.start,
     context: "[Avant ton déjeuner]",
     stop: j5Musee,
+    category: "museum",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
   },
   {
@@ -651,7 +658,114 @@ export const propositions: Proposal[] = [
     time: j5Distillerie.start,
     context: "[Entre ton déjeuner et ton temps libre]",
     stop: j5Distillerie,
+    category: "tasting",
     travelFromPrevious: { mode: "transit", minutes: 50, estimated: true },
-    detour: "[À 50 min en bus, la distillerie la plus proche accessible sans voiture]",
+    detour: "[La distillerie la plus proche accessible sans voiture]",
+  },
+];
+
+// --- Voyage débloqué (écran 6b, décision 0013 § 3.6) -----------------------
+
+export const EDIMBOURG_DEBLOQUE_TRIP_ID = "mock_trip_edimbourg_debloque";
+
+/**
+ * Même voyage, débloqué, dérivé du premier (pas de copie) : le J6 est encore en préparation
+ * (`generating: true`) et n'a aucune proposition. Sert l'écran 6b « Suite du tri ».
+ */
+export const edimbourgDebloque: Trip = {
+  ...edimbourg,
+  id: EDIMBOURG_DEBLOQUE_TRIP_ID,
+  unlocked: true,
+  days: edimbourg.days.map((day) => (day.index === 6 ? { ...day, generating: true } : day)),
+};
+
+// Options 2 et 3 du dîner du J3, hors programme (un créneau de repas à 3 options).
+const j3DinerOption2: Stop = {
+  id: "j3-diner-option-2",
+  kind: "meal",
+  placeId: "mock_place_grassmarket_diner_2",
+  name: "[Brasserie du Grassmarket]",
+  start: "20:30",
+  end: "21:30",
+  meta: "[Grassmarket, brasserie, 1 h]",
+  reason: "[Près de l'arrivée du car, à 5 min à pied]",
+  exceptions: [],
+  locked: false,
+};
+const j3DinerOption3: Stop = {
+  id: "j3-diner-option-3",
+  kind: "meal",
+  placeId: "mock_place_cowgate_diner",
+  name: "[Petite adresse de Cowgate]",
+  start: "20:30",
+  end: "21:30",
+  meta: "[Cowgate, cuisine écossaise, 1 h]",
+  reason: "[Près de l'arrivée du car, à 10 min à pied]",
+  exceptions: ["toConfirm"],
+  locked: false,
+};
+
+const j3DinerOptions: Proposal[] = [j3Diner, j3DinerOption2, j3DinerOption3].map((stop, i) => ({
+  id: `prop-j3-diner-${i + 1}`,
+  kind: "meal",
+  day: 3,
+  weekday: "lun.",
+  time: stop.start,
+  context: "[Après le retour du car]",
+  stop,
+  category: "restaurant",
+  option: { index: i + 1, total: 3 },
+  travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
+}));
+
+/**
+ * Propositions de la suite du tri : 7 cartes des jours 3 et 4, hors aperçu (Arthur's Seat, déjà
+ * présenté, n'y figure pas), dont un dîner à 3 options et deux activités `nature`.
+ */
+export const propositionsDebloque: Proposal[] = [
+  {
+    id: "prop-j3-excursion-highlands",
+    kind: "activity",
+    day: 3,
+    weekday: "lun.",
+    time: j3Excursion.start,
+    context: "[Ta journée dans les Highlands]",
+    stop: j3Excursion,
+    category: "nature",
+    travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
+  },
+  ...j3DinerOptions,
+  {
+    id: "prop-j4-calton-hill",
+    kind: "activity",
+    day: 4,
+    weekday: "mar.",
+    time: j4CaltonHill.start,
+    context: "[Pour commencer la journée]",
+    stop: j4CaltonHill,
+    category: "nature",
+    travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
+  },
+  {
+    id: "prop-j4-holyrood",
+    kind: "activity",
+    day: 4,
+    weekday: "mar.",
+    time: j4Holyrood.start,
+    context: "[Entre Calton Hill et ton déjeuner]",
+    stop: j4Holyrood,
+    category: "museum",
+    travelFromPrevious: { mode: "walk", minutes: 20, estimated: false },
+  },
+  {
+    id: "prop-j4-diner",
+    kind: "meal",
+    day: 4,
+    weekday: "mar.",
+    time: j4Diner.start,
+    context: "[Après ton temps libre]",
+    stop: j4Diner,
+    category: "restaurant",
+    travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
   },
 ];

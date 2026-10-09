@@ -55,3 +55,32 @@ export function IconMaison(props: IconProps) {
     </Icon>
   );
 }
+
+/** Croix du bouton « Pas pour moi » (DeckCard/preview.html, trait 2,4). */
+export function IconCroix(props: IconProps) {
+  return (
+    <Icon strokeWidth={2.4} {...props}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </Icon>
+  );
+}
+
+/** Cœur du bouton « J'aime » (DeckCard/preview.html). */
+export function IconCoeur(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
+    </Icon>
+  );
+}
+
+/** Image du bloc « Photo du lieu » (DeckCard/preview.html, trait 1,6). */
+export function IconPhoto(props: IconProps) {
+  return (
+    <Icon strokeWidth={1.6} {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="M21 16l-5-5-8 8" />
+    </Icon>
+  );
+}

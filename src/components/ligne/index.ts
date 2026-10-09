@@ -13,8 +13,10 @@ export {
   type RailTexture,
 } from "./DayLine";
 export { DayTabs, type DayTabsDay, type DayTabsProps } from "./DayTabs";
+export { DeckCard, deckCardLabels, deckCardTag, type DeckCardProps } from "./DeckCard";
+export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
 export { IconButton, type IconButtonProps } from "./IconButton";
-export { IconMaison, IconPartager, IconRetour } from "./icons";
+export { IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
 export {
   SegmentedControl,
@@ -24,3 +26,4 @@ export {
 export { StatusBanner, statusBannerRole, type StatusBannerKind, type StatusBannerProps } from "./StatusBanner";
 export { StopMarker, type StopMarkerKind, type StopMarkerProps } from "./StopMarker";
 export { Tag, type TagKind, type TagProps } from "./Tag";
+export { UndoToast, type UndoToastProps } from "./UndoToast";

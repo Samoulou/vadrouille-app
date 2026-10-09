@@ -9,6 +9,8 @@ import {
   DayBadge,
   DayLine,
   DayTabs,
+  DeckCard,
+  DeckProgress,
   IconButton,
   IconPartager,
   IconRetour,
@@ -17,11 +19,12 @@ import {
   StatusBanner,
   StopMarker,
   Tag,
+  UndoToast,
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
-import type { DayLineItem, Stop, Weekday } from "@/contracts";
-import { messages } from "@/i18n";
+import type { DayLineItem, Proposal, Stop, Weekday } from "@/contracts";
+import { format, messages } from "@/i18n";
 
 const t = messages.dev.composants;
 const ex = t.exemples;
@@ -63,6 +66,47 @@ const DEMO_LINE: DayLineItem[] = [
 ];
 const DEMO_CAR: DayLineItem[] = [{ type: "segment", segment: { mode: "car", minutes: 15, estimated: false } }];
 const stopHref = (stop: Stop) => `#arret-${stop.id}`;
+
+/** Cartes de présentation de démonstration (DeckCard/preview.html), sans src/mocks. */
+const px = ex.presentation;
+const DEMO_ACTIVITE: Proposal = {
+  id: "demo-activite",
+  kind: "activity",
+  day: 5,
+  weekday: "mer.",
+  time: "13:30",
+  context: px.activite.contexte,
+  category: "tasting",
+  stop: {
+    ...DEMO_STOP_BASE,
+    id: "demo-distillerie",
+    name: px.activite.nom,
+    start: "13:30",
+    meta: px.activite.meta,
+    reason: px.activite.raison,
+    exceptions: ["toReserve", "toConfirm"],
+  },
+  travelFromPrevious: { mode: "transit", minutes: 50, estimated: true },
+  detour: px.activite.detour,
+};
+const DEMO_REPAS: Proposal = {
+  id: "demo-repas-1",
+  kind: "meal",
+  day: 1,
+  weekday: "sam.",
+  time: "18:45",
+  context: px.repas.contexte,
+  category: "restaurant",
+  stop: { ...DEMO_STOP_BASE, kind: "meal", id: "demo-repas-1", name: px.repas.nom, start: "18:45", meta: px.repas.meta, reason: px.repas.raison, exceptions: ["toReserve"] },
+  option: { index: 1, total: 2 },
+};
+const DEMO_REPAS_2: Proposal = {
+  ...DEMO_REPAS,
+  id: "demo-repas-2",
+  stop: { ...DEMO_REPAS.stop, id: "demo-repas-2", name: px.repas2.nom, meta: px.repas2.meta },
+  option: { index: 2, total: 2 },
+};
+const noop = () => {};
 
 /** Fond de carte des marqueurs de démonstration (StopMarker/preview.html). */
 const MAP_CELL = "flex h-14 w-16 items-center justify-center rounded-control bg-map-land";
@@ -248,6 +292,24 @@ export function ComposantsShowcase() {
           <span className={MAP_CELL}>
             <StopMarker kind="overview" />
           </span>
+        </State>
+      </Section>
+
+      <Section id="presentation" title="Présentation">
+        <State label={t.etats.progression}>
+          <DeckProgress current={4} total={8} label={format(messages.presentation.progression, { current: 4, total: 8 })} />
+        </State>
+        <State label={t.etats.deckActivite}>
+          <DeckCard proposal={DEMO_ACTIVITE} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+        </State>
+        <State label={t.etats.deckRepas}>
+          <DeckCard proposal={DEMO_REPAS} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+        </State>
+        <State label={t.etats.deckDerniere}>
+          <DeckCard proposal={DEMO_REPAS_2} isLastOption onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+        </State>
+        <State label={t.etats.toast}>
+          <UndoToast message={px.toast} onUndo={noop} onExpire={noop} className="w-full" />
         </State>
       </Section>
     </main>

@@ -87,7 +87,12 @@
         "ligneDuJour": "Séquence du preview.html de DayLine",
         "voiture": "Segment en voiture",
         "marqueursLigne": "Arrêt et terminus de la ligne",
-        "marqueursCarte": "Carte : arrêt numéroté, sélectionné, terminus, vue d'ensemble"
+        "marqueursCarte": "Carte : arrêt numéroté, sélectionné, terminus, vue d'ensemble",
+        "deckActivite": "Carte d'activité, avec trajet au-delà de 20 min",
+        "deckRepas": "Carte repas, option 1 sur 2",
+        "deckDerniere": "Carte repas, dernière option",
+        "progression": "Progression, 4 sur 8",
+        "toast": "Toast d'annulation"
       },
       "exemples": {
         "garder": "Garder",
@@ -136,6 +141,26 @@
           },
           "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
           "rangeeJour": "Jours du séjour, démonstration J9 actif"
+        },
+        "presentation": {
+          "activite": {
+            "nom": "[Distillerie]",
+            "meta": "[Visite et dégustation, 1 h 30]",
+            "contexte": "[Entre ton déjeuner et ton temps libre]",
+            "raison": "[Tu as demandé une distillerie sans voiture]",
+            "detour": "[La distillerie la plus proche accessible sans voiture]"
+          },
+          "repas": {
+            "nom": "[Bonne table]",
+            "meta": "[Cuisine écossaise, 1 h 30]",
+            "contexte": "[Avant ton concert]",
+            "raison": "[Tu as choisi une bonne table le samedi soir]"
+          },
+          "repas2": {
+            "nom": "[Bistrot]",
+            "meta": "[Bistrot, 1 h 30]"
+          },
+          "toast": "[Distillerie] écarté."
         }
       }
     },
@@ -150,6 +175,72 @@
         "avec": "Avec placesFromGoogle vrai :",
         "sans": "Avec placesFromGoogle faux : aucune mention (phase 0)."
       }
+    }
+  },
+  "presentation": {
+    "titre": {
+      "apercu": "Tes premières propositions",
+      "suite": "Suite du tri"
+    },
+    "paquet": "Propositions à trier",
+    "passer": "Passer",
+    "toutGarder": "Tout garder pour le jour {n}",
+    "progression": "Proposition {current} sur {total}",
+    "generation": "Jour {n} en préparation",
+    "carte": {
+      "photo": "Photo du lieu",
+      "vers": "vers {time}",
+      "detail": "Voir le détail de {name}",
+      "option": "option {index} sur {total}"
+    },
+    "actions": {
+      "like": "J'aime",
+      "dislike": "Pas pour moi",
+      "choose": "Je choisis",
+      "next": "Option suivante"
+    },
+    "toast": {
+      "disliked": "{name} écarté.",
+      "liked": "{name} gardé.",
+      "chosen": "{name} choisi.",
+      "dayKept": "Jour {day} gardé.",
+      "annuler": "Annuler"
+    },
+    "question": {
+      "categorie": "On arrête {categorie} pour ce voyage ?",
+      "distance": "On reste plus près de ton hôtel ?",
+      "raison": "Pourquoi ? (facultatif)",
+      "oui": "Oui",
+      "non": "Non",
+      "fermer": "Fermer",
+      "retirees": "{nombre} propositions retirées",
+      "retiree": "1 proposition retirée"
+    },
+    "raisons": {
+      "notMyStyle": "Pas mon style",
+      "tooBusy": "Trop chargé",
+      "tooExpensive": "Trop cher",
+      "tooFar": "Trop loin",
+      "other": "Autre raison"
+    },
+    "categories": {
+      "museum": "les musées et monuments",
+      "walk": "les balades en ville",
+      "nature": "la nature et les points de vue",
+      "tasting": "les dégustations"
+    },
+    "detail": {
+      "moment": "Jour {day}, {weekday}, vers {time}",
+      "source": "Source : ",
+      "verifie": "Informations vérifiées le {date}",
+      "fermer": "Fermer"
+    },
+    "fin": {
+      "apercu": "Tu as vu tes premières propositions",
+      "suite": "Tu as tout trié",
+      "vide": "Aucune proposition à trier",
+      "debloquer": "Débloquer",
+      "programme": "Voir le programme"
     }
   }
 }

@@ -22,7 +22,7 @@ import {
   type Weekday,
 } from "./index";
 
-// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId) ---
+// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013) ---
 type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "dim.";
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
@@ -76,6 +76,8 @@ interface HandoverProposal {
   day: number; weekday: HandoverWeekday; time: string;
   context: string;
   stop: HandoverStop;
+  /** Ajout signalé (décision 0013, § 3.1), comme Trip.organizationId. */
+  category: "museum" | "walk" | "nature" | "tasting" | "restaurant";
   option?: { index: number; total: number };
   photoUrl?: string;
   travelFromPrevious?: HandoverSegment;
@@ -108,6 +110,7 @@ const validProposal: Proposal = {
   time: "10:45",
   context: "[Entre ton déjeuner et [Distillerie]]",
   stop: validStop,
+  category: "museum",
 };
 
 describe("types exportés", () => {
@@ -125,7 +128,7 @@ describe("types exportés", () => {
     expectTypeOf<Change>().toEqualTypeOf<z.infer<typeof ChangeSchema>>();
   });
 
-  it("ont exactement les champs du handover § 9 (plus Trip.organizationId)", () => {
+  it("ont exactement les champs du handover § 9 (plus Trip.organizationId et Proposal.category)", () => {
     expectTypeOf<Weekday>().toEqualTypeOf<HandoverWeekday>();
     expectTypeOf<Exception>().toEqualTypeOf<HandoverException>();
     expectTypeOf<Source>().toEqualTypeOf<HandoverSource>();
@@ -152,6 +155,10 @@ describe("types exportés", () => {
       "ChecklistItemSchema",
       "ProposalSchema",
       "ChangeSchema",
+      "CategorySchema",
+      "PreferencePromptSchema",
+      "PreferenceAnswerSchema",
+      "PreferenceReasonSchema",
     ]) {
       expect(contracts).toHaveProperty(name);
     }
@@ -314,6 +321,14 @@ describe("ProposalSchema", () => {
     { index: 3, total: 3 },
   ])("accepte l'option %j", (option) => {
     expect(ProposalSchema.safeParse({ ...meal, option }).success).toBe(true);
+  });
+
+  it("exige une catégorie du vocabulaire fermé (décision 0013)", () => {
+    const withoutCategory: Partial<Proposal> = { ...validProposal };
+    delete withoutCategory.category;
+    expect(ProposalSchema.safeParse(withoutCategory).success).toBe(false);
+    expect(ProposalSchema.safeParse({ ...validProposal, category: "museums" }).success).toBe(false);
+    expect(ProposalSchema.safeParse({ ...validProposal, category: "restaurant" }).success).toBe(true);
   });
 
   it("refuse une photoUrl invalide et un champ inconnu", () => {
