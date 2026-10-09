@@ -22,11 +22,14 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 7 | F4 | Carte Google Maps | frontend | F3 | Fait (spec #25, code #35) |
 | 8 | T1 | Décisions déléguées du Tech Lead (Q33, Q36, Q52, Q58, Q60) | tech-lead | — | Fait (#39, ADR 0013) |
 | 9 | F6 | Présentation « J'aime / Pas pour moi » | frontend | F1, F2, ADR 0013 | Fait (spec #33, code #44) |
-| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | F5a fait (#54) ; F5b en revue (#66) ; F5c après T4 |
+| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | F5a fait (#54) ; F5b (#66) bloquée après 2 corrections (Q119) ; F5c après T4 |
 | 10 bis | T4 | JavaScript initial de la Journée sous le budget de 200 Ko (Q95) : valeurs des contrats sans Zod côté client, mesure en `zod/mini`, règle de lint, test e2e de budget | frontend | F5b ; avant F5c | Décidée (décision 0016 § 3) ; place exacte fixée par le CEO |
 | 10 ter | T7 | Un port Playwright par worktree, `reuseExistingServer: false` (Q107, décision 0017) | frontend | fusion de #65 | Jamais dans le même cycle que F8b (Q113, CEO) |
 | 10 quater | T6 | Positions simulées du voyage débloqué d'Édimbourg, pour la carte de la démonstration (Q100, décision 0017) | frontend | fusion de #65 et de F5b (#66) | Jamais dans le même cycle qu'une tâche qui touche `src/mocks` ou `src/adapters` (Q113, CEO) |
-| 11 | F7 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
+| 10 quinquies | T9 | Garde de revue dans `techlead-gate` : échec si `techlead-approved` et `changes-requested` coexistent ou après un nouveau push, logique dans `scripts/ci/` testée (décision 0019, Q117) | backend | fusion de #72 | En tête de la file dès la fusion de #72 (Q125, CEO) |
+| 10 sexies | T10 | Marqueurs proches sur la carte : fonction pure `groupMarkers` commune aux deux rendus (décision 0019, Q116) | frontend | F5b, T4, Q123, Q124 | Priorité basse (Q125, CEO) |
+| 10 septies | F9 | Débloquer (9) et Programme ajusté (10), paiement simulé : décisions F9-TL (Q132), puis F9a, puis F9b | product-owner, tech-lead, frontend | F6 ; F9b après F7a | Spec en revue (#73) ; F9a jamais dans le même cycle que T4, T6 ou une tâche qui touche `src/contracts` ou `src/adapters` (Q134, CEO) |
+| 11 | F7, F10 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
 
 En phase 0 (périmètre élargi par Samuel le 2026-10-08), le CEO peut engager tout le front F1 à F12 sur données simulées et le handover back-end. Restent interdits avant G0 : comptes et services payants, clés de production, mise en production.
