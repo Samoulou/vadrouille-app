@@ -44,3 +44,14 @@ test("Fiche de la distillerie, panneau à 92 %, ReasonBlock", async ({ page }) =
   await expectSheetAt(page, 0.92, "Fiche étape");
   await capture(page, "sejour-fiche-distillerie-92.png");
 });
+
+test("Fiche du Tattoo à 92 %, « Verrouiller » enfoncé visible", async ({ page }) => {
+  await openFiche(page, 1, "j1-tattoo");
+  await fiche(page).getByRole("button", { name: "Agrandir le panneau" }).click();
+  await expectSheetAt(page, 0.92, "Fiche étape");
+  await fiche(page)
+    .locator("[data-part='contenu']")
+    .evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(fiche(page).getByRole("button", { name: "Verrouiller", pressed: true })).toBeInViewport();
+  await capture(page, "sejour-fiche-tattoo-92.png");
+});

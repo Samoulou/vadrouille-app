@@ -205,6 +205,17 @@ export function ComposantsShowcase() {
         <State label={t.etats.focus}>
           <Button className={FOCUS_DEMO}>{ex.appliquer}</Button>
         </State>
+        <State label={t.etats.bascule}>
+          <Button variant="secondary" size="sm" aria-pressed={false} data-demo="bascule-relache">
+            {ex.verrouiller}
+          </Button>
+          <Button variant="secondary" size="sm" aria-pressed data-demo="bascule-enfonce">
+            {ex.verrouiller}
+          </Button>
+          <Button variant="secondary" size="sm" aria-pressed className={FOCUS_DEMO} data-demo="bascule-focus">
+            {ex.verrouiller}
+          </Button>
+        </State>
         <State label={t.etats.lien}>
           <Button asChild variant="secondary">
             <a href="/dev/tokens">{ex.reserver}</a>

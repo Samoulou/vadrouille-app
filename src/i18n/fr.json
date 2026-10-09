@@ -127,7 +127,8 @@
         "panneau": "Panneau à 25 %, 55 % et 92 % de son cadre",
         "raison": "Avec date de consultation, sans date",
         "bandeauTrajet": "Bandeau de trajet (type travel)",
-        "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage"
+        "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage",
+        "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus"
       },
       "exemples": {
         "garder": "Garder",
@@ -211,7 +212,8 @@
             "nom": "[Billets du concert]",
             "meta": "[Concert, 1 h 30, billets réservés]"
           }
-        }
+        },
+        "verrouiller": "Verrouiller"
       }
     },
     "carte": {
