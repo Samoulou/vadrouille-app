@@ -1,4 +1,4 @@
-import type { Day, DayLineItem, Proposal, Segment, Stop, Trip } from "@/contracts";
+import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
 
 /**
  * Voyage simulé à Édimbourg (spécification F1).
@@ -358,6 +358,27 @@ const j6Brunch: Stop = {
   locked: false,
 };
 
+// --- Idées « Surprends-moi » (décision 0015 § 3) ------------------------------
+
+// Hors programme, avec justification et source (simulées, entre crochets).
+const j2Surprise: SurpriseIdea = {
+  id: "j2-surprise-circus-lane",
+  placeId: "mock_place_circus_lane",
+  name: "[Circus Lane]",
+  meta: "[Stockbridge, 20 min, gratuit]",
+  reason: "[Tu as choisi les balades : une ruelle fleurie à deux pas de ton déjeuner]",
+  source: { label: "[Office du tourisme d'Édimbourg]", url: "https://example.org/mock/circus-lane" },
+  verifiedAt: "2026-08-18",
+};
+const j4Surprise: SurpriseIdea = {
+  id: "j4-surprise-dunbars-close",
+  placeId: "mock_place_dunbars_close",
+  name: "[Jardin de Dunbar's Close]",
+  meta: "[Canongate, 20 min, gratuit]",
+  reason: "[Tu as choisi les parcs et jardins : un jardin caché sur ton chemin vers Holyrood]",
+  source: { label: "[Site du jardin]", url: "https://example.org/mock/dunbars-close" },
+};
+
 // --- Jours -----------------------------------------------------------------
 
 const days: Day[] = [
@@ -410,6 +431,7 @@ const days: Day[] = [
     ],
     budgetPerPerson: 95,
     events: [j2Concert],
+    surprise: j2Surprise,
     generating: false,
     travelMinutes: 85,
     travelBudgetMinutes: SIMULATED_TRAVEL_BUDGET_MINUTES,
@@ -457,6 +479,7 @@ const days: Day[] = [
     ],
     budgetPerPerson: 70,
     events: [j4Marche],
+    surprise: j4Surprise,
     generating: false,
     travelMinutes: 80,
     travelBudgetMinutes: SIMULATED_TRAVEL_BUDGET_MINUTES,

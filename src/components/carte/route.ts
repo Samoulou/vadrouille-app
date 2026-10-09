@@ -130,6 +130,38 @@ export function buildOverview(maps: DayMap[]): LatLng[] {
   return [...termini, ...rings];
 }
 
+/** Marge en pixels CSS de chaque côté (même forme que `FitPadding` de `types.ts`). */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/** Taille du monde en pixels au zoom `zoom` (tuile de 256 px). */
+const worldSize = (zoom: number) => 256 * 2 ** zoom;
+const MAX_LAT = 85.05112878;
+
+/**
+ * Centre de carte qui place `target` au milieu de la zone non couverte par `insets` (décision 0015 § 4).
+ * Décalage en pixels `((right − left) / 2, (bottom − top) / 2)` depuis la cible (y vers le bas),
+ * converti en latitude et longitude en projection Web Mercator au zoom courant. Inserts nuls : la cible.
+ */
+export function offsetCenter(target: LatLng, insets: Insets | undefined, zoom: number): LatLng {
+  if (!insets) return { ...target };
+  const dx = (insets.right - insets.left) / 2;
+  const dy = (insets.bottom - insets.top) / 2;
+  if (dx === 0 && dy === 0) return { ...target };
+  const size = worldSize(zoom);
+  const lat = Math.max(-MAX_LAT, Math.min(MAX_LAT, target.lat));
+  const sin = Math.sin((lat * Math.PI) / 180);
+  const x = ((target.lng + 180) / 360) * size + dx;
+  const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size + dy;
+  const lng = (x / size) * 360 - 180;
+  const n = Math.PI - (2 * Math.PI * y) / size;
+  return { lat: (Math.atan(Math.sinh(n)) * 180) / Math.PI, lng };
+}
+
 export interface Bounds {
   north: number;
   south: number;

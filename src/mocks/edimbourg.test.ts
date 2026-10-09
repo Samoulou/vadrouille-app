@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   DETOUR_THRESHOLD_MINUTES,
   ProposalSchema,
+  SurpriseIdeaSchema,
   TripSchema,
   type Day,
   type Proposal,
@@ -278,6 +279,28 @@ function mealSlots(list: Proposal[]) {
   }
   return [...slots.values()];
 }
+
+describe("jeu Édimbourg : idées « Surprends-moi » (décision 0015 § 3)", () => {
+  it("J2 et J4 ont une idée entre crochets, avec justification et source fictive ; les autres jours n'en ont pas", () => {
+    const withIdea = edimbourg.days.filter((day) => day.surprise).map((day) => day.index);
+    expect(withIdea).toEqual([2, 4]);
+    for (const day of edimbourg.days) {
+      const idea = day.surprise;
+      if (!idea) continue;
+      expect(SurpriseIdeaSchema.parse(idea)).toEqual(idea);
+      for (const text of [idea.name, idea.meta, idea.reason, idea.source.label]) expect(text).toMatch(/^\[.*\]$/);
+      expect(new URL(idea.source.url).hostname).toBe("example.org");
+      if (idea.placeId) expect(idea.placeId).toMatch(/^mock_/);
+    }
+  });
+
+  it("une idée n'est pas une étape du programme (identifiant absent des items et des événements)", () => {
+    const ids = new Set(allStops().map((stop) => stop.id));
+    for (const day of edimbourg.days) {
+      if (day.surprise) expect(ids.has(day.surprise.id)).toBe(false);
+    }
+  });
+});
 
 describe("jeu Édimbourg : présentation (F6)", () => {
   it("mock: options de repas présentes (total égal au nombre d'options du créneau)", () => {

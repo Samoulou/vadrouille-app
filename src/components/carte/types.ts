@@ -18,6 +18,8 @@ export type MapView =
       selectedStopId?: string;
       onMarkerPress?: (stopId: string) => void;
       fitPadding?: FitPadding;
+      /** Partie de la carte couverte (panneau en bas) : le recentrage sur la sélection la place au milieu du reste. */
+      visibleInsets?: FitPadding;
     }
   | {
       mode: "overview";

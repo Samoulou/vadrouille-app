@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { axeViolations } from "../../../tests/unit/axe";
 import { applyTokens, day2, day4, map2, map4, stubLayout } from "../../../tests/unit/carte-fixtures";
 
-import { buildDayRoute } from "./route";
+import { buildDayRoute, offsetCenter } from "./route";
 import { fitCamera, scaleAt } from "./simulated-model";
 import { SimulatedMapRenderer } from "./SimulatedMapRenderer";
 import type { MapView } from "./types";
@@ -83,6 +83,17 @@ describe("SimulatedMapRenderer", () => {
     expect(selected).toHaveLength(1);
     expect(selected[0]).toHaveAccessibleName(/^Étape 3 :/);
     expect(selected[0]?.querySelector("[data-selected='true']")).not.toBeNull();
+  });
+
+  it("visibleInsets : la sélection place l'étape au centre décalé (offsetCenter), zoom inchangé (décision 0015 § 4)", () => {
+    const insets = { top: 0, right: 0, bottom: 200, left: 0 };
+    const { rerender } = render(<SimulatedMapRenderer view={view({ visibleInsets: insets })} />);
+    const { zoom } = camera();
+    rerender(<SimulatedMapRenderer view={view({ visibleInsets: insets, selectedStopId: "j2-dejeuner" })} />);
+    const target = map2.points.find((p) => p.ref.type === "stop" && p.ref.stopId === "j2-dejeuner")!;
+    const expected = offsetCenter({ lat: target.lat, lng: target.lng }, insets, zoom);
+    expect(camera()).toEqual({ lat: expected.lat, lng: expected.lng, zoom });
+    expect(camera().lat).toBeLessThan(target.lat);
   });
 
   it("glisser déplace le centre de l'opposé du geste, sans rappel ni changement de zoom", () => {

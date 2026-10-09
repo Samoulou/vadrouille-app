@@ -50,7 +50,7 @@ describe("valeurs en dur dans src/components/ligne", () => {
       .filter(({ line }) => /^\s*--[\w-]+\s*:/.test(line));
     expect(declarations.length).toBeGreaterThan(0);
     for (const { line, index } of declarations) {
-      expect(lines[index - 1] ?? "", line).toMatch(/\/\* (?:Q(?:11|13|19)|F6-Q[12])\b.*\*\//);
+      expect(lines[index - 1] ?? "", line).toMatch(/\/\* (?:Q(?:11|13|19)|F6-Q[12]|F5-Q1)\b.*\*\//);
     }
   });
 });

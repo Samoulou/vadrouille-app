@@ -15,7 +15,9 @@ import {
   IconPartager,
   IconRetour,
   OtpInput,
+  ReasonBlock,
   SegmentedControl,
+  Sheet,
   StatusBanner,
   StopMarker,
   Tag,
@@ -31,7 +33,7 @@ const t = messages.dev.composants;
 const ex = t.exemples;
 
 const TAG_KINDS: TagKind[] = ["toReserve", "toConfirm", "unconfirmed"];
-const BANNER_KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating"];
+const BANNER_KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
 const SEGMENT_OPTIONS = [
   { value: "a", label: ex.segmente.options.a },
   { value: "b", label: ex.segmente.options.b },
@@ -108,6 +110,14 @@ const DEMO_REPAS_2: Proposal = {
   option: { index: 2, total: 2 },
 };
 const noop = () => {};
+
+/** Panneau coulissant à chacune de ses hauteurs, dans un cadre (F5) ; noms de région distincts. */
+const pg = ex.programme;
+const SHEET_DEMOS = [
+  { snap: 0.25, label: pg.panneaux.petit },
+  { snap: 0.55, label: pg.panneaux.moyen },
+  { snap: 0.92, label: pg.panneaux.grand },
+] as const;
 
 /** Fond de carte des marqueurs de démonstration (StopMarker/preview.html). */
 const MAP_CELL = "flex h-14 w-16 items-center justify-center rounded-control bg-map-land";
@@ -318,6 +328,25 @@ export function ComposantsShowcase() {
           <UndoToastRegion className="w-full">
             <UndoToast message={px.toast} onUndo={noop} onExpire={noop} />
           </UndoToastRegion>
+        </State>
+      </Section>
+
+      <Section id="programme" title="Programme">
+        <State label={t.etats.panneau}>
+          {SHEET_DEMOS.map(({ snap, label }) => (
+            <div key={snap} data-demo="panneau" className="relative h-72 w-full overflow-hidden rounded-block bg-map-land">
+              <Sheet label={label} defaultSnap={snap}>
+                <p className="px-5 text-corps text-ink-2">{pg.contenu}</p>
+              </Sheet>
+            </div>
+          ))}
+        </State>
+        <State label={t.etats.raison}>
+          <ReasonBlock text={pg.raison} sourceLabel={pg.source} sourceUrl="#programme" verifiedAt="2026-08-15" className="w-full" />
+          <ReasonBlock text={pg.raison} sourceLabel={pg.source} sourceUrl="#programme" className="w-full" />
+        </State>
+        <State label={t.etats.bandeauTrajet}>
+          <StatusBanner kind="travel" message={ex.bandeaux.travel} className="w-full" />
         </State>
       </Section>
     </main>
