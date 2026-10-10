@@ -33,7 +33,7 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 10 nonies | F11 | Mes voyages, Après le voyage, états transverses : décisions F11-TL (Q155), puis F11c, F11a, F11b | product-owner, tech-lead, frontend | F11a après F9a et F10a ; F11b après F11a | Spec fusionnée (#81) ; décisions F11-TL fusionnées (T12, #85, décision 0021) ; F11c fait (#92) ; F11a attend T4 (et F5c ou création de `DestinationPlate`) ; ordre fixé par Q156 (CEO) |
 | 11 | F7 | Suite du handover front-end | frontend | voir handover | Autorisé sur données simulées |
 | 11 bis | F12 | Accessibilité, performance, grand écran : F12a (mesure), F12b (Séjour et Journée grand écran), F12c (autres écrans grand écran), F12d (passe finale) | product-owner, frontend | F12a après T4 ; F12b après F5c et F12a ; F12c après F12a ; F12d après F5 à F11 | Spec fusionnée (#91) ; ordre fixé par Q175 (CEO) ; une sous-tâche à la fois |
-| 11 ter | T13 | Décisions du Tech Lead pour F12 (F12-TL-1 à F12-TL-8, Q174) | tech-lead | spec F12 (#91) | En cours (ticket #94) |
+| 11 ter | T13 | Décisions du Tech Lead pour F12 (F12-TL-1 à F12-TL-8, Q174) | tech-lead | spec F12 (#91) | En revue (#95, décision 0022, ticket #94) |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
 
 En phase 0 (périmètre élargi par Samuel le 2026-10-08), le CEO peut engager tout le front F1 à F12 sur données simulées et le handover back-end. Restent interdits avant G0 : comptes et services payants, clés de production, mise en production.
