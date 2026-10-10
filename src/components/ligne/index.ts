@@ -6,6 +6,7 @@ export {
   DayLine,
   segmentLabel,
   type DayLineFreeTimeProps,
+  type DayLineOpenMealProps,
   type DayLineProps,
   type DayLineSegmentProps,
   type DayLineStopProps,
@@ -16,7 +17,7 @@ export { DayTabs, type DayTabsDay, type DayTabsProps } from "./DayTabs";
 export { DeckCard, deckCardLabels, deckCardTag, type DeckCardProps } from "./DeckCard";
 export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
 export { IconButton, type IconButtonProps } from "./IconButton";
-export { IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
+export { IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
 export { ReasonBlock, type ReasonBlockProps } from "./ReasonBlock";
 export { Sheet, type SheetProps } from "./Sheet";

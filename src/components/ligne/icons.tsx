@@ -56,6 +56,18 @@ export function IconMaison(props: IconProps) {
   );
 }
 
+/**
+ * Coche de l'état enfoncé d'un bouton bascule (`Button` avec `aria-pressed`). Le jeu Ligne contient une
+ * coche, pas encore exportée en SVG (Q13) : tracé provisoire au trait de la grille 24, à remplacer à l'export.
+ */
+export function IconCoche(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Icon>
+  );
+}
+
 /** Croix du bouton « Pas pour moi » (DeckCard/preview.html, trait 2,4). */
 export function IconCroix(props: IconProps) {
   return (

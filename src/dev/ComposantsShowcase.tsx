@@ -69,6 +69,28 @@ const DEMO_LINE: DayLineItem[] = [
 ];
 const DEMO_CAR: DayLineItem[] = [{ type: "segment", segment: { mode: "car", minutes: 15, estimated: false } }];
 const stopHref = (stop: Stop) => `#arret-${stop.id}`;
+const ideasHref = () => "#idees";
+/** Lien « Idées » par plage (F5-TL-8) : l'adresse de démonstration reprend la plage. */
+const ideasHrefForFree = (free: { from: string; to: string }) => `#idees-${free.from}-${free.to}`;
+
+/** Ajouts de F5b à DayLine : étape verrouillée, repas pas encore choisis, lien « Idées » par plage. */
+const DEMO_ADDITIONS: DayLineItem[] = [
+  { type: "openMeal", time: "12:30", meal: "lunch" },
+  { type: "free", from: "14:00", to: "18:30" },
+  { type: "openMeal", time: "19:00", meal: "dinner" },
+  { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
+  {
+    type: "stop",
+    stop: {
+      ...DEMO_STOP_BASE,
+      id: "demo-verrou",
+      name: ex.programme.verrouillee.nom,
+      start: "21:30",
+      meta: ex.programme.verrouillee.meta,
+      locked: true,
+    },
+  },
+];
 
 /** Cartes de présentation de démonstration (DeckCard/preview.html), sans src/mocks. */
 const px = ex.presentation;
@@ -183,6 +205,17 @@ export function ComposantsShowcase() {
         <State label={t.etats.focus}>
           <Button className={FOCUS_DEMO}>{ex.appliquer}</Button>
         </State>
+        <State label={t.etats.bascule}>
+          <Button variant="secondary" size="sm" aria-pressed={false} data-demo="bascule-relache">
+            {ex.verrouiller}
+          </Button>
+          <Button variant="secondary" size="sm" aria-pressed data-demo="bascule-enfonce">
+            {ex.verrouiller}
+          </Button>
+          <Button variant="secondary" size="sm" aria-pressed className={FOCUS_DEMO} data-demo="bascule-focus">
+            {ex.verrouiller}
+          </Button>
+        </State>
         <State label={t.etats.lien}>
           <Button asChild variant="secondary">
             <a href="/dev/tokens">{ex.reserver}</a>
@@ -281,7 +314,7 @@ export function ComposantsShowcase() {
           <DayTabs days={TEN_DAYS} current={9} sejourHref="#ligne-sejour" label={lx.rangeeJour} className="w-full" />
         </State>
         <State label={t.etats.ligneDuJour}>
-          <DayLine items={DEMO_LINE} getStopHref={stopHref} ideasHref="#idees" className="w-full" />
+          <DayLine items={DEMO_LINE} getStopHref={stopHref} getIdeasHref={ideasHref} className="w-full" />
         </State>
         <State label={t.etats.voiture}>
           <DayLine items={DEMO_CAR} getStopHref={stopHref} className="w-full" />
@@ -344,6 +377,9 @@ export function ComposantsShowcase() {
         <State label={t.etats.raison}>
           <ReasonBlock text={pg.raison} sourceLabel={pg.source} sourceUrl="#programme" verifiedAt="2026-08-15" className="w-full" />
           <ReasonBlock text={pg.raison} sourceLabel={pg.source} sourceUrl="#programme" className="w-full" />
+        </State>
+        <State label={t.etats.ligneAjouts}>
+          <DayLine items={DEMO_ADDITIONS} getStopHref={stopHref} getIdeasHref={ideasHrefForFree} className="w-full" />
         </State>
         <State label={t.etats.bandeauTrajet}>
           <StatusBanner kind="travel" message={ex.bandeaux.travel} className="w-full" />

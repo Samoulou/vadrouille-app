@@ -11,6 +11,7 @@ import {
   dayMarkers,
   dragVertical,
   expectSheetAt,
+  fiche,
   fullyInside,
   handle,
   listStops,
@@ -187,7 +188,7 @@ test.describe("Journée", () => {
     await expect.poll(() => fullyInside(listStops(page).nth(3), body(page))).toBe(true);
     expect(page.url()).toBe(url);
     await expect(marker).toBeFocused();
-    // Toucher n'ouvre pas de fiche et ne sélectionne pas (F4-PO-4) ; la fiche arrive avec F5b.
+    // Sans fiche ouverte, toucher n'ouvre pas de fiche et ne sélectionne pas (F4-PO-4) ; avec une fiche ouverte : sejour-fiche.e2e.spec.ts.
     await expect(page.locator("[aria-current='true']")).toHaveCount(0);
   });
 
@@ -323,6 +324,13 @@ test.describe("transverses", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mercredi 2 septembre");
     await listStops(page).first().click();
     await expect(page).toHaveURL(/\?etape=/);
+    // Fiche (F5b) : verrou posé puis annulé, puis posé de nouveau.
+    const lock = fiche(page).getByRole("button", { name: "Verrouiller" });
+    await lock.click();
+    await page.locator("[data-undo-toast]").getByRole("button", { name: "Annuler" }).click();
+    await expect(lock).toHaveAttribute("aria-pressed", "false");
+    await lock.click();
+    await expect(lock).toHaveAttribute("aria-pressed", "true");
 
     const stored = await page.evaluate(async () => ({
       local: localStorage.length,

@@ -6,8 +6,8 @@ import { StopMarker } from "@/components/ligne/StopMarker";
 
 import { defaultFitPadding } from "./css";
 import { MarkerButton } from "./MarkerButton";
-import { offsetCenter, type LatLng } from "./route";
-import { drag, fitCamera, project, type Camera, type Size } from "./simulated-model";
+import type { LatLng } from "./route";
+import { drag, fitCamera, offsetCamera, project, type Camera, type Size } from "./simulated-model";
 import type { MapView } from "./types";
 
 /** Au-delà de ce déplacement (en pixels CSS), le geste est un glisser et non un toucher. */
@@ -61,9 +61,9 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
     setPreviousSelection(selectedStopId);
     const target = view.mode === "day" ? view.route.stops.find((stop) => stop.stopId === selectedStopId) : undefined;
     if (next && target) {
-      // Étape au milieu de la zone non couverte par le panneau (décision 0015 § 4).
+      // Étape au milieu de la zone non couverte par le panneau, dans la projection simulée (décision 0016 § 2).
       const insets = view.mode === "day" ? view.visibleInsets : undefined;
-      next = { ...next, center: offsetCenter(target.position, insets, next.zoom) };
+      next = { ...next, center: offsetCamera(target.position, insets, next.zoom) };
     }
   }
   if (next !== camera) {
