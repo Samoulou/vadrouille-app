@@ -5,7 +5,7 @@ import { advanceClock, configurePayment, isScopeName, resetScope, simulationEnab
 /**
  * `R-sim` : contrôle des simulations, tests seulement (décision 0017 § 10.5, créée par F9a avec
  * `configurePayment` selon 0020 § 6). 404 sans pages de développement ou sur un déploiement de production ;
- * 415 sans JSON ; 413 au-delà de 1 024 octets ; 400 hors schéma ou sans portée explicite valide (la portée
+ * 415 sans JSON ; 413 au-delà de 1 024 octets (annoncés par `content-length`, avant toute lecture, ou lus) ; 400 hors schéma ou sans portée explicite valide (la portée
  * par défaut n'est jamais modifiée).
  */
 
@@ -31,6 +31,7 @@ const empty = (status: number) => new Response(null, { status });
 export async function POST(request: Request): Promise<Response> {
   if (!simulationEnabled()) return empty(404);
   if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return empty(415);
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return empty(413);
   const text = await request.text();
   if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return empty(413);
   const scope = request.headers.get(SIMULATION_HEADER);

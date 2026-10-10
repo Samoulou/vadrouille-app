@@ -82,12 +82,29 @@ describe("CheckoutRequestSchema", () => {
 });
 
 describe("redirectUrl : chemin de l'application seulement", () => {
-  it.each(["/voyages/t1/debloquer/paiement-simule/x"])("accepte %s", (path) => {
+  it.each([
+    "/voyages/t1/debloquer/paiement-simule/x",
+    "/voyages/mock_trip_edimbourg/debloquer?paiement=chk_0123456789abcdef",
+    "/voyages/mock_trip_edimbourg/debloquer/confirmation?paiement=a%20b",
+  ])("accepte %s", (path) => {
     expect(AppPathSchema.safeParse(path).success).toBe(true);
     expect(CheckoutStartSchema.safeParse({ checkoutId: CHECKOUT_ID, redirectUrl: path }).success).toBe(true);
   });
 
-  it.each(["//evil.example", "/\\evil", "https://evil.example/", "voyages/t1", ""])("refuse %s", (path) => {
+  it.each([
+    "//evil.example",
+    "/\\evil",
+    "/\t/evil.example",
+    "/\n/evil.example",
+    "/\r/evil.example",
+    "/ /evil.example",
+    "/\u0000/evil.example",
+    "/\u007f/evil.example",
+    "/voyages\\evil",
+    "https://evil.example/",
+    "voyages/t1",
+    "",
+  ])("refuse %j", (path) => {
     expect(AppPathSchema.safeParse(path).success).toBe(false);
   });
 });

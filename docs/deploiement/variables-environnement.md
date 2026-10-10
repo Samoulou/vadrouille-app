@@ -10,6 +10,19 @@ Note de sécurité (revue de F9a, PR #86). Elle ne crée aucune règle : elle ra
 | `VADROUILLE_DEV_PAGES=1` | Les pages de développement sur un build de production (prévue pour les tests Playwright). | `devPagesEnabled` l'accepte même en production ; seule la portée des simulations exige en plus `!isProductionDeployment()`. Ne compter que sur l'absence de la variable. |
 | `VADROUILLE_DEMO_PAYMENT=1` | Le paiement simulé (écran 9, `R9-sim`, `R9-retour`, actions de paiement). | Ignorée si `VADROUILLE_ENV` ou `VERCEL_ENV` vaut `production` (le `Dockerfile` pose `VADROUILLE_ENV=production` ; le job `docker` de la CI vérifie la fermeture). |
 
+## Choix des adaptateurs
+
+| Variable | Valeurs | Effet |
+|---|---|---|
+| `DATA_ADAPTER` | absente, vide ou `mock` (défaut) ; `api` | `api` ferme les parcours simulés : `getRequestContext()` lève tant que l'authentification (B3) n'existe pas, et le paiement simulé reste indisponible. Toute autre valeur lève une erreur. |
+| `PAYMENT_ADAPTER` | absente, vide ou `mock` (défaut) ; `stripe` réservé | `stripe` lève « non implémenté » jusqu'à la tâche de paiement réel (décision 0020). Toute autre valeur lève une erreur. `mock` ne suffit pas à ouvrir le paiement simulé : `paymentAvailable` exige aussi `paymentDemoAllowed` et `DATA_ADAPTER` à `mock`. |
+
+Ni l'une ni l'autre n'ouvre quoi que ce soit à elle seule : l'ouverture dépend des variables du tableau précédent.
+
+## Déploiements de preview Vercel
+
+Ils sont construits avec `NODE_ENV=production` et `VERCEL_ENV=preview` : les pages de développement, `POST /dev/api/simulation` et le paiement simulé y restent **fermés** tant qu'aucune des trois variables du premier tableau n'y est posée. Ne pas les poser sur l'environnement « Preview » de Vercel non plus : l'état en mémoire n'y serait pas fiable (voir ci-dessous) et une preview peut être publique.
+
 Dans le dépôt, seuls `playwright.config.ts` (tests sur le build local), `pnpm dev` (`NODE_ENV=development`) et la seconde image du job `docker` (qui vérifie la fermeture) les posent.
 
 ## Pourquoi

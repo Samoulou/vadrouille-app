@@ -44,6 +44,16 @@ describe("R-sim", () => {
     expect((await post(null, { raw: JSON.stringify({ action: "advanceClock", ms: 0, pad: "x".repeat(1100) }) })).status).toBe(413);
   });
 
+  it("413 sur un content-length annoncé au-delà de 1 024 octets, sans lire le corps", async () => {
+    const request = new Request(URL_SIM, {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": "5000", "x-vadrouille-simulation": "rsim-1" },
+      body: JSON.stringify({ action: "advanceClock", ms: 0 }),
+    });
+    expect((await POST(request)).status).toBe(413);
+    expect(request.bodyUsed).toBe(false);
+  });
+
   it.each([
     [{ action: "advanceClock", ms: -1 }],
     [{ action: "advanceClock", ms: 604_800_001 }],

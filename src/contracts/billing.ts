@@ -53,15 +53,27 @@ export const CheckoutRequestSchema = z.strictObject({ tripId: TripIdSchema, meth
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 
 /**
- * Phase 0 : `redirectUrl` est un chemin de l'application (commence par `/`, ni `//` ni `/\`). La tâche de
+ * Phase 0 : `redirectUrl` est un chemin de l'application : commence par `/`, ni `//` ni `/\` en tête, et
+ * aucun espace, caractère de contrôle (tabulation, retour à la ligne…) ni antislash nulle part, car
+ * l'analyseur d'URL retire les uns et lit l'autre comme `/` (`"/\t/evil.com"` y deviendrait `//evil.com`).
+ * Seconde défense : résolu contre une origine fictive, le chemin doit garder cette origine. La tâche de
  * paiement réel l'élargira à une liste fermée d'origines du prestataire, jamais à une adresse libre.
  */
+const APP_PATH_ORIGIN = "http://app.invalid";
+
+function staysOnAppOrigin(path: string): boolean {
+  try {
+    return new URL(path, APP_PATH_ORIGIN).origin === APP_PATH_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 export const AppPathSchema = z
   .string()
   .min(1)
-  .refine((path) => path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\"), {
-    message: "chemin de l'application attendu",
-  });
+  .regex(/^\/(?![/\\])[^\s\\\u0000-\u001f\u007f]*$/, "chemin de l'application attendu")
+  .refine(staysOnAppOrigin, { message: "chemin de l'application attendu" });
 
 export const CheckoutStartSchema = z.strictObject({ checkoutId: CheckoutIdSchema, redirectUrl: AppPathSchema });
 export type CheckoutStart = z.infer<typeof CheckoutStartSchema>;
