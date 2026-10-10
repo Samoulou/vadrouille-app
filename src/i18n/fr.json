@@ -349,5 +349,41 @@
     "surprise": {
       "bouton": "Surprends-moi"
     }
+  },
+  "etats": {
+    "accueil": "Retour à l'accueil",
+    "introuvable": {
+      "titreDocument": "Page introuvable · {produit}",
+      "titre": "Page introuvable",
+      "texte": "Cette page n'existe pas ou n'est plus disponible."
+    },
+    "erreur": {
+      "titreDocument": "Cette page n'a pas pu s'afficher · {produit}",
+      "titre": "Cette page n'a pas pu s'afficher",
+      "texte": "Réessaie dans un instant. Si le problème continue, reviens à l'accueil.",
+      "reessayer": "Réessayer"
+    },
+    "erreurCalcul": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+    "catalogue": {
+      "titre": "États transverses",
+      "intro": "Page de développement, désactivée en production. Chaque état est rendu par le composant réel, avec le texte de l'écran qui le possède.",
+      "exemple": "Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.",
+      "sections": {
+        "toConfirm": "Information incertaine",
+        "unconfirmed": "Événement non confirmé",
+        "offline": "Hors ligne",
+        "conflict": "Conflit",
+        "noOption": "Aucune option compatible",
+        "error": "Erreur de calcul",
+        "generating": "Jour en préparation",
+        "travel": "Trajet au-delà du rythme",
+        "introuvable": "Page introuvable",
+        "erreur": "Erreur inattendue"
+      },
+      "liens": {
+        "introuvable": "Ouvrir une adresse inexistante",
+        "erreur": "Ouvrir une page qui lève une erreur"
+      }
+    }
   }
 }
