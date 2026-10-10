@@ -38,6 +38,22 @@ const SIMULATED_MAP_PATTERN = {
     "La carte simulée ne s'importe que depuis src/app/dev et les tests (décisions 0013 § 1.4 et 0015 § 1) : aucune route produit ne l'embarque.",
 };
 
+/** F11 : ni la carte Google ni la carte simulée dans les pages d'erreur et le catalogue (décision 0021 § 10). */
+const MAP_PATTERN = {
+  group: ["@/components/carte", "@/components/carte/**", "**/components/carte", "**/components/carte/**"],
+  message: "Aucune carte dans ces fichiers (décision 0021 § 10) : ni la carte Google, ni la carte simulée.",
+};
+
+/** F11c : pages d'erreur et d'introuvable, rendu partagé, catalogue des états (décision 0021 § 10). */
+const F11C_FILES = [
+  "src/app/not-found.tsx",
+  "src/app/error.tsx",
+  "src/app/global-error.tsx",
+  "src/app/dev/etats/**/*.{js,jsx,ts,tsx}",
+  "src/dev/EtatsShowcase.tsx",
+  "src/features/etats/**/*.{js,jsx,ts,tsx}",
+];
+
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
 function restrictedImports(...patterns) {
   return { "no-restricted-imports": ["error", { patterns }] };
@@ -158,6 +174,32 @@ export default defineConfig([
     ignores: ["**/*.test.{ts,tsx}"],
     rules: {
       "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
+    // F11c : aucun texte en dur, aucune persistance côté client dans les pages d'erreur et d'introuvable et
+    // dans le catalogue des états (décision 0021 § 10).
+    files: F11C_FILES,
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+      ...noClientStorage("États transverses", "décision 0021 § 10", "aucun service worker"),
+      // Le dernier bloc l'emporte (décision 0015 § 1) : reprend src/mocks et la carte simulée, ajoute la carte.
+      ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN),
+      // Décision 0016 § 3.1 règle 4, appliquée à ces fichiers par 0021 § 10 : ni `zod`, ni valeur de @/contracts.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            { name: "zod", message: "Pas de zod dans ces fichiers (décision 0016 § 3.1 règle 4) : zod/mini ou @/contracts/values." },
+            {
+              name: "@/contracts",
+              allowTypeImports: true,
+              message: "Types seulement depuis @/contracts (import type) ; valeurs depuis @/contracts/values (décision 0016 § 3.1).",
+            },
+          ],
+        },
+      ],
     },
   },
   {
