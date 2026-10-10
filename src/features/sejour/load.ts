@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { getRequestContext, getTripAdapter, type AdapterContext, type TripAdapter } from "@/adapters";
+import { getRequestContext, getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
 import type { Day, DayMap, Trip } from "@/contracts";
 
 export interface TripData {
@@ -22,10 +22,11 @@ export async function readTrip(adapter: TripAdapter, ctx: AdapterContext, tripId
 
 /**
  * Une seule lecture par requête pour le layout, la page et leurs métadonnées (décision 0015 § 5.3),
- * sur le modèle de `features/presentation/load.ts`.
+ * sur le modèle de `features/presentation/load.ts`. Lecture par `getTripReader()` : un voyage débloqué par
+ * un paiement simulé est servi débloqué (décision 0020 § 3).
  */
 export const loadTrip = cache(async (tripId: string): Promise<TripData | null> =>
-  readTrip(getTripAdapter(), getRequestContext(), tripId),
+  readTrip(getTripReader(), getRequestContext(), tripId),
 );
 
 /** `n` de l'adresse : entier écrit sans zéro initial, dans les jours du voyage ; sinon `null` (404). */

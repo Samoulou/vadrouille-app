@@ -70,4 +70,19 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg/jour/2)" = "404"
+          # Paiement simulé fermé dans l'image de production (F9-PO-19, décision 0020 § 5).
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer/paiement-simule/AAAAAAAAAAAAAAAAAAAAAA)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer/confirmation?paiement=AAAAAAAAAAAAAAAAAAAAAA')" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'x-vadrouille-simulation: ci' -d '{"action":"advanceClock","ms":0}' http://127.0.0.1:3000/dev/api/simulation)" = "404"
+          if curl -fsS http://127.0.0.1:3000/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
           docker rm -f app
+          # VADROUILLE_ENV=production ferme le paiement simulé même avec le drapeau de démonstration.
+          docker run -d --name app-drapeau -p 3001:3000 -e VADROUILLE_DEMO_PAYMENT=1 app:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/; then break; fi
+            sleep 1
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/voyages/mock_trip_edimbourg/debloquer)" = "404" || { docker logs app-drapeau; exit 1; }
+          if curl -fsS http://127.0.0.1:3001/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
+          docker rm -f app-drapeau

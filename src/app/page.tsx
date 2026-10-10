@@ -1,23 +1,30 @@
-import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, getTripAdapter, isMockAdapter } from "@/adapters";
+import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, getTripAdapter, isMockAdapter, paymentAvailable } from "@/adapters";
 import { PRODUCT_NAME } from "@/config/site";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
-import { presentationRoute } from "@/features/presentation/routes";
+import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { tripRoutes } from "@/features/sejour/routes";
 import { messages } from "@/i18n";
 
 // `DATA_ADAPTER` lu à chaque requête, comme les pages du voyage (D1-PO-5).
 export const dynamic = "force-dynamic";
 
-/** Les quatre parcours simulés, dans l'ordre du produit (D1-PO-2) ; identifiants de `@/adapters` (D1-PO-3). */
+/**
+ * Les quatre parcours simulés, dans l'ordre du produit (D1-PO-2) ; identifiants de `@/adapters` (D1-PO-3).
+ * Cinquième entrée « Débloquer » (F9-PO-17), seulement si le paiement simulé est disponible (F9-PO-19).
+ */
 function demoLinks(): DemoLink[] {
   const t = messages.accueil.demo.liens;
   const unlocked = tripRoutes("/voyages", MOCK_DEMO_UNLOCKED_TRIP.tripId);
-  return [
+  const links: DemoLink[] = [
     { href: presentationRoute(MOCK_DEMO_TRIP.tripId), label: t.presentation.libelle, detail: t.presentation.precision },
     { href: presentationRoute(MOCK_DEMO_UNLOCKED_TRIP.tripId), label: t.suite.libelle, detail: t.suite.precision },
     { href: unlocked.sejour(), label: t.sejour.libelle, detail: t.sejour.precision },
     { href: unlocked.jour(1), label: t.jour.libelle, detail: t.jour.precision },
   ];
+  if (paymentAvailable()) {
+    links.push({ href: unlockRoutes(MOCK_DEMO_TRIP.tripId).debloquer(), label: t.debloquer.libelle, detail: t.debloquer.precision });
+  }
+  return links;
 }
 
 /**

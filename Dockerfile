@@ -19,9 +19,12 @@ COPY . .
 RUN pnpm build && mkdir -p public
 
 # 3. Exécution
+# VADROUILLE_ENV=production : toute image de production ferme le paiement simulé (décisions 0017 § 11.0
+# et 0020 § 2.3), quel que soit l'hébergeur et même si un drapeau de démonstration est passé au conteneur.
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
+    VADROUILLE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
