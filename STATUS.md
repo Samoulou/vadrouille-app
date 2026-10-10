@@ -70,7 +70,6 @@ Cette PR reprend #88 (état du 17e cycle, non fusionnée) et la remplace.
   - Q140 : carte Google facturée à chaque visite de la vue partagée ;
   - **Q171 (nouvelle, spec F12)** : audit humain avec lecteurs d'écran, interne ou payant ;
   - **Q172 (nouvelle, spec F12)** : clé Maps de test pour mesurer la performance avec la vraie carte (liée à Q103) ;
-  - **Q172 (nouvelle, spec F12)** : clé Maps de test pour mesurer la performance avec la vraie carte (liée à Q103) ;
   - Q118 : tag et release GitHub de v2026.10.09-09, ou droits de la routine release.
 - **Offre et cadrage** : Q57, Q63, Q67, Q76, Q78, Q88, Q89, Q90 (partie Google) ; Q128 « Ce qui est inclus », Q133 autres entrées « Débloquer », Q135 « un aperçu actif à la fois » ; Q138 ; **nouvelles (spec F11)** : Q149 accès à un voyage 30 jours après le retour, Q151 usage des avis et lieux découverts.
 - **Durées et documents** : Q27, Q12 (maquettes), Q59 (Dossier UX).
