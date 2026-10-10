@@ -1,38 +1,37 @@
-# État du studio — 2026-10-09 (17e cycle)
+# État du studio — 2026-10-10 (18e cycle)
 
 Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
-Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
+Cette PR reprend #88 (état du 17e cycle, non fusionnée) et la remplace.
 
 ## Messages de Samuel traités
-- Aucun nouveau message dans #studio depuis le résumé du 16e cycle (20:26 CEST).
+- Aucun nouveau message dans #studio depuis le résumé du 17e cycle (2026-10-10 00:33 CEST).
 
 ## Fait
-- **Spec F11 — Mes voyages, Après le voyage, états transverses (#81) : fusionnée** (c303ee7). Ticket #79 fermé avec un renvoi.
-- **T11 — Décisions Tech Lead pour F9 (#80) : fusionnée** (15f39f5, décision 0020). Ticket #78 fermé avec un renvoi.
-- **T12 — Décisions Tech Lead pour F11 (#85, ticket #84) : ouverte et fusionnée dans le cycle** (373a63c, décision 0021). Ticket #84 fermé par la PR.
-  - F11-TL-1 à F11-TL-11 retenues, TL-1 et TL-3 amendées (Q155).
-  - Amende 0020 : § 3 (le décorateur fournit aussi `listTrips`), § 7 (`RetainedPreference` dans `src/contracts/preference.ts`), § 8 (`TripSessionProvider` monté dans `src/app/voyages/layout.tsx` ; F11a supprime le layout `[id]` de F9a).
-  - Rien de réservé à Samuel n'est tranché. Questions : Q158, Q159 (Product Owner).
-- **Release v2026.10.09-21 (#87) : fusionnée** (b20c259) ; elle liste 0020 et 0021 dans « Décisions prises par le studio ».
+- **Spec F12 — Accessibilité, performance, grand écran (#91, ticket #90) : ouverte et fusionnée dans le cycle** (158ccb8).
+  - Décisions F12-PO-1 à F12-PO-21, propositions F12-TL-1 à F12-TL-8, critères C1 à C31.
+  - Découpage en 4 sous-PR : F12a (mesure, après T4), F12b (Séjour et Journée en grand écran, après F5c), F12c (autres écrans), F12d (passe finale).
+  - Questions Q170 à Q177 (numéros gardés tels quels). Q175 est tranchée par le CEO.
+- **Ticket #84 (T12)** fermé avec un renvoi vers #85.
 
 ## En cours (toutes en `needs-review`)
-- **F9a — Débloquer, paiement simulé, confirmation, état débloqué (PR #86, ticket #83)** : nouvelle, frontend.
-  - La revue Tech Lead de 21:52 UTC n'a trouvé aucun bloquant de code. Elle demandait une description complète, la mesure du budget et une CI verte.
-  - 1re correction faite (65b44b0, après fusion de `main`) : description complétée et retours UX intégrés. Nouvelle note `docs/deploiement/variables-environnement.md` sur les drapeaux interdits en production.
-  - CI `verify` et `docker` verte sur 65b44b0. Références visuelles prises sur la CI (décision 0004).
-  - Cible de réussite `R11` (F9-PO-18). Garde `paymentDemoAllowed` fermée par défaut et fausse en production ; actions serveur dans `src/server/actions/`, avec `parse-input.ts` et la règle de lint.
-  - Prérequis absents de `main` créés selon la spec (l. 285) et 0020 : `values.ts`, `errors.ts`, portée de simulation (`R-sim`), `DestinationPlate`.
-  - Budget JavaScript de la Journée : 194 633 o → 196 742 o, sous 200 000 o (mesure hors dépôt, T4 n'étant pas fusionnée).
-  - 5e entrée « Débloquer » sur l'accueil de démonstration ; tests de D1 adaptés, aucun test désactivé.
-  - Questions : Q160, Q161, Q164 (Tech Lead), Q165 (Tech Lead, Sécurité), Q162 (UX/UI) ; Q128 complétée (Samuel) ; avis Sécurité Q148 attendu à la revue.
+- **F9a — Débloquer, paiement simulé (PR #86, ticket #83)** : 2e et dernière correction faite (145f3d9).
+  - Bloquant Sécurité traité : `AppPathSchema` refuse les espaces, les caractères de contrôle et l'antislash, et vérifie l'origine avec `new URL`. Les cas de refus sont testés.
+  - Optionnels faits : 413 sur `/dev/api/simulation` avant la lecture du corps ; `DATA_ADAPTER`, `PAYMENT_ADAPTER` et previews Vercel fermées dans `docs/deploiement/variables-environnement.md`.
+  - Reportés : UX O1 à O4, dépendance inversée de `src/adapters`, captures de l'accueil.
+  - CI `verify` et `docker` verte. Réponses du Tech Lead reportées : Q160, Q161, Q164.
+  - Si une 3e correction est demandée, la tâche passe en bloqué.
+- **F11c — Page introuvable, page d'erreur, catalogue des états (PR #92, ticket #89)** : nouvelle, frontend.
+  - Le 1er sous-agent a été coupé par un redémarrage du conteneur. Son travail, resté dans le worktree, a été repris, relu et livré.
+  - La revue de 00:36 UTC a lu un état intermédiaire (description vide, références absentes) ; le head e81155c avait déjà réglé ces 3 points. Correction 1 comptée, sans changement de code, et `needs-review` reposé.
+  - CI `verify` (test visuel compris) et `docker` verte sur e81155c. Références visuelles prises sur la CI (0004, procédure A).
+  - Écarts dans la PR : état vide de Mes voyages laissé à F11a (0021 § 8) ; textes d'exemple pour `offline`, `conflict` et `noOption`.
+  - Aucune nouvelle question ; rappels Q154 et Q12.
 - **T8 — Décision 0019 (PR #72, ticket #71)** et **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : toujours en attente de revue, sans changement.
-- **État du 16e cycle (#82)** : remplacée par cette PR.
-- Note : `pnpm verify` en session échoue sur `test:visual` (rendu des polices), comme prévu par la décision 0004 ; tout le reste passe sur #76, #85 et #86.
-- Incident : pendant F9a, un `pkill -f serve-standalone.mjs` a pu couper un serveur Playwright d'un autre worktree. Aucun effet constaté sur les livrables.
+- **État du 17e cycle (#88)** : remplacée par cette PR.
 
 ## Bloqué
-- **Spec F10 (PR #76, ticket #75)** : 2e et dernière correction faite (1edace2), mais la revue de 21:23 UTC demande une 3e correction. 2 tentatives épuisées : **Q163**.
+- **Spec F10 (PR #76, ticket #75)** : la revue de 21:23 UTC demande une 3e correction ; 2 tentatives épuisées : **Q163**. Sans changement.
   - La correction 2 a traité les 4 bloquants de 18:27 UTC : `SharedDay` sans `events` complets, C37 avant hydratation, F10-Q3 (Q139) étendue à `name` et `meta`, attribution Google (F10-PO-20, C43).
   - Les 5 nouveaux bloquants viennent tous de la décision 0020 (F9), fusionnée après la rédaction de la spec :
     - actions de partage dans `src/server/actions/partage.ts`, et non dans `src/features/` ;
@@ -53,13 +52,13 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 
 ## Décisions attendues de Samuel
 - **Règles du studio** :
-  - **Q163 (nouvelle)** : 3e tentative pour la spec F10 (#76), dont les 5 bloquants restants sont un alignement sur 0020, fusionnée après sa rédaction ; ou attente de Q122 ;
+  - Q163 : 3e tentative pour la spec F10 (#76), dont les 5 bloquants restants sont un alignement sur 0020, fusionnée après sa rédaction ; ou attente de Q122 ;
   - **Q119 (la plus urgente)** : 3e tentative pour #65 et #66, découpage, ou attente. Toute la suite du code en dépend ;
   - Q120 à Q122 (décision 0019) : règle de revue dans le prompt R2, libellés `ux-approved` et `secu-approved`, correction due à un bloquant signalé tard non comptée comme tentative ;
   - Q43 : 3e tentative de correction pour #26 et #27, découpage, ou attente ;
   - Q23 : moment du retrait de `in-progress`.
-- **Phases** : **Q152 (nouvelle)** : souvenir partageable exclu de F11 ; Q137 : le hors-ligne fait-il partie du MVP mis en service ? Le cadrage le range après le MVP, le handover l'inclut.
-- **Juridique, à la suite de Q5** : Q5, Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q48, Q75, Q127 ; Q139 ; **Q150 (nouvelle)** : consentement de « Retenir mes goûts », durées de conservation, effacement.
+- **Phases** : Q152 : souvenir partageable exclu de F11 ; **Q176 (nouvelle, spec F12)** : adaptation grand écran du parcours mobile suffisante pour le MVP, vues bureau des agences hors MVP ? Q137 : le hors-ligne fait-il partie du MVP mis en service ? Le cadrage le range après le MVP, le handover l'inclut.
+- **Juridique, à la suite de Q5** : Q5, Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q48, Q75, Q127 ; Q139 ; **Q170 (nouvelle, spec F12)** : déclaration d'accessibilité et Acte européen sur l'accessibilité ; Q150 : consentement de « Retenir mes goûts », durées de conservation, effacement.
 - **Argent et comptes** :
   - Q9 : clé Gemini ;
   - Q24 à Q26 ;
@@ -69,6 +68,9 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
   - Q103 : compte Google Cloud et clé Places ;
   - Q129 : remboursement d'un second paiement ;
   - Q140 : carte Google facturée à chaque visite de la vue partagée ;
+  - **Q171 (nouvelle, spec F12)** : audit humain avec lecteurs d'écran, interne ou payant ;
+  - **Q172 (nouvelle, spec F12)** : clé Maps de test pour mesurer la performance avec la vraie carte (liée à Q103) ;
+  - **Q172 (nouvelle, spec F12)** : clé Maps de test pour mesurer la performance avec la vraie carte (liée à Q103) ;
   - Q118 : tag et release GitHub de v2026.10.09-09, ou droits de la routine release.
 - **Offre et cadrage** : Q57, Q63, Q67, Q76, Q78, Q88, Q89, Q90 (partie Google) ; Q128 « Ce qui est inclus », Q133 autres entrées « Débloquer », Q135 « un aperçu actif à la fois » ; Q138 ; **nouvelles (spec F11)** : Q149 accès à un voyage 30 jours après le retour, Q151 usage des avis et lieux découverts.
 - **Durées et documents** : Q27, Q12 (maquettes), Q59 (Dossier UX).
@@ -81,11 +83,12 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
 - **Ligne** :
   - Q37 ;
   - Q130 : logos TWINT et cartes ;
-  - **Q157 (nouvelle)** : une plaque par écran contre les « cartes de voyage » du handover ;
+  - **Q177 (nouvelle, spec F12)** : largeurs grand écran et survol dans Ligne ;
+  - Q157 : une plaque par écran contre les « cartes de voyage » du handover ;
   - Q108 : icônes « moins » et chevron, tokens de la mini-ligne et du champ de montant, coche `on-line`.
 - Configuration de la routine R1 sur 3 h (à faire par Samuel).
 - **Veto possible** :
-  - avant le 2026-10-10 : ADR 0005, PO-1 à PO-7 (B0), ADR 0001 « Évolution », F4-PO, F6-PO-1 à F6-PO-16, ADR 0013, Q66, F5-PO-1 à F5-PO-18 sauf F5-PO-10 ;
+  - échues le 2026-10-10 sans veto lu dans #studio, donc définitives : ADR 0005, PO-1 à PO-7 (B0), ADR 0001 « Évolution », F4-PO, F6-PO-1 à F6-PO-16, ADR 0013, Q66, F5-PO-1 à F5-PO-18 sauf F5-PO-10 ;
   - avant le 2026-10-11 :
   - décisions 0014, 0015 et 0016 ;
   - F7-PO-1 à F7-PO-19 ;
@@ -99,22 +102,25 @@ Cette PR reprend #82 (état du 16e cycle, non fusionnée) et la remplace.
   - si #76 est fusionnée : F10-PO-1 à F10-PO-19 (dont Q50) et Q143 (CEO) ;
   - avant le 2026-10-11 : décision 0020 (Tech Lead, #80 fusionnée) ; F11-PO-1 à F11-PO-20, Q153 et Q156 (CEO, #81 fusionnée) ; décision 0021 (Tech Lead, #85 fusionnée) ;
   - si #86 est fusionnée : écarts de F9a listés dans la PR (Product Owner et frontend).
+  - avant le 2026-10-12 : F12-PO-1 à F12-PO-21 (#91, fusionnée ; F12-PO-2 et F12-PO-4 étendent les budgets du handover § 14) ; Q175 (CEO) ; réponses du Tech Lead Q160, Q161, Q164 (revue de #86) ;
+  - si #92 est fusionnée : rendus provisoires de F11c (Q154).
 
 ## Prochain cycle
-1. Appliquer la réponse de Samuel à Q119 (#65, #66) et à Q43 (#26, #27).
-2. Suivre #86 (F9a), #72 et #67. Après #72 : T9 en tête. F11c est prête (0021 fusionnée). #76 : appliquer la réponse à Q163 ; ensuite, décisions F10-TL (Q144, Q146).
+1. Appliquer les réponses de Samuel à Q119 (#65, #66), Q163 (#76) et Q43 (#26, #27).
+2. Suivre #86 (F9a, dernière correction faite), #92 (F11c), #72 et #67. Après #72 : T9 en tête.
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136, Q147, Q158 et Q159.
-4. S'il reste de la place : spec F12 (accessibilité, performance, grand écran).
+4. Tech Lead : propositions F12-TL (Q174), dans une tâche de décision comme T11 et T12.
+5. F12a attend T4, qui attend Q119.
 
 ## Part d'usage estimée
-- 17e cycle (2026-10-09) : environ 1,1 M de jetons (estimation).
+- 18e cycle (2026-10-10) : environ 560 000 jetons (estimation).
 
 | Poste | Jetons |
 |---|---|
-| F9a, code, tests et correction 1 | ≈ 700 000 |
-| T12, décision 0021 | ≈ 195 000 |
-| Correction 2 de la spec F10 | ≈ 135 000 |
-| Pilotage, état | ≈ 55 000 |
+| Spec F12 | ≈ 190 000 |
+| F11c, code et tests (dont un sous-agent coupé par le redémarrage) | ≈ 230 000 |
+| Correction 2 de F9a | ≈ 75 000 |
+| Pilotage, état | ≈ 65 000 |
 
 - Part de l'abonnement : non mesurable depuis la routine.
-- Messages de Samuel dans #studio depuis le 16e cycle (20:26 CEST) : aucun.
+- Messages de Samuel dans #studio depuis le 17e cycle (00:33 CEST) : aucun.
