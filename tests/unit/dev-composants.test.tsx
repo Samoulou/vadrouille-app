@@ -88,13 +88,13 @@ describe("/dev/composants", () => {
     expect(within(section).getByRole("link", { name: "Idées" })).toHaveAttribute("href", "#idees-14:00-18:30");
   });
 
-  it("montre le bouton bascule relâché, enfoncé (coche) et enfoncé avec focus", () => {
+  it("montre le bouton bascule relâché, enfoncé et enfoncé avec focus, sans icône", () => {
     render(<ComposantsShowcase />);
     const section = screen.getByRole("region", { name: "Button" });
     expect(within(section).getAllByRole("button", { name: "Verrouiller", pressed: false })).toHaveLength(1);
     const pressed = within(section).getAllByRole("button", { name: "Verrouiller", pressed: true });
     expect(pressed).toHaveLength(2);
-    for (const button of pressed) expect(button.querySelector("[data-part='coche']")).not.toBeNull();
+    for (const button of pressed) expect(button.querySelector("svg")).toBeNull();
   });
 
   it("montre chaque type de Tag et de StatusBanner, et le compteur seulement quand il vaut plus de 0", () => {

@@ -55,3 +55,14 @@ test("Fiche du Tattoo à 92 %, « Verrouiller » enfoncé visible", async ({ pag
   await expect(fiche(page).getByRole("button", { name: "Verrouiller", pressed: true })).toBeInViewport();
   await capture(page, "sejour-fiche-tattoo-92.png");
 });
+
+test("Fiche de la distillerie à 92 %, toast d'annulation à droite de « Retour »", async ({ page }) => {
+  // Horloge figée : le toast reste affiché le temps de la capture.
+  await page.clock.install();
+  await openFiche(page, 5, "j5-distillerie");
+  await fiche(page).getByRole("button", { name: "Agrandir le panneau" }).click();
+  await expectSheetAt(page, 0.92, "Fiche étape");
+  await fiche(page).getByRole("button", { name: "Verrouiller" }).click();
+  await expect(page.locator("[data-undo-toast]")).toBeVisible();
+  await capture(page, "sejour-fiche-distillerie-92-toast.png");
+});

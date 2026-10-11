@@ -202,7 +202,7 @@ Date : 2026-10-09 · PR #66 (F5b, ticket #61), revue Tech Lead du 2026-10-09. Ce
 - **(b) État de la fiche dans `TripShell` (précise § 5.3).**
   - Ces éléments vivent dans `TripShell` et son contexte, et non dans la page :
     - la fiche ouverte, déduite de `?etape=` par `useSearchParams` ;
-    - son origine : ouverte depuis le panneau du jour, ou directement ;
+    - son origine : ouverte depuis le panneau du jour, ou directement. Cette origine ne vaut que pour la fiche qu'elle a ouverte : elle est oubliée dès que cette fiche se ferme, quelle que soit la façon (« Fermer », Échap, retour du navigateur, marqueur), ou au changement de jour (correction 3 de #66) ;
     - la fiche fermée, dont le lien doit reprendre le focus ;
     - la sélection laissée par un marqueur ;
     - l'annonce d'étape absente.
@@ -212,6 +212,7 @@ Date : 2026-10-09 · PR #66 (F5b, ticket #61), revue Tech Lead du 2026-10-09. Ce
   - `Sheet` gagne `above?: ReactNode`, affiché en position absolue juste au-dessus du bord supérieur du panneau. Ce contenu suit les changements de hauteur et le glisser.
   - Le toast d'annulation unique de `TripShell` (décision 0016 § 9) y est placé.
   - La zone porte `pointer-events-none`, pour ne pas bloquer la carte.
+  - Panneau au plus haut (92 %), son bord arrive à hauteur de « Retour », posé sur la carte : le toast est alors décalé à droite de « Retour » pour ne jamais le recouvrir (correction 3 de #66).
 - **(d) `scroll={false}` sur les liens d'étape et d'événement.**
   - Les `Link` des arrêts de `DayLine` et des lignes d'événement (`EventLines`) ouvrent la fiche sans le défilement automatique de Next.js.
   - L'écran garde la main sur le défilement du contenu du panneau (marqueur, retour du focus).

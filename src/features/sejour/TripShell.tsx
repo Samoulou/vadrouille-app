@@ -21,10 +21,11 @@ import type { FitPadding } from "@/components/carte/types";
 import { DayTabs } from "@/components/ligne/DayTabs";
 import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
-import { DEFAULT_SNAP, type SnapPoint } from "@/components/ligne/sheet-model";
+import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sheet-model";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, Stop, Trip } from "@/contracts";
 import { messages } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
 import { findFicheTarget, type FicheTarget } from "./fiche";
@@ -41,6 +42,8 @@ const t = messages.sejour;
 
 /** Hauteur du panneau relevée par un marqueur, une fiche ou le lien d'évitement quand il est au plus bas (F5-PO-7, F5-PO-8). */
 const LOWEST: SnapPoint = 0.25;
+/** Hauteur la plus haute du panneau : son bord est alors à hauteur de « Retour », posé sur la carte. */
+const HIGHEST: SnapPoint = Math.max(...SNAP_POINTS) as SnapPoint;
 
 /** Toast d'annulation en cours (une action à la fois, handover § 7). */
 interface ToastState {
@@ -176,7 +179,8 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
   );
 
   // Fiche : ouverte depuis le panneau du jour (« Fermer » revient dans l'historique) ou directement.
-  const openedFromPanel = useRef<string | null>(null);
+  // Adresse de la fiche marquée par un lien du panneau ; vidée dès que cette fiche se ferme ou change de jour.
+  const [openedFromPanel, setOpenedFromPanel] = useState<string | null>(null);
   const [closedFiche, setClosedFiche] = useState<ClosedFiche | null>(null);
   const [closingByMarker, setClosingByMarker] = useState(false);
   const [missingNoticeDay, setMissingNoticeDay] = useState<number | null>(null);
@@ -201,6 +205,10 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
     setTracked({ ficheKey, fiche: fiche && day ? { dayIndex: day.index, stopId: fiche.stop.id } : undefined, dayIndex });
     // L'annonce d'étape absente ne vaut que pour le jour où elle a été faite : un changement de jour l'efface.
     if (dayIndex !== tracked.dayIndex) setMissingNoticeDay(null);
+    // L'ouverture depuis le panneau ne vaut que pour la fiche qu'elle a ouverte : quand cette fiche se ferme
+    // (« Fermer », Échap, retour du navigateur, marqueur) ou qu'on change de jour, la marque est oubliée. Une
+    // réouverture qui ne passe pas par le panneau (Séjour, historique) remplace alors l'adresse à la fermeture.
+    if (tracked.ficheKey !== null || dayIndex !== tracked.dayIndex) setOpenedFromPanel(null);
     if (ficheKey && ficheKey !== tracked.ficheKey) {
       setMarkerSelection(null);
       setMissingNoticeDay(null);
@@ -230,7 +238,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
       const next = snap === LOWEST ? DEFAULT_SNAP : snap;
       setSnap(next);
       if (fiche) {
-        openedFromPanel.current = null;
+        setOpenedFromPanel(null);
         setMarkerSelection({ dayIndex, stopId });
         setPendingScroll(stopId);
         // Fermeture par un marqueur : pas de retour du focus sur le lien de la fiche fermée.
@@ -255,19 +263,17 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
     if (snap === LOWEST) flushSync(() => setSnap(DEFAULT_SNAP));
   }, [snap]);
 
-  const markOpenedFromPanel = useCallback((href: string) => {
-    openedFromPanel.current = href;
-  }, []);
+  const markOpenedFromPanel = useCallback((href: string) => setOpenedFromPanel(href), []);
 
   // « Fermer » et Échap : retour à l'entrée d'historique précédente après une ouverture depuis le panneau du
   // jour ; sinon (ouverture directe, ou depuis le Séjour), l'adresse du jour remplace celle de la fiche.
   const closeFiche = useCallback(() => {
     if (!fiche || dayIndex === undefined) return;
-    const fromPanel = openedFromPanel.current === routes.etape(dayIndex, fiche.stop.id);
-    openedFromPanel.current = null;
+    const fromPanel = openedFromPanel === routes.etape(dayIndex, fiche.stop.id);
+    setOpenedFromPanel(null);
     if (fromPanel) router.back();
     else router.replace(routes.jour(dayIndex), { scroll: false });
-  }, [dayIndex, fiche, router, routes]);
+  }, [dayIndex, fiche, openedFromPanel, router, routes]);
 
   const consumeClosedFiche = useCallback(() => setClosedFiche(null), []);
 
@@ -356,8 +362,12 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
     />
   );
 
+  // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
+  // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s.
   const toastRegion = (
-    <UndoToastRegion className="pointer-events-none px-3 pb-2">
+    <UndoToastRegion
+      className={cn("pointer-events-none pb-2", snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour)" : "px-3")}
+    >
       {toast ? (
         <UndoToast
           key={toast.id}

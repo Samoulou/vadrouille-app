@@ -69,24 +69,34 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Passer" })).toHaveClass("text-corps", "text-ink-soft");
   });
 
-  it("bouton bascule : enfoncé, aplat ink, texte page et coche ; libellé et nom accessible inchangés", () => {
+  it("bouton bascule : enfoncé en aplat ink et texte page, sans icône ; libellé et nom accessible inchangés", () => {
     const { rerender } = render(
       <Button variant="secondary" aria-pressed={false}>
         Verrouiller
       </Button>,
     );
     const button = screen.getByRole("button", { name: "Verrouiller" });
-    expect(button).toHaveClass("aria-pressed:bg-ink", "aria-pressed:text-page");
-    expect(button.querySelector("[data-part='coche']")).toBeNull();
+    expect(button).toHaveClass("aria-pressed:not-disabled:bg-ink", "aria-pressed:not-disabled:text-page");
     rerender(
       <Button variant="secondary" aria-pressed>
         Verrouiller
       </Button>,
     );
-    expect(screen.getByRole("button", { name: "Verrouiller", pressed: true })).toBeInTheDocument();
-    const check = button.querySelector("[data-part='coche']");
-    expect(check).not.toBeNull();
-    expect(check).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "Verrouiller", pressed: true })).toBe(button);
+    // README Button : pas d'icône décorative dans un bouton à libellé.
+    expect(button.querySelector("svg")).toBeNull();
+    expect(button).toHaveTextContent(/^Verrouiller$/);
+  });
+
+  it("bouton bascule désactivé : le fond désactivé n'est pas concurrencé par l'aplat enfoncé", () => {
+    render(
+      <Button variant="secondary" aria-pressed disabled>
+        Verrouiller
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Verrouiller" });
+    expect(button).toHaveClass("disabled:bg-muted");
+    expect(button).not.toHaveClass("aria-pressed:bg-ink");
   });
 
   it("n'a aucune violation axe", async () => {

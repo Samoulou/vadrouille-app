@@ -162,16 +162,25 @@ test.describe("Fiche étape", () => {
     await expect(sheet(page).locator("[data-part='annonce-etape']")).toHaveText("");
   });
 
-  test("fiche: « Verrouiller » enfoncé visible sans la couleur seule (coche)", async ({ page }) => {
+  test("fiche: « Verrouiller » enfoncé : aplat et texte inversés, sans icône, mention du verrou", async ({ page }) => {
     await page.goto(`${JOUR2}?etape=${DEAN}`);
     const lock = fiche(page).getByRole("button", { name: "Verrouiller" });
-    await expect(lock.locator("[data-part='coche']")).toHaveCount(0);
-    const before = await lock.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const colors = () =>
+      lock.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { background: style.backgroundColor, color: style.color };
+      });
+    const before = await colors();
     await lock.click();
     await expect(lock).toHaveAttribute("aria-pressed", "true");
-    await expect(lock.locator("[data-part='coche']")).toBeVisible();
     await expect(lock).toHaveText("Verrouiller");
-    expect(await lock.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
+    await expect(lock.locator("svg")).toHaveCount(0);
+    const after = await colors();
+    // Inversion : le fond enfoncé prend la couleur du texte relâché, et inversement (aplat `ink`, texte `page`).
+    expect(after.background).toBe(before.color);
+    expect(after.background).not.toBe(before.background);
+    // L'état est aussi dit en toutes lettres dans la fiche, pas seulement par le rendu du bouton.
+    await expect(fiche(page).locator("[data-part='verrou']")).toBeVisible();
   });
 
   test("fiche: verrouiller et annuler", async ({ page }) => {
@@ -278,6 +287,16 @@ test.describe("Fiche étape", () => {
         .map(({ name, box }) => `${name} (${box.width} × ${box.height})`),
     );
     expect(small).toEqual([]);
+    // Panneau à 92 % : le toast, posé au-dessus du panneau, ne recouvre pas « Retour » (revue du head 84bfe8e).
+    const toastBox = (await page.locator("[data-undo-toast]").boundingBox())!;
+    const retourBox = (await page.locator("[data-part='retour']").boundingBox())!;
+    const overlap =
+      toastBox.x < retourBox.x + retourBox.width &&
+      retourBox.x < toastBox.x + toastBox.width &&
+      toastBox.y < retourBox.y + retourBox.height &&
+      retourBox.y < toastBox.y + toastBox.height;
+    expect(overlap).toBe(false);
+    await page.locator("[data-part='retour']").click({ trial: true });
   });
 
   test("journee: marqueur ferme la fiche et fait défiler la liste", async ({ page }) => {
