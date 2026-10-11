@@ -94,6 +94,8 @@
   --ligne-deck-nom-approche: -0.01em;
   /* Q11 : approche du style titre-jour de tokens.json (-0.015em), absente du handover § 4.1 (titre des fins de paquet). */
   --ligne-titre-jour-approche: -0.015em;
+  /* Q11 : approche du style destination de tokens.json (-0.02em), absente du handover § 4.1 (DestinationPlate). */
+  --ligne-destination-approche: -0.02em;
   /* F6-Q1 : voile des feuilles modales, ink à 40 % (rendu non maquetté, en attendant Q10). */
   --ligne-voile: color-mix(in oklab, var(--color-ink) 40%, transparent);
   /* F6-Q1 : hauteur maximale de la feuille modale, 92 % de la fenêtre (rendu non maquetté). */

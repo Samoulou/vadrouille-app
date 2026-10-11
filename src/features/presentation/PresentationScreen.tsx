@@ -41,6 +41,11 @@ export interface PresentationScreenProps {
   /** Jours encore en préparation (`Day.generating`), pour le `StatusBanner` (F6-PO-13). */
   generatingDays: number[];
   proposals: Proposal[];
+  /**
+   * Lien « Débloquer » de la fin de l'aperçu (F9-PO-19) : la page passe `paymentAvailable()`, pour qu'aucun
+   * lien ne mène à une page 404 quand le paiement simulé n'est pas disponible.
+   */
+  canUnlock?: boolean;
   /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3). */
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
@@ -71,7 +76,7 @@ function toastMessage(toast: UndoToastInfo): string {
 
 type FocusTarget = "card" | "keep";
 
-function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }: Omit<PresentationScreenProps, "recorder" | "recorderKind">) {
+function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, actions: injected }: Omit<PresentationScreenProps, "recorder" | "recorderKind">) {
   const [state, dispatch] = useReducer(deckReducer, proposals, initDeck);
   const [actions] = useState<DeckActions>(() => injected ?? createLocalDeckActions());
   const track = useTrack();
@@ -256,7 +261,7 @@ function Deck({ tripId, unlocked, generatingDays, proposals, actions: injected }
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} tripId={tripId} titleRef={endTitleRef} />
+        <DeckEnd variant={endVariant} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PreferenceSheet

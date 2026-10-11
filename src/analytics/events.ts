@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema, type PreferenceReason } from "@/contracts";
+import { CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
 
 /**
  * Événements de mesure (handover § 12, spécification F6, décision 0013 § 3.3).
@@ -62,11 +63,50 @@ export const PreferencePromptAnsweredEventSchema = z.strictObject({
   }),
 });
 
+/**
+ * Paiement (handover § 12, spécification F9, décision 0020 § 9). `price_variant` : code de la liste fermée
+ * `PRICE_VARIANTS`, jamais un montant ni la configuration serveur. Ni identifiant de voyage ou de paiement,
+ * ni destination, ni montant.
+ */
+const PriceVariantPropertySchema = z.enum(PRICE_VARIANTS);
+const PaymentMethodPropertySchema = z.enum(PAYMENT_METHODS);
+
+/** Sans `method` : aucun moyen choisi à l'affichage (F9-PO-16, amende le handover § 12). */
+export const PaywallViewedEventSchema = z.strictObject({
+  name: z.literal("paywall_viewed"),
+  properties: z.strictObject({ price_variant: PriceVariantPropertySchema }),
+});
+
+export const PaymentStartedEventSchema = z.strictObject({
+  name: z.literal("payment_started"),
+  properties: z.strictObject({ method: PaymentMethodPropertySchema, price_variant: PriceVariantPropertySchema }),
+});
+
+/** Envoyé par le navigateur en phase 0 ; émis par le serveur avec la tâche de paiement réel (0020 § 9). */
+export const PaymentSucceededEventSchema = z.strictObject({
+  name: z.literal("payment_succeeded"),
+  properties: z.strictObject({ method: PaymentMethodPropertySchema, price_variant: PriceVariantPropertySchema }),
+});
+
+/** Ajout de F9-PO-16 : mesurer les abandons. */
+export const PaymentFailedEventSchema = z.strictObject({
+  name: z.literal("payment_failed"),
+  properties: z.strictObject({
+    method: PaymentMethodPropertySchema,
+    price_variant: PriceVariantPropertySchema,
+    reason: z.enum(CHECKOUT_FAILURES),
+  }),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
   DeckSkippedEventSchema,
   PreferencePromptAnsweredEventSchema,
+  PaywallViewedEventSchema,
+  PaymentStartedEventSchema,
+  PaymentSucceededEventSchema,
+  PaymentFailedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];
