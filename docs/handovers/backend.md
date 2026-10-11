@@ -31,7 +31,7 @@ Ce document est le pendant du handover front-end (`docs/handovers/frontend.md`).
 |---|---|---|
 | `QUESTIONS.md` (questions tranchées par Samuel) et `docs/decisions/` dont le décideur est Samuel | Q2 = 29 CHF, Q3 = clés Maps navigateur, Q4 = Better Auth, Q43 = découpage de B0 ; décisions 0001 et 0002 | Samuel |
 | `docs/produit/cadrage-v5.md` | Produit, architecture, données, conformité, règles R1 à R10, tests de sortie | Samuel (points « tranché » ou « confirmé par Samuel » : D4, D7…) |
-| `docs/decisions/` déléguées : 0003 (agent frontend, validée par le Tech Lead), 0004, 0005, 0006 à 0010, 0013, 0015 à 0017, 0019 à 0023 (Tech Lead), 0014 et 0018 (UX/UI) | Versions, architecture, bibliothèques, outillage, tests, rendus | Rôle délégué, dans le cadre du cadrage |
+| `docs/decisions/` déléguées : 0003 (agent frontend, validée par le Tech Lead), 0004, 0005, 0006 à 0010, 0013, 0015 à 0017, 0019 à 0023 (Tech Lead), 0012, 0014 et 0018 (UX/UI) | Versions, architecture, bibliothèques, outillage, tests, rendus | Rôle délégué, dans le cadre du cadrage |
 | Rubriques « Décisions » des spécifications (`specs/B0-handover-backend.md`, PO-1 à PO-7 ; specs F) | Détails fonctionnels | Product Owner, dans le cadre du cadrage |
 | `docs/handovers/backend.md` (ce document), puis `docs/handovers/frontend.md` pour les données | Mise en œuvre | Applique les sources ci-dessus |
 | `src/contracts`, `src/adapters` | Contrats et adaptateurs existants | Évoluent seulement par une tâche qui cite sa décision (§ 4) |
