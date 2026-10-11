@@ -11,7 +11,7 @@ export interface DemoLink {
 export interface DemoSectionProps {
   /** Destination du voyage d'exemple, lue par l'adaptateur (`getTrip`) ; absente si le voyage manque. */
   destination?: string;
-  /** Les quatre liens, dans l'ordre du parcours (D1-PO-2). */
+  /** Les liens, dans l'ordre du parcours (D1-PO-2), puis « Débloquer » si le paiement simulé est disponible (F9-PO-17). */
   links: DemoLink[];
 }
 

@@ -76,7 +76,7 @@ export const edimbourgCarte: DayMap[] = [
 ];
 
 /**
- * Positions d'un voyage dérivé d'Édimbourg (décision 0017 § 13, proposée dans la PR 65 ; bug n° 106) :
+ * Positions d'un voyage dérivé d'Édimbourg (décision 0017 § 13 ; bug n° 106) :
  * dérivation, pas copie, comme le voyage débloqué lui-même (0013 § 3.6). Un jour en préparation
  * (`generating`) n'a pas de position : `getDayMap` y renvoie `null` et l'écran garde l'état de remplacement.
  */

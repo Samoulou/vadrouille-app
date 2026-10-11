@@ -31,7 +31,7 @@ interface MockEntry {
 const DEFAULT_ENTRIES: MockEntry[] = [
   { trip: edimbourg, proposals: propositions, maps: edimbourgCarte },
   // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué. Ses positions sont dérivées de celles
-  // d'Édimbourg, sauf le J6 en préparation (bug n° 106, décision 0017 § 13 proposée dans la PR 65).
+  // d'Édimbourg, sauf le J6 en préparation (bug n° 106, décision 0017 § 13).
   { trip: edimbourgDebloque, proposals: propositionsDebloque, maps: deriveEdimbourgCarte(edimbourgDebloque) },
 ];
 
@@ -55,6 +55,18 @@ export const MOCK_DEMO_UNLOCKED_TRIP = {
   ctx: { organizationId: MOCK_ORGANIZATION_ID } satisfies AdapterContext,
   tripId: EDIMBOURG_DEBLOQUE_TRIP_ID,
 } as const;
+
+/**
+ * Pendant débloqué d'un voyage simulé (décision 0020 § 3) : après un paiement simulé réussi,
+ * `getTripReader()` sert le contenu du pendant sous l'identifiant payé.
+ */
+const UNLOCK_COUNTERPARTS: Readonly<Record<string, string>> = {
+  [EDIMBOURG_TRIP_ID]: EDIMBOURG_DEBLOQUE_TRIP_ID,
+};
+
+export function counterpartOf(tripId: string): string | undefined {
+  return Object.hasOwn(UNLOCK_COUNTERPARTS, tripId) ? UNLOCK_COUNTERPARTS[tripId] : undefined;
+}
 
 /**
  * Adaptateur simulé : lit les jeux de `src/mocks`, valide chaque sortie avec

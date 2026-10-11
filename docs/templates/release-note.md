@@ -3,6 +3,10 @@
 ## Nouveautés
 - … (capture si l'interface change)
 
+## Bugs corrigés
+- #<ticket> — <résumé> — sev:<1|2|3> — test qui le reproduit : <chemin du test>
+- Aucun, s'il n'y en a pas.
+
 ## Qualité
 Tests : … · Accessibilité : … · Visuel : …
 
