@@ -17,7 +17,7 @@ import {
   propositions,
   propositionsDebloque,
 } from "@/mocks/edimbourg";
-import { edimbourgCarte } from "@/mocks/edimbourg-carte";
+import { deriveEdimbourgCarte, edimbourgCarte } from "@/mocks/edimbourg-carte";
 
 import type { AdapterContext, TripAdapter } from "./types";
 
@@ -30,8 +30,9 @@ interface MockEntry {
 
 const DEFAULT_ENTRIES: MockEntry[] = [
   { trip: edimbourg, proposals: propositions, maps: edimbourgCarte },
-  // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué, sans positions simulées.
-  { trip: edimbourgDebloque, proposals: propositionsDebloque },
+  // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué. Ses positions sont dérivées de celles
+  // d'Édimbourg, sauf le J6 en préparation (bug n° 106, décision 0017 § 13 proposée dans la PR 65).
+  { trip: edimbourgDebloque, proposals: propositionsDebloque, maps: deriveEdimbourgCarte(edimbourgDebloque) },
 ];
 
 /** Organisation simulée, lue seulement par `getRequestContext` quand DATA_ADAPTER vaut `mock`. */

@@ -93,9 +93,9 @@ describe("adaptateur mock", () => {
     expect(await mockTripAdapter.getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId)).not.toBeNull();
   });
 
-  // Bug #106 : sur la démonstration, le Jour 1 du voyage débloqué affichait « Carte indisponible »
+  // Bug n° 106 : sur la démonstration, le Jour 1 du voyage débloqué affichait « Carte indisponible »
   // malgré la clé et le Map ID, faute de positions simulées pour ce voyage.
-  describe("voyage débloqué de la démonstration (bug #106)", () => {
+  describe("voyage débloqué de la démonstration (bug n° 106)", () => {
     const { ctx, tripId } = MOCK_DEMO_UNLOCKED_TRIP;
 
     it("renvoie les positions du jour 1, validées pour le voyage débloqué", async () => {
