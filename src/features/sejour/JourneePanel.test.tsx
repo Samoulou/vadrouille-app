@@ -65,6 +65,29 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     expect(screen.queryByRole("button", { name: "Surprends-moi" })).toBeNull();
   });
 
+  it("J2 : lien « Idées » du temps libre vers « Ajouter un lieu » avec la plage (F5-TL-8, F5-PO-12)", () => {
+    render(<JourneePanel day={day(2)} routes={routes} />);
+    expect(screen.getByRole("link", { name: "Idées" })).toHaveAttribute(
+      "href",
+      "/voyages/mock_trip_edimbourg/jour/2/ajouter?de=15:00&a=18:30",
+    );
+  });
+
+  it("jour de test avec un dîner pas encore choisi : rendu sans lien, numérotation des étapes inchangée", () => {
+    const items = day(2).items;
+    const lastStop = items.map((item) => item.type).lastIndexOf("stop");
+    const withOpenMeal: Day = {
+      ...day(2),
+      items: [...items.slice(0, lastStop), { type: "openMeal", time: "19:30", meal: "dinner" }, ...items.slice(lastStop + 1)],
+    };
+    const { container } = render(<JourneePanel day={withOpenMeal} routes={routes} />);
+    const meal = container.querySelector("li[data-type='openMeal']") as HTMLElement;
+    expect(meal).toHaveTextContent("19:30");
+    expect(meal).toHaveTextContent("Dîner pas encore choisi");
+    expect(within(meal).queryByRole("link")).toBeNull();
+    expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(4);
+  });
+
   it("événement sans fin : l'heure de début seule", () => {
     expect(eventRange({ start: "18:00" })).toBe("18:00");
     expect(eventRange({ start: "18:00", end: "19:00" })).toBe("18:00 – 19:00");

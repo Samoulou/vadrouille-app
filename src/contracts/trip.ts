@@ -35,6 +35,13 @@ export const SourceSchema = z.strictObject({
 });
 export type Source = z.infer<typeof SourceSchema>;
 
+/**
+ * Engagement saisi par la personne avant la génération (décision 0015 § 9) : billet ou réservation.
+ * Indépendant du verrou : un engagement déverrouillé garde la trace de sa réservation.
+ */
+export const CommitmentSchema = z.enum(["ticket", "reservation"]);
+export type Commitment = z.infer<typeof CommitmentSchema>;
+
 export const StopSchema = z.strictObject({
   id: TextSchema,
   kind: z.enum(["activity", "meal", "event"]),
@@ -50,6 +57,8 @@ export const StopSchema = z.strictObject({
   /** Au plus 2 badges par étape (design system, Tag). */
   exceptions: z.array(ExceptionSchema).max(2),
   locked: z.boolean(),
+  /** Engagement saisi (décision 0015 § 9) : ajout au handover § 9, signalé. Absent : pas un engagement. */
+  commitment: CommitmentSchema.optional(),
 });
 export type Stop = z.infer<typeof StopSchema>;
 
@@ -61,6 +70,10 @@ export const SegmentSchema = z.strictObject({
 });
 export type Segment = z.infer<typeof SegmentSchema>;
 
+/** Repas d'un créneau laissé vide (décision 0015 § 2). */
+export const MealSchema = z.enum(["lunch", "dinner"]);
+export type Meal = z.infer<typeof MealSchema>;
+
 export const DayLineItemSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("terminus"),
@@ -71,6 +84,11 @@ export const DayLineItemSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("stop"), stop: StopSchema }),
   z.strictObject({ type: z.literal("segment"), segment: SegmentSchema }),
   z.strictObject({ type: z.literal("free"), from: TimeSchema, to: TimeSchema }),
+  /**
+   * Créneau de repas pas encore choisi (décision 0015 § 2, évolution E8 ; F6-PO-7) : sans nom ni lieu,
+   * il ne peut porter aucune donnée de lieu. Ce n'est pas une étape : ni numéro sur la carte, ni fiche.
+   */
+  z.strictObject({ type: z.literal("openMeal"), time: TimeSchema, meal: MealSchema }),
 ]);
 export type DayLineItem = z.infer<typeof DayLineItemSchema>;
 
@@ -178,6 +196,14 @@ export const ProposalSchema = z
     detour: TextSchema.optional(),
   })
   .superRefine((proposal, ctx) => {
+    // Une proposition de la présentation n'est jamais un engagement (décision 0015 § 9).
+    if (proposal.stop.commitment !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "une proposition n'est jamais un engagement (stop.commitment interdit)",
+        path: ["stop", "commitment"],
+      });
+    }
     const minutes = proposal.travelFromPrevious?.minutes ?? 0;
     if (minutes > DETOUR_THRESHOLD_MINUTES && proposal.detour === undefined) {
       ctx.addIssue({

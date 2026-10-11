@@ -3,7 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { Day, DayLineItem } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
-import { dayTravelLine, formatMontant, isOverTravelBudget, longestSegmentToStop, travelBannerMessage } from "./travel";
+import {
+  dayTravelLine,
+  formatMontant,
+  isOverTravelBudget,
+  longestSegmentToStop,
+  pathTo,
+  pathToLabel,
+  travelBannerMessage,
+} from "./travel";
 
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
 
@@ -60,6 +68,71 @@ describe("travel: plus long segment suivi d'une étape", () => {
     ];
     expect(longestSegmentToStop(items)?.stop.id).toBe("a");
     expect(longestSegmentToStop([])).toBeNull();
+  });
+
+  it("un créneau de repas pas encore choisi n'est pas une destination (décision 0015 § 2)", () => {
+    const stop = (id: string) => ({ ...day(2).events[0]!, id, kind: "activity" as const });
+    const items: DayLineItem[] = [
+      { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
+      { type: "stop", stop: stop("a") },
+      { type: "segment", segment: { mode: "transit", minutes: 40, estimated: true } },
+      { type: "openMeal", time: "12:30", meal: "lunch" },
+      { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
+      { type: "stop", stop: stop("b") },
+    ];
+    expect(longestSegmentToStop(items)).toEqual({ segment: { mode: "walk", minutes: 15, estimated: false }, stop: stop("b") });
+  });
+});
+
+describe("travel: « Pour y aller » (F5-PO-9)", () => {
+  it("J2, Dean Village : « À pied, 20 min depuis [Royal Mile] »", () => {
+    const path = pathTo(day(2).items, "j2-dean-village");
+    expect(path).toEqual({ segment: { mode: "walk", minutes: 20, estimated: false }, origin: "[Royal Mile]" });
+    expect(pathToLabel(path!)).toBe("À pied, 20 min depuis [Royal Mile]");
+  });
+
+  it("J5, distillerie : « Bus, environ 50 min (estimation) depuis [Petite adresse de Chambers Street] »", () => {
+    expect(pathToLabel(pathTo(day(5).items, "j5-distillerie")!)).toBe(
+      "Bus, environ 50 min (estimation) depuis [Petite adresse de Chambers Street]",
+    );
+  });
+
+  it("première étape : origine = terminus de départ ; temps libre entre l'origine et le segment ignoré", () => {
+    expect(pathToLabel(pathTo(day(2).items, "j2-royal-mile")!)).toMatch(/^À pied, 10 min depuis \[/);
+    // J2 : jardin, temps libre, bus de 20 min, dîner : l'origine est le jardin.
+    const stops = day(2).items.flatMap((item) => (item.type === "stop" ? [item.stop] : []));
+    const path = pathTo(day(2).items, stops[stops.length - 1]!.id);
+    expect(path?.segment.mode).toBe("transit");
+    expect(path?.origin).toBe(stops[stops.length - 2]?.name);
+  });
+
+  it("événement hors programme, étape inconnue ou sans segment avant elle : null", () => {
+    expect(pathTo(day(2).items, "j2-concert-orgue")).toBeNull();
+    expect(pathTo(day(2).items, "inconnue")).toBeNull();
+    const stop = (id: string) => ({ ...day(2).events[0]!, id, kind: "activity" as const });
+    const items: DayLineItem[] = [
+      { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+      { type: "stop", stop: stop("a") },
+      { type: "segment", segment: { mode: "walk", minutes: 5, estimated: false } },
+      { type: "stop", stop: stop("b") },
+      { type: "stop", stop: stop("c") },
+    ];
+    expect(pathTo(items, "a")).toBeNull();
+    expect(pathTo(items, "c")).toBeNull();
+    expect(pathTo(items, "b")).toEqual({ segment: { mode: "walk", minutes: 5, estimated: false }, origin: stop("a").name });
+  });
+
+  it("un créneau de repas pas encore choisi n'est ni origine ni étape intermédiaire (décision 0015 § 2)", () => {
+    const stop = (id: string) => ({ ...day(2).events[0]!, id, kind: "activity" as const });
+    const items: DayLineItem[] = [
+      { type: "stop", stop: stop("a") },
+      { type: "openMeal", time: "12:30", meal: "lunch" },
+      { type: "segment", segment: { mode: "walk", minutes: 12, estimated: false } },
+      { type: "openMeal", time: "13:00", meal: "lunch" },
+      { type: "stop", stop: stop("b") },
+    ];
+    expect(pathTo(items, "b")).toEqual({ segment: { mode: "walk", minutes: 12, estimated: false }, origin: stop("a").name });
+    expect(pathToLabel({ segment: { mode: "car", minutes: 15, estimated: false } })).toBe("En voiture, 15 min");
   });
 });
 
