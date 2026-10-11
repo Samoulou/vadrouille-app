@@ -7,7 +7,7 @@ import { demoLinks } from "./accueil-helpers";
 
 test("accueil: aucune violation axe", async ({ page }) => {
   await page.goto("/");
-  await expect(demoLinks(page)).toHaveCount(4);
+  await expect(demoLinks(page)).toHaveCount(5);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
     .analyze();
