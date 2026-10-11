@@ -28,6 +28,22 @@ describe("analytics: enregistreur chargé à la demande (F5c)", () => {
     expect(recorder.events).toEqual([]);
   });
 
+  it("chargement en échec : l'appel est rejeté, puis l'appel suivant retente le chargement (M1, revue de la PR 128)", async () => {
+    const recorder = createMemoryRecorder();
+    const real = await import("./track");
+    const load = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("chargement impossible"))
+      .mockResolvedValue({ createTracker: real.createTracker, recorderFor: real.recorderFor });
+    const track = createLazyTrack("none", recorder, load);
+    await expect(track({ name: "checklist_item_done", properties: {} })).rejects.toThrow("chargement impossible");
+    expect(recorder.events).toEqual([]);
+    await track({ name: "checklist_item_done", properties: {} });
+    await track({ name: "checklist_item_done", properties: {} });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(recorder.events).toHaveLength(2);
+  });
+
   it("sans enregistreur injecté : celui de `recorderKind` (console avec les pages de développement, sans effet sinon)", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     await createLazyTrack("console")({ name: "checklist_item_done", properties: {} });

@@ -98,7 +98,13 @@ export function SejourPanel({ recorderKind = "none", recorder }: SejourPanelProp
                 done={item.done}
                 bookingUrl={item.bookingUrl}
                 sponsored={item.sponsored}
-                onToggle={(done) => void onToggle(item, done)}
+                onToggle={(done) => {
+                  onToggle(item, done).catch(() => {
+                    // Échec de l'action (B11) ou de la mesure (chargement impossible) : aucun texte d'erreur
+                    // n'est prévu par F5 (F5-Q1). La case garde l'état rendu par le programme ; la mesure
+                    // perdue n'est pas réessayée, et le prochain cochage retente le chargement (`createLazyTrack`).
+                  });
+                }}
               />
             </li>
           ))}

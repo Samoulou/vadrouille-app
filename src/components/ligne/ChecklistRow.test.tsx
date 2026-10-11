@@ -33,6 +33,7 @@ describe("ChecklistRow", () => {
     const { container } = render(<ChecklistRow {...base} done={false} onToggle={() => {}} />);
     const square = container.querySelector("[data-part='case'] > span");
     expect(square).toHaveClass("size-5.5", "border-2", "border-ink");
+    expect(square).toHaveClass("bg-transparent");
     expect(square?.querySelector("svg")).toBeNull();
   });
 
@@ -62,9 +63,16 @@ describe("ChecklistRow", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("rémunéré : « Lien rémunéré » en legende ink-soft à côté de « Réserver » ; rien une fois faite", () => {
+  it("rémunéré : « Lien rémunéré » en legende ink-soft à côté de « Réserver », sur la même ligne ; rien une fois faite", () => {
     const { rerender } = render(<ChecklistRow {...base} sponsored done={false} onToggle={() => {}} />);
-    expect(screen.getByText("Lien rémunéré")).toHaveClass("text-legende", "text-ink-soft");
+    const mention = screen.getByText("Lien rémunéré");
+    expect(mention).toHaveClass("text-legende", "text-ink-soft");
+    const link = screen.getByRole("link", { name: "Réserver" });
+    // Même conteneur en ligne (flex en rangée), juste avant le lien ; la mention décrit aussi le lien.
+    expect(mention.parentElement).toBe(link.parentElement);
+    expect(mention.parentElement).not.toHaveClass("flex-col");
+    expect(mention.nextElementSibling).toBe(link);
+    expect(link).toHaveAccessibleDescription("[Château d'Édimbourg] Lien rémunéré");
     rerender(<ChecklistRow {...base} sponsored done onToggle={() => {}} />);
     expect(screen.queryByText("Lien rémunéré")).not.toBeInTheDocument();
   });
