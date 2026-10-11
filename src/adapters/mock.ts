@@ -9,6 +9,7 @@ import {
   type Trip,
 } from "@/contracts";
 import {
+  EDIMBOURG_DEBLOQUE_TRIP_ID,
   EDIMBOURG_TRIP_ID,
   MOCK_ORGANIZATION_ID,
   edimbourg,
@@ -43,6 +44,15 @@ export const MOCK_REQUEST_CONTEXT: AdapterContext = { organizationId: MOCK_ORGAN
 export const MOCK_DEMO_TRIP = {
   ctx: { organizationId: MOCK_ORGANIZATION_ID } satisfies AdapterContext,
   tripId: EDIMBOURG_TRIP_ID,
+} as const;
+
+/**
+ * Même voyage simulé, débloqué (écran 6b, puis Séjour et Journée après « Débloquer »), pour la
+ * section « Démonstration » de la page d'accueil (spécification D1, D1-PO-3).
+ */
+export const MOCK_DEMO_UNLOCKED_TRIP = {
+  ctx: { organizationId: MOCK_ORGANIZATION_ID } satisfies AdapterContext,
+  tripId: EDIMBOURG_DEBLOQUE_TRIP_ID,
 } as const;
 
 /**

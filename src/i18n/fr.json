@@ -2,6 +2,31 @@
   "produit": {
     "promesse": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
   },
+  "accueil": {
+    "demo": {
+      "titre": "Démonstration",
+      "mention": "Données simulées. Les lieux entre crochets ne sont pas vérifiés.",
+      "voyage": "Voyage d'exemple : {destination}",
+      "liens": {
+        "presentation": {
+          "libelle": "Tes premières propositions",
+          "precision": "J'aime / Pas pour moi, avant de débloquer"
+        },
+        "suite": {
+          "libelle": "Suite du tri",
+          "precision": "Voyage débloqué"
+        },
+        "sejour": {
+          "libelle": "Séjour",
+          "precision": "Le programme jour par jour"
+        },
+        "jour": {
+          "libelle": "Jour 1",
+          "precision": "Étapes et trajets du jour"
+        }
+      }
+    }
+  },
   "ligne": {
     "tag": {
       "toReserve": "À réserver",
@@ -351,6 +376,42 @@
       "toastVerrouillee": "Étape verrouillée.",
       "toastDeverrouillee": "Verrou retiré.",
       "absente": "Cette étape n'est plus dans ce jour."
+    }
+  },
+  "etats": {
+    "accueil": "Retour à l'accueil",
+    "introuvable": {
+      "titreDocument": "Page introuvable · {produit}",
+      "titre": "Page introuvable",
+      "texte": "Cette page n'existe pas ou n'est plus disponible."
+    },
+    "erreur": {
+      "titreDocument": "Cette page n'a pas pu s'afficher · {produit}",
+      "titre": "Cette page n'a pas pu s'afficher",
+      "texte": "Réessaie dans un instant. Si le problème continue, reviens à l'accueil.",
+      "reessayer": "Réessayer"
+    },
+    "erreurCalcul": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+    "catalogue": {
+      "titre": "États transverses",
+      "intro": "Page de développement, désactivée en production. Chaque état est rendu par le composant réel, avec le texte de l'écran qui le possède.",
+      "exemple": "Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.",
+      "sections": {
+        "toConfirm": "Information incertaine",
+        "unconfirmed": "Événement non confirmé",
+        "offline": "Hors ligne",
+        "conflict": "Conflit",
+        "noOption": "Aucune option compatible",
+        "error": "Erreur de calcul",
+        "generating": "Jour en préparation",
+        "travel": "Trajet au-delà du rythme",
+        "introuvable": "Page introuvable",
+        "erreur": "Erreur inattendue"
+      },
+      "liens": {
+        "introuvable": "Ouvrir une adresse inexistante",
+        "erreur": "Ouvrir une page qui lève une erreur"
+      }
     }
   }
 }
