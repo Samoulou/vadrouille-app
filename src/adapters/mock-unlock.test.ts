@@ -46,7 +46,7 @@ describe("withSimulatedUnlock", () => {
     expect(JSON.stringify(trip)).not.toContain(EDIMBOURG_DEBLOQUE_TRIP_ID);
   });
 
-  it("positions du pendant réétiquetées et revalidées ; avant T6, aucune position (null)", async () => {
+  it("positions du pendant réétiquetées et revalidées ; avec T6, le voyage payé lit les positions dérivées", async () => {
     const maps = edimbourgCarte.map((map) => ({ ...map, tripId: EDIMBOURG_DEBLOQUE_TRIP_ID }));
     const { edimbourg, edimbourgDebloque } = await import("@/mocks/edimbourg");
     const base = createMockTripAdapter([
@@ -60,9 +60,17 @@ describe("withSimulatedUnlock", () => {
     expect(validateDayMap(trip.days[1]!, map!, EDIMBOURG_TRIP_ID)).toEqual([]);
     for (const dayMap of await reader.getTripMap(ctx, EDIMBOURG_TRIP_ID)) expect(dayMap.tripId).toBe(EDIMBOURG_TRIP_ID);
 
+    // Données par défaut (T6, décision 0017 § 13 ; bug n° 106) : le voyage payé passe par
+    // `deriveEdimbourgCarte` du pendant débloqué ; le J6 en préparation reste sans position.
     const plain = withSimulatedUnlock(mockTripAdapter, unlockedFor(new Set([`${MOCK_ORGANIZATION_ID}:${EDIMBOURG_TRIP_ID}`])), counterpartOf);
-    expect(await plain.getDayMap(ctx, EDIMBOURG_TRIP_ID, 2)).toBeNull();
-    expect(await plain.getTripMap(ctx, EDIMBOURG_TRIP_ID)).toEqual([]);
+    const plainTrip = (await plain.getTrip(ctx, EDIMBOURG_TRIP_ID))!;
+    const plainMap = await plain.getDayMap(ctx, EDIMBOURG_TRIP_ID, 1);
+    expect(plainMap?.tripId).toBe(EDIMBOURG_TRIP_ID);
+    expect(validateDayMap(plainTrip.days[0]!, plainMap!, EDIMBOURG_TRIP_ID)).toEqual([]);
+    expect(await plain.getDayMap(ctx, EDIMBOURG_TRIP_ID, 6)).toBeNull();
+    const plainMaps = await plain.getTripMap(ctx, EDIMBOURG_TRIP_ID);
+    expect(plainMaps.map((dayMap) => dayMap.dayIndex)).toEqual([1, 2, 3, 4, 5]);
+    for (const dayMap of plainMaps) expect(dayMap.tripId).toBe(EDIMBOURG_TRIP_ID);
   });
 
   it("voyage débloqué dans les données : jamais modifié ; autre organisation : rien", async () => {
