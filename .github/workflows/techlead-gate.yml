@@ -1,22 +1,84 @@
 name: techlead-gate
+# Porte de fusion (décisions 0019 § 3.3 et 0023 § 4). La décision est la fonction pure
+# scripts/ci/techlead-gate.mjs, testée dans tests/unit/ci/techlead-gate.test.ts.
+# - échec si changes-requested est posé, ou si techlead-approved manque ;
+# - chaque nouveau push (synchronize) retire techlead-approved, y compris un push du
+#   studio ou une fusion de main dans la branche (voulu par Samuel, 2026-10-11) ;
+# - libellés contradictoires ou revue consolidée d'un autre head : échec et retrait ;
+# - les PR qui ne touchent que STATUS.md, QUESTIONS.md ou docs/releases/ restent exemptées.
+# Un libellé retiré avec GITHUB_TOKEN ne déclenche pas de nouvelle exécution (unlabeled) :
+# rien ne s'appuie sur cette relance, l'exécution qui retire le libellé échoue elle-même.
 on:
   pull_request:
-    types: [opened, synchronize, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+concurrency:
+  group: techlead-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 0 }
       - id: diff
+        name: Détecter une PR exemptée (STATUS.md, QUESTIONS.md, docs/releases/)
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          git diff --name-only "origin/${BASE_REF}...HEAD" > files.txt
           if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/releases/)' files.txt; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.diff.outputs.code == 'true' && !contains(github.event.pull_request.labels.*.name, 'techlead-approved')
+      - name: Lire les libellés et les revues consolidées
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CODE: ${{ steps.diff.outputs.code }}
         run: |
-          echo "Validation du Tech Lead manquante (libellé techlead-approved)."
-          exit 1
+          # Libellés lus maintenant, pas ceux de l'événement : une revue peut avoir retiré
+          # le libellé opposé entre l'événement et l'exécution.
+          gh api "repos/$REPO/issues/$PR/labels" --paginate --jq '.[].name' \
+            | jq -R . | jq -s . > labels.json
+          {
+            gh api "repos/$REPO/issues/$PR/comments" --paginate \
+              --jq '.[] | {body: (.body // ""), createdAt: .created_at}'
+            gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+              --jq '.[] | {body: (.body // ""), createdAt: .submitted_at}'
+          } | jq -s . > reviews.json
+          jq -n --arg action "$ACTION" --arg head "$HEAD_SHA" --argjson code "$CODE" \
+            --slurpfile labels labels.json --slurpfile reviews reviews.json \
+            '{action: $action, headSha: $head, code: $code, labels: $labels[0], reviews: $reviews[0]}' \
+            > gate-input.json
+      - id: decide
+        name: Décider
+        run: |
+          node scripts/ci/techlead-gate.mjs gate-input.json > decision.json
+          cat decision.json
+          echo "remove=$(jq -r .removeApproval decision.json)" >> "$GITHUB_OUTPUT"
+      - if: steps.decide.outputs.remove == 'true'
+        name: Retirer techlead-approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # 404 si une exécution concurrente l'a déjà retiré : rien à commenter.
+          if gh api -X DELETE "repos/$REPO/issues/$PR/labels/techlead-approved" > /dev/null; then
+            jq -r '"techlead-gate : techlead-approved retiré.\n\n" + (.messages | map("- " + .) | join("\n"))' \
+              decision.json > comment.md
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+          fi
+      - name: Verdict
+        run: |
+          jq -r '.warnings[] | "::warning::" + .' decision.json
+          jq -r '.messages[]' decision.json
+          if [ "$(jq -r .pass decision.json)" != "true" ]; then exit 1; fi
