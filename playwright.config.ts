@@ -37,6 +37,9 @@ export default defineConfig({
     { name: "e2e", testDir: "tests/e2e", testMatch: /.*\.e2e\.spec\.ts$/ },
     { name: "a11y", testDir: "tests/e2e", testMatch: /.*\.a11y\.spec\.ts$/ },
     { name: "visual", testDir: "tests/visual", testMatch: /.*\.visual\.spec\.ts$/ },
+    // Mesure Lighthouse (décision 0022 § 1 et § 2) : `pnpm test:perf`, hors de `pnpm verify`, un seul worker,
+    // sans nouvelle tentative (elle cacherait un score instable).
+    { name: "perf", testDir: "tests/perf", testMatch: /.*\.perf\.spec\.ts$/, retries: 0 },
   ],
   webServer: {
     command,
