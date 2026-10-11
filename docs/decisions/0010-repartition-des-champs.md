@@ -1,0 +1,41 @@
+# 0010 — Répartition des champs des contrats : stockés, chargés à la demande, calculés (Q14), hors données dérivées de Google
+
+Statut : proposé · Date : 2026-10-08 (révisée après la revue Tech Lead et Sécurité de la PR #27), reprise le 2026-10-11 dans B0a (découpage de #27, Q43) sans ce qui dépend de Q5 · Décideur : Tech Lead (architecture des contrats, Q14 déléguée) · Définitif sans veto de Samuel avant le 2026-10-13 ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio ». Cette décision **ne tranche aucune question juridique** : le statut des données dérivées de Google (Q5, et à sa suite Q29, Q34, Q38, Q44) et les photos (Q6) restent à Samuel.
+
+## Contexte
+Q14 : certains champs de `src/contracts` peuvent venir de Google (`Stop.name`, `Stop.meta`, `Stop.verifiedAt`) alors que seul l'identifiant de lieu est stockable (cadrage § 6.5, `CLAUDE.md`) ; d'autres sont des textes d'interface (`Day.title`, `Proposal.context`) alors qu'aucun texte d'interface n'est stocké (handover front § 9). PO-2 et PO-6 demandent au Tech Lead la forme de deux contrats. Depuis #27, les décisions 0013, 0015, 0016, 0020 et 0021 ont ajouté des champs et des contrats (`Proposal.category`, `DayMap`, `openMeal`, `Stop.commitment`, `Day.surprise`, paiement, `ApiError`, préférences) : le tableau du handover les couvre.
+
+La seconde revue Sécurité de #27 (points 1 à 3) a montré que le « défaut prudent » sur les données dérivées de Google (verdicts, dates de contrôle, durées de trajet, codes tirés d'horaires) est lui-même une question juridique. Sur consigne de Samuel (Q43), ces champs sont retirés de cette décision et listés dans la section « En attente de Q5 » du handover.
+
+## Décision
+**Catégories** (une seule par champ ; tableau complet au § 5 du handover back-end, 137 clés ; 7 clés « En attente de Q5 ») :
+- *stocké* : contenu maison (nom et résumé issus de notre recherche web, choix de l'utilisateur, sortie du moteur conservée dans la version, paiement enregistré) ou identifiant de lieu ;
+- *chargé à la demande* : contenu Google obtenu côté serveur à l'affichage, jamais persisté, affiché avec la carte Google ou la mention « Données de lieux : Google » ;
+- *calculé* : à la lecture, par le moteur (`src/domain`, appelé par le serveur), par le serveur (configuration, identifiants) ou par l'interface (formatage) ; jamais persisté.
+
+**Règle stricte en attendant Q5.** Aucune donnée dérivée d'une réponse Google n'a de colonne en base ni de champ dans l'instantané d'une version. C'est la règle de `CLAUDE.md` (« stocker autre chose que l'identifiant d'un lieu Google : jamais »), pas une interprétation juridique ; c'est la réponse de Samuel qui dira ce qui peut s'y ajouter. Tests `schéma: aucune colonne dérivée de Google` et `versions: l'instantané ne contient ni durée de trajet ni date de contrôle`.
+
+**Principes**
+1. `Stop.name` (et `SurpriseIdea.name`) est le nom trouvé par notre recherche web (source citée) ou saisi par la personne : stocké. **Il n'est jamais écrit depuis le `displayName` de Google**, y compris pour un lieu ajouté par la recherche (`PlaceSearchResult`, décision 0016 § 4.3 et § 12) : le nom Google y est seulement *chargé à la demande* et affiché avec l'attribution ; l'opération `add` de `TripPatch` porte `placeId` et un nom saisi par la personne (F7-PO-10), jamais un nom recopié par le serveur depuis Google. Test de B11 : `révision: aucun nom Google écrit dans Stop.name`. L'affichage du nom Google dans la liste de résultats suit Q90 (Samuel).
+2. `Stop.meta` et `SurpriseIdea.meta` deviennent des champs calculés par l'interface à partir de faits structurés (`StopFacts` : durée, coût estimé, secteur) ; `Day.title`, `Day.weekday` et `Proposal.weekday` sont calculés par l'interface à partir de `date` ; `Proposal.context` est calculé par l'interface à partir de `ProposalNeighbours`.
+3. Positions : `DayMap` (décision 0013 § 1) est *chargé à la demande* pour la carte Google, jamais persisté par le navigateur. Les coordonnées ne figurent dans aucun contrat stocké, aucune version, aucun journal ni aucun état de workflow. Leur cache côté serveur attend Q5 et Q34.
+4. `Proposal.photoUrl` : chargé à la demande, **provisoire, suit Q6**.
+5. Offre : `Offer` et `OfferConfig` sont *calculés* par le serveur depuis `src/server/config/offer.ts` (décision 0020) ; le paiement enregistre l'instantané du prix dans `checkouts` (décision 0020 § 1.3).
+6. **Instantané d'une version** : `TripSnapshotSchema` est dérivé de `TripSchema` par omission des champs calculés et chargés à la demande (`.omit()` de Zod sur `TripSchema` et sur les schémas imbriqués dérivés, aucune copie de champ). À la lecture, le serveur recompose le `Trip` complet et le valide avec `TripSchema`. Écart signalé avec la spécification B0 (« instantané validé par `TripSchema` ») : la version stockée est validée par le schéma dérivé, la réponse par `TripSchema`. Les champs « En attente de Q5 » n'entrent pas dans l'instantané tant que Samuel n'a pas répondu ; B2 les omet et les recompose à la lecture selon la forme que la partie Q5 fixera.
+
+**PO-2 — moment d'un élément de la liste** : `ChecklistItem.when` devient un objet `ChecklistMoment`, union discriminée par `type` :
+- `{ type: "deadline", date: IsoDate }` (date limite) ;
+- `{ type: "beforeDeparture" }` ;
+- `{ type: "tripDay", day: number }` (1 = J1 ; l'interface affiche « à l'arrivée » pour le J1).
+Aucun libellé dans les données.
+
+**PO-6 — aperçu incomplet** : nouveau contrat `PreviewSlot`, union discriminée par `type` :
+- `{ type: "proposal", proposal: Proposal }` ;
+- `{ type: "noOption", day: number, time: Time, kind: "activity" | "meal" }`.
+L'aperçu est une liste ordonnée de `PreviewSlot` (8 au plus) lue par `TripAdapter.listPreviewSlots` ; `GenerationStatus` porte les compteurs `expected` et `ready` (décision 0017 § 2.4). Aucun texte d'interface ; l'état « aucune option compatible » est affiché par l'interface (`StatusBanner noOption`).
+
+## Conséquences
+- Les évolutions de contrats (§ 4 du handover) sont appliquées par la tâche B2 avec la mise à jour de `src/mocks/edimbourg.ts` et des composants concernés.
+- Tests de B2 : `contrats: chaque champ a une seule catégorie` (le script du critère § 5 de B0, rejoué sur les contrats modifiés ; les clés « En attente de Q5 » sont comptées à part jusqu'à la réponse de Samuel) ; `contrats: ChecklistMoment et PreviewSlot sans texte d'interface`.
+- Tests de B1 et B2 : `schéma: aucune colonne dérivée de Google` et `versions: l'instantané ne contient ni durée de trajet ni date de contrôle`.
+- La partie Q5 (catégorie de `Stop.verifiedAt`, `SurpriseIdea.verifiedAt`, `Stop.exceptions`, `Segment.minutes`, `Day.travelMinutes`, `Change[segment].before`, `Change[segment].after`) amendera cette décision quand Samuel aura répondu.
