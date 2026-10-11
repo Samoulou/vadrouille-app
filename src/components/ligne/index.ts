@@ -6,6 +6,7 @@ export {
   DayLine,
   segmentLabel,
   type DayLineFreeTimeProps,
+  type DayLineOpenMealProps,
   type DayLineProps,
   type DayLineSegmentProps,
   type DayLineStopProps,
