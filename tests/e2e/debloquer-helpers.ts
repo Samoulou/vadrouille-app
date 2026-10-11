@@ -27,10 +27,15 @@ export interface Scope {
   control(body: Record<string, unknown>): Promise<void>;
 }
 
+/** Ajoute l'en-tête de la portée `name` à chaque requête du contexte vers l'origine de l'application. */
+export async function sendScope(context: BrowserContext, baseURL: string, name: string) {
+  await context.route(`${baseURL}/**`, (route) => route.continue({ headers: { ...route.request().headers(), [HEADER]: name } }));
+}
+
 /** Portée explicite pour tout le contexte (tous ses onglets), remise à zéro au 2026-08-01T12:00:00+02:00. */
 export async function useScope(context: BrowserContext, baseURL: string): Promise<Scope> {
   const name = `f9a-${randomUUID()}`;
-  await context.route(`${baseURL}/**`, (route) => route.continue({ headers: { ...route.request().headers(), [HEADER]: name } }));
+  await sendScope(context, baseURL, name);
   const request = context.request;
   const control = async (body: Record<string, unknown>) => {
     const response = await request.post(`${baseURL}${SIM}`, { headers: { [HEADER]: name }, data: body });

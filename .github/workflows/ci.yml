@@ -28,6 +28,18 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - if: steps.diff.outputs.code == 'true'
         run: pnpm verify
+      # Mesure Lighthouse (décision 0022 § 1 et § 2) : réutilise le build de `pnpm verify`, aucun service externe.
+      - if: steps.diff.outputs.code == 'true'
+        name: Mesurer avec Lighthouse
+        run: E2E_SKIP_BUILD=1 pnpm test:perf
+      - if: always() && steps.diff.outputs.code == 'true'
+        name: Envoyer les rapports Lighthouse en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: lighthouse-report/
+          if-no-files-found: ignore
+          retention-days: 7
       - if: failure() && steps.diff.outputs.code == 'true'
         name: Envoyer les résultats de test en artefact
         uses: actions/upload-artifact@v4
