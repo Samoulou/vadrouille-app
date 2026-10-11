@@ -7,6 +7,9 @@ export const VIEWPORT_HEIGHT = 844;
 export const HEIGHTS = { 0.25: 0.25 * VIEWPORT_HEIGHT, 0.55: 0.55 * VIEWPORT_HEIGHT, 0.92: 0.92 * VIEWPORT_HEIGHT } as const;
 
 export const sheet = (page: Page) => page.getByRole("region", { name: "Programme", exact: true });
+/** Panneau quand la fiche étape est ouverte (région « Fiche étape », F5b). */
+export const fiche = (page: Page) => page.getByRole("region", { name: "Fiche étape", exact: true });
+export const ficheTitle = (page: Page) => fiche(page).getByRole("heading", { level: 1 });
 export const handle = (page: Page) => sheet(page).locator("[data-part='poignee']");
 export const body = (page: Page) => sheet(page).locator("[data-part='contenu']");
 export const dayList = (page: Page) => page.locator("#liste-etapes");
@@ -14,15 +17,16 @@ export const listStops = (page: Page) => dayList(page).locator("a[data-part='arr
 export const dayMarkers = (page: Page, n = 2) =>
   page.getByRole("region", { name: `Carte du jour ${n}` }).getByRole("button", { name: /^Étape \d+ :/ });
 
-export async function sheetHeight(page: Page): Promise<number> {
-  return (await sheet(page).boundingBox())?.height ?? 0;
+export async function sheetHeight(page: Page, region: "Programme" | "Fiche étape" = "Programme"): Promise<number> {
+  const target = region === "Programme" ? sheet(page) : fiche(page);
+  return (await target.boundingBox())?.height ?? 0;
 }
 
-/** Attend que le panneau soit posé à `part` de la fenêtre (2 px près). */
-export async function expectSheetAt(page: Page, part: keyof typeof HEIGHTS) {
-  await expect.poll(() => sheetHeight(page), { timeout: 3_000 }).toBeGreaterThan(HEIGHTS[part] - 2);
-  await expect.poll(() => sheetHeight(page), { timeout: 3_000 }).toBeLessThan(HEIGHTS[part] + 2);
-  await expect(sheet(page)).toHaveAttribute("data-snap", String(part));
+/** Attend que le panneau (nommé `region`) soit posé à `part` de la fenêtre (2 px près). */
+export async function expectSheetAt(page: Page, part: keyof typeof HEIGHTS, region: "Programme" | "Fiche étape" = "Programme") {
+  await expect.poll(() => sheetHeight(page, region), { timeout: 3_000 }).toBeGreaterThan(HEIGHTS[part] - 2);
+  await expect.poll(() => sheetHeight(page, region), { timeout: 3_000 }).toBeLessThan(HEIGHTS[part] + 2);
+  await expect(region === "Programme" ? sheet(page) : fiche(page)).toHaveAttribute("data-snap", String(part));
 }
 
 /** Ouvre une page du voyage et attend le panneau ; sur /dev, attend aussi la carte simulée cadrée. */

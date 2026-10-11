@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 
 import { format, messages } from "@/i18n";
 
-import { JourneePanel } from "./JourneePanel";
+import { findFicheTarget } from "./fiche";
+import { JourneeView } from "./JourneeView";
 import { dayFromParam, loadTrip } from "./load";
-import { tripRoutes, type TripRoutesBase } from "./routes";
+import type { TripRoutesBase } from "./routes";
 import { SejourPanel } from "./SejourPanel";
 import { TripShell } from "./TripShell";
 
@@ -35,11 +36,16 @@ export async function SejourScreen({ tripId }: { tripId: string }) {
   return <SejourPanel trip={data.trip} />;
 }
 
-export async function JourneeScreen({ tripId, n, base }: { tripId: string; n: string; base: TripRoutesBase }) {
+/**
+ * Écran 12 « Journée » et, avec `?etape=`, écran 13 « Fiche étape » : la page valide `n` (404 sinon) ; le
+ * contenu du panneau est rendu par `JourneeView` depuis le contexte du voyage (programme, fiche), et ses
+ * adresses par le module `routes.ts` que `TripShell` construit pour la même base.
+ */
+export async function JourneeScreen({ tripId, n }: { tripId: string; n: string }) {
   const data = await loadTrip(tripId);
   const day = data ? dayFromParam(data.trip, n) : null;
   if (!data || !day) notFound();
-  return <JourneePanel day={day} routes={tripRoutes(base, data.trip.id)} />;
+  return <JourneeView />;
 }
 
 /** Titre du document du Séjour : « {destination} · Séjour » (F5-PO-1). */
@@ -48,11 +54,17 @@ export async function sejourMetadata(tripId: string): Promise<Metadata> {
   return data ? { title: format(t.sejour, { destination: data.trip.destination }), robots: ROBOTS } : { robots: ROBOTS };
 }
 
-/** Titre du document de la Journée : « {destination} · Jour {n} » (F5-PO-1). */
-export async function journeeMetadata(tripId: string, n: string): Promise<Metadata> {
+/**
+ * Titre du document de la Journée : « {destination} · Jour {n} », et, fiche ouverte, « {nom de l'étape} ·
+ * Jour {n} » (F5-PO-1). Un `etape` absent du jour garde le titre du jour.
+ */
+export async function journeeMetadata(tripId: string, n: string, etape?: string | string[]): Promise<Metadata> {
   const data = await loadTrip(tripId);
   const day = data ? dayFromParam(data.trip, n) : null;
-  return data && day
-    ? { title: format(t.jour, { destination: data.trip.destination, n: day.index }), robots: ROBOTS }
-    : { robots: ROBOTS };
+  if (!data || !day) return { robots: ROBOTS };
+  const fiche = findFicheTarget(day, Array.isArray(etape) ? etape[0] : etape);
+  const title = fiche
+    ? format(t.etape, { name: fiche.stop.name, n: day.index })
+    : format(t.jour, { destination: data.trip.destination, n: day.index });
+  return { title, robots: ROBOTS };
 }
