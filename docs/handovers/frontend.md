@@ -277,6 +277,7 @@ Numéros = titres des écrans sur la page « Direction Ligne ». « W » = écra
 - **14 :** raisons proposées dans cet ordre : Pas mon style, Trop chargé, Trop cher, Trop loin, Autre raison ; réponse depuis la réserve < 5 s avec squelette ; au-delà, message « On cherche autour de … » avec « Arrêter » ; après « Appliquer », retour à la journée, étapes modifiées surlignées 2 s, `UndoToast` « Modifié. Annuler ».
 - **Déplacer :** toujours disponible sans glisser ; jours complets désactivés avec la mention « complet ».
 - **15 :** « Enregistré pour le hors-ligne à HH:MM » visible ; liste utilisable sans réseau.
+  *Note (2026-10-11) : critère reporté « Après le MVP » par la décision de Samuel (Q137, Q139). Au MVP, l'écran 15 a le bandeau hors ligne de l'écran ouvert et la page de repli, sans copie du programme sur l'appareil : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 
 ---
 
@@ -483,7 +484,7 @@ pnpm test:visual    # captures comparées à tests/visual
 
 **Budgets :** Lighthouse mobile ≥ 90 en performance et 100 en accessibilité sur `/voyages/[id]` avec données simulées ; JavaScript initial de la route Journée < 200 Ko compressé hors carte.
 
-**Scénarios Playwright** (reprennent le plan de test du Dossier UX) : créer un voyage sans hôtel ; corriger le brief ; trier en écartant deux musées et répondre à la question ; débloquer ; remplacer Dean Village sans toucher au dîner ; trouver la liste à réserver ; trouver la prochaine étape le jour J, y compris hors ligne.
+**Scénarios Playwright** (reprennent le plan de test du Dossier UX) : créer un voyage sans hôtel ; corriger le brief ; trier en écartant deux musées et répondre à la question ; débloquer ; remplacer Dean Village sans toucher au dîner ; trouver la liste à réserver ; trouver la prochaine étape le jour J, y compris hors ligne. *Note (2026-10-11) : la partie « hors ligne » de ce scénario (ouverture sans réseau) est reportée « Après le MVP » (Q137, Q139) ; au MVP, seul le réseau perdu écran ouvert est testé : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 
 ---
 
