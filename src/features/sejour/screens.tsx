@@ -5,16 +5,19 @@ import type { ReactNode } from "react";
 import { format, messages } from "@/i18n";
 
 import { findFicheTarget } from "./fiche";
-import { JourneeView } from "./JourneeView";
 import { dayFromParam, loadTrip } from "./load";
 import type { TripRoutesBase } from "./routes";
-import { SejourPanel } from "./SejourPanel";
+import { SejourOriginProvider } from "./SejourOrigin";
 import { TripShell } from "./TripShell";
 
 /**
  * Composants serveur partagés par les routes `/voyages/…` et leurs pages de développement `/dev/voyages/…`
  * (décision 0015 § 1 et § 5.3) : lecture par l'adaptateur dans le contexte de la requête, `notFound()`
  * hors organisation ou hors limites. Aucune de ces fonctions n'importe la carte simulée.
+ *
+ * Ce module, importé par la mise en page du voyage, n'importe le contenu d'aucun écran : chaque page importe
+ * le sien (`screen-sejour.tsx`, `screen-journee.tsx`). Sinon le JavaScript du Séjour (mesure comprise) serait
+ * chargé par la Journée, et celui de la Journée par le Séjour (budget du handover § 14, décision 0016 § 3).
  */
 
 const t = messages.sejour.titreDocument;
@@ -25,27 +28,9 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   if (!data) notFound();
   return (
     <TripShell trip={data.trip} maps={data.maps} base={base}>
-      {children}
+      <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>
   );
-}
-
-export async function SejourScreen({ tripId }: { tripId: string }) {
-  const data = await loadTrip(tripId);
-  if (!data) notFound();
-  return <SejourPanel trip={data.trip} />;
-}
-
-/**
- * Écran 12 « Journée » et, avec `?etape=`, écran 13 « Fiche étape » : la page valide `n` (404 sinon) ; le
- * contenu du panneau est rendu par `JourneeView` depuis le contexte du voyage (programme, fiche), et ses
- * adresses par le module `routes.ts` que `TripShell` construit pour la même base.
- */
-export async function JourneeScreen({ tripId, n }: { tripId: string; n: string }) {
-  const data = await loadTrip(tripId);
-  const day = data ? dayFromParam(data.trip, n) : null;
-  if (!data || !day) notFound();
-  return <JourneeView />;
 }
 
 /** Titre du document du Séjour : « {destination} · Séjour » (F5-PO-1). */

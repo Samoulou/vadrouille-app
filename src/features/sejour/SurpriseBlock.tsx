@@ -10,7 +10,8 @@ import { messages } from "@/i18n";
 const t = messages.sejour.surprise;
 
 /**
- * « Surprends-moi » (écran 12, cadrage § 3.4 ; F5-PO-5) : dévoile l'idée du jour sous le bouton, sans
+ * « Surprends-moi » (écran 12, cadrage § 3.4 ; F5-PO-5) : dévoile l'idée du jour sous le bouton, précédée de
+ * la mention « Une idée pour ta journée, pas encore dans ton programme. » (décision 0018 § 4), sans
  * l'ajouter au programme (« Ajouter à ma journée » viendra avec F7). Le focus reste sur le bouton ;
  * l'idée n'est gardée qu'en mémoire.
  */
@@ -26,6 +27,9 @@ export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
       <div id={panelId} className="flex w-full flex-col gap-2">
         {open ? (
           <>
+            <p data-part="surprise-mention" className="text-corps-s text-ink-soft">
+              {t.mention}
+            </p>
             <h3 className="text-arret font-bold text-ink">{idea.name}</h3>
             <p className="text-corps-s text-ink-soft">{idea.meta}</p>
             <ReasonBlock

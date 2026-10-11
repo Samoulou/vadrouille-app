@@ -96,3 +96,32 @@ export function pathToLabel(path: { segment: Segment; origin?: string }): string
     ? segment
     : format(messages.sejour.fiche.pourYAllerDepuis, { segment, origin: path.origin });
 }
+
+const ts = messages.sejour.sejour;
+
+/**
+ * Ligne de budget du Séjour (F5-PO-3) : « Budget estimé : environ {total} CHF par personne », total des
+ * `budgetPerPerson` définis, suivi de « (sans le jour {n}) » pour chaque jour sans budget ; `null` si aucun
+ * jour n'a de budget (la ligne n'est pas rendue).
+ */
+export function tripBudgetLine(days: readonly Pick<Day, "index" | "budgetPerPerson">[]): string | null {
+  const budgeted = days.filter((day) => day.budgetPerPerson !== undefined);
+  if (budgeted.length === 0) return null;
+  const total = budgeted.reduce((sum, day) => sum + (day.budgetPerPerson ?? 0), 0);
+  const missing = days.filter((day) => day.budgetPerPerson === undefined).map((day) => format(ts.budgetSansJour, { n: day.index }));
+  return [format(ts.budget, { montant: formatMontant(total) }), ...missing].join(" ");
+}
+
+/** Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet ». */
+export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
+  const count = day.items.filter((item) => item.type === "stop").length;
+  const etapes = count === 1 ? ts.jourParJour.etapes.un : format(ts.jourParJour.etapes.plusieurs, { n: count });
+  return format(ts.jourParJour.resume, { etapes, duree: formatDuree(day.travelMinutes) });
+}
+
+/** Événements de tous les jours (`Day.events`) pour « Pendant ton séjour » : par jour, puis par heure de début. */
+export function tripEvents<D extends Pick<Day, "index" | "events">>(days: readonly D[]): { day: D; event: Stop }[] {
+  return [...days]
+    .sort((a, b) => a.index - b.index)
+    .flatMap((day) => [...day.events].sort((a, b) => a.start.localeCompare(b.start)).map((event) => ({ day, event })));
+}

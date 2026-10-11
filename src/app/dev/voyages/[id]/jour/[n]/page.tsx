@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { devPagesEnabled } from "@/dev/flags";
-import { JourneeScreen, journeeMetadata } from "@/features/sejour/screens";
+import { JourneeScreen } from "@/features/sejour/screen-journee";
+import { journeeMetadata } from "@/features/sejour/screens";
 
 export const dynamic = "force-dynamic";
 

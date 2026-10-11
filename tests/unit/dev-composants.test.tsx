@@ -88,6 +88,27 @@ describe("/dev/composants", () => {
     expect(within(section).getByRole("link", { name: "Idées" })).toHaveAttribute("href", "#idees-14:00-18:30");
   });
 
+  it("montre la section Programme de F5c : DestinationPlate dans les 4 couleurs, ChecklistRow à faire, faite, sans lien, rémunérée", () => {
+    const { container } = render(<ComposantsShowcase />);
+    const section = screen.getByRole("region", { name: "Programme" });
+    const pg = messages.dev.composants.exemples.programme;
+    expect(
+      Array.from(container.querySelectorAll("[data-destination-plate]")).map((plate) => plate.getAttribute("data-destination-plate")),
+    ).toEqual(["bruyere", "azulejo", "ocre", "granit"]);
+    for (const name of Object.values(pg.plaque.noms)) expect(within(section).getByText(name)).toBeInTheDocument();
+    const cl = pg.checklist;
+    expect(within(section).getByRole("button", { name: cl.aFaire.label })).toHaveAttribute("aria-pressed", "false");
+    const faite = within(section).getByRole("button", { name: cl.faite.label });
+    expect(faite).toHaveAttribute("aria-pressed", "true");
+    expect(within(faite.closest("li")!).queryByRole("link")).toBeNull();
+    expect(within(within(section).getByRole("button", { name: cl.sansLien.label }).closest("li")!).queryByRole("link")).toBeNull();
+    const remuneree = within(section).getByRole("button", { name: cl.remuneree.label }).closest("li")!;
+    expect(within(remuneree).getByText("Lien rémunéré")).toBeInTheDocument();
+    // Cliquable : la case bascule.
+    fireEvent.click(within(section).getByRole("button", { name: cl.aFaire.label }));
+    expect(within(section).getByRole("button", { name: cl.aFaire.label })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("montre le bouton bascule relâché, enfoncé et enfoncé avec focus, sans icône", () => {
     render(<ComposantsShowcase />);
     const section = screen.getByRole("region", { name: "Button" });

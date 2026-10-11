@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
-import { SejourScreen, sejourMetadata } from "@/features/sejour/screens";
+import { devPagesEnabled } from "@/dev/flags";
+import { SejourScreen } from "@/features/sejour/screen-sejour";
+import { sejourMetadata } from "@/features/sejour/screens";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +16,5 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 /** Écran 11 « Séjour » (spécification F5). */
 export default async function SejourPage({ params }: { params: Params }) {
   const { id } = await params;
-  return <SejourScreen tripId={id} />;
+  return <SejourScreen tripId={id} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

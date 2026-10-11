@@ -63,6 +63,25 @@ describe("analytics: événements deck sans donnée personnelle", () => {
   });
 });
 
+describe("analytics: checklist_item_done (spécification F5, F5c)", () => {
+  it("accepte l'événement sans propriété", () => {
+    expect(AnalyticsEventSchema.safeParse({ name: "checklist_item_done", properties: {} }).success).toBe(true);
+  });
+
+  it.each([
+    ["itemId", "check-chateau"],
+    ["label", "[Château d'Édimbourg]"],
+    ["placeId", "mock_place_chateau"],
+    ["done", true],
+  ])("refuse la propriété %s", (key, value) => {
+    expect(AnalyticsEventSchema.safeParse({ name: "checklist_item_done", properties: { [key]: value } }).success).toBe(false);
+  });
+
+  it("refuse l'événement sans objet properties", () => {
+    expect(AnalyticsEventSchema.safeParse({ name: "checklist_item_done" }).success).toBe(false);
+  });
+});
+
 describe("analytics: enregistreurs", () => {
   afterEach(() => {
     vi.restoreAllMocks();

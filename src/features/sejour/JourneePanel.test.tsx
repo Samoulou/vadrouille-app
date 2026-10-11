@@ -88,6 +88,15 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(4);
   });
 
+  it("lignes d'événements : nom et métadonnées en ink-2 sur muted (décision 0018 § 3)", () => {
+    render(<JourneePanel day={day(2)} routes={routes} />);
+    const concert = within(screen.getByRole("region", { name: "Événements du jour" })).getByRole("link", { name: /Concert d'orgue/ });
+    expect(concert).toHaveClass("bg-muted");
+    expect(within(concert).getByText("[Concert d'orgue à St Giles]")).toHaveClass("text-ink-2");
+    expect(within(concert).getByText(day(2).events[0]!.meta)).toHaveClass("text-ink-2");
+    expect(within(concert).getByText("18:00 – 19:00")).toHaveClass("text-ink-2");
+  });
+
   it("événement sans fin : l'heure de début seule", () => {
     expect(eventRange({ start: "18:00" })).toBe("18:00");
     expect(eventRange({ start: "18:00", end: "19:00" })).toBe("18:00 – 19:00");
@@ -103,6 +112,11 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     expect(button).toHaveFocus();
+    // Mention de la décision 0018 § 4, avant le nom : l'idée n'est pas ajoutée au programme.
+    const mention = within(panel).getByText("Une idée pour ta journée, pas encore dans ton programme.");
+    expect(mention).toBeVisible();
+    expect(mention).toHaveClass("text-corps-s", "text-ink-soft");
+    expect(mention.compareDocumentPosition(within(panel).getByRole("heading", { level: 3 }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(within(panel).getByRole("heading", { level: 3 })).toHaveTextContent("[Circus Lane]");
     expect(within(panel).getByText("[Stockbridge, 20 min, gratuit]")).toBeInTheDocument();
     expect(within(panel).getByText("Pourquoi pour toi")).toBeInTheDocument();

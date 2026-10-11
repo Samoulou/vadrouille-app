@@ -104,6 +104,15 @@ export const PaymentFailedEventSchema = z.strictObject({
   }),
 });
 
+/**
+ * Ligne de « À faire avant de partir » passée de « à faire » à « faite » (handover § 12, spécification F5,
+ * F5c) : aucune propriété, ni identifiant ni nom de la ligne. Décocher n'envoie rien.
+ */
+export const ChecklistItemDoneEventSchema = z.strictObject({
+  name: z.literal("checklist_item_done"),
+  properties: z.strictObject({}),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -113,6 +122,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   PaymentStartedEventSchema,
   PaymentSucceededEventSchema,
   PaymentFailedEventSchema,
+  ChecklistItemDoneEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

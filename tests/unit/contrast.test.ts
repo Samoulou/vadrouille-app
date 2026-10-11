@@ -47,6 +47,12 @@ const TEXT_PAIRS: [ColorToken, ColorToken][] = [
   ["ink", "raised"], // Button secondaire, IconButton, Chip, OtpInput
   ["ink-2", "muted"], // StatusBanner, SegmentedControl, bloc temps libre (F3)
   ["ink", "muted"], // lien « Idées » du temps libre (F3)
+  ["on-line", "dest-bruyere"], // DestinationPlate (F5c), chacune des 4 couleurs de la palette fermée
+  ["on-line", "dest-azulejo"],
+  ["on-line", "dest-ocre"],
+  ["on-line", "dest-granit"],
+  ["line", "page"], // lien « Réserver » de ChecklistRow (F5c)
+  ["on-line", "ink"], // coche de la case faite de ChecklistRow (F5c)
 ];
 
 describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {
@@ -68,6 +74,10 @@ describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {
 
   it("border-control sur raised (cases du code) : au moins 3:1", () => {
     expect(contrast("border-control", "raised")).toBeGreaterThanOrEqual(CONTROL_BORDER);
+  });
+
+  it("ink sur page : au moins 3:1 pour le contour de la case de ChecklistRow (F5c)", () => {
+    expect(contrast("ink", "page")).toBeGreaterThanOrEqual(CONTROL_BORDER);
   });
 
   it("line sur page : au moins 3:1 pour l'anneau de focus", () => {

@@ -264,6 +264,7 @@ export default defineConfig([
       "src/components/ligne/Sheet.tsx",
       "src/components/ligne/sheet-model.ts",
       "src/components/ligne/ReasonBlock.tsx",
+      "src/components/ligne/ChecklistRow.tsx",
       "src/lib/pointer.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}"],

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import {
   Button,
+  ChecklistRow,
   Chip,
   Counter,
   DayBadge,
@@ -11,6 +12,7 @@ import {
   DayTabs,
   DeckCard,
   DeckProgress,
+  DestinationPlate,
   IconButton,
   IconPartager,
   IconRetour,
@@ -26,7 +28,7 @@ import {
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
-import type { DayLineItem, Proposal, Stop, Weekday } from "@/contracts";
+import type { DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
 import { format, messages } from "@/i18n";
 
 const t = messages.dev.composants;
@@ -140,6 +142,37 @@ const SHEET_DEMOS = [
   { snap: 0.55, label: pg.panneaux.moyen },
   { snap: 0.92, label: pg.panneaux.grand },
 ] as const;
+
+/** Les quatre couleurs de la palette fermée des plaques (DestinationPlate/README). */
+const DEST_COLORS: Trip["destinationColor"][] = ["bruyere", "azulejo", "ocre", "granit"];
+
+/** ChecklistRow dans ses quatre états, cliquable (F5c) : à faire, faite, sans lien, lien rémunéré. */
+function ChecklistDemo() {
+  const cl = pg.checklist;
+  const [done, setDone] = useState<Record<string, boolean>>({ aFaire: false, faite: true, sansLien: false, remuneree: false });
+  const rows = [
+    { key: "aFaire", ...cl.aFaire, bookingUrl: "#reserver-distillerie", sponsored: false },
+    { key: "faite", ...cl.faite, bookingUrl: "#reserver-tattoo", sponsored: false },
+    { key: "sansLien", ...cl.sansLien, bookingUrl: undefined, sponsored: false },
+    { key: "remuneree", ...cl.remuneree, bookingUrl: "#reserver-assurance", sponsored: true },
+  ];
+  return (
+    <ul className="w-full">
+      {rows.map(({ key, label, when, bookingUrl, sponsored }) => (
+        <li key={key} className="border-b border-hairline last:border-b-0">
+          <ChecklistRow
+            label={label}
+            when={when}
+            done={done[key] ?? false}
+            bookingUrl={bookingUrl}
+            sponsored={sponsored}
+            onToggle={(next) => setDone((current) => ({ ...current, [key]: next }))}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Fond de carte des marqueurs de démonstration (StopMarker/preview.html). */
 const MAP_CELL = "flex h-14 w-16 items-center justify-center rounded-control bg-map-land";
@@ -383,6 +416,14 @@ export function ComposantsShowcase() {
         </State>
         <State label={t.etats.bandeauTrajet}>
           <StatusBanner kind="travel" message={ex.bandeaux.travel} className="w-full" />
+        </State>
+        <State label={t.etats.plaque}>
+          {DEST_COLORS.map((color) => (
+            <DestinationPlate key={color} as="p" name={pg.plaque.noms[color]} meta={pg.plaque.meta} color={color} className="w-full" />
+          ))}
+        </State>
+        <State label={t.etats.checklist}>
+          <ChecklistDemo />
         </State>
       </Section>
     </main>

@@ -4,8 +4,8 @@ import { blockGoogle } from "../e2e/carte-helpers";
 import { TRIP, expectSheetAt, openTrip, sheet } from "../e2e/sejour-helpers";
 
 /**
- * Captures de F5a en 390 × 844 (références de la CI, décision 0004) : Journée J2 et J5, panneau à 25 % et
- * 92 %, « Surprends-moi », Séjour. Carte simulée (/dev/voyages) : aucune donnée Google.
+ * Captures de F5a et F5c en 390 × 844 (références de la CI, décision 0004) : Journée J2 et J5, panneau à 25 % et
+ * 92 %, « Surprends-moi », Séjour (55 %, 92 %, fin du contenu). Carte simulée (/dev/voyages) : aucune donnée Google.
  */
 
 async function capture(page: Page, name: string) {
@@ -55,4 +55,26 @@ test("Journée J2, panneau à 25 %", async ({ page }) => {
 test("Séjour, vue d'ensemble (contenu du panneau livré par F5c)", async ({ page }) => {
   await openTrip(page, `/dev/voyages/${TRIP}`);
   await capture(page, "sejour-sejour.png");
+});
+
+// F5c : contenu du Séjour à 92 % (plaque, budget, liste à réserver avec une ligne cochée), puis défilé jusqu'à
+// « Pendant ton séjour » et « Jour par jour ».
+test("Séjour à 92 %, ligne du château cochée", async ({ page }) => {
+  await openTrip(page, `/dev/voyages/${TRIP}`);
+  await sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true }).click();
+  await page.getByRole("button", { name: "Agrandir le panneau" }).click();
+  await expectSheetAt(page, 0.92);
+  await page.getByRole("button", { name: "Réduire le panneau" }).blur();
+  await capture(page, "sejour-sejour-92.png");
+});
+
+test("Séjour à 92 %, défilé jusqu'à « Jour par jour »", async ({ page }) => {
+  await openTrip(page, `/dev/voyages/${TRIP}`);
+  await page.getByRole("button", { name: "Agrandir le panneau" }).click();
+  await expectSheetAt(page, 0.92);
+  await page.getByRole("button", { name: "Réduire le panneau" }).blur();
+  await sheet(page)
+    .locator("[data-part='contenu']")
+    .evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await capture(page, "sejour-sejour-92-fin.png");
 });

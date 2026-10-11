@@ -54,6 +54,9 @@ describe("règle ESLint : aucune persistance côté client dans le programme (F5
     "src/app/voyages/[id]/(programme)/page.tsx",
     "src/components/ligne/Sheet.tsx",
     "src/components/ligne/ReasonBlock.tsx",
+    "src/components/ligne/ChecklistRow.tsx",
+    "src/features/sejour/SejourPanel.tsx",
+    "src/features/sejour/SejourOrigin.tsx",
   ])("refuse localStorage, sessionStorage, indexedDB, caches et document.cookie dans %s", async (filePath) => {
     for (const statement of [
       `localStorage.setItem("panneau", "0.92");`,
@@ -74,6 +77,8 @@ describe("règle react/jsx-no-literals sur les fichiers de F5", () => {
     "src/app/dev/voyages/[id]/layout.tsx",
     "src/app/voyages/[id]/(programme)/page.tsx",
     "src/components/ligne/Sheet.tsx",
+    "src/components/ligne/ChecklistRow.tsx",
+    "src/features/sejour/SejourPanel.tsx",
   ])("refuse un texte en dur dans %s", async (filePath) => {
     const messages = await messagesFor(`export function E() {\n  return <span>Surprends-moi</span>;\n}\n`, filePath, [
       "react/jsx-no-literals",
