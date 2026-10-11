@@ -35,7 +35,7 @@ On démarre en A ; on passe en B dès que Projects apparaît dans `claude.ai/cod
 |---|---|---|
 | **R1 Cycle** | Toutes les 3 h à HH:07 (00:07, 03:07, 06:07, 09:07, 12:07, 15:07, 18:07, 21:07) | Le CEO lit l'état, choisit 1 à 3 tâches (verrou `in-progress` sur chaque ticket pris), les délègue, fait ouvrir des PR testées, met à jour `STATUS.md`, résume dans `#studio` |
 | **R2 Revue** | Événement GitHub : PR étiquetée `needs-review` | Tech Lead, Sécurité (chemins sensibles) et UX/UI (interface) relisent ; ajoutent `techlead-approved` ou demandent des changements |
-| **R3 Release** | Toutes les 4 h à HH:52 (01:52, 05:52, 09:52, 13:52, 17:52, 21:52) | Si `main` a changé et que la CI est verte : tag, release GitHub, vérification du staging, note de version dans `#studio` et `docs/releases/` |
+| **R3 Release** | Toutes les 4 h à HH:52 (01:52, 05:52, 09:52, 13:52, 17:52, 21:52) | Si `main` a changé et que la CI est verte : vérification du staging et note de version dans `docs/releases/` (PR `docs-only`). Elle ne crée ni tag ni release : le workflow GitHub `release` s'en charge à la fusion de la note et la poste dans `#studio` (consigne de Samuel du 2026-10-11, décision 0023 § 5) |
 | **R4 Hebdo** | Dimanche 20:07 | Audit : écarts avec les maquettes et le cadrage, état des conditions de passage, consommation de l'abonnement, priorités proposées pour la semaine, ordre du jour de la revue avec Samuel |
 
 Les horaires évitent l'heure pile, où un lancement peut prendre quelques minutes de retard. L'intervalle personnalisé (toutes les 3 h pour R1, toutes les 4 h pour R3) se règle avec `/schedule update` dans la CLI, l'intervalle minimal étant d'une heure.
@@ -45,11 +45,22 @@ Les horaires évitent l'heure pile, où un lancement peut prendre quelques minut
 1. R1 fait ouvrir une PR sur une branche `claude/…`, avec le libellé `needs-review` ; le workflow GitHub `auto-merge` active aussitôt la fusion automatique.
 2. La CI GitHub (`ci`) lance tous les tests.
 3. R2 relit et ajoute `techlead-approved`, ou demande des changements.
-4. La porte GitHub (`techlead-gate`) passe au vert quand le libellé est présent.
+4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4).
 5. Les deux vérifications vertes, GitHub fusionne ; Vercel déploie `main` sur le staging.
-6. R3 tague et publie la note de version au créneau suivant.
+6. Au créneau suivant, R3 écrit la note de version dans `docs/releases/` ; à sa fusion, le workflow `release` crée le tag (nom de la note sans `.md`) et la release GitHub, puis poste la note dans `#studio`.
 
 Les PR de pure documentation (`STATUS.md`, `QUESTIONS.md`, `docs/releases/`) portent le libellé `docs-only` : fusion automatique activée, porte franchie sans revue, R2 non déclenchée.
+
+**Bugs** (consignes de Samuel du 2026-10-11)
+
+- **Signalement** : modèle de ticket `.github/ISSUE_TEMPLATE/bug.md` (adresse, appareil, étapes, attendu, observé, capture), libellé `bug`. Quand Samuel écrit « Bug : » dans `#studio`, le CEO crée le ticket avec ce modèle au cycle suivant.
+- **Gravité** : un libellé parmi `sev:1`, `sev:2`, `sev:3`.
+- **Priorité** :
+  - `sev:1` : traité avant toute nouvelle tâche ;
+  - `sev:2` : traité au cycle suivant ;
+  - `sev:3` : pris dans l'ordre du backlog (`docs/roadmap.md`).
+- **Correction** : elle commence par un test qui reproduit le bug, en échec avant la correction et vert après ; la PR le cite (« Closes #<ticket> »).
+- **Note de version** : rubrique « Bugs corrigés » de `docs/templates/release-note.md`.
 
 ---
 
@@ -207,9 +218,9 @@ Contrôle RLS, secrets, dépendances, règles Google (affichage, stockage, promp
 ```markdown
 ---
 name: release
-description: Tag, release GitHub, vérification du staging, note de version.
+description: Vérification du staging et note de version ; le tag et la release GitHub sont créés par le workflow release.
 ---
-Utilise docs/templates/release-note.md. Ne promeut jamais en production.
+Utilise docs/templates/release-note.md, rubrique « Bugs corrigés » comprise. Ne crée ni tag ni release GitHub : le workflow release (.github/workflows/release.yml) les crée à la fusion de la note dans docs/releases/ et la poste dans #studio. Ne promeut jamais en production. Signe tes messages Slack « Studio ».
 ```
 
 ---
@@ -250,8 +261,8 @@ Tu es l'agent release ; ta définition est dans .claude/agents/release.md.
 0. Si docs/STUDIO_PAUSED existe, arrête-toi.
 1. Compare main au dernier tag. Si rien n'a changé, poste dans #studio un résumé de STATUS.md signé « Studio » et arrête-toi.
 2. Vérifie que la CI du dernier commit de main est verte et que le déploiement staging correspondant est prêt sur Vercel.
-3. Crée le tag vAAAA.MM.JJ-HH et une release GitHub avec la note de docs/templates/release-note.md : nouveautés avec captures, tests, risques, décisions attendues, lien staging.
-4. Ajoute la note dans docs/releases/ par une PR « docs: release » avec le libellé docs-only. La publication de la release déclenche une notification Slack automatique (workflow release-notify) : ne la poste pas toi-même.
+3. Rédige la note vAAAA.MM.JJ-HH avec docs/templates/release-note.md : nouveautés avec captures, bugs corrigés, tests, risques, décisions, lien staging. Ne crée ni tag ni release GitHub.
+4. Ajoute la note dans docs/releases/vAAAA.MM.JJ-HH.md par une PR « docs: release » avec le libellé docs-only. À sa fusion, le workflow release crée le tag et la release GitHub, puis poste la note dans #studio : ne la poste pas toi-même.
 Ne promeus jamais en production.
 ```
 
@@ -316,28 +327,92 @@ jobs:
 ```yaml
 # .github/workflows/techlead-gate.yml
 name: techlead-gate
+# Porte de fusion (décisions 0019 § 3.3 et 0023 § 4). La décision est la fonction pure
+# scripts/ci/techlead-gate.mjs, testée dans tests/unit/ci/techlead-gate.test.ts.
+# - échec si changes-requested est posé, ou si techlead-approved manque ;
+# - chaque nouveau push (synchronize) retire techlead-approved, y compris un push du
+#   studio ou une fusion de main dans la branche (voulu par Samuel, 2026-10-11) ;
+# - libellés contradictoires ou revue consolidée d'un autre head : échec et retrait ;
+# - les PR qui ne touchent que STATUS.md, QUESTIONS.md ou docs/releases/ restent exemptées.
+# Un libellé retiré avec GITHUB_TOKEN ne déclenche pas de nouvelle exécution (unlabeled) :
+# rien ne s'appuie sur cette relance, l'exécution qui retire le libellé échoue elle-même.
 on:
   pull_request:
-    types: [opened, synchronize, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+concurrency:
+  group: techlead-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 0 }
       - id: diff
+        name: Détecter une PR exemptée (STATUS.md, QUESTIONS.md, docs/releases/)
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          git diff --name-only "origin/${BASE_REF}...HEAD" > files.txt
           if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/releases/)' files.txt; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.diff.outputs.code == 'true' && !contains(github.event.pull_request.labels.*.name, 'techlead-approved')
+      - name: Lire les libellés et les revues consolidées
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CODE: ${{ steps.diff.outputs.code }}
         run: |
-          echo "Validation du Tech Lead manquante (libellé techlead-approved)."
-          exit 1
+          # Libellés lus maintenant, pas ceux de l'événement : une revue peut avoir retiré
+          # le libellé opposé entre l'événement et l'exécution.
+          gh api "repos/$REPO/issues/$PR/labels" --paginate --jq '.[].name' \
+            | jq -R . | jq -s . > labels.json
+          {
+            gh api "repos/$REPO/issues/$PR/comments" --paginate \
+              --jq '.[] | {body: (.body // ""), createdAt: .created_at}'
+            gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+              --jq '.[] | {body: (.body // ""), createdAt: .submitted_at}'
+          } | jq -s . > reviews.json
+          jq -n --arg action "$ACTION" --arg head "$HEAD_SHA" --argjson code "$CODE" \
+            --slurpfile labels labels.json --slurpfile reviews reviews.json \
+            '{action: $action, headSha: $head, code: $code, labels: $labels[0], reviews: $reviews[0]}' \
+            > gate-input.json
+      - id: decide
+        name: Décider
+        run: |
+          node scripts/ci/techlead-gate.mjs gate-input.json > decision.json
+          cat decision.json
+          echo "remove=$(jq -r .removeApproval decision.json)" >> "$GITHUB_OUTPUT"
+      - if: steps.decide.outputs.remove == 'true'
+        name: Retirer techlead-approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # 404 si une exécution concurrente l'a déjà retiré : rien à commenter.
+          if gh api -X DELETE "repos/$REPO/issues/$PR/labels/techlead-approved" > /dev/null; then
+            jq -r '"techlead-gate : techlead-approved retiré.\n\n" + (.messages | map("- " + .) | join("\n"))' \
+              decision.json > comment.md
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+          fi
+      - name: Verdict
+        run: |
+          jq -r '.warnings[] | "::warning::" + .' decision.json
+          jq -r '.messages[]' decision.json
+          if [ "$(jq -r .pass decision.json)" != "true" ]; then exit 1; fi
 ```
+
+La release automatique est dans `.github/workflows/release.yml` (décision 0023 § 5) ; elle remplace `release-notify.yml`.
 
 Script attendu dans `package.json` : `"verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:a11y && pnpm test:e2e && pnpm test:visual"`.
 

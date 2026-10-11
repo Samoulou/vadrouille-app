@@ -22,8 +22,14 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 | Testing Library | `@testing-library/react` 16.3.3, `dom` 10.4.2, `jest-dom` 7.0.1 | |
 | Playwright | `@playwright/test` 1.56.1 | **Pas 1.64.0** (dernière) : version alignée sur le Chromium préinstallé des sessions d'agents (révision 1194), pour que les captures de référence soient produites et comparées avec le même navigateur en local et en CI |
 | axe | `@axe-core/playwright` 4.13.0 | Règles WCAG 2.0/2.1/2.2 A et AA + bonnes pratiques |
+| `@radix-ui/react-slot` | 1.4.0 | Ajouté en F2 (`asChild` des composants Ligne) : voir la décision 0005 |
+| `axe-core` (dev) | 4.13.0 | Ajouté en F2 (axe dans Vitest) ; **pas 4.14.0**, aligné sur `@axe-core/playwright` : voir la décision 0005 |
+| `@googlemaps/js-api-loader` | 2.1.3 | Ajouté en F4 (chargement de la carte Google) ; **remplace `@vis.gl/react-google-maps`** nommée par le handover : voir la décision 0013 |
+| `@types/google.maps` (dev) | 3.66.4 | Ajouté en F4, déclaré dans `types` de `tsconfig.json` ; monte avec le chargeur : voir la décision 0013 |
+| `@radix-ui/react-dialog` | 1.2.0 | Feuille modale de F6 (`Dialog` de shadcn/ui, `src/components/ui/dialog.tsx`) ; `vaul` (`Drawer`) non retenu : voir la décision 0013 |
 
 ## Conséquences
 - Revoir TypeScript 7 et ESLint 10 quand `typescript-eslint` et `eslint-config-next` les prendront en charge.
 - Toute montée de version de Playwright change le Chromium : régénérer les captures (`pnpm test:visual:update`) dans la même PR.
+- Bibliothèques de geste : `motion` n'est pas installé ; F6 utilise les Pointer Events natifs (décision 0013, § 3.4).
 - Image Docker : l'étiquette `node:22-bookworm-slim` suit les correctifs de Node 22 ; la figer par empreinte si la reproductibilité stricte devient nécessaire.

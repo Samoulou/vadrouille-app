@@ -2,6 +2,119 @@
   "produit": {
     "promesse": "Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour."
   },
+  "accueil": {
+    "demo": {
+      "titre": "Démonstration",
+      "mention": "Données simulées. Les lieux entre crochets ne sont pas vérifiés.",
+      "voyage": "Voyage d'exemple : {destination}",
+      "liens": {
+        "presentation": {
+          "libelle": "Tes premières propositions",
+          "precision": "J'aime / Pas pour moi, avant de débloquer"
+        },
+        "suite": {
+          "libelle": "Suite du tri",
+          "precision": "Voyage débloqué"
+        },
+        "sejour": {
+          "libelle": "Séjour",
+          "precision": "Le programme jour par jour"
+        },
+        "jour": {
+          "libelle": "Jour 1",
+          "precision": "Étapes et trajets du jour"
+        },
+        "debloquer": {
+          "libelle": "Débloquer",
+          "precision": "L'offre et le paiement simulé"
+        }
+      }
+    }
+  },
+  "ligne": {
+    "tag": {
+      "toReserve": "À réserver",
+      "toConfirm": "À confirmer",
+      "unconfirmed": "Non confirmé"
+    },
+    "otp": {
+      "groupe": "Code à {length} chiffres",
+      "position": "Chiffre {position} sur {length}"
+    },
+    "duree": {
+      "minutes": "{minutes} min",
+      "heures": "{heures} h",
+      "heuresMinutes": "{heures} h {minutes}"
+    },
+    "jour": {
+      "pastille": "J{day}",
+      "nom": "Jour {day}",
+      "nomAvecJour": "Jour {day}, {weekday}",
+      "complet": "complet",
+      "nomComplet": "{nom}, complet"
+    },
+    "jours": {
+      "navigation": "Jours du séjour",
+      "sejour": "Séjour"
+    },
+    "terminus": {
+      "start": "Départ de {label}",
+      "end": "Retour à {label}"
+    },
+    "segment": {
+      "walk": "À pied",
+      "transit": "Bus",
+      "car": "En voiture",
+      "libelle": "{mode}, {duree}",
+      "libelleEstime": "{mode}, environ {duree} (estimation)"
+    },
+    "tempsLibre": {
+      "texte": "Temps libre jusqu'à {to}",
+      "idees": "Idées"
+    },
+    "panneau": {
+      "agrandir": "Agrandir le panneau",
+      "reduire": "Réduire le panneau"
+    },
+    "raison": {
+      "titre": "Pourquoi pour toi",
+      "source": "Source : {label}",
+      "consultee": "Source consultée le {date}"
+    },
+    "dates": {
+      "longue": "{day} {month} {year}",
+      "mois": [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre"
+      ]
+    },
+    "verrouillee": "Verrouillée",
+    "repasNonChoisi": {
+      "lunch": "Déjeuner pas encore choisi",
+      "dinner": "Dîner pas encore choisi"
+    }
+  },
+  "carte": {
+    "regionJour": "Carte du jour {n}",
+    "regionSejour": "Carte du séjour",
+    "evitement": "Aller à la liste des étapes",
+    "marqueur": "Étape {numero} : {name}",
+    "horsLigne": "Carte indisponible hors ligne. La liste reste utilisable.",
+    "indisponible": "Carte indisponible. La liste contient tout le programme.",
+    "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
+    "reessayer": "Réessayer",
+    "attribution": "Données de lieux : Google"
+  },
   "dev": {
     "tokens": {
       "titre": "Tokens Ligne",
@@ -11,6 +124,387 @@
       "rayons": "Rayons",
       "exemple": "Ton voyage, de l'hôtel à la soirée",
       "chiffres": "10:45 – 11:45"
+    },
+    "composants": {
+      "titre": "Composants Ligne",
+      "intro": "Page de développement, désactivée en production. Les contenus entre crochets ne sont pas vérifiés.",
+      "etats": {
+        "variantes": "Variantes, taille md (52 px)",
+        "tailles": "Taille sm (44 px), texte ink-soft",
+        "desactive": "Désactivé",
+        "focus": "Focus",
+        "lien": "Lien (asChild)",
+        "formes": "Carré et rond",
+        "types": "Types",
+        "compteur": "Compteur (rien à 0)",
+        "selection": "Non sélectionnée, sélectionnée",
+        "deduit": "Déduite, non sélectionnée et sélectionnée",
+        "vide": "Vide",
+        "rempli": "Rempli",
+        "pastilles": "Inactive, active, désactivée, réduite",
+        "rangeeSejour": "« Séjour » actif",
+        "rangeeJour": "J9 actif",
+        "ligneDuJour": "Séquence du preview.html de DayLine",
+        "voiture": "Segment en voiture",
+        "marqueursLigne": "Arrêt et terminus de la ligne",
+        "marqueursCarte": "Carte : arrêt numéroté, sélectionné, terminus, vue d'ensemble",
+        "deckActivite": "Carte d'activité, avec trajet au-delà de 20 min",
+        "deckRepas": "Carte repas, option 1 sur 2",
+        "deckDerniere": "Carte repas, dernière option",
+        "progression": "Progression, 4 sur 8",
+        "toast": "Toast d'annulation",
+        "panneau": "Panneau à 25 %, 55 % et 92 % de son cadre",
+        "raison": "Avec date de consultation, sans date",
+        "bandeauTrajet": "Bandeau de trajet (type travel)",
+        "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage",
+        "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus"
+      },
+      "exemples": {
+        "garder": "Garder",
+        "remplacer": "Remplacer",
+        "appliquer": "Appliquer",
+        "passer": "Passer",
+        "plusTard": "Plus tard",
+        "reserver": "Réserver",
+        "debloquer": "Débloquer",
+        "retour": "Retour",
+        "partager": "Partager",
+        "compteurTitre": "À faire avant de partir",
+        "compteurLabel": "[4 réservations à faire]",
+        "compteurZeroLabel": "[Aucune réservation à faire]",
+        "chips": {
+          "histoire": "Histoire",
+          "balades": "Balades en ville",
+          "musees": "[Musées]",
+          "marches": "[Marchés]"
+        },
+        "segmente": {
+          "label": "[Rythme]",
+          "options": {
+            "a": "[Option 1]",
+            "b": "[Option 2]",
+            "c": "[Option 3]"
+          }
+        },
+        "bandeaux": {
+          "offline": "Carte indisponible hors ligne",
+          "conflict": "[Conflit : message fourni par l'écran]",
+          "noOption": "[Aucune option : message fourni par l'écran]",
+          "error": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+          "generating": "[Génération en cours : message fourni par l'écran]",
+          "travel": "[Bandeau de trajet : message composé par l'écran]"
+        },
+        "ligne": {
+          "hotel": "[Nom de l'hôtel]",
+          "arret1": {
+            "nom": "Calton Hill",
+            "meta": "Balade, 45 min, gratuit",
+            "raison": "La ville entière vue d'en haut, à 10 min de l'hôtel."
+          },
+          "arret2": {
+            "nom": "[Distillerie]",
+            "meta": "Visite et dégustation, 1 h 30"
+          },
+          "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
+          "rangeeJour": "Jours du séjour, démonstration J9 actif"
+        },
+        "presentation": {
+          "activite": {
+            "nom": "[Distillerie]",
+            "meta": "[Visite et dégustation, 1 h 30]",
+            "contexte": "[Entre ton déjeuner et ton temps libre]",
+            "raison": "[Tu as demandé une distillerie sans voiture]",
+            "detour": "[La distillerie la plus proche accessible sans voiture]"
+          },
+          "repas": {
+            "nom": "[Bonne table]",
+            "meta": "[Cuisine écossaise, 1 h 30]",
+            "contexte": "[Avant ton concert]",
+            "raison": "[Tu as choisi une bonne table le samedi soir]"
+          },
+          "repas2": {
+            "nom": "[Bistrot]",
+            "meta": "[Bistrot, 1 h 30]"
+          },
+          "toast": "[Distillerie] écarté."
+        },
+        "programme": {
+          "panneaux": {
+            "petit": "[Panneau de démonstration à 25 %]",
+            "moyen": "[Panneau de démonstration à 55 %]",
+            "grand": "[Panneau de démonstration à 92 %]"
+          },
+          "contenu": "[Contenu du panneau, qui défile à l'intérieur]",
+          "raison": "[Tu as choisi Histoire et Balades en ville. Ancien village de meuniers au bord de la rivière.]",
+          "source": "[Office du tourisme]",
+          "verrouillee": {
+            "nom": "[Billets du concert]",
+            "meta": "[Concert, 1 h 30, billets réservés]"
+          }
+        },
+        "verrouiller": "Verrouiller"
+      }
+    },
+    "carte": {
+      "titre": "Carte",
+      "intro": "Page de développement, désactivée en production. Carte simulée sur données simulées : aucun fond de carte, aucune donnée Google.",
+      "jours": "Jour affiché",
+      "liste": "Étapes du jour {n}",
+      "sejour": "Jours du séjour",
+      "attribution": {
+        "titre": "Mention d'attribution",
+        "avec": "Avec placesFromGoogle vrai :",
+        "sans": "Avec placesFromGoogle faux : aucune mention (phase 0)."
+      }
+    },
+    "voyages": {
+      "titre": "Voyage (carte simulée)"
+    }
+  },
+  "presentation": {
+    "titre": {
+      "apercu": "Tes premières propositions",
+      "suite": "Suite du tri"
+    },
+    "paquet": "Propositions à trier",
+    "passer": "Passer",
+    "toutGarder": "Tout garder pour le jour {n}",
+    "progression": "Proposition {current} sur {total}",
+    "progressionVisible": "{current} sur {total}",
+    "generation": "Jour {n} en préparation",
+    "carte": {
+      "photo": "Photo du lieu",
+      "vers": "vers {time}",
+      "detail": "Voir le détail de {name}",
+      "option": "option {index} sur {total}"
+    },
+    "actions": {
+      "like": "J'aime",
+      "dislike": "Pas pour moi",
+      "choose": "Je choisis",
+      "next": "Option suivante"
+    },
+    "toast": {
+      "disliked": "{name} écarté.",
+      "liked": "{name} gardé.",
+      "chosen": "{name} choisi.",
+      "dayKept": "Jour {day} gardé.",
+      "annuler": "Annuler"
+    },
+    "question": {
+      "categorie": "On arrête {categorie} pour ce voyage ?",
+      "distance": "On reste plus près de ton hôtel ?",
+      "raison": "Pourquoi ? (facultatif)",
+      "oui": "Oui",
+      "non": "Non",
+      "fermer": "Fermer",
+      "retirees": "{nombre} propositions retirées",
+      "retiree": "1 proposition retirée"
+    },
+    "raisons": {
+      "notMyStyle": "Pas mon style",
+      "tooBusy": "Trop chargé",
+      "tooExpensive": "Trop cher",
+      "tooFar": "Trop loin",
+      "other": "Autre raison"
+    },
+    "categories": {
+      "museum": "les musées et monuments",
+      "walk": "les balades en ville",
+      "nature": "la nature et les points de vue",
+      "tasting": "les dégustations",
+      "restaurant": "les restaurants"
+    },
+    "detail": {
+      "moment": "Jour {day}, {weekday}, vers {time}",
+      "source": "Source : ",
+      "verifie": "Informations vérifiées le {date}",
+      "mois": [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre"
+      ],
+      "fermer": "Fermer"
+    },
+    "fin": {
+      "apercu": "Tu as vu tes premières propositions",
+      "suite": "Tu as tout trié",
+      "vide": "Aucune proposition à trier",
+      "debloquer": "Débloquer",
+      "programme": "Voir le programme"
+    }
+  },
+  "sejour": {
+    "titreDocument": {
+      "sejour": "{destination} · Séjour",
+      "jour": "{destination} · Jour {n}",
+      "etape": "{name} · Jour {n}"
+    },
+    "region": "Programme",
+    "retour": "Retour",
+    "journee": {
+      "trajet": "{duree} de trajet",
+      "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
+      "enPreparation": "Jour {n} en préparation",
+      "etapes": "Étapes du jour {n}",
+      "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
+      "bandeauPlusLong": "Le plus long : {segment}, vers {name}."
+    },
+    "evenements": {
+      "titreJour": "Événements du jour",
+      "plage": "{start} – {end}"
+    },
+    "surprise": {
+      "bouton": "Surprends-moi"
+    },
+    "regionFiche": "Fiche étape",
+    "fiche": {
+      "fermer": "Fermer",
+      "moment": "J{n} · {title} · {range}",
+      "verrou": "Étape verrouillée : elle ne bougera pas quand tu modifies ton programme.",
+      "evenement": "Proposé pendant ton séjour, pas dans ton programme.",
+      "pourYAller": "Pour y aller",
+      "pourYAllerDepuis": "{segment} depuis {origin}",
+      "actions": "Actions",
+      "remplacer": "Remplacer",
+      "verrouiller": "Verrouiller",
+      "toastVerrouillee": "Étape verrouillée.",
+      "toastDeverrouillee": "Verrou retiré.",
+      "absente": "Cette étape n'est plus dans ce jour."
+    }
+  },
+  "debloquer": {
+    "titreDocument": {
+      "debloquer": "{destination} · Débloquer",
+      "simule": "Paiement simulé",
+      "confirmation": "{destination} · Confirmation du paiement"
+    },
+    "retour": "Retour",
+    "plaque": {
+      "ligne": "{debut} – {fin} · {voyageurs}",
+      "date": "{jour} {date}",
+      "jours": [
+        "dim.",
+        "lun.",
+        "mar.",
+        "mer.",
+        "jeu.",
+        "ven.",
+        "sam."
+      ],
+      "adultes": {
+        "un": "1 adulte",
+        "plusieurs": "{n} adultes"
+      },
+      "enfants": {
+        "un": "1 enfant",
+        "plusieurs": "{n} enfants"
+      },
+      "separateur": ", "
+    },
+    "offre": {
+      "titre": "Débloquer ton voyage",
+      "titreDebloque": "Ton voyage est débloqué",
+      "paiementUnique": "Paiement unique pour ce voyage, sans abonnement.",
+      "simulation": "Démonstration : le paiement est simulé, aucun montant n'est débité.",
+      "inclusTitre": "Ce qui est inclus",
+      "inclus": {
+        "allDays": "Toutes les journées de ton voyage, du {debut} au {fin}",
+        "mealsAndEvenings": "Les repas et les soirées",
+        "events": "Les événements pendant ton séjour",
+        "replacements": "Des remplacements pour ajuster ton programme",
+        "checklist": "La liste à réserver avant de partir",
+        "calendarAndSharing": "Le calendrier et le partage avec tes proches",
+        "access": "Accès jusqu'au {date}"
+      },
+      "remplacementsLimite": "Jusqu'à {n} remplacements pour ajuster ton programme",
+      "jourMois": "{day} {month}",
+      "payer": {
+        "twint": "Payer avec TWINT",
+        "card": "Payer par carte"
+      },
+      "paiements": "Moyens de paiement",
+      "sansDebloquer": "Continuer sans débloquer",
+      "restentAccessibles": "Tes premières propositions restent accessibles, même sans payer.",
+      "preparation": "Préparation du paiement…",
+      "erreurDebut": "Le paiement n'a pas pu commencer.",
+      "reessayer": "Réessayer",
+      "echec": {
+        "declined": "Le paiement n'a pas abouti. Aucun montant n'a été débité.",
+        "cancelled": "Paiement annulé.",
+        "expired": "Ce paiement a expiré. Tu peux recommencer."
+      },
+      "voirProgramme": "Voir le programme"
+    },
+    "simule": {
+      "titre": "Paiement simulé",
+      "mention": "Démonstration : aucun paiement n'est effectué et aucune donnée de paiement n'est demandée.",
+      "recapitulatif": "Récapitulatif",
+      "voyage": "Voyage : {destination}",
+      "montant": "Montant : {prix}",
+      "moyen": {
+        "twint": "Moyen : TWINT",
+        "card": "Moyen : carte"
+      },
+      "reussi": "Simuler un paiement réussi",
+      "refus": "Simuler un refus",
+      "annuler": "Annuler",
+      "envoi": "Envoi de la simulation…",
+      "erreur": "La simulation n'a pas pu être envoyée.",
+      "reessayer": "Réessayer"
+    },
+    "confirmation": {
+      "titre": "On confirme ton paiement",
+      "attente": "Confirmation du paiement en cours.",
+      "attenteLongue": "La confirmation prend plus de temps que prévu. Ton voyage sera débloqué dès qu'elle arrivera.",
+      "propositions": "Voir mes premières propositions",
+      "verifier": "Vérifier de nouveau",
+      "attenteArretee": "La confirmation n'est pas encore arrivée. Ton voyage sera débloqué dès qu'elle arrivera : vérifie de nouveau dans un moment."
+    }
+  },
+  "etats": {
+    "accueil": "Retour à l'accueil",
+    "introuvable": {
+      "titreDocument": "Page introuvable · {produit}",
+      "titre": "Page introuvable",
+      "texte": "Cette page n'existe pas ou n'est plus disponible."
+    },
+    "erreur": {
+      "titreDocument": "Cette page n'a pas pu s'afficher · {produit}",
+      "titre": "Cette page n'a pas pu s'afficher",
+      "texte": "Réessaie dans un instant. Si le problème continue, reviens à l'accueil.",
+      "reessayer": "Réessayer"
+    },
+    "erreurCalcul": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+    "catalogue": {
+      "titre": "États transverses",
+      "intro": "Page de développement, désactivée en production. Chaque état est rendu par le composant réel, avec le texte de l'écran qui le possède.",
+      "exemple": "Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.",
+      "sections": {
+        "toConfirm": "Information incertaine",
+        "unconfirmed": "Événement non confirmé",
+        "offline": "Hors ligne",
+        "conflict": "Conflit",
+        "noOption": "Aucune option compatible",
+        "error": "Erreur de calcul",
+        "generating": "Jour en préparation",
+        "travel": "Trajet au-delà du rythme",
+        "introuvable": "Page introuvable",
+        "erreur": "Erreur inattendue"
+      },
+      "liens": {
+        "introuvable": "Ouvrir une adresse inexistante",
+        "erreur": "Ouvrir une page qui lève une erreur"
+      }
     }
   }
 }

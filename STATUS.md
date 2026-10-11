@@ -1,73 +1,71 @@
-# État du studio — 2026-10-08 (5e cycle)
+# État du studio — 2026-10-11 (29e cycle)
 
-Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31, appliquée par #16)
+Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
+
+## Messages de Samuel traités (#studio, 2026-10-11)
+- **10:46 CEST** : réponses à Q98, Q101, Q31, Q140, Q137 à Q139, Q138, Q149, Q151, Q152, Q176, Q150, Q170, Q171. Reportées dans `QUESTIONS.md` ; celles qui touchent F10 sont appliquées à la spec (#76, correction 3).
+- **10:54 CEST** :
+  - nouvelle règle : après 2 corrections bloquées, le CEO décide avec le Tech Lead (3e tentative ou découpage), appliquée à Q119, Q163 et Q43 ;
+  - Q157, Q177 et Q120 à Q122 sont délégués ;
+  - Q118 : release automatique et correction de `techlead-gate` → T10 (#108, fusionnée) ;
+  - Q9 : Claude seul, sans Gemini. Q172 : mesure sans la vraie carte. Q31 : clé ouverte à `vadrouille-app-ten.vercel.app` et `git-main` ;
+  - processus des bugs → modèle et règles (#108) ;
+  - bug sev:2 « Carte indisponible » → ticket #106, PR #109.
 
 ## Fait
-- **Consignes de Samuel du 16:31 et du 16:33 (S2, PR #16, ticket #13) : fusionnée.**
-  - `docs/CONTEXT.md` : cycle de 3 h, 3 tâches, verrou `in-progress`, périmètre de phase 0 élargi (F1 à F12 sur données simulées, handover back-end) ; restent interdits avant G0 les comptes et services payants, les clés de production et la mise en production.
-  - `docs/roadmap.md` : statuts et périmètre à jour.
-  - `.github/pull_request_template.md` : `Closes #<numéro>` en tête (« Refs # » si la PR ne termine pas la tâche : ajout du CEO).
-  - `docs/studio/mise-en-place.md` et ADR 0001 (section « Évolution ») alignés.
-  - Deux corrections sur les revues Tech Lead. Source de la clause « in-progress retiré à l'ouverture de la PR », que la revue jugeait non vérifiable : le prompt de la routine du CEO enregistré par Samuel, étape 3, texte exact : « Pose in-progress sur leur ticket dès que tu les prends. […] Retire in-progress quand la PR est ouverte. » Voir Q23.
-- **Tickets #8 (F1) et #9 (S1)** : déjà fermés ; commentaire de renvoi vers #11 et #10 ajouté (consigne du 16:33).
-- **Spec B0 — handover back-end (ticket #15, reste ouvert pour la rédaction du handover) : prête et fusionnée.**
-  - `specs/B0-handover-backend.md` : #17, puis deux suites de revue (#18 et #20). Les deux revues R2 de #20 sont conformes.
-  - Leurs remarques non bloquantes sont à reprendre lors de la rédaction du handover : sens des verdicts, durées Routes API dans l'état des workflows, critères PO-2 et PO-6, historique de revue à retirer de PO-1.
-  - Décisions du Product Owner, définitives sans veto de Samuel avant le 2026-10-10 :
-    - PO-1 (Q8) : budget de trajet de 60, 90 ou 150 min ; réduction d'un quart arrondie vers le bas à 5 min ; plancher retiré ;
-    - PO-2 (Q22) ;
-    - PO-3 à PO-7 ;
-    - verdicts d'ancrage limités à une énumération ;
-    - extension signalée du test de sortie § 9.
-  - Questions nouvelles : Q24 à Q29.
+- **Fusionnées** :
+  - T8 (#72, décision 0019) et U2 (#67, correction de 0018) : la revue R2 a repris, **Q181 résolue** ;
+  - T5 (#65, décision 0017, après sa 3e correction) ;
+  - **F9a (#86)**, après la mise à jour avec `main` ;
+  - **F5b (#66)**, après sa 3e correction ;
+  - **T10 (#108)** : `release.yml` (tag, release et note dans #studio, aussi chaque heure), `techlead-gate` (échec si `changes-requested` ; retrait de `techlead-approved` à chaque push), modèle `.github/ISSUE_TEMPLATE/bug.md`, décision 0023 (Q120 à Q122) ;
+  - release v2026.10.11-09 (#110).
+- **Q119 levée** : la suite du code est débloquée.
+- Bug #106 : la cause est dans le code, pas dans Vercel. Le voyage débloqué de la démonstration n'avait pas de positions simulées, donc la carte affichait « Carte indisponible » avec ou sans clé. La clé et l'ID de carte sont bien présents dans le JavaScript servi en Production. Correction et test de reproduction dans #109 (contenu de T6, décision 0017 § 13).
 
 ## En cours
-- **F2 — Composants de base (PR #19, ticket #14).**
-  - Les 8 composants, `/dev/composants`, les tests unitaires, a11y, e2e et de contraste sont livrés ; `docker` est vert depuis la 1re correction (`tsconfig.build.json`).
-  - Décisions du Tech Lead (ADR 0005) : `@radix-ui/react-slot` 1.4.0, `axe-core` 4.13.0, tokens Ligne dans `cn()`, `tsconfig.build.json`.
-  - 1re correction :
-    - `docker` est réparé par `tsconfig.build.json` ;
-    - l'ADR 0005 est ajoutée ;
-    - la référence `dev-composants.png` vient maintenant de l'artefact CI : cette fois, le téléchargement n'a pas reçu de 403.
-  - `verify` et `docker` sont verts. `needs-review` est reposé : la revue R2 est relancée.
+- **Bug #106, PR #109** (`needs-review`) : correction 1 faite (8f60958). Le conflit avec F9a est résolu ; la CI `verify` est verte, captures visuelles comprises, ainsi que `docker`. Après fusion et déploiement de `main`, Samuel vérifie la carte sur la démonstration.
+- **Spec F10, PR #76** :
+  - correction 3 (comptée) : les 5 bloquants du Tech Lead sont levés ;
+  - correction 4 : non comptée (0023 § 3), parce que Sécurité et UX/UI relisaient pour la première fois ;
+  - revue de 10:11 UTC : Tech Lead et Sécurité conformes, UX/UI demande 4 bloquants (B1 à B4 : sous-titre, étapes passées, contraste de `raised`, écarts avec le handover).
+  - Décision du CEO : une correction 5 au 30e cycle ; si UX/UI bloque encore, la spec sera découpée (F10a « Pendant le voyage », F10c « Partage »).
 
 ## Bloqué
-- F3 : attend F2 (#19).
-- P0 : attend Q9 (clé Gemini) et la clé serveur Places/Routes.
-- F4 : attend F3.
-- Références visuelles : tant que l'ADR 0004 n'est pas implémenté, chaque nouvelle capture se télécharge à la main depuis l'artefact `test-results` de la CI. Ce cycle, le téléchargement a fonctionné. Localement, les tests visuels échouent toujours à cause des glyphes : seule la CI fait foi.
-
-## Décisions attendues de Samuel
-- Q5 et Q6 : juridique (règles Google, photos). Q29 (verdicts d'ancrage dérivés de Google) suit Q5.
-- Q9 : clé Gemini (dépense).
-- Q12 : export des maquettes.
-- Q23 : moment du retrait du verrou `in-progress`.
-- Q24 à Q27 : Postgres UE, envoi des codes, Stripe test avec TWINT, durées de conservation.
-- Configuration de la routine R1 sur claude.ai : intervalle de 3 h et prompt de l'annexe B de `docs/studio/mise-en-place.md` (à faire par Samuel).
-- Veto possible avant le 2026-10-10 sur les décisions déléguées :
-  - CEO : ticket référencé par une PR ouverte = en revue, non repris (ADR 0001, « Évolution ») ;
-  - Product Owner : PO-1 à PO-7 de la spec B0 ;
-  - Tech Lead : ADR 0005 (dépendances F2, typage du build), si #19 est fusionnée.
-
-## Constat sur le processus
-- La routine R2 (revue) se déclenche à chaque pose de `needs-review`. Ce cycle, le CEO a aussi lancé des revues Tech Lead dans sa session. Résultat : la fusion automatique part dès la première approbation et R2 publie ensuite des demandes de changements sur des PR déjà fusionnées (#17, #18). Désormais, le CEO laisse la revue à R2 seule.
+- **B0 (#27) et U1 (#26)**, règle de Samuel appliquée à Q43 : #27 sera découpée (une PR pour ce qui ne dépend pas de Q5) et #26 aura une 3e tentative. À exécuter au 30e cycle, la limite de tâches du 29e étant atteinte.
+- **P0** : Q9 est tranchée (Claude seul) ; il attend la clé serveur Places/Routes (Q103).
 
 ## Prochain cycle
-1. F2 (#19) : suivre la revue R2 (2e et dernière tentative de correction si besoin), puis F3 dès que F2 est fusionnée.
-2. Rédaction du handover B0 (`docs/handovers/backend.md`, Product Owner et Tech Lead), avec les remarques non bloquantes des revues de #20.
-3. Décisions déléguées à UX/UI (Q10, Q11, Q13, Q15 à Q19, Q30), qui débloquent la validation de F2 et F3 ; ADR 0004 tranché et implémenté par le Tech Lead.
-4. Roadmap : prérequis de B0 « — » à remplacer par « F1 » (écart signalé dans #18 et #20).
+1. Suivre #109 (sev:2) et #76.
+2. **T4** (budget JavaScript de la Journée), prête depuis la fusion de F5b, en tête du code.
+3. Découper #27 et faire la 3e tentative de #26 (Q43).
+4. #76 : correction 5.
+5. Ensuite, dans l'ordre : F5c et T7 après T4 ; T7 n'entre dans le même cycle ni que F8b ni que F12a (Q182) ; F8a ; F11a et F12a après T4.
+6. UX/UI : Q157, Q177, Q183. Product Owner : spec F7 (Q110, Q104, 0019).
+
+## Décisions attendues de Samuel
+- **À faire à la main** (T10, #108) :
+  - coller le texte de 0023 § 1 dans la routine Revue (Q120) ;
+  - coller le prompt R3 (annexe B de `docs/studio/mise-en-place.md`) ;
+  - vérifier le secret `SLACK_WEBHOOK_STUDIO` ;
+  - créer les libellés `sev:1` et `sev:3` (Q184).
+- **Nouvelles (spec F10)** :
+  - Q186 : information du visiteur sur le chargement de Google ;
+  - Q187 : texte des rappels « À réserver » ;
+  - Q188 : mention du fuseau.
+  - Le Product Owner donne une recommandation pour chacune.
+- **Toujours ouvertes** :
+  - juridique : Q5, Q6, Q29, Q34, Q38, Q44, Q46 à Q48, Q75, Q127, Q150 (durées) ;
+  - argent et comptes : Q24 à Q26, Q39, Q45, Q56, Q84, Q103, Q129 ;
+  - offre : Q57, Q63, Q67, Q76, Q78, Q88 à Q90, Q128, Q133, Q135, et Q149 (voyage jamais débloqué) ;
+  - documents et environnement : Q12, Q27, Q59, Q40, Q101 (qui vérifie `VADROUILLE_DEV_PAGES`) ;
+  - Ligne : Q37, Q108, Q130 ;
+  - règles : Q23.
+- **Veto possible** :
+  - avant le 2026-10-12 : F12-PO, Q175, Q179, décision 0022, rendus de F11c ;
+  - avant le 2026-10-13 : décisions 0017 (#65), 0019 (#72), 0023 (#108), écarts de F9a (#86) et de F5b (#66), Q182 ;
+  - après la fusion de #76 : F10-PO-1 à F10-PO-21 et Q185.
 
 ## Part d'usage estimée
-- 5e cycle du 2026-10-08 : environ 1 400 000 jetons.
-
-| Poste | Jetons |
-|---|---|
-| F2 et sa correction | ≈ 260 000 |
-| Spec B0 et 2 suites | ≈ 270 000 |
-| S2 et 2 corrections | ≈ 170 000 |
-| Revues Tech Lead (session) | ≈ 410 000 |
-| Pilotage | ≈ 250 000 |
-
-- Cumul de la journée : environ 2 700 000 jetons.
+- 29e cycle : environ 1,5 million de jetons (estimation) : 8 sous-agents, dont 6 PR mises à jour et 2 PR nouvelles.
 - Part de l'abonnement : non mesurable depuis la routine.

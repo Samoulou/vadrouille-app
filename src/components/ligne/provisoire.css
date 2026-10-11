@@ -1,0 +1,129 @@
+/*
+ * Valeurs provisoires des composants Ligne, sans token dans le handover § 4.1.
+ * Seul fichier de src/components/ligne qui contient des mesures en dur ; chaque
+ * déclaration cite la question qui la tranchera. À retirer quand la question est tranchée.
+ */
+:root {
+  /* Q13 : contour 1,5 px des boutons secondaires, des tags « À confirmer » et des chips (Button et Tag, preview.html). */
+  --ligne-trait-controle: 1.5px;
+  /* Q13 : taille du texte des boutons principal et secondaire (16 px dans Button/preview.html, aucun style nommé). */
+  --ligne-bouton-texte: 16px;
+}
+
+/*
+ * F3, ligne du jour. Tokens de tokens.json absents du handover § 4.1 (Q11) et mesures
+ * des preview.html sans token (Q19). Noms préfixés par --ligne- comme la géométrie du handover.
+ */
+:root {
+  /* Q11 : espacement space-2 de tokens.json (écart entre colonnes de la ligne du jour, entre pastilles). */
+  --ligne-espace-2: 8px;
+  /* Q11 : rayon radius-round de tokens.json (arrêts et marqueurs). */
+  --ligne-rayon-rond: 999px;
+  /* Q11 : style de texte heure de tokens.json (15/22, 700, tabulaire). */
+  --ligne-texte-heure: 15px;
+  /* Q11 : interligne du style heure. */
+  --ligne-texte-heure-interligne: 22px;
+  /* Q11 : style de texte pastille de tokens.json (15/20, 800, tabulaire). */
+  --ligne-texte-pastille: 15px;
+  /* Q11 : interligne du style pastille. */
+  --ligne-texte-pastille-interligne: 20px;
+  /* Q19 : colonne heure de la ligne du jour (DayLine/preview.html). */
+  --ligne-col-heure: 52px;
+  /* Q19 : colonne rail de la ligne du jour (DayLine/preview.html). */
+  --ligne-col-rail: 28px;
+  /* Q19 : décalage vertical du marqueur dans la première ligne de 22 px (DayLine/preview.html, top: 1px). */
+  --ligne-marqueur-decalage: 1px;
+  /* Q19 : coins du carré terminus de la ligne (DayLine et StopMarker/preview.html). */
+  --ligne-rayon-terminus: 5px;
+  /* Q19 : coins du terminus de carte et de la pastille réduite (StopMarker/preview.html, README DayBadge). */
+  --ligne-rayon-mini: 6px;
+  /* Q19 : côté du terminus de carte, avec la maison (StopMarker/preview.html). */
+  --ligne-terminus-carte: 24px;
+  /* Q19 : taille de l'icône maison du terminus de carte (StopMarker/preview.html). */
+  --ligne-icone-terminus-carte: 14px;
+  /* Q19 : anneau des marqueurs de carte, du sélectionné et de la vue d'ensemble (StopMarker/preview.html). */
+  --ligne-anneau-carte: 3px;
+  /* Q19 : numéro d'un arrêt de carte (StopMarker/preview.html, 12 px 800). */
+  --ligne-numero-carte: 12px;
+  /* Q19 : numéro de l'arrêt sélectionné (StopMarker/preview.html, 15 px 800). */
+  --ligne-numero-carte-selection: 15px;
+  /* Q19 : arrêt de la vue d'ensemble (StopMarker/preview.html). */
+  --ligne-stop-ensemble: 12px;
+  /* Q19 : trait sous l'onglet « Séjour » actif (DayBadge/preview.html). */
+  --ligne-trait-onglet: 3px;
+  /* Q19 : coins du bloc temps libre (DayLine/preview.html). */
+  --ligne-rayon-temps-libre: 10px;
+  /* Q19 : hauteur de la pastille réduite (README DayBadge). */
+  --ligne-pastille-reduite: 26px;
+}
+
+/*
+ * F6, présentation. Mesures du preview.html de DeckCard sans token (F6-Q2, complète Q19)
+ * et rendus non maquettés (F6-Q1).
+ */
+:root {
+  /* F6-Q2 : nom de la carte, 22 px en 800 (DeckCard/preview.html). */
+  --ligne-deck-nom: 22px;
+  /* F6-Q2 : interligne du nom de la carte (28 px). */
+  --ligne-deck-nom-interligne: 28px;
+  /* F6-Q2 : hauteur de la photo (220 px), réduite quand la fenêtre manque de place. */
+  --ligne-deck-photo: 220px;
+  /* F6-Q1 : hauteur minimale de la photo réduite (rendu non maquetté). */
+  --ligne-deck-photo-min: 72px;
+  /* F6-Q2 : boutons ronds « Pas pour moi » et « J'aime » (68 px). */
+  --ligne-deck-bouton: 68px;
+  /* F6-Q2 : écart entre les deux boutons ronds (56 px). */
+  --ligne-deck-ecart-boutons: 56px;
+  /* F6-Q2 : contour du bouton « Pas pour moi » (2 px ink). */
+  --ligne-deck-trait-bouton: 2px;
+  /* F6-Q2 : hauteur de la pastille du jour (24 px). */
+  --ligne-deck-pastille: 24px;
+  /* F6-Q2 : largeur minimale de la pastille du jour (30 px). */
+  --ligne-deck-pastille-largeur: 30px;
+  /* F6-Q2 : coins de la pastille du jour (6 px). */
+  --ligne-deck-pastille-rayon: 6px;
+  /* F6-Q2 : arrêts de la progression (12 px). */
+  --ligne-deck-arret: 12px;
+  /* F6-Q2 : anneau des arrêts de la progression (3 px). */
+  --ligne-deck-anneau: 3px;
+  /* F6-Q2 : icônes des boutons ronds (26 px). */
+  --ligne-deck-icone: 26px;
+  /* F6-Q2 : icône du bloc « Photo du lieu » (30 px, DeckCard/preview.html). */
+  --ligne-deck-icone-photo: 30px;
+  /* F6-Q2 : approche du nom de la carte (letter-spacing -0.01em, DeckCard/preview.html). */
+  --ligne-deck-nom-approche: -0.01em;
+  /* Q11 : approche du style titre-jour de tokens.json (-0.015em), absente du handover § 4.1 (titre des fins de paquet). */
+  --ligne-titre-jour-approche: -0.015em;
+  /* Q11 : approche du style destination de tokens.json (-0.02em), absente du handover § 4.1 (DestinationPlate). */
+  --ligne-destination-approche: -0.02em;
+  /* F6-Q1 : voile des feuilles modales, ink à 40 % (rendu non maquetté, en attendant Q10). */
+  --ligne-voile: color-mix(in oklab, var(--color-ink) 40%, transparent);
+  /* F6-Q1 : hauteur maximale de la feuille modale, 92 % de la fenêtre (rendu non maquetté). */
+  --ligne-feuille-hauteur-max: 92dvh;
+}
+
+/*
+ * F5, panneau coulissant, Journée et « Surprends-moi ». Rendus non maquettés (F5-Q1, Q62) et
+ * style de texte de tokens.json absent du handover § 4.1 (Q11).
+ */
+:root {
+  /* F5-Q1 : largeur de la barre de la poignée du panneau (rendu non maquetté). */
+  --ligne-poignee-largeur: 40px;
+  /* F5-Q1 : épaisseur de la barre de la poignée du panneau (rendu non maquetté). */
+  --ligne-poignee-epaisseur: 4px;
+  /* F5-Q1 : largeur minimale du bouton de la poignée, plus large que la cible de 44 px (rendu non maquetté). */
+  --ligne-poignee-zone: 88px;
+  /* Q11 : style de texte bloc de tokens.json (15/20, 800), titre du ReasonBlock (ReasonBlock/preview.html). */
+  --ligne-texte-bloc: 15px;
+  /* Q11 : interligne du style bloc. */
+  --ligne-texte-bloc-interligne: 20px;
+  /* Q19 : marge intérieure verticale du ReasonBlock (14 px, ReasonBlock/preview.html). */
+  --ligne-bloc-marge-v: 14px;
+  /* Q19 : marge intérieure horizontale du ReasonBlock (16 px, ReasonBlock/preview.html). */
+  --ligne-bloc-marge-h: 16px;
+}
+
+:root {
+  /* F5-Q1 : place du toast au-dessus du panneau à 92 %, retrait à gauche qui laisse « Retour » visible (left-3, une cible tactile, puis space-2). */
+  --ligne-toast-retrait-retour: calc(var(--spacing) * 5 + var(--touch-target));
+}
