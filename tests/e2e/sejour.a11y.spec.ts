@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { blockGoogle } from "./carte-helpers";
 import { TRIP, expectSheetAt, fiche, openTrip, sheet } from "./sejour-helpers";
 
-/** Axe (WCAG 2.2 AA) sur les écrans livrés par F5a et F5b : Journée (J2, J5, J6 en préparation), panneau à chaque hauteur, Séjour, Fiche étape. */
+/** Axe (WCAG 2.2 AA) sur les écrans livrés par F5a, F5b et F5c : Journée (J2, J5, J6 en préparation), panneau à chaque hauteur, Séjour, Fiche étape. */
 
 async function expectNoViolations(page: Page) {
   const results = await new AxeBuilder({ page })
@@ -58,6 +58,30 @@ test("sejour: aucune violation axe, panneau à 92 % puis à 25 %", async ({ page
 
 test("sejour: aucune violation axe, Séjour (vue d'ensemble)", async ({ page }) => {
   await openTrip(page, `/dev/voyages/${TRIP}`);
+  await expectNoViolations(page);
+});
+
+// F5c : contenu du Séjour (plaque, budget, liste à réserver cochée, événements, jours), à 92 % et à 25 %.
+test("sejour: aucune violation axe, Séjour à 92 % avec une ligne cochée et le compteur", async ({ page }) => {
+  await openTrip(page, `/voyages/${TRIP}`);
+  await sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true }).click();
+  await page.getByRole("button", { name: "Agrandir le panneau" }).click();
+  await expectSheetAt(page, 0.92);
+  await expectNoViolations(page);
+  await sheet(page)
+    .locator("[data-part='contenu']")
+    .evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expectNoViolations(page);
+});
+
+test("sejour: aucune violation axe, Séjour à 25 %, toutes les lignes faites (compteur masqué)", async ({ page }) => {
+  await openTrip(page, `/voyages/${TRIP}`);
+  for (const name of ["[Excursion dans les Highlands]", "[Château d'Édimbourg]", "[Visite de la distillerie]", "[Assurance voyage]"]) {
+    await sheet(page).getByRole("button", { name, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Agrandir le panneau" }).click();
+  await page.getByRole("button", { name: "Réduire le panneau" }).click();
+  await expectSheetAt(page, 0.25);
   await expectNoViolations(page);
 });
 

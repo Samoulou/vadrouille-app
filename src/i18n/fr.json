@@ -102,6 +102,10 @@
     "repasNonChoisi": {
       "lunch": "Déjeuner pas encore choisi",
       "dinner": "Dîner pas encore choisi"
+    },
+    "checklist": {
+      "reserver": "Réserver",
+      "remunere": "Lien rémunéré"
     }
   },
   "carte": {
@@ -157,7 +161,9 @@
         "raison": "Avec date de consultation, sans date",
         "bandeauTrajet": "Bandeau de trajet (type travel)",
         "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage",
-        "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus"
+        "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus",
+        "plaque": "Plaque destination : bruyère, azulejo, ocre, granit",
+        "checklist": "Ligne à réserver : à faire, faite, sans lien, lien rémunéré (cliquable)"
       },
       "exemples": {
         "garder": "Garder",
@@ -240,6 +246,33 @@
           "verrouillee": {
             "nom": "[Billets du concert]",
             "meta": "[Concert, 1 h 30, billets réservés]"
+          },
+          "plaque": {
+            "noms": {
+              "bruyere": "[Édimbourg]",
+              "azulejo": "[Lisbonne]",
+              "ocre": "[Séville]",
+              "granit": "[Porto]"
+            },
+            "meta": "[sam. 29.08 – jeu. 03.09 · 2 adultes]"
+          },
+          "checklist": {
+            "aFaire": {
+              "label": "[Distillerie], visite",
+              "when": "J2, 15:00, 2 personnes"
+            },
+            "faite": {
+              "label": "[Military Tattoo]",
+              "when": "J1, 21:30, déjà réservé"
+            },
+            "sansLien": {
+              "label": "[Adaptateur électrique]",
+              "when": "[Avant le départ]"
+            },
+            "remuneree": {
+              "label": "[Assurance voyage]",
+              "when": "[Avant le départ]"
+            }
           }
         },
         "verrouiller": "Verrouiller"
@@ -361,10 +394,12 @@
     },
     "evenements": {
       "titreJour": "Événements du jour",
-      "plage": "{start} – {end}"
+      "plage": "{start} – {end}",
+      "prefixe": "J{n} · {date} · {plage}"
     },
     "surprise": {
-      "bouton": "Surprends-moi"
+      "bouton": "Surprends-moi",
+      "mention": "Une idée pour ta journée, pas encore dans ton programme."
     },
     "regionFiche": "Fiche étape",
     "fiche": {
@@ -380,6 +415,30 @@
       "toastVerrouillee": "Étape verrouillée.",
       "toastDeverrouillee": "Verrou retiré.",
       "absente": "Cette étape n'est plus dans ce jour."
+    },
+    "sejour": {
+      "budget": "Budget estimé : environ {montant} CHF par personne",
+      "budgetSansJour": "(sans le jour {n})",
+      "aFaire": {
+        "titre": "À faire avant de partir",
+        "compteur": {
+          "un": "1 réservation à faire",
+          "plusieurs": "{n} réservations à faire"
+        }
+      },
+      "pendant": {
+        "titre": "Pendant ton séjour",
+        "vide": "Aucun événement retenu pour tes dates."
+      },
+      "jourParJour": {
+        "titre": "Jour par jour",
+        "resume": "{etapes} · {duree} de trajet",
+        "etapes": {
+          "un": "1 étape",
+          "plusieurs": "{n} étapes"
+        },
+        "enPreparation": "En préparation"
+      }
     }
   },
   "debloquer": {

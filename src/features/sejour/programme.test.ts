@@ -6,6 +6,7 @@ import { edimbourg } from "@/mocks/edimbourg";
 import {
   INITIAL_PROGRAMME,
   applyProgramme,
+  baseChecklistDone,
   baseLocked,
   createMemoryProgramme,
   programmeReducer,
@@ -74,5 +75,59 @@ describe("programme: verrouiller et annuler (F5-TL-6)", () => {
       { type: "setStopLocked", stopId: "j1-tattoo", locked: false, base: true },
       { type: "undo" },
     ]);
+  });
+});
+
+const doneOf = (trip: typeof edimbourg, id: string) => trip.checklist.find((item) => item.id === id)?.done;
+
+describe("programme: cocher et décocher la liste « À faire avant de partir » (F5c, décision 0015 § 6)", () => {
+  it("cocher le château : écart enregistré, ligne faite dans le voyage affiché, données inchangées", () => {
+    const state = programmeReducer(INITIAL_PROGRAMME, { type: "setChecklistItemDone", itemId: "check-chateau", done: true, base: false });
+    expect(state.checklist).toEqual({ "check-chateau": true });
+    const shown = applyProgramme(edimbourg, state);
+    expect(doneOf(shown, "check-chateau")).toBe(true);
+    // Ordre des lignes conservé (F5-PO-4) ; les autres lignes et les jours ne changent pas.
+    expect(shown.checklist.map((item) => item.id)).toEqual(edimbourg.checklist.map((item) => item.id));
+    expect(shown.days).toBe(edimbourg.days);
+    expect(doneOf(edimbourg, "check-chateau")).toBe(false);
+  });
+
+  it("décocher rétablit les données de l'adaptateur : plus aucun écart, voyage renvoyé tel quel", () => {
+    const checked = programmeReducer(INITIAL_PROGRAMME, { type: "setChecklistItemDone", itemId: "check-chateau", done: true, base: false });
+    const unchecked = programmeReducer(checked, { type: "setChecklistItemDone", itemId: "check-chateau", done: false, base: false });
+    expect(unchecked).toEqual(INITIAL_PROGRAMME);
+    expect(applyProgramme(edimbourg, unchecked)).toBe(edimbourg);
+  });
+
+  it("décocher une ligne faite dans les données (billets du Tattoo)", () => {
+    const state = programmeReducer(INITIAL_PROGRAMME, { type: "setChecklistItemDone", itemId: "check-tattoo", done: false, base: true });
+    expect(doneOf(applyProgramme(edimbourg, state), "check-tattoo")).toBe(false);
+  });
+
+  it("la liste n'a pas d'annulation : cocher ne touche ni aux verrous ni à la modification annulable", () => {
+    const locked = programmeReducer(INITIAL_PROGRAMME, { type: "setStopLocked", stopId: "j2-dean-village", locked: true, base: false });
+    const checked = programmeReducer(locked, { type: "setChecklistItemDone", itemId: "check-chateau", done: true, base: false });
+    expect(checked.locks).toBe(locked.locks);
+    expect(checked.previous).toBe(locked.previous);
+    // « Annuler » du verrou ne décoche pas la ligne.
+    const undone = programmeReducer(checked, { type: "undo" });
+    expect(undone.locks).toEqual({});
+    expect(undone.checklist).toEqual({ "check-chateau": true });
+    const shown = applyProgramme(edimbourg, checked);
+    expect(stopOf(shown, "j2-dean-village")?.locked).toBe(true);
+    expect(doneOf(shown, "check-chateau")).toBe(true);
+  });
+
+  it("baseChecklistDone lit la valeur de l'adaptateur", () => {
+    expect(baseChecklistDone(edimbourg, "check-tattoo")).toBe(true);
+    expect(baseChecklistDone(edimbourg, "check-chateau")).toBe(false);
+    expect(baseChecklistDone(edimbourg, "inconnue")).toBe(false);
+  });
+
+  it("implémentation en mémoire : promesse résolue, événement transmis au réducteur", async () => {
+    const events: ProgrammeEvent[] = [];
+    const actions = createMemoryProgramme(edimbourg, (event) => events.push(event));
+    await expect(actions.setChecklistItemDone("check-chateau", true)).resolves.toBeUndefined();
+    expect(events).toEqual([{ type: "setChecklistItemDone", itemId: "check-chateau", done: true, base: false }]);
   });
 });

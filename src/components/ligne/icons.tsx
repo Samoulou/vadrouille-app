@@ -84,3 +84,12 @@ export function IconPhoto(props: IconProps) {
     </Icon>
   );
 }
+
+/** Coche de la case cochée de `ChecklistRow` (ChecklistRow/preview.html, trait 3). */
+export function IconCoche(props: IconProps) {
+  return (
+    <Icon strokeWidth={3} {...props}>
+      <path d="M5 12l4 4 10-10" />
+    </Icon>
+  );
+}

@@ -40,7 +40,13 @@ describe("valeurs en dur dans les fichiers de F5", () => {
     );
   });
 
-  for (const file of [...files, "src/components/ligne/Sheet.tsx", "src/components/ligne/ReasonBlock.tsx"]) {
+  for (const file of [
+    ...files,
+    "src/components/ligne/Sheet.tsx",
+    "src/components/ligne/ReasonBlock.tsx",
+    "src/components/ligne/ChecklistRow.tsx",
+    "src/components/ligne/DestinationPlate.tsx",
+  ]) {
     it(`${file} : ni couleur, ni px, ni valeur arbitraire`, () => {
       const source = readFileSync(join(ROOT, file), "utf8");
       expect(source).not.toMatch(HEX);
@@ -52,7 +58,12 @@ describe("valeurs en dur dans les fichiers de F5", () => {
 });
 
 describe("textes du programme (handover § 10)", () => {
-  const text = JSON.stringify({ sejour: messages.sejour, raison: messages.ligne.raison, panneau: messages.ligne.panneau });
+  const text = JSON.stringify({
+    sejour: messages.sejour,
+    raison: messages.ligne.raison,
+    panneau: messages.ligne.panneau,
+    checklist: messages.ligne.checklist,
+  });
 
   it.each(["Vérifié", "vérifié", "Aperçu", "Supprimer", "OK", "!"])("n'emploie pas « %s »", (word) => {
     expect(text).not.toContain(word);
@@ -61,5 +72,10 @@ describe("textes du programme (handover § 10)", () => {
   it("emploie « Séjour » pour l'onglet du voyage et « Pourquoi pour toi »", () => {
     expect(messages.ligne.jours.sejour).toBe("Séjour");
     expect(messages.ligne.raison.titre).toBe("Pourquoi pour toi");
+  });
+
+  it("emploie « Réserver » pour le lien de réservation (jamais « Booker »)", () => {
+    expect(messages.ligne.checklist.reserver).toBe("Réserver");
+    expect(JSON.stringify(messages.sejour)).not.toMatch(/book/i);
   });
 });

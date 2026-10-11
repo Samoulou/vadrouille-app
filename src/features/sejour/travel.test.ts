@@ -4,6 +4,7 @@ import type { Day, DayLineItem } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import {
+  daySummary,
   dayTravelLine,
   formatMontant,
   isOverTravelBudget,
@@ -11,6 +12,8 @@ import {
   pathTo,
   pathToLabel,
   travelBannerMessage,
+  tripBudgetLine,
+  tripEvents,
 } from "./travel";
 
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
@@ -148,5 +151,72 @@ describe("travel: ligne trajet et budget", () => {
   it("formate les montants en fr-CH", () => {
     expect(formatMontant(1640)).toBe(new Intl.NumberFormat("fr-CH").format(1640));
     expect(formatMontant(95)).toBe("95");
+  });
+});
+
+describe("travel: budget total du Séjour (F5-PO-3)", () => {
+  it("somme des budgets journaliers par personne : 640 CHF pour Édimbourg", () => {
+    expect(tripBudgetLine(edimbourg.days)).toBe("Budget estimé : environ 640 CHF par personne");
+  });
+
+  it("un jour sans budget est nommé, et n'entre pas dans le total", () => {
+    const days = edimbourg.days.map((candidate) => (candidate.index === 4 ? { ...candidate, budgetPerPerson: undefined } : candidate));
+    expect(tripBudgetLine(days)).toBe("Budget estimé : environ 570 CHF par personne (sans le jour 4)");
+  });
+
+  it("chaque jour sans budget est nommé, dans l'ordre des jours", () => {
+    const days = edimbourg.days.map((candidate) =>
+      candidate.index === 2 || candidate.index === 6 ? { ...candidate, budgetPerPerson: undefined } : candidate,
+    );
+    expect(tripBudgetLine(days)).toBe("Budget estimé : environ 500 CHF par personne (sans le jour 2) (sans le jour 6)");
+  });
+
+  it("aucun jour avec budget : pas de ligne", () => {
+    expect(tripBudgetLine(edimbourg.days.map((candidate) => ({ ...candidate, budgetPerPerson: undefined })))).toBeNull();
+    expect(tripBudgetLine([])).toBeNull();
+  });
+
+  it("montant formaté par Intl.NumberFormat(\"fr-CH\")", () => {
+    expect(tripBudgetLine([{ index: 1, budgetPerPerson: 1200 }])).toBe(
+      `Budget estimé : environ ${new Intl.NumberFormat("fr-CH").format(1200)} CHF par personne`,
+    );
+  });
+});
+
+describe("travel: résumé du jour (« Jour par jour »)", () => {
+  it("nombre d'étapes et durée de trajet au format de F3", () => {
+    const stops = day(2).items.filter((item) => item.type === "stop").length;
+    expect(daySummary(day(2))).toBe(`${stops} étapes · 1 h 25 de trajet`);
+    expect(daySummary(day(5))).toMatch(/ · 2 h 45 de trajet$/);
+  });
+
+  it("singulier pour une étape ; ni le temps libre, ni les segments, ni un repas pas encore choisi ne comptent", () => {
+    const items: DayLineItem[] = [
+      { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+      { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
+      { type: "stop", stop: (day(2).items.find((item) => item.type === "stop") as Extract<DayLineItem, { type: "stop" }>).stop },
+      { type: "free", from: "12:00", to: "14:00" },
+      { type: "openMeal", time: "19:00", meal: "dinner" },
+    ];
+    expect(daySummary({ items, travelMinutes: 10 })).toBe("1 étape · 10 min de trajet");
+  });
+});
+
+describe("travel: événements du séjour (« Pendant ton séjour »)", () => {
+  it("par jour, puis par heure ; seulement les Day.events (le Tattoo, dans le programme, n'y est pas)", () => {
+    const list = tripEvents(edimbourg.days);
+    expect(list.map(({ day: d, event }) => [d.index, event.name])).toEqual([
+      [2, "[Concert d'orgue à St Giles]"],
+      [4, "[Marché nocturne de Leith]"],
+    ]);
+  });
+
+  it("trie par heure de début dans un jour et par jour, quel que soit l'ordre des données", () => {
+    const concert = day(2).events[0]!;
+    const days = [
+      { index: 3, events: [{ ...concert, id: "b", start: "21:00" }, { ...concert, id: "a", start: "09:30" }] },
+      { index: 1, events: [{ ...concert, id: "c", start: "18:00" }] },
+    ];
+    expect(tripEvents(days).map(({ event }) => event.id)).toEqual(["c", "a", "b"]);
   });
 });
