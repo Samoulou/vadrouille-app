@@ -1,6 +1,6 @@
 # 0017 — Décisions du Tech Lead pour F8 (création du voyage et connexion) et suites de D1
 
-Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #62 · Corrections 1 et 2 après les revues de #65
+Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-13, délai compté depuis la correction 3) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09, corrigée le 2026-10-11 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #62 · Corrections 1, 2 et 3 après les revues de #65 (3e tentative accordée par le CEO sur délégation de Samuel, Q119)
 
 ## Contexte
 Six questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` :
@@ -12,6 +12,11 @@ Six questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` :
 Le code de F8 est découpé en trois PR successives (F8-PO-16, découpage proposé au CEO, F8-Q8) : **F8a** (écrans 1 et 2), **F8b** (écrans 3 et 4) et **F8c** (lancement et écran 5). Pour chaque décision, la PR qui l'applique est indiquée. Chaque PR ne crée que ce qu'elle utilise.
 
 Cette décision s'appuie sur les décisions 0013, 0015 et 0016. Elle les amende là où c'est dit : § 3 (0016 § 3.1, emplacement des actions serveur), § 8 (0013 § 3.1), § 11 (`devPagesEnabled`) et § 12 (0013 § 1.5). Elle renvoie au handover back-end (#27, en revue) et à la décision UX/UI 0012 (#26, en revue) sans les présupposer acceptés. Les numéros 0006 à 0012 restent réservés par des PR en revue.
+
+**Coordination avec les décisions 0020, 0021 et 0022** (fusionnées pendant la revue de cette PR) :
+- **0020** (F9) reprend, « dans les mêmes termes », l'emplacement des actions serveur (0020 § 11 = § 3.3 ici), le contrat d'erreur (0020 § 1.3 = § 4), la règle d'identifiant (`TRIP_ID_PATTERN`, 0020 § 1.1 = § 1), la portée de simulation (0020 § 6 = § 10) et `isProductionDeployment` (0020 § 2.3 = § 11.0). Chaque élément est créé par la première PR qui en a besoin (F8a, F8b ou F9a) et réutilisé par l'autre, sans seconde copie. Les sections concernées le rappellent. Cette décision, fusionnée en second, amende 0020 sur un seul point : l'exception du job `docker` (§ 11.3), qui vaut aussi pour `VADROUILLE_DEMO_PAYMENT`.
+- **0021** (F11) ajoute `not_found` et `limit_reached` à `API_ERROR_CODES` (§ 4) : sans conflit.
+- **0022** (F12) fait toucher `playwright.config.ts` par F12a. F8b (§ 11.3), F9a (0020 § 2.3) et T7 (§ 14) le touchent aussi : le CEO en tient compte dans l'ordre des tâches (Q175, Questions liées).
 
 **Coordination avec la décision 0018** (UX/UI, #64, fusionnée) : 0018 § 14 à § 20 fixent les rendus et les textes de F8, dont la marque « déduit » de `SegmentedControl` et des champs numériques (§ 16) et la section « Démonstration » (Q106). La présente décision ne fixe que l'architecture, les contrats et les tests. Quand elle dit « rendu provisoire », c'est le rendu de 0018 qui s'applique. Elle répond aussi à U2-Q2 de 0018 (§ 2.4).
 
@@ -44,7 +49,7 @@ Hors de cette décision :
   - **F8c** : `preparation(tripId)`, avec l'identifiant encodé.
 - **`R-lancer` avant F8c** : la page `R-lancer` n'existe qu'en F8c et répond 404 d'ici là, comme les cibles de l'écran 5 avant F5 et F6 (spécification, « Prérequis vérifiables »). Les critères [b] de F8b qui mènent au lancement (réussite de la connexion, garde) vérifient l'adresse atteinte (`R-lancer`), et non le contenu de la page. F8c ajoute les critères du contenu.
 - **`suite.ts`** : l'écriture et la relecture de `suite` (`connexionRoute(suite)` et `normaliserSuite`) vivent ensemble dans `src/features/compte/suite.ts`. Le module qui écrit une adresse est celui qui la relit (0016 § 7). Il est créé par **F8a**, qui écrit la première adresse `R4(R-lancer)`.
-  - **Validation d'identifiant avant reconstruction** : l'identifiant extrait d'une forme `/voyages/{id}…` doit correspondre entièrement à `^[A-Za-z0-9_-]{1,64}$` avant toute reconstruction. Sinon, la fonction renvoie `/voyages`.
+  - **Validation d'identifiant avant reconstruction** : l'identifiant extrait d'une forme `/voyages/{id}…` doit correspondre entièrement à `TRIP_ID_PATTERN` (`/^[A-Za-z0-9_-]{1,64}$/`, dans `src/contracts/values.ts`, 0020 § 1.1 ; créé par F8a ou F9a, la première des deux) avant toute reconstruction. Sinon, la fonction renvoie `/voyages`.
   - **Reconstruction** : `normaliserSuite` reconstruit la valeur par `tripRoutes("/voyages", id).sejour()`, `presentationRoute(id)` (§ 12) et `creationRoutes.preparation(id)`. Avant F8c, elle reconstruit `/voyages/{id}/preparation` par `tripRoutes(...).sejour()` suivi de `/preparation`. F8c remplace cette ligne par l'appel à `creationRoutes`.
   - **Test hostile exigé de F8a**, en plus des cas de la spécification : `//evil.example`, `/\evil`, `%2e%2e`, `/voyages/%2e%2e/connexion`, `/voyages/..%2Fconnexion`, ainsi que des identifiants avec un caractère Unicode ou une espace insécable.
 - **Point de revue** : aucune adresse de F8 n'est concaténée ailleurs.
@@ -156,6 +161,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - `tests/unit/lint/` le teste : un import de `@/server/actions/creation` depuis `src/features/creation` passe ; un import de `@/server/parse-input` ou de `zod` depuis ce dossier est refusé ; les interdictions précédentes tiennent toujours (point d'attention de 0015 § 1 sur la configuration plate) ;
   - un test vérifie que chaque fichier de `src/server/actions/` commence par la directive `"use server"`.
 - La spécification F8 propose `src/features/creation/actions.ts` et `src/features/compte/actions.ts`. Ce paragraphe remplace ces deux emplacements. Les tests des actions suivent dans `src/server/actions/`.
+- La décision 0020 § 11 reprend cette règle dans les mêmes termes. La première PR qui crée `src/server/` (F8a ou F9a) livre la règle de lint, ses tests et `parse-input.ts` ; l'autre les réutilise.
 
 #### 3.4 Actions serveur : ordre des contrôles
 - **Action authentifiée** (`createTrip`, puis `getGenerationStatus` en B3) :
@@ -212,7 +218,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 ### 4. Q102, partie codes — Contrat d'erreur des actions
 **Décision : le format d'erreur commun du handover back-end (#27, « Format d'erreur commun »), codes en `snake_case`. `invalid_input` est renommé `validation_failed` ; `unauthenticated` est confirmé.**
 
-- **Codes** : `API_ERROR_CODES` (dans `values.ts`, § 2.1) est l'énumération fermée des codes que F8 utilise : `validation_failed`, `unauthenticated`, `rate_limited`, `cost_cap_reached`, `quota_reached`, `provider_error`, `no_option`, `invalid_code`, `code_expired`, `too_many_attempts` et `active_preview_exists`. B6 et suivants l'étendent sans renommer.
+- **Codes** : `API_ERROR_CODES` (dans `values.ts`, § 2.1) est l'énumération fermée des codes que F8 utilise : `validation_failed`, `unauthenticated`, `rate_limited`, `cost_cap_reached`, `quota_reached`, `provider_error`, `no_option`, `invalid_code`, `code_expired`, `too_many_attempts` et `active_preview_exists`. F9 (0020 § 1.3), F11 (0021, `not_found` et `limit_reached`), puis B6 et suivants l'étendent sans renommer. Si F9a crée `errors.ts` avant F8a, F8a y ajoute ses codes.
 - **Types** : `src/contracts/errors.ts` en dérive `ApiErrorCodeSchema`, `ApiError = { code; field?; retryable? }` et `Result<T> = { ok: true; value: T } | { ok: false; error: ApiError }`.
 - **Renommage** : `validation_failed` est le nom du handover, qui l'associe déjà à « erreur de champ du formulaire » avec `field`. Garder `invalid_input` créerait deux noms pour la même erreur entre F8 et B9. Comme le prévoit la spécification (« Codes d'erreur »), le renommage ne change ni les textes, ni les comportements, ni les critères. Les tests importent les codes depuis `src/contracts`.
 - **`field`** : le chemin du premier champ refusé, en pointé (`otherCities.2.arrival`).
@@ -243,7 +249,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - Il est gardé dans un module client minuscule, `src/features/creation/launch-timing.ts` : `markLaunch(tripId, t)` et `takeLaunch(tripId)`, avec une horloge injectable, `performance.now` par défaut.
   - C'est une variable de module, en mémoire de l'onglet, perdue au rechargement : c'est exactement la règle de F8-PO-15 (propriété absente après un rechargement).
   - Aucun stockage navigateur n'est utilisé.
-- **Q79** : la mémoire de l'onglet est retenue pour la phase 0 (F8-PO-1). Avis de la Sécurité, rendu à la revue de #65 sur `142f902` : la mémoire d'onglet est validée, rien n'est persisté côté appareil. Le stockage navigateur de C6 est écarté : il garderait sur l'appareil un récit personnel. Revenir dessus demande un amendement écrit de cette décision et un nouvel avis de la Sécurité.
+- **Q79** : la mémoire de l'onglet est retenue pour la phase 0 (F8-PO-1). Avis de la Sécurité, rendu à la revue de #65 sur `142f902` : la mémoire d'onglet est validée, rien n'est persisté côté appareil. Le stockage navigateur de C6 est écarté : il garderait sur l'appareil un récit personnel. Revenir dessus demande un amendement écrit de cette décision et l'avis de la Sécurité sur ce changement.
 - PR : **F8a** (fournisseur, réducteur, groupe `(creation)`) ; **F8c** (`R-lancer`, `launch-timing.ts`).
 
 ### 6. F8-TL-4 — Marque « déduit » hors `Chip`
@@ -305,7 +311,10 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - **Horloge injectée** : `mock-auth.ts` et `mock-creation.ts` reçoivent `now` à leur construction et n'appellent jamais `Date.now()`. Une règle de lint le vérifie sur ces deux fichiers (`no-restricted-syntax` sur `Date.now`), avec son test dans `tests/unit/lint/`.
 
 #### 10.2 Lecture de la portée
-- `getSimulationScope()` est exporté par `src/adapters/simulation.ts`, module serveur. Il appelle `headers()` de `next/headers`, ce qui suffit à le rendre inutilisable côté client. Les actions de `src/server/actions/` et les pages serveur l'importent depuis `@/adapters`. La règle de lint du § 3.3 sur `@/server/*` ne le concerne donc pas. Une règle `no-restricted-imports` interdit `@/adapters/simulation` dans `src/features/**` et `src/components/**`, avec son test.
+- `getSimulationScope()` est exporté par `src/adapters/simulation.ts`, module serveur qui appelle `headers()` de `next/headers`. La règle de lint du § 3.3 sur `@/server/*` ne le concerne pas.
+  - **`src/adapters/index.ts` ne le réexporte pas**, ni rien de `simulation.ts` : `@/adapters` est importé par du code client (`MOCK_DEMO_DRAFT`, § 7), et `next/headers` ne doit pas entrer dans un bundle client.
+  - Les actions de `src/server/actions/`, les pages et gestionnaires serveur de `src/app/**` et les fabriques de `src/adapters/` l'importent directement depuis `@/adapters/simulation`.
+  - Une règle `no-restricted-imports` interdit `@/adapters/simulation` dans `src/features/**`, `src/components/**` et `src/lib/**`. Son test, dans `tests/unit/lint/`, vérifie aussi que `src/adapters/index.ts` n'importe ni ne réexporte `./simulation`.
 - Il lit l'en-tête `x-vadrouille-simulation` (`headers()` de Next.js) seulement si `devPagesEnabled()` est vrai (§ 11, garde fermée par défaut).
 - La valeur doit correspondre à `^[A-Za-z0-9_-]{1,64}$`, et n'être ni le nom réservé de la portée par défaut (`default`), ni `__proto__`, `constructor` ou `prototype`. Sinon, c'est la portée par défaut, sans erreur.
 - En build de production sans pages de développement, l'en-tête n'a donc aucun effet.
@@ -323,7 +332,7 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 
 #### 10.5 Contrôle `R-sim`
 `R-sim` = `/dev/api/simulation`, gestionnaire de route `POST` dans `src/app/dev/api/simulation/route.ts`. Il répond :
-- 404 si `devPagesEnabled()` est faux. C'est vérifié par `tests/unit/dev-creation.test.tsx` et par une ligne du job `docker` (`curl -X POST`, 404 attendu) ;
+- 404 si `devPagesEnabled()` est faux. C'est vérifié par `tests/unit/dev-creation.test.tsx` et par le job `docker` (`curl -X POST` avec `Content-Type: application/json`, un corps valide et une portée explicite, 404 attendu), sans drapeau puis avec les drapeaux (§ 11.0) ;
 - 415 sans `Content-Type: application/json` ;
 - 413 au-delà de 1 024 octets de corps ;
 - 400 pour un corps hors du schéma strict, qui accepte `{ action: "reset"; now: string }` (date ISO avec fuseau, entre 2020 et 2100) ou `{ action: "advanceClock"; ms: number }` (entier de 0 à 604 800 000, soit 7 jours, par appel) ;
@@ -342,9 +351,15 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - `isProductionDeployment(env)`, fonction pure de `src/dev/flags.ts`, est vraie si **l'une** de ces conditions est remplie :
   - `VADROUILLE_ENV` vaut `production` ;
   - `VERCEL_ENV` vaut `production`.
-- **`VADROUILLE_ENV=production` est fixé dans le `Dockerfile`** (étape d'exécution, à côté de `NODE_ENV=production`). Toute image de production refuse donc la connexion simulée et les pages de développement, quel que soit l'hébergeur (décision 0002, portabilité). `VERCEL_ENV` n'est qu'une seconde condition, propre à Vercel.
-- Le `webServer` de Playwright (build autonome, hors image) ne pose pas `VADROUILLE_ENV`. Le job `docker` vérifie au contraire que l'image le porte : les 404 de `/dev` et de `R-sim` y tiennent même si `VADROUILLE_DEV_PAGES=1` est passé au conteneur (ligne `docker run -e VADROUILLE_DEV_PAGES=1 -e VADROUILLE_DEMO_AUTH=1` ajoutée au job, 404 attendu sur `R3-dev`).
-- `VADROUILLE_ENV` n'est pas un drapeau d'ouverture : il ne peut que fermer. `dev-pages-env.test.ts` (§ 11.3) ne l'interdit donc pas, et vérifie au contraire que le `Dockerfile` le pose à `production`.
+- **Comparaison tolérante, parce que la garde ferme** : chaque valeur est comparée après `trim().toLowerCase()`. ` Production` ou `PRODUCTION` ferment donc aussi. À l'inverse, les drapeaux qui ouvrent (`VADROUILLE_DEV_PAGES`, `VADROUILLE_DEMO_AUTH`) restent comparés exactement à `1` (§ 11.1, § 11.2).
+- **F8b fixe `VADROUILLE_ENV=production` dans le `Dockerfile`**, dans l'étape finale d'exécution (`runner`), à côté de `NODE_ENV=production`. Toute image de production refusera donc la connexion simulée et les pages de développement, quel que soit l'hébergeur (décision 0002, portabilité). `VERCEL_ENV` n'est qu'une seconde condition, propre à Vercel. Si F9a a déjà livré `isProductionDeployment` et cette ligne (0020 § 2.3), F8b les réutilise.
+- Le `webServer` de Playwright (build autonome, hors image) ne pose pas `VADROUILLE_ENV`.
+- **F8b ajoute au job `docker`** de `.github/workflows/ci.yml` une étape nommée exactement `Gardes fermées malgré les drapeaux`. Elle lance un second conteneur de la même image avec les drapeaux d'ouverture passés en arguments `-e` de `docker run` (`-e VADROUILLE_DEV_PAGES=1 -e VADROUILLE_DEMO_AUTH=1`), puis attend 404 :
+  - sur `R3-dev` (`GET`) ;
+  - sur `R-sim` (`POST` avec `Content-Type: application/json`, un corps valide et une portée explicite).
+  
+  C'est `VADROUILLE_ENV=production`, porté par l'image, qui ferme. F9a y ajoute `-e VADROUILLE_DEMO_PAYMENT=1` et sa ligne `R9` (0020 § 5). La première des deux PR crée l'étape, l'autre la complète. Cette étape est la seule exception de configuration versionnée (§ 11.3).
+- `VADROUILLE_ENV` n'est pas un drapeau d'ouverture : il ne peut que fermer. `dev-pages-env.test.ts` (§ 11.3) ne l'interdit donc pas. Il vérifie au contraire que l'**étape finale** du `Dockerfile` (après le dernier `FROM`) pose `VADROUILLE_ENV=production`. Une ligne posée dans une étape de build seulement ne suffit pas.
 
 #### 11.1 Pages de développement et portée (amende `devPagesEnabled` de `src/dev/flags.ts`, utilisé par 0013 § 1.6 et 0015 § 1)
 - `devPagesEnabled(env)` est **toujours faux** si `isProductionDeployment(env)` est vrai.
@@ -357,7 +372,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - `development` et `test` : vrai ;
   - drapeau à `1` : vrai ;
   - drapeau à `true` ou à ` 1` : faux ;
-  - `VERCEL_ENV=production` ou `VADROUILLE_ENV=production`, avec le drapeau, et aussi avec `NODE_ENV` à `development` ou `test` : faux.
+  - `VERCEL_ENV=production` ou `VADROUILLE_ENV=production`, avec le drapeau, et aussi avec `NODE_ENV` à `development` ou `test` : faux ;
+  - `VADROUILLE_ENV` à ` production` ou `PRODUCTION` : faux (comparaison tolérante du § 11.0).
 
 #### 11.2 Adaptateur `auth` simulé
 - `getAuthAdapter()` lève une erreur à l'appel, et non à l'import ni au build, si l'adaptateur retenu est `mock` et que l'une de ces conditions est remplie :
@@ -374,10 +390,18 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 
 #### 11.3 Playwright et configuration versionnée
 - **Playwright** : `playwright.config.ts` pose `VADROUILLE_DEMO_AUTH: "1"` dans `webServer.env`, à côté de `VADROUILLE_DEV_PAGES`.
-- **Configuration versionnée** : `tests/unit/dev-pages-env.test.ts` lit `Dockerfile`, `vercel.json` s'il existe et chaque fichier `.env*` suivi par Git (aujourd'hui `.env.example`). Il lit aussi `.github/workflows/*`, les fichiers compose (`compose*.y*ml`, `docker-compose*.y*ml`) s'il en existe, et `next.config.*`. Il échoue si l'un d'eux pose `VADROUILLE_DEV_PAGES` ou `VADROUILLE_DEMO_AUTH`. **Exception unique** : `playwright.config.ts`, qui n'est pas dans cette liste, les pose pour les tests (ci-dessus).
+- **Configuration versionnée** : `tests/unit/dev-pages-env.test.ts` lit `Dockerfile`, `vercel.json` s'il existe et chaque fichier `.env*` suivi par Git (aujourd'hui `.env.example`). Il lit aussi `.github/workflows/*`, les fichiers compose (`compose*.y*ml`, `docker-compose*.y*ml`) s'il en existe, et `next.config.*`. Il échoue si l'un d'eux pose un drapeau d'ouverture : `VADROUILLE_DEV_PAGES`, `VADROUILLE_DEMO_AUTH`, et `VADROUILLE_DEMO_PAYMENT` (0020 § 2.3). `playwright.config.ts` n'est pas dans cette liste : il les pose pour les tests (ci-dessus).
+- **Exception unique et bornée, l'étape `Gardes fermées malgré les drapeaux` du § 11.0.** Dans les fichiers lus, un drapeau d'ouverture n'est accepté que si toutes ces conditions sont réunies :
+  - le fichier est `.github/workflows/ci.yml`, le job est `docker` et l'étape porte exactement ce nom ;
+  - le drapeau apparaît seulement sous la forme `-e NOM=1`, sur une commande `docker run` de l'image construite par le job (`app:ci`) ;
+  - l'étape n'a pas de clé `env:` et ne fait pas d'`export`, pour que le drapeau n'atteigne que ce conteneur ;
+  - pour chaque drapeau passé, l'étape attend un 404 sur ce qu'il ouvrirait sans la garde : `R3-dev` et `R-sim` pour `VADROUILLE_DEV_PAGES` et `VADROUILLE_DEMO_AUTH`, `R9` pour `VADROUILLE_DEMO_PAYMENT`. L'exception ne sert donc qu'à vérifier une fermeture, quelle que soit la PR (F8b ou F9a) qui crée l'étape.
+  
+  Toute autre occurrence échoue : autre fichier, autre job, autre étape, clé `env:`, valeur autre que `1`. Le test lit le fichier par lignes, sans nouvelle dépendance : l'étape va de sa ligne `- name:` à la suivante du même job, repérée par l'indentation. Il a ses propres cas : une occurrence dans un autre job ou dans un `env:` de l'étape échoue ; l'étape conforme passe.
   - **Plus strict que la spécification**, qui ne visait que `VADROUILLE_DEV_PAGES` : poser la connexion simulée dans un fichier versionné reviendrait à l'ouvrir sur tout déploiement de l'image, ce qui relève de Samuel (Q101).
-  - Aucun des deux drapeaux n'a de préfixe `NEXT_PUBLIC_`.
-- Le 404 des pages de développement dans l'image de production reste vérifié par le job `docker` (0013 § 1.6), avec les lignes de `R3-dev` et de `R-sim`.
+  - Aucun drapeau d'ouverture n'a de préfixe `NEXT_PUBLIC_`.
+- Le 404 des pages de développement dans l'image de production reste vérifié par le job `docker` (0013 § 1.6), avec les lignes de `R3-dev` et de `R-sim`, sans drapeau puis dans l'étape du § 11.0.
+- **Amendement de 0020 § 2.3 et § 5** : la ligne `-e VADROUILLE_DEMO_PAYMENT=1` du job `docker` de F9a se place dans cette même étape, et l'exception ci-dessus la couvre. Sans cela, 0020 § 2.3 (« seul `playwright.config.ts` le pose ») et 0020 § 5 se contrediraient comme le faisaient les § 11.0 et § 11.3 de la correction 2.
 
 #### 11.4 Réservé à Samuel
 - **Q101, F8-Q12** : poser ou non `VADROUILLE_DEMO_AUTH=1` sur un environnement Vercel, et vérifier hors dépôt que `VADROUILLE_DEV_PAGES` n'y est posé nulle part. Ce sont des réglages de compte externe, que le studio ne touche pas.
@@ -422,17 +446,16 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - **`reuseExistingServer: false`** partout. Si le port est occupé, Playwright échoue avec une erreur claire au lieu de tester un autre build ;
   - **port** : `E2E_PORT` s'il est fourni. Sinon, 3100 en CI. Sinon, en local, un port déterminé par le chemin absolu du dépôt : un hachage stable (par exemple FNV-1a) ramené entre 3100 et 3899. Le calcul est une fonction pure de `scripts/` avec son test unitaire (stabilité, bornes).
 - **Coût** : Playwright démarre un seul `webServer` par exécution. `pnpm verify` lance trois exécutions (a11y, e2e, visual), donc trois démarrages du serveur en local. C'est déjà le cas en CI, qui ne réutilise pas de serveur.
-- **T7 — « Serveur Playwright isolé par worktree (Q107) »** (rôle frontend, outillage) : porte ce changement. C'est une petite tâche, jamais dans le même cycle que F8b, qui modifie aussi `playwright.config.ts` (§ 11). Le CEO inscrit T7 dans `docs/roadmap.md` et fixe sa place.
+- **T7 — « Serveur Playwright isolé par worktree (Q107) »** (rôle frontend, outillage) : porte ce changement. C'est une petite tâche, jamais dans le même cycle qu'une autre PR qui modifie `playwright.config.ts` : F8b (§ 11.3), F9a (0020 § 2.3) et F12a (0022 § 2, projet `perf`, qui suit la même règle de port). Le CEO inscrit T7 dans `docs/roadmap.md` et fixe sa place.
 
 ## Conséquences
 - **F8a** (écrans 1 et 2) :
-  - `creationRoutes` (`nouveau`, `brief`, `lancer`) et `suite.ts` avec ses tests hostiles ;
+  - `creationRoutes` (`nouveau`, `brief`, `lancer`) et `suite.ts` avec ses tests hostiles, `TRIP_ID_PATTERN` si F9a ne l'a pas livré ;
   - groupe `(creation)` et `DraftProvider` ;
   - `src/contracts/creation.ts` (`TripDraft`, `BriefRequest` minimisé, `Brief`, `InferredBrief`) et `src/contracts/errors.ts` ;
   - valeurs, énumérations, `isEmailShape` et `CATEGORIES` dans `src/contracts/values.ts` ;
   - `CategorySchema` étendu et libellés des deux tables ;
-  - `CreationAdapter.structureBrief`, son mock, `src/server/actions/creation.ts` et `src/server/parse-input.ts` ;
-  - règle de lint sur `@/server/*` et son test ;
+  - `CreationAdapter.structureBrief`, son mock, `src/server/actions/creation.ts` ; `src/server/parse-input.ts`, règle de lint sur `@/server/*` et son test si F9a ne les a pas livrés (0020 § 11) ;
   - `SegmentedControl` (`inferredValue`, et `value: T | null` s'il n'est pas encore livré) et `NumberField` ;
   - tests de concordance et test de `field`.
 - **F8b** (écrans 3 et 4) :
@@ -441,9 +464,10 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
   - `src/contracts/auth.ts`, `AuthAdapter`, `mock-auth.ts` (magasin minimisé, HMAC) et `src/server/actions/compte.ts` ;
   - avertissement du mode simulé ;
   - `simulation.ts` et `R-sim` (bornes du § 10) ;
-  - `isProductionDeployment`, `VADROUILLE_ENV=production` dans le `Dockerfile` et sa ligne `docker` ;
+  - `isProductionDeployment` (comparaison tolérante) et `VADROUILLE_ENV=production` dans l'étape finale du `Dockerfile`, si F9a ne les a pas livrés ; étape `docker` « Gardes fermées malgré les drapeaux » (`R3-dev` et `R-sim`), créée ou complétée ;
   - `devPagesEnabled` fermé par défaut et garde `VADROUILLE_DEMO_AUTH` ; mise à jour de `dev-flags.test.ts` et de `src/adapters/index.test.ts` ;
-  - `dev-pages-env.test.ts`, lignes `docker` de `R3-dev` et de `R-sim`, règle de lint sur `Date.now`.
+  - `dev-pages-env.test.ts` avec l'exception bornée du § 11.3 et ses cas, lignes `docker` de `R3-dev` et de `R-sim`, règle de lint sur `Date.now` ;
+  - règle de lint sur `@/adapters/simulation` et non-réexport par `src/adapters/index.ts` (§ 10.2).
 - **F8c** (lancement et écran 5) :
   - `creationRoutes.preparation` ;
   - `TripRequest` et `GenerationStatus` (avec `readyStops`), `createTrip` et `getGenerationStatus` ;
@@ -476,7 +500,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 **Nouvelles questions** :
 - **UX/UI** (2026-10-09) : avec le nouveau code `heritage` (« Patrimoine et monuments »), la phrase de F6 pour `museum` (« les musées et monuments ») recoupe celle de `heritage`. Faut-il la réduire à « les musées » ? Il faut aussi les trois phrases de `presentation.categories` pour `heritage`, `market` et `nightlife`. **Bloque** : rien. F8a livre des textes provisoires.
 - **UX/UI** (2026-10-09) : texte et rendu de l'avertissement de l'écran 4 quand la connexion est simulée (§ 3.5). **Bloque** : rien en local et en CI. C'est nécessaire avant toute ouverture sur un déploiement (Q101).
-- **CEO** (2026-10-09) : inscrire T6 (positions simulées du voyage débloqué) et T7 (serveur Playwright isolé par worktree) dans `docs/roadmap.md` et fixer leur place. T6 n'est pas dans le même cycle que F8b, F8c ou F7a ; T7 pas dans le même cycle que F8b. **Bloque** : rien pour F8a.
+- **CEO** (2026-10-09) : inscrire T6 (positions simulées du voyage débloqué) et T7 (serveur Playwright isolé par worktree) dans `docs/roadmap.md` et fixer leur place. T6 n'est pas dans le même cycle que F8b, F8c ou F7a ; T7 pas dans le même cycle que F8b, F9a ou F12a. **Bloque** : rien pour F8a.
+- **CEO** (2026-10-11), pour Q175 : la liste des fichiers partagés de 0022 (« `playwright.config.ts` n'est plus touché que par F12a ») vaut entre les PR de F12. Hors F12, F8b, F9a et T7 touchent aussi `playwright.config.ts`, et F8b, F9a et F12a touchent `ci.yml`. **Bloque** : rien, c'est une contrainte d'ordre.
 
 **Questions déjà ouvertes, rappelées** :
 - **Q101** (Samuel, comptes et environnements) : connexion simulée sur un déploiement, et contrôle de `VADROUILLE_DEV_PAGES` hors dépôt (§ 11). **Limite à connaître** : la session simulée est partagée par tous les visiteurs d'une instance, une connexion vaut pour tous, et le code est connu de tous. La garde refuse en tout cas tout déploiement de production (`VADROUILLE_ENV=production`, posé par le `Dockerfile`, ou `VERCEL_ENV=production`) tant que cette décision n'est pas amendée. Là où `/dev` est ouvert, le nom d'une portée n'est pas un secret.
