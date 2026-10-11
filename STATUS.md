@@ -45,5 +45,5 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
   - avant le 2026-10-13 : décisions 0017, 0019, 0023, **0024 (#125)**, écarts de F9a et de F5b, Q182, F10-PO-1 à F10-PO-22 et Q185, décision 0012, F7-PO-20 et F7-PO-21, **F8-PO-18 à F8-PO-22 (#126)**.
 
 ## Part d'usage estimée
-- 33e cycle : environ 1,4 million de jetons (estimation), avec 3 sous-agents et 2 corrections : 5 PR fusionnées (#109, #117, #125, #126, plus #114 avant le cycle), 1 PR en revue (#128).
+- 33e cycle : environ 1,4 million de jetons (estimation), avec 3 sous-agents et 2 corrections : 4 PR fusionnées pendant le cycle (#109, #117, #125, #126), 1 PR en revue (#128).
 - Part de l'abonnement : impossible à mesurer depuis la routine.
