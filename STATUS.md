@@ -1,19 +1,19 @@
-# État du studio — 2026-10-11 (26e cycle)
+# État du studio — 2026-10-11 (27e cycle)
 
 Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
 
-État du 25e cycle fusionné (#102, b26bbd4).
+État du 26e cycle fusionné (#103, 81af1e6).
 
 ## Messages de Samuel traités
-- Aucun nouveau message dans #studio depuis le résumé du 25e cycle (2026-10-10 23:08 CEST).
+- Aucun nouveau message dans #studio depuis le résumé du 26e cycle (2026-10-11 02:08 CEST).
 
 ## Fait
-- Fusionnée : l'état du 25e cycle (#102, b26bbd4). Rien d'autre (6e cycle de suite) : aucune revue, aucune tâche prête, aucun nouveau ticket.
+- Fusionnée : l'état du 26e cycle (#103, 81af1e6). Rien d'autre (7e cycle de suite) : aucune revue, aucune tâche prête, aucun nouveau ticket.
 - Rappel du 20e cycle : **T13 (#95) fusionnée** (97a219e), décision 0022.
 
 ## En cours (toutes en `needs-review`, sans nouvelle revue depuis le 19e cycle)
-- **Q181** : la revue R2 n'a rien publié depuis la fusion de #95 (03:21 UTC), soit environ 21 h à 00:08 UTC le 2026-10-11. Dernière revue de #86 : 2026-10-09 22:37 UTC (25 h 30).
-- **F9a — Débloquer, paiement simulé (PR #86, ticket #83)** : 2e et dernière correction faite (145f3d9) le 2026-10-10 à 00:16 UTC ; CI `verify` et `docker` verte ; `gate` attend `techlead-approved`. Aucune revue depuis 24 h. Si une 3e correction est demandée, la tâche passe en bloqué.
+- **Q181** : la revue R2 n'a rien publié depuis la fusion de #95 (2026-10-10 03:21 UTC), soit environ 24 h à 03:08 UTC le 2026-10-11. Dernière revue de #86 : 2026-10-09 22:37 UTC (28 h 30).
+- **F9a — Débloquer, paiement simulé (PR #86, ticket #83)** : 2e et dernière correction faite (145f3d9) le 2026-10-10 à 00:16 UTC ; CI `verify` et `docker` verte ; `gate` attend `techlead-approved`. Aucune revue depuis 27 h. Si une 3e correction est demandée, la tâche passe en bloqué.
 - **T8 — Décision 0019 (PR #72, ticket #71)** et **U2 — Correction de la décision 0018 (PR #67, ticket #63)** : en attente de revue depuis le 2026-10-09 (15:16 et 09:55 UTC).
 - **Correction du constat des cycles précédents** : `gate` n'exige `techlead-approved` que si la PR touche autre chose que `STATUS.md`, `QUESTIONS.md` ou `docs/releases/`. Les PR d'état fusionnent donc seules (#99 en 24 s) ; seules #86, #72 et #67 attendent la revue R2.
 
@@ -31,7 +31,7 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 
 ## Décisions attendues de Samuel
 - **Règles du studio** :
-  - **Q181 (la plus urgente avec Q119)** : la routine de revue R2 n'a rien publié depuis le 2026-10-10 03:21 UTC (21 h) ; à vérifier ;
+  - **Q181 (la plus urgente avec Q119)** : la routine de revue R2 n'a rien publié depuis le 2026-10-10 03:21 UTC (24 h) ; à vérifier ;
   - Q163 : 3e tentative pour la spec F10 (#76), dont les 5 bloquants restants sont un alignement sur 0020, fusionnée après sa rédaction ; ou attente de Q122 ;
   - **Q119 (la plus urgente)** : 3e tentative pour #65 et #66, découpage, ou attente. Toute la suite du code en dépend ;
   - Q120 à Q122 (décision 0019) : règle de revue dans le prompt R2, libellés `ux-approved` et `secu-approved`, correction due à un bloquant signalé tard non comptée comme tentative ;
@@ -83,6 +83,6 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 3. Product Owner, après #67 et #72 : une seule PR pour la spec F7 (Q110, Q104, 0019), plus Q136, Q147, Q158 et Q159 ; Q178 et Q180 à la prochaine mise à jour de la spec F12.
 
 ## Part d'usage estimée
-- 26e cycle (2026-10-11) : environ 30 000 jetons (estimation), pilotage et état seulement ; aucune tâche prête.
+- 27e cycle (2026-10-11) : environ 30 000 jetons (estimation), pilotage et état seulement ; aucune tâche prête.
 - Part de l'abonnement : non mesurable depuis la routine.
-- Messages de Samuel dans #studio depuis le 25e cycle (23:08 CEST) : aucun.
+- Messages de Samuel dans #studio depuis le 26e cycle (02:08 CEST) : aucun.
