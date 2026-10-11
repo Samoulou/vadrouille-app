@@ -13,7 +13,8 @@ async function messagesFor(code: string, filePath: string, rules: string[]) {
   return result?.messages.filter((m) => m.ruleId !== null && rules.includes(m.ruleId)) ?? [];
 }
 
-const IMPORTS = ["no-restricted-imports"];
+// T4 (0016 § 3.1 règle 4) : dans src/features, les interdits passent par la variante typescript-eslint.
+const IMPORTS = ["no-restricted-imports", "@typescript-eslint/no-restricted-imports"];
 const simulatedImport = `import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";\nexport const s = SimulatedMapRenderer;\n`;
 const modelImport = `import { fitCamera } from "../../components/carte/simulated-model";\nexport const f = fitCamera;\n`;
 const mocksImport = `import { edimbourg } from "@/mocks/edimbourg";\nexport const e = edimbourg;\n`;

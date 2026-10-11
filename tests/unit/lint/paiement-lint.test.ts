@@ -14,7 +14,9 @@ async function messagesFor(code: string, filePath: string, rules: string[]) {
   return result?.messages.filter((m) => m.ruleId !== null && rules.includes(m.ruleId)) ?? [];
 }
 
-const IMPORTS = ["no-restricted-imports"];
+// T4 (0016 § 3.1 règle 4) : dans le code chargé par le navigateur, les interdits passent par la variante
+// typescript-eslint de la règle ; les deux noms comptent, un import interdit n'est signalé qu'une fois.
+const IMPORTS = ["no-restricted-imports", "@typescript-eslint/no-restricted-imports"];
 const importOf = (source: string) => `import * as m from "${source}";\nexport const x = m;\n`;
 
 describe("imports de src/server hors de src/server", () => {

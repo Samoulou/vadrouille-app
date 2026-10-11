@@ -1,17 +1,23 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
-import { CategorySchema, type PreferenceReason } from "@/contracts";
-import { CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
+import type { PreferenceReason } from "@/contracts";
+import { CATEGORIES, CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
 
 /**
  * Événements de mesure (handover § 12, spécification F6, décision 0013 § 3.3).
  *
- * Union discriminée Zod d'objets stricts : une propriété inconnue est refusée, ce qui empêche d'y
- * glisser un nom de lieu, un `placeId`, un identifiant de proposition ou un texte libre. Toutes les
- * propriétés sont des codes fermés ou des nombres.
+ * Union discriminée d'objets stricts : une propriété inconnue est refusée, ce qui empêche d'y glisser un nom
+ * de lieu, un `placeId`, un identifiant de proposition ou un texte libre. Toutes les propriétés sont des codes
+ * fermés ou des nombres.
+ *
+ * Écrits avec `zod/mini`, le point d'entrée léger du paquet `zod` (décision 0016 § 3.1 règle 3) : ce module
+ * est chargé par le navigateur et n'embarque pas le Zod complet. Les variantes suivantes s'écrivent de même.
  */
 
-const PositionSchema = z.number().int().positive();
+const PositionSchema = z.int().check(z.positive());
+
+/** Catégorie d'une proposition, tirée de la même liste que `CategorySchema` (`CATEGORIES`). */
+const CategoryPropertySchema = z.enum(CATEGORIES);
 
 /** Raisons des événements, en `snake_case` (F6-PO-14). */
 export const EventReasonSchema = z.enum(["not_my_style", "too_busy", "too_expensive", "too_far", "other"]);
@@ -31,12 +37,12 @@ export const DeckDecisionEventSchema = z.strictObject({
   properties: z.strictObject({
     decision: z.enum(["like", "dislike"]),
     kind: z.enum(["activity", "meal"]),
-    category: CategorySchema,
+    category: CategoryPropertySchema,
     position: PositionSchema,
     gesture: z.enum(["swipe", "button", "key"]),
-    travel_minutes: z.number().int().nonnegative(),
+    travel_minutes: z.int().check(z.nonnegative()),
     /** Jamais renseigné dans F6 : la raison se donne dans la feuille (F6-PO-14). */
-    reason: EventReasonSchema.optional(),
+    reason: z.optional(EventReasonSchema),
   }),
 });
 
@@ -57,9 +63,9 @@ export const DeckSkippedEventSchema = z.strictObject({
 export const PreferencePromptAnsweredEventSchema = z.strictObject({
   name: z.literal("preference_prompt_answered"),
   properties: z.strictObject({
-    category: z.union([CategorySchema, z.literal("distance")]),
+    category: z.union([CategoryPropertySchema, z.literal("distance")]),
     answer: z.enum(["yes", "no"]),
-    reason: EventReasonSchema.optional(),
+    reason: z.optional(EventReasonSchema),
   }),
 });
 

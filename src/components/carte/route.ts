@@ -1,4 +1,5 @@
-import { mapPointKey, type Day, type DayMap, type MapPointRef } from "@/contracts";
+import type { Day, DayMap, MapPointRef } from "@/contracts";
+import { mapPointKey } from "@/contracts/values";
 
 /**
  * Construction du contenu de la carte à partir de `Day.items` et de `DayMap` (spécification F4).

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema } from "./category";
+import { PREFERENCE_REASONS } from "./values";
 
 /**
  * Question de préférence et réponse de la présentation (décision 0013, § 3.2).
@@ -9,8 +10,8 @@ import { CategorySchema } from "./category";
  * de `DeckDecisionResult`) sans renommer ceux-ci.
  */
 
-/** Codes de raison de B0 : Pas mon style, Trop chargé, Trop cher, Trop loin, Autre raison (dans cet ordre). */
-export const PreferenceReasonSchema = z.enum(["notMyStyle", "tooBusy", "tooExpensive", "tooFar", "other"]);
+/** Codes de raison de B0 : Pas mon style, Trop chargé, Trop cher, Trop loin, Autre raison (dans cet ordre, `values.ts`). */
+export const PreferenceReasonSchema = z.enum(PREFERENCE_REASONS);
 export type PreferenceReason = z.infer<typeof PreferenceReasonSchema>;
 
 export const PreferencePromptSchema = z.discriminatedUnion("kind", [
