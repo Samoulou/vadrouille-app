@@ -56,6 +56,18 @@ export const MOCK_DEMO_UNLOCKED_TRIP = {
 } as const;
 
 /**
+ * Pendant débloqué d'un voyage simulé (décision 0020 § 3) : après un paiement simulé réussi,
+ * `getTripReader()` sert le contenu du pendant sous l'identifiant payé.
+ */
+const UNLOCK_COUNTERPARTS: Readonly<Record<string, string>> = {
+  [EDIMBOURG_TRIP_ID]: EDIMBOURG_DEBLOQUE_TRIP_ID,
+};
+
+export function counterpartOf(tripId: string): string | undefined {
+  return Object.hasOwn(UNLOCK_COUNTERPARTS, tripId) ? UNLOCK_COUNTERPARTS[tripId] : undefined;
+}
+
+/**
  * Adaptateur simulé : lit les jeux de `src/mocks`, valide chaque sortie avec
  * les schémas de `src/contracts` (une erreur de jeu échoue tôt) et ne renvoie
  * rien pour une autre organisation.
