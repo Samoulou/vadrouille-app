@@ -1,11 +1,17 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { DayMapSchema, TripSchema } from "@/contracts";
-import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, edimbourg } from "@/mocks/edimbourg";
+import { DayMapSchema, TripSchema, validateDayMap } from "@/contracts";
+import {
+  EDIMBOURG_DEBLOQUE_TRIP_ID,
+  EDIMBOURG_TRIP_ID,
+  MOCK_ORGANIZATION_ID,
+  edimbourg,
+  edimbourgDebloque,
+} from "@/mocks/edimbourg";
 import { edimbourgCarte } from "@/mocks/edimbourg-carte";
 
-import { MOCK_DEMO_TRIP, createMockTripAdapter, mockTripAdapter } from "./mock";
+import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, createMockTripAdapter, mockTripAdapter } from "./mock";
 
 const ownCtx = { organizationId: MOCK_ORGANIZATION_ID };
 const otherCtx = { organizationId: "mock_org_autre" };
@@ -85,5 +91,30 @@ describe("adaptateur mock", () => {
 
   it("expose la référence du voyage de démonstration pour les pages de développement", async () => {
     expect(await mockTripAdapter.getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId)).not.toBeNull();
+  });
+
+  // Bug #106 : sur la démonstration, le Jour 1 du voyage débloqué affichait « Carte indisponible »
+  // malgré la clé et le Map ID, faute de positions simulées pour ce voyage.
+  describe("voyage débloqué de la démonstration (bug #106)", () => {
+    const { ctx, tripId } = MOCK_DEMO_UNLOCKED_TRIP;
+
+    it("renvoie les positions du jour 1, validées pour le voyage débloqué", async () => {
+      const map = await mockTripAdapter.getDayMap(ctx, tripId, 1);
+      expect(map).not.toBeNull();
+      expect(map?.tripId).toBe(EDIMBOURG_DEBLOQUE_TRIP_ID);
+      const day = edimbourgDebloque.days.find((candidate) => candidate.index === 1)!;
+      expect(validateDayMap(day, map!, EDIMBOURG_DEBLOQUE_TRIP_ID)).toEqual([]);
+    });
+
+    it("positionne les jours 1 à 5 ; le J6 en préparation n'a pas de position", async () => {
+      const maps = await mockTripAdapter.getTripMap(ctx, tripId);
+      expect(maps.map((map) => map.dayIndex)).toEqual([1, 2, 3, 4, 5]);
+      expect(await mockTripAdapter.getDayMap(ctx, tripId, 6)).toBeNull();
+    });
+
+    it("ne renvoie aucune position pour une autre organisation (isolation)", async () => {
+      expect(await mockTripAdapter.getDayMap(otherCtx, tripId, 1)).toBeNull();
+      expect(await mockTripAdapter.getTripMap(otherCtx, tripId)).toEqual([]);
+    });
   });
 });
