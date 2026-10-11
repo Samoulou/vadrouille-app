@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema } from "./category";
+import { DETOUR_THRESHOLD_MINUTES } from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -162,9 +163,6 @@ export const TripSchema = z.strictObject({
   unlocked: z.boolean(),
 });
 export type Trip = z.infer<typeof TripSchema>;
-
-/** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
-export const DETOUR_THRESHOLD_MINUTES = 20;
 
 export const ProposalSchema = z
   .strictObject({

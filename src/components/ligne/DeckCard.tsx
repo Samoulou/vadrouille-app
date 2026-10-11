@@ -9,7 +9,8 @@ import {
   type Ref,
 } from "react";
 
-import { DETOUR_THRESHOLD_MINUTES, type Exception, type Proposal } from "@/contracts";
+import type { Exception, Proposal } from "@/contracts";
+import { DETOUR_THRESHOLD_MINUTES } from "@/contracts/values";
 import {
   MAX_ROTATION,
   TAP_MAX_DISTANCE,

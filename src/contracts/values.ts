@@ -3,9 +3,29 @@
  * les schémas de `src/contracts` en dérivent, il n'y a donc pas de seconde copie. Le code client lit
  * ces valeurs ici (`@/contracts/values`) et les types depuis `@/contracts` par `import type`.
  *
- * Créé par F9a avec les seules valeurs du paiement (décision 0020 § 1.1) ; T4 et F8a le complètent
- * sans renommer.
+ * Créé par F9a avec les seules valeurs du paiement (décision 0020 § 1.1) ; T4 y ajoute celles de la carte,
+ * de la présentation et de la mesure ; F8a le complète sans renommer.
+ *
+ * Seuls des `import type` sont permis ici : ils disparaissent à la compilation.
  */
+import type { MapPointRef } from "./map";
+
+/** Catégories d'une proposition (décision 0013 § 3.1 ; codes provisoires de F6-PO-10). Source de `CategorySchema`. */
+export const CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant"] as const;
+
+/**
+ * Codes de raison de B0, dans l'ordre d'affichage : Pas mon style, Trop chargé, Trop cher, Trop loin,
+ * Autre raison. Source de `PreferenceReasonSchema`.
+ */
+export const PREFERENCE_REASONS = ["notMyStyle", "tooBusy", "tooExpensive", "tooFar", "other"] as const;
+
+/** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
+export const DETOUR_THRESHOLD_MINUTES = 20;
+
+/** Clé unique d'une référence de point de carte : « stop:<id> » ou « terminus:<role> ». */
+export function mapPointKey(ref: MapPointRef): string {
+  return ref.type === "stop" ? `stop:${ref.stopId}` : `terminus:${ref.role}`;
+}
 
 /**
  * Codes de variante de prix, liste fermée (décision 0020 § 4). Ajouter un code est un changement de
