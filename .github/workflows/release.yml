@@ -1,0 +1,83 @@
+name: release
+# Release automatique (consigne de Samuel du 2026-10-11, Q118 ; décision 0023 § 5).
+# Pour chaque note docs/releases/vAAAA.MM.JJ-HH.md de main sans release GitHub :
+#   1. tag = nom du fichier sans .md, posé sur le commit qui a ajouté la note ;
+#   2. release GitHub avec la note comme corps (GITHUB_TOKEN, contents: write) ;
+#   3. note postée dans #studio par le secret SLACK_WEBHOOK_STUDIO (avertissement s'il manque).
+# Idempotent : une note dont la release existe est ignorée, sans second message Slack.
+# Remplace release-notify.yml : une release créée avec GITHUB_TOKEN ne déclenche pas
+# l'événement release, et le message Slack part d'ici, une seule fois.
+# Le créneau horaire rattrape une note fusionnée par la fusion automatique : une fusion
+# faite avec GITHUB_TOKEN peut ne pas déclencher l'événement push.
+# Les revues hebdomadaires (docs/releases/hebdo-*.md) ne créent ni tag ni release.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/releases/*.md']
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { fetch-depth: 0 }
+      - name: Créer les tags et les releases manquants
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          : > published.txt
+          for file in docs/releases/v*.md; do
+            tag=$(node scripts/ci/release-note.mjs tag "$file")
+            if [ -z "$tag" ]; then
+              echo "$file : pas une note de release, ignorée."
+              continue
+            fi
+            if gh release view "$tag" --repo "$REPO" > /dev/null 2>&1; then
+              echo "$tag : release déjà publiée."
+              continue
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" --notes-file "$file"
+            else
+              target=$(git log --diff-filter=A --format=%H -1 -- "$file")
+              gh release create "$tag" --repo "$REPO" --target "${target:-$GITHUB_SHA}" \
+                --title "$tag" --notes-file "$file"
+            fi
+            url=$(gh release view "$tag" --repo "$REPO" --json url --jq .url)
+            printf '%s\t%s\t%s\n' "$tag" "$url" "$file" >> published.txt
+            echo "$tag : release publiée, $url"
+          done
+      - name: Envoyer les notes publiées dans #studio
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_STUDIO }}
+        run: |
+          if [ ! -s published.txt ]; then
+            echo "Aucune nouvelle release."
+            exit 0
+          fi
+          if [ -z "$WEBHOOK" ]; then
+            echo "::warning::Secret SLACK_WEBHOOK_STUDIO absent : note(s) non envoyée(s) dans #studio."
+            exit 0
+          fi
+          status=0
+          while IFS=$'\t' read -r tag url file; do
+            node scripts/ci/release-note.mjs slack "$tag" "$url" "$file" > payload.json
+            if curl -sS --fail-with-body -X POST -H 'Content-type: application/json' \
+              --data @payload.json "$WEBHOOK" > /dev/null; then
+              echo "$tag : note envoyée dans #studio."
+            else
+              echo "::error::$tag : envoi Slack en échec ; la release existe, poster la note à la main."
+              status=1
+            fi
+          done < published.txt
+          exit $status
