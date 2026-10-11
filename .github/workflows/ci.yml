@@ -76,6 +76,8 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer/confirmation?paiement=AAAAAAAAAAAAAAAAAAAAAA')" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'x-vadrouille-simulation: ci' -d '{"action":"advanceClock","ms":0}' http://127.0.0.1:3000/dev/api/simulation)" = "404"
           if curl -fsS http://127.0.0.1:3000/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats/erreur)" = "404"
           docker rm -f app
           # VADROUILLE_ENV=production ferme le paiement simulé même avec le drapeau de démonstration.
           docker run -d --name app-drapeau -p 3001:3000 -e VADROUILLE_DEMO_PAYMENT=1 app:ci
