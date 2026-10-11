@@ -37,6 +37,8 @@ export interface LighthouseRun {
   scores: Scores;
   /** Requêtes vers un autre hôte que l'application (attendu : aucune, Google bloqué compris). */
   foreignRequests: string[];
+  /** Adresse affichée à la fin du chargement (chemin et requête) : une redirection mesurerait une autre page. */
+  finalPath: string;
   /** Erreur d'exécution de Lighthouse (page non chargée, etc.), sinon `null`. */
   runtimeError: string | null;
 }
@@ -130,6 +132,7 @@ export async function runLighthouse(port: number, target: LighthouseTarget, run:
     run,
     scores,
     foreignRequests,
+    finalPath: new URL(lhr.finalDisplayedUrl).pathname + new URL(lhr.finalDisplayedUrl).search,
     runtimeError: lhr.runtimeError ? `${lhr.runtimeError.code} : ${lhr.runtimeError.message}` : null,
   };
   appendSummary(measured);

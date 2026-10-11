@@ -56,6 +56,7 @@ async function measure(route: RouteEntry, baseURL: string, runs: number) {
     const result = await runLighthouse(port, target, run);
     console.log(formatRun(result));
     expect(result.runtimeError, `${route.id} passage ${run}`).toBeNull();
+    expect(result.finalPath, `${route.id} passage ${run} : page redirigée`).toBe(result.path);
     expect(result.foreignRequests, `${route.id} passage ${run} : requêtes hors de l'application`).toEqual([]);
     expect(result.scores.accessibility, `${route.id} passage ${run} : accessibilité`).toBe(ACCESSIBILITY_REQUIRED);
     results.push(result);

@@ -56,6 +56,8 @@ test.describe("budget: JavaScript initial par route", () => {
       }
 
       expect(measure.scripts.length).toBeGreaterThan(0);
+      const url = new URL(page.url());
+      expect(`${url.pathname}${url.search}`, `${route.id} : page redirigée pendant la mesure`).toBe(path);
       const known = route.knownExceedance;
       if (route.budgets.javascript === "seuil" && known) {
         test.info().annotations.push({ type: "dépassement connu", description: `${route.id} : ${known.reason}` });

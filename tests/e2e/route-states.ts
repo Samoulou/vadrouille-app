@@ -40,6 +40,12 @@ export interface PreparedRoute {
  */
 export type RoutePreparation = (page: Page, baseURL: string) => Promise<PreparedRoute>;
 
+/**
+ * Délai de confirmation simulé de `confirmation-en-attente` : le plus long accepté par `R-sim` (10 minutes) ;
+ * l'horloge de la portée n'avance que par `R-sim`, la confirmation reste donc en attente pendant la mesure.
+ */
+const CONFIRMATION_DELAY_MS = 600_000;
+
 export const ROUTE_PREPARATIONS = {
   /** `R9-sim` : paiement par carte commencé depuis l'écran 9, en attente. */
   "paiement-en-attente": async (page, baseURL) => {
@@ -48,9 +54,13 @@ export const ROUTE_PREPARATIONS = {
     await startPayment(page, "card");
     return { path: pathOf(page), scope: scope.name };
   },
-  /** `R9-retour` : paiement simulé réussi, page de confirmation. */
-  "paiement-reussi": async (page, baseURL) => {
+  /**
+   * `R9-retour` : paiement simulé réussi, confirmation en attente (l'écran affiché ; une fois confirmée, la page
+   * remplace aussitôt l'adresse par le Séjour).
+   */
+  "confirmation-en-attente": async (page, baseURL) => {
     const scope = await createScope(page.context(), baseURL);
+    await scope.control({ action: "configurePayment", confirmationDelayMs: CONFIRMATION_DELAY_MS });
     await openOffer(page);
     await startPayment(page, "card");
     await simulate(page, "Simuler un paiement réussi");

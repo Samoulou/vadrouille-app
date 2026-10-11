@@ -18,7 +18,7 @@ export type RouteStateName = "fiche-ouverte" | "annulation-proposee";
  * identifiant). L'action, dans `route-states.ts` (`ROUTE_PREPARATIONS`), crée l'état dans une portée de
  * simulation explicite (0017 § 10.3) et renvoie l'adresse réelle à mesurer.
  */
-export type RoutePreparationName = "paiement-en-attente" | "paiement-reussi";
+export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente";
 
 /** `seuil` : budget bloquant ; `journal` : mesuré et journalisé sans seuil. */
 export type BudgetMode = "seuil" | "journal";
@@ -105,7 +105,7 @@ export const ROUTES: readonly RouteEntry[] = [
     id: "R9-retour",
     path: `${TRIP}/debloquer/confirmation?paiement=[paiementId]`,
     page: "voyages/[id]/debloquer/confirmation/page.tsx",
-    prepare: "paiement-reussi",
+    prepare: "confirmation-en-attente",
     states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
