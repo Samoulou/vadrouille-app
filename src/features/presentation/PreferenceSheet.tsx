@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 
 import { Button, Chip } from "@/components/ligne";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
-import { PreferenceReasonSchema, type Category, type PreferenceAnswer, type PreferencePrompt, type PreferenceReason } from "@/contracts";
+import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason } from "@/contracts";
+import { PREFERENCE_REASONS } from "@/contracts/values";
 import { format, messages } from "@/i18n";
 
 const t = messages.presentation;
@@ -13,7 +14,7 @@ const t = messages.presentation;
 const CATEGORY_LABELS: Record<Category, string> = t.categories;
 
 /** Raisons, dans l'ordre imposé (handover § 6 écran 14, § 10). */
-const REASONS: readonly PreferenceReason[] = PreferenceReasonSchema.options;
+const REASONS: readonly PreferenceReason[] = PREFERENCE_REASONS;
 
 export function promptTitle(prompt: PreferencePrompt): string {
   if (prompt.kind === "distance") {

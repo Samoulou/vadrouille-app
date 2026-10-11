@@ -4,7 +4,6 @@ export {
   CommitmentSchema,
   DayLineItemSchema,
   DaySchema,
-  DETOUR_THRESHOLD_MINUTES,
   ExceptionSchema,
   IsoDateSchema,
   MealSchema,
@@ -37,7 +36,6 @@ export {
   DayMapSchema,
   MapPointRefSchema,
   MapPointSchema,
-  mapPointKey,
   validateDayMap,
 } from "./map";
 export type { DayMap, MapPoint, MapPointRef } from "./map";
@@ -74,4 +72,6 @@ export type {
 } from "./billing";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
+// Valeurs sans Zod (décision 0016 § 3.1 règle 1) : `mapPointKey`, `DETOUR_THRESHOLD_MINUTES`, `CATEGORIES`,
+// `PREFERENCE_REASONS` et celles du paiement. Le code serveur continue de les lire ici.
 export * from "./values";

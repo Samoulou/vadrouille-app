@@ -55,10 +55,24 @@ const SIMULATION_PATTERN = {
   message: "La portée des simulations ne s'importe pas dans un écran (décision 0017 § 10.2) : passe par une page serveur.",
 };
 
-/** F9a : pas de Zod complet dans un écran (décision 0016 § 3.1 règle 4, test exigé par 0020 § 11). */
+/** F9a, T4 : pas de Zod complet dans le code chargé par le navigateur (décision 0016 § 3.1 règle 4) ; `zod/mini` passe. */
 const ZOD_PATH = {
   name: "zod",
-  message: "Pas de zod dans le code chargé par le navigateur (décision 0016 § 3.1) : valeurs par @/contracts/values.",
+  message: "Pas de zod dans le code chargé par le navigateur (décision 0016 § 3.1) : zod/mini, ou valeurs par @/contracts/values.",
+};
+
+/** T4 : types seulement depuis @/contracts, dont l'index charge tous les schémas Zod (décision 0016 § 3.1 règles 2 et 4). */
+const CONTRACTS_PATH = {
+  name: "@/contracts",
+  allowTypeImports: true,
+  message: "Types seulement depuis @/contracts (import type) ; valeurs depuis @/contracts/values (décision 0016 § 3.1).",
+};
+
+/** T4 : même règle pour les autres modules de @/contracts, qui importent tous zod ; `values` seul passe. */
+const CONTRACTS_MODULES_PATTERN = {
+  group: ["@/contracts/*", "!@/contracts/values"],
+  allowTypeImports: true,
+  message: "Types seulement depuis @/contracts (import type) ; valeurs depuis @/contracts/values (décision 0016 § 3.1).",
 };
 
 /** F11 : ni la carte Google ni la carte simulée dans les pages d'erreur et le catalogue (décision 0021 § 10). */
@@ -82,9 +96,20 @@ function restrictedImports(...patterns) {
   return { "no-restricted-imports": ["error", { patterns }] };
 }
 
-/** Variante avec des chemins interdits (`paths`), dans la même règle. */
-function restrictedImportsWithPaths(paths, ...patterns) {
-  return { "no-restricted-imports": ["error", { paths, patterns }] };
+/**
+ * T4 : code chargé par le navigateur (décision 0016 § 3.1 règle 4). Une seule règle,
+ * `@typescript-eslint/no-restricted-imports` (pour `allowTypeImports`), porte dans le même bloc `zod`, les
+ * valeurs de @/contracts et les motifs précédents (src/mocks, carte simulée, src/server, simulations). La
+ * règle de base est coupée sur ces fichiers : un import interdit n'est signalé qu'une fois.
+ */
+function clientImports(...patterns) {
+  return {
+    "no-restricted-imports": "off",
+    "@typescript-eslint/no-restricted-imports": [
+      "error",
+      { paths: [ZOD_PATH, CONTRACTS_PATH], patterns: [...patterns, CONTRACTS_MODULES_PATTERN] },
+    ],
+  };
 }
 
 export default defineConfig([
@@ -125,10 +150,16 @@ export default defineConfig([
     rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN),
   },
   {
-    // F9a : composants et bibliothèque : ni src/server hors actions, ni la portée des simulations, ni zod.
-    files: ["src/components/**/*.{js,jsx,ts,tsx}", "src/lib/**/*.{js,jsx,ts,tsx}"],
+    // T4 (0016 § 3.1 règle 4) : composants, mesure, bibliothèque et textes : ni zod, ni valeur de @/contracts.
+    // F1, F5 et F9a tiennent : ni src/mocks, ni carte simulée, ni src/server hors actions, ni portée des simulations.
+    files: [
+      "src/components/**/*.{js,jsx,ts,tsx}",
+      "src/analytics/**/*.{js,jsx,ts,tsx}",
+      "src/lib/**/*.{js,jsx,ts,tsx}",
+      "src/i18n/**/*.{js,jsx,ts,tsx}",
+    ],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImportsWithPaths([ZOD_PATH], MOCKS_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F5 : ni src/mocks ni la carte simulée dans les routes du voyage (décision 0015 § 1) ; F9a : ni src/server hors actions.
@@ -138,10 +169,11 @@ export default defineConfig([
   },
   {
     // F5 : ni src/mocks ni la carte simulée dans les écrans (décision 0015 § 1) ; F9a : ni src/server hors
-    // actions, ni la portée des simulations, ni zod (décisions 0017 § 10.2 et 0020 § 11).
+    // actions, ni la portée des simulations (décisions 0017 § 10.2 et 0020 § 11) ; T4 : ni zod, ni valeur de
+    // @/contracts (décision 0016 § 3.1 règle 4).
     files: ["src/features/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImportsWithPaths([ZOD_PATH], MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F9a : aucun journal dans le paiement simulé (ni montant ni identifiant de paiement, décision 0020 § 11).

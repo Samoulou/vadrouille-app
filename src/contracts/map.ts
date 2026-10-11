@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Day } from "./trip";
+import { mapPointKey } from "./values";
 
 /**
  * Positions d'une journée pour la carte (spécification F4, proposition F4-TL-1).
@@ -23,11 +24,6 @@ export const MapPointSchema = z.strictObject({
   lng: z.number().min(-180).max(180),
 });
 export type MapPoint = z.infer<typeof MapPointSchema>;
-
-/** Clé unique d'une référence : « stop:<id> » ou « terminus:<role> ». */
-export function mapPointKey(ref: MapPointRef): string {
-  return ref.type === "stop" ? `stop:${ref.stopId}` : `terminus:${ref.role}`;
-}
 
 export const DayMapSchema = z
   .strictObject({
