@@ -24,6 +24,19 @@ export interface InitialJavaScript {
   scripts: MeasuredScript[];
   /** Somme des `gzipBytes` : c'est elle que le budget compare. */
   totalGzipBytes: number;
+  /** Faux si l'inactivité du réseau n'a pas été atteinte dans `idleTimeoutMs` (voir `MeasureOptions`). */
+  networkIdle: boolean;
+}
+
+export interface MeasureOptions {
+  /** Statut attendu du document (404 pour la page introuvable de l'inventaire). 200 par défaut. */
+  expectedStatus?: number;
+  /**
+   * Attente maximale de l'inactivité du réseau. Sans valeur (test de T4), la mesure l'attend jusqu'au délai du
+   * test. Avec une valeur (test par route), une page dont une requête ne se termine jamais (préchargement d'une
+   * adresse encore absente, par exemple) est mesurée à l'échéance, et `networkIdle` vaut faux.
+   */
+  idleTimeoutMs?: number;
 }
 
 /**
@@ -31,16 +44,28 @@ export interface InitialJavaScript {
  * l'application chargé jusque-là. La compression est refaite ici pour ne pas dépendre de celle du serveur.
  * Les domaines Google se bloquent avant l'appel (`blockGoogle`), comme dans les autres specs.
  */
-export async function measureInitialJavaScript(page: Page, path: string): Promise<InitialJavaScript> {
+export async function measureInitialJavaScript(
+  page: Page,
+  path: string,
+  { expectedStatus = 200, idleTimeoutMs }: MeasureOptions = {},
+): Promise<InitialJavaScript> {
   const responses: Response[] = [];
   const collect = (response: Response) => responses.push(response);
   page.on("response", collect);
 
   const target = await page.goto(path, { waitUntil: "load" });
-  if (!target?.ok()) {
+  if (target?.status() !== expectedStatus) {
     throw new Error(`${path} : réponse ${target?.status() ?? "absente"}`);
   }
-  await page.waitForLoadState("networkidle");
+  let networkIdle = true;
+  if (idleTimeoutMs === undefined) {
+    await page.waitForLoadState("networkidle");
+  } else {
+    networkIdle = await page
+      .waitForLoadState("networkidle", { timeout: idleTimeoutMs })
+      .then(() => true)
+      .catch(() => false);
+  }
   page.off("response", collect);
 
   const origin = new URL(target.url()).origin;
@@ -57,11 +82,12 @@ export async function measureInitialJavaScript(page: Page, path: string): Promis
   }
 
   scripts.sort((a, b) => b.gzipBytes - a.gzipBytes);
-  return { path, scripts, totalGzipBytes: scripts.reduce((sum, script) => sum + script.gzipBytes, 0) };
+  return { path, scripts, totalGzipBytes: scripts.reduce((sum, script) => sum + script.gzipBytes, 0), networkIdle };
 }
 
 /** Journal lisible de la mesure, pour la sortie du test et la description des PR. */
 export function formatInitialJavaScript(measure: InitialJavaScript): string {
   const lines = measure.scripts.map((s) => `  ${String(s.gzipBytes).padStart(7)} o gzip  ${String(s.rawBytes).padStart(8)} o  ${s.path}`);
-  return [`JavaScript initial de ${measure.path} : ${measure.totalGzipBytes} o gzip (${measure.scripts.length} scripts)`, ...lines].join("\n");
+  const idle = measure.networkIdle ? "" : ", réseau jamais inactif : mesure à l'échéance";
+  return [`JavaScript initial de ${measure.path} : ${measure.totalGzipBytes} o gzip (${measure.scripts.length} scripts${idle})`, ...lines].join("\n");
 }

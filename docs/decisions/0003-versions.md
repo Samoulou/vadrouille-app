@@ -9,7 +9,7 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 
 | Outil | Version | Note |
 |---|---|---|
-| Node.js | 22 (LTS) | Version de la CI (`actions/setup-node`, `node-version: 22`) et de l'image Docker (`node:22-bookworm-slim`) ; `engines.node >= 22.12` |
+| Node.js | 22 (LTS) | Version de la CI (`actions/setup-node`, `node-version: 22`) et de l'image Docker (`node:22-bookworm-slim`) ; `engines.node >= 22.19` (relevé par F12a pour `lighthouse` 13.5.0, décision 0022 § 1) |
 | pnpm | 10.28.0 | Champ `packageManager` |
 | Next.js | 16.4.0 | App Router, `output: "standalone"` |
 | React / React DOM | 19.3.0 | |
@@ -27,6 +27,7 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 | `@googlemaps/js-api-loader` | 2.1.3 | Ajouté en F4 (chargement de la carte Google) ; **remplace `@vis.gl/react-google-maps`** nommée par le handover : voir la décision 0013 |
 | `@types/google.maps` (dev) | 3.66.4 | Ajouté en F4, déclaré dans `types` de `tsconfig.json` ; monte avec le chargeur : voir la décision 0013 |
 | `@radix-ui/react-dialog` | 1.2.0 | Feuille modale de F6 (`Dialog` de shadcn/ui, `src/components/ui/dialog.tsx`) ; `vaul` (`Drawer`) non retenu : voir la décision 0013 |
+| `lighthouse` (dev) | 13.5.0 | Ajouté en F12a (mesure en CI, décision 0022 § 1), dernière version stable au 2026-10-11 (publiée le 2026-09-18) ; exige Node ≥ 22.19 ; vérifiée avec le Chromium 1194 de Playwright 1.56.1 (canal `chromium`, mode sans fenêtre récent), **Playwright ne monte pas**. Embarque son propre `axe-core` 4.14.0 pour l'audit d'accessibilité (les tests axe restent sur 4.13.0) ; `@sentry/node` en dépendance, rapport d'erreurs désactivé explicitement |
 
 ## Conséquences
 - Revoir TypeScript 7 et ESLint 10 quand `typescript-eslint` et `eslint-config-next` les prendront en charge.

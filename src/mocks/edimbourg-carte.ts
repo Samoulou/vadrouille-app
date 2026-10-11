@@ -1,4 +1,4 @@
-import type { DayMap, MapPoint } from "@/contracts";
+import type { DayMap, MapPoint, Trip } from "@/contracts";
 
 import { EDIMBOURG_TRIP_ID } from "./edimbourg";
 
@@ -74,3 +74,15 @@ export const edimbourgCarte: DayMap[] = [
     end(AEROPORT),
   ]),
 ];
+
+/**
+ * Positions d'un voyage dérivé d'Édimbourg (décision 0017 § 13 ; bug n° 106) :
+ * dérivation, pas copie, comme le voyage débloqué lui-même (0013 § 3.6). Un jour en préparation
+ * (`generating`) n'a pas de position : `getDayMap` y renvoie `null` et l'écran garde l'état de remplacement.
+ */
+export function deriveEdimbourgCarte(trip: Pick<Trip, "id" | "days">): DayMap[] {
+  return edimbourgCarte.flatMap((map) => {
+    const day = trip.days.find((candidate) => candidate.index === map.dayIndex);
+    return day && !day.generating ? [{ ...map, tripId: trip.id }] : [];
+  });
+}

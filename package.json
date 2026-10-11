@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -17,6 +17,7 @@
     "test:e2e": "playwright test --project=e2e",
     "test:visual": "playwright test --project=visual",
     "test:visual:update": "playwright test --project=visual --update-snapshots",
+    "test:perf": "playwright test --project=perf --workers=1",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && E2E_SKIP_BUILD=1 pnpm test:a11y && E2E_SKIP_BUILD=1 pnpm test:e2e && E2E_SKIP_BUILD=1 pnpm test:visual"
   },
   "pnpm": {
@@ -52,6 +53,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
     "jsdom": "30.1.2",
+    "lighthouse": "13.5.0",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "vitest": "5.0.3"

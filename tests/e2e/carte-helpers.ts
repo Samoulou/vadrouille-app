@@ -1,8 +1,26 @@
 import { expect, type Page } from "@playwright/test";
 
-/** Domaines Google bloqués dans chaque spec de F4 : aucune dépendance au réseau Google. */
-export const GOOGLE_ROUTES = ["**/*.googleapis.com/**", "**/*.gstatic.com/**", "**/maps.google.com/**"];
-const GOOGLE_HOST = /(^|\.)(googleapis\.com|gstatic\.com)$|^maps\.google\.com$/;
+/**
+ * Hôtes Google bloqués dans chaque spec de F4 et pendant la mesure Lighthouse : aucune dépendance au réseau
+ * Google. Seule liste : les motifs Playwright, les motifs Lighthouse et le test d'hôte en dérivent (0022 § 1).
+ * `subdomains` : l'hôte et tous ses sous-domaines ; sinon l'hôte exact.
+ */
+export const GOOGLE_HOSTS = [
+  { host: "googleapis.com", subdomains: true },
+  { host: "gstatic.com", subdomains: true },
+  { host: "maps.google.com", subdomains: false },
+] as const;
+
+/** Motifs de `page.route` (Playwright). */
+export const GOOGLE_ROUTES = GOOGLE_HOSTS.map(({ host, subdomains }) => (subdomains ? `**/*.${host}/**` : `**/${host}/**`));
+
+/** Motifs de `blockedUrlPatterns` (Lighthouse, jokers `*` sur l'adresse entière). */
+export const GOOGLE_LIGHTHOUSE_PATTERNS = GOOGLE_HOSTS.map(({ host, subdomains }) => (subdomains ? `*.${host}/*` : `*://${host}/*`));
+
+/** Vrai si `hostname` est un hôte Google de la liste. */
+export function isGoogleHost(hostname: string): boolean {
+  return GOOGLE_HOSTS.some(({ host, subdomains }) => hostname === host || (subdomains && hostname.endsWith(`.${host}`)));
+}
 
 /**
  * Bloque les domaines Google (`route.abort()`) et relève toute requête qui les vise,
@@ -15,7 +33,7 @@ export async function blockGoogle(page: Page): Promise<string[]> {
   }
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (GOOGLE_HOST.test(url.hostname)) {
+    if (isGoogleHost(url.hostname)) {
       requests.push(request.url());
     }
   });
