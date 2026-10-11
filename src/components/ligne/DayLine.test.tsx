@@ -36,7 +36,8 @@ const ITEMS: DayLineItem[] = [
 const href = (s: Stop) => `/voyages/v/jour/1?etape=${s.id}`;
 
 function renderLine(items = ITEMS, ideasHref?: string) {
-  return render(<DayLine items={items} getStopHref={href} ideasHref={ideasHref} />);
+  const getIdeasHref = ideasHref ? () => ideasHref : undefined;
+  return render(<DayLine items={items} getStopHref={href} getIdeasHref={getIdeasHref} />);
 }
 
 describe("DayLine", () => {
@@ -141,7 +142,7 @@ describe("DayLine", () => {
     expect(segmentLabel({ mode: "transit", minutes: 90, estimated: true })).toBe("Bus, environ 1 h 30 (estimation)");
   });
 
-  it("temps libre : heure from, texte, lien « Idées » seulement avec ideasHref", () => {
+  it("temps libre : heure from, texte, lien « Idées » seulement avec getIdeasHref", () => {
     const { container, unmount } = renderLine(ITEMS, "/idees");
     const free = container.querySelector("li[data-type='free']") as HTMLElement;
     expect(free.querySelector("[data-part='heure']")).toHaveTextContent("17:00");
@@ -170,6 +171,82 @@ describe("DayLine", () => {
 
   it("n'a aucune violation axe", async () => {
     const { container } = renderLine(ITEMS, "/idees");
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe("DayLine, ajouts de F5b (Q17)", () => {
+  const LOCKED = stop({ id: "s3", name: "[Concert]", start: "21:30", meta: "[Billets réservés]", locked: true });
+  const WITH_ADDITIONS: DayLineItem[] = [
+    { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+    { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
+    { type: "stop", stop: CALTON },
+    { type: "openMeal", time: "12:30", meal: "lunch" },
+    { type: "free", from: "15:00", to: "18:30" },
+    { type: "free", from: "19:00", to: "20:00" },
+    { type: "openMeal", time: "20:00", meal: "dinner" },
+    { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
+    { type: "stop", stop: LOCKED },
+    { type: "terminus", role: "end", time: "23:15", label: "[Hôtel]" },
+  ];
+
+  it("étape verrouillée : « Verrouillée » en legende ink-soft sous meta, dans le nom accessible du lien, sans Tag (F5-PO-14)", () => {
+    render(<DayLine items={WITH_ADDITIONS} getStopHref={href} />);
+    const link = screen.getByRole("link", { name: /\[Concert\]/ });
+    expect(link).toHaveAccessibleName(expect.stringContaining("Verrouillée"));
+    const mention = within(link).getByText("Verrouillée");
+    expect(mention).toHaveClass("text-legende", "text-ink-soft");
+    expect(mention.previousElementSibling).toHaveTextContent("[Billets réservés]");
+    expect(link.querySelectorAll("[data-kind]")).toHaveLength(0);
+    expect(link.closest("li")).toHaveAttribute("data-locked", "true");
+    // Étape non verrouillée : pas de mention.
+    expect(screen.getByRole("link", { name: /Calton/ })).not.toHaveTextContent("Verrouillée");
+  });
+
+  it("openMeal : heure, anneau et rail comme un arrêt, texte « … pas encore choisi » en arret ink-2, sans lien (F5-PO-13)", () => {
+    const { container } = render(<DayLine items={WITH_ADDITIONS} getStopHref={href} />);
+    const meals = Array.from(container.querySelectorAll<HTMLElement>("li[data-type='openMeal']"));
+    expect(meals.map((meal) => meal.dataset.meal)).toEqual(["lunch", "dinner"]);
+    const [lunch, dinner] = meals;
+    expect(lunch?.querySelector("[data-part='heure']")).toHaveTextContent("12:30");
+    expect(lunch).toHaveTextContent("Déjeuner pas encore choisi");
+    expect(dinner?.querySelector("[data-part='heure']")).toHaveTextContent("20:00");
+    expect(dinner).toHaveTextContent("Dîner pas encore choisi");
+    expect(within(dinner!).getByText("Dîner pas encore choisi")).toHaveClass("text-arret", "text-ink-2");
+    expect(dinner?.querySelector("[data-rail]")).toHaveAttribute("data-rail", "plein");
+    // Même rail et même anneau qu'un arrêt.
+    const stopRail = container.querySelector("li[data-type='stop'] [data-part='rail']")!;
+    expect(dinner?.querySelector("[data-part='rail']")?.innerHTML).toBe(stopRail.innerHTML);
+    for (const meal of meals) {
+      expect(within(meal).queryByRole("link")).toBeNull();
+      expect(meal.querySelectorAll("[data-kind='toReserve'], [data-kind='toConfirm'], [data-kind='unconfirmed']")).toHaveLength(0);
+    }
+    // Seuls les deux arrêts sont des liens de fiche.
+    expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(2);
+  });
+
+  it("lien « Idées » par plage : getIdeasHref reçoit from et to de chaque temps libre (F5-TL-8)", () => {
+    const calls: { from: string; to: string }[] = [];
+    const { container } = render(
+      <DayLine
+        items={WITH_ADDITIONS}
+        getStopHref={href}
+        getIdeasHref={(free) => {
+          calls.push(free);
+          return `/voyages/v/jour/2/ajouter?de=${free.from}&a=${free.to}`;
+        }}
+      />,
+    );
+    expect(calls).toEqual([
+      { from: "15:00", to: "18:30" },
+      { from: "19:00", to: "20:00" },
+    ]);
+    const ideas = Array.from(container.querySelectorAll("a[data-part='idees']")).map((a) => a.getAttribute("href"));
+    expect(ideas).toEqual(["/voyages/v/jour/2/ajouter?de=15:00&a=18:30", "/voyages/v/jour/2/ajouter?de=19:00&a=20:00"]);
+  });
+
+  it("n'a aucune violation axe avec les ajouts", async () => {
+    const { container } = render(<DayLine items={WITH_ADDITIONS} getStopHref={href} getIdeasHref={() => "/idees"} />);
     expect(await axeViolations(container)).toEqual([]);
   });
 });

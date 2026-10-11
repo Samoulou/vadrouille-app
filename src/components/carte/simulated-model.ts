@@ -56,13 +56,21 @@ export function fitCamera(positions: LatLng[], size: Size, padding: FitPadding):
     }
   }
   // Marge asymétrique (panneau en bas, F5) : la boîte est centrée dans la zone hors marge, comme fitBounds.
+  return { center: offsetCamera(center, padding, zoom), zoom };
+}
+
+/**
+ * Centre de carte qui place `target` au milieu de la zone non couverte par `insets` (décision 0016 § 2),
+ * dans la projection de la carte simulée (équirectangulaire, `scaleAt(zoom)` pixels par degré en latitude
+ * comme en longitude) : le centre est décalé depuis la cible de ((right − left) / 2, (bottom − top) / 2)
+ * pixels, y vers le bas. Le rendu Google garde `offsetCenter` (Web Mercator, `route.ts`).
+ */
+export function offsetCamera(target: LatLng, insets: FitPadding | undefined, zoom: number): LatLng {
+  if (!insets) return { lat: target.lat, lng: target.lng };
   const scale = scaleAt(zoom);
   return {
-    center: {
-      lat: center.lat - (padding.bottom - padding.top) / 2 / scale,
-      lng: center.lng + (padding.right - padding.left) / 2 / scale,
-    },
-    zoom,
+    lat: target.lat - (insets.bottom - insets.top) / 2 / scale,
+    lng: target.lng + (insets.right - insets.left) / 2 / scale,
   };
 }
 

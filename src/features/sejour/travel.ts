@@ -60,3 +60,39 @@ export function dayTravelLine(day: Pick<Day, "travelMinutes" | "budgetPerPerson"
     ? format(t.trajet, { duree })
     : format(t.trajetBudget, { duree, montant: formatMontant(day.budgetPerPerson) });
 }
+
+/**
+ * « Pour y aller » d'une étape de `items` (F5-PO-9) : le segment le plus proche avant l'étape, sans autre
+ * étape entre eux, et son origine, l'étape ou le terminus qui précède ce segment (un temps libre ou un
+ * créneau de repas pas encore choisi n'en est pas une, décision 0015 § 2). `null` si l'étape n'est pas
+ * dans `items` (événement de `Day.events`) ou n'a pas de segment avant elle.
+ */
+export function pathTo(items: readonly DayLineItem[], stopId: string): { segment: Segment; origin?: string } | null {
+  const index = items.findIndex((item) => item.type === "stop" && item.stop.id === stopId);
+  if (index < 0) return null;
+  let segmentIndex = -1;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (item?.type === "segment") {
+      segmentIndex = i;
+      break;
+    }
+    if (item?.type === "stop" || item?.type === "terminus") return null;
+  }
+  const found = items[segmentIndex];
+  if (found?.type !== "segment") return null;
+  for (let i = segmentIndex - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (item?.type === "stop") return { segment: found.segment, origin: item.stop.name };
+    if (item?.type === "terminus") return { segment: found.segment, origin: item.label };
+  }
+  return { segment: found.segment };
+}
+
+/** Texte de « Pour y aller » : « À pied, 20 min depuis [Royal Mile] », ou le segment seul sans origine. */
+export function pathToLabel(path: { segment: Segment; origin?: string }): string {
+  const segment = segmentLabel(path.segment);
+  return path.origin === undefined
+    ? segment
+    : format(messages.sejour.fiche.pourYAllerDepuis, { segment, origin: path.origin });
+}

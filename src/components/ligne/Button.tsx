@@ -15,7 +15,7 @@ export const buttonVariants = cva(
       variant: {
         primary: "bg-line px-5 text-(length:--ligne-bouton-texte) font-extrabold text-on-line",
         secondary:
-          "border-(length:--ligne-trait-controle) border-ink bg-raised px-5 text-(length:--ligne-bouton-texte) font-bold text-ink disabled:border-muted",
+          "border-(length:--ligne-trait-controle) border-ink bg-raised px-5 text-(length:--ligne-bouton-texte) font-bold text-ink disabled:border-muted aria-pressed:not-disabled:bg-ink aria-pressed:not-disabled:text-page",
         text: "bg-transparent px-2 text-corps font-normal underline underline-offset-2",
       },
       tone: {
@@ -56,11 +56,23 @@ export function Button({
   tone = "ink",
   asChild = false,
   type,
+  children,
   ...props
 }: ButtonProps) {
   const classes = cn(buttonVariants({ variant, size, tone }), className);
   if (asChild) {
-    return <Slot className={classes} {...props} />;
+    return (
+      <Slot className={classes} {...props}>
+        {children}
+      </Slot>
+    );
   }
-  return <button type={type ?? "button"} className={classes} {...props} />;
+  // Bouton bascule enfoncé (`aria-pressed`, variante secondaire) : aplat `ink` et texte `page`, l'inverse du
+  // fond `raised` et du texte `ink` relâchés. Aucune icône : README Button, « pas d'icône décorative dans un
+  // bouton à libellé » (rendu provisoire, à valider par UX/UI).
+  return (
+    <button type={type ?? "button"} className={classes} {...props}>
+      {children}
+    </button>
+  );
 }

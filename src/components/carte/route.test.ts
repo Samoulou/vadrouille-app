@@ -56,6 +56,22 @@ describe("buildDayRoute", () => {
     expect(route.stops[0]?.name).toBe("[s1]");
   });
 
+  it("ignore un créneau de repas pas encore choisi (openMeal, décision 0015 § 2) : ni marqueur, ni rang, ni tronçon", () => {
+    const day = dayOf();
+    const withMeal: Day = {
+      ...day,
+      items: [...day.items.slice(0, 3), { type: "openMeal", time: "12:30", meal: "lunch" }, ...day.items.slice(3)],
+    };
+    const route = buildDayRoute(withMeal, mapOf(ALL));
+    expect(route.stops.map((stop) => [stop.stopId, stop.number])).toEqual([
+      ["s1", 1],
+      ["s2", 2],
+      ["s3", 3],
+      ["s4", 4],
+    ]);
+    expect(route.legs).toEqual(buildDayRoute(day, mapOf(ALL)).legs);
+  });
+
   it("garde le rang dans la liste quand l'étape 2 n'a pas de position : marqueurs 1, 3, 4", () => {
     const route = buildDayRoute(dayOf(), mapOf(ALL.filter((p) => !(p.ref.type === "stop" && p.ref.stopId === "s2"))));
     expect(route.stops.map((stop) => stop.number)).toEqual([1, 3, 4]);

@@ -115,6 +115,8 @@ const j1Tattoo: Stop = {
   verifiedAt: "2026-08-20",
   exceptions: [],
   locked: true,
+  /** Engagement saisi par la personne (décision 0015 § 9) : billets déjà pris (« À faire avant de partir »). */
+  commitment: "ticket",
 };
 
 // J2 — dimanche 30 août : Old Town, Dean Village, Stockbridge.

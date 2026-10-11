@@ -22,7 +22,7 @@ import {
   type Weekday,
 } from "./index";
 
-// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise : décision 0015) ---
+// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise, + Stop.commitment, + DayLineItem openMeal : décision 0015) ---
 type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "dim.";
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
@@ -39,13 +39,17 @@ interface HandoverStop {
   verifiedAt?: string;
   exceptions: HandoverException[];
   locked: boolean;
+  /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
+  commitment?: "ticket" | "reservation";
 }
 interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number; estimated: boolean }
 type HandoverDayLineItem =
   | { type: "terminus"; role: "start" | "end"; time: string; label: string }
   | { type: "stop"; stop: HandoverStop }
   | { type: "segment"; segment: HandoverSegment }
-  | { type: "free"; from: string; to: string };
+  | { type: "free"; from: string; to: string }
+  /** Ajout signalé (décision 0015, § 2) : créneau de repas pas encore choisi. */
+  | { type: "openMeal"; time: string; meal: "lunch" | "dinner" };
 interface HandoverDay {
   index: number;
   date: string;
@@ -172,6 +176,8 @@ describe("types exportés", () => {
       "PreferenceAnswerSchema",
       "PreferenceReasonSchema",
       "SurpriseIdeaSchema",
+      "CommitmentSchema",
+      "MealSchema",
     ]) {
       expect(contracts).toHaveProperty(name);
     }
@@ -256,6 +262,30 @@ describe("StopSchema", () => {
   it("refuse une source dont l'URL est invalide", () => {
     const stop = { ...validStop, source: { label: "[Source]", url: "pas une url" } };
     expect(StopSchema.safeParse(stop).success).toBe(false);
+  });
+
+  it("commitment (décision 0015 § 9) : facultatif, « ticket » ou « reservation », indépendant du verrou", () => {
+    expect(StopSchema.safeParse({ ...validStop, commitment: "ticket", locked: true }).success).toBe(true);
+    expect(StopSchema.safeParse({ ...validStop, commitment: "reservation", locked: false }).success).toBe(true);
+    expect(StopSchema.safeParse({ ...validStop, commitment: "booking" }).success).toBe(false);
+    expect(StopSchema.safeParse({ ...validStop, commitment: true }).success).toBe(false);
+    expect(StopSchema.shape.commitment.safeParse(undefined).success).toBe(true);
+  });
+});
+
+describe("DayLineItemSchema, variante openMeal (décision 0015 § 2)", () => {
+  it.each(["lunch", "dinner"])("accepte un créneau %s pas encore choisi", (meal) => {
+    expect(contracts.DayLineItemSchema.safeParse({ type: "openMeal", time: "12:30", meal }).success).toBe(true);
+  });
+
+  it.each([
+    [{ type: "openMeal", time: "12:30", meal: "breakfast" }],
+    [{ type: "openMeal", time: "12h30", meal: "lunch" }],
+    [{ type: "openMeal", meal: "lunch" }],
+    [{ type: "openMeal", time: "12:30", meal: "lunch", name: "[Restaurant]" }],
+    [{ type: "openMeal", time: "12:30", meal: "lunch", placeId: "mock_place" }],
+  ])("refuse %j (objet strict, sans lieu)", (item) => {
+    expect(contracts.DayLineItemSchema.safeParse(item).success).toBe(false);
   });
 });
 
@@ -376,6 +406,13 @@ describe("ProposalSchema", () => {
     expect(ProposalSchema.safeParse(withoutCategory).success).toBe(false);
     expect(ProposalSchema.safeParse({ ...validProposal, category: "museums" }).success).toBe(false);
     expect(ProposalSchema.safeParse({ ...validProposal, category: "restaurant" }).success).toBe(true);
+  });
+
+  it("refuse une proposition dont l'étape est un engagement (décision 0015 § 9)", () => {
+    const committed = { ...validProposal, stop: { ...validStop, commitment: "ticket" as const } };
+    const result = ProposalSchema.safeParse(committed);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join("."))).toContain("stop.commitment");
   });
 
   it("refuse une photoUrl invalide et un champ inconnu", () => {

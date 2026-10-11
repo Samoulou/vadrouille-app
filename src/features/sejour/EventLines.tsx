@@ -28,6 +28,7 @@ export function EventLines({ events, getHref }: EventLinesProps) {
         <li key={event.id}>
           <Link
             href={getHref(event)}
+            scroll={false}
             data-part="evenement"
             className="flex min-h-(--touch-target) flex-col items-start gap-1 rounded-block bg-muted p-3"
           >

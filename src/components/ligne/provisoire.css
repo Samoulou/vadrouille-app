@@ -122,3 +122,8 @@
   /* Q19 : marge intérieure horizontale du ReasonBlock (16 px, ReasonBlock/preview.html). */
   --ligne-bloc-marge-h: 16px;
 }
+
+:root {
+  /* F5-Q1 : place du toast au-dessus du panneau à 92 %, retrait à gauche qui laisse « Retour » visible (left-3, une cible tactile, puis space-2). */
+  --ligne-toast-retrait-retour: calc(var(--spacing) * 5 + var(--touch-target));
+}
