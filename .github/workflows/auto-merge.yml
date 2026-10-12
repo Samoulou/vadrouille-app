@@ -1,7 +1,7 @@
 name: auto-merge
-# pull_request_target : le workflow exécuté est celui de main, jamais celui de la
-# branche de la PR ; une branche ne peut donc pas le modifier pour lire le secret.
-# Aucun checkout : aucun code de la PR n'est exécuté (décision 0033).
+# pull_request_target : le workflow exécuté est celui de main, sans checkout ni code
+# de la PR. AUTOMERGE_TOKEN est un secret de l'environnement `automerge`, limité à
+# main : un workflow lancé depuis une autre branche ne peut pas le lire (décision 0033).
 on:
   pull_request_target:
     types: [labeled]
@@ -10,8 +10,12 @@ permissions:
   pull-requests: write
 jobs:
   enable:
-    if: github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only'
+    # PR du dépôt seulement : jamais l'identité de Samuel pour une PR de fork.
+    if: >-
+      (github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only')
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    environment: automerge
     env:
       HAS_TOKEN: ${{ secrets.AUTOMERGE_TOKEN != '' }}
     steps:
