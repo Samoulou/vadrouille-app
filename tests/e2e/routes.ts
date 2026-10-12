@@ -20,6 +20,14 @@ export type RouteStateName = "fiche-ouverte" | "annulation-proposee";
  */
 export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente";
 
+/**
+ * Parcours côté client (F8a, spécification F8, « Inventaire des routes ») : certaines pages n'ont de contenu
+ * qu'avec le brouillon de création, qui vit en mémoire de l'onglet ; ouvertes directement, elles remplacent leur
+ * adresse par `R1`. L'action, dans `route-states.ts` (`ROUTE_JOURNEYS`), part de son adresse de départ, remplit
+ * le brouillon et atteint l'adresse de l'entrée par navigation côté client, dans le même onglet.
+ */
+export type RouteJourneyName = "brouillon-ecran-1";
+
 /** `seuil` : budget bloquant ; `journal` : mesuré et journalisé sans seuil. */
 export type BudgetMode = "seuil" | "journal";
 
@@ -34,6 +42,12 @@ export interface RouteEntry {
   readonly status?: 200 | 404;
   /** Préparation qui crée l'adresse réelle (voir `RoutePreparationName`). */
   readonly prepare?: RoutePreparationName;
+  /**
+   * Parcours qui remplit le brouillon (voir `RouteJourneyName`) : la mesure du JavaScript compte tout ce qui est
+   * chargé depuis l'adresse de départ. Lighthouse, qui ouvre l'adresse dans un onglet neuf, ne mesure pas ces
+   * entrées (question au Tech Lead, PR de F8a).
+   */
+  readonly journey?: RouteJourneyName;
   /** États à vérifier en plus de l'état initial (balayage d'accessibilité, F12d). */
   readonly states: readonly RouteStateName[];
   readonly budgets: {
@@ -102,6 +116,23 @@ export const ROUTES: readonly RouteEntry[] = [
     path: `${TRIP}/debloquer/confirmation?paiement=[paiementId]`,
     page: "voyages/[id]/debloquer/confirmation/page.tsx",
     prepare: "confirmation-en-attente",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F8a : écran 1 de la création ; budgets en `journal` en attendant le Tech Lead (F8-Q15).
+    id: "R1",
+    path: "/voyages/nouveau",
+    page: "(creation)/voyages/nouveau/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F8a : écran 2, atteint par l'écran 1 rempli (le brouillon vit dans l'onglet) ; `journal` (F8-Q15).
+    id: "R2",
+    path: "/voyages/nouveau/brief",
+    page: "(creation)/voyages/nouveau/brief/page.tsx",
+    journey: "brouillon-ecran-1",
     states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },
   },

@@ -93,7 +93,8 @@ interface HandoverProposal {
   context: string;
   stop: HandoverStop;
   /** Ajout signalé (décision 0013, § 3.1), comme Trip.organizationId. */
-  category: "museum" | "walk" | "nature" | "tasting" | "restaurant";
+  // Trois codes ajoutés par F8a (F8-TL-8, décision 0017 § 8, qui amende 0013 § 3.1) pour les envies du brief.
+  category: "museum" | "walk" | "nature" | "tasting" | "restaurant" | "heritage" | "market" | "nightlife";
   option?: { index: number; total: number };
   photoUrl?: string;
   travelFromPrevious?: HandoverSegment;

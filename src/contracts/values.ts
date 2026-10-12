@@ -10,8 +10,11 @@
  */
 import type { MapPointRef } from "./map";
 
-/** Catégories d'une proposition (décision 0013 § 3.1 ; codes provisoires de F6-PO-10). Source de `CategorySchema`. */
-export const CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant"] as const;
+/**
+ * Catégories d'une proposition et vocabulaire des envies du brief (décision 0013 § 3.1 ; codes provisoires de
+ * F6-PO-10, complétés par F8a selon 0017 § 8 : `heritage`, `market`, `nightlife`). Source de `CategorySchema`.
+ */
+export const CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"] as const;
 
 /**
  * Codes de raison de B0, dans l'ordre d'affichage : Pas mon style, Trop chargé, Trop cher, Trop loin,
@@ -75,12 +78,86 @@ export const CHECKOUT_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 export const TRIP_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
- * Codes d'erreur des actions serveur (format commun de 0017 § 4, `snake_case`) : les seuls que F9a
- * utilise. F8a et B6 l'étendent sans renommer.
+ * Codes d'erreur des actions serveur (format commun de 0017 § 4, `snake_case`). F9a a créé les trois
+ * premiers ; F8a ajoute ceux de `structureBrief` (0017 § 4) ; F8b, F8c et B6 l'étendent sans renommer.
  */
-export const API_ERROR_CODES = ["validation_failed", "not_found", "already_unlocked"] as const;
+export const API_ERROR_CODES = [
+  "validation_failed",
+  "not_found",
+  "already_unlocked",
+  "provider_error",
+  "rate_limited",
+  "cost_cap_reached",
+] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
 export function isCheckoutFailure(status: string): status is CheckoutFailure {
   return (CHECKOUT_FAILURES as readonly string[]).includes(status);
+}
+
+/*
+ * Création du voyage et brief (décision 0017 § 2.1, F8a) : bornes, en constantes nommées, et énumérations lues
+ * par l'interface. Les schémas de `creation.ts` en dérivent ; `src/features/creation/validation.ts` les relit
+ * sans charger Zod. Une borne n'est écrite qu'ici.
+ */
+
+/** Destination : texte libre, espaces retirés aux extrémités. */
+export const DESTINATION_LENGTH = { min: 2, max: 80 } as const;
+/** Nom d'une autre ville. */
+export const CITY_NAME_LENGTH = { min: 2, max: 80 } as const;
+/** « Oui » : nom ou adresse du logement saisi. */
+export const KNOWN_LODGING_LENGTH = { min: 2, max: 120 } as const;
+/** « Un quartier » : quartier saisi. */
+export const AREA_LENGTH = { min: 2, max: 80 } as const;
+/** Libellé d'un engagement déjà pris. */
+export const COMMITMENT_LABEL_LENGTH = { min: 2, max: 80 } as const;
+/** Récit de l'écran 2 (plafond provisoire, F8-Q9). */
+export const STORY_LENGTH = { min: 20, max: 1000 } as const;
+/** Villes en tout, destination comprise (provisoire, F8-PO-3). */
+export const MAX_CITIES = 4;
+/** Engagements déjà pris (provisoire, F8-PO-3). */
+export const MAX_COMMITMENTS = 10;
+export const ADULTS = { min: 1, max: 9 } as const;
+export const CHILDREN = { min: 0, max: 9 } as const;
+/** Budget par repas et par personne, entier en CHF. */
+export const MEAL_BUDGET_CHF = { min: 5, max: 500 } as const;
+export const EMAIL_MAX_LENGTH = 254;
+export const OTP_LENGTH = 6;
+
+/** Rythme du brief (cadrage § 3.7), dans l'ordre d'affichage. */
+export const PACES = ["relaxed", "balanced", "intense"] as const;
+export type Pace = (typeof PACES)[number];
+
+/** Déplacements, dans l'ordre d'affichage. */
+export const MOBILITY_MODES = ["walk", "transit", "car"] as const;
+export type MobilityMode = (typeof MOBILITY_MODES)[number];
+
+/** Les 6 « champs » du brief (F8-PO-15), comptés par `brief_completed`. */
+export const BRIEF_FIELDS = ["travellers", "pace", "wishes", "mobility", "limits", "mealBudget"] as const;
+export type BriefField = (typeof BRIEF_FIELDS)[number];
+
+/** Type d'un engagement déjà pris : « Vol », « Réservation », « Billet ». */
+export const COMMITMENT_KINDS = ["flight", "booking", "ticket"] as const;
+export type CommitmentKind = (typeof COMMITMENT_KINDS)[number];
+
+/**
+ * Logement d'une ville (0017 § 2.2) : saisi (`known`, `area`), pas encore (`none`), ou suggestion retenue à
+ * l'écran 3 (`suggestedLodging`, `suggestedArea`, identifiants seulement).
+ */
+export const LODGING_KINDS = ["known", "area", "none", "suggestedLodging", "suggestedArea"] as const;
+export type LodgingKind = (typeof LODGING_KINDS)[number];
+
+/**
+ * Forme d'une adresse email (0017 § 2.1, écran 4) : un seul `@`, partie locale non vide, domaine qui contient
+ * un point ni au début ni à la fin, aucun espace, 254 caractères au plus. L'interface et le serveur (par
+ * `.refine`) acceptent exactement les mêmes adresses ; seule la réception du code prouve qu'elle existe.
+ */
+export function isEmailShape(value: string): boolean {
+  if (value.length === 0 || value.length > EMAIL_MAX_LENGTH || /\s/.test(value)) return false;
+  const parts = value.split("@");
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts as [string, string];
+  if (local.length === 0) return false;
+  const dot = domain.indexOf(".");
+  return dot > 0 && !domain.startsWith(".") && !domain.endsWith(".");
 }

@@ -70,6 +70,21 @@ export type {
   OfferConfig,
   SimulateOutcomeRequest,
 } from "./billing";
+export {
+  BRIEF_FIELD_PROPERTY,
+  BriefFieldSchema,
+  BriefRequestSchema,
+  BriefSchema,
+  InferredBriefSchema,
+  LodgingSchema,
+  MobilityModeSchema,
+  OtherCitySchema,
+  PaceSchema,
+  TravellersSchema,
+  TripCommitmentSchema,
+  TripDraftSchema,
+} from "./creation";
+export type { Brief, BriefRequest, InferredBrief, Lodging, OtherCity, TripCommitment, TripDraft } from "./creation";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
 // Valeurs sans Zod (décision 0016 § 3.1 règle 1) : `mapPointKey`, `DETOUR_THRESHOLD_MINUTES`, `CATEGORIES`,

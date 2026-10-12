@@ -77,8 +77,14 @@ test.describe("perf: budgets du § 14", () => {
   }
 });
 
+/**
+ * Les entrées à parcours (`journey`, F8a) n'ont de contenu qu'avec le brouillon en mémoire de l'onglet : Lighthouse,
+ * qui ouvre l'adresse dans un onglet neuf, mesurerait `R1` après le remplacement d'adresse. Elles sont mesurées par
+ * `budget: JavaScript initial par route` et par axe (`creation.a11y.spec.ts`) ; leur mesure Lighthouse est une
+ * question au Tech Lead (PR de F8a, avec F8-Q15).
+ */
 test.describe("perf: inventaire", () => {
-  for (const route of ROUTES.filter((entry) => entry.budgets.lighthouse === "journal")) {
+  for (const route of ROUTES.filter((entry) => entry.budgets.lighthouse === "journal" && !entry.journey)) {
     test(`${route.id} ${route.path}`, async ({ baseURL }) => {
       test.setTimeout(180_000);
       await measure(route, baseURL!, 1);
