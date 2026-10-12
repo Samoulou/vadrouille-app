@@ -158,6 +158,20 @@ describe("BriefScreen : récit", () => {
     },
   );
 
+  it("réponse arrivée après « Remplir moi-même » : ignorée, le choix de la personne reste", async () => {
+    let resolve: (value: Awaited<ReturnType<typeof structureBrief>>) => void = () => {};
+    vi.mocked(structureBrief).mockReturnValue(new Promise((r) => (resolve = r)));
+    const { container } = renderScreen();
+    fireEvent.change(story(), { target: { value: STORY } });
+    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remplir moi-même" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+    await act(async () => resolve(ok(MOCK_INFERRED_BRIEF)));
+    expect(container.querySelector("[data-inferred]")).toBeNull();
+    expect(screen.getAllByRole("radio").filter((radio) => radio.getAttribute("aria-checked") === "true")).toEqual([]);
+    expect(screen.queryByRole("alert", { name: /Impossible/ })).toBeNull();
+  });
+
   it("une exception réseau donne le même bandeau", async () => {
     vi.mocked(structureBrief).mockRejectedValue(new Error("réseau"));
     renderScreen();
@@ -271,6 +285,45 @@ describe("BriefScreen : vérification", () => {
     expect(amount).toHaveAttribute("inputMode", "numeric");
     fireEvent.click(budget);
     expect(budget).toHaveTextContent("Environ 150 CHF par personne et par repas");
+  });
+
+  it("voyageurs aux bornes : « Retirer » et « Ajouter » en aria-disabled, atteignables, sans effet", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Remplir moi-même" }));
+    const adults = screen.getByRole("textbox", { name: "Adultes" });
+    const lessAdult = screen.getByRole("button", { name: "Retirer un adulte" });
+    expect(adults).toHaveValue("1");
+    expect(lessAdult).toHaveAttribute("aria-disabled", "true");
+    expect(lessAdult).not.toBeDisabled();
+    fireEvent.click(lessAdult);
+    expect(adults).toHaveValue("1");
+
+    const children = screen.getByRole("textbox", { name: "Enfants" });
+    expect(screen.getByRole("button", { name: "Retirer un enfant" })).toHaveAttribute("aria-disabled", "true");
+    const moreChild = screen.getByRole("button", { name: "Ajouter un enfant" });
+    for (let i = 0; i < 9; i++) fireEvent.click(moreChild);
+    expect(children).toHaveValue("9");
+    expect(moreChild).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(moreChild);
+    expect(children).toHaveValue("9");
+  });
+
+  it("voyageurs : le contenu est sélectionné au focus, un chiffre tapé remplace la valeur", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Remplir moi-même" }));
+    const adults = screen.getByRole<HTMLInputElement>("textbox", { name: "Adultes" });
+    act(() => adults.focus());
+    expect([adults.selectionStart, adults.selectionEnd]).toEqual([0, adults.value.length]);
+  });
+
+  it("double clic sur « Continuer » : un seul brief_completed", async () => {
+    renderScreen();
+    await prepare();
+    const next = screen.getByRole("button", { name: "Continuer" });
+    fireEvent.click(next);
+    fireEvent.click(next);
+    expect(recorder.events).toHaveLength(1);
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 
   it("budget hors bornes : la section s'ouvre et le champ reçoit le focus", async () => {

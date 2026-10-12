@@ -21,6 +21,9 @@ export const SEPARATEUR_MILLIERS = "\u202F";
  * « 1 000 », séparateur `SEPARATEUR_MILLIERS`. Formaté sans `Intl.NumberFormat` : son séparateur dépend de
  * l'ICU embarqué (espace fine ou apostrophe selon la version de Node ou du navigateur), ce qui ferait différer
  * le rendu serveur et le rendu client (hydratation) et les environnements entre eux. Rendu identique partout.
+ * Écart voulu avec `formatMontant` (`src/features/sejour/travel.ts`, `Intl.NumberFormat`) : le compteur du récit
+ * atteint 1 000, et le budget suit le même format que lui ; `formatMontant` pourra rejoindre cette fonction quand
+ * le séjour en aura besoin (hors F8a).
  */
 export function formatNombre(value: number): string {
   const entier = Math.trunc(value);

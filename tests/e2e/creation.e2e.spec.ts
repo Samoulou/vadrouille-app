@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+
 import { expect, test, type Page } from "@playwright/test";
 
-import { formatNombre } from "../../src/features/creation/brief-fields";
+import { serverLogPath } from "../../scripts/e2e-server-log.mjs";
+
 import { blockGoogle } from "./carte-helpers";
 import {
   EDIMBOURG,
@@ -24,8 +28,8 @@ import { collectEvents } from "./presentation-helpers";
  * domaines Google bloqués, horloge du navigateur installée au 2026-08-01T08:00 (jamais en temps fixe).
  */
 
-/** « 1 000 », formaté par la même fonction que l'application (indépendant de l'ICU). */
-const MILLE = formatNombre(1000);
+/** « 1 000 » attendu à l'écran, écrit en dur (espace fine insécable U+202F, format suisse indépendant de l'ICU). */
+const MILLE = "1 000";
 const R4_LANCER = "/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer";
 
 let googleRequests: string[] = [];
@@ -125,10 +129,17 @@ test("creation: villes, récapitulatif et maximums", async ({ page }) => {
   await expect(button(page, "Ajouter une ville")).toBeFocused();
 
   for (let i = 0; i < 3; i++) await button(page, "Ajouter une ville").click();
-  await expect(button(page, "Ajouter une ville")).toBeDisabled();
+  // Au plafond : `aria-disabled` (atteignable au clavier, comme les `Chip`), un clic de plus n'ajoute rien.
+  await expect(button(page, "Ajouter une ville")).toHaveAttribute("aria-disabled", "true");
+  await button(page, "Ajouter une ville").focus();
+  await page.keyboard.press("Enter");
+  await expect(field(page, "Nom de la ville")).toHaveCount(3);
   await expect(page.getByText("Au plus 4 villes en tout, destination comprise.")).toBeVisible();
   for (let i = 0; i < 10; i++) await button(page, "Ajouter un engagement").click();
-  await expect(button(page, "Ajouter un engagement")).toBeDisabled();
+  await expect(button(page, "Ajouter un engagement")).toHaveAttribute("aria-disabled", "true");
+  await button(page, "Ajouter un engagement").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("region", { name: "Engagements déjà pris" }).getByRole("region")).toHaveCount(10);
   await expect(page.getByRole("region", { name: /^Engagement \d+$/ })).toHaveCount(10);
 });
 
@@ -269,6 +280,27 @@ test("brief: à limiter, envies indisponibles", async ({ page }) => {
   await expect(nature).toHaveAttribute("aria-pressed", "false");
 });
 
+/** Aucun défilement horizontal, et les boutons des voyageurs tiennent dans la largeur de la fenêtre. */
+async function expectTravellersFit(page: Page) {
+  const width = page.viewportSize()!.width;
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  for (const name of ["Retirer un adulte", "Ajouter un adulte", "Retirer un enfant", "Ajouter un enfant"]) {
+    const box = (await button(page, name).boundingBox())!;
+    expect(box.x, name).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, name).toBeLessThanOrEqual(width);
+  }
+}
+
+test("brief: voyageurs à 320 px", async ({ page }) => {
+  // 0018 § 16 et WCAG 1.4.10 (320 px CSS, soit 1 280 px zoomés à 400 % ou 640 px à 200 %) : la rangée
+  // « Adultes » / « Enfants » passe à la ligne au lieu de déborder. Les tailles de texte Ligne sont en px :
+  // le zoom du navigateur, pas la taille de police racine, est le cas à couvrir.
+  await page.setViewportSize({ width: 320, height: 844 });
+  await reachBrief(page);
+  await reachReview(page);
+  await expectTravellersFit(page);
+});
+
 test("brief: revenir au récit ou à l'écran 1", async ({ page }) => {
   await reachBrief(page);
   await reachReview(page);
@@ -294,7 +326,12 @@ test("brief: revenir au récit ou à l'écran 1", async ({ page }) => {
   await expect(field(page, "Destination")).toHaveValue("Édimbourg");
 });
 
-test("creation: aucune donnée persistée ni exposée", async ({ page, context }) => {
+/** Sortie du serveur de test depuis son démarrage (`webServer`, recopiée par scripts/serve-standalone.mjs). */
+function serverOutput(baseURL: string | undefined): string {
+  return readFileSync(serverLogPath({ port: Number(new URL(baseURL!).port), tmpDir: tmpdir() }), "utf8");
+}
+
+test("creation: aucune donnée persistée ni exposée", async ({ page, context, baseURL }) => {
   const visited: string[] = [];
   const consoleLines: string[] = [];
   page.on("framenavigated", (frame) => {
@@ -327,5 +364,10 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context }
   expect(consoleLines.join("\n")).not.toContain(fragment);
   expect(JSON.stringify(events)).not.toContain(fragment);
   expect(JSON.stringify(events)).not.toContain("Édimbourg");
+  // Sortie du serveur relue en fin de test : le serveur a bien écrit (démarrage), sans récit ni destination.
+  const output = serverOutput(baseURL);
+  expect(output).toContain("Ready");
+  expect(output).not.toContain(fragment);
+  expect(output).not.toContain("Édimbourg");
   expect(pathOf(page)).toBe(R4_LANCER);
 });

@@ -29,7 +29,7 @@ import { useDraft } from "./DraftProvider";
 import { IconMoinsProvisoire, NumberField } from "./NumberField";
 import { briefCompletedProperties, formatNombre } from "./brief-fields";
 import type { BriefValues, ChipField } from "./draft";
-import { describedBy, errorId, FieldMessage, fieldId, focusField } from "./fields";
+import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldMessage, fieldId, focusField } from "./fields";
 import type { StageProps } from "./stage";
 import { creationRoutes } from "./routes";
 import { parseInteger, validateBrief, type FormError } from "./validation";
@@ -46,6 +46,10 @@ const ALREADY_WISHED_ID = "brief-deja-envie";
 const PACE_OPTIONS = PACES.map((value) => ({ value, label: v.rythme.options[value] }));
 
 const SECTION_TITLE_CLASS = "text-section font-extrabold text-ink";
+
+/** « Retirer » ou « Ajouter » à la borne : indisponible comme une `Chip` (`aria-disabled`, fond `muted`). */
+const STEP_BOUND_CLASS =
+  "aria-disabled:cursor-not-allowed aria-disabled:border-transparent aria-disabled:bg-muted aria-disabled:text-ink-soft";
 
 const errorMessages: Record<string, string> = {
   adults: format(err.adultes, ADULTS),
@@ -78,6 +82,8 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
   const { values, marks, shown } = state.brief;
   const [errors, setErrors] = useState<FormError[]>([]);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  // « Continuer » déjà validé : un second clic avant la navigation n'envoie pas `brief_completed` une seconde fois.
+  const submitted = useRef(false);
   // Sections facultatives ouvertes d'office si elles contiennent une déduction (aucune déduction cachée).
   const [open, setOpen] = useState(() => ({
     mobility: marks.mobility.length > 0,
@@ -93,6 +99,7 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
     errors.some((error) => error.field === field) ? (errorMessages[field] ?? null) : null;
 
   function submit() {
+    if (submitted.current) return;
     const found = validateBrief(values);
     setErrors(found);
     const first = found[0];
@@ -101,6 +108,7 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
       requestAnimationFrame(() => focusField(first.field));
       return;
     }
+    submitted.current = true;
     dispatch({ type: "briefReady" });
     track({ name: "brief_completed", properties: briefCompletedProperties(state.brief) });
     router.push(connexionRoute(creationRoutes.lancer()));
@@ -118,7 +126,7 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
       </h1>
       {shown.length > 0 ? <p className="text-corps-s text-ink-soft">{v.aide}</p> : null}
       <span id={INFERRED_ID} hidden>
-        {t.deduit}
+        {messages.ligne.deduit}
       </span>
       <span id={ALREADY_LIMITED_ID} hidden>
         {v.envies.dejaLimite}
@@ -269,8 +277,8 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
           {v.revenirRecit}
         </Button>
       </div>
-      <div role="status" />
-      <div role="alert" />
+      <div role="status" className={EMPTY_LIVE_REGION_CLASS} />
+      <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
     </>
   );
 }
@@ -292,18 +300,29 @@ function TravellerRow({ field, label, less, more, bounds, values, inferred, erro
   const id = fieldId(field);
   const labelId = `${id}-libelle`;
   const current = parseInteger(values[field], { min: 0, max: Number.MAX_SAFE_INTEGER });
+  const atMin = current !== null && current <= bounds.min;
+  const atMax = current !== null && current >= bounds.max;
   const step = (delta: number) => {
+    // À la borne, le bouton reste atteignable au clavier (`aria-disabled`) et ne fait rien.
+    if ((delta < 0 && atMin) || (delta > 0 && atMax)) return;
     const base = current ?? bounds.min;
     onChange(String(Math.min(bounds.max, Math.max(bounds.min, base + delta))));
   };
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
+      {/* Passage à la ligne à 320 px ou en texte agrandi (0018 § 16, WCAG 1.4.10), comme la rangée du budget. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <span id={labelId} className="text-corps font-bold text-ink">
           {label}
         </span>
         <div className="flex items-center gap-2">
-          <IconButton icon={<IconMoinsProvisoire />} label={less} onClick={() => step(-1)} />
+          <IconButton
+            icon={<IconMoinsProvisoire />}
+            label={less}
+            aria-disabled={atMin || undefined}
+            className={STEP_BOUND_CLASS}
+            onClick={() => step(-1)}
+          />
           <NumberField
             id={id}
             size="compact"
@@ -314,7 +333,13 @@ function TravellerRow({ field, label, less, more, bounds, values, inferred, erro
             invalid={error !== null}
             onChange={onChange}
           />
-          <IconButton icon={<IconPlus />} label={more} onClick={() => step(1)} />
+          <IconButton
+            icon={<IconPlus />}
+            label={more}
+            aria-disabled={atMax || undefined}
+            className={STEP_BOUND_CLASS}
+            onClick={() => step(1)}
+          />
         </div>
       </div>
       <FieldMessage id={errorId(id)} message={error} />
@@ -407,7 +432,7 @@ interface OptionalSectionProps {
 function OptionalSection({ id, title, open, onToggle, summary, children }: OptionalSectionProps) {
   const panelId = `${id}-contenu`;
   return (
-    <section aria-labelledby={`${id}-titre`} className="flex flex-col gap-3 border-t border-outline pt-4">
+    <section aria-labelledby={`${id}-titre`} className="flex flex-col gap-3 border-t border-hairline pt-4">
       <h2 className={SECTION_TITLE_CLASS}>
         <button
           type="button"
@@ -424,7 +449,7 @@ function OptionalSection({ id, title, open, onToggle, summary, children }: Optio
               </span>
             )}
           </span>
-          <IconRetour className={cn("text-ink", open ? "rotate-90" : "-rotate-90")} />
+          <IconRetour className={cn("text-ink-soft", open ? "rotate-90" : "-rotate-90")} />
         </button>
       </h2>
       <div id={panelId} hidden={!open}>

@@ -40,6 +40,8 @@ export function NumberField({ id, value, onChange, labelledBy, describedBy, infe
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
       data-inferred={inferred || undefined}
+      // Contenu sélectionné au focus : taper un chiffre remplace « 2 » malgré `maxLength` (une seule position).
+      onFocus={(event) => event.currentTarget.select()}
       onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
       className={cn(
         INPUT_CLASS,

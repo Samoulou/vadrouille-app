@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BriefRequestSchema, BriefSchema, TripDraftSchema } from "@/contracts";
+import { BriefRequestSchema, BriefSchema, IsoDateSchema, TripDraftSchema } from "@/contracts";
 import {
   ADULTS,
   AREA_LENGTH,
@@ -16,6 +16,7 @@ import {
 import { draftReducer, emptyBriefValues, initialDraft, type BriefValues, type CommitmentForm, type TripForm } from "./draft";
 import {
   cityRanges,
+  isDate,
   parseInteger,
   storyError,
   textError,
@@ -143,6 +144,18 @@ describe("concordance avec les schémas (le serveur fait foi, aucune borne recop
       expect(validateTrip(trip, TODAY)).toEqual([]);
       expect(TripDraftSchema.safeParse(toTripDraft(trip)).success).toBe(true);
     }
+  });
+
+  it("dates : l'interface et IsoDateSchema donnent le même verdict (date existante au calendrier)", () => {
+    const samples = ["2026-08-29", "2028-02-29", "2026-02-28", "2026-02-29", "2026-02-31", "2026-04-31", "2026-13-01", "2026-00-10", "2026-01-00", "2026-8-29", ""];
+    for (const value of samples) {
+      expect(isDate(value), value).toBe(IsoDateSchema.safeParse(value).success);
+    }
+    expect(validateTrip({ ...TRIP, start: "2026-09-31", end: "2026-10-02" }, TODAY)).toContainEqual({ field: "start", code: "required" });
+  });
+
+  it("toTripDraft refuse un engagement sans type au lieu de lui en donner un", () => {
+    expect(() => toTripDraft({ ...TRIP, commitments: [{ ...COMMITMENT, kind: null }] })).toThrow(/engagement sans type/);
   });
 
   it("aux bornes, l'interface et le schéma refusent les mêmes textes", () => {

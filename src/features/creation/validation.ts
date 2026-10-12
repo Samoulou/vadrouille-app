@@ -60,7 +60,13 @@ function lodgingErrors(lodging: LodgingForm, base: string): FormError[] {
   return code ? [{ field: `${base}.label`, code }] : [];
 }
 
-const isDate = (value: string) => ISO_DATE.test(value);
+/** Date `AAAA-MM-JJ` qui existe au calendrier (`2026-02-31` est refusée, comme par le schéma serveur). */
+export function isDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
 
 /** Erreurs de l'écran 1, dans l'ordre d'affichage des champs (le focus va sur la première). */
 export function validateTrip(trip: TripForm, today: string): FormError[] {
@@ -138,8 +144,14 @@ function toLodging(lodging: LodgingForm): Lodging {
   }
 }
 
-/** `TripDraft` d'un écran 1 validé. */
+/**
+ * `TripDraft` d'un écran 1 validé (contrat livré par F8a, 0017 § 2 ; lu par la création du voyage de F8c et par
+ * le test de concordance). Un engagement sans type est une erreur d'appel, jamais remplacé par une valeur.
+ */
 export function toTripDraft(trip: TripForm): TripDraft {
+  if (trip.commitments.some((commitment) => commitment.kind === null)) {
+    throw new Error("toTripDraft : écran 1 non validé (engagement sans type).");
+  }
   return {
     destination: trip.destination.trim(),
     start: trip.start,
@@ -147,7 +159,7 @@ export function toTripDraft(trip: TripForm): TripDraft {
     lodging: toLodging(trip.lodging),
     otherCities: trip.otherCities.map((city) => ({ name: city.name.trim(), arrival: city.arrival, lodging: toLodging(city.lodging) })),
     commitments: trip.commitments.map((commitment) => ({
-      kind: commitment.kind ?? "booking",
+      kind: commitment.kind as NonNullable<typeof commitment.kind>,
       label: commitment.label.trim(),
       date: commitment.date,
       start: commitment.start,

@@ -2,6 +2,7 @@
 
 import { getCreationAdapter } from "@/adapters";
 import { BriefRequestSchema, InferredBriefSchema, fail, ok, type InferredBrief, type Result } from "@/contracts";
+import type { ApiErrorCode } from "@/contracts/values";
 
 import { parseInput } from "../parse-input";
 
@@ -14,8 +15,11 @@ import { parseInput } from "../parse-input";
  * conforme devient `provider_error` et rien n'est rendu. Aucun journal : ni récit ni destination.
  */
 
-/** Erreurs de structuration transmises telles quelles ; toute autre devient `provider_error`. */
-const STRUCTURE_ERRORS = new Set(["rate_limited", "cost_cap_reached", "provider_error"]);
+/**
+ * Erreurs de structuration transmises telles quelles ; toute autre devient `provider_error`. Typées par
+ * `ApiErrorCode` (dérivé de `API_ERROR_CODES`) : un code absent de la liste commune ne compile pas.
+ */
+const STRUCTURE_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["rate_limited", "cost_cap_reached", "provider_error"]);
 
 export async function structureBrief(input: unknown): Promise<Result<InferredBrief>> {
   const parsed = parseInput(BriefRequestSchema, input);

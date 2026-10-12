@@ -12,7 +12,7 @@ import { structureBrief } from "@/server/actions/creation";
 import { TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { formatNombre } from "./brief-fields";
-import { describedBy, errorId, FieldMessage, helpId, INPUT_CLASS } from "./fields";
+import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldMessage, helpId, INPUT_CLASS } from "./fields";
 import type { StageProps } from "./stage";
 import { storyError, toBriefRequest } from "./validation";
 
@@ -42,10 +42,20 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
   const [failed, setFailed] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  // Numéro de la demande en cours : « Remplir moi-même », « Retour » (démontage) ou une nouvelle demande le changent,
+  // et une réponse arrivée ensuite est ignorée (elle n'écrase pas le choix de la personne).
+  const attempt = useRef(0);
 
   useEffect(() => {
     if (focusTitle) titleRef.current?.focus();
   }, [focusTitle]);
+
+  useEffect(
+    () => () => {
+      attempt.current += 1;
+    },
+    [],
+  );
 
   const length = state.story.length;
 
@@ -59,9 +69,12 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
     setError(false);
     setFailed(false);
     setPending(true);
+    attempt.current += 1;
+    const current = attempt.current;
     let succeeded = false;
     try {
       const result = await structureBrief(toBriefRequest(state.trip, state.story));
+      if (attempt.current !== current) return;
       if (result.ok) {
         succeeded = true;
         onStageChange();
@@ -70,6 +83,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
     } catch {
       // Erreur réseau ou serveur : même bandeau qu'une erreur de structuration.
     }
+    if (attempt.current !== current) return;
     if (!succeeded) {
       setPending(false);
       setFailed(true);
@@ -77,6 +91,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
   }
 
   function fillMyself() {
+    attempt.current += 1;
     onStageChange();
     dispatch({ type: "fillMyself" });
   }
@@ -100,7 +115,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
           aria-describedby={describedBy(helpId(STORY_ID), error && errorId(STORY_ID), COUNTER_ID)}
           aria-invalid={error || undefined}
           onChange={(event) => dispatch({ type: "story", story: event.target.value })}
-          className={cn(INPUT_CLASS, "h-auto min-h-40 resize-y py-3")}
+          className={cn(INPUT_CLASS, "h-auto min-h-40 resize-none py-3")}
         />
         <FieldMessage id={errorId(STORY_ID)} message={error ? r.erreur : null} />
         <p id={COUNTER_ID} className="self-end text-legende text-ink-soft tabular-nums">
@@ -111,7 +126,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
           {ANNOUNCED_LENGTHS.has(length) ? counterText(length) : null}
         </p>
       </div>
-      <div role="alert">
+      <div role="alert" className={failed ? undefined : EMPTY_LIVE_REGION_CLASS}>
         {failed ? (
           <StatusBanner
             kind="error"
@@ -138,7 +153,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
         >
           {r.preparer}
         </Button>
-        <p role="status" className="text-corps-s text-ink-soft">
+        <p role="status" className={pending ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
           {pending ? r.attente : null}
         </p>
         <Button variant="text" onClick={fillMyself}>

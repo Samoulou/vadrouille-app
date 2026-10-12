@@ -167,10 +167,17 @@ describe("CreateTripForm", () => {
     renderForm();
     for (let i = 0; i < MAX_CITIES - 1; i++) fireEvent.click(screen.getByRole("button", { name: "Ajouter une ville" }));
     for (let i = 0; i < MAX_COMMITMENTS; i++) fireEvent.click(screen.getByRole("button", { name: "Ajouter un engagement" }));
-    expect(screen.getByRole("button", { name: "Ajouter une ville" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Ajouter une ville" })).toHaveAccessibleDescription("Au plus 4 villes en tout, destination comprise.");
-    expect(screen.getByRole("button", { name: "Ajouter un engagement" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Ajouter un engagement" })).toHaveAccessibleDescription("Au plus 10 engagements.");
+    // Au plafond : `aria-disabled` (atteignable au clavier, comme les `Chip`), un clic de plus n'ajoute rien.
+    const addCity = screen.getByRole("button", { name: "Ajouter une ville" });
+    expect(addCity).toHaveAttribute("aria-disabled", "true");
+    expect(addCity).not.toBeDisabled();
+    expect(addCity).toHaveAccessibleDescription("Au plus 4 villes en tout, destination comprise.");
+    fireEvent.click(addCity);
+    const addCommitment = screen.getByRole("button", { name: "Ajouter un engagement" });
+    expect(addCommitment).toHaveAttribute("aria-disabled", "true");
+    expect(addCommitment).not.toBeDisabled();
+    expect(addCommitment).toHaveAccessibleDescription("Au plus 10 engagements.");
+    fireEvent.click(addCommitment);
     expect(latest?.trip.otherCities).toHaveLength(MAX_CITIES - 1);
     expect(latest?.trip.commitments).toHaveLength(MAX_COMMITMENTS);
   });

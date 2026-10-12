@@ -23,7 +23,17 @@ import { format, messages } from "@/i18n";
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
-import { describedBy, errorId, FieldHelp, FieldMessage, FieldRow, fieldId, focusField, TextField } from "./fields";
+import {
+  describedBy,
+  EMPTY_LIVE_REGION_CLASS,
+  errorId,
+  FieldHelp,
+  FieldMessage,
+  FieldRow,
+  fieldId,
+  focusField,
+  TextField,
+} from "./fields";
 import { creationRoutes } from "./routes";
 import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
 
@@ -33,6 +43,10 @@ const err = e1.erreurs;
 
 const LODGING_OPTIONS = LODGING_ANSWERS.map((value) => ({ value, label: e1.logement.options[value] }));
 const KIND_OPTIONS = COMMITMENT_KINDS.map((value) => ({ value, label: e1.engagements.types[value] }));
+
+/** « Ajouter une ville » ou « Ajouter un engagement » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
+const ADD_BUTTON_CLASS =
+  "self-start aria-disabled:cursor-not-allowed aria-disabled:border-muted aria-disabled:bg-muted aria-disabled:text-ink-soft";
 
 const length = (bounds: { min: number; max: number }) => format(err.longueur, bounds);
 
@@ -156,10 +170,10 @@ export function CreateTripForm() {
   return (
     <CreationShell backHref={creationRoutes.mesVoyages()}>
       {/* Bloc `muted` du brouillon perdu : région présente dès le chargement, texte écrit ensuite (0018 § 14). */}
-      <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : undefined}>
+      <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
         {state.noticeVisible ? t.brouillonPerdu : null}
       </div>
-      <div role="alert" />
+      <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
       <form noValidate onSubmit={submit} className="flex flex-col gap-6">
         <TextField
@@ -259,10 +273,11 @@ export function CreateTripForm() {
             ref={addCityButton}
             variant="secondary"
             size="sm"
-            className="self-start"
-            disabled={citiesFull}
+            className={ADD_BUTTON_CLASS}
+            aria-disabled={citiesFull || undefined}
             aria-describedby={describedBy(citiesFull && "villes-maximum")}
             onClick={() => {
+              if (citiesFull) return;
               focusAfterAdd.current = `otherCities.${trip.otherCities.length}.name`;
               dispatch({ type: "addCity" });
             }}
@@ -365,10 +380,11 @@ export function CreateTripForm() {
             ref={addCommitmentButton}
             variant="secondary"
             size="sm"
-            className="self-start"
-            disabled={commitmentsFull}
+            className={ADD_BUTTON_CLASS}
+            aria-disabled={commitmentsFull || undefined}
             aria-describedby={describedBy(commitmentsFull && "engagements-maximum")}
             onClick={() => {
+              if (commitmentsFull) return;
               focusAfterAdd.current = `commitments.${trip.commitments.length}.kind`;
               dispatch({ type: "addCommitment" });
             }}

@@ -29,6 +29,13 @@ export function describedBy(...ids: (string | false | null | undefined)[]): stri
   return ids.filter(Boolean).join(" ") || undefined;
 }
 
+/**
+ * Région live vide (`role="status"` ou `role="alert"`, présente dès l'affichage, 0018 § 14) : hors du flux tant
+ * qu'elle est vide, pour ne pas ajouter d'écart dans la colonne ; elle reste rendue (jamais `hidden` ni
+ * `display: none`), donc annoncée dès qu'un texte y est écrit.
+ */
+export const EMPTY_LIVE_REGION_CLASS = "absolute";
+
 export const INPUT_CLASS =
   "h-13 w-full min-w-0 rounded-control border-(length:--ligne-trait-controle) border-border-control bg-raised bg-clip-padding px-4 text-corps text-ink aria-invalid:border-ink";
 

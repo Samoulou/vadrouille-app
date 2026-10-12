@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "../e2e/carte-helpers";
-import { EDIMBOURG, R1, continueButton, fillTrip, installClock, reachBrief, reachReview } from "../e2e/creation-helpers";
+import { EDIMBOURG, R1, STORY, continueButton, fillTrip, installClock, reachBrief, reachReview } from "../e2e/creation-helpers";
 
 /**
  * Captures des écrans 1 et 2 de la création en 390 × 844 (références de la CI, décision 0004), mêmes états que
@@ -64,6 +64,16 @@ test("brief: récit avec erreur", async ({ page }) => {
   await page.getByRole("button", { name: "Préparer mon brief" }).click();
   await expect(page.getByText("Écris au moins une phrase, ou remplis le brief toi-même.")).toBeVisible();
   await capture(page, "brief-recit-erreur.png");
+});
+
+test("brief: récit, bandeau d'erreur de la préparation", async ({ page }) => {
+  await reachBrief(page);
+  // Appel de l'action serveur interrompu (même bandeau qu'une erreur de structuration).
+  await page.route("**/voyages/nouveau/brief", (route) => (route.request().method() === "POST" ? route.abort() : route.continue()));
+  await page.getByRole("textbox", { name: "Raconte ton voyage en quelques phrases" }).fill(STORY);
+  await page.getByRole("button", { name: "Préparer mon brief" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Impossible de préparer ton brief pour le moment.");
+  await capture(page, "brief-recit-bandeau-erreur.png");
 });
 
 test("brief: vérification avec champs déduits", async ({ page }) => {

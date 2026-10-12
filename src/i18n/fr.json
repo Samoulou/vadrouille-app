@@ -606,7 +606,6 @@
   "creation": {
     "retour": "Retour",
     "brouillonPerdu": "Ton brouillon n'a pas été conservé. Recommence à partir de la destination.",
-    "deduit": "déduit de ton récit",
     "continuer": "Continuer",
     "titreDocument": {
       "nouveau": "Nouveau voyage · Destination et dates",
