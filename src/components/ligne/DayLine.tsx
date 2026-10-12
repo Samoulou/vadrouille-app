@@ -134,7 +134,8 @@ export interface DayLineStopProps {
  *
  * Écran 15 (F10-TL-12, rendu provisoire UX/UI) : étape en cours avec `aria-current="step"` et l'étiquette
  * visible « En cours » ; étape passée avec l'étiquette visible « Terminée », nom et heure en `ink-soft` en
- * complément (jamais la seule couleur).
+ * complément (jamais la seule couleur), sans `Tag` : le jaune `quai` ne signale qu'une action requise
+ * (handover § 0 règle 6, § 4.2), et une étape terminée n'en demande plus.
  */
 function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
   const past = state === "past";
@@ -156,7 +157,7 @@ function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
         </span>
       ) : null}
       {!compact && stop.reason ? <span className="text-corps-s text-ink">{stop.reason}</span> : null}
-      {stop.exceptions.length > 0 ? (
+      {!past && stop.exceptions.length > 0 ? (
         <span className="mt-1 flex flex-wrap gap-(--ligne-espace-2)">
           {stop.exceptions.map((exception) => (
             <Tag key={exception} kind={exception} />

@@ -320,6 +320,19 @@ describe("DayLine en lecture seule (F10-TL-12)", () => {
     }
   });
 
+  it("étape passée : aucune Tag (le jaune quai ne signale qu'une action requise) ; sans isPast, Tag rendue", () => {
+    const { container, unmount } = render(<DayLine items={DAY} compact isPast={(s) => s.id === "c"} />);
+    const past = row(container, "[Café de Stockbridge]");
+    expect(past).toHaveAttribute("data-state", "past");
+    expect(within(past).getByText(t.etape.terminee)).toBeVisible();
+    expect(past.textContent).not.toContain(t.tag.toReserve);
+    unmount();
+    const { container: sans } = render(<DayLine items={DAY} compact />);
+    const cafe = row(sans, "[Café de Stockbridge]");
+    expect(cafe).not.toHaveAttribute("data-state");
+    expect(within(cafe).getByText(t.tag.toReserve)).toBeVisible();
+  });
+
   it("sans les props de l'écran 15 : aucune étiquette, aucun aria-current", () => {
     const { container } = render(<DayLine items={DAY} getStopHref={href} />);
     expect(container.querySelector("[aria-current]")).toBeNull();
