@@ -40,7 +40,7 @@ Dans la spec P0, ces recommandations correspondent aux options b : **P0-Q8 b**, 
 ## Points signalés (aucun n'est tranché ici)
 1. **P0-Q12 b contestée par la revue Sécurité.** La revue consolidée du head `0dd05f7` de #149 (bloquant 3, Sécurité) relève que le dossier du projet Claude est relu par les agents : un programme réel (identifiants de lieu, positions, horaires) y entrerait dans le contexte, donc dans un prompt, ce qu'interdit `CLAUDE.md` (« Mettre une donnée Google dans un prompt »). Une question a été posée à Samuel le 2026-10-12 (P0-Q13 dans la spec P0) : exécutions réelles sur son poste, programmes jamais sortis de son poste. Sa réponse peut remplacer P0-Q12 b ; d'ici là, aucune exécution réelle n'a lieu (point 3).
 2. **Portée du quota de Q252.** La question « quota de 100 par jour : par méthode ou pour toute l'API Places » est posée à Samuel (P0-Q14 dans la spec P0) (revue du head `0dd05f7`, bloquant 2). La citation du point 1 ne la tranche pas ; cette décision ne fixe aucun plafond.
-3. **Découpage de la spec P0 (décision 0029 du Tech Lead, 2026-10-12).** #149 ne garde que P0a1 et P0b1, sans clé. Les exécutions réelles (P0a2, P0a3, P0b2, A5 et les plafonds définitifs) passent dans une spec suivante, écrite après les réponses de Samuel aux points 1 et 2.
+3. **Découpage de la spec P0 (décision 0030 du Tech Lead, 2026-10-12).** #149 ne garde que P0a1 et P0b1, sans clé. Les exécutions réelles (P0a2, P0a3, P0b2, A5 et les plafonds définitifs) passent dans une spec suivante, écrite après les réponses de Samuel aux points 1 et 2.
 
 ## Conséquences
 - Les réponses ci-dessus remplacent, pour Q241, Q249, Q250, Q252, P0-Q5, P0-Q8 et P0-Q12, la liste « Restent ouvertes » de la décision 0027.

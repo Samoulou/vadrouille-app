@@ -1,8 +1,8 @@
-# 0029 — Décision du Tech Lead : découpage de la spécification P0
+# 0030 — Décision du Tech Lead : découpage de la spécification P0
 
 Statut : décision déléguée (périmètre technique d'une tâche), à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-12 · Décideur : Tech Lead (délégation « Qui décide quoi » de `docs/CONTEXT.md`), consignée par IA-recherche dans #149 à sa demande, confirmée par la revue du Tech Lead du head `aefc7bf` · Ticket #147
 
-Numérotation : 0028 est jointe à #149 ; 0011 reste réservé par #27. 0029 est le prochain numéro libre.
+Numérotation : 0028 est jointe à #149 ; 0011 reste réservé par #27 ; 0029 est prise par #164 (chaîne MVP ouverte avant G0). 0030 est le prochain numéro libre.
 
 ## Contexte
 La spécification P0 (#149) a connu trois corrections comptées. La revue consolidée du head `0dd05f7` (2026-10-12) relevait six bloquants, tous issus des ajouts sur les exécutions réelles (programmes réels hors du dépôt, transfert, purge, quotas Google). La règle du cycle de Samuel prévoit qu'au-delà de deux corrections, une troisième tentative ou un découpage se décide avec le Tech Lead.
