@@ -32,12 +32,15 @@ export const QUERY = `query($owner: String!, $name: String!) {
       nodes { headRefName baseRefName isCrossRepository }
     }
     branches: refs(refPrefix: "refs/heads/claude/", first: 100) {
+      pageInfo { hasNextPage }
       nodes { name target { oid } }
     }
   }
 }`;
 
 export const MAX_AGE_DAYS = 7;
+// Nombre de PR fusionnées demandées (`first: 50`) : atteint, la fenêtre peut être incomplète.
+export const MERGED_LIMIT = 50;
 
 // Seules les branches de travail des agents sont supprimées ; le motif exclut aussi
 // tout caractère qu'un shell pourrait interpréter, et les segments « . » et « .. ».
@@ -49,9 +52,10 @@ const BRANCH = /^claude(?:\/(?!\.{1,2}(?:\/|$))[A-Za-z0-9._-]+)+$/;
  *   encore ouvert, et pas rouvert depuis la fusion (une réouverture par Samuel l'emporte).
  * - Branche : `claude/…`, tête d'une PR fusionnée du dépôt, toujours sur le commit fusionné
  *   (aucun push après la fusion), ni tête ni base d'une PR ouverte.
- * Fenêtre : PR fusionnées depuis MAX_AGE_DAYS jours au plus. Une liste de PR fusionnées
- * tronquée ne fait qu'oublier un nettoyage ; une liste de PR ouvertes tronquée ferait
- * supprimer une branche encore utile : échec fermé.
+ * Fenêtre : PR fusionnées depuis MAX_AGE_DAYS jours au plus. Une liste de PR ouvertes
+ * tronquée ferait supprimer une branche encore utile : échec fermé. Une liste de PR
+ * fusionnées ou de branches tronquée ne fait qu'oublier un nettoyage : le plan s'exécute
+ * et `warnings` le signale (le workflow échoue alors à la fin, de façon visible).
  */
 export function planCleanup(data, now = new Date()) {
   const repo = data?.repository;
@@ -81,7 +85,11 @@ export function planCleanup(data, now = new Date()) {
     const mergedAt = Date.parse(pr.mergedAt);
     if (mergedAt < since) continue;
     for (const issue of pr.closingIssuesReferences?.nodes ?? []) {
-      const reopenedAt = issue.timelineItems?.nodes?.[0]?.createdAt;
+      // Réouverture illisible : le ticket est ignoré (échec fermé).
+      const events = issue.timelineItems?.nodes;
+      if (!Array.isArray(events) || events.some((event) => !event?.createdAt))
+        continue;
+      const reopenedAt = events[0]?.createdAt;
       if (
         issue.state === "OPEN" &&
         issue.repository?.nameWithOwner === repo.nameWithOwner &&
@@ -103,7 +111,19 @@ export function planCleanup(data, now = new Date()) {
       branches.set(branch, { pr: pr.number, oid: pr.headRefOid });
     }
   }
+  const warnings = [];
+  if (repo.merged.nodes.length >= MERGED_LIMIT) {
+    warnings.push(
+      `${MERGED_LIMIT} PR fusionnées lues : la fenêtre de ${MAX_AGE_DAYS} jours peut être incomplète.`,
+    );
+  }
+  if (repo.branches.pageInfo?.hasNextPage !== false) {
+    warnings.push(
+      "Plus de 100 branches claude/… : les suivantes ne sont pas examinées ; nettoyer à la main.",
+    );
+  }
   return {
+    warnings,
     closeIssues: [...issues]
       .map(([issue, pr]) => ({ issue, pr }))
       .sort((a, b) => a.issue - b.issue),
@@ -113,13 +133,17 @@ export function planCleanup(data, now = new Date()) {
   };
 }
 
-/** Lignes lues par le workflow : `issue <n> <pr>` et `branch <nom> <pr> <commit>`. */
+/**
+ * Lignes lues par le workflow : `issue <n> <pr>`, `branch <nom> <pr> <commit>`, et
+ * `warn <message>` en dernier.
+ */
 export function planLines(plan) {
   return [
     ...plan.closeIssues.map(({ issue, pr }) => `issue ${issue} ${pr}`),
     ...plan.deleteBranches.map(
       ({ branch, pr, oid }) => `branch ${branch} ${pr} ${oid}`,
     ),
+    ...(plan.warnings ?? []).map((message) => `warn ${message}`),
   ];
 }
 

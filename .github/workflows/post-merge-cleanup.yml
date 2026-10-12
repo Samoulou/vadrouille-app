@@ -43,7 +43,12 @@ jobs:
           status=0
           # plan.txt est lu sur le descripteur 3 : les appels gh ne consomment pas le plan.
           while read -r kind target pr oid <&3; do
-            if [ "$kind" = issue ]; then
+            if [ "$kind" = warn ]; then
+              echo "::warning::$target $pr $oid"
+              status=1
+            elif [ "$kind" = issue ]; then
+              # Pas de relecture de l'état ici : fermer un ticket déjà fermé ne change rien ;
+              # une réouverture survenue pendant la boucle serait annulée (décision 0033).
               if gh issue close "$target" --repo "$REPO" --reason completed \
                 --comment "Fermé automatiquement : réglé par #$pr, fusionnée (décision 0033)." < /dev/null; then
                 echo "Ticket #$target fermé (PR #$pr)."
@@ -52,7 +57,8 @@ jobs:
                 status=1
               fi
             elif [ "$kind" = branch ]; then
-              # Relecture juste avant la suppression : un push depuis le plan garde la branche.
+              # Relecture du commit juste avant la suppression : un push depuis le plan garde la
+              # branche. Les PR ouvertes ne sont pas relues (décision 0033, risque résiduel).
               current=$(gh api "repos/$REPO/git/ref/heads/$target" --jq .object.sha < /dev/null) || current=""
               if [ "$current" != "$oid" ]; then
                 echo "Branche $target : modifiée depuis le plan, gardée."

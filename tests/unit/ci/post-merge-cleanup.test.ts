@@ -1,9 +1,13 @@
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   MAX_AGE_DAYS,
+  MERGED_LIMIT,
   planCleanup,
   planLines,
   QUERY,
@@ -64,6 +68,7 @@ function data({
   }[],
   branches = [{ name: "154-comptes-externes", target: { oid: OID } }],
   hasNextPage = false,
+  branchesTruncated = false,
 } = {}) {
   return {
     repository: {
@@ -71,7 +76,10 @@ function data({
       defaultBranchRef: { name: "main" },
       merged: { nodes: pulls },
       open: { pageInfo: { hasNextPage }, nodes: open },
-      branches: { nodes: branches },
+      branches: {
+        pageInfo: { hasNextPage: branchesTruncated },
+        nodes: branches,
+      },
     },
   };
 }
@@ -79,6 +87,7 @@ function data({
 describe("planCleanup", () => {
   it("ferme le ticket relié et supprime la branche de la PR fusionnée (cas de la PR 156)", () => {
     expect(planCleanup(data(), NOW)).toEqual({
+      warnings: [],
       closeIssues: [{ issue: 154, pr: 156 }],
       deleteBranches: [
         { branch: "claude/154-comptes-externes", pr: 156, oid: OID },
@@ -93,6 +102,7 @@ describe("planCleanup", () => {
     expect(planCleanup(data({ pulls: [closed] }), NOW).closeIssues).toEqual([]);
     const other = merged({ baseRefName: "claude/autre" });
     expect(planCleanup(data({ pulls: [other] }), NOW)).toEqual({
+      warnings: [],
       closeIssues: [],
       deleteBranches: [],
     });
@@ -101,6 +111,7 @@ describe("planCleanup", () => {
   it(`ignore les PR fusionnées depuis plus de ${MAX_AGE_DAYS} jours`, () => {
     const old = merged({ mergedAt: "2026-10-01T09:00:00Z" });
     expect(planCleanup(data({ pulls: [old] }), NOW)).toEqual({
+      warnings: [],
       closeIssues: [],
       deleteBranches: [],
     });
@@ -154,6 +165,27 @@ describe("planCleanup", () => {
     expect(planCleanup(data({ pulls: pulls2 }), NOW).closeIssues).toEqual([
       { issue: 154, pr: 156 },
     ]);
+  });
+
+  it("ignore un ticket dont la réouverture est illisible", () => {
+    for (const timelineItems of [undefined, { nodes: [{}] }]) {
+      const pulls = [
+        merged({
+          closingIssuesReferences: { nodes: [issue({ timelineItems })] },
+        }),
+      ];
+      expect(planCleanup(data({ pulls }), NOW).closeIssues).toEqual([]);
+    }
+  });
+
+  it("signale une liste de branches ou de PR fusionnées tronquée, sans bloquer le reste", () => {
+    const plan = planCleanup(data({ branchesTruncated: true }), NOW);
+    expect(plan.warnings).toHaveLength(1);
+    expect(plan.closeIssues).toEqual([{ issue: 154, pr: 156 }]);
+    const pulls = Array.from({ length: MERGED_LIMIT }, (_, i) =>
+      merged({ number: 1000 + i, headRefName: `claude/x-${i}` }),
+    );
+    expect(planCleanup(data({ pulls }), NOW).warnings).toHaveLength(1);
   });
 
   it("refuse de nettoyer si la liste des PR ouvertes est tronquée", () => {
@@ -221,7 +253,15 @@ describe("workflow", () => {
   it("n'utilise que GITHUB_TOKEN, sans secret, et le code de main", () => {
     expect(workflow).not.toMatch(/secrets\./);
     expect(workflow).toMatch(/github\.ref == 'refs\/heads\/main'/);
-    expect(workflow).not.toMatch(/pull_request_target|on:\s*\n\s*pull_request/);
+    const triggers = workflow.slice(
+      workflow.indexOf("\non:"),
+      workflow.indexOf("\npermissions:"),
+    );
+    expect(triggers).not.toMatch(/pull_request|push|issue/);
+    expect(triggers).toMatch(/schedule:/);
+    expect(workflow).toContain(
+      "github.repository == 'Samoulou/vadrouille-app'",
+    );
     expect(workflow).toContain("persist-credentials: false");
   });
 
@@ -229,5 +269,33 @@ describe("workflow", () => {
     expect(QUERY).toContain("closingIssuesReferences");
     expect(QUERY).toContain("hasNextPage");
     expect(QUERY).toContain("ReopenedEvent");
+  });
+});
+
+describe("ligne de commande", () => {
+  const cli = (file: string) =>
+    spawnSync("node", ["scripts/ci/post-merge-cleanup.mjs", "plan", file], {
+      encoding: "utf8",
+    });
+  const write = (content: unknown) => {
+    const file = join(mkdtempSync(join(tmpdir(), "cleanup-")), "r.json");
+    writeFileSync(file, JSON.stringify(content));
+    return file;
+  };
+
+  it("échoue sur une réponse GraphQL en erreur", () => {
+    const result = cli(write({ errors: [{ message: "boom" }] }));
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe("");
+  });
+
+  it("écrit le plan d'une réponse valide", () => {
+    const result = cli(
+      write({
+        data: data({ pulls: [merged({ mergedAt: new Date().toISOString() })] }),
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim().split("\n")[0]).toBe("issue 154 156");
   });
 });
