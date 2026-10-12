@@ -118,6 +118,20 @@ describe("/dev/composants", () => {
     for (const button of pressed) expect(button.querySelector("svg")).toBeNull();
   });
 
+  it("montre une Chip indisponible (aria-disabled) qui ne bascule pas au clic", () => {
+    render(<ComposantsShowcase />);
+    const chips = screen.getByRole("region", { name: "Chip" });
+    const indisponibles = within(chips)
+      .getAllByRole("button", { name: messages.dev.composants.exemples.chips.musees })
+      .filter((chip) => chip.getAttribute("aria-disabled") === "true");
+    expect(indisponibles).toHaveLength(1);
+    const chip = indisponibles[0]!;
+    expect(chip).not.toBeDisabled();
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("montre chaque type de Tag et de StatusBanner, et le compteur seulement quand il vaut plus de 0", () => {
     render(<ComposantsShowcase />);
     const ex = messages.dev.composants.exemples;
@@ -126,17 +140,24 @@ describe("/dev/composants", () => {
       expect(within(tags).getByText(text)).toBeInTheDocument();
     }
     const banners = screen.getByRole("region", { name: "StatusBanner" });
-    expect(within(banners).getAllByRole("status")).toHaveLength(5);
-    expect(within(banners).getByRole("alert")).toHaveTextContent(ex.bandeaux.error);
+    // role=alert pour error et conflict, role=status pour les quatre autres (0012, Q13).
+    expect(within(banners).getAllByRole("status")).toHaveLength(4);
+    const alerts = within(banners).getAllByRole("alert");
+    expect(alerts.map((alert) => alert.getAttribute("data-kind"))).toEqual(["conflict", "error"]);
+    expect(alerts[1]).toHaveTextContent(ex.bandeaux.error);
     expect(screen.getByRole("img", { name: ex.compteurLabel })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: ex.compteurZeroLabel })).not.toBeInTheDocument();
   });
 
-  it("montre OtpInput vide et rempli, et un SegmentedControl qui répond", () => {
+  it("montre OtpInput vide, rempli et invalide, et un SegmentedControl qui répond", () => {
     render(<ComposantsShowcase />);
     const otp = screen.getByRole("region", { name: "OtpInput" });
     const groups = within(otp).getAllByRole("group");
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(3);
+    // Invalide : aria-invalid sur chaque case, message relié au groupe (0012, Q13).
+    expect(groups[2]).toHaveAccessibleDescription(messages.dev.composants.exemples.codeInvalide);
+    for (const input of within(groups[2]!).getAllByRole("textbox")) expect(input).toHaveAttribute("aria-invalid", "true");
+    for (const input of within(groups[0]!).getAllByRole("textbox")) expect(input).not.toHaveAttribute("aria-invalid");
     const code = (group: HTMLElement) =>
       within(group)
         .getAllByRole("textbox")

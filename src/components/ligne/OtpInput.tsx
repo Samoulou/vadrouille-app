@@ -15,6 +15,13 @@ export interface OtpInputProps {
   /** Nom accessible du groupe ; par défaut « Code à 6 chiffres ». */
   label?: string;
   disabled?: boolean;
+  /** Code refusé : contour `ink` et `aria-invalid="true"` sur chaque case (décision 0012, Q13). */
+  invalid?: boolean;
+  /**
+   * Identifiant de l'élément qui porte le message écrit, fourni par l'écran (Q10) : relié au groupe par
+   * `aria-describedby`. À passer avec `invalid`.
+   */
+  describedBy?: string;
   className?: string;
 }
 
@@ -26,7 +33,7 @@ function digitsOf(text: string): string[] {
 
 /**
  * Code à usage unique, une case par chiffre. Accepte le collage et le remplissage automatique
- * (`autocomplete="one-time-code"`). Rendu provisoire, absent du design system (Q13).
+ * (`autocomplete="one-time-code"`). Rendu décidé par UX/UI (décision 0012, Q13 et Q30), absent du design system.
  */
 export function OtpInput({
   length = 6,
@@ -34,6 +41,8 @@ export function OtpInput({
   defaultValue = "",
   label,
   disabled = false,
+  invalid = false,
+  describedBy,
   className,
 }: OtpInputProps) {
   const [digits, setDigits] = useState<string[]>(() =>
@@ -107,6 +116,7 @@ export function OtpInput({
     <div
       role="group"
       aria-label={label ?? format(t.groupe, { length })}
+      aria-describedby={describedBy}
       className={cn("flex gap-2", className)}
     >
       {digits.map((digit, index) => (
@@ -121,13 +131,17 @@ export function OtpInput({
           pattern="[0-9]*"
           autoComplete="one-time-code"
           aria-label={format(t.position, { position: index + 1, length })}
+          aria-invalid={invalid || undefined}
           value={digit}
           disabled={disabled}
           onChange={(event) => handleChange(event, index)}
           onPaste={(event) => handlePaste(event, index)}
           onKeyDown={(event) => handleKeyDown(event, index)}
           onFocus={(event) => event.target.select()}
-          className="h-13 w-(--touch-target) min-w-0 rounded-control border-(length:--ligne-trait-controle) border-border-control bg-raised text-center text-section font-extrabold text-ink tabular-nums disabled:bg-muted disabled:text-ink-soft"
+          className={cn(
+            "h-13 w-(--touch-target) min-w-0 rounded-control border-(length:--ligne-trait-controle) bg-raised text-center text-section font-extrabold text-ink tabular-nums disabled:bg-muted disabled:text-ink-soft",
+            invalid ? "border-ink" : "border-border-control",
+          )}
         />
       ))}
     </div>
