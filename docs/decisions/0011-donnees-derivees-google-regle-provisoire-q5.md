@@ -54,17 +54,17 @@ Conséquence sur le découpage : **aucune étape ne passe un sous-ensemble de ca
 | `Day.travelMinutes` | calculé | Somme à la lecture des `Segment.minutes` du jour, hors excursion |
 | `Change[segment].before` | calculé | Durée relue pour la version de départ, au moment de la réponse de révision ; jamais écrite dans `trip_versions.patch` |
 | `Change[segment].after` | calculé | Idem, pour la version produite |
-| `Stop.verifiedAt` | calculé | Date (`created_at`, donnée maison) de la version qui a planifié l'étape : le moteur contrôle chaque lieu à la création de la version (R1, R4). Aucune colonne `verified_at` |
+| `Stop.verifiedAt` | calculé | Date (`created_at`, donnée maison) de la première version de la chaîne des parents à partir de laquelle l'étape est inchangée (même `id`, même `placeId`, même jour, même horaire), calculée à la lecture en remontant `parent_version` : c'est la version où le moteur a contrôlé ce lieu (R1, R4). Aucune colonne `verified_at` |
 | `SurpriseIdea.verifiedAt` | calculé | Idem, pour la version qui a écrit l'idée |
-| `Stop.exceptions` | stocké, sans `toConfirm` | L'instantané type `exceptions` comme un tableau de `toReserve` et `unconfirmed` seulement (au plus 2 ; schéma imbriqué `StopSnapshot` dérivé de `StopSchema`), comme l'écart 3 bis de la spec P0 ; `toReserve` vient de nos sources web, `unconfirmed` de la relecture de la page d'un événement (R2). `toConfirm`, tiré d'horaires Google, n'est **jamais stocké** : il est ajouté à la lecture d'une journée ou d'une fiche par une relecture des horaires (Place Details, à l'intérieur de `src/grounding`, sans stockage), dans la limite de 2 badges |
+| `Stop.exceptions` | stocké, sans `toConfirm` | L'instantané type `exceptions` comme un tableau de `toReserve` et `unconfirmed` seulement (au plus 2 ; schéma imbriqué `StopSnapshot` dérivé de `StopSchema`), comme l'écart 3 bis de la spec P0 (#149) ; `toReserve` vient de nos sources web, `unconfirmed` de la relecture de la page d'un événement (R2). `toConfirm`, tiré d'horaires Google, n'est **jamais stocké** : il est ajouté à la lecture d'une journée ou d'une fiche par une relecture des horaires (Place Details, à l'intérieur de `src/grounding`, sans stockage), dans la limite de 2 badges |
 
-**Relecture.** Une relecture qui échoue (plafond ou quota atteint, Google indisponible) **n'invente jamais de valeur** : la journée s'affiche avec l'état d'erreur existant et « Réessayer » (comme P0b) ; `toConfirm` absent faute de relecture n'est pas une erreur (le moteur a garanti R4 à la création). Une relecture qui ne trouve pas d'itinéraire pour le mode choisi donne une durée estimée par le moteur à partir des coordonnées, avec `estimated = true`, calculée et jamais stockée.
+**Relecture.** Une relecture qui échoue (plafond ou quota atteint, Google indisponible) **n'invente jamais de valeur** : la journée s'affiche avec l'état d'erreur existant et « Réessayer » (comme P0b, spec P0, #149) ; `toConfirm` absent faute de relecture n'est pas une erreur (le moteur a garanti R4 à la création). Une relecture qui ne trouve pas d'itinéraire pour le mode choisi donne une durée estimée par le moteur à partir des coordonnées, avec `estimated = true`, calculée et jamais stockée.
 
 **`Proposal.detour`** : écrit pour chaque proposition (justification maison, sans durée), gardé ou omis à la lecture selon `DETOUR_THRESHOLD_MINUTES` et la durée relue, comme dans P0 (sinon sa présence trahirait une durée de Routes).
 
 **`trip_versions.validation_report`** : **n'est pas créée**. Le rapport de validation ne vit qu'en mémoire dans l'étape de planification ; une version écrite est une version qui a passé la validation. La contradiction relevée par le bloquant 3 (purge ciblée impossible dans une table en ajout seulement) disparaît : aucune donnée dérivée n'entre dans `trip_versions`.
 
-**Horaires planifiés** (`Stop.start`, `Stop.end`) : hors des 7 clés, ils suivent la réponse de Samuel à P0-Q9 (spec P0) ; d'ici là, B9 ne branche pas l'écriture de programmes réels (même règle que P0).
+**Horaires planifiés** (`Stop.start`, `Stop.end`) : hors des 7 clés, ils suivent la réponse de Samuel à P0-Q9 (spec P0, #149) ; d'ici là, B9 ne branche pas l'écriture de programmes réels (même règle que P0).
 
 ### 6. Cache des coordonnées (`place_coordinates`, amende la décision 0007)
 Créé par B8 et réservé à `src/grounding` (moteur et carte Google) :
@@ -77,19 +77,24 @@ Créé par B8 et réservé à `src/grounding` (moteur et carte Google) :
 Le test `schéma: aucune colonne de contenu Google` admet une seule exception, `place_coordinates.lat` et `.lng`, nommée dans le test.
 
 ### 7. Pipeline de génération (variante B, 0027 point 1)
+Les étapes portent les lettres du workflow 1 du handover (« Partie Q5 », § 8).
+
 | Étape | Type | Données Google dans l'étape | Écrit en base | Sortie sérialisée |
 |---|---|---|---|---|
-| a Recherche web | IA (DeepSeek) | non | `candidates` (contenu maison, sans `placeId`) | compteurs |
-| b Ancrage | appel externe (Places) | oui, en mémoire | `candidates.place_id` des candidats `compatible` seulement | compteurs |
-| c Notation | IA (Decider) | non | notes du Decider sur les candidats (donnée maison) | compteurs |
-| d Classement, planification, validation, réparation déterministe | déterministe (moteur), relectures Places et Routes | oui, en mémoire | version de travail (instantané sans données dérivées, sans raisons), cases `proposals` | identifiant de version |
-| e Raisons et publication | IA (DeepSeek), puis écriture | non | `Stop.reason` des lieux retenus dans une nouvelle version, qui devient `current_version` | identifiant de version |
+| a Brief | déterministe | non | — | identifiant du brief |
+| b Recherche web | IA (DeepSeek) | non | `candidates` (contenu maison, sans `placeId`) | compteurs |
+| c Ancrage | appel externe (Places) | oui, en mémoire | `candidates.place_id` des candidats `compatible` seulement | compteurs |
+| d Notation | IA (Decider) | non | notes du Decider sur les candidats (donnée maison) | compteurs |
+| e Classement, planification, validation, réparation déterministe | déterministe (moteur), relectures Places et Routes | oui, en mémoire | **plan de travail** dans `plan_drafts` (non versionné) et cases `proposals` | identifiant du plan de travail |
+| f Raisons et publication | IA (DeepSeek), puis écriture | non | `reason` des lieux retenus ; **seule** écriture dans `trip_versions`, version qui devient `current_version` ; suppression du plan de travail | identifiant de version |
 
-Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover). La version de travail de l'étape d n'est jamais `current_version` : seule celle de l'étape e est publiée (aucune version partielle). La variante A (DeepSeek seul, mesure de référence) remplace les étapes c et e par une étape DeepSeek qui note et rédige ; les règles d'entrée sont les mêmes. Modèles et variante choisis par configuration (0027).
+**Plan de travail (`plan_drafts`).** Table non versionnée : `organization_id`, `trip_id`, `generation_run_id`, `day`, `plan` (JSONB validé par `PlanDraftSchema`, dérivé de `TripSnapshotSchema` en rendant facultatifs `Stop.reason` et `SurpriseIdea.reason`, sans aucune donnée Google ni dérivée), `created_at` ; unique `(generation_run_id, day)` ; RLS type ; `vadrouille_app` : `SELECT, INSERT, DELETE` ; aucune vue partagée. Elle n'entre ni dans l'historique, ni dans la numérotation des versions, ni dans l'annulation (PO-5), ni dans la détection des révisions obsolètes. L'étape f valide le résultat par `TripSnapshotSchema` (raisons présentes) avant d'écrire la version, puis supprime le plan dans la même transaction. Un plan d'une exécution arrêtée (plafond, quota, erreur) n'est jamais publié et est supprimé à la clôture de l'exécution ; `purge_organization_data` couvre `plan_drafts` et `place_coordinates` (amende 0007).
+
+Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover). La variante A (DeepSeek seul, mesure de référence) remplace les étapes d et f par une étape DeepSeek qui note et rédige ; les règles d'entrée sont les mêmes. Modèles et variante choisis par configuration (0027).
 
 ## Tests nommés
 - `workflows: aucune donnée Google dans l'état sérialisé` : pour chaque étape, entrée et sortie validées par leur contrat strict ; aucune clé interdite à aucun niveau (`rating`, `userRatingCount`, `openingHours`, `regularOpeningHours`, `currentOpeningHours`, `businessStatus`, `priceLevel`, `photos`, `phone`, `nationalPhoneNumber`, `internationalPhoneNumber`, `address`, `formattedAddress`, `displayName`, `reviews`, `lat`, `lng`, `latitude`, `longitude`, `location`, `viewport`, `duration`, `staticDuration`, `distanceMeters`, `polyline`) ; **en plus** : aucune clé `verdict`, `checkedAt`, `placeId`, `grounded`, aucune valeur de `GroundingVerdict`, et aucune liste d'identifiants de candidats en sortie de l'étape d'ancrage.
-- `prompts: canari, aucune donnée Google ni dérivée dans un prompt` : clients Places et Routes simulés à valeurs sentinelles (comme P0) ; aucune sentinelle, aucun `placeId`, aucune valeur de `GroundingVerdict` dans les messages envoyés au client de modèles simulé, pour les étapes a, c et e.
+- `prompts: canari, aucune donnée Google ni dérivée dans un prompt` : clients Places et Routes simulés à valeurs sentinelles (comme P0) ; aucune sentinelle, aucun `placeId`, aucune valeur de `GroundingVerdict` dans les messages envoyés au client de modèles simulé, pour les étapes b, d et f.
 - `réparation: aucun appel de modèle` : un créneau en échec de validation est réparé sans appel au client de modèles simulé.
 - `schéma: aucune colonne dérivée de Google` (B1, étendu) : ni `grounding_verdict`, `grounding_checked_at`, `verified_at`, `travel_minutes`, `validation_report` ni équivalent.
 - `versions: l'instantané ne contient ni durée de trajet ni date de contrôle` (B2, étendu) : ni `toConfirm` dans `exceptions`.
@@ -98,8 +103,8 @@ Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover).
 - `ancrage: un candidat réutilisé est ré-ancré` (B9) : le client Places simulé est rappelé pour un candidat de la réserve qui a déjà un `placeId`.
 
 ## Points soumis à Samuel (validation juridique de Q5)
-- **S1** : un candidat sans `placeId` laisse savoir qu'il n'a pas été ancré, sans motif. La décision considère que seul le `placeId` est stocké ; si Samuel juge que cette absence est déjà une donnée dérivée, l'étape b n'écrit plus rien et l'étape d ré-ancre tous les candidats (coût : appels « IDs only » supplémentaires).
-- **S2** : 0027 point 1.3 fait noter par le Decider les seuls candidats ancrés ; la spec P0 (contrainte 7) retenait l'ordre inverse (le modèle note tout, le code écarte ensuite), pour que l'ensemble présenté au modèle ne trahisse pas un verdict. Cette décision suit 0027, décision de Samuel, et ne tranche pas l'écart avec P0.
+- **S1** : un candidat sans `placeId` laisse savoir qu'il n'a pas été ancré, sans motif. La décision considère que seul le `placeId` est stocké ; si Samuel juge que cette absence est déjà une donnée dérivée, l'étape c n'écrit plus rien et l'étape e ré-ancre tous les candidats (coût : appels « IDs only » supplémentaires).
+- **S2** : 0027 point 1.3 fait noter par le Decider les seuls candidats ancrés ; la spec P0 (#149, contrainte 7) retenait l'ordre inverse (le modèle note tout, le code écarte ensuite), pour que l'ensemble présenté au modèle ne trahisse pas un verdict. Cette décision suit 0027, décision de Samuel, et ne tranche pas l'écart avec P0.
 - **S3** : `CLAUDE.md` interdit encore de « stocker autre chose que l'identifiant d'un lieu Google », sans l'exception de 30 jours pour les coordonnées que la règle provisoire admet. La modification des règles du studio est réservée à Samuel : le cache du point 6 n'est créé par B8 qu'une fois `CLAUDE.md` aligné.
 
 ## Conséquences
