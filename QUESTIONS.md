@@ -274,3 +274,12 @@
 | Q282 | P0a1 (#180) : nom exact de l'option `data_collection` du fournisseur OpenRouter de l'AI SDK | IA-recherche (spec suivante) | 2026-10-12 | P0r1 | Ouverte |
 | Q283 | F10a (#186) : un voyage non débloqué en cours rouvre-t-il sur R15 (lettre de F11, appliquée) ou sur R6 ? | Product Owner | 2026-10-12 | Rien | Ouverte |
 | Q284 | F10a (#186) : exception `google-regles` pour `itineraire.ts` et clés `ligne.terminusSansLibelle.*` | Tech Lead | 2026-10-12 | Rien | Ouverte |
+| Q285 | Décision 0034 (#182) : `main` est déployée automatiquement en production, sur un domaine public sans authentification, alors que `docs/studio/mise-en-place.md` prévoit « production promue à la main » et que `CONTEXT.md` interdit la mise en production avant G0. Faut-il couper le déploiement automatique de la production (réglage Vercel) ? | Samuel | 2026-10-12 | Rien (garde `VERCEL_ENV=production` exigée tant que l'écart dure) | Ouverte |
+| Q286 | Décision 0034 (#182) : confirmer la lecture de « on laisse » (clés OpenRouter et Google sur Production, identifiant propriétaire Neon sur Preview, jusqu'à la mise en public) | Samuel | 2026-10-12 | Rien | Ouverte |
+| Q287 | Spec P0-suite (#172, P0-Q20) : règle de stockage des positions à inscrire dans `CLAUDE.md` | Samuel | 2026-10-12 | P0r2 | Ouverte |
+| Q288 | Spec P0-suite (#172, P0-Q21) : rendre obligatoire le contrôle de chemins dans la protection de `main` | Samuel | 2026-10-12 | P0r3 | Ouverte |
+| Q289 | B1 (#188) : ajouter le job `db` aux contrôles obligatoires de `main` | Samuel | 2026-10-12 | Rien | Ouverte |
+| Q290 | B1 (#188) : avec les branches de préversion Neon, l'hôte change-t-il à chaque préversion (étape 3 de `db/README.md`) ? | Tech Lead | 2026-10-12 | Bascule des rôles sur Preview | Ouverte |
+| Q291 | B1 (#188) : la console Neon garde-t-elle dans son historique la requête qui pose le mot de passe des rôles ? | Sécurité | 2026-10-12 | Bascule des rôles sur Preview | Ouverte |
+| Q292 | Spec T18 (#183, question 6) : préfixe de commit du Product Owner, absent de `CLAUDE.md` (`[ceo]` utilisé par défaut) | Samuel | 2026-10-12 | Rien | Ouverte |
+| Q293 | Spec T18 (#183, question 5) : ajouter `edited` (changement de base) aux déclencheurs de la porte | Tech Lead | 2026-10-12 | T18 (code) | Ouverte |
