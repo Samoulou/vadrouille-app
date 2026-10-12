@@ -1,52 +1,17 @@
 name: auto-merge
-# pull_request_target : le workflow exécuté est celui de main, sans checkout ni code
-# de la PR. AUTOMERGE_TOKEN est un secret de l'environnement `automerge`, limité à
-# main : un workflow lancé depuis une autre branche ne peut pas le lire (décision 0033).
-# Une PR qui touche .github/ n'est jamais fusionnée automatiquement : Samuel la
-# fusionne après `owner-approved` (Q245).
 on:
-  pull_request_target:
-    types: [labeled, synchronize]
+  pull_request:
+    types: [labeled]
 permissions:
-  # contents: write sert au repli sur github.token, qui fait alors la fusion.
   contents: write
   pull-requests: write
 jobs:
   enable:
-    # PR du dépôt, branche claude/… seulement : jamais l'identité de Samuel pour un fork.
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository
-      && startsWith(github.event.pull_request.head.ref, 'claude/')
-      && (github.event.action == 'synchronize'
-          || github.event.label.name == 'needs-review'
-          || github.event.label.name == 'docs-only')
+    if: github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only'
     runs-on: ubuntu-latest
-    environment: automerge
-    env:
-      HAS_TOKEN: ${{ secrets.AUTOMERGE_TOKEN != '' }}
-      PR: ${{ github.event.pull_request.number }}
-      REPO: ${{ github.repository }}
     steps:
-      - name: Exclure les PR qui touchent .github/
-        id: scope
+      - run: gh pr merge --auto --squash "$PR" --repo "$REPO"
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' | grep -q '^\.github/'; then
-            echo "::warning::La PR touche .github/ : pas de fusion automatique, Samuel fusionne après owner-approved (Q245)."
-            echo "workflows=true" >> "$GITHUB_OUTPUT"
-          fi
-      # Un push qui ajoute un fichier de .github/ coupe une fusion automatique déjà activée.
-      - if: steps.scope.outputs.workflows == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr merge --disable-auto "$PR" --repo "$REPO" || true
-      - if: steps.scope.outputs.workflows != 'true' && github.event.action == 'labeled' && env.HAS_TOKEN != 'true'
-        run: >-
-          echo "::warning::AUTOMERGE_TOKEN absent, fusion par GITHUB_TOKEN ; ticket non fermé et branche non supprimée (décision 0033)."
-      # Une fusion faite avec GITHUB_TOKEN ne ferme pas les tickets « Closes #n »
-      # et ne supprime pas la branche : jeton dédié s'il existe (décision 0033).
-      - if: steps.scope.outputs.workflows != 'true' && github.event.action == 'labeled'
-        env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
-        run: gh pr merge --auto --squash "$PR" --repo "$REPO"
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}

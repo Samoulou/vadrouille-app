@@ -47,6 +47,7 @@ Les horaires évitent l'heure pile, où un lancement peut prendre quelques minut
 3. R2 relit et ajoute `techlead-approved`, ou demande des changements.
 4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4).
 5. Les deux vérifications vertes, GitHub fusionne ; Vercel déploie `main` sur le staging.
+   Comme la fusion est faite avec `GITHUB_TOKEN`, GitHub ne ferme pas les tickets « Closes #n » et ne supprime pas la branche : le workflow `post-merge-cleanup` les rattrape à HH:17 et HH:47 (décision 0033).
 6. Au créneau suivant, R3 écrit la note de version dans `docs/releases/` ; à sa fusion, le workflow `release` crée le tag (nom de la note sans `.md`) et la release GitHub, puis poste la note dans `#studio`.
 
 Les PR de pure documentation (`STATUS.md`, `QUESTIONS.md`, `docs/releases/`) portent le libellé `docs-only` : fusion automatique activée, porte franchie sans revue, R2 non déclenchée.
