@@ -6,6 +6,10 @@ import { z } from "zod";
  * (`scripts/p0/`), les valide, puis injecte les valeurs. Aucun identifiant de modèle, aucun hôte, aucune URL
  * ni aucun nom de variable d'environnement n'est écrit en dur dans le code.
  *
+ * Les clés `activity`, `meal`, `evening` (types de créneau) et `officielle`, `independante`, `generique`
+ * (classes de source) sont celles de `TYPES_CRENEAU` et `CLASSES_SOURCE` de `candidat.ts` : les modules de
+ * `src/prototype` sont des feuilles sans import entre eux (décision 0032, A3.2), un test vérifie l'égalité.
+ *
  * **Aucun champ ne peut ouvrir un chemin réel** : chaque niveau est strict, une clé inconnue (`mode`, `reel`,
  * `host`, `url`…) fait refuser le fichier. Module pur, n'importe que `zod`.
  */
@@ -54,10 +58,6 @@ export function modelesDeLaVariante(config: ConfigModeles, variante: Variante): 
   return variante === "a" ? { ...config.etapes, ...config.variantes.a } : { ...config.etapes };
 }
 
-/** Types de créneau (notation `slotFit`, cibles de la recherche). */
-export const TYPES_CRENEAU = ["activity", "meal", "evening"] as const;
-export type TypeCreneau = (typeof TYPES_CRENEAU)[number];
-
 const entier = (max: number) => z.number().int().min(1).max(max);
 
 /** `recherche.json` : bornes de l'agent (P0-PO-4). */
@@ -79,10 +79,6 @@ export const ConfigRechercheSchema = z.strictObject({
   ageSourceMaxJours: entier(3650),
 });
 export type ConfigRecherche = z.infer<typeof ConfigRechercheSchema>;
-
-/** Classes de source de la politique de sources (cadrage § 6.5), classement maison des domaines. */
-export const CLASSES_SOURCE = ["officielle", "independante", "generique"] as const;
-export type ClasseSource = (typeof CLASSES_SOURCE)[number];
 
 const poids = z.number().finite().min(0).max(100);
 const poidsSigne = z.number().finite().min(-100).max(100);
