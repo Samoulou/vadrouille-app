@@ -13,10 +13,10 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 - Ticket créé : **#154 (B0c)**. Tickets en cours : #147 (spec P0), #22 (B0), #154.
 
 ## En cours
-- **Spec P0 (#149, ticket #147)** : correction 3 (la revue de 07:53 UTC ne la compte pas : bloquant tardif). P0-Q2 ajoutée aux prérequis de P0b2, mineurs 2 à 14, variante B, plafonds, briefs et incontournables (0027), décisions 0026 et 0027 jointes.
-- **B0, partie Q5 (#27, ticket #22)** : finalisée sur la règle provisoire de Q5 (0027 § 4), avec `main` intégrée.
-- **B0c (#154)** : liste des comptes externes et recommandation Neon ou Supabase (nouveau fichier `docs/handovers/comptes-externes.md`).
-- **F11a (#152)** : en revue, CI verte, aucune revue publiée depuis 07:27 UTC.
+- **Spec P0 (#149, ticket #147)** : correction 3 faite (hors compte selon la revue : bloquant tardif) : P0-Q2 dans les prérequis de P0b2, mineurs 2 à 14, variante B, mesure de référence de la variante A (une exécution par brief, jugement à l'aveugle), plafonds, briefs et incontournables (ces derniers servent seulement au critère B4), décisions 0026 et 0027, ligne P0 de la roadmap. CI à confirmer, de nouveau en revue. #153 fermée, remplacée par #155 et #149.
+- **B0, partie Q5 (#27, ticket #22)** : finalisée sur la règle provisoire de Q5 (0027 § 4), `main` intégrée par fusion, bloquants Sécurité 1 à 3 et 2 bloquants du Tech Lead traités. De nouveau en revue.
+- **B0c (#154, PR #156)** : comptes externes dans l'ordre des tâches B ; le Tech Lead recommande **Neon à Francfort** (gratuit pour le staging, formule Launch pour la bêta ; Neon Auth non retenu, Better Auth garde la main), Supabase seulement si un hébergement à Zurich est exigé ; domaine ajouté (absent de B0a) ; trois prix non vérifiés (Brevo, TWINT chez Stripe, Sentry UE). En revue.
+- **F11a (#152)** : en revue, CI verte.
 - `pnpm verify` en local : vert sauf les captures visuelles (polices, 0004). La CI fait foi.
 
 ## Bloqué
@@ -30,7 +30,8 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 
 ## Décisions attendues de Samuel
 - **P0** : Q249 (clé Google : portée minimale recommandée) ; Q250 points 2 et 3 (clés Vercel limitées à Preview et Development) ; Q241 (horaires planifiés commités) ; Q252 (valeurs des quotas quotidiens, plafond par exécution) ; P0-Q5 (OpenRouter hors UE pour P0, `zdr` à essayer) ; P0-Q6 (seuils G0) ; P0-Q8 (relire plutôt que garder).
-- **Après #154** : choix du fournisseur Postgres (Q24) et ouverture des comptes.
+- **Après #156** : choix du fournisseur Postgres (Q24 ; recommandation : Neon à Francfort) et ouverture des comptes.
+- **#27** : Q253 (montrer qu'un candidat n'a pas d'identifiant Google), Q254 (aligner `CLAUDE.md` sur la règle provisoire des coordonnées gardées 30 jours).
 - **Q245** : protéger `.github/workflows/` (CODEOWNERS ou règle de branche).
 - **Après le déploiement de `main`** : vérifier la carte du jour 1 sur https://vadrouille-app-ten.vercel.app/voyages/mock_trip_edimbourg_debloque/jour/1 (bug #106 corrigé).
 - **Toujours ouvertes** :
@@ -46,5 +47,5 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
   - avant le 2026-10-13 : décisions 0017, 0019, 0023, 0024, écarts de F9a et de F5b, Q182, F10-PO-1 à F10-PO-22 et Q185, 0012, F7-PO-20 et F7-PO-21, F8-PO-18 à F8-PO-22.
 
 ## Part d'usage estimée
-- 38e cycle : estimation à compléter en fin de cycle (3 fils : 2 corrections, 1 tâche nouvelle).
+- 38e cycle : environ 1 million de jetons (estimation) pour 3 fils : 2 corrections (#149, #27) et 1 tâche nouvelle (#156) ; 1 PR fusionnée (#155).
 - Part de l'abonnement : impossible à mesurer depuis la routine.
