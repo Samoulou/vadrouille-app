@@ -38,7 +38,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - poser `owner-approved` sur **#188** (B1 touche la CI) ;
   - plafond de quota de Maps JavaScript API (Q263).
 - **Nouvelles** :
-  - **Q285** : faut-il couper le déploiement automatique de la production ? Aujourd'hui, chaque fusion est publiée sur un domaine public.
+  - **Q285** : chaque fusion est publiée en production sur un domaine public. Recommandation : laisser ainsi jusqu'à la mise en public, comme Samuel l'a dit à 13:49 CEST. Il suffit qu'il confirme ; aucun réglage Vercel à faire.
   - Q286 : confirmer la lecture de « on laisse » ;
   - Q287 et Q288 (#172) ;
   - Q289 : job `db` obligatoire ;
