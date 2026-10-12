@@ -51,6 +51,7 @@ Lecture stricte du cadrage : **aucune donnée Google dans les prompts, seul l'id
 - La spec P0 (#149) décrit le pipeline de la variante B, la mesure de référence de la variante A, les plafonds du point 2, les briefs et incontournables du point 6, et la protection du point 3.
 - La PR #27 est finalisée sur la règle provisoire du point 4 (Q29, Q34, Q38 et Q44 la suivent), sans attendre la validation juridique formelle.
 - Restent ouvertes pour Samuel : Q249 (portée de la clé Google), Q250 points 2 et 3 (clés limitées à Preview et Development), Q241 (horaires planifiés commités), Q245, P0-Q5 (OpenRouter hors UE pour P0), P0-Q6 (seuils G0), P0-Q8, les valeurs des quotas quotidiens.
+- Suite : voir 0028 (réponses de Samuel du 2026-10-12 à 10:35 et 10:49).
 
 ## Quand revoir cette décision
 Après la mesure comparée des variantes A et B (Tech Lead), à la validation juridique de Q5, ou avant l'ouverture au public (Q214).
