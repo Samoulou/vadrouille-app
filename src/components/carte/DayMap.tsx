@@ -27,8 +27,10 @@ export type DayMapProps =
       onMarkerPress?: (stopId: string) => void;
       /** Id de la liste des étapes, cible du lien d'évitement ; l'appelant y pose `tabindex="-1"` (F4-PO-10). */
       listId: string;
-      /** Marge de cadrage ; par défaut `--touch-target` de chaque côté. Objet stable : le changer recadre. */
+      /** Marge de cadrage ; par défaut `--touch-target` de chaque côté. Appliquée au cadrage d'un jour ou d'un `fitScope`. */
       fitPadding?: FitPadding;
+      /** Change quand la disposition change (grand écran, F12-TL-6) : la carte est alors recadrée une fois, sans animation. */
+      fitScope?: string;
       /**
        * Partie de la carte couverte par d'autres éléments (le panneau, en bas), décision 0015 § 4 :
        * le recentrage sur `selectedStopId` place l'étape au milieu du reste. La changer ne recadre ni ne recentre.
@@ -50,6 +52,8 @@ export type DayMapProps =
       controls?: ReactNode;
       /** Marge de cadrage (panneau du Séjour en bas) ; par défaut `--touch-target` de chaque côté. */
       fitPadding?: FitPadding;
+      /** Voir le mode « day » : son changement recadre la carte. */
+      fitScope?: string;
       placesFromGoogle: boolean;
       className?: string;
     };
@@ -95,16 +99,17 @@ export function DayMap(props: DayMapProps) {
   const selectedStopId = props.mode === "day" ? props.selectedStopId : undefined;
   const onMarkerPress = props.mode === "day" ? props.onMarkerPress : undefined;
   const fitPadding = props.fitPadding;
+  const scope = props.fitScope ? `:${props.fitScope}` : "";
   const visibleInsets = props.mode === "day" ? props.visibleInsets : undefined;
   const view = useMemo<MapView | null>(() => {
     if (route && day) {
-      return { mode: "day", fitKey: `jour-${day.index}`, route, selectedStopId, onMarkerPress, fitPadding, visibleInsets };
+      return { mode: "day", fitKey: `jour-${day.index}${scope}`, route, selectedStopId, onMarkerPress, fitPadding, visibleInsets };
     }
     if (rings) {
-      return { mode: "overview", fitKey: "sejour", rings, fitPadding };
+      return { mode: "overview", fitKey: `sejour${scope}`, rings, fitPadding };
     }
     return null;
-  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets]);
+  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope]);
 
   const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.rings.length > 0) : false;
   const needsConfig = !Simulated;

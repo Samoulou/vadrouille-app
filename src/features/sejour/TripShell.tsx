@@ -11,7 +11,6 @@ import {
   useReducer,
   useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
@@ -25,6 +24,8 @@ import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sh
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, Stop, Trip } from "@/contracts";
 import { messages } from "@/i18n";
+import { useLargeScreen } from "@/lib/large-screen";
+import { useElementSize, type ElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
 
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
@@ -99,29 +100,28 @@ export function useTripShell(): TripShellValue {
   return value;
 }
 
-function subscribeResize(callback: () => void) {
-  window.addEventListener("resize", callback);
-  return () => window.removeEventListener("resize", callback);
-}
-
-/** `window.innerHeight`, relu au redimensionnement ; 0 au rendu serveur. */
-function useViewportHeight(): number {
-  return useSyncExternalStore(
-    subscribeResize,
-    () => window.innerHeight,
-    () => 0,
-  );
-}
-
-/** Marge du cadrage initial : `--touch-target` sur les côtés, panneau à 55 % en bas ; calculée une fois au montage. */
-function initialFitPadding(): FitPadding | undefined {
-  if (typeof window === "undefined") return undefined;
+/**
+ * Marge du cadrage (décision 0022 § 6, amende 0016 § 1.3) : `--touch-target` de chaque côté ; en mobile, le panneau
+ * à 55 % de la hauteur de `main` en bas ; en grand écran, rien de plus (le panneau ne couvre pas la carte).
+ */
+export function layoutFitPadding(main: ElementSize, largeScreen: boolean): FitPadding {
   const side = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--touch-target")) || 0;
-  return { top: side, right: side, bottom: DEFAULT_SNAP * window.innerHeight, left: side };
+  return { top: side, right: side, bottom: largeScreen ? side : DEFAULT_SNAP * main.height, left: side };
 }
 
-/** Fait défiler le contenu du panneau pour amener le lien de l'étape au milieu de sa zone visible, à la hauteur `snap`. */
-function scrollStopIntoPanel(body: HTMLElement, href: string, snap: SnapPoint) {
+/**
+ * Partie de la carte couverte par le panneau (décision 0015 § 4, 0022 § 6) : en mobile, `snap` de la hauteur de
+ * `main` en bas ; en grand écran, aucune (le recentrage place l'étape au milieu de la zone de la carte).
+ */
+export function layoutVisibleInsets(main: ElementSize, snap: SnapPoint, largeScreen: boolean): FitPadding {
+  return { top: 0, right: 0, bottom: largeScreen ? 0 : snap * main.height, left: 0 };
+}
+
+/**
+ * Fait défiler le contenu du panneau pour amener le lien de l'étape au milieu de sa zone visible : à la hauteur
+ * `snap` en mobile, toute la hauteur du contenu en grand écran.
+ */
+function scrollStopIntoPanel(body: HTMLElement, href: string, snap: SnapPoint, largeScreen: boolean) {
   const link = Array.from(body.querySelectorAll<HTMLAnchorElement>("a[data-part='arret']")).find(
     (candidate) => candidate.getAttribute("href") === href,
   );
@@ -129,7 +129,7 @@ function scrollStopIntoPanel(body: HTMLElement, href: string, snap: SnapPoint) {
   const available = sheet?.parentElement?.clientHeight ?? 0;
   if (!link || !sheet || available <= 0) return;
   // Hauteur visible du contenu une fois le panneau posé (la transition de hauteur peut être en cours).
-  const visible = snap * available - body.offsetTop;
+  const visible = largeScreen ? body.clientHeight : snap * available - body.offsetTop;
   const linkTop = link.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
   const linkHeight = link.getBoundingClientRect().height;
   body.scrollTo({ top: Math.max(0, linkTop - Math.max(0, (visible - linkHeight) / 2)), behavior: "auto" });
@@ -148,7 +148,8 @@ export interface TripShellProps {
 /**
  * Mise en page commune du Séjour et de la Journée (spécification F5, F5-PO-1 ; décision 0015 § 5.3) :
  * carte en fond sur toute la fenêtre, « Retour » posé sur la carte, panneau `Sheet` au-dessus avec les
- * onglets du voyage. Monté par le layout du voyage : la hauteur du panneau, l'état du programme et le
+ * onglets du voyage. À partir de 1024 px (F12-PO-7, décision 0022 § 6), carte à gauche et panneau latéral à
+ * droite, même arbre de composants : la bascule ne démonte rien (F12-PO-10). Monté par le layout du voyage : la hauteur du panneau, l'état du programme et le
  * toast d'annulation sont conservés entre les pages du même voyage, et repartent de zéro au chargement,
  * sans aucun stockage (F5-PO-16).
  */
@@ -171,12 +172,20 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
 
   const [snap, setSnap] = useState<SnapPoint>(DEFAULT_SNAP);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [fitPadding] = useState(initialFitPadding);
-  const viewport = useViewportHeight();
+  // Mesures du conteneur, pas de la fenêtre (décision 0022 § 6) : `main`, base des hauteurs du panneau.
+  const [mainRef, main] = useElementSize<HTMLElement>();
+  const largeScreen = useLargeScreen();
   const visibleInsets = useMemo<FitPadding | undefined>(
-    () => (viewport > 0 ? { top: 0, right: 0, bottom: snap * viewport, left: 0 } : undefined),
-    [snap, viewport],
+    () => (main && main.height > 0 ? layoutVisibleInsets(main, snap, largeScreen) : undefined),
+    [main, snap, largeScreen],
   );
+  // Marge du cadrage : calculée à la première mesure, puis seulement au passage du seuil (recadrage unique).
+  const [fit, setFit] = useState<{ largeScreen: boolean; padding: FitPadding } | null>(null);
+  if (main && main.height > 0 && (fit === null || fit.largeScreen !== largeScreen)) {
+    setFit({ largeScreen, padding: layoutFitPadding(main, largeScreen) });
+  }
+  const fitPadding = fit?.padding;
+  const fitScope = fit ? (fit.largeScreen ? "grand-ecran" : "mobile") : undefined;
 
   // Fiche : ouverte depuis le panneau du jour (« Fermer » revient dans l'historique) ou directement.
   // Adresse de la fiche marquée par un lien du panneau ; vidée dès que cette fiche se ferme ou change de jour.
@@ -213,7 +222,8 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
       setMarkerSelection(null);
       setMissingNoticeDay(null);
       setClosedFiche(null);
-      if (snap === LOWEST) setSnap(DEFAULT_SNAP);
+      // En grand écran, la hauteur du panneau mobile n'est pas touchée (0022 § 6).
+      if (snap === LOWEST && !largeScreen) setSnap(DEFAULT_SNAP);
     } else if (!ficheKey && tracked.fiche) {
       setClosingByMarker(false);
       setClosedFiche(!closingByMarker && tracked.fiche.dayIndex === dayIndex ? tracked.fiche : null);
@@ -235,7 +245,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
   const onMarkerPress = useCallback(
     (stopId: string) => {
       if (dayIndex === undefined) return;
-      const next = snap === LOWEST ? DEFAULT_SNAP : snap;
+      const next = snap === LOWEST && !largeScreen ? DEFAULT_SNAP : snap;
       setSnap(next);
       if (fiche) {
         setOpenedFromPanel(null);
@@ -246,22 +256,23 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
         router.replace(routes.jour(dayIndex), { scroll: false });
         return;
       }
-      if (bodyRef.current) scrollStopIntoPanel(bodyRef.current, routes.etape(dayIndex, stopId), next);
+      if (bodyRef.current) scrollStopIntoPanel(bodyRef.current, routes.etape(dayIndex, stopId), next, largeScreen);
     },
-    [dayIndex, fiche, router, routes, snap],
+    [dayIndex, fiche, router, routes, snap, largeScreen],
   );
 
   // Après la fermeture par un marqueur, la ligne du jour est de nouveau rendue : défilement jusqu'à l'étape.
   useEffect(() => {
     if (!pendingScroll || fiche || dayIndex === undefined || !bodyRef.current) return;
-    scrollStopIntoPanel(bodyRef.current, routes.etape(dayIndex, pendingScroll), snap);
+    scrollStopIntoPanel(bodyRef.current, routes.etape(dayIndex, pendingScroll), snap, largeScreen);
     setPendingScroll(null);
-  }, [pendingScroll, fiche, dayIndex, routes, snap]);
+  }, [pendingScroll, fiche, dayIndex, routes, snap, largeScreen]);
 
   // Lien d'évitement activé panneau à 25 % : le panneau passe à 55 % avant que le focus arrive sur la liste.
+  // En grand écran, la liste est toujours visible : rien à relever.
   const onSkipToList = useCallback(() => {
-    if (snap === LOWEST) flushSync(() => setSnap(DEFAULT_SNAP));
-  }, [snap]);
+    if (snap === LOWEST && !largeScreen) flushSync(() => setSnap(DEFAULT_SNAP));
+  }, [snap, largeScreen]);
 
   const markOpenedFromPanel = useCallback((href: string) => setOpenedFromPanel(href), []);
 
@@ -363,10 +374,15 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
   );
 
   // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
-  // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s.
+  // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s. En grand écran,
+  // il est posé en bas du panneau latéral, sans retrait (rendu provisoire, UX/UI, Q173).
   const toastRegion = (
     <UndoToastRegion
-      className={cn("pointer-events-none pb-2", snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour)" : "px-3")}
+      className={cn(
+        "pointer-events-none pb-2",
+        snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour)" : "px-3",
+        "lg:px-3",
+      )}
     >
       {toast ? (
         <UndoToast
@@ -382,8 +398,8 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
 
   return (
     <TripShellContext.Provider value={context}>
-      <main className="fixed inset-0 overflow-hidden bg-map-land">
-        <div className="absolute inset-0">
+      <main ref={mainRef} className="fixed inset-0 overflow-hidden bg-map-land lg:flex">
+        <div data-part="zone-carte" className="absolute inset-0 lg:relative lg:inset-auto lg:min-w-0 lg:flex-1">
           {day ? (
             <DayMap
               mode="day"
@@ -393,6 +409,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
               onMarkerPress={onMarkerPress}
               listId={DAY_LIST_ID}
               fitPadding={fitPadding}
+              fitScope={fitScope}
               visibleInsets={visibleInsets}
               onSkipToList={onSkipToList}
               controls={retour}
@@ -405,6 +422,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
               maps={maps}
               controls={retour}
               fitPadding={fitPadding}
+              fitScope={fitScope}
               placesFromGoogle={PLACES_FROM_GOOGLE}
             />
           )}
@@ -416,6 +434,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
           header={tabs}
           bodyRef={bodyRef}
           above={toastRegion}
+          sideOnLargeScreen
         >
           {children}
         </Sheet>

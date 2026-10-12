@@ -12,6 +12,7 @@ import {
   dayMarkers,
   dragVertical,
   expectSheetAt,
+  findChecklistToBook,
   fiche,
   ficheTitle,
   fullyInside,
@@ -341,41 +342,7 @@ test.describe("Séjour", () => {
   });
 
   test("sejour: trouver la liste à réserver", async ({ page, context }) => {
-    // Scénario du handover § 14 : depuis le Séjour, la liste « À faire avant de partir » et ses liens.
-    await openTrip(page, SEJOUR);
-    const rows = aFaire(page).getByRole("listitem");
-    await expect(rows).toHaveCount(5);
-    for (const [index, item] of edimbourg.checklist.entries()) {
-      await expect(rows.nth(index).getByRole("button")).toHaveAccessibleName(item.label);
-    }
-    await expect(aFaire(page).getByRole("img", { name: "4 réservations à faire" })).toHaveText("4");
-    // « [Billets du Tattoo] » : faite, barrée, en ink-soft, sans lien.
-    const tattoo = row(page, "[Billets du Tattoo]");
-    await expect(box(page, "[Billets du Tattoo]")).toHaveAttribute("aria-pressed", "true");
-    await expect(tattoo.getByRole("link")).toHaveCount(0);
-    const done = await tattoo.evaluate((el) => {
-      const probe = document.createElement("span");
-      probe.style.color = "var(--color-ink-soft)";
-      document.body.append(probe);
-      const inkSoft = getComputedStyle(probe).color;
-      probe.remove();
-      const name = el.querySelector("[id]")!;
-      return { color: getComputedStyle(name).color, inkSoft, decoration: getComputedStyle(name).textDecorationLine };
-    });
-    expect(done.color).toBe(done.inkSoft);
-    expect(done.decoration).toBe("line-through");
-    // « Réserver » : nouvel onglet, rel="noopener noreferrer".
-    const reserver = row(page, "[Château d'Édimbourg]").getByRole("link", { name: "Réserver" });
-    await expect(reserver).toHaveAttribute("href", "https://example.org/mock/chateau");
-    await expect(reserver).toHaveAttribute("target", "_blank");
-    await expect(reserver).toHaveAttribute("rel", "noopener noreferrer");
-    await context.route("https://example.org/**", (route) => route.fulfill({ status: 200, body: "" }));
-    const [popup] = await Promise.all([page.waitForEvent("popup"), reserver.click()]);
-    expect(popup.url()).toBe("https://example.org/mock/chateau");
-    await popup.close();
-    // « [Assurance voyage] » : lien rémunéré.
-    await expect(row(page, "[Assurance voyage]")).toContainText("Lien rémunéré");
-    await expect(row(page, "[Château d'Édimbourg]")).not.toContainText("Lien rémunéré");
+    await findChecklistToBook(page, context, SEJOUR);
   });
 
   test("sejour: liste à réserver", async ({ page }) => {

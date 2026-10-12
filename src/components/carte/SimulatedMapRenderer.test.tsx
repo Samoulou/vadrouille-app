@@ -105,6 +105,38 @@ describe("SimulatedMapRenderer", () => {
     },
   );
 
+  it("grand écran (F12b) : zone de carte de 860 × 800 px dans une fenêtre plus large, aucune partie couverte : l'étape sélectionnée au milieu de la zone de la carte", () => {
+    // La zone de la carte n'est pas la fenêtre (décision 0022 § 6) : seul son conteneur est mesuré.
+    const size = { width: 860, height: 800 };
+    stubLayout(size.width, size.height);
+    const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+    const { rerender } = render(<SimulatedMapRenderer view={view({ visibleInsets: insets })} />);
+    const { zoom } = camera();
+    rerender(<SimulatedMapRenderer view={view({ visibleInsets: insets, selectedStopId: "j2-dejeuner" })} />);
+    const point = map2.points.find((p) => p.ref.type === "stop" && p.ref.stopId === "j2-dejeuner")!;
+    const after = camera();
+    expect(after.zoom).toBe(zoom);
+    const { x, y } = project({ lat: point.lat, lng: point.lng }, { center: { lat: after.lat, lng: after.lng }, zoom });
+    // Position à l'écran : (largeur / 2 + x, hauteur / 2 − y) = milieu de la zone de la carte.
+    expect(Math.abs(x)).toBeLessThan(1e-6);
+    expect(Math.abs(y)).toBeLessThan(1e-6);
+    const marker = screen.getAllByRole("button").find((b) => b.getAttribute("aria-current") === "true")!;
+    expect(marker.style.left).toBe(`${size.width / 2}px`);
+    expect(marker.style.top).toBe(`${size.height / 2}px`);
+  });
+
+  it("changement de clé de cadrage (bascule au seuil, F12-TL-6) : recadre une fois avec la nouvelle marge", () => {
+    const large = { top: 44, right: 44, bottom: 44, left: 44 };
+    const mobile = { top: 44, right: 44, bottom: 0.55 * 320, left: 44 };
+    const { rerender } = render(<SimulatedMapRenderer view={view({ fitKey: "jour-2:mobile", fitPadding: mobile })} />);
+    const positions = buildDayRoute(day2, map2).positions;
+    const first = fitCamera(positions, { width: 390, height: 320 }, mobile)!;
+    expect(camera()).toEqual({ lat: first.center.lat, lng: first.center.lng, zoom: first.zoom });
+    rerender(<SimulatedMapRenderer view={view({ fitKey: "jour-2:grand-ecran", fitPadding: large })} />);
+    const second = fitCamera(positions, { width: 390, height: 320 }, large)!;
+    expect(camera()).toEqual({ lat: second.center.lat, lng: second.center.lng, zoom: second.zoom });
+  });
+
   it("glisser déplace le centre de l'opposé du geste, sans rappel ni changement de zoom", () => {
     const onMarkerPress = vi.fn();
     render(<SimulatedMapRenderer view={view({ onMarkerPress })} />);
