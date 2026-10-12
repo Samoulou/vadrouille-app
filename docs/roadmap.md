@@ -16,7 +16,7 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 1 | F0 | Socle front (handover § 15) | frontend | — | Fait (#3) |
 | 2 | F1 | Contrats Zod et données simulées Édimbourg | frontend | F0 | Fait (#11) |
 | 3 | F2 | Composants de base | frontend | F0 | Fait (#19) |
-| 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, Claude seul depuis Q9) | ia-recherche | clé serveur Places/Routes (Q103), clé du fournisseur de modèles | Spécification en revue (#149) ; P0a1 et P0b1 sans clé ; le reste attend les clés (Q103, Q234) |
+| 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, modèle configurable via OpenRouter, décision 0026) | ia-recherche | `GOOGLE_MAPS_SERVER_KEY` (Q103) et `OPENROUTER_API_KEY` (0026), posées par Samuel | Spécification en revue (#149) ; P0a1 et P0b1 sans clé ; le reste attend l'annonce des clés dans #studio |
 | 5 | F3 | Composants de la ligne du jour | frontend | F1, F2 | Fait (#30) |
 | 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | F1 | Spécifiée (#17, #18, #20) — handover en revue (#27), bloqué après 2 corrections (Q43) |
 | 7 | F4 | Carte Google Maps | frontend | F3 | Fait (spec #25, code #35) |
