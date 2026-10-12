@@ -36,7 +36,7 @@ Conventions :
 1. Tables et colonnes en `snake_case` ; contrats en `camelCase` ; la conversion se fait dans `src/server` (jamais dans l'interface).
 2. Identifiants : UUID générés par la base (`gen_random_uuid()`, Postgres 17), exposés comme chaînes ; les identifiants d'étape du programme restent des chaînes stables entre versions (décision 0010).
 3. Montants en centimes (entiers) avec la devise ; dates en `date`, instants en `timestamptz` UTC ; heures locales de la destination en `HH:MM`.
-4. Variables d'environnement serveur sans préfixe `NEXT_PUBLIC_`, lues et validées une seule fois par un schéma Zod (`src/server/env.ts`) ; `.env.example` liste les noms sans valeur ; seules `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` et `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` (Q3) sont publiques. `DATABASE_URL_MIGRATOR` n'existe que dans l'environnement des migrations : `src/server/env.ts` refuse de démarrer s'il la trouve (test `env: gardes de configuration`).
+4. Variables d'environnement serveur sans préfixe `NEXT_PUBLIC_`, lues et validées une seule fois par un schéma Zod (`src/server/env.ts`) ; `.env.example` liste les noms sans valeur ; seules `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` et `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` (Q3) sont publiques. `VADROUILLE_DATABASE_URL_MIGRATOR` n'existe que dans l'environnement des migrations : `src/server/env.ts` refuse de démarrer s'il la trouve (test `env: gardes de configuration`). Noms des variables de connexion : `VADROUILLE_DATABASE_URL` (`vadrouille_app`), `VADROUILLE_DATABASE_URL_AUTH` (`vadrouille_auth`), `VADROUILLE_DATABASE_URL_MIGRATOR` (`vadrouille_migrator`) ; l'application ne lit jamais `DATABASE_URL` ni les variables posées par l'intégration Neon (amendement par la décision 0036, B1-TL-3).
 5. Chaque action serveur : commence par `"use server"`, vérifie la session, construit le contexte côté serveur, valide son entrée par `parseInput` et sa sortie avec un contrat de `src/contracts`, renvoie `Result` (`ok` ou `ApiError`, décision 0017 § 4).
 6. Base de test : `docker compose up db` en local ; en CI, conteneur de service `postgres:17.11`. Les tests de base (`pnpm test:db`, ajouté par B1) ne sont jamais ignorés en silence : sans base, ils échouent avec un message explicite.
 
@@ -66,5 +66,5 @@ Audit des dépendances (`pnpm audit`, 2026-10-12, revue de sécurité de #188, p
 
 ## Conséquences
 - B1 ajoute `docker-compose.yml`, le script `test:db`, le conteneur de service dans `.github/workflows/ci.yml` et l'inclut dans `pnpm verify`.
-- Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant.
+- Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant. **Amendé par la décision 0036 (B1-TL-1)** : sans base, une session hors CI pose explicitement `SKIP_DB_TESTS=1` (avertissement visible, refusée en CI) ; Q40 ne bloque plus `pnpm verify` en local, la CI fait foi pour les tests de base.
 - Revoir cette décision si Drizzle 1.0 sort en version stable (montée de version à planifier) ou si la RLS devient trop coûteuse à maintenir avec drizzle-kit.

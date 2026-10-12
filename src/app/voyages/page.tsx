@@ -19,7 +19,8 @@ export const metadata: Metadata = {
  * apparaît débloqué, décision 0021 § 2) ; aucun jour, aucune proposition, aucune position. Le classement est
  * fait par l'écran, dans le navigateur (décision 0021 § 3).
  *
- * « Créer un voyage » n'est pas proposé : l'écran 1 (`/voyages/nouveau`, F8a) n'existe pas encore (F11-PO-4).
+ * « Créer un voyage » n'est pas encore proposé : l'écran 1 (`/voyages/nouveau`) existe depuis F8a, et le lien sera
+ * ajouté par la première PR qui touche `R17` (F11-PO-4).
  */
 export default async function MesVoyagesPage() {
   const trips = await getTripReader().listTrips(getRequestContext());

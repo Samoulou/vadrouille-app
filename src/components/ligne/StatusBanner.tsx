@@ -10,6 +10,11 @@ export interface StatusBannerProps {
   message: string;
   /** Action éventuelle (un `Button` `text` ou `secondary`), placée sous le message. */
   action?: ReactNode;
+  /**
+   * Faux quand le bandeau est écrit dans une région live déjà présente dans la page (règle des annonces de
+   * 0018) : le bandeau n'a alors pas de rôle propre, la région l'annonce. Vrai par défaut.
+   */
+  announce?: boolean;
   className?: string;
 }
 
@@ -38,10 +43,10 @@ const RAIL_CLASSES: Record<StatusBannerKind, string> = {
  * Le texte porte toute l'information ; le filet à gauche n'est qu'un repère visuel.
  * Rendu décidé par UX/UI (décision 0012, Q13), absent du design system.
  */
-export function StatusBanner({ kind, message, action, className }: StatusBannerProps) {
+export function StatusBanner({ kind, message, action, announce = true, className }: StatusBannerProps) {
   return (
     <div
-      role={statusBannerRole(kind)}
+      role={announce ? statusBannerRole(kind) : undefined}
       data-kind={kind}
       className={cn("flex gap-3 rounded-block bg-muted p-4 text-corps text-ink-2", className)}
     >

@@ -37,6 +37,11 @@ export interface MeasureOptions {
    * adresse encore absente, par exemple) est mesurée à l'échéance, et `networkIdle` vaut faux.
    */
   idleTimeoutMs?: number;
+  /**
+   * Parcours côté client après l'ouverture de `path` (entrées `journey` de l'inventaire, F8a) : la mesure compte
+   * tout le JavaScript chargé depuis l'adresse de départ jusqu'à l'adresse atteinte, réseau de nouveau inactif.
+   */
+  journey?: (page: Page) => Promise<void>;
 }
 
 /**
@@ -47,7 +52,7 @@ export interface MeasureOptions {
 export async function measureInitialJavaScript(
   page: Page,
   path: string,
-  { expectedStatus = 200, idleTimeoutMs }: MeasureOptions = {},
+  { expectedStatus = 200, idleTimeoutMs, journey }: MeasureOptions = {},
 ): Promise<InitialJavaScript> {
   const responses: Response[] = [];
   const collect = (response: Response) => responses.push(response);
@@ -57,14 +62,20 @@ export async function measureInitialJavaScript(
   if (target?.status() !== expectedStatus) {
     throw new Error(`${path} : réponse ${target?.status() ?? "absente"}`);
   }
-  let networkIdle = true;
-  if (idleTimeoutMs === undefined) {
-    await page.waitForLoadState("networkidle");
-  } else {
-    networkIdle = await page
+  const waitIdle = async () => {
+    if (idleTimeoutMs === undefined) {
+      await page.waitForLoadState("networkidle");
+      return true;
+    }
+    return page
       .waitForLoadState("networkidle", { timeout: idleTimeoutMs })
       .then(() => true)
       .catch(() => false);
+  };
+  let networkIdle = await waitIdle();
+  if (journey) {
+    await journey(page);
+    networkIdle = (await waitIdle()) && networkIdle;
   }
   page.off("response", collect);
 

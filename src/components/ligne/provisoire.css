@@ -136,3 +136,16 @@
   /* Q177 : largeur du panneau latéral du voyage en grand écran (420 px, handover § 6). */
   --ligne-panneau-large: 420px;
 }
+
+/*
+ * F8a, création du voyage (écrans 1 et 2, non maquettés). Valeurs de la décision 0018 (« Valeurs à déclarer dans
+ * provisoire.css »), sans token dans Ligne.
+ */
+:root {
+  /* Q74 (F8-Q1), Q87 (F7-Q1) : largeur minimale d'un champ côte à côte avant empilement (dates, heures ; 0018, « Champ de saisie »). */
+  --ligne-champ-min: 160px;
+  /* Q108 (U2-Q1), Q74 (F8-Q1) : champ du budget par repas, quatre chiffres et marges (0018 § 16). */
+  --ligne-champ-montant: 6rem;
+  /* Q108 (U2-Q1) : coche, « plus », « moins », chevron des sections (icône « retour » tournée), 20 px (0018 § 6 et § 16). */
+  --ligne-icone-petite: 20px;
+}

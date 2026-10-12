@@ -353,6 +353,38 @@ export default defineConfig([
     rules: { "ligne/require-server-only": "error" },
   },
   {
+    // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).
+    files: ["src/features/creation/**/*.{jsx,tsx}", "src/features/compte/**/*.{jsx,tsx}", "src/app/(creation)/**/*.{jsx,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+    },
+  },
+  {
+    // F8a : brouillon, récit et email en mémoire de l'onglet seulement (F8-PO-1, décision 0017 § 5).
+    files: ["src/features/creation/**/*.{js,jsx,ts,tsx}", "src/features/compte/**/*.{js,jsx,ts,tsx}", "src/app/(creation)/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: noClientStorage("Création", "spécification F8, F8-PO-1, décision 0017 § 5", "aucun service worker"),
+  },
+  {
+    // F8a : ni src/mocks, ni carte simulée, ni src/server hors actions, ni portée des simulations dans les routes de
+    // la création (spécification F8, « Règles Google et données personnelles » ; décisions 0015 § 1, 0017 § 10.2, 0020 § 11).
+    files: ["src/app/(creation)/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
+    // F8a : ni récit, ni destination, ni email dans un journal (spécification F8, « Données personnelles »).
+    files: [
+      "src/features/creation/**/*.{js,jsx,ts,tsx}",
+      "src/features/compte/**/*.{js,jsx,ts,tsx}",
+      "src/server/actions/creation.ts",
+      "src/adapters/mock-creation.ts",
+    ],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: { "no-console": "error" },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },
