@@ -3,6 +3,8 @@ import {
   DaySchema,
   ProposalSchema,
   TripSchema,
+  TripSummarySchema,
+  countToReserve,
   validateDayMap,
   type Trip,
 } from "@/contracts";
@@ -53,6 +55,27 @@ export function withSimulatedUnlock(
   }
 
   return {
+    /**
+     * Amendement de 0020 § 3 par 0021 § 2 : le résumé d'un voyage non débloqué dans les données et débloqué par
+     * un droit de la portée est celui de sa vue débloquée (pendant réétiqueté, ou drapeau seul), revalidé ; les
+     * autres résumés ne changent pas.
+     */
+    async listTrips(ctx) {
+      const summaries = await base.listTrips(ctx);
+      return Promise.all(
+        summaries.map(async (summary) => {
+          if (summary.unlocked) return summary;
+          const view = await resolve(ctx, summary.id);
+          if (view.kind === "base") return summary;
+          return TripSummarySchema.parse({
+            ...summary,
+            unlocked: true,
+            toReserveCount: countToReserve(view.trip.checklist),
+            dayCount: view.trip.days.length,
+          });
+        }),
+      );
+    },
     async getTrip(ctx, tripId) {
       const view = await resolve(ctx, tripId);
       return view.kind === "base" ? base.getTrip(ctx, tripId) : view.trip;

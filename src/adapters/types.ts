@@ -8,6 +8,7 @@ import type {
   Proposal,
   Result,
   Trip,
+  TripSummary,
 } from "@/contracts";
 import type { CheckoutOutcome } from "@/contracts/values";
 
@@ -22,6 +23,11 @@ export interface AdapterContext {
 
 /** Accès aux voyages, simulé (`mock`) ou réel (`api`, avec le back-end). */
 export interface TripAdapter {
+  /**
+   * Résumés des voyages de l'organisation, pour « Mes voyages » (décision 0021 § 2), **sans ordre garanti** :
+   * le classement est fait par l'écran. Autre organisation : liste vide.
+   */
+  listTrips(ctx: AdapterContext): Promise<TripSummary[]>;
   getTrip(ctx: AdapterContext, tripId: string): Promise<Trip | null>;
   /** `index` : 1 = J1. */
   getDay(ctx: AdapterContext, tripId: string, index: number): Promise<Day | null>;

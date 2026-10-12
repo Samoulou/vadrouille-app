@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema } from "./category";
-import { DETOUR_THRESHOLD_MINUTES } from "./values";
+import { DETOUR_THRESHOLD_MINUTES, STOP_KINDS } from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -19,6 +19,23 @@ export const TimeSchema = z
 
 /** Date ISO « AAAA-MM-JJ » (date réelle du calendrier). */
 export const IsoDateSchema = z.iso.date("date attendue au format AAAA-MM-JJ");
+
+/**
+ * Fuseau horaire IANA de la destination (`Europe/London`), champ maison (spécification F10, F10-TL-1 ; décision
+ * 0021 § 3). Tout identifiant accepté par `Intl.DateTimeFormat` passe, alias compris (`Asia/Kolkata`, `UTC`) :
+ * la liste `Intl.supportedValuesOf("timeZone")` ne contient que les noms canoniques de l'environnement.
+ */
+export const TimeZoneSchema = z.string().min(1).refine(
+  (value) => {
+    try {
+      new Intl.DateTimeFormat("fr", { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: "fuseau horaire IANA attendu (par exemple Europe/London)" },
+);
 
 const MinutesSchema = z.number().int().nonnegative();
 const TextSchema = z.string().min(1);
@@ -45,7 +62,7 @@ export type Commitment = z.infer<typeof CommitmentSchema>;
 
 export const StopSchema = z.strictObject({
   id: TextSchema,
-  kind: z.enum(["activity", "meal", "event"]),
+  kind: z.enum(STOP_KINDS),
   /** Identifiant de lieu Google : seul élément Google stockable. */
   placeId: TextSchema.optional(),
   name: TextSchema,
@@ -153,6 +170,11 @@ export const TripSchema = z.strictObject({
   destinationColor: z.enum(["bruyere", "azulejo", "ocre", "granit"]),
   start: IsoDateSchema,
   end: IsoDateSchema,
+  /**
+   * Fuseau de la destination : « aujourd'hui » et « en cours » s'y calculent (F11-PO-6, F10-PO-3). Ajout au
+   * handover § 9, signalé (créé par F11a, décision 0021 § 3, dans la forme de F10-TL-1).
+   */
+  timeZone: TimeZoneSchema,
   travellers: z.strictObject({
     adults: z.number().int().nonnegative(),
     children: z.number().int().nonnegative(),
