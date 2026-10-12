@@ -2,7 +2,7 @@
 
 Statut : décision déléguée, à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-12 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #174 (T19)
 
-Numérotation : 0029 est prise par #165, 0030 par #149, 0031 par #172. Aucune PR ouverte n'utilise 0032 (vérifié le 2026-10-12). 0032 est le prochain numéro libre.
+Numérotation : 0029 est prise par la PR #165 (ticket #164 ; la décision 0030 cite le ticket), 0030 par la PR #149, 0031 par la PR #172 (vérifié le 2026-10-12 : chacune de ces PR ajoute le fichier correspondant). Aucune PR ouverte n'utilise 0032 (vérifié le 2026-10-12). 0032 est le prochain numéro libre.
 
 ## Contexte
 La spécification P0 (`specs/P0-prototype-recherche.md`, #149, fusionnée le 2026-10-12) attend du Tech Lead cinq décisions d'architecture (section « Décisions d'architecture attendues ») :
@@ -21,9 +21,12 @@ Contraintes reprises de la spécification, non négociables ici :
 
 **Argent, comptes, données hors UE** : rien. Aucune dépendance n'engage un compte ni un service. Aucune clé n'est lue.
 
-**Principe « l'agent cherche, l'ancrage vérifie, le moteur planifie »** : c'est le découpage en dossiers de A3. La recherche vit dans `src/research` et `src/ai`, l'ancrage dans `src/grounding`, le moteur dans `src/domain`. Seul l'orchestrateur du script voit les trois. Les règles d'import empêchent un résultat d'ancrage d'atteindre un prompt.
+**Principe « l'agent cherche, l'ancrage vérifie, le moteur planifie »** : c'est le découpage en dossiers de A3. La recherche vit dans `src/research` et `src/ai`, l'ancrage dans `src/grounding`, le moteur dans `src/domain`. Seul l'orchestrateur du script voit les trois. Les types qui passent d'une étape à l'autre vivent dans deux modules purs de `src/prototype/` : `candidat.ts` (candidat et notes) et `ancrage.ts` (résultat d'ancrage). `src/ai` et `src/research` n'ont pas le droit d'importer `ancrage.ts`, ni directement ni par transitivité (A3.2). C'est ce qui rend le principe vérifiable : un résultat d'ancrage ne peut pas atteindre un prompt par un import.
 
-**Règles Google** : inchangées. Les seules données Google gardées sont celles que Samuel a décidées (0027 § 4, 0028) : `placeId`, table `positions`, horaires planifiés. Dans ce périmètre, elles n'existent que sous forme de valeurs sentinelles.
+**Règles Google** : celles de `CLAUDE.md` (« Jamais ») et de la réponse de Samuel à Q241 (0028 : « aucune donnée Google (horaires compris) dans le dépôt public ; [...] seuls les identifiants de lieu peuvent y figurer »). Cette décision ne les modifie pas. Elle les applique ainsi :
+- **Dans le dépôt** : seulement des identifiants de lieu et des valeurs sentinelles (fixtures, programme de test). Aucune position réelle, aucun horaire Google, aucune durée de Routes.
+- **Positions** (table `positions`) : seulement dans un programme réel **hors du dépôt**, 30 jours au plus (P0-Q8 b, 0028). Aucun programme réel n'existe dans P0a1 ni dans P0b1 (0030).
+- **Horaires** : aucun horaire d'ouverture Google ni aucune durée de Routes n'est gardé, nulle part. Ils vivent en mémoire pendant l'exécution, puis disparaissent (spécification, contrainte 3). Les heures planifiées d'un programme réel en dérivent indirectement et suivent le régime du programme hors du dépôt ; ce point est porté à Q5 par la spécification.
 
 ## A3 — Emplacements, règles d'import, commande `pnpm p0`
 
@@ -37,7 +40,7 @@ Raisons :
 
 | Emplacement | Contenu |
 |---|---|
-| `src/prototype/` | Code **pur** partagé par le script et l'application. `programme-reduit.ts` : schéma strict de la forme réduite, type, constante `PROTOTYPE_ORG_ID = "org_prototype"`. `config.ts` : schémas Zod des fichiers de A2. `brief.ts` : schéma strict du brief (P0-PO-2). `reduction.ts` : passage du programme complet validé à la forme réduite. |
+| `src/prototype/` | Code **pur** partagé par le script et l'application. `programme-reduit.ts` : schéma strict de la forme réduite, type, constante `PROTOTYPE_ORG_ID = "org_prototype"`. `config.ts` : schémas Zod des fichiers de A2. `brief.ts` : schéma strict du brief (P0-PO-2). `candidat.ts` : schéma et type du candidat trouvé par la recherche et de ses notes (`matchesWishes`, `notForMeRisk`, `mustSee`, `slotFit`). `ancrage.ts` : schéma et type du résultat d'ancrage (`placeId`, position, horaires et durées en mémoire, statut). `reduction.ts` : passage du programme complet validé à la forme réduite. |
 | `src/domain/` | Moteur pur. Squelette, classement (formule lue dans la configuration, A2), planification, validateurs R1, R2, R4 à R8. Identifiant `proto_<slug>_<AAAAMMJJ>_<n>`. Gabarits de `Day.title` et de `Proposal.context`. |
 | `src/ai/` | Interface du client de modèles (requête, réponse, réglage `data_collection`). Garde `data_collection: "deny"` avant chaque requête. Client simulé. Constructeurs de requêtes. Schémas stricts des sorties de modèles. Prompts versionnés dans `src/ai/prompts/`, un module TypeScript par étape qui exporte `{ id, version, texte }` (aucune lecture de fichier). |
 | `src/research/` | Agent borné. Politique de sources. Validation des URL de source. `fetch-page.ts` : seul module de lecture des pages, résolveur DNS et couche HTTP **injectés**. `ip-guard.ts` : contrôle des adresses. `extract-text.ts` : extraction du texte HTML (A7). Énumération fermée des raisons `pages_refused`. |
@@ -61,17 +64,19 @@ Hors des imports permis ci-dessous, sont refusés : tout paquet npm, tout module
 
 | Fichiers | Seuls imports permis |
 |---|---|
-| `src/prototype/**` | `@/contracts`, `zod`, `@/prototype/*` (relatifs compris) |
-| `src/domain/**` | `@/contracts`, `zod`, `@/domain/*`, `@/prototype/brief`, `@/prototype/config` |
-| `src/ai/**` | `@/contracts`, `zod`, `@/ai/*`, `@/prototype/brief`, `@/prototype/config` |
-| `src/research/**` | `@/contracts`, `zod`, `@/ai/*`, `@/research/*`, `@/prototype/brief`, `@/prototype/config`. En plus : `node:net` dans `ip-guard.ts` seulement, sous la seule forme `import { BlockList, isIP } from "node:net"` ; le parseur HTML de A7 dans `extract-text.ts` seulement. `ip-guard.ts` n'est importé que par `fetch-page.ts` (et par son test). |
-| `src/grounding/**` | `@/contracts`, `zod`, `@/grounding/*`, `@/prototype/brief`, `@/prototype/config` |
+| `src/prototype/brief.ts`, `config.ts`, `candidat.ts`, `ancrage.ts`, `programme-reduit.ts` | `@/contracts`, `zod` seulement (modules feuilles, aucun import entre eux) |
+| `src/prototype/reduction.ts` | `@/contracts`, `zod`, `@/prototype/ancrage`, `@/prototype/programme-reduit` |
+| `src/domain/**` | `@/contracts`, `zod`, `@/domain/*`, `@/prototype/brief`, `@/prototype/config`, `@/prototype/candidat`, `@/prototype/ancrage` |
+| `src/ai/**` | `@/contracts`, `zod`, `@/ai/*`, `@/prototype/brief`, `@/prototype/config`, `@/prototype/candidat` |
+| `src/research/**` | `@/contracts`, `zod`, `@/ai/*`, `@/research/*`, `@/prototype/brief`, `@/prototype/config`, `@/prototype/candidat`. En plus : `node:net` dans `ip-guard.ts` seulement, sous la seule forme `import { BlockList, isIP } from "node:net"` ; `parse5` (A7.2) dans `extract-text.ts` seulement. `ip-guard.ts` n'est importé que par `fetch-page.ts` (et par son test). |
+| `src/grounding/**` | `@/contracts`, `zod`, `@/grounding/*`, `@/prototype/brief`, `@/prototype/config`, `@/prototype/candidat`, `@/prototype/ancrage` |
 | `scripts/p0/**/*.ts` | `@/contracts`, `zod`, `@/prototype/*`, `@/domain/*`, `@/ai/*`, `@/research/*`, `@/grounding/*`, fichiers de `scripts/p0/`, `node:fs`, `node:fs/promises`, `node:path`, `node:util` (pour `parseArgs`) |
-| `scripts/p0/enregistrer.mjs` | `node:module` et `node:url` seulement. C'est le seul fichier `.mjs` du dossier. Le test fige son contenu (A3.4). |
+| `scripts/p0/enregistrer.mjs` | `import { registerHooks } from "node:module"` seulement, sous cette forme exacte. C'est le seul fichier `.mjs` du dossier. **Écart à la spécification**, déclaré et justifié en A3.4 ; contenu figé par empreinte. |
 
 Règles complémentaires :
-- `src/ai` et `src/research` n'importent jamais `@/grounding`, ni rien de `scripts/`. Aucune donnée Google ne peut atteindre un prompt par un import.
-- `src/prototype` n'importe rien d'autre que `@/contracts` et `zod` : `programme-reduit.ts` reste importable par l'application, sans rien tirer du script. Test dédié : le graphe transitif de `src/prototype/programme-reduit.ts` ne contient que des fichiers de `src/prototype`, de `src/contracts` et `zod`.
+- `src/ai` et `src/research` n'importent jamais `@/grounding`, `@/prototype/ancrage`, `@/prototype/reduction`, `@/prototype/programme-reduit`, `@/domain`, ni rien de `scripts/`. Test dédié sur le **graphe transitif** : depuis chaque fichier de `src/ai` et de `src/research`, aucun chemin d'import n'atteint `src/prototype/ancrage.ts` ni `src/grounding`. Aucune donnée Google ne peut atteindre un prompt par un import.
+- Les types partagés entre étapes ne sont définis qu'une fois, dans `src/prototype/candidat.ts` et `src/prototype/ancrage.ts`. Aucune étape ne les recopie. `src/contracts` ne change pas.
+- Les modules de `src/prototype` n'importent que `@/contracts` et `zod` (sauf `reduction.ts`, ci-dessus) : `programme-reduit.ts` reste importable par l'application, sans rien tirer du script. Test dédié : le graphe transitif de `src/prototype/programme-reduit.ts` ne contient que lui-même, des fichiers de `src/contracts` et `zod`.
 - Graphe de l'application : aucun fichier de `src/app`, `src/features`, `src/components`, `src/lib`, `src/adapters`, `src/mocks` ni de configuration de Next.js n'importe `@/ai`, `@/research`, `@/grounding`, `@/domain` ou un fichier de `scripts/`. De `src/prototype`, `src/adapters` n'importe que `@/prototype/programme-reduit`. Même test.
 - **Écart à la spécification (plus strict)** : les clients simulés (`*.simule.ts`) **ne sont pas exclus** de la liste d'autorisation. Ils servent le mode simulé, pas seulement les tests, et n'ont besoin de rien d'autre. Seuls les fichiers `*.test.ts` sont exclus, sauf pour la règle `node:net`.
 - `process.env` est refusé partout dans ces fichiers, `scripts/p0/` compris. Le mode simulé ne lit aucune variable d'environnement.
@@ -86,11 +91,43 @@ Le handover back-end § 3 reste la cible de B7 et B8 (règles ESLint par dossier
 **Retenu : le support natif de TypeScript de Node, sans dépendance.**
 - Script : `"p0": "node --import ./scripts/p0/enregistrer.mjs scripts/p0/main.ts"`.
 - Node retire les types nativement depuis 22.18 (moteur du dépôt : `>=22.19.0`).
-- `enregistrer.mjs` enregistre, par `module.register`, un seul point d'accroche `resolve`. Il traduit `@/` vers `src/` et résout les imports relatifs sans extension vers `.ts` ou `/index.ts`. Il ne fait rien d'autre : pas de `load`, pas de réseau, pas de lecture d'environnement.
+- `enregistrer.mjs` enregistre, par `registerHooks` (synchrone, dans le même fil ; disponible depuis Node 22.15), un seul point d'accroche `resolve` (forme ci-dessous).
 - Fichier `tsconfig.p0.json` : il étend `tsconfig.json`, couvre `scripts/p0`, `src/prototype`, `src/domain`, `src/ai`, `src/research`, `src/grounding` et `src/contracts`, et active `erasableSyntaxOnly` et `verbatimModuleSyntax` (syntaxe que Node sait retirer, imports de types explicites). `pnpm typecheck` devient `tsc --noEmit && tsc -p tsconfig.p0.json --noEmit`.
 - Les fichiers JSON sont lus par `node:fs` dans `scripts/p0/`, jamais importés.
 - `vitest.config.mts` inclut `scripts/**/*.test.ts` si P0a1 y place des tests.
 - Preuve que la commande tourne : un test lance `pnpm p0 --brief edimbourg-1` dans un sous-processus, avec un environnement sans variable de clé. Il vérifie le code de sortie et la présence du programme réduit et du rapport. Il fait partie de `pnpm verify`.
+
+**Faisabilité à prouver par la PR de P0a1** (non prouvée ici) :
+- `package.json` n'a pas de champ `"type"` (vérifié le 2026-10-12) : la PR montre que Node détecte les fichiers `.ts` comme modules ES (détection de syntaxe) sans erreur ni changement de `package.json` ;
+- l'avertissement expérimental du retrait des types, s'il apparaît, est noté dans la PR. Il peut être tu par `--disable-warning=ExperimentalWarning`, et par rien d'autre ;
+- `src/contracts` passe `tsc -p tsconfig.p0.json --noEmit` avec `erasableSyntaxOnly` et `verbatimModuleSyntax` (aucun `enum`, aucun `namespace`, imports de types marqués `type`). `src/contracts` ne se modifie pas dans P0 : en cas d'échec, c'est le repli `jiti` ;
+- `registerHooks` existe sur la version de Node de la CI.
+
+#### Écart à la spécification : `node:module` dans `enregistrer.mjs`
+La spécification (test `p0: aucun client réel ni accès réseau dans le code de P0a1`) refuse `module` dans le dossier du script et n'admet que `node:net` dans `ip-guard.ts`. `enregistrer.mjs` importe `node:module`. **C'est un assouplissement**, déclaré ici comme écart.
+
+Justification. Node sait retirer les types, mais pas résoudre ce que le code du dépôt écrit :
+- les alias `@/` (convention du dépôt, `tsconfig.json`, `paths`) ;
+- les imports relatifs sans extension de `src/contracts` (`./index`, `./values`…), que P0 ne peut pas modifier.
+
+Variantes étudiées sans point d'accroche :
+1. **Imports relatifs avec extension `.ts`** et `allowImportingTsExtensions` : possible pour le code neuf, mais `src/contracts` resterait sans extension. Refusée : elle oblige à modifier les contrats.
+2. **Alias par le champ `imports` de `package.json`** (`#src/*`, résolu nativement par Node, TypeScript et Next.js) : règle l'alias, pas les imports sans extension de `src/contracts`. Elle change aussi la convention `@/` du dépôt pour une partie du code seulement. Refusée.
+3. **Compiler avant d'exécuter** (`tsc` vers un dossier temporaire) : `tsc` ne réécrit ni les alias ni les extensions. Refusée.
+4. **`jiti`** : pas de point d'accroche de Node, mais il charge, transforme et évalue lui-même tout le code du processus. Surface plus grande qu'un `resolve` de quelques lignes. Gardée comme repli.
+5. **`tsx`** : refusé (`esbuild`, script d'installation).
+
+**Retenu : un point d'accroche `resolve` minimal**, parce qu'il est la seule variante sans dépendance qui laisse `src/contracts` intact, et la plus petite surface. Il s'applique à tous les modules du processus, mais ce processus n'exécute que `pnpm p0` : aucun autre programme ne charge `enregistrer.mjs` (ni Next.js, ni Vitest, ni l'application ; test statique sur `package.json`, `next.config.ts` et `vitest.config.mts`).
+
+Forme imposée :
+- un seul import, `import { registerHooks } from "node:module"` ; aucun autre module, ni `node:fs`, ni `process`, ni `fetch` ;
+- un seul appel `registerHooks({ resolve })` ; **pas de `load`**, pas d'`initialize`, pas de `module.register` ;
+- `resolve` ne touche qu'aux spécificateurs `@/…` et aux spécificateurs relatifs **dont le module parent est sous `src/` ou `scripts/p0/`**. Il traduit `@/x` vers l'URL de `src/x` (calculée par `new URL(…, import.meta.url)`, sans import), puis essaie, par `nextResolve`, le chemin tel quel, puis `.ts`, puis `/index.ts`. Une URL obtenue hors de `src/` ou `scripts/p0/` est refusée par une erreur. Tout autre spécificateur passe à `nextResolve` sans changement ;
+- aucun accès au réseau, au système de fichiers ni à l'environnement.
+
+Gel : le test `p0: enregistrer.mjs est figé` compare l'empreinte SHA-256 du fichier à une constante écrite dans le test, et vérifie par l'arbre syntaxique la forme ci-dessus (un import, un appel, aucun `load`). Changer le fichier oblige à changer la constante, ce qui se voit dans la PR et exige une nouvelle revue Sécurité.
+
+**Revue Sécurité demandée** : la PR de P0a1 la demande sur `enregistrer.mjs` et son test, en plus de la revue de la garde SSRF.
 
 **Repli, seulement si P0a1 montre que le support natif ne suffit pas** (par exemple une syntaxe de `src/contracts` que Node ne sait pas retirer : `src/contracts` ne se modifie pas dans P0) : `jiti` 2.7.0 en devDependency. Il est déjà dans le lockfile par transitivité. Licence MIT, aucune dépendance, aucun script d'installation, publié le 2026-05-05. La PR de P0a1 justifie le repli. `tsx` est refusé : il dépend d'`esbuild`, qui exige un script d'installation.
 
@@ -108,7 +145,15 @@ Le handover back-end § 3 reste la cible de B7 et B8 (règles ESLint par dossier
 | `modeles.json` | `etapes` : `recherche`, `notation`, `raisons` (identifiants OpenRouter de la variante B). `variantes.a` : **seulement** `notation` (variante A). `routage` : `data_collection`, et `zdr` facultatif. | `.strict()` à chaque niveau. `variantes.a` n'accepte que la clé `notation` : la variante A ne peut changer que le modèle de notation, et c'est garanti par la forme. `data_collection` est `z.literal("deny")`. Identifiant de modèle : `^[a-z0-9-]+/[a-z0-9._:-]+$`, 100 caractères au plus. Valeurs de Samuel (0027) : `deepseek/deepseek-v4.1-flash`, `perplexity/pplx-decider-v1.1-27b`, `deepseek/deepseek-v4.1-flash` ; variante A : `deepseek/deepseek-v4.1-flash`. |
 | `recherche.json` | Bornes de l'agent : cibles de candidats **trouvés** par type de créneau (`activity`, `meal`, `evening`), total de candidats visé, taille des lots de notation, nombre maximal de tours de l'agent. | Entiers positifs bornés. Le total visé reste sous le plafond `candidatsTrouves` de `plafonds.json` (contrôle croisé au chargement). |
 | `classement.json` | Formule de classement proposée par ia-recherche : poids des notes, traitement de `matchesWishes` à « non », priorité des `mustSee`, poids du coût de trajet par type d'étape. | Nombres finis et bornés, énumérations fermées, **aucune chaîne libre**. La formule est appliquée par `src/domain`, jamais écrite dans un prompt. |
-| `plafonds.json` | Un plafond par compteur de la spécification : `coutUsd`, `recherchesWeb`, `pagesLues`, `candidatsTrouves`, `placesTextSearch`, `placesDetails`, `routesRequetes`, `routesElements`, `dureeMs`. | Valeurs provisoires choisies par ia-recherche. Bornes dures du schéma, en garde-fou : `coutUsd` ≤ 3 (proposition P0-Q2), chaque compteur Google ≤ 100 (quota quotidien de Q252). Relever une borne demande une décision écrite. |
+| `plafonds.json` | Un plafond par compteur de la spécification : `coutUsd`, `recherchesWeb`, `pagesLues`, `candidatsTrouves`, `placesTextSearch`, `placesDetails`, `routesRequetes`, `routesElements`, `dureeMs`. | Valeurs du fichier choisies par ia-recherche, provisoires. Bornes du schéma : garde-fous **provisoires et non décisionnels** du mode simulé, posés par le Tech Lead (détail sous le tableau). |
+
+Bornes du schéma de `plafonds.json`. Elles sont **provisoires et non décisionnelles** : elles empêchent une valeur absurde dans le mode simulé et ne fixent aucun plafond d'exécution réelle. Les plafonds définitifs sont fixés par la spécification suivante (0030 § 3), qui tient compte de la réponse de Samuel à Q256 (P0-Q14, 2026-10-12, QUESTIONS.md) : le quota de 100 requêtes par jour de Q252 s'entend **par méthode** (Text Search et Place Details comptés séparément). Elles sont revues à ce moment-là.
+- `coutUsd` : nombre fini, > 0 et ≤ 3. Le chiffre de 3 USD est une **proposition du studio** (P0-Q2), non citée par Samuel (0027 § 2) ; P0-Q18 lui est posée. Il n'est pas attribué à Samuel.
+- `placesTextSearch`, `placesDetails`, `routesRequetes` : **requêtes par exécution**, entiers > 0 et ≤ 100 chacun. Une exécution ne peut donc pas dépasser à elle seule le quota journalier d'une méthode. Ce n'est pas le quota journalier : la somme des exécutions d'une journée, marge et ancrage des logements compris, relève de la spécification suivante.
+- `routesElements` : **éléments de matrice**, compteur distinct des requêtes, entier > 0 et ≤ 5 000. La valeur du fichier est choisie par P0a1 de sorte qu'un séjour de 7 jours passe en mode simulé (test). Savoir si la console Google compte les éléments ou les requêtes de Routes relève de la spécification suivante.
+- `recherchesWeb`, `pagesLues`, `candidatsTrouves`, `dureeMs` : entiers > 0, bornés par le schéma à des valeurs choisies par P0a1 et notées dans sa PR.
+
+Relever une borne du schéma demande un amendement écrit de cette décision. Changer une valeur sous la borne relève d'ia-recherche.
 
 Règles communes :
 - Chaque fichier porte un champ `schema: 1`. Le rapport note la version des fichiers et les identifiants de modèle effectifs.
@@ -125,7 +170,7 @@ Règles communes :
 - `isIP` sert à classer l'adresse et à refuser une IP littérale dans l'URL. Les formes décimale, octale et hexadécimale sont refusées avant, par la normalisation de l'hôte (classe `URL` de WHATWG, globale, sans import).
 - Aucune comparaison de chaînes écrite à la main, aucune bibliothèque de CIDR. Un test par plage.
 
-### A7.2 Parseur HTML : contraintes, et choix proposé
+### A7.2 Parseur HTML : contraintes, et choix retenu
 Contraintes pour toute dépendance que P0a1 ajoute (spécification, « Dépendances nouvelles ») :
 1. **Version exacte** dans `package.json` (ni `^` ni `~`), installée par `pnpm install --frozen-lockfile` en CI.
 2. Version **publiée depuis au moins 2 semaines** à la date de la PR. Date vérifiée sur le registre et notée dans la PR.
@@ -136,14 +181,14 @@ Contraintes pour toute dépendance que P0a1 ajoute (spécification, « Dépendan
 7. Importé **seulement** par `src/research/extract-text.ts` (A3.2). Ce module rend du texte brut borné. Le contenu reste une donnée, jamais une instruction.
 8. Revue Sécurité de la PR.
 
-**Choix proposé : `parse5` 8.0.1**, en `dependencies` (code de `src/research`, futur B8). Vérifié sur le registre le 2026-10-12 :
+**Retenu : `parse5` 8.0.1**, en `dependencies` (code de `src/research`, futur B8). Vérifié sur le registre le 2026-10-12 :
 - publié le 2026-04-19, licence MIT ;
 - une seule dépendance, `entities` 8.1.0 (BSD-2-Clause) ;
 - aucun script d'installation dans l'un ni l'autre ;
 - les deux paquets sont déjà dans le lockfile par `jsdom`, donc aucun paquet nouveau dans l'arbre ;
 - analyseur conforme à la norme HTML, sans DOM vivant ni exécution de script.
 
-La PR de P0a1 confirme le nom et la version exacts. Un autre parseur reste possible, aux mêmes conditions, avec sa justification.
+Le test de liste d'autorisation (A3.2) nomme le paquet : `parse5`, dans `src/research/extract-text.ts` seulement. La PR de P0a1 revérifie les conditions 2 à 5 à sa date. Un autre parseur demande un amendement de cette décision, aux mêmes conditions.
 
 Aucune autre dépendance n'est prévue dans P0a1. `jiti` (repli de A3.4) suit les mêmes conditions.
 
@@ -180,6 +225,8 @@ Aucune autre dépendance n'est prévue dans P0a1. `jiti` (repli de A3.4) suit le
 
 Toute autre combinaison ferme. Les conditions 2 et 3 sont plus strictes que la spécification : elles ne font que fermer.
 
+**Signatures.** Aujourd'hui, `getTripAdapter(value = process.env.DATA_ADAPTER)` et `getRequestContext(value = process.env.DATA_ADAPTER)` ne prennent que la valeur de l'adaptateur. P0b1 leur ajoute un second paramètre facultatif : `getTripAdapter(value = process.env.DATA_ADAPTER, env = process.env)`, de même pour `getRequestContext`. `env` est passé à `prototypeAdapterAllowed(env)`. Les appelants actuels (pages, chargeurs de `src/features`, `src/server/actions`) gardent la valeur par défaut ; les tests passent `env` explicitement. Appelants et tests suivent dans la même PR.
+
 `getTripAdapter("prototype")` et `getRequestContext()` en mode prototype **lèvent une erreur** quand la garde est fausse. Jamais de repli silencieux vers `mock`. Le relecteur simulé et son compteur ne sont atteignables que si la garde est vraie.
 
 ### A4.3 Dossier des programmes
@@ -195,19 +242,17 @@ L'image pose `VADROUILLE_ENV=production`. Deux lancements de plus :
 
 Pour chacun, `GET /` doit renvoyer le statut **500** (erreur explicite de la garde), et le corps ne doit contenir ni le titre « Prototype » ni la chaîne `proto_`. L'image ne contient d'ailleurs aucun dossier de programmes.
 
+Ce 500 suppose que la page ne commence pas un flux avec le statut 200 avant de lever l'erreur. P0b1 le **prouve sur l'image** : `test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:<port>/)" = "500"`. L'attente de démarrage de ces conteneurs ne peut pas reprendre la boucle actuelle de `ci.yml` (`curl -fsS` sur `/`, qui échoue sur un 500) : elle attend un code HTTP quelconque, autre que `000`. Si l'image renvoie 200 avec un corps d'erreur, P0b1 ne change pas le test : il le signale dans sa PR et le Tech Lead amende cette décision.
+
 ## A6 — Relecture, aucun cache, rendu dynamique, lecture de `DATA_ADAPTER`
 
 ### A6.1 Relecture côté serveur
 Les relectures (matrice de Routes entre `placeId`, une requête par journée affichée) sont faites **côté serveur**, par l'adaptateur appelé dans les composants serveur. Le navigateur ne reçoit que le résultat validé par les contrats. La clé navigateur reste limitée à Maps JavaScript (F4). Dans P0b1, seul le relecteur simulé existe.
 
 ### A6.2 Rendu dynamique : rien à ajouter, à garder
-Toutes les routes que sert l'adaptateur `prototype` exportent **déjà, sans condition**, `export const dynamic = "force-dynamic"` dans `main` :
-- `src/app/page.tsx` ;
-- `src/app/voyages/[id]/presentation/page.tsx` ;
-- `src/app/voyages/[id]/(programme)/layout.tsx`, `page.tsx` et `jour/[n]/page.tsx` ;
-- `src/app/voyages/page.tsx`.
+Dans `main` (vérifié le 2026-10-12), **tous** les fichiers `page.tsx` et `route.ts` de `src/app` exportent déjà, sans condition, `export const dynamic = "force-dynamic"` : l'accueil, la Présentation, le groupe `(programme)` et sa Journée, « Mes voyages », `debloquer` et ses sous-routes, `src/app/dev/carte/page.tsx` (qui appelle `getTripAdapter`) et les autres pages et routes de `src/app/dev/`. Parmi les `layout.tsx`, seuls deux ne l'exportent pas : `src/app/layout.tsx` et `src/app/voyages/layout.tsx`. Aucun des deux ne lit de données (ni `@/adapters`, ni chargeur de `src/features`).
 
-Le mode `mock` les rend donc déjà dynamiques. **Aucun mécanisme conditionnel n'est ajouté**, et le manifeste de build du mode `mock` ne change pas par construction.
+Le mode `mock` rend donc déjà dynamique tout ce que l'adaptateur peut servir. **Aucun mécanisme conditionnel n'est ajouté**, et le manifeste de build du mode `mock` ne change pas par construction.
 
 P0b1 :
 - ne retire ni n'affaiblit ces exports ;
@@ -215,13 +260,13 @@ P0b1 :
 - n'active ni `cacheComponents` ni le prérendu partiel dans `next.config.ts`.
 
 Tests :
-- recherche statique de l'export dans chacune de ces routes ;
+- test statique sur l'arbre `src/app/**` (pas une liste écrite à la main) : chaque `page.tsx` et chaque `route.ts` exporte `dynamic = "force-dynamic"` ; chaque `layout.tsx` aussi, sauf les deux cités, pour lesquels le test vérifie qu'ils n'importent ni `@/adapters` ni un chargeur de `src/features`. Une nouvelle page sans l'export fait échouer le test ;
 - test du manifeste de build : ces routes ne sont pas prérendues ; le manifeste du mode `mock` est identique avant et après P0b1.
 
 ### A6.3 `DATA_ADAPTER` est lu à la requête : un seul build
 `DATA_ADAPTER` n'a pas de préfixe `NEXT_PUBLIC_` : Next.js ne l'insère pas dans le build. `getTripAdapter` le lit dans `process.env` à chaque appel, sur des routes dynamiques. Donc :
 - **un seul build**, testé dans les deux modes ;
-- l'e2e du prototype lance un second serveur sur le même build, avec `DATA_ADAPTER=prototype`, `VADROUILLE_PROTOTYPE=1`, `CI=true` et `VADROUILLE_PROTOTYPE_DIR`. Projet Playwright et port distincts, forme fixée par P0b1 ;
+- l'e2e du prototype lance un second serveur sur le même build, avec `DATA_ADAPTER=prototype`, `VADROUILLE_PROTOTYPE=1`, `CI=true`, `VADROUILLE_PROTOTYPE_DIR` et `VADROUILLE_DEV_PAGES=1` (sans ce dernier, `/dev/api/prototype/relectures` répond 404 sur le build de production, A6.6 ; `playwright.config.ts` le pose déjà pour le serveur existant). Projet Playwright et port distincts, forme fixée par P0b1 ;
 - l'image Docker est construite une fois. Le mode prototype y est refusé par la garde (A4.4).
 
 ### A6.4 En-têtes
@@ -230,7 +275,7 @@ Pour une route dynamique, Next.js envoie par défaut `Cache-Control: private, no
 Si l'e2e montre un autre en-tête, P0b1 ajoute une règle `headers()` **sans condition** dans `next.config.ts` pour ces routes, et le signale dans sa PR. Aucun autre mécanisme sans amendement de cette décision.
 
 ### A6.5 Ce qui est interdit, et comment c'est testé
-- Dans `src/adapters/prototype*.ts`, `src/mocks/prototype-relecteur.ts`, `src/prototype/**` et les routes de A6.2 : aucun `unstable_cache`, `"use cache"`, `cacheLife`, `cacheTag`, `revalidate` positif (export ou option `next` de `fetch`). Recherche statique.
+- Dans `src/adapters/prototype*.ts`, `src/mocks/prototype-relecteur.ts`, `src/prototype/**` et les fichiers de `src/app` couverts par A6.2 : aucun `unstable_cache`, `"use cache"`, `cacheLife`, `cacheTag`, `revalidate` positif (export ou option `next` de `fetch`). Recherche statique.
 - Aucun cache de module qui garde une durée relue entre deux requêtes. La fonction `cache` de React, limitée à une requête, reste permise. L'index du chargeur (identifiant vers fichier) n'est pas un cache de données Google : il ne contient ni durée ni position, et le fichier est relu et revalidé à chaque lecture.
 - `cache: "no-store"` sur chaque `fetch` vers Google : exigence du relecteur réel (spécification suivante). Dans P0b1, aucun `fetch` n'existe.
 
@@ -243,10 +288,14 @@ L'e2e « prototype sans cache » charge deux fois la Journée et vérifie que le
 - P0a1 peut démarrer : A2, A3 et A7 sont fixées. P0b1 démarre après la fusion de P0a1 (ou de sa PR intermédiaire du schéma, décision 0030) : A4 et A6 sont fixées.
 - Aucune dépendance n'est ajoutée par cette PR. P0a1 en ajoutera une seule (parseur HTML, A7.2), plus `jiti` seulement en repli (A3.4).
 - Le handover back-end § 3 n'est pas modifié. La liste plus étroite de A3.2 s'applique pendant P0 ; P0r1 (#172) l'élargit.
+- Écart à la spécification déclaré : `node:module` dans `scripts/p0/enregistrer.mjs` (A3.4), sous revue Sécurité dans la PR de P0a1. Écart plus strict : clients simulés soumis à la liste d'autorisation (A3.2).
+- Les bornes de `plafonds.json` (A2) sont provisoires et non décisionnelles ; aucun plafond d'exécution réelle n'est fixé ici.
 - Variables nouvelles à documenter par P0b1 dans `docs/deploiement/variables-environnement.md` : `VADROUILLE_PROTOTYPE`, `VADROUILLE_PROTOTYPE_DIR`. P0a1 n'en ajoute aucune.
 
 ## Quand revoir cette décision
-- À la spécification suivante : A1, A5, élargissement de A3.2, conduite face au proxy des routines (A7.3).
+- À la spécification suivante : A1, A5, élargissement de A3.2, conduite face au proxy des routines (A7.3), plafonds définitifs (bornes de A2 revues selon Q256, quota par méthode).
+- À la réponse de Samuel à P0-Q18 (plafond de coût par exécution) : borne `coutUsd` de A2.
+- Si `enregistrer.mjs` doit changer (nouvelle empreinte, nouvelle revue Sécurité, A3.4).
 - Si le support natif de TypeScript de Node ne suffit pas pour `pnpm p0` (repli de A3.4).
 - Si une route servie par le prototype devait cesser d'être dynamique en mode `mock` (A6.2).
 - À B3, pour aligner la garde de A4.2 sur `resolveServerEnvironment` (0006).
