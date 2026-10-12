@@ -36,6 +36,8 @@ const ex = t.exemples;
 
 const TAG_KINDS: TagKind[] = ["toReserve", "toConfirm", "unconfirmed"];
 const BANNER_KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
+/** Message de l'état invalide d'OtpInput, relié au groupe par `describedBy` (0012, Q13). */
+const OTP_MESSAGE_ID = "otp-invalide-message";
 const SEGMENT_OPTIONS = [
   { value: "a", label: ex.segmente.options.a },
   { value: "b", label: ex.segmente.options.b },
@@ -304,6 +306,9 @@ export function ComposantsShowcase() {
         <State label={t.etats.desactive}>
           <Chip label={ex.chips.histoire} disabled />
         </State>
+        <State label={t.etats.indisponible}>
+          <Chip label={ex.chips.musees} aria-disabled="true" />
+        </State>
         <State label={t.etats.focus}>
           <Chip label={ex.chips.balades} className={FOCUS_DEMO} />
         </State>
@@ -324,6 +329,14 @@ export function ComposantsShowcase() {
         </State>
         <State label={t.etats.rempli}>
           <OtpInput defaultValue="482913" />
+        </State>
+        <State label={t.etats.invalide}>
+          <div className="flex flex-col gap-2">
+            <OtpInput invalid describedBy={OTP_MESSAGE_ID} />
+            <p id={OTP_MESSAGE_ID} className="text-corps text-ink">
+              {ex.codeInvalide}
+            </p>
+          </div>
         </State>
       </Section>
 

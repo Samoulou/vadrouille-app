@@ -136,6 +136,7 @@
         "variantes": "Variantes, taille md (52 px)",
         "tailles": "Taille sm (44 px), texte ink-soft",
         "desactive": "Désactivé",
+        "indisponible": "Indisponible (aria-disabled)",
         "focus": "Focus",
         "lien": "Lien (asChild)",
         "formes": "Carré et rond",
@@ -145,6 +146,7 @@
         "deduit": "Déduite, non sélectionnée et sélectionnée",
         "vide": "Vide",
         "rempli": "Rempli",
+        "invalide": "Invalide, message relié au groupe",
         "pastilles": "Inactive, active, désactivée, réduite",
         "rangeeSejour": "« Séjour » actif",
         "rangeeJour": "J9 actif",
@@ -178,6 +180,7 @@
         "compteurTitre": "À faire avant de partir",
         "compteurLabel": "[4 réservations à faire]",
         "compteurZeroLabel": "[Aucune réservation à faire]",
+        "codeInvalide": "Ce code ne correspond pas. Vérifie-le ou demande un nouveau code.",
         "chips": {
           "histoire": "Histoire",
           "balades": "Balades en ville",

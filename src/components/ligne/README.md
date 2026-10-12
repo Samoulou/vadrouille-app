@@ -4,5 +4,6 @@ Composants du design system Ligne (handover § 5), démontrés sur /dev/composan
 - F6 : DeckCard, DeckProgress, UndoToast.
 - F5a : Sheet (points d’arrêt dans `sheet-model.ts`), ReasonBlock, type `travel` de StatusBanner.
 - F12b : `Sheet` en mode latéral à partir de 1024 px (`sideOnLargeScreen`, décision 0022 § 6) ; largeur `--ligne-panneau-large` dans `provisoire.css` (Q177).
+- F2c : rendus de la décision 0012 (Q13) pour StatusBanner (`alert` pour `conflict`, filet `generating` fixe en `ink-soft`), Chip (coche de 20 px, déduite sans aplat `line`, indisponible sans contour) et OtpInput (`invalid`, `describedBy`).
 
 Aucune chaîne en dur (`react/jsx-no-literals`) ; valeurs sans token dans `provisoire.css` uniquement, chacune avec le numéro de sa question (test `tests/unit/ligne-valeurs-en-dur.test.ts`).
