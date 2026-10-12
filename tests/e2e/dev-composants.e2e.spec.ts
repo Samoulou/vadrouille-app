@@ -101,7 +101,8 @@ test.describe("/dev/composants", () => {
 
   test("SegmentedControl : un seul arrêt de tabulation, flèches pour changer d'option", async ({ page }) => {
     await page.goto("/dev/composants");
-    const group = page.getByRole("radiogroup");
+    // Premier groupe : le SegmentedControl de F2 (les suivants montrent la marque « déduit », F8-TL-4).
+    const group = page.getByRole("radiogroup").first();
     const checked = group.locator("[aria-checked='true']");
     await checked.focus();
     const before = await checked.textContent();

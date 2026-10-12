@@ -72,4 +72,15 @@ describe("StatusBanner", () => {
     );
     expect(await axeViolations(container)).toEqual([]);
   });
+
+  it("announce={false} : aucun rôle propre, la région live déjà présente de l'écran annonce le bandeau (0018)", () => {
+    render(
+      <div role="alert">
+        <StatusBanner kind="error" announce={false} message="Impossible de préparer ton brief pour le moment." />
+      </div>,
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("Impossible de préparer ton brief pour le moment.");
+    expect(screen.getByText("Impossible de préparer ton brief pour le moment.").closest("[data-kind]")).not.toHaveAttribute("role");
+  });
 });

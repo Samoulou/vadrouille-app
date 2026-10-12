@@ -1,9 +1,11 @@
 import type {
+  BriefRequest,
   CheckoutRequest,
   CheckoutStart,
   CheckoutStatus,
   Day,
   DayMap,
+  InferredBrief,
   Offer,
   Proposal,
   Result,
@@ -62,4 +64,14 @@ export interface PaymentAdapter {
  */
 export interface PaymentSimulator {
   simulateOutcome(ctx: AdapterContext, checkoutId: string, outcome: CheckoutOutcome): Promise<Result<CheckoutStatus>>;
+}
+
+/**
+ * Création du voyage (décision 0017 § 3.1, F8-TL-3), simulée en phase 0. `structureBrief` est anonyme : il ne
+ * prend pas de contexte d'organisation. F8a livre `structureBrief` ; F8b ajoute `suggestLodging`, F8c
+ * `createTrip` et `getGenerationStatus`. La sortie est revalidée par l'action (`InferredBriefSchema`).
+ */
+export interface CreationAdapter {
+  /** Seule étape IA des écrans 1 à 4 (0017 § 3.6) : le récit est une donnée, jamais une instruction. */
+  structureBrief(request: BriefRequest): Promise<Result<InferredBrief>>;
 }
