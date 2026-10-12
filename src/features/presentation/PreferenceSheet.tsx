@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 
-import { Button, Chip } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
+import { Chip } from "@/components/ligne/Chip";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason } from "@/contracts";
 import { PREFERENCE_REASONS } from "@/contracts/values";

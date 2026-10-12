@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -11,10 +13,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
-import { AnalyticsProvider, useTrack } from "@/analytics/context";
-import { EVENT_REASON } from "@/analytics/events";
-import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
-import { Button, DeckCard, DeckProgress, StatusBanner, UndoToast, UndoToastRegion } from "@/components/ligne";
+import type { AnalyticsEvent } from "@/analytics/events";
+import { createLazyTrack, type LazyTrack } from "@/analytics/lazy";
+import { EVENT_REASON } from "@/analytics/reasons";
+import type { EventRecorder, RecorderKind } from "@/analytics/track";
+import { Button } from "@/components/ligne/Button";
+import { DeckCard } from "@/components/ligne/DeckCard";
+import { DeckProgress } from "@/components/ligne/DeckProgress";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
+import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
 import { format, messages } from "@/i18n";
 
@@ -29,8 +36,24 @@ import {
   type UndoToastInfo,
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
-import { PreferenceSheet } from "./PreferenceSheet";
-import { ProposalDetailSheet } from "./ProposalDetailSheet";
+
+/**
+ * Chargement différé (décision 0024 § 1, T14) de ce que le premier rendu n'affiche pas : les deux feuilles, avec
+ * leur dialogue (`@radix-ui/react-dialog`), et la validation de la mesure (`zod/mini`, via `createLazyTrack`).
+ * Le chargement commence au premier geste dans l'écran (`preloadDeferred`), avant qu'une feuille ou un
+ * événement ne soit demandé ; `import()` ne charge chaque module qu'une fois.
+ */
+const loadPreferenceSheet = () => import("./PreferenceSheet");
+const loadProposalDetailSheet = () => import("./ProposalDetailSheet");
+const PreferenceSheet = lazy(() => loadPreferenceSheet().then((m) => ({ default: m.PreferenceSheet })));
+const ProposalDetailSheet = lazy(() => loadProposalDetailSheet().then((m) => ({ default: m.ProposalDetailSheet })));
+
+function preloadDeferred() {
+  // Un échec du préchargement (réseau coupé) est ignoré ici : la feuille ou l'événement refait la demande.
+  void loadPreferenceSheet().catch(() => {});
+  void loadProposalDetailSheet().catch(() => {});
+  void import("@/analytics/track").catch(() => {});
+}
 
 const t = messages.presentation;
 
@@ -57,14 +80,29 @@ export interface PresentationScreenProps {
   actions?: DeckActions;
 }
 
-/** Écrans 6 et 6b : présentation « J'aime / Pas pour moi ». État en mémoire seulement (F6-PO-15). */
+/**
+ * Écrans 6 et 6b : présentation « J'aime / Pas pour moi ». État en mémoire seulement (F6-PO-15).
+ * La validation de la mesure (`zod/mini`) est chargée au premier événement (`createLazyTrack`), hors du
+ * JavaScript initial de la présentation (décision 0024 § 1, T14) ; les événements gardent leur ordre.
+ */
 export function PresentationScreen({ recorderKind = "none", recorder, ...props }: PresentationScreenProps) {
-  const chosen = useMemo(() => recorder ?? recorderFor(recorderKind), [recorder, recorderKind]);
-  return (
-    <AnalyticsProvider recorder={chosen}>
-      <Deck {...props} />
-    </AnalyticsProvider>
-  );
+  const track = useMemo(() => sendWith(createLazyTrack(recorderKind, recorder)), [recorderKind, recorder]);
+  return <Deck {...props} track={track} />;
+}
+
+type Send = (event: AnalyticsEvent) => void;
+
+/**
+ * Envoi sans attente depuis les gestes du paquet. Hors production, un échec (événement invalide) reste une
+ * erreur non rattrapée, qui fait échouer les tests (décision 0013 § 3.3). En production, une mesure perdue
+ * (chargement impossible) n'interrompt rien ; l'événement suivant retente le chargement (`createLazyTrack`).
+ */
+function sendWith(lazyTrack: LazyTrack): Send {
+  return (event) => {
+    lazyTrack(event).catch((error: unknown) => {
+      if (process.env.NODE_ENV !== "production") throw error;
+    });
+  };
 }
 
 function toastMessage(toast: UndoToastInfo): string {
@@ -76,10 +114,11 @@ function toastMessage(toast: UndoToastInfo): string {
 
 type FocusTarget = "card" | "keep";
 
-function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, actions: injected }: Omit<PresentationScreenProps, "recorder" | "recorderKind">) {
+type DeckProps = Omit<PresentationScreenProps, "recorder" | "recorderKind"> & { track: Send };
+
+function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, actions: injected, track }: DeckProps) {
   const [state, dispatch] = useReducer(deckReducer, proposals, initDeck);
   const [actions] = useState<DeckActions>(() => injected ?? createLocalDeckActions());
-  const track = useTrack();
   const [detail, setDetail] = useState<Proposal | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; serial: number } | null>(null);
@@ -211,7 +250,11 @@ function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, a
     ) : null;
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-md flex-col gap-3 px-5 pt-3 pb-4">
+    <main
+      className="mx-auto flex h-dvh w-full max-w-md flex-col gap-3 px-5 pt-3 pb-4"
+      onPointerDownCapture={preloadDeferred}
+      onFocusCapture={preloadDeferred}
+    >
       <h1 className="sr-only">{unlocked ? t.titre.suite : t.titre.apercu}</h1>
       {generatingDays.map((day) => (
         <StatusBanner key={day} kind="generating" message={format(t.generation, { n: day })} className="shrink-0" />
@@ -264,13 +307,22 @@ function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, a
         <DeckEnd variant={endVariant} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
-      <PreferenceSheet
-        prompt={state.prompt}
-        onAnswer={answer}
-        onDismiss={() => dispatch({ type: "dismissPrompt" })}
-        onReturnFocus={returnFocus}
-      />
-      <ProposalDetailSheet proposal={detail} onClose={() => setDetail(null)} onReturnFocus={returnFocus} />
+      {/* Montées seulement à l'ouverture : la fermeture les démonte, et Radix rend le focus (`onReturnFocus`). */}
+      {state.prompt ? (
+        <Suspense fallback={null}>
+          <PreferenceSheet
+            prompt={state.prompt}
+            onAnswer={answer}
+            onDismiss={() => dispatch({ type: "dismissPrompt" })}
+            onReturnFocus={returnFocus}
+          />
+        </Suspense>
+      ) : null}
+      {detail ? (
+        <Suspense fallback={null}>
+          <ProposalDetailSheet proposal={detail} onClose={() => setDetail(null)} onReturnFocus={returnFocus} />
+        </Suspense>
+      ) : null}
     </main>
   );
 }

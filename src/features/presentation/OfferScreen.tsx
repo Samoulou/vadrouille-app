@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AnalyticsProvider, useTrack } from "@/analytics/context";
 import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
-import { Button, DestinationPlate, StatusBanner, iconButtonClassName } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
+import { DestinationPlate } from "@/components/ligne/DestinationPlate";
+import { iconButtonClassName } from "@/components/ligne/IconButton";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { IconRetour } from "@/components/ligne/icons";
 import type { Offer, Trip } from "@/contracts";
 import type { CheckoutFailure, OfferInclusion, PaymentMethod, PriceVariant } from "@/contracts/values";
