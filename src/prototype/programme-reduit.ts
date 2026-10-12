@@ -165,7 +165,7 @@ export const PropositionReduiteSchema = z
   });
 export type PropositionReduite = z.infer<typeof PropositionReduiteSchema>;
 
-const PositionSchema = z.strictObject({
+export const PositionSchema = z.strictObject({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
 });

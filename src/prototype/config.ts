@@ -8,7 +8,7 @@ import { z } from "zod";
  *
  * Les clés `activity`, `meal`, `evening` (types de créneau) et `officielle`, `independante`, `generique`
  * (classes de source) sont celles de `TYPES_CRENEAU` et `CLASSES_SOURCE` de `candidat.ts` : les modules de
- * `src/prototype` sont des feuilles sans import entre eux (décision 0032, A3.2), un test vérifie l'égalité.
+ * `src/prototype` sont des feuilles sans import entre eux (décision 0032, A3.2) ; `config.test.ts` vérifie l'égalité.
  *
  * **Aucun champ ne peut ouvrir un chemin réel** : chaque niveau est strict, une clé inconnue (`mode`, `reel`,
  * `host`, `url`…) fait refuser le fichier. Module pur, n'importe que `zod`.

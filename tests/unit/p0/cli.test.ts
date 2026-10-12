@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
 import dns from "node:dns";
-import { cpSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
@@ -16,6 +16,12 @@ import { CODES_SORTIE, ERREUR_MODE_REEL, principal, type Sorties } from "../../.
 import type { Dossiers } from "../../../scripts/p0/fichiers";
 
 /**
+ * Exemption documentée (revue Sécurité de #180, mineur 8) : ce test importe `node:net`, `node:http`,
+ * `node:https`, `node:tls` et `node:dns` **uniquement pour les espionner** (`vi.spyOn`) et prouver qu'aucune
+ * connexion n'est ouverte pendant `principal()`. Il est hors de `DOSSIERS_P0`, donc hors de la liste
+ * d'autorisation de `imports.test.ts` (dont la règle `node:net` ne couvre que les fichiers de ces dossiers) ;
+ * aucun code du script n'importe un fichier de test.
+ *
  * Commande `pnpm p0` : `--reel` en erreur fermée, validation de `--brief`, aucune clé lue, aucune connexion, et
  * une exécution réelle de la commande dans un sous-processus (décision 0032, A3.4).
  */
@@ -205,20 +211,30 @@ describe("p0: la commande pnpm p0 tourne (sous-processus, environnement sans var
       const valeur = process.env[nom];
       if (valeur !== undefined) env[nom] = valeur;
     }
-    const resultat = spawnSync("pnpm", ["-s", "p0", "--brief", "edimbourg-1"], { cwd: RACINE, env, encoding: "utf8", timeout: 60_000 });
-    expect(resultat.status, resultat.stderr).toBe(0);
-    const codes = resultat.stdout
-      .trim()
-      .split("\n")
-      .map((ligne) => (JSON.parse(ligne) as { code: string }).code);
-    expect(codes).toContain("programme_written");
-    expect(codes).toContain("report_written");
-    const nouveaux = readdirSync(sortiesDir).filter((nom) => !avant.includes(nom));
-    expect(nouveaux.filter((nom) => nom.endsWith(".rapport.json"))).toHaveLength(1);
-    expect(nouveaux.filter((nom) => !nom.endsWith(".rapport.json"))).toHaveLength(1);
-    // Seul avertissement toléré sur la sortie d'erreur : le type de module de package.json (noté dans la PR).
-    const avertissements = resultat.stderr.split("\n").filter((ligne) => /Warning/.test(ligne));
-    for (const ligne of avertissements) expect(ligne).toMatch(/MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning/);
+    const dossierExistait = existsSync(sortiesDir);
+    try {
+      const resultat = spawnSync("pnpm", ["-s", "p0", "--brief", "edimbourg-1"], { cwd: RACINE, env, encoding: "utf8", timeout: 60_000 });
+      expect(resultat.status, resultat.stderr).toBe(0);
+      const codes = resultat.stdout
+        .trim()
+        .split("\n")
+        .map((ligne) => (JSON.parse(ligne) as { code: string }).code);
+      expect(codes).toContain("programme_written");
+      expect(codes).toContain("report_written");
+      const nouveaux = readdirSync(sortiesDir).filter((nom) => !avant.includes(nom));
+      expect(nouveaux.filter((nom) => nom.endsWith(".rapport.json"))).toHaveLength(1);
+      expect(nouveaux.filter((nom) => !nom.endsWith(".rapport.json"))).toHaveLength(1);
+      // Seul avertissement toléré sur la sortie d'erreur : le type de module de package.json (noté dans la PR).
+      const avertissements = resultat.stderr.split("\n").filter((ligne) => /Warning/.test(ligne));
+      for (const ligne of avertissements) expect(ligne).toMatch(/MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning/);
+    } finally {
+      // Nettoyage (revue Sécurité de #180, mineur 8) : les fichiers écrits par ce test sont retirés, pour ne pas
+      // approcher le plafond de 999 sorties par jour et par brief au fil des exécutions locales.
+      if (existsSync(sortiesDir)) {
+        for (const nom of readdirSync(sortiesDir).filter((n) => !avant.includes(n))) rmSync(path.join(sortiesDir, nom), { force: true });
+        if (!dossierExistait && readdirSync(sortiesDir).length === 0) rmSync(sortiesDir, { recursive: true, force: true });
+      }
+    }
   });
 
   it("pnpm p0 --reel : code 2 et real_mode_unavailable", () => {

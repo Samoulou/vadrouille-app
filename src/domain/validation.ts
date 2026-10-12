@@ -31,13 +31,20 @@ export type ContexteValidation = {
   evenementsNonConfirmes: ReadonlySet<string>;
 };
 
-function urlSourceValide(url: string): boolean {
+/**
+ * URL de source (R1) : `https` seulement, sans identifiants, nom d'hôte non vide, 2 048 caractères au plus. Copie
+ * de `urlSourceValide` de `src/prototype/programme-reduit.ts`, que `src/domain` n'a pas le droit d'importer
+ * (décision 0032, A3.2) : `tests/unit/p0/copies.test.ts` vérifie les deux sur une même table.
+ */
+export function urlSourceValide(url: string): boolean {
+  if (url.length > 2048) return false;
+  let valeur: URL;
   try {
-    const valeur = new URL(url);
-    return valeur.protocol === "https:" && valeur.username === "" && valeur.password === "" && url.length <= 2048;
+    valeur = new URL(url);
   } catch {
     return false;
   }
+  return valeur.protocol === "https:" && valeur.username === "" && valeur.password === "" && valeur.hostname !== "";
 }
 
 export function valider(trip: Trip, contexte: ContexteValidation): Violations {

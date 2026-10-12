@@ -12,6 +12,7 @@ import {
   modelesDeLaVariante,
   validerConfiguration,
 } from "./config";
+import { CLASSES_SOURCE, TYPES_CRENEAU } from "./candidat";
 
 const DOSSIER = join(process.cwd(), "prototype", "config");
 const lire = (nom: string): unknown => JSON.parse(readFileSync(join(DOSSIER, `${nom}.json`), "utf8"));
@@ -119,5 +120,14 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const poids = structuredClone(classement) as { poids: Record<string, unknown> };
     poids.poids.mustSee = "25";
     expect(ConfigClassementSchema.safeParse(poids).success).toBe(false);
+  });
+
+  it("les clés de créneau et de classe de source sont celles de candidat.ts (TYPES_CRENEAU, CLASSES_SOURCE)", () => {
+    const trier = (cles: Iterable<string>) => [...cles].sort();
+    expect(trier(Object.keys(ConfigRechercheSchema.shape.ciblesParCreneau.shape))).toEqual(trier(TYPES_CRENEAU));
+    expect(trier(Object.keys(ConfigClassementSchema.shape.poids.shape.source.shape))).toEqual(trier(CLASSES_SOURCE));
+    expect(trier(Object.keys(ConfigClassementSchema.shape.coutTrajetParMinute.shape))).toEqual(
+      trier([...TYPES_CRENEAU, "surprise"]),
+    );
   });
 });

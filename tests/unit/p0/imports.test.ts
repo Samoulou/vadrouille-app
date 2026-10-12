@@ -74,6 +74,16 @@ const IDENTIFIANTS_INTERDITS = new Set([
   "dlopen",
   "net",
   "undici",
+  // Revue Sécurité de #180 (bloquant 1) : chargement d'un module intégré sans import (Node ≥ 22.3), accès à
+  // l'objet global (et donc à `process`, `fetch`… sans les nommer), constructeur de code, réflexion, code
+  // natif et fils d'exécution.
+  "getBuiltinModule",
+  "globalThis",
+  "global",
+  "Function",
+  "Reflect",
+  "WebAssembly",
+  "Worker",
 ]);
 const PROPRIETES_INTERDITES = new Set(["constructor", "connect", "createConnection"]);
 
@@ -96,18 +106,28 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
     }
     if (ts.isCallExpression(noeud) && noeud.expression.kind === ts.SyntaxKind.ImportKeyword) constructions.push("import() dynamique");
     if (ts.isNewExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "Function") constructions.push("new Function");
+    if (ts.isCallExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "Function") constructions.push("Function()");
+    // `const { env } = process`, `const { env: e } = p` : toute déstructuration d'une propriété `env`.
+    if (ts.isBindingElement(noeud)) {
+      const propriete = noeud.propertyName ?? noeud.name;
+      if ((ts.isIdentifier(propriete) || ts.isStringLiteralLike(propriete)) && propriete.text === "env") constructions.push("{ env } déstructuré");
+    }
     if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text)) constructions.push(noeud.text);
     if (ts.isPropertyAccessExpression(noeud)) {
       const nom = noeud.name.text;
       const objet = noeud.expression.getText(sf);
       if (PROPRIETES_INTERDITES.has(nom)) constructions.push(`.${nom}`);
       if (objet === "process" && nom === "env") constructions.push("process.env");
+      else if (nom === "env" && objet !== "import.meta") constructions.push(".env (alias de process)");
       if (objet === "import.meta" && nom === "env") constructions.push("import.meta.env");
       if (objet === "module" && nom === "require") constructions.push("module.require");
     }
     if (ts.isElementAccessExpression(noeud) && ts.isStringLiteralLike(noeud.argumentExpression)) {
       const nom = noeud.argumentExpression.text;
       if (IDENTIFIANTS_INTERDITS.has(nom) || PROPRIETES_INTERDITES.has(nom) || nom === "env") constructions.push(`["${nom}"]`);
+    } else if (ts.isElementAccessExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "process") {
+      // `process[cle]` avec une clé calculée : la propriété atteinte ne peut pas être contrôlée.
+      constructions.push("process[clé calculée]");
     }
     ts.forEachChild(noeud, visiter);
   };
@@ -315,6 +335,20 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["src/ai/client.ts", "new XMLHttpRequest();"],
       ["src/ai/client.ts", "new EventSource('https://exemple.org');"],
       ["src/ai/client.ts", "navigator.sendBeacon('https://exemple.org', '');"],
+      // Revue Sécurité de #180, bloquant 1 : un cas négatif par construction.
+      ["src/ai/client.ts", 'const https = process.getBuiltinModule("node:https");'],
+      ["src/ai/client.ts", 'const https = process["getBuiltinModule"]("node:https");'],
+      ["src/ai/client.ts", "const p = globalThis.process;"],
+      ["src/ai/client.ts", "const p = global.process;"],
+      ["src/ai/client.ts", "const f = Function('return process')();"],
+      ["src/ai/client.ts", "const { env } = process;"],
+      ["src/ai/client.ts", "const { env: e } = process;"],
+      ["src/ai/client.ts", "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"],
+      ["src/ai/client.ts", 'const c = "env";\nconst k = process[c];'],
+      ["src/ai/client.ts", "const k = Reflect.get(process, 'env');"],
+      ["src/ai/client.ts", "const m = await WebAssembly.instantiate(octets);"],
+      ["src/ai/client.ts", "new Worker('data:text/javascript,1');"],
+      ["scripts/p0/cli.ts", "const { env } = process;"],
       ["src/ai/requetes.ts", 'import { ancrer } from "@/grounding/ancrage";'],
       ["src/ai/requetes.ts", 'import type { Ancrage } from "@/prototype/ancrage";'],
       ["src/research/agent.ts", 'import { classer } from "@/domain/classement";'],
