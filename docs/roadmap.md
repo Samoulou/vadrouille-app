@@ -27,4 +27,7 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 11 | F7 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
 
-En phase 0 (périmètre élargi par Samuel le 2026-10-08), le CEO peut engager tout le front F1 à F12 sur données simulées et le handover back-end. Restent interdits avant G0 : comptes et services payants, clés de production, mise en production.
+| 13 | B1, B2, B5 | Socle base de données, évolutions des contrats, moteur sans IA (handover back-end, « Backlog ») | data, backend | voir handover ; B1 : compte Neon créé par Samuel au démarrage (Q24) | Ouvertes (décision 0029) ; en parallèle, sur des fichiers distincts, après P0a1 et P0b1 |
+| 14 | B3, B4, B6 à B12 | Suite de la chaîne MVP : compte, paiement simulé, API, IA et recherche, ancrage, génération, présentation, révision, pendant et après le voyage | backend, ia-recherche | voir handover ; B7 et B8 après P0 | Ouvertes (décision 0029), dans l'ordre des prérequis du handover |
+
+En phase 0, le CEO peut engager tout le front F1 à F12 sur données simulées, le handover back-end et, depuis le 2026-10-12, toute la chaîne MVP B1 à B12 (décision 0029). Restent réservés à Samuel : comptes et services payants, paiement réel et envoi réel d'e-mails, clés de production, mise en production. G0 reste la condition commerciale de passage.
