@@ -7,7 +7,7 @@ Numérotation : 0031 est prise par la PR #172, 0033 par la PR #177, 0035 par la 
 ## Contexte
 La spécification B1 (`specs/B1-socle-base-de-donnees.md`, #185, fusionnée le 2026-10-12) attend quatre décisions du Tech Lead (section « Décisions attendues », B1-TL-1 à B1-TL-4 ; questions Q276 et Q277). La PR de code de B1 (#188) applique les valeurs par défaut de la spécification. La revue consolidée de #188 (2026-10-12, 15:42 UTC) retient ces valeurs et demande qu'elles soient écrites : B1-TL-1 bloque la fusion de #188.
 
-Cette décision retient les propositions de la spécification, en précisant ce qu'il faut pour les tester. Elle ne modifie aucun code. Elle amende le handover back-end § 2, le handover des comptes externes et la décision 0006 sur les noms des variables (B1-TL-3), la décision 0006 et le handover back-end sur Q40 (B1-TL-1), et la décision 0007 sur l'invariant des rôles `vadrouille_fn_*` (B1-TL-2).
+Cette décision retient les propositions de la spécification, en précisant ce qu'il faut pour les tester. Elle ne modifie aucun code. Elle amende le handover back-end § 2, le handover des comptes externes et la décision 0006 sur les noms des variables (B1-TL-3), la décision 0006 et le handover back-end sur Q40 (B1-TL-1), et, sur l'invariant des rôles `vadrouille_fn_*` (B1-TL-2), la décision 0007, la décision 0011, le handover back-end et le handover des comptes externes.
 
 **Argent, comptes, données hors UE** : rien. Aucune dépendance, aucun compte, aucun service. Le réglage « job `db` obligatoire sur `main` » (protection de branche) touche le compte GitHub : il reste à Samuel.
 
@@ -75,6 +75,11 @@ Conséquences :
   - l. 73 (règles communes, point 1) : « sans membre » devient « sans appartenance avec `SET` ni `INHERIT` » ;
   - l. 102 (test `rôles`) : « `vadrouille_migrator` n'est membre que de `vadrouille_owner` après migration » devient « après migration, la seule appartenance de `vadrouille_migrator` avec `SET` est `vadrouille_owner` ; ses autres appartenances sont celles, `ADMIN` seule, aux rôles `vadrouille_fn_*` » ; « les rôles `vadrouille_fn_*` n'ont aucun membre » devient le point 3 de B1-TL-2 ;
   - l. 111 (test `registres`) : « (aucun membre) » devient « (aucune appartenance avec `SET`) ».
+- **Décision 0011** (B1-TL-2), texte amendé en conséquence (sa ligne « Statut » renvoie à cette décision, qui prévaut) :
+  - point 6, rôle `vadrouille_fn_coords` (l. 75) : « `NOLOGIN`, sans membre » devient « `NOLOGIN`, sans appartenance avec `SET` ni `INHERIT` (0036, B1-TL-2) » ;
+  - test `coordonnées: DELETE limité et aucun UPDATE` (l. 103, B8) : « et aucun membre » devient « et sans appartenance avec `SET` ni `INHERIT` (0036, B1-TL-2) », ses seules appartenances admises étant celles, `ADMIN` seule, de `vadrouille_migrator` et du rôle d'amorçage (point 2 de B1-TL-2).
+- **Handover back-end** (B1-TL-2) : § 6, règles communes (l. 450), et tableau des décisions, ligne 0007 (l. 666) : « rôles `vadrouille_fn_*` sans membre » devient « rôles `vadrouille_fn_*` sans appartenance avec `SET` ni `INHERIT` (0036, B1-TL-2) ».
+- **Handover des comptes externes** (B1-TL-2), vérification sur Neon staging : les appartenances et le transfert de propriété ne sont plus « à consigner par B1 dans un amendement de 0007 » ; renvoi à cette décision et à l'amendement de 0007. La vérification sur la base de staging Neon reste à faire.
 - **Décision 0006**, « Conséquences », et **handover back-end**, Q40 : Q40 ne bloque plus `pnpm verify` en local (B1-TL-1, point 6 : `SKIP_DB_TESTS=1` hors CI, la CI fait foi) ; renvoi à cette décision.
 
 ## Hors de cette décision
