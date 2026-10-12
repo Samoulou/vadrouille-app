@@ -13,9 +13,17 @@ export function briefCompletedProperties(brief: Pick<BriefForm, "shown" | "edite
   };
 }
 
-const NUMBER_FORMAT = new Intl.NumberFormat("fr-CH");
+/** Séparateur des milliers suisse (`fr-CH`, CLDR) : espace fine insécable U+202F. */
+export const SEPARATEUR_MILLIERS = "\u202F";
 
-/** Nombre affiché par la création (compteur, budget par repas) : `Intl.NumberFormat("fr-CH")` (handover § 9). */
+/**
+ * Nombre entier affiché par la création (compteur, budget par repas), à la mode suisse (handover § 9) :
+ * « 1 000 », séparateur `SEPARATEUR_MILLIERS`. Formaté sans `Intl.NumberFormat` : son séparateur dépend de
+ * l'ICU embarqué (espace fine ou apostrophe selon la version de Node ou du navigateur), ce qui ferait différer
+ * le rendu serveur et le rendu client (hydratation) et les environnements entre eux. Rendu identique partout.
+ */
 export function formatNombre(value: number): string {
-  return NUMBER_FORMAT.format(value);
+  const entier = Math.trunc(value);
+  const chiffres = String(Math.abs(entier)).replace(/\B(?=(\d{3})+(?!\d))/g, SEPARATEUR_MILLIERS);
+  return entier < 0 ? `\u2212${chiffres}` : chiffres;
 }

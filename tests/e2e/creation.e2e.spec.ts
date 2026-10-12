@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { formatNombre } from "../../src/features/creation/brief-fields";
 import { blockGoogle } from "./carte-helpers";
 import {
   EDIMBOURG,
@@ -23,7 +24,8 @@ import { collectEvents } from "./presentation-helpers";
  * domaines Google bloqués, horloge du navigateur installée au 2026-08-01T08:00 (jamais en temps fixe).
  */
 
-const MILLE = new Intl.NumberFormat("fr-CH").format(1000);
+/** « 1 000 », formaté par la même fonction que l'application (indépendant de l'ICU). */
+const MILLE = formatNombre(1000);
 const R4_LANCER = "/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer";
 
 let googleRequests: string[] = [];

@@ -9,6 +9,7 @@ import { structureBrief } from "@/server/actions/creation";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
+import { formatNombre } from "./brief-fields";
 import { BriefScreen } from "./BriefScreen";
 import { DraftProvider, useDraft } from "./DraftProvider";
 import { initialDraft, type DraftState } from "./draft";
@@ -19,8 +20,8 @@ vi.mock("@/server/actions/creation", () => ({ structureBrief: vi.fn() }));
 
 /** Écran 2 « Brief raconté puis vérifié » (`R2`, F8-PO-4 à F8-PO-7, F8-PO-18). */
 
-/** « 1 000 » au format suisse (`Intl.NumberFormat("fr-CH")`, espace fine insécable). */
-const MILLE = new Intl.NumberFormat("fr-CH").format(1000);
+/** « 1 000 », formaté par la même fonction que l'application (indépendant de l'ICU). */
+const MILLE = formatNombre(1000);
 
 const STORY = "On part à deux, on aime la nature, les dégustations et les bons restaurants.";
 
