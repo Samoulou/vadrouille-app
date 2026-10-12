@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   CategorySchema,
+  ChecklistItemSchema,
   DaySchema,
   MealSchema,
   SegmentSchema,
@@ -25,7 +26,8 @@ import {
  * - `detour` présent sur **chaque** proposition (sa présence ne trahit aucune durée).
  *
  * Module pur, importable par l'application (`src/adapters`, P0b1) : il n'importe que `@/contracts` et `zod`,
- * rien du script (test du graphe d'import, `tests/unit/p0/imports.test.ts`). P0b1 l'importe tel quel.
+ * rien du script (décision 0032, A3.2 ; le test du graphe d'import arrive avec la seconde PR de P0a1). P0b1
+ * l'importe tel quel.
  */
 
 /** Organisation fictive du prototype (décision 0032, A4.1). */
@@ -66,7 +68,8 @@ const SourceReduiteSchema = z.strictObject({
   url: z.string().refine(urlSourceValide, "URL de source https, sans identifiants, 2 048 caractères au plus"),
 });
 
-export const StopReduitSchema = StopSchema.omit({ verifiedAt: true, exceptions: true }).extend({
+/** Étape sans `verifiedAt` ni `commitment` : le prototype n'enregistre aucun billet ni aucune réservation. */
+export const StopReduitSchema = StopSchema.omit({ verifiedAt: true, exceptions: true, commitment: true }).extend({
   placeId: PlaceIdSchema.optional(),
   name: texte(LONGUEURS.nom),
   meta: z.string().max(LONGUEURS.meta),
@@ -116,10 +119,18 @@ export const JourReduitSchema = DaySchema.omit({ travelMinutes: true, items: tru
 });
 export type JourReduit = z.infer<typeof JourReduitSchema>;
 
-export const VoyageReduitSchema = TripSchema.omit({ days: true, organizationId: true, id: true, unlocked: true }).extend({
+export const VoyageReduitSchema = TripSchema.omit({
+  days: true,
+  organizationId: true,
+  id: true,
+  unlocked: true,
+  checklist: true,
+}).extend({
   id: z.string().regex(TRIP_ID_PATTERN, "identifiant de voyage conforme à TRIP_ID_PATTERN"),
   organizationId: z.literal(PROTOTYPE_ORG_ID),
   days: z.array(JourReduitSchema).min(1),
+  /** Le prototype ne produit aucune liste de préparatifs (donc aucun `bookingUrl`). */
+  checklist: z.array(ChecklistItemSchema).max(0),
   /** Tout le séjour est parcourable (spécification, « Sortie 1 »). */
   unlocked: z.literal(true),
 });
@@ -128,7 +139,7 @@ export type VoyageReduit = z.infer<typeof VoyageReduitSchema>;
 /**
  * Proposition sans `travelFromPrevious.minutes`, sans `photoUrl`, avec `detour` obligatoire. Recopiée champ par
  * champ de `ProposalSchema` (qui porte des raffinements, donc pas de `.omit`) ; le test vérifie que ses clés
- * restent un sous-ensemble de celles du contrat.
+ * restent un sous-ensemble de celles du contrat. `stop.commitment` est refusé par `StopReduitSchema`.
  */
 export const PropositionReduiteSchema = z
   .strictObject({
@@ -153,15 +164,6 @@ export const PropositionReduiteSchema = z
     travelFromPrevious: SegmentReduitSchema.optional(),
     /** Justification maison de l'intérêt du lieu, sur chaque proposition (spécification, « Proposal.detour »). */
     detour: texte(LONGUEURS.detour),
-  })
-  .superRefine((proposition, ctx) => {
-    if (proposition.stop.commitment !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        message: "une proposition n'est jamais un engagement (stop.commitment interdit)",
-        path: ["stop", "commitment"],
-      });
-    }
   });
 export type PropositionReduite = z.infer<typeof PropositionReduiteSchema>;
 
@@ -169,6 +171,14 @@ const PositionSchema = z.strictObject({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
 });
+
+/** Table `positions` : Zod 4 ignore en silence une clé propre `__proto__` d'un enregistrement ; elle est refusée avant. */
+const PositionsSchema = z
+  .unknown()
+  .refine((valeur) => typeof valeur !== "object" || valeur === null || !Object.hasOwn(valeur, "__proto__"), {
+    message: "clé __proto__ refusée",
+  })
+  .pipe(z.record(PlaceIdSchema, PositionSchema));
 
 export const TerminusReduitSchema = z.strictObject({
   jour: z.number().int().positive(),
@@ -205,7 +215,7 @@ export const ProgrammeReduitSchema = z
     trip: VoyageReduitSchema,
     /** Les 8 propositions de la présentation (cadrage § 4), au plus. */
     proposals: z.array(PropositionReduiteSchema).max(8),
-    positions: z.record(PlaceIdSchema, PositionSchema),
+    positions: PositionsSchema,
     terminus: z.array(TerminusReduitSchema),
   })
   .superRefine((programme, ctx) => {
@@ -218,12 +228,15 @@ export const ProgrammeReduitSchema = z
       }
     }
     for (const placeId of attendus) {
-      if (!(placeId in programme.positions)) {
+      if (!Object.hasOwn(programme.positions, placeId)) {
         ctx.addIssue({ code: "custom", message: "lieu du programme sans position", path: ["positions"] });
         break;
       }
     }
     const jours = programme.trip.days.map((jour) => jour.index);
+    if (new Set(jours).size !== jours.length) {
+      ctx.addIssue({ code: "custom", message: "indices de jour en double", path: ["trip", "days"] });
+    }
     const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
     if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus[index] !== jour)) {
       ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
