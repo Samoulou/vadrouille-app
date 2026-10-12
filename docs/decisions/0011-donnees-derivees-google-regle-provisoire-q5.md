@@ -31,7 +31,7 @@ L'énumération `GroundingVerdict` (type serveur de `src/grounding`, jamais expo
 
 Les trois verdicts sont exclusifs et couvrent tous les cas. **Aucun n'est conservé** : ni colonne, ni champ d'instantané, ni état de workflow, ni journal. Le motif d'un écart (introuvable, hors zone, fermé) n'est écrit nulle part.
 
-**Seule trace durable de l'ancrage : le `placeId`.** L'étape d'ancrage écrit `candidates.place_id` pour un candidat `compatible`, et rien pour les autres. Un candidat sans `placeId` peut donc être non résolu, hors zone ou fermé : le motif n'est pas recouvrable. C'est l'application directe de « seul l'identifiant de lieu stocké » (point soumis à Samuel S1).
+**Seule trace durable de l'ancrage : le `placeId`.** L'étape d'ancrage écrit `candidates.place_id` pour un candidat `compatible`, et rien pour les autres. Un candidat sans `placeId` peut donc être non résolu, hors zone ou fermé : le motif n'est pas recouvrable. C'est l'application directe de « seul l'identifiant de lieu stocké » (point S1, jugé acceptable par Samuel le 2026-10-12).
 
 **Revérification.** Un candidat réutilisé plus tard (réserve, recalcul par lot, révision unitaire, workflow 4) est **ré-ancré** dans l'étape qui l'utilise (résolution « IDs only », puis Place Details avec le seul champ de statut) : le verdict est recalculé, jamais relu. Un `placeId` présent ne vaut pas verdict.
 
@@ -103,7 +103,7 @@ Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover).
 - `ancrage: un candidat réutilisé est ré-ancré` (B9) : le client Places simulé est rappelé pour un candidat de la réserve qui a déjà un `placeId`.
 
 ## Points soumis à Samuel (validation juridique de Q5)
-- **S1** : un candidat sans `placeId` laisse savoir qu'il n'a pas été ancré, sans motif. La décision considère que seul le `placeId` est stocké ; si Samuel juge que cette absence est déjà une donnée dérivée, l'étape c n'écrit plus rien et l'étape e ré-ancre tous les candidats (coût : appels « IDs only » supplémentaires).
+- **S1** : **Répondu par Samuel le 2026-10-12 (fil « Finalisation B0 sur Q5 », 10:38 CEST) : acceptable** ; la règle ci-dessous s'applique. Un candidat sans `placeId` laisse savoir qu'il n'a pas été ancré, sans motif. La décision considère que seul le `placeId` est stocké ; si Samuel juge que cette absence est déjà une donnée dérivée, l'étape c n'écrit plus rien et l'étape e ré-ancre tous les candidats (coût : appels « IDs only » supplémentaires).
 - **S2** : 0027 point 1.3 fait noter par le Decider les seuls candidats ancrés ; la spec P0 (#149, contrainte 7) retenait l'ordre inverse (le modèle note tout, le code écarte ensuite), pour que l'ensemble présenté au modèle ne trahisse pas un verdict. Cette décision suit 0027, décision de Samuel, et ne tranche pas l'écart avec P0.
 - **S3** : `CLAUDE.md` interdit encore de « stocker autre chose que l'identifiant d'un lieu Google », sans l'exception de 30 jours pour les coordonnées que la règle provisoire admet. La modification des règles du studio est réservée à Samuel : le cache du point 6 n'est créé par B8 qu'une fois `CLAUDE.md` aligné.
 
@@ -113,4 +113,4 @@ Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover).
 - B8 et B9 peuvent être spécifiés sans attendre la validation juridique formelle de Q5 ; ils restent soumis à leurs autres prérequis (G0, Q3, Q45, P0-Q9).
 
 ## Quand revoir cette décision
-À la validation juridique formelle de Q5 (Samuel), à la réponse sur S1 à S3, ou si la mesure comparée des variantes A et B change le pipeline (0027).
+À la validation juridique formelle de Q5 (Samuel), à la réponse sur S2 et S3, ou si la mesure comparée des variantes A et B change le pipeline (0027).
