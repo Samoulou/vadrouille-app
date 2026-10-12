@@ -1,73 +1,47 @@
-# État du studio — 2026-10-08 (5e cycle)
+# État du studio — 2026-10-12 (35e cycle)
 
-Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31, appliquée par #16)
+Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
+
+## Messages de Samuel traités (#studio)
+- Aucun nouveau message depuis le 34e cycle (2026-10-12 02:43 CEST).
 
 ## Fait
-- **Consignes de Samuel du 16:31 et du 16:33 (S2, PR #16, ticket #13) : fusionnée.**
-  - `docs/CONTEXT.md` : cycle de 3 h, 3 tâches, verrou `in-progress`, périmètre de phase 0 élargi (F1 à F12 sur données simulées, handover back-end) ; restent interdits avant G0 les comptes et services payants, les clés de production et la mise en production.
-  - `docs/roadmap.md` : statuts et périmètre à jour.
-  - `.github/pull_request_template.md` : `Closes #<numéro>` en tête (« Refs # » si la PR ne termine pas la tâche : ajout du CEO).
-  - `docs/studio/mise-en-place.md` et ADR 0001 (section « Évolution ») alignés.
-  - Deux corrections sur les revues Tech Lead. Source de la clause « in-progress retiré à l'ouverture de la PR », que la revue jugeait non vérifiable : le prompt de la routine du CEO enregistré par Samuel, étape 3, texte exact : « Pose in-progress sur leur ticket dès que tu les prends. […] Retire in-progress quand la PR est ouverte. » Voir Q23.
-- **Tickets #8 (F1) et #9 (S1)** : déjà fermés ; commentaire de renvoi vers #11 et #10 ajouté (consigne du 16:33).
-- **Spec B0 — handover back-end (ticket #15, reste ouvert pour la rédaction du handover) : prête et fusionnée.**
-  - `specs/B0-handover-backend.md` : #17, puis deux suites de revue (#18 et #20). Les deux revues R2 de #20 sont conformes.
-  - Leurs remarques non bloquantes sont à reprendre lors de la rédaction du handover : sens des verdicts, durées Routes API dans l'état des workflows, critères PO-2 et PO-6, historique de revue à retirer de PO-1.
-  - Décisions du Product Owner, définitives sans veto de Samuel avant le 2026-10-10 :
-    - PO-1 (Q8) : budget de trajet de 60, 90 ou 150 min ; réduction d'un quart arrondie vers le bas à 5 min ; plancher retiré ;
-    - PO-2 (Q22) ;
-    - PO-3 à PO-7 ;
-    - verdicts d'ancrage limités à une énumération ;
-    - extension signalée du test de sortie § 9.
-  - Questions nouvelles : Q24 à Q29.
+- **Fusionnées depuis le 34e cycle** : **T14 (#136)**, présentation R6 à 180 958 o, `knownExceedance` retiré, Q208 fiabilisée ; **T7 (#135)**, port Playwright par worktree. T7 a été mise à jour avec `main` (sa CI avait échoué sur le test instable Q208, corrigé par T14), puis relancée en revue (Q220).
+- Tickets fermés : #132 (T14), #133 (T16). Tickets créés : #138 (F2c), #139 (F12b), #140 à #142 (F10a, F10b, F10c : découpage de la spec F10).
+- **Ordre (CEO)** : F12b passe avant F7a et F11a, comme le prévoit la spec F12 (« avant F7 à F11 »). Ces deux tâches partagent `TripShell.tsx`, `fr.json` et `tests/e2e/routes.ts` avec F12b ou entre elles, et attendent donc sa fusion.
 
 ## En cours
-- **F2 — Composants de base (PR #19, ticket #14).**
-  - Les 8 composants, `/dev/composants`, les tests unitaires, a11y, e2e et de contraste sont livrés ; `docker` est vert depuis la 1re correction (`tsconfig.build.json`).
-  - Décisions du Tech Lead (ADR 0005) : `@radix-ui/react-slot` 1.4.0, `axe-core` 4.13.0, tokens Ligne dans `cn()`, `tsconfig.build.json`.
-  - 1re correction :
-    - `docker` est réparé par `tsconfig.build.json` ;
-    - l'ADR 0005 est ajoutée ;
-    - la référence `dev-composants.png` vient maintenant de l'artefact CI : cette fois, le téléchargement n'a pas reçu de 403.
-  - `verify` et `docker` sont verts. `needs-review` est reposé : la revue R2 est relancée.
+- **F2c (ticket #138, PR #143)** : écarts à 0012, points 2 à 4 (`StatusBanner` `conflict` en `role="alert"`, filet `generating` sans animation ; `Chip` coche de 20 px, chip déduite sans aplat, chip indisponible sans contour ; `OtpInput` invalide avec `aria-invalid` et `aria-describedby`). Correction 1 faite : une seule capture changée (`presentation-question.png`, reprise de la CI, Q232), CI verte, de nouveau en revue.
+- **F12b (ticket #139, PR #144)** : grand écran du voyage (carte à gauche, panneau de 420 px dès 1024 px, bascule sans perte d'état, recentrage tiré du conteneur). Correction 1 faite (références 1280 × 800, toast sous le contenu du panneau), CI verte, de nouveau en revue. Budgets : R11 185 177 o, R12 185 447 o, R6 inchangée (seuil 200 000 o).
+- `pnpm verify` en local : vert sauf les captures visuelles (polices, décision 0004). La CI fait foi.
 
 ## Bloqué
-- F3 : attend F2 (#19).
-- P0 : attend Q9 (clé Gemini) et la clé serveur Places/Routes.
-- F4 : attend F3.
-- Références visuelles : tant que l'ADR 0004 n'est pas implémenté, chaque nouvelle capture se télécharge à la main depuis l'artefact `test-results` de la CI. Ce cycle, le téléchargement a fonctionné. Localement, les tests visuels échouent toujours à cause des glyphes : seule la CI fait foi.
-
-## Décisions attendues de Samuel
-- Q5 et Q6 : juridique (règles Google, photos). Q29 (verdicts d'ancrage dérivés de Google) suit Q5.
-- Q9 : clé Gemini (dépense).
-- Q12 : export des maquettes.
-- Q23 : moment du retrait du verrou `in-progress`.
-- Q24 à Q27 : Postgres UE, envoi des codes, Stripe test avec TWINT, durées de conservation.
-- Configuration de la routine R1 sur claude.ai : intervalle de 3 h et prompt de l'annexe B de `docs/studio/mise-en-place.md` (à faire par Samuel).
-- Veto possible avant le 2026-10-10 sur les décisions déléguées :
-  - CEO : ticket référencé par une PR ouverte = en revue, non repris (ADR 0001, « Évolution ») ;
-  - Product Owner : PO-1 à PO-7 de la spec B0 ;
-  - Tech Lead : ADR 0005 (dépendances F2, typage du build), si #19 est fusionnée.
-
-## Constat sur le processus
-- La routine R2 (revue) se déclenche à chaque pose de `needs-review`. Ce cycle, le CEO a aussi lancé des revues Tech Lead dans sa session. Résultat : la fusion automatique part dès la première approbation et R2 publie ensuite des demandes de changements sur des PR déjà fusionnées (#17, #18). Désormais, le CEO laisse la revue à R2 seule.
+- **B0, partie Q5 (#27)** : attend **Q5** (juridique) ; à rebaser sur `main` (seulement la partie Q5 et 0011) quand Q5 avance.
+- **P0** : attend la clé serveur Places/Routes (Q103).
 
 ## Prochain cycle
-1. F2 (#19) : suivre la revue R2 (2e et dernière tentative de correction si besoin), puis F3 dès que F2 est fusionnée.
-2. Rédaction du handover B0 (`docs/handovers/backend.md`, Product Owner et Tech Lead), avec les remarques non bloquantes des revues de #20.
-3. Décisions déléguées à UX/UI (Q10, Q11, Q13, Q15 à Q19, Q30), qui débloquent la validation de F2 et F3 ; ADR 0004 tranché et implémenté par le Tech Lead.
-4. Roadmap : prérequis de B0 « — » à remplacer par « F1 » (écart signalé dans #18 et #20).
+1. Suivre #143 (F2c) et #144 (F12b) ; reposer `needs-review` après toute correction (Q220).
+2. T17 : workflow `visual-update.yml` de la décision 0004 (Q232).
+3. Après la fusion de F12b : F11a (crée `/voyages`, Q207), puis F7a ; F8a après F2c (Q221). F10a (#140) après F12b. Tâche des points 1 et 5 de 0012 (`DayBadge`, échelle d'espacement, avec Q230).
+
+## Décisions attendues de Samuel
+- **Q214** (sous Q45) : plafond global des écrans 2 et 3 épuisable par environ 50 adresses. Ne bloque pas la phase 0.
+- **Après le déploiement de `main`** : vérifier la carte du jour 1 sur https://vadrouille-app-ten.vercel.app/voyages/mock_trip_edimbourg_debloque/jour/1 (bug #106 corrigé).
+- **À faire à la main** (T10, #108) : coller le texte de 0023 § 1 dans la routine Revue (Q120) ; coller le prompt R3 ; créer les libellés `sev:1` et `sev:3` (Q184) ; accès Vercel des routines (liste des déploiements en 403).
+- **Rappelées** : Q48, Q27, Q129 (B0a).
+- **Toujours ouvertes** :
+  - F10 : Q186, Q187, Q188 ;
+  - Ligne et juridique : Q194, Q197 ;
+  - juridique : Q5, Q6, Q29, Q34, Q38, Q44, Q46 à Q48, Q75, Q127, Q150 (durées) ;
+  - argent et comptes : Q24 à Q26, Q39, Q45, Q56, Q84, Q103, Q129 ;
+  - offre : Q57, Q63, Q67, Q76, Q78, Q88 à Q90, Q128, Q133, Q135, Q149 ;
+  - documents et environnement : Q12, Q27, Q59, Q40, Q101 ;
+  - Ligne : Q19 (avec Q226), Q37, Q108, Q130 ;
+  - règles : Q23.
+- **Veto possible** :
+  - avant le 2026-10-14 : **décision 0025 (#134)** (Q223, Q224) ;
+  - avant le 2026-10-13 : décisions 0017, 0019, 0023, **0024 (#125)**, écarts de F9a et de F5b, Q182, F10-PO-1 à F10-PO-22 et Q185, décision 0012, F7-PO-20 et F7-PO-21, **F8-PO-18 à F8-PO-22 (#126)**.
 
 ## Part d'usage estimée
-- 5e cycle du 2026-10-08 : environ 1 400 000 jetons.
-
-| Poste | Jetons |
-|---|---|
-| F2 et sa correction | ≈ 260 000 |
-| Spec B0 et 2 suites | ≈ 270 000 |
-| S2 et 2 corrections | ≈ 170 000 |
-| Revues Tech Lead (session) | ≈ 410 000 |
-| Pilotage | ≈ 250 000 |
-
-- Cumul de la journée : environ 2 700 000 jetons.
-- Part de l'abonnement : non mesurable depuis la routine.
+- 35e cycle : environ 0,8 million de jetons (estimation), avec 2 sous-agents et 2 corrections : 1 PR fusionnée (#135), 2 PR ouvertes (#143, #144).
+- Part de l'abonnement : impossible à mesurer depuis la routine.

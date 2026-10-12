@@ -8,9 +8,12 @@ import { describe, expect, it } from "vitest";
  */
 const eslint = new ESLint({ cwd: process.cwd() });
 
+// T4 (0016 § 3.1 règle 4) : dans src/features, l'interdit passe par la variante typescript-eslint de la règle.
+const RULES = ["no-restricted-imports", "@typescript-eslint/no-restricted-imports"];
+
 async function restrictedImports(code: string, filePath: string) {
   const [result] = await eslint.lintText(code, { filePath });
-  return result?.messages.filter((m) => m.ruleId === "no-restricted-imports") ?? [];
+  return result?.messages.filter((m) => m.ruleId !== null && RULES.includes(m.ruleId)) ?? [];
 }
 
 const aliasImport = `import { edimbourg } from "@/mocks/edimbourg";\nexport const trip = edimbourg;\n`;

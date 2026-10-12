@@ -51,9 +51,9 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | Styles | Tailwind CSS v4, tokens dans `@theme` | Aucune valeur arbitraire `[#hex]` |
 | Composants de base | shadcn/ui, adaptés à Ligne | Utiliser le serveur MCP et les skills shadcn si disponibles |
 | Police | Hanken Grotesk 400, 600, 700, 800 via `next/font/google` | Chiffres tabulaires pour heures, dates, montants |
-| Carte | Google Maps JavaScript API, bibliothèque React officielle `@vis.gl/react-google-maps` | Map ID avec style cloud (§ 8) |
-| Gestes | `motion` (ex-Framer Motion) pour le glisser des cartes de présentation | Ou équivalent maintenu |
-| Panneau coulissant | Drawer de shadcn/ui avec points d'arrêt | Vérifier que la dépendance sous-jacente est maintenue, sinon `motion` |
+| Carte | Google Maps JavaScript API, chargée par `@googlemaps/js-api-loader` (chargeur officiel de Google) ; types `@types/google.maps` | Map ID avec style cloud (§ 8). `@vis.gl/react-google-maps` non retenue : décision 0013 |
+| Gestes | Pointer Events natifs pour le glisser des cartes de présentation (seuils et rotation en fonctions pures) | `motion` non retenu pour F6 : décision 0013 |
+| Panneau coulissant | `Sheet` de Ligne sur les Pointer Events natifs, points d'arrêt en fonctions pures (`sheet-model.ts`), transition CSS | Drawer de shadcn/ui (`vaul`, non maintenu) et `motion` non retenus : décision 0015 § 5 |
 | Validation | Zod, schémas partagés avec le back-end | `src/contracts` |
 | Données serveur | Server Actions et route handlers derrière des adaptateurs | Mocks au MVP front |
 | Tests | Vitest, Testing Library, Playwright, axe | § 14 |
@@ -62,7 +62,9 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | PWA | Manifest + service worker | Hors-ligne du § 13 |
 | Hébergement | Vercel ; portabilité préservée : `output: "standalone"`, `Dockerfile` construit en CI, aucun stockage propre à Vercel (KV, Edge Config) | Décision 0002 |
 
-Versions : dernière version stable de chaque outil au démarrage, notée dans `docs/decisions/0001-versions.md`. L'agent vérifie la documentation officielle avant d'utiliser une API qu'il ne connaît pas avec certitude.
+*Note (2026-10-11), ligne « PWA » : au MVP, le manifeste et un service worker qui ne sert que la page de repli hors ligne et ses ressources statiques, sans donnée du voyage ; le hors-ligne complet du § 13 est reporté « Après le MVP » (Q137, Q139) : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
+
+Versions : dernière version stable de chaque outil au démarrage, notée dans `docs/decisions/0003-versions.md`. L'agent vérifie la documentation officielle avant d'utiliser une API qu'il ne connaît pas avec certitude.
 
 ---
 
@@ -264,6 +266,8 @@ Numéros = titres des écrans sur la page « Direction Ligne ». « W » = écra
 | W | États | composants transverses | `StatusBanner` | — |
 | W | Vue partagée | `/p/[token]` | lecture seule de 11 et 12 | `SharedTrip` |
 
+*Note (2026-10-11), ligne 15, colonne « Données » : le contrat `Today` n'est pas créé ; l'écran 15 reçoit les jours du voyage projetés et calcule le jour courant dans le navigateur (proposition F10-TL-2, soumise au Tech Lead) : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
+
 **Règles de navigation** (Dossier UX, architecture de l'information) : retour toujours vers le niveau supérieur ; un voyage rouvre sur le dernier onglet consulté, et sur `/aujourdhui` aux dates du voyage ; la fiche se ferme sur l'arrêt d'origine ; l'email « propositions prêtes » ouvre la présentation à la dernière carte vue.
 
 **Mise en page grand écran (non maquettée) :** à partir de 1024 px, carte à gauche (flexible) et panneau de 420 px à droite, sans feuille coulissante. Implémenter, capturer, signaler dans la PR.
@@ -277,6 +281,7 @@ Numéros = titres des écrans sur la page « Direction Ligne ». « W » = écra
 - **14 :** raisons proposées dans cet ordre : Pas mon style, Trop chargé, Trop cher, Trop loin, Autre raison ; réponse depuis la réserve < 5 s avec squelette ; au-delà, message « On cherche autour de … » avec « Arrêter » ; après « Appliquer », retour à la journée, étapes modifiées surlignées 2 s, `UndoToast` « Modifié. Annuler ».
 - **Déplacer :** toujours disponible sans glisser ; jours complets désactivés avec la mention « complet ».
 - **15 :** « Enregistré pour le hors-ligne à HH:MM » visible ; liste utilisable sans réseau.
+  *Note (2026-10-11) : critère reporté « Après le MVP » par la décision de Samuel (Q137, Q139). Au MVP, l'écran 15 a le bandeau hors ligne de l'écran ouvert et la page de repli, sans copie du programme sur l'appareil : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 
 ---
 
@@ -297,7 +302,7 @@ Numéros = titres des écrans sur la page « Direction Ligne ». « W » = écra
 
 ## 8. Carte (Google Maps)
 
-- `@vis.gl/react-google-maps`, carte vectorielle avec **Map ID** et style cloud selon la section Carte du design system : terre `map-land`, eau `map-water`, parcs `map-park`, routes blanches de toutes catégories, points d'intérêt Google masqués, lignes de transport masquées, libellés en gris.
+- Carte vectorielle chargée par `@googlemaps/js-api-loader` (décision 0013), avec **Map ID** et style cloud selon la section Carte du design system : terre `map-land`, eau `map-water`, parcs `map-park`, routes blanches de toutes catégories, points d'intérêt Google masqués, lignes de transport masquées, libellés en gris.
 - Marqueurs avancés en HTML : `StopMarker` numérotés, terminus carré, arrêt sélectionné 38 px plein `line`.
 - Tracé du jour : polyligne `line` 4 px, extrémités arrondies ; retour à pied vers l'hôtel en pointillé.
 - **Conformité :** les données de lieux Google (noms, horaires, notes) ne s'affichent que sur cette carte ou, sans carte, avec la mention « Données de lieux : Google ». Aucune autre carte n'affiche ces données.
@@ -453,8 +458,10 @@ Noms en `snake_case`, propriétés sans donnée personnelle. Ils alimentent les 
 ## 13. Hors-ligne (PWA)
 
 - Mise en cache des données du programme du jour et du lendemain (données produites par nous), des polices et de l'interface.
+  *Note (2026-10-11) : au MVP, seules l'interface de la page de repli et les polices de l'application sont mises en cache, sans aucune donnée du programme ; la copie du programme est reportée « Après le MVP » (Q137, Q139) : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 - Pas de mise en cache des contenus ou tuiles Google (§ 8).
 - Indicateur « Enregistré pour le hors-ligne à HH:MM » sur `/aujourdhui` ; `StatusBanner offline` quand le réseau manque.
+  *Note (2026-10-11) : l'indicateur est reporté « Après le MVP » avec la copie du programme (Q137, Q139) ; le `StatusBanner offline` reste au MVP : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 - Les actions qui demandent le réseau (remplacer, ajouter) sont désactivées hors ligne avec une explication.
 
 ---
@@ -483,7 +490,7 @@ pnpm test:visual    # captures comparées à tests/visual
 
 **Budgets :** Lighthouse mobile ≥ 90 en performance et 100 en accessibilité sur `/voyages/[id]` avec données simulées ; JavaScript initial de la route Journée < 200 Ko compressé hors carte.
 
-**Scénarios Playwright** (reprennent le plan de test du Dossier UX) : créer un voyage sans hôtel ; corriger le brief ; trier en écartant deux musées et répondre à la question ; débloquer ; remplacer Dean Village sans toucher au dîner ; trouver la liste à réserver ; trouver la prochaine étape le jour J, y compris hors ligne.
+**Scénarios Playwright** (reprennent le plan de test du Dossier UX) : créer un voyage sans hôtel ; corriger le brief ; trier en écartant deux musées et répondre à la question ; débloquer ; remplacer Dean Village sans toucher au dîner ; trouver la liste à réserver ; trouver la prochaine étape le jour J, y compris hors ligne. *Note (2026-10-11) : la partie « hors ligne » de ce scénario (ouverture sans réseau) est reportée « Après le MVP » (Q137, Q139) ; au MVP, seul le réseau perdu écran ouvert est testé : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 
 ---
 
@@ -506,6 +513,8 @@ Chaque tâche est indépendante une fois ses prérequis terminés. Taille visée
 | F10 | Pendant le voyage (15), hors-ligne PWA, vue partagée `/p/[token]` | F5 | Scénario jour J hors ligne ; aucun cache Google |
 | F11 | Mes voyages, Après le voyage, états transverses (wireframes en Ligne) | F5 | Captures soumises à validation |
 | F12 | Passe accessibilité, performance et grand écran (≥ 1024 px) | F5 à F11 | Budgets du § 14 atteints |
+
+*Note (2026-10-11), ligne F10 : au MVP, « Scénario jour J hors ligne » se lit comme le scénario jour J en ligne, le réseau perdu écran ouvert et la page de repli ; l'ouverture de l'écran sans réseau est reportée « Après le MVP » (Q137, Q139) ; « aucun cache Google » reste entier : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 
 ---
 

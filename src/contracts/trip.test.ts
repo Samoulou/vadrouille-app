@@ -22,7 +22,7 @@ import {
   type Weekday,
 } from "./index";
 
-// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId) ---
+// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise, + Stop.commitment, + DayLineItem openMeal : décision 0015) ---
 type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "dim.";
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
@@ -39,13 +39,17 @@ interface HandoverStop {
   verifiedAt?: string;
   exceptions: HandoverException[];
   locked: boolean;
+  /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
+  commitment?: "ticket" | "reservation";
 }
 interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number; estimated: boolean }
 type HandoverDayLineItem =
   | { type: "terminus"; role: "start" | "end"; time: string; label: string }
   | { type: "stop"; stop: HandoverStop }
   | { type: "segment"; segment: HandoverSegment }
-  | { type: "free"; from: string; to: string };
+  | { type: "free"; from: string; to: string }
+  /** Ajout signalé (décision 0015, § 2) : créneau de repas pas encore choisi. */
+  | { type: "openMeal"; time: string; meal: "lunch" | "dinner" };
 interface HandoverDay {
   index: number;
   date: string;
@@ -57,6 +61,18 @@ interface HandoverDay {
   generating: boolean;
   travelMinutes: number;
   travelBudgetMinutes: number;
+  /** Ajout signalé (décision 0015, § 3), comme Trip.organizationId. */
+  surprise?: HandoverSurpriseIdea;
+}
+/** Ajout signalé (décision 0015, § 3) : idée « Surprends-moi », hors handover § 9. */
+interface HandoverSurpriseIdea {
+  id: string;
+  placeId?: string;
+  name: string;
+  meta: string;
+  reason: string;
+  source: HandoverSource;
+  verifiedAt?: string;
 }
 interface HandoverChecklistItem { id: string; label: string; when: string; done: boolean; bookingUrl?: string; sponsored: boolean }
 interface HandoverTrip {
@@ -76,6 +92,8 @@ interface HandoverProposal {
   day: number; weekday: HandoverWeekday; time: string;
   context: string;
   stop: HandoverStop;
+  /** Ajout signalé (décision 0013, § 3.1), comme Trip.organizationId. */
+  category: "museum" | "walk" | "nature" | "tasting" | "restaurant";
   option?: { index: number; total: number };
   photoUrl?: string;
   travelFromPrevious?: HandoverSegment;
@@ -108,6 +126,7 @@ const validProposal: Proposal = {
   time: "10:45",
   context: "[Entre ton déjeuner et [Distillerie]]",
   stop: validStop,
+  category: "museum",
 };
 
 describe("types exportés", () => {
@@ -125,7 +144,7 @@ describe("types exportés", () => {
     expectTypeOf<Change>().toEqualTypeOf<z.infer<typeof ChangeSchema>>();
   });
 
-  it("ont exactement les champs du handover § 9 (plus Trip.organizationId)", () => {
+  it("ont exactement les champs du handover § 9 (plus Trip.organizationId et Proposal.category)", () => {
     expectTypeOf<Weekday>().toEqualTypeOf<HandoverWeekday>();
     expectTypeOf<Exception>().toEqualTypeOf<HandoverException>();
     expectTypeOf<Source>().toEqualTypeOf<HandoverSource>();
@@ -152,9 +171,50 @@ describe("types exportés", () => {
       "ChecklistItemSchema",
       "ProposalSchema",
       "ChangeSchema",
+      "CategorySchema",
+      "PreferencePromptSchema",
+      "PreferenceAnswerSchema",
+      "PreferenceReasonSchema",
+      "SurpriseIdeaSchema",
+      "CommitmentSchema",
+      "MealSchema",
     ]) {
       expect(contracts).toHaveProperty(name);
     }
+  });
+});
+
+describe("SurpriseIdeaSchema (décision 0015, § 3)", () => {
+  const idea = {
+    id: "idee-1",
+    name: "[Idée]",
+    meta: "[1 h, gratuit]",
+    reason: "[Tu as choisi les balades]",
+    source: { label: "[Source]", url: "https://example.org/mock/idee" },
+  };
+
+  it("accepte une idée avec justification et source", () => {
+    expect(contracts.SurpriseIdeaSchema.safeParse(idea).success).toBe(true);
+    expect(contracts.SurpriseIdeaSchema.safeParse({ ...idea, placeId: "mock_place", verifiedAt: "2026-08-15" }).success).toBe(true);
+  });
+
+  it.each(["reason", "source"])("refuse une idée sans %s", (key) => {
+    const without: Record<string, unknown> = { ...idea };
+    delete without[key];
+    expect(contracts.SurpriseIdeaSchema.safeParse(without).success).toBe(false);
+  });
+
+  it.each([
+    ["start", "10:00"],
+    ["locked", false],
+    ["rating", 4.5],
+    ["location", { lat: 55.95, lng: -3.19 }],
+  ])("refuse le champ inconnu %s", (key, value) => {
+    expect(contracts.SurpriseIdeaSchema.safeParse({ ...idea, [key]: value }).success).toBe(false);
+  });
+
+  it("est facultative sur Day", () => {
+    expect(DaySchema.shape.surprise.safeParse(undefined).success).toBe(true);
   });
 });
 
@@ -202,6 +262,30 @@ describe("StopSchema", () => {
   it("refuse une source dont l'URL est invalide", () => {
     const stop = { ...validStop, source: { label: "[Source]", url: "pas une url" } };
     expect(StopSchema.safeParse(stop).success).toBe(false);
+  });
+
+  it("commitment (décision 0015 § 9) : facultatif, « ticket » ou « reservation », indépendant du verrou", () => {
+    expect(StopSchema.safeParse({ ...validStop, commitment: "ticket", locked: true }).success).toBe(true);
+    expect(StopSchema.safeParse({ ...validStop, commitment: "reservation", locked: false }).success).toBe(true);
+    expect(StopSchema.safeParse({ ...validStop, commitment: "booking" }).success).toBe(false);
+    expect(StopSchema.safeParse({ ...validStop, commitment: true }).success).toBe(false);
+    expect(StopSchema.shape.commitment.safeParse(undefined).success).toBe(true);
+  });
+});
+
+describe("DayLineItemSchema, variante openMeal (décision 0015 § 2)", () => {
+  it.each(["lunch", "dinner"])("accepte un créneau %s pas encore choisi", (meal) => {
+    expect(contracts.DayLineItemSchema.safeParse({ type: "openMeal", time: "12:30", meal }).success).toBe(true);
+  });
+
+  it.each([
+    [{ type: "openMeal", time: "12:30", meal: "breakfast" }],
+    [{ type: "openMeal", time: "12h30", meal: "lunch" }],
+    [{ type: "openMeal", meal: "lunch" }],
+    [{ type: "openMeal", time: "12:30", meal: "lunch", name: "[Restaurant]" }],
+    [{ type: "openMeal", time: "12:30", meal: "lunch", placeId: "mock_place" }],
+  ])("refuse %j (objet strict, sans lieu)", (item) => {
+    expect(contracts.DayLineItemSchema.safeParse(item).success).toBe(false);
   });
 });
 
@@ -314,6 +398,21 @@ describe("ProposalSchema", () => {
     { index: 3, total: 3 },
   ])("accepte l'option %j", (option) => {
     expect(ProposalSchema.safeParse({ ...meal, option }).success).toBe(true);
+  });
+
+  it("exige une catégorie du vocabulaire fermé (décision 0013)", () => {
+    const withoutCategory: Partial<Proposal> = { ...validProposal };
+    delete withoutCategory.category;
+    expect(ProposalSchema.safeParse(withoutCategory).success).toBe(false);
+    expect(ProposalSchema.safeParse({ ...validProposal, category: "museums" }).success).toBe(false);
+    expect(ProposalSchema.safeParse({ ...validProposal, category: "restaurant" }).success).toBe(true);
+  });
+
+  it("refuse une proposition dont l'étape est un engagement (décision 0015 § 9)", () => {
+    const committed = { ...validProposal, stop: { ...validStop, commitment: "ticket" as const } };
+    const result = ProposalSchema.safeParse(committed);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join("."))).toContain("stop.commitment");
   });
 
   it("refuse une photoUrl invalide et un champ inconnu", () => {
