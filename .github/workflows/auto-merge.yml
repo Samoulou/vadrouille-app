@@ -1,6 +1,9 @@
 name: auto-merge
+# pull_request_target : le workflow exécuté est celui de main, jamais celui de la
+# branche de la PR ; une branche ne peut donc pas le modifier pour lire le secret.
+# Aucun checkout : aucun code de la PR n'est exécuté (décision 0033).
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 permissions:
   contents: write
@@ -9,11 +12,16 @@ jobs:
   enable:
     if: github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only'
     runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.AUTOMERGE_TOKEN != '' }}
     steps:
+      - if: env.HAS_TOKEN != 'true'
+        run: >-
+          echo "::warning::AUTOMERGE_TOKEN absent, fusion par GITHUB_TOKEN ; ticket non fermé et branche non supprimée (décision 0033)."
+      # Une fusion faite avec GITHUB_TOKEN ne ferme pas les tickets « Closes #n »
+      # et ne supprime pas la branche : jeton dédié s'il existe (décision 0033).
       - run: gh pr merge --auto --squash "$PR" --repo "$REPO"
         env:
-          # Une fusion faite avec GITHUB_TOKEN ne ferme pas les tickets « Closes #n »
-          # et ne supprime pas la branche : jeton dédié s'il existe (#176).
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
