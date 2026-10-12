@@ -13,26 +13,31 @@ export interface StatusBannerProps {
   className?: string;
 }
 
-/** Provisoire (Q13) : `alert` pour `error` seulement, `status` pour les autres types. */
+/**
+ * `alert` pour `error` et `conflict` (la personne doit réagir avant de continuer), `status` pour les autres
+ * types (décision 0012, Q13 ; handover § 11).
+ */
 export function statusBannerRole(kind: StatusBannerKind): "alert" | "status" {
-  return kind === "error" ? "alert" : "status";
+  return kind === "error" || kind === "conflict" ? "alert" : "status";
 }
+
+/** Filet décoratif : `ink` pour `error` et `conflict`, `ink-soft` pour les autres types, jamais `line` (0012, Q13). */
 
 const RAIL_CLASSES: Record<StatusBannerKind, string> = {
   offline: "bg-ink-soft",
   conflict: "bg-ink",
   noOption: "bg-ink-soft",
   error: "bg-ink",
-  // La ligne qui se dessine : seule animation, absente sous prefers-reduced-motion.
-  generating: "bg-line motion-safe:animate-pulse",
-  // Temps de trajet du jour au-delà du budget du rythme (décision 0015 § 7) ; filet provisoire (F5-Q1, Q62).
+  // Aucune animation : seul le message, mis à jour par l'écran appelant, dit que la génération avance (0012, Q13).
+  generating: "bg-ink-soft",
+  // Temps de trajet du jour au-delà du budget du rythme (décision 0015 § 7 ; filet aligné par 0018 § 2 et 0012, Q13).
   travel: "bg-ink-soft",
 };
 
 /**
- * Bandeau d'état transverse (hors ligne, conflit, aucune option, erreur, génération).
+ * Bandeau d'état transverse (hors ligne, conflit, aucune option, erreur, génération, trajet).
  * Le texte porte toute l'information ; le filet à gauche n'est qu'un repère visuel.
- * Rendu provisoire, absent du design system (Q13).
+ * Rendu décidé par UX/UI (décision 0012, Q13), absent du design system.
  */
 export function StatusBanner({ kind, message, action, className }: StatusBannerProps) {
   return (

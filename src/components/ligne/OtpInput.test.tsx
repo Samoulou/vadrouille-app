@@ -126,11 +126,40 @@ describe("OtpInput", () => {
     expect(onComplete).toHaveBeenLastCalledWith("123450");
   });
 
-  it("n'a aucune violation axe, vide ou rempli", async () => {
+  it("valide : ni aria-invalid ni aria-describedby", () => {
+    render(<OtpInput />);
+    expect(screen.getByRole("group")).not.toHaveAttribute("aria-describedby");
+    for (const input of positions()) {
+      expect(input).not.toHaveAttribute("aria-invalid");
+    }
+  });
+
+  it("invalide : aria-invalid sur chaque case, contour ink, message relié au groupe (0012, Q13)", () => {
+    render(
+      <>
+        <OtpInput defaultValue="482913" invalid describedBy="otp-message" />
+        <p id="otp-message">Ce code ne fonctionne pas.</p>
+      </>,
+    );
+    const group = screen.getByRole("group", { name: "Code à 6 chiffres" });
+    expect(group).toHaveAttribute("aria-describedby", "otp-message");
+    expect(group).toHaveAccessibleDescription("Ce code ne fonctionne pas.");
+    expect(positions()).toHaveLength(6);
+    for (const input of positions()) {
+      expect(input).toHaveAttribute("aria-invalid", "true");
+      expect(input).toBeInvalid();
+      expect(input).toHaveClass("border-ink");
+      expect(input).not.toHaveClass("border-border-control");
+    }
+  });
+
+  it("n'a aucune violation axe, vide, rempli ou invalide", async () => {
     const { container } = render(
       <>
         <OtpInput />
         <OtpInput defaultValue="482913" />
+        <OtpInput defaultValue="482913" invalid describedBy="otp-message" />
+        <p id="otp-message">Ce code ne fonctionne pas.</p>
       </>,
     );
     expect(await axeViolations(container)).toEqual([]);

@@ -126,8 +126,11 @@ describe("/dev/composants", () => {
       expect(within(tags).getByText(text)).toBeInTheDocument();
     }
     const banners = screen.getByRole("region", { name: "StatusBanner" });
-    expect(within(banners).getAllByRole("status")).toHaveLength(5);
-    expect(within(banners).getByRole("alert")).toHaveTextContent(ex.bandeaux.error);
+    // role=alert pour error et conflict, role=status pour les quatre autres (0012, Q13).
+    expect(within(banners).getAllByRole("status")).toHaveLength(4);
+    const alerts = within(banners).getAllByRole("alert");
+    expect(alerts.map((alert) => alert.getAttribute("data-kind"))).toEqual(["conflict", "error"]);
+    expect(alerts[1]).toHaveTextContent(ex.bandeaux.error);
     expect(screen.getByRole("img", { name: ex.compteurLabel })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: ex.compteurZeroLabel })).not.toBeInTheDocument();
   });
