@@ -5,7 +5,8 @@
 # Entrée : VADROUILLE_DB_ADMIN_URL, ou à défaut PGHOST, PGPORT, PGUSER, PGDATABASE (superutilisateur du conteneur
 # postgres:17.11, jetable, authentification « trust » limitée au conteneur) ; EXPECTED_SERVER_VERSION facultative.
 # Sortie : VADROUILLE_DATABASE_URL, VADROUILLE_DATABASE_URL_AUTH, VADROUILLE_DATABASE_URL_MIGRATOR dans $GITHUB_ENV,
-# masquées dans les journaux. Aucune valeur n'est écrite dans le dépôt.
+# masquées dans les journaux (jamais l'adresse d'administration). Aucune valeur n'est écrite dans le dépôt.
+# Le refus de SKIP_DB_TESTS en CI est fait par scripts/test-db.mjs seulement.
 set -euo pipefail
 
 if [ -z "${VADROUILLE_DB_ADMIN_URL:-}" ]; then
@@ -13,7 +14,7 @@ if [ -z "${VADROUILLE_DB_ADMIN_URL:-}" ]; then
   : "${PGHOST:?PGHOST absente}" "${PGPORT:?PGPORT absente}" "${PGUSER:?PGUSER absente}" "${PGDATABASE:?PGDATABASE absente}"
   VADROUILLE_DB_ADMIN_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}"
   export VADROUILLE_DB_ADMIN_URL
-  if [ -n "${GITHUB_ENV:-}" ]; then echo "VADROUILLE_DB_ADMIN_URL=${VADROUILLE_DB_ADMIN_URL}" >> "$GITHUB_ENV"; fi
+  # Jamais dans $GITHUB_ENV : l'accès administrateur reste limité aux étapes qui le posent (.github/workflows/ci.yml).
 fi
 if [ -n "${EXPECTED_SERVER_VERSION:-}" ]; then
   version="$(psql "$VADROUILLE_DB_ADMIN_URL" -tAc 'SHOW server_version')"
@@ -21,10 +22,6 @@ if [ -n "${EXPECTED_SERVER_VERSION:-}" ]; then
     "$EXPECTED_SERVER_VERSION"*) echo "Postgres ${version}" ;;
     *) echo "Postgres ${version} au lieu de ${EXPECTED_SERVER_VERSION} (décision 0006)." >&2; exit 1 ;;
   esac
-fi
-if [ -n "${SKIP_DB_TESTS:-}" ]; then
-  echo "SKIP_DB_TESTS est interdite en CI : les tests de base y font foi (décision B1-PO-1)." >&2
-  exit 1
 fi
 
 host_part="${VADROUILLE_DB_ADMIN_URL#*@}" # hôte:port/base
@@ -38,8 +35,10 @@ done
 for role in migrator app auth; do
   password="$(openssl rand -hex 24)"
   echo "::add-mask::${password}"
-  # Mot de passe passé par variable psql, jamais dans la ligne de commande ni dans un fichier.
-  psql "$VADROUILLE_DB_ADMIN_URL" -v ON_ERROR_STOP=1 -q -v role="vadrouille_${role}" -v pw="$password" <<'SQL'
+  # Mot de passe transmis à psql par l'entrée standard (\set dans un document « here »), jamais dans sa ligne de
+  # commande, visible dans la liste des processus. Valeur hexadécimale : aucun caractère à échapper.
+  psql "$VADROUILLE_DB_ADMIN_URL" -v ON_ERROR_STOP=1 -q -v role="vadrouille_${role}" <<SQL
+\set pw '${password}'
 ALTER ROLE :"role" PASSWORD :'pw';
 SQL
   url="postgres://vadrouille_${role}:${password}@${host_part}"

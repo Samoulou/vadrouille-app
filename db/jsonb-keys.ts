@@ -35,6 +35,28 @@ export const CHECKLIST_MOMENT_VARIANTS = {
  */
 export const PROPOSAL_RECORD_KEYS = ["id", "kind", "day", "time", "stop", "category", "travelFromPrevious", "detour"] as const;
 
+/**
+ * Liste blanche de l'instantané partagé (vue `shared_trip_version`, fonctions `shared_*` de
+ * `db/migrations/0001_securite.sql`). Écrite à la main dans la migration ; le test
+ * `tests/unit/db/liste-blanche-partage.test.ts` vérifie que chaque fonction `shared_*` émet exactement ces clés, et
+ * le test `schéma: les clés JSONB suivent les contrats` (PR fusionnée en second, B1 ou B2) les compare aussi aux
+ * schémas Zod de B2. Jamais l'étiquette de logement des terminus (Q50).
+ */
+export const SHARED_SNAPSHOT_KEYS = {
+  source: ["label", "url"],
+  facts: STOP_FACTS_KEYS,
+  stop: ["id", "kind", "placeId", "name", "start", "end", "facts", "reason", "source", "exceptions", "locked", "commitment"],
+  surprise: ["id", "placeId", "name", "facts", "reason", "source"],
+  day: ["index", "date", "travelBudgetMinutes", "items", "events", "surprise"],
+} as const;
+
+/**
+ * Valeurs de `Stop.exceptions` admises dans l'instantané (décision 0011, point 5) : au plus 2, jamais `toConfirm`
+ * (tiré d'horaires Google, ajouté à la lecture seulement).
+ */
+export const SNAPSHOT_STOP_EXCEPTIONS = ["toReserve", "unconfirmed"] as const;
+export const SNAPSHOT_STOP_EXCEPTIONS_MAX = 2;
+
 /** Littéral SQL `ARRAY['a', 'b']::text[]` d'une liste de clés (valeurs fixes de ce fichier, jamais une saisie). */
 export function sqlTextArray(keys: readonly string[]): string {
   for (const key of keys) {

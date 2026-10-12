@@ -18,6 +18,13 @@ function secretsOf(url: string): string[] {
   return [url, parsed.password, decodeURIComponent(parsed.password)].filter((s) => s.length > 0);
 }
 
+/** Même adresse, avec un rôle pris dès l'ouverture de la session (paramètre de démarrage `options`). */
+function withRole(url: string, role: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.set("options", `-c role=${role}`);
+  return parsed.href;
+}
+
 async function refusal(role: "vadrouille_app" | "vadrouille_auth", url: string): Promise<Error> {
   const pool = createGuardedPool(role, { [role === "vadrouille_app" ? DB_ENV.app : DB_ENV.auth]: url });
   try {
@@ -52,6 +59,17 @@ describe("connexion: la garde refuse un rôle administrateur", () => {
       expect(error.message).toContain(`au lieu de « ${role} »`);
       for (const secret of secretsOf(url)) expect(error.message).not.toContain(secret);
     }
+  });
+
+  it("une session superutilisateur qui prend le rôle attendu (options=-c role=…) est refusée : session_user compte", async () => {
+    const url = withRole(urlFor("admin"), "vadrouille_app");
+    const error = await refusal("vadrouille_app", url);
+    expect(error).toBeInstanceOf(DatabaseGuardError);
+    expect(error.message).toContain("rôle courant vadrouille_app");
+    for (const secret of secretsOf(url)) expect(error.message).not.toContain(secret);
+    await expect(runMigrations({ [DB_ENV.migrator]: withRole(urlFor("admin"), "vadrouille_migrator") })).rejects.toBeInstanceOf(
+      DatabaseGuardError,
+    );
   });
 
   it("le rôle attendu est accepté, par le pool comme par le client Drizzle", async () => {

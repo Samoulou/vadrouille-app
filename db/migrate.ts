@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
-import { assertDatabaseAllowed, DatabaseGuardError, MIGRATOR_URL_VARIABLE } from "./connection.ts";
+import { assertDatabaseAllowed, DatabaseGuardError, MIGRATOR_URL_VARIABLE, verifyConnectionRole } from "./connection.ts";
 
 /**
  * Applique les migrations SQL relues de `db/migrations/` (décision 0006), dans l'ordre du journal de drizzle-kit
@@ -52,15 +52,8 @@ export async function runMigrations(env: Env, migrations: Migration[] = readMigr
   const client = new pg.Client({ connectionString });
   await client.connect();
   try {
-    const { rows } = await client.query<{ current_user: string; rolsuper: boolean; rolbypassrls: boolean }>(
-      "SELECT current_user::text AS current_user, r.rolsuper, r.rolbypassrls FROM pg_catalog.pg_roles AS r WHERE r.rolname = current_user",
-    );
-    const me = rows[0];
-    if (!me || me.current_user !== MIGRATOR_ROLE || me.rolsuper || me.rolbypassrls) {
-      throw new DatabaseGuardError(
-        `Migrations refusées : elles s'exécutent sous ${MIGRATOR_ROLE}, sans SUPERUSER ni BYPASSRLS (décision 0007).`,
-      );
-    }
+    // Même contrôle que la garde applicative (session_user et current_user, ni SUPERUSER ni BYPASSRLS).
+    await verifyConnectionRole(client, MIGRATOR_ROLE);
 
     await client.query(
       "CREATE TABLE IF NOT EXISTS vadrouille_migrations.applied (tag text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())",

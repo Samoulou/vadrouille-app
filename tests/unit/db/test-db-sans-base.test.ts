@@ -1,14 +1,22 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
 /**
  * `pnpm test:db` n'est jamais ignoré en silence (décision 0006, convention 6 ; spécification B1) : sans base
  * joignable, il échoue avec un message explicite ; `SKIP_DB_TESTS=1` n'est admise qu'explicitement et hors CI
- * (proposition B1-TL-1).
+ * (proposition B1-TL-1). L'adresse injoignable est construite à l'exécution, avec un mot de passe aléatoire : aucune
+ * chaîne de connexion n'est écrite dans le dépôt.
  */
-const UNREACHABLE = "postgres://vadrouille_app:secret-de-test@127.0.0.1:1/vadrouille";
+const PASSWORD = randomUUID();
+const UNREACHABLE = (() => {
+  const url = new URL("postgres://127.0.0.1:1/vadrouille");
+  url.username = "vadrouille_app";
+  url.password = PASSWORD;
+  return url.href;
+})();
 
 function run(extra: Record<string, string | undefined>) {
   const env: Record<string, string | undefined> = { ...process.env };
@@ -29,7 +37,7 @@ describe("pnpm test:db sans base", () => {
     const { status, output } = run({});
     expect(status).not.toBe(0);
     expect(output).toContain("base de test injoignable");
-    expect(output).not.toContain("secret-de-test");
+    expect(output).not.toContain(PASSWORD);
   }, 90_000);
 
   it("variables absentes : échec explicite", () => {

@@ -419,9 +419,12 @@ CREATE FUNCTION public.shared_source(p jsonb) RETURNS jsonb
   LANGUAGE sql IMMUTABLE PARALLEL SAFE
   SET search_path = pg_catalog, pg_temp
 AS $$
+  -- url : seulement une chaîne en https:// (le lien privé la rend en href, sans compte) ; javascript:, http:, data:
+  -- ou une valeur non textuelle sont retirés, comme sur les autres chemins (CHECK de candidates.sources).
   SELECT CASE WHEN pg_catalog.jsonb_typeof(p) = 'object' THEN pg_catalog.jsonb_strip_nulls(pg_catalog.jsonb_build_object(
     'label', public.shared_scalar(p -> 'label'),
-    'url', public.shared_scalar(p -> 'url'))) END
+    'url', CASE WHEN pg_catalog.jsonb_typeof(p -> 'url') = 'string' AND pg_catalog.left(p ->> 'url', 8) = 'https://'
+      THEN p -> 'url' END)) END
 $$;
 --> statement-breakpoint
 CREATE FUNCTION public.shared_facts(p jsonb) RETURNS jsonb
@@ -434,14 +437,18 @@ AS $$
     'area', public.shared_scalar(p -> 'area'))) END
 $$;
 --> statement-breakpoint
-CREATE FUNCTION public.shared_strings(p jsonb) RETURNS jsonb
+-- Stop.exceptions de l'instantané (décision 0011, point 5) : toReserve et unconfirmed seulement, au plus 2 ;
+-- toConfirm (tiré d'horaires Google) et toute autre valeur sont retirés.
+CREATE FUNCTION public.shared_exceptions(p jsonb) RETURNS jsonb
   LANGUAGE sql IMMUTABLE PARALLEL SAFE
   SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT CASE WHEN pg_catalog.jsonb_typeof(p) = 'array' THEN (
-    SELECT COALESCE(pg_catalog.jsonb_agg(e.v ORDER BY e.n), '[]'::jsonb)
-    FROM pg_catalog.jsonb_array_elements(p) WITH ORDINALITY AS e(v, n)
-    WHERE pg_catalog.jsonb_typeof(e.v) = 'string') END
+    SELECT COALESCE(pg_catalog.jsonb_agg(f.v ORDER BY f.n), '[]'::jsonb)
+    FROM (
+      SELECT e.v, e.n FROM pg_catalog.jsonb_array_elements(p) WITH ORDINALITY AS e(v, n)
+      WHERE pg_catalog.jsonb_typeof(e.v) = 'string' AND e.v #>> '{}' IN ('toReserve', 'unconfirmed')
+      ORDER BY e.n LIMIT 2) AS f) END
 $$;
 --> statement-breakpoint
 CREATE FUNCTION public.shared_stop(p jsonb) RETURNS jsonb
@@ -458,7 +465,7 @@ AS $$
     'facts', public.shared_facts(p -> 'facts'),
     'reason', public.shared_scalar(p -> 'reason'),
     'source', public.shared_source(p -> 'source'),
-    'exceptions', public.shared_strings(p -> 'exceptions'),
+    'exceptions', public.shared_exceptions(p -> 'exceptions'),
     'locked', public.shared_scalar(p -> 'locked'),
     'commitment', public.shared_scalar(p -> 'commitment'))) END
 $$;
@@ -532,7 +539,7 @@ AS $$
 $$;
 --> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.shared_scalar(jsonb), public.shared_source(jsonb), public.shared_facts(jsonb),
-  public.shared_strings(jsonb), public.shared_stop(jsonb), public.shared_surprise(jsonb), public.shared_line_item(jsonb),
+  public.shared_exceptions(jsonb), public.shared_stop(jsonb), public.shared_surprise(jsonb), public.shared_line_item(jsonb),
   public.shared_day(jsonb), public.shared_snapshot(jsonb) TO vadrouille_share;
 --> statement-breakpoint
 

@@ -36,7 +36,7 @@ Commandes :
 - `pnpm test:db` : tests de base (projet Vitest `vitest.db.config.mts`, dossier `tests/db/`). Chaque test se connecte
   avec le rôle qu'il éprouve. Sans base joignable ou sans variables, il échoue avec un message explicite.
   `SKIP_DB_TESTS=1`, posée explicitement et hors CI, l'ignore avec un avertissement visible (proposition B1-TL-1) ;
-  en CI elle est refusée.
+  en CI elle est refusée (par `scripts/test-db.mjs`, seul endroit qui porte ce refus).
 - `pnpm verify` appelle `pnpm test:db` (proposition B1-TL-1).
 - `pnpm db:generate` : génère une migration à partir de `db/schema/` (drizzle-kit). `drizzle-kit push` n'est
   jamais utilisé. Une migration de sécurité s'écrit à la main : `pnpm db:generate --custom --name <nom>`.
@@ -45,10 +45,18 @@ Base de référence : le conteneur `postgres:17.11` de la CI (jobs `db` et `veri
 Sur un poste qui dispose de Docker (facultatif, décision 0002) :
 
 1. `docker compose up -d db` (authentification « trust », port lié à `127.0.0.1` seulement) ;
-2. `psql postgres://postgres@127.0.0.1:5432/vadrouille -v ON_ERROR_STOP=1 -f db/bootstrap/roles.sql` ;
-3. poser, dans le shell, `VADROUILLE_DATABASE_URL`, `VADROUILLE_DATABASE_URL_AUTH`,
-   `VADROUILLE_DATABASE_URL_MIGRATOR` (`postgres://<rôle>@127.0.0.1:5432/vadrouille`, sans mot de passe grâce à
-   « trust ») et `VADROUILLE_DB_ADMIN_URL` (`postgres://postgres@127.0.0.1:5432/vadrouille`) ;
+2. exécuter `db/bootstrap/roles.sql` avec `psql -v ON_ERROR_STOP=1 -f db/bootstrap/roles.sql`, connecté en
+   `postgres` (hôte `127.0.0.1`, port `5432`, base `vadrouille`) ;
+3. poser, dans le shell, les quatre variables de connexion du tableau ci-dessus, toutes vers l'hôte `127.0.0.1`, le
+   port `5432` et la base `vadrouille`, sans mot de passe grâce à « trust » :
+
+   | Variable | Rôle de connexion |
+   | --- | --- |
+   | `VADROUILLE_DATABASE_URL` | `vadrouille_app` |
+   | `VADROUILLE_DATABASE_URL_AUTH` | `vadrouille_auth` |
+   | `VADROUILLE_DATABASE_URL_MIGRATOR` | `vadrouille_migrator` |
+   | `VADROUILLE_DB_ADMIN_URL` | `postgres` |
+
 4. `pnpm db:migrate`, puis `pnpm test:db`.
 
 Les tests de base supposent une base jetable : ils créent des organisations et ne nettoient pas.
@@ -79,8 +87,10 @@ arrière se fait **vers l'avant**, par une migration corrective :
 5. Ajouter la migration au tableau ci-dessus : « irréversible » motivé, ou fichier inverse relu
    `db/migrations/<tag>.down.sql` (le test `tests/unit/db/migrations-retour-arriere.test.ts` l'exige).
 6. CI : le job `db` applique les migrations deux fois (la seconde ne fait rien) puis `pnpm test:db`.
-7. Application à la base Neon de staging : selon la réponse à la question 3 de la spécification B1 (workflow manuel
-   ou construction Vercel) ; jamais depuis l'application.
+7. Application à la base Neon de staging : selon la réponse à la question 3 de la spécification B1 ; jamais depuis
+   l'application. L'option « construction Vercel » de cette question contredit la décision 0006 (l'identifiant de
+   `vadrouille_migrator` n'entre jamais dans Vercel) : elle est remontée à Samuel (#188), seul le workflow GitHub
+   déclenché à la main reste compatible en l'état.
 
 Test de restauration sur la base de staging (sauvegarde, point dans le temps) : renvoyé à la question 3 de la
 spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de conservation).

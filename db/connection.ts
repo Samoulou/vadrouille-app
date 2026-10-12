@@ -8,10 +8,11 @@ import pg from "pg";
  * 1. **Production** (décision 0034, « Garde préalable à toute fusion ») : `main` est déployé automatiquement sur une
  *    adresse publique ; tant que la mise en public n'a pas eu sa passe de sécurité, aucune connexion n'est ouverte
  *    quand `VERCEL_ENV` ou `VADROUILLE_ENV` vaut `production` (comparaison après `trim().toLowerCase()`).
- * 2. **Rôle** : à chaque nouvelle connexion physique du pool, avant toute requête, `current_user` doit être le rôle
- *    attendu (`vadrouille_app` ou `vadrouille_auth`) et ce rôle ne doit avoir ni `SUPERUSER` ni `BYPASSRLS`. Sinon le
- *    pool refuse définitivement de servir. C'est ce qui rend vraie la règle de 0029 (« l'application ne lit jamais
- *    ces identifiants » d'administration) même si une variable est mal posée.
+ * 2. **Rôle** : à chaque nouvelle connexion physique du pool, avant toute requête, `session_user` et `current_user`
+ *    doivent être le rôle attendu (`vadrouille_app` ou `vadrouille_auth`), et ce rôle ne doit avoir ni `SUPERUSER`
+ *    ni `BYPASSRLS`. Sinon le pool refuse définitivement de servir (une erreur transitoire du contrôle, elle, ne rend
+ *    pas le refus définitif). C'est ce qui rend vraie la règle de 0029 (« l'application ne lit jamais ces
+ *    identifiants » d'administration) même si une variable est mal posée.
  * Aucun message d'erreur ne contient la chaîne de connexion ni un mot de passe.
  */
 
@@ -60,28 +61,34 @@ export function connectionStringFor(role: AppDatabaseRole, env: Env): string {
   return value;
 }
 
-type RoleRow = { current_user: string; rolsuper: boolean; rolbypassrls: boolean };
+type RoleRow = { current_user: string; session_user: string; rolsuper: boolean; rolbypassrls: boolean };
 
-/** Contrôle d'une connexion ouverte : rôle attendu, ni SUPERUSER ni BYPASSRLS. */
+/**
+ * Contrôle d'une connexion ouverte : `session_user` (le rôle authentifié) et `current_user` sont tous deux le rôle
+ * attendu, et ce rôle n'a ni SUPERUSER ni BYPASSRLS. Comparer `current_user` seul ne suffit pas : une connexion
+ * superutilisateur ouverte avec `options=-c role=vadrouille_app` (ou suivie d'un `SET ROLE`) aurait le bon
+ * `current_user`, passerait la garde, puis pourrait revenir à son rôle de session par `RESET ROLE`.
+ */
 export async function verifyConnectionRole(
   client: { query: (sql: string) => Promise<{ rows: unknown[] }> },
   expectedRole: string,
 ): Promise<void> {
   const { rows } = await client.query(
-    "SELECT current_user::text AS current_user, r.rolsuper, r.rolbypassrls FROM pg_catalog.pg_roles AS r WHERE r.rolname = current_user",
+    "SELECT current_user::text AS current_user, session_user::text AS session_user, r.rolsuper, r.rolbypassrls FROM pg_catalog.pg_roles AS r WHERE r.rolname = session_user",
   );
   const row = rows[0] as RoleRow | undefined;
   if (!row) {
     throw new DatabaseGuardError("Connexion à la base refusée : rôle de connexion introuvable.");
   }
-  if (row.current_user !== expectedRole) {
+  if (row.session_user !== expectedRole || row.current_user !== expectedRole) {
+    const received = row.session_user === row.current_user ? row.session_user : `${row.session_user} (rôle courant ${row.current_user})`;
     throw new DatabaseGuardError(
-      `Connexion à la base refusée : rôle « ${row.current_user} » au lieu de « ${expectedRole} » (spécification B1, garde de connexion).`,
+      `Connexion à la base refusée : rôle « ${received} » au lieu de « ${expectedRole} » (spécification B1, garde de connexion).`,
     );
   }
   if (row.rolsuper || row.rolbypassrls) {
     throw new DatabaseGuardError(
-      `Connexion à la base refusée : le rôle « ${row.current_user} » a SUPERUSER ou BYPASSRLS (décision 0007).`,
+      `Connexion à la base refusée : le rôle « ${row.session_user} » a SUPERUSER ou BYPASSRLS (décision 0007).`,
     );
   }
 }
@@ -90,9 +97,11 @@ type ConnectCallback = ((err: Error) => void) | ((err: null, c: pg.Client) => vo
 type LooseConnectCallback = (err: Error | null, c?: pg.Client) => void;
 
 /**
- * Pool dont chaque connexion physique est contrôlée avant de servir. Après un premier refus, le pool refuse toute
- * nouvelle demande, même si la connexion suivante passerait (une variable mal posée ne se « répare » pas en cours
- * d'exécution).
+ * Pool dont chaque connexion physique est contrôlée avant de servir. Après un premier refus de fond
+ * (`DatabaseGuardError` : mauvais rôle, attribut d'administration), le pool refuse toute nouvelle demande, même si
+ * la connexion suivante passerait (une variable mal posée ne se « répare » pas en cours d'exécution). Une erreur
+ * transitoire du contrôle (réseau, délai) ferme la connexion et remonte telle quelle, sans rendre le refus
+ * définitif : la demande suivante refait le contrôle.
  */
 export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit<pg.PoolConfig, "connectionString" | "Client"> = {}): pg.Pool {
   const connectionString = connectionStringFor(role, env);
@@ -108,9 +117,9 @@ export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit
         try {
           await verifyConnectionRole(this, role);
         } catch (error) {
-          refusal = error instanceof DatabaseGuardError ? error : new DatabaseGuardError("Connexion à la base refusée : contrôle du rôle impossible.");
+          if (error instanceof DatabaseGuardError) refusal = error;
           await this.end().catch(() => undefined);
-          throw refusal;
+          throw error;
         }
         return this;
       })();

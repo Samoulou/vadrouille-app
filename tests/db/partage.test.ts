@@ -43,7 +43,7 @@ const SNAPSHOT = {
             reason: "Tu aimes l'histoire",
             source: { label: "Site", url: "https://exemple.ch", checkedOn: "2026-10-01", rating: 4.8 },
             facts: { durationMinutes: 90, area: "Old Town", openingHours: "9-17" },
-            exceptions: ["toReserve", { nested: true }],
+            exceptions: ["toConfirm", "verified", { nested: true }, "toReserve", "unconfirmed", "toReserve"],
             locked: false,
             verifiedAt: "2026-10-01",
             rating: 4.7,
@@ -52,6 +52,11 @@ const SNAPSHOT = {
           },
         },
         { type: "segment", segment: { mode: "walk", minutes: 12, estimated: false, polyline: "abc" } },
+        // Sources aux adresses refusées : jamais rendues en href dans le lien privé.
+        { type: "stop", stop: { id: "s2", name: "Script", source: { label: "Piège", url: "javascript:alert(1)" } } },
+        { type: "stop", stop: { id: "s3", name: "Clair", source: { label: "Non chiffré", url: "http://exemple.ch" } } },
+        { type: "stop", stop: { id: "s4", name: "Majuscules", source: { label: "Casse", url: "JAVASCRIPT:alert(1)" } } },
+        { type: "stop", stop: { id: "s5", name: "Objet", source: { label: "Objet", url: { href: "https://exemple.ch" } } } },
         { type: "free", from: "11:00", to: "12:00", note: "x" },
         { type: "openMeal", time: "12:30", meal: "lunch", extra: 1 },
         { type: "inconnu", value: "x" },
@@ -83,11 +88,15 @@ const EXPECTED_SNAPSHOT = {
             reason: "Tu aimes l'histoire",
             source: { label: "Site", url: "https://exemple.ch" },
             facts: { durationMinutes: 90, area: "Old Town" },
-            exceptions: ["toReserve"],
+            exceptions: ["toReserve", "unconfirmed"],
             locked: false,
           },
         },
         { type: "segment", segment: { mode: "walk", estimated: false } },
+        { type: "stop", stop: { id: "s2", name: "Script", source: { label: "Piège" } } },
+        { type: "stop", stop: { id: "s3", name: "Clair", source: { label: "Non chiffré" } } },
+        { type: "stop", stop: { id: "s4", name: "Majuscules", source: { label: "Casse" } } },
+        { type: "stop", stop: { id: "s5", name: "Objet", source: { label: "Objet" } } },
         { type: "free", from: "11:00", to: "12:00" },
         { type: "openMeal", time: "12:30", meal: "lunch" },
         { type: "terminus", role: "end", time: "18:00" },
@@ -295,5 +304,21 @@ describe("vues partagées: l'instantané partagé ne contient que les clés de l
     for (const forbidden of ["Balmoral", "secret", "rating", "displayName", "location", "openingHours", "minutes\"", "verifiedAt", "polyline", "phone", "reviews", "title"]) {
       expect(text, forbidden).not.toContain(forbidden);
     }
+  });
+
+  it("source.url : seulement une chaîne en https:// (javascript:, http:, autre type retirés)", async () => {
+    const shared = await readShared(a.valid);
+    const text = JSON.stringify(shared.version[0].snapshot);
+    for (const forbidden of ["javascript:", "JAVASCRIPT:", "http://", "href"]) expect(text, forbidden).not.toContain(forbidden);
+    const urls = [...text.matchAll(/"url":"([^"]*)"/g)].map((m) => m[1] ?? "");
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) expect(url.startsWith("https://"), url).toBe(true);
+  });
+
+  it("exceptions : toReserve et unconfirmed seulement, au plus 2 (décision 0011, point 5 ; jamais toConfirm)", async () => {
+    const shared = await readShared(a.valid);
+    const stop = shared.version[0].snapshot.days[0].items[1].stop;
+    expect(stop.exceptions).toEqual(["toReserve", "unconfirmed"]);
+    expect(JSON.stringify(shared.version[0].snapshot)).not.toContain("toConfirm");
   });
 });
