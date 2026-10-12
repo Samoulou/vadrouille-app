@@ -105,6 +105,17 @@ export const ChecklistItemDoneEventSchema = z.strictObject({
   properties: z.strictObject({}),
 });
 
+/**
+ * Ouverture de l'écran 15 « Pendant le voyage » (handover § 12, spécification F10, F10-PO-16) : une fois par
+ * chargement, quand l'écran sort de « Chargement de ta journée », quel que soit le cas affiché. `offline` vaut
+ * `false` au MVP (l'écran ne se rend qu'avec le réseau) ; aucune autre propriété : ni identifiant de voyage, ni
+ * nom, ni heure.
+ */
+export const TodayOpenedEventSchema = z.strictObject({
+  name: z.literal("today_opened"),
+  properties: z.strictObject({ offline: z.boolean() }),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -115,6 +126,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   PaymentSucceededEventSchema,
   PaymentFailedEventSchema,
   ChecklistItemDoneEventSchema,
+  TodayOpenedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

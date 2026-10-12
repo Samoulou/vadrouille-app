@@ -25,6 +25,11 @@ export interface TripRoutes {
    * n'a pas de pendant de développement (décision 0021 § 6, qui renomme `retour()`).
    */
   mesVoyages(): string;
+  /**
+   * Écran 15 « Pendant le voyage » (`R15`, F10-TL-3) ; `null` avec la base `/dev/voyages`, qui n'a pas de page
+   * `R15` (F10-PO-7) : aucun lien ne mène alors à une 404.
+   */
+  aujourdhui(): string | null;
 }
 
 /** `R17` « Mes voyages » : seul endroit qui écrit cette adresse (décision 0021 § 6). */
@@ -42,5 +47,6 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     remplacer: (n, stopId) => `${jour(n)}/remplacer/${encodeURIComponent(stopId)}`,
     ajouter: (n, free) => (free ? `${jour(n)}/ajouter?de=${free.from}&a=${free.to}` : `${jour(n)}/ajouter`),
     mesVoyages: mesVoyagesRoute,
+    aujourdhui: () => (base === "/voyages" ? `${trip}/aujourdhui` : null),
   };
 }
