@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal } from "@/contracts";
 import { format, messages } from "@/i18n";

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition } from "react";
 
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import { format, messages } from "@/i18n";
 

@@ -81,10 +81,6 @@ export const ROUTES: readonly RouteEntry[] = [
     page: "voyages/[id]/presentation/page.tsx",
     states: ["annulation-proposee"],
     budgets: { lighthouse: "journal", javascript: "seuil" },
-    knownExceedance: {
-      javascriptBytes: 219_305,
-      reason: "Mesuré à F12a le 2026-10-11 (219 305 o gzip, 15 scripts) ; décision du Tech Lead attendue (PR de F12a).",
-    },
   },
   {
     id: "R9",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import { EtatPage } from "@/features/etats/EtatPage";
 import { format, messages } from "@/i18n";

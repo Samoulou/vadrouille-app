@@ -1,7 +1,8 @@
 import * as z from "zod/mini";
 
-import type { PreferenceReason } from "@/contracts";
 import { CATEGORIES, CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
+
+import { EVENT_REASON, EVENT_REASONS, type EventReason } from "./reasons";
 
 /**
  * Événements de mesure (handover § 12, spécification F6, décision 0013 § 3.3).
@@ -19,18 +20,9 @@ const PositionSchema = z.int().check(z.positive());
 /** Catégorie d'une proposition, tirée de la même liste que `CategorySchema` (`CATEGORIES`). */
 const CategoryPropertySchema = z.enum(CATEGORIES);
 
-/** Raisons des événements, en `snake_case` (F6-PO-14). */
-export const EventReasonSchema = z.enum(["not_my_style", "too_busy", "too_expensive", "too_far", "other"]);
-export type EventReason = z.infer<typeof EventReasonSchema>;
-
-/** Seule table de conversion des codes du contrat (`PreferenceReason`) vers les événements. */
-export const EVENT_REASON: Record<PreferenceReason, EventReason> = {
-  notMyStyle: "not_my_style",
-  tooBusy: "too_busy",
-  tooExpensive: "too_expensive",
-  tooFar: "too_far",
-  other: "other",
-};
+/** Raisons des événements, en `snake_case` (F6-PO-14), tirées de `EVENT_REASONS` (module sans `zod`). */
+export const EventReasonSchema = z.enum(EVENT_REASONS);
+export { EVENT_REASON, type EventReason };
 
 export const DeckDecisionEventSchema = z.strictObject({
   name: z.literal("deck_decision"),

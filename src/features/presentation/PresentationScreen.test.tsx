@@ -78,18 +78,20 @@ describe("PresentationScreen", () => {
   it("presentation: boutons et clavier", async () => {
     const { events } = setup();
     await click("J'aime");
-    expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "like", gesture: "button", position: 1, kind: "activity", category: "museum", travel_minutes: 15 });
+    await waitFor(() =>
+      expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "like", gesture: "button", position: 1, kind: "activity", category: "museum", travel_minutes: 15 }),
+    );
     // Le focus reste sur le bouton qui sert à la carte suivante.
     await click("Option suivante");
-    expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "dislike", kind: "meal", category: "restaurant", position: 2 });
+    await waitFor(() => expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "dislike", kind: "meal", category: "restaurant", position: 2 }));
     card().focus();
     await key(card(), "ArrowRight");
-    expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "like", gesture: "key", position: 3 });
+    await waitFor(() => expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "like", gesture: "key", position: 3 }));
     // Depuis la carte, le focus passe à la carte suivante.
     expect(document.activeElement).toBe(card());
     expect(cardName()).toBe("[Dean Village]");
     await key(button("J'aime"), "ArrowLeft");
-    expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "dislike", gesture: "key", position: 4 });
+    await waitFor(() => expect(events("deck_decision").at(-1)?.properties).toMatchObject({ decision: "dislike", gesture: "key", position: 4 }));
 
     // Sans effet sur le toast.
     const count = events("deck_decision").length;
@@ -129,7 +131,7 @@ describe("PresentationScreen", () => {
     expect(progress()).toHaveAccessibleName("Proposition 2 sur 8");
     expect(progressText()).toHaveTextContent(/^2 sur 8$/);
     expect(document.activeElement).toBe(card());
-    expect(events("deck_undo").at(-1)?.properties).toEqual({ position: 2 });
+    await waitFor(() => expect(events("deck_undo").at(-1)?.properties).toEqual({ position: 2 }));
     expect(toast()).toBeNull();
   });
 
@@ -153,16 +155,18 @@ describe("PresentationScreen", () => {
     await click("J'aime"); // jardin
     await click("J'aime"); // Arthur's Seat
     await click("Pas pour moi"); // musée national (museum)
-    const dialog = screen.getByRole("dialog", { name: "On arrête les musées et monuments pour ce voyage ?" });
+    const dialog = await screen.findByRole("dialog", { name: "On arrête les musées et monuments pour ce voyage ?" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.activeElement).toBe(within(dialog).getByRole("heading"));
     expect(toast()).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Trop cher" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Oui" }));
     await flush();
-    expect(events("preference_prompt_answered")).toEqual([
-      { name: "preference_prompt_answered", properties: { category: "museum", answer: "yes", reason: "too_expensive" } },
-    ]);
+    await waitFor(() =>
+      expect(events("preference_prompt_answered")).toEqual([
+        { name: "preference_prompt_answered", properties: { category: "museum", answer: "yes", reason: "too_expensive" } },
+      ]),
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(toast()).toHaveTextContent("[Musée national d'Écosse] écarté.");
   });
@@ -179,12 +183,12 @@ describe("PresentationScreen", () => {
     const { events } = setup({ proposals, actions: local });
     await click("Pas pour moi");
     await click("Pas pour moi");
-    const oui = within(screen.getByRole("dialog")).getByRole("button", { name: "Oui" });
+    const oui = within(await screen.findByRole("dialog")).getByRole("button", { name: "Oui" });
     fireEvent.click(oui);
     fireEvent.click(oui);
     await flush();
     expect(answerPrompt).toHaveBeenCalledTimes(1);
-    expect(events("preference_prompt_answered")).toHaveLength(1);
+    await waitFor(() => expect(events("preference_prompt_answered")).toHaveLength(1));
     expect(cardName()).toBe("[w1]");
     expect(document.querySelector("[data-announce]")).toHaveTextContent("1 proposition retirée");
   });
@@ -201,7 +205,9 @@ describe("PresentationScreen", () => {
     const { events } = setup({ proposals });
     await click("Pas pour moi");
     await click("Pas pour moi");
-    const dialog = screen.getByRole("dialog");
+    const dialog = await screen.findByRole("dialog");
+    // Validation chargée (deux décisions enregistrées) : l'absence de réponse ci-dessous est une vraie absence.
+    await waitFor(() => expect(events("deck_decision")).toHaveLength(2));
     fireEvent.keyDown(dialog, { key: "Escape" });
     await flush();
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -212,7 +218,7 @@ describe("PresentationScreen", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await click("Pas pour moi"); // n1
     await click("Pas pour moi"); // n2 → question nature
-    expect(screen.getByRole("dialog", { name: "On arrête la nature et les points de vue pour ce voyage ?" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "On arrête la nature et les points de vue pour ce voyage ?" })).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Fermer" }));
     await flush();
     await click("Pas pour moi"); // m4 : museum déjà posée
@@ -223,8 +229,10 @@ describe("PresentationScreen", () => {
     const { events } = setup({ proposals: [activity("m1", 1, "09:00", "museum"), activity("m2", 1, "10:00", "museum"), activity("m3", 1, "11:00", "walk")] });
     await click("Pas pour moi");
     await click("Pas pour moi");
+    const heading = within(await screen.findByRole("dialog")).getByRole("heading");
+    await waitFor(() => expect(events("deck_decision")).toHaveLength(2));
     const count = events("deck_decision").length;
-    await key(within(screen.getByRole("dialog")).getByRole("heading"), "ArrowRight");
+    await key(heading, "ArrowRight");
     expect(events("deck_decision")).toHaveLength(count);
   });
 
@@ -239,7 +247,7 @@ describe("PresentationScreen", () => {
     setup({ proposals });
     await click("Pas pour moi");
     await click("Pas pour moi");
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Oui" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Oui" }));
     await flush();
     expect(cardName()).toBe("[w1]");
     expect(progress()).toHaveAccessibleName("Proposition 3 sur 3");
@@ -251,7 +259,7 @@ describe("PresentationScreen", () => {
     setup({ proposals });
     await click("Pas pour moi");
     await click("Pas pour moi");
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Non" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Non" }));
     await flush();
     expect(cardName()).toBe("[m3]");
     expect(progress()).toHaveAccessibleName("Proposition 3 sur 3");
@@ -265,23 +273,25 @@ describe("PresentationScreen", () => {
     await click("J'aime"); // Dean Village
     await click("Pas pour moi"); // jardin (nature 1)
     await click("Pas pour moi"); // Arthur's Seat (nature 2) → question nature
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Trop loin" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Trop loin" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Non" }));
     await flush();
     await click("Pas pour moi"); // musée national (museum 2) → question museum
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Trop loin" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Trop loin" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Oui" }));
     await flush();
-    const distance = screen.getByRole("dialog", { name: "On reste plus près de ton hôtel ?" });
+    const distance = await screen.findByRole("dialog", { name: "On reste plus près de ton hôtel ?" });
     expect(document.activeElement).toBe(within(distance).getByRole("heading"));
     expect(within(distance).queryByRole("button", { name: "Trop loin" })).toBeNull();
     fireEvent.click(within(distance).getByRole("button", { name: "Oui" }));
     await flush();
-    expect(events("preference_prompt_answered").map((e) => e.properties)).toEqual([
-      { category: "nature", answer: "no", reason: "too_far" },
-      { category: "museum", answer: "yes", reason: "too_far" },
-      { category: "distance", answer: "yes" },
-    ]);
+    await waitFor(() =>
+      expect(events("preference_prompt_answered").map((e) => e.properties)).toEqual([
+        { category: "nature", answer: "no", reason: "too_far" },
+        { category: "museum", answer: "yes", reason: "too_far" },
+        { category: "distance", answer: "yes" },
+      ]),
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -289,14 +299,15 @@ describe("PresentationScreen", () => {
     const { events } = setup();
     await click("Tout garder pour le jour 1");
     expect(cardName()).toBe("[Dean Village]");
-    expect(events("deck_skipped").at(-1)?.properties).toEqual({ position: 1, scope: "day" });
+    await waitFor(() => expect(events("deck_skipped").at(-1)?.properties).toEqual({ position: 1, scope: "day" }));
+    // Les événements gardent leur ordre : une décision envoyée avant serait déjà enregistrée.
     expect(events("deck_decision")).toEqual([]);
     expect(toast()).toHaveTextContent("Jour 1 gardé.");
     fireEvent.click(within(toast() as HTMLElement).getByRole("button", { name: "Annuler" }));
     await flush();
     expect(cardName()).toBe("[Château d'Édimbourg]");
     fireEvent.click(screen.getByRole("link", { name: "Passer" }));
-    expect(events("deck_skipped").at(-1)?.properties).toEqual({ position: 1, scope: "all" });
+    await waitFor(() => expect(events("deck_skipped").at(-1)?.properties).toEqual({ position: 1, scope: "all" }));
   });
 
   it("presentation: fin de l'aperçu", async () => {
@@ -336,7 +347,7 @@ describe("PresentationScreen", () => {
     setup({ proposals: propositions.slice(7) });
     card().focus();
     fireEvent.click(card());
-    const dialog = screen.getByRole("dialog", { name: "[Distillerie accessible en bus]" });
+    const dialog = await screen.findByRole("dialog", { name: "[Distillerie accessible en bus]" });
     expect(document.activeElement).toBe(within(dialog).getByRole("heading"));
     expect(within(dialog).getByRole("link", { name: "[Site de la distillerie]" })).toHaveAttribute("href", "https://example.org/mock/distillerie");
     expect(dialog).toHaveTextContent("Informations vérifiées le 15 août 2026");
@@ -344,7 +355,10 @@ describe("PresentationScreen", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
     await flush();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(card());
+    // Radix rend le focus dans un setTimeout après la fermeture ; `flush` (act asynchrone) n'attend qu'un
+    // setImmediate, que Node exécute avant ou après ce délai selon la charge (Q208). On attend donc l'état
+    // observable, comme pour la feuille de question.
+    await waitFor(() => expect(document.activeElement).toBe(card()));
   });
 
   it("aucune violation axe : carte, feuille, fin", async () => {
