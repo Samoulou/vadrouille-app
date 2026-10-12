@@ -8,10 +8,11 @@ import { StatusBanner, statusBannerRole, type StatusBannerKind } from "./StatusB
 const KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
 
 describe("StatusBanner", () => {
-  it("utilise role=alert pour error et role=status pour les autres types (provisoire, Q13)", () => {
+  it("utilise role=alert pour error et conflict, role=status pour les autres types (0012, Q13)", () => {
     for (const kind of KINDS) {
       const { unmount } = render(<StatusBanner kind={kind} message={`Message ${kind}`} />);
-      const expected = kind === "error" ? "alert" : "status";
+      const expected = kind === "error" || kind === "conflict" ? "alert" : "status";
+      expect(statusBannerRole(kind)).toBe(expected);
       expect(screen.getByRole(expected)).toHaveAttribute("data-kind", kind);
       unmount();
     }
@@ -27,11 +28,23 @@ describe("StatusBanner", () => {
     expect(banner.querySelector("[data-rail]")).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("n'anime le filet de génération que hors prefers-reduced-motion", () => {
+  it("generating : filet ink-soft, sans aucune animation (0012, Q13)", () => {
     render(<StatusBanner kind="generating" message="Jour 2 en préparation" />);
-    const rail = screen.getByRole("status").querySelector("[data-rail]");
-    expect(rail).toHaveClass("motion-safe:animate-pulse");
-    expect(rail?.className).not.toMatch(/(^|\s)animate-/);
+    const banner = screen.getByRole("status");
+    const rail = banner.querySelector("[data-rail]");
+    expect(rail).toHaveClass("bg-ink-soft");
+    expect(rail).not.toHaveClass("bg-line");
+    expect(banner.outerHTML).not.toMatch(/animate-/);
+  });
+
+  it("filet ink pour error et conflict, ink-soft pour les autres, jamais line", () => {
+    for (const kind of KINDS) {
+      const { container, unmount } = render(<StatusBanner kind={kind} message={`Message ${kind}`} />);
+      const rail = container.querySelector("[data-rail]");
+      expect(rail, kind).toHaveClass(kind === "error" || kind === "conflict" ? "bg-ink" : "bg-ink-soft");
+      expect(rail?.className, kind).not.toMatch(/bg-line/);
+      unmount();
+    }
   });
 
   it("type travel (décision 0015 § 7) : role=status, filet ink-soft fixe", () => {

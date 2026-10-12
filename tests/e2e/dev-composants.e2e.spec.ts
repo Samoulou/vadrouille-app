@@ -130,8 +130,8 @@ test.describe("/dev/composants", () => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/dev/composants");
     const rail = page.locator("[data-kind='generating'] [data-rail]");
-    // Sans préférence, le filet de génération est animé : le test ci-dessous a un objet.
-    expect(await rail.evaluate((el) => getComputedStyle(el).animationName)).not.toBe("none");
+    // Le filet de génération n'est jamais animé, même sans préférence (décision 0012, Q13).
+    expect(await rail.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 
     await page.emulateMedia({ reducedMotion: "reduce" });
     const animated = await page.evaluate(() => {
