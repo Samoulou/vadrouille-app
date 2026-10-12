@@ -132,13 +132,27 @@ function processAutorise(fichier: string, noeud: ts.Identifier): boolean {
   );
 }
 
-/** Clé d'accès admise : littéral (chaîne, nombre, gabarit sans substitution) ou symbole bien connu `Symbol.x`. */
-function cleLitterale(expression: ts.Expression): boolean {
+/**
+ * Symboles bien connus admis comme clé (décision du CEO, 43e cycle, point 1) : liste fermée. `Symbol` lui-même ne
+ * peut être ni redéclaré (variable, paramètre, import, classe, fonction…), ni réaffecté, ni nommé autrement que
+ * dans `Symbol.<un de ces quatre>` : voir la construction « Symbol hors liste fermée » dans `analyser`.
+ */
+const SYMBOLES_BIEN_CONNUS = new Set(["iterator", "asyncIterator", "toStringTag", "hasInstance"]);
+
+/** `Symbol.iterator`, `Symbol.asyncIterator`, `Symbol.toStringTag` ou `Symbol.hasInstance`, en accès littéral. */
+function symboleBienConnu(expression: ts.Node): expression is ts.PropertyAccessExpression {
   return (
-    ts.isStringLiteralLike(expression) ||
-    ts.isNumericLiteral(expression) ||
-    (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === "Symbol")
+    ts.isPropertyAccessExpression(expression) &&
+    !expression.questionDotToken &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === "Symbol" &&
+    SYMBOLES_BIEN_CONNUS.has(expression.name.text)
   );
+}
+
+/** Clé d'accès admise : chaîne (littéral ou gabarit sans substitution), nombre, ou symbole de la liste fermée. */
+function cleLitterale(expression: ts.Expression): boolean {
+  return ts.isStringLiteralLike(expression) || ts.isNumericLiteral(expression) || symboleBienConnu(expression);
 }
 
 /** Vrai si un littéral objet est la cible d'une affectation par déstructuration (`({ a, ...r } = x)`). */
@@ -220,6 +234,15 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
         }
       }
     }
+    // Décision du CEO, 43e cycle, point 1 : l'identifiant `Symbol` n'est admis que comme objet de
+    // `Symbol.<symbole de la liste fermée>`. Toute autre occurrence est refusée : déclaration qui le masque
+    // (`const Symbol = …`, paramètre, import, classe, fonction, `catch (Symbol)`), réaffectation, alias,
+    // propriété hors liste (`Symbol.c`, `Symbol.e = "env"`). `with` est refusé : il masquerait `Symbol` sans le
+    // déclarer.
+    if (ts.isIdentifier(noeud) && noeud.text === "Symbol" && !(symboleBienConnu(noeud.parent) && noeud.parent.expression === noeud)) {
+      constructions.push(`Symbol hors liste fermée : ${noeud.parent.getText(sf).slice(0, 60)}`);
+    }
+    if (ts.isWithStatement(noeud)) constructions.push("with");
     if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text)) constructions.push(noeud.text);
     if (ts.isPropertyAccessExpression(noeud)) {
       const nom = noeud.name.text;
@@ -254,6 +277,7 @@ const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossi
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[] };
 
 const contrats = sous("src/contracts");
+const FICHIER_FS = "scripts/p0/fichiers.ts";
 
 function regleDe(fichier: string): Regle | undefined {
   if (FEUILLES_PROTOTYPE.includes(fichier)) return { projet: contrats, externes: ["zod"] };
@@ -293,7 +317,9 @@ function regleDe(fichier: string): Regle | undefined {
       projet: (c) =>
         contrats(c) ||
         ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"].some((d) => sous(d)(c)),
-      externes: ["zod", "node:fs", "node:fs/promises", "node:path", "node:util"],
+      // Revue Sécurité de #180, mineur 5 (décision du CEO, 43e cycle, point 4) : `node:fs` et `node:fs/promises`
+      // réservés à `scripts/p0/fichiers.ts` (pas de `readFileSync("/proc/self/environ")` ailleurs, 0032 A3.2).
+      externes: ["zod", "node:path", "node:util", ...(fichier === FICHIER_FS ? ["node:fs", "node:fs/promises"] : [])],
     };
   }
   return undefined;
@@ -358,6 +384,12 @@ function controler(fichier: string, source: string): string[] {
   if (regle === undefined) return [`fichier hors de la liste : ${fichier}`];
   for (const { specificateur, forme } of imports) {
     const cible = resoudre(fichier, specificateur);
+    // Décision du CEO, 43e cycle, point 2 : un fichier non test n'importe aucun fichier de test (exempté de la liste
+    // d'autorisation), qu'il soit résolu ou non (`./helper.test`, `./helper.test.ts`, `@/ai/ai.test`).
+    if ((cible.type === "projet" && estTest(cible.chemin)) || /\.test(\.[cm]?[jt]sx?)?$/.test(specificateur)) {
+      violations.push(`import d'un fichier de test refusé : ${specificateur}`);
+      continue;
+    }
     if (cible.type === "projet") {
       if (!regle.projet(cible.chemin)) violations.push(`import refusé : ${cible.chemin}`);
     } else if (!regle.externes.includes(cible.nom)) {
@@ -373,8 +405,37 @@ function controler(fichier: string, source: string): string[] {
 // --- Fichiers contrôlés -------------------------------------------------------------------------------------
 
 const DOSSIERS_P0 = ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"];
-const FICHIERS_P0 = DOSSIERS_P0.flatMap((dossier) => fichiers(dossier, [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]));
-const SOURCES_P0 = FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts") && !estTest(fichier));
+
+/** Tous les fichiers présents sous un dossier, quelle que soit l'extension (`.d.ts` compris). */
+function tousLesFichiers(dossier: string): string[] {
+  const absolu = path.join(RACINE, dossier);
+  if (!existsSync(absolu)) return [];
+  const resultat: string[] = [];
+  for (const nom of readdirSync(absolu)) {
+    const chemin = path.join(absolu, nom);
+    if (statSync(chemin).isDirectory()) resultat.push(...tousLesFichiers(rel(chemin)));
+    else resultat.push(rel(chemin));
+  }
+  return resultat.sort();
+}
+
+/**
+ * Décision du CEO, 43e cycle, point 3 : liste d'exceptions fermée des fichiers admis dans les six dossiers de P0a1.
+ * `.ts` (contrôlés un par un), `scripts/p0/enregistrer.mjs` et les JSON de données (hors `package.json`,
+ * `tsconfig*.json` et `jsconfig*.json`, qui changeraient la résolution ou le mode des modules). Tout autre fichier
+ * (`.tsx`, `.jsx`, `.js`, `.mjs`, `.cts`, `.node`, `.wasm`…) fait échouer le test.
+ */
+function fichierAdmis(fichier: string): boolean {
+  const nom = path.posix.basename(fichier);
+  if (fichier.endsWith(".ts")) return true;
+  if (fichier === "scripts/p0/enregistrer.mjs") return true;
+  return nom.endsWith(".json") && nom !== "package.json" && !/^[tj]sconfig.*\.json$/.test(nom);
+}
+
+/** Tous les fichiers présents des six dossiers (sur-ensemble des fichiers suivis). */
+const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
+const FICHIERS_P0 = TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts"));
+const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
 /** Graphe des imports de projet d'un fichier, transitif. */
 function graphe(depart: string): Set<string> {
@@ -395,13 +456,38 @@ function graphe(depart: string): Set<string> {
 }
 
 describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => {
-  it("les dossiers de P0a1 ne contiennent que des fichiers TypeScript, plus enregistrer.mjs", () => {
-    const autres = FICHIERS_P0.filter((fichier) => !fichier.endsWith(".ts"));
-    expect(autres).toEqual(["scripts/p0/enregistrer.mjs"]);
+  it("les dossiers de P0a1 ne contiennent que des fichiers .ts, enregistrer.mjs et des JSON de données", () => {
+    expect(TOUS_FICHIERS_P0.filter((fichier) => !fichierAdmis(fichier))).toEqual([]);
+    expect(TOUS_FICHIERS_P0).toContain("scripts/p0/enregistrer.mjs");
     expect(SOURCES_P0.length).toBeGreaterThan(30);
   });
 
-  for (const fichier of FICHIERS_P0.filter((f) => f.endsWith(".ts"))) {
+  describe("test négatif : sélection des fichiers (décision du CEO, 43e cycle, point 3)", () => {
+    const refuses = [
+      "src/ai/evil.tsx",
+      "src/research/x.jsx",
+      "src/ai/x.js",
+      "scripts/p0/autre.mjs",
+      "src/domain/x.cjs",
+      "src/grounding/x.mts",
+      "src/prototype/x.cts",
+      "src/research/x.node",
+      "src/ai/x.wasm",
+      "src/ai/package.json",
+      "scripts/p0/tsconfig.json",
+      "src/ai/enregistrer.mjs",
+    ];
+    for (const fichier of refuses) {
+      it(`${fichier} est refusé`, () => {
+        expect(fichierAdmis(fichier)).toBe(false);
+      });
+    }
+    it(".ts, scripts/p0/enregistrer.mjs et un JSON de données sont admis", () => {
+      expect(["src/ai/client.ts", "scripts/p0/enregistrer.mjs", "src/domain/tables.json"].every(fichierAdmis)).toBe(true);
+    });
+  });
+
+  for (const fichier of FICHIERS_P0) {
     it(`liste d'autorisation des imports : ${fichier}`, () => {
       expect(controler(fichier, readFileSync(path.join(RACINE, fichier), "utf8"))).toEqual([]);
     });
@@ -550,6 +636,34 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["src/research/agent.test.ts", 'import { request } from "http";'],
       ["src/ai/client.test.ts", 'import { lookup } from "node:dns/promises";'],
       ["src/ai/client.test.ts", 'const m = await import("node:https");'],
+      // Décision du CEO, 43e cycle, point 1 : `Symbol` masqué, réaffecté ou hors liste fermée (revue du head 2eecd59).
+      ["src/ai/client.ts", 'const Symbol = { c: "constructor" };\nconst F = (() => {})[Symbol.c];'],
+      ["src/ai/client.ts", 'Symbol.e = "env";\nconst e = objet[Symbol.e];'],
+      ["src/ai/client.ts", "function f(Symbol: { k: string }) { return (() => {})[Symbol.k]; }"],
+      ["scripts/p0/main.ts", "function f(Symbol: { k: string }) { return (() => {})[Symbol.k]; }"],
+      ["src/ai/client.ts", 'const Symbol = { iterator: "constructor" };\nconst F = (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", 'const f = (Symbol: { iterator: string }) => (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", 'import { Symbol } from "@/ai/sorties";\nconst F = (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", 'class Symbol { static iterator = "constructor"; }\nconst F = (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", "function Symbol() {}\nconst F = (() => {})[Symbol.iterator];"],
+      ["src/ai/client.ts", 'try {} catch (Symbol) {}\nconst F = (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", 'Symbol = { iterator: "constructor" };\nconst F = (() => {})[Symbol.iterator];'],
+      ["src/ai/client.ts", "const S = Symbol;\nconst F = (() => {})[S.iterator];"],
+      ["src/ai/client.ts", "const F = (() => {})[Symbol?.iterator];"],
+      ["src/ai/client.ts", "const F = (() => {})[Symbol.for('x')];"],
+      ["src/ai/client.ts", 'with (o) { const F = (() => {})[Symbol.iterator]; }'],
+      // Décision du CEO, 43e cycle, point 2 : un fichier non test n'importe pas un fichier de test.
+      ["src/domain/relais.ts", 'import { go } from "./moteur.test";'],
+      ["src/domain/relais.ts", 'import { go } from "./helper.test";'],
+      ["src/domain/relais.ts", 'export * from "./moteur.test.ts";'],
+      ["scripts/p0/main.ts", 'import { go } from "@/ai/ai.test";'],
+      ["src/ai/client.ts", 'import type { T } from "./ai.test";'],
+      // Décision du CEO, 43e cycle, point 4 (mineur 5) : node:fs réservé à scripts/p0/fichiers.ts.
+      ["scripts/p0/main.ts", 'import { readFileSync } from "node:fs";'],
+      ["scripts/p0/main.ts", 'export { readFileSync } from "node:fs";'],
+      ["scripts/p0/cli.ts", 'import { readFile } from "node:fs/promises";'],
+      ["scripts/p0/pipeline.ts", 'import fs = require("node:fs");'],
+      ["scripts/p0/main.ts", 'import { readFileSync } from "fs";'],
     ];
     for (const [fichier, source] of cas) {
       it(`${fichier} : ${source.split("\n").at(-1)}`, () => {
@@ -569,6 +683,18 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
     it("accès littéral, symbole bien connu et création d'un littéral objet à clé calculée passent", () => {
       const source = 'const a = t[0];\nconst b = t["cle"];\nconst i = s[Symbol.asyncIterator]();\nconst o = { [cle]: 1 };';
       expect(controler("src/ai/client.ts", source)).toEqual([]);
+    });
+
+    it("les quatre symboles de la liste fermée passent, en accès et en nom de méthode", () => {
+      const source =
+        "const a = s[Symbol.iterator]();\nconst b = s[Symbol.asyncIterator]();\nconst c = s[Symbol.toStringTag];\nconst d = C[Symbol.hasInstance](x);\n" +
+        "const o = { async *[Symbol.asyncIterator]() {}, *[Symbol.iterator]() {} };";
+      expect(controler("src/ai/client.ts", source)).toEqual([]);
+    });
+
+    it("scripts/p0/fichiers.ts peut importer node:fs et node:fs/promises", () => {
+      const source = 'import { readFileSync } from "node:fs";\nimport { readFile } from "node:fs/promises";';
+      expect(controler("scripts/p0/fichiers.ts", source)).toEqual([]);
     });
   });
 });
