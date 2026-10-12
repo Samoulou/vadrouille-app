@@ -59,6 +59,9 @@ En `production`, toutes les gardes d'ouverture sont fermées (webhook simulé, p
 ## Modules d'environnement par dossier (revue de #114, point 12)
 `src/server/env.ts` valide toutes les variables au démarrage mais **n'exporte aucune clé de fournisseur**. Les clés sont exposées par des modules étroits : `src/server/env/ai.ts` (clés des fournisseurs de modèles, importable par `src/ai` seulement), `src/server/env/grounding.ts` (`GOOGLE_MAPS_SERVER_KEY`, importable par `src/grounding` seulement), `src/server/env/payment.ts` (secrets Stripe et du webhook simulé, importable par `src/server/routes` et `src/server/payment` seulement). Règles ESLint et tests au handover § 3.
 
+## Amendement B1 : versions installées (ticket #184, 2026-10-12)
+Constat, sans nouveau choix : B1 installe les versions du tableau, toujours les dernières stables au registre npm le 2026-10-12 : `drizzle-orm` 0.45.4, `drizzle-kit` 0.31.11, `pg` 8.23.1, `server-only` 0.0.1 (seule version publiée), et ajoute les types `@types/pg` 8.23.1 en dépendance de développement. Image de CI et de `docker-compose.yml` : `postgres:17.11`. Les noms des variables de connexion (B1-TL-3) et l'appel de `pnpm test:db` par `pnpm verify` (B1-TL-1) suivent les propositions de la spécification B1, en attente du Tech Lead.
+
 ## Conséquences
 - B1 ajoute `docker-compose.yml`, le script `test:db`, le conteneur de service dans `.github/workflows/ci.yml` et l'inclut dans `pnpm verify`.
 - Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant.

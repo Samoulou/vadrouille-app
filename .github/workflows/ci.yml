@@ -3,6 +3,24 @@ on: [pull_request]
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Spécification B1, proposition B1-TL-1 : `pnpm verify` appelle `pnpm test:db`, qui ne s'ignore jamais en CI.
+    # Ce job a donc lui aussi sa base jetable ; le job `db` ci-dessous rejoue en plus amorçage et migrations.
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: vadrouille
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vadrouille"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: vadrouille
+      VADROUILLE_DB_BOOTSTRAP_ROLE: postgres
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -27,6 +45,9 @@ jobs:
       - if: steps.diff.outputs.code == 'true'
         run: pnpm exec playwright install --with-deps chromium
       - if: steps.diff.outputs.code == 'true'
+        name: Préparer la base de test (amorçage, mots de passe jetables, migrations)
+        run: scripts/ci/db-setup.sh
+      - if: steps.diff.outputs.code == 'true'
         run: pnpm verify
       # Mesure Lighthouse (décision 0022 § 1 et § 2) : réutilise le build de `pnpm verify`, aucun service externe.
       - if: steps.diff.outputs.code == 'true'
@@ -50,6 +71,58 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+  # Spécification B1 : base de référence des tests de base (décision B1-PO-1). Conteneur postgres:17.11 jetable,
+  # amorçage avec l'utilisateur administrateur du conteneur, migrations sous vadrouille_migrator (deux fois : la
+  # seconde ne fait rien), puis `pnpm test:db`, dont chaque test se connecte avec le rôle qu'il éprouve.
+  db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: vadrouille
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vadrouille"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: vadrouille
+      VADROUILLE_DB_BOOTSTRAP_ROLE: postgres
+      EXPECTED_SERVER_VERSION: "17.11"
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: diff
+        name: Détecter une PR de documentation seule
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
+          # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
+          if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.code == 'true'
+        name: Refuser SKIP_DB_TESTS (les tests de base font foi en CI)
+        run: |
+          if [ -n "${SKIP_DB_TESTS:-}" ]; then echo "SKIP_DB_TESTS est interdite dans le job db." >&2; exit 1; fi
+      - if: steps.diff.outputs.code == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.diff.outputs.code == 'true'
+        uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.diff.outputs.code == 'true'
+        name: Amorçage et migrations, deux fois chacun
+        run: scripts/ci/db-setup.sh --twice
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm test:db
   docker:
     runs-on: ubuntu-latest
     steps:

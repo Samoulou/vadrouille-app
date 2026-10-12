@@ -338,6 +338,21 @@ export default defineConfig([
     },
   },
   {
+    // B1 (décision 0006, handover § 3) : `import "server-only"` obligatoire dans db/ et les dossiers serveur.
+    // `src/server/actions/` est déjà protégé par "use server" ; les tests et la configuration de drizzle-kit, non.
+    files: [
+      "db/**/*.{js,mjs,ts,tsx,mts}",
+      "src/server/**/*.{js,jsx,ts,tsx}",
+      "src/tenancy/**/*.{js,jsx,ts,tsx}",
+      "src/ai/**/*.{js,jsx,ts,tsx}",
+      "src/research/**/*.{js,jsx,ts,tsx}",
+      "src/grounding/**/*.{js,jsx,ts,tsx}",
+      "src/workflows/**/*.{js,jsx,ts,tsx}",
+    ],
+    ignores: ["src/server/actions/**", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: { "ligne/require-server-only": "error" },
+  },
+  {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
     files: ["eslint-rules/**", "tests/unit/lint/**"],
     rules: { "ligne/no-hardcoded-colors": "off" },
