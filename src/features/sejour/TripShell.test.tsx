@@ -2,10 +2,11 @@ import { act, render } from "@testing-library/react";
 import { useEffect, type ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LARGE_SCREEN_QUERY } from "@/lib/large-screen";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { tripRoutes } from "./routes";
-import { TripShell, useTripShell, type TripShellValue } from "./TripShell";
+import { TripShell, layoutFitPadding, layoutVisibleInsets, useTripShell, type TripShellValue } from "./TripShell";
 
 // Adresse courante simulée : paramètre `n` (jour) et `?etape=`, modifiés par le test comme le ferait le routeur.
 const location: { n?: string; etape: string | null } = { etape: null };
@@ -93,5 +94,49 @@ describe("TripShell : fermeture de la fiche (« Fermer », Échap)", () => {
     act(() => shell().closeFiche());
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith(routes.jour(2), { scroll: false });
+  });
+});
+
+describe("TripShell : grand écran (F12-PO-7 à F12-PO-10, décision 0022 § 6)", () => {
+  const main = { width: 1280, height: 800 };
+
+  it("marge du cadrage : panneau à 55 % de `main` en bas en mobile ; `--touch-target` seul en grand écran", () => {
+    document.documentElement.style.setProperty("--touch-target", "44px");
+    expect(layoutFitPadding({ width: 390, height: 844 }, false)).toEqual({ top: 44, right: 44, bottom: 0.55 * 844, left: 44 });
+    expect(layoutFitPadding(main, true)).toEqual({ top: 44, right: 44, bottom: 44, left: 44 });
+    document.documentElement.style.removeProperty("--touch-target");
+  });
+
+  it("partie couverte de la carte : `snap` de la hauteur de `main` en mobile ; aucune en grand écran", () => {
+    expect(layoutVisibleInsets({ width: 390, height: 844 }, 0.92, false)).toEqual({ top: 0, right: 0, bottom: 0.92 * 844, left: 0 });
+    expect(layoutVisibleInsets(main, 0.92, true)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+  });
+
+  it("fiche ouverte panneau à 25 % en grand écran : la hauteur mobile n'est pas touchée et reste 25 % sous le seuil", () => {
+    let large = true;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      get matches() {
+        return query === LARGE_SCREEN_QUERY && large;
+      },
+      media: query,
+      addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+    }));
+    try {
+      location.n = "2";
+      const { rerender } = render(tree());
+      act(() => shell().setSnap(0.25));
+      navigate(rerender, { n: "2", etape: CONCERT });
+      expect(shell().fiche?.stop.id).toBe(CONCERT);
+      expect(shell().snap).toBe(0.25);
+      act(() => {
+        large = false;
+        for (const listener of listeners) listener();
+      });
+      expect(shell().snap).toBe(0.25);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { StopMarker } from "@/components/ligne/StopMarker";
+import { useElementSize } from "@/lib/use-element-size";
 
 import { defaultFitPadding } from "./css";
 import { MarkerButton } from "./MarkerButton";
 import type { LatLng } from "./route";
-import { drag, fitCamera, offsetCamera, project, type Camera, type Size } from "./simulated-model";
+import { drag, fitCamera, offsetCamera, project, type Camera } from "./simulated-model";
 import type { MapView } from "./types";
 
 /** Au-delà de ce déplacement (en pixels CSS), le geste est un glisser et non un toucher. */
@@ -28,26 +29,13 @@ interface DragState {
  * Son état `{ center, zoom }` est exposé en attributs `data-center-lat`, `data-center-lng`, `data-zoom`.
  */
 export function SimulatedMapRenderer({ view }: { view: MapView }) {
-  const [size, setSize] = useState<Size | null>(null);
+  // Taille du conteneur, par le crochet commun (décision 0022 § 6) : la zone de la carte, pas la fenêtre.
+  const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [camera, setCamera] = useState<(Camera & { key: string }) | null>(null);
   const selectedStopId = view.mode === "day" ? view.selectedStopId : undefined;
   const [previousSelection, setPreviousSelection] = useState(selectedStopId);
   const dragState = useRef<DragState | null>(null);
   const suppressClick = useRef(false);
-
-  const measure = useCallback((element: HTMLDivElement | null) => {
-    if (!element) {
-      return;
-    }
-    const update = () => setSize({ width: element.clientWidth, height: element.clientHeight });
-    update();
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   // Cadrage au premier affichage et à chaque changement de jour seulement ; recentrage quand la
   // sélection change (zoom inchangé, sans transition). Ajusté pendant le rendu, sans effet.
@@ -111,7 +99,7 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
 
   return (
     <div
-      ref={measure}
+      ref={containerRef}
       data-renderer="simulated"
       data-center-lat={camera?.center.lat}
       data-center-lng={camera?.center.lng}
