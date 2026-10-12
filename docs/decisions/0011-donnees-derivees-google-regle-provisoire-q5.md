@@ -1,6 +1,6 @@
 # 0011 — Données dérivées de Google : application de la règle provisoire de Q5 (verdicts d'ancrage, état des workflows, durées, coordonnées)
 
-Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08 de la PR #27) · Décideur : Tech Lead pour l'architecture (délégation « Qui décide quoi » de `docs/CONTEXT.md`) ; **la règle appliquée est celle de Samuel** (décision 0027, point 4, #studio, 2026-10-12 09:46 CEST) · Définitif sans veto de Samuel sous 2 jours pour sa partie technique ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio ». **L'accord tacite sous veto ne couvre aucun aspect juridique** : la validation juridique formelle de Q5 reste ouverte (Samuel, avant le lancement) ; cette décision n'interprète pas la règle au-delà de son texte et signale chaque point d'interprétation (section « Points soumis à Samuel »).
+Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08 de la PR #27) · Décideur : Tech Lead pour l'architecture (délégation « Qui décide quoi » de `docs/CONTEXT.md`) ; **la règle appliquée est celle de Samuel** (décision 0027, point 4, #studio, 2026-10-12 09:46 CEST) · Définitif sans veto de Samuel sous 2 jours pour sa partie technique ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio ». **L'accord tacite sous veto ne couvre aucun aspect juridique** : la validation juridique formelle de Q5 reste ouverte (Samuel, avant le lancement) ; cette décision n'interprète pas la règle au-delà de son texte et signale chaque point d'interprétation (section « Points d'interprétation tranchés par Samuel »).
 
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.
 
@@ -102,10 +102,10 @@ Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover).
 - `coordonnées: expiration à 30 jours au plus` (B8) : `CHECK` refusé au-delà ; une ligne expirée n'est plus lisible ; `purge_expired_coordinates` ne supprime que les lignes expirées ; `vadrouille_app` n'a pas `DELETE`.
 - `ancrage: un candidat réutilisé est ré-ancré` (B9) : le client Places simulé est rappelé pour un candidat de la réserve qui a déjà un `placeId`.
 
-## Points soumis à Samuel (validation juridique de Q5)
+## Points d'interprétation tranchés par Samuel (2026-10-12)
 - **S1** : **Répondu par Samuel le 2026-10-12 (fil « Finalisation B0 sur Q5 », 10:38 CEST) : acceptable** ; la règle ci-dessous s'applique. Un candidat sans `placeId` laisse savoir qu'il n'a pas été ancré, sans motif. La décision considère que seul le `placeId` est stocké ; si Samuel juge que cette absence est déjà une donnée dérivée, l'étape c n'écrit plus rien et l'étape e ré-ancre tous les candidats (coût : appels « IDs only » supplémentaires).
-- **S2** : 0027 point 1.3 fait noter par le Decider les seuls candidats ancrés ; la spec P0 (#149, contrainte 7) retenait l'ordre inverse (le modèle note tout, le code écarte ensuite), pour que l'ensemble présenté au modèle ne trahisse pas un verdict. Cette décision suit 0027, décision de Samuel, et ne tranche pas l'écart avec P0.
-- **S3** : `CLAUDE.md` interdit encore de « stocker autre chose que l'identifiant d'un lieu Google », sans l'exception de 30 jours pour les coordonnées que la règle provisoire admet. La modification des règles du studio est réservée à Samuel : le cache du point 6 n'est créé par B8 qu'une fois `CLAUDE.md` aligné.
+- **S2** : **Répondu par Samuel le 2026-10-12 (fil « Finalisation B0 sur Q5 », 10:39 CEST) : le Decider note les seuls candidats ancrés**, comme 0027. 0027 point 1.3 fait noter par le Decider les seuls candidats ancrés ; la spec P0 (#149, contrainte 7) retenait l'ordre inverse (le modèle note tout, le code écarte ensuite), pour que l'ensemble présenté au modèle ne trahisse pas un verdict. Cette décision suit 0027, décision de Samuel, et ne tranche pas l'écart avec P0.
+- **S3** : **Répondu par Samuel le 2026-10-12 (même fil, 10:39 CEST) : `CLAUDE.md` est aligné** (exception de 30 jours pour les coordonnées, dans cette PR) ; B8 peut créer le cache. Texte d'origine : `CLAUDE.md` interdit encore de « stocker autre chose que l'identifiant d'un lieu Google », sans l'exception de 30 jours pour les coordonnées que la règle provisoire admet. La modification des règles du studio est réservée à Samuel.
 
 ## Conséquences
 - Le handover back-end remplace la section « En attente de Q5 » par « Partie Q5 » (§ 5, § 6, § 8, § 10, § 15).
@@ -113,4 +113,4 @@ Une étape IA ne contient jamais de donnée Google (règle du § 8 du handover).
 - B8 et B9 peuvent être spécifiés sans attendre la validation juridique formelle de Q5 ; ils restent soumis à leurs autres prérequis (G0, Q3, Q45, P0-Q9).
 
 ## Quand revoir cette décision
-À la validation juridique formelle de Q5 (Samuel), à la réponse sur S2 et S3, ou si la mesure comparée des variantes A et B change le pipeline (0027).
+À la validation juridique formelle de Q5 (Samuel), ou si la mesure comparée des variantes A et B change le pipeline (0027).
