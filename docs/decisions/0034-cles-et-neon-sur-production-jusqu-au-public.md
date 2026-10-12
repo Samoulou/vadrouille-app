@@ -1,4 +1,4 @@
-# 0034 — Clés OpenRouter et Google, et identifiant propriétaire Neon, sur Production jusqu'à la mise en public
+# 0034 — Clés OpenRouter et Google sur Production, et identifiant propriétaire Neon sur les préversions, jusqu'à la mise en public
 
 Statut : accepté · Date : 2026-10-12 · Décideur : Samuel (fil « Correction spec P0 » du projet Claude « Vadrouille », 2026-10-12 13:49 CEST) · Consigné par le CEO (40e cycle) · Ticket #181
 
@@ -25,9 +25,9 @@ Le studio demandait s'il fallait supprimer la ligne Production de ces deux clés
 
 ## Ce que cela change
 - **Q250 et 0028 § 1** sont amendées : jusqu'à la mise en public, les deux clés restent sur Preview, Development **et Production**.
-- **P0-Q19** est close : l'identifiant propriétaire Neon reste sur les préversions jusqu'à la mise en public.
+- **P0-Q19** est close : l'identifiant propriétaire Neon reste sur les préversions jusqu'à la mise en public. État vérifié par le CEO le 2026-10-12 à 13:20 CEST : les variables de l'intégration Neon visent Development et Preview, jamais Production (`POSTGRES_USER` vise Development seulement). Le choix de Samuel les laisse en l'état ; il ne les étend pas à Production.
 - C'est un **risque accepté**, valable jusqu'à la **passe de sécurité avant la mise en public**. La liste de contrôle de cette passe comprend au minimum :
-  1. le retrait de l'identifiant propriétaire Neon de Preview et de Production, remplacé par les rôles à moindre privilège (0007, créés par B1) ;
+  1. le retrait de l'identifiant propriétaire Neon de Preview, remplacé par les rôles à moindre privilège (0007, créés par B1) ;
   2. la limitation des clés OpenRouter et Google aux environnements prévus ;
   3. la vérification de la protection des préversions.
 
