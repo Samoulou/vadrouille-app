@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Button, IconButton, StatusBanner } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
+import { IconButton } from "@/components/ligne/IconButton";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { IconRetour } from "@/components/ligne/icons";
 import type { CheckoutOutcome, Currency, PaymentMethod } from "@/contracts/values";
 import { isCheckoutFailure } from "@/contracts/values";

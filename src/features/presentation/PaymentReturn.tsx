@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AnalyticsProvider, useTrack } from "@/analytics/context";
 import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import type { CheckoutStatusCode, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { isCheckoutFailure } from "@/contracts/values";
 import { useTripSession } from "@/features/voyage/TripSessionProvider";

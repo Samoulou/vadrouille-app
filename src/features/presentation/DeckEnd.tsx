@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Ref } from "react";
 
-import { Button } from "@/components/ligne";
+import { Button } from "@/components/ligne/Button";
 import { messages } from "@/i18n";
 
 import { unlockRoutes } from "./routes";

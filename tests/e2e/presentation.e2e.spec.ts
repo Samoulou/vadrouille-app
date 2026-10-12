@@ -89,7 +89,9 @@ test("presentation: glisser décide ou revient", async ({ page }) => {
   // 40 % vers la droite : « J'aime ».
   await swipe(page, 0.4);
   await expect.poll(() => cardName(page)).toBe("[Bonne table de l'Old Town]");
-  expect(named("deck_decision")).toEqual([
+  // Validation chargée au premier événement (`createLazyTrack`) : on attend l'enregistrement. Les événements
+  // gardent leur ordre, donc une décision envoyée par erreur plus haut ferait échouer cette égalité.
+  await expect.poll(() => named("deck_decision")).toEqual([
     {
       name: "deck_decision",
       properties: { decision: "like", kind: "activity", category: "museum", position: 1, gesture: "swipe", travel_minutes: 15 },
@@ -181,7 +183,7 @@ test("presentation: annuler restaure l'état exact", async ({ page }) => {
   expect(await cardName(page)).toBe("[Bonne table de l'Old Town]");
   await expect(card(page)).toBeFocused();
   await expect(toast(page)).toHaveCount(0);
-  expect(named("deck_undo")).toEqual([{ name: "deck_undo", properties: { position: 2 } }]);
+  await expect.poll(() => named("deck_undo")).toEqual([{ name: "deck_undo", properties: { position: 2 } }]);
 });
 
 test("presentation: le toast disparaît après 5 s", async ({ page }) => {
@@ -234,7 +236,7 @@ test("presentation: écarter deux musées et répondre", async ({ page }) => {
   await sheet.getByRole("button", { name: "Trop cher" }).click();
   await sheet.getByRole("button", { name: "Oui" }).click();
   await expect(sheet).toHaveCount(0);
-  expect(named("preference_prompt_answered")).toEqual([
+  await expect.poll(() => named("preference_prompt_answered")).toEqual([
     { name: "preference_prompt_answered", properties: { category: "museum", answer: "yes", reason: "too_expensive" } },
   ]);
   await expect(toast(page)).toContainText("[Musée national d'Écosse] écarté.");
@@ -275,7 +277,7 @@ test("presentation: question de distance", async ({ page }) => {
   await expect(distance.getByRole("heading")).toBeFocused();
   await distance.getByRole("button", { name: "Oui" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  expect(named("preference_prompt_answered").map((e) => e.properties)).toEqual([
+  await expect.poll(() => named("preference_prompt_answered").map((e) => e.properties)).toEqual([
     { category: "nature", answer: "no", reason: "too_far" },
     { category: "museum", answer: "yes", reason: "too_far" },
     { category: "distance", answer: "yes" },
@@ -289,14 +291,15 @@ test("presentation: passer et tout garder", async ({ page }) => {
   await press(page, "Tout garder pour le jour 1");
   expect(await cardName(page)).toBe("[Dean Village]");
   await expect(toast(page)).toContainText("Jour 1 gardé.");
-  expect(named("deck_skipped")).toEqual([{ name: "deck_skipped", properties: { position: 1, scope: "day" } }]);
+  await expect.poll(() => named("deck_skipped")).toEqual([{ name: "deck_skipped", properties: { position: 1, scope: "day" } }]);
+  // Les événements gardent leur ordre : une décision envoyée avant serait déjà enregistrée.
   expect(named("deck_decision")).toEqual([]);
   await toast(page).getByRole("button", { name: "Annuler" }).click();
   expect(await cardName(page)).toBe("[Château d'Édimbourg]");
   await page.getByRole("link", { name: "Passer" }).click();
   await page.waitForURL("**/voyages/mock_trip_edimbourg");
   expect(new URL(page.url()).pathname).toBe("/voyages/mock_trip_edimbourg");
-  expect(named("deck_skipped").at(-1)).toEqual({ name: "deck_skipped", properties: { position: 1, scope: "all" } });
+  await expect.poll(() => named("deck_skipped").at(-1)).toEqual({ name: "deck_skipped", properties: { position: 1, scope: "all" } });
 });
 
 test("presentation: détail et retour du focus", async ({ page }) => {
