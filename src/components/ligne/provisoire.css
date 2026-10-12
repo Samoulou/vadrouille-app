@@ -127,3 +127,12 @@
   /* F5-Q1 : place du toast au-dessus du panneau à 92 %, retrait à gauche qui laisse « Retour » visible (left-3, une cible tactile, puis space-2). */
   --ligne-toast-retrait-retour: calc(var(--spacing) * 5 + var(--touch-target));
 }
+
+/*
+ * F12b, grand écran du voyage (≥ 1024 px, handover § 6, non maquetté). Ligne n'a pas de règle au-delà du mobile
+ * (Q177) ; rendu provisoire (UX/UI, Q7, Q173).
+ */
+:root {
+  /* Q177 : largeur du panneau latéral du voyage en grand écran (420 px, handover § 6). */
+  --ligne-panneau-large: 420px;
+}

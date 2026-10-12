@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -11,6 +12,7 @@ import {
 } from "react";
 
 import { messages } from "@/i18n";
+import { useLargeScreen } from "@/lib/large-screen";
 import { releaseVelocity, type PointerSample } from "@/lib/pointer";
 import { cn } from "@/lib/utils";
 
@@ -44,11 +46,18 @@ export interface SheetProps {
   bodyRef?: Ref<HTMLDivElement>;
   /**
    * Contenu posé juste au-dessus du bord supérieur du panneau, qui suit ses hauteurs et le glisser (par
-   * exemple la région du toast d'annulation). Placé après le contenu dans l'ordre de lecture.
+   * exemple la région du toast d'annulation). Placé après le contenu dans l'ordre de lecture. En mode latéral
+   * (grand écran), posé sous le contenu, dans le panneau : il ne couvre ni le contenu ni la carte.
    */
   above?: ReactNode;
   children: ReactNode;
   className?: string;
+  /**
+   * Grand écran (≥ 1024 px, F12-PO-7 ; décision 0022 § 6) : panneau latéral de `--ligne-panneau-large`, sur toute
+   * la hauteur du conteneur, sans poignée ni glisser ni point d'arrêt. `snap` est conservé et redevient la hauteur
+   * visible sous le seuil. Faux par défaut : panneau coulissant à toutes les tailles.
+   */
+  sideOnLargeScreen?: boolean;
 }
 
 interface DragState {
@@ -86,6 +95,7 @@ export function Sheet({
   above,
   children,
   className,
+  sideOnLargeScreen = false,
 }: SheetProps) {
   const [internal, setInternal] = useState<SnapPoint>(defaultSnap);
   const snap = controlled ?? internal;
@@ -96,8 +106,13 @@ export function Sheet({
   const [dragging, setDragging] = useState<{ height: number; max: number } | null>(null);
 
   const maxSnap = Math.max(...snapPoints);
+  // Lu après le montage (faux au rendu serveur) : seulement pour le comportement, la disposition est en CSS.
+  const largeScreen = useLargeScreen();
+  const side = sideOnLargeScreen && largeScreen;
 
   const change = (next: SnapPoint) => {
+    // Panneau latéral : aucune hauteur à changer, `snap` reste celui d'avant le seuil.
+    if (side) return;
     if (controlled === undefined) setInternal(next);
     if (next !== snap) onSnapChange?.(next);
   };
@@ -109,7 +124,7 @@ export function Sheet({
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const sheet = sheetRef.current;
     const available = sheet?.parentElement?.clientHeight ?? 0;
-    if (!sheet || available <= 0 || drag.current || !event.isPrimary) return;
+    if (side || !sheet || available <= 0 || drag.current || !event.isPrimary) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const state: DragState = {
       pointerId: event.pointerId,
@@ -179,9 +194,12 @@ export function Sheet({
   };
 
   const reduces = handleReduces(snap, snapPoints);
-  const style = dragging
-    ? { height: percent(maxSnap), transform: `translateY(${dragging.max - dragging.height}px)` }
-    : { height: percent(snap) };
+  const transform = dragging ? `translateY(${dragging.max - dragging.height}px)` : undefined;
+  const height = dragging ? percent(maxSnap) : percent(snap);
+  // Mode latéral possible : hauteur en variable (`h-(--sheet-height)`) pour que `lg:h-full` l'emporte (0022 § 6).
+  const style: CSSProperties = sideOnLargeScreen
+    ? ({ "--sheet-height": height, transform } as CSSProperties)
+    : { height, transform };
 
   return (
     <section
@@ -190,16 +208,21 @@ export function Sheet({
       data-sheet=""
       data-snap={snap}
       data-dragging={dragging ? "true" : undefined}
+      data-side={sideOnLargeScreen ? "" : undefined}
       style={style}
       className={cn(
         "absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-t-sheet border border-b-0 border-outline bg-page",
         dragging ? "transition-none" : "transition-all duration-200 ease-in-out motion-reduce:transition-none",
+        // Grand écran : à droite de la carte, sur toute la hauteur, séparé par un contour hairline (rendu provisoire,
+        // UX/UI, Q173) ; aucune transition à la bascule (F12-PO-10).
+        sideOnLargeScreen &&
+          "h-(--sheet-height) lg:relative lg:inset-auto lg:h-full lg:w-(--ligne-panneau-large) lg:shrink-0 lg:rounded-none lg:border-0 lg:border-l lg:border-hairline lg:transition-none",
         className,
       )}
     >
       <div
         data-part="poignee-zone"
-        className="flex shrink-0 touch-none justify-center select-none"
+        className={cn("flex shrink-0 touch-none justify-center select-none", sideOnLargeScreen && "lg:hidden")}
         onPointerDown={onPointerDown}
       >
         <button
@@ -221,7 +244,10 @@ export function Sheet({
         {children}
       </div>
       {above ? (
-        <div data-part="au-dessus" className="pointer-events-none absolute inset-x-0 bottom-full">
+        <div
+          data-part="au-dessus"
+          className={cn("pointer-events-none absolute inset-x-0 bottom-full", sideOnLargeScreen && "lg:static lg:shrink-0")}
+        >
           {above}
         </div>
       ) : null}
