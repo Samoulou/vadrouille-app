@@ -1,6 +1,6 @@
 import * as z from "zod/mini";
 
-import { CATEGORIES, CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
+import { BRIEF_FIELDS, CATEGORIES, CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
 
 import { EVENT_REASON, EVENT_REASONS, type EventReason } from "./reasons";
 
@@ -116,6 +116,27 @@ export const TodayOpenedEventSchema = z.strictObject({
   properties: z.strictObject({ offline: z.boolean() }),
 });
 
+/** Nombre de champs du brief : 0 à 6 (`BRIEF_FIELDS`, F8-PO-15). */
+const BriefFieldCountSchema = z.int().check(z.nonnegative(), z.lte(BRIEF_FIELDS.length));
+
+/**
+ * « Continuer » réussi à l'état « Vérification » de l'écran 2 (handover § 12, spécification F8, F8-PO-15) :
+ * deux comptes, ni récit, ni destination, ni valeur du brief, ni identifiant.
+ */
+export const BriefCompletedEventSchema = z.strictObject({
+  name: z.literal("brief_completed"),
+  properties: z
+    .strictObject({
+      inferred_fields_count: BriefFieldCountSchema,
+      edited_fields_count: BriefFieldCountSchema,
+    })
+    .check(
+      z.refine((properties) => properties.edited_fields_count <= properties.inferred_fields_count, {
+        message: "edited_fields_count au plus inferred_fields_count",
+      }),
+    ),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -127,6 +148,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   PaymentFailedEventSchema,
   ChecklistItemDoneEventSchema,
   TodayOpenedEventSchema,
+  BriefCompletedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

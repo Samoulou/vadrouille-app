@@ -228,6 +228,8 @@ function State({ label, children }: { label: string; children: ReactNode }) {
 /** Chaque composant Ligne (F2, puis F3 dans la section « Ligne ») dans chacun de ses états. */
 export function ComposantsShowcase() {
   const [segment, setSegment] = useState<SegmentValue>("b");
+  const [inferredSegment, setInferredSegment] = useState<SegmentValue>("b");
+  const [inferredMarked, setInferredMarked] = useState(true);
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-8 px-5 py-6">
@@ -344,6 +346,22 @@ export function ComposantsShowcase() {
           value={segment}
           onChange={setSegment}
         />
+        {/* F8-TL-4 : marque « déduit » (0018 § 16) ; choisir une autre option la retire, comme sur l'écran 2. */}
+        <State label={t.etats.segmenteDeduit}>
+          <div className="flex w-full flex-col gap-3">
+            <SegmentedControl
+              label={ex.segmente.label}
+              options={SEGMENT_OPTIONS}
+              value={inferredSegment}
+              inferredValue={inferredSegment === "b" && inferredMarked ? "b" : undefined}
+              onChange={(value) => {
+                setInferredSegment(value);
+                setInferredMarked(false);
+              }}
+            />
+            <SegmentedControl label={ex.segmente.label} options={SEGMENT_OPTIONS} value={null} onChange={() => {}} />
+          </div>
+        </State>
       </Section>
 
       <Section id="otp-input" title="OtpInput">

@@ -118,7 +118,8 @@
     "checklist": {
       "reserver": "Réserver",
       "remunere": "Lien rémunéré"
-    }
+    },
+    "deduit": "déduit de ton récit"
   },
   "carte": {
     "regionJour": "Carte du jour {n}",
@@ -180,7 +181,8 @@
         "checklist": "Ligne à réserver : à faire, faite, sans lien, lien rémunéré (cliquable)",
         "bandeauAction": "Bandeau d'action requise (ActionBanner, aplat quai)",
         "ligneCompacte": "Ligne compacte en lecture seule : étape terminée, étape en cours, étape à venir",
-        "ligneReduite": "Ligne réduite : terminus sans libellé, étapes sans lien"
+        "ligneReduite": "Ligne réduite : terminus sans libellé, étapes sans lien",
+        "segmenteDeduit": "Option déduite choisie, puis sans choix"
       },
       "exemples": {
         "garder": "Garder",
@@ -371,7 +373,10 @@
       "walk": "les balades en ville",
       "nature": "la nature et les points de vue",
       "tasting": "les dégustations",
-      "restaurant": "les restaurants"
+      "restaurant": "les restaurants",
+      "heritage": "le patrimoine et les monuments",
+      "market": "les marchés",
+      "nightlife": "les bars et les soirées"
     },
     "detail": {
       "moment": "Jour {day}, {weekday}, vers {time}",
@@ -669,6 +674,160 @@
         "introuvable": "Ouvrir une adresse inexistante",
         "erreur": "Ouvrir une page qui lève une erreur"
       }
+    }
+  },
+  "creation": {
+    "retour": "Retour",
+    "brouillonPerdu": "Ton brouillon n'a pas été conservé. Recommence à partir de la destination.",
+    "continuer": "Continuer",
+    "titreDocument": {
+      "nouveau": "Nouveau voyage · Destination et dates",
+      "brief": "Nouveau voyage · Ton brief"
+    },
+    "ecran1": {
+      "titre": "Ton voyage",
+      "destination": "Destination",
+      "arrivee": "Arrivée",
+      "depart": "Départ",
+      "logement": {
+        "question": "As-tu déjà un logement ?",
+        "options": {
+          "known": "Oui",
+          "area": "Un quartier",
+          "none": "Pas encore"
+        },
+        "nomAdresse": "Nom ou adresse du logement",
+        "quartier": "Quartier"
+      },
+      "villes": {
+        "titre": "Autres villes",
+        "aide": "Chaque ville commence le jour où tu y arrives et se termine le jour où tu arrives dans la suivante.",
+        "ajouter": "Ajouter une ville",
+        "maximum": "Au plus {max} villes en tout, destination comprise.",
+        "ville": "Ville {n}",
+        "nom": "Nom de la ville",
+        "arrivee": "Arrivée dans cette ville",
+        "recapitulatif": "Tes villes",
+        "plage": "{nom} : {debut} – {fin}"
+      },
+      "engagements": {
+        "titre": "Engagements déjà pris",
+        "aide": "Ils seront gardés tels quels dans ton programme.",
+        "ajouter": "Ajouter un engagement",
+        "maximum": "Au plus {max} engagements.",
+        "engagement": "Engagement {n}",
+        "type": "Type d'engagement",
+        "types": {
+          "flight": "Vol",
+          "booking": "Réservation",
+          "ticket": "Billet"
+        },
+        "libelle": "Libellé",
+        "date": "Date",
+        "debut": "Heure de début",
+        "fin": "Heure de fin (facultatif)"
+      },
+      "retirer": "Retirer",
+      "retirerNom": "Retirer {nom}",
+      "erreurs": {
+        "destination": "Indique ta destination.",
+        "longueur": "Entre {min} et {max} caractères.",
+        "arrivee": "Indique ta date d'arrivée.",
+        "arriveePassee": "La date d'arrivée ne peut pas être déjà passée.",
+        "depart": "Indique ta date de départ.",
+        "departAvantArrivee": "Le départ doit suivre l'arrivée d'au moins une nuit.",
+        "logement": "Choisis une réponse.",
+        "nomAdresse": "Indique le nom ou l'adresse du logement.",
+        "quartier": "Indique le quartier.",
+        "villeNom": "Indique le nom de la ville.",
+        "villeArrivee": "Indique la date d'arrivée dans cette ville.",
+        "villeOrdre": "L'arrivée doit suivre celle de la ville précédente d'au moins une nuit.",
+        "villeAvantDepart": "L'arrivée doit précéder le départ du voyage d'au moins une nuit.",
+        "type": "Choisis un type.",
+        "libelle": "Indique un libellé.",
+        "date": "Indique la date.",
+        "dateHorsVoyage": "La date doit être comprise dans les dates du voyage.",
+        "debut": "Indique l'heure de début.",
+        "fin": "L'heure de fin doit suivre l'heure de début."
+      }
+    },
+    "ecran2": {
+      "recit": {
+        "titre": "Raconte ton voyage en quelques phrases",
+        "aide": "Qui part, ce qui te fait envie, ce que tu préfères éviter, ton budget pour les repas.",
+        "compteur": "{n} sur {max} caractères",
+        "preparer": "Préparer mon brief",
+        "remplirMoiMeme": "Remplir moi-même",
+        "attente": "On prépare ton brief…",
+        "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
+        "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
+        "reessayer": "Réessayer"
+      },
+      "verification": {
+        "titre": "Vérifie ton brief",
+        "aide": "En pointillé : ce qu'on a compris de ton récit. Touche pour corriger.",
+        "revenirRecit": "Revenir à mon récit",
+        "facultatif": "Facultatif",
+        "voyageurs": {
+          "titre": "Voyageurs",
+          "adultes": "Adultes",
+          "enfants": "Enfants",
+          "retirerAdulte": "Retirer un adulte",
+          "ajouterAdulte": "Ajouter un adulte",
+          "retirerEnfant": "Retirer un enfant",
+          "ajouterEnfant": "Ajouter un enfant"
+        },
+        "rythme": {
+          "titre": "Rythme",
+          "options": {
+            "relaxed": "Tranquille",
+            "balanced": "Équilibré",
+            "intense": "Intense"
+          }
+        },
+        "envies": {
+          "titre": "Envies",
+          "indisponibles": "Les éléments à limiter ne peuvent pas être choisis.",
+          "dejaLimite": "Déjà à limiter"
+        },
+        "deplacements": {
+          "titre": "Déplacements"
+        },
+        "limiter": {
+          "titre": "À limiter",
+          "indisponibles": "Les envies déjà choisies ne peuvent pas être limitées.",
+          "dejaEnvie": "Déjà dans tes envies"
+        },
+        "budget": {
+          "titre": "Budget par repas",
+          "avant": "Environ",
+          "apres": "CHF par personne et par repas",
+          "resume": "Environ {montant} CHF par personne et par repas"
+        },
+        "resumeSeparateur": ", ",
+        "erreurs": {
+          "adultes": "Entre {min} et {max} adultes.",
+          "enfants": "Entre {min} et {max} enfants.",
+          "rythme": "Choisis un rythme.",
+          "envies": "Choisis au moins une envie.",
+          "budget": "Un nombre entier entre {min} et {max}."
+        }
+      }
+    },
+    "envies": {
+      "museum": "Musées",
+      "walk": "Balades en ville",
+      "nature": "Nature",
+      "tasting": "Dégustations",
+      "restaurant": "Restaurants",
+      "heritage": "Patrimoine et monuments",
+      "market": "Marchés",
+      "nightlife": "Bars et soirées"
+    },
+    "deplacements": {
+      "walk": "À pied",
+      "transit": "Transports publics",
+      "car": "Voiture"
     }
   }
 }

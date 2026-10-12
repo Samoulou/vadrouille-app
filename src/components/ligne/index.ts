@@ -23,7 +23,7 @@ export { DeckCard, deckCardLabels, deckCardTag, type DeckCardProps } from "./Dec
 export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
 export { DestinationPlate, type DestinationPlateProps } from "./DestinationPlate";
 export { IconButton, iconButtonClassName, type IconButtonProps } from "./IconButton";
-export { IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconRetour } from "./icons";
+export { IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconPlus, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
 export { ReasonBlock, type ReasonBlockProps } from "./ReasonBlock";
 export { Sheet, type SheetProps } from "./Sheet";

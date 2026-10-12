@@ -1,8 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 
+import { R1, R2, continueButton, fillTrip, upcomingTrip } from "./creation-helpers";
 import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useScope as createScope } from "./debloquer-helpers";
 import { card, press, toast } from "./presentation-helpers";
-import type { RoutePreparationName, RouteStateName } from "./routes";
+import type { RouteJourneyName, RoutePreparationName, RouteStateName } from "./routes";
 import { ficheTitle, listStops } from "./sejour-helpers";
 
 /**
@@ -68,3 +69,23 @@ export const ROUTE_PREPARATIONS = {
     return { path: pathOf(page), scope: scope.name };
   },
 } satisfies Record<RoutePreparationName, RoutePreparation>;
+
+export interface RouteJourney {
+  /** Adresse ouverte par `page.goto` avant le parcours. */
+  start: string;
+  /** Amène la page, ouverte sur `start`, à l'adresse de l'entrée par navigation côté client. */
+  run: (page: Page) => Promise<void>;
+}
+
+export const ROUTE_JOURNEYS = {
+  /** `R2` : écran 1 rempli (dates à venir, sans horloge installée) et validé ; l'écran 2 s'affiche à l'état « Récit ». */
+  "brouillon-ecran-1": {
+    start: R1,
+    run: async (page) => {
+      await fillTrip(page, upcomingTrip());
+      await continueButton(page).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(R2);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    },
+  },
+} satisfies Record<RouteJourneyName, RouteJourney>;
