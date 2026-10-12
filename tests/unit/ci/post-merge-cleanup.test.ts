@@ -188,6 +188,26 @@ describe("planCleanup", () => {
     expect(planCleanup(data({ pulls }), NOW).warnings).toHaveLength(1);
   });
 
+  it("n'avertit pas quand les plus anciennes des PR lues sortent de la fenêtre", () => {
+    const pulls = Array.from({ length: MERGED_LIMIT }, (_, i) =>
+      merged({
+        number: 1000 + i,
+        headRefName: `claude/x-${i}`,
+        mergedAt: i < 10 ? "2026-10-12T09:00:00Z" : "2026-09-01T09:00:00Z",
+      }),
+    );
+    expect(planCleanup(data({ pulls }), NOW).warnings).toEqual([]);
+  });
+
+  it("demande à GitHub autant de PR fusionnées que MERGED_LIMIT", () => {
+    expect(QUERY).toContain(`states: MERGED, first: ${MERGED_LIMIT},`);
+  });
+
+  it("ne ferme aucun ticket pour une PR de fork (corps modifiable par un tiers)", () => {
+    const pulls = [merged({ isCrossRepository: true })];
+    expect(planCleanup(data({ pulls }), NOW).closeIssues).toEqual([]);
+  });
+
   it("refuse de nettoyer si la liste des PR ouvertes est tronquée", () => {
     expect(() => planCleanup(data({ hasNextPage: true }), NOW)).toThrow();
   });

@@ -43,7 +43,10 @@ jobs:
           status=0
           # plan.txt est lu sur le descripteur 3 : les appels gh ne consomment pas le plan.
           while read -r kind target pr oid <&3; do
-            if [ "$kind" = warn ]; then
+            if [ "$kind" != warn ] && { [ -z "$target" ] || [ -z "$pr" ]; }; then
+              echo "::error::Ligne de plan incomplète : $kind."
+              status=1
+            elif [ "$kind" = warn ]; then
               echo "::warning::$target $pr $oid"
               status=1
             elif [ "$kind" = issue ]; then

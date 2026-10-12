@@ -7,13 +7,17 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
+export const MAX_AGE_DAYS = 7;
+// Nombre de PR fusionnées demandées par la requête.
+export const MERGED_LIMIT = 50;
+
 // Requête GraphQL : PR fusionnées récentes avec les tickets que GitHub leur relie
 // (dépôt et réouverture compris), PR ouvertes (tête et base), branches claude/….
 export const QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     nameWithOwner
     defaultBranchRef { name }
-    merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    merged: pullRequests(states: MERGED, first: ${MERGED_LIMIT}, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
         number mergedAt baseRefName headRefName headRefOid isCrossRepository
         closingIssuesReferences(first: 20) {
@@ -37,10 +41,6 @@ export const QUERY = `query($owner: String!, $name: String!) {
     }
   }
 }`;
-
-export const MAX_AGE_DAYS = 7;
-// Nombre de PR fusionnées demandées (`first: 50`) : atteint, la fenêtre peut être incomplète.
-export const MERGED_LIMIT = 50;
 
 // Seules les branches de travail des agents sont supprimées ; le motif exclut aussi
 // tout caractère qu'un shell pourrait interpréter, et les segments « . » et « .. ».
@@ -84,7 +84,11 @@ export function planCleanup(data, now = new Date()) {
     if (pr.baseRefName !== base || !pr.mergedAt) continue;
     const mergedAt = Date.parse(pr.mergedAt);
     if (mergedAt < since) continue;
-    for (const issue of pr.closingIssuesReferences?.nodes ?? []) {
+    // PR de fork : son corps (« Closes #n ») reste modifiable par un tiers après la fusion.
+    const linked = pr.isCrossRepository
+      ? []
+      : (pr.closingIssuesReferences?.nodes ?? []);
+    for (const issue of linked) {
       // Réouverture illisible : le ticket est ignoré (échec fermé).
       const events = issue.timelineItems?.nodes;
       if (!Array.isArray(events) || events.some((event) => !event?.createdAt))
@@ -112,7 +116,12 @@ export function planCleanup(data, now = new Date()) {
     }
   }
   const warnings = [];
-  if (repo.merged.nodes.length >= MERGED_LIMIT) {
+  // Fenêtre coupée seulement si la liste est pleine et que sa PR la plus ancienne est
+  // encore dans la fenêtre : des PR plus anciennes, mais récentes, ont pu être omises.
+  const oldest = Math.min(
+    ...repo.merged.nodes.map((pr) => Date.parse(pr.mergedAt)),
+  );
+  if (repo.merged.nodes.length >= MERGED_LIMIT && oldest >= since) {
     warnings.push(
       `${MERGED_LIMIT} PR fusionnées lues : la fenêtre de ${MAX_AGE_DAYS} jours peut être incomplète.`,
     );
