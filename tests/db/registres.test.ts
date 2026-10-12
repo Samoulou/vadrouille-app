@@ -6,7 +6,7 @@ import { attempt, closeAll, connect, expectRefused, inTx, seedOrganization, type
 /**
  * Ajout seulement (décision 0007) : `trip_versions`, `billing`, `usage_ledger` refusent UPDATE, DELETE et TRUNCATE,
  * par les droits (aucun rôle applicatif ne les a) et par un déclencheur, qui ne laisse passer qu'un DELETE sur
- * `trip_versions` par la fonction de purge (`current_user = vadrouille_fn_purge`, rôle sans membre).
+ * `trip_versions` par la fonction de purge (`current_user = vadrouille_fn_purge`, rôle sans appartenance avec SET ni INHERIT, décision 0036).
  *
  * Le déclencheur est un second verrou : aucun rôle applicatif ne peut l'atteindre (droits absents) et le
  * propriétaire ne voit aucune ligne (RLS forcée). Pour prouver qu'il refuse quand même, la mise à jour et la

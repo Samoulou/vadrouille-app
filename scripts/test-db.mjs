@@ -1,4 +1,4 @@
-// `pnpm test:db` (spécification B1, proposition B1-TL-1 du Tech Lead, en attente de sa réponse).
+// `pnpm test:db` (spécification B1 ; décision 0036, B1-TL-1).
 //
 // Lance le projet Vitest des tests de base (`vitest.db.config.mts`). Sans base joignable, il échoue avec un message
 // explicite (tests/db/global-setup.ts) ; il n'est jamais ignoré en silence (décision 0006, convention 6).

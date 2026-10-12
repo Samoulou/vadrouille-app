@@ -18,7 +18,7 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 | `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034) et garde de rôle (B1-PO-6). |
 | `db/index.ts` | `createDatabase("vadrouille_app" \| "vadrouille_auth")` : client Drizzle sur un pool gardé. |
 
-Variables (noms proposés par B1-TL-3, jamais `DATABASE_URL`, que l'intégration Neon de Vercel pose avec
+Variables (noms de la décision 0036, B1-TL-3 ; jamais `DATABASE_URL`, que l'intégration Neon de Vercel pose avec
 l'identifiant propriétaire) :
 
 | Variable | Rôle | Où |
@@ -35,9 +35,11 @@ Commandes :
   rôle qui a `SUPERUSER` ou `BYPASSRLS`. Une seconde exécution ne fait rien.
 - `pnpm test:db` : tests de base (projet Vitest `vitest.db.config.mts`, dossier `tests/db/`). Chaque test se connecte
   avec le rôle qu'il éprouve. Sans base joignable ou sans variables, il échoue avec un message explicite.
-  `SKIP_DB_TESTS=1`, posée explicitement et hors CI, l'ignore avec un avertissement visible (proposition B1-TL-1) ;
+  `SKIP_DB_TESTS=1`, posée explicitement et hors CI, l'ignore avec un avertissement visible (décision 0036, B1-TL-1) ;
   en CI elle est refusée (par `scripts/test-db.mjs`, seul endroit qui porte ce refus).
-- `pnpm verify` appelle `pnpm test:db` (proposition B1-TL-1).
+- `pnpm verify` appelle `pnpm test:db` (décision 0036, B1-TL-1). Une PR dit si `pnpm verify` a tourné avec ou sans
+  base ; une PR qui touche `db/`, `tests/db/` ou une migration s'appuie sur le job `db` de la CI, jamais sur un
+  `verify` local sans base.
 - `pnpm db:generate` : génère une migration à partir de `db/schema/` (drizzle-kit). `drizzle-kit push` n'est
   jamais utilisé. Une migration de sécurité s'écrit à la main : `pnpm db:generate --custom --name <nom>`.
 
@@ -127,7 +129,8 @@ FROM pg_catalog.pg_roles WHERE rolname LIKE 'vadrouille\_%' ORDER BY rolname;
 Contrôle des appartenances (attendu : `vadrouille_app` membre de `vadrouille_share`, `vadrouille_webhook`,
 `vadrouille_account_admin`, `vadrouille_limiter` avec `inherit = false` ; `vadrouille_migrator` membre de
 `vadrouille_owner` avec `inherit = true`, et des cinq `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
-`set = false`) :
+`set = false` ; décision 0036, B1-TL-2. La ligne `ADMIN` seule du rôle d'amorçage sur chaque `vadrouille_fn_*`,
+créée par Postgres 16 et suivants quand il n'est pas superutilisateur, est admise ; elle n'apparaît pas ici) :
 
 ```sql
 SELECT m.rolname AS membre, r.rolname AS role, am.admin_option AS admin,

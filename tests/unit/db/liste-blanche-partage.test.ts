@@ -42,16 +42,26 @@ describe("vues partagées : la liste blanche de la migration suit db/jsonb-keys.
     expect(emittedKeys(name)).toEqual([...keys]);
   });
 
-  it("shared_exceptions : seulement les valeurs de SNAPSHOT_STOP_EXCEPTIONS, au plus SNAPSHOT_STOP_EXCEPTIONS_MAX", () => {
+  it("shared_exceptions : seulement les valeurs de SNAPSHOT_STOP_EXCEPTIONS, sans doublon, au plus SNAPSHOT_STOP_EXCEPTIONS_MAX", () => {
     const code = body("exceptions");
     const allowed = /IN \(([^)]*)\)/.exec(code)?.[1] ?? "";
     expect([...allowed.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1])).toEqual([...SNAPSHOT_STOP_EXCEPTIONS]);
     expect(code).toContain(`LIMIT ${SNAPSHOT_STOP_EXCEPTIONS_MAX}`);
+    // Sans doublon avant la limite (revue de #188, mineur 2).
+    expect(code).toContain("GROUP BY e.v");
     expect(code).not.toContain("toConfirm");
   });
 
   it("shared_source : url seulement en https://", () => {
     expect(body("source")).toMatch(/jsonb_typeof\(p -> 'url'\) = 'string' AND pg_catalog\.left\(p ->> 'url', 8\) = 'https:\/\/'/);
+  });
+
+  it("chaque fonction shared_* perd explicitement ses droits PUBLIC (REVOKE ALL … FROM PUBLIC, revue de la PR 188)", () => {
+    const names = [...sql.matchAll(/CREATE FUNCTION public\.(shared_[a-z_]+)\(p jsonb\)/g)].map((m) => m[1]);
+    expect(names.length).toBeGreaterThan(0);
+    const revoke = /REVOKE ALL ON FUNCTION ([^;]*?) FROM PUBLIC;/g;
+    const revoked = [...sql.matchAll(revoke)].flatMap((m) => [...(m[1] ?? "").matchAll(/public\.(shared_[a-z_]+)\(jsonb\)/g)].map((n) => n[1]));
+    expect([...revoked].sort()).toEqual([...names].sort());
   });
 
   it("shared_stop utilise shared_exceptions pour exceptions (plus aucune fonction de chaînes libres)", () => {

@@ -8,6 +8,7 @@ import {
   assertDatabaseAllowed,
   connectionStringFor,
   createGuardedPool,
+  DatabaseConnectionError,
   DatabaseGuardError,
   verifyConnectionRole,
 } from "../../../db/connection";
@@ -127,16 +128,63 @@ describe("db : refus définitif seulement pour un refus de fond", () => {
     return query;
   }
 
-  it("une erreur transitoire du contrôle remonte telle quelle, et la demande suivante refait le contrôle", async () => {
-    const transient = Object.assign(new Error("Connection terminated unexpectedly"), { code: "ECONNRESET" });
+  it("une erreur transitoire du contrôle remonte emballée (code seul), et la demande suivante refait le contrôle", async () => {
+    const transient = Object.assign(new Error(`Connection terminated unexpectedly (${UNREACHABLE})`), { code: "ECONNRESET" });
     simulate(async () => {
       throw transient;
     }, VALID);
     const pool = createGuardedPool("vadrouille_app", env);
     try {
-      await expect(pool.connect()).rejects.toBe(transient);
+      const error = await pool.connect().then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(DatabaseConnectionError);
+      expect(error).toMatchObject({ code: "ECONNRESET" });
+      expect((error as Error).message).not.toContain(PASSWORD);
+      expect((error as Error).message).not.toContain("127.0.0.1");
+      expect((error as Error).cause).toBeUndefined();
       const client = await pool.connect();
       client.release();
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("une erreur d'ouverture de pg (adresse et mot de passe dans le message) remonte sans l'adresse ni le mot de passe", async () => {
+    vi.spyOn(pg.Client.prototype, "connect").mockImplementation((async () => {
+      throw Object.assign(new Error(`connect ECONNREFUSED 127.0.0.1:1 ${UNREACHABLE}`), { code: "ECONNREFUSED" });
+    }) as never);
+    vi.spyOn(pg.Client.prototype, "end").mockImplementation((async () => undefined) as never);
+    const pool = createGuardedPool("vadrouille_app", env);
+    try {
+      const error = await pool.query("SELECT 1").then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(DatabaseConnectionError);
+      expect(error).toMatchObject({ code: "ECONNREFUSED" });
+      for (const secret of [PASSWORD, "127.0.0.1", "utilisateur", "postgres://"]) {
+        expect((error as Error).message, secret).not.toContain(secret);
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("une erreur sans code utilisable devient « inconnu »", async () => {
+    vi.spyOn(pg.Client.prototype, "connect").mockImplementation((async () => {
+      throw Object.assign(new Error(UNREACHABLE), { code: `x ${PASSWORD}` });
+    }) as never);
+    vi.spyOn(pg.Client.prototype, "end").mockImplementation((async () => undefined) as never);
+    const pool = createGuardedPool("vadrouille_app", env);
+    try {
+      const error = await pool.connect().then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toMatchObject({ name: "DatabaseConnectionError", code: "inconnu" });
+      expect((error as Error).message).not.toContain(PASSWORD);
     } finally {
       await pool.end();
     }

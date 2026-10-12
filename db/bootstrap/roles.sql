@@ -57,7 +57,7 @@ GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille
   TO vadrouille_app WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
 
 -- Transfert de propriété (décision 0007) : vadrouille_migrator doit pouvoir accorder, le temps d'une migration,
--- l'appartenance aux rôles vadrouille_fn_* (option ADMIN seule, sans SET ni INHERIT : question B1-TL-2).
+-- l'appartenance aux rôles vadrouille_fn_* (option ADMIN seule, sans SET ni INHERIT : décision 0036, B1-TL-2).
 GRANT vadrouille_fn_share, vadrouille_fn_share_views, vadrouille_fn_checkout, vadrouille_fn_coords, vadrouille_fn_purge
   TO vadrouille_migrator WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 

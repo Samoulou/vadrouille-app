@@ -54,7 +54,11 @@ const SNAPSHOT = {
         { type: "segment", segment: { mode: "walk", minutes: 12, estimated: false, polyline: "abc" } },
         // Sources aux adresses refusées : jamais rendues en href dans le lien privé.
         { type: "stop", stop: { id: "s2", name: "Script", source: { label: "Piège", url: "javascript:alert(1)" } } },
-        { type: "stop", stop: { id: "s3", name: "Clair", source: { label: "Non chiffré", url: "http://exemple.ch" } } },
+        {
+          type: "stop",
+          // Doublons : une seule occurrence de chaque valeur, dans l'ordre de première apparition.
+          stop: { id: "s3", name: "Clair", source: { label: "Non chiffré", url: "http://exemple.ch" }, exceptions: ["toReserve", "toReserve", "toReserve"] },
+        },
         { type: "stop", stop: { id: "s4", name: "Majuscules", source: { label: "Casse", url: "JAVASCRIPT:alert(1)" } } },
         { type: "stop", stop: { id: "s5", name: "Objet", source: { label: "Objet", url: { href: "https://exemple.ch" } } } },
         { type: "free", from: "11:00", to: "12:00", note: "x" },
@@ -94,7 +98,7 @@ const EXPECTED_SNAPSHOT = {
         },
         { type: "segment", segment: { mode: "walk", estimated: false } },
         { type: "stop", stop: { id: "s2", name: "Script", source: { label: "Piège" } } },
-        { type: "stop", stop: { id: "s3", name: "Clair", source: { label: "Non chiffré" } } },
+        { type: "stop", stop: { id: "s3", name: "Clair", source: { label: "Non chiffré" }, exceptions: ["toReserve"] } },
         { type: "stop", stop: { id: "s4", name: "Majuscules", source: { label: "Casse" } } },
         { type: "stop", stop: { id: "s5", name: "Objet", source: { label: "Objet" } } },
         { type: "free", from: "11:00", to: "12:00" },
@@ -315,10 +319,12 @@ describe("vues partagées: l'instantané partagé ne contient que les clés de l
     for (const url of urls) expect(url.startsWith("https://"), url).toBe(true);
   });
 
-  it("exceptions : toReserve et unconfirmed seulement, au plus 2 (décision 0011, point 5 ; jamais toConfirm)", async () => {
+  it("exceptions : toReserve et unconfirmed seulement, sans doublon, au plus 2 (décision 0011, point 5 ; jamais toConfirm)", async () => {
     const shared = await readShared(a.valid);
     const stop = shared.version[0].snapshot.days[0].items[1].stop;
     expect(stop.exceptions).toEqual(["toReserve", "unconfirmed"]);
+    // Sans doublon : ["toReserve", "toReserve", "toReserve"] donne ["toReserve"].
+    expect(shared.version[0].snapshot.days[0].items[4].stop.exceptions).toEqual(["toReserve"]);
     expect(JSON.stringify(shared.version[0].snapshot)).not.toContain("toConfirm");
   });
 });

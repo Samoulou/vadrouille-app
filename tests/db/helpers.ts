@@ -21,7 +21,10 @@ export function urlFor(login: Login): string {
   return value;
 }
 
-/** Rôle d'amorçage nommé dans le test `rôles` (B1-TL-2) : superutilisateur du conteneur en CI. */
+/**
+ * Rôle d'amorçage nommé dans le test `rôles` (décision 0036, B1-TL-2 ; variable `VADROUILLE_DB_BOOTSTRAP_ROLE`) :
+ * superutilisateur `postgres` du conteneur en CI, qui ne reçoit pas de ligne ADMIN. Sa ligne est tolérée, non exigée.
+ */
 export const BOOTSTRAP_ROLE = process.env.VADROUILLE_DB_BOOTSTRAP_ROLE ?? "postgres";
 
 const open: pg.Client[] = [];

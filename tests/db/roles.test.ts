@@ -163,10 +163,14 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
     expect(privileges.rows[0]).toEqual({ purge: false, entitlements: false, billing: false, limiter: false });
   });
 
-  it("vadrouille_migrator n'est membre (SET ou INHERIT) que de vadrouille_owner ; aucun autre rôle n'a de membre hors amorçage", async () => {
+  it("vadrouille_migrator : seule appartenance avec SET, vadrouille_owner ; ses autres appartenances sont ADMIN seule aux rôles vadrouille_fn_* (décision 0036, amendement de 0007)", async () => {
     const all = await memberships();
     const usable = all.filter((m) => m.set_option || m.inherit_option);
     expect(usable.filter((m) => m.member === "vadrouille_migrator").map((m) => m.role)).toEqual(["vadrouille_owner"]);
+    for (const m of all.filter((x) => x.member === "vadrouille_migrator" && x.role !== "vadrouille_owner")) {
+      expect(FN_ROLES, `vadrouille_migrator→${m.role}`).toContain(m.role);
+      expect(m, `vadrouille_migrator→${m.role}`).toMatchObject({ set_option: false, inherit_option: false, admin_option: true });
+    }
     // Seules appartenances utilisables vers un rôle vadrouille_* : migrator → owner, app → ses quatre rôles.
     expect(
       usable
@@ -186,7 +190,10 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
     expect(all.filter((m) => m.member.startsWith("vadrouille_") && !m.role.startsWith("vadrouille_"))).toEqual([]);
   });
 
-  it("rôles vadrouille_fn_* : aucune appartenance avec SET ou INHERIT ; seule l'option ADMIN de vadrouille_migrator et du rôle d'amorçage (B1-TL-2)", async () => {
+  // Décision 0036, B1-TL-2 : rôles vadrouille_fn_* « sans appartenance avec SET ni INHERIT ». Seules sont admises,
+  // ADMIN seule, l'appartenance de vadrouille_migrator (exigée) et celle du rôle d'amorçage (VADROUILLE_DB_BOOTSTRAP_ROLE,
+  // tolérée, non exigée : en CI, le superutilisateur postgres n'en reçoit pas). Tout autre membre ou option échoue.
+  it("rôles vadrouille_fn_* : sans appartenance avec SET ni INHERIT ; ADMIN seule de vadrouille_migrator et, tolérée, du rôle d'amorçage (décision 0036, B1-TL-2)", async () => {
     const fn = (await memberships()).filter((m) => FN_ROLES.includes(m.role));
     for (const m of fn) {
       expect(m, `${m.member}→${m.role}`).toMatchObject({ set_option: false, inherit_option: false, admin_option: true });

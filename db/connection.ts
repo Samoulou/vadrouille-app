@@ -13,14 +13,15 @@ import pg from "pg";
  *    ni `BYPASSRLS`. Sinon le pool refuse définitivement de servir (une erreur transitoire du contrôle, elle, ne rend
  *    pas le refus définitif). C'est ce qui rend vraie la règle de 0029 (« l'application ne lit jamais ces
  *    identifiants » d'administration) même si une variable est mal posée.
- * Aucun message d'erreur ne contient la chaîne de connexion ni un mot de passe.
+ * Aucun message d'erreur ne contient la chaîne de connexion, l'hôte ni un mot de passe : une erreur de `pg` à
+ * l'ouverture ou pendant le contrôle est remplacée par une `DatabaseConnectionError` qui n'en garde que le code.
  */
 
 export type AppDatabaseRole = "vadrouille_app" | "vadrouille_auth";
 
 /**
- * Variables de connexion (proposition B1-TL-3, en attente du Tech Lead) : des noms que l'intégration Neon de Vercel
- * ne peut pas poser (elle injecte `DATABASE_URL` avec l'identifiant propriétaire). `DATABASE_URL` n'est jamais lue.
+ * Variables de connexion (décision 0036, B1-TL-3) : des noms que l'intégration Neon de Vercel ne pose jamais (elle
+ * injecte `DATABASE_URL` avec l'identifiant propriétaire). `DATABASE_URL` n'est jamais lue.
  */
 export const DATABASE_URL_VARIABLES = {
   vadrouille_app: "VADROUILLE_DATABASE_URL",
@@ -34,6 +35,28 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 export class DatabaseGuardError extends Error {
   override name = "DatabaseGuardError";
+}
+
+/**
+ * Échec transitoire d'ouverture ou de contrôle d'une connexion (réseau, délai, authentification). Le message de `pg`
+ * peut nommer l'hôte et le port : il n'est pas repris. Seul son code (`ECONNREFUSED`, code SQLSTATE…) est gardé, sans
+ * `cause`, pour qu'aucun journal ne reçoive l'adresse.
+ */
+export class DatabaseConnectionError extends Error {
+  override name = "DatabaseConnectionError";
+  readonly code: string;
+
+  constructor(code: string) {
+    super(`Connexion à la base impossible (code ${code}) : erreur d'ouverture ou de contrôle, la demande suivante réessaie.`);
+    this.code = code;
+  }
+}
+
+/** Erreur de `pg` réduite à son code : `DatabaseGuardError` passe telle quelle, tout le reste est emballé. */
+export function sanitizeConnectionError(error: unknown): DatabaseGuardError | DatabaseConnectionError {
+  if (error instanceof DatabaseGuardError || error instanceof DatabaseConnectionError) return error;
+  const code = (error as { code?: unknown } | null)?.code;
+  return new DatabaseConnectionError(typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code) ? code : "inconnu");
 }
 
 /** Vrai pour un déploiement de production, quel que soit l'hébergeur (décisions 0017 § 11.0 et 0034). */
@@ -100,8 +123,9 @@ type LooseConnectCallback = (err: Error | null, c?: pg.Client) => void;
  * Pool dont chaque connexion physique est contrôlée avant de servir. Après un premier refus de fond
  * (`DatabaseGuardError` : mauvais rôle, attribut d'administration), le pool refuse toute nouvelle demande, même si
  * la connexion suivante passerait (une variable mal posée ne se « répare » pas en cours d'exécution). Une erreur
- * transitoire du contrôle (réseau, délai) ferme la connexion et remonte telle quelle, sans rendre le refus
- * définitif : la demande suivante refait le contrôle.
+ * transitoire de l'ouverture ou du contrôle (réseau, délai) ferme la connexion et remonte comme
+ * `DatabaseConnectionError` (code seul, ni hôte ni mot de passe), sans rendre le refus définitif : la demande
+ * suivante refait le contrôle.
  */
 export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit<pg.PoolConfig, "connectionString" | "Client"> = {}): pg.Pool {
   const connectionString = connectionStringFor(role, env);
@@ -113,13 +137,17 @@ export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit
     override connect(callback?: ConnectCallback): Promise<pg.Client> | void {
       const ready = (async () => {
         if (refusal) throw refusal;
-        await super.connect();
+        try {
+          await super.connect();
+        } catch (error) {
+          throw sanitizeConnectionError(error);
+        }
         try {
           await verifyConnectionRole(this, role);
         } catch (error) {
           if (error instanceof DatabaseGuardError) refusal = error;
           await this.end().catch(() => undefined);
-          throw error;
+          throw sanitizeConnectionError(error);
         }
         return this;
       })();

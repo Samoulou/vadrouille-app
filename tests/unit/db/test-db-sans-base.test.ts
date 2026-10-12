@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 /**
  * `pnpm test:db` n'est jamais ignoré en silence (décision 0006, convention 6 ; spécification B1) : sans base
  * joignable, il échoue avec un message explicite ; `SKIP_DB_TESTS=1` n'est admise qu'explicitement et hors CI
- * (proposition B1-TL-1). L'adresse injoignable est construite à l'exécution, avec un mot de passe aléatoire : aucune
+ * (décision 0036, B1-TL-1). L'adresse injoignable est construite à l'exécution, avec un mot de passe aléatoire : aucune
  * chaîne de connexion n'est écrite dans le dépôt.
  */
 const PASSWORD = randomUUID();

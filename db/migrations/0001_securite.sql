@@ -55,7 +55,7 @@ $$;
 -- 3. Déclencheurs.
 -- 3.1 Ajout seulement (décision 0007, « Ajout seulement ») : trip_versions, billing, usage_ledger refusent UPDATE
 -- et DELETE, sauf un DELETE sur trip_versions par la fonction de purge (current_user = vadrouille_fn_purge, rôle
--- sans membre : critère non falsifiable, un set_config ne le lève pas). Tant que Q48 est ouverte, DELETE sur
+-- sans appartenance avec SET ni INHERIT, décision 0036 : critère non falsifiable, un set_config ne le lève pas). Tant que Q48 est ouverte, DELETE sur
 -- billing et usage_ledger est refusé à tous.
 CREATE FUNCTION public.forbid_update_delete() RETURNS trigger
   LANGUAGE plpgsql
@@ -437,8 +437,9 @@ AS $$
     'area', public.shared_scalar(p -> 'area'))) END
 $$;
 --> statement-breakpoint
--- Stop.exceptions de l'instantané (décision 0011, point 5) : toReserve et unconfirmed seulement, au plus 2 ;
--- toConfirm (tiré d'horaires Google) et toute autre valeur sont retirés.
+-- Stop.exceptions de l'instantané (décision 0011, point 5) : toReserve et unconfirmed seulement, sans doublon,
+-- au plus 2, dans l'ordre de leur première apparition ; toConfirm (tiré d'horaires Google) et toute autre valeur
+-- sont retirés.
 CREATE FUNCTION public.shared_exceptions(p jsonb) RETURNS jsonb
   LANGUAGE sql IMMUTABLE PARALLEL SAFE
   SET search_path = pg_catalog, pg_temp
@@ -446,9 +447,9 @@ AS $$
   SELECT CASE WHEN pg_catalog.jsonb_typeof(p) = 'array' THEN (
     SELECT COALESCE(pg_catalog.jsonb_agg(f.v ORDER BY f.n), '[]'::jsonb)
     FROM (
-      SELECT e.v, e.n FROM pg_catalog.jsonb_array_elements(p) WITH ORDINALITY AS e(v, n)
+      SELECT e.v, pg_catalog.min(e.n) AS n FROM pg_catalog.jsonb_array_elements(p) WITH ORDINALITY AS e(v, n)
       WHERE pg_catalog.jsonb_typeof(e.v) = 'string' AND e.v #>> '{}' IN ('toReserve', 'unconfirmed')
-      ORDER BY e.n LIMIT 2) AS f) END
+      GROUP BY e.v ORDER BY pg_catalog.min(e.n) LIMIT 2) AS f) END
 $$;
 --> statement-breakpoint
 CREATE FUNCTION public.shared_stop(p jsonb) RETURNS jsonb
@@ -538,6 +539,12 @@ AS $$
       WITH ORDINALITY AS e(v, n)))
 $$;
 --> statement-breakpoint
+-- Les privilèges par défaut de 0000_socle retirent déjà EXECUTE à PUBLIC ; le REVOKE explicite le garantit quel que
+-- soit le rôle qui crée ces fonctions (revue de #188).
+REVOKE ALL ON FUNCTION public.shared_scalar(jsonb), public.shared_source(jsonb), public.shared_facts(jsonb),
+  public.shared_exceptions(jsonb), public.shared_stop(jsonb), public.shared_surprise(jsonb), public.shared_line_item(jsonb),
+  public.shared_day(jsonb), public.shared_snapshot(jsonb) FROM PUBLIC;
+--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.shared_scalar(jsonb), public.shared_source(jsonb), public.shared_facts(jsonb),
   public.shared_exceptions(jsonb), public.shared_stop(jsonb), public.shared_surprise(jsonb), public.shared_line_item(jsonb),
   public.shared_day(jsonb), public.shared_snapshot(jsonb) TO vadrouille_share;
@@ -574,7 +581,7 @@ GRANT SELECT ON public.shared_trip, public.shared_trip_version, public.shared_ch
 -- 7. Transfert de propriété (décision 0007, « Transfert de propriété ») : sous vadrouille_migrator (qui hérite des
 -- droits de vadrouille_owner), dans cette même transaction. Le rôle cible doit pouvoir être pris (appartenance
 -- SET accordée puis révoquée par vadrouille_migrator, qui n'a sur les rôles vadrouille_fn_* que l'option ADMIN,
--- sans SET ni INHERIT : B1-TL-2) et doit avoir CREATE sur le schéma (accordé puis révoqué). Les droits accordés
+-- sans SET ni INHERIT : décision 0036, B1-TL-2) et doit avoir CREATE sur le schéma (accordé puis révoqué). Les droits accordés
 -- plus haut suivent l'objet chez son nouveau propriétaire.
 RESET ROLE;
 --> statement-breakpoint
