@@ -1,0 +1,16 @@
+{
+  "baseSecondes": 300,
+  "pasSecondes": 45,
+  "modulo": 20,
+  "loin": {
+    "placeIds": [
+      "SENTINELLE_PLACE_ID_006"
+    ],
+    "secondesEnPlus": 2700
+  },
+  "sentinelle": {
+    "de": "SENTINELLE_PLACE_ID_LOGEMENT",
+    "vers": "SENTINELLE_PLACE_ID_001",
+    "secondes": 4321
+  }
+}
