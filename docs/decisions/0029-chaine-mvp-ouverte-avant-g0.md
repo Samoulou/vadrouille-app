@@ -27,7 +27,7 @@ Ces fichiers ne sont pas modifiés ici : #27 a modifié le handover sans aligner
 
 ## Ce qui ne change pas
 - **G0 reste la condition commerciale** de passage de la phase 0 (`docs/roadmap.md`).
-- **Restent à Samuel** (« Qui décide quoi ») : mise en production, clés de production, comptes et services payants, envoi réel d'e-mails (Q25), paiement réel (Q26), ouverture du paiement simulé sur Internet (Q131), clé serveur Places/Routes (Q3), fournisseur de modèles au-delà de la phase 0 (Q46). Toute donnée personnelle envoyée hors UE remonte à Samuel.
+- **Restent à Samuel** (« Qui décide quoi ») : mise en production, clés de production, comptes et services payants, envoi réel d'e-mails (Q25), paiement réel et compte Stripe (Q26), ouverture du paiement simulé sur Internet (Q131), clauses de sous-traitance des fournisseurs de modèles (Q46). Toute donnée personnelle envoyée hors UE remonte à Samuel.
 - Les prérequis de chaque tâche B restent ceux du handover, sans la mention « G0 ».
 - Les règles Google de `CLAUDE.md` s'appliquent à B7, B8 et B9. **B7 à B9 s'appuient sur la spec P0 (#149, décisions 0026 à 0028 et 0030, règle provisoire de Q5) et sur B0 (#27, décision 0011), toutes deux fusionnées le 2026-10-12.**
 
