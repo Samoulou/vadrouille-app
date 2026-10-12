@@ -2,7 +2,7 @@ import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, getTripAdapter, isMockAdapter,
 import { PRODUCT_NAME } from "@/config/site";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
-import { tripRoutes } from "@/features/sejour/routes";
+import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { messages } from "@/i18n";
 
 // `DATA_ADAPTER` lu à chaque requête, comme les pages du voyage (D1-PO-5).
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 /**
  * Les quatre parcours simulés, dans l'ordre du produit (D1-PO-2) ; identifiants de `@/adapters` (D1-PO-3).
  * Cinquième entrée « Débloquer » (F9-PO-17), seulement si le paiement simulé est disponible (F9-PO-19).
+ * Dernière entrée « Mes voyages » (F11-PO-18), après les entrées existantes.
  */
 function demoLinks(): DemoLink[] {
   const t = messages.accueil.demo.liens;
@@ -24,6 +25,7 @@ function demoLinks(): DemoLink[] {
   if (paymentAvailable()) {
     links.push({ href: unlockRoutes(MOCK_DEMO_TRIP.tripId).debloquer(), label: t.debloquer.libelle, detail: t.debloquer.precision });
   }
+  links.push({ href: mesVoyagesRoute(), label: t.mesVoyages.libelle, detail: t.mesVoyages.precision });
   return links;
 }
 

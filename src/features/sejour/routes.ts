@@ -20,8 +20,16 @@ export interface TripRoutes {
   remplacer(n: number, stopId: Stop["id"]): string;
   /** « Ajouter un lieu » du jour (F7), avec la plage de temps libre proposée. */
   ajouter(n: number, free?: { from: string; to: string }): string;
-  /** Niveau supérieur du Séjour : « Mes voyages » (F11). */
-  retour(): string;
+  /**
+   * Niveau supérieur du Séjour : « Mes voyages » (`R17`). Toujours `/voyages`, quelle que soit la base : `R17`
+   * n'a pas de pendant de développement (décision 0021 § 6, qui renomme `retour()`).
+   */
+  mesVoyages(): string;
+}
+
+/** `R17` « Mes voyages » : seul endroit qui écrit cette adresse (décision 0021 § 6). */
+export function mesVoyagesRoute(): string {
+  return "/voyages";
 }
 
 export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
@@ -33,6 +41,6 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     etape: (n, stopId) => `${jour(n)}?etape=${encodeURIComponent(stopId)}`,
     remplacer: (n, stopId) => `${jour(n)}/remplacer/${encodeURIComponent(stopId)}`,
     ajouter: (n, free) => (free ? `${jour(n)}/ajouter?de=${free.from}&a=${free.to}` : `${jour(n)}/ajouter`),
-    retour: () => base,
+    mesVoyages: mesVoyagesRoute,
   };
 }

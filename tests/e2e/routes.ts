@@ -62,6 +62,14 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // F11a : JavaScript initial journalisé sans seuil (décision 0021 § 4).
+    id: "R17",
+    path: "/voyages",
+    page: "voyages/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R11",
     path: TRIP,
     page: "voyages/[id]/(programme)/page.tsx",
