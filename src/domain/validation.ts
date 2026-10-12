@@ -5,6 +5,7 @@ import { jourSemaine, versMinutes } from "@/domain/temps";
 import type { AncrageResolu, Trajets } from "@/prototype/ancrage";
 import { estAncre } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
+import { lire } from "@/domain/tables";
 
 /**
  * Validateurs R1, R2, R4, R5, R6 et R8 du cadrage (§ 8) sur le programme complet, en mémoire (spécification P0,
@@ -83,8 +84,8 @@ export function valider(trip: Trip, contexte: ContexteValidation): Violations {
 
     // R5 : trajets faisables avec marge entre étapes consécutives.
     for (let index = 1; index < stops.length; index += 1) {
-      const avant = stops[index - 1];
-      const apres = stops[index];
+      const avant = stops.at(index - 1);
+      const apres = stops.at(index);
       if (!avant?.placeId || !apres?.placeId || !avant.end) continue;
       const trajet = contexte.trajets(avant.placeId, apres.placeId);
       if (trajet === undefined || versMinutes(apres.start) < versMinutes(avant.end) + trajet + MARGE_MINUTES) violations.R5 += 1;
@@ -111,13 +112,13 @@ export function valider(trip: Trip, contexte: ContexteValidation): Violations {
     // R8 : rythme respecté (nombre d'activités) et temps libre minimal sur un jour complet.
     // La soirée est une étape de kind « activity » : elle s'ajoute au nombre d'activités du rythme.
     const activites = stops.filter((stop) => stop.kind === "activity").length;
-    if (activites > ACTIVITES_PAR_RYTHME[brief.rythme] + 1) violations.R8 += 1;
+    if (activites > lire(ACTIVITES_PAR_RYTHME, brief.rythme) + 1) violations.R8 += 1;
     const complet = day.date !== brief.arrivee && day.date !== brief.depart;
     if (complet) {
       // Temps libre = fenêtre du jour − étapes − trajets (même définition que le planificateur).
       const etapes = stops.reduce((total, stop) => total + (stop.end ? versMinutes(stop.end) - versMinutes(stop.start) : 0), 0);
       const libre = FIN_JOUR - DEBUT_JOUR - etapes - day.travelMinutes;
-      if (libre < TEMPS_LIBRE_MIN[brief.rythme]) violations.R8 += 1;
+      if (libre < lire(TEMPS_LIBRE_MIN, brief.rythme)) violations.R8 += 1;
     }
   }
   return violations;

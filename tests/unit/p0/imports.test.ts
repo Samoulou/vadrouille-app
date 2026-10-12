@@ -11,8 +11,13 @@ import { describe, expect, it } from "vitest";
  * A3.2), contrôlée sur l'arbre syntaxique de chaque fichier par l'API du compilateur TypeScript. Couvre `import`,
  * `import type`, `export … from`, `import x = require()`, et refuse les constructions listées par la spécification.
  *
- * Les fichiers `*.test.ts` sont exclus, sauf pour la règle `node:net`. Les clients simulés (`*.simule.ts`) ne le
- * sont **pas** (écart plus strict de A3.2).
+ * Les fichiers `*.test.ts` sont exclus, sauf pour la règle `node:net` et, dans `src/ai` et `src/research`, pour les
+ * modules et constructions réseau (`fetch`, `getBuiltinModule`, `node:http`, `node:https`…). Les clients simulés
+ * (`*.simule.ts`) ne le sont **pas** (écart plus strict de A3.2).
+ *
+ * `process` suit une liste d'autorisation : refusé partout, sauf dans `scripts/p0/main.ts` pour `argv`, `exitCode`,
+ * `stdout.write` et `stderr.write` en accès littéral. Les accès `x[expr]` non littéraux, les noms calculés en
+ * déstructuration et le reste d'objet (`...r`) déstructuré sont refusés partout (revue Sécurité de #180).
  */
 
 const RACINE = fileURLToPath(new URL("../../../", import.meta.url));
@@ -86,6 +91,77 @@ const IDENTIFIANTS_INTERDITS = new Set([
   "Worker",
 ]);
 const PROPRIETES_INTERDITES = new Set(["constructor", "connect", "createConnection"]);
+// Revue Sécurité de #180 (bloquant 1, correction 2) : réflexion sur les prototypes et les descripteurs, qui
+// permettrait d'atteindre `Function` ou une propriété de `process` sans les nommer.
+for (const nom of [
+  "getPrototypeOf",
+  "setPrototypeOf",
+  "getOwnPropertyDescriptor",
+  "getOwnPropertyDescriptors",
+  "getOwnPropertyNames",
+  "getOwnPropertySymbols",
+  "__proto__",
+  "__lookupGetter__",
+  "__lookupSetter__",
+  "__defineGetter__",
+  "__defineSetter__",
+]) {
+  IDENTIFIANTS_INTERDITS.add(nom);
+}
+
+/**
+ * Liste d'autorisation de `process` (revue Sécurité de #180, bloquant 1) : l'identifiant est refusé partout, sauf
+ * dans `scripts/p0/main.ts`, et seulement en accès littéral à `argv`, `exitCode`, `stdout.write` et `stderr.write`.
+ */
+const FICHIER_PROCESS = "scripts/p0/main.ts";
+function processAutorise(fichier: string, noeud: ts.Identifier): boolean {
+  if (fichier !== FICHIER_PROCESS) return false;
+  const acces = noeud.parent;
+  if (!ts.isPropertyAccessExpression(acces) || acces.expression !== noeud || acces.questionDotToken) return false;
+  const nom = acces.name.text;
+  if (nom === "argv" || nom === "exitCode") return true;
+  if (nom !== "stdout" && nom !== "stderr") return false;
+  const ecrire = acces.parent;
+  return (
+    ts.isPropertyAccessExpression(ecrire) &&
+    ecrire.expression === acces &&
+    ecrire.name.text === "write" &&
+    !ecrire.questionDotToken &&
+    ts.isCallExpression(ecrire.parent) &&
+    ecrire.parent.expression === ecrire
+  );
+}
+
+/** Clé d'accès admise : littéral (chaîne, nombre, gabarit sans substitution) ou symbole bien connu `Symbol.x`. */
+function cleLitterale(expression: ts.Expression): boolean {
+  return (
+    ts.isStringLiteralLike(expression) ||
+    ts.isNumericLiteral(expression) ||
+    (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === "Symbol")
+  );
+}
+
+/** Vrai si un littéral objet est la cible d'une affectation par déstructuration (`({ a, ...r } = x)`). */
+function cibleDeDestructuration(noeud: ts.ObjectLiteralExpression): boolean {
+  let enfant: ts.Node = noeud;
+  let parent = noeud.parent;
+  while (
+    ts.isParenthesizedExpression(parent) ||
+    ts.isPropertyAssignment(parent) ||
+    ts.isShorthandPropertyAssignment(parent) ||
+    ts.isSpreadAssignment(parent) ||
+    ts.isSpreadElement(parent) ||
+    ts.isArrayLiteralExpression(parent) ||
+    ts.isObjectLiteralExpression(parent)
+  ) {
+    if (ts.isPropertyAssignment(parent) && parent.name === enfant) return false;
+    enfant = parent;
+    parent = parent.parent;
+  }
+  if (ts.isBinaryExpression(parent)) return parent.operatorToken.kind === ts.SyntaxKind.EqualsToken && parent.left === enfant;
+  if (ts.isForOfStatement(parent) || ts.isForInStatement(parent)) return parent.initializer === enfant;
+  return false;
+}
 
 function analyser(fichier: string, source: string): { imports: Import[]; constructions: string[] } {
   const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, true, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
@@ -107,10 +183,42 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
     if (ts.isCallExpression(noeud) && noeud.expression.kind === ts.SyntaxKind.ImportKeyword) constructions.push("import() dynamique");
     if (ts.isNewExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "Function") constructions.push("new Function");
     if (ts.isCallExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "Function") constructions.push("Function()");
-    // `const { env } = process`, `const { env: e } = p` : toute déstructuration d'une propriété `env`.
+    // `process` : liste d'autorisation (voir `processAutorise`). Couvre aussi les alias (`const p = process`), la
+    // déstructuration, `{ ...process }`, `Object.entries(process)`, `for (k in process)`, `process.report`…
+    if (ts.isIdentifier(noeud) && noeud.text === "process" && !processAutorise(fichier, noeud)) {
+      constructions.push(`process hors liste d'autorisation : ${noeud.parent.getText(sf).slice(0, 60)}`);
+    }
     if (ts.isBindingElement(noeud)) {
       const propriete = noeud.propertyName ?? noeud.name;
-      if ((ts.isIdentifier(propriete) || ts.isStringLiteralLike(propriete)) && propriete.text === "env") constructions.push("{ env } déstructuré");
+      // `const { env } = process`, `const { env: e } = p`, `const { constructor: C } = f`.
+      if (ts.isIdentifier(propriete) || ts.isStringLiteralLike(propriete)) {
+        if (propriete.text === "env") constructions.push("{ env } déstructuré");
+        if (PROPRIETES_INTERDITES.has(propriete.text) || IDENTIFIANTS_INTERDITS.has(propriete.text)) constructions.push(`{ ${propriete.text} } déstructuré`);
+      }
+      // `const { ...r } = x` : le reste d'un objet emporte des propriétés que le contrôle ne voit pas.
+      if (noeud.dotDotDotToken && ts.isObjectBindingPattern(noeud.parent)) constructions.push("...reste d'objet déstructuré");
+    }
+    // Nom de propriété calculé : refusé en déstructuration (`const { [k]: e } = x`, `({ [k]: e } = x)`) et dans les
+    // classes. Admis seulement pour **créer** un littéral objet (`{ [cle]: valeur }` n'atteint aucune propriété
+    // existante) et pour une méthode nommée par un symbole bien connu (`[Symbol.asyncIterator]()`).
+    if (ts.isComputedPropertyName(noeud)) {
+      const membre = noeud.parent;
+      const creation =
+        ts.isObjectLiteralElementLike(membre) &&
+        !ts.isSpreadAssignment(membre) &&
+        ts.isObjectLiteralExpression(membre.parent) &&
+        !cibleDeDestructuration(membre.parent);
+      const symbole = ts.isMethodDeclaration(membre) && cleLitterale(noeud.expression);
+      if (!creation && !symbole) constructions.push("nom de propriété calculé");
+    }
+    if (ts.isObjectLiteralExpression(noeud) && cibleDeDestructuration(noeud)) {
+      for (const propriete of noeud.properties) {
+        if (ts.isSpreadAssignment(propriete)) constructions.push("...reste d'objet déstructuré");
+        const nom = ts.isPropertyAssignment(propriete) || ts.isShorthandPropertyAssignment(propriete) ? propriete.name : undefined;
+        if (nom && (ts.isIdentifier(nom) || ts.isStringLiteralLike(nom)) && (nom.text === "env" || PROPRIETES_INTERDITES.has(nom.text))) {
+          constructions.push(`{ ${nom.text} } déstructuré`);
+        }
+      }
     }
     if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text)) constructions.push(noeud.text);
     if (ts.isPropertyAccessExpression(noeud)) {
@@ -122,12 +230,14 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
       if (objet === "import.meta" && nom === "env") constructions.push("import.meta.env");
       if (objet === "module" && nom === "require") constructions.push("module.require");
     }
-    if (ts.isElementAccessExpression(noeud) && ts.isStringLiteralLike(noeud.argumentExpression)) {
-      const nom = noeud.argumentExpression.text;
-      if (IDENTIFIANTS_INTERDITS.has(nom) || PROPRIETES_INTERDITES.has(nom) || nom === "env") constructions.push(`["${nom}"]`);
-    } else if (ts.isElementAccessExpression(noeud) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "process") {
-      // `process[cle]` avec une clé calculée : la propriété atteinte ne peut pas être contrôlée.
-      constructions.push("process[clé calculée]");
+    if (ts.isElementAccessExpression(noeud)) {
+      if (!cleLitterale(noeud.argumentExpression)) {
+        // `x[expr]` : la propriété atteinte ne peut pas être contrôlée (`x["constr" + "uctor"]`, alias de `process`).
+        constructions.push(`accès calculé : ${noeud.getText(sf).slice(0, 60)}`);
+      } else if (ts.isStringLiteralLike(noeud.argumentExpression)) {
+        const nom = noeud.argumentExpression.text;
+        if (IDENTIFIANTS_INTERDITS.has(nom) || PROPRIETES_INTERDITES.has(nom) || nom === "env" || nom === "process") constructions.push(`["${nom}"]`);
+      }
     }
     ts.forEachChild(noeud, visiter);
   };
@@ -189,6 +299,25 @@ function regleDe(fichier: string): Regle | undefined {
   return undefined;
 }
 
+/** Tests de src/ai et src/research : modules et constructions qui ouvriraient le réseau (revue Sécurité de #180, mineur 2). */
+const MODULES_RESEAU_TESTS = ["http", "https", "http2", "tls", "dgram", "dns", "child_process", "worker_threads", "undici"];
+const CONSTRUCTIONS_RESEAU_TESTS = new Set([
+  "fetch",
+  "getBuiltinModule",
+  "WebSocket",
+  "XMLHttpRequest",
+  "EventSource",
+  "sendBeacon",
+  "require",
+  "createRequire",
+  "eval",
+  "Worker",
+  "WebAssembly",
+  "new Function",
+  "Function()",
+  "import() dynamique",
+]);
+
 /** Contrôle d'un fichier (chemin relatif au dépôt) : liste des violations, vide si le fichier est conforme. */
 function controler(fichier: string, source: string): string[] {
   const { imports, constructions } = analyser(fichier, source);
@@ -205,6 +334,16 @@ function controler(fichier: string, source: string): string[] {
   }
   if (!test && fichier !== "src/research/ip-guard.ts" && constructions.includes("net")) violations.push("identifiant net refusé");
   if (test) {
+    // Revue Sécurité de #180 (mineur 2) : les tests de src/ai et src/research n'ouvrent pas non plus le réseau.
+    if (fichier.startsWith("src/ai/") || fichier.startsWith("src/research/")) {
+      for (const { specificateur, forme } of imports) {
+        const nu = specificateur.replace(/^node:/, "");
+        if (MODULES_RESEAU_TESTS.some((module) => nu === module || nu.startsWith(`${module}/`))) violations.push(`module réseau refusé dans un test : ${forme}`);
+      }
+      for (const construction of constructions) {
+        if (CONSTRUCTIONS_RESEAU_TESTS.has(construction)) violations.push(`construction refusée dans un test : ${construction}`);
+      }
+    }
     // ip-guard.ts n'est importé que par fetch-page.ts et par son propre test.
     for (const { specificateur } of imports) {
       const cible = resoudre(fichier, specificateur);
@@ -363,6 +502,54 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["scripts/p0/cli.ts", "const cle = process.env.GOOGLE_MAPS_SERVER_KEY;"],
       ["src/research/fetch-page.test.ts", 'import net from "node:net";'],
       ["src/research/agent.test.ts", 'import { adresseAutorisee } from "@/research/ip-guard";'],
+      // Revue Sécurité de #180, bloquant 1 (correction 2) : `process` en liste d'autorisation, accès calculés.
+      ["src/ai/client.ts", 'const p = process;\np["getBuiltin" + "Module"]("node:https");'],
+      ["scripts/p0/main.ts", 'const p = process;\np["getBuiltin" + "Module"]("node:https");'],
+      ["scripts/p0/main.ts", "const p = process;"],
+      ["src/ai/client.ts", 'const { ["getBuiltinModule"]: g } = process;'],
+      ["src/ai/client.ts", 'const { ["env"]: e } = process;'],
+      ["scripts/p0/main.ts", 'const { ["getBuiltinModule"]: g } = process;'],
+      ["src/ai/client.ts", "const { [k]: e } = objet;"],
+      ["src/ai/client.ts", "({ [k]: e } = objet);"],
+      ["src/ai/client.ts", "const { ...r } = objet;"],
+      ["src/ai/client.ts", "({ ...r } = objet);"],
+      ["src/ai/client.ts", "for ({ ...r } of objets);"],
+      ["src/ai/client.ts", "const { a: { [k]: e } } = objet;"],
+      ["src/ai/client.ts", 'const d = Object.getOwnPropertyDescriptor(process, "env");'],
+      ["scripts/p0/main.ts", 'const d = Object.getOwnPropertyDescriptor(process, "env");'],
+      ["scripts/p0/main.ts", "const e = Object.entries(process);"],
+      ["scripts/p0/main.ts", "const v = Object.values(process);"],
+      ["scripts/p0/main.ts", "const c = { ...process };"],
+      ["scripts/p0/main.ts", "const t = JSON.stringify(process);"],
+      ["scripts/p0/main.ts", "for (const k in process) console.log(k);"],
+      ["scripts/p0/main.ts", "const r = process.report.getReport();"],
+      ["scripts/p0/main.ts", 'process.loadEnvFile(".env");'],
+      ["scripts/p0/main.ts", 'process.execve("/bin/sh");'],
+      ["scripts/p0/main.ts", 'const a = process["argv"];'],
+      ["scripts/p0/main.ts", "const a = process?.argv;"],
+      ["scripts/p0/main.ts", "const s = process.stdout;"],
+      ["scripts/p0/main.ts", "const w = process.stdout.write;"],
+      ["scripts/p0/main.ts", "const { argv } = process;"],
+      ["scripts/p0/cli.ts", "const a = process.argv;"],
+      ["src/research/agent.ts", "process.exitCode = 1;"],
+      ["src/ai/client.ts", "const n = objet.process;"],
+      ["src/ai/client.ts", 'const f = (() => {})["constr" + "uctor"];'],
+      ["src/ai/client.ts", 'const c = "constructor";\nconst f = (() => {})[c];'],
+      ["src/ai/client.ts", "const valeur = table[cle];"],
+      ["src/ai/client.ts", "table[cle] = 1;"],
+      ["src/ai/client.ts", 'const f = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(() => {}), "constructor");'],
+      ["src/ai/client.ts", "const p = Object.getPrototypeOf(() => {});"],
+      ["src/ai/client.ts", "const { constructor: C } = () => {};"],
+      ["src/ai/client.ts", "({ constructor: C } = () => {});"],
+      ["src/ai/client.ts", 'const p = objet["__proto__"];'],
+      ["src/ai/client.ts", "class A { [cle]() {} }"],
+      // Revue Sécurité de #180, mineur 2 : tests de src/ai et src/research.
+      ["src/ai/client.test.ts", "await fetch('https://exemple.org');"],
+      ["src/research/agent.test.ts", 'const https = process.getBuiltinModule("node:https");'],
+      ["src/research/agent.test.ts", 'import { request } from "node:https";'],
+      ["src/research/agent.test.ts", 'import { request } from "http";'],
+      ["src/ai/client.test.ts", 'import { lookup } from "node:dns/promises";'],
+      ["src/ai/client.test.ts", 'const m = await import("node:https");'],
     ];
     for (const [fichier, source] of cas) {
       it(`${fichier} : ${source.split("\n").at(-1)}`, () => {
@@ -372,6 +559,16 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
 
     it("la forme exacte de ip-guard.ts passe", () => {
       expect(controler("src/research/ip-guard.ts", 'import { BlockList, isIP } from "node:net";')).toEqual([]);
+    });
+
+    it("scripts/p0/main.ts : argv, exitCode, stdout.write et stderr.write en accès littéral passent", () => {
+      const source = 'process.exitCode = 1;\nconst a = process.argv.slice(2);\nprocess.stdout.write("x");\nprocess.stderr.write("y");';
+      expect(controler("scripts/p0/main.ts", source)).toEqual([]);
+    });
+
+    it("accès littéral, symbole bien connu et création d'un littéral objet à clé calculée passent", () => {
+      const source = 'const a = t[0];\nconst b = t["cle"];\nconst i = s[Symbol.asyncIterator]();\nconst o = { [cle]: 1 };';
+      expect(controler("src/ai/client.ts", source)).toEqual([]);
     });
   });
 });

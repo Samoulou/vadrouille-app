@@ -39,6 +39,7 @@ function creneauParDefaut(typeEtape: string): (typeof TYPES_CRENEAU)[number] {
 
 export function creerModelesSimules(fixtures: FixturesModeles): ClientModeles {
   let tour = 0;
+  const notesParNom = new Map(Object.entries(fixtures.notes));
   const repondre = (valeur: unknown): ReponseModele => ({
     texte: typeof valeur === "string" ? valeur : JSON.stringify(valeur),
     coutUsd: fixtures.coutParRequeteUsd,
@@ -50,7 +51,7 @@ export function creerModelesSimules(fixtures: FixturesModeles): ClientModeles {
         case "plan":
           return repondre(fixtures.plan);
         case "recherche": {
-          const reponse = fixtures.recherche[tour] ?? { actions: [], candidats: [], termine: true };
+          const reponse = fixtures.recherche.at(tour) ?? { actions: [], candidats: [], termine: true };
           tour += 1;
           return repondre(reponse);
         }
@@ -59,7 +60,7 @@ export function creerModelesSimules(fixtures: FixturesModeles): ClientModeles {
           return repondre({
             notes: candidats.map((candidat) => ({
               id: candidat.id,
-              ...((fixtures.notes[candidat.nom] as object | undefined) ?? {
+              ...((notesParNom.get(candidat.nom) as object | undefined) ?? {
                 ...fixtures.notesParDefaut,
                 slotFit: [creneauParDefaut(candidat.typeEtape)],
               }),

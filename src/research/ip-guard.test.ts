@@ -34,9 +34,9 @@ const CAS_IPV6: Record<string, string> = {
   "64:ff9b:1::/48": "64:ff9b:1::1",
   "100::/64": "100::1",
   "2001::/23": "2001:4:112::1",
-  "2001::/32": "2001:0:4136:e378::1",
   "2001:10::/28": "2001:10::1",
   "2001:20::/28": "2001:20::1",
+  "2001:30::/28": "2001:30::1",
   "2001:db8::/32": "2001:db8::1",
   "2002::/16": "2002:c000:204::1",
   "2620:4f:8000::/48": "2620:4f:8000::42",
@@ -60,6 +60,10 @@ describe("p0: lecture de pages, garde SSRF — plages d'adresses (ip-guard)", ()
   for (const [plage, adresse] of Object.entries(CAS_IPV6)) {
     it(`refuse ${adresse} (${plage})`, () => expect(adresseAutorisee(adresse)).toBe(false));
   }
+
+  it("refuse Teredo (2001::/32), couvert par 2001::/23", () => {
+    expect(adresseAutorisee("2001:0:4136:e378::1")).toBe(false);
+  });
 
   it("accepte une adresse IPv4 publique", () => {
     expect(adresseAutorisee("45.10.20.30")).toBe(true);

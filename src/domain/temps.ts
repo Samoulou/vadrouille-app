@@ -1,4 +1,5 @@
 import type { Weekday } from "@/contracts";
+import { element } from "@/domain/tables";
 
 /** Aides de calcul d'heures et de dates du moteur (minutes depuis minuit, dates ISO en UTC). */
 
@@ -39,7 +40,7 @@ export function jourSemaine(date: string): number {
 const LIBELLES_JOUR: readonly Weekday[] = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 
 export function libelleJour(date: string): Weekday {
-  return LIBELLES_JOUR[jourSemaine(date)] ?? "lun.";
+  return element(LIBELLES_JOUR, jourSemaine(date)) ?? "lun.";
 }
 
 /** « 1 h 30 », « 45 min », « 2 h ». */

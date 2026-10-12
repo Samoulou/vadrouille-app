@@ -103,9 +103,9 @@ export function lireNotes(texte: string, idsAttendus: ReadonlySet<string>): Lect
   const { valeur, refuses } = elements(objet.notes, NoteAvecIdSchema, idsAttendus.size);
   const notes = new Map<string, Notes>();
   let ecartes = refuses;
-  for (const { id, ...note } of valeur) {
+  for (const { id, matchesWishes, notForMeRisk, mustSee, slotFit } of valeur) {
     if (!idsAttendus.has(id) || notes.has(id)) ecartes += 1;
-    else notes.set(id, note);
+    else notes.set(id, { matchesWishes, notForMeRisk, mustSee, slotFit });
   }
   return { valeur: notes, refuses: ecartes };
 }

@@ -1,4 +1,5 @@
 import type { Category } from "@/contracts";
+import { lire } from "@/domain/tables";
 
 /**
  * Textes déterministes du programme (spécification P0, « Textes produits ») : `Day.title` et `Proposal.context`
@@ -19,9 +20,9 @@ export function titreDuJour(categories: readonly Category[]): string {
   const distinctes = [...new Set(categories)];
   const [premiere, seconde] = distinctes;
   if (premiere === undefined) return "Journée libre";
-  const debut = LIBELLES_CATEGORIE[premiere];
+  const debut = lire(LIBELLES_CATEGORIE, premiere);
   if (seconde === undefined) return debut;
-  const suite = LIBELLES_CATEGORIE[seconde];
+  const suite = lire(LIBELLES_CATEGORIE, seconde);
   return `${debut}, ${suite.charAt(0).toLowerCase()}${suite.slice(1)}`;
 }
 
@@ -36,5 +37,5 @@ const LIBELLES_CRENEAU: Record<CreneauTexte, string> = {
 
 /** « Déjeuner du jour 1 ». */
 export function contexteDeProposition(creneau: CreneauTexte, jour: number): string {
-  return `${LIBELLES_CRENEAU[creneau]} du jour ${jour}`;
+  return `${lire(LIBELLES_CRENEAU, creneau)} du jour ${jour}`;
 }

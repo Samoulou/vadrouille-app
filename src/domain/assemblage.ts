@@ -19,6 +19,7 @@ import { contexteDeProposition, titreDuJour } from "@/domain/textes";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
+import { element } from "@/domain/tables";
 
 /**
  * Assemblage du programme complet, en mémoire (spécification P0, « Sortie 1 »), puis validation par
@@ -60,7 +61,7 @@ const COULEURS = ["bruyere", "azulejo", "ocre", "granit"] as const;
 function couleur(destination: string): Trip["destinationColor"] {
   let somme = 0;
   for (const caractere of destination) somme = (somme + (caractere.codePointAt(0) ?? 0)) % 997;
-  return COULEURS[somme % COULEURS.length] ?? "granit";
+  return COULEURS.at(somme % COULEURS.length) ?? "granit";
 }
 
 function domaine(url: string): string {
@@ -104,7 +105,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
   const proposals: Proposal[] = [];
   const justifications = new Map<string, string>();
   const terminus: ProgrammeComplet["terminus"] = [];
-  const logementTexte = (index: number) => brief.logements[index]?.texte ?? brief.logements[0]?.texte ?? "Logement";
+  const logementTexte = (index: number) => element(brief.logements, index)?.texte ?? brief.logements[0]?.texte ?? "Logement";
 
   const days: Day[] = entree.jours.map((jour) => {
     const s = jour.squelette;

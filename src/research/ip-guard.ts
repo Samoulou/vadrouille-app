@@ -41,11 +41,13 @@ export const PLAGES_INTERDITES_IPV6: readonly (readonly [string, number])[] = [
   ["64:ff9b::", 96],
   ["64:ff9b:1::", 48],
   ["100::", 64],
-  // Bloc IETF pour usages spéciaux (RFC 2928) : couvre aussi 2001:1::, 2001:2::, 2001:3::, 2001:4:112::.
+  // Bloc IETF pour usages spéciaux (RFC 2928) : couvre aussi Teredo (2001::/32), 2001:1::, 2001:2::, 2001:3::,
+  // 2001:4:112::. Les trois /28 ci-dessous y sont inclus ; ils restent listés pour être nommés et testés.
   ["2001::", 23],
-  ["2001::", 32],
   ["2001:10::", 28],
   ["2001:20::", 28],
+  // Drone Remote ID (DRIP, RFC 9374).
+  ["2001:30::", 28],
   ["2001:db8::", 32],
   ["2002::", 16],
   ["2620:4f:8000::", 48],

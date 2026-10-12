@@ -3,6 +3,7 @@ import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { CompteurPlafonne, ConfigPlafonds } from "@/prototype/config";
 import type { LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
+import { lire } from "@/domain/tables";
 
 /**
  * Plafonds par exécution et registre de coût (spécification P0, « Plafonds de dépense » ; décision 0032, A3.1).
@@ -67,13 +68,14 @@ export class Compteurs {
   /** Réserve `quantite` unités d'un compteur avant l'appel ; refuse si le plafond serait dépassé. */
   consommer(compteur: keyof Registre["utilise"], quantite = 1): void {
     this.verifierBudget();
-    if (this.registre.utilise[compteur] + quantite > this.plafonds[compteur]) throw new PlafondAtteint(compteur);
-    this.registre.utilise[compteur] += quantite;
+    const utilise = lire(this.registre.utilise, compteur);
+    if (utilise + quantite > lire(this.plafonds, compteur)) throw new PlafondAtteint(compteur);
+    Object.assign(this.registre.utilise, { [compteur]: utilise + quantite });
   }
 
   ajouterCout(poste: keyof Registre["cout"], usd: number): void {
     if (!Number.isFinite(usd) || usd < 0) return;
-    this.registre.cout[poste] += usd;
+    Object.assign(this.registre.cout, { [poste]: lire(this.registre.cout, poste) + usd });
     if (this.coutTotal() > this.plafonds.coutUsd) throw new PlafondAtteint("coutUsd");
   }
 }

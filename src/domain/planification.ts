@@ -3,6 +3,7 @@ import { DUREES, MARGE_MINUTES, type Creneau, type JourSquelette } from "@/domai
 import { arrondi5, versMinutes } from "@/domain/temps";
 import type { AncrageResolu, PlageOuverture, Trajets } from "@/prototype/ancrage";
 import type { Candidat, CandidatNote, TypeCreneau } from "@/prototype/candidat";
+import { element, lire } from "@/domain/tables";
 
 /**
  * Planification déterministe (spécification P0, étapes 7 et 8) : pour chaque jour du squelette, chaque créneau
@@ -61,7 +62,7 @@ export function ouvert(horaires: readonly PlageOuverture[] | null, jour: number,
 }
 
 function dureeDe(candidat: CandidatNote, creneau: Creneau): number {
-  if (creneau.type === "meal") return DUREES[creneau.repas];
+  if (creneau.type === "meal") return lire(DUREES, creneau.repas);
   if (creneau.type === "evening") return DUREES.evening;
   return candidat.dureeMinutes ?? DUREES.activity;
 }
@@ -78,8 +79,8 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
   const resultat: JourPlanifie[] = [];
 
   for (const jour of entree.jours) {
-    const logementDepart = entree.logements[jour.logementDepart] ?? entree.logements[0] ?? "";
-    const logementArrivee = entree.logements[jour.logementArrivee] ?? entree.logements[0] ?? "";
+    const logementDepart = element(entree.logements, jour.logementDepart) ?? entree.logements[0] ?? "";
+    const logementArrivee = element(entree.logements, jour.logementArrivee) ?? entree.logements[0] ?? "";
     const etapes: EtapePlanifiee[] = [];
     let position = logementDepart;
     let instant = jour.debut;
@@ -87,7 +88,7 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
     let occupe = 0;
 
     jour.creneaux.forEach((creneau, rang) => {
-      const suivant = jour.creneaux[rang + 1];
+      const suivant = jour.creneaux.at(rang + 1);
       const limite = suivant?.type === "meal" ? suivant.auPlusTard : jour.fin;
       const type: TypeCreneau = creneau.type;
       const depuis = position;

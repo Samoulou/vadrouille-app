@@ -32,10 +32,11 @@ export class ReductionRefusee extends Error {
 }
 
 /** Copie d'un objet sans les clés données (retrait explicite des clés dérivées de Google). */
-function sans<T extends object, K extends keyof T>(objet: T, ...cles: K[]): Omit<T, K> {
-  const copie: Partial<T> = { ...objet };
-  for (const cle of cles) delete copie[cle];
-  return copie as Omit<T, K>;
+function sans<T extends object, K extends keyof T & string>(objet: T, ...cles: K[]): Omit<T, K> {
+  // Sans accès calculé ni reste d'objet (revue Sécurité de #180) : seules les propriétés propres et énumérables
+  // sont copiées.
+  const retirees: ReadonlySet<string> = new Set(cles);
+  return Object.fromEntries(Object.entries(objet).filter(([cle]) => !retirees.has(cle))) as Omit<T, K>;
 }
 
 function etape(stop: Stop): StopReduit {
@@ -93,20 +94,20 @@ export function reduireProgramme(
     justifications: ReadonlyMap<string, string>;
   },
 ): ProgrammeReduit {
-  const { days, ...voyage } = complet.trip;
-  const trip = { ...voyage, days: days.map(jour) } as VoyageReduit;
+  const trip = { ...sans(complet.trip, "days"), days: complet.trip.days.map(jour) } as VoyageReduit;
   const proposals = complet.proposals.map((valeur) => {
     const justification = options.justifications.get(valeur.id);
     if (justification === undefined) throw new ReductionRefusee();
     return proposition(valeur, justification);
   });
   const ids = placeIdsDuProgramme({ trip, proposals, terminus: options.terminus });
-  const positions: Record<string, Position> = {};
-  for (const placeId of [...ids].sort()) {
-    const position = options.positions.get(placeId);
-    if (position === undefined) throw new ReductionRefusee();
-    positions[placeId] = { lat: position.lat, lng: position.lng };
-  }
+  const positions: Record<string, Position> = Object.fromEntries(
+    [...ids].sort().map((placeId) => {
+      const position = options.positions.get(placeId);
+      if (position === undefined) throw new ReductionRefusee();
+      return [placeId, { lat: position.lat, lng: position.lng }];
+    }),
+  );
   const resultat = ProgrammeReduitSchema.safeParse({
     schema: PROGRAMME_REDUIT_SCHEMA,
     trip,

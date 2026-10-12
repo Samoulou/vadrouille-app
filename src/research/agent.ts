@@ -133,7 +133,10 @@ export async function chercherCandidats(
     }
     cles.add(k);
     candidats.push(resultat.data);
-    trouves[creneauDe(resultat.data.typeEtape)] += 1;
+    const creneau = creneauDe(resultat.data.typeEtape);
+    if (creneau === "activity") trouves.activity += 1;
+    else if (creneau === "meal") trouves.meal += 1;
+    else trouves.evening += 1;
   };
 
   // Étape 3 : tours de l'agent, bornés.
@@ -188,7 +191,8 @@ export async function chercherCandidats(
           pagesTexte.set(url, lue.texte);
           pages.push({ url, texte: lue.texte.slice(0, 4000) });
         } else {
-          compteurs.pagesRefusees[lue.raison] = (compteurs.pagesRefusees[lue.raison] ?? 0) + 1;
+          const deja = new Map(Object.entries(compteurs.pagesRefusees)).get(lue.raison) ?? 0;
+          compteurs.pagesRefusees = { ...compteurs.pagesRefusees, [lue.raison]: deja + 1 };
         }
       }
     }

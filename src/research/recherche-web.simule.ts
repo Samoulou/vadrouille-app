@@ -17,9 +17,10 @@ export const FixturesRechercheSchema = z.strictObject({
 export type FixturesRecherche = z.infer<typeof FixturesRechercheSchema>;
 
 export function creerRechercheSimulee(fixtures: FixturesRecherche): ClientRechercheWeb {
+  const parRequete = new Map(Object.entries(fixtures.resultats));
   return {
     async rechercher(requete) {
-      return { resultats: [...(fixtures.resultats[requete] ?? [])], coutUsd: fixtures.coutParRequeteUsd };
+      return { resultats: [...(parRequete.get(requete) ?? [])], coutUsd: fixtures.coutParRequeteUsd };
     },
   };
 }

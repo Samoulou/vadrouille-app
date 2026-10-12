@@ -32,6 +32,7 @@ import {
   plafonnerRecherche,
   plafonnerRoutes,
 } from "./plafonds";
+import { lireSiPresent } from "@/domain/tables";
 import { RapportSchema, type Rapport } from "./rapport";
 
 /**
@@ -79,20 +80,21 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
   const { brief, configuration, journal, horloge } = entree;
   const compteurs = new Compteurs(configuration.plafonds, horloge);
   const debut = horloge();
-  const temps: Record<"recherche" | "ancrage" | "notation" | "planification" | "raisons" | "validation", number> = {
-    recherche: 0,
-    ancrage: 0,
-    notation: 0,
-    planification: 0,
-    raisons: 0,
-    validation: 0,
-  };
-  const chrono = async <T>(etape: keyof typeof temps, travail: () => Promise<T> | T): Promise<T> => {
+  type EtapeChronometree = "recherche" | "ancrage" | "notation" | "planification" | "raisons" | "validation";
+  const temps = new Map<EtapeChronometree, number>([
+    ["recherche", 0],
+    ["ancrage", 0],
+    ["notation", 0],
+    ["planification", 0],
+    ["raisons", 0],
+    ["validation", 0],
+  ]);
+  const chrono = async <T>(etape: EtapeChronometree, travail: () => Promise<T> | T): Promise<T> => {
     const depart = horloge();
     try {
       return await travail();
     } finally {
-      temps[etape] += Math.max(0, Math.round(horloge() - depart));
+      temps.set(etape, (temps.get(etape) ?? 0) + Math.max(0, Math.round(horloge() - depart)));
     }
   };
 
@@ -276,11 +278,12 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     journal.ecrire(raisonArret);
   }
 
-  const repartition = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), 0])) as Record<string, number>;
+  const repartition = new Map(Array.from({ length: 10 }, (_, i) => [String(i + 1), 0]));
   let oui = 0;
   let incontournables = 0;
   for (const note of notes.values()) {
-    repartition[String(note.notForMeRisk)] = (repartition[String(note.notForMeRisk)] ?? 0) + 1;
+    const risque = String(note.notForMeRisk);
+    repartition.set(risque, (repartition.get(risque) ?? 0) + 1);
     if (note.matchesWishes) oui += 1;
     if (note.mustSee) incontournables += 1;
   }
@@ -306,12 +309,12 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     ...(RoutageSchema.safeParse(configuration.modeles.routage).success ? { routage: { ...configuration.modeles.routage } } : {}),
     fichiersConfig: { modeles: CONFIG_SCHEMA, recherche: CONFIG_SCHEMA, classement: CONFIG_SCHEMA, plafonds: CONFIG_SCHEMA },
     notes: {
-      notForMeRisk: repartition,
+      notForMeRisk: Object.fromEntries(repartition),
       matchesWishes: { oui, non: notes.size - oui },
       mustSee: { oui: incontournables, non: notes.size - incontournables },
     },
     sortiesRefusees,
-    elapsedMs: { total: Math.max(0, Math.round(horloge() - debut)), ...temps },
+    elapsedMs: { total: Math.max(0, Math.round(horloge() - debut)), ...Object.fromEntries(temps) },
     coutUsd: {
       modeles: registre.cout.modeles,
       rechercheWeb: registre.cout.rechercheWeb,
@@ -327,7 +330,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       toursAgent: agent?.tours ?? 0,
       recherches: agent?.recherches ?? registre.utilise.recherchesWeb,
       pagesLues: agent?.pagesLues ?? 0,
-      pagesRefusees: Object.fromEntries(RAISONS_REFUS_PAGE.map((raison) => [raison, agent?.pagesRefusees[raison] ?? 0])),
+      pagesRefusees: Object.fromEntries(RAISONS_REFUS_PAGE.map((raison) => [raison, (agent === undefined ? undefined : lireSiPresent(agent.pagesRefusees, raison)) ?? 0])),
       candidatsTrouves: candidats.length,
       candidatsRefuses: agent?.candidatsRefuses ?? { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
       candidatsAncres: ancres,

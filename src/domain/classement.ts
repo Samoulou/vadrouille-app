@@ -1,6 +1,7 @@
 import { joursEntre } from "@/domain/temps";
 import type { CandidatNote, TypeCreneau } from "@/prototype/candidat";
 import type { ConfigClassement } from "@/prototype/config";
+import { lire } from "@/domain/tables";
 
 /**
  * Classement déterministe (spécification P0, étape 7 ; cadrage § 3.7). La formule vit dans `classement.json`
@@ -29,7 +30,7 @@ export function scoreBase(candidat: CandidatNote, parametres: ParametresClasseme
   let score = notes.matchesWishes ? poids.matchesWishes : -penaliteHorsEnvies;
   if (notes.mustSee) score += poids.mustSee;
   score -= poids.notForMeRisk * (notes.notForMeRisk - 1);
-  score += poids.source[candidat.source.classe];
+  score += lire(poids.source, candidat.source.classe);
   if (joursEntre(candidat.source.date, parametres.dateExecution) > parametres.ageSourceMaxJours) {
     score -= poids.sourceAncienne;
   }
@@ -45,7 +46,7 @@ export function score(
   type: TypeCout,
   parametres: ParametresClassement,
 ): number {
-  return scoreBase(candidat, parametres) - parametres.classement.coutTrajetParMinute[type] * minutesDeTrajet;
+  return scoreBase(candidat, parametres) - lire(parametres.classement.coutTrajetParMinute, type) * minutesDeTrajet;
 }
 
 /**

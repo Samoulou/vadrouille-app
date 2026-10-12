@@ -33,9 +33,10 @@ function nomDe(texte: string): string {
 
 export function creerPlacesSimule(fixtures: FixturesPlaces): ClientPlaces {
   const parPlaceId = new Map(Object.values(fixtures.lieux).map((lieu) => [lieu.placeId, lieu]));
+  const parNom = new Map(Object.entries(fixtures.lieux));
   return {
     async textSearch(requete) {
-      const lieu = fixtures.lieux[nomDe(requete.texte)];
+      const lieu = parNom.get(nomDe(requete.texte));
       return { placeIds: lieu === undefined ? [] : [lieu.placeId] };
     },
     async details(placeId) {

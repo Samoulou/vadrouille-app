@@ -14,11 +14,12 @@ import type { Candidat } from "@/prototype/candidat";
 /** Rayon du biais géographique autour du premier logement. */
 export const RAYON_BIAIS_METRES = 30_000;
 
-const STATUTS: Record<string, AncrageResolu["statut"]> = {
-  OPERATIONAL: "ouvert",
-  CLOSED_TEMPORARILY: "ferme_temporairement",
-  CLOSED_PERMANENTLY: "ferme_definitivement",
-};
+// Map plutôt qu'un objet : un statut inattendu (`constructor`…) ne remonte jamais au prototype.
+const STATUTS: ReadonlyMap<string, AncrageResolu["statut"]> = new Map([
+  ["OPERATIONAL", "ouvert"],
+  ["CLOSED_TEMPORARILY", "ferme_temporairement"],
+  ["CLOSED_PERMANENTLY", "ferme_definitivement"],
+]);
 
 async function ancrerTexte(texte: string, places: ClientPlaces, biais: Coordonnees | null): Promise<Ancrage> {
   const { placeIds } = await places.textSearch({
@@ -37,7 +38,7 @@ async function ancrerTexte(texte: string, places: ClientPlaces, biais: Coordonne
   return {
     resolu: true,
     placeId,
-    statut: STATUTS[details.statut] ?? "ferme_definitivement",
+    statut: STATUTS.get(details.statut) ?? "ferme_definitivement",
     position: { lat: details.position.lat, lng: details.position.lng },
     horaires: details.horaires === null ? null : details.horaires.map(({ jour, debut, fin }) => ({ jour, debut, fin })),
   };
@@ -84,7 +85,7 @@ export async function matriceTrajets(placeIds: readonly string[], mode: ModeRout
       const { secondes } = await routes.matrice({ origines, destinations, mode });
       origines.forEach((de, a) => {
         destinations.forEach((vers, b) => {
-          const valeur = secondes[a]?.[b];
+          const valeur = secondes.at(a)?.at(b);
           if (typeof valeur === "number" && Number.isFinite(valeur) && valeur >= 0) {
             minutes.set(`${de}\u0000${vers}`, Math.ceil(valeur / 60));
           }

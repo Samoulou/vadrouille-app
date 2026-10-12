@@ -30,7 +30,8 @@ export function dateMentionnee(texte: string, date: string): boolean {
   if (bas.includes(date)) return true;
   const index = Number(mois) - 1;
   const j = String(Number(jour));
-  return [MOIS_EN[index], MOIS_FR[index]].some(
+  const valide = Number.isInteger(index) && index >= 0;
+  return [valide ? MOIS_EN.at(index) : undefined, valide ? MOIS_FR.at(index) : undefined].some(
     (nom) => nom !== undefined && (bas.includes(`${j} ${nom} ${annee}`) || bas.includes(`${j}${j === "1" ? "er" : ""} ${nom} ${annee}`)),
   );
 }

@@ -32,7 +32,7 @@ export function extraireTexte(html: string): string {
     }
     const enfants = noeud.childNodes ?? [];
     for (let index = enfants.length - 1; index >= 0; index -= 1) {
-      const enfant = enfants[index];
+      const enfant = enfants.at(index);
       if (enfant !== undefined) pile.push(enfant);
     }
   }

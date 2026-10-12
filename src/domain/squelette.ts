@@ -1,6 +1,7 @@
 import { ajouterJours, joursEntre, jourSemaine, libelleJour, versMinutes } from "@/domain/temps";
 import type { Weekday } from "@/contracts";
 import { BUDGET_TRAJET_PAR_RYTHME, type Brief, type Rythme } from "@/prototype/brief";
+import { element, lire } from "@/domain/tables";
 
 /**
  * Squelette déterministe du séjour (spécification P0, étape 5 ; cadrage § 6.5) : terminus de chaque jour au
@@ -60,7 +61,7 @@ function logementsParNuit(brief: Brief): number[] {
 export function squelette(brief: Brief): JourSquelette[] {
   const nuits = logementsParNuit(brief);
   const nombreJours = joursEntre(brief.arrivee, brief.depart) + 1;
-  const activites = ACTIVITES_PAR_RYTHME[brief.rythme];
+  const activites = lire(ACTIVITES_PAR_RYTHME, brief.rythme);
   const matin = Math.ceil(activites / 2);
   return Array.from({ length: nombreJours }, (_, index) => {
     const date = ajouterJours(brief.arrivee, index);
@@ -80,12 +81,12 @@ export function squelette(brief: Brief): JourSquelette[] {
       jourSemaine: jourSemaine(date),
       debut: premier ? Math.max(DEBUT_JOUR, versMinutes(brief.heureArrivee)) : DEBUT_JOUR,
       fin: dernier ? Math.min(FIN_JOUR, versMinutes(brief.heureDepart)) : FIN_JOUR,
-      logementDepart: premier ? (nuits[0] ?? 0) : (nuits[index - 1] ?? 0),
-      logementArrivee: dernier ? (nuits[index - 1] ?? nuits[0] ?? 0) : (nuits[index] ?? 0),
+      logementDepart: premier ? (nuits[0] ?? 0) : (element(nuits, index - 1) ?? 0),
+      logementArrivee: dernier ? (element(nuits, index - 1) ?? nuits[0] ?? 0) : (element(nuits, index) ?? 0),
       creneaux,
-      budgetTrajet: BUDGET_TRAJET_PAR_RYTHME[brief.rythme],
+      budgetTrajet: lire(BUDGET_TRAJET_PAR_RYTHME, brief.rythme),
       complet: !premier && !dernier,
-      tempsLibreMin: !premier && !dernier ? TEMPS_LIBRE_MIN[brief.rythme] : 0,
+      tempsLibreMin: !premier && !dernier ? lire(TEMPS_LIBRE_MIN, brief.rythme) : 0,
     };
   });
 }

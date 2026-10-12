@@ -22,8 +22,10 @@ export const FixturesPagesSchema = z.strictObject({
 export type FixturesPages = z.infer<typeof FixturesPagesSchema>;
 
 export function creerResolveurSimule(table: FixturesPages["dns"]): Resolveur {
+  // Map plutôt que `table[hote]` : aucun accès calculé, aucune clé héritée du prototype (`constructor`…).
+  const parHote = new Map(Object.entries(table));
   return async (hote) => {
-    const adresses = table[hote];
+    const adresses = parHote.get(hote);
     if (adresses === undefined) throw new Error("dns_failed");
     return adresses;
   };
@@ -37,12 +39,12 @@ export function creerHttpSimule(
   pages: FixturesPages["pages"],
   capture?: (requete: RequeteHttp) => void,
 ): CoucheHttp {
+  const parUrl = new Map(Object.entries(pages));
   return async (requete) => {
     capture?.(requete);
-    const page = pages[`https://${requete.nomHote}${requete.chemin}`];
+    const page = parUrl.get(`https://${requete.nomHote}${requete.chemin}`);
     if (page === undefined) return { statut: 404, entetes: { "content-type": "text/plain" }, corps: morceaux("") };
-    const entetes: Record<string, string> = {};
-    for (const [nom, valeur] of Object.entries(page.entetes)) entetes[nom.toLowerCase()] = valeur;
+    const entetes: Record<string, string> = Object.fromEntries(Object.entries(page.entetes).map(([nom, valeur]) => [nom.toLowerCase(), valeur]));
     return { statut: page.statut, entetes, corps: morceaux(page.corps) };
   };
 }

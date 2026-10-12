@@ -72,10 +72,11 @@ export function creerJournal(sortie: (ligne: string) => void, redacteur: (texte:
   const lignes: string[] = [];
   return {
     ecrire(code, compteurs) {
-      const propres: Record<string, number> = {};
-      for (const [nom, valeur] of Object.entries(compteurs ?? {})) {
-        if (/^[a-zA-Z0-9_.]{1,64}$/.test(nom) && typeof valeur === "number" && Number.isFinite(valeur)) propres[nom] = valeur;
-      }
+      const propres: Record<string, number> = Object.fromEntries(
+        Object.entries(compteurs ?? {}).filter(
+          ([nom, valeur]) => /^[a-zA-Z0-9_.]{1,64}$/.test(nom) && typeof valeur === "number" && Number.isFinite(valeur),
+        ),
+      );
       const ligne: LigneJournal = Object.keys(propres).length === 0 ? { code } : { code, compteurs: propres };
       const texte = redacteur(JSON.stringify(ligne));
       lignes.push(texte);

@@ -225,7 +225,7 @@ export const ProgrammeReduitSchema = z
     }
     const jours = programme.trip.days.map((jour) => jour.index);
     const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
-    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus[index] !== jour)) {
+    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus.at(index) !== jour)) {
       ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
     }
     const joursConnus = new Set(jours);
