@@ -6,6 +6,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **2026-10-12 10:29** (#studio) : le CEO tourne dans le projet Claude « Vadrouille », 3 fils au plus ; chaque résumé indique le nombre de fils lancés et leur consommation estimée. Appliqué.
 - **2026-10-12 10:35** (#studio) : Q24 (Neon à Francfort), Q249, Q250, Q241, Q252, P0-Q5 (consignées dans la décision 0028, #149) ; Q253 et Q254 (oui, `CLAUDE.md` aligné dans #27) ; **Q245** (PR qui touche `.github/workflows/` : signalée dans #studio, attend `owner-approved` posé par Samuel ; contrôle à ajouter à `techlead-gate`, ticket **#163**).
 - **2026-10-12 11:09 à 11:12** (fil « Parcours cible du MVP ») : **toute la chaîne MVP est construite maintenant**, B1 à B12, révision et pendant/après le voyage compris ; G0 reste la condition commerciale. Consigné dans la **décision 0029** (#165), avec `CONTEXT.md` et la roadmap.
+- **2026-10-12 12:47 et 12:48** (fil « Routine cycle du studio ») : Q257 (exécutions réelles de P0 en ligne, préversion Vercel protégée et Neon, jamais sur son poste ni en production) ; Q256, Q258, Q259, Q260 (recommandations suivies). Q261 et Q262 étaient déjà tranchées dans le fil photos (11:12).
 - **2026-10-12 vers 11:35** : projet Neon gratuit créé (Francfort, Postgres 17, Neon Auth désactivé), relié à Vercel pour Development et Preview. Q24 tranchée.
 - Le message de 10:32 est le résumé du 38e cycle (#157).
 
@@ -23,7 +24,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - `pnpm verify` en local : vert sauf les captures visuelles (rendu du conteneur, 0004). La CI fait foi. Docker ne tourne pas dans ces sessions : les tests de base de données ne passent qu'en CI.
 
 ## Bloqué
-- **Exécutions réelles de P0 (P0a2, P0a3, P0b2)** : attendent Q256 (portée du quota) et Q257 (exécutions sur le poste de Samuel), puis une spec suivante.
+- **Exécutions réelles de P0 (P0a2, P0a3, P0b2)** : Q256 et Q257 tranchées ; attendent une spec suivante (en ligne, préversion Vercel protégée et Neon).
 - **B7 à B9** : attendent la fusion de #149 et de #27 (décision 0029).
 
 ## Prochain cycle
@@ -34,10 +35,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 5. F7a après F8a (`SegmentedControl.tsx`), puis F10a.
 
 ## Décisions attendues de Samuel
-- **P0** : Q256 (quota par méthode ou par API) ; Q257 (exécutions réelles sur ton poste, programmes jamais dans le dossier du projet) ; P0-Q6 (seuils G0).
-- **#27** : Q258 (S4, compteurs d'ancrage) ; Q259 (S5, `verifiedAt` reconstitué) ; Q260 (DeepSeek hors Suisse et UE).
-- **F13** : Q261 (attribution des photos Google hors carte Google) ; Q262 (IP du voyageur chez Google en option A).
-- **Quota de la clé Maps JavaScript** : plafond à confirmer dans Google Cloud Console (Q263), la clé acceptant tout `*.vercel.app`.
+- **Action** : plafond de quota journalier sur Maps JavaScript API dans Google Cloud Console (Q263), la clé acceptant tout `*.vercel.app`.
+- **P0** : P0-Q6 (seuils G0).
 - **Toujours ouvertes** :
   - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44 (règle provisoire en attendant), Q46, Q47, Q75, Q127, Q150 ;
   - argent et comptes : Q25, Q26, Q39, Q45, Q56, Q84 ;
