@@ -11,7 +11,7 @@ Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches
 - **Ordre (CEO)** : F12b passe avant F7a et F11a, comme le prévoit la spec F12 (« avant F7 à F11 »). Ces deux tâches partagent `TripShell.tsx`, `fr.json` et `tests/e2e/routes.ts` avec F12b ou entre elles, et attendent donc sa fusion.
 
 ## En cours
-- **F2c (ticket #138, PR #143)** : écarts à 0012, points 2 à 4 (`StatusBanner` `conflict` en `role="alert"`, filet `generating` sans animation ; `Chip` coche de 20 px, chip déduite sans aplat, chip indisponible sans contour ; `OtpInput` invalide avec `aria-invalid` et `aria-describedby`). Approuvée par le Tech Lead ; correction 1 en cours (références visuelles à reprendre de la CI, Q232).
+- **F2c (ticket #138, PR #143)** : écarts à 0012, points 2 à 4 (`StatusBanner` `conflict` en `role="alert"`, filet `generating` sans animation ; `Chip` coche de 20 px, chip déduite sans aplat, chip indisponible sans contour ; `OtpInput` invalide avec `aria-invalid` et `aria-describedby`). Correction 1 faite : une seule capture changée (`presentation-question.png`, reprise de la CI, Q232), CI verte, de nouveau en revue.
 - **F12b (ticket #139, PR #144)** : grand écran du voyage (carte à gauche, panneau de 420 px dès 1024 px, bascule sans perte d'état, recentrage tiré du conteneur). Correction 1 faite (références 1280 × 800, toast sous le contenu du panneau), CI verte, de nouveau en revue. Budgets : R11 185 177 o, R12 185 447 o, R6 inchangée (seuil 200 000 o).
 - `pnpm verify` en local : vert sauf les captures visuelles (polices, décision 0004). La CI fait foi.
 
