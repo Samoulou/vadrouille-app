@@ -24,6 +24,7 @@ import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sh
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, Stop, Trip } from "@/contracts";
 import { messages } from "@/i18n";
+import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { useLargeScreen } from "@/lib/large-screen";
 import { useElementSize, type ElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
@@ -201,6 +202,17 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
 
   const dayIndex = day?.index;
 
+  // Dernier onglet consulté (F11-PO-5, décision 0021 § 4) : la Journée `n` dès qu'un jour est affiché (fiche et
+  // sous-pages comprises), sinon le Séjour. Hors du fournisseur (pages de développement), rien n'est enregistré.
+  const tabMemory = useOptionalTripSession();
+  // Un `n` hors du voyage (page 404) n'enregistre rien.
+  const tripId = sourceTrip.id;
+  const unknownDay = nParam !== undefined && dayIndex === undefined;
+  useEffect(() => {
+    if (unknownDay) return;
+    tabMemory?.recordLastTab(tripId, dayIndex === undefined ? { kind: "sejour" } : { kind: "jour", n: dayIndex });
+  }, [tabMemory, tripId, dayIndex, unknownDay]);
+
   // Ajustements pendant le rendu, à chaque changement de fiche ou de jour (sans effet) :
   // - une fiche qui s'ouvre efface la sélection laissée par un marqueur et l'annonce d'étape absente, et
   //   relève le panneau à 55 % s'il était à 25 % (F5-PO-8) ;
@@ -351,7 +363,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
 
   const retour = (
     <Link
-      href={day ? routes.sejour() : routes.retour()}
+      href={day ? routes.sejour() : routes.mesVoyages()}
       aria-label={t.retour}
       data-part="retour"
       className="absolute left-3 top-3 z-10 inline-flex size-(--touch-target) items-center justify-center rounded-control border border-outline bg-raised text-ink"

@@ -27,6 +27,10 @@
         "debloquer": {
           "libelle": "Débloquer",
           "precision": "L'offre et le paiement simulé"
+        },
+        "mesVoyages": {
+          "libelle": "Mes voyages",
+          "precision": "Écran 17, voyages simulés"
         }
       }
     }
@@ -444,6 +448,29 @@
       }
     }
   },
+  "mesVoyages": {
+    "titre": "Mes voyages",
+    "titreDocument": "Mes voyages · {produit}",
+    "creer": "Créer un voyage",
+    "chargement": "Chargement de tes voyages",
+    "vide": "Tu n'as pas encore de voyage.",
+    "sections": {
+      "enCours": "En cours",
+      "aVenir": "À venir",
+      "nonDebloques": "Pas encore débloqués",
+      "passes": "Passés"
+    },
+    "mentions": {
+      "premieresPropositions": "Tes premières propositions",
+      "nonDebloque": "Non débloqué"
+    },
+    "reservations": {
+      "un": "1 réservation à faire",
+      "plusieurs": "{n} réservations à faire",
+      "suiteUn": "réservation à faire",
+      "suitePlusieurs": "réservations à faire"
+    }
+  },
   "debloquer": {
     "titreDocument": {
       "debloquer": "{destination} · Débloquer",
@@ -471,7 +498,8 @@
         "un": "1 enfant",
         "plusieurs": "{n} enfants"
       },
-      "separateur": ", "
+      "separateur": ", ",
+      "dateAnnee": "{jour} {date}.{annee}"
     },
     "offre": {
       "titre": "Débloquer ton voyage",
@@ -561,7 +589,8 @@
         "generating": "Jour en préparation",
         "travel": "Trajet au-delà du rythme",
         "introuvable": "Page introuvable",
-        "erreur": "Erreur inattendue"
+        "erreur": "Erreur inattendue",
+        "aucunVoyage": "Aucun voyage"
       },
       "liens": {
         "introuvable": "Ouvrir une adresse inexistante",

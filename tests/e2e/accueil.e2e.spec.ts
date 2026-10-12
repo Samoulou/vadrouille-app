@@ -41,6 +41,13 @@ const ARRIVALS: { name: string; check: (page: Page) => Promise<void> }[] = [
       await expect(page.getByRole("heading", { level: 1, name: "Débloquer ton voyage" })).toBeVisible();
     },
   },
+  // F11a (F11-PO-18) : dernière entrée, « Mes voyages » (écran 17).
+  {
+    name: "Mes voyages Écran 17, voyages simulés",
+    check: async (page) => {
+      await expect(page.getByRole("heading", { level: 1, name: "Mes voyages" })).toBeVisible();
+    },
+  },
 ];
 
 let googleRequests: string[] = [];
@@ -72,7 +79,8 @@ test("accueil: chaque lien mène à un écran livré (200, pas de 404), puis ret
 
   for (const [index, arrival] of ARRIVALS.entries()) {
     const href = hrefs[index] ?? "";
-    expect(href).toMatch(/^\/voyages\//);
+    // Écrans du voyage, ou « Mes voyages » (`/voyages`, F11a) ; jamais une page /dev.
+    expect(href).toMatch(/^\/voyages(\/|$)/);
 
     // Statut de la page d'arrivée, chargée comme document.
     const response = await page.request.get(href);

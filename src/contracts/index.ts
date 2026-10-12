@@ -13,6 +13,7 @@ export {
   StopSchema,
   SurpriseIdeaSchema,
   TimeSchema,
+  TimeZoneSchema,
   TripSchema,
   WeekdaySchema,
 } from "./trip";
@@ -32,6 +33,8 @@ export type {
   Trip,
   Weekday,
 } from "./trip";
+export { TripSummarySchema } from "./trip-summary";
+export type { TripSummary } from "./trip-summary";
 export {
   DayMapSchema,
   MapPointRefSchema,

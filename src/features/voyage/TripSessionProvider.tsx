@@ -4,7 +4,17 @@ import { createContext, useContext, useMemo, useRef, type ReactNode } from "reac
 
 import type { PaymentMethod } from "@/contracts/values";
 
-import { EMPTY_SESSION, recordCheckout, reportCheckout, type ReportKind, type StartedCheckout, type TripSessionState } from "./trip-session";
+import {
+  EMPTY_SESSION,
+  lastTabOf,
+  recordCheckout,
+  recordLastTab,
+  reportCheckout,
+  type LastTab,
+  type ReportKind,
+  type StartedCheckout,
+  type TripSessionState,
+} from "./trip-session";
 
 export interface TripSession {
   /** Paiement commencé dans cet onglet, pour ce voyage. */
@@ -24,9 +34,10 @@ interface TripSessionStore {
 const TripSessionContext = createContext<TripSessionStore | null>(null);
 
 /**
- * Fournisseur de l'onglet (décision 0020 § 8), monté par `src/app/voyages/[id]/layout.tsx` : état en mémoire
- * de l'onglet seulement, rangé par voyage, perdu au rechargement. Aucun stockage navigateur, aucun cookie,
- * rien dans l'adresse. Aucune dépendance : il entre dans le JavaScript initial de la Journée.
+ * Fournisseur de l'onglet (décision 0020 § 8), monté par `src/app/voyages/layout.tsx` (décision 0021 § 4, qui le
+ * déplace au niveau de « Mes voyages ») : état en mémoire de l'onglet seulement, rangé par voyage, perdu au
+ * rechargement. Aucun stockage navigateur, aucun cookie, rien dans l'adresse. Aucune dépendance : il entre dans
+ * le JavaScript initial de la Journée.
  */
 export function TripSessionProvider({ children }: { children: ReactNode }) {
   const ref = useRef<TripSessionState>(EMPTY_SESSION);
@@ -63,4 +74,34 @@ export function useTripSession(tripId: string): TripSession {
       },
     };
   }, [provided, tripId]);
+}
+
+/** Mémoire des onglets de l'onglet du navigateur (F11a, décision 0021 § 4). */
+export interface TabMemory {
+  /** Enregistre le dernier onglet consulté du voyage (Séjour ou Journée n). */
+  recordLastTab(tripId: string, tab: LastTab): void;
+  /** Dernier onglet consulté du voyage, ou `undefined`. */
+  lastTab(tripId: string): LastTab | undefined;
+}
+
+/**
+ * Mémoire des onglets, ou `null` hors du fournisseur : les pages de développement (`/dev/voyages`, sans
+ * fournisseur) et les tests isolés n'enregistrent rien.
+ */
+export function useOptionalTripSession(): TabMemory | null {
+  const provided = useContext(TripSessionContext);
+  return useMemo<TabMemory | null>(
+    () =>
+      provided
+        ? {
+            recordLastTab(tripId, tab) {
+              provided.set(recordLastTab(provided.get(), tripId, tab));
+            },
+            lastTab(tripId) {
+              return lastTabOf(provided.get(), tripId);
+            },
+          }
+        : null,
+    [provided],
+  );
 }
