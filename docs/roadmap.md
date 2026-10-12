@@ -18,11 +18,11 @@ Pas d'échéance : une phase s'achève quand sa condition de qualité est rempli
 | 3 | F2 | Composants de base | frontend | F0 | Fait (#19) |
 | 4 | P0 | Prototype de l'agent de recherche (script, Édimbourg et Zakynthos, modèle configurable via OpenRouter, décision 0026 ; variante B et mesure de la variante A, décision 0027) | ia-recherche | aucun pour P0a1 et P0b1 ; prérequis des exécutions réelles : `GOOGLE_MAPS_SERVER_KEY` (Q103) et `OPENROUTER_API_KEY` (0026), posées par Samuel | Spécification de P0a1 puis P0b1 (sans clé, P0b1 après P0a1) en revue (#149) ; clés en place ; exécutions réelles (P0a2, P0b2, P0a3) dans une spécification suivante, après les réponses de Samuel (décision 0028) ; programmes hors du dépôt, 30 jours au plus (Q241) |
 | 5 | F3 | Composants de la ligne du jour | frontend | F1, F2 | Fait (#30) |
-| 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | F1 | Spécifiée (#17, #18, #20) — handover en revue (#27), bloqué après 2 corrections (Q43) |
+| 6 | B0 | Handover back-end (contrats serveur, schéma, workflows) | product-owner, tech-lead | F1 | Fait (#27, fusionnée le 2026-10-12, décision 0011) |
 | 7 | F4 | Carte Google Maps | frontend | F3 | Fait (spec #25, code #35) |
 | 8 | T1 | Décisions déléguées du Tech Lead (Q33, Q36, Q52, Q58, Q60) | tech-lead | — | Fait (#39, ADR 0013) |
 | 9 | F6 | Présentation « J'aime / Pas pour moi » | frontend | F1, F2, ADR 0013 | Spécifiée (#33) — code en cours (ticket #42) |
-| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | Spécification en revue (#40) ; ordre F6 puis F5 (Q66, CEO) |
+| 10 | F5a, F5b, F5c | Séjour, Journée, Fiche (écrans 11 à 13), une sous-tâche à la fois | frontend | F4, code de F6 (`UndoToast`, `src/analytics`) | Spécifiée (#40, fusionnée) ; ordre F6 puis F5 (Q66, CEO) |
 | 10 bis | T4 | JavaScript initial de la Journée sous le budget de 200 Ko (Q95) : valeurs des contrats sans Zod côté client, mesure en `zod/mini`, règle de lint, test e2e de budget | frontend | F5b ; avant F5c | Décidée (décision 0016 § 3) ; place exacte fixée par le CEO |
 | 11 | F7 à F12 | Suite du handover front-end | frontend | voir handover | Autorisés sur données simulées |
 | 12 | « Signaler une erreur » | Action de la Fiche (écran 13) | frontend | B11 (contrat `StopReport`) | Après B11 (Q66, CEO) |
