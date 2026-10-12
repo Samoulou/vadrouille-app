@@ -1,6 +1,8 @@
-# P0 (suite) — Exécutions réelles du prototype de recherche, en ligne, sur les briques du MVP
+# P0 (suite) — Exécutions réelles du prototype de recherche, en ligne : cadre et clients réels (P0r1)
 
-Rôle : ia-recherche (gabarit du Product Owner) · Date : 2026-10-12 · Ticket : #170 · Décisions 0026 à 0028 et 0030 (#149, fusionnée) · Exécutions après B1 · Suite de `specs/P0-prototype-recherche.md` (#149, P0a1 et P0b1)
+Rôle : ia-recherche (gabarit du Product Owner) · Date : 2026-10-12 · Ticket : #170 · Décisions 0026 à 0028 et 0030 (#149, fusionnée), 0031 (découpage, jointe à cette PR) · Suite de `specs/P0-prototype-recherche.md` (#149, P0a1 et P0b1)
+
+**Périmètre (découpage décidé par le Tech Lead le 2026-10-12, décision 0031).** Cette spécification fixe le **cadre** des exécutions réelles et ne spécifie en détail que **P0r1** (clients réels, sans aucun appel déclenchable). P0r2 à P0r4 et les exécutions P0a2, P0b2, P0a3 sont renvoyés à la spécification suivante (« Renvoyé à la spécification suivante »), avec leurs exigences d'entrée.
 
 ## Objectif
 Faire tourner le prototype de recherche **pour de vrai** (OpenRouter, Google Places et Routes) sur Édimbourg puis Zakynthos, et laisser Samuel parcourir les programmes produits dans les écrans existants, pour juger G0.
@@ -8,218 +10,113 @@ Faire tourner le prototype de recherche **pour de vrai** (OpenRouter, Google Pla
 Samuel, 2026-10-12 à 12:47 CEST, dans le projet Claude (réponse à Q257, P0-Q13) : « Non ça ne tournera pas sur mon poste, je suis en full remote, je travail dans le cloud, sur des ordi différents. On a défini un architecture pour lancer le projet en MVP on la suit, Fait en sorte que arrive en MVP. C'est important d'itérer vers une version assez proche de la réalité. »
 
 Ce que cette spécification en tire :
-- **Rien ne tourne sur un poste** : ni exécution, ni lecture des programmes. Les options « poste local » (A5 de #149) et « dossier du projet Claude » (P0-Q12 b) sont abandonnées.
+- **Rien ne tourne sur un poste** : ni exécution, ni lecture des programmes. Les options « poste local » (A5 de #149) et « dossier du projet Claude » (P0-Q12 b) sont abandonnées, ainsi que l'option « workflow GitHub approuvé » de Q235 ; P0c de #149 est absorbé par l'exécution en ligne (spécification suivante).
 - **Les exécutions réelles empruntent le chemin du MVP** (`docs/handovers/backend.md`) : modules `src/ai`, `src/research`, `src/grounding` (B7, B8), exécution durable par le Workflow SDK (décision 0009, B9), base Postgres Neon à Francfort (Q24, socle B1), déploiement Vercel (décision 0002). Le code de P0 **devient** le premier morceau de B7 et B8, au lieu d'un script jetable : « le prototype P0 alimente ce chapitre sans être recopié » (handover § 8).
-- **Rien de public, rien en production** (Q235, Q250) : exécution et lecture sur une **préversion Vercel protégée par l'authentification Vercel**, jamais sur l'environnement « Production ».
+- **Rien de public, rien en production** (Q235, Q250) : exécution et lecture sur une préversion Vercel protégée, jamais sur l'environnement « Production ».
 
 ## Ce qui est déjà en place (2026-10-12)
 - Clés `OPENROUTER_API_KEY` et `GOOGLE_MAPS_SERVER_KEY` posées par Samuel dans Vercel, sur « Preview » et « Development » seulement (Q249, Q250).
 - Projet Neon gratuit à Francfort (Postgres 17), relié à Vercel pour « Development » et « Preview » (`STATUS.md`, 2026-10-12 vers 11:35).
 - Quotas Google : 100 requêtes par jour et par méthode (Q252, Q256), alerte de budget à 20 USD (Q252) ; 40 USD par mois sur OpenRouter, 20 USD par mois sur Google (0027 § 2).
 - OpenRouter hors UE accepté en phase 0, briefs de test seulement (P0-Q5) ; DeepSeek via OpenRouter accepté dans les mêmes conditions, à revoir avant la bêta (Q260, 2026-10-12 à 12:48 CEST).
-- Positions Google gardées dans le programme hors du dépôt, 30 jours au plus ; durées de trajet relues à l'affichage (P0-Q8, option b ; Q241).
+- Positions Google gardées dans le programme hors du dépôt, 30 jours au plus ; durées de trajet relues à l'affichage (0027 § 4, 0028 P0-Q8 b ; Q241). Q5 reste ouverte.
+- Chaîne MVP B1 à B12 ouverte avant G0 par Samuel (décision 0029, ticket #164).
 
-## Prérequis (dans cet ordre)
-1. **#149 fusionnée** (fait le 2026-10-12), puis **P0a1** (pipeline en mode simulé, schéma de la forme réduite) et **P0b1** (adaptateur `prototype`, relecteurs simulés).
-2. **B1 fusionnée** (socle base : Drizzle, migrations, rôles, RLS) : les tables du prototype en dépendent. Samuel a levé la porte « après G0 » pour toute la chaîne MVP (2026-10-12), B1 peut donc avancer en parallèle de P0a1.
-3. **Amendement de `CLAUDE.md`** par le CEO pour l'écart des positions gardées 30 jours (« Stockage dans Neon »), avant P0r2.
-4. **Décision A3 de P0a1 alignée sur le MVP** : le code du pipeline vit dans `src/ai`, `src/research`, `src/grounding`, `src/domain` (handover § 3), pas dans un dossier isolé du script. La commande `pnpm p0` reste une enveloppe mince autour de ces modules. Sans cela, les étapes du workflow devraient recopier le script (point signalé au Tech Lead dans #149).
+## Prérequis de P0r1
+1. **P0a1 fusionnée** (pipeline en mode simulé, schéma de la forme réduite, garde de lecture des pages `fetch-page.ts` et `ip-guard.ts`).
+2. **Décision A3 de P0a1 alignée sur le MVP** : le code du pipeline vit dans `src/ai`, `src/research`, `src/grounding`, `src/domain` (handover § 3), pas dans un dossier isolé du script. La commande `pnpm p0` reste une enveloppe mince autour de ces modules.
+3. Décisions D1, D12 et D13 (ci-dessous) prises par le Tech Lead avant ou avec la PR de P0r1.
 
-## Découpage
-| Tâche | Contenu | Rôle | Prérequis |
+P0r1 ne dépend ni de B1, ni de B3, ni d'une base : il n'écrit rien en base et ne lit aucune variable par `src/server/env.ts`.
+
+## Découpage (feuille de route)
+| Tâche | Contenu | Rôle | Spécifiée |
 |---|---|---|---|
-| **P0r1** | Clients réels : modèles via l'AI SDK et OpenRouter (A1) dans `src/ai` ; Places et Routes dans `src/grounding` ; couche HTTP réelle de la lecture des pages dans `src/research` ; modules d'environnement étroits `@/server/env/ai` et `@/server/env/grounding` ; aucun appel déclenchable encore | ia-recherche | P0a1 |
-| **P0r2** | Tables du prototype et purge à 30 jours (A8) ; registre des exécutions et des appels (embryon de `usage_ledger`) | data, avec ia-recherche | B1, P0r1 |
-| **P0r3** | Workflow `p0Run` (Workflow SDK, monde Vercel en préversion, monde local en CI) ; page protégée de lancement ; garde du mode réel ; plafonds ; essai d'intégration borné | ia-recherche, backend | P0r2, P0b1 |
-| **P0r4** | Adaptateur `prototype` branché sur Neon au lieu du dossier ; relecteur Google réel (durées de trajet relues à l'affichage, `no-store`) | ia-recherche | P0r3 |
-| **P0a2** | Exécutions réelles d'Édimbourg : 2 de la variante B et 1 de la variante A par brief (9 au total, une par jour) | ia-recherche lance, Samuel juge | P0r4 |
-| **P0b2** | Séances de jugement à l'aveugle de Samuel sur la préversion | Samuel, ia-recherche prépare | P0a2 |
-| **P0a3** | Zakynthos, même chemin | ia-recherche | P0b2, récit de Zakynthos par Samuel |
+| **P0r1** | Clients réels (modèles, Places, Routes, lecture des pages) ; modules d'environnement étroits ; port de consommation `@/server/usage` avec implémentation en mémoire ; table de prix Google ; aucun appel déclenchable | ia-recherche | **ici** |
+| **P0r2** | Tables du prototype dans Neon, rôles, purge à 30 jours ; implémentation Neon du port de consommation | data, avec ia-recherche | spécification suivante |
+| **P0r3** | Workflow `p0Run`, branche et préversion des exécutions, page de lancement, garde complète du mode réel, plafonds, essai d'intégration | ia-recherche, backend | spécification suivante |
+| **P0r4** | Adaptateur `prototype` sur Neon ; relecteur Google réel | ia-recherche | spécification suivante |
+| **P0a2, P0b2, P0a3** | Exécutions d'Édimbourg, jugement de Samuel, Zakynthos (tâches nommées par #149) | ia-recherche, Samuel | spécification suivante |
 
-Une tâche = une section de cette spécification = une PR, selon le découpage que le CEO retient. P0a2, P0b2 et P0a3 sont les tâches que #149 a nommées et renvoyées ici, pas de nouveaux numéros ; P0r1 à P0r4 sont nouveaux. **Recouvrement avec B9** : aucun fichier commun sauf `src/workflows/index.ts`, créé par P0r3 et complété par B9 ; B9 réutilise les modules d'étapes (`src/ai`, `src/research`, `src/grounding`), pas le workflow `p0Run`, qui disparaît avec le schéma `prototype` à la fin de la phase 0.
+## Comportement de P0r1
 
-## Comportement
+### Aucun appel déclenchable
+P0r1 livre des clients réels **qui ne sont branchés à aucun point d'entrée** : ni action serveur, ni route, ni workflow, ni commande. L'option `--reel` de `pnpm p0` reste fermée (`real_mode_unavailable`, #149) ; le branchement et la garde complète du mode réel arrivent avec P0r3. Les tests appellent les clients avec une couche HTTP de test (serveur local ou double), jamais les services réels. Test `p0: aucun client réel atteignable depuis un point d'entrée` (graphe d'imports : aucun fichier de `src/app`, `src/server/actions`, `src/workflows` ni du script n'importe les fabriques de clients réels).
 
-### Où une exécution tourne : la branche `p0-reel` (bloquant 1 de la revue du head 55d346e)
-- **Branche longue dédiée** `p0-reel` (nom proposé, A11), déployée par Vercel dans l'environnement « Preview ». La branche de production (`main`) donne l'environnement « Production » : elle est exclue. Les préversions des branches `claude/…` sont éphémères et ne servent jamais aux exécutions réelles.
-- **Mise à jour** : `p0-reel` ne reçoit **que des fusions de `main`**, jamais de commit propre. La fusion est faite par une PR ordinaire de `main` vers `p0-reel`, revue comme les autres, ou par Samuel. Règle de protection de branche sur `p0-reel` (Samuel) : PR obligatoire, pas de poussée forcée. Ainsi le code qui tourne avec les clés est toujours du code déjà fusionné et revu.
-- **Adresse stable** : l'adresse de branche de Vercel (`vadrouille-app-git-p0-reel-<équipe>.vercel.app`), protégée par l'**authentification Vercel** (P0-Q15). Jamais `vadrouille-app-ten.vercel.app` (« Production »). La clé Maps navigateur accepte déjà `*.vercel.app` (Q263) : la carte s'affiche sur cette adresse sans autre réglage.
-- **Variables propres à la branche** : Vercel permet de poser une variable « Preview » pour **une seule branche**. `P0_REAL_RUNS`, `P0_RUN_TOKEN` et `P0_DATABASE_URL` sont posées par Samuel sur « Preview », branche `p0-reel` seulement (P0-Q16). Aucune autre préversion ne peut donc lancer une exécution réelle ni lire les programmes, même si elle lit les clés `OPENROUTER_API_KEY` et `GOOGLE_MAPS_SERVER_KEY` (risque résiduel accepté par Samuel, Q250).
-- **Rôle de la CI** : elle ne lance jamais d'exécution réelle (garde ci-dessous) et n'a ni `P0_DATABASE_URL` ni clé. Elle teste `p0Run` dans le monde local du Workflow SDK, avec des clients simulés et une base Postgres de service.
+### Modules d'environnement étroits (bloquant 5 de la revue du head 2639d52)
+- P0r1 livre `src/server/env/ai.ts` (`@/server/env/ai`), qui lit et valide **seulement** `OPENROUTER_API_KEY`, et `src/server/env/grounding.ts` (`@/server/env/grounding`), qui lit et valide **seulement** `GOOGLE_MAPS_SERVER_KEY`. Chacun est autonome : il ne dépend pas de `src/server/env.ts` (absent de `main`, livré par B3). Quand B3 livrera `src/server/env.ts`, celui-ci validera ces variables au démarrage sans exporter leur valeur (handover § 2), sans changer ces deux modules.
+- Lecture **paresseuse**, à l'appel de la fabrique du client, jamais à l'import ; valeur absente : erreur fermée `missing_key`, sans aucune valeur dans un message exporté.
+- Lint de confinement (handover § 3), avec ses tests : `@/server/env/ai` importable depuis `src/ai` seulement ; `@/server/env/grounding` depuis `src/grounding` seulement ; lecture de `OPENROUTER_API_KEY` ou de `GOOGLE_MAPS_SERVER_KEY` (`process.env` et chaîne littérale) refusée hors de ces deux fichiers.
 
-### Comment une exécution tourne
-- **Déclenchement** : Samuel (ou ia-recherche, si Samuel lui ouvre la préversion) ouvre la page `/prototype/executions` (nom proposé) sur l'adresse de `p0-reel`, choisit un brief de `prototype/briefs/` et une variante, saisit le jeton d'exécution et lance. La page appelle une **action serveur** (`src/server/actions/prototype.ts`) qui réserve le jour, puis démarre le workflow et renvoie son identifiant. Le suivi (statut, phase, compteurs) s'affiche sur la même page.
-- **Exécution durable** : le workflow `p0Run` (`src/workflows/p0-run.ts`) enchaîne les étapes de #149 (brief, plan de recherche, recherche, lecture des pages, ancrage, notation, classement, planification, raisons, validation, écriture), chacune dans une étape `"use step"` courte et rejouable. Une exécution dure jusqu'à 15 min : seul un workflow durable tient cette durée sur Vercel sans dépendre de la durée maximale d'une fonction.
-- **Points d'entrée HTTP du Workflow SDK** (bloquant 2) : le SDK sert ses propres routes à l'intégration Next.js (sous `/.well-known/workflow/`, chemins exacts à relever sur la version de 0009). Ce sont les seules routes HTTP ajoutées. Exigences de A10 :
-  1. le Tech Lead relève sur la version installée comment ces routes authentifient leurs appels (invocation signée par la file du monde Vercel, ou autre) et le consigne ; une route qui accepterait un appel non authentifié est refusée et bloque P0r3 ;
-  2. **chaque étape revérifie la garde du mode réel à son entrée** : un appel qui atteindrait une étape en production, en CI ou hors de `p0-reel` sort en erreur fermée sans appel externe ;
-  3. sur le déploiement « Production », `p0Run` n'est pas démarrable (garde de l'action serveur) et toute étape appelée refuse (point 2) ; test e2e sur le build de production : un appel direct aux routes du SDK pour `p0Run` ne produit aucun appel aux clients (simulés) ;
-  4. `src/workflows/index.ts` reste le seul point d'entrée des workflows (handover § 8) ; P0r3 le crée, B9 y ajoute ses workflows.
-- **État des étapes** (décision 0009, handover § 8) : identifiants internes, `placeId`, compteurs et codes d'erreur **seulement**. Les résultats intermédiaires (candidats, résumés de recherche, programme) sont écrits dans les tables du prototype par l'étape elle-même et relus par identifiant. Jamais de donnée Google, de brief ni de texte libre dans l'état sérialisé (test `workflows: aucune donnée Google dans l'état sérialisé`, repris pour `p0Run`).
-- **Région de l'état** (Q28, décision 0009 § 5) : 0009 § 5 tolère un état hors UE parce qu'il ne contient que des identifiants pseudonymes. P0r3 relève la région de l'état du monde Vercel et la note dans sa PR ; si elle est hors UE, la question remonte à Samuel comme le prévoit 0009, et la règle ci-dessus reste la condition du lancement.
-- **Aucune session d'agent ne lit un programme réel** : les agents n'ont ni accès à la préversion de `p0-reel` (sauf décision de Samuel), ni `P0_DATABASE_URL`, ni le jeton. Le rapport d'exécution que l'agent consulte ne contient que des compteurs, coûts, durées et codes (comme dans #149).
+### Port de consommation `@/server/usage` (bloquant 6)
+Le handover § 3 interdit à `src/ai` et à `src/grounding` d'accéder à `db/` ; `src/ai` n'importe que `@/server/usage` pour la consommation. P0r1 définit donc ce port :
+- **Interface** (`src/server/usage/port.ts`) : enregistrer un appel (`recordCall`, avec fournisseur, méthode, SKU, unités, coût estimé en micro-USD, nature `execution` ou `relecture`, identifiant d'exécution facultatif) et consulter les consommations du jour ou du mois avant un appel (`consumption`) ; forme exacte, dont une réservation atomique pour la spécification suivante : décision D13. Types maison stricts, aucun champ pour une donnée Google, un prompt ou un texte libre.
+- **Injection** : les clients reçoivent une implémentation du port à leur création ; ils ne connaissent ni la base ni le schéma.
+- **Implémentation de P0r1** : en mémoire seulement, pour les tests. L'implémentation Neon (`prototype.run_calls`) arrive avec P0r2 ; l'implémentation `usage_ledger` du MVP la remplacera avec B7 et B9 (migration nommée : `run_calls` vers `usage_ledger`, mêmes colonnes).
+- **Contrôle avant appel** : chaque client consulte le port et refuse l'appel (`cap_reached`) si un plafond passé à sa création serait dépassé. Les **valeurs** des plafonds sont fixées par la spécification suivante ; P0r1 teste le mécanisme avec des valeurs de test.
+- Test d'import : `src/ai` et `src/grounding` n'importent de `src/server` que `@/server/usage` (le port, jamais une implémentation) et leur module d'environnement.
 
-### Garde du mode réel
-Le mode réel s'ouvre **seulement** si toutes les conditions suivantes sont vraies ; chacune est testée seule :
-- `isProductionDeployment()` est faux (décision 0017 § 11.0) ;
-- l'environnement résolu par `src/server/env.ts` est `staging` (préversion Vercel). **`local` est refusé** (bloquant 3) : Samuel a écarté toute exécution sur un poste (Q257) ;
-- `CI` n'est pas posée : en CI, le mode réel est toujours refusé, sans exception (pas de reprise de l'exception `VADROUILLE_PROTOTYPE`/`CI` de l'adaptateur) ;
-- `P0_REAL_RUNS=enabled` (nom proposé), posée par Samuel sur « Preview », branche `p0-reel` seulement ;
-- le jeton d'exécution est valide (ci-dessous) ;
-- la **réservation du jour** a réussi (ci-dessous) ;
-- les plafonds du mois et de l'enveloppe ne sont pas atteints.
-Sinon : erreur fermée constante (`real_mode_unavailable`, `daily_run_used`, `cap_reached`, `invalid_run_token`), aucune lecture de clé, aucun appel.
+### Clients réels
+- **Modèles** : AI SDK et fournisseur OpenRouter (décision D1, amendement de 0006), confinés à `src/ai`, clé par `@/server/env/ai` ; `provider: { data_collection: "deny" }` sur chaque requête (refus de partir sans) ; base d'URL figée dans le code ; identifiants de modèles dans la configuration commitée (A2 de #149, variantes B et A de 0027).
+- **Google** : Places API (New) et Routes API, confinés à `src/grounding`, clé par `@/server/env/grounding` ; hôtes figés (`places.googleapis.com`, `routes.googleapis.com`) ; masques de champs minimaux ; `cache: "no-store"` sur chaque requête.
+- **Lecture des pages** : couche HTTP réelle derrière la garde de #149 (`fetch-page.ts`, `ip-guard.ts`). Client proposé (décision D12) : `undici`, par un `Agent` dont l'option `connect.lookup` renvoie **l'adresse déjà vérifiée** par la garde (épinglage, aucune seconde résolution), avec `servername` égal au nom d'hôte (TLS et SNI vérifiés sur le nom) ; jamais le `fetch` global. Chaque redirection est suivie à la main et **revalidée** par la garde (3 au plus) ; corps limité à 2 Mo après décompression et 10 s par page au total, comme dans #149. Variables de proxy : `EnvHttpProxyAgent`, `ProxyAgent` et `setGlobalDispatcher` sont refusés dans `src/research` (liste d'autorisation des imports et des identifiants) ; test avec `HTTPS_PROXY` posée : connexion directe à l'adresse vérifiée.
+- **Règles d'import** : celles du handover § 3 remplacent, pour ces trois dossiers, la recherche statique « aucun accès réseau » de P0a1 ; la liste d'autorisation des imports de `src/research` est élargie à `undici`, dans `fetch-page.ts` seulement.
 
-**Réservation atomique du jour** (bloquant 4). Avant tout appel externe, l'action serveur insère la ligne de l'exécution dans `prototype.runs` avec la date du jour (fuseau Europe/Zurich) et le mode `reel`. Une **contrainte d'unicité** sur `(jour, mode)` pour le mode `reel` refuse la seconde insertion du même jour (`daily_run_used`). Une exécution qui échoue, qui atteint un plafond ou qui est l'essai d'intégration **consomme le jour** : seule une décision écrite de Samuel libère un jour (aucun bouton). Test de concurrence : deux lancements simultanés, une seule réservation, un seul workflow démarré.
-
-**Jeton d'exécution** (A9, mineur 12). La protection de Vercel est la première barrière ; elle ne suffit pas seule (lien de partage, protection désactivée par erreur). Tant que l'authentification du MVP (B3) n'existe pas, l'action serveur exige `P0_RUN_TOKEN` (32 octets aléatoires au moins, posé par Samuel, branche `p0-reel` seulement) :
-- comparaison en temps constant, sur des empreintes de même longueur ;
-- au plus 5 essais par heure, compteur dans `prototype.runs_attempts` (aucune adresse IP stockée), puis refus pendant une heure ;
-- jamais journalisé ni exporté : le champ est masqué dans les journaux, les traces et les erreurs (liste des champs masqués de `src/server`) ; jamais écrit dans l'état du workflow ;
-- jamais connu des agents : Samuel le garde ; aucun fichier du dépôt ni du projet ne le contient.
-B3 le remplacera par la session du propriétaire. Dans tous les cas, les plafonds bornent ce qu'un abus coûterait.
-
-### Stockage dans Neon (A8)
-Tables du prototype, dans un **schéma Postgres séparé `prototype`** (proposition), supprimé à la fin de la phase 0 :
-| Table | Contenu | Données Google | Rétention |
-|---|---|---|---|
-| `prototype.runs` | registre : identifiant, jour (Europe/Zurich), mode, brief (nom), variante, statut, phase, compteurs par méthode, coût estimé, durée, codes d'erreur ; unicité `(jour, mode)` pour `reel` | non | durée de P0 (aucune donnée Google, aucun texte libre) |
-| `prototype.run_calls` | une ligne par appel payant : exécution (nulle pour une relecture à l'affichage), nature (`execution` ou `relecture`), fournisseur, méthode, SKU, unités, coût estimé (forme de `usage_ledger`, handover § 13) | non | durée de P0 |
-| `prototype.runs_attempts` | essais du jeton : heure, résultat | non | 24 h |
-| `prototype.programmes` | programme réduit validé par le schéma strict de P0a1 (`programme-reduit.ts`), avec la table `positions` | **oui** (positions, `placeId`) | **30 jours au plus** : `expires_at` écrit à la création |
-| `prototype.work` | résultats intermédiaires d'une exécution (candidats, résumés de recherche) | `placeId` seulement ; les positions restent en mémoire de l'étape | supprimés à la fin de l'exécution, réussie ou non ; 24 h au plus |
-
-- **Positions Google gardées 30 jours : ce que Samuel a décidé** (bloquant 6). Décision 0027 § 4, règle provisoire de Samuel pour Q5 (2026-10-12 09:46 CEST) : « aucune donnée Google dans les prompts, seul l'identifiant de lieu stocké, coordonnées gardées 30 jours au plus ». Décision 0028, P0-Q8 : Samuel suit la recommandation « garder les positions dans le programme hors dépôt 30 jours au plus » (option b). Q241 vise le dépôt public : « les programmes générés restent hors du dépôt, 30 jours au plus ». Neon est hors du dépôt. **Q5 (statut des données dérivées de Google) reste ouverte** : la validation juridique formelle viendra avant le lancement (0027 § 4) ; si elle change la règle, `prototype.programmes` est vidée.
-- **Écart au « Jamais » de `CLAUDE.md`** (« stocker autre chose que l'identifiant d'un lieu Google ») et au handover § 10 : c'est l'écart que 0027 § 4 et 0028 autorisent pour le prototype, borné à `prototype.programmes` et à 30 jours. L'amendement de `CLAUDE.md` qui consigne cet écart est à faire par le CEO (demande déjà faite dans #149) ; P0r2 ne fusionne pas avant cet amendement. Le test `schéma: aucune colonne de contenu Google` de B1 exclut le schéma `prototype` **par nom**, et `p0: aucune autre table que prototype.programmes ne contient de positions` vérifie le reste.
-- **Rôles** : un rôle `vadrouille_prototype` sans `BYPASSRLS`, seul à lire et écrire le schéma `prototype`, créé par migration (`DATABASE_URL_MIGRATOR`, B1) sans mot de passe dans le dépôt. Samuel lui donne un mot de passe dans la console Neon et pose `P0_DATABASE_URL` (P0-Q16). `vadrouille_app` n'a **aucun droit** sur le schéma `prototype` (test). Lignes rattachées à l'organisation fictive `org_prototype`.
-- **Une seule base** : si l'intégration Vercel crée une branche Neon par préversion, `P0_DATABASE_URL` pointe sur la branche Neon principale, et la purge (ci-dessous) vise la même base. Vérification par data dans P0r2, notée dans la PR.
-- **Purge à 30 jours**, en trois couches :
-  1. toute lecture filtre `expires_at > now()` : un programme expiré n'est jamais servi, même s'il n'est pas encore supprimé ;
-  2. suppression des lignes expirées au début de chaque exécution et à chaque lecture de la liste des programmes ;
-  3. **purge planifiée quotidienne**, indépendante de toute visite. Les tâches planifiées de Vercel ne visent que la production, d'où la proposition (P0-Q17) d'un workflow GitHub Actions planifié (`.github/workflows/p0-purge.yml`). Il se connecte à la même base que `P0_DATABASE_URL` avec un rôle `vadrouille_prototype_purge` limité à `DELETE` des lignes expirées (`P0_PURGE_DATABASE_URL`, secret GitHub posé par Samuel). Points connus (mineur 9) : le fichier touche `.github/workflows/`, donc la PR de P0r2 attend `owner-approved` (Q245) ; GitHub désactive une tâche planifiée après 60 jours sans activité du dépôt, d'où un contrôle de la date de la dernière purge réussie dans le rapport du cycle ; la connexion réveille la base Neon en veille. Alternative à trancher par le Tech Lead : `pg_cron` de Neon, s'il tourne sur la formule gratuite malgré la mise en veille.
-  Test : programme expiré jamais servi ; supprimé par chacune des trois couches.
-
-### Clients réels (P0r1)
-- **Modèles** : AI SDK et fournisseur OpenRouter (A1, amendement de 0006), confinés à `src/ai`, clé lue par `@/server/env/ai` seulement ; `provider: { data_collection: "deny" }` sur chaque requête (refus de partir sans) ; base d'URL figée dans le code ; identifiants de modèles dans la configuration commitée (A2 de #149, variantes B et A de 0027).
-- **Google** : Places API (New) et Routes API, confinés à `src/grounding`, clé lue par `@/server/env/grounding` seulement ; hôtes figés (`places.googleapis.com`, `routes.googleapis.com`) ; masques de champs minimaux ; `cache: "no-store"` sur chaque `fetch`.
-- **Lecture des pages** (mineur 16) : couche HTTP réelle derrière la garde de #149 (`fetch-page.ts`, `ip-guard.ts`). Client proposé (A12) : `undici`, par un `Agent` dont la fonction `connect` reçoit l'adresse déjà vérifiée (épinglage), avec `servername` égal au nom d'hôte (TLS et SNI vérifiés sur le nom), jamais le `fetch` global. Variables de proxy : `EnvHttpProxyAgent`, `ProxyAgent` et `setGlobalDispatcher` sont interdits dans `src/research` (liste d'autorisation), et `NODE_USE_ENV_PROXY` posée fait refuser le démarrage du mode réel ; test avec `HTTPS_PROXY` posée : connexion directe à l'adresse vérifiée. Sur Vercel la sortie est directe : le cas `proxy_required` ne se présente pas, il reste testé.
-- **Règles d'import** : celles du handover § 3 remplacent la recherche statique de P0a1 (« aucun accès réseau ») pour ces trois dossiers ; la liste d'autorisation des imports de `src/research` est élargie à `undici`, dans `fetch-page.ts` seulement. Lint de confinement : `@/server/env/ai` importable depuis `src/ai` seulement, `@/server/env/grounding` depuis `src/grounding` seulement (tests de lint, handover § 3).
+### Prompts et contenu web
 - **Aucune donnée Google dans un prompt** : les étapes de notation, de classement et de rédaction des raisons ne reçoivent que des types maison (identifiants internes, résumés de notre recherche web) ; le constructeur de prompts n'accepte pas d'autre type (handover § 10).
-- **Erreurs** : converties dans l'étape en codes d'une énumération fermée et `retryable` ; aucun message, corps de réponse ni pile d'un fournisseur ne sort de l'étape (handover § 8).
-- **Journaux et traces** : ni donnée Google, ni brief, ni clé, ni jeton, ni texte de prompt (handover § 13, redaction de #149).
+- Les étapes qui reçoivent des résumés de pages n'ont **aucun outil** ; leur sortie est validée par un schéma strict ; les URL de source ne peuvent être que `https:` (test).
+- **Erreurs** : converties dans le client en codes d'une énumération fermée et `retryable` ; aucun message, corps de réponse ni pile d'un fournisseur ne sort du client (handover § 8).
+- **Journaux et traces** : ni donnée Google, ni brief, ni clé, ni texte de prompt (handover § 13, redaction de #149).
 
-### Plafonds et quotas
-Appliqués **avant chaque appel** à partir de `prototype.run_calls`, mois calendaire et jour en fuseau Europe/Zurich :
-| Plafond | Valeur | Source |
-|---|---|---|
-| Par exécution : modèles et recherche web | 3 USD | **proposé**, P0-Q18 |
-| Par exécution : recherches web, pages lues, candidats | 60, 150, 90 | proposé (ia-recherche) |
-| Par exécution : Text Search, Place Details, Routes | 90, 90, 20 (et 400 éléments) | proposé, sous le quota de 100 par méthode |
-| Par exécution : durée | 15 min | proposé |
-| Par jour : exécutions réelles | **1** (réservation atomique) | conséquence des quotas |
-| Par jour et **par méthode** (Text Search, Place Details, Routes ; Q256) : requêtes Google, exécutions et relectures comprises | 100 au plus (quota de la console) ; le code s'arrête à 95 | Q252, Q256 |
-| Par mois : modèles et recherche web | 40 USD | 0027 § 2 ; **plafond dur** : limite de crédit de la clé OpenRouter posée par Samuel |
-| Par mois : Google | 20 USD | 0027 § 2 ; **appliqué par le code** avant chaque appel (ci-dessous) ; l'alerte de budget à 20 USD de la console (Q252) prévient seulement |
-| Enveloppe jusqu'à G0 | 80 USD de modèles, 40 USD de Google | **proposé**, P0-Q18 |
+### Table de prix Google
+Une **table de prix par SKU** commitée (`config/p0/prix-google.json`, nom proposé), relevée par ia-recherche sur la page de tarifs de Google à la date de la PR de P0r1, avec la date de relevé et les tranches gratuites mensuelles. P0r1 livre la fonction qui calcule le coût d'un mois à partir des consommations du port (tranches gratuites déduites), et montre dans sa PR le calcul « quotas × prix » : au plus 100 requêtes par jour et par méthode, sur 31 jours, au prix de chaque SKU retenue. L'application du plafond mensuel de 20 USD (0027 § 2) arrive avec P0r3.
 
-**Coût Google appliqué par le code** (bloquant 5). Un quota quotidien ne borne pas un coût mensuel, et l'alerte de budget ne fait que prévenir. Donc :
-- une **table de prix par SKU** commitée (`config/p0/prix-google.json`, nom proposé), relevée par ia-recherche sur la page de tarifs de Google à la date de P0r1, avec la date de relevé et les tranches gratuites mensuelles ;
-- avant chaque appel Google, le code calcule le coût du mois (lignes de `run_calls` du mois, tranches gratuites déduites) et refuse l'appel (`cap_reached`) si l'appel ferait dépasser 20 USD ;
-- la PR de P0r1 montre le calcul « quotas × prix » : au plus 100 requêtes par jour et par méthode, sur 31 jours, au prix de la SKU retenue ; si ce maximum dépasse 20 USD, c'est le plafond du code qui borne le mois, pas les quotas.
+### Dépendances nouvelles
+`ai`, le fournisseur OpenRouter de l'AI SDK et `undici` suivent les conditions du studio : version exacte publiée depuis au moins deux semaines, licence compatible, `pnpm audit` sans vulnérabilité haute, `onlyBuiltDependencies` inchangé (aucun script d'installation), lockfile commité, revue Sécurité, versions notées dans un amendement de 0006.
 
-**Relectures à l'affichage** (mineur 10). Seules les durées de trajet sont relues (Routes). Chaque affichage d'une Journée appelle Routes (`no-store`, aucun cache) et s'inscrit dans `run_calls` (nature `relecture`, exécution nulle). Le jour d'une exécution, celle-ci prend au plus 20 requêtes Routes et laisse au moins 75 relectures. Quand le compteur Routes du jour atteint 95, la relecture **échoue fermée**, sans appel : la Journée renvoie l'état d'erreur existant (« réessayer plus tard »), jamais une durée inventée ni une durée conservée d'un affichage précédent.
-
-### Lecture des programmes (P0r4, P0b2)
-- L'adaptateur `prototype` de P0b1 reçoit ses programmes d'une source injectée ; P0r4 ajoute la source **Neon** (lecture par `vadrouille_prototype`, `expires_at > now()`, schéma strict de la forme réduite, `trip.id` validé par `TRIP_ID_PATTERN`). Le chargeur de dossier de P0b1 reste pour les tests.
-- **Relecteur Google réel** : durées de trajet relues à l'affichage (Routes), jamais stockées ; `no-store`, rendu dynamique, `Cache-Control: private, no-store` (A6 de #149).
-- **Affichage des positions** : les positions Google ne s'affichent que sur la carte Google, et toute donnée de lieu affichée hors de la carte porte la mention « Données de lieux : Google » (`placesFromGoogle`, comme P0b1 ; handover § 10).
-- Séances de jugement (P0b2) : Samuel ouvre la préversion de `p0-reel` ; l'ordre des variantes est tiré au hasard par le code (pas par un agent, qui ne voit pas les programmes) et révélé après le formulaire.
-
-## Exigences reprises de #149 (« Renvoyé à la spécification suivante »)
-- Quotas : ci-dessus, par méthode (Q256).
-- Rétention : purge à 30 jours en trois couches, ci-dessus.
-- Transfert : **sans objet**, aucun programme ne quitte Neon ni la préversion.
-- Garde de CI : échec sur tout fichier suivi sous `prototype/sorties/` et sur tout motif `placeId` ou coordonnées dans les fichiers suivis (hors fixtures sentinelles) ; aucune URL de base Neon dans le dépôt.
-- Garde du mode réel : ci-dessus (liste blanche propre au mode réel, sans l'exception de CI).
-- Clients et couche réseau réels : P0r1.
-- Essai d'intégration : un essai borné sur `p0-reel`, avant la première exécution comptée, avec un brief réduit à 1 jour de séjour et ces plafonds : 0,30 USD de modèles, 6 recherches web, 15 pages, 9 candidats, 9 Text Search, 9 Place Details, 2 Routes (40 éléments), 5 min ; il consomme le jour ; compteurs dans la PR de P0r3.
-- Mineurs de la revue : rotation de la clé Google et plafond de facturation (Q249) ; clé OpenRouter sur « Preview » utilisée seulement par le code serveur du prototype ; registre du jour dans `prototype.runs`.
-
-## Tests attendus (noms proposés)
-- `p0: mode réel refusé en production, en CI et sans P0_REAL_RUNS` (chaque condition seule).
-- `p0: une seule exécution réelle par jour` (registre du jour, fuseau Europe/Zurich).
-- `p0: plafond atteint arrête l'exécution sans programme partiel` (chaque plafond, client simulé).
-- `p0: jeton d'exécution exigé et jamais journalisé`.
-- `workflows: aucune donnée Google dans l'état sérialisé` (étapes de `p0Run`).
-- `p0: programme expiré jamais servi et supprimé` (trois couches).
-- `p0: aucune autre table que prototype.programmes ne contient de positions`.
+## Tests attendus de P0r1 (noms proposés)
+- `p0: aucun client réel atteignable depuis un point d'entrée`.
+- `p0: modules d'environnement étroits` (chacun ne lit que sa variable, à l'appel ; valeur absente : `missing_key` sans valeur) ; lint : `@/server/env/ai` hors de `src/ai` et `@/server/env/grounding` hors de `src/grounding` refusés.
 - `p0: les clients réels n'appellent que leurs hôtes figés` ; `p0: data_collection deny sur chaque requête OpenRouter` ; `p0: no-store sur chaque appel Google`.
+- `p0: plafond atteint, appel refusé` (port en mémoire, valeurs de test, pour chaque client).
+- `p0: src/ai et src/grounding n'importent que le port de consommation`.
 - `p0: erreur de fournisseur réduite à un code` (message simulé contenant un nom de lieu et une adresse).
-- `recherche: le lecteur de pages refuse les adresses internes` et la suite SSRF de #149, sur la couche HTTP réelle (serveur local de test, sans réseau externe).
-- e2e sur le build de production, préversion simulée : page `/prototype/executions` absente en mode `mock` et en production ; appel direct aux routes du Workflow SDK pour `p0Run` en production : aucun appel aux clients simulés.
-- `p0: mode réel refusé en local` (environnement `local`, toutes les autres conditions vraies).
-- `p0: réservation du jour atomique` (deux lancements simultanés : une réservation, un workflow) ; `p0: une exécution échouée ou plafonnée consomme le jour`.
-- `p0: chaque étape revérifie la garde` (étape appelée directement en production, en CI, sans `P0_REAL_RUNS` : refus sans appel).
-- `p0: jeton limité à 5 essais par heure, comparé en temps constant, masqué dans journaux, traces et erreurs`.
-- `p0: plafond mensuel Google appliqué par le code` (table de prix de test, mois presque plein : appel refusé) ; `p0: relecture refusée quand le compteur Routes du jour atteint 95`.
 - `prompts: aucun prompt ne contient de donnée Google` (étapes de notation, classement et raisons : types maison seulement ; parcours des prompts journalisés).
-- `journaux: ni donnée Google, ni brief, ni clé, ni jeton` (journaux et traces de `p0Run`, exportateurs simulés).
-- `affichage: positions Google seulement sur la carte Google ou avec la mention` (écrans de P0r4).
-- Lint : `@/server/env/ai` hors de `src/ai` refusé ; `@/server/env/grounding` hors de `src/grounding` refusé.
-- Base : `vadrouille_app` n'a aucun droit sur le schéma `prototype` ; `vadrouille_prototype_purge` ne peut que supprimer des lignes expirées.
-- `p0: variables de proxy ignorées par le lecteur de pages` (`HTTPS_PROXY` posée) ; `NODE_USE_ENV_PROXY` posée : mode réel refusé.
+- `journaux: ni donnée Google, ni brief, ni clé` (clients réels, exportateurs simulés).
+- `recherche: le lecteur de pages refuse les adresses internes` et la suite SSRF de #149, sur la couche `undici` réelle face à un serveur local de test ; épinglage (`connect.lookup` ne résout jamais une seconde fois) ; redirection revalidée ; `HTTPS_PROXY` ignorée.
+- `p0: coût Google du mois` (table de prix de test, tranches gratuites).
 
 ## Décisions d'architecture attendues (Tech Lead)
+Libellés `D…`, pour ne pas les confondre avec les critères A1 à A9 de la grille G0.
+
 | # | Sujet | Proposition |
 |---|---|---|
-| A1 | Client de modèles | AI SDK et fournisseur OpenRouter, versions notées dans un amendement de 0006 |
-| A3 (rappel) | Emplacement du code de P0a1 | dossiers de l'application (`src/ai`, `src/research`, `src/grounding`, `src/domain`) |
-| A5 | Où vivent les programmes réels | Neon, schéma `prototype`, ci-dessus (remplace « poste local ») |
-| A8 | Tables, rôle et purge du prototype | ci-dessus ; écart au handover § 10 consigné |
-| A9 | Accès à la page de lancement | authentification Vercel et jeton d'exécution jusqu'à B3 |
-| A10 | Workflow SDK pour `p0Run` | versions de 0009, monde Vercel en préversion, monde local en CI ; routes du SDK nommées et leur authentification consignée ; garde revérifiée à chaque étape ; installé par P0r3 et repris par B9 |
-| A11 | Branche et adresse des exécutions réelles | branche longue `p0-reel`, alimentée par fusion de `main` seulement, protégée ; variables « Preview » propres à la branche |
-| A12 | Client HTTP de la lecture des pages | `undici` (`Agent` avec `connect` épinglé), version notée dans un amendement de 0006 |
+| D1 | Client de modèles | AI SDK et fournisseur OpenRouter, versions notées dans un amendement de 0006 |
+| D3 (rappel) | Emplacement du code de P0a1 | dossiers de l'application (`src/ai`, `src/research`, `src/grounding`, `src/domain`) |
+| D12 | Client HTTP de la lecture des pages | `undici` (`Agent`, `connect.lookup` épinglé), version notée dans un amendement de 0006 |
+| D13 | Port de consommation `@/server/usage` | interface ci-dessus ; implémentations en mémoire (P0r1), Neon (P0r2), `usage_ledger` (B7, B9) |
+
+## Renvoyé à la spécification suivante (décision 0031)
+Spécification `specs/P0-suite-2.md` (nom proposé), ticket et PR ouverts par le CEO, place dans le backlog fixée par le CEO. Elle couvre P0r2, P0r3, P0r4, P0a2, P0b2, P0a3, les valeurs des plafonds, la grille G0 et P0-Q6. Le brouillon issu de la revue du head `2639d52` lui sert de base : branche longue `p0-reel` et variables propres à la branche, routes du Workflow SDK et garde revérifiée à chaque étape, réservation atomique du jour, jeton d'exécution, schéma `prototype` et purge en trois couches, relectures plafonnées, grille G0 jugée sur les deux exécutions de chaque brief.
+
+**Exigences d'entrée** (bloquants 1 à 4 de la revue consolidée du head `2639d52`, repris tels quels) :
+1. « L'intégration Neon–Vercel […] pose ses propres identifiants (rôle propriétaire, hors RLS) sur toutes les préversions Preview, `claude/…` comprises. Le risque accepté en Q250 ne couvre que les clés OpenRouter et Google. Limiter ces variables à Development (ou désactiver l'intégration pour Preview), le dire dans la spec, l'ajouter à P0-Q16 et aux vérifications de P0r2, avec un test ou une vérification « aucun identifiant avec droit sur `prototype` hors `p0-reel` ». »
+2. « Une branche Neon enfant copie `prototype.programmes` (positions Google comprises) et échappe à la purge. Désactiver les branches Neon par préversion, ou les créer sans le schéma `prototype`, et consigner la fenêtre de restauration d'historique de Neon comme durée réelle maximale. »
+3. « `P0_PURGE_DATABASE_URL` est un simple secret GitHub dans un dépôt public ; une PR `claude/…` peut modifier un workflow et le lire. Exiger un GitHub Environment limité à `main` avec relecteur obligatoire, et un workflow déclenché par `schedule`/`workflow_dispatch` seulement. De plus, « limité à `DELETE` des lignes expirées » n'est pas faisable par simple `GRANT` : préciser le mécanisme (politique RLS ou fonction `SECURITY DEFINER`), et amender la liste de rôles de 0007 et le test « aucun rôle ne contourne la RLS » pour `vadrouille_prototype` et `vadrouille_prototype_purge`. »
+4. « Seul le lancement exige le jeton ; la lecture des programmes et la relecture Routes ne reposent que sur la protection Vercel. Si elle tombe, les positions stockées sont lisibles et des appels payants déclenchables. Même barrière (jeton ou cookie dérivé) sur les écrans de lecture et la relecture, et test e2e « lecture sans barrière : refus et aucun appel Routes ». »
+
+Ainsi que :
+- la garde complète du mode réel : `isProductionDeployment()` ; environnement `staging` résolu par `src/server/env.ts` de B3 (dépendance déclarée) ; `local` et `CI` refusés ; `VERCEL_GIT_COMMIT_REF` égal à `p0-reel` ; `P0_DATABASE_URL` absente : refus ; `src/server/env.ts` refuse de démarrer si une variable `P0_*` est posée en production ;
+- les mineurs 7 à 14 et 18 à 21 de la même revue : seul Samuel lance ; protection des déploiements de forks ; fusions vers `p0-reel` par Samuel seul, hors fusion automatique ; jeton vérifié avant la réservation du jour, compteur atomique ; jour des quotas Google à minuit heure du Pacifique ; relectures plafonnées à part ; colonnes Google stockées et origine du nom affiché (pour l'amendement de `CLAUDE.md`) ; authentification des rappels de la file testée sur `p0-reel` ; migration et mots de passe des rôles ; formule Vercel compatible avec le Workflow SDK ; nombre de programmes présentés par brief ;
+- l'amendement de `CLAUDE.md` par le CEO avant tout stockage de positions ; B1 avant P0r2.
+
+**Questions déjà posées à Samuel** (fil du projet Claude, 2026-10-12), reprises par la spécification suivante :
+- **P0-Q15** — la protection « Vercel Authentication » est-elle active sur les préversions ?
+- **P0-Q16** — réglages sur Vercel, Neon et GitHub (branche `p0-reel`, variables propres à la branche, mots de passe des rôles).
+- **P0-Q17** — purge quotidienne par une tâche GitHub planifiée (secret dans un GitHub Environment).
+- **P0-Q18** — 3 USD au plus par exécution ; enveloppe jusqu'à G0 de 80 USD de modèles et 40 USD de Google.
 
 ## Hors périmètre
-- Production, clés de production, comptes payants (Neon reste en formule gratuite ; Vercel selon la formule actuelle de Samuel).
-- Comptes utilisateurs (B3), paiement, workflows du MVP autres que `p0Run`.
-- Gemini (Q9).
-
-## Questions pour Samuel (numérotées par le CEO)
-- **P0-Q15 — Protection de la préversion** : la protection « Vercel Authentication » est-elle active sur les préversions du projet ? Si oui, rien à faire ; sinon, l'activer (Settings, Deployment Protection). Bloque P0r3.
-- **P0-Q16 — Réglages à faire sur Vercel, Neon et GitHub** (liste complète, bloquant 8) : créer la branche `p0-reel` et sa règle de protection (PR obligatoire, pas de poussée forcée) ; sur « Preview », **branche `p0-reel` seulement**, poser `P0_REAL_RUNS=enabled`, `P0_RUN_TOKEN` (valeur aléatoire que tu gardes pour toi) et `P0_DATABASE_URL` ; dans la console Neon, donner un mot de passe au rôle `vadrouille_prototype` créé par la migration (c'est lui qu'utilise `P0_DATABASE_URL`) ; rien à changer sur la clé Maps navigateur (`*.vercel.app` déjà autorisé, Q263). Bloque P0a2, pas le code.
-- **P0-Q17 — Purge planifiée** : d'accord pour une tâche GitHub planifiée qui efface chaque jour les programmes de plus de 30 jours (un secret de base à poser dans GitHub) ? Recommandation : oui. Bloque P0r2. Si oui, à poser aussi : le secret GitHub `P0_PURGE_DATABASE_URL` (rôle `vadrouille_prototype_purge`).
-- **P0-Q18 — Plafonds qui engagent de l'argent** : d'accord pour **3 USD au plus par exécution** (modèles et recherche web) et une **enveloppe jusqu'à G0 de 80 USD de modèles et 40 USD de Google** ? Ce sont des propositions (P0-Q2 n'a confirmé que les plafonds mensuels de 40 et 20 USD). Recommandation : oui. Bloque P0a2.
-
-## Grille de jugement G0 : « prototype jugé exploitable sur Édimbourg » (P0-PO-10, sous réserve de P0-Q6)
-Le jugement porte sur la **variante B**, avec **deux exécutions** de chacun des **trois briefs de référence** d'Édimbourg (reproductibilité). Le prototype est **exploitable** si les **six** exécutions franchissent tous les critères A, et si Samuel, sur **les deux** exécutions de chaque brief parcourues dans P0b2, franchit tous les critères B pour les trois briefs. Juger seulement la meilleure des deux introduirait un biais de sélection : le seuil vaut pour chaque exécution, sous réserve de P0-Q6.
-
-**A — Contrôles automatiques** (rapport d'exécution et tests ; aucun jugement humain). A1 à A6 et A9 sont des **seuils de qualité** (P0-Q6) ; A7 et A8 sont des **plafonds** de coût et de durée (P0-Q2), mesurés et notés ; la cible de 3 min du cadrage vaut pour B9, pas pour P0.
-| # | Critère | Seuil |
-|---|---|---|
-| A1 | Programme valide par `TripSchema` et `ProposalSchema` (après recomposition) | oui |
-| A2 | R1 : toute étape de lieu a un `placeId` et une source | 100 % |
-| A3 | R2 : aucun événement hors des dates ; tout événement non marqué `unconfirmed` a une page source relue qui mentionne sa date | 100 % |
-| A4 | R4, R5, R6, R8 : horaires respectés, trajets faisables avec marge, départ et retour au logement, rythme et temps libre minimal | 0 violation restante |
-| A5 | Aucun trou : chaque journée va du terminus de départ au terminus d'arrivée sans créneau non couvert | 100 % des jours |
-| A6 | Les 8 propositions de la présentation existent (ou des cases « aucune option compatible », PO-6, sans lieu non ancré) | 8 |
-| A7 | Coût de l'exécution (plafond, P0-Q2) | ≤ 3 USD ; mesuré et noté |
-| A8 | Durée de l'exécution (plafond, P0-Q2) | ≤ 15 min ; mesurée et notée |
-| A9 | Test canari vert sur le code de l'exécution | vert |
-
-**B — Jugement de Samuel** (sur le programme parcouru dans P0b2, formulaire défini par P0b2 ; seuils de qualité, P0-Q6)
-| # | Critère | Seuil |
-|---|---|---|
-| B1 | Erreur critique : lieu fermé ou inexistant, horaire manifestement impossible, événement hors dates ou inventé, adresse dans la mauvaise ville | **0** |
-| B2 | Note de 1 à 5 sur pertinence, variété, rythme, justification, surprise (cadrage § 8) | moyenne ≥ **3,5** et aucun axe < 3 (signal d'alerte du cadrage § 12 : pertinence < 3,5) |
-| B3 | Étapes et repas que Samuel garderait (« J'aime » ou neutre) parmi toutes les étapes du programme | ≥ **65 %**, soit « Pas pour moi » ≤ 35 % (seuil de G1) |
-| B4 | Couverture des incontournables : la liste de 10 lieux d'Édimbourg de Samuel (décision 0027 § 6), jamais donnée au prototype | ≥ **7 sur 10** dans le programme de chaque brief |
-| B5 | Trajets : journées au-dessus du budget de trajet du rythme sans justification affichée | **0** |
-| B6 | Réponse de Samuel à « Utiliserais-tu ce programme pour ce voyage, avec au plus 5 remplacements ? » | **oui** |
-
-**Comparaison avec la variante A** (mesure de référence, décision 0027). Pour chaque brief, une exécution de la variante A (P0a2). Mesures : critères A1 à A9 (dont R1 à R10, R3 et R10 sans objet), coût et durée par voyage (rapport), et taux de « Pas pour moi » (B3), que Samuel donne sur le programme de la variante A comme sur celui de la variante B. Proposition (P0-PO-12) : Samuel juge les deux programmes d'un même brief **sans savoir lequel vient de quelle variante** (ordre tiré au hasard par le code, révélé après le formulaire). Le tableau de comparaison va dans `docs/produit/p0-jugements.md` ; si B n'apporte rien de mesurable, le Tech Lead peut revenir à A par une décision écrite (0027). La variante A ne compte pas pour G0.
-
-Zakynthos (P0a3) suit la même grille **pour information** : G0 ne nomme qu'Édimbourg. Le résultat (critères A et B, coûts, durées) est consigné dans `docs/produit/p0-jugements.md` (proposition) par l'agent qui recueille les réponses de Samuel ; ce fichier ne contient aucune donnée Google.
-
-P0-Q6 (seuils) reste ouverte. Cette grille est la seule copie : #149 la renvoie ici.
+- Tout appel réel : P0r1 ne déclenche rien.
+- Base de données, workflow, préversion, page de lancement (spécification suivante).
+- Production, clés de production, comptes payants ; Gemini (Q9).
