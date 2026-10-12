@@ -714,7 +714,7 @@ Questions inscrites dans `QUESTIONS.md` (non tranchées ici) :
 - **Q27** (Samuel) : durées de conservation ; bloque la purge et la politique de confidentialité. Y figurent aussi : les journaux de la plateforme qui contiennent le jeton en clair de `/p/[token]` (§ 12) et `research_runs.queries` (données personnelles indirectes, § 6).
 - **Q28** (Tech Lead, puis Samuel si hors UE) : partiellement traitée par la décision 0009 ; région de l'état du monde Vercel à vérifier (B9).
 - **Q39, Q45** (Samuel, argent) : plafonds de coût et plafond global des actions sans compte (§ 7, § 13), plafond des lectures partagées de `getPlaceDetails` (§ 12) ; le risque d'épuisement du plafond global par une cinquantaine d'adresses n'est pas accepté ici (nouvelle question 3).
-- **Q40** (Samuel) : Docker dans les sessions d'agents (B1 en local).
+- **Q40** (Samuel) : Docker dans les sessions d'agents (B1 en local). Ne bloque plus B1 : sans base, `SKIP_DB_TESTS=1` hors CI (décision 0036, B1-TL-1).
 - **Q41** (Product Owner) : réduction de trajet redemandée après annulation (B10).
 - **Q42** (Product Owner) : « [Au plus tôt] » dans `ChecklistMoment` (B2).
 - **Q46** (Samuel) : engagement des fournisseurs de modèles (B7).

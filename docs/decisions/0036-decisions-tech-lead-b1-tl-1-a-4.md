@@ -7,7 +7,7 @@ Numérotation : 0031 est prise par la PR #172, 0033 par la PR #177, 0035 par la 
 ## Contexte
 La spécification B1 (`specs/B1-socle-base-de-donnees.md`, #185, fusionnée le 2026-10-12) attend quatre décisions du Tech Lead (section « Décisions attendues », B1-TL-1 à B1-TL-4 ; questions Q276 et Q277). La PR de code de B1 (#188) applique les valeurs par défaut de la spécification. La revue consolidée de #188 (2026-10-12, 15:42 UTC) retient ces valeurs et demande qu'elles soient écrites : B1-TL-1 bloque la fusion de #188.
 
-Cette décision retient les propositions de la spécification, en précisant ce qu'il faut pour les tester. Elle ne modifie aucun code. Elle amende le handover back-end § 2, le handover des comptes externes et la décision 0006 sur les noms des variables (B1-TL-3).
+Cette décision retient les propositions de la spécification, en précisant ce qu'il faut pour les tester. Elle ne modifie aucun code. Elle amende le handover back-end § 2, le handover des comptes externes et la décision 0006 sur les noms des variables (B1-TL-3), la décision 0006 et le handover back-end sur Q40 (B1-TL-1), et la décision 0007 sur l'invariant des rôles `vadrouille_fn_*` (B1-TL-2).
 
 **Argent, comptes, données hors UE** : rien. Aucune dépendance, aucun compte, aucun service. Le réglage « job `db` obligatoire sur `main` » (protection de branche) touche le compte GitHub : il reste à Samuel.
 
@@ -23,6 +23,8 @@ Cette décision retient les propositions de la spécification, en précisant ce 
 5. Une PR doit dire dans sa section « Vérifications » si `pnpm verify` a été lancé avec ou sans base (`SKIP_DB_TESTS=1`). Une PR qui touche `db/`, `tests/db/` ou une migration ne s'appuie jamais sur un `verify` local sans base : le job `db` de la CI fait foi.
 6. Q40 (Docker dans les sessions d'agents) ne bloque plus B1. Le CEO peut proposer à Samuel de la clore.
 
+**Noms ajoutés par la PR de code de B1 (#188)**, absents jusqu'ici du handover back-end § 2 : le script `scripts/test-db.mjs` (lancé par `pnpm test:db`, seul endroit du refus en CI), la variable `SKIP_DB_TESTS` (point 2 ci-dessus ; outillage de test, jamais lue par l'application) et la variable `VADROUILLE_DB_BOOTSTRAP_ROLE` (nom du rôle qui a exécuté l'amorçage, lue par le test `rôles` seulement, B1-TL-2 ; `postgres` en CI). Elles s'ajoutent aux trois variables de connexion de B1-TL-3, qui restent les seules lues par l'application.
+
 Option écartée : laisser `pnpm verify` sans base et ne compter que sur le job `db`. Elle crée deux définitions de « vert » et rend `test:db` facile à oublier en local quand une base existe.
 
 ## B1-TL-2 — Rôles `vadrouille_fn_*` « sans membre » sur Postgres 16 et suivants (Q277)
@@ -34,7 +36,9 @@ Depuis Postgres 16, un rôle non superutilisateur qui crée un rôle en reçoit 
 3. le test `rôles: aucun rôle ne contourne la RLS` nomme ces deux membres (le second par `VADROUILLE_DB_BOOTSTRAP_ROLE`) et échoue sur tout autre membre ou toute autre option ;
 4. pendant une migration, `vadrouille_migrator` peut s'accorder `SET` sur un rôle `vadrouille_fn_*` pour un `ALTER … OWNER TO`, puis doit le retirer **dans la même transaction** (`REVOKE … GRANTED BY vadrouille_migrator`). Le test vérifie l'état après migrations, donc ce retrait.
 
-Le critère « `current_user = 'vadrouille_fn_purge'` n'est pas falsifiable par un rôle applicatif » reste vrai : `vadrouille_app`, `vadrouille_auth` et les rôles qui leur sont accordés n'ont aucune appartenance aux `vadrouille_fn_*`.
+Le critère « `current_user = 'vadrouille_fn_purge'` n'est pas falsifiable par un rôle applicatif » reste vrai : `vadrouille_app`, `vadrouille_auth` et les rôles qui leur sont accordés n'ont aucune appartenance aux `vadrouille_fn_*`. Ce critère ne tient que tant que les identifiants de `vadrouille_migrator` et du rôle d'amorçage restent hors de l'environnement de l'application (B1-TL-3) : avec leur option `ADMIN`, l'un ou l'autre peut s'accorder `SET` sur un rôle `vadrouille_fn_*`.
+
+La ligne `ADMIN` du rôle d'amorçage est **tolérée, non exigée** : en CI, l'amorçage est exécuté par un superutilisateur (`postgres`), qui n'en reçoit pas. Le test `rôles` passe donc avec ou sans cette ligne ; il échoue seulement sur une appartenance d'un autre rôle ou avec une autre option.
 
 ## B1-TL-3 — Noms des variables de connexion
 L'intégration Neon de Vercel injecte `DATABASE_URL` (et des variables voisines) avec l'identifiant propriétaire. Le même nom ne peut pas désigner deux identifiants.
@@ -64,6 +68,14 @@ Conséquences :
 - **Décision 0006**, convention 4 : `DATABASE_URL_MIGRATOR` devient `VADROUILLE_DATABASE_URL_MIGRATOR` ; renvoi à cette décision.
 - **Handover back-end § 2** : variables d'exécution `VADROUILLE_DATABASE_URL` et `VADROUILLE_DATABASE_URL_AUTH` ; `VADROUILLE_DATABASE_URL_MIGRATOR` dans l'environnement des migrations seulement, et dans la garde de `src/server/env.ts`.
 - **Handover des comptes externes** (Neon) : mêmes noms.
+- **Décision 0007** (B1-TL-2), dont le texte est amendé en conséquence (sa ligne « Statut » renvoie à cette décision, qui prévaut en cas d'écart) :
+  - tableau des rôles, ligne `vadrouille_migrator` : « membre de `vadrouille_owner` et de lui seul » devient « seule appartenance avec `SET` : `vadrouille_owner` ; en outre, appartenance avec `ADMIN` seule à chaque rôle `vadrouille_fn_*` » ;
+  - l. 33 (« n'ont **aucun membre** (`pg_auth_members` vide pour eux) : personne ne peut `SET ROLE` vers eux ») : aucune appartenance n'a `inherit_option` ni `set_option` ; seules les appartenances `ADMIN` seule de `vadrouille_migrator` et du rôle d'amorçage sont admises ; aucun rôle applicatif ne peut `SET ROLE` vers eux ;
+  - l. 35 (transfert de propriété) : `vadrouille_migrator` s'accorde `SET` sur le rôle `vadrouille_fn_*` puis le retire dans la même transaction (`REVOKE … GRANTED BY vadrouille_migrator`) ; le test vérifie qu'après migration aucune appartenance n'a `SET` ni `INHERIT` ;
+  - l. 73 (règles communes, point 1) : « sans membre » devient « sans appartenance avec `SET` ni `INHERIT` » ;
+  - l. 102 (test `rôles`) : « `vadrouille_migrator` n'est membre que de `vadrouille_owner` après migration » devient « après migration, la seule appartenance de `vadrouille_migrator` avec `SET` est `vadrouille_owner` ; ses autres appartenances sont celles, `ADMIN` seule, aux rôles `vadrouille_fn_*` » ; « les rôles `vadrouille_fn_*` n'ont aucun membre » devient le point 3 de B1-TL-2 ;
+  - l. 111 (test `registres`) : « (aucun membre) » devient « (aucune appartenance avec `SET`) ».
+- **Décision 0006**, « Conséquences », et **handover back-end**, Q40 : Q40 ne bloque plus `pnpm verify` en local (B1-TL-1, point 6 : `SKIP_DB_TESTS=1` hors CI, la CI fait foi) ; renvoi à cette décision.
 
 ## Hors de cette décision
 - Question 3 de la spécification (Q278 : application des migrations à Neon staging, workflow manuel ou construction Vercel) : décision à part, après la fusion de B1 ; le secret éventuel reste à Samuel.

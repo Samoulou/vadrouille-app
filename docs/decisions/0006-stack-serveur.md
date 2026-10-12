@@ -61,5 +61,5 @@ En `production`, toutes les gardes d'ouverture sont fermées (webhook simulé, p
 
 ## Conséquences
 - B1 ajoute `docker-compose.yml`, le script `test:db`, le conteneur de service dans `.github/workflows/ci.yml` et l'inclut dans `pnpm verify`.
-- Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant.
+- Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant. **Amendé par la décision 0036 (B1-TL-1)** : sans base, une session hors CI pose explicitement `SKIP_DB_TESTS=1` (avertissement visible, refusée en CI) ; Q40 ne bloque plus `pnpm verify` en local, la CI fait foi pour les tests de base.
 - Revoir cette décision si Drizzle 1.0 sort en version stable (montée de version à planifier) ou si la RLS devient trop coûteuse à maintenir avec drizzle-kit.
