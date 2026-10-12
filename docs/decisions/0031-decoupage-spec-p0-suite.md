@@ -18,7 +18,7 @@ La décision 0030 (§ 3) renvoyait à une spécification suivante les exécution
 ## Conséquences
 - P0r1 démarre à la fusion de #172 et de P0a1, sans B1 ni B3.
 - P0r2, P0r3 et toute exécution réelle restent bloqués tant que les exigences d'entrée 1 à 4 ne sont pas satisfaites et vérifiées ; aucune exécution réelle n'a lieu avant la fusion de P0r3, exigences vérifiées. La fusion de la spécification suivante ne suffit pas.
-- Mesure provisoire proposée à Samuel (P0-Q19) : limiter l'intégration Neon–Vercel à « Development », ou la désactiver pour « Preview », sans attendre P0r2.
+- Mesure provisoire proposée à Samuel (P0-Q19) et refusée le 2026-10-12 : l'identifiant propriétaire reste sur les préversions jusqu'à P0r2 ; risque accepté jusqu'à la mise en public.
 - Les questions déjà posées à Samuel (P0-Q15 à P0-Q18) sont reprises par la spécification suivante.
 
 ## Quand revoir cette décision

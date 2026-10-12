@@ -116,7 +116,7 @@ Spécification `specs/P0-suite-2.md` (nom proposé), ticket et PR ouverts par le
 
 **Verrou des exécutions réelles.** La fusion d'une spécification ne suffit pas : P0r2, P0r3 et **toute exécution réelle** restent bloqués tant que les exigences d'entrée 1 à 4 ci-dessous ne sont pas **satisfaites et vérifiées**. La vérification est consignée dans la PR de P0r3 ; aucune exécution réelle n'a lieu avant la fusion de P0r3, exigences vérifiées.
 
-**Mesure provisoire, à décider par Samuel dès maintenant (P0-Q19).** L'exigence 1 décrit un risque déjà présent, indépendant de P0 : l'intégration Neon–Vercel pose aujourd'hui un identifiant propriétaire de la base sur toutes les préversions. Proposition : limiter l'intégration à « Development », ou la désactiver pour « Preview », jusqu'à P0r2. Rien dans P0r1 n'en dépend.
+**Risque présent, accepté par Samuel (P0-Q19, 2026-10-12 à 13:49 CEST).** L'exigence 1 décrit un risque déjà présent, indépendant de P0 : l'intégration Neon–Vercel pose un identifiant propriétaire de la base sur toutes les préversions. Samuel : « pour l'instant on laisse […] notre prod n'est pas sensible, c'est une chose à consolider avant une release public ». Pas de mesure provisoire ; l'exigence 1 reste une condition d'entrée de P0r2, et le resserrement est dû avant toute ouverture publique. Rien dans P0r1 n'en dépend.
 
 **Exigences d'entrée** (bloquants 1 à 4 de la revue consolidée du head `2639d52`, repris tels quels) :
 1. « […] est contredit par l'intégration Neon–Vercel, qui pose ses propres identifiants (rôle propriétaire, hors RLS) sur toutes les préversions Preview, `claude/…` comprises. Le risque accepté en Q250 ne couvre que les clés OpenRouter et Google. Limiter ces variables à Development (ou désactiver l'intégration pour Preview), le dire dans la spec, l'ajouter à P0-Q16 et aux vérifications de P0r2, avec un test ou une vérification « aucun identifiant avec droit sur `prototype` hors `p0-reel` ». »
@@ -139,7 +139,7 @@ Ainsi que :
 - **P0-Q18** — 3 USD au plus par exécution ; enveloppe jusqu'à G0 de 80 USD de modèles et 40 USD de Google.
 
 **Question nouvelle, posée par cette PR** :
-- **P0-Q19** — limiter dès maintenant l'intégration Neon–Vercel à « Development » (ou la désactiver pour « Preview ») ? Recommandation : oui.
+- **P0-Q19** — limiter dès maintenant l'intégration Neon–Vercel à « Development » ? Réponse de Samuel (2026-10-12) : non, on garde ; sécurité à consolider avant la mise en public. Même réponse pour les clés OpenRouter et Google, aussi posées sur « Production » (écart à Q250 accepté jusqu'à la mise en public).
 
 ## Hors périmètre
 - Tout appel réel : P0r1 ne déclenche rien.
