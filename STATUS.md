@@ -1,49 +1,48 @@
-# État du studio — 2026-10-12 (41e cycle)
+# État du studio — 2026-10-12 (42e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 41e cycle est le cycle planifié de 17:07 CEST.
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 42e cycle est le cycle planifié de 20:07 CEST.
 
 ## Messages de Samuel traités (#studio et projet)
-- #studio et fils du projet : aucun nouveau message de Samuel depuis le résumé du 40e cycle.
+- #studio et fils du projet : aucun nouveau message de Samuel depuis le résumé du 41e cycle.
 
 ## Fait
-- Fusionnée : **chore: status du 40e cycle (#187)**.
-- **Spec P0-suite (#172)** : la 3e tentative ayant échoué, la rédaction est passée au rôle Sécurité (décision du CEO annoncée au 40e cycle). Les bloquants 1 à 8 sont corrigés sur le fond (`0190606`). La nouvelle revue (Tech Lead et Sécurité) demande encore des changements.
-- **P0a1 (#180)** : correction 1 poussée (`e0074ab`), approuvée par le Tech Lead. La Sécurité garde 1 bloquant, corrigé en partie seulement (cas négatifs de `imports.test.ts`).
-- **Décision 0034 (#182)** :
-  - correction 2 (`b87d3ca`) refusée sur 3 points de texte ;
-  - le CEO choisit une 3e tentative plutôt qu'un découpage, car les points sont localisés et décrits par le Tech Lead ;
-  - correction 3 poussée (`647cb1d`) : tension avec `CONTEXT.md` reconnue, heure de vérification corrigée.
-- **Spec T18 (#183)** : correction 1 poussée (`02c46af`) : lecture `git diff -z`, retrait d'`owner-approved` sur `opened`, `reopened` et tout push qui change les workflows, calculs faits dans la CLI.
-- **B1 (#188, ticket #184)** : socle base de données ouvert. `verify` local vert avec Postgres (158 tests de base), hors captures visuelles (écart de polices connu). La PR modifie `.github/workflows/ci.yml`, donc **Samuel doit poser `owner-approved`**.
+- Fusionnées : **décision 0034 (#182)** et **chore: status du 41e cycle (#189)**.
+- **Spec P0-suite (#172) découpée** (décision du CEO avec le Tech Lead : les bloquants ne convergeaient pas) :
+  - #172 réduite au cadre, aux clients et à P0r1 (`335d925`), avec le refus du TLS affaibli et l'amendement de 0031 ; elle est en revue ;
+  - le régime de confinement des capacités et de l'environnement devient la **spec P0c (#193, ticket #191)**, exigence d'entrée de P0r2 ; elle est en revue.
+- **B1 (#188)** : correction 1 poussée (`99c30a9`) ; elle est en revue :
+  - adresses de test sans mot de passe, `url` limitée à `https://` ;
+  - garde `session_user = current_user` ;
+  - `main` fusionnée.
+- **Décision 0036 (#192, ticket #190)** : décisions B1-TL-1 à TL-4 du Tech Lead, qui débloquent #188 ; elle est en revue.
+- **P0a1 (#180)** : correction 2, la dernière autorisée (`2eecd59`) ; elle est en revue. La garde des imports passe en liste d'autorisation, et 21 fichiers sont réécrits sans changer les sorties.
+- **Spec T18 (#183)** : correction 2 (`c4845b2`), sur la concurrence ; elle est en revue. Libellé `docs-only` retiré, car inexact.
 
 ## En cours
-- En revue : #167 (F8a), #179 et #180 (P0a1), #172 (P0-suite), #182 (0034), #183 (T18), #186 (F10a), #188 (B1).
-- **T20 (#177)** : `techlead-approved` et `owner-approved` posés ; attend la fusion automatique.
-- Contrainte du jour : pas de préversion Vercel jusqu'au passage en Pro ; les contrôles qui en dépendent sont notés bloqués, sans relance.
+- En revue : #167 (F8a), #172, #179 et #180 (P0a1), #183, #186 (F10a), #188, #192, #193.
+- **T20 (#177)** : attend la fusion automatique.
 
 ## Bloqué
-- **Exécutions réelles de P0** : après P0r1 (#172), puis P0-suite-2 (#173) et ses exigences d'entrée 1 à 4.
-- **B7 à B9** : il faut encore B1 (#188), B2 et P0r1.
+- **Exécutions réelles de P0** : P0r1 (#172), puis P0c (#193) et son code avant P0r2, puis P0-suite-2 (#173).
+- **B7 à B9** : B1 (#188, après #192), B2 et P0r1.
 
 ## Prochain cycle
-1. **#172** : correction suivante décidée avec le Tech Lead (on est au-delà de deux corrections ; tentative de plus ou découpage).
-2. **#180** : correction 2 (bloquant Sécurité). **#182** et **#183** : suivre la revue. Après toute correction, retirer puis reposer `needs-review`.
-3. Chore séparée : amendement de 0032 pour consigner les écarts acceptés par le Tech Lead sur #180.
-4. **B2** (backend, spec d'abord), puis B5. Après #179 et #180 : **P0b1**.
-5. F7a et #171 après F8a ; F10b après F10a.
+1. Suivre les revues : #172, #180, #183, #188, #192, #193.
+2. Si la revue de #180 échoue encore, le CEO décide avec le Tech Lead (3 tentatives faites).
+3. **B2** : spec d'abord (Product Owner). Après #179 et #180 : **P0b1**.
+4. Chore : amendement de 0032, pour les écarts acceptés sur #180.
+5. Après P0c : son code, découpé en P0c1 (back) et P0c2 (release).
 
 ## Décisions attendues de Samuel
 - **Actions** :
-  - passer Vercel en Pro (annoncé pour ce soir) ;
-  - poser `owner-approved` sur **#188** (B1 touche la CI) ;
-  - plafond de quota de Maps JavaScript API (Q263).
+  - poser `owner-approved` sur **#188** (B1 modifie la CI) ;
+  - plafond de quota de Maps JavaScript API (Q263) ;
+  - après la fusion de T18 (#183) : retirer puis reposer `owner-approved` sur #177 et sur toute PR de workflow déjà approuvée.
 - **Nouvelles** :
-  - **Q285** : faut-il couper le déploiement automatique de la production ? Aujourd'hui, chaque fusion est publiée sur un domaine public.
-  - Q286 : confirmer la lecture de « on laisse » ;
-  - Q287 et Q288 (#172) ;
-  - Q289 : job `db` obligatoire ;
-  - Q292 : préfixe de commit du Product Owner.
-- **Déjà posées** : Q268 à Q270, Q272 à Q275, Q278 à Q280.
+  - **Q294** : migrations au staging, workflow GitHub plutôt que construction Vercel ;
+  - **Q288 reformulée** : contrôle obligatoire et indépendance du verdict Sécurité, options a, b ou c.
+- **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public, comme Samuel l'a dit à 13:49 CEST ; aucun réglage Vercel à faire.
+- **Déjà posées** : Q268 à Q270, Q272 à Q275, Q278 à Q280, Q286, Q287, Q289, Q292.
 - **Toujours ouvertes** :
   - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q75, Q127, Q150 ;
   - argent et comptes : Q25, Q26, Q39, Q45, Q56, Q84 ;
@@ -57,11 +56,14 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - avant le 2026-10-13 : décisions listées au 39e cycle.
 
 ## Part d'usage estimée
-- 41e cycle : 4 sous-agents, 3 au plus en même temps :
-  - Sécurité sur #172 (0,21 M de jetons) ;
-  - correction de P0a1 (0,14 M) ;
-  - code de B1, lancé au 40e cycle (0,14 M) ;
-  - correction de la spec T18 (0,13 M).
-- S'y ajoute le travail du CEO : correction 3 de 0034, suivi des PR, ce statut.
-- Total : environ 1 M de jetons (estimation).
+- 42e cycle : 7 sous-agents, 3 au plus en même temps :
+  - avis du Tech Lead sur #172 (0,08 M de jetons) ;
+  - réduction de #172 (0,17 M) ;
+  - correction de B1 (0,23 M) ;
+  - correction de P0a1 (0,21 M) ;
+  - spec P0c (0,22 M) ;
+  - décision 0036 (0,11 M) ;
+  - correction de T18 (0,12 M).
+- S'y ajoute le travail du CEO.
+- Total : environ 1,3 M de jetons (estimation).
 - Part de l'abonnement : impossible à mesurer depuis la routine.
