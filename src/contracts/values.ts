@@ -22,6 +22,18 @@ export const CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant", 
  */
 export const PREFERENCE_REASONS = ["notMyStyle", "tooBusy", "tooExpensive", "tooFar", "other"] as const;
 
+/** Natures d'une étape (handover § 9). Source de `StopSchema.kind` (décision 0021 § 1.1). */
+export const STOP_KINDS = ["activity", "meal", "event"] as const;
+export type StopKind = (typeof STOP_KINDS)[number];
+
+/**
+ * Nombre de lignes « À faire » non faites (décision 0021 § 1.1) : seul calcul des « réservations à faire »,
+ * pour le résumé de voyage (`TripSummary.toReserveCount`) et, avec F9b, le programme ajusté.
+ */
+export function countToReserve(checklist: readonly { done: boolean }[]): number {
+  return checklist.filter((item) => !item.done).length;
+}
+
 /** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
 export const DETOUR_THRESHOLD_MINUTES = 20;
 

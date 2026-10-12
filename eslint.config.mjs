@@ -293,6 +293,24 @@ export default defineConfig([
     },
   },
   {
+    // F11a : aucun texte en dur, aucune persistance côté client dans « Mes voyages » (décision 0021 § 10) ;
+    // `src/app/voyages/page.tsx` est déjà couvert par les blocs des routes du voyage.
+    files: ["src/features/compte/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+      ...noClientStorage("Mes voyages", "décision 0021 § 10, F11-PO-14", "aucun service worker"),
+    },
+  },
+  {
+    // F11a : ni src/mocks, ni carte (Google ou simulée), ni src/server hors actions, ni portée des simulations,
+    // ni zod, ni valeur de @/contracts dans « Mes voyages » et sa page (décision 0021 § 10). Le dernier bloc
+    // l'emporte (décision 0015 § 1) : il reprend tous les motifs précédents.
+    files: ["src/features/compte/**/*.{js,jsx,ts,tsx}", "src/app/voyages/page.tsx"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
     // F11c : aucun texte en dur, aucune persistance côté client dans les pages d'erreur et d'introuvable et
     // dans le catalogue des états (décision 0021 § 10).
     files: F11C_FILES,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Button, StatusBanner, Tag, type StatusBannerKind, type TagKind } from "@/components/ligne";
+import { TripsScreen } from "@/features/compte/TripsScreen";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
 
@@ -80,7 +81,8 @@ function PageLink({ href, label }: { href: string; label: string }) {
 /**
  * Catalogue des états transverses (écran 18, F11-PO-17) : chaque état sous son titre, rendu par le composant
  * réel avec le texte de l'écran qui le possède. Sert aux captures de validation (handover § 15, F11).
- * La section « Aucun voyage » (état vide de Mes voyages) est ajoutée par F11a (décision 0021 § 8).
+ * La section « Aucun voyage » rend l'état vide de Mes voyages par le composant de `R17`, avec une liste vide
+ * (F11a, décision 0021 § 8 ; critère C13).
  */
 export function EtatsShowcase() {
   return (
@@ -104,6 +106,10 @@ export function EtatsShowcase() {
           {example ? <p className="text-legende text-ink-soft">{t.exemple}</p> : null}
         </Section>
       ))}
+
+      <Section id="etat-aucunVoyage" title={t.sections.aucunVoyage}>
+        <TripsScreen trips={[]} embedded />
+      </Section>
 
       <Section id="etat-introuvable" title={t.sections.introuvable}>
         <PageLink href={ETATS_ROUTES.introuvable} label={t.liens.introuvable} />

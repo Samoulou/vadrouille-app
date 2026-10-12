@@ -1,51 +1,54 @@
-# État du studio — 2026-10-12 (38e cycle)
+# État du studio — 2026-10-12 (39e cycle)
 
-Phase : 0 — Valider · Régime : cycle toutes les 3 heures, jusqu'à 3 tâches par cycle (consigne de Samuel du 2026-10-08 16:31)
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, #165) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle (consigne de Samuel du 2026-10-12 10:29)
 
-## Messages de Samuel traités (#studio)
-- **2026-10-12 09:46** : décisions. Q214 (risque accepté en phase 0) ; Q186, Q187, Q188, Q194, Q48, Q27, Q129 (recommandations validées) ; Q197 (mention à l'écran 2) ; **Q5, règle provisoire** (aucune donnée Google dans les prompts, seul l'identifiant de lieu stocké, coordonnées 30 jours au plus ; juridique formel avant le lancement) ; Q237 (#27 gardée et finalisée sur cette règle) ; Q234 (40 USD par mois OpenRouter, 20 USD par mois Google, quotas journaliers) ; Q235 (prototype protégé, rien de public) ; T10 fait (Q120, Q184, connecteur Vercel) ; **P0 en variante B** (DeepSeek cherche, le code ancre, le Decider note, le code classe, DeepSeek rédige ; variante A mesurée une fois). Consigné dans la **décision 0027**, jointe à la spec P0 (#149) avec 0026.
-- **2026-10-12 09:53** : Q236, 3 briefs de référence et 10 incontournables d'Édimbourg (0027 § 6), appliqués à la spec P0.
-- **2026-10-12 09:57** : comptes externes du back-end selon B0a et recommandation Neon ou Supabase du Tech Lead : ticket **#154 (B0c)** (Q251).
-- Les messages de 07:12 et 08:47 avaient été traités au 37e cycle (#153). #153 n'a pas été fusionnée : cette PR la remplace (STATUS et QUESTIONS) ; 0026 et la ligne P0 de la roadmap passent dans #149.
+## Messages de Samuel traités (#studio et projet)
+- **2026-10-12 10:29** (#studio) : le CEO tourne dans le projet Claude « Vadrouille », 3 fils au plus ; chaque résumé indique le nombre de fils lancés et leur consommation estimée. Appliqué.
+- **2026-10-12 10:35** (#studio) : Q24 (Neon à Francfort), Q249, Q250, Q241, Q252, P0-Q5 (consignées dans la décision 0028, #149) ; Q253 et Q254 (oui, `CLAUDE.md` aligné dans #27) ; **Q245** (PR qui touche `.github/workflows/` : signalée dans #studio, attend `owner-approved` posé par Samuel ; contrôle à ajouter à `techlead-gate`, ticket **#163**).
+- **2026-10-12 11:09 à 11:12** (fil « Parcours cible du MVP ») : **toute la chaîne MVP est construite maintenant**, B1 à B12, révision et pendant/après le voyage compris ; G0 reste la condition commerciale. Consigné dans la **décision 0029** (#165), avec `CONTEXT.md` et la roadmap.
+- **2026-10-12 12:47 et 12:48** (fil « Routine cycle du studio ») : Q257 (exécutions réelles de P0 en ligne, préversion Vercel protégée et Neon, jamais sur son poste ni en production) ; Q256, Q258, Q259, Q260 (recommandations suivies). Q261 et Q262 étaient déjà tranchées dans le fil photos (11:12).
+- **2026-10-12 vers 11:35** : projet Neon gratuit créé (Francfort, Postgres 17, Neon Auth désactivé), relié à Vercel pour Development et Preview. Q24 tranchée.
+- Le message de 10:32 est le résumé du 38e cycle (#157).
 
 ## Fait
-- Rien de fusionné depuis le 37e cycle.
-- Ticket créé : **#154 (B0c)**. Tickets en cours : #147 (spec P0), #22 (B0), #154.
+- Fusionnées depuis le 38e cycle : **F13, spec des photos (#160)** ; **bug #159, carte refusée sur les previews (#161)**, F4-Q1 tranchée par le joker `*.vercel.app` (Q263) ; **B0c (#156)** ; note de version v2026.10.12-09 (#166).
+- Corrections du cycle : #161 (1 bloquant et 4 mineurs, fusionnée ensuite) ; **#27, dernière passe** (voir « En cours »).
+- Tickets créés : **#162 (F8a)**, **#163 (Q245, `techlead-gate`)**, **#164 (décision 0029)**.
 
 ## En cours
-- **Spec P0 (#149, ticket #147)** : correction 3 faite (hors compte selon la revue : bloquant tardif) : P0-Q2 dans les prérequis de P0b2, mineurs 2 à 14, variante B, mesure de référence de la variante A (une exécution par brief, jugement à l'aveugle), plafonds, briefs et incontournables (ces derniers servent seulement au critère B4), décisions 0026 et 0027, ligne P0 de la roadmap. CI à confirmer, de nouveau en revue. #153 fermée, remplacée par #155 et #149.
-- **B0, partie Q5 (#27, ticket #22)** : finalisée sur la règle provisoire de Q5 (0027 § 4), `main` intégrée par fusion, bloquants Sécurité 1 à 3 et 2 bloquants du Tech Lead traités. De nouveau en revue.
-- **B0c (#154, PR #156)** : comptes externes dans l'ordre des tâches B ; le Tech Lead recommande **Neon à Francfort** (gratuit pour le staging, formule Launch pour la bêta ; Neon Auth non retenu, Better Auth garde la main), Supabase seulement si un hébergement à Zurich est exigé ; domaine ajouté (absent de B0a) ; trois prix non vérifiés (Brevo, TWINT chez Stripe, Sentry UE). En revue.
-- **F11a (#152)** : en revue, CI verte.
-- `pnpm verify` en local : vert sauf les captures visuelles (polices, 0004). La CI fait foi.
+- **F8a (#167, ticket #162)** : écrans 1 et 2 de la création, brouillon en mémoire, `SegmentedControl` déduit, `brief_completed`, R1 et R2 à l'inventaire des routes. Critères [a] couverts. `update-snapshots` posé pour régénérer les références visuelles par la CI (0004) ; en revue.
+- **B0, partie Q5 (#27, ticket #22)** : au-delà de la règle des deux corrections. **Décision du CEO avec le Tech Lead : découpage**, une passe unique sur une liste fermée (`0c4d158`) : plan gardé en mémoire (étapes e et f réunies, `plan_drafts` supprimé), compteurs d'ancrage retirés, `place_coordinates` sans `UPDATE` avec rôle `vadrouille_fn_coords` (0007 amendée), exception d'appartenance dans 0011 § 1, citation de Samuel pour `CLAUDE.md`. S4 et S5 partent à Samuel (Q258, Q259). Si cette passe échoue, #27 est fermée et le blocage documenté. De nouveau en revue.
+- **Décision 0029 (#165, ticket #164)** : correction 1 faite (tableau, B5 après B2, B1 en local, B7 à B9 après #149 et #27, précédence). De nouveau en revue.
+- **Spec P0 (#149, ticket #147)** : découpée par le Tech Lead (P0a1 et P0b1 seulement) ; décision 0028 ajoutée ; revue du head `e469a07` : Tech Lead conforme, Sécurité 1 bloquant. Suivie par le fil « Correction spec P0 ».
+- **F11a (#152)** : revue conforme sur le head `62eada5`, mais `techlead-approved` absent (retiré par la porte juste avant la revue) ; revue relancée (`needs-review` reposé).
+- `pnpm verify` en local : vert sauf les captures visuelles (rendu du conteneur, 0004). La CI fait foi. Docker ne tourne pas dans ces sessions : les tests de base de données ne passent qu'en CI.
 
 ## Bloqué
-- **Exécutions réelles de P0 (P0a2, P0a3, P0b2)** : attendent Q249 (portée de la clé Google), Q250 points 2 et 3, Q241 (horaires commités, P0b2), P0-Q5 (OpenRouter hors UE pour P0) et Q252 (valeurs des quotas quotidiens). Le code sans clé (P0a1, P0b1) n'attend que la fusion de #149.
+- **Exécutions réelles de P0 (P0a2, P0a3, P0b2)** : Q256 et Q257 tranchées ; attendent une spec suivante (en ligne, préversion Vercel protégée et Neon).
+- **B7 à B9** : attendent la fusion de #149 et de #27 (décision 0029).
 
 ## Prochain cycle
-1. Suivre #149, #27, #152 et la PR de #154 ; reposer `needs-review` après toute correction (Q220).
-2. Après #149 : **P0a1** et **P0b1** (fichiers distincts).
-3. F8a (prête, reportée faute de place) ; après #152 : F7a, puis F10a (#140, Q248). Ces tâches partagent `fr.json` : une seule à la fois.
-4. Premier essai réel du workflow `visual-update.yml` sur la prochaine PR d'écran (Q238).
+1. Suivre #27, #149, #152, #165, #167 ; après toute correction, retirer puis reposer `needs-review` (la revue ne se déclenche qu'à l'ajout du libellé).
+2. Après #149 : **P0a1** et **P0b1**.
+3. Après #165 : **B1** (data, en local) et **B2** (backend) en parallèle, puis B5 ; spécification du Product Owner d'abord si la ligne du handover ne suffit pas. Ordre par défaut : plan des cycles 39 à 58 (fil « Plan des 10 à 20 prochains cycles »).
+4. **#163** (Q245, `techlead-gate`) : la PR touche `.github/workflows/`, elle attend `owner-approved` de Samuel.
+5. F7a après F8a (`SegmentedControl.tsx`), puis F10a.
 
 ## Décisions attendues de Samuel
-- **P0** : Q249 (clé Google : portée minimale recommandée) ; Q250 points 2 et 3 (clés Vercel limitées à Preview et Development) ; Q241 (horaires planifiés commités) ; Q252 (valeurs des quotas quotidiens, plafond par exécution) ; P0-Q5 (OpenRouter hors UE pour P0, `zdr` à essayer) ; P0-Q6 (seuils G0) ; P0-Q8 (relire plutôt que garder).
-- **Après #156** : choix du fournisseur Postgres (Q24 ; recommandation : Neon à Francfort) et ouverture des comptes.
-- **#27** : Q253 (montrer qu'un candidat n'a pas d'identifiant Google), Q254 (aligner `CLAUDE.md` sur la règle provisoire des coordonnées gardées 30 jours).
-- **Q245** : protéger `.github/workflows/` (CODEOWNERS ou règle de branche).
-- **Après le déploiement de `main`** : vérifier la carte du jour 1 sur https://vadrouille-app-ten.vercel.app/voyages/mock_trip_edimbourg_debloque/jour/1 (bug #106 corrigé).
+- **Action** : plafond de quota journalier sur Maps JavaScript API dans Google Cloud Console (Q263), la clé acceptant tout `*.vercel.app`.
+- **P0** : P0-Q6 (seuils G0).
 - **Toujours ouvertes** :
   - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44 (règle provisoire en attendant), Q46, Q47, Q75, Q127, Q150 ;
-  - argent et comptes : Q24 à Q26, Q39, Q45, Q56, Q84 ;
+  - argent et comptes : Q25, Q26, Q39, Q45, Q56, Q84 ;
   - offre : Q57, Q63, Q67, Q76, Q78, Q88 à Q90, Q128, Q133, Q135, Q149 ;
   - documents et environnement : Q12, Q59, Q40, Q101 ;
   - Ligne : Q19 (avec Q226), Q37, Q108, Q130 ;
   - règles : Q23.
 - **Veto possible** :
-  - 2 jours après leur publication dans la note de version : « Évolution » de 0004 (#148) ; décisions déléguées P0-PO-2, 3, 5 à 8 et 11 (#149, si fusionnée) ;
+  - 2 jours après leur publication dans la note de version : décisions déléguées de #27 (0011, sauf S4 et S5) si fusionnée ; « Évolution » de 0004 (#148) ; décisions déléguées P0-PO-2, 3, 5 à 8 et 11 (#149, si fusionnée) ;
   - avant le 2026-10-14 : décision 0025 (#134) ;
   - avant le 2026-10-13 : décisions 0017, 0019, 0023, 0024, écarts de F9a et de F5b, Q182, F10-PO-1 à F10-PO-22 et Q185, 0012, F7-PO-20 et F7-PO-21, F8-PO-18 à F8-PO-22.
 
 ## Part d'usage estimée
-- 38e cycle : environ 1 million de jetons (estimation) pour 3 fils : 2 corrections (#149, #27) et 1 tâche nouvelle (#156) ; 1 PR fusionnée (#155).
+- 39e cycle : 4 sous-agents lancés par la routine (correction de #161, F8a, avis du Tech Lead sur #27, dernière passe de #27), 3 au plus en même temps ; la décision 0029 et ce statut sont écrits par le CEO. Environ 1,2 M de jetons (estimation : 0,35 M pour F8a, 0,22 M pour #27, 0,09 M chacun pour #161 et l'avis, le reste pour le CEO).
 - Part de l'abonnement : impossible à mesurer depuis la routine.

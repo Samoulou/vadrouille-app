@@ -3,11 +3,15 @@ import {
   DaySchema,
   ProposalSchema,
   TripSchema,
+  TripSummarySchema,
+  countToReserve,
   validateDayMap,
   type DayMap,
   type Proposal,
   type Trip,
+  type TripSummary,
 } from "@/contracts";
+import { lisbonne, porto } from "@/mocks/autres-voyages";
 import {
   EDIMBOURG_DEBLOQUE_TRIP_ID,
   EDIMBOURG_TRIP_ID,
@@ -33,7 +37,30 @@ const DEFAULT_ENTRIES: MockEntry[] = [
   // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué. Ses positions sont dérivées de celles
   // d'Édimbourg, sauf le J6 en préparation (bug n° 106, décision 0017 § 13).
   { trip: edimbourgDebloque, proposals: propositionsDebloque, maps: deriveEdimbourgCarte(edimbourgDebloque) },
+  // F11a (F11-PO-15, décision 0021 § 2) : un voyage passé et un voyage à venir, sans positions ni propositions,
+  // ajoutés après les deux d'Édimbourg pour que les tests qui lisent les entrées par identifiant ne changent pas.
+  { trip: lisbonne, proposals: [] },
+  { trip: porto, proposals: [] },
 ];
+
+/**
+ * Résumé d'un voyage (décision 0021 § 1.2), validé par `TripSummarySchema` : champs du voyage, réservations
+ * à faire et nombre de jours, sans jour, étape, position ni organisation.
+ */
+export function toTripSummary(trip: Trip): TripSummary {
+  return TripSummarySchema.parse({
+    id: trip.id,
+    destination: trip.destination,
+    destinationColor: trip.destinationColor,
+    start: trip.start,
+    end: trip.end,
+    timeZone: trip.timeZone,
+    travellers: trip.travellers,
+    unlocked: trip.unlocked,
+    toReserveCount: countToReserve(trip.checklist),
+    dayCount: trip.days.length,
+  });
+}
 
 /** Organisation simulée, lue seulement par `getRequestContext` quand DATA_ADAPTER vaut `mock`. */
 export const MOCK_REQUEST_CONTEXT: AdapterContext = { organizationId: MOCK_ORGANIZATION_ID };
@@ -95,6 +122,11 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
   };
 
   return {
+    async listTrips(ctx) {
+      return entries
+        .filter((entry) => entry.trip.organizationId === ctx.organizationId)
+        .map((entry) => toTripSummary(TripSchema.parse(entry.trip)));
+    },
     async getTrip(ctx, tripId) {
       const entry = find(ctx, tripId);
       return entry ? TripSchema.parse(entry.trip) : null;

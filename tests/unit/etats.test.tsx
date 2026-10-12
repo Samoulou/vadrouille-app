@@ -190,9 +190,13 @@ describe("/dev/etats (catalogue des états)", () => {
     expect(t.erreurCalcul).toBe("Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.");
   });
 
-  it("ne rend pas encore l'état vide de Mes voyages (F11a, décision 0021 § 8)", () => {
+  it("rend l'état vide de Mes voyages par le composant de R17, avec une liste vide (F11a, décision 0021 § 8, C13)", () => {
     render(<EtatsShowcase />);
-    expect(screen.queryByRole("region", { name: "Aucun voyage" })).not.toBeInTheDocument();
+    const empty = screen.getByRole("region", { name: "Aucun voyage" });
+    expect(within(empty).getByRole("heading", { level: 3, name: "Mes voyages" })).toBeInTheDocument();
+    expect(within(empty).getByText("Tu n'as pas encore de voyage.")).toBeInTheDocument();
+    expect(within(empty).queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tripRoutes } from "./routes";
+import { mesVoyagesRoute, tripRoutes } from "./routes";
 
 describe("tripRoutes (décision 0015 § 1)", () => {
   const routes = tripRoutes("/voyages", "mock_trip_edimbourg");
@@ -10,14 +10,20 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     expect(routes.jour(2)).toBe("/voyages/mock_trip_edimbourg/jour/2");
     expect(routes.etape(2, "j2-dean-village")).toBe("/voyages/mock_trip_edimbourg/jour/2?etape=j2-dean-village");
     expect(routes.remplacer(2, "j2-dean-village")).toBe("/voyages/mock_trip_edimbourg/jour/2/remplacer/j2-dean-village");
-    expect(routes.retour()).toBe("/voyages");
+    expect(routes.mesVoyages()).toBe("/voyages");
   });
 
   it("applique le préfixe des pages de développement", () => {
     const dev = tripRoutes("/dev/voyages", "mock_trip_edimbourg");
     expect(dev.sejour()).toBe("/dev/voyages/mock_trip_edimbourg");
     expect(dev.jour(5)).toBe("/dev/voyages/mock_trip_edimbourg/jour/5");
-    expect(dev.retour()).toBe("/dev/voyages");
+    // `R17` n'a pas de pendant de développement : « Mes voyages » reste `/voyages` (décision 0021 § 6).
+    expect(dev.mesVoyages()).toBe("/voyages");
+  });
+
+  it("« Mes voyages » : une seule adresse, `/voyages` (décision 0021 § 6)", () => {
+    expect(mesVoyagesRoute()).toBe("/voyages");
+    expect(tripRoutes("/voyages", "a b").mesVoyages()).toBe(mesVoyagesRoute());
   });
 
   it("encode les identifiants", () => {

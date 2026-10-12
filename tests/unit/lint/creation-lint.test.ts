@@ -51,7 +51,8 @@ describe("création du voyage : aucune persistance côté client", () => {
 describe("création du voyage : imports", () => {
   it.each([...COMPONENTS, ...MODULES])("src/mocks et la carte simulée refusés dans %s", async (filePath) => {
     expect(await messagesFor(importOf("@/mocks/creation-edimbourg"), filePath, IMPORTS)).toHaveLength(1);
-    expect(await messagesFor(importOf("@/components/carte/SimulatedMapRenderer"), filePath, IMPORTS)).toHaveLength(1);
+    // Dans src/features/compte, F11a interdit en plus toute carte (décision 0021 § 10) : deux motifs peuvent répondre.
+    expect((await messagesFor(importOf("@/components/carte/SimulatedMapRenderer"), filePath, IMPORTS)).length).toBeGreaterThan(0);
     expect(await messagesFor(importOf("@/adapters/simulation"), filePath, IMPORTS)).toHaveLength(1);
     expect(await messagesFor(importOf("@/server/parse-input"), filePath, IMPORTS)).toHaveLength(1);
   });

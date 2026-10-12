@@ -36,6 +36,8 @@ describe("règle ESLint : aucune persistance côté client dans la carte", () =>
   }
 
   it("ne vise pas les autres dossiers", async () => {
+    // `src/features/compte` (F11a, décision 0021 § 10) et `src/features/creation` (F8a) sont couverts :
+    // exemple pris dans un dossier encore libre.
     expect(await storageErrors(`export function f() {\n  localStorage.clear();\n}\n`, "src/features/autre/Exemple.tsx")).toHaveLength(0);
   });
 

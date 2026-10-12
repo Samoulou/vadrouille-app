@@ -81,6 +81,8 @@ interface HandoverTrip {
   destination: string;
   destinationColor: "bruyere" | "azulejo" | "ocre" | "granit";
   start: string; end: string;
+  /** Ajout signalé (décision 0021 § 3, forme de F10-TL-1) : fuseau IANA de la destination. */
+  timeZone: string;
   travellers: { adults: number; children: number };
   days: HandoverDay[];
   checklist: HandoverChecklistItem[];
@@ -430,6 +432,7 @@ describe("TripSchema, ChecklistItem et Change", () => {
     destinationColor: "granit",
     start: "2026-08-29",
     end: "2026-09-03",
+    timeZone: "Europe/London",
     travellers: { adults: 2, children: 0 },
     days: [],
     checklist: [
@@ -446,6 +449,17 @@ describe("TripSchema, ChecklistItem et Change", () => {
     const withoutOrganization: Partial<Trip> = { ...validTrip };
     delete withoutOrganization.organizationId;
     expect(TripSchema.safeParse(withoutOrganization).success).toBe(false);
+  });
+
+  it("exige un fuseau horaire IANA, alias compris (décision 0021 § 3, F10-TL-1)", () => {
+    const withoutTimeZone: Partial<Trip> = { ...validTrip };
+    delete withoutTimeZone.timeZone;
+    expect(TripSchema.safeParse(withoutTimeZone).success).toBe(false);
+    expect(TripSchema.safeParse({ ...validTrip, timeZone: "" }).success).toBe(false);
+    expect(TripSchema.safeParse({ ...validTrip, timeZone: "Europe/Nulle-Part" }).success).toBe(false);
+    for (const timeZone of ["Europe/Lisbon", "Asia/Kolkata", "UTC"]) {
+      expect(TripSchema.safeParse({ ...validTrip, timeZone }).success, timeZone).toBe(true);
+    }
   });
 
   it("refuse une bookingUrl invalide", () => {

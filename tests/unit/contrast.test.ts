@@ -83,4 +83,10 @@ describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {
   it("line sur page : au moins 3:1 pour l'anneau de focus", () => {
     expect(contrast("line", "page")).toBeGreaterThanOrEqual(CONTROL_BORDER);
   });
+
+  // F11a (décision 0021 § 11) : la plaque en lien de « Mes voyages » a le contour de focus de Ligne à l'extérieur
+  // de l'aplat (décalé de 2 px), donc sur le fond de la page, quelle que soit la couleur de destination.
+  it("line sur page : au moins 3:1 pour le contour de focus de la plaque en lien (F11a)", () => {
+    expect(contrast("line", "page")).toBeGreaterThanOrEqual(CONTROL_BORDER);
+  });
 });
