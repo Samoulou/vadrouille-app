@@ -1,6 +1,11 @@
 import { defineConfig } from "@playwright/test";
 
-const PORT = 3100;
+import { e2ePort } from "./scripts/e2e-port.mjs";
+
+// Un port par worktree (décision 0017 § 14, Q107) : `E2E_PORT` s'il est fourni, sinon 3100 en CI, sinon un port
+// stable entre 3100 et 3899 tiré du chemin absolu du dépôt. Jamais de serveur réutilisé : un port occupé fait
+// échouer Playwright au lieu de tester le build d'un autre worktree, ou un ancien build resté en mémoire.
+const PORT = e2ePort({ env: process.env, repoPath: __dirname });
 const baseURL = `http://127.0.0.1:${PORT}`;
 
 // Tests sur le build de production, servi comme dans l'image Docker. `pnpm verify` construit une seule fois
@@ -44,7 +49,7 @@ export default defineConfig({
   webServer: {
     command,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
     // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ; seul
     // fichier versionné qui le pose (tests/unit/dev-pages-env.test.ts).
