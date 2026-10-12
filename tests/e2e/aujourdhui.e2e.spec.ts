@@ -245,7 +245,9 @@ test("aujourdhui: réseau perdu", async ({ page, context }) => {
   await openToday(page);
   await context.setOffline(true);
 
+  // Région live montée vide avec la journée, remplie hors ligne (annonce fiable), vidée au retour du réseau.
   const banner = page.locator("#aujourdhui-hors-ligne");
+  await expect(banner).toHaveAttribute("role", "status");
   await expect(banner).toContainText("Tu es hors ligne. Ce programme est celui du dernier chargement.");
   await expect(region(page, "Prochaine étape")).toContainText("[Dean Village]");
   const links = [
@@ -259,6 +261,7 @@ test("aujourdhui: réseau perdu", async ({ page, context }) => {
     await expect(link).toBeFocused();
     const pages = context.pages().length;
     await link.click({ force: true });
+    await link.click({ force: true, button: "middle" });
     expect(context.pages()).toHaveLength(pages);
     await expect(page).toHaveURL(R15);
   }
@@ -267,7 +270,7 @@ test("aujourdhui: réseau perdu", async ({ page, context }) => {
   await expect(region(page, "En ce moment")).toContainText("[Dean Village]");
 
   await context.setOffline(false);
-  await expect(banner).toHaveCount(0);
+  await expect(banner).toBeEmpty();
   await expect(page.getByRole("link", { name: "Voir la journée sur la carte" })).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("link", { name: /^Itinéraire/ })).toHaveCount(0); // « Ensuite » : le café n'a pas de lieu Google.
   await expectNothingPersisted(page);
