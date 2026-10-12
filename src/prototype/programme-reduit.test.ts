@@ -7,6 +7,7 @@ import {
   ProgrammeReduitSchema,
   PropositionReduiteSchema,
   StopReduitSchema,
+  placeIdsDuProgramme,
   urlSourceValide,
   type ProgrammeReduit,
 } from "./programme-reduit";
@@ -164,6 +165,91 @@ describe("p0: schéma strict de la forme réduite", () => {
     const champEnTrop = exemple();
     (champEnTrop.positions.SENTINELLE_PLACE_ID as Record<string, unknown>).name = "SENTINELLE-NOM-GOOGLE";
     expect(ProgrammeReduitSchema.safeParse(champEnTrop).success).toBe(false);
+  });
+
+  it("refuse un placeId de lieu nommé comme une propriété d'Object.prototype sans position (constructor, __proto__)", () => {
+    for (const placeId of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+      const programme = exemple();
+      (programme.trip.days[0]!.items[2] as { stop: { placeId: string } }).stop.placeId = placeId;
+      programme.proposals[0]!.stop = { ...programme.proposals[0]!.stop, placeId };
+      delete programme.positions.SENTINELLE_PLACE_ID;
+      expect(ProgrammeReduitSchema.safeParse(programme).success, placeId).toBe(false);
+    }
+    // Clé propre « __proto__ » telle que JSON.parse la produit : la position est bien présente.
+    const programme = exemple();
+    (programme.trip.days[0]!.items[2] as { stop: { placeId: string } }).stop.placeId = "constructor";
+    programme.proposals[0]!.stop = { ...programme.proposals[0]!.stop, placeId: "constructor" };
+    programme.positions = JSON.parse(
+      '{"constructor":{"lat":55.95,"lng":-3.18},"SENTINELLE_PLACE_ID_LOGEMENT":{"lat":55.95,"lng":-3.19}}',
+    ) as ProgrammeReduit["positions"];
+    expect(ProgrammeReduitSchema.safeParse(programme).success).toBe(true);
+    const protoSansLieu = exemple();
+    protoSansLieu.positions = JSON.parse(
+      `{"__proto__":{"lat":1,"lng":2},${JSON.stringify(exemple().positions).slice(1)}`,
+    ) as ProgrammeReduit["positions"];
+    expect(ProgrammeReduitSchema.safeParse(protoSansLieu).success).toBe(false);
+  });
+
+  it("placeIdsDuProgramme couvre étapes, événements, idée « Surprends-moi », propositions et terminus", () => {
+    const programme = exemple();
+    const jour = programme.trip.days[0]!;
+    jour.events = [{ ...programme.proposals[0]!.stop, id: "j1-e1", kind: "event", placeId: "ID_EVENEMENT" }];
+    jour.surprise = {
+      id: "s1",
+      placeId: "ID_IDEE",
+      name: "Idée maison",
+      meta: "",
+      reason: "Raison maison.",
+      source: { label: "exemple.org", url: "https://exemple.org/idee" },
+    };
+    programme.proposals[0]!.stop = { ...programme.proposals[0]!.stop, placeId: "ID_PROPOSITION" };
+    programme.terminus = [{ jour: 1, depart: "ID_DEPART", arrivee: "ID_ARRIVEE" }];
+    expect([...placeIdsDuProgramme(programme)].sort()).toEqual(
+      ["ID_ARRIVEE", "ID_DEPART", "ID_EVENEMENT", "ID_IDEE", "ID_PROPOSITION", "SENTINELLE_PLACE_ID"].sort(),
+    );
+  });
+
+  it("Day.events ne contient que des étapes de kind « event »", () => {
+    const programme = exemple();
+    programme.trip.days[0]!.events = [{ ...programme.proposals[0]!.stop, id: "j1-e1", kind: "event" }];
+    expect(ProgrammeReduitSchema.safeParse(programme).success).toBe(true);
+    programme.trip.days[0]!.events = [{ ...programme.proposals[0]!.stop, id: "j1-e1", kind: "activity" }];
+    expect(ProgrammeReduitSchema.safeParse(programme).success).toBe(false);
+  });
+
+  it("refuse commitment (étape du programme et proposition) et toute entrée de checklist", () => {
+    const etape = exemple();
+    (etape.trip.days[0]!.items[2] as { stop: Record<string, unknown> }).stop.commitment = "ticket";
+    expect(ProgrammeReduitSchema.safeParse(etape).success).toBe(false);
+    const proposition = exemple();
+    (proposition.proposals[0]!.stop as Record<string, unknown>).commitment = "reservation";
+    expect(ProgrammeReduitSchema.safeParse(proposition).success).toBe(false);
+    const checklist = exemple();
+    (checklist.trip as Record<string, unknown>).checklist = [
+      { id: "c1", label: "Réserver", when: "avant", done: false, bookingUrl: "javascript:alert(1)", sponsored: false },
+    ];
+    expect(ProgrammeReduitSchema.safeParse(checklist).success).toBe(false);
+  });
+
+  it("refuse plus de 8 propositions, unlocked: false et des indices de jour en double", () => {
+    const huit = exemple();
+    huit.proposals = Array.from({ length: 8 }, (_, index) => ({ ...exemple().proposals[0]!, id: `p${index + 1}` }));
+    expect(ProgrammeReduitSchema.safeParse(huit).success).toBe(true);
+    const neuf = exemple();
+    neuf.proposals = Array.from({ length: 9 }, (_, index) => ({ ...exemple().proposals[0]!, id: `p${index + 1}` }));
+    expect(ProgrammeReduitSchema.safeParse(neuf).success).toBe(false);
+
+    const verrouille = exemple();
+    (verrouille.trip as Record<string, unknown>).unlocked = false;
+    expect(ProgrammeReduitSchema.safeParse(verrouille).success).toBe(false);
+
+    const doublon = exemple();
+    doublon.trip.days.push({ ...doublon.trip.days[0]!, items: [], events: [] });
+    doublon.terminus.push({ ...doublon.terminus[0]! });
+    expect(ProgrammeReduitSchema.safeParse(doublon).success).toBe(false);
+    doublon.trip.days[1]!.index = 2;
+    doublon.terminus[1]!.jour = 2;
+    expect(ProgrammeReduitSchema.safeParse(doublon).success).toBe(true);
   });
 
   it("exige un terminus par jour et une organisation org_prototype", () => {
