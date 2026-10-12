@@ -46,7 +46,8 @@ export interface SheetProps {
   bodyRef?: Ref<HTMLDivElement>;
   /**
    * Contenu posé juste au-dessus du bord supérieur du panneau, qui suit ses hauteurs et le glisser (par
-   * exemple la région du toast d'annulation). Placé après le contenu dans l'ordre de lecture.
+   * exemple la région du toast d'annulation). Placé après le contenu dans l'ordre de lecture. En mode latéral
+   * (grand écran), posé sous le contenu, dans le panneau : il ne couvre ni le contenu ni la carte.
    */
   above?: ReactNode;
   children: ReactNode;
@@ -245,7 +246,7 @@ export function Sheet({
       {above ? (
         <div
           data-part="au-dessus"
-          className={cn("pointer-events-none absolute inset-x-0 bottom-full", sideOnLargeScreen && "lg:bottom-0")}
+          className={cn("pointer-events-none absolute inset-x-0 bottom-full", sideOnLargeScreen && "lg:static lg:shrink-0")}
         >
           {above}
         </div>

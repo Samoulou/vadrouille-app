@@ -209,6 +209,24 @@ test.describe("grand écran", () => {
     });
   }
 
+  test("grand écran: toast d'annulation sous le contenu du panneau, sans couvrir le contenu ni la carte", async ({ page }) => {
+    await openTrip(page, JOUR2);
+    await deanLink(page).click();
+    await expect(ficheTitle(page)).toBeFocused();
+    await expectSideLayout(page, SIZES.large);
+    await fiche(page).getByRole("button", { name: "Verrouiller" }).click();
+    const toast = page.locator("[data-undo-toast]");
+    await expect(toast).toBeVisible();
+    const toastBox = await rectOf(toast);
+    const content = await rectOf(tripSheet(page).locator("[data-part='contenu']"));
+    const panel = await rectOf(tripSheet(page));
+    expect(intersects(toastBox, content)).toBe(false);
+    expect(intersects(toastBox, await rectOf(mapZone(page)))).toBe(false);
+    expect(toastBox.x).toBeGreaterThanOrEqual(panel.x);
+    expect(toastBox.y + toastBox.height).toBeLessThanOrEqual(panel.y + panel.height);
+    await expect(toast.getByRole("button", { name: "Annuler" })).toBeInViewport();
+  });
+
   test("grand écran: mouvement réduit, aucune transition à la bascule ni au recentrage", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize(SIZES.mobile);
@@ -221,8 +239,20 @@ test.describe("grand écran", () => {
     // Recentrage sur une étape : la carte simulée se pose sans transition (aucune animation calculée).
     await deanLink(page).click();
     await expect(dayMarkers(page).nth(1)).toHaveAttribute("aria-current", "true");
-    const animated = await page.evaluate(() => document.getAnimations().length);
-    expect(animated).toBe(0);
+    // Sous mouvement réduit, la règle globale ramène toute transition à 0,01 ms (instantanée) : seules comptent les
+    // animations perceptibles (plus de 1 ms), comme dans la spec mobile de F5.
+    const moving = await page.evaluate(() =>
+      document
+        .getAnimations()
+        .filter((animation) => {
+          const effect = animation.effect as KeyframeEffect | null;
+          const target = effect?.target;
+          if (!(target instanceof Element) || !target.closest("[data-sheet], [data-part='zone-carte']")) return false;
+          return Number(effect?.getComputedTiming().duration ?? 0) > 1;
+        })
+        .map((animation) => (animation instanceof CSSTransition ? animation.transitionProperty : "animation")),
+    );
+    expect(moving).toEqual([]);
   });
 
   test("grand écran: transition coupée en grand écran même sans mouvement réduit", async ({ page }) => {

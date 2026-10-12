@@ -375,13 +375,16 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
 
   // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
   // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s. En grand écran,
-  // il est posé en bas du panneau latéral, sans retrait (rendu provisoire, UX/UI, Q173).
+  // il est posé sous le contenu du panneau latéral (il ne masque aucun élément focalisable, WCAG 2.4.11) ; sans
+  // toast, la région n'y prend aucune hauteur (rendu provisoire, UX/UI, Q173). `lg:px-3` annule le retrait de
+  // « Retour », inutile en grand écran.
   const toastRegion = (
     <UndoToastRegion
       className={cn(
         "pointer-events-none pb-2",
         snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour)" : "px-3",
         "lg:px-3",
+        toast ? "lg:py-2" : "lg:min-h-0 lg:pb-0",
       )}
     >
       {toast ? (
