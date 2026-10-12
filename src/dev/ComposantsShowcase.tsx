@@ -333,7 +333,7 @@ export function ComposantsShowcase() {
         <State label={t.etats.invalide}>
           <div className="flex flex-col gap-2">
             <OtpInput invalid describedBy={OTP_MESSAGE_ID} />
-            <p id={OTP_MESSAGE_ID} className="text-corps text-ink-2">
+            <p id={OTP_MESSAGE_ID} className="text-corps text-ink">
               {ex.codeInvalide}
             </p>
           </div>
