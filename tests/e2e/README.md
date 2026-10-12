@@ -13,7 +13,10 @@ des préparations sont dans `route-states.ts`.
 `ROUTES`, dans la même PR, avec :
 - `id` : numéro d'écran du handover (`R15`, `R17`…), ou `R-…` pour une page sans numéro ;
 - `path` : adresse avec les paramètres du jeu simulé (`mock_trip_edimbourg`) ; `prepare` si l'adresse n'existe qu'après une
-  action côté serveur (paiement commencé…), avec son action dans `ROUTE_PREPARATIONS` ;
+  action côté serveur (paiement commencé…), avec son action dans `ROUTE_PREPARATIONS` ; `journey` si la page n'a de
+  contenu qu'avec un état en mémoire de l'onglet (brouillon de création, F8a), avec son parcours dans `ROUTE_JOURNEYS` :
+  la mesure du JavaScript part de l'adresse de départ du parcours et compte tout ce qui est chargé jusqu'à l'adresse de
+  l'entrée ; Lighthouse ne mesure pas ces entrées (onglet neuf, sans brouillon ; question au Tech Lead, PR de F8a) ;
 - `page` : chemin du fichier `page.tsx` sous `src/app`, groupes de routes compris ;
 - `states` : états à vérifier en plus de l'état initial (feuille ouverte, toast, hors ligne…), chacun avec son action dans
   `ROUTE_STATES`, qui réutilise les aides des `*-helpers.ts` ;

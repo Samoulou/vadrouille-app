@@ -163,9 +163,10 @@ test("mes-voyages: « Retour » du Séjour de chaque voyage mène à /voyages (2
   await expect(page.getByRole("button", { name: "Retour" })).toHaveCount(0);
 });
 
-test("mes-voyages: aucun lien vers une 404 aux trois dates ; pas de « Créer un voyage » sans écran 1", async ({ page }) => {
+test("mes-voyages: aucun lien vers une 404 aux trois dates ; « Créer un voyage » pas encore ajouté (F11-PO-4)", async ({ page }) => {
+  // L'écran 1 existe depuis F8a ; le lien « Créer un voyage » sera ajouté par la première PR qui touche R17 (F11-PO-4).
   const created = await page.request.get("/voyages/nouveau");
-  expect(created.status()).toBe(404);
+  expect(created.status()).toBe(200);
   await setClock(page, DATES.avant);
   for (const iso of Object.values(DATES)) {
     await page.clock.setSystemTime(new Date(iso));

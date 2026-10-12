@@ -93,3 +93,12 @@ export function IconCoche(props: IconProps) {
     </Icon>
   );
 }
+
+/** « Plus » du jeu Ligne (README, « Iconographie ») : « Ajouter une ville », « Ajouter un adulte » (0018 § 15 et § 16). */
+export function IconPlus(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}

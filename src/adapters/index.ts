@@ -2,13 +2,14 @@ import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { counterpartOf, mockTripAdapter } from "./mock";
+import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
-import type { PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+import type { CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 
-export type { AdapterContext, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+export type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
@@ -35,6 +36,23 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
       return mockTripAdapter;
     case "api":
       throw new Error("adaptateur api non implémenté");
+    default:
+      throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api)`);
+  }
+}
+
+/**
+ * Création du voyage (décision 0017 § 3.1), selon la variable serveur `DATA_ADAPTER` (`mock` par défaut, même
+ * normalisation que `getTripAdapter`, erreur pour une valeur inconnue). Sans portée de simulation (§ 10) :
+ * `structureBrief` ne garde rien ; F8b et F8c ajouteront la portée pour y ranger leur état.
+ */
+export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER): CreationAdapter {
+  const choice = adapterChoice(value);
+  switch (choice) {
+    case "mock":
+      return createMockCreationAdapter();
+    case "api":
+      throw new Error("adaptateur api de création non implémenté (B9)");
     default:
       throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api)`);
   }
