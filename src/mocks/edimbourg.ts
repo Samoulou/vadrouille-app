@@ -547,6 +547,8 @@ export const edimbourg: Trip = {
   destinationColor: "bruyere",
   start: "2026-08-29",
   end: "2026-09-03",
+  // Fuseau de la destination (décision 0021 § 3, forme de F10-TL-1).
+  timeZone: "Europe/London",
   travellers: { adults: 2, children: 0 },
   days,
   checklist: [

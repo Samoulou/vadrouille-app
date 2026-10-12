@@ -9,7 +9,7 @@ import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "@/adapters";
 import HomePage, { dynamic } from "@/app/page";
 import { PRODUCT_NAME } from "@/config/site";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
-import { tripRoutes } from "@/features/sejour/routes";
+import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { messages } from "@/i18n";
 
 vi.mock("@/adapters", async (importOriginal) => {
@@ -38,25 +38,28 @@ afterEach(() => {
 describe("accueil : section « Démonstration » avec l'adaptateur mock", () => {
   // F9a (F9-PO-17) : paiement simulé disponible (NODE_ENV=test), une cinquième entrée « Débloquer » suit les
   // quatre entrées de D1, inchangées ; sans paiement simulé, les quatre entrées de D1 seules (test plus bas).
-  it.each([undefined, "", "mock"])("DATA_ADAPTER=%j : titre, mention, les 4 liens de D1 dans l'ordre puis « Débloquer »", async (value) => {
+  // F11a (F11-PO-18, C16) : « Mes voyages » en dernier, après les entrées existantes, inchangées.
+  it.each([undefined, "", "mock"])("DATA_ADAPTER=%j : titre, mention, les 4 liens de D1 dans l'ordre, « Débloquer » puis « Mes voyages »", async (value) => {
     vi.stubEnv("DATA_ADAPTER", value);
     await renderHome();
     expect(screen.getByRole("heading", { level: 2, name: "Démonstration" })).toBeInTheDocument();
     expect(screen.getByText(/Données simulées/)).toBeInTheDocument();
     const items = within(demoList()).getAllByRole("listitem");
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(6);
     const links = within(demoList()).getAllByRole("link");
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(6);
     expect(links.map((link) => link.textContent)).toEqual([
       expect.stringContaining("Tes premières propositions"),
       expect.stringContaining("Suite du tri"),
       expect.stringContaining("Séjour"),
       expect.stringContaining("Jour 1"),
       expect.stringContaining("Débloquer"),
+      expect.stringContaining("Mes voyages"),
     ]);
+    expect(links[5]).toHaveAccessibleName("Mes voyages Écran 17, voyages simulés");
   });
 
-  it("adresses : présentation, suite du tri, Séjour et Jour 1 du voyage débloqué, puis écran 9 ; aucune page /dev", async () => {
+  it("adresses : présentation, suite du tri, Séjour et Jour 1 du voyage débloqué, écran 9, puis Mes voyages ; aucune page /dev", async () => {
     await renderHome();
     const hrefs = within(demoList())
       .getAllByRole("link")
@@ -68,12 +71,14 @@ describe("accueil : section « Démonstration » avec l'adaptateur mock", () => 
       unlocked.sejour(),
       unlocked.jour(1),
       unlockRoutes(MOCK_DEMO_TRIP.tripId).debloquer(),
+      mesVoyagesRoute(),
     ]);
     expect(hrefs[4]).toBe("/voyages/mock_trip_edimbourg/debloquer");
+    expect(hrefs[5]).toBe("/voyages");
     for (const href of hrefs) expect(href).not.toMatch(/^\/dev/);
   });
 
-  it("paiement simulé indisponible (NODE_ENV=production sans drapeau) : les 4 liens de D1, sans « Débloquer » (F9-PO-19)", async () => {
+  it("paiement simulé indisponible (NODE_ENV=production sans drapeau) : les 4 liens de D1 et « Mes voyages », sans « Débloquer » (F9-PO-19)", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VADROUILLE_DEMO_PAYMENT", undefined);
     await renderHome();
@@ -83,6 +88,7 @@ describe("accueil : section « Démonstration » avec l'adaptateur mock", () => 
       presentationRoute(MOCK_DEMO_UNLOCKED_TRIP.tripId),
       tripRoutes("/voyages", MOCK_DEMO_UNLOCKED_TRIP.tripId).sejour(),
       tripRoutes("/voyages", MOCK_DEMO_UNLOCKED_TRIP.tripId).jour(1),
+      mesVoyagesRoute(),
     ]);
     expect(screen.queryByRole("link", { name: /Débloquer/ })).not.toBeInTheDocument();
   });
@@ -91,7 +97,8 @@ describe("accueil : section « Démonstration » avec l'adaptateur mock", () => 
     vi.stubEnv(name, "production");
     vi.stubEnv("VADROUILLE_DEMO_PAYMENT", "1");
     await renderHome();
-    expect(within(demoList()).getAllByRole("link")).toHaveLength(4);
+    expect(within(demoList()).getAllByRole("link")).toHaveLength(5);
+    expect(screen.queryByRole("link", { name: /Débloquer/ })).not.toBeInTheDocument();
   });
 
   it("la mention précède les liens", async () => {
