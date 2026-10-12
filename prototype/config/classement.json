@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "poids": {
+    "matchesWishes": 30,
+    "mustSee": 25,
+    "notForMeRisk": 4,
+    "source": {
+      "officielle": 4,
+      "independante": 6,
+      "generique": -8
+    },
+    "sourceAncienne": 6
+  },
+  "matchesWishesNon": "penaliser",
+  "penaliteHorsEnvies": 20,
+  "prioriteMustSee": "avant",
+  "coutTrajetParMinute": {
+    "activity": 0.1,
+    "meal": 1,
+    "evening": 1,
+    "surprise": 2
+  }
+}
