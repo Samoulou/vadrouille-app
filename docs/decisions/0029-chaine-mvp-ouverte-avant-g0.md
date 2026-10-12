@@ -27,13 +27,13 @@ Ces fichiers ne sont pas modifiés ici, car #27 modifie le handover ; la prochai
 
 ## Ce qui ne change pas
 - **G0 reste la condition commerciale** de passage de la phase 0 (`docs/roadmap.md`).
-- **Restent à Samuel** (« Qui décide quoi ») : mise en production, clés de production, comptes et services payants, envoi réel d'e-mails (Q25), paiement réel (Q26), ouverture du paiement simulé sur Internet (Q131), clé serveur Places/Routes (Q3), fournisseurs de modèles et leurs clés (Q9, Q46). Toute donnée personnelle envoyée hors UE remonte à Samuel.
+- **Restent à Samuel** (« Qui décide quoi ») : mise en production, clés de production, comptes et services payants, envoi réel d'e-mails (Q25), paiement réel (Q26), ouverture du paiement simulé sur Internet (Q131), clé serveur Places/Routes (Q3), fournisseur de modèles hors UE au-delà de la phase 0 (Q46). Toute donnée personnelle envoyée hors UE remonte à Samuel.
 - Les prérequis de chaque tâche B restent ceux du handover, sans la mention « G0 ».
 - Les règles Google de `CLAUDE.md` s'appliquent à B7, B8 et B9. **B7 à B9 ne démarrent qu'après la fusion de #149 (décisions 0026 à 0028, règle provisoire de Q5) et de #27 (décision 0011).**
 
 ## Conséquences
 - `docs/CONTEXT.md`, « Phase en cours », et `docs/roadmap.md` sont mis à jour dans la même PR.
-- **B1 démarre en local** (Docker Compose, conteneur Postgres en CI, aucun compte externe). La base de staging utilise le projet Neon (Francfort, Postgres 17) que Samuel a créé le 2026-10-12 et relié à Vercel pour Development et Preview (Q24, reportée par le CEO dans `QUESTIONS.md`). Vercel y a injecté des identifiants d'administration : B1 crée les rôles à moindre privilège de la décision 0007 et l'application ne lit jamais ces identifiants.
+- **B1 démarre en local** (Docker Compose, conteneur Postgres en CI, aucun compte externe). La base de staging utilise le projet Neon (Francfort, Postgres 17) que Samuel a créé via Vercel, comme annoncé dans sa réponse à Q24 (#studio, 2026-10-12 10:35 CEST : « Neon à Francfort. Je crée le compte au démarrage de B1, via Vercel. »). Création constatée par le CEO dans les variables du projet Vercel : intégration Neon ajoutée par Samuel le 2026-10-12 à 11:34 CEST, pour Development et Preview seulement. Q24 est à reporter par le CEO dans la PR « chore: status » (fait dans #168). Vercel y a injecté des identifiants d'administration : B1 crée les rôles à moindre privilège de la décision 0007 et l'application ne lit jamais ces identifiants.
 - Ordre retenu par le CEO (délégation « ordre des tâches ») : par choix d'ordonnancement, P0 d'abord (P0a1 et P0b1, le code sans clé de la spec P0 en revue dans #149), car B7 et B8 en dépendent ; en parallèle, **B1 et B2**, qui ne demandent aucun compte externe ; **B5 après B2** (son prérequis) ; ensuite l'ordre des prérequis du handover. Chaque tâche B reçoit un ticket et, si la ligne du handover ne suffit pas comme spécification, une spécification du Product Owner d'abord.
 
 ## Quand revoir cette décision
