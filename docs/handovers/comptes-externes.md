@@ -102,7 +102,7 @@ Tarifs : [Neon](https://neon.com/pricing) et [Supabase](https://supabase.com/pri
 
 ### Points communs, quel que soit le choix
 - Les deux sociétés sont américaines (Neon appartient à Databricks) ; les données restent dans la région choisie. Contrat de sous-traitance (DPA) à signer par Samuel ; sa disponibilité n'a pas été vérifiée ici.
-- Le rôle d'administration fourni (`neondb_owner` ou `postgres`) a `BYPASSRLS` : il ne sert qu'à l'amorçage des rôles. `DATABASE_URL`, `DATABASE_URL_AUTH` et `DATABASE_URL_MIGRATOR` (0006) pointent sur `vadrouille_app`, `vadrouille_auth` et `vadrouille_migrator`, jamais sur lui.
+- Le rôle d'administration fourni (`neondb_owner` ou `postgres`) a `BYPASSRLS` : il ne sert qu'à l'amorçage des rôles. `VADROUILLE_DATABASE_URL`, `VADROUILLE_DATABASE_URL_AUTH` et `VADROUILLE_DATABASE_URL_MIGRATOR` (0006, 0036) pointent sur `vadrouille_app`, `vadrouille_auth` et `vadrouille_migrator`, jamais sur lui.
 - À vérifier par B1 sur la base de staging Neon, puis à consigner par B1 dans un amendement de 0007 (ce n'est pas encore une décision) : les appartenances `WITH INHERIT FALSE, SET TRUE` et le transfert de propriété vers les rôles `vadrouille_fn_*` fonctionnent depuis le rôle d'amorçage (Postgres 16 et suivants, `CREATEROLE` sans superutilisateur) ; le test `rôles: aucun rôle ne contourne la RLS` passe sur la base gérée et pas seulement dans le conteneur.
 
 ---
