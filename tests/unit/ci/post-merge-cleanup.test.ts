@@ -39,6 +39,7 @@ function issue(overrides: Partial<IssueRef> = {}): IssueRef {
 type Merged = {
   number: number;
   mergedAt: string | null;
+  updatedAt?: string;
   baseRefName: string;
   headRefName: string;
   headRefOid: string;
@@ -50,6 +51,7 @@ function merged(overrides: Partial<Merged> = {}): Merged {
   return {
     number: 156,
     mergedAt: "2026-10-12T09:00:55Z",
+    updatedAt: "2026-10-12T09:00:55Z",
     baseRefName: "main",
     headRefName: "claude/154-comptes-externes",
     headRefOid: OID,
@@ -188,15 +190,40 @@ describe("planCleanup", () => {
     expect(planCleanup(data({ pulls }), NOW).warnings).toHaveLength(1);
   });
 
-  it("n'avertit pas quand les plus anciennes des PR lues sortent de la fenêtre", () => {
+  it("n'avertit pas quand la moins récemment mise à jour des PR lues précède la fenêtre", () => {
     const pulls = Array.from({ length: MERGED_LIMIT }, (_, i) =>
       merged({
         number: 1000 + i,
         headRefName: `claude/x-${i}`,
         mergedAt: i < 10 ? "2026-10-12T09:00:00Z" : "2026-09-01T09:00:00Z",
+        updatedAt: i < 10 ? "2026-10-12T09:00:00Z" : "2026-09-02T09:00:00Z",
       }),
     );
     expect(planCleanup(data({ pulls }), NOW).warnings).toEqual([]);
+  });
+
+  it("avertit quand une PR ancienne remontée par un commentaire remplit la liste", () => {
+    // Fusionnée il y a 20 jours, commentée hier : mergedAt hors fenêtre, updatedAt dedans.
+    const pulls = Array.from({ length: MERGED_LIMIT }, (_, i) =>
+      merged({
+        number: 1000 + i,
+        headRefName: `claude/x-${i}`,
+        mergedAt: i === 0 ? "2026-09-22T09:00:00Z" : "2026-10-12T09:00:00Z",
+        updatedAt: "2026-10-11T09:00:00Z",
+      }),
+    );
+    expect(planCleanup(data({ pulls }), NOW).warnings).toHaveLength(1);
+  });
+
+  it("avertit quand une date de mise à jour est illisible (échec fermé)", () => {
+    const pulls = Array.from({ length: MERGED_LIMIT }, (_, i) =>
+      merged({
+        number: 1000 + i,
+        headRefName: `claude/x-${i}`,
+        updatedAt: i === 0 ? "pas une date" : "2026-09-01T09:00:00Z",
+      }),
+    );
+    expect(planCleanup(data({ pulls }), NOW).warnings).toHaveLength(1);
   });
 
   it("demande à GitHub autant de PR fusionnées que MERGED_LIMIT", () => {

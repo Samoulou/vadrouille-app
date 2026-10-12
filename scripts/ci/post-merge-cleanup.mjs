@@ -19,7 +19,7 @@ export const QUERY = `query($owner: String!, $name: String!) {
     defaultBranchRef { name }
     merged: pullRequests(states: MERGED, first: ${MERGED_LIMIT}, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
-        number mergedAt baseRefName headRefName headRefOid isCrossRepository
+        number mergedAt updatedAt baseRefName headRefName headRefOid isCrossRepository
         closingIssuesReferences(first: 20) {
           nodes {
             number state
@@ -116,12 +116,14 @@ export function planCleanup(data, now = new Date()) {
     }
   }
   const warnings = [];
-  // Fenêtre coupée seulement si la liste est pleine et que sa PR la plus ancienne est
-  // encore dans la fenêtre : des PR plus anciennes, mais récentes, ont pu être omises.
-  const oldest = Math.min(
-    ...repo.merged.nodes.map((pr) => Date.parse(pr.mergedAt)),
+  // La liste est triée par date de mise à jour décroissante. Une PR fusionnée dans la
+  // fenêtre a été mise à jour dans la fenêtre : si la moins récemment mise à jour des PR
+  // lues l'a été avant la fenêtre, aucune PR de la fenêtre n'a été omise. Liste pleine et
+  // date plus récente, ou illisible (NaN) : fenêtre peut-être coupée, on avertit.
+  const leastUpdated = Math.min(
+    ...repo.merged.nodes.map((pr) => Date.parse(pr.updatedAt)),
   );
-  if (repo.merged.nodes.length >= MERGED_LIMIT && oldest >= since) {
+  if (repo.merged.nodes.length >= MERGED_LIMIT && !(leastUpdated < since)) {
     warnings.push(
       `${MERGED_LIMIT} PR fusionnées lues : la fenêtre de ${MAX_AGE_DAYS} jours peut être incomplète.`,
     );

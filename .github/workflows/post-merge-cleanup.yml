@@ -43,7 +43,7 @@ jobs:
           status=0
           # plan.txt est lu sur le descripteur 3 : les appels gh ne consomment pas le plan.
           while read -r kind target pr oid <&3; do
-            if [ "$kind" != warn ] && { [ -z "$target" ] || [ -z "$pr" ]; }; then
+            if [ "$kind" != warn ] && { [ -z "$target" ] || [ -z "$pr" ] || { [ "$kind" = branch ] && [ -z "$oid" ]; }; }; then
               echo "::error::Ligne de plan incomplète : $kind."
               status=1
             elif [ "$kind" = warn ]; then
@@ -73,6 +73,9 @@ jobs:
                 echo "::error::Branche $target : suppression en échec."
                 status=1
               fi
+            else
+              echo "::error::Ligne de plan inconnue : $kind."
+              status=1
             fi
           done 3< plan.txt
           exit "$status"
