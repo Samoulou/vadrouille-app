@@ -2,7 +2,7 @@
 
 Rédaction : rôle **product-owner** (`.claude/agents/product-owner.md`, modèle `specs/F0-socle.md`) · Ticket : #158 · Demande de Samuel (projet Claude « Vadrouille », 2026-10-12 10:51 CEST) : « il faut qu'on trouve un moyen d'afficher les preview des photos pour les propositions ».
 
-Rôles d'exécution : frontend (F13a), backend ou frontend selon le CEO (F13b) · Prérequis : F6 dans `main` (fait) ; **F13b attend le choix de Samuel (Q6) et la fusion de #149 (spec P0, décisions 0026 et 0027)** · Référence : `docs/produit/cadrage-v5.md` (§ 3.3, § 6.5, § 9), `docs/handovers/frontend.md` (§ 8 « Conformité » et « Stockage », § 17 point 5), `specs/F6-presentation.md` (« Carte (`DeckCard`) », « Règles Google », F6-PO-11, F6-Q2), `specs/P0-prototype-recherche.md` (#149 : P0b, quotas), décisions 0002, 0010 (principes 4 et 7 : `Proposal.photoUrl` chargé à la demande, suit Q6), 0027 (règle provisoire de Q5, plafonds ; jointe à #149), `QUESTIONS.md` (Q5, Q6, Q14, Q252).
+Rôles d'exécution : frontend (F13a), backend ou frontend selon le CEO (F13b) · Prérequis : F6 dans `main` (fait) ; **F13b attend la fusion de #149 (spec P0, décisions 0026 et 0027)** · Référence : `docs/produit/cadrage-v5.md` (§ 3.3, § 6.5, § 9), `docs/handovers/frontend.md` (§ 8 « Conformité » et « Stockage », § 17 point 5), `specs/F6-presentation.md` (« Carte (`DeckCard`) », « Règles Google », F6-PO-11, F6-Q2), `specs/P0-prototype-recherche.md` (#149 : P0b, quotas), décisions 0002, 0010 (principes 4 et 7 : `Proposal.photoUrl` chargé à la demande, suit Q6), 0027 (règle provisoire de Q5, plafonds ; jointe à #149), `QUESTIONS.md` (Q5, Q6, Q14, Q252).
 
 ## Objectif
 Montrer en haut de chaque carte de la présentation (`DeckCard`, écrans 6, 6b et 8) une photo **du lieu proposé**, pour que le voyageur décide « J'aime / Pas pour moi » en voyant l'endroit, sans enfreindre la règle provisoire de Q5 (décision 0027 : aucune donnée Google dans un prompt, seul l'identifiant de lieu stocké) ni dépasser les plafonds fixés par Samuel (20 USD par mois sur Google, 100 requêtes par jour et par API).
@@ -33,7 +33,10 @@ Hypothèses de calcul : une présentation = 8 cartes (aperçu, D11) ; une photo 
 
 Option écartée d'office : reprendre l'image du site source (balise `og:image`) : droits d'auteur du site, aucune licence.
 
-## Recommandation du Product Owner
+## Choix de Samuel (Q6, 2026-10-12 11:05 CEST)
+**Option A retenue** : photos Google relues à l'affichage, jamais stockées, avec D en repli (projet Claude « Vadrouille », fil « Photos des propositions » : « go pour A photo google »). F13b met en œuvre A.
+
+## Recommandation du Product Owner (avant le choix)
 **A, photos Google relues à l'affichage, avec D en repli** : c'est la seule option qui montre le vrai lieu pour les repas (environ la moitié des cartes, cadrage § 4) ; elle ne stocke rien de Google et coûte au plus le plafond déjà fixé. Quand le quota du jour est atteint, qu'un lieu n'a pas de photo ou que Google ne répond pas, la carte montre le bloc « Photo du lieu », sans message d'erreur.
 
 Limite à connaître : en phase 0, la photo ne peut s'afficher qu'avec de vrais `placeId`, donc dans P0b (programmes réels, poste de Samuel). La démonstration Vercel, sur données simulées, garde des photos simulées (F13a).
@@ -44,7 +47,7 @@ Si Samuel préfère ne pas dépendre de Google pour les photos : **B avec D en r
 | Tâche | Contenu | Rôle | Attend |
 |---|---|---|---|
 | **F13a** | `DeckCard` affiche une photo quand l'adaptateur en fournit une, avec cadrage, chargement, repli et zone d'attribution ; l'adaptateur `mock` fournit des photos **simulées** (images fabriquées pour le test, dans le dépôt, sans droits de tiers) pour 2 à 3 propositions du jeu simulé, les autres restent sans photo | frontend | rien : indépendant du choix de Samuel |
-| **F13b** | Source réelle choisie par Samuel : pour A, route serveur de photo (relecture Google, aucun cache) et branchement dans l'adaptateur `prototype` de P0b ; pour B, identifiant Wikidata dans le programme (P0a) et lecture Commons | backend ou frontend (CEO) ; revue Sécurité | Q6 (Samuel), décision du Tech Lead F13-TL-1 à F13-TL-3, P0b1 |
+| **F13b** | Source réelle choisie par Samuel : pour A, route serveur de photo (relecture Google, aucun cache) et branchement dans l'adaptateur `prototype` de P0b ; pour B, identifiant Wikidata dans le programme (P0a) et lecture Commons | backend ou frontend (CEO) ; revue Sécurité | décision du Tech Lead F13-TL-1 à F13-TL-3, P0b1, fusion de #149 |
 
 ## Comportement (F13a, toutes options)
 - **Emplacement** : le bloc photo de `DeckCard` (220 px de haut, F6-Q2), pleine largeur de la carte, coins du haut de la carte. Rien ne change ailleurs sur la carte.
@@ -100,6 +103,6 @@ Avis du Tech Lead (relecture du 2026-10-12, avant la PR) : F13-TL-1 et F13-TL-3 
 Photos dans la Journée, le Séjour, la Fiche étape ou sur la carte géographique ; galerie ; photos d'hôtel ; génération d'images par IA ; signalement d'une photo ; mise en production (G0).
 
 ## Questions ouvertes
-- **F13-Q1 (Samuel, reprend Q6)** : source des photos des propositions. A (Google à l'affichage, recommandé), B (Wikimedia Commons), C (banque d'images, déconseillé) ou D (pas de photo). Bloque F13b seulement ; F13a peut démarrer.
+- **F13-Q1 (Samuel, reprend Q6)** : répondue le 2026-10-12 à 11:05 CEST : option A.
 - **F13-Q2 (Samuel, si A)** : les photos partagent le quota quotidien de 100 requêtes Places avec P0a ; d'ici G0, accepter que les photos manquent les jours d'exécution de P0a, ou relever le quota Place Photos (argent) ?
 - **F13-Q3 (Samuel, juridique, avec Q6)** : l'image chargée depuis Google reste dans le cache HTTP du navigateur selon les en-têtes de Google. Est-ce compatible avec « pas de mise en cache locale des photos Google » (handover § 8), puisque l'application n'écrit rien elle-même ? Recommandation de Sécurité et du Tech Lead, à confirmer par Samuel : oui.
