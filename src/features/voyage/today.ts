@@ -1,4 +1,4 @@
-import type { Meal, Segment, Stop, Trip } from "@/contracts";
+import type { DayLineItem, Meal, Segment, Stop, Trip } from "@/contracts";
 
 /**
  * Date et heure de la destination (décision 0021 § 3) : seul calcul de « aujourd'hui » dans l'application,
@@ -95,6 +95,32 @@ export interface TodayTrip {
 }
 
 /**
+ * Recopie champ par champ d'un élément de la ligne (F10-TL-2) : aucun champ ajouté plus tard au contrat ne
+ * passe à l'écran 15 sans être nommé ici.
+ */
+function projectTodayItem(item: DayLineItem): TodayItem {
+  switch (item.type) {
+    case "terminus":
+      return { type: "terminus", role: item.role, time: item.time, label: item.label };
+    case "segment": {
+      const { mode, minutes, estimated } = item.segment;
+      return { type: "segment", segment: { mode, minutes, estimated } };
+    }
+    case "free":
+      return { type: "free", from: item.from, to: item.to };
+    case "openMeal":
+      return { type: "openMeal", time: item.time, meal: item.meal };
+    case "stop": {
+      const { id, kind, name, start, end, meta, exceptions, placeId } = item.stop;
+      const stop: TodayStop = { id, kind, name, start, meta, exceptions: [...exceptions] };
+      if (end !== undefined) stop.end = end;
+      if (placeId !== undefined) stop.placeId = placeId;
+      return { type: "stop", stop };
+    }
+  }
+}
+
+/**
  * Projection du voyage pour l'écran 15 (F10-TL-2) : jours du programme sans positions (elles ne sont pas lues),
  * sans événements « Pendant ton séjour », sans raison, source, date de vérification, verrou, budget ni idée
  * « Surprends-moi ». Le `placeId` reste : il sert au lien « Itinéraire » au moment du clic, sans être stocké.
@@ -109,14 +135,7 @@ export function projectTodayTrip(trip: Pick<Trip, "id" | "destination" | "timeZo
       date: day.date,
       title: day.title,
       generating: day.generating,
-      items: day.items.map((item): TodayItem => {
-        if (item.type !== "stop") return item;
-        const { id, kind, name, start, end, meta, exceptions, placeId } = item.stop;
-        const stop: TodayStop = { id, kind, name, start, meta, exceptions: [...exceptions] };
-        if (end !== undefined) stop.end = end;
-        if (placeId !== undefined) stop.placeId = placeId;
-        return { type: "stop", stop };
-      }),
+      items: day.items.map(projectTodayItem),
     })),
   };
 }

@@ -60,6 +60,25 @@ const trip = projectTodayTrip(edimbourg);
 const day = (index: number) => trip.days.find((candidate) => candidate.index === index)!;
 const names = (stops: readonly { name: string }[]) => stops.map((stop) => stop.name);
 
+describe("projectTodayTrip", () => {
+  it("recopie chaque élément champ par champ : égaux au contrat, jamais la même référence", () => {
+    edimbourg.days.forEach((source, d) => {
+      source.items.forEach((item, i) => {
+        const projected = trip.days[d]!.items[i]!;
+        expect(projected).not.toBe(item);
+        if (item.type === "segment" && projected.type === "segment") {
+          expect(projected.segment).toEqual(item.segment);
+          expect(projected.segment).not.toBe(item.segment);
+        }
+        if (item.type !== "stop") expect(projected).toEqual(item);
+      });
+    });
+    const types = new Set(trip.days.flatMap((d) => d.items.map((item) => item.type)));
+    expect(types).toContain("segment");
+    expect(types).toContain("terminus");
+  });
+});
+
 describe("localTimeAt et previousDate", () => {
   it("heure de la destination à la minute près, secondes ignorées", () => {
     expect(localTimeAt(at("2026-08-30T10:49:59+01:00"), "Europe/London")).toBe("10:49");

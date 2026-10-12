@@ -17,6 +17,7 @@ import { format, messages } from "@/i18n";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
+import { timeZoneMention } from "./fuseau";
 import { itineraryUrl } from "./itineraire";
 import {
   deviceTimeDiffers,
@@ -62,18 +63,18 @@ function inSentence(title: string): string {
   return title.charAt(0).toLocaleLowerCase("fr") + title.slice(1);
 }
 
-/** « Heures de Lisbonne », « Heures d'Édimbourg » (élision devant une voyelle). */
-function timeZoneMention(destination: string): string {
-  return format(/^[aeiouyàâäéèêëîïôöùûüœ]/i.test(destination) ? t.fuseauElision : t.fuseau, { destination });
-}
-
-/** Lien désactivé hors ligne (F10-PO-6) : focalisable, `aria-disabled`, décrit par le bandeau, sans effet au clic. */
+/**
+ * Lien désactivé hors ligne (F10-PO-6) : focalisable, `aria-disabled`, décrit par le bandeau, sans effet au clic,
+ * clic milieu compris (`auxclick`, qui ouvrirait un nouvel onglet).
+ */
 function offlineLinkProps(online: boolean) {
   if (online) return {};
+  const prevent = (event: MouseEvent<HTMLAnchorElement>) => event.preventDefault();
   return {
     "aria-disabled": true as const,
     "aria-describedby": OFFLINE_ID,
-    onClick: (event: MouseEvent<HTMLAnchorElement>) => event.preventDefault(),
+    onClick: prevent,
+    onAuxClick: prevent,
   };
 }
 
@@ -331,11 +332,13 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
             </p>
           ) : null}
         </div>
-        {online ? null : (
-          <div id={OFFLINE_ID}>
-            <StatusBanner kind="offline" message={t.horsLigne} />
-          </div>
-        )}
+        {/*
+          Région live présente dès l'affichage de la journée, vide tant que le réseau est là : le bandeau y est
+          injecté hors ligne, donc annoncé (règle des annonces de 0018). Vide, elle annule l'espacement du parent.
+        */}
+        <div id={OFFLINE_ID} role="status" data-part="hors-ligne" className="empty:-mt-5">
+          {online ? null : <StatusBanner kind="offline" message={t.horsLigne} announce={false} />}
+        </div>
         {day ? (
           <During trip={trip} day={day} time={time} current={current} next={next} online={online} />
         ) : (

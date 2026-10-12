@@ -48,6 +48,9 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   const { trip, routes, actions } = useTripShell();
   // Lien « Aujourd'hui · Jour {n} » (F10-PO-7) : aux dates du voyage, à la date de la destination, calculée dans
   // le navigateur après le montage ; seulement avec la base `/voyages` (pas de page `R15` de développement).
+  // Décalage assumé : aux dates du voyage, le lien apparaît après le montage et pousse le panneau d'une hauteur
+  // de cible tactile. Réserver cette hauteur la laisserait vide sur tous les autres voyages (avant ou après les
+  // dates), qui sont le cas courant, puisque le jour courant n'est connu qu'une fois dans le navigateur.
   const now = useClientNow({ now: clock });
   const aujourdhui = routes.aujourdhui();
   const todayIndex = now === null || aujourdhui === null ? null : currentDayIndex(trip, now);

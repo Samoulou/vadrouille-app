@@ -297,9 +297,14 @@ describe("TodayScreen : réseau perdu, écran ouvert (C17)", () => {
 
   it("bandeau offline, contenu gardé, liens réseau désactivés et décrits par le bandeau ; rétablis au retour du réseau", () => {
     renderAt("2026-08-30T10:40:00+01:00");
+    // Région live montée vide avant la perte du réseau, puis remplie : le message est annoncé.
+    const live = document.querySelector("[data-part='hors-ligne']");
+    expect(live).toHaveAttribute("role", "status");
+    expect(live).toBeEmptyDOMElement();
     act(() => setOnline(false));
     const banner = screen.getByText(t.horsLigne).closest("[data-kind='offline']");
-    expect(banner).toHaveAttribute("role", "status");
+    expect(banner).not.toHaveAttribute("role");
+    expect(banner?.parentElement).toBe(live);
     expect(region(t.prochaine.titre)).toHaveTextContent("[Dean Village]");
     const links = [
       screen.getByRole("link", { name: "Itinéraire vers [Dean Village] (nouvelle fenêtre)" }),
@@ -308,12 +313,17 @@ describe("TodayScreen : réseau perdu, écran ouvert (C17)", () => {
     for (const link of links) {
       expect(link).toHaveAttribute("aria-disabled", "true");
       expect(link).toHaveAccessibleDescription(t.horsLigne);
-      expect(link).toHaveClass("text-ink-soft");
       expect(fireEvent.click(link)).toBe(false);
+      // Clic milieu : pas de nouvel onglet.
+      expect(fireEvent(link, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }))).toBe(false);
     }
     act(() => setOnline(true));
     expect(screen.queryByText(t.horsLigne)).toBeNull();
-    for (const link of links) expect(link).not.toHaveAttribute("aria-disabled");
+    for (const link of links) {
+      expect(link).not.toHaveAttribute("aria-disabled");
+      expect(fireEvent(link, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }))).toBe(true);
+    }
+    expect(live).toBeEmptyDOMElement();
   });
 });
 
