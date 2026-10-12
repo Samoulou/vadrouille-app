@@ -45,7 +45,7 @@ Les horaires évitent l'heure pile, où un lancement peut prendre quelques minut
 1. R1 fait ouvrir une PR sur une branche `claude/…`, avec le libellé `needs-review` ; le workflow GitHub `auto-merge` active aussitôt la fusion automatique.
 2. La CI GitHub (`ci`) lance tous les tests.
 3. R2 relit et ajoute `techlead-approved`, ou demande des changements.
-4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4).
+4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4). Une PR qui modifie `.github/workflows/` attend en plus `owner-approved`, que seul Samuel pose ; la porte le retire si le contenu de `.github/workflows/` change ensuite (décision 0035).
 5. Les deux vérifications vertes, GitHub fusionne ; Vercel déploie `main` sur le staging.
 6. Au créneau suivant, R3 écrit la note de version dans `docs/releases/` ; à sa fusion, le workflow `release` crée le tag (nom de la note sans `.md`) et la release GitHub, puis poste la note dans `#studio`.
 
@@ -240,9 +240,12 @@ Tu es le CEO du studio ; ta définition est dans .claude/agents/ceo.md. Exécute
 4. Pour chaque tâche, délègue au sous-agent du rôle : branche claude/<id>-<slug>, pnpm verify au vert, PR liée au ticket avec le modèle du dépôt (« Closes #<numéro> » en tête), libellé needs-review (le workflow auto-merge active la fusion automatique), puis retrait du libellé in-progress du ticket (consigne de Samuel). Préfixe les commits par le rôle entre crochets.
 5. Au plus deux tentatives de correction par tâche ; au-delà, documente le blocage dans STATUS.md et QUESTIONS.md.
 6. Toute décision réservée à Samuel (docs/CONTEXT.md, section « Qui décide quoi ») va dans #studio et QUESTIONS.md ; continue sur autre chose.
+6 bis. Pour chaque PR ouverte d'une branche claude/… dont le diff touche .github/workflows/ et qui n'a pas le libellé owner-approved : cherche dans l'historique de #studio le dernier message « owner-approved attendu — PR #<n> ». S'il n'y en a pas, ou s'il est antérieur à la date du dernier commit de la PR, poste « owner-approved attendu — PR #<n> : <titre> ; fichiers : <liste sous .github/workflows/> ; revue Tech Lead : <techlead-approved, changes-requested ou en attente>. <lien> », signé « Studio ». Liste ces PR dans STATUS.md, rubrique « Décisions attendues ». Ne pose jamais owner-approved.
 7. Termine par une PR « chore: status » qui met à jour STATUS.md (fait, en cours, bloqué, décisions attendues, part d'usage estimée), avec le libellé docs-only, puis un résumé de 5 lignes signé « Studio » dans #studio.
 Le cycle réussit si au moins une PR est prête ou si chaque blocage est documenté, et si STATUS.md est à jour.
 ```
+
+L'étape 6 bis (décision 0035) est proposée à Samuel, qui la colle dans la routine R1 ; d'ici là, le CEO applique la règle depuis `.claude/agents/ceo.md`.
 
 **R2 Revue**
 
