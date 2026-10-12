@@ -2,7 +2,7 @@
 
 Statut : accepté · Date : 2026-10-12 · Décideur : Samuel (fil « Correction spec P0 » du projet Claude « Vadrouille », 2026-10-12 13:49 CEST) · Consigné par le CEO (40e cycle) · Ticket #181 · Citations lues dans le fil par le CEO le 2026-10-12
 
-Numérotation : 0029 est prise par #164 (fusionnée), 0031 est réservée par #172 et 0033 par #177. 0034 est le prochain numéro libre. Cette décision vaut indépendamment de la fusion de #172 et de #177.
+Numérotation : 0029 est prise par la PR #165 (ticket #164), fusionnée sur `main` le 2026-10-12 à 12:46 UTC (vérifié par le CEO le 2026-10-12 à 17:20 CEST, `git ls-tree origin/main docs/decisions/`) ; 0031 est réservée par #172 et 0033 par #177. 0034 est le prochain numéro libre. Cette décision vaut indépendamment de la fusion de #172 et de #177.
 
 ## Contexte
 Le 2026-10-12, le studio a vérifié l'environnement Vercel du projet et constaté deux écarts :
@@ -11,7 +11,8 @@ Le 2026-10-12, le studio a vérifié l'environnement Vercel du projet et constat
 
 La revue consolidée de #172 (head `a7a042b`, bloquant 6) demande une décision écrite. Celle-ci cite **mot pour mot** les questions du studio et les réponses de Samuel.
 
-## État vérifié (CEO, 2026-10-12 à 13:20 CEST, API Vercel)
+## État vérifié (CEO, 2026-10-12 à 13:20 CEST)
+Sources : API Vercel (`GET /v10/projects/{id}/env`, liste des déploiements `target=production`, domaines du projet) et requête HTTP sur le domaine de production, appelées par le CEO depuis sa session. Cette vérification est postérieure aux réponses de Samuel (13:49 CEST) ; elle constate l'état qu'il a choisi de laisser.
 - **Neon** : les 16 variables de l'intégration visent Development et Preview, et `POSTGRES_USER` vise Development seulement. **Aucune ne vise Production.**
 - **Clés** : `OPENROUTER_API_KEY` et `GOOGLE_MAPS_SERVER_KEY` existent sur Development, Preview et Production.
 - **Production** : Vercel déploie automatiquement `main` en production par l'intégration Git (déploiements de #149, #27 et #175). Le domaine de production `vadrouille-app-ten.vercel.app` répond **sans authentification** (HTTP 200), car la protection Vercel est en mode « tout sauf les domaines de production ». Les préversions, elles, restent protégées.
@@ -40,7 +41,7 @@ Réponse de Samuel, 13:49:15 CEST :
 
 > ok je comprends pas tout, pour l'instant on laisse en prod, car notre prod n'est pas sensible, c'est une chose à consolidé avant une release public, mais en gros tant qu'on est pas en pbulic on est ok, on fera la sécu quan dla release sera en pbulic
 
-« On laisse » répond à la proposition de retirer Preview : l'état est laissé tel quel, donc Development et Preview. Rien n'est ajouté sur Production.
+Lecture du CEO, **à confirmer par Samuel** : « on laisse » répond à la proposition de retirer Preview, donc l'état est laissé tel quel, sur Development et Preview. Rien n'est ajouté sur Production.
 
 ### 2. Clés OpenRouter et Google sur Production
 Question du studio, 13:40:32 CEST :
@@ -53,10 +54,10 @@ Réponse de Samuel, 13:49:46 CEST :
 
 ## Ce que cela change
 - **Q250, 0028 § 1 et 0026** (« jamais utilisées en production ») sont amendées sans être réécrites (comme dans 0019). Jusqu'à la mise en public, les deux clés restent sur Development, Preview **et Production**. D'ici là, cette décision prime sur 0028 § 1 et sur cette phrase de 0026.
-- **P0-Q19** est close. L'identifiant propriétaire Neon reste sur Development et Preview jusqu'à la mise en public. Il n'est jamais posé sur Production.
-- **`docs/CONTEXT.md`** (« clés de production » réservées à Samuel) n'est pas contredit : c'est Samuel lui-même qui décide, et les clés restent celles du prototype (0026). Elles ne deviennent pas des clés de production au sens de `CLAUDE.md`.
+- **P0-Q19** est close. L'identifiant propriétaire Neon reste sur Development et Preview jusqu'à la mise en public. Il n'est pas posé sur Production.
+- **`docs/CONTEXT.md`** (« clés de production » réservées à Samuel) n'est pas contredit : c'est Samuel lui-même qui décide (`CONTEXT.md`, « Qui décide quoi »).
 - **Garde préalable à toute fusion** : production est déployée automatiquement et publique. Aucun code qui lit `OPENROUTER_API_KEY`, `GOOGLE_MAPS_SERVER_KEY` ou une variable Neon ne fusionne sans une garde qui refuse tout client réel et toute connexion quand `VERCEL_ENV=production`. Cette garde doit être testée dans la même PR. C'est l'exigence du bloquant 7 de #172, étendue à toute PR.
-- **Plafonds** : les plafonds de Q249 et Q252 restent la seule borne de coût tant que les clés sont sur Production. Ils ne sont pas relâchés avant la mise en public. Il s'agit de la clé Google limitée à Places et Routes, des quotas journaliers et des budgets mensuels de 0027.
+- **Plafonds** : les plafonds de Q249 et Q252 (100 requêtes par jour et par API, alerte à 20 USD, 0028) et les budgets mensuels de Q234 (0027 § 2) bornent le coût tant que les clés sont sur Production ; la portée exacte du quota reste ouverte (P0-Q14). Ils ne sont pas relâchés avant la mise en public. Il s'agit de la clé Google limitée à Places et Routes, des quotas journaliers et des budgets mensuels de 0027.
 
 ## Passe de sécurité avant la mise en public
 **Mise en public** : premier accès au produit pour une personne extérieure au studio et à Samuel (testeur, prospect, bêta), ou annonce d'une adresse du produit. Le prototype parcouru par Samuel seul n'en est pas une.
@@ -68,10 +69,14 @@ Réponse de Samuel, 13:49:46 CEST :
 2. Limiter les clés OpenRouter et Google aux environnements prévus, puis faire tourner les deux clés, puisqu'elles ont été exposées aux préversions et à Production.
 3. Vérifier la protection des préversions et de la production : mode de protection, domaine public.
 4. Vérifier que les PR de forks ne reçoivent aucun secret d'environnement (le dépôt est public) : protection des forks de Vercel et de GitHub Actions.
-5. Vérifier que les plafonds de Q249 et Q252 sont toujours en place.
+5. Vérifier dans les consoles Google Cloud et OpenRouter que les quotas et plafonds de Q249, Q252 et Q234 existent réellement et sont toujours en place.
+6. Avant tout réglage, relever l'état par environnement via l'API Vercel (variables, déploiements de production, domaines, protection) et le joindre au verdict.
 
 ## Ce qui ne change pas
-- `CLAUDE.md`, « Jamais » : aucun agent n'utilise une clé de production ni ne promeut quoi que ce soit en production. Le studio ne déclenche aucun déploiement de production. Le déploiement automatique de `main` est un réglage de Samuel (0002).
+- `CLAUDE.md`, « Jamais » : aucun agent n'utilise une clé de production ni n'effectue de promotion manuelle en production.
+
+## Écart constaté avec le plan, remonté à Samuel
+`docs/studio/mise-en-place.md` (l. 20 et 49) prévoit « `main` déployé automatiquement sur le staging ; production promue à la main », et `CONTEXT.md` réserve la mise en production à Samuel. L'état vérifié montre que chaque fusion sur `main` est déployée en **production**, sur un domaine public sans authentification. Cet écart est un réglage du projet Vercel, qui relève de Samuel. Il lui est remonté (description de #182, 2026-10-12) : faut-il que la production cesse d'être déployée automatiquement ? Cela ne bloque pas cette décision. En revanche, la garde `VERCEL_ENV=production` ci-dessus reste exigée tant que l'écart dure.
 - Aucune exécution réelle n'a lieu avant P0r3, exigences d'entrée vérifiées (0031, PR #172).
 
 ## Quand revoir cette décision
