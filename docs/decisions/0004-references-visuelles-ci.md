@@ -28,3 +28,21 @@ Option C, implémentée dans une tâche dédiée (`.github/workflows/visual-upda
 - Plus de téléchargement d'artefact ; les références viennent du même environnement que la comparaison.
 - Un push fait avec le `GITHUB_TOKEN` ne relance pas les workflows : après le commit des images, l'agent pousse un nouveau commit (même vide) pour relancer `ci` et `techlead-gate` sur la dernière révision. Un jeton d'application GitHub éviterait cette étape, mais c'est un compte externe : décision de Samuel.
 - L'artefact `test-results` reste produit en cas d'échec, pour diagnostiquer.
+
+## Évolution — 2026-10-12, mise en œuvre (T17, ticket #146)
+Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-14) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Décideur : Tech Lead (outillage et tests) · Origine : Q232.
+
+`.github/workflows/visual-update.yml` met en œuvre l'option C. Il précise la décision proposée sur les points suivants :
+1. **Garde-fous** (point 2) : en plus du dépôt de tête et du préfixe `claude/`, la PR doit être ouverte. Une PR qui ne remplit pas ces conditions ne lance rien, et son libellé reste posé (un fork n'a de toute façon qu'un jeton en lecture).
+2. **Révision figée** : le job extrait `head.sha`, la révision de la PR au moment du libellé, et pousse sur `refs/heads/<branche>`. Si la branche a avancé pendant le job, le push est refusé (non fast-forward) : on repose le libellé.
+3. **Jeton isolé du code de la PR** : `persist-credentials: false`. L'installation, le build et les tests s'exécutent sans jeton en écriture ; le jeton n'est passé qu'aux étapes de commit, de push et de libellés, écrites dans le workflow.
+4. **Même environnement que `verify`** : `ubuntu-latest`, Node 22, pnpm du champ `packageManager`, Chromium et polices système par `pnpm exec playwright install --with-deps chromium` à la version de `pnpm-lock.yaml`. Actions épinglées par SHA (0023 § 4.9), aux versions que résolvent les étiquettes `v4` de `ci.yml`.
+5. **Toutes les captures réécrites** (point 3) : `playwright test --project=visual --update-snapshots=all`, et non `pnpm test:visual:update` (mode `changed`, qui ne réécrit que les captures au-delà de la tolérance). Une référence dont l'écart reste sous 1 % est ainsi aussi régénérée (Q232, F2c-Q4). Le script local `test:visual:update` est inchangé : en session, des références réécrites en entier différeraient de la CI. Tolérance et fichiers `*.visual.spec.ts` inchangés (point 5).
+6. **Commit** (points 3 et 4) : un seul commit `[qa] chore: références visuelles régénérées (0004)`, auteur `github-actions[bot]`, limité aux PNG de `tests/visual/__screenshots__/`. Aucun commit si rien ne change. Tout autre fichier modifié fait échouer le job sans push.
+7. **Libellé** : `update-snapshots` est retiré à la fin, que le job réussisse ou échoue ; le reposer relance le job. En cas d'échec, l'artefact `test-results` est produit, comme dans `ci.yml`.
+8. **Relance de la CI** (précise « Conséquences ») : le push fait avec `GITHUB_TOKEN` ne déclenche ni `ci` ni `techlead-gate`. Après un commit, le workflow :
+   - retire lui-même `techlead-approved`, comme la porte le ferait à un push (0023 § 4.4), puisqu'elle ne s'exécute pas ;
+   - publie un commentaire qui liste les captures modifiées et rappelle l'étape suivante.
+
+   L'agent de la PR pousse ensuite un commit, même vide (`git commit --allow-empty`), pour relancer `ci` et `techlead-gate` sur la dernière révision ; la revue reprend ensuite comme après tout push. Le workflow ne touche ni `needs-review` ni les autres libellés.
+9. **Droits** : `contents: write` (push) et `pull-requests: write` (libellés et commentaire de la PR). Aucun autre droit ; aucune action en dehors de celles que `ci.yml` utilise déjà.
