@@ -22,7 +22,6 @@ export function statusBannerRole(kind: StatusBannerKind): "alert" | "status" {
 }
 
 /** Filet décoratif : `ink` pour `error` et `conflict`, `ink-soft` pour les autres types, jamais `line` (0012, Q13). */
-
 const RAIL_CLASSES: Record<StatusBannerKind, string> = {
   offline: "bg-ink-soft",
   conflict: "bg-ink",
