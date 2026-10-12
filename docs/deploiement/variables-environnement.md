@@ -45,6 +45,18 @@ Samuel seul pose les variables et déclenche les déploiements (`docs/CONTEXT.md
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | `src/components/carte/config.tsx` (`readMapConfig`) | Production (déploiement de `main`) et, si voulu, Preview |
 | `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | même fichier | mêmes environnements que la clé |
 
+### Référents HTTP autorisés sur la clé
+
+Réglés par Samuel dans Google Cloud Console (Identifiants, restrictions de sites web). Seule API autorisée : Maps JavaScript API.
+
+| Référent | Pour |
+|---|---|
+| `http://localhost:3000/*` | `pnpm dev` et les tests sur le poste |
+| `https://vadrouille-app-ten.vercel.app/*` | adresse de démonstration (déploiement de `main`) |
+| `https://*.vercel.app/*` | previews Vercel : chaque déploiement a sa propre adresse `vadrouille-<hash>-sams-projects-47a8db3e.vercel.app` (ajouté le 2026-10-12, bug #159) |
+
+Google n'accepte le joker qu'en tête du domaine : on ne peut pas limiter la clé aux seules previews de ce projet. N'importe quel site en `vercel.app` peut donc l'utiliser ; un plafond de quota journalier sur Maps JavaScript API borne le coût. La restriction est vérifiée par Google : la changer ne demande aucun redéploiement (délai de prise en compte jusqu'à 5 minutes).
+
 - **Figées au build.** Les variables `NEXT_PUBLIC_*` sont recopiées dans le JavaScript au moment du build. Ajouter ou changer une valeur dans Vercel n'a aucun effet sur un déploiement existant : il faut un **nouveau déploiement** (nouveau commit sur `main`, ou « Redeploy » sans le cache de build dans Vercel).
 - **Nom exact.** Sans le préfixe `NEXT_PUBLIC_`, la variable n'arrive jamais au navigateur.
 - **Environnement.** L'adresse de démonstration (`vadrouille-app-ten.vercel.app`) sert le déploiement de `main`, que Vercel range dans l'environnement « Production ». Une variable cochée seulement « Preview » ou « Development » n'y est pas lue.
@@ -75,3 +87,10 @@ Samuel seul pose les variables et déclenche les déploiements (`docs/CONTEXT.md
 - **Correction** : positions dérivées de celles d'Édimbourg pour le voyage débloqué (`deriveEdimbourgCarte`), sauf le J6 en préparation, comme le prévoit la tâche T6 de la décision 0017 § 13. Test qui reproduit : `src/adapters/mock.test.ts`, « voyage débloqué de la démonstration (bug n° 106) ».
 - **Voyage payé par le paiement simulé (F9a)** : `withSimulatedUnlock` (`src/adapters/mock-unlock.ts`) sert `mock_trip_edimbourg` débloqué à partir de son pendant `mock_trip_edimbourg_debloque` ; ses positions sont donc aussi celles de `deriveEdimbourgCarte`, réétiquetées et revalidées (`src/adapters/mock-unlock.test.ts`).
 - **Action de Samuel** : aucune variable à changer. Après la fusion, le déploiement automatique de `main` suffit ; vérifier ensuite que la carte du Jour 1 s'affiche sur l'adresse de démonstration.
+
+## Bug #159 (2026-10-12) : « La carte n'a pas pu être chargée » sur les previews
+
+- **Constat** : sur une preview (`vadrouille-czeyuis24-sams-projects-47a8db3e.vercel.app/voyages/mock_trip_edimbourg_debloque` et `/jour/1`), la carte affichait « La carte n'a pas pu être chargée. La liste contient tout le programme. » ; la liste du programme restait complète.
+- **Ce qui a été vérifié** (2026-10-12, 08:55 UTC) : la console du navigateur montre `RefererNotAllowedMapError` sur la preview ; la même page sur `vadrouille-app-ten.vercel.app` affiche la carte ; aucune erreur serveur dans les journaux Vercel.
+- **Cause** : hors du code. La clé n'acceptait que `localhost:3000` et `vadrouille-app-ten.vercel.app`.
+- **Correction** : Samuel a ajouté `https://*.vercel.app/*` aux référents de la clé (tableau ci-dessus). Aucun changement de code. Vérifié le 2026-10-12 à 09:00 UTC : la carte du Jour 1 s'affiche sur la même preview, sans redéploiement.
