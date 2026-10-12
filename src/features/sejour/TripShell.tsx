@@ -149,9 +149,9 @@ export interface TripShellProps {
  * Mise en page commune du Séjour et de la Journée (spécification F5, F5-PO-1 ; décision 0015 § 5.3) :
  * carte en fond sur toute la fenêtre, « Retour » posé sur la carte, panneau `Sheet` au-dessus avec les
  * onglets du voyage. À partir de 1024 px (F12-PO-7, décision 0022 § 6), carte à gauche et panneau latéral à
- * droite, même arbre de composants : la bascule ne démonte rien (F12-PO-10). Monté par le layout du voyage : la hauteur du panneau, l'état du programme et le
- * toast d'annulation sont conservés entre les pages du même voyage, et repartent de zéro au chargement,
- * sans aucun stockage (F5-PO-16).
+ * droite, même arbre de composants : la bascule ne démonte rien (F12-PO-10). Monté par le layout du voyage :
+ * la hauteur du panneau, l'état du programme et le toast d'annulation sont conservés entre les pages du même
+ * voyage, et repartent de zéro au chargement, sans aucun stockage (F5-PO-16).
  */
 export function TripShell({ trip: sourceTrip, maps, base, actions: injected, children }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -376,14 +376,13 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
   // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
   // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s. En grand écran,
   // il est posé sous le contenu du panneau latéral (il ne masque aucun élément focalisable, WCAG 2.4.11) ; sans
-  // toast, la région n'y prend aucune hauteur (rendu provisoire, UX/UI, Q173). `lg:px-3` annule le retrait de
-  // « Retour », inutile en grand écran.
+  // toast, la région n'y prend aucune hauteur (rendu provisoire, UX/UI, Q173). Le retrait de « Retour » ne vaut
+  // qu'en mobile (`lg:pl-3`).
   const toastRegion = (
     <UndoToastRegion
       className={cn(
         "pointer-events-none pb-2",
-        snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour)" : "px-3",
-        "lg:px-3",
+        snap === HIGHEST ? "pr-3 pl-(--ligne-toast-retrait-retour) lg:pl-3" : "px-3",
         toast ? "lg:py-2" : "lg:min-h-0 lg:pb-0",
       )}
     >
