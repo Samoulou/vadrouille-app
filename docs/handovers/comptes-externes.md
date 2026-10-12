@@ -2,6 +2,8 @@
 
 Rôles : backend (liste), tech-lead (recommandation Neon ou Supabase) · Date : 2026-10-12 · Ticket : #154 · Demande de Samuel : #studio, 2026-10-12 09:57 CEST · Sources internes : `docs/handovers/backend.md` (B0a, § 2, § 9, § 12 à § 15), décisions 0002, 0006 à 0009, 0026 (sur la branche du 37e cycle, pas encore sur `main`), `QUESTIONS.md` (Q24, Q25, Q26, Q28, Q46, Q103, Q197), cadrage § 11 (budget)
 
+**Décision de Samuel sur Q24 (#studio, 2026-10-12 10:35 CEST)** : Neon à Francfort ; Samuel crée le compte lui-même au démarrage de B1, via Vercel. Les autres comptes restent des recommandations.
+
 **Ce document recommande, il ne tranche pas.** Ouvrir un compte, choisir un fournisseur payant et engager une dépense sont réservés à Samuel (`docs/CONTEXT.md`, « Qui décide quoi »). Aucun compte n'est ouvert par cette PR.
 
 **Tarifs** : relevés le 2026-10-12 sur les pages officielles citées, en USD ou en CHF selon la page, hors TVA. Un tarif marqué « non vérifié » n'a pas pu être lu sur la page officielle ce jour-là : à confirmer à l'ouverture du compte.
@@ -30,7 +32,7 @@ L'ordre suit le backlog de B0a (`docs/handovers/backend.md` § 15, B1 à B12). A
 
 | Étape | Compte | Quand (tâche) | Ce qu'il débloque | Formule recommandée | Région | Données personnelles | Question |
 |---|---|---|---|---|---|---|---|
-| 1 | **Postgres managé en UE** (recommandation : Neon, § 3) | B1 pour la base de staging ; bloquant pour B3 (essai de l'en-tête d'IP de confiance sur staging) et pour le test de restauration | Base de staging, puis de production ; repli « monde Postgres » des workflows (0009) | Neon : Free pour le staging, Launch (à l'usage) pour la bêta | Neon `aws-eu-central-1` (Francfort) | toutes les données des utilisateurs (comptes, briefs, voyages) | Q24 |
+| 1 | **Postgres managé en UE** : Neon, retenu par Samuel (§ 3) | B1 pour la base de staging ; bloquant pour B3 (essai de l'en-tête d'IP de confiance sur staging) et pour le test de restauration | Base de staging, puis de production ; repli « monde Postgres » des workflows (0009) | Neon : Free pour le staging, Launch (à l'usage) pour la bêta | Neon `aws-eu-central-1` (Francfort) | toutes les données des utilisateurs (comptes, briefs, voyages) | Q24 |
 | 2 | **Nom de domaine** | Avant les étapes 3 et 4 | Adresse d'envoi des emails (SPF, DKIM) ; site public avec mentions légales, exigé par TWINT ; `APP_URL` | payant, 30 CHF prévus (cadrage § 11) | bureau d'enregistrement au choix | coordonnées du titulaire | hors § 14 de B0a, ajouté ici |
 | 3 | **Envoi d'emails** (codes de connexion, « propositions prêtes ») | B3 pour l'envoi réel ; Mailpit suffit avant | Connexion réelle sur le staging, puis en bêta | gratuite au départ (voir les candidats ci-dessous) | UE à exiger | adresse email, code à usage unique (sous-traitant) | Q25 |
 | 4 | **Stripe, mode test, carte et TWINT** | B4 pour l'adaptateur `stripe` ; l'adaptateur simulé suffit avant | Paiement de test de bout en bout, webhook signé | gratuit en mode test ; en production, frais par transaction (ci-dessous) | Stripe (sous-traitant de paiement) ; compte suisse | nom, email, moyen de paiement (chez Stripe seulement) | Q26 |
@@ -64,6 +66,8 @@ Le transport est déjà prévu en SMTP (`nodemailer`, décision 0008) : tous ces
 ---
 
 ## 3. Recommandation du Tech Lead : Neon plutôt que Supabase
+
+**Suivie par Samuel le 2026-10-12 (Q24)** : Neon, `aws-eu-central-1` (Francfort), compte créé par Samuel au démarrage de B1, via Vercel. Le reste de cette section garde l'argumentaire tel qu'il a été proposé.
 
 **Recommandation : Neon, projet en région `aws-eu-central-1` (Francfort), formule Free pour le staging, Launch pour la bêta.** Better Auth reste une bibliothèque dans notre code (décision 0008) ; ni Neon Auth ni Supabase Auth ne sont utilisés.
 
@@ -103,7 +107,7 @@ Tarifs : [Neon](https://neon.com/pricing) et [Supabase](https://supabase.com/pri
 
 ## 4. Ce que Samuel décide
 
-1. **Q24** : Neon (recommandé) ou Supabase, région Francfort, et à quel moment ouvrir le compte (au plus tôt : B1, après G0).
+1. ~~**Q24**~~ : tranchée le 2026-10-12 (Neon, Francfort, compte créé par Samuel via Vercel au démarrage de B1).
 2. **Domaine** : lequel, et quand (avant l'envoi réel d'emails et l'activation de TWINT).
 3. **Q25** : fournisseur d'emails en UE (Scaleway ou Brevo au volume du MVP).
 4. **Q26** : ouverture du compte Stripe suisse en mode test ; TWINT exigera le site public de l'étape 2.
