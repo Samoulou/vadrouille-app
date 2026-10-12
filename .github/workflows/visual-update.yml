@@ -1,103 +1,63 @@
 name: visual-update
 # Régénère les références visuelles Playwright sur la CI (décision 0004, option C, et sa section « Évolution »).
-# - Déclencheur : libellé `update-snapshots` posé sur une PR ouverte. Jamais `pull_request_target`.
-# - Garde-fous : branche de tête `claude/…` de ce même dépôt ; une PR venue d'un fork ne lance rien
-#   (son jeton serait de toute façon en lecture seule).
-# - Même environnement que le job `verify` de ci.yml : ubuntu-latest, Node 22, pnpm du champ packageManager,
-#   Chromium et polices système installés par `playwright install --with-deps chromium` à la version figée
-#   dans pnpm-lock.yaml (décision 0003).
-# - Le code de la PR (installation, build, tests) s'exécute sans jeton en écriture : `persist-credentials: false`,
-#   et le jeton n'est passé qu'aux étapes de commit, de push et de libellés, qui n'exécutent que ce fichier.
-# - Un seul commit `[qa] chore: références visuelles régénérées (0004)`, limité à tests/visual/__screenshots__/ ;
-#   aucun commit si rien ne change. Le libellé est retiré à la fin, que le job réussisse ou non.
-# - Un push fait avec GITHUB_TOKEN ne relance ni `ci` ni `techlead-gate` : le job retire lui-même
-#   `techlead-approved` (règle « chaque nouveau push », 0023 § 4.4) et l'agent de la PR pousse ensuite un commit,
-#   même vide, pour relancer la CI (0004, « Évolution »).
+# - Déclencheur : libellé `update-snapshots` posé par Samoulou (Samuel ou les routines du studio) sur une PR ouverte
+#   dont la branche de tête est `claude/…` dans ce dépôt. Jamais `pull_request_target`, jamais un fork.
+# - Trois jobs, permissions au niveau de chaque job :
+#   1. `regenerate` (contents: read) exécute le code de la PR : installation, Playwright `--update-snapshots=all`,
+#      envoi des seuls PNG de tests/visual/__screenshots__/ en artefact. Aucun jeton en écriture dans ce job,
+#      pas de cache pnpm. Même environnement que le job `verify` de ci.yml (Node 22, pnpm du champ packageManager,
+#      Chromium et polices système à la version de pnpm-lock.yaml, décision 0003).
+#   2. `publish` (contents: write, pull-requests: write) n'exécute aucun code de la PR : ni pnpm, ni node, ni script
+#      du dépôt. Il extrait la même révision, valide chaque fichier de l'artefact, les copie, retire
+#      `techlead-approved` AVANT le push, committe sans hooks et pousse, puis commente la PR.
+#   3. `label` (pull-requests: write) retire `update-snapshots`, que les jobs précédents réussissent ou non.
+# - Un push fait avec GITHUB_TOKEN ne relance ni `ci` ni `techlead-gate` : l'agent de la PR pousse ensuite un commit,
+#   même vide, pour les relancer (0004, « Évolution »).
+# Actions épinglées par SHA ; correspondance SHA ↔ version vérifiée par `git ls-remote` le 2026-10-12.
 on:
   pull_request:
     types: [labeled]
-permissions:
-  contents: write
-  pull-requests: write
-concurrency:
-  group: visual-update-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+permissions: {}
 jobs:
-  update:
+  regenerate:
     if: >-
       github.event.label.name == 'update-snapshots' &&
+      github.event.sender.login == 'Samoulou' &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'claude/')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      # Révision exacte de la PR au moment du libellé : si la branche avance pendant le job, le push est refusé
-      # (non fast-forward) au lieu de committer des images prises sur une autre révision.
+      # Révision exacte de la PR au moment du libellé.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0 (= v4, comme ci.yml)
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 (= v4, comme ci.yml)
-        with: { node-version: 22, cache: pnpm }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      # Pas de `cache: pnpm` : un cache écrit par du code non fiable pourrait être relu par un autre workflow.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22 }
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       # `--update-snapshots=all` et non `pnpm test:visual:update` (mode `changed`) : une capture dont l'écart reste
       # sous la tolérance de 1 % est aussi réécrite (Q232, F2c-Q4). Tolérance et specs inchangées (0004, point 5).
       - name: Régénérer les références visuelles
         run: pnpm exec playwright test --project=visual --update-snapshots=all
-      - id: changes
-        name: Vérifier que seules des références ont changé
-        run: |
-          git status --porcelain --untracked-files=all > changes.txt
-          cat changes.txt
-          if grep -vqE '^.. tests/visual/__screenshots__/[^/]+\.png$' changes.txt; then
-            echo "::error::Fichiers modifiés hors de tests/visual/__screenshots__/ : rien n'est poussé (décision 0004, point 4)."
-            exit 1
-          fi
-          if [ -s changes.txt ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Aucune référence modifiée : aucun commit."
-          fi
-          rm changes.txt
-      - if: steps.changes.outputs.changed == 'true'
-        name: Committer et pousser sur la branche de la PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898073+github-actions[bot]@users.noreply.github.com"
-          git add -A tests/visual/__screenshots__/
-          git commit -m "[qa] chore: références visuelles régénérées (0004)"
-          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          echo "::add-mask::$auth"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
-            push origin "HEAD:refs/heads/${HEAD_REF}"
-      - if: steps.changes.outputs.changed == 'true'
-        name: Retirer techlead-approved et signaler le commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          # 404 si le libellé n'était pas posé : sans effet.
-          gh api -X DELETE "repos/$REPO/issues/$PR/labels/techlead-approved" > /dev/null 2>&1 || true
-          {
-            echo "visual-update : références régénérées sur la CI, commit \`$(git rev-parse --short=7 HEAD)\` (décision 0004)."
-            echo
-            git show --name-status --format= HEAD | sed 's/^/- /'
-            echo
-            echo "Ce push, fait avec GITHUB_TOKEN, ne relance pas \`ci\` ni \`techlead-gate\` :"
-            echo "pousse un commit (même vide) sur la branche pour les relancer. \`techlead-approved\` a été retiré."
-          } > comment.md
-          gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+      # Seuls les PNG du répertoire des références partent dans l'artefact (à plat, sans sous-répertoire).
+      # Le job `publish` les revalide : ce job a exécuté du code de la PR, son artefact n'est pas fiable.
+      - name: Envoyer les références en artefact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: references-visuelles
+          path: tests/visual/__screenshots__/*.png
+          if-no-files-found: error
+          retention-days: 1
       - if: failure()
         name: Envoyer les résultats de test en artefact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2 (= v4, comme ci.yml)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-results
           path: |
@@ -105,12 +65,172 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
-      - if: always()
-        name: Retirer le libellé update-snapshots
+
+  publish:
+    needs: regenerate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    # Au niveau du job : un événement `labeled` écarté par le `if` n'entre pas dans le groupe.
+    concurrency:
+      group: visual-update-publish-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      # Même révision que `regenerate`. Si la branche a avancé entre-temps, le push est refusé (non fast-forward).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: references-visuelles
+          path: ${{ runner.temp }}/references
+      - name: Valider et copier les références
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/references"
+          dest_rel="tests/visual/__screenshots__"
+          name_re='^[A-Za-z0-9_-][A-Za-z0-9._-]*\.png$'
+          max_bytes=$((5 * 1024 * 1024))
+          max_files=500
+          fail() { echo "::error::$1 Rien n'est poussé (décision 0004, point 4)."; exit 1; }
+
+          # Destination : le répertoire réel des références, sans lien symbolique sur le chemin ni dedans.
+          dest="$(realpath -e -- "$dest_rel")" || fail "Répertoire $dest_rel absent."
+          [ "$dest" = "$GITHUB_WORKSPACE/$dest_rel" ] || fail "$dest_rel n'est pas un répertoire du dépôt."
+          [ -z "$(find "$dest" -mindepth 1 -maxdepth 1 -type l)" ] || fail "Lien symbolique dans $dest_rel."
+
+          # Artefact : uniquement des fichiers réguliers à plat.
+          [ -z "$(find "$src" -mindepth 1 ! -type f)" ] || fail "Entrée qui n'est pas un fichier régulier dans l'artefact."
+          [ -z "$(find "$src" -mindepth 2)" ] || fail "Sous-répertoire dans l'artefact."
+          # `find` et non un glob : les fichiers cachés sont listés, donc refusés par le contrôle du nom.
+          mapfile -t files < <(find "$src" -mindepth 1 -maxdepth 1 | LC_ALL=C sort)
+          [ "${#files[@]}" -gt 0 ] || fail "Artefact vide."
+          [ "${#files[@]}" -le "$max_files" ] || fail "Plus de $max_files fichiers dans l'artefact."
+
+          # Chaque fichier est validé avant toute copie.
+          for f in "${files[@]}"; do
+            name="${f##*/}"
+            [[ "$name" =~ $name_re ]] || fail "Nom refusé : $name."
+            if [ ! -f "$f" ] || [ -L "$f" ]; then fail "$name n'est pas un fichier régulier."; fi
+            size="$(stat -c %s -- "$f")"
+            if [ "$size" -le 0 ] || [ "$size" -gt "$max_bytes" ]; then fail "$name : taille $size hors bornes."; fi
+            magic="$(head -c 8 -- "$f" | od -An -tx1 | tr -d ' \n')"
+            [ "$magic" = "89504e470d0a1a0a" ] || fail "$name n'est pas un PNG."
+            target="$dest/$name"
+            if [ -e "$target" ] || [ -L "$target" ]; then
+              if [ ! -f "$target" ] || [ -L "$target" ]; then fail "$dest_rel/$name existe et n'est pas un fichier régulier."; fi
+            fi
+          done
+          for f in "${files[@]}"; do
+            cp -- "$f" "$dest/${f##*/}"
+          done
+          echo "${#files[@]} fichiers validés et copiés."
+      - id: changes
+        name: Vérifier que seules des références ont changé
+        run: |
+          set -euo pipefail
+          changes="$(git status --porcelain=v1 --untracked-files=all)"
+          if [ -z "$changes" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Aucune référence modifiée : aucun commit."
+            exit 0
+          fi
+          printf '%s\n' "$changes"
+          # Modifié dans l'arbre (` M`) ou nouveau (`??`) ; ni renommage, ni changement de type, ni suppression.
+          if printf '%s\n' "$changes" | grep -vqE '^( M|\?\?) tests/visual/__screenshots__/[A-Za-z0-9_-][A-Za-z0-9._-]*\.png$'; then
+            echo "::error::Changement hors des PNG de tests/visual/__screenshots__/ : rien n'est poussé (décision 0004, point 4)."
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      # Avant le push : un commit non revu ne doit jamais rester sous une approbation périmée,
+      # puisque `techlead-gate` ne s'exécute pas sur un push fait avec GITHUB_TOKEN (0023 § 4.4).
+      - if: steps.changes.outputs.changed == 'true'
+        name: Retirer techlead-approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LABEL: techlead-approved
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o "$RUNNER_TEMP/label.json" -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$REPO/issues/$PR/labels/$LABEL")"
+          case "$code" in
+            200) echo "$LABEL retiré." ;;
+            404) echo "$LABEL n'était pas posé." ;;
+            *) cat "$RUNNER_TEMP/label.json"; echo "::error::Retrait de $LABEL : HTTP $code. Rien n'est poussé."; exit 1 ;;
+          esac
+      - if: steps.changes.outputs.changed == 'true'
+        name: Committer et pousser sur la branche de la PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898073+github-actions[bot]@users.noreply.github.com"
+          git add -- tests/visual/__screenshots__/
+          # Contrôle de l'index : fichiers ordinaires ajoutés (A) ou modifiés (M), aucun lien symbolique (120000).
+          tab="$(printf '\t')"
+          staged="$(git diff --cached --raw --no-abbrev --no-renames)"
+          printf '%s\n' "$staged"
+          if [ -z "$staged" ] || printf '%s\n' "$staged" | grep -vqE "^:(000000|100644|100755) (100644|100755) [0-9a-f]+ [0-9a-f]+ [AM]${tab}tests/visual/__screenshots__/[A-Za-z0-9_-][A-Za-z0-9._-]*\.png$"; then
+            echo "::error::Index inattendu : rien n'est poussé (décision 0004, point 4)."
+            exit 1
+          fi
+          git -c core.hooksPath=/dev/null commit --no-verify -m "[qa] chore: références visuelles régénérées (0004)"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          git -c core.hooksPath=/dev/null \
+            -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push --no-verify origin "HEAD:refs/heads/${HEAD_REF}"
+      - if: steps.changes.outputs.changed == 'true'
+        name: Signaler le commit sur la PR
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          # 404 si une exécution concurrente l'a déjà retiré : sans effet.
-          gh api -X DELETE "repos/$REPO/issues/$PR/labels/update-snapshots" > /dev/null 2>&1 || true
+          set -euo pipefail
+          sha="$(git rev-parse --short=7 HEAD)"
+          files="$(git show --name-status --format= HEAD | sed 's/^/- /')"
+          body="visual-update : références régénérées sur la CI, commit \`${sha}\` (décision 0004).
+
+          ${files}
+
+          \`techlead-approved\` a été retiré avant le push. Ce push, fait avec GITHUB_TOKEN, ne relance pas \`ci\` ni \`techlead-gate\` : pousse un commit (même vide) sur la branche pour les relancer."
+          gh api "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+
+  label:
+    needs: [regenerate, publish]
+    # S'exécute dès que `regenerate` a été lancé (garde-fous remplis), quel que soit le résultat.
+    if: always() && needs.regenerate.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Retirer le libellé update-snapshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LABEL: update-snapshots
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o "$RUNNER_TEMP/label.json" -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$REPO/issues/$PR/labels/$LABEL")"
+          case "$code" in
+            200) echo "$LABEL retiré." ;;
+            404) echo "$LABEL déjà retiré (exécution concurrente)." ;;
+            *) cat "$RUNNER_TEMP/label.json"; echo "::error::Retrait de $LABEL : HTTP $code."; exit 1 ;;
+          esac
