@@ -48,11 +48,13 @@ test("parcours prototype : accueil, section « Prototype », présentation, Séj
   await expect(page.locator("#liste-etapes")).toContainText("[Lieu de test 1]");
 });
 
-test("affichage: mention « Données de lieux : Google » en mode prototype (écrans 6, 11, 12 et 13)", async ({ page }) => {
+test("affichage: mention « Données de lieux : Google » en mode prototype (écrans 6, 11, 12, 13 et 15)", async ({ page }) => {
   for (const path of [
     `/voyages/${PROTOTYPE_TRIP}/presentation`,
     `/voyages/${PROTOTYPE_TRIP}`,
     `/voyages/${PROTOTYPE_TRIP}/jour/1`,
+    `/voyages/${PROTOTYPE_TRIP}/aujourdhui`,
+    // En dernier : la fiche est vérifiée après la boucle.
     `/voyages/${PROTOTYPE_TRIP}/jour/1?etape=j1-a1`,
   ]) {
     await page.goto(path);
