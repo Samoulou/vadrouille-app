@@ -287,6 +287,52 @@
         }
       ],
       "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente)"
+    },
+    {
+      "fichier": "tests/e2e/hors-ligne.e2e.spec.ts",
+      "portee": "test",
+      "usage": "hôtes Google bloqués et requête Google du service worker qui doit échouer (F10b)",
+      "capacites": [
+        {
+          "capacite": "hote:maps.googleapis.com",
+          "formes": [
+            "https://maps.googleapis.com/maps/api/js?callback=x",
+            "maps.googleapis.com"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:places.googleapis.com",
+          "formes": [
+            "places.googleapis.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : à trancher par le Tech Lead avec verdict Sécurité dans la revue de la PR 217 (0038 TL-5 point 7)"
+    },
+    {
+      "fichier": "tests/unit/sw-route.test.ts",
+      "portee": "test",
+      "usage": "adresses Google que l'aiguillage du service worker ne doit jamais mettre en cache (F10b)",
+      "capacites": [
+        {
+          "capacite": "hote:maps.googleapis.com",
+          "formes": [
+            "<link rel=\"stylesheet\" href=\"/_next/static/css/a.css?dpl=1&amp;x=2\"/>\n      <link rel=\"preload\" as=\"font\" href=\"/_next/static/media/h.woff2\"/>\n      <script src=\"/_next/static/chunks/b.js\"></script><script src=\"/_next/static/chunks/b.js\"></script>\n      <script src=\"https://maps.googleapis.com/maps/api/js\"></script>\n      <link rel=\"manifest\" href=\"/manifest.webmanifest\"/><a href=\"/voyages/x\">x</a>",
+            "https://maps.googleapis.com/maps/api/js?key=x"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:places.googleapis.com",
+          "formes": [
+            "https://places.googleapis.com/v1/places/x"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : à trancher par le Tech Lead avec verdict Sécurité dans la revue de la PR 217 (0038 TL-5 point 7)"
     }
   ]
 }
