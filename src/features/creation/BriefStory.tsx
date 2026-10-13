@@ -11,7 +11,7 @@ import { structureBrief } from "@/server/actions/creation";
 
 import { TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
-import { formatNombre } from "./brief-fields";
+import { formatNombre } from "@/lib/nombre";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldMessage, helpId, INPUT_CLASS } from "./fields";
 import type { StageProps } from "./stage";
 import { storyError, toBriefRequest } from "./validation";
