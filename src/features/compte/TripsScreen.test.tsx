@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { mockTripAdapter } from "@/adapters/mock";
 import type { TripSummary } from "@/contracts";
 import { TripSessionProvider, useOptionalTripSession, type TabMemory } from "@/features/voyage/TripSessionProvider";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { MOCK_ORGANIZATION_ID } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";

@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ligne/Button";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import type { SurpriseIdea } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 
 const t = messages.sejour.surprise;

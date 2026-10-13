@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DevComposantsPage from "@/app/dev/composants/page";
 import { ComposantsShowcase } from "@/dev/ComposantsShowcase";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { axeViolations } from "./axe";
 

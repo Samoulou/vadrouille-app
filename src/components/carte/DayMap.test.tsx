@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { axeViolations } from "../../../tests/unit/axe";
 import { day2, days, map2, maps, stubLayout, stubOnline } from "../../../tests/unit/carte-fixtures";

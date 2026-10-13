@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { Meal, Segment, Stop } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatDuree } from "@/lib/duree";
 import { formatFaits } from "@/lib/faits";
 import { cn } from "@/lib/utils";

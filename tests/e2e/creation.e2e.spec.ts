@@ -10,6 +10,7 @@ import {
   EDIMBOURG,
   R1,
   R2,
+  R3,
   STORY,
   continueButton,
   field,
@@ -20,6 +21,7 @@ import {
   reachReview,
   storyField,
 } from "./creation-helpers";
+import { MOCK_WRONG_CODE, emailField, pasteCode } from "./connexion-helpers";
 import { expectPath, pathOf } from "./debloquer-helpers";
 import { collectEvents } from "./presentation-helpers";
 
@@ -31,6 +33,8 @@ import { collectEvents } from "./presentation-helpers";
 /** « 1 000 » attendu à l'écran, écrit en dur (espace fine insécable U+202F, format suisse indépendant de l'ICU). */
 const MILLE = "1 000";
 const R4_LANCER = "/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer";
+/** Adresse propre à ce test : elle ne doit apparaître nulle part hors du champ. */
+const SECRET_EMAIL = "secret-f8b@exemple.org";
 
 let googleRequests: string[] = [];
 let foreignRequests: string[] = [];
@@ -239,7 +243,8 @@ test("brief: corriger une déduction", async ({ page }) => {
   await expect.poll(() => events.filter((event) => event.name === "brief_completed")).toEqual([
     { name: "brief_completed", properties: { inferred_fields_count: 4, edited_fields_count: 2 } },
   ]);
-  await expectPath(page, R4_LANCER);
+  // F8b : voyage « Pas encore » : l'écran 3 suit le brief (F8-PO-8).
+  await expectPath(page, R3);
 });
 
 test("brief: remplir moi-même", async ({ page }) => {
@@ -346,7 +351,15 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
   await button(page, "Préparer mon brief").click();
   await reachReview(page);
   await continueButton(page).click();
+  // F8b : écrans 3 et 4 compris ; ni adresse ni code dans une adresse, la console, les mesures ou le serveur.
+  await expectPath(page, R3);
+  await button(page, "Partir du quartier, choisir plus tard").click();
   await expectPath(page, R4_LANCER);
+  await emailField(page).fill(SECRET_EMAIL);
+  await button(page, "Recevoir un code").click();
+  await expect(page.getByRole("textbox", { name: "Chiffre 1 sur 6" })).toBeFocused();
+  await pasteCode(page, MOCK_WRONG_CODE);
+  await expect(page.getByRole("alert").filter({ hasText: "Ce code ne correspond pas." })).toBeVisible();
 
   const storage = await page.evaluate(async () => ({
     local: window.localStorage.length,
@@ -369,5 +382,11 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
   expect(output).toContain("Ready");
   expect(output).not.toContain(fragment);
   expect(output).not.toContain("Édimbourg");
+  for (const secret of [SECRET_EMAIL, MOCK_WRONG_CODE]) {
+    for (const url of visited) expect(decodeURIComponent(url)).not.toContain(secret);
+    expect(consoleLines.join("\n")).not.toContain(secret);
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(output).not.toContain(secret);
+  }
   expect(pathOf(page)).toBe(R4_LANCER);
 });

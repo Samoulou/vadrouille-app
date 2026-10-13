@@ -182,6 +182,8 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg/jour/2)" = "404"
+          # F8b : écran 3 avec la carte simulée (`R3-dev`, décision 0017 § 11.3).
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/nouveau/logement)" = "404"
           # Paiement simulé fermé dans l'image de production (F9-PO-19, décision 0020 § 5).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer/paiement-simule/AAAAAAAAAAAAAAAAAAAAAA)" = "404"
@@ -191,15 +193,6 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats/erreur)" = "404"
           docker rm -f app
-          # VADROUILLE_ENV=production ferme le paiement simulé même avec le drapeau de démonstration.
-          docker run -d --name app-drapeau -p 3001:3000 -e VADROUILLE_DEMO_PAYMENT=1 app:ci
-          for i in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://127.0.0.1:3001/; then break; fi
-            sleep 1
-          done
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/voyages/mock_trip_edimbourg/debloquer)" = "404" || { docker logs app-drapeau; exit 1; }
-          if curl -fsS http://127.0.0.1:3001/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
-          docker rm -f app-drapeau
           # Adaptateur prototype refusé dans l'image (VADROUILLE_ENV=production), même avec le drapeau de CI
           # (spécification P0, P0b1 ; décision 0032 § A4.4) : erreur 500 explicite, ni section « Prototype » ni
           # programme. Attente d'un code HTTP quelconque (pas `curl -f` : la réponse attendue est un 500).
@@ -220,3 +213,24 @@ jobs:
             docker logs "$name" 2>&1 | grep -q 'adaptateur prototype refusé' || { echo "500 sans le refus de la garde ($name)"; docker logs "$name"; exit 1; }
           done
           docker rm -f app-prototype app-prototype-drapeau
+      # Décision 0017 § 11.0 et § 11.3 (F8b), amendant 0020 § 5 (F9a) : VADROUILLE_ENV=production, porté par l'image,
+      # ferme les pages de développement, la portée des simulations, la connexion et le paiement simulés, même avec
+      # les drapeaux d'ouverture. Drapeaux passés en `-e` au seul conteneur vérifié : ni clé `env:`, ni `export`
+      # (seule exception de configuration versionnée, tests/unit/dev-pages-env.test.ts).
+      - if: steps.diff.outputs.code == 'true'
+        name: Gardes fermées malgré les drapeaux
+        run: |
+          docker run -d --name app-drapeau -p 3001:3000 -e VADROUILLE_DEV_PAGES=1 -e VADROUILLE_DEMO_AUTH=1 -e VADROUILLE_DEMO_PAYMENT=1 app:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:3001/ || { docker logs app-drapeau; exit 1; }
+          # R3-dev : pages de développement et connexion simulée.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/dev/voyages/nouveau/logement)" = "404" || { docker logs app-drapeau; exit 1; }
+          # R-sim, corps valide et portée explicite : portée des simulations.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'x-vadrouille-simulation: ci-gardes' -d '{"action":"advanceClock","ms":0}' http://127.0.0.1:3001/dev/api/simulation)" = "404" || { docker logs app-drapeau; exit 1; }
+          # R9 : paiement simulé.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/voyages/mock_trip_edimbourg/debloquer)" = "404" || { docker logs app-drapeau; exit 1; }
+          if curl -fsS http://127.0.0.1:3001/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
+          docker rm -f app-drapeau

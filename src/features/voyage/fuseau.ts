@@ -1,4 +1,5 @@
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 const t = messages.voyage.aujourdhui;
 

@@ -1,5 +1,8 @@
+import { randomBytes } from "node:crypto";
+
 import { headers } from "next/headers";
 
+import type { Session } from "@/contracts";
 import type { CheckoutOutcome, CheckoutStatusCode, Currency, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
 import { FIXED_SHARE_LINKS } from "@/mocks/edimbourg-partage";
@@ -27,6 +30,8 @@ export const MAX_CHECKOUTS_PER_SCOPE = 50;
 export const MAX_ENTITLEMENTS_PER_SCOPE = 20;
 /** Liens de partage créés gardés par portée (F10-PO-18) ; au-delà, le plus ancien est retiré et répond 404. */
 export const MAX_SHARE_LINKS_PER_SCOPE = 20;
+/** Adresses (clés HMAC) gardées par portée pour la connexion simulée (0017 § 10.4) ; au-delà, la plus ancienne est retirée. */
+export const MAX_AUTH_ADDRESSES_PER_SCOPE = 50;
 
 export interface Clock {
   now(): number;
@@ -82,12 +87,38 @@ export interface ShareStore {
   links: Map<string, ShareLinkRecord>;
 }
 
+/**
+ * Code actif d'une adresse (connexion simulée, 0017 § 3.5) : instants et compteur seulement. Le code n'est pas
+ * recopié (il est comparé à la constante du jeu simulé) ; l'adresse n'est jamais gardée en clair.
+ */
+export interface ActiveCode {
+  expiresAt: number;
+  attempts: number;
+  /** `too_many_attempts` atteint : tout essai suivant le renvoie jusqu'à une nouvelle demande. */
+  locked: boolean;
+}
+
+/** État d'une adresse, rangé sous le HMAC-SHA-256 de l'adresse normalisée. */
+export interface AuthAddressRecord {
+  /** Instants des demandes de code retenues dans la fenêtre glissante. */
+  requests: number[];
+  code: ActiveCode | null;
+}
+
+export interface AuthStore {
+  /** Clé : HMAC de l'adresse normalisée ; ordre d'insertion = ordre d'usage (la plus ancienne est retirée). */
+  addresses: Map<string, AuthAddressRecord>;
+  /** Session simulée de la portée (aucun cookie : 0017 § 3.5) ; une connexion vaut pour toute la portée. */
+  session: Session | null;
+}
+
 export interface SimulationScope {
   name: string;
   explicit: boolean;
   clock: Clock;
   payment: PaymentStore;
   share: ShareStore;
+  auth: AuthStore;
 }
 
 interface ManualClock extends Clock {
@@ -106,6 +137,10 @@ function manualClock(start: number): ManualClock {
       current += ms;
     },
   };
+}
+
+function emptyAuthStore(): AuthStore {
+  return { addresses: new Map(), session: null };
 }
 
 function emptyPaymentStore(): PaymentStore {
@@ -133,6 +168,11 @@ export function initialShareStore(): ShareStore {
 interface Registry {
   defaultScope: SimulationScope;
   explicit: Map<string, SimulationScope & { clock: ManualClock }>;
+  /**
+   * Clé HMAC des adresses de la connexion simulée (0017 § 3.5) : tirée une fois par processus, jamais écrite,
+   * gardée ici pour que le rechargement à chaud ne la change pas (compteurs cohérents).
+   */
+  authKey: Buffer;
 }
 
 const REGISTRY_KEY = Symbol.for("vadrouille.simulation");
@@ -146,8 +186,10 @@ function registry(): Registry {
       clock: { now: () => Date.now() },
       payment: emptyPaymentStore(),
       share: initialShareStore(),
+      auth: emptyAuthStore(),
     },
     explicit: new Map(),
+    authKey: randomBytes(32),
   };
   return holder[REGISTRY_KEY];
 }
@@ -170,7 +212,14 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
     // Plus récemment utilisée : replacée en fin d'ordre d'insertion.
     scopes.delete(name);
   } else {
-    scope = { name, explicit: true, clock: manualClock(Date.now()), payment: emptyPaymentStore(), share: initialShareStore() };
+    scope = {
+      name,
+      explicit: true,
+      clock: manualClock(Date.now()),
+      payment: emptyPaymentStore(),
+      share: initialShareStore(),
+      auth: emptyAuthStore(),
+    };
   }
   scopes.set(name, scope);
   while (scopes.size > MAX_SCOPES) {
@@ -183,13 +232,20 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
 
 /**
  * Vide paiements et droits de la portée, remet le délai de confirmation à 0, efface les liens de partage créés et
- * rétablit les liens fixes (F10-PO-18), et fixe l'horloge.
+ * rétablit les liens fixes (F10-PO-18), vide les codes, compteurs et session de la connexion simulée (F8b), et fixe
+ * l'horloge.
  */
 export function resetScope(name: string, now: number): void {
   const scope = explicitScope(name);
   scope.payment = emptyPaymentStore();
   scope.share = initialShareStore();
+  scope.auth = emptyAuthStore();
   scope.clock.set(now);
+}
+
+/** Clé HMAC du processus pour les adresses de la connexion simulée (0017 § 3.5). */
+export function authHmacKey(): Buffer {
+  return registry().authKey;
 }
 
 export function advanceClock(name: string, ms: number): void {

@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { getRequestContext, getTripReader } from "@/adapters";
 import { PRODUCT_NAME } from "@/config/site";
 import { TripsScreen } from "@/features/compte/TripsScreen";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Données lues à chaque requête, dans le contexte d'organisation de la requête.
 export const dynamic = "force-dynamic";

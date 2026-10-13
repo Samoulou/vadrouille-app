@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { EtatsShowcase } from "@/dev/EtatsShowcase";
 import { devPagesEnabled } from "@/dev/flags";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Lu à chaque requête : la variable VADROUILLE_DEV_PAGES est évaluée à l'exécution.
 export const dynamic = "force-dynamic";

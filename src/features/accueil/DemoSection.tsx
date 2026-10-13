@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 export interface DemoLink {
   href: string;

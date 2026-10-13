@@ -8,7 +8,8 @@ import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day, RevisionPreview as RevisionPreviewData, Stop } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 import { cn } from "@/lib/utils";
 

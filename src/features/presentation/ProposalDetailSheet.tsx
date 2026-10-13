@@ -6,7 +6,8 @@ import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal, Weekday } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 
 const t = messages.presentation;

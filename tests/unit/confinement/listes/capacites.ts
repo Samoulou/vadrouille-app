@@ -62,6 +62,14 @@ export const LIGNES_CAPACITE = [
     usage: "test des règles de déblocage",
     capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
   },
+  // F8b (décision 0017 § 11.3) : liste des fichiers suivis par Git (`git ls-files`). Verdict Sécurité : à venir (PR F8b, ticket 259).
+  {
+    fichier: "tests/unit/dev-pages-env.test.ts",
+    portee: "test",
+    usage: "test de la configuration versionnée (drapeaux d'ouverture)",
+    ecart: "fichier apparu après `40b6738` (F8b, ticket 259 ; décision 0017 § 11.3) : ligne ordinaire B, 0040 D4",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+  },
   {
     fichier: "src/lib/large-screen.test.tsx",
     portee: "test",

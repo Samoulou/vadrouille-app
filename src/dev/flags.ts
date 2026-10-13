@@ -1,19 +1,24 @@
 /**
- * Les pages de développement (/dev/…) sont désactivées en production.
- * Elles restent accessibles en développement, ou quand VADROUILLE_DEV_PAGES=1
- * est fourni explicitement (tests Playwright sur le build de production).
+ * Pages de développement (`/dev/…`), portée des simulations et `R-sim` (décision 0017 § 11.1, **fermées par
+ * défaut**) : toujours fermées sur un déploiement de production (`isProductionDeployment`) ; sinon ouvertes
+ * seulement en `development` ou `test`, ou quand `VADROUILLE_DEV_PAGES` vaut exactement `1` (tests Playwright sur
+ * le build de production). Toute autre valeur de `NODE_ENV` (absente, `staging`, faute de frappe) ferme.
  */
 export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.NODE_ENV !== "production" || env.VADROUILLE_DEV_PAGES === "1";
+  if (isProductionDeployment(env)) return false;
+  return env.NODE_ENV === "development" || env.NODE_ENV === "test" || env.VADROUILLE_DEV_PAGES === "1";
 }
 
 /**
  * Déploiement de production, quel que soit l'hébergeur (décision 0017 § 11.0, créée par F9a selon
  * 0020 § 2.3) : `VADROUILLE_ENV=production` (posé par le `Dockerfile`) ou `VERCEL_ENV=production`.
- * Cette condition ne peut que fermer : elle n'ouvre jamais rien.
+ * Cette condition ne peut que fermer : elle n'ouvre jamais rien. **Comparaison tolérante, parce que la garde
+ * ferme** (0017 § 11.0, F8b) : chaque valeur est comparée après `trim().toLowerCase()` ; ` Production` ou
+ * `PRODUCTION` ferment aussi. Les drapeaux qui ouvrent restent comparés exactement à `1`.
  */
 export function isProductionDeployment(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.VADROUILLE_ENV === "production" || env.VERCEL_ENV === "production";
+  const normalisee = (value: string | undefined) => value?.trim().toLowerCase();
+  return normalisee(env.VADROUILLE_ENV) === "production" || normalisee(env.VERCEL_ENV) === "production";
 }
 
 /**

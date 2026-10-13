@@ -10,7 +10,7 @@ import type { MapConfig } from "./config";
 import { cssLength, cssVar, defaultFitPadding, prefersReducedMotion } from "./css";
 import { MapFallback } from "./MapFallback";
 import { MarkerButton } from "./MarkerButton";
-import { boundsOf, offsetCenter, type LatLng, type StopMarkerSpec } from "./route";
+import { areaCorners, boundsOf, offsetCenter, type LatLng, type StopMarkerSpec } from "./route";
 import type { MapView } from "./types";
 
 /**
@@ -53,6 +53,10 @@ interface Hosts {
 /** Éléments hôtes des marqueurs avancés en HTML : React y rend `StopMarker` par des portails. */
 function createHosts(view: MapView): Hosts {
   const host = () => document.createElement("div");
+  if (view.mode === "area") {
+    // Zone d'un quartier : un cercle, aucun marqueur en phase 0 (décision 0017 § 7).
+    return { stops: [], termini: [], rings: [] };
+  }
   if (view.mode === "overview") {
     return { stops: [], termini: [], rings: view.rings.map((position) => ({ position, element: host() })) };
   }
@@ -99,11 +103,14 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
 
   const route = view.mode === "day" ? view.route : null;
   const rings = view.mode === "overview" ? view.rings : null;
+  const areaLat = view.mode === "area" ? view.center.lat : null;
+  const areaLng = view.mode === "area" ? view.center.lng : null;
+  const areaRadius = view.mode === "area" ? view.radiusM : null;
   const fitKey = view.fitKey;
   const fitPadding = view.fitPadding;
   // Les hôtes ne changent qu'avec le contenu (changement de jour), pas avec la sélection.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const hosts = useMemo(() => (typeof document === "undefined" ? null : createHosts(view)), [route, rings]);
+  const hosts = useMemo(() => (typeof document === "undefined" ? null : createHosts(view)), [route, rings, areaLat, areaLng, areaRadius]);
 
   useEffect(() => {
     onMarkerPressRef.current = view.mode === "day" ? view.onMarkerPress : undefined;
@@ -207,9 +214,25 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
         }),
     );
 
+    // Zone d'un quartier : cercle au contour `line`, sans remplissage, dessiné dans la projection de la carte.
+    const area =
+      areaLat !== null && areaLng !== null && areaRadius !== null ? { center: { lat: areaLat, lng: areaLng }, radiusM: areaRadius } : null;
+    const circle = area
+      ? new libraries.maps.Circle({
+          map,
+          center: area.center,
+          radius: area.radiusM,
+          clickable: false,
+          strokeColor: color,
+          strokeWeight: weight,
+          strokeOpacity: 1,
+          fillOpacity: 0,
+        })
+      : null;
+
     if (lastFitKey.current !== fitKey) {
       lastFitKey.current = fitKey;
-      const box = boundsOf(route ? route.positions : (rings ?? []));
+      const box = boundsOf(route ? route.positions : area ? areaCorners(area.center, area.radiusM) : (rings ?? []));
       if (box) {
         map.fitBounds(box, fitPadding ?? defaultFitPadding());
       }
@@ -218,9 +241,10 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
     return () => {
       for (const marker of markers) marker.map = null;
       for (const polyline of polylines) polyline.setMap(null);
+      circle?.setMap(null);
       stopMarkers.clear();
     };
-  }, [ready, hosts, route, rings, fitKey, fitPadding]);
+  }, [ready, hosts, route, rings, areaLat, areaLng, areaRadius, fitKey, fitPadding]);
 
   // Sélection : marqueur au-dessus des autres ; recentrage sans changer le zoom quand elle change.
   useEffect(() => {

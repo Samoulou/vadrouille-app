@@ -19,7 +19,8 @@ import {
   type Decision,
   type Gesture,
 } from "@/features/presentation/deck";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 import { releaseVelocity, type PointerSample } from "@/lib/pointer";
 import { cn } from "@/lib/utils";
