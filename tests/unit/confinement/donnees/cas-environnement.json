@@ -347,6 +347,129 @@
       "chemin": "tests/unit/x.test.ts",
       "source": "import { it } from \"vitest\";\nit(\"x\", () => process.cwd());",
       "attendu": "admis"
+    },
+    {
+      "id": "env-b1-admis-01",
+      "chemin": "db/connection.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-b1-admis-02",
+      "chemin": "db/connection.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_AUTH;",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-b1-admis-03",
+      "chemin": "db/migrate.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_MIGRATOR;",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-b1-refus-01",
+      "chemin": "db/index.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-02",
+      "chemin": "db/schema/x.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-03",
+      "chemin": "tests/db/env.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-04",
+      "chemin": "db/connection.test.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-05",
+      "chemin": "db/connection.mts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-06",
+      "chemin": "db/connection/index.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-07",
+      "chemin": "src/db/connection.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-08",
+      "chemin": "tests/db/connection.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-09",
+      "chemin": "db/migrate.test.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_MIGRATOR;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-10",
+      "chemin": "db/migrations/migrate.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_MIGRATOR;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-11",
+      "chemin": "scripts/migrate.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_MIGRATOR;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-b1-refus-12",
+      "chemin": "db/connection.ts",
+      "source": "export const v = process.env.OPENROUTER_API_KEY;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-b1-refus-13",
+      "chemin": "db/connection.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL_MIGRATOR;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-b1-refus-14",
+      "chemin": "db/migrate.ts",
+      "source": "export const v = process.env.VADROUILLE_DATABASE_URL;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-b1-refus-15",
+      "chemin": "db/migrate.ts",
+      "source": "export const v = process.env.GOOGLE_MAPS_SERVER_KEY;",
+      "attendu": "refus",
+      "regle": "environnement"
     }
   ]
 }

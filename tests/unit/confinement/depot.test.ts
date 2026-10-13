@@ -23,7 +23,7 @@ import { verifierFermeture } from "./graphe";
 import { LIGNES_CAPACITE, LIGNES_CAPACITE_TEXTES, type LigneCapacite } from "./listes/capacites";
 import { FORMES_NOMINATIVES_TESTS } from "./listes/formes-tests";
 import { CONSTRUITS, PAQUETS } from "./listes/paquets";
-import { ENV_ENTIER, LECTURES_ENV, PARAMETRES_ENV, PROPRIETES_PROCESS } from "./listes/process";
+import { ENV_ENTIER, LECTURES_ENV_SECRETES, LECTURES_ENV_TOUTES, PARAMETRES_ENV, PROPRIETES_PROCESS } from "./listes/process";
 import { SPECIFICATEURS, SPECIFICATEURS_NOMINATIFS } from "./listes/specificateurs";
 import { construireProgramme } from "./programme";
 
@@ -33,6 +33,8 @@ import { construireProgramme } from "./programme";
  */
 
 const LIGNES: readonly LigneCapacite[] = [...LIGNES_CAPACITE, ...LIGNES_CAPACITE_TEXTES];
+/** Lectures de `process.env` : lignes des listes `.ts` et lignes de noms secrets lues dans les données du régime. */
+const LECTURES_ENV = LECTURES_ENV_TOUTES;
 /**
  * Fichiers des tableaux de la section 3 (exceptions de `40b6738`, lignes du régime lui-même) et de la section 9
  * (`scripts/p0/enregistrer.mjs`) : seules lignes admises sans champ `ecart` (mineur 4 de la revue du head `eb7e3bf`).
@@ -186,6 +188,45 @@ describe("confinement: dépôt", () => {
     expect(fautes).toEqual([]);
   });
 
+  // Revue du head a89d9a5 (PR 244, mineur 2) : les lignes de noms secrets sont lues par simple conversion de type.
+  it("confinement: forme des lignes lues dans donnees/lectures-env-secretes.json (contrôle d'exécution)", () => {
+    const fautes: string[] = [];
+    for (const l of LECTURES_ENV_SECRETES as readonly unknown[]) {
+      const x = l as Record<string, unknown>;
+      const noms = x.noms;
+      const ok =
+        typeof x.fichier === "string" &&
+        Array.isArray(noms) &&
+        noms.length > 0 &&
+        noms.every((n: unknown) => typeof n === "string" && /^[A-Z][A-Z0-9_]*$/.test(n)) &&
+        new Set(noms).size === noms.length &&
+        typeof x.motif === "string" &&
+        x.motif.trim() !== "" &&
+        x.constante === undefined &&
+        Object.keys(x).every((k) => ["fichier", "noms", "motif"].includes(k));
+      if (!ok) fautes.push(JSON.stringify(l).slice(0, 120));
+    }
+    expect(fautes).toEqual([]);
+    expect(LECTURES_ENV_SECRETES.length).toBeGreaterThan(0);
+  });
+
+  // Revue du head a89d9a5 (PR 244, mineur 7, Sécurité) : db/migrate.ts exporte la lecture de la variable de
+  // vadrouille_migrator ; hors de pnpm db:migrate, seuls des fichiers de tests/ peuvent l'importer.
+  it("confinement: seuls des fichiers de tests/ importent db/migrate.ts", () => {
+    expect(resultats.some((r) => r.fichier === "db/migrate.ts")).toBe(true);
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "db/migrate.ts")).map((r) => r.fichier);
+    expect(importeurs.length).toBeGreaterThan(0);
+    expect(importeurs.filter((f) => !f.startsWith("tests/"))).toEqual([]);
+  });
+
+  // Revue du head a89d9a5 (PR 244, mineur 8, Sécurité) : `uniqueKeyName` assemble des noms en `_key` ; il reste borné
+  // aux noms de contraintes du schéma.
+  it("confinement: seuls des fichiers de db/schema/ importent db/schema/naming.ts", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "db/schema/naming.ts")).map((r) => r.fichier);
+    expect(importeurs.length).toBeGreaterThan(0);
+    expect(importeurs.filter((f) => !f.startsWith("db/schema/"))).toEqual([]);
+  });
+
   it("confinement: fonctions qui reçoivent process.env entier (section 5, forme 2)", () => {
     const fonctions = new Set(resultats.flatMap((r) => r.fonctionsEnv));
     const passages = constats.filter((c) => c.regle === "environnement" && c.capacite === "entier" && c.forme.startsWith("argument:"));
@@ -252,6 +293,8 @@ describe("confinement: noms secrets dans les listes (section 5 ; bloquant 3 de l
   it("aucun nom de LECTURES_ENV ni de table de vi.stubEnv n'est secret hors de src/server/env/", () => {
     const tables = FORMES_NOMINATIVES_TESTS.filter((f) => f.forme === "stubEnv-table");
     expect(nomsSecretsDesListes(LECTURES_ENV, tables)).toEqual([]);
+    // Les données de noms secrets ne portent que des noms secrets ; tout autre nom reste dans les listes `.ts`.
+    expect(LECTURES_ENV_SECRETES.flatMap((l) => l.noms.filter((nom) => !estNomSecret(nom)).map((nom) => `${l.fichier} : ${nom}`))).toEqual([]);
   });
 
   it("seule exception : les vi.stubEnv de VARIABLES_DE_CLE de cli.test.ts (0040 D1)", () => {

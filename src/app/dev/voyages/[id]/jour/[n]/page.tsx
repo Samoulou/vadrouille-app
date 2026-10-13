@@ -19,5 +19,5 @@ export async function generateMetadata({ params, searchParams }: { params: Param
 export default async function DevJourneePage({ params }: { params: Params }) {
   if (!devPagesEnabled()) notFound();
   const { id, n } = await params;
-  return <JourneeScreen tripId={id} n={n} />;
+  return <JourneeScreen tripId={id} n={n} recorderKind="console" />;
 }

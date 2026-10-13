@@ -1,11 +1,12 @@
 "use client";
 
-import { useId, useRef, type KeyboardEvent, type Ref } from "react";
+import { useId, type Ref } from "react";
 
 import { messages } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 import { IconCoche } from "./icons";
+import { useRadioGroup } from "./useRadioGroup";
 
 export interface SegmentedOption<T extends string> {
   value: T;
@@ -44,11 +45,9 @@ export interface SegmentedControlProps<T extends string> {
   className?: string;
 }
 
-const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown"]);
-const PREVIOUS_KEYS = new Set(["ArrowLeft", "ArrowUp"]);
-
 /**
- * Choix exclusif (radiogroup) : un seul arrêt de tabulation, les flèches changent d'option.
+ * Choix exclusif (radiogroup) : un seul arrêt de tabulation, les flèches changent d'option (logique clavier de
+ * `useRadioGroup`, décision 0019 § 1.2).
  * Rendu décidé par UX/UI (décision 0012, Q13) : rail `muted`, option choisie en aplat `line`.
  * Option déduite choisie (0018 § 16 avec 0012) : fond `raised`, contour pointillé `ink`, texte `ink` 700,
  * coche de 20 px en `ink` ; la mention « déduit de ton récit » décrit le groupe (`aria-describedby`).
@@ -69,38 +68,20 @@ export function SegmentedControl<T extends string>({
   groupRef,
   className,
 }: SegmentedControlProps<T>) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const inferredId = useId();
   const selectedIndex = options.findIndex((option) => option.value === value);
   // Sans option choisie, la première reste atteignable au clavier.
-  const tabStop = selectedIndex === -1 ? 0 : selectedIndex;
+  const radio = useRadioGroup({
+    count: options.length,
+    selectedIndex,
+    onSelect: (index) => {
+      const option = options[index];
+      if (option) onChange(option.value);
+    },
+  });
   const inferred = inferredValue !== undefined && value === inferredValue;
   const description = [inferred ? inferredId : undefined, describedBy].filter(Boolean).join(" ") || undefined;
   const vertical = orientation === "vertical";
-
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let target: number;
-    if (NEXT_KEYS.has(event.key)) {
-      target = (index + 1) % options.length;
-    } else if (PREVIOUS_KEYS.has(event.key)) {
-      target = (index - 1 + options.length) % options.length;
-    } else if (event.key === "Home") {
-      target = 0;
-    } else if (event.key === "End") {
-      target = options.length - 1;
-    } else {
-      return;
-    }
-    event.preventDefault();
-    const option = options[target];
-    if (!option) {
-      return;
-    }
-    refs.current[target]?.focus();
-    if (option.value !== value) {
-      onChange(option.value);
-    }
-  }
 
   return (
     <div
@@ -128,20 +109,14 @@ export function SegmentedControl<T extends string>({
         return (
           <button
             key={option.value}
-            ref={(element) => {
-              refs.current[index] = element;
-            }}
+            ref={radio.itemRef(index)}
             type="button"
             role="radio"
             aria-checked={checked}
             data-inferred={marked || undefined}
-            tabIndex={index === tabStop ? 0 : -1}
-            onClick={() => {
-              if (!checked) {
-                onChange(option.value);
-              }
-            }}
-            onKeyDown={(event) => handleKeyDown(event, index)}
+            tabIndex={index === radio.tabStop ? 0 : -1}
+            onClick={() => radio.onActivate(index)}
+            onKeyDown={(event) => radio.onKeyDown(event, index)}
             className={cn(
               "inline-flex min-h-(--touch-target) cursor-pointer items-center gap-1 rounded-control text-corps",
               vertical ? "w-full justify-start px-4 text-left" : "flex-1 justify-center px-3",

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { PreferenceReasonSchema } from "./deck";
-import { ChangeSchema, DaySchema, StopSchema } from "./trip";
+import { ChangeSchema, DaySchema, StopSchema, TimeSchema } from "./trip";
 import { WISH_MAX_LENGTH } from "./values";
 
 /**
@@ -26,6 +26,36 @@ export const ReplacementRequestSchema = z.strictObject({
   baseVersion: z.number().int().nonnegative(),
 });
 export type ReplacementRequest = z.infer<typeof ReplacementRequestSchema>;
+
+/**
+ * Demande de déplacement (0016 § 4.1, F7b) : l'étape et le point d'insertion choisi parmi ceux de `MoveOptions`.
+ * Ni nom, ni `placeId`, ni heure saisie : le point est un identifiant opaque.
+ */
+export const MoveRequestSchema = z.strictObject({
+  stopId: IdSchema,
+  pointId: IdSchema,
+  baseVersion: z.number().int().nonnegative(),
+});
+export type MoveRequest = z.infer<typeof MoveRequestSchema>;
+
+/** Point d'insertion d'un jour : identifiant opaque et heure d'arrivée (« Placer ici, vers {heure} »). */
+const MovePointSchema = z.strictObject({ id: IdSchema, time: TimeSchema });
+
+/**
+ * Jours et points d'insertion possibles pour déplacer une étape (0016 § 4.3, F7b) : un jour sans point est
+ * « complet ». Lus une fois à l'ouverture de la feuille « Déplacer » (décision 0019 § 1.2).
+ */
+export const MoveOptionsSchema = z.strictObject({
+  stopId: IdSchema,
+  days: z
+    .array(z.strictObject({ index: z.number().int().positive(), points: z.array(MovePointSchema) }))
+    .refine((days) => new Set(days.map((day) => day.index)).size === days.length, { message: "days : jours distincts" })
+    .refine((days) => {
+      const ids = days.flatMap((day) => day.points.map((point) => point.id));
+      return new Set(ids).size === ids.length;
+    }, { message: "points : identifiants distincts" }),
+});
+export type MoveOptions = z.infer<typeof MoveOptionsSchema>;
 
 interface DraftShape {
   days: readonly { index: number; items: readonly ({ type: "stop"; stop: { id: string; commitment?: unknown } } | { type: string })[] }[];
@@ -78,14 +108,33 @@ const ReplacementDraftBaseSchema = z.strictObject({
 export const ReplacementDraftSchema = ReplacementDraftBaseSchema.superRefine(refineDraft);
 export type ReplacementDraft = z.infer<typeof ReplacementDraftSchema>;
 
+/** Champs d'un brouillon de déplacement (F7b) : jours de départ et d'arrivée, sans proposition. */
+const MoveDraftBaseSchema = z.strictObject({
+  /** Brouillons complets des jours touchés (jour d'origine et jour d'arrivée). */
+  days: z.array(DaySchema).min(1),
+  changes: z.array(ChangeSchema),
+  changedStopIds: z.array(IdSchema),
+  /** Étape déplacée : reçoit le focus après « Appliquer » (F7-PO-1). */
+  targetStopId: IdSchema,
+});
+
+/** Brouillon de déplacement du jeu simulé (0016 § 6) : un aperçu sans `id` ni `baseVersion`. */
+export const MoveDraftSchema = MoveDraftBaseSchema.superRefine(refineDraft);
+export type MoveDraft = z.infer<typeof MoveDraftSchema>;
+
 /**
  * Aperçu d'une révision (`ReplacementPreview` du handover = variante `replace`), union discriminée sur `kind`
- * (0016 § 4.2). F7b et F7c ajoutent les variantes `move` et `add`.
+ * (0016 § 4.2). F7b ajoute `move` ; F7c ajoutera `add`.
  */
 export const RevisionPreviewSchema = z
   .discriminatedUnion("kind", [
     ReplacementDraftBaseSchema.extend({
       kind: z.literal("replace"),
+      id: IdSchema,
+      baseVersion: z.number().int().nonnegative(),
+    }),
+    MoveDraftBaseSchema.extend({
+      kind: z.literal("move"),
       id: IdSchema,
       baseVersion: z.number().int().nonnegative(),
     }),
@@ -102,14 +151,41 @@ export const ReplacementFixtureSchema = z.strictObject({
 export type ReplacementFixture = z.infer<typeof ReplacementFixtureSchema>;
 
 /**
+ * Déplacement d'une étape du jeu simulé (F7b) : ses options (jours et points) et un brouillon par point. Un point
+ * sans brouillon répond « aucune option compatible » (phase 0, sans moteur).
+ */
+export const MoveFixtureSchema = z
+  .strictObject({
+    options: MoveOptionsSchema,
+    drafts: z.array(z.strictObject({ pointId: IdSchema, draft: MoveDraftSchema })),
+  })
+  .superRefine((fixture, ctx) => {
+    const points = new Set(fixture.options.days.flatMap((day) => day.points.map((point) => point.id)));
+    const seen = new Set<string>();
+    fixture.drafts.forEach((entry, index) => {
+      if (!points.has(entry.pointId)) ctx.addIssue({ code: "custom", message: "pointId : point absent des options", path: ["drafts", index, "pointId"] });
+      if (seen.has(entry.pointId)) ctx.addIssue({ code: "custom", message: "un brouillon par point", path: ["drafts", index, "pointId"] });
+      seen.add(entry.pointId);
+      if (entry.draft.targetStopId !== fixture.options.stopId) {
+        ctx.addIssue({ code: "custom", message: "targetStopId : l'étape déplacée", path: ["drafts", index, "draft", "targetStopId"] });
+      }
+    });
+  });
+export type MoveFixture = z.infer<typeof MoveFixtureSchema>;
+
+/**
  * Jeu simulé de révision d'un voyage (0016 § 6), lu par `getRevisionFixtures` (adaptateur `mock` seulement) :
- * brouillons de remplacement par étape. F7b et F7c y ajoutent options de déplacement, index de recherche et
- * brouillons d'ajout. B11 le remplace par les Server Actions.
+ * brouillons de remplacement par étape, options et brouillons de déplacement par étape (F7b). F7c y ajoutera index
+ * de recherche et brouillons d'ajout. B11 le remplace par les Server Actions.
  */
 export const RevisionFixturesSchema = z.strictObject({
   replacements: z.array(ReplacementFixtureSchema).refine(
     (fixtures) => new Set(fixtures.map((fixture) => fixture.stopId)).size === fixtures.length,
     { message: "un brouillon de remplacement par étape" },
+  ),
+  moves: z.array(MoveFixtureSchema).refine(
+    (fixtures) => new Set(fixtures.map((fixture) => fixture.options.stopId)).size === fixtures.length,
+    { message: "un jeu de déplacement par étape" },
   ),
 });
 export type RevisionFixtures = z.infer<typeof RevisionFixturesSchema>;

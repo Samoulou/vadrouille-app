@@ -219,8 +219,10 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `ReplacementFixture` | Brouillon de remplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7a ; remplacé par B11 |
 | `RevisionFixtures` | Jeu simulé de révision d'un voyage, lu par `getRevisionFixtures` (adaptateur `mock`, 0016 § 6) ; F7b et F7c le complètent | F7a ; remplacé par B11 |
 | `RevisionError` | Codes d'écran de la révision (0016 § 4.4), convertis depuis `ApiError` par l'adaptateur `api` | F7a |
-| `MoveRequest` | Déplacement d'une étape vers un point d'insertion (0016 § 4.1) | F7b |
-| `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b |
+| `MoveRequest` | Déplacement d'une étape vers un point d'insertion (0016 § 4.1) | F7b ; complété par B11 |
+| `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b ; complété par B11 |
+| `MoveDraft` | Brouillon simulé de déplacement : aperçu sans identifiant ni version (0016 § 6), phase 0 | F7b ; remplacé par le moteur en B11 |
+| `MoveFixture` | Options et brouillons de déplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7b ; remplacé par B11 |
 | `AddRequest` | Ajout d'un lieu : source opaque, nom saisi, moment (0016 § 4.1) | F7c |
 | `AddMoment` | Moment d'un ajout : temps libre ou repas laissé vide (0016 § 4.3) | F7c |
 | `PlaceSearchResult` | Résultat de recherche : `resultId`, `placeId`, nom chargé à la demande et jamais recopié dans `Stop.name`, moments (0016 § 4.3) | F7c ; complété par B11 |

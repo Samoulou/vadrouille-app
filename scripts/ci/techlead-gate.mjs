@@ -54,7 +54,7 @@ export function classifyFiles(files) {
 export function readFileList(bytes) {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   const files = text.split("\0");
-  if (files[files.length - 1] === "") files.pop();
+  if (files.at(-1) === "") files.pop();
   return files;
 }
 
@@ -121,9 +121,10 @@ export function evaluateOwnerApproval({
 /**
  * Identifiant `<mode> <objet>` du contenu `.github/workflows` du commit `sha`, ou `absent`.
  * Lève une erreur si le commit est absent du clone.
+ * L'environnement de `git` est restreint à `PATH`, `HOME` et `GIT_LITERAL_PATHSPECS` (0040 D2, A8).
  */
 export function workflowsTreeId({ sha, cwd }) {
-  const env = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME, GIT_LITERAL_PATHSPECS: "1" };
   if (typeof sha !== "string" || !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha)) {
     throw new Error(`sha invalide : ${String(sha)}`);
   }

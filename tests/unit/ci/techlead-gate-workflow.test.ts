@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { workflowsTreeId } from "../../../scripts/ci/techlead-gate.mjs";
 
@@ -49,6 +49,7 @@ const LIST_FILES = runScript("Lister les fichiers de la PR");
 
 const roots: string[] = [];
 afterEach(() => {
+  vi.unstubAllEnvs();
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -231,6 +232,23 @@ describe("workflowsTreeId", () => {
   it("erreur pour un sha absent du dépôt (et non « absent »)", () => {
     const { ws } = setup();
     expect(() => workflowsTreeId({ sha: "9".repeat(40), cwd: ws })).toThrow();
+  });
+
+  it("ignore les variables Git de l'environnement du processus (0040 A8)", () => {
+    const { ws, git, write, commit } = setup();
+    write(".github/workflows/b.yml", "on: pull_request\n");
+    commit("b");
+    const sha = git("rev-parse", "HEAD");
+    const reference = workflowsTreeId({ sha, cwd: ws });
+    const vide = mkdtempSync(join(tmpdir(), "techlead-gate-git-dir-"));
+    roots.push(vide);
+    // Sous GIT_DIR posé, ni l'assistant `git` ni `tree()` sans argument : ils lèveraient aussi.
+    vi.stubEnv("GIT_DIR", vide);
+    let resultat: string | undefined;
+    expect(() => {
+      resultat = workflowsTreeId({ sha, cwd: ws });
+    }).not.toThrow();
+    expect(resultat).toBe(reference);
   });
 });
 

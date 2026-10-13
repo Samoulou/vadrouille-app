@@ -3,6 +3,8 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { boolean, check, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
+import { uniqueKeyName } from "./naming.ts";
+
 /**
  * Tables d'authentification, d'organisation et du limiteur (handover § 6 et § 7, décisions 0007 et 0008).
  * B1 les crée avec les colonnes du handover ; B3 relie Better Auth à ces tables et ajoute par migration ce que la
@@ -16,7 +18,7 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 /** Exception à `organization_id` : une personne peut appartenir à plusieurs organisations. */
 export const users = pgTable("users", {
   id: id(),
-  email: text("email").notNull().unique("users_email_key"),
+  email: text("email").notNull().unique(uniqueKeyName("users_email")),
   emailVerified: boolean("email_verified").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -28,7 +30,7 @@ export const organizations = pgTable(
   {
     id: id(),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique("organizations_slug_key"),
+    slug: text("slug").notNull().unique(uniqueKeyName("organizations_slug")),
     kind: text("kind").notNull(),
     deletionRequestedAt: timestamp("deletion_requested_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -44,7 +46,7 @@ export const sessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    token: text("token").notNull().unique("sessions_token_key"),
+    token: text("token").notNull().unique(uniqueKeyName("sessions", "token")),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     activeOrganizationId: uuid("active_organization_id").references(() => organizations.id),
     createdAt: createdAt(),
@@ -95,7 +97,7 @@ export const memberships = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    unique("memberships_organization_id_user_id_key").on(t.organizationId, t.userId),
+    unique(uniqueKeyName("memberships_organization_id_user_id")).on(t.organizationId, t.userId),
     uniqueIndex("memberships_one_owner_idx").on(t.organizationId).where(sql`${t.role} = 'owner'`),
     index("memberships_user_id_idx").on(t.userId),
     check("memberships_role_check", sql`${t.role} IN ('owner', 'member')`),

@@ -77,6 +77,10 @@ export type { PreviewSlot } from "./preview";
 export { ADDED_STOP_NAME_MAX, PatchResultSchema, TripPatchOperationSchema, TripPatchSchema } from "./patch";
 export type { PatchResult, TripPatch, TripPatchOperation } from "./patch";
 export {
+  MoveDraftSchema,
+  MoveFixtureSchema,
+  MoveOptionsSchema,
+  MoveRequestSchema,
   ReplacementDraftSchema,
   ReplacementFixtureSchema,
   ReplacementRequestSchema,
@@ -85,6 +89,10 @@ export {
 } from "./revision";
 export type {
   ApplyResult,
+  MoveDraft,
+  MoveFixture,
+  MoveOptions,
+  MoveRequest,
   ReplacementDraft,
   ReplacementFixture,
   ReplacementRequest,

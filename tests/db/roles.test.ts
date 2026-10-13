@@ -1,7 +1,6 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, PURGED_TABLES, seedOrganization } from "./helpers";
+import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, seedOrganization } from "./helpers";
 
 /** Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1. */
 
@@ -20,6 +19,8 @@ const ROLES = {
   vadrouille_fn_coords: false,
   vadrouille_fn_purge: false,
 } as const;
+/** Attribut LOGIN attendu par rôle, lu par `Map` (clé venue de la base : aucun accès calculé, spécification P0c, 2.6). */
+const LOGIN_BY_ROLE = new Map<string, boolean>(Object.entries(ROLES));
 const FN_ROLES = Object.keys(ROLES).filter((role) => role.startsWith("vadrouille_fn_"));
 const APPLICATIVE_ROLES = ["vadrouille_app", "vadrouille_auth", "vadrouille_share", "vadrouille_webhook", "vadrouille_account_admin", "vadrouille_limiter"];
 const SHARED_VIEWS = ["shared_checklist", "shared_trip", "shared_trip_version"];
@@ -102,7 +103,7 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
   },
 };
 
-let app: pg.Client;
+let app: DbClient;
 let tables: string[];
 let seededOrg: string;
 
@@ -143,7 +144,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
         rolcreaterole: false,
         rolcreatedb: false,
         rolreplication: false,
-        rolcanlogin: ROLES[row.rolname as keyof typeof ROLES],
+        rolcanlogin: LOGIN_BY_ROLE.get(row.rolname),
       });
     }
   });
@@ -323,6 +324,7 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
     checkout_organization: { owner: "vadrouille_fn_checkout", execute: ["vadrouille_webhook"] },
     purge_organization_data: { owner: "vadrouille_fn_purge", execute: ["vadrouille_account_admin"] },
   } as const;
+  const EXPECTED_BY_NAME = new Map<string, (typeof EXPECTED)[keyof typeof EXPECTED]>(Object.entries(EXPECTED));
 
   it("seules les trois fonctions prévues sont SECURITY DEFINER, avec search_path fixé, leur propriétaire vadrouille_fn_* et EXECUTE nominatif", async () => {
     const { rows } = await app.query(
@@ -336,7 +338,8 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
     );
     expect(rows.map((r) => r.proname).sort()).toEqual(Object.keys(EXPECTED).sort());
     for (const row of rows) {
-      const expected = EXPECTED[row.proname as keyof typeof EXPECTED];
+      const expected = EXPECTED_BY_NAME.get(row.proname);
+      if (!expected) throw new Error(`fonction inattendue : ${row.proname}`);
       expect(row.proconfig, row.proname).toContain("search_path=pg_catalog, pg_temp");
       expect(row.owner, row.proname).toBe(expected.owner);
       expect(row.execute, row.proname).toEqual([...expected.execute]);

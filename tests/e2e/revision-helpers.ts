@@ -29,3 +29,28 @@ export async function askProposal(page: Page, reason: string, wish?: string): Pr
   await expect(proposalTitle(page)).toBeFocused();
   return proposalTitle(page);
 }
+
+// --- F7b : feuille « Déplacer » ---------------------------------------------------------------------------------
+
+export const JARDIN = "j2-jardin-botanique";
+export const FICHE_JARDIN = `/voyages/${TRIP}/jour/2?etape=${JARDIN}`;
+export const DEV_FICHE_JARDIN = `/dev${FICHE_JARDIN}`;
+
+export const moveSheet = (page: Page) => page.getByRole("dialog");
+export const moveDays = (page: Page) => moveSheet(page).getByRole("radiogroup", { name: "Vers quel jour ?" });
+export const placeHere = (page: Page, time: string) => moveSheet(page).getByRole("button", { name: `Placer ici, vers ${time}` });
+export const moveButton = (page: Page) => page.getByRole("region", { name: "Fiche étape", exact: true }).getByRole("button", { name: "Déplacer" });
+
+/** Ouvre la feuille « Déplacer » depuis la fiche affichée et attend les jours chargés. */
+export async function openMoveSheet(page: Page) {
+  await moveButton(page).click();
+  await expect(moveSheet(page).getByRole("heading", { level: 2 })).toBeFocused();
+  await expect(moveDays(page).getByRole("radio", { name: "Jour 3, complet" })).toHaveAttribute("aria-disabled", "true");
+}
+
+/** Feuille ouverte : choisit J4 et le point de 15:45, attend l'aperçu (focus sur « Ce qui change »). */
+export async function previewMoveToJ4(page: Page) {
+  await moveDays(page).getByRole("radio", { name: "Jour 4", exact: true }).click();
+  await placeHere(page, "15:45").click();
+  await expect(moveSheet(page).getByRole("heading", { level: 3, name: "Ce qui change" })).toBeFocused();
+}

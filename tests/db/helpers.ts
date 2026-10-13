@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { expect } from "vitest";
 
-import { DB_ENV } from "./env";
+import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl } from "./env";
 
 /**
  * Outils des tests de base (`pnpm test:db`, spécification B1). Chaque test se connecte avec le rôle qu'il éprouve ;
@@ -11,21 +11,16 @@ import { DB_ENV } from "./env";
  * conteneur en CI) ne sert qu'à prouver un refus : garde de connexion, déclencheurs d'ajout seulement.
  */
 
-export { DB_ENV };
+export { BOOTSTRAP_ROLE, DB_ENV, type Login };
 
-export type Login = keyof typeof DB_ENV;
+/** Client de `pg` des tests de base : seul ce fichier et le préalable importent `pg` (lignes de capacité de P0c). */
+export type DbClient = pg.Client;
 
 export function urlFor(login: Login): string {
-  const value = process.env[DB_ENV[login]];
+  const value = readUrl(login);
   if (!value) throw new Error(`variable ${DB_ENV[login]} absente (voir tests/db/global-setup.ts)`);
   return value;
 }
-
-/**
- * Rôle d'amorçage nommé dans le test `rôles` (décision 0036, B1-TL-2 ; variable `VADROUILLE_DB_BOOTSTRAP_ROLE`) :
- * superutilisateur `postgres` du conteneur en CI, qui ne reçoit pas de ligne ADMIN. Sa ligne est tolérée, non exigée.
- */
-export const BOOTSTRAP_ROLE = process.env.VADROUILLE_DB_BOOTSTRAP_ROLE ?? "postgres";
 
 const open: pg.Client[] = [];
 

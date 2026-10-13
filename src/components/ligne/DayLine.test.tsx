@@ -371,3 +371,31 @@ describe("DayLine : surlignage après « Appliquer » (F7a, handover § 7)", () 
     expect(container.querySelector(".transition-colors")).toBeNull();
   });
 });
+
+describe("DayLine : lignes insérées (F7b, points « Placer ici »)", () => {
+  it("rendues après l'élément de leur rang, rail du temps libre après un temps libre, plein sinon ; sans la prop, rien", () => {
+    const items = [
+      { type: "terminus" as const, role: "start" as const, time: "09:00", label: "[Hôtel]" },
+      { type: "free" as const, from: "09:00", to: "12:00" },
+      { type: "terminus" as const, role: "end" as const, time: "12:00", label: "[Hôtel]" },
+    ];
+    const { container, rerender } = render(
+      <DayLine
+        items={items}
+        compact
+        insertions={[
+          { afterIndex: 1, key: "a", content: <button type="button">A</button> },
+          { afterIndex: 0, key: "b", content: <button type="button">B</button> },
+        ]}
+      />,
+    );
+    const rows = Array.from(container.querySelectorAll("ol > li")).map((li) => li.getAttribute("data-type"));
+    expect(rows).toEqual(["terminus", "insertion", "free", "insertion", "terminus"]);
+    const inserted = container.querySelectorAll("li[data-type='insertion']");
+    expect(inserted[0]).toHaveTextContent("B");
+    expect(inserted[0]!.querySelector("[data-rail]")).toHaveAttribute("data-rail", "plein");
+    expect(inserted[1]!.querySelector("[data-rail]")).toHaveAttribute("data-rail", "libre");
+    rerender(<DayLine items={items} compact />);
+    expect(container.querySelectorAll("li[data-type='insertion']")).toHaveLength(0);
+  });
+});

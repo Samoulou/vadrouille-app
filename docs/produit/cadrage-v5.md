@@ -247,6 +247,8 @@ Premier objectif : trouver des personnes ayant un voyage réel à préparer. Les
 
 **Seuils G0, à confirmer avant le pilote :** 30 prospects voyageurs contactés, au moins 10 échanges approfondis, au moins 5 achats ou préventes payés dont au moins 3 hors cercle proche. Côté agences, information sans condition de passage : nombre d'agences prêtes à un essai. Si l'offre ne se vend pas, modifier cible, promesse ou prix avant d'ajouter des fonctionnalités.
 
+**Amendé par Samuel le 2026-10-13 (décisions 0043 et 0044) :** produit purement numérique pour les particuliers, sans entretien ni pilote assisté ; seuils commerciaux de G0 : 300 visites de la page de prévente, 10 réponses au questionnaire en ligne, au moins 5 achats ou préventes payés dont au moins 3 hors cercle proche. Le volet agences est reporté.
+
 ## 6. Architecture
 
 ### 6.1 Exigences qui pilotent l'architecture
