@@ -22,7 +22,7 @@ Les valeurs entre crochets attendent Samuel : [DATE D'OUVERTURE] et la règle de
 - **Bouton principal** : Précommander pour 29 CHF (ancre vers la section 6 ; écart au § 10 déclaré plus haut, proposition)
 
 ## 2. Ce que fait Vadrouille
-- **Titre (h2)** : Un programme que tu peux vraiment suivre
+- **Titre (h2)** : Un programme pensé pour être suivi
 - Tu racontes ton voyage en quelques phrases : dates, logement, envies, rythme.
 - Vadrouille cherche le meilleur de la destination et l'organise jour par jour : visites, repas, soirées, temps libre.
 - Tu tries les propositions : J'aime ou Pas pour moi. Le programme s'ajuste.
@@ -32,10 +32,10 @@ Les valeurs entre crochets attendent Samuel : [DATE D'OUVERTURE] et la règle de
 
 ## 3. Ce que Vadrouille vise
 - **Titre (h2)** : Ce que Vadrouille cherche à garantir
-- **Fiable** : chaque lieu est contrôlé avant d'apparaître. Horaires et dates portent leur source et leur date. Ce qui reste incertain est marqué « À confirmer ».
-- **Choisi** : chaque adresse dit pourquoi elle est là pour toi, avec sa source.
-- **D'actualité** : les événements réellement prévus pendant tes dates. Un événement sans source relue reste « Non confirmé ».
-- **Adaptable** : tu changes une étape en quelques gestes, sans casser tes réservations ni tes horaires fixes.
+- **Fiable** : chaque lieu contrôlé avant d'apparaître ; horaires et dates avec leur source et leur date ; ce qui reste incertain marqué « À confirmer ».
+- **Choisi** : pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source.
+- **D'actualité** : les événements réellement prévus pendant tes dates ; un événement sans source relue marqué « Non confirmé ».
+- **Adaptable** : une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes.
 
 (Quatre points de différenciation : cadrage § 2. La section ne compare pas Vadrouille aux assistants généralistes : aucune affirmation sur eux sans source datée. Seul fait sourcé disponible : « Les planificateurs reconnaissent eux-mêmes qu'ils peuvent se tromper sur les détails et qu'un itinéraire IA reste un brouillon » (cadrage § 2, source [23], consultée le 6 octobre 2026) ; une comparaison directe n'entre sur la page qu'avec les écarts réellement relevés dans la démonstration (`demo-avant-apres.md`, déroulé, étape 6). Ces phrases décrivent l'objectif du produit, pas un résultat acquis : G0 n'est pas passé. La page ne promet donc ni « aucun lieu inventé » ni « aucun lieu fermé », et ne publie aucun chiffre de fiabilité.)
 
@@ -86,7 +86,7 @@ Les valeurs entre crochets attendent Samuel : [DATE D'OUVERTURE] et la règle de
 - **Vadrouille réserve-t-il à ma place ?**
   Non. Vadrouille te dit ce qui est « À réserver », avec le lien, et tu réserves toi-même.
 - **Comment les adresses sont-elles choisies ?**
-  Chaque lieu est contrôlé à partir de ses sources avant d'apparaître dans ton programme. Les horaires et les dates portent leur source et leur date ; ce qui reste incertain est marqué « À confirmer » ou « Non confirmé ». (objectif du produit, cadrage § 2 et § 3.2, pas un résultat acquis tant que G0 n'est pas passé ; formulation à aligner sur le produit livré)
+  C'est notre objectif : contrôler chaque lieu à partir de ses sources avant de l'afficher dans ton programme, donner pour les horaires et les dates leur source et leur date, et marquer « À confirmer » ou « Non confirmé » ce qui reste incertain. (objectif du produit, cadrage § 2 et § 3.2, pas un résultat acquis tant que G0 n'est pas passé ; formulation à aligner sur le produit livré)
 - **Quelqu'un relit-il mon programme ?**
   Non. Vadrouille est entièrement en libre-service : tout se fait dans l'application.
 - **Que devient ce que je saisis ?**
@@ -103,5 +103,5 @@ Les valeurs entre crochets attendent Samuel : [DATE D'OUVERTURE] et la règle de
 
 ## Mesure (pour la tâche frontend)
 - Compter chaque visite de la page sans donnée personnelle (décision 0044, « Conséquences » ; outil à proposer à Samuel s'il engage un compte externe). Définition d'une visite : `suivi.md`, « Ce qu'est une visite » (proposition, question 7).
-- Lire la provenance par un paramètre de lien par lieu de diffusion (`?src=forum`, `?src=instagram`, `?src=proches`…), sans cookie ni identifiant personnel ; liste des valeurs : `suivi.md`.
+- Lire la provenance par un paramètre de lien par lieu de diffusion (`?src=forum`, `?src=instagram`, `?src=proches`…), sans cookie ni identifiant personnel ; liste des valeurs : `suivi.md`. Le lien de test `?src=interne` (Samuel et le studio) est exclu de tous les comptes.
 - Réutiliser les événements `paywall_viewed`, `payment_started`, `payment_succeeded` (`docs/handovers/frontend.md` § 12), avec `price_variant`.

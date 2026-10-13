@@ -47,6 +47,9 @@ Valeur du paramètre `src` du lien (`page-prevente.md`, « Mesure »). La questi
 | `instagram-pub` (si test payé) | | | | |
 | `createur` | | | | |
 | sans `src` (direct ou inconnu) | | | | 0 |
+| `interne` (tests de Samuel et du studio) | exclu | exclu | exclu | exclu |
+
+`src=interne` est le lien de test de Samuel et du studio : ses visites, préventes et réponses sont exclues de tous les comptes (visites, préventes, hors cercle proche, réponses au questionnaire) ; la ligne reste vide.
 
 ## Questionnaire (cumul)
 - Période de voyage (question 2 du questionnaire) : Pâques · Ascension · Pentecôte · autre printemps · plus tard · pas de date.
@@ -60,6 +63,7 @@ Reprises du cadrage § 13 pour plus tard (hors G0 commercial) : taux de passage 
 **Proposition, non tranchée (question 7).** La décision 0044 ne définit pas « cercle proche » ; la définition et la règle de compte reviennent à Samuel (phases G0, « Qui décide quoi »). Proposition de définition : les personnes que Samuel connaît personnellement, et celles qui ont reçu le lien directement de lui ou de ses proches.
 
 Règle proposée, sans aucune vérification humaine ni donnée personnelle dans le dépôt. Un achat n'est compté **hors cercle proche** que si sa provenance est connue et n'est pas proche ; dans le doute, il est **indéterminé**, jamais hors cercle par défaut :
+0. **exclu** : un achat venu du lien de test `src=interne` (Samuel et le studio) n'entre dans aucun compte, ni proche, ni hors cercle, ni indéterminé ;
 1. **cercle proche** : achat venu d'un lien `src=proches` ; ou, si le rattachement au paiement est accepté (question 8), réponse « Je connais personnellement la personne qui crée Vadrouille » ou « Par un ami ou une amie » à la question 5 du questionnaire ;
 2. **hors cercle proche** : achat venu d'un lien `src` connu et non proche (`forum`, `groupe`, `reddit`, `instagram`, `instagram-pub`, `createur`), sans indice contraire (si le rattachement est accepté : aucune réponse « Je connais personnellement… » ni « Par un ami ou une amie ») ;
 3. **indéterminé** : tout le reste, notamment un achat sans `src` (lien direct ou transmis), ou des indices contradictoires. La question 5 du questionnaire étant facultative, une réponse absente ne fait jamais passer un achat hors cercle ;

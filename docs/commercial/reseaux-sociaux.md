@@ -46,20 +46,20 @@ Bilan à la fin de S4 dans `suivi.md` : visites par `src`, préventes, réponses
 (Remboursement : règle proposée, non tranchée, question 5 ; le marqueur est retiré seulement après la réponse de Samuel.)
 
 **P2 — Le problème** (image : un itinéraire généré, une ligne barrée)
-> Même les planificateurs par IA le disent : un itinéraire généré reste un brouillon. Dans notre test du [DATE DU TEST] sur Édimbourg, l'assistant généraliste a [écart relevé 1, par exemple placé un lieu fermé ce jour-là] et [écart relevé 2, par exemple oublié un trajet entre deux étapes]. Vadrouille part de là où ça casse.
+> Layla le reconnaît elle-même : un itinéraire généré reste un brouillon. Dans notre test du [DATE DU TEST] sur Édimbourg, l'assistant généraliste a [écart relevé 1, par exemple placé un lieu fermé ce jour-là] et [écart relevé 2, par exemple oublié un trajet entre deux étapes]. Vadrouille part de là où ça casse.
 
 (Conditionnelle : publiée seulement après la démonstration réelle (`demo-avant-apres.md`, déroulé, étapes 1 à 6), avec les seuls écarts réellement relevés et vérifiables ; sans écart vérifiable, P2 n'est pas publiée. Première phrase : cadrage § 2, source [23] (Layla, « limites des planificateurs IA »), consultée le 6 octobre 2026. « Un dîner réservé qui saute » n'est écrit que si la demande de remplacement de l'étape 3 du déroulé l'a réellement montré.)
 
 **P3 — Fiable** (capture : Fiche étape avec source et date)
-> Chaque lieu est contrôlé avant d'apparaître, avec sa source et sa date. Ce qui reste incertain est marqué « À confirmer ».
+> Notre objectif : contrôler chaque lieu avant de l'afficher, avec sa source et sa date, et marquer « À confirmer » ce qui reste incertain.
 
 (Objectif du produit, pas un résultat acquis : G0 n'est pas passé. Ne jamais écrire « aucun lieu inventé » ni « aucun lieu fermé ».)
 
 **P4 — Choisi** (capture : une proposition à trier)
-> Pas une liste de lieux bien notés : chaque adresse dit pourquoi elle est là pour toi. Tu tries : J'aime ou Pas pour moi.
+> Chaque adresse vient avec la raison pour laquelle elle est là pour toi. Tu tries : J'aime ou Pas pour moi.
 
 **P5 — D'actualité** (capture : bloc « Pendant ton séjour »)
-> Le concert, le marché, le festival qui ont lieu pendant tes dates, pas l'an dernier. Sans source relue, c'est « Non confirmé ».
+> Notre objectif : le concert, le marché, le festival prévus pendant tes dates. Un événement sans source relue reste « Non confirmé ».
 
 **P6 — Adaptable** (vidéo courte d'écran : Remplacer)
 > « Cette visite ne me tente pas, je préfère une dégustation, mais je garde mon restaurant à 19:00. » Remplacer, Appliquer. Le dîner ne bouge pas.

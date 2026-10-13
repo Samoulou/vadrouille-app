@@ -48,10 +48,10 @@ Tous les textes : tutoiement ou vouvoiement selon l'usage du lieu, pas de point 
 ### A. Forum (aide d'abord, lien seulement si autorisé)
 > Bonjour. [Réponse utile à la question posée, tirée d'un voyage vécu. Exemple du brief d'Édimbourg (cadrage § 2) : le Tattoo du samedi est à 21:30, prévoir le dîner avant ; la distillerie se rejoint en transports publics.]
 >
-> Transparence : je construis Vadrouille, un planificateur de voyages qui fait ce genre de programme jour par jour, avec les sources. Si le règlement le permet : [LIEN]
+> Transparence : je construis Vadrouille, un planificateur de voyages qui vise à faire ce genre de programme jour par jour, avec les sources. Si le règlement le permet : [LIEN]
 
 ### B. Groupe romand qui autorise les annonces
-> Bonjour à toutes et à tous. Je construis Vadrouille, un planificateur de voyages pour les séjours de 5 à 10 jours en Europe : tu racontes ton voyage, tu obtiens un programme jour par jour avec des adresses sourcées, les événements pendant tes dates, et tu remplaces une étape sans casser le reste.
+> Bonjour à toutes et à tous. Je construis Vadrouille, un planificateur de voyages pour les séjours de 5 à 10 jours en Europe. L'objectif : tu racontes ton voyage et tu obtiens un programme jour par jour avec des adresses sourcées, les événements pendant tes dates, et la possibilité de remplacer une étape sans casser le reste.
 >
 > Je lance une précommande pour les voyages de printemps (Pâques, Ascension, Pentecôte) : 29 CHF le voyage, remboursé si ce n'est pas prêt à temps [sous réserve question 5]. La démonstration est sur la page : [LIEN]
 >
@@ -60,7 +60,7 @@ Tous les textes : tutoiement ou vouvoiement selon l'usage du lieu, pas de point 
 (Prix : Q2 ; dates : cadrage § 5 ; remboursement : règle proposée, non tranchée, question 5 ; la mention entre crochets reste tant que Samuel n'a pas répondu.)
 
 ### C. Communauté Reddit (si autorisé, sinon dans le fil prévu)
-> Titre : Je construis un planificateur de voyages qui source chaque adresse : vos critiques avant le lancement
+> Titre : Je construis un planificateur de voyages qui vise à sourcer chaque adresse : vos critiques avant le lancement
 >
 > Le [DATE DU TEST], j'ai donné le récit d'un voyage que j'ai vraiment fait à Édimbourg à un assistant généraliste, et je l'ai comparé à [la démonstration de mon outil, sur des données simulées | le programme de mon outil]. Ce que j'ai relevé : [écarts réellement relevés]. La comparaison est ici : [LIEN]. Ce qui m'intéresse : est-ce que vous paieriez pour un outil qui vise à contrôler chaque lieu avant de l'afficher et à marquer « À confirmer » ce qui reste incertain, ou un assistant gratuit vous suffit-il ? Précommande ouverte pour le printemps, mais je cherche surtout des avis.
 
