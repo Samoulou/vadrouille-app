@@ -7,7 +7,7 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-export const MAX_AGE_DAYS = 7;
+export const MAX_AGE_DAYS = 2;
 // Nombre de PR fusionnées demandées par la requête.
 export const MERGED_LIMIT = 100;
 
