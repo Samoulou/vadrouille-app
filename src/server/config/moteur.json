@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "budgetTrajetParRythme": { "relaxed": 60, "balanced": 90, "intense": 150 },
+  "activitesParRythme": { "relaxed": 2, "balanced": 3, "intense": 4 },
+  "tempsLibreMinParRythme": { "relaxed": 120, "balanced": 60, "intense": 30 },
+  "fenetreJour": { "debut": "09:00", "fin": "22:30" },
+  "repas": {
+    "lunch": { "auPlusTot": "12:00", "auPlusTard": "14:00" },
+    "dinner": { "auPlusTot": "18:30", "auPlusTard": "20:45" }
+  },
+  "debutSoiree": "20:30",
+  "dureesParDefaut": { "activity": 90, "lunch": 75, "dinner": 90, "evening": 90 },
+  "margeMinutes": 5,
+  "seuilTempsLibreMinutes": 30
+}

@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { IMPORTS_DOMAINE, sourcesDomaine } from "../lint/domaine-cas-communs";
+
 /**
  * `p0: aucun client réel ni accès réseau dans le code de P0a1` — liste d'autorisation des imports (décision 0032,
  * A3.2), contrôlée sur l'arbre syntaxique de chaque fichier par l'API du compilateur TypeScript. Couvre `import`,
@@ -454,11 +456,10 @@ function regleDeBase(fichier: string): Regle | undefined {
   if (fichier === "src/prototype/reduction.ts") {
     return { projet: (c) => contrats(c) || proto("ancrage", "programme-reduit").includes(c), externes: ["zod"] };
   }
+  // Décision 0045 § 1.2 et § 3 (amendement de 0032 A3.2) : `@/contracts`, `zod` et `src/domain` seulement ; plus
+  // aucun `@/prototype/*`. Même liste que la règle ESLint « src/domain sans entrée-sortie » (cas communs).
   if (fichier.startsWith("src/domain/")) {
-    return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || proto("brief", "config", "candidat", "ancrage").includes(c),
-      externes: ["zod"],
-    };
+    return { projet: (c) => contrats(c) || sous("src/domain")(c), externes: ["zod"] };
   }
   if (fichier.startsWith("src/ai/")) {
     return { projet: (c) => contrats(c) || sous("src/ai")(c) || proto("brief", "config", "candidat").includes(c), externes: ["zod"] };
@@ -852,6 +853,9 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["src/research/agent.ts", 'import { executer } from "../../scripts/p0/pipeline";'],
       ["src/prototype/brief.ts", 'import { CandidatSchema } from "@/prototype/candidat";'],
       ["src/prototype/programme-reduit.ts", 'import { valider } from "@/domain/validation";'],
+      // Décision 0045 § 1 (« Ce que B5a doit tester ») : src/domain n'importe plus @/prototype/*.
+      ["src/domain/x.ts", 'import type { Brief } from "@/prototype/brief";'],
+      ["src/domain/x.ts", 'import { ConfigClassementSchema } from "@/prototype/config";'],
       ["src/grounding/ancrage.ts", 'import { lireTour } from "@/ai/sorties";'],
       ["src/research/ai.simule.ts", 'import { request } from "node:https";'],
       ["scripts/p0/cli.ts", 'import { spawn } from "node:child_process";'],
@@ -1045,6 +1049,14 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       expect(controler("src/ai/client.ts", source)).toEqual([]);
     });
 
+    it("src/domain : cas communs avec la règle ESLint « src/domain sans entrée-sortie » (décision 0045 § 3.2)", () => {
+      for (const { specificateur, admis } of IMPORTS_DOMAINE) {
+        for (const source of sourcesDomaine(specificateur)) {
+          expect(controler("src/domain/exemple.ts", source).length === 0, `${specificateur} : ${source}`).toBe(admis);
+        }
+      }
+    });
+
     it("scripts/p0/fichiers.ts peut importer node:fs et node:fs/promises", () => {
       const source = 'import { readFileSync } from "node:fs";\nimport { readFile } from "node:fs/promises";';
       expect(controler("scripts/p0/fichiers.ts", source)).toEqual([]);
@@ -1073,6 +1085,15 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     const atteints = [...graphe("src/prototype/programme-reduit.ts")];
     for (const chemin of atteints) {
       expect(chemin === "src/prototype/programme-reduit.ts" || chemin.startsWith("src/contracts/") || chemin === "externe:zod", chemin).toBe(true);
+    }
+  });
+
+  // Décision 0045 § 6 (B5-TL-6) : R3 a une seule définition, importable par le serveur en B11.
+  it("le graphe de src/domain/verrous.ts ne contient que lui-même, src/contracts et zod", () => {
+    const atteints = [...graphe("src/domain/verrous.ts")];
+    expect(atteints).toContain("src/domain/verrous.ts");
+    for (const chemin of atteints) {
+      expect(chemin === "src/domain/verrous.ts" || chemin.startsWith("src/contracts/") || chemin === "externe:zod", chemin).toBe(true);
     }
   });
 
