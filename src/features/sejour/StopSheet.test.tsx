@@ -13,7 +13,7 @@ import { StopSheet } from "./StopSheet";
 const routes = tripRoutes("/voyages", edimbourg.id);
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
 
-function renderFiche(n: number, stopId: string, overrides: Partial<Stop> = {}) {
+function renderFiche(n: number, stopId: string, overrides: Partial<Stop> = {}, placesFromGoogle?: boolean) {
   const target = findFicheTarget(day(n), stopId)!;
   const onClose = vi.fn();
   const onToggleLock = vi.fn();
@@ -25,6 +25,7 @@ function renderFiche(n: number, stopId: string, overrides: Partial<Stop> = {}) {
       routes={routes}
       onClose={onClose}
       onToggleLock={onToggleLock}
+      placesFromGoogle={placesFromGoogle}
     />,
   );
   return { ...result, onClose, onToggleLock };
@@ -115,6 +116,16 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
     expect(screen.queryByRole("link", { name: "Remplacer" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Verrouiller" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Pour y aller" })).toBeNull();
+  });
+
+  it("mention « Données de lieux : Google » en fin de fiche avec l'adaptateur prototype, absente par défaut", () => {
+    const { container, unmount } = renderFiche(2, "j2-dean-village");
+    expect(container.querySelector("[data-part='attribution']")).toBeNull();
+    unmount();
+    const prototype = renderFiche(2, "j2-dean-village", {}, true);
+    const fiche = prototype.container.querySelector("[data-part='fiche']")!;
+    expect(fiche.lastElementChild).toHaveAttribute("data-part", "attribution");
+    expect(fiche.lastElementChild).toHaveTextContent("Données de lieux : Google");
   });
 
   it("« Fermer » et Échap ferment la fiche", () => {

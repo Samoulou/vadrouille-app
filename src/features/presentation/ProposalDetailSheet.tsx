@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 
+import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal } from "@/contracts";
@@ -21,13 +22,18 @@ export interface ProposalDetailSheetProps {
   onClose: () => void;
   /** Rend le focus à la carte à la fermeture (handover § 7). */
   onReturnFocus: () => void;
+  /**
+   * Mention « Données de lieux : Google » dans la feuille (adaptateur `prototype`, spécification P0) : la feuille
+   * modale recouvre celle du pied du paquet. Absente par défaut.
+   */
+  placesFromGoogle?: boolean;
 }
 
 /**
  * Détail d'une proposition (F6-PO-12, provisoire UX/UI) : feuille modale en lecture seule ; aucune
  * décision ne s'y prend. Quand `ReasonBlock` existera (F5), le détail l'utilisera.
  */
-export function ProposalDetailSheet({ proposal, onClose, onReturnFocus }: ProposalDetailSheetProps) {
+export function ProposalDetailSheet({ proposal, onClose, onReturnFocus, placesFromGoogle = false }: ProposalDetailSheetProps) {
   const title = useRef<HTMLHeadingElement>(null);
   const stop = proposal?.stop;
   return (
@@ -58,7 +64,12 @@ export function ProposalDetailSheet({ proposal, onClose, onReturnFocus }: Propos
           {stop.source ? (
             <p className="text-corps-s text-ink-2">
               {t.detail.source}
-              <a href={stop.source.url} className="font-semibold text-ink underline underline-offset-2" rel="noreferrer">
+              <a
+                href={stop.source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-ink underline underline-offset-2"
+              >
                 {stop.source.label}
               </a>
             </p>
@@ -68,6 +79,7 @@ export function ProposalDetailSheet({ proposal, onClose, onReturnFocus }: Propos
               {format(t.detail.verifie, { date: formatVerifiedAt(stop.verifiedAt) })}
             </p>
           ) : null}
+          <PlacesAttribution placesFromGoogle={placesFromGoogle} />
           <DialogClose asChild>
             <Button variant="secondary" className="w-full">
               {t.detail.fermer}

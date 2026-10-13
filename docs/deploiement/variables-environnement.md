@@ -9,19 +9,47 @@ Note de sécurité (revue de F9a, PR #86). Elle ne crée aucune règle : elle ra
 | `NODE_ENV=development` | Les pages de développement (`/dev/…`, dont `POST /dev/api/simulation`, ouvertes dès que `NODE_ENV` n'est pas `production`) et le paiement simulé (ouvert en `development` et `test`). | `devPagesEnabled` (`src/dev/flags.ts`) n'a **aucune** autre garde ; `paymentDemoAllowed` (`src/adapters/payment-guard.ts`) reste fermé si `VADROUILLE_ENV` ou `VERCEL_ENV` vaut `production`. |
 | `VADROUILLE_DEV_PAGES=1` | Les pages de développement sur un build de production (prévue pour les tests Playwright). | `devPagesEnabled` l'accepte même en production ; seule la portée des simulations exige en plus `!isProductionDeployment()`. Ne compter que sur l'absence de la variable. |
 | `VADROUILLE_DEMO_PAYMENT=1` | Le paiement simulé (écran 9, `R9-sim`, `R9-retour`, actions de paiement). | Ignorée si `VADROUILLE_ENV` ou `VERCEL_ENV` vaut `production` (le `Dockerfile` pose `VADROUILLE_ENV=production` ; le job `docker` de la CI vérifie la fermeture). |
+| `VADROUILLE_PROTOTYPE=1` | L'adaptateur `prototype` sur un build de production lancé hors de Vercel (`next start`, serveur autonome), **en CI seulement** (tests Playwright, spécification P0, P0b1). | Prise en compte seulement si `CI` vaut exactement `true`, sans `VERCEL_ENV`, et jamais si `VADROUILLE_ENV` ou `VERCEL_ENV` vaut `production` (`prototypeAdapterAllowed`, `src/dev/flags.ts`, décision 0032 § A4.2 ; le job `docker` vérifie la fermeture). Voir « Adaptateur prototype » ci-dessous : poser `CI=true` sur un poste est trivial, ce second garde n'est pas une protection. |
 
 ## Choix des adaptateurs
 
 | Variable | Valeurs | Effet |
 |---|---|---|
-| `DATA_ADAPTER` | absente, vide ou `mock` (défaut) ; `api` | `api` ferme les parcours simulés : `getRequestContext()` lève tant que l'authentification (B3) n'existe pas, et le paiement simulé reste indisponible. Toute autre valeur lève une erreur. |
+| `DATA_ADAPTER` | absente, vide ou `mock` (défaut) ; `api` ; `prototype` (**jamais en production**) | `api` ferme les parcours simulés : `getRequestContext()` lève tant que l'authentification (B3) n'existe pas, et le paiement simulé reste indisponible. `prototype` sert les programmes du prototype de recherche (section « Adaptateur prototype » ci-dessous) et lève une erreur hors de sa liste blanche. Toute autre valeur lève une erreur. |
 | `PAYMENT_ADAPTER` | absente, vide ou `mock` (défaut) ; `stripe` réservé | `stripe` lève « non implémenté » jusqu'à la tâche de paiement réel (décision 0020). Toute autre valeur lève une erreur. `mock` ne suffit pas à ouvrir le paiement simulé : `paymentAvailable` exige aussi `paymentDemoAllowed` et `DATA_ADAPTER` à `mock`. |
 
 Ni l'une ni l'autre n'ouvre quoi que ce soit à elle seule : l'ouverture dépend des variables du tableau précédent.
 
+## Adaptateur prototype (spécification P0, P0b1 ; décision 0032 § A4 et § A6)
+
+`DATA_ADAPTER=prototype` fait parcourir un programme produit par le prototype de recherche dans les écrans existants (accueil, présentation, Séjour, Journée, carte). **Jamais sur l'environnement « Production »** de Vercel ni dans l'image `docker`.
+
+| Variable | Valeur | Où la poser |
+|---|---|---|
+| `DATA_ADAPTER` | `prototype` | `.env.local` du poste (avec `pnpm dev`) ; le second serveur de `playwright.config.ts`. Jamais en production. |
+| `VADROUILLE_PROTOTYPE_DIR` | chemin **absolu et canonique** du dossier des programmes (sans lien symbolique : `realpath` du chemin égal au chemin donné), lu une fois au démarrage | `.env.local` ; `playwright.config.ts` (programme de test `prototype/programmes-test/`). Absente ou vide : la section « Prototype » de l'accueil est absente, sans erreur. |
+| `VADROUILLE_PROTOTYPE` | `1`, avec `CI=true` | **En CI seulement** : `playwright.config.ts`, pour les tests sur le build de production. |
+
+**Liste blanche** (`prototypeAdapterAllowed`, `src/dev/flags.ts`) : l'adaptateur et son contexte (`org_prototype`) ne s'ouvrent que si aucun déploiement de production n'est détecté (`VADROUILLE_ENV` et `VERCEL_ENV` différents de `production`, même en majuscules ou avec des espaces), si `VADROUILLE_ENV` est absente, `local` ou `ci`, **et** dans l'un de ces trois cas :
+- `VERCEL_ENV=preview` ou `VERCEL_ENV=development` ;
+- sans `VERCEL_ENV`, `NODE_ENV=development` ou `test` (`pnpm dev`, Vitest) ;
+- sans `VERCEL_ENV`, `VADROUILLE_PROTOTYPE=1` **et** `CI=true` exactement.
+
+Sinon, `getTripAdapter("prototype")` et `getRequestContext()` lèvent une erreur : la page répond 500, jamais un programme. Le job `docker` lance l'image avec `-e DATA_ADAPTER=prototype`, puis avec `-e VADROUILLE_PROTOTYPE=1 -e CI=true` en plus, et vérifie le 500 sans section « Prototype » ni identifiant `proto_`.
+
+**Écart assumé** (spécification P0) : `VADROUILLE_PROTOTYPE=1` ouvre aussi un serveur `NODE_ENV=production` lancé hors de Docker et de Vercel, par exemple `next start` sur un poste, si `CI=true` y est posé. Ce second garde **réduit** l'écart sans le supprimer : poser `CI=true` est trivial. Consigne : ne poser `VADROUILLE_PROTOTYPE` qu'en CI ; Playwright en local pose aussi `CI=true` pour ces tests, sur son seul second serveur.
+
+**Préversions Vercel** : `VERCEL_ENV=preview` est dans la liste blanche. Une préversion avec `DATA_ADAPTER=prototype` sert donc le prototype. Q235 demande que rien ne soit public, mais la protection des préversions par Vercel n'est pas vérifiée ici, et une preview peut être publique (section « Déploiements de preview Vercel » ci-dessous) : **à vérifier avant d'y poser un dossier de programmes**. Dans P0b1, aucun dossier de programmes n'existe sur Vercel (pas de valeur pour `VADROUILLE_PROTOTYPE_DIR`) : la section est absente. L'emplacement des programmes réels hors du dépôt (A5) relève de la spécification suivante, sans stockage propre à Vercel (décision 0002).
+
+**Aucune clé, aucun appel à Google dans P0b1** : les durées de trajet sont relues par un relecteur **simulé** (durées sentinelles), dans tous les environnements, y compris une préversion qui porterait `GOOGLE_MAPS_SERVER_KEY`. La ligne de `GOOGLE_MAPS_SERVER_KEY` et son module d'environnement arrivent avec le relecteur réel (spécification suivante).
+
+**Aucun cache** : les pages servies par l'adaptateur sont rendues à chaque requête (`dynamic = "force-dynamic"`, jamais prérendues) et répondent `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate` (en-tête par défaut de Next.js, vérifié par l'e2e sur le build de production). Aucune durée relue n'est gardée entre deux requêtes.
+
+`GET /dev/api/prototype/relectures` (compteur du relecteur simulé, pour l'e2e) répond 404 sauf avec les pages de développement **et** la liste blanche ouvertes.
+
 ## Déploiements de preview Vercel
 
-Ils sont construits avec `NODE_ENV=production` et `VERCEL_ENV=preview` : les pages de développement, `POST /dev/api/simulation` et le paiement simulé y restent **fermés** tant qu'aucune des trois variables du premier tableau n'y est posée. Ne pas les poser sur l'environnement « Preview » de Vercel non plus : l'état en mémoire n'y serait pas fiable (voir ci-dessous) et une preview peut être publique.
+Ils sont construits avec `NODE_ENV=production` et `VERCEL_ENV=preview` : les pages de développement, `POST /dev/api/simulation` et le paiement simulé y restent **fermés** tant qu'aucune des trois premières variables du premier tableau n'y est posée. Ne pas les poser sur l'environnement « Preview » de Vercel non plus : l'état en mémoire n'y serait pas fiable (voir ci-dessous) et une preview peut être publique.
 
 Dans le dépôt, seuls `playwright.config.ts` (tests sur le build local), `pnpm dev` (`NODE_ENV=development`) et la seconde image du job `docker` (qui vérifie la fermeture) les posent.
 
@@ -33,7 +61,7 @@ Dans le dépôt, seuls `playwright.config.ts` (tests sur le build local), `pnpm 
 ## À vérifier avant de modifier un environnement
 
 1. `VADROUILLE_ENV=production` ou `VERCEL_ENV=production` est présent sur tout déploiement de production.
-2. Aucune des trois variables du tableau n'est définie (`vercel env ls`, `docker inspect`).
+2. Aucune des quatre variables du tableau n'est définie (`vercel env ls`, `docker inspect`), et `DATA_ADAPTER` ne vaut pas `prototype`.
 3. `GET /dev/composants`, `GET /voyages/mock_trip_edimbourg/debloquer` et `POST /dev/api/simulation` répondent 404.
 
 ## Carte Google Maps (F4, Q3)

@@ -15,6 +15,8 @@ const t = messages.sejour;
 export interface JourneePanelProps {
   day: Day;
   routes: TripRoutes;
+  /** Mention « Données de lieux : Google » (adaptateur `prototype`) ; `PLACES_FROM_GOOGLE` par défaut. */
+  placesFromGoogle?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface JourneePanelProps {
  * ligne trajet/budget, bandeaux (préparation, trajet), ligne du jour, « Événements du jour »,
  * « Surprends-moi », mention d'attribution. Un jour en préparation n'affiche que son bandeau et ses événements.
  */
-export function JourneePanel({ day, routes }: JourneePanelProps) {
+export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE }: JourneePanelProps) {
   const banner = day.generating ? null : travelBannerMessage(day);
 
   return (
@@ -61,7 +63,7 @@ export function JourneePanel({ day, routes }: JourneePanelProps) {
 
       {!day.generating && day.surprise ? <SurpriseBlock idea={day.surprise} /> : null}
 
-      <PlacesAttribution placesFromGoogle={PLACES_FROM_GOOGLE} />
+      <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>
   );
 }

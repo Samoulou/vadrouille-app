@@ -38,6 +38,12 @@ journalisé. Toute requête vers un autre hôte que l'application fait échouer 
 `summary.json`, dans `lighthouse-report/` (ignoré par git), envoyés en artefact `lighthouse` de la CI (7 jours), jamais
 ailleurs. En local : `pnpm build` puis `E2E_SKIP_BUILD=1 pnpm test:perf` (ou `pnpm test:perf`, qui reconstruit).
 
+## Prototype (spécification P0, P0b1)
+`prototype.e2e.spec.ts` et `prototype.a11y.spec.ts` visent un **second serveur** sur le même build (`playwright.config.ts`,
+port du premier + 1 000, `PROTOTYPE_URL` de `prototype-helpers.ts`), lancé avec `DATA_ADAPTER=prototype`,
+`VADROUILLE_PROTOTYPE=1`, `CI=true` et `VADROUILLE_PROTOTYPE_DIR` sur `prototype/programmes-test/` (programme fabriqué à la
+main, valeurs sentinelles, relecteur simulé). Aucune requête vers Google.
+
 ## Service workers (F10b, F10-TL-6)
 `playwright.config.ts` bloque les service workers par défaut (`use.serviceWorkers: "block"`) et pose
 `PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1`, pour que les requêtes du service worker passent par `context.route` (blocage
