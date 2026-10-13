@@ -46,6 +46,28 @@ describe("Sheet", () => {
     expect(screen.getByRole("navigation", { name: "Onglets" })).toBeInTheDocument();
   });
 
+  it("focusableBody : zone de contenu focalisable, nommée « Contenu du panneau » ; sans la prop, ni tabindex ni rôle", async () => {
+    const { container, unmount } = render(
+      <Sheet label="Programme" focusableBody>
+        <p>contenu</p>
+      </Sheet>,
+    );
+    const body = screen.getByRole("region", { name: "Contenu du panneau" });
+    expect(body).toHaveAttribute("data-part", "contenu");
+    expect(body).toHaveAttribute("tabindex", "0");
+    expect(await axeViolations(container)).toEqual([]);
+    unmount();
+    render(
+      <Sheet label="Programme">
+        <p>contenu</p>
+      </Sheet>,
+    );
+    const plain = screen.getByText("contenu").closest("[data-part='contenu']");
+    expect(plain).not.toHaveAttribute("tabindex");
+    expect(plain).not.toHaveAttribute("role");
+    expect(screen.queryByRole("region", { name: "Contenu du panneau" })).toBeNull();
+  });
+
   it("poignée : « Agrandir le panneau » à 25 et 55 %, « Réduire le panneau » à 92 % (retour à 25 %)", () => {
     render(
       <Sheet label="Programme">

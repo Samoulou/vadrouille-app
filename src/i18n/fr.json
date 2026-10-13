@@ -101,7 +101,8 @@
     },
     "panneau": {
       "agrandir": "Agrandir le panneau",
-      "reduire": "Réduire le panneau"
+      "reduire": "Réduire le panneau",
+      "contenu": "Contenu du panneau"
     },
     "raison": {
       "titre": "Pourquoi pour toi",

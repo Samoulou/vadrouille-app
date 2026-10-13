@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { DayMap } from "@/components/carte/DayMap";
 import type { RouteDay, RouteMap } from "@/components/carte/route";
 import { DayTabs } from "@/components/ligne/DayTabs";
+import { iconButtonClassName } from "@/components/ligne/IconButton";
 import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
 import { DEFAULT_SNAP, type SnapPoint } from "@/components/ligne/sheet-model";
@@ -72,7 +73,7 @@ export function SharedShell({ token, days, current, maps, placesFromGoogle, chil
         href={routes.sejour()}
         aria-label={t.retour}
         data-part="retour"
-        className="absolute left-3 top-3 z-10 inline-flex size-(--touch-target) items-center justify-center rounded-control border border-outline bg-raised text-ink"
+        className={iconButtonClassName("square", "absolute left-3 top-3 z-10")}
       >
         <IconRetour />
       </Link>

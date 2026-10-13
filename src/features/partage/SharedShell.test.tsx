@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectSharedMaps, projectSharedPoints, projectSharedTrip } from "@/adapters/share-projection";
 import { CarteProvider, type CarteInjection } from "@/components/carte/config";
 import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";
+import { DAY_LIST_ID } from "@/features/sejour/constants";
 import { deriveEdimbourgCarte } from "@/mocks/edimbourg-carte";
 import { edimbourgDebloque } from "@/mocks/edimbourg";
 
@@ -150,6 +151,8 @@ describe("Journée partagée, RPJ (C30)", () => {
     const { container } = render(<SharedDayScreen day={day6} placesFromGoogle={false} />);
     expect(screen.getByText("Cette journée est encore en préparation.")).toBeVisible();
     expect(container.querySelector("ol")).toBeNull();
+    // Le lien d'évitement de la carte a toujours une cible : le bandeau tient la place de la liste.
+    expect(container.querySelector(`#${DAY_LIST_ID}`)).toContainElement(screen.getByText("Cette journée est encore en préparation."));
   });
 
   it("C5 : mention « Données de lieux : Google » une fois avec placesFromGoogle, absente sinon", () => {

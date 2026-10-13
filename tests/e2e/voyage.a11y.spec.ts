@@ -135,7 +135,7 @@ test.describe("partage", () => {
 
   /**
    * Cibles de 44 px de la vue partagée. Le lien d'évitement de la carte (`data-part="evitement"`, F4, commun avec
-   * la Journée) n'est pas mesuré : masqué hors focus, il est hors du périmètre de F10c (signalé dans la PR).
+   * la Journée), masqué hors focus, est mesuré au focus par son propre test.
    */
   async function expectViewTouchTargets(page: Page) {
     const elements = page.locator("button, a[href]:not([data-part='evitement']), input, [tabindex]:not([tabindex='-1'])");
@@ -226,6 +226,29 @@ test.describe("partage", () => {
       await expectNoViolations(page);
       await expectViewTouchTargets(page);
       await expectFocusOutlines(page);
+    });
+  }
+
+  for (const n of [2, 6]) {
+    test(`partage: lien d'évitement de la carte au clavier, RPJ jour ${n}`, async ({ page }) => {
+      // Mesuré à part (exclu de `expectViewTouchTargets`, masqué hors focus) : atteint au clavier, 44 px au moins,
+      // contour visible, sans recouvrir « Retour » ; il mène à la liste du jour ou, en préparation, au bandeau.
+      await page.goto(RPJ(SHARE_TOKEN_VALIDE, n));
+      const skip = page.locator("[data-part='evitement']");
+      for (let press = 0; press < 10 && !(await skip.evaluate((el) => el === document.activeElement)); press += 1) {
+        await page.keyboard.press("Tab");
+      }
+      await expect(skip).toBeFocused();
+      const box = (await skip.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(await skip.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
+      const back = (await page.locator("[data-part='retour']").boundingBox())!;
+      const overlaps =
+        box.x < back.x + back.width && back.x < box.x + box.width && box.y < back.y + back.height && back.y < box.y + box.height;
+      expect(overlaps).toBe(false);
+      await page.keyboard.press("Enter");
+      await expect(page.locator("#liste-etapes")).toBeFocused();
     });
   }
 

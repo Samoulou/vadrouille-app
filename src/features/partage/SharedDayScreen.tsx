@@ -7,7 +7,7 @@ import { EventLines } from "@/features/sejour/EventLines";
 import { format, messages } from "@/i18n";
 import { formatTitreJour } from "@/lib/dates";
 
-import { ReadOnlyMention } from "./SharedTripScreen";
+import { ReadOnlyMention } from "./ReadOnlyMention";
 
 const t = messages.partage.vue;
 
@@ -30,14 +30,17 @@ export function SharedDayScreen({ day, placesFromGoogle }: SharedDayScreenProps)
         {formatTitreJour(day.date)}
       </h1>
 
-      {day.generating ? (
-        <StatusBanner kind="generating" message={t.enPreparation} />
-      ) : (
-        <div id={DAY_LIST_ID} tabIndex={-1} className="rounded-block">
-          <h2 className="sr-only">{format(t.etapes, { n: day.index })}</h2>
-          <DayLine<SharedStop> items={day.items} />
-        </div>
-      )}
+      {/* Cible du lien d'évitement de la carte, y compris pour un jour en préparation (bandeau à la place de la liste). */}
+      <div id={DAY_LIST_ID} tabIndex={-1} className="rounded-block">
+        {day.generating ? (
+          <StatusBanner kind="generating" message={t.enPreparation} />
+        ) : (
+          <>
+            <h2 className="sr-only">{format(t.etapes, { n: day.index })}</h2>
+            <DayLine<SharedStop> items={day.items} />
+          </>
+        )}
+      </div>
 
       {day.events.length > 0 ? (
         <section aria-labelledby="evenements-du-jour" className="flex flex-col gap-3">

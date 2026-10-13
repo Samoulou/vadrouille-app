@@ -7,6 +7,12 @@ import { format, messages } from "@/i18n";
 const t = messages.partage.invalide;
 const documentTitle = format(messages.partage.vue.titreDocument.invalide, { produit: PRODUCT_NAME });
 
+/**
+ * Titre du document par deux voies, comme `src/app/not-found.tsx` (décision 0021 § 7) : l'export `metadata` vaut
+ * pour les adresses de ce segment qu'aucune page ne reconnaît ; l'élément <title> de React 19 vaut pour les
+ * `notFound()` de `RP` et `RPJ`, où Next 16.4 garde la `metadata` de la page (sans titre) et ferait sinon passer le
+ * titre du layout racine. Les deux portent le même texte.
+ */
 export const metadata: Metadata = { title: documentTitle, robots: { index: false, follow: false } };
 
 /**

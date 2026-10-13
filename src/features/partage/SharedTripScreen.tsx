@@ -10,6 +10,7 @@ import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { format, messages } from "@/i18n";
 import { formatTitreJour } from "@/lib/dates";
 
+import { ReadOnlyMention } from "./ReadOnlyMention";
 import { sharedRoutes } from "./routes";
 
 const t = messages.partage.vue;
@@ -19,15 +20,6 @@ export interface SharedTripScreenProps {
   trip: SharedTrip;
   /** Mention « Données de lieux : Google » (F10-PO-20), sous la même condition que le Séjour. */
   placesFromGoogle: boolean;
-}
-
-/** Mention de lecture seule, en tête du panneau de `RP` et de `RPJ` (provisoire, UX/UI). */
-export function ReadOnlyMention() {
-  return (
-    <p data-part="mention-partage" className="text-corps-s font-bold text-ink-soft">
-      {t.mention}
-    </p>
-  );
 }
 
 /**

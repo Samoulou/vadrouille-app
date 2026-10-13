@@ -250,6 +250,9 @@ export function Sheet({
         ref={bodyRef}
         data-part="contenu"
         tabIndex={focusableBody ? 0 : undefined}
+        // Zone focalisable : rôle et nom, pour que le lecteur d'écran annonce ce qui reçoit le focus.
+        role={focusableBody ? "region" : undefined}
+        aria-label={focusableBody ? t.contenu : undefined}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {children}

@@ -280,10 +280,6 @@ function ShareContent({
           />
         ) : null}
 
-        <p role="status" data-part="annonce-partage" className="text-corps-s text-ink-2 empty:hidden">
-          {view.kind === "loading" ? t.chargement : announce}
-        </p>
-
         {view.kind === "none" ? (
           <Button variant="primary" data-focus="creer" data-part="creer" className={cn("w-full", ARIA_DISABLED)} {...disabledProps("create")}>
             {t.creer}
@@ -391,6 +387,11 @@ function ShareContent({
             </Button>
           </div>
         ) : null}
+
+        {/* Sous les actions : son apparition (« Lien copié »…) ne décale ni le champ ni les boutons. */}
+        <p role="status" data-part="annonce-partage" className="text-corps-s text-ink-2 empty:hidden">
+          {view.kind === "loading" ? t.chargement : announce}
+        </p>
 
         <DialogClose asChild>
           <Button variant="text" data-part="fermer" className="self-start">
