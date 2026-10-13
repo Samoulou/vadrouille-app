@@ -2,7 +2,18 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { messages } from "../../src/i18n";
 import { blockGoogle } from "../e2e/carte-helpers";
-import { DEV_REPLACE_DEAN, applyButton, askProposal, replaceTitle } from "../e2e/revision-helpers";
+import {
+  DEV_FICHE_JARDIN,
+  DEV_REPLACE_DEAN,
+  applyButton,
+  askProposal,
+  moveDays,
+  moveSheet,
+  openMoveSheet,
+  placeHere,
+  previewMoveToJ4,
+  replaceTitle,
+} from "../e2e/revision-helpers";
 import { TRIP, expectSheetAt, openTrip, sheet } from "../e2e/sejour-helpers";
 
 /**
@@ -73,4 +84,38 @@ test("section « Révision » de /dev/composants", async ({ page }) => {
   const section = page.getByRole("region", { name: messages.dev.composants.exemples.revision.titre, exact: true });
   await expect(section).toBeVisible();
   await expect(section).toHaveScreenshot("dev-composants-revision.png");
+});
+
+/** Ouvre la fiche de « [Jardin botanique royal] » sur la carte simulée (panneau « Fiche étape »). */
+async function openFicheJardin(page: Page) {
+  await page.goto(DEV_FICHE_JARDIN);
+  await expect(page.getByRole("region", { name: "Fiche étape", exact: true }).getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator("[data-renderer='simulated']")).toHaveAttribute("data-zoom", /\d+/);
+}
+
+test("Feuille « Déplacer » : jours, J4 cochée avec ses points", async ({ page }) => {
+  await openFicheJardin(page);
+  await openMoveSheet(page);
+  await capture(page, "revision-deplacer-jours.png");
+  await moveDays(page).getByRole("radio", { name: "Jour 4", exact: true }).click();
+  await expect(placeHere(page, "15:45")).toBeVisible();
+  await capture(page, "revision-deplacer-points.png");
+});
+
+test("Feuille « Déplacer » : aperçu du déplacement vers J4", async ({ page }) => {
+  await openFicheJardin(page);
+  await openMoveSheet(page);
+  await previewMoveToJ4(page);
+  await moveSheet(page).locator("[data-part='apercu']").scrollIntoViewIfNeeded();
+  await capture(page, "revision-deplacer-apercu.png");
+});
+
+test("groupe radio « Vers quel jour ? » de /dev/composants : focus sur un jour complet", async ({ page }) => {
+  await page.goto("/dev/composants");
+  await page.evaluate(() => document.fonts.ready);
+  const group = page.getByRole("radiogroup", { name: "Vers quel jour ?" }).first();
+  await group.getByRole("radio", { name: "Jour 2", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(group.getByRole("radio", { name: "Jour 3, complet" })).toBeFocused();
+  await expect(group).toHaveScreenshot("dev-composants-jours-focus-complet.png");
 });

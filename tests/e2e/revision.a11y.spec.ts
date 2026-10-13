@@ -2,7 +2,20 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "./carte-helpers";
-import { DEV_REPLACE_DEAN, REPLACE_DEAN, applyButton, askButton, askProposal, reasons, replaceTitle } from "./revision-helpers";
+import {
+  DEV_FICHE_JARDIN,
+  DEV_REPLACE_DEAN,
+  FICHE_JARDIN,
+  REPLACE_DEAN,
+  applyButton,
+  askButton,
+  askProposal,
+  moveSheet,
+  openMoveSheet,
+  previewMoveToJ4,
+  reasons,
+  replaceTitle,
+} from "./revision-helpers";
 import { TRIP, expectSheetAt, openTrip, sheet } from "./sejour-helpers";
 
 /**
@@ -89,6 +102,52 @@ test("revision: aucune violation axe, Journée après « Appliquer » (surlignag
   await askProposal(page, "Pas mon style");
   await applyButton(page).click();
   await expect(page.locator("[data-undo-toast]")).toContainText("Modifié.");
+  await expect(page.locator("#liste-etapes [data-highlighted='true']")).toHaveCount(1);
+  await expectNoViolations(page);
+  await expectTargetsAndSingleH1(page);
+});
+
+/** Feuille « Déplacer » (portail hors de `main`) : chaque bouton et radio visible mesure au moins 44 × 44 px. */
+/** Ouvre une fiche (`?etape=`) : le panneau est alors la région « Fiche étape » ; sur /dev, attend la carte simulée. */
+async function openFiche(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page.getByRole("region", { name: "Fiche étape", exact: true }).getByRole("heading", { level: 1 })).toBeVisible();
+  if (path.startsWith("/dev/")) await expect(page.locator("[data-renderer='simulated']")).toHaveAttribute("data-zoom", /\d+/);
+}
+
+async function expectSheetTargets(page: Page) {
+  const small = await moveSheet(page).evaluate((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>("a[href], button, [role='radio']"))
+      .map((el) => ({ name: el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "", box: el.getBoundingClientRect() }))
+      .filter(({ box }) => box.width > 0 && (box.width < 43.5 || box.height < 43.5))
+      .map(({ name, box }) => `${name} (${box.width} × ${box.height})`),
+  );
+  expect(small).toEqual([]);
+}
+
+test("revision: aucune violation axe, feuille « Déplacer » ouverte avec des jours complets", async ({ page }) => {
+  await openFiche(page, FICHE_JARDIN);
+  await openMoveSheet(page);
+  await expectNoViolations(page);
+  await expectSheetTargets(page);
+  // Le reste de la page est masqué aux technologies d'assistance pendant la feuille modale : un seul `h1` dans le DOM.
+  await expect(page.locator("h1")).toHaveCount(1);
+});
+
+test("revision: aucune violation axe, feuille « Déplacer » avec points et aperçu (carte simulée)", async ({ page }) => {
+  await openFiche(page, DEV_FICHE_JARDIN);
+  await openMoveSheet(page);
+  await previewMoveToJ4(page);
+  await expectNoViolations(page);
+  await expectSheetTargets(page);
+});
+
+test("revision: aucune violation axe, Journée après un déplacement (surlignage et toast)", async ({ page }) => {
+  await openFiche(page, DEV_FICHE_JARDIN);
+  await openMoveSheet(page);
+  await previewMoveToJ4(page);
+  await moveSheet(page).getByRole("button", { name: "Appliquer" }).click();
+  await expect(page.locator("[data-undo-toast]")).toContainText("Étape déplacée.");
   await expect(page.locator("#liste-etapes [data-highlighted='true']")).toHaveCount(1);
   await expectNoViolations(page);
   await expectTargetsAndSingleH1(page);

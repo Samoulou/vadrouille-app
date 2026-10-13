@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { KeyboardEvent, Ref } from "react";
 
 import type { Weekday } from "@/contracts";
 import { format, messages } from "@/i18n";
@@ -29,6 +30,35 @@ export function dayBadgeName({ day, weekday, disabled }: Pick<DayBadgeProps, "da
   return disabled ? format(t.nomComplet, { nom }) : nom;
 }
 
+/** Classes communes du mode lien et du rendu radio : pastille inactive, active (plein `line`) ou désactivée (F3). */
+function dayBadgeClasses({ small, active, disabled, className }: { small: boolean; active: boolean; disabled: boolean; className?: string }) {
+  return cn(
+    "relative inline-flex shrink-0 flex-col items-center justify-center font-extrabold tabular-nums",
+    small
+      ? "h-(--ligne-pastille-reduite) min-w-(--ligne-pastille-reduite) rounded-(--ligne-rayon-mini) px-1.5 text-etiquette"
+      : "min-h-(--touch-target) min-w-(--touch-target) rounded-badge px-(--ligne-espace-2) text-(length:--ligne-texte-pastille) leading-(--ligne-texte-pastille-interligne)",
+    disabled
+      ? "bg-muted text-ink-soft"
+      : active
+        ? "border-(length:--ligne-trait-controle) border-line bg-line text-on-line"
+        : "border-(length:--ligne-trait-controle) border-outline-strong bg-raised text-ink",
+    className,
+  );
+}
+
+/** Contenu visible (« J2 », puis « complet ») et nom accessible complet en texte masqué. */
+function DayBadgeContent({ day, weekday, disabled }: Pick<DayBadgeProps, "day" | "weekday" | "disabled">) {
+  return (
+    <>
+      <span aria-hidden="true" className="flex flex-col items-center">
+        <span>{format(t.pastille, { day })}</span>
+        {disabled ? <span className="text-legende font-semibold">{t.complet}</span> : null}
+      </span>
+      <span className="sr-only">{dayBadgeName({ day, weekday, disabled })}</span>
+    </>
+  );
+}
+
 /** Pastille de jour (J1, J2…), numéro de ligne et onglet de navigation. Design system : components/DayBadge. */
 export function DayBadge({
   day,
@@ -42,31 +72,8 @@ export function DayBadge({
 }: DayBadgeProps) {
   const small = size === "sm";
   const isActive = active && !disabled;
-  const name = dayBadgeName({ day, weekday, disabled });
-  const label = format(t.pastille, { day });
-
-  const classes = cn(
-    "relative inline-flex shrink-0 flex-col items-center justify-center font-extrabold tabular-nums",
-    small
-      ? "h-(--ligne-pastille-reduite) min-w-(--ligne-pastille-reduite) rounded-(--ligne-rayon-mini) px-1.5 text-etiquette"
-      : "min-h-(--touch-target) min-w-(--touch-target) rounded-badge px-(--ligne-espace-2) text-(length:--ligne-texte-pastille) leading-(--ligne-texte-pastille-interligne)",
-    disabled
-      ? "bg-muted text-ink-soft"
-      : isActive
-        ? "border-(length:--ligne-trait-controle) border-line bg-line text-on-line"
-        : "border-(length:--ligne-trait-controle) border-outline-strong bg-raised text-ink",
-    className,
-  );
-
-  const content = (
-    <>
-      <span aria-hidden="true" className="flex flex-col items-center">
-        <span>{label}</span>
-        {disabled ? <span className="text-legende font-semibold">{t.complet}</span> : null}
-      </span>
-      <span className="sr-only">{name}</span>
-    </>
-  );
+  const classes = dayBadgeClasses({ small, active: isActive, disabled, className });
+  const content = <DayBadgeContent day={day} weekday={weekday} disabled={disabled} />;
 
   const current = isActive ? currentValue : undefined;
 
@@ -88,5 +95,50 @@ export function DayBadge({
     <span aria-current={current} data-day={day} className={classes}>
       {content}
     </span>
+  );
+}
+
+export interface DayBadgeRadioProps {
+  day: number;
+  weekday?: Weekday;
+  /** Jour coché (`aria-checked="true"`) : rendu de la pastille active de F3. */
+  checked: boolean;
+  /** Jour « complet » : `aria-disabled="true"`, mention visible « complet », jamais coché (décision 0019 § 1.2). */
+  disabled?: boolean;
+  /** Arrêt de tabulation du groupe (`tabIndex={0}`), sinon `-1`. */
+  tabStop: boolean;
+  buttonRef: Ref<HTMLButtonElement>;
+  onActivate: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}
+
+/**
+ * Rendu radio de `DayBadge` (décision 0019 § 1.2), **réservé à `DayBadgeGroup`** : il n'est pas exporté par
+ * `src/components/ligne/index.ts`, et sa logique clavier vient du groupe (`useRadioGroup`). `<button role="radio">`
+ * avec `aria-checked` et le nom accessible de F3 (« Jour 4 », « Jour 3, complet ») ; jamais `aria-current` ni
+ * `aria-pressed`. Un jour « complet » garde le focus (`aria-disabled`, pas l'attribut natif `disabled`).
+ */
+export function DayBadgeRadio({ day, weekday, checked, disabled = false, tabStop, buttonRef, onActivate, onKeyDown }: DayBadgeRadioProps) {
+  const isChecked = checked && !disabled;
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      role="radio"
+      aria-checked={isChecked}
+      aria-disabled={disabled || undefined}
+      tabIndex={tabStop ? 0 : -1}
+      data-day={day}
+      onClick={onActivate}
+      onKeyDown={onKeyDown}
+      className={dayBadgeClasses({
+        small: false,
+        active: isChecked,
+        disabled,
+        className: disabled ? "cursor-not-allowed" : "cursor-pointer",
+      })}
+    >
+      <DayBadgeContent day={day} weekday={weekday} disabled={disabled} />
+    </button>
   );
 }

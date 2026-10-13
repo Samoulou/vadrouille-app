@@ -121,6 +121,40 @@ function clientImports(...patterns) {
   };
 }
 
+/**
+ * B5a (décision 0045 § 3, B5-TL-3 ; handover § 3) : `src/domain` sans entrée-sortie. Liste blanche des imports
+ * (`import`, `import type`, `export … from`) : `@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain`
+ * (`@/domain/*` ou relatif sans remonter), et `vitest` pour les seuls `*.test.ts`. Constructions refusées : `process`
+ * (tout accès), `fetch`, `Date.now`, `new Date()` et `Date()` sans argument, `Math.random`, `crypto`, `performance`,
+ * `globalThis`, `require`, `import()`, `eval`, `Function`. `Date.parse`, `Date.UTC` et `new Date(argument)` restent
+ * permis. Même liste que la ligne `src/domain` de `tests/unit/p0/imports.test.ts` tant que P0 tourne.
+ */
+const DOMAIN_IMPORTS = "zod|@/contracts(/.+)?|@/domain/.+|\\./[^/]+";
+function domainSansEntreeSortie(avecVitest) {
+  const admis = avecVitest ? `${DOMAIN_IMPORTS}|vitest` : DOMAIN_IMPORTS;
+  const message = "src/domain sans entrée-sortie (décision 0045 § 3) : seuls @/contracts, zod et src/domain s'importent.";
+  const io = "src/domain sans entrée-sortie (décision 0045 § 3) : le moteur reçoit la date, les identifiants et les relectures en entrée.";
+  return {
+    "no-restricted-imports": ["error", { patterns: [{ regex: `^(?!(${admis})$)`, message }] }],
+    "no-restricted-globals": [
+      "error",
+      ...["process", "fetch", "crypto", "performance", "globalThis", "require", "eval", "Function"].map((name) => ({ name, message: io })),
+    ],
+    "no-restricted-properties": [
+      "error",
+      { object: "Date", property: "now", message: io },
+      { object: "Math", property: "random", message: io },
+    ],
+    "no-restricted-syntax": [
+      "error",
+      { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: io },
+      { selector: "CallExpression[callee.name='Date']", message: io },
+      { selector: "CallExpression[callee.name='require']", message: io },
+      { selector: "ImportExpression", message: io },
+    ],
+  };
+}
+
 export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -352,6 +386,10 @@ export default defineConfig([
       "src/components/ligne/ChecklistRow.tsx",
       // F7a : aperçu des effets (spécification F7, C3).
       "src/components/ligne/ChangeSet.tsx",
+      // F7b : choix du jour de « Déplacer » (spécification F7, C3 ; décision 0019 § 1).
+      "src/components/ligne/DayBadge.tsx",
+      "src/components/ligne/DayBadgeGroup.tsx",
+      "src/components/ligne/useRadioGroup.ts",
       "src/lib/pointer.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}"],
@@ -557,6 +595,16 @@ export default defineConfig([
       ...noClientStorage("Vue partagée", "spécification F10, F10c, décision 0039 F10-TL-5", "aucun service worker"),
       ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
     },
+  },
+  {
+    // B5a (décision 0045 § 3) : `src/domain` sans entrée-sortie, tests compris (`vitest` en plus pour eux).
+    files: ["src/domain/**/*.ts"],
+    ignores: ["src/domain/**/*.test.ts"],
+    rules: domainSansEntreeSortie(false),
+  },
+  {
+    files: ["src/domain/**/*.test.ts"],
+    rules: domainSansEntreeSortie(true),
   },
   {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
