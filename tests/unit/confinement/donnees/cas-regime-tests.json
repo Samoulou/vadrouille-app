@@ -552,7 +552,7 @@
       "attendu": "admis"
     },
     {
-      "id": "tests-stubenv-secret-malgre-ligne-texte",
+      "id": "tests-stubenv-secret-fichier-p0",
       "chemin": "tests/unit/p0/cli.test.ts",
       "source": "import { vi } from \"vitest\";\nvi.stubEnv(\"OPENROUTER_API_KEY\", \"x\");",
       "attendu": "refus",
