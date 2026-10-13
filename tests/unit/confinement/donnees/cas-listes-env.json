@@ -1,0 +1,11 @@
+{
+  "_": "Cas du contrôle des noms secrets dans les listes de process.env et de vi.stubEnv (spécification P0c, section 5 ; bloquant 3 de la revue du head eb7e3bf). Une lecture d'un nom secret n'est admise que dans un module non-test de src/server/env/ ; vi.stubEnv d'un nom secret ne l'est nulle part (section 4, forme 3).",
+  "cas": [
+    { "id": "listes-env-lecture-secrete-hors-zone", "lectures": [{ "fichier": "src/adapters/index.ts", "noms": ["FOO_API_KEY"] }], "tables": [], "attendu": "refus" },
+    { "id": "listes-env-lecture-secrete-test-de-zone", "lectures": [{ "fichier": "src/server/env/cles.test.ts", "noms": ["OPENROUTER_API_KEY"] }], "tables": [], "attendu": "refus" },
+    { "id": "listes-env-lecture-database-url", "lectures": [{ "fichier": "src/dev/flags.ts", "noms": ["VADROUILLE_DATABASE_URL"] }], "tables": [], "attendu": "refus" },
+    { "id": "listes-env-table-stubenv-secrete", "lectures": [], "tables": [{ "fichier": "tests/unit/x.test.tsx", "valeur": "VERCEL_ENV,VERCEL_OIDC_TOKEN" }], "attendu": "refus" },
+    { "id": "listes-env-lecture-secrete-zone-env", "lectures": [{ "fichier": "src/server/env/cles.ts", "noms": ["OPENROUTER_API_KEY"] }], "tables": [], "attendu": "admis" },
+    { "id": "listes-env-cle-publique", "lectures": [{ "fichier": "src/components/carte/config.tsx", "noms": ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"] }], "tables": [{ "fichier": "tests/unit/x.test.tsx", "valeur": "VERCEL_ENV,VADROUILLE_ENV" }], "attendu": "admis" }
+  ]
+}

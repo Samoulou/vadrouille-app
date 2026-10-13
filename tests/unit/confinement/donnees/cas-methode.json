@@ -1,0 +1,836 @@
+{
+  "_": "Cas de la méthode de détection (spécification P0c, sections 2.2 à 2.4 ; « Tests attendus », méthode). Données du régime : jamais dans un fichier analysé.",
+  "cas": [
+    {
+      "id": "methode-refus-01",
+      "chemin": "src/x.ts",
+      "source": "import http from \"node:http\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-02",
+      "chemin": "src/x.ts",
+      "source": "import https from \"https\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "methode-refus-03",
+      "chemin": "src/x.ts",
+      "source": "import { lookup } from \"node:dns/promises\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-04",
+      "chemin": "src/x.ts",
+      "source": "import type { Agent } from \"node:https\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-05",
+      "chemin": "src/x.ts",
+      "source": "export * from \"node:net\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-06",
+      "chemin": "src/x.ts",
+      "source": "export { connect } from \"node:tls\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-07",
+      "chemin": "src/x.ts",
+      "source": "import cp = require(\"node:child_process\");",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-08",
+      "chemin": "src/x.ts",
+      "source": "const m = await import(\"undici\");",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-09",
+      "chemin": "src/x.ts",
+      "source": "type T = typeof import(\"node:http2\");",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-10",
+      "chemin": "src/x.ts",
+      "source": "import { generateText } from \"ai\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-11",
+      "chemin": "src/x.ts",
+      "source": "import { createX } from \"@ai-sdk/gateway\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-12",
+      "chemin": "src/x.ts",
+      "source": "import pg from \"pg\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-13",
+      "chemin": "src/x.ts",
+      "source": "import vm from \"node:vm\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-14",
+      "chemin": "src/x.ts",
+      "source": "import { Worker as W } from \"node:worker_threads\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-15",
+      "chemin": "src/x.ts",
+      "source": "import cluster from \"node:cluster\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-16",
+      "chemin": "src/x.ts",
+      "source": "import inspector from \"node:inspector\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-17",
+      "chemin": "src/x.ts",
+      "source": "import { createRequire } from \"node:module\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-18",
+      "chemin": "src/x.ts",
+      "source": "import dgram from \"node:dgram\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-19",
+      "chemin": "src/x.ts",
+      "source": "import { Inter } from \"next/font/google\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "methode-refus-20",
+      "chemin": "src/x.ts",
+      "source": "const m = await import(\"data:text/javascript,export default 1\");",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "methode-refus-21",
+      "chemin": "src/x.ts",
+      "source": "import x from \"file:///etc/x.js\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "methode-refus-22",
+      "chemin": "src/x.ts",
+      "source": "fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-23",
+      "chemin": "src/x.ts",
+      "source": "export const o = { fetch };",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-24",
+      "chemin": "src/x.ts",
+      "source": "globalThis.fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-25",
+      "chemin": "src/x.ts",
+      "source": "globalThis[\"fetch\"](\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-26",
+      "chemin": "src/x.ts",
+      "source": "window.fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-27",
+      "chemin": "src/x.ts",
+      "source": "self.fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-28",
+      "chemin": "src/x.ts",
+      "source": "global.fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-29",
+      "chemin": "src/x.ts",
+      "source": "document.defaultView.fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-30",
+      "chemin": "src/x.ts",
+      "source": "window.parent[\"fetch\"](\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-31",
+      "chemin": "src/x.ts",
+      "source": "const { fetch: f } = frames;",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-32",
+      "chemin": "src/x.ts",
+      "source": "const g = globalThis;",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "methode-refus-33",
+      "chemin": "src/x.ts",
+      "source": "Reflect.get(globalThis, \"fetch\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-34",
+      "chemin": "src/x.ts",
+      "source": "Object.getOwnPropertyDescriptor(globalThis, \"fetch\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-35",
+      "chemin": "src/x.ts",
+      "source": "const { fetch: f } = globalThis;",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "methode-refus-36",
+      "chemin": "src/x.ts",
+      "source": "export const v = globalThis[k];",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "methode-refus-37",
+      "chemin": "src/x.ts",
+      "source": "for (const k in globalThis) { console.log(k); }",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "methode-refus-38",
+      "chemin": "src/x.ts",
+      "source": "Object.assign({}, window);",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "methode-refus-39",
+      "chemin": "src/x.ts",
+      "source": "(() => {}).constructor(\"return 1\");",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-40",
+      "chemin": "src/x.ts",
+      "source": "(() => {})[\"constructor\"](\"return 1\");",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-41",
+      "chemin": "src/x.ts",
+      "source": "(() => {})[\"con\" + \"structor\"];",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-42",
+      "chemin": "src/x.ts",
+      "source": "(() => {})[`constructor`];",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-43",
+      "chemin": "src/x.ts",
+      "source": "f?.[\"constructor\"];",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-44",
+      "chemin": "src/x.ts",
+      "source": "f.constructor`x`;",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-45",
+      "chemin": "src/x.ts",
+      "source": "f.constructor.value;",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-46",
+      "chemin": "src/x.ts",
+      "source": "class X extends f.constructor {}",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-47",
+      "chemin": "src/x.ts",
+      "source": "const { constructor: F } = f;",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-48",
+      "chemin": "src/x.ts",
+      "source": "function g({ constructor: F }) { return F; }",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-49",
+      "chemin": "src/x.ts",
+      "source": "({ constructor: F } = f);",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-50",
+      "chemin": "src/x.ts",
+      "source": "new f.constructor(\"x\");",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-51",
+      "chemin": "src/x.ts",
+      "source": "Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-52",
+      "chemin": "src/x.ts",
+      "source": "Object.getOwnPropertyDescriptor(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-53",
+      "chemin": "src/x.ts",
+      "source": "Object.getOwnPropertyDescriptors(Object.getPrototypeOf(f));",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-54",
+      "chemin": "src/x.ts",
+      "source": "const O = Object;",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-55",
+      "chemin": "src/x.ts",
+      "source": "Object[\"getPrototypeOf\"](f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-56",
+      "chemin": "src/x.ts",
+      "source": "new Proxy(f, {});",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-57",
+      "chemin": "src/x.ts",
+      "source": "Object.defineProperties(f, {});",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-58",
+      "chemin": "src/x.ts",
+      "source": "Object.defineProperty(document, \"visibilityState\", { value: \"hidden\" });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-59",
+      "chemin": "src/x.ts",
+      "source": "f.__proto__;",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-60",
+      "chemin": "src/x.ts",
+      "source": "navigator.sendBeacon(\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-61",
+      "chemin": "src/x.ts",
+      "source": "navigator[\"sendBeacon\"](\"/x\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-62",
+      "chemin": "src/x.ts",
+      "source": "x[\"getBuiltinModule\"](\"http\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-63",
+      "chemin": "src/x.ts",
+      "source": "process.getBuiltinModule(\"http\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "methode-refus-64",
+      "chemin": "src/x.ts",
+      "source": "process[\"binding\"](\"tcp_wrap\");",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "methode-refus-65",
+      "chemin": "src/x.ts",
+      "source": "module.require(\"http\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-66",
+      "chemin": "src/x.ts",
+      "source": "import(k);",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-67",
+      "chemin": "src/x.ts",
+      "source": "require(k);",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-68",
+      "chemin": "src/x.ts",
+      "source": "require(\"node:http\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-69",
+      "chemin": "src/x.ts",
+      "source": "import.meta.resolve(\"x\");",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-70",
+      "chemin": "src/x.ts",
+      "source": "eval(\"1\");",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-71",
+      "chemin": "src/x.ts",
+      "source": "new Function(\"return 1\");",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-72",
+      "chemin": "src/x.ts",
+      "source": "Function(\"return 1\")();",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-73",
+      "chemin": "src/x.ts",
+      "source": "with (f) { x; }",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-74",
+      "chemin": "src/x.ts",
+      "source": "setTimeout(\"code\");",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-75",
+      "chemin": "src/x.ts",
+      "source": "window.setInterval(\"code\", 10);",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "methode-refus-76",
+      "chemin": "src/x.ts",
+      "source": "new WebSocket(\"wss://exemple.org\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-77",
+      "chemin": "src/x.ts",
+      "source": "new XMLHttpRequest();",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-78",
+      "chemin": "src/x.ts",
+      "source": "new EventSource(\"/x\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-79",
+      "chemin": "src/x.ts",
+      "source": "new Worker(\"w.js\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-80",
+      "chemin": "src/x.ts",
+      "source": "importScripts(\"x.js\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "methode-refus-cjs",
+      "chemin": "src/x.cjs",
+      "source": "module.exports = 1;",
+      "attendu": "refus",
+      "regle": "fichier"
+    },
+    {
+      "id": "methode-refus-js",
+      "chemin": "scripts/x.js",
+      "source": "export const a = 1;",
+      "attendu": "refus",
+      "regle": "fichier"
+    },
+    {
+      "id": "methode-refus-non-resolu",
+      "chemin": "src/x.ts",
+      "source": "import { a } from \"./absent\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "methode-refus-constructor-name-zone",
+      "chemin": "src/ai/x.ts",
+      "source": "export const n = x.constructor.name;",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-constructor-name-mjs",
+      "chemin": "scripts/x.mjs",
+      "source": "export const n = x.constructor.name;",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "methode-refus-defineProperty-zone",
+      "chemin": "src/ai/x.test.ts",
+      "source": "Object.defineProperty(document, \"visibilityState\", { value: \"hidden\" });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-defineProperty-global",
+      "chemin": "src/x.test.ts",
+      "source": "Object.defineProperty(globalThis, \"x\", { value: 1 });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-refus-defineProperty-interdit",
+      "chemin": "src/x.test.ts",
+      "source": "Object.defineProperty(o, \"constructor\", { value: 1 });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-admis-01",
+      "chemin": "src/x.ts",
+      "source": "export const m = window.matchMedia(\"(min-width: 1px)\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-02",
+      "chemin": "src/x.ts",
+      "source": "export const t = typeof window === \"undefined\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-03",
+      "chemin": "src/x.ts",
+      "source": "(window as unknown as { x: number }).x = 1;",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-04",
+      "chemin": "src/x.ts",
+      "source": "window[\"x\"] = 1;",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-05",
+      "chemin": "src/x.ts",
+      "source": "export const n = x.constructor.name;",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-06",
+      "chemin": "src/x.ts",
+      "source": "export const h = Object.hasOwn(v, \"__proto__\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-07",
+      "chemin": "src/x.ts",
+      "source": "export const e = Object.entries(o);",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-08",
+      "chemin": "src/x.test.ts",
+      "source": "Object.defineProperty(document, \"visibilityState\", { value: \"hidden\" });",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-09",
+      "chemin": "src/x.ts",
+      "source": "setTimeout(() => {}, 0);",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-10",
+      "chemin": "src/x.ts",
+      "source": "const tick = () => {}; setInterval(tick, 10);",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-11",
+      "chemin": "scripts/x.mjs",
+      "source": "export function e2ePort({ env, repoPath }) { return repoPath; }",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-12",
+      "chemin": "src/x.ts",
+      "source": "export const n = new Intl.NumberFormat(\"fr-CH\").format(1);",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-13",
+      "chemin": "src/x.ts",
+      "source": "import { z } from \"zod\"; export const s = z.string();",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-14",
+      "chemin": "src/x.ts",
+      "source": "class A { constructor() {} fetch() { return 1; } } export const a = new A();",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-admis-15",
+      "chemin": "src/x.ts",
+      "source": "export const o = { fetch: 1, process: 2, constructor: 3 };",
+      "attendu": "admis"
+    },
+    {
+      "id": "methode-reflect-global-pointe",
+      "chemin": "src/x.ts",
+      "source": "export const F = globalThis.Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-window-crochets",
+      "chemin": "src/x.ts",
+      "source": "export const F = window[\"Reflect\"].get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-crochets-replies",
+      "chemin": "src/x.ts",
+      "source": "export const F = self[\"Ref\" + \"lect\"].get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-propriete-objet-quelconque",
+      "chemin": "src/x.ts",
+      "source": "export const F = outils.Reflect.apply(f, undefined, []);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-alias-global",
+      "chemin": "src/x.ts",
+      "source": "const g = globalThis;\nexport const F = g.Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-destructure-global",
+      "chemin": "src/x.ts",
+      "source": "const { Reflect: R } = globalThis;\nexport const F = R.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-destructure-affectation",
+      "chemin": "src/x.ts",
+      "source": "let R;\n({ Reflect: R } = globalThis);\nexport { R };",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-self-valeur",
+      "chemin": "src/x.ts",
+      "source": "export const P = self.Proxy;",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-new-global",
+      "chemin": "src/x.ts",
+      "source": "export const p = new globalThis.Proxy(f, { apply() { return 1; } });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-destructure-raccourci",
+      "chemin": "src/x.ts",
+      "source": "const { Proxy } = window;\nexport const p = new Proxy(f, {});",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-getprototypeof",
+      "chemin": "src/x.ts",
+      "source": "export const p = globalThis.Object.getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-crochets",
+      "chemin": "src/x.ts",
+      "source": "export const p = window[\"Object\"][\"getPrototypeOf\"](f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-descripteur",
+      "chemin": "src/x.ts",
+      "source": "export const d = self.Object.getOwnPropertyDescriptor(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-destructure",
+      "chemin": "src/x.ts",
+      "source": "const { getPrototypeOf } = globalThis.Object;\nexport const p = getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-alias",
+      "chemin": "src/x.ts",
+      "source": "export const O = globalThis.Object;",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-destructure-object",
+      "chemin": "src/x.ts",
+      "source": "const { Object: O } = globalThis;\nexport const p = O.getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-defineproperty",
+      "chemin": "src/x.ts",
+      "source": "globalThis.Object.defineProperty(globalThis, \"fetch\", { value: 1 });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-keys-admis",
+      "chemin": "src/x.ts",
+      "source": "export const k = globalThis.Object.keys(o);",
+      "attendu": "admis"
+    }
+  ]
+}

@@ -1,14 +1,14 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { runInNewContext } from "node:vm";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /**
  * Aiguillage du service worker (spécification F10, F10b ; F10-TL-4, critère C26) : `public/sw-route.js`, script
- * classique chargé par `public/sw.js`, exécuté ici dans un contexte isolé (seuls `URL` et `self` y sont fournis :
- * ni horloge, ni stockage).
+ * classique chargé par `public/sw.js`. Il est importé ici une fois, `self` remplacé le temps du chargement par un
+ * réceptacle (`vi.stubGlobal`), sans évaluation de texte (`node:vm` retiré : spécification P0c, section 2.4 ;
+ * revue de la PR 217). L'absence d'horloge et de stockage est vérifiée sur les sources (F10-PO-11, plus bas).
  */
 
 interface SwRoute {
@@ -21,15 +21,20 @@ interface SwRoute {
   staleCaches(keys: string[]): string[];
 }
 
-function loadRoute(): SwRoute {
-  const source = readFileSync(join(process.cwd(), "public", "sw-route.js"), "utf8");
-  const self: { vadrouilleSwRoute?: SwRoute } = {};
-  runInNewContext(source, { self, URL });
-  if (!self.vadrouilleSwRoute) throw new Error("aiguillage absent");
-  return self.vadrouilleSwRoute;
+async function loadRoute(): Promise<SwRoute> {
+  const holder: { vadrouilleSwRoute?: SwRoute } = {};
+  vi.stubGlobal("self", holder);
+  try {
+    // @ts-expect-error script classique du service worker, sans déclaration de types (`allowJs` faux)
+    await import("../../public/sw-route.js");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  if (!holder.vadrouilleSwRoute) throw new Error("aiguillage absent");
+  return holder.vadrouilleSwRoute;
 }
 
-const route = loadRoute();
+const route = await loadRoute();
 const ORIGIN = "https://vadrouille.example";
 
 function request(path: string, init: { method?: string; mode?: string; headers?: Record<string, string> } = {}) {
