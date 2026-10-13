@@ -22,12 +22,13 @@ import {
 import type { Category } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
 import { format, messages } from "@/i18n";
+import { formatNombre } from "@/lib/nombre";
 import { cn } from "@/lib/utils";
 
 import { TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { IconMoinsProvisoire, NumberField } from "./NumberField";
-import { briefCompletedProperties, formatNombre } from "./brief-fields";
+import { briefCompletedProperties } from "./brief-fields";
 import type { BriefValues, ChipField } from "./draft";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldMessage, fieldId, focusField } from "./fields";
 import type { StageProps } from "./stage";

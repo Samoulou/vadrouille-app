@@ -2,6 +2,7 @@ import type { Day, DayLineItem, Segment, Stop } from "@/contracts";
 import { segmentLabel } from "@/components/ligne/DayLine";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
+import { formatNombre } from "@/lib/nombre";
 
 /**
  * Fonctions pures de la Journée (spécification F5, F5-PO-5, F5-PO-6) : seuil du budget de trajet,
@@ -11,9 +12,12 @@ import { formatDuree } from "@/lib/duree";
 
 const t = messages.sejour.journee;
 
-/** Montant en francs, formaté par l'interface (handover § 9). */
+/**
+ * Montant en francs, formaté par l'interface (handover § 9) avec `formatNombre`, indépendant de l'ICU
+ * (F-ICU, ticket 171) : arrondi au franc (« environ … CHF »), milliers séparés par U+202F.
+ */
 export function formatMontant(amount: number): string {
-  return new Intl.NumberFormat("fr-CH").format(amount);
+  return formatNombre(Math.round(amount));
 }
 
 /** Dépassement strict : `travelMinutes` > `travelBudgetMinutes` (égalité : pas de bandeau). */
