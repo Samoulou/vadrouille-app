@@ -1,20 +1,31 @@
-import type { RevisionFixtures } from "@/contracts";
+import type { RevisionFixtures, Trip } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
+import { createMockShareAdapter, shareEnded } from "./mock-share";
 import { prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
+import { shareAvailable } from "./share-guard";
 import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
-import type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+import type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
-export type { AdapterContext, CreationAdapter, MemberRole, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+export type {
+  AdapterContext,
+  CreationAdapter,
+  MemberRole,
+  PaymentAdapter,
+  PaymentSimulator,
+  ShareAdapter,
+  TripAdapter,
+} from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
+export { shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { prototypeRelectures } from "./prototype-instance";
 
@@ -151,4 +162,33 @@ export async function getRevisionFixtures(
 ): Promise<RevisionFixtures | null> {
   if (!isMockAdapter(value)) return null;
   return getMockRevisionFixtures(ctx, tripId);
+}
+
+/**
+ * Adaptateur de partage (spécification F10, F10-TL-7 ; décision 0039), simulé dans la portée de la requête : liens en
+ * mémoire de la portée, voyages lus par `getTripReader()` de la même portée, durée du partage lue dans la
+ * configuration serveur. **Filet de sécurité** : lève une erreur si `shareAvailable()` est faux ; les pages et les
+ * actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
+ */
+export function getShareAdapter(options: { scope?: SimulationScope } = {}): ShareAdapter {
+  if (!shareAvailable()) {
+    throw new Error("partage indisponible : shareAvailable() est faux (spécification F10, F10-TL-7)");
+  }
+  const scope = options.scope ?? defaultScope();
+  return createMockShareAdapter({
+    trips: getTripReader({ scope }),
+    now: () => scope.clock.now(),
+    store: scope.share,
+    accessDaysAfterReturn: OFFER_CONFIG.accessDaysAfterReturn,
+  });
+}
+
+/**
+ * Bouton « Partager » du Séjour et de la Journée (F10-PO-13, F10-PO-21) : partage disponible, voyage débloqué et fin
+ * du partage pas encore passée à l'horloge de la portée de la requête. Rien n'est lu si la garde est fermée.
+ */
+export async function shareButtonVisible(trip: Pick<Trip, "unlocked" | "end" | "timeZone">): Promise<boolean> {
+  if (!shareAvailable() || !trip.unlocked) return false;
+  const scope = await getSimulationScope();
+  return !shareEnded(trip, scope.clock.now(), OFFER_CONFIG.accessDaysAfterReturn);
 }

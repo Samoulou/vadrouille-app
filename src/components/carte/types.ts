@@ -20,6 +20,8 @@ export type MapView =
       fitPadding?: FitPadding;
       /** Partie de la carte couverte (panneau en bas) : le recentrage sur la sélection la place au milieu du reste. */
       visibleInsets?: FitPadding;
+      /** `false` : marqueurs non interactifs (vue partagée, F10-TL-14) ; interactifs par défaut. */
+      interactive?: boolean;
     }
   | {
       mode: "overview";

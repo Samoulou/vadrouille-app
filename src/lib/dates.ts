@@ -87,3 +87,14 @@ export function formatTripDates(
     voyageurs: formatVoyageurs(travellers),
   });
 }
+
+/**
+ * Fin de l'accès et du partage : date ISO de fin du voyage + `days` jours (cadrage § 4), en ISO « AAAA-MM-JJ ».
+ * Seule implémentation (décision 0039, F10-TL-7 point 1), partagée par l'écran 9 et le partage (F10-PO-21) ;
+ * calcul sur le calendrier, en UTC, sans fuseau horaire.
+ */
+export function accessUntil(end: string, days: number): string {
+  const [year, month, day] = end.split("-").map(Number);
+  const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, (day ?? 1) + days));
+  return date.toISOString().slice(0, 10);
+}

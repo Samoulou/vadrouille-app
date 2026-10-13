@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
-import type { Day, DayMap as DayMapData } from "@/contracts";
 import { format, messages } from "@/i18n";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { isMapConfigComplete, useCarteInjection } from "./config";
 import { GoogleMapRenderer } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
-import { buildDayRoute, buildOverview } from "./route";
+import { buildDayRoute, buildOverview, type RouteDay, type RouteMap } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
@@ -18,14 +17,19 @@ const t = messages.carte;
 export type DayMapProps =
   | {
       mode: "day";
-      /** Fournit l'ordre et la numérotation (items). */
-      day: Day;
+      /** Fournit l'ordre et la numérotation (items) ; `Day` en est un sous-type. */
+      day: RouteDay;
       /** Positions du jour (F4-TL-1) ; `null` ou vide : état de remplacement, aucun script chargé. */
-      map: DayMapData | null;
+      map: RouteMap | null;
       /** Étape dont la fiche est ouverte (F4-PO-5). */
       selectedStopId?: string;
       /** Marqueur touché : l'appelant fait défiler la liste jusqu'à l'étape (F4-PO-4). */
       onMarkerPress?: (stopId: string) => void;
+      /**
+       * Faux : marqueurs non interactifs, rendus comme des images nommées et non comme des boutons (vue partagée,
+       * spécification F10, F10-TL-14). Vrai par défaut.
+       */
+      interactiveMarkers?: boolean;
       /** Id de la liste des étapes, cible du lien d'évitement ; l'appelant y pose `tabindex="-1"` (F4-PO-10). */
       listId: string;
       /** Marge de cadrage ; par défaut `--touch-target` de chaque côté. Appliquée au cadrage d'un jour ou d'un `fitScope`. */
@@ -47,8 +51,8 @@ export type DayMapProps =
     }
   | {
       mode: "overview";
-      days: Day[];
-      maps: DayMapData[];
+      days: readonly RouteDay[];
+      maps: readonly RouteMap[];
       /** Contrôles posés sur la carte (« Retour »), en tête de l'ordre de tabulation. */
       controls?: ReactNode;
       /** Marge de cadrage (panneau du Séjour en bas) ; par défaut `--touch-target` de chaque côté. */
@@ -84,15 +88,25 @@ export function DayMap(props: DayMapProps) {
   const fitPadding = props.fitPadding;
   const scope = props.fitScope ? `:${props.fitScope}` : "";
   const visibleInsets = props.mode === "day" ? props.visibleInsets : undefined;
+  const interactive = props.mode === "day" ? (props.interactiveMarkers ?? true) : true;
   const view = useMemo<MapView | null>(() => {
     if (route && day) {
-      return { mode: "day", fitKey: `jour-${day.index}${scope}`, route, selectedStopId, onMarkerPress, fitPadding, visibleInsets };
+      return {
+        mode: "day",
+        fitKey: `jour-${day.index}${scope}`,
+        route,
+        selectedStopId,
+        onMarkerPress,
+        fitPadding,
+        visibleInsets,
+        ...(interactive ? {} : { interactive: false }),
+      };
     }
     if (rings) {
       return { mode: "overview", fitKey: `sejour${scope}`, rings, fitPadding };
     }
     return null;
-  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope]);
+  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive]);
 
   const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.rings.length > 0) : false;
   const needsConfig = !Simulated;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateCourte, formatDateLongue, formatTitreJour, formatTripDates, formatVoyageurs } from "./dates";
+import { accessUntil, formatDateCourte, formatDateLongue, formatTitreJour, formatTripDates, formatVoyageurs } from "./dates";
 
 describe("formatDateLongue", () => {
   it("écrit la date en toutes lettres", () => {
@@ -42,5 +42,17 @@ describe("formatTripDates (décision 0021 § 3)", () => {
     expect(formatTripDates("2026-08-29", "2026-08-29", { adults: 1, children: 2 })).toBe("sam. 29.08 – sam. 29.08 · 1 adulte, 2 enfants");
     expect(formatDateCourte("2027-05-11", true)).toBe("mar. 11.05.2027");
     expect(formatVoyageurs({ adults: 2, children: 1 })).toBe("2 adultes, 1 enfant");
+  });
+});
+
+// Déplacé de `src/features/presentation/price.test.ts` avec `accessUntil` (décision 0039, F10-TL-7 point 1).
+describe("accessUntil", () => {
+  it("fin du voyage + 30 jours", () => {
+    expect(accessUntil("2026-09-03", 30)).toBe("2026-10-03");
+  });
+
+  it("change de mois et d'année", () => {
+    expect(accessUntil("2026-12-20", 30)).toBe("2027-01-19");
+    expect(accessUntil("2026-09-03", 0)).toBe("2026-09-03");
   });
 });

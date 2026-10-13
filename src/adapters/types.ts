@@ -3,6 +3,7 @@ import type {
   CheckoutRequest,
   CheckoutStart,
   CheckoutStatus,
+  CreatedShareLink,
   Day,
   DayMap,
   InferredBrief,
@@ -10,6 +11,9 @@ import type {
   PreviewSlot,
   Proposal,
   Result,
+  ShareStatus,
+  SharedDayView,
+  SharedTripView,
   Trip,
   TripSummary,
 } from "@/contracts";
@@ -86,4 +90,26 @@ export interface PaymentSimulator {
 export interface CreationAdapter {
   /** Seule étape IA des écrans 1 à 4 (0017 § 3.6) : le récit est une donnée, jamais une instruction. */
   structureBrief(request: BriefRequest): Promise<Result<InferredBrief>>;
+}
+
+/**
+ * Partage (spécification F10, F10-TL-7 ; décision 0039) : un lien privé par voyage débloqué, révocable, valable
+ * jusqu'à la fin du partage (`accessUntil(trip.end, accessDaysAfterReturn)`, à l'heure de la destination). Simulé en
+ * phase 0 (`mock-share.ts`, état de la portée de simulation) ; B12 le remplace par la table `share_links` sans changer
+ * l'interface. Voyage inconnu, d'une autre organisation ou non débloqué : `not_found`, exactement comme un inconnu.
+ */
+export interface ShareAdapter {
+  /** Désactive le lien actif éventuel et en crée un nouveau ; seule réponse qui porte le jeton en clair. */
+  createLink(ctx: AdapterContext, tripId: string): Promise<Result<CreatedShareLink>>;
+  /** Désactive le lien actif éventuel ; renvoie `{ active: false }`. */
+  revokeLink(ctx: AdapterContext, tripId: string): Promise<Result<ShareStatus>>;
+  /** État du lien, jamais le jeton. */
+  getStatus(ctx: AdapterContext, tripId: string): Promise<Result<ShareStatus>>;
+  /**
+   * Vue partagée `RP` : projection stricte du voyage et de ses points de carte ; `null` pour un jeton inconnu,
+   * désactivé, expiré ou mal formé, sans dire lequel. Une projection non conforme lève une erreur (page d'erreur).
+   */
+  getSharedTrip(token: string): Promise<SharedTripView | null>;
+  /** Vue partagée `RPJ` du jour `index` (1 = J1) ; `null` comme `getSharedTrip`, ou pour un jour hors du voyage. */
+  getSharedDay(token: string, index: number): Promise<SharedDayView | null>;
 }
