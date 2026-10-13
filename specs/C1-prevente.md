@@ -3,7 +3,7 @@
 Rôle : `commercial` (décision 0043) · Ticket : à ouvrir par le CEO · Livrables dans `docs/commercial/`, documents seulement, aucun code.
 
 ## Objectif
-Donner à Samuel tout ce qu'il faut pour vendre des préventes du voyage complet, **en libre-service et sans intervention humaine** (décision 0043 § 4), et mesurer le volet commercial de G0 : au moins 5 achats ou préventes payés dont au moins 3 hors cercle proche (`docs/roadmap.md`). Samuel publie et encaisse ; le studio prépare.
+Donner à Samuel tout ce qu'il faut pour vendre des préventes du voyage complet, **en libre-service et sans intervention humaine** (décision 0043 § 4), et mesurer le volet commercial de G0 (`docs/roadmap.md`, décision 0044) : 300 visites de la page de prévente, 10 réponses au questionnaire, au moins 5 achats ou préventes payés dont au moins 3 hors cercle proche. Samuel publie et encaisse ; le studio prépare.
 
 ## Références
 - `docs/produit/cadrage-v5.md` : § 2 (promesse, concurrence, benchmark), § 3.1 (parcours : on découvre avant de payer), § 4 (produit en libre-service, prix à tester), § 5 (saisonnalité, acquisition initiale, page d'offre avec un vrai prix), § 11 (budget), § 12 (risques), § 13 (suivi).
@@ -34,7 +34,7 @@ Donner à Samuel tout ce qu'il faut pour vendre des préventes du voyage complet
 - Le volet agences (reporté par Samuel, décision 0043 § 4).
 
 ## Questions ouvertes (Samuel)
-1. Seuils commerciaux de G0 : « 30 prospects contactés, 10 échanges » supposent des contacts humains. Recommandation : les remplacer par des mesures en ligne, par exemple « 300 visites de la page de prévente et 10 réponses au questionnaire », en gardant « 5 achats ou préventes dont 3 hors cercle proche ».
+1. ~~Seuils commerciaux de G0~~ : **tranchée par Samuel** (2026-10-13, décision 0044) : 300 visites de la page de prévente, 10 réponses au questionnaire, 5 achats ou préventes dont 3 hors cercle proche.
 2. Comment encaisser une prévente avant le paiement réel de l'application (Q26) : lien de paiement TWINT ou carte ouvert par Samuel ? Qui l'ouvre et quand ?
 3. Achat du domaine (Q1, environ 30 CHF au cadrage § 11) : quand ?
 4. Quels réseaux sociaux ouvrir, au nom de qui, et qui publie ?
