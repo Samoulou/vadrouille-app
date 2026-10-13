@@ -1,0 +1,184 @@
+# B5 — Moteur sans IA
+
+Rôle : backend · Rédaction : Product Owner · Ticket : #228 · Revue : Tech Lead · Prérequis : B2 fusionnée (#219, contrats `TripPatch`, `PatchResult`, `TripSnapshot`, `ApiError.currentVersion`) ; décision 0029 (chaîne MVP ouverte avant G0) ; décisions du Tech Lead sur B5-TL-1 à B5-TL-6 (section « Propositions au Tech Lead ») avant le code ; aucun compte externe, aucune clé · Parallèle : aucun fichier commun avec B1 (#188), B3, B4 ; coordination avec F7a (#227, `ChangeSchema`) et le rôle `ia` (code de P0 dans `src/domain`) · Suite : B6 (lecture, voisins), B8 (durées et horaires réels), B9 (génération), B10 (réduction de trajet, recalcul par lot), B11 (révision) · Référence : `docs/handovers/backend.md` (§ 0 règles 1 et 7, § 3 « Liste blanche », § 4 « Concurrence », § 5, § 8, § 12 « Tests de sortie », § 15 PO-1 et PO-5, ligne B5 du « Backlog », « Partie Q5 »), cadrage v5 (§ 3.7, § 6.2, § 6.5 étapes 5 à 8, § 6.6, § 7 « Ordre de construction », § 8 R1 à R10), décisions 0010, 0011 (points 4, 5 et 7), 0015 (§ 2 et § 9), 0016 (§ 4), 0029, 0032 (A3), 0037, spécifications B2, F5 (F5-PO-10), F6 (F6-PO-7), F7 (F7-PO-6), P0 (P0-PO-6, P0-PO-7)
+
+## Objectif
+Livrer le **moteur déterministe** du MVP dans `src/domain` : il construit les journées, les planifie, les valide selon R1 à R10, applique les révisions sous forme de patch sur une version identifiée et calcule les champs « calculé » que le handover § 5 lui attribue. C'est le bloc 2 de l'ordre de construction du cadrage (§ 7) : « modèle du programme, planificateur, validateurs R1–R10 […] sur des données de test ».
+
+Le moteur est **pur** : aucune base, aucun réseau, aucune variable d'environnement, aucune horloge, aucun hasard. Tout ce qui vient de l'extérieur lui est passé en entrée :
+- le brief, les logements, les engagements, les candidats de la réserve et leurs notes (données maison) ;
+- les données dérivées de Google dont il a besoin (validité d'un lieu, plages d'ouverture, durées de trajet), par des **interfaces injectées** qui, dans B5, sont des doubles de test à valeurs sentinelles ; B8 branche les vraies relectures (« Partie Q5 », « Comportement définitif de B2, B5 et B6 ») ;
+- les valeurs de configuration (budget de trajet PO-1, valeurs du squelette B5-PO-1), lues par le serveur.
+
+Il ne **stocke** rien et ne **renvoie jamais** une durée, un horaire ou un verdict dans ce qu'il destine à l'écriture : sa sortie d'écriture est validée par `TripSnapshotSchema` (sans `minutes`, `verifiedAt`, `travelMinutes` ni `toConfirm`), et son rapport de validation reste en mémoire (0011 point 5).
+
+## Ce que B5 ne fait pas
+- Aucune écriture en base, aucune transaction, aucun verrou de ligne : B6 (lecture) et B11 (écriture des versions). La contrainte d'unicité `(trip_id, version)` et le verrou de ligne sur `trips` (handover § 4, « Concurrence ») sont la seconde défense de R10, côté serveur.
+- Aucun appel à Google, à Routes ni à un fournisseur de modèles. Aucune donnée Google dans le code, les tests ou les données de test, hormis des `placeId` simulés et des valeurs sentinelles (`CLAUDE.md`, décision 0032 « Règles Google »).
+- Aucun workflow, aucun `GenerationStatus`, aucun plafond : B9.
+- **Pas de composition de l'aperçu de 8 cases** (`PreviewSlot`) : elle dépend de Q57 (Samuel : une option de repas compte-t-elle pour une proposition ?) et revient à B9. B5 fournit les briques (classement, planification, `Proposal.option`, voisins).
+- Pas de signaux ni de questions de préférence, pas de recalcul par lot : B10. B5 fournit la fonction de réduction du budget de trajet (PO-1) ; c'est B10 qui la déclenche.
+- Pas de raisons rédigées (`Stop.reason`, `Proposal.detour`) : appel IA de l'étape e (B9). Le moteur les reçoit déjà écrites, ou les laisse absentes.
+- Pas de recherche, d'ancrage ni de relecture : B7, B8. Aucune modification de `src/contracts` sauf si le Tech Lead le décide (B5-TL-5).
+
+## Découpage proposé (une PR de code par sous-tâche)
+La ligne B5 du « Backlog » couvre sept blocs. Une seule PR serait trop grosse à relire et mélangerait l'outillage, la planification et l'écriture des versions. Proposition au CEO (ordre des tâches) :
+
+| Sous-tâche | Contenu | Prérequis | Critères |
+|---|---|---|---|
+| **B5a — Modèle, validateurs et règles d'import** | Types d'entrée du moteur et interfaces injectées (B5-TL-1, B5-TL-2) ; validateurs R1 à R10 et rapport en mémoire ; fonctions calculées (voisins 0037, `budgetPerPerson`, `travelMinutes`, `destinationColor`, marque `toConfirm`) ; budget de trajet et sa réduction (PO-1) ; règle ESLint « `src/domain` sans entrée-sortie » et son test ; configuration du moteur (B5-TL-4) | B2 ; décisions sur B5-TL-1 à B5-TL-4 | « Critères communs » et « B5a » |
+| **B5b — Squelette, planificateur et réparation** | Squelette depuis le brief, les logements et les engagements ; classement et planification des candidats de la réserve ; réparation déterministe (option suivante, sinon créneau vide) ; sortie d'écriture validée par `TripSnapshotSchema` | B5a | « Critères communs » et « B5b » |
+| **B5c — Patches, versions et annulation** | Application d'un `TripPatch` (`replace`, `add`, `move`, `lock`, `unlock`, `revert`), replanification des jours touchés, refus explicite d'un patch obsolète (R10, `currentVersion`), `PatchResult` et liste `Change` | B5b ; B5-TL-5 ; `ChangeSchema` de `main` au démarrage (F7a, #227, le change) | « Critères communs » et « B5c » |
+
+Les trois sous-tâches touchent `src/domain` : elles sont **séquentielles**, pas parallèles. Chacune garde `pnpm p0` et les tests de P0 verts.
+
+## État de départ (vérifié sur `main` le 2026-10-13, `f68772f`)
+- `src/domain` existe déjà : moteur du prototype P0 (P0a1, #180 ; P0a1 bis, #216), rôle `ia` : `squelette.ts`, `classement.ts`, `planification.ts`, `validation.ts` (R1, R2, R4, R5, R6, R8), `assemblage.ts`, `temps.ts`, `tables.ts`, `identifiant.ts`, `moteur.test.ts`. Il importe des types de `src/prototype` (`brief`, `config`, `candidat`, `ancrage`), ce que permet la décision 0032 (A3.2) pendant P0, mais pas la liste blanche du handover § 3 (`src/domain` : `@/contracts`, `zod`, fichiers de `src/domain`). C'est l'objet de B5-TL-1.
+- Contrats prêts (B2) : `TripPatchSchema`, `PatchResultSchema`, `TripSnapshotSchema`, `DaySnapshotSchema`, `ProposalRecordSchema`, `ApiErrorSchema` avec `version_conflict` et `currentVersion`, `StopFactsSchema`, `ProposalNeighboursSchema`, `BriefSchema` (`pace`, `mobility`, `wishes`, `limits`, `mealBudgetPerPerson`), `TripCommitmentSchema` (`flight`, `booking`, `ticket`).
+- `ChangeSchema` de `main` a encore l'ancienne forme de `moved` ; F7a (#227, en revue) applique les formes de 0016 § 4.5 (`added`, `moved` structuré, `segment.label`). B5c utilise `ChangeSchema` tel qu'il est dans `main` à son démarrage.
+- `lockedStopViolations` (0016 § 4.2) est livrée côté interface par F7a ; 0016 prévoit qu'elle passe dans `src/domain` en B11. B5a écrit R3 avec la même définition (B5-PO-11) ; B11 fait le déplacement sans seconde copie.
+
+## À livrer
+
+### Critères communs aux trois sous-tâches
+- Code dans `src/domain` uniquement, plus la configuration du moteur (B5-TL-4) et les tests.
+- Entrées et sorties typées par `src/contracts` ou par des types maison de `src/domain` ; aucune forme Google brute (pas de champ `displayName`, `formattedAddress`, `location`, `regularOpeningHours`, `rating`…) dans un type du moteur.
+- Déterminisme : même entrée, même sortie, octet pour octet (test `moteur: déterministe`).
+- Doubles de test à valeurs sentinelles pour les interfaces injectées, fabriqués dans les tests, jamais tirés d'une réponse réelle de Google (« Partie Q5 », § 5 « Règles de relecture »).
+- `pnpm verify` vert ; `pnpm p0` et `src/domain/moteur.test.ts` (ou son successeur, B5-TL-1) verts.
+
+### B5a — Modèle, validateurs et règles d'import
+1. **Types d'entrée et interfaces injectées** (B5-TL-1, B5-TL-2) : brief (`Brief`), nuits et logements (étiquette maison, `placeId` facultatif), engagements (`TripCommitment`), candidats de la réserve (nom et résumé maison, catégorie, `StopFacts`, sources `https:`, notes du Decider, `placeId` posé par l'ancrage), état de choix des repas et soirées (B5-PO-8), configuration (B5-TL-4) ; interfaces `validité d'un lieu`, `plages d'ouverture d'un jour`, `durée d'un trajet par mode`, chacune pouvant répondre « inconnu ».
+2. **Validateurs R1 à R10** (cadrage § 8, règles fonctionnelles B5-PO-4 à B5-PO-11), sur un jour ou sur un programme, avec un **rapport en mémoire** : liste de `{ règle, identifiant d'étape ou de jour }`, codes d'une énumération fermée, rien d'autre (aucune valeur d'horaire, de durée ni de `placeId` dans le rapport ; 0011 point 4).
+3. **Fonctions calculées** (handover § 5, colonne « calculé », règle « Moteur ») :
+   - `Proposal.neighbours` (0037 B2-TL-1, règle exacte de son point 2) ;
+   - `Proposal.option` (`index`, `total` ≤ 3) depuis le classement d'un créneau de repas ;
+   - `Day.budgetPerPerson` (B5-PO-10) et `Change[budget].deltaPerPerson` ;
+   - `Day.travelMinutes` depuis les durées fournies en mémoire (pour la recomposition de B8) ;
+   - `Trip.destinationColor` (attribution stable depuis la destination, reprise de P0) ;
+   - la marque `toConfirm` d'une étape (B5-PO-5), calculée en mémoire pour la recomposition de B8, jamais dans une sortie d'écriture.
+4. **Budget de trajet** (PO-1, B5-PO-2, B5-PO-3) : budget du jour selon le rythme, lu dans la configuration ; fonction de réduction (plus grand multiple de 5 qui ne dépasse pas les trois quarts) appliquée une seule fois par voyage.
+5. **Règle ESLint « `src/domain` sans entrée-sortie »** (handover § 3, ligne B5 du « Backlog ») et son test dans `tests/unit/lint/` : liste blanche des imports et interdictions de B5-TL-3.
+6. **Configuration du moteur** (B5-TL-4) : valeurs de PO-1 et de B5-PO-1, validées par Zod, lues par le serveur, passées au moteur.
+
+### B5b — Squelette, planificateur et réparation
+1. **Squelette** (cadrage § 6.5 étape 5) : jours du séjour, fenêtres, logement de départ et d'arrivée de chaque jour (B5-PO-7), engagements posés et verrouillés (B5-PO-12), créneaux d'activités, de repas et de soirée selon le rythme (B5-PO-1), budget de trajet du jour.
+2. **Classement** (cadrage § 3.7, § 6.5 étape 6) : adéquation et qualité moins un coût de trajet pondéré par type d'étape, formule lue dans la configuration (comme `classement.json` de P0, décision 0032 A2) ; aucun appel de modèle.
+3. **Planification** (§ 6.5 étape 7) : ordre, horaires, trajets (durées en mémoire), ouvertures, marges, temps libre ; aucun trou (principe produit 4, B5-PO-9).
+4. **Réparation déterministe** (0011 point 4, P0-PO-7) : un créneau qui échoue à la validation prend l'option suivante du classement, sinon il reste vide (repas : `openMeal` ; activité : temps libre) ; aucun appel de modèle ; aucune liste de candidats écartés n'est produite.
+5. **Sortie d'écriture** : un instantané validé par `TripSnapshotSchema`, dont aucune étape n'a `minutes`, `verifiedAt`, `toConfirm` ni `travelMinutes`, et le rapport de validation en mémoire. Aucune version qui échoue à la validation n'est produite comme sortie d'écriture (« Partie Q5 », workflow 3).
+6. **Identifiants d'étape** : stables entre versions (handover § 5, `Stop.id`), produits de façon déterministe (B5-TL-3).
+
+### B5c — Patches, versions et annulation
+1. **Application d'un patch** (`TripPatch`, 0037 B2-TL-3) sur l'instantané de la version de base : opérations dans l'ordre du tableau, sur un brouillon, puis replanification et validation des jours touchés (cadrage § 6.6, révision unitaire, point 3 ; B5-PO-13).
+2. **Concurrence (R10)** : le moteur reçoit le numéro de la version courante ; si `baseVersion` n'est pas la version courante, il refuse explicitement, sans rien calculer, avec un résultat convertible en `ApiError` `{ code: "version_conflict", retryable: true, currentVersion }` validé par `ApiErrorSchema` (handover § 4, « Concurrence » ; E10).
+3. **Annulation** (PO-5, B5-PO-14) : `revert` produit un instantané identique à celui de `toVersion`.
+4. **`PatchResult`** (0037 B2-TL-4) : `version = baseVersion + 1`, `touchedDays` en ordre croissant, `changes` selon B5-PO-15 ; `Change[segment]` calculés en mémoire à la réponse, jamais dans le patch écrit.
+5. **Refus typés** (B5-TL-5) : patch obsolète, étape inconnue, étape verrouillée, aucune option compatible, annulation invalide ; aucun refus n'écrit quoi que ce soit, aucun patch n'est appliqué en partie.
+
+## Critères d'acceptation
+Chaque test nommé est un test Vitest de `pnpm test`, au nom exact ci-dessous, vert en CI. Les jeux de test sont fabriqués dans les tests (jours, candidats, doubles des interfaces), sans fixture tirée d'une réponse réelle.
+
+**Lecture de « R1 à R10 testées à 100 % »** (ligne B5 du « Backlog ») : chaque règle a au moins un cas conforme et un cas en violation, tous verts, et la PR qui livre une règle livre ses deux cas. Un seuil de couverture de code éventuel relève du Tech Lead (outillage).
+
+### B5a
+- [ ] `validation: R1 lieu ancré et sourcé` : une étape choisie par le moteur sans `placeId`, avec un lieu que l'interface de validité dit fermé définitivement ou introuvable, ou sans source `https:`, est une violation ; l'idée « Surprends-moi » et les événements suivent la même règle ; un engagement n'est pas contrôlé ; une étape ajoutée par la personne suit B5-PO-4 (configurable selon la réponse à la question 1).
+- [ ] `validation: R2 événement dans les dates et date relue` : un événement hors des dates du séjour est une violation ; un événement dont la date n'est pas confirmée sans `unconfirmed` est une violation.
+- [ ] `validation: R3 étapes verrouillées inchangées` : définition de B5-PO-11 (disparition, changement de nom, de jour, d'heure de début ou de fin, de `placeId`) entre un programme de base et un brouillon ; un engagement compte comme verrouillé.
+- [ ] `validation: R4 horaires d'ouverture` : étape hors d'une plage connue : violation ; plage inconnue : conforme, marquée `toConfirm` en mémoire (B5-PO-5).
+- [ ] `validation: R5 trajets faisables avec marge` : départ de l'étape suivante avant la fin de la précédente plus la durée fournie plus la marge : violation ; trajet sans durée connue : violation ; deux étapes verrouillées incompatibles : signalées sans bloquer (B5-PO-6).
+- [ ] `validation: R6 logement du jour` : jour qui ne commence pas par le terminus `start` du bon logement ou ne finit pas par le terminus `end` du bon logement ; jour de changement de logement (B5-PO-7).
+- [ ] `validation: R7 aucun repas ni soirée sans choix` : une étape de repas ou de soirée sans l'un des états admis par B5-PO-8 est une violation.
+- [ ] `validation: R8 rythme et temps libre` : plus d'activités que le rythme n'en admet ; temps libre sous le minimum d'un jour complet ; trou de 30 min ou plus non écrit comme temps libre (B5-PO-9).
+- [ ] `validation: R9 budget calculé et distinct` : `budgetPerPerson` égal à la somme des coûts quand tous sont connus, absent sinon ; `mealBudgetPerPerson` du brief ne change jamais le budget calculé (B5-PO-10).
+- [ ] `validation: R10 patch sur sa version de base` : fonction de contrôle de version (B5c s'en sert) : `baseVersion` différente de la version courante donne le refus `version_conflict` avec `currentVersion`.
+- [ ] `validation: le rapport ne contient que des codes et des identifiants` : le rapport d'un programme en violation sur chaque règle, sérialisé, ne contient aucune des valeurs sentinelles des doubles (horaire, durée, `placeId`, statut) ni aucune clé de la liste interdite du handover § 8.
+- [ ] `moteur: budget réduit 60 → 45, 90 → 65, 150 → 110, une seule fois` (ligne B5 du « Backlog ») : les trois valeurs ; une seconde réduction sur un voyage déjà réduit ne change rien.
+- [ ] `moteur: voisins d'une proposition` : règle du point 2 de B2-TL-1 (0037) : élément qui précède et qui suit le créneau, trajets ignorés, étape de la proposition ignorée, jour `generating` ou sans voisin : `{}` ; résultat validé par `ProposalNeighboursSchema`.
+- [ ] `moteur: champs calculés` : `travelMinutes` (somme des durées fournies, B5-PO-2), `destinationColor` (stable pour une destination), `Proposal.option` (`total` ≤ 3).
+- [ ] `lint: src/domain sans entrée-sortie` : un fichier de test placé sous `src/domain` qui importe `node:fs`, `@/server/config/…`, `@/grounding`, `@/prototype/…` (selon B5-TL-1), ou qui lit `process.env`, appelle `fetch`, `Date.now()`, `new Date()` sans argument ou `Math.random()` (selon B5-TL-3) est signalé ; un fichier qui n'importe que `@/contracts`, `zod` et `@/domain/*` passe.
+- [ ] Configuration (B5-TL-4) : valeur absente ou hors bornes refusée au chargement (test nommé par la PR).
+
+### B5b
+- [ ] `moteur: une étape verrouillée est conservée` (test de sortie du cadrage § 9, handover § 12) : replanifier un jour qui contient une étape verrouillée et un engagement les laisse identiques (B5-PO-11), même si un meilleur candidat existe pour leur créneau.
+- [ ] `moteur: squelette selon le rythme` : nombre de créneaux d'activités, présence de la soirée, fenêtres du jour d'arrivée et du jour de départ (B5-PO-1, B5-PO-7, B5-PO-12).
+- [ ] `moteur: engagements posés et verrouillés` : un `ticket` et un `booking` deviennent des étapes verrouillées à leur date et heure, avec `commitment` ; un `booking` dans une fenêtre de repas prend la place de ce repas ; un `flight` borne la journée (B5-PO-12).
+- [ ] `moteur: réparation par l'option suivante, sans modèle` : un candidat fermé ce jour-là, ou trop loin pour la marge, est remplacé par le suivant du classement ; sans suivant, repas en `openMeal`, activité en temps libre ; aucune interface de modèle n'est passée au moteur (le test le vérifie par le type d'entrée).
+- [ ] `moteur: aucun repas ni soirée sans choix` : sans état de choix (B5-PO-8), le programme a des `openMeal` et aucune soirée ; avec un choix, l'étape choisie y est.
+- [ ] `moteur: sortie d'écriture sans durée ni date de contrôle` : la sortie d'écriture passe `TripSnapshotSchema` ; aucune étape n'a `minutes`, `verifiedAt`, `toConfirm` ; aucun jour n'a `travelMinutes` ; les valeurs sentinelles des doubles n'y figurent pas, sauf les `placeId` des étapes.
+- [ ] `moteur: déterministe` : deux exécutions sur la même entrée donnent des sorties égales (identifiants compris).
+- [ ] `moteur: aucun trou dans la journée` : entre deux éléments consécutifs d'un jour planifié, l'écart est un trajet, un temps libre ou une marge de moins de 30 min (B5-PO-9).
+
+### B5c
+- [ ] `versions: une révision obsolète est refusée explicitement` (test de sortie du cadrage § 9, handover § 12) : un patch de `baseVersion` 3 sur une version courante 4 est refusé sans calcul ; le refus converti en `ApiError` passe `ApiErrorSchema` avec `code: "version_conflict"`, `retryable: true`, `currentVersion: 4` ; rejoué sur la version 4 (nouveau `baseVersion`), il s'applique.
+- [ ] `versions: annuler crée une version identique` (PO-5, ligne B5 du « Backlog ») : après un `replace` qui produit la version 3, `revert` vers 2 produit une version 4 dont l'instantané est égal (égalité profonde) à celui de la version 2 ; aucune version n'est supprimée ni modifiée.
+- [ ] `moteur: une étape verrouillée est conservée` rejoué sur les patches : `replace` ou `move` d'une étape verrouillée est refusé ; `add` ou `move` d'une autre étape ne déplace jamais une étape verrouillée (B5-PO-11, B5-PO-13).
+- [ ] `patch: tout ou rien` : un patch dont la deuxième opération est refusée ne change rien (instantané de base intact, aucun résultat de version).
+- [ ] `patch: rejoué tel quel, même résultat` : appliquer deux fois le même patch à la même version donne deux instantanés égaux, identifiants attribués compris (0037 B2-TL-3).
+- [ ] `patch: PatchResult` : `version = baseVersion + 1`, `touchedDays` croissants et distincts, `changes` selon B5-PO-15 (dont `unchanged` pour chaque étape des jours touchés qui garde lieu et heure, étapes verrouillées comprises, F7-PO-6) ; résultat validé par `PatchResultSchema`.
+- [ ] `patch: aucune durée dans ce qui est écrit` : le patch reçu est écrit tel quel (aucune durée ajoutée) ; l'instantané produit passe `TripSnapshotSchema` ; les `Change[segment]` ne figurent que dans `PatchResult`.
+- [ ] `patch: aucune option compatible` : un `add` ou un `move` vers un moment où le jour ne peut pas être replanifié de façon valide est refusé avec le code « aucune option compatible » (B5-TL-5), sans rien produire.
+
+### Vérifications d'ensemble (chaque PR de code)
+- [ ] `pnpm verify` vert ; `pnpm p0` vert.
+- [ ] Aucun fichier de `src/contracts`, `src/mocks`, `src/components`, `src/features`, `db/` modifié, sauf décision écrite du Tech Lead (B5-TL-5).
+- [ ] Aucune nouvelle dépendance sans décision (handover § 2).
+- [ ] Aucune donnée Google dans le diff, hormis des `placeId` simulés.
+- [ ] La PR liste ses écarts à cette spécification et les décisions du Tech Lead qu'elle applique.
+
+## Décisions (Product Owner, définitives sans veto de Samuel avant le 2026-10-15)
+À lister dans la note de version suivante, rubrique « Décisions prises par le studio ». Seuls les détails fonctionnels sont tranchés ici (« Qui décide quoi ») ; l'architecture, les interfaces, l'outillage et les contrats sont proposés au Tech Lead (section suivante). Les valeurs numériques sont des **valeurs de départ**, lues dans la configuration (jamais codées dans le moteur ni dans l'interface, comme PO-1) et calibrées en bêta.
+
+- **B5-PO-1 — Valeurs du squelette.** Reprises du code du prototype P0 (`src/domain/squelette.ts`, P0a1), où elles n'avaient pas de décision écrite :
+  - activités par jour complet selon le rythme : 2 (`relaxed`), 3 (`balanced`), 4 (`intense`), la moitié arrondie au-dessus le matin, le reste l'après-midi ;
+  - fenêtre d'un jour complet : 09:00 à 22:30 ;
+  - déjeuner entre 12:00 et 14:00, dîner entre 18:30 et 20:45 ;
+  - une soirée à partir de 20:30, sauf en rythme `relaxed` et le dernier jour ;
+  - durée prévue quand `StopFacts.durationMinutes` est absent : 90 min pour une activité ou une soirée, 75 min pour un déjeuner, 90 min pour un dîner ;
+  - marge entre l'arrivée et le début d'une étape : 5 min (R5).
+  Raison : ces valeurs ont servi aux exécutions de P0 sur Édimbourg ; en changer sans mesure ne serait pas mieux fondé.
+- **B5-PO-2 — Budget de trajet du jour (PO-1).** Le budget n'est **pas une contrainte dure** : le classement le prend en compte par le coût de trajet (cadrage § 3.7, « la distance est un coût, pas un filtre ») ; un dépassement n'est pas une violation ; il est signalé par l'interface (`travelMinutes > travelBudgetMinutes`, déjà en place). `Day.travelMinutes` compte **tous** les trajets du jour, retour au logement compris, tant que les contrats n'ont pas de notion d'excursion (question 4).
+- **B5-PO-3 — Réduction du budget (PO-1).** La réduction porte sur **tous les jours** du voyage (« réduit le budget du voyage d'un quart ») ; elle est appliquée au plus une fois par voyage : le moteur reçoit l'état « déjà réduit » et ne réduit pas une seconde fois. Elle produit une nouvelle version (annulable par PO-5). La possibilité de la redemander après annulation reste Q41 (B10).
+- **B5-PO-4 — Portée de R1.** R1 s'applique à chaque lieu **choisi par le moteur** (étape, événement, idée « Surprends-moi ») : `placeId` valide, lieu non fermé définitivement, au moins une source `https:`. Un **engagement** saisi par la personne n'est pas contrôlé (ni lieu ni source : c'est sa réservation). Pour un **lieu ajouté par la personne** (`add`), la règle attend la réponse de Samuel à la question 1 ; d'ici là, le validateur prend la portée en paramètre et B5 applique la recommandation : `placeId` contrôlé s'il existe, aucune source exigée.
+- **B5-PO-5 — R4 et « À confirmer ».** Une plage d'ouverture connue qui exclut l'étape : le candidat n'est pas planifié (option suivante). Plage inconnue : l'étape est planifiée et marquée `toConfirm` en mémoire ; la marque n'est jamais écrite et B8 la recalcule à la lecture (0011 point 5). Une étape verrouillée ou un engagement hors des heures connues reste en place (R3 prime) et est marqué `toConfirm`.
+- **B5-PO-6 — R5 et conflits.** Un trajet sans durée connue pour aucun mode admis rend le candidat non planifiable. Un conflit entre deux étapes verrouillées (ou engagements) ne se répare pas : le moteur ne les déplace pas, il le note dans le rapport en mémoire et ne bloque pas le voyage ; la façon de le montrer est la question 5. Mode de chaque trajet : le plus rapide parmi les modes de `Brief.mobility` dont l'interface donne une durée ; à égalité, marche, puis transports publics, puis voiture. `Segment.estimated` reprend ce que répond l'interface de trajets.
+- **B5-PO-7 — R6, logements.** Chaque jour part du logement de la nuit précédente et finit au logement de la nuit suivante ; le premier jour part du premier logement à l'heure d'arrivée (ou 09:00 si elle est plus tôt), le dernier finit au dernier logement à l'heure de départ (ou 22:30 si elle est plus tard). Un jour de changement de logement part de l'ancien et finit au nouveau. Les bagages (« le changement d'hôtel gère départ et bagages », R6) attendent la question 3 : B5 n'ajoute ni étape ni contrainte de bagages. Un voyage dont une nuit n'a ni logement ni quartier n'entre pas dans le moteur : B9 décide comment `createTrip` traite le logement `none`.
+- **B5-PO-8 — R7, repas et soirée.** Une étape de repas ou de soirée n'entre dans le programme que si elle est dans l'un de ces états, fournis au moteur : choisie (`choose`) ; présentée et gardée sans décision (F6-PO-7 : « sans décision, l'option 1 reste ») ; engagement ; ajoutée par la personne. Sinon : repas en `openMeal`, soirée en temps libre. La correspondance entre les signaux de `preference_signals` et ces états est faite par B10.
+- **B5-PO-9 — R8 et aucun trou.** Le nombre d'activités d'un jour ne dépasse pas celui du rythme, plus une soirée. Le temps libre minimal d'un jour complet (ni arrivée ni départ) est de 120 min (`relaxed`), 60 min (`balanced`), 30 min (`intense`), valeurs de P0. Tout écart de 30 min ou plus entre deux éléments est écrit comme temps libre (`free`) ; en dessous, il compte comme marge (valeur de P0, `TEMPS_LIBRE_AFFICHE`).
+- **B5-PO-10 — R9, budget.** `Day.budgetPerPerson` est la somme des `StopFacts.costPerPerson` des étapes et événements du programme du jour, **seulement si chacun a un coût connu** (0 = gratuit) ; sinon il est absent, comme dans P0 : une somme partielle afficherait un budget faux. L'idée « Surprends-moi », les `openMeal` et les propositions ne comptent pas. `mealBudgetPerPerson` du brief sert au classement des repas, jamais au calcul du budget (« distinct du niveau d'expérience »). `Change[budget]` n'est produit que si l'écart est non nul.
+- **B5-PO-11 — R3, verrou et engagements.** Une étape verrouillée est inchangée si elle garde son identifiant, son nom, son jour, ses heures de début et de fin et son `placeId` (définition de 0016 § 4.2, étendue au `placeId` et à l'heure de fin). Un engagement est verrouillé à sa création (0015 § 9). `unlock` d'un engagement est accepté par le moteur (F5-PO-10 : tout verrou est réversible) ; Q71 (UX/UI, Product Owner) reste ouverte pour l'interface.
+- **B5-PO-12 — Engagements de l'écran 1.** `ticket` → étape `activity` avec `commitment: "ticket"` ; `booking` → `commitment: "reservation"`, de type `meal` si son début tombe dans une fenêtre de repas (B5-PO-1), à la place de ce repas, sinon `activity` ; le nom de l'étape est le libellé saisi. `flight` n'est pas une étape : son heure borne la journée (le premier jour commence à la fin du vol, ou à son début si la fin est absente ; le dernier jour finit au début du vol). Le temps de transfert entre l'aéroport et le logement n'est pas compté par B5 (limite connue, question 6).
+- **B5-PO-13 — Application d'un patch.** Tout ou rien. Seuls les jours touchés sont replanifiés : leurs étapes non verrouillées peuvent changer d'heure, jamais de lieu ni de jour, sauf l'étape visée par l'opération. Un jour touché qui ne peut pas être replanifié de façon valide fait refuser le patch (« aucune option compatible ») ; rien n'est produit. Un `move` vers un autre jour touche les deux jours.
+- **B5-PO-14 — Annulation (PO-5).** `revert` recopie exactement l'instantané de `toVersion`, sans replanifier ni revalider (sauf `TripSnapshotSchema`) : « identique » au sens strict. Il exige que `baseVersion` soit la version courante (R10). Le moteur accepte toute version antérieure fournie ; l'interface du MVP n'offre que l'annulation de la dernière modification (5 secondes).
+- **B5-PO-15 — Ce qui change.** `PatchResult.changes` suit F7-PO-6 : `unchanged` pour chaque étape des jours touchés qui garde son lieu et son heure, étapes verrouillées comprises ; un `Change[segment]` pour chaque trajet dont la durée change ; `replaced`, `moved` (et `added` quand F7a est fusionnée) pour l'étape visée ; `budget` selon B5-PO-10. Les noms sont des noms maison (`Stop.name` ou nom saisi), jamais un nom Google.
+
+## Propositions au Tech Lead (architecture, contrats, outillage : à trancher avant le code)
+- **B5-TL-1 — Un seul moteur.** Proposition : B5 fait évoluer le moteur de P0 déjà dans `src/domain` au lieu d'en écrire un second. Les types d'entrée dont le moteur a besoin (brief interne, candidat noté, résultat d'ancrage en mémoire, configuration du classement) sont définis dans `src/domain` ou dérivés de `src/contracts` ; `src/prototype` les importe depuis `src/domain` (sens inversé), ou les adapte dans `scripts/p0`. `src/domain` ne garde que `@/contracts`, `zod` et ses propres fichiers, conformément à la liste blanche du handover § 3. Conséquences : amendement de la décision 0032 (A3.2, ligne `src/domain/**`) et du test `tests/unit/p0/imports.test.ts` ; information du rôle `ia` (spécification P0-suite-2, #223, en revue) ; `pnpm p0` reste vert. Autre option : moteur de production à côté de celui de P0, au prix d'un doublon de règles R1 à R8.
+- **B5-TL-2 — Interfaces injectées pour les données dérivées de Google.** Proposition : trois interfaces maison, synchrones et en mémoire (validité d'un `placeId`, plages d'ouverture d'un jour, durée d'un trajet par mode), sans champ de forme Google, chacune pouvant répondre « inconnu » ; le moteur ne les appelle que pendant un calcul et ne renvoie jamais leurs valeurs dans une sortie d'écriture ; B8 les implémente depuis Places et Routes. Synchrone ou asynchrone, et forme exacte : Tech Lead.
+- **B5-TL-3 — Règle « `src/domain` sans entrée-sortie ».** Proposition : liste blanche du handover § 3 (`@/contracts`, `zod`, `@/domain/*`) et, en plus de `process.env` et `fetch`, interdiction de `Date.now`, `new Date()` sans argument, `Math.random`, `crypto` et `performance` dans `src/domain` hors tests : le moteur reçoit la date du jour et les identifiants (ou une graine) en entrée, ce qui rend le déterminisme vérifiable. Identifiants d'étape créés par la génération : dérivés de l'entrée (par exemple identifiant de la demande et rang), à fixer par le Tech Lead ; ceux d'un patch sont déjà attribués par le serveur (0037).
+- **B5-TL-4 — Configuration du moteur.** Proposition : un module `src/server/config/moteur.ts` (sur le modèle de `offer.ts`, décision 0020), validé par Zod, qui porte PO-1, B5-PO-1, B5-PO-9 et la formule de classement ; le serveur le lit et le passe au moteur ; `src/domain` ne l'importe jamais. Pour P0, `prototype/config/` reste la source tant que P0 tourne (aucune seconde copie des valeurs : l'une est dérivée de l'autre, ou P0 lit le module).
+- **B5-TL-5 — Refus typés et codes d'erreur.** Proposition : le moteur renvoie une union `{ ok: true, … } | { ok: false, code }` avec une énumération fermée (`version_conflict`, `unknown_stop`, `locked_stop`, `no_option`, `invalid_revert`) ; une seule fonction de `src/domain` convertit `version_conflict` en `ApiError` (avec `currentVersion`) ; les autres codes sont convertis par B11, qui ajoute à `API_ERROR_CODES` ce qui manque (`no_option` est déjà prévu par le handover § 4, pas encore dans l'énumération). B5 ne modifie pas `src/contracts`.
+- **B5-TL-6 — Une seule définition de R3.** Proposition : la fonction de R3 de B5a (`src/domain`) est celle que B11 utilise côté serveur ; la fonction `lockedStopViolations` de F7a (interface) est remplacée par elle ou alignée par un test commun en B11, comme 0016 § 4.2 le prévoit. Aucune règle d'import nouvelle pour l'interface (0032 interdit `@/domain` depuis `src/features`).
+
+## Hors périmètre
+- Écriture et lecture en base, adaptateur `api`, actions serveur : B6, B11. Ancrage et relectures réelles : B8. Workflows, plafonds, aperçu de 8 cases (Q57) : B9. Signaux, questions de préférence, recalcul par lot, déblocage : B10.
+- Les 7 clés de la « Partie Q5 » (recomposition par B8 ; `verifiedAt` attend S5, Samuel). B5 fournit seulement les calculs purs qu'elles utilisent.
+- Gestion des bagages (question 3), excursions (question 4), affichage d'un conflit résiduel (question 5), transfert vers l'aéroport (question 6).
+- Toute action dans les consoles Google, Neon, Vercel ou GitHub ; toute mise en production.
+
+## Questions ouvertes
+Nouvelles questions (numérotées par le CEO dans `QUESTIONS.md`) :
+1. **Samuel (règle de qualité R1, condition G1)** — R1 dit « tout lieu du programme est ancré et possède au moins une source web ». Un lieu **ajouté par la personne** (« Ajouter un lieu », B11) peut venir de la recherche Google (pas de source web) ou d'un nom saisi sans lieu. Faut-il l'exclure de R1 (c'est son choix), ou lui appliquer R1 en entier (l'ajout serait refusé sans source) ? Recommandation : **contrôler seulement que le lieu existe et n'est pas fermé, sans exiger de source** ; les engagements saisis restent hors de R1. Bloque la forme finale de R1 pour B11, pas B5 (le validateur prend la portée en paramètre).
+2. **CEO** — Découpage B5a, B5b, B5c, séquentiel (section « Découpage proposé »). Bloque le ticket de la première PR de code.
+3. **UX/UI, puis Product Owner** — R6 « le changement d'hôtel gère départ et bagages » : que doit faire le programme un jour de changement de logement (passage par l'ancien logement, dépôt des bagages au nouveau avant les visites, consigne) ? La colonne `stays.luggage` (B1) n'a pas encore de sens fonctionnel. Bloque la partie « bagages » de R6, pas B5.
+4. **Tech Lead** — Les contrats n'ont aucune notion d'excursion, alors que le budget de trajet est « hors excursion » (cadrage § 3.7, `Day.travelMinutes`) et qu'une excursion occupe une journée entière (§ 6.5 étape 5). Faut-il un marqueur (champ de `Stop` ou de `Day`) ? D'ici là, B5 compte tous les trajets (B5-PO-2). Bloque les excursions, pas B5.
+5. **Tech Lead et UX/UI** — Un conflit entre deux étapes verrouillées (trajet impossible, B5-PO-6) n'a aucune place dans les contrats (« sinon le conflit est signalé », R5). Faut-il un badge ou un champ ? Bloque l'affichage du conflit, pas B5.
+6. **Tech Lead** — Temps de transfert entre l'aéroport et le logement pour un engagement `flight` (B5-PO-12) : l'aéroport n'a pas de `placeId` dans `TripCommitment`. Faut-il un champ, ou une durée forfaitaire en configuration ? Bloque la précision des jours d'arrivée et de départ, pas B5.
+7. **Rôle `ia`** (information) — B5-TL-1 change les imports de `src/domain` et de `src/prototype` ; `pnpm p0` doit rester vert. Bloque B5a si P0-suite-2 (#223) modifie `src/domain` en même temps : le CEO ordonne les deux.
+
+Questions existantes touchées :
+- **Q57** (Samuel) : décompte des 8 propositions ; la composition de l'aperçu reste à B9.
+- **Q41** (Product Owner) : redemander la réduction après annulation ; B10.
+- **Q71** (Product Owner, UX/UI) : déverrouiller un engagement ; le moteur l'accepte (B5-PO-11), l'interface attend la réponse.
+- **S5** (Samuel, « Partie Q5 ») : `verifiedAt` ; ne bloque pas B5.
+- **P0-Q9** (Samuel) : écriture des horaires planifiés de programmes réels ; ne bloque pas B5 (données de test seulement), bloque B9.
