@@ -368,13 +368,15 @@ test.describe("vue partagée", () => {
     // C40 : une requête vers une autre origine ne porte que l'origine de la page.
     await createShareScope(context, baseURL!);
     const referers: (string | undefined)[] = [];
-    await context.route("https://referer.example/**", async (route) => {
-      referers.push(await route.request().headerValue("referer") ?? undefined);
-      await route.fulfill({ status: 204 });
-    });
-    for (const path of [RP(SHARE_TOKEN_VALIDE), RPJ(SHARE_TOKEN_VALIDE, 2)]) {
+    await context.route("https://referer.example/**", (route) => route.fulfill({ status: 204 }));
+    for (const [rank, path] of [RP(SHARE_TOKEN_VALIDE), RPJ(SHARE_TOKEN_VALIDE, 2)].entries()) {
       await page.goto(path);
-      await page.evaluate(() => fetch("https://referer.example/sonde", { mode: "no-cors" }).then(() => undefined));
+      const probe = `https://referer.example/sonde-${rank}`;
+      const probed = page.waitForRequest(probe);
+      await page.evaluate((url) => {
+        new Image().src = url;
+      }, probe);
+      referers.push((await (await probed).headerValue("referer")) ?? undefined);
     }
     expect(referers).toEqual([`${new URL(baseURL!).origin}/`, `${new URL(baseURL!).origin}/`]);
   });
