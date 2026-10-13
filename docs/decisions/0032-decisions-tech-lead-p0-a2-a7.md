@@ -2,6 +2,8 @@
 
 Statut : décision déléguée, à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-12 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #174 (T19) · Amendée le 2026-10-13 (section « Amendements » : écarts acceptés en revue de P0a1, #179 et #180)
 
+**Amendée par 0046** (#266, D15 point 4) : `PROTOTYPE_ORG_ID` (lignes 43 et 212) devient un uuid fixe, celui d'`org_prototype` créée par migration ; § A3.1 (ligne 56, décorateurs de plafonds) inchangé.
+
 Numérotation : 0029 est prise par la PR #165 (ticket #164 ; la décision 0030 cite le ticket), 0030 par la PR #149, 0031 par la PR #172 (vérifié le 2026-10-12 : chacune de ces PR ajoute le fichier correspondant). Aucune PR ouverte n'utilise 0032 (vérifié le 2026-10-12). 0032 est le prochain numéro libre.
 
 ## Contexte
