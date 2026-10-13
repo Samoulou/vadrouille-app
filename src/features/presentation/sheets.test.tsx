@@ -81,13 +81,25 @@ describe("ProposalDetailSheet", () => {
     expect(dialog).toHaveTextContent("Jour 5, mer., vers 13:30");
     expect(dialog).toHaveTextContent(distillerie.stop.meta);
     expect(dialog).toHaveTextContent(distillerie.stop.reason!);
-    expect(within(dialog).getByRole("link", { name: "[Site de la distillerie]" })).toBeInTheDocument();
+    // Lien de source ouvert hors de l'application, sans accès à la page d'origine (spécification P0, P0b1).
+    const source = within(dialog).getByRole("link", { name: "[Site de la distillerie]" });
+    expect(source).toHaveAttribute("href", distillerie.stop.source!.url);
+    expect(source).toHaveAttribute("target", "_blank");
+    expect(source).toHaveAttribute("rel", "noopener noreferrer");
+    // Adaptateur `mock` (par défaut) : données simulées, aucune mention Google.
+    expect(within(dialog).queryByText("Données de lieux : Google")).toBeNull();
     expect(dialog).toHaveTextContent("Informations vérifiées le 15 août 2026");
     expect(within(dialog).getAllByRole("button").map((b) => b.textContent)).toEqual(["Fermer"]);
     fireEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
     expect(onClose).toHaveBeenCalled();
     expect(formatVerifiedAt("2026-08-20")).toBe("20 août 2026");
     expect(formatVerifiedAt("2026-01-05")).toBe("5 janvier 2026");
+  });
+
+  it("adaptateur prototype : mention « Données de lieux : Google » dans la feuille (écran 6)", () => {
+    render(<ProposalDetailSheet proposal={distillerie} onClose={() => {}} onReturnFocus={() => {}} placesFromGoogle />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    expect(within(dialog).getByText("Données de lieux : Google")).toHaveAttribute("data-part", "attribution");
   });
 
   it("fermé sans proposition ; aucune violation axe", async () => {

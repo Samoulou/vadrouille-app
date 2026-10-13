@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID } from "@/mocks/edimbourg";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 
 import { getRequestContext } from "./context";
 import { mockTripAdapter } from "./mock";
@@ -21,6 +22,19 @@ describe("getRequestContext (décision 0013, § 3.6)", () => {
   it("lève une erreur avec tout autre adaptateur", () => {
     vi.stubEnv("DATA_ADAPTER", "api");
     expect(() => getRequestContext()).toThrow(/B3/);
+  });
+
+  it("adaptateurs: contexte de requête org_prototype en mode prototype, refusé en production", () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    vi.stubEnv("NODE_ENV", "test");
+    expect(getRequestContext()).toEqual({ organizationId: PROTOTYPE_ORG_ID });
+    expect(getRequestContext("prototype", { NODE_ENV: "development" })).toEqual({ organizationId: PROTOTYPE_ORG_ID });
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(() => getRequestContext()).toThrow(/adaptateur prototype refusé/);
+    expect(() => getRequestContext("prototype", { NODE_ENV: "test", VADROUILLE_ENV: "production" })).toThrow(
+      /adaptateur prototype refusé/,
+    );
+    expect(() => getRequestContext("prototype", { NODE_ENV: "production" })).toThrow(/adaptateur prototype refusé/);
   });
 
   it("renvoie une copie : la modifier ne change pas le contexte suivant", () => {

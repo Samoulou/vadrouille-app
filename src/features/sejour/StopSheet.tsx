@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, type KeyboardEvent } from "react";
 
+import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { IconButton } from "@/components/ligne/IconButton";
 import { IconCroix } from "@/components/ligne/icons";
@@ -11,6 +12,7 @@ import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
 import { messages } from "@/i18n";
 
+import { PLACES_FROM_GOOGLE } from "./constants";
 import { ficheMoment, type FicheTarget } from "./fiche";
 import type { TripRoutes } from "./routes";
 import { pathTo, pathToLabel } from "./travel";
@@ -24,6 +26,11 @@ export interface StopSheetProps extends FicheTarget {
   onClose: () => void;
   /** Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. */
   onToggleLock: (locked: boolean) => void;
+  /**
+   * Mention « Données de lieux : Google » en fin de fiche (adaptateur `prototype`, spécification P0) : la fiche
+   * remplace le panneau du jour et recouvre en grande partie la carte. `PLACES_FROM_GOOGLE` par défaut.
+   */
+  placesFromGoogle?: boolean;
 }
 
 /**
@@ -33,7 +40,15 @@ export interface StopSheetProps extends FicheTarget {
  * signalé comme hors programme, sans action. « Garder » attend la réponse de Samuel (Q67) ; « Déplacer »
  * vient avec F7, « Signaler une erreur » après B11.
  */
-export function StopSheet({ stop, inProgramme, day, routes, onClose, onToggleLock }: StopSheetProps) {
+export function StopSheet({
+  stop,
+  inProgramme,
+  day,
+  routes,
+  onClose,
+  onToggleLock,
+  placesFromGoogle = PLACES_FROM_GOOGLE,
+}: StopSheetProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   // Ouverture : focus sur le titre de la fiche (handover § 7), à chaque nouvelle étape.
@@ -129,6 +144,8 @@ export function StopSheet({ stop, inProgramme, day, routes, onClose, onToggleLoc
           </Button>
         </section>
       ) : null}
+
+      <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
+import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { ChecklistRow } from "@/components/ligne/ChecklistRow";
 import { Counter } from "@/components/ligne/Counter";
 import { DayBadge } from "@/components/ligne/DayBadge";
@@ -45,7 +46,7 @@ function counterLabel(remaining: number): string {
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
 export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
-  const { trip, routes, actions } = useTripShell();
+  const { trip, routes, actions, placesFromGoogle } = useTripShell();
   // Lien « Aujourd'hui · Jour {n} » (F10-PO-7) : aux dates du voyage, à la date de la destination, calculée dans
   // le navigateur après le montage ; seulement avec la base `/voyages` (pas de page `R15` de développement).
   // Décalage assumé : aux dates du voyage, le lien apparaît après le montage et pousse le panneau d'une hauteur
@@ -182,6 +183,8 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           ))}
         </ul>
       </section>
+
+      <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>
   );
 }

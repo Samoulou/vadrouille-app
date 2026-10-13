@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
-import { PLACES_FROM_GOOGLE } from "@/features/sejour/constants";
 import { loadToday } from "@/features/voyage/load-today";
 import { TodayScreen } from "@/features/voyage/TodayScreen";
 import { format, messages } from "@/i18n";
@@ -34,5 +34,6 @@ export default async function AujourdhuiPage({ params }: { params: Params }) {
   const { id } = await params;
   const trip = await loadToday(id);
   if (!trip) notFound();
-  return <TodayScreen trip={trip} placesFromGoogle={PLACES_FROM_GOOGLE} recorderKind={devPagesEnabled() ? "console" : "none"} />;
+  // Mention « Données de lieux : Google » avec l'adaptateur `prototype` (spécification P0), comme le Séjour.
+  return <TodayScreen trip={trip} placesFromGoogle={isPrototypeAdapter()} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

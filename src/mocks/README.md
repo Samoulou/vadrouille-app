@@ -1,1 +1,1 @@
-Jeux de données simulées : Édimbourg (aperçu et débloqué), Lisbonne (passé) et Porto (à venir, F11a).
+Jeux de données simulées : Édimbourg (aperçu et débloqué), Lisbonne (passé) et Porto (à venir, F11a). Relecteur simulé des durées de trajet du prototype (`prototype-relecteur.ts`, P0b1) : durées sentinelles, aucun appel réseau.

@@ -88,6 +88,8 @@ export interface TripShellValue {
   consumeClosedFiche: () => void;
   /** Annonce « Cette étape n'est plus dans ce jour. » pour ce jour, ou `null`. */
   missingNoticeDay: number | null;
+  /** Données de lieux Google affichées (adaptateur `prototype`) : mention « Données de lieux : Google » hors carte. */
+  placesFromGoogle: boolean;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
 }
@@ -143,6 +145,8 @@ export interface TripShellProps {
   base: TripRoutesBase;
   /** Actions du programme injectées (tests, B11) ; sinon l'implémentation en mémoire de la phase 0. */
   actions?: ProgrammeActions;
+  /** Données de lieux Google (adaptateur `prototype`, spécification P0) ; `PLACES_FROM_GOOGLE` par défaut. */
+  placesFromGoogle?: boolean;
   children: ReactNode;
 }
 
@@ -154,7 +158,14 @@ export interface TripShellProps {
  * la hauteur du panneau, l'état du programme et le toast d'annulation sont conservés entre les pages du même
  * voyage, et repartent de zéro au chargement, sans aucun stockage (F5-PO-16).
  */
-export function TripShell({ trip: sourceTrip, maps, base, actions: injected, children }: TripShellProps) {
+export function TripShell({
+  trip: sourceTrip,
+  maps,
+  base,
+  actions: injected,
+  placesFromGoogle = PLACES_FROM_GOOGLE,
+  children,
+}: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
   const router = useRouter();
   const params = useParams<{ n?: string | string[] }>();
@@ -337,6 +348,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
       consumeClosedFiche,
       missingNoticeDay,
       reportMissingEtape,
+      placesFromGoogle,
     }),
     [
       routes,
@@ -353,6 +365,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
       consumeClosedFiche,
       missingNoticeDay,
       reportMissingEtape,
+      placesFromGoogle,
     ],
   );
 
@@ -427,7 +440,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
               visibleInsets={visibleInsets}
               onSkipToList={onSkipToList}
               controls={retour}
-              placesFromGoogle={PLACES_FROM_GOOGLE}
+              placesFromGoogle={placesFromGoogle}
             />
           ) : (
             <DayMap
@@ -437,7 +450,7 @@ export function TripShell({ trip: sourceTrip, maps, base, actions: injected, chi
               controls={retour}
               fitPadding={fitPadding}
               fitScope={fitScope}
-              placesFromGoogle={PLACES_FROM_GOOGLE}
+              placesFromGoogle={placesFromGoogle}
             />
           )}
         </div>

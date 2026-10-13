@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { isPrototypeAdapter } from "@/adapters";
 import { format, messages } from "@/i18n";
 
 import { findFicheTarget } from "./fiche";
@@ -27,7 +28,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   const data = await loadTrip(tripId);
   if (!data) notFound();
   return (
-    <TripShell trip={data.trip} maps={data.maps} base={base}>
+    <TripShell trip={data.trip} maps={data.maps} base={base} placesFromGoogle={isPrototypeAdapter()}>
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>
   );
