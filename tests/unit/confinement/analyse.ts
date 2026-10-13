@@ -11,7 +11,7 @@ import * as specificateurs from "./listes/specificateurs";
 const LIGNES_CAPACITE: readonly capacites.LigneCapacite[] = [...capacites.LIGNES_CAPACITE, ...capacites.LIGNES_CAPACITE_TEXTES];
 const FORMES_NOMINATIVES_TESTS: readonly formesTests.FormeNominativeTest[] = formesTests.FORMES_NOMINATIVES_TESTS;
 const PROPRIETES_PROCESS: readonly listeProcess.LigneProcess[] = listeProcess.PROPRIETES_PROCESS;
-const LECTURES_ENV: readonly listeProcess.LigneLectureEnv[] = [...listeProcess.LECTURES_ENV, ...listeProcess.LECTURES_ENV_SECRETES];
+const LECTURES_ENV: readonly listeProcess.LigneLectureEnv[] = listeProcess.LECTURES_ENV_TOUTES;
 const ENV_ENTIER: readonly listeProcess.LigneEnvEntier[] = listeProcess.ENV_ENTIER;
 const PARAMETRES_ENV: readonly listeProcess.ParametreEnv[] = listeProcess.PARAMETRES_ENV;
 const SPECIFICATEURS: readonly specificateurs.LigneSpecificateur[] = specificateurs.SPECIFICATEURS;
@@ -499,7 +499,7 @@ export const estNomSecret = (nom: string) => secretsDe(nom).length > 0;
  * Fichiers où une lecture de `process.env` peut porter un nom secret (section 5, « Noms secrets ») : modules non-test
  * de `src/server/env/`, le module de connexion de B1 (`db/connection.ts`) et son outil de migration (`db/migrate.ts`,
  * seul lecteur de la variable de `vadrouille_migrator`, section 9), ajoutés par la PR du ticket 242 (B1, PR 188, fusionnée
- * après P0c1), Verdict Sécurité demandé. Les noms lus restent fixés fichier par fichier par `LECTURES_ENV`.
+ * après P0c1) ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244). Les noms lus restent fixés fichier par fichier par `LECTURES_ENV`.
  */
 const MODULES_DE_CONNEXION_B1 = ["db/connection.ts", "db/migrate.ts"];
 export const lectureSecreteAdmise = (fichier: string) =>

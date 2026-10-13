@@ -361,7 +361,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; Verdict Sécurité demandé (PR du ticket 242)"
+      "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)"
     }
   ]
 }

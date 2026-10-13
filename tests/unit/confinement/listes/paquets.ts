@@ -9,7 +9,7 @@ export type LignePaquet = { readonly paquet: string; readonly usage: string; rea
 
 const EXISTANT = "existant au 2026-10-12 (`40b6738`)";
 /** Paquets de B1, fusionnés avant leur ligne : verdict Sécurité qui cite le lockfile demandé dans la PR du ticket 242. */
-const B1 = "B1 (PR 188, décision 0006) ; Verdict Sécurité demandé (PR du ticket 242, lockfile cité dans sa description)";
+const B1 = "B1 (PR 188, décision 0006) ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242 ; lockfile cité dans sa description)";
 
 export const PAQUETS = [
   { paquet: "@googlemaps/js-api-loader", usage: "carte Google du navigateur (F4) ; module à capacité", verdict: EXISTANT },

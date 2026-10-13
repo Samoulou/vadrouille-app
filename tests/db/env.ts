@@ -1,4 +1,4 @@
-import { connectionStringFor, DATABASE_URL_VARIABLES, DatabaseGuardError, MIGRATOR_URL_VARIABLE } from "../../db/connection";
+import { connectionStringFor, DATABASE_URL_VARIABLES, DatabaseGuardError, isProductionForDatabase, MIGRATOR_URL_VARIABLE } from "../../db/connection";
 import { migratorConnectionString } from "../../db/migrate";
 
 /**
@@ -21,7 +21,14 @@ export type Login = keyof typeof DB_ENV;
  */
 export const BOOTSTRAP_ROLE = process.env.VADROUILLE_DB_BOOTSTRAP_ROLE ?? "postgres";
 
-/** Adresse de connexion d'un login, ou `undefined` si sa variable n'est pas posée (ou vide). */
+/**
+ * Vrai si la garde de production de `db/connection.ts` (décision 0034) refuse toute connexion dans cet environnement :
+ * `readUrl` rend alors `undefined` pour chaque login, et le préalable le signale comme tel, pas comme des variables
+ * absentes (revue du head a89d9a5, PR 244, mineur 5).
+ */
+export const productionGuardActive = (): boolean => isProductionForDatabase(process.env);
+
+/** Adresse de connexion d'un login, ou `undefined` si sa variable n'est pas posée (ou vide) ou en production. */
 export function readUrl(login: Login): string | undefined {
   try {
     switch (login) {

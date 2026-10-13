@@ -49,6 +49,15 @@ describe("pnpm test:db sans base", () => {
     expect(output).toContain("base de test non configurée");
   }, 90_000);
 
+  // Revue du head a89d9a5 (PR 244, mineur 5) : la garde de production n'est pas rapportée comme des variables absentes.
+  it("garde de production : échec explicite, distinct des variables absentes, aucun secret", () => {
+    const { status, output } = run({ VERCEL_ENV: "production" });
+    expect(status).not.toBe(0);
+    expect(output).toContain("garde de production");
+    expect(output).not.toContain("base de test non configurée");
+    expect(output).not.toContain(PASSWORD);
+  }, 90_000);
+
   it("SKIP_DB_TESTS=1 explicite hors CI : avertissement visible et succès ; refusée en CI ; autre valeur refusée", () => {
     const skipped = run({ SKIP_DB_TESTS: "1" });
     expect(skipped.status).toBe(0);

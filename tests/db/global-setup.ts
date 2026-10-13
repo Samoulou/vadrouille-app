@@ -1,12 +1,18 @@
 import pg from "pg";
 
-import { DB_ENV, type Login, readUrl } from "./env";
+import { DB_ENV, type Login, productionGuardActive, readUrl } from "./env";
 
 /**
  * Préalable de `pnpm test:db` (décision 0006, convention 6) : sans base joignable, les tests de base échouent avec
  * un message explicite ; ils ne sont jamais ignorés en silence. Le message ne contient aucune chaîne de connexion.
  */
 export default async function globalSetup(): Promise<void> {
+  if (productionGuardActive()) {
+    throw new Error(
+      "pnpm test:db : connexion à la base refusée par la garde de production (décision 0034 ; VERCEL_ENV ou VADROUILLE_ENV vaut « production »). " +
+        "Les tests de base ne tournent jamais en production.",
+    );
+  }
   const logins = Object.keys(DB_ENV) as Login[];
   const missing = logins.filter((login) => !readUrl(login)).map((login) => DB_ENV[login]);
   if (missing.length > 0) {

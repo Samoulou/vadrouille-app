@@ -44,7 +44,7 @@ export const SPECIFICATEURS = [
   { specificateur: "class-variance-authority", zones: ["src/components/**"] },
   { specificateur: "@radix-ui/react-dialog", zones: ["src/components/**"] },
   { specificateur: "@radix-ui/react-slot", zones: ["src/components/**"] },
-  // `vitest.db.config.mts` : projet Vitest de `pnpm test:db` (B1, PR 188, décision 0036 B1-TL-1). Verdict Sécurité demandé (PR du ticket 242).
+  // `vitest.db.config.mts` : projet Vitest de `pnpm test:db` (B1, PR 188, décision 0036 B1-TL-1). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { specificateur: "vitest", zones: ["@test", "vitest.config.mts", "vitest.db.config.mts"] },
   { specificateur: "@testing-library/react", zones: ["@test"] },
   { specificateur: "@testing-library/jest-dom", zones: ["tests/unit/**"] },
@@ -63,7 +63,7 @@ export const SPECIFICATEURS = [
   // Section 9 (P0a1) : `scripts/p0/cli.ts`.
   { specificateur: "node:util", zones: ["scripts/p0/**"] },
   // B1 (PR 188, décisions 0006 et 0036 ; spécification P0c, section 9) : paquets sans capacité du socle base de
-  // données. `pg` est un module à capacité : lignes nominatives de `listes/capacites.ts`. Verdict Sécurité demandé (PR du ticket 242).
+  // données. `pg` est un module à capacité : lignes nominatives de `listes/capacites.ts`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { specificateur: "server-only", zones: ["db/**", "src/server/**"] },
   { specificateur: "drizzle-orm", zones: ["db/**"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },

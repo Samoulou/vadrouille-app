@@ -46,7 +46,7 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/p0/main.ts", propriete: "exitCode" },
   { fichier: "scripts/p0/main.ts", propriete: "stdout" },
   { fichier: "scripts/p0/main.ts", propriete: "stderr" },
-  // B1 (PR 188, après P0c1 ; spécification P0c, section 9) : `pnpm db:migrate` et `pnpm test:db`. Verdict Sécurité demandé (PR du ticket 242).
+  // B1 (PR 188, après P0c1 ; spécification P0c, section 9) : `pnpm db:migrate` et `pnpm test:db`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { fichier: "db/migrate.ts", propriete: "argv" },
   { fichier: "db/migrate.ts", propriete: "exitCode" },
   { fichier: "scripts/test-db.mjs", propriete: "argv" },
@@ -65,7 +65,7 @@ export const LECTURES_ENV = [
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
   { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
-  // B1 (PR 188, après P0c1 ; spécification P0c, sections 5 et 9 ; décision 0036). Verdict Sécurité demandé (PR du ticket 242).
+  // B1 (PR 188, après P0c1 ; spécification P0c, sections 5 et 9 ; décision 0036). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   // Noms secrets de la base : `LECTURES_ENV_SECRETES` ci-dessous (module de connexion et outil de migration seulement).
   { fichier: "db/connection.ts", noms: ["VERCEL_ENV", "VADROUILLE_ENV"] },
   { fichier: "scripts/test-db.mjs", noms: ["SKIP_DB_TESTS", "CI", "GITHUB_ACTIONS"] },
@@ -102,18 +102,20 @@ export const ENV_ENTIER = [
   { fichier: "tests/e2e/prototype-helpers.ts", formes: ["propriete-env:e2ePort"] },
   // Relevé de `f57153c` (T18) : environnement des sous-processus de test.
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", formes: ["etalement"] },
-  // B1 (PR 188, après P0c1 ; spécification P0c, section 9). Verdict Sécurité demandé (PR du ticket 242).
+  // B1 (PR 188, après P0c1 ; spécification P0c, section 9). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { fichier: "db/index.ts", formes: ["defaut:createDatabase", "argument:createGuardedPool"] },
   { fichier: "db/connection.ts", formes: ["argument:connectionStringFor", "argument:assertDatabaseAllowed", "argument:isProductionForDatabase"] },
   { fichier: "db/migrate.ts", formes: ["argument:runMigrations", "argument:migratorConnectionString", "argument:assertDatabaseAllowed"] },
-  { fichier: "tests/db/env.ts", formes: ["argument:connectionStringFor", "argument:migratorConnectionString"] },
+  // `argument:isProductionForDatabase` : ajoutée par la correction 1 de la PR 244 (mineur 5 de la revue du head
+  // a89d9a5 : garde de production distinguée des variables absentes) ; verdict Sécurité à renouveler sur ce head.
+  { fichier: "tests/db/env.ts", formes: ["argument:connectionStringFor", "argument:migratorConnectionString", "argument:isProductionForDatabase"] },
 ] as const satisfies readonly LigneEnvEntier[];
 
 export const PARAMETRES_ENV = [
   { fichier: "scripts/e2e-port.mjs", fonction: "e2ePort", parametre: "env" },
   // Relevé de la base de P0c1 (P0b1) : reçoit `process.env` de `getRequestContext` et de `prototypeTripAdapter`.
   { fichier: "src/adapters/prototype-instance.ts", fonction: "assertPrototypeAllowed", parametre: "env" },
-  // B1 (PR 188, après P0c1) : chaîne de la garde de connexion et des migrations, lue par propriété littérale. Verdict Sécurité demandé (PR du ticket 242).
+  // B1 (PR 188, après P0c1) : chaîne de la garde de connexion et des migrations, lue par propriété littérale. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { fichier: "db/connection.ts", fonction: "createGuardedPool", parametre: "env" },
   { fichier: "db/connection.ts", fonction: "connectionStringFor", parametre: "env" },
   { fichier: "db/connection.ts", fonction: "assertDatabaseAllowed", parametre: "env" },
@@ -132,3 +134,9 @@ export const PARAMETRES_ENV = [
 export const LECTURES_ENV_SECRETES: readonly LigneLectureEnv[] = (
   JSON.parse(readFileSync(new URL("../donnees/lectures-env-secretes.json", import.meta.url), "utf8")) as { lignes: readonly LigneLectureEnv[] }
 ).lignes;
+
+/**
+ * Toutes les lectures littérales de `process.env` admises : lignes `.ts` et lignes de noms secrets des données du
+ * régime. Liste unique pour l'analyse et le test du dépôt (revue du head `a89d9a5`, PR 244, mineur 3).
+ */
+export const LECTURES_ENV_TOUTES: readonly LigneLectureEnv[] = [...LECTURES_ENV, ...LECTURES_ENV_SECRETES];

@@ -342,7 +342,7 @@ export const LIGNES_CAPACITE = [
     ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; sentinelle : le worker ne met pas en cache les requêtes Google)",
   },
   // B1 (PR 188, fusionnée le 2026-10-13, `d1ba047`, après P0c1) : lignes attendues par la spécification P0c, section 9,
-  // relevées par la PR du ticket 242. Verdict Sécurité demandé (PR du ticket 242) pour chacune.
+  // relevées par la PR du ticket 242. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242) pour chacune.
   {
     fichier: "db/connection.ts",
     portee: "application",
@@ -351,7 +351,7 @@ export const LIGNES_CAPACITE = [
       "module `server-only`, jamais dans le navigateur ; refus en production (0034) et de tout rôle autre que celui attendu, " +
       "ou qui a SUPERUSER ou BYPASSRLS, avant toute requête",
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
-    ecart: "module à capacité `pg` (section 3) dans le module de connexion de B1 (décisions 0006, 0036) : spécification P0c, section 9 ; Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "module à capacité `pg` (section 3) dans le module de connexion de B1 (décisions 0006, 0036) : spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "db/migrate.ts",
@@ -361,42 +361,42 @@ export const LIGNES_CAPACITE = [
       "`server-only` lancé par Node hors de Next, importé par aucun fichier de l'application ; même garde de rôle que " +
       "`db/connection.ts`. Portée application parce que le fichier est sous `db/` (fermeture transitive, section 3)",
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
-    ecart: "module à capacité `pg` (section 3) dans l'outil de migration de B1 (décisions 0006, 0007) : spécification P0c, section 9 ; Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "module à capacité `pg` (section 3) dans l'outil de migration de B1 (décisions 0006, 0007) : spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "scripts/test-db.mjs",
     portee: "outil",
     usage: "`pnpm test:db` : lance `pnpm exec vitest run --config vitest.db.config.mts` sans `shell`, après le refus de `SKIP_DB_TESTS` en CI",
     capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 }],
-    ecart: "script de B1 (décision 0036, B1-TL-1) : spécification P0c, section 9 ; Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "script de B1 (décision 0036, B1-TL-1) : spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "tests/db/global-setup.ts",
     portee: "test",
     usage: "préalable de `pnpm test:db` : une connexion réelle par rôle à la base de test (conteneur de CI), message explicite sans base",
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
-    ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "tests/db/helpers.ts",
     portee: "test",
     usage: "outils des tests de base : connexions réelles à la base de test sous le rôle éprouvé ; seul fichier de `tests/db/*.test.ts` qui importe `pg`",
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
-    ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "tests/unit/db/garde-connexion.test.ts",
     portee: "test",
     usage: "test de la garde de connexion sans base : espions sur `pg.Client.prototype` (`connect`, `end`, `query`), adresse injoignable (port 1)",
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
-    ecart: "import réel d'un module à capacité dans un test (section 4), B1 (décision 0034, garde de production) : Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "import réel d'un module à capacité dans un test (section 4), B1 (décision 0034, garde de production) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
   {
     fichier: "tests/unit/db/test-db-sans-base.test.ts",
     portee: "test",
     usage: "lance `node scripts/test-db.mjs` sans base joignable (environnement réduit à `PATH`, `HOME` et aux variables du cas)",
     capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 }],
-    ecart: "sous-processus dans un test (section 4), critère « sans base joignable » de B1 (décisions 0006, 0036) : Verdict Sécurité demandé (PR du ticket 242)",
+    ecart: "sous-processus dans un test (section 4), critère « sans base joignable » de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
 ] as const satisfies readonly LigneCapacite[];
 
