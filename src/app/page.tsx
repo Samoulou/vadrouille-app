@@ -1,6 +1,16 @@
-import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, getTripAdapter, isMockAdapter, paymentAvailable } from "@/adapters";
+import {
+  MOCK_DEMO_TRIP,
+  MOCK_DEMO_UNLOCKED_TRIP,
+  getRequestContext,
+  getTripAdapter,
+  isMockAdapter,
+  isPrototypeAdapter,
+  paymentAvailable,
+} from "@/adapters";
 import { PRODUCT_NAME } from "@/config/site";
+import type { TripSummary } from "@/contracts";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
+import { PrototypeSection } from "@/features/accueil/PrototypeSection";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { messages } from "@/i18n";
@@ -32,12 +42,19 @@ function demoLinks(): DemoLink[] {
 /**
  * Page d'accueil : nom et promesse. Avec l'adaptateur `mock` seulement, section « Démonstration » vers les
  * parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
+ * Avec l'adaptateur `prototype` seulement, section « Prototype » (spécification P0, P0-PO-11) : un voyage par
+ * programme du dossier, absente sans programme ; hors liste blanche, `getRequestContext()` lève (erreur 500).
  */
 export default async function HomePage() {
   let demo: { destination?: string } | null = null;
   if (isMockAdapter()) {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);
     demo = { destination: trip?.destination };
+  }
+  let prototype: TripSummary[] = [];
+  if (isPrototypeAdapter()) {
+    const ctx = getRequestContext();
+    prototype = await getTripAdapter().listTrips(ctx);
   }
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">
@@ -46,6 +63,11 @@ export default async function HomePage() {
       {demo ? (
         <div className="mt-6">
           <DemoSection destination={demo.destination} links={demoLinks()} />
+        </div>
+      ) : null}
+      {prototype.length > 0 ? (
+        <div className="mt-6">
+          <PrototypeSection trips={prototype} />
         </div>
       ) : null}
     </main>

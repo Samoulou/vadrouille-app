@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { TripLayout } from "@/features/sejour/screens";
 
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
  * `/voyages/…`, avec la carte simulée injectée. 404 en production sans VADROUILLE_DEV_PAGES=1.
  */
 export default async function DevTripLayout({ params, children }: { params: Promise<{ id: string }>; children: ReactNode }) {
-  if (!devPagesEnabled()) notFound();
+  // Carte simulée : jamais de données du prototype (positions Google) sur une carte non Google (CLAUDE.md).
+  if (!devPagesEnabled() || isPrototypeAdapter()) notFound();
   const { id } = await params;
   return (
     <SimulatedCarte>

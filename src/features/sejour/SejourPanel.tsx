@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
+import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { ChecklistRow } from "@/components/ligne/ChecklistRow";
 import { Counter } from "@/components/ligne/Counter";
 import { DayBadge } from "@/components/ligne/DayBadge";
@@ -41,7 +42,7 @@ function counterLabel(remaining: number): string {
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
 export function SejourPanel({ recorderKind = "none", recorder }: SejourPanelProps) {
-  const { trip, routes, actions } = useTripShell();
+  const { trip, routes, actions, placesFromGoogle } = useTripShell();
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
   const origin = useSejourOrigin();
   const eventsRef = useRef<HTMLElement>(null);
@@ -161,6 +162,8 @@ export function SejourPanel({ recorderKind = "none", recorder }: SejourPanelProp
           ))}
         </ul>
       </section>
+
+      <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>
   );
 }

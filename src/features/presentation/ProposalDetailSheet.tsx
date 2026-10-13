@@ -58,7 +58,12 @@ export function ProposalDetailSheet({ proposal, onClose, onReturnFocus }: Propos
           {stop.source ? (
             <p className="text-corps-s text-ink-2">
               {t.detail.source}
-              <a href={stop.source.url} className="font-semibold text-ink underline underline-offset-2" rel="noreferrer">
+              <a
+                href={stop.source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-ink underline underline-offset-2"
+              >
                 {stop.source.label}
               </a>
             </p>

@@ -17,6 +17,7 @@ import type { AnalyticsEvent } from "@/analytics/events";
 import { createLazyTrack, type LazyTrack } from "@/analytics/lazy";
 import { EVENT_REASON } from "@/analytics/reasons";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
+import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
@@ -69,6 +70,8 @@ export interface PresentationScreenProps {
    * lien ne mène à une page 404 quand le paiement simulé n'est pas disponible.
    */
   canUnlock?: boolean;
+  /** Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0) ; absente par défaut. */
+  placesFromGoogle?: boolean;
   /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3). */
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
@@ -116,7 +119,16 @@ type FocusTarget = "card" | "keep";
 
 type DeckProps = Omit<PresentationScreenProps, "recorder" | "recorderKind"> & { track: Send };
 
-function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, actions: injected, track }: DeckProps) {
+function Deck({
+  tripId,
+  unlocked,
+  generatingDays,
+  proposals,
+  canUnlock = true,
+  placesFromGoogle = false,
+  actions: injected,
+  track,
+}: DeckProps) {
   const [state, dispatch] = useReducer(deckReducer, proposals, initDeck);
   const [actions] = useState<DeckActions>(() => injected ?? createLocalDeckActions());
   const [detail, setDetail] = useState<Proposal | null>(null);
@@ -307,6 +319,7 @@ function Deck({ tripId, unlocked, generatingDays, proposals, canUnlock = true, a
         <DeckEnd variant={endVariant} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
+      <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
       {/* Montées seulement à l'ouverture : la fermeture les démonte, et Radix rend le focus (`onReturnFocus`). */}
       {state.prompt ? (
         <Suspense fallback={null}>

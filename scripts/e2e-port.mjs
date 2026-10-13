@@ -42,3 +42,9 @@ export function e2ePort({ env, repoPath }) {
   if (env.CI) return CI_PORT;
   return worktreePort(repoPath);
 }
+
+/**
+ * Décalage du port du second serveur de test, en mode prototype (spécification P0, P0b1 ; décision 0032 § A6.3) :
+ * 3100 à 3899 deviennent 4100 à 4899, sans recouvrement avec les ports du premier serveur.
+ */
+export const PROTOTYPE_PORT_OFFSET = 1000;

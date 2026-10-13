@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getRequestContext, getTripReader, paymentAvailable } from "@/adapters";
+import { getRequestContext, getTripReader, isPrototypeAdapter, paymentAvailable } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { loadPresentation } from "@/features/presentation/load";
 import { PresentationScreen } from "@/features/presentation/PresentationScreen";
@@ -28,5 +28,12 @@ export default async function PresentationPage({ params }: { params: Promise<{ i
   if (!data) {
     notFound();
   }
-  return <PresentationScreen {...data} canUnlock={paymentAvailable()} recorderKind={devPagesEnabled() ? "console" : "none"} />;
+  return (
+    <PresentationScreen
+      {...data}
+      canUnlock={paymentAvailable()}
+      placesFromGoogle={isPrototypeAdapter()}
+      recorderKind={devPagesEnabled() ? "console" : "none"}
+    />
+  );
 }

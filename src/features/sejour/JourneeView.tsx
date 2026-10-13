@@ -73,7 +73,7 @@ export function JourneeView() {
           onToggleLock={onToggleLock}
         />
       ) : (
-        <JourneePanel day={day} routes={routes} />
+        <JourneePanel day={day} routes={routes} placesFromGoogle={shell.placesFromGoogle} />
       )}
     </div>
   );
