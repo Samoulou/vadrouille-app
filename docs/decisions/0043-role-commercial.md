@@ -13,8 +13,10 @@ Le 2026-10-13 à 16:59 UTC, dans le fil de projet « Commercialisation en parall
 1. Le rôle `commercial` est créé (`.claude/agents/commercial.md`). Il prépare la vente, le marketing et les réseaux sociaux sous forme de documents dans `docs/commercial/`.
 2. Il ne décide rien de ce qui est réservé à Samuel : cible, offre, prix, phases, dépenses, comptes externes, juridique. Il ne contacte, ne publie et ne dépense jamais au nom de Samuel : il prépare, Samuel valide et envoie.
 3. Ses tâches suivent les règles communes (ticket, spécification `specs/C<n>-…`, branche, PR, `pnpm verify`, `needs-review`). Elles ne touchent pas au code de l'application ; elles comptent dans la limite de 3 fils en parallèle du CEO, mais n'entrent jamais en conflit de fichiers avec les tâches de développement.
-4. Première tâche : `specs/C1-prevente.md`.
+4. **Produit purement numérique pour les particuliers** (Samuel, même fil, 2026-10-13 17:07 UTC : « pour moi c'est un produit purement digital sans intervention humaine pour la partie client privé, on verra pour la partie agence de voyage »). Le rôle ne prévoit ni entretien, ni appel, ni pilote accompagné, ni vérification humaine pour les particuliers ; la validation passe par la page de prévente, un questionnaire en ligne et les mesures du produit. Le pilote assisté du cadrage § 4 (49 puis 79 CHF) n'est plus une offre à vendre. Le volet agences est reporté.
+5. Première tâche : `specs/C1-prevente.md`.
 
 ## Conséquences
 - Le CEO ajoute le rôle `commercial` à ses cycles et reporte ses questions dans `QUESTIONS.md`.
+- Les seuils commerciaux de G0 (`docs/roadmap.md`) prévoient « 30 prospects contactés, 10 échanges » : ils supposent des contacts humains. Leur adaptation est une question pour Samuel (phases G0 à G3), posée dans la PR de cette décision ; `docs/roadmap.md` n'est pas modifié ici.
 - Le tableau de suivi hebdomadaire du cadrage § 13 (prospects, offres, achats, provenance) devient un livrable du rôle.
