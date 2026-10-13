@@ -13,6 +13,9 @@ const LIBELLES_CATEGORIE: Record<Category, string> = {
   nature: "Nature et points de vue",
   tasting: "Dégustations",
   restaurant: "Bonnes tables",
+  heritage: "Patrimoine et monuments",
+  market: "Marchés",
+  nightlife: "Bars et soirées",
 };
 
 /** « Balades, dégustations » ; « Journée libre » sans étape. */

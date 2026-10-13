@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { INITIAL_JS_BUDGET_BYTES, formatInitialJavaScript, measureInitialJavaScript } from "./budget-helpers";
 import { blockGoogle } from "./carte-helpers";
 import { sendScope } from "./debloquer-helpers";
-import { ROUTE_PREPARATIONS } from "./route-states";
+import { ROUTE_JOURNEYS, ROUTE_PREPARATIONS } from "./route-states";
 import { ROUTES } from "./routes";
 
 /**
@@ -33,6 +33,7 @@ const IDLE_TIMEOUT_MS = 10_000;
  * sous 200 000 octets sur les entrées `javascript: "seuil"` (R11, R12, R6), mesure journalisée sur les autres.
  * Une route préparée (paiement) est créée dans un contexte à part, pour que son JavaScript ne soit pas déjà
  * dans le cache du navigateur au moment de la mesure ; la page mesurée envoie la portée de la préparation.
+ * Une route à parcours (`journey`, F8a) est mesurée depuis l'adresse de départ, dans le même onglet.
  * Une route dont une requête ne se termine jamais est mesurée après `IDLE_TIMEOUT_MS` et annotée ; le test de T4
  * ci-dessus garde l'attente sans échéance.
  */
@@ -49,7 +50,13 @@ test.describe("budget: JavaScript initial par route", () => {
       }
       const googleRequests = await blockGoogle(page);
 
-      const measure = await measureInitialJavaScript(page, path, { expectedStatus: route.status, idleTimeoutMs: IDLE_TIMEOUT_MS });
+      // Parcours (F8a) : la page s'ouvre sur l'adresse de départ, le parcours mène à l'adresse de l'entrée.
+      const journey = route.journey ? ROUTE_JOURNEYS[route.journey] : undefined;
+      const measure = await measureInitialJavaScript(page, journey?.start ?? path, {
+        expectedStatus: route.status,
+        idleTimeoutMs: IDLE_TIMEOUT_MS,
+        journey: journey?.run,
+      });
       console.log(`[${route.id}, ${route.budgets.javascript}] ${formatInitialJavaScript(measure)}`);
       if (!measure.networkIdle) {
         test.info().annotations.push({ type: "réseau jamais inactif", description: `${route.id} mesuré après ${IDLE_TIMEOUT_MS} ms` });

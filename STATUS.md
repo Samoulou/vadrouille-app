@@ -1,54 +1,83 @@
-# État du studio — 2026-10-12 (39e cycle)
+# État du studio — 2026-10-12 (43e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, #165) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle (consigne de Samuel du 2026-10-12 10:29)
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 43e cycle est le cycle planifié de 23:07 CEST.
 
 ## Messages de Samuel traités (#studio et projet)
-- **2026-10-12 10:29** (#studio) : le CEO tourne dans le projet Claude « Vadrouille », 3 fils au plus ; chaque résumé indique le nombre de fils lancés et leur consommation estimée. Appliqué.
-- **2026-10-12 10:35** (#studio) : Q24 (Neon à Francfort), Q249, Q250, Q241, Q252, P0-Q5 (consignées dans la décision 0028, #149) ; Q253 et Q254 (oui, `CLAUDE.md` aligné dans #27) ; **Q245** (PR qui touche `.github/workflows/` : signalée dans #studio, attend `owner-approved` posé par Samuel ; contrôle à ajouter à `techlead-gate`, ticket **#163**).
-- **2026-10-12 11:09 à 11:12** (fil « Parcours cible du MVP ») : **toute la chaîne MVP est construite maintenant**, B1 à B12, révision et pendant/après le voyage compris ; G0 reste la condition commerciale. Consigné dans la **décision 0029** (#165), avec `CONTEXT.md` et la roadmap.
-- **2026-10-12 12:47 et 12:48** (fil « Routine cycle du studio ») : Q257 (exécutions réelles de P0 en ligne, préversion Vercel protégée et Neon, jamais sur son poste ni en production) ; Q256, Q258, Q259, Q260 (recommandations suivies). Q261 et Q262 étaient déjà tranchées dans le fil photos (11:12).
-- **2026-10-12 vers 11:35** : projet Neon gratuit créé (Francfort, Postgres 17, Neon Auth désactivé), relié à Vercel pour Development et Preview. Q24 tranchée.
-- Le message de 10:32 est le résumé du 38e cycle (#157).
+- #studio et fils du projet : aucun nouveau message de Samuel depuis le résumé du 42e cycle.
 
 ## Fait
-- Fusionnées depuis le 38e cycle : **F13, spec des photos (#160)** ; **bug #159, carte refusée sur les previews (#161)**, F4-Q1 tranchée par le joker `*.vercel.app` (Q263) ; **B0c (#156)** ; note de version v2026.10.12-09 (#166).
-- Corrections du cycle : #161 (1 bloquant et 4 mineurs, fusionnée ensuite) ; **#27, dernière passe** (voir « En cours »).
-- Tickets créés : **#162 (F8a)**, **#163 (Q245, `techlead-gate`)**, **#164 (décision 0029)**.
+- Fusionnées :
+  - **P0r1 (#172)**, spec réduite : cadre et clients réels, avec `maxRetries: 0` et les imports nommés ; les points restants passent à P0r2 (#173) ;
+  - **décision 0036 (#192)** : décisions B1-TL-1 à TL-4, avec 0007, 0011 et les handovers amendés ;
+  - **F8a (#167)** : création de voyage, écrans 1 et 2 ;
+  - **P0a1, partie 1 (#179)** : schéma réduit et configuration, après une correction (`Object.hasOwn`).
+- **P0a1 (#180), découpage** (décision du CEO avec le Tech Lead) :
+  - troisième et dernière tentative ; les 4 points demandés sont corrigés ;
+  - deux bloquants tardifs restaient : #180 fusionne en l'état, avec le correctif de #179 reporté ;
+  - ces bloquants passent au ticket **#195**, exigence d'entrée du code de P0r1 ;
+  - le Tech Lead a approuvé ; la PR attend la fusion automatique.
+- **P0c (#193)** : corrections 1 et 2 poussées (`fb1a906`) ; elle est en revue. Elle pose **Q296** à Samuel (texte de la routine de revue).
+- **B1 (#188)** : alignée sur 0036, avec `main` fusionnée et les mineurs corrigés (`f0dbd0a`). Le Tech Lead approuve sous réserve de la CI ; la Sécurité a un bloquant tardif (écouteur d'erreur du pool).
+- **Spec B2 (#198, ticket #196)** : écrite par le Product Owner ; la revue demande 8 corrections.
+- **Code T18 (#199)** : décision 0035 et contrôle `owner-approved` dans `techlead-gate`. La revue demande des corrections (dont `pipefail`).
+- **F10a (#186)** : correction 1 poussée, avec les captures régénérées sur la CI. UX/UI est conforme. Seul bloquant : aucune CI n'a tourné sur le commit du robot des captures.
 
 ## En cours
-- **F8a (#167, ticket #162)** : écrans 1 et 2 de la création, brouillon en mémoire, `SegmentedControl` déduit, `brief_completed`, R1 et R2 à l'inventaire des routes. Critères [a] couverts. `update-snapshots` posé pour régénérer les références visuelles par la CI (0004) ; en revue.
-- **B0, partie Q5 (#27, ticket #22)** : au-delà de la règle des deux corrections. **Décision du CEO avec le Tech Lead : découpage**, une passe unique sur une liste fermée (`0c4d158`) : plan gardé en mémoire (étapes e et f réunies, `plan_drafts` supprimé), compteurs d'ancrage retirés, `place_coordinates` sans `UPDATE` avec rôle `vadrouille_fn_coords` (0007 amendée), exception d'appartenance dans 0011 § 1, citation de Samuel pour `CLAUDE.md`. S4 et S5 partent à Samuel (Q258, Q259). Si cette passe échoue, #27 est fermée et le blocage documenté. De nouveau en revue.
-- **Décision 0029 (#165, ticket #164)** : correction 1 faite (tableau, B5 après B2, B1 en local, B7 à B9 après #149 et #27, précédence). De nouveau en revue.
-- **Spec P0 (#149, ticket #147)** : découpée par le Tech Lead (P0a1 et P0b1 seulement) ; décision 0028 ajoutée ; revue du head `e469a07` : Tech Lead conforme, Sécurité 1 bloquant. Suivie par le fil « Correction spec P0 ».
-- **F11a (#152)** : revue conforme sur le head `62eada5`, mais `techlead-approved` absent (retiré par la porte juste avant la revue) ; revue relancée (`needs-review` reposé).
-- `pnpm verify` en local : vert sauf les captures visuelles (rendu du conteneur, 0004). La CI fait foi. Docker ne tourne pas dans ces sessions : les tests de base de données ne passent qu'en CI.
+- En revue : #193 (P0c, correction 2).
+- Approuvées, en attente de fusion : #180 (P0a1), #177 (T20).
+- Changements demandés, à relancer au prochain cycle : #186, #188, #198, #199.
 
 ## Bloqué
-- **Exécutions réelles de P0 (P0a2, P0a3, P0b2)** : Q256 et Q257 tranchées ; attendent une spec suivante (en ligne, préversion Vercel protégée et Neon).
-- **B7 à B9** : attendent la fusion de #149 et de #27 (décision 0029).
+- **Exécutions réelles de P0** : code de P0r1 (après #195), puis P0c (#193) et son code avant P0r2, puis P0-suite-2 (#173).
+- **B5** : code de B2, après la spec B2 (#198) et F10a (#186) (Q300).
+- **B7 à B9** : B1 (#188), B2 et P0r1.
 
 ## Prochain cycle
-1. Suivre #27, #149, #152, #165, #167 ; après toute correction, retirer puis reposer `needs-review` (la revue ne se déclenche qu'à l'ajout du libellé).
-2. Après #149 : **P0a1** et **P0b1**.
-3. Après #165 : **B1** (data, en local) et **B2** (backend) en parallèle, puis B5 ; spécification du Product Owner d'abord si la ligne du handover ne suffit pas. Ordre par défaut : plan des cycles 39 à 58 (fil « Plan des 10 à 20 prochains cycles »).
-4. **#163** (Q245, `techlead-gate`) : la PR touche `.github/workflows/`, elle attend `owner-approved` de Samuel.
-5. F7a après F8a (`SegmentedControl.tsx`), puis F10a.
+1. Relancer les corrections :
+   - #186 : un push pour relancer la CI ;
+   - #188 : écouteur d'erreur du pool ;
+   - #198 : 8 points ;
+   - #199 : `pipefail` et mineurs.
+2. Suivre la revue de #193. Si elle échoue, le CEO décide avec le Tech Lead (2 corrections faites).
+3. **P0b1**, après la fusion de #180. Puis le ticket **#195**.
+4. Chore : amendement de 0032, pour les écarts acceptés sur #180.
+5. F7a et F-ICU (#171), maintenant que F8a est fusionnée ; F10b après F10a.
 
 ## Décisions attendues de Samuel
-- **Action** : plafond de quota journalier sur Maps JavaScript API dans Google Cloud Console (Q263), la clé acceptant tout `*.vercel.app`.
-- **P0** : P0-Q6 (seuils G0).
+- **Actions** :
+  - poser `owner-approved` sur **#188** (B1 modifie la CI) et sur **#199** (T18 modifie `techlead-gate`) ;
+  - plafond de quota de Maps JavaScript API (Q263) ;
+  - après la fusion de T18 (#199) : retirer puis reposer `owner-approved` sur #177 et sur toute PR de workflow déjà approuvée ;
+  - Vercel : la limite de 100 déploiements par jour est de nouveau atteinte, et les préversions échouent jusqu'au passage à l'offre Pro.
+- **Nouvelles** :
+  - **Q296** : texte de la routine de revue, options a, b ou c (recommandation : a) ;
+  - **Q297** : règle `owner-approved` dans `CLAUDE.md`.
+- **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
+- **Déjà posées** : Q268 à Q270, Q272 à Q275, Q278 à Q280, Q286 à Q289, Q292, Q294.
 - **Toujours ouvertes** :
-  - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44 (règle provisoire en attendant), Q46, Q47, Q75, Q127, Q150 ;
+  - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q75, Q127, Q150 ;
   - argent et comptes : Q25, Q26, Q39, Q45, Q56, Q84 ;
   - offre : Q57, Q63, Q67, Q76, Q78, Q88 à Q90, Q128, Q133, Q135, Q149 ;
   - documents et environnement : Q12, Q59, Q40, Q101 ;
   - Ligne : Q19 (avec Q226), Q37, Q108, Q130 ;
   - règles : Q23.
 - **Veto possible** :
-  - 2 jours après leur publication dans la note de version : décisions déléguées de #27 (0011, sauf S4 et S5) si fusionnée ; « Évolution » de 0004 (#148) ; décisions déléguées P0-PO-2, 3, 5 à 8 et 11 (#149, si fusionnée) ;
-  - avant le 2026-10-14 : décision 0025 (#134) ;
-  - avant le 2026-10-13 : décisions 0017, 0019, 0023, 0024, écarts de F9a et de F5b, Q182, F10-PO-1 à F10-PO-22 et Q185, 0012, F7-PO-20 et F7-PO-21, F8-PO-18 à F8-PO-22.
+  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032, 0036, décisions B1-PO-1 à 6 (#185) ;
+  - avant le 2026-10-14 : décision 0025, amendement de 0007 par 0036, décisions B2-PO-1 à 11 (#198, si fusionnée) ;
+  - avant le 2026-10-13 : décisions listées au 39e cycle.
 
 ## Part d'usage estimée
-- 39e cycle : 4 sous-agents lancés par la routine (correction de #161, F8a, avis du Tech Lead sur #27, dernière passe de #27), 3 au plus en même temps ; la décision 0029 et ce statut sont écrits par le CEO. Environ 1,2 M de jetons (estimation : 0,35 M pour F8a, 0,22 M pour #27, 0,09 M chacun pour #161 et l'avis, le reste pour le CEO).
+- 43e cycle : 12 sous-agents, 3 au plus en même temps :
+  - avis du Tech Lead sur #180 et #172 (0,09 M de jetons) ;
+  - décision 0036, deux corrections (0,20 M) ;
+  - P0c, deux corrections (0,34 M) ;
+  - P0a1 (#180), correction 3 (0,11 M) ;
+  - P0a1 (#179), correction 1 (0,11 M) ;
+  - P0r1 (#172), correction bornée (0,12 M) ;
+  - B1, mise à jour (0,18 M) ;
+  - spec B2 (0,25 M) ;
+  - code T18 (0,16 M) ;
+  - F10a, correction 1 (0,12 M).
+- S'y ajoute le travail du CEO.
+- Total : environ 1,8 M de jetons (estimation).
 - Part de l'abonnement : impossible à mesurer depuis la routine.

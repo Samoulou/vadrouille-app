@@ -21,7 +21,7 @@ Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en
 4. TypeScript de bout en bout, Next.js, Tailwind v4 avec les tokens Ligne, Postgres en région UE, Vercel.
 
 ## Phase en cours
-**Phase 0 — Valider.** Autorisé pour le studio (périmètre élargi par Samuel le 2026-10-08) : tout le front F1 à F12 sur données simulées, le handover back-end (B0), le prototype de l'agent de recherche (P0). Interdit tant que la condition G0 n'est pas franchie : comptes et services payants (tout engagement de dépense externe), clés de production, mise en production.
+**Phase 0 — Valider.** Autorisé pour le studio : tout le front F1 à F12 sur données simulées, le handover back-end (B0), le prototype de l'agent de recherche (P0) et, depuis le 2026-10-12, **toute la chaîne du MVP, B1 à B12** (décision 0029 : Samuel lève la mention « après G0 » pour la construction ; G0 reste la condition commerciale). Restent réservés à Samuel : comptes et services payants (tout engagement de dépense externe), paiement réel et compte Stripe (Q26) et envoi réel d'e-mails (Q25), clés de production, mise en production.
 
 ## Règles du studio
 - Cycle toutes les 3 heures ; jusqu'à 3 tâches par cycle, sur des fichiers distincts (régime fixé par Samuel le 2026-10-08).
