@@ -1,3 +1,5 @@
+import "server-only";
+
 import { OfferConfigSchema, type OfferConfig } from "@/contracts";
 
 /**

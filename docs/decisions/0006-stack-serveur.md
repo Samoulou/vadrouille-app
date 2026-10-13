@@ -59,6 +59,29 @@ En `production`, toutes les gardes d'ouverture sont fermées (webhook simulé, p
 ## Modules d'environnement par dossier (revue de #114, point 12)
 `src/server/env.ts` valide toutes les variables au démarrage mais **n'exporte aucune clé de fournisseur**. Les clés sont exposées par des modules étroits : `src/server/env/ai.ts` (clés des fournisseurs de modèles, importable par `src/ai` seulement), `src/server/env/grounding.ts` (`GOOGLE_MAPS_SERVER_KEY`, importable par `src/grounding` seulement), `src/server/env/payment.ts` (secrets Stripe et du webhook simulé, importable par `src/server/routes` et `src/server/payment` seulement). Règles ESLint et tests au handover § 3.
 
+## Amendement B1 : versions installées (ticket #184, 2026-10-12)
+Constat, sans nouveau choix : B1 installe les versions du tableau, toujours les dernières stables au registre npm le 2026-10-12 : `drizzle-orm` 0.45.4, `drizzle-kit` 0.31.11, `pg` 8.23.1, `server-only` 0.0.1 (seule version publiée), et ajoute les types `@types/pg` 8.23.1 en dépendance de développement. Image de CI et de `docker-compose.yml` : `postgres:17.11`. Les noms des variables de connexion (B1-TL-3) et l'appel de `pnpm test:db` par `pnpm verify` (B1-TL-1) suivent la décision 0036 (B1-TL-3 et B1-TL-1), qui retient les propositions de la spécification B1.
+
+Audit des dépendances (`pnpm audit`, 2026-10-12, revue de sécurité de #188, point 13) : `drizzle-kit` 0.31.11 ajoute une alerte **modérée**, GHSA-67mh-4wv8-2f99 (`esbuild` 0.18.20, par `@esbuild-kit/esm-loader` ; corrigée à partir d'`esbuild` 0.25.0). Elle vise le serveur de développement d'`esbuild`, qui permet à un site de lire ses réponses. Exposition : aucune. `drizzle-kit` est une dépendance de développement (`pnpm db:generate`), absente de l'image et du déploiement, et le projet ne lance jamais ce serveur. Aucune version de `drizzle-kit` sans cette dépendance n'est publiée à cette date. À revoir à chaque montée de `drizzle-kit`. L'autre alerte du rapport (`braces`, élevée, par `eslint-config-next`) existait déjà avant B1.
+
+Exception de `server-only` (fusion de `main` dans B1, revue du 2026-10-13, #188) :
+
+- **Liste fermée** : 20 modules de phase 0 de `src/ai`, `src/research` et `src/grounding`, nommés un par un dans `eslint.config.mjs`, n'importent pas `server-only`, parce que `pnpm p0` les charge hors Next.js, où ce paquet lève une erreur. Tout autre fichier de ces dossiers reste soumis à la règle (test `tests/unit/lint/p0-server-modules-lint.test.ts`).
+- **Garde de remplacement** : la règle `ligne/no-p0-server-modules` (corrections 3 et 4 de #188) interdit ces trois dossiers dans tout fichier hors de `src/server`, `src/tenancy`, `src/ai`, `src/research`, `src/grounding`, `src/workflows`, `db/`, `scripts/` et des tests, sous toutes les formes de chargement (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`, `import x = require()`, `typeof import()`). La règle de 0020 § 11 = 0017 § 3.3 ne vise que `src/server`.
+- **Règle exacte du test d'une source** :
+  - source alias (`@/…`) : la partie après `@/`, débarrassée de ses `/` de tête, est normalisée par `path.posix.normalize` (segments `.`, `..` et `//` résolus), puis `@/` + ce reste est testé : refus si le premier segment est `ai`, `research` ou `grounding`, ou si le reste remonte par `../` vers un chemin dont un segment est l'un d'eux. Exemples refusés : `@/ai/client`, `@/lib/../ai/client`, `@//ai/client`, `@/lib/x/../../research/a`, `@/./ai`, `@/../src/ai` ; acceptés : `@/lib/ai-utils`, `@/airline`, `@/contracts/x`. La chaîne entière n'est jamais normalisée (`path.posix.normalize("@/../src/ai")` donnerait `src/ai` et rouvrirait ce contournement) ;
+  - chemin relatif (`./`, `../`) : refus si un segment quelconque du chemin est `ai`, `research` ou `grounding`, sans normalisation ;
+  - toute autre source (paquet, chemin sans alias) : non visée.
+- **Faux positifs et négatifs connus** :
+  - côté sûr : un chemin relatif vers un dossier nommé `ai`, `research` ou `grounding` hors de `src/` est refusé aussi ;
+  - non visés, sans effet ici : `@/AI/x` (la casse n'est pas repliée ; la construction sous Linux est sensible à la casse et ne résout pas ce chemin), `@/ai.ts` (désigne un fichier `src/ai.ts`, pas le dossier) ; un alias dont le dossier `ai`, `research` ou `grounding` n'est pas le premier segment après normalisation (`@/components/ai/x`) n'est pas refusé, car il ne désigne pas ces dossiers.
+- **Limites (non couvertes par la règle ni par un test)** :
+  - un `import()` ou un `require()` dont la source n'est pas une chaîne fixe (ou un gabarit dont le début est fixe) n'est pas lu, y compris une concaténation (`"@/" + "ai"`) ;
+  - `eval`, `new Function`, `new Worker(new URL("../ai/x", import.meta.url))`, `require.resolve`, `module.require` ne sont pas lus ;
+  - un chemin sans alias ni `./` (`src/ai/x`, `/src/ai/x`) n'est pas lu ;
+  - une directive `/* eslint-disable ligne/no-p0-server-modules */` (ou `eslint-disable-next-line`) désactive la garde : `linterOptions.noInlineConfig` n'est pas posé ; la revue de chaque PR doit refuser une telle directive.
+- **Condition de sortie** : retirer la liste dès que `pnpm p0` ne charge plus ces modules hors Next.js.
+
 ## Conséquences
 - B1 ajoute `docker-compose.yml`, le script `test:db`, le conteneur de service dans `.github/workflows/ci.yml` et l'inclut dans `pnpm verify`.
 - Si les sessions d'agents n'ont pas Docker, `pnpm verify` ne peut pas passer en local : Q40 (Samuel), la CI fait foi en attendant. **Amendé par la décision 0036 (B1-TL-1)** : sans base, une session hors CI pose explicitement `SKIP_DB_TESTS=1` (avertissement visible, refusée en CI) ; Q40 ne bloque plus `pnpm verify` en local, la CI fait foi pour les tests de base.
