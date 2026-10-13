@@ -6,9 +6,9 @@ import { z } from "zod";
  * (`scripts/p0/`), les valide, puis injecte les valeurs. Aucun identifiant de modèle, aucun hôte, aucune URL
  * ni aucun nom de variable d'environnement n'est écrit en dur dans le code.
  *
- * Les clés `activity`, `meal`, `evening` (types de créneau) et `officielle`, `independante`, `generique`
- * (classes de source) sont celles de `TYPES_CRENEAU` et `CLASSES_SOURCE` de `candidat.ts` : les modules de
- * `src/prototype` sont des feuilles sans import entre eux (décision 0032, A3.2) ; `config.test.ts` vérifie l'égalité.
+ * Les clés `activity`, `meal`, `evening` (types de créneau) de `recherche.json` sont celles de `TYPES_CRENEAU` de
+ * `candidat.ts` : les modules de `src/prototype` sont des feuilles sans import entre eux (décision 0032, A3.2) ;
+ * `config.test.ts` vérifie l'égalité. Le schéma de `classement.json` est dans `src/domain` (décision 0045 § 1.4).
  *
  * **Aucun champ ne peut ouvrir un chemin réel** : chaque niveau est strict, une clé inconnue (`mode`, `reel`,
  * `host`, `url`…) fait refuser le fichier. Module pur, n'importe que `zod`.
@@ -80,39 +80,6 @@ export const ConfigRechercheSchema = z.strictObject({
 });
 export type ConfigRecherche = z.infer<typeof ConfigRechercheSchema>;
 
-const poids = z.number().finite().min(0).max(100);
-const poidsSigne = z.number().finite().min(-100).max(100);
-const coutMinute = z.number().finite().min(0).max(10);
-
-/**
- * `classement.json` : formule de classement proposée par ia-recherche (spécification, étape 7). Nombres bornés
- * et énumérations fermées, **aucune chaîne libre**. Appliquée par `src/domain`, jamais écrite dans un prompt.
- */
-export const ConfigClassementSchema = z.strictObject({
-  schema: Version,
-  poids: z.strictObject({
-    /** Bonus quand le candidat correspond aux envies. */
-    matchesWishes: poids,
-    /** Bonus d'un incontournable. */
-    mustSee: poids,
-    /** Malus par point de risque « Pas pour moi » au-dessus de 1. */
-    notForMeRisk: poids,
-    /** Bonus ou malus selon la classe de la source. */
-    source: z.strictObject({ officielle: poidsSigne, independante: poidsSigne, generique: poidsSigne }),
-    /** Malus d'une source plus ancienne que `ageSourceMaxJours`. */
-    sourceAncienne: poids,
-  }),
-  /** Traitement d'un candidat qui ne correspond pas aux envies : écarté, ou seulement pénalisé. */
-  matchesWishesNon: z.enum(["exclure", "penaliser"]),
-  /** Malus d'un candidat qui ne correspond pas aux envies, quand il est pénalisé. */
-  penaliteHorsEnvies: poids,
-  /** Les incontournables passent avant les autres activités, ou seulement par leur poids. */
-  prioriteMustSee: z.enum(["avant", "poids"]),
-  /** Coût d'une minute de trajet, par type d'étape (cadrage § 3.7 : la distance est un coût, pas un filtre). */
-  coutTrajetParMinute: z.strictObject({ activity: coutMinute, meal: coutMinute, evening: coutMinute, surprise: coutMinute }),
-});
-export type ConfigClassement = z.infer<typeof ConfigClassementSchema>;
-
 /**
  * Bornes du schéma de `plafonds.json` : provisoires et non décisionnelles (décision 0032, A2). Elles empêchent
  * une valeur absurde dans le mode simulé et ne fixent aucun plafond d'exécution réelle. Relever une borne
@@ -150,15 +117,18 @@ export const ConfigPlafondsSchema = z.strictObject({
 export type ConfigPlafonds = z.infer<typeof ConfigPlafondsSchema>;
 export type CompteurPlafonne = Exclude<keyof ConfigPlafonds, "schema">;
 
+/**
+ * Fichiers de configuration de P0 validés ici. `classement.json` est validé par `ConfigClassementSchema`, défini
+ * dans `src/domain` depuis B5a (décision 0045 § 1.4, amendement de 0032 A2), par `scripts/p0/fichiers.ts`.
+ */
 export type Configuration = {
   modeles: ConfigModeles;
   recherche: ConfigRecherche;
-  classement: ConfigClassement;
   plafonds: ConfigPlafonds;
 };
 
 /**
- * Valide les quatre fichiers et leurs contrôles croisés : le total de candidats visé reste sous le plafond
+ * Valide les trois fichiers et leurs contrôles croisés : le total de candidats visé reste sous le plafond
  * `candidatsTrouves`, et la somme des cibles par créneau ne dépasse pas ce total. Lève une erreur sans recopier
  * la valeur reçue.
  */
@@ -166,7 +136,6 @@ export function validerConfiguration(brut: Record<keyof Configuration, unknown>)
   const configuration: Configuration = {
     modeles: ConfigModelesSchema.parse(brut.modeles),
     recherche: ConfigRechercheSchema.parse(brut.recherche),
-    classement: ConfigClassementSchema.parse(brut.classement),
     plafonds: ConfigPlafondsSchema.parse(brut.plafonds),
   };
   if (configuration.recherche.totalCandidats > configuration.plafonds.candidatsTrouves) {

@@ -1,9 +1,10 @@
 import { classer, type ParametresClassement } from "@/domain/classement";
-import { DUREES, MARGE_MINUTES, type Creneau, type JourSquelette } from "@/domain/squelette";
+import type { ConfigurationMoteur } from "@/domain/configuration";
+import type { CandidatEvenement, CandidatMoteur, TypeCreneau } from "@/domain/entrees";
+import { dansLesPlages, INCONNU, type ModeTrajet, type Point, type Relectures } from "@/domain/relectures";
+import type { Creneau, JourSquelette } from "@/domain/squelette";
+import { lire } from "@/domain/tables";
 import { arrondi5, versMinutes } from "@/domain/temps";
-import type { AncrageResolu, PlageOuverture, Trajets } from "@/prototype/ancrage";
-import type { Candidat, CandidatNote, TypeCreneau } from "@/prototype/candidat";
-import { element, lire } from "@/domain/tables";
 
 /**
  * Planification déterministe (spécification P0, étapes 7 et 8) : pour chaque jour du squelette, chaque créneau
@@ -11,7 +12,9 @@ import { element, lire } from "@/domain/tables";
  * laisse la marge de trajet (R5) ; sinon le candidat suivant (aucune réparation par un modèle, P0-PO-7). Un
  * créneau sans candidat reste vide (« aucune option compatible », PO-6) : jamais de relance de la recherche.
  *
- * Les horaires d'ouverture et les durées de trajet sont lus **en mémoire** ; rien de ce module ne les écrit.
+ * Validité des lieux, horaires d'ouverture et durées de trajet sont lus **en mémoire** par les interfaces injectées
+ * (`relectures.ts`, décision 0045 § 2) ; rien de ce module ne les écrit. Reprise de P0 ; B5b y applique B5-PO-6
+ * (mode le plus rapide), B5-PO-12 (engagements) et B5-PO-16 (idées reçues déjà écrites).
  */
 
 export type EtapePlanifiee = {
@@ -31,8 +34,9 @@ export type EvenementPlanifie = { candidatId: string; placeId?: string; debut: n
 
 export type JourPlanifie = {
   squelette: JourSquelette;
-  logementDepart: string;
-  logementArrivee: string;
+  /** Index de la nuit du logement de départ et d'arrivée (0045 § 2.2). */
+  logementDepart: number;
+  logementArrivee: number;
   etapes: EtapePlanifiee[];
   /** Minutes du retour au logement (mémoire seulement). */
   retour: number;
@@ -41,48 +45,54 @@ export type JourPlanifie = {
 };
 
 export type EntreePlanification = {
-  jours: JourSquelette[];
-  /** Candidats **ancrés** et notés. */
-  candidats: readonly CandidatNote[];
-  ancrages: ReadonlyMap<string, AncrageResolu>;
-  /** Événements trouvés (ancrés ou non), avec leur ancrage s'il existe. */
-  evenements: readonly Candidat[];
-  /** `placeId` de chaque logement, dans l'ordre du brief. */
-  logements: readonly string[];
-  trajets: Trajets;
+  jours: readonly JourSquelette[];
+  /** Candidats notés de la réserve ; seuls ceux qui ont un `placeId` valide sont planifiés (R1). */
+  candidats: readonly CandidatMoteur[];
+  /** Événements trouvés (ancrés ou non). */
+  evenements: readonly CandidatEvenement[];
+  relectures: Relectures;
+  /** Mode de trajet du calcul (reprise de P0 ; B5b applique B5-PO-6). */
+  mode: ModeTrajet;
   parametres: ParametresClassement;
-  arrivee: string;
-  depart: string;
+  configuration: ConfigurationMoteur;
+  voyage: { start: string; end: string };
 };
 
-/** Vrai si l'étape tient entièrement dans une plage d'ouverture du jour (horaires inconnus : aucune contrainte). */
-export function ouvert(horaires: readonly PlageOuverture[] | null, jour: number, debut: number, fin: number): boolean {
-  if (horaires === null) return true;
-  return horaires.some((plage) => plage.jour === jour && plage.debut <= debut && fin <= plage.fin);
+/** Vrai si l'étape tient dans une plage d'ouverture de la date (plages inconnues : aucune contrainte, B5-PO-5). */
+export function ouvert(relectures: Relectures, placeId: string, date: string, debut: number, fin: number): boolean {
+  return dansLesPlages(relectures.plages(placeId, date), debut, fin) !== false;
 }
 
-function dureeDe(candidat: CandidatNote, creneau: Creneau): number {
-  if (creneau.type === "meal") return lire(DUREES, creneau.repas);
-  if (creneau.type === "evening") return DUREES.evening;
-  return candidat.dureeMinutes ?? DUREES.activity;
+function dureeDe(candidat: CandidatMoteur, creneau: Creneau, configuration: ConfigurationMoteur): number {
+  const durees = configuration.dureesParDefaut;
+  if (creneau.type === "meal") return lire(durees, creneau.repas);
+  if (creneau.type === "evening") return durees.evening;
+  return candidat.faits.durationMinutes ?? durees.activity;
 }
 
-function admisPourCreneau(candidat: CandidatNote, creneau: Creneau): boolean {
+function admisPourCreneau(candidat: CandidatMoteur, creneau: Creneau): boolean {
   if (!candidat.notes.slotFit.includes(creneau.type)) return false;
   if (creneau.type === "meal") return candidat.typeEtape === "meal";
   return candidat.typeEtape === "activity";
 }
 
 export function planifier(entree: EntreePlanification): JourPlanifie[] {
+  const { relectures, configuration } = entree;
+  const marge = configuration.margeMinutes;
   const utilises = new Set<string>();
-  const placeDe = (candidat: { id: string }) => entree.ancrages.get(candidat.id)?.placeId;
+  const lieuValide = (candidat: { placeId?: string }): string | undefined =>
+    candidat.placeId !== undefined && relectures.validite(candidat.placeId) === "valide" ? candidat.placeId : undefined;
+  const trajet = (depuis: Point, vers: Point): number | undefined => {
+    const minutes = relectures.duree(depuis, vers, entree.mode);
+    return minutes === INCONNU ? undefined : minutes;
+  };
   const resultat: JourPlanifie[] = [];
 
   for (const jour of entree.jours) {
-    const logementDepart = element(entree.logements, jour.logementDepart) ?? entree.logements[0] ?? "";
-    const logementArrivee = element(entree.logements, jour.logementArrivee) ?? entree.logements[0] ?? "";
+    const logementDepart: Point = { logement: jour.logementDepart };
+    const logementArrivee: Point = { logement: jour.logementArrivee };
     const etapes: EtapePlanifiee[] = [];
-    let position = logementDepart;
+    let position: Point = logementDepart;
     let instant = jour.debut;
     /** Minutes occupées (trajets et étapes) : le temps libre minimal du rythme est gardé (R8). */
     let occupe = 0;
@@ -99,28 +109,27 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
         admis,
         type,
         (candidat) => {
-          const place = placeDe(candidat);
-          return place === undefined ? undefined : entree.trajets(reference, place);
+          const place = lieuValide(candidat);
+          return place === undefined ? undefined : trajet(reference, { lieu: place });
         },
         entree.parametres,
       );
       const faisables = classes.flatMap((candidat) => {
-        const place = placeDe(candidat);
-        const ancrage = entree.ancrages.get(candidat.id);
-        if (place === undefined || ancrage === undefined) return [];
-        const trajet = entree.trajets(depuis, place);
-        const retour = entree.trajets(place, logementArrivee);
-        if (trajet === undefined || retour === undefined) return [];
+        const place = lieuValide(candidat);
+        if (place === undefined) return [];
+        const aller = trajet(depuis, { lieu: place });
+        const retour = trajet({ lieu: place }, logementArrivee);
+        if (aller === undefined || retour === undefined) return [];
         const auPlusTot = creneau.type === "activity" ? 0 : creneau.auPlusTot;
-        const debut = arrondi5(Math.max(instant + trajet + MARGE_MINUTES, auPlusTot));
+        const debut = arrondi5(Math.max(instant + aller + marge, auPlusTot));
         if (creneau.type === "meal" && debut > creneau.auPlusTard) return [];
-        const duree = dureeDe(candidat, creneau);
+        const duree = dureeDe(candidat, creneau, configuration);
         const fin = debut + duree;
-        if (fin + retour + MARGE_MINUTES > jour.fin) return [];
-        if (jour.fin - jour.debut - (occupe + trajet + duree + retour) < jour.tempsLibreMin) return [];
+        if (fin + retour + marge > jour.fin) return [];
+        if (jour.fin - jour.debut - (occupe + aller + duree + retour) < jour.tempsLibreMin) return [];
         if (creneau.type === "activity" && fin > limite) return [];
-        if (!ouvert(ancrage.horaires, jour.jourSemaine, debut, fin)) return [];
-        return [{ candidat, place, trajet, debut, fin }];
+        if (!ouvert(relectures, place, jour.date, debut, fin)) return [];
+        return [{ candidat, place, aller, debut, fin }];
       });
       const choix = faisables[0];
       if (choix === undefined) return;
@@ -132,15 +141,15 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
         ...(creneau.type === "meal" ? { repas: creneau.repas } : {}),
         debut: choix.debut,
         fin: choix.fin,
-        trajetAvant: choix.trajet,
+        trajetAvant: choix.aller,
         options: Math.min(3, faisables.length),
       });
-      position = choix.place;
+      position = { lieu: choix.place };
       instant = choix.fin;
-      occupe += choix.trajet + (choix.fin - choix.debut);
+      occupe += choix.aller + (choix.fin - choix.debut);
     });
 
-    const retour = entree.trajets(position, logementArrivee) ?? 0;
+    const retour = trajet(position, logementArrivee) ?? 0;
 
     // Idée « Surprends-moi » : la meilleure activité restante, près du logement du jour (une par jour au plus).
     const restantes = entree.candidats.filter(
@@ -150,13 +159,13 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
       restantes,
       "surprise",
       (candidat) => {
-        const place = placeDe(candidat);
-        return place === undefined ? undefined : entree.trajets(logementArrivee, place);
+        const place = lieuValide(candidat);
+        return place === undefined ? undefined : trajet(logementArrivee, { lieu: place });
       },
       entree.parametres,
     );
     let idee: JourPlanifie["idee"];
-    const placeIdee = ideeChoisie === undefined ? undefined : placeDe(ideeChoisie);
+    const placeIdee = ideeChoisie === undefined ? undefined : lieuValide(ideeChoisie);
     if (ideeChoisie !== undefined && placeIdee !== undefined) {
       utilises.add(ideeChoisie.id);
       idee = { candidatId: ideeChoisie.id, placeId: placeIdee };
@@ -165,13 +174,21 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
     // Événements du jour, aux dates du séjour seulement (R2), avec une heure lue sur la page.
     const evenements: EvenementPlanifie[] = entree.evenements.flatMap((evenement) => {
       const info = evenement.evenement;
-      if (info === undefined || info.heure === undefined || info.date !== jour.date) return [];
-      if (info.date < entree.arrivee || info.date > entree.depart) return [];
-      const placeId = placeDe(evenement);
+      if (info.heure === undefined || info.date !== jour.date) return [];
+      if (info.date < entree.voyage.start || info.date > entree.voyage.end) return [];
+      const placeId = evenement.placeId;
       return [{ candidatId: evenement.id, ...(placeId === undefined ? {} : { placeId }), debut: versMinutes(info.heure) }];
     });
 
-    resultat.push({ squelette: jour, logementDepart, logementArrivee, etapes, retour, ...(idee ? { idee } : {}), evenements });
+    resultat.push({
+      squelette: jour,
+      logementDepart: jour.logementDepart,
+      logementArrivee: jour.logementArrivee,
+      etapes,
+      retour,
+      ...(idee ? { idee } : {}),
+      evenements,
+    });
   }
   return resultat;
 }

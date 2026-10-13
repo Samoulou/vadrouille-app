@@ -26,3 +26,28 @@ export function identifiantVoyage(destination: string, dateExecution: string, nu
   if (!TRIP_ID_PATTERN.test(id)) throw new RangeError("identifiant non conforme");
   return id;
 }
+
+/**
+ * Identifiants d'étape créés par le moteur (décision 0045 § 3.5) : déterministes, sans graine aléatoire. Une étape
+ * créée dans la version `n` a l'identifiant `v<n>-j<jour>-<rang>` (rang à partir de 1 dans le jour) ; suffixes
+ * `e<rang>` pour un événement, `idee` pour l'idée, `c<rang>` pour une proposition. Une étape existante garde son
+ * identifiant ; ceux d'un patch sont attribués par le serveur (0037). P0 garde ses identifiants `j<jour>-<rang>`.
+ */
+export type GenreEtape = "etape" | "evenement" | "idee" | "proposition";
+
+export function identifiantEtape(version: number, jour: number, genre: GenreEtape, rang = 1): string {
+  for (const valeur of [version, jour, rang]) {
+    if (!Number.isInteger(valeur) || valeur < 1) throw new RangeError("version, jour et rang entiers à partir de 1");
+  }
+  const prefixe = `v${version}-j${jour}`;
+  switch (genre) {
+    case "etape":
+      return `${prefixe}-${rang}`;
+    case "evenement":
+      return `${prefixe}-e${rang}`;
+    case "idee":
+      return `${prefixe}-idee`;
+    case "proposition":
+      return `${prefixe}-c${rang}`;
+  }
+}

@@ -143,7 +143,7 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 **Liste noire** pour les autres dossiers :
 | Dossier | Interdit |
 |---|---|
-| `src/domain` | en plus de la liste blanche : `process.env`, `fetch` (aucune entrée-sortie) |
+| `src/domain` | en plus de la liste blanche (`@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain` ; `vitest` en plus pour les `*.test.ts`, tout autre import refusé, `import type` et `export … from` compris) : `process` (tout accès), `fetch`, `Date.now`, `new Date()` et `Date()` sans argument, `Math.random`, `crypto`, `performance`, `globalThis`, `require`, `import()`, `eval`, `Function` ; `Date.parse`, `Date.UTC` et `new Date(argument)` restent permis (aucune entrée-sortie, ni horloge, ni hasard ; décision 0045 § 3, règle ESLint de `eslint.config.mjs`, test `lint: src/domain sans entrée-sortie`) |
 | `src/ai`, `src/research` | en plus de la liste blanche, vérifié explicitement : `@/grounding`, `db/` (aucune donnée Google ne peut atteindre un prompt ; la recherche écrit par le serveur) |
 | `src/app`, `src/features`, `src/components` | `db/`, `drizzle-orm`, `pg`, `better-auth`, `@/workflows`, `@/grounding`, `@/ai`, `@/research` (ils passent par les actions et `src/adapters`) |
 | tout sauf `src/ai` | SDK de modèles (`ai`, `@ai-sdk/*`, SDK des fournisseurs) |

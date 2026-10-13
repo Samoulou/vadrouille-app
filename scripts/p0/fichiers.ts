@@ -1,10 +1,12 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 import { FixturesModelesSchema, type FixturesModeles } from "@/ai/modeles.simule";
+import { ConfigClassementSchema, type ConfigClassement } from "@/domain/classement";
+import { ConfigurationMoteurSchema, type ConfigurationMoteur } from "@/domain/configuration";
 import { FixturesPlacesSchema, type FixturesPlaces } from "@/grounding/places.simule";
 import { FixturesRoutesSchema, type FixturesRoutes } from "@/grounding/routes.simule";
 import { BriefSchema, NOM_BRIEF_PATTERN, type Brief } from "@/prototype/brief";
-import { validerConfiguration, type Configuration } from "@/prototype/config";
+import { validerConfiguration, type Configuration as ConfigurationPrototype } from "@/prototype/config";
 import { FixturesPagesSchema, type FixturesPages } from "@/research/pages.simule";
 import { FixturesRechercheSchema, type FixturesRecherche } from "@/research/recherche-web.simule";
 
@@ -22,9 +24,21 @@ export class ErreurFichier extends Error {
   }
 }
 
-export type Dossiers = { racine: URL };
+/**
+ * `moteur` : fichier des valeurs de la configuration du moteur (décision 0045 § 4.2), `src/server/config/moteur.json`
+ * par défaut. Seule copie des valeurs : P0 le lit ici (`node:fs`), sans charger de module de `src/server`.
+ */
+export type Dossiers = { racine: URL; moteur?: URL };
 
-export const DOSSIERS_PAR_DEFAUT: Dossiers = { racine: new URL("../../prototype/", import.meta.url) };
+export const FICHIER_MOTEUR = new URL("../../src/server/config/moteur.json", import.meta.url);
+
+export const DOSSIERS_PAR_DEFAUT: Dossiers = { racine: new URL("../../prototype/", import.meta.url), moteur: FICHIER_MOTEUR };
+
+/**
+ * Configuration d'une exécution de P0 : les fichiers de `prototype/config/` (dont `classement.json`, validé par le
+ * schéma de `src/domain`, décision 0045 § 1.4) et la configuration du moteur.
+ */
+export type Configuration = ConfigurationPrototype & { classement: ConfigClassement; moteur: ConfigurationMoteur };
 
 const dossier = (dossiers: Dossiers, nom: string) => new URL(`${nom}/`, dossiers.racine);
 
@@ -46,15 +60,23 @@ export function lireBrief(nom: string, dossiers: Dossiers = DOSSIERS_PAR_DEFAUT)
   return resultat.data;
 }
 
+/** Configuration du moteur : `moteur.json` validé par le schéma de `src/domain` (même schéma que le serveur). */
+export function lireConfigurationMoteur(fichier: URL = FICHIER_MOTEUR): ConfigurationMoteur {
+  return ConfigurationMoteurSchema.parse(lireJson(fichier));
+}
+
 export function lireConfiguration(dossiers: Dossiers = DOSSIERS_PAR_DEFAUT): Configuration {
   const config = dossier(dossiers, "config");
   try {
-    return validerConfiguration({
-      modeles: lireJson(new URL("modeles.json", config)),
-      recherche: lireJson(new URL("recherche.json", config)),
-      classement: lireJson(new URL("classement.json", config)),
-      plafonds: lireJson(new URL("plafonds.json", config)),
-    });
+    return {
+      ...validerConfiguration({
+        modeles: lireJson(new URL("modeles.json", config)),
+        recherche: lireJson(new URL("recherche.json", config)),
+        plafonds: lireJson(new URL("plafonds.json", config)),
+      }),
+      classement: ConfigClassementSchema.parse(lireJson(new URL("classement.json", config))),
+      moteur: lireConfigurationMoteur(dossiers.moteur ?? FICHIER_MOTEUR),
+    };
   } catch {
     throw new ErreurFichier("config_invalid");
   }

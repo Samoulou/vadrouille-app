@@ -5,23 +5,23 @@ import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
 import { requeteNotation, requeteRaisons } from "@/ai/requetes";
 import { lireNotes, lireRaisons } from "@/ai/sorties";
-import { assembler, type Raison } from "@/domain/assemblage";
 import { identifiantVoyage } from "@/domain/identifiant";
 import { planifier } from "@/domain/planification";
 import { squelette } from "@/domain/squelette";
-import { valider, type Violations } from "@/domain/validation";
 import { ancrerCandidats, ancrerLogements, matriceTrajets } from "@/grounding/ancrage";
-import type { ClientPlaces, ClientRoutes, ModeRoutes } from "@/grounding/interfaces";
+import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import { estAncre, type Ancrage, type AncrageResolu, type Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat, CandidatNote } from "@/prototype/candidat";
-import { CONFIG_SCHEMA, modelesDeLaVariante, RoutageSchema, type Configuration, type Variante } from "@/prototype/config";
+import { CONFIG_SCHEMA, modelesDeLaVariante, RoutageSchema, type Variante } from "@/prototype/config";
 import type { ProgrammeReduit } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 
+import { assembler, type Raison } from "./assemblage";
+import type { Configuration } from "./fichiers";
 import { codeErreur, type Journal } from "./journal";
 import {
   Compteurs,
@@ -34,6 +34,17 @@ import {
 } from "./plafonds";
 import { lireSiPresent } from "@/domain/tables";
 import { RapportSchema, type Rapport } from "./rapport";
+import {
+  briefDepuisBrief,
+  candidatVersMoteur,
+  engagementsDepuisBrief,
+  evenementVersMoteur,
+  modeDeTrajet,
+  nuitsDepuisBrief,
+  relecturesDepuisAncrages,
+  violationsP0,
+  type ViolationsP0,
+} from "./vers-moteur";
 
 /**
  * Orchestrateur du prototype (spécification P0, « Déroulement » ; décision 0032, A3.1) : seul fichier qui compose
@@ -63,12 +74,6 @@ export type EntreePipeline = {
 };
 
 export type ResultatPipeline = { programme?: ProgrammeReduit; rapport: Rapport };
-
-function modeDeTrajet(brief: Brief): ModeRoutes {
-  if (brief.deplacements.includes("transit")) return "transit";
-  if (brief.deplacements.includes("walk")) return "walk";
-  return "car";
-}
 
 function enLots<T>(valeurs: readonly T[], taille: number): T[][] {
   const lots: T[][] = [];
@@ -117,7 +122,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
   let retenus = 0;
   let propositions = 0;
   let jours = 0;
-  let violations: Violations = { R1: 0, R2: 0, R4: 0, R5: 0, R6: 0, R8: 0 };
+  let violations: ViolationsP0 = { R1: 0, R2: 0, R4: 0, R5: 0, R6: 0, R8: 0 };
   let programme: ProgrammeReduit | undefined;
   let statut: Rapport["statut"] = "complete";
   let raisonArret: Rapport["raisonArret"];
@@ -175,7 +180,8 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     });
     journal.ecrire("notation_done", { notes: notesCandidats.length });
 
-    // Étapes 5, 7 et 8 : squelette, classement et planification, déterministes.
+    // Étapes 5, 7 et 8 : squelette, classement et planification, déterministes, par le moteur (`src/domain`),
+    // sur ses propres entrées (adaptateur `vers-moteur.ts`, décision 0045 § 1.3).
     const placesLogements = logements.map((logement) => logement.placeId);
     const trajetsMemoire = await chrono("planification", () =>
       matriceTrajets(
@@ -184,22 +190,33 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
         routes,
       ),
     );
-    const joursSquelette = squelette(brief);
+    const nuits = nuitsDepuisBrief(brief, placesLogements);
+    const ancragesParPlace = new Map<string, AncrageResolu>();
+    for (const ancrage of [...logements, ...ancrages.values()]) ancragesParPlace.set(ancrage.placeId, ancrage);
+    const relectures = relecturesDepuisAncrages(ancragesParPlace, nuits, trajetsMemoire);
+    const briefMoteur = briefDepuisBrief(brief);
+    const joursSquelette = squelette({
+      voyage: { start: brief.arrivee, end: brief.depart },
+      pace: briefMoteur.pace,
+      nombreDeNuits: nuits.length,
+      engagements: engagementsDepuisBrief(brief),
+      configuration: configuration.moteur,
+      budgetTrajetReduit: false,
+    });
     const planifies = await chrono("planification", () =>
       planifier({
         jours: joursSquelette,
-        candidats: notesCandidats,
-        ancrages,
-        evenements,
-        logements: placesLogements,
-        trajets: trajetsMemoire,
+        candidats: notesCandidats.map((candidat) => candidatVersMoteur(candidat, ancrages.get(candidat.id))),
+        evenements: evenements.flatMap((candidat) => evenementVersMoteur(candidat, ancrages.get(candidat.id)) ?? []),
+        relectures,
+        mode: modeDeTrajet(brief),
         parametres: {
           classement: configuration.classement,
           ageSourceMaxJours: configuration.recherche.ageSourceMaxJours,
-          dateExecution: entree.dateExecution,
+          dateReference: entree.dateExecution,
         },
-        arrivee: brief.arrivee,
-        depart: brief.depart,
+        configuration: configuration.moteur,
+        voyage: { start: brief.arrivee, end: brief.depart },
       }),
     );
     journal.ecrire("planning_done", { jours: planifies.length });
@@ -231,30 +248,23 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       const complet = assembler({
         tripId,
         brief,
+        nuits,
+        configuration: configuration.moteur,
         jours: planifies,
         candidats: parId,
         raisons,
         mode: modeDeTrajet(brief),
         positions,
       });
-      const ancragesParPlace = new Map<string, AncrageResolu>();
-      for (const ancrage of [...logements, ...ancrages.values()]) ancragesParPlace.set(ancrage.placeId, ancrage);
-      const nonConfirmes = new Set(
-        complet.trip.days.flatMap((day) =>
-          day.events.filter((stop) => stop.exceptions.includes("unconfirmed")).map((stop) => stop.id),
-        ),
-      );
-      violations = valider(complet.trip, {
+      // Validateurs du moteur (R1 à R10, rapport en mémoire), ramenés aux six compteurs du rapport de P0.
+      violations = violationsP0(complet.trip.days, {
         brief,
-        ancrages: ancragesParPlace,
-        trajets: trajetsMemoire,
-        terminus: complet.terminus,
-        logementsAttendus: planifies.map((jour) => ({
-          jour: jour.squelette.index,
-          depart: jour.logementDepart,
-          arrivee: jour.logementArrivee,
-        })),
-        evenementsNonConfirmes: nonConfirmes,
+        briefMoteur,
+        nuits,
+        relectures,
+        configuration: configuration.moteur,
+        planifies,
+        candidats: parId,
       });
       propositions = complet.proposals.length;
       jours = complet.trip.days.length;
