@@ -49,6 +49,9 @@ function fakeRevision(applyResult: ApplyResult = { ok: true, version: 1 }) {
         }),
     ),
     apply: vi.fn(async () => applyResult),
+    // Déplacement (F7b) : hors de l'écran 14.
+    getMoveOptions: vi.fn(async (stopId: string) => ({ stopId, days: [] })),
+    previewMove: vi.fn(async (): Promise<RevisionResult> => ({ ok: false, error: "noOption" })),
   };
   return revision;
 }

@@ -160,6 +160,16 @@ export const ReplaceUndoneEventSchema = z.strictObject({
   properties: ReplacementPropertiesSchema,
 });
 
+/**
+ * « Appliquer » d'un déplacement (handover § 12, spécification F7, F7-PO-18 ; décision 0016 § 10), une fois
+ * l'application résolue. `method` vaut `button` dans F7 (`drag` est réservé au glisser futur, F7-PO-16). Ni nom,
+ * ni `placeId`, ni identifiant d'étape, ni jour : l'objet strict les refuse.
+ */
+export const StopMovedEventSchema = z.strictObject({
+  name: z.literal("stop_moved"),
+  properties: z.strictObject({ method: z.enum(["button", "drag"]) }),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -174,6 +184,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   BriefCompletedEventSchema,
   ReplaceAppliedEventSchema,
   ReplaceUndoneEventSchema,
+  StopMovedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

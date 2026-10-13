@@ -27,6 +27,10 @@ export interface StopSheetProps extends FicheTarget {
   onClose: () => void;
   /** Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. */
   onToggleLock: (locked: boolean) => void;
+  /** « Déplacer » (F7-PO-15) : ouvre la feuille « Déplacer » ; sans fonction, pas de bouton. */
+  onMove?: () => void;
+  /** Préchargement de la feuille « Déplacer » au survol ou au focus du bouton. */
+  onMoveIntent?: () => void;
   /**
    * Mention « Données de lieux : Google » en fin de fiche (adaptateur `prototype`, spécification P0) : la fiche
    * remplace le panneau du jour et recouvre en grande partie la carte. `PLACES_FROM_GOOGLE` par défaut.
@@ -38,8 +42,8 @@ export interface StopSheetProps extends FicheTarget {
  * Écran 13 « Fiche étape », dans le panneau de la Journée (spécification F5, F5-PO-8 à F5-PO-11 ; rendu
  * provisoire, F5-Q1). Titre de niveau 1 (le titre du jour n'est plus rendu), focus sur ce titre à
  * l'ouverture ; Échap ou « Fermer » ferment la fiche. Un événement de `Day.events` est en lecture seule,
- * signalé comme hors programme, sans action. « Garder » attend la réponse de Samuel (Q67) ; « Déplacer »
- * vient avec F7, « Signaler une erreur » après B11.
+ * signalé comme hors programme, sans action. « Garder » attend la réponse de Samuel (Q67) ; « Déplacer » (F7b)
+ * suit « Remplacer », absent pour une étape verrouillée ; « Signaler une erreur » vient après B11.
  */
 export function StopSheet({
   stop,
@@ -48,6 +52,8 @@ export function StopSheet({
   routes,
   onClose,
   onToggleLock,
+  onMove,
+  onMoveIntent,
   placesFromGoogle = PLACES_FROM_GOOGLE,
 }: StopSheetProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -135,6 +141,19 @@ export function StopSheet({
               <Link href={routes.remplacer(day.index, stop.id)} data-part="remplacer">
                 {t.remplacer}
               </Link>
+            </Button>
+          )}
+          {stop.locked || !onMove ? null : (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-haspopup="dialog"
+              data-part="deplacer"
+              onClick={onMove}
+              onPointerEnter={onMoveIntent}
+              onFocus={onMoveIntent}
+            >
+              {t.deplacer}
             </Button>
           )}
           <Button

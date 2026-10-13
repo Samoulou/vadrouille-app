@@ -30,6 +30,11 @@ export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "ReplacementDraft", task: "B11", reason: "brouillon simulé de remplacement (0016 § 6), remplacé par le moteur en B11" },
   { contract: "ReplacementFixture", task: "B11", reason: "jeu simulé de révision (0016 § 6), remplacé par B11" },
   { contract: "RevisionFixtures", task: "B11", reason: "jeu simulé de révision (0016 § 6), remplacé par B11" },
+  // F7b (décision 0016 § 4 et § 6) : déplacement, mêmes raisons ; B11 les reprend (`getMoveOptions`, `applyPatch`).
+  { contract: "MoveRequest", task: "B11", reason: "demande de déplacement (0016 § 4.1), action serveur de B11" },
+  { contract: "MoveOptions", task: "B11", reason: "points d'insertion (0016 § 4.3), action serveur de B11" },
+  { contract: "MoveDraft", task: "B11", reason: "brouillon simulé de déplacement (0016 § 6), remplacé par le moteur en B11" },
+  { contract: "MoveFixture", task: "B11", reason: "jeu simulé de révision (0016 § 6), remplacé par B11" },
 ];
 
 /**

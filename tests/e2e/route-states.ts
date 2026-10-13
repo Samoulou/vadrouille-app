@@ -5,8 +5,8 @@ import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useSc
 import { card, press, toast } from "./presentation-helpers";
 import { RP, RPJ, SHARE_TOKEN_VALIDE, createShareScope } from "./partage-helpers";
 import type { RouteJourneyName, RoutePreparationName, RouteStateName } from "./routes";
-import { askProposal } from "./revision-helpers";
-import { ficheTitle, listStops } from "./sejour-helpers";
+import { askProposal, moveDays, openMoveSheet } from "./revision-helpers";
+import { dayList, ficheTitle, listStops } from "./sejour-helpers";
 
 /**
  * Actions des états et des préparations de l'inventaire (`routes.ts`, décision 0022 § 3). Elles réutilisent les
@@ -31,6 +31,16 @@ export const ROUTE_STATES = {
   /** Écran 14 : raison « Pas mon style », proposition affichée avec son aperçu des effets (F7a, C29). */
   "proposition-affichee": async (page) => {
     await askProposal(page, "Pas mon style");
+  },
+  /**
+   * Journée : fiche de « [Jardin botanique royal] », feuille « Déplacer » ouverte, J4 cochée avec ses points
+   * d'insertion (F7b, C29).
+   */
+  "deplacer-ouverte": async (page) => {
+    await dayList(page).getByRole("link", { name: /\[Jardin botanique royal\]/ }).click();
+    await expect(ficheTitle(page)).toBeVisible();
+    await openMoveSheet(page);
+    await moveDays(page).getByRole("radio", { name: "Jour 4", exact: true }).click();
   },
 } satisfies Record<RouteStateName, RouteStateAction>;
 

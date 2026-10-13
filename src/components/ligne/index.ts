@@ -5,6 +5,8 @@ export { ChecklistRow, type ChecklistRowProps } from "./ChecklistRow";
 export { Chip, type ChipProps } from "./Chip";
 export { Counter, type CounterProps } from "./Counter";
 export { DayBadge, dayBadgeName, type DayBadgeProps } from "./DayBadge";
+// Rendu radio de `DayBadge` réservé à `DayBadgeGroup` (décision 0019 § 1.2) : `DayBadgeRadio` n'est pas exporté ici.
+export { DayBadgeGroup, type DayBadgeGroupDay, type DayBadgeGroupProps } from "./DayBadgeGroup";
 export {
   DayLine,
   segmentLabel,
@@ -47,4 +49,5 @@ export {
 export { StatusBanner, statusBannerRole, type StatusBannerKind, type StatusBannerProps } from "./StatusBanner";
 export { StopMarker, type StopMarkerKind, type StopMarkerProps } from "./StopMarker";
 export { Tag, type TagKind, type TagProps } from "./Tag";
+export { radioTabStop, radioTarget, useRadioGroup, type RadioGroup, type UseRadioGroupOptions } from "./useRadioGroup";
 export { UndoToast, UndoToastRegion, type UndoToastProps, type UndoToastRegionProps } from "./UndoToast";

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type MouseEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "react";
 
+import type { RecorderKind } from "@/analytics/track";
 import { messages } from "@/i18n";
 
 import { JourneePanel } from "./JourneePanel";
@@ -9,6 +10,15 @@ import { StopSheet } from "./StopSheet";
 import { useTripShell } from "./TripShell";
 
 const t = messages.sejour.fiche;
+
+/** Feuille « Déplacer » chargée à la demande : hors du JavaScript initial de la Journée (comme « Partager », 0039). */
+const loadMoveSheet = () => import("./MoveSheet");
+const MoveSheet = lazy(() => loadMoveSheet().then((loaded) => ({ default: loaded.MoveSheet })));
+
+/** Préchargement au survol ou au focus de « Déplacer » ; un échec est retenté par l'ouverture elle-même. */
+function preloadMoveSheet() {
+  loadMoveSheet().catch(() => {});
+}
 
 /**
  * Contenu du panneau de l'écran 12 « Journée » : la journée ou, avec `?etape=`, la Fiche étape (écran 13,
@@ -19,8 +29,10 @@ const t = messages.sejour.fiche;
 /** Aucune étape surlignée : la ligne garde son fondu pour la fin du surlignage (0018 § 9). */
 const NO_HIGHLIGHT: readonly string[] = [];
 
-export function JourneeView() {
+export function JourneeView({ recorderKind = "none" }: { recorderKind?: RecorderKind } = {}) {
   const shell = useTripShell();
+  // Feuille « Déplacer » (F7b) : étape visée, montée au premier usage, ouverte ou fermée sans changer d'adresse.
+  const [moving, setMoving] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
   const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -77,8 +89,24 @@ export function JourneeView() {
     });
   };
 
+  // Étape de la feuille « Déplacer » : celle de la fiche ouverte quand la feuille a été ouverte.
+  const movingStop =
+    moving && fiche && fiche.inProgramme && fiche.stop.id === moving.stopId && moving.dayIndex === day.index ? fiche.stop : null;
+
   return (
     <div ref={contentRef} onClickCapture={onClickCapture}>
+      {moving && movingStop ? (
+        <Suspense fallback={null}>
+          <MoveSheet
+            open={moving.open}
+            onOpenChange={(open) => setMoving((current) => (current ? { ...current, open } : current))}
+            stop={movingStop}
+            dayIndex={moving.dayIndex}
+            recorderKind={recorderKind}
+            onReturnFocus={() => contentRef.current?.querySelector<HTMLButtonElement>("[data-part='deplacer']")?.focus()}
+          />
+        </Suspense>
+      ) : null}
       <p role="status" data-part="annonce-etape" className="px-5 text-corps-s text-ink-2">
         {shell.missingNoticeDay === day.index && !fiche ? t.absente : null}
       </p>
@@ -91,6 +119,8 @@ export function JourneeView() {
           routes={routes}
           onClose={shell.closeFiche}
           onToggleLock={onToggleLock}
+          onMove={() => setMoving({ stopId: fiche.stop.id, dayIndex: day.index, open: true })}
+          onMoveIntent={preloadMoveSheet}
           placesFromGoogle={shell.placesFromGoogle}
         />
       ) : (
