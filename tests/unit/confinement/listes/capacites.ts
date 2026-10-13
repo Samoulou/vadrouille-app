@@ -212,15 +212,9 @@ export const LIGNES_CAPACITE = [
   {
     fichier: "scripts/ci/techlead-gate.mjs",
     portee: "outil",
-    usage: "porte techlead-gate (0035) : `git cat-file` et `git ls-tree` sur le clone, environnement copié avec `GIT_LITERAL_PATHSPECS`",
-    capacites: [
-      { capacite: "module:node:child_process", formes: ["execFileSync"] },
-      { capacite: "environnement:entier", formes: ["etalement"] },
-      { capacite: "acces-calcule:cle-non-litterale", formes: ["files[files.length - 1]"] },
-    ],
-    ecart:
-      "script de CI (T18, PR 199) : 0040 D2, A8 (amendement M3) ; `execFileSync` permanent ; étalement de `process.env` et " +
-      "`files[files.length - 1]` transitoires, retrait par la tâche `release` de 0040 D2 (A8)",
+    usage: "porte techlead-gate (0035) : `git cat-file` et `git ls-tree` sur le clone, environnement restreint à `PATH`, `HOME` et `GIT_LITERAL_PATHSPECS`",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+    ecart: "script de CI (T18, PR 199) : 0040 D2, A8 ; `execFileSync` permanent (outil)",
   },
   {
     fichier: "tests/unit/ci/techlead-gate.test.ts",

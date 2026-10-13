@@ -76,6 +76,8 @@ export const LECTURES_ENV = [
   { fichier: "tests/unit/p0/cli.test.ts", noms: ["PATH", "HOME"] },
   // Relevé de `f57153c` (T18) : `PATH` d'un sous-processus de test.
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", noms: ["PATH"] },
+  // 0040 D2, A8 : environnement de `git` construit (P0c-suite-release, #222).
+  { fichier: "scripts/ci/techlead-gate.mjs", noms: ["PATH", "HOME"] },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [
