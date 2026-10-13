@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /**
  * Règle ESLint locale : ni `src/ai`, ni `src/research`, ni `src/grounding` hors des dossiers serveur (décision 0006,
  * amendement du 2026-10-13 ; B1, #188, correction 3).
@@ -16,6 +18,23 @@
 
 /** Alias `@/ai`, `@/research`, `@/grounding` ; chemin relatif (éventuellement précédé de `@/`) qui y mène. */
 export const P0_SERVER_MODULES_REGEX = /^(@\/(ai|research|grounding)(\/|$)|(@\/)?(\.{1,2}\/)+(.*\/)?(ai|research|grounding)(\/|$))/;
+
+/**
+ * Source normalisée pour le test (#188, correction 4, Q327). Alias : la partie après `@/`, sans `/` de tête, est
+ * normalisée (`path.posix.normalize`) puis préfixée de `@/` : `@/lib/../ai/client` → `@/ai/client`,
+ * `@//ai/client` → `@/ai/client`, `@/./ai` → `@/ai`, `@/../src/ai` → `@/../src/ai` (toujours refusé par la
+ * partie relative du motif). La chaîne entière n'est jamais normalisée : `path.posix.normalize("@/../src/ai")`
+ * donnerait `src/ai` et rouvrirait ce contournement. Chemin relatif ou autre : inchangé.
+ */
+export function normalizeSource(source) {
+  if (!source.startsWith("@/")) return source;
+  return "@/" + path.posix.normalize(source.slice(2).replace(/^\/+/, ""));
+}
+
+/** Vrai si la source mène à `src/ai`, `src/research` ou `src/grounding`. */
+export function isP0ServerModuleSource(source) {
+  return P0_SERVER_MODULES_REGEX.test(normalizeSource(source));
+}
 
 /** Valeur fixe d'une source : chaîne littérale, ou début d'un gabarit (`\`@/ai/${x}\`` → `@/ai/`). */
 function sourceText(node) {
@@ -38,7 +57,7 @@ const rule = {
   create(context) {
     function check(node, sourceNode) {
       const source = sourceText(sourceNode);
-      if (source !== null && P0_SERVER_MODULES_REGEX.test(source)) {
+      if (source !== null && isP0ServerModuleSource(source)) {
         context.report({ node, messageId: "forbidden", data: { source } });
       }
     }
@@ -52,8 +71,8 @@ const rule = {
       },
       TSExternalModuleReference: (node) => check(node, node.expression),
       TSImportType(node) {
-        // typescript-eslint 8 : `argument` est un TSLiteralType ; versions antérieures : `parameter`.
-        const argument = node.argument ?? node.parameter;
+        // typescript-eslint 8.x récent : `source` (littéral) ; avant : `argument` (TSLiteralType), puis `parameter`.
+        const argument = node.source ?? node.argument ?? node.parameter;
         check(node, argument?.type === "TSLiteralType" ? argument.literal : argument);
       },
     };

@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 /**
  * B1 (#188, corrections 2 et 3), amendement de la décision 0006 du 2026-10-13 :
  * 1. garde de remplacement de l'exception nominative de `ligne/require-server-only` : `ligne/no-p0-server-modules`
- *    refuse `src/ai`, `src/research` et `src/grounding` (alias, chemin relatif, alias suivi de `../`) dans tout
+ *    refuse `src/ai`, `src/research` et `src/grounding` (alias normalisé, chemin relatif) dans tout
  *    fichier hors des dossiers serveur, `db/`, `scripts/` et des tests, sous toutes les formes de chargement
  *    (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`) ; seul un bloc de la
  *    configuration la règle, aucun bloc plus bas ne la remplace ;
@@ -82,6 +82,12 @@ const FORBIDDEN = [
   "@/../src/ai/client",
   "@/./ai/client",
   "@/../src/research",
+  // Correction 4 (Q327) : segments `..`, `.` ou `//` dans un chemin alias, normalisés avant le test.
+  "@/lib/../ai/client",
+  "@/lib/x/../../research/a",
+  "@//ai/client",
+  "@/../src/ai",
+  "@/./ai",
 ];
 
 /** Toutes les formes de chargement d'un module (`S` est remplacé par la source). */
@@ -128,6 +134,8 @@ describe("src/ai, src/research et src/grounding restent hors du code client (000
     "../airline/x",
     "@/aide",
     "@/researcher/x",
+    "@/lib/ai-utils",
+    "@/airline",
     "next/dynamic",
   ])("un chemin voisin (%s) n'est pas visé", async (source) => {
     for (const [label, template] of FORMS) {
