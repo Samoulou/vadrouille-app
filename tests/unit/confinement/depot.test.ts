@@ -142,9 +142,16 @@ describe("confinement: dépôt", () => {
     expect(ids.length).toBe(new Set(ids).size);
   });
 
-  it("confinement: chaque écart cite une décision ou une PR (0040 D5)", () => {
-    // `PR <n>` vaut `#<n>` : la règle ESLint `ligne/no-hardcoded-colors` prend `#180` pour une couleur.
-    const reference = /\b0\d{3}\b|#\d+|\bPR \d+/;
+  it("confinement: chaque ligne de 0040 D6 est bornée en nombre, forme par forme (revue du head ad0b008, bloquant 4)", () => {
+    const sansNombre = LIGNES.filter((l) => l.ecart?.includes("0040 D6")).flatMap((l) =>
+      l.capacites.filter((c) => c.nombre === undefined).map((c) => `${l.fichier} ${c.capacite}`),
+    );
+    expect(sansNombre).toEqual([]);
+  });
+
+  it("confinement: chaque écart cite une décision numérotée (0040 D5 ; revue du head ad0b008, mineur 1)", () => {
+    // Depuis 0040, une PR seule (`#<n>`, `PR <n>`) ne suffit plus : chaque écart nomme la décision qui le tranche.
+    const reference = /\b0\d{3}\b/;
     const ecarts = [
       ...LIGNES.flatMap((l) => (l.ecart === undefined ? [] : [{ ou: l.fichier, texte: l.ecart }])),
       ...SPECIFICATEURS_NOMINATIFS.map((l) => ({ ou: `${l.fichier} ${l.specificateur}`, texte: l.motif })),

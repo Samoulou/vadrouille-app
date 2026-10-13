@@ -183,7 +183,22 @@ const MODULES_NODE_CAPACITE = new Set([
   "process",
 ]);
 
-/** Nom du module à capacité d'un spécificateur, ou `undefined`. */
+/**
+ * Spécificateur normalisé (revue du head `ad0b008`, bloquant 1) : en minuscules, et préfixé de `node:` quand son
+ * premier segment est un module de Node à capacité écrit sans préfixe (`child_process`, `http`…). `node:HTTP`,
+ * `http` et `node:http` désignent donc le même module.
+ */
+export function normaliserSpecificateur(specificateur: string): string {
+  const bas = specificateur.toLowerCase();
+  const sansPrefixe = bas.startsWith("node:") ? bas.slice(5) : bas;
+  return MODULES_NODE_CAPACITE.has(sansPrefixe.split("/")[0] as string) ? `node:${sansPrefixe}` : bas;
+}
+
+/**
+ * Nom du module à capacité d'un spécificateur écrit sous sa forme canonique (`node:http`, `undici`), ou `undefined`.
+ * Les clés des lignes nominatives en dérivent : une autre graphie n'est couverte par aucune ligne (voir
+ * `moduleACapaciteNormalise`).
+ */
 export function moduleACapacite(specificateur: string): string | undefined {
   if (specificateur.startsWith("node:")) {
     const base = specificateur.slice(5).split("/")[0] as string;
@@ -265,7 +280,11 @@ export const NOMS_INTERDITS = new Set([
   "Worker",
   "SharedWorker",
   "importScripts",
+  "Reflect",
+  "Proxy",
 ]);
+/** Réflexion de 2.3, refusée aussi comme propriété de tout objet (revue du head `ad0b008`, bloquant 2). */
+const NOMS_REFLEXION = new Set(["Reflect", "Proxy"]);
 const REFLEXION_OBJECT_REFUSEE = new Set([
   "getPrototypeOf",
   "setPrototypeOf",
@@ -528,6 +547,42 @@ export function resoudre(depuis: string, specificateur: string, existe: (chemin:
 
 export const estRelatif = (s: string) => s.startsWith("./") || s.startsWith("../") || s.startsWith("@/") || s === "." || s === "..";
 
+/** Module à capacité d'un spécificateur dans toute graphie (préfixe `node:` absent, casse) : doubles et graphe. */
+export const moduleACapaciteNormalise = (specificateur: string) => moduleACapacite(normaliserSpecificateur(specificateur));
+
+/** Spécificateurs tiers admis sans ligne en zone sensible et dans les non-test de `src/contracts/` (section 6). */
+function tiersDeZone(chemin: string): readonly string[] | undefined {
+  if (estZoneSensible(chemin)) return estFichierTest(chemin) ? ["vitest", "zod", "node:fs", "node:path"] : ["zod"];
+  if (estContracts(chemin) && !estFichierTest(chemin)) return ["zod"];
+  return undefined;
+}
+
+/** Ligne générale de `SPECIFICATEURS` qui admet ce spécificateur tiers dans ce fichier. */
+function ligneTiers(chemin: string, texte: string): specificateurs.LigneSpecificateur | undefined {
+  return SPECIFICATEURS.find(
+    (l) =>
+      (l.sousChemins === "exacts" ? texte === l.specificateur : texte === l.specificateur || texte.startsWith(`${l.specificateur}/`)) &&
+      l.zones.some((zone) => dansZone(zone, chemin)) &&
+      !(l.sauf ?? []).some((zone) => dansZone(zone, chemin)),
+  );
+}
+
+/**
+ * Double « original » (section 4, forme 2 : `vi.importActual`, `vi.importMock`, fabrique absente, non littérale ou à
+ * paramètre, options `{ spy: true }`) admis sans ligne : spécificateur relatif ou `@/…` (sa fermeture est jugée par
+ * le graphe), ou spécificateur tiers qu'une ligne de la section 6 admet dans ce fichier et qui n'est pas un module à
+ * capacité. Tout autre spécificateur (nom nu, module de Node sans préfixe ou en autre casse, paquet non listé) est
+ * refusé (revue du head `ad0b008`, bloquant 1) ; la comparaison se fait sur le spécificateur normalisé.
+ */
+export function doubleOriginalAdmis(chemin: string, specificateur: string): boolean {
+  if (estRelatif(specificateur)) return true;
+  const normal = normaliserSpecificateur(specificateur);
+  if (moduleACapaciteNormalise(normal)) return false;
+  const zone = tiersDeZone(chemin);
+  if (zone) return zone.some((a) => normal === a || normal.startsWith(`${a}/`));
+  return ligneTiers(chemin, normal) !== undefined;
+}
+
 // --- Analyse ----------------------------------------------------------------------------------------------------
 
 type Collecteur = {
@@ -706,6 +761,11 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       return;
     }
     imports.push({ specificateur: texte, ligne });
+    // Graphie non canonique d'un module à capacité (`https`, `node:HTTP`) : refus qu'aucune ligne ne couvre.
+    if (!moduleACapacite(texte) && moduleACapaciteNormalise(texte)) {
+      c.refuser("specificateur", "non-canonique", texte, noeud);
+      return;
+    }
     const moduleCapacite = moduleACapacite(texte);
     if (moduleCapacite) {
       for (const f of forme) capacite("module-capacite", `module:${moduleCapacite}`, f, noeud);
@@ -715,8 +775,8 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       c.ajouter("specificateur", "schema", texte, noeud);
       return;
     }
-    if (sensible || (estContracts(chemin) && !test)) {
-      const admis = sensible ? (test ? ["vitest", "zod", "node:fs", "node:path"] : ["zod"]) : ["zod"];
+    const admis = tiersDeZone(chemin);
+    if (admis) {
       if (admis.some((a) => texte === a || texte.startsWith(`${a}/`))) {
         c.ajouter("specificateur", "tiers", texte, noeud, true);
         return;
@@ -724,12 +784,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       c.ajouter("specificateur", "zone", texte, noeud, ...nominatif(texte, forme));
       return;
     }
-    const ligneGenerale = SPECIFICATEURS.find(
-      (l) =>
-        (l.sousChemins === "exacts" ? texte === l.specificateur : texte === l.specificateur || texte.startsWith(`${l.specificateur}/`)) &&
-        l.zones.some((zone) => dansZone(zone, chemin)) &&
-        !(l.sauf ?? []).some((zone) => dansZone(zone, chemin)),
-    );
+    const ligneGenerale = ligneTiers(chemin, texte);
     if (ligneGenerale) c.ajouter("specificateur", "tiers", texte, noeud, true, `spec:${ligneGenerale.specificateur}`);
     else c.ajouter("specificateur", "non-liste", texte, noeud, ...nominatif(texte, forme));
   };
@@ -1003,9 +1058,46 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     else c.ajouter("acces-calcule", "type", `${forme} (${motif})`, noeud);
   };
 
+  // --- Objet global et `Object` qualifiés (2.3 ; revue du head `ad0b008`, bloquant 2) ------------------
+  /** Nom lu par un accès pointé ou par crochets à clé littérale. */
+  const nomAccede = (e: ts.Expression): string | undefined =>
+    ts.isPropertyAccessExpression(e) ? e.name.text : ts.isElementAccessExpression(e) ? texteLitteral(e.argumentExpression) : undefined;
+  /** `globalThis`, `global`, `self`, `window`, un alias, ou un nom global lu sur l'un d'eux (`globalThis.window`). */
+  const estGlobalQualifie = (expression: ts.Expression): boolean => {
+    const e = sansConversion(expression);
+    if (ts.isIdentifier(e)) return NOMS_GLOBAUX.has(e.text) || alias.has(e.text);
+    const nom = nomAccede(e);
+    return nom !== undefined && NOMS_GLOBAUX.has(nom) && estGlobalQualifie((e as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression);
+  };
+  /** `Object`, ou `Object` lu sur un objet global (`globalThis.Object`, `window["Object"]`). */
+  const estObjectQualifie = (expression: ts.Expression): boolean => {
+    const e = sansConversion(expression);
+    if (ts.isIdentifier(e)) return e.text === "Object";
+    return nomAccede(e) === "Object" && estGlobalQualifie((e as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression);
+  };
+  /** L'accès est lui-même l'objet d'un accès pointé ou par crochets à clé littérale (`<accès>.keys`). */
+  const estObjetDUnAcces = (acces: ts.Node): boolean => {
+    const { parent, enfant } = parentEffectif(acces);
+    return (
+      (ts.isPropertyAccessExpression(parent) && parent.expression === enfant) ||
+      (ts.isElementAccessExpression(parent) && parent.expression === enfant && texteLitteral(parent.argumentExpression) !== undefined)
+    );
+  };
+
   // --- Lecture d'une propriété nommée (accès pointé, crochets littéraux, déstructuration) ----------------
   const lecturePropriete = (nom: string, noeud: ts.Node, objet: ts.Expression | undefined, acces: ts.Node | undefined) => {
     if (PROPRIETES_REFUSEES.has(nom)) c.ajouter("propriete", `propriete:${nom}`, nom, noeud);
+    // `Reflect` et `Proxy` comme propriété de tout objet (`globalThis.Reflect`, `self["Proxy"]`, `const { Reflect } = x`) :
+    // refus qu'aucune ligne ne couvre ; la seule exception de 0040 D1 porte sur les identifiants nus, sous ses formes.
+    if (NOMS_REFLEXION.has(nom)) c.refuser("reflexion", nom, `propriété ${nom} (${texteNormalise(acces ?? noeud).slice(0, 120)})`, noeud);
+    // `Object` lu sur un objet global hors d'un accès pointé (`const O = globalThis.Object`, `const { Object } = self`) :
+    // même règle que l'identifiant nu.
+    if (nom === "Object" && objet && estGlobalQualifie(objet) && !(acces && estObjetDUnAcces(acces))) {
+      c.ajouter("reflexion", "Object", "hors accès pointé", noeud);
+    }
+    // `vi` ou `vitest` lu sur un objet global (`globalThis.vi.importActual(…)`) : l'objet `vi` échapperait au régime des
+    // tests, qui ne suit que les noms liés dans le fichier (revue du head `ad0b008`, mineur 4).
+    if (EXPORTS_VI.has(nom) && objet && estGlobalQualifie(objet)) c.ajouter("regime-tests", "vi-hors-appel", `${nom} lu sur un objet global`, noeud);
     if (nom === "constructor") {
       const exterieur = acces ? parentEffectif(acces) : undefined;
       const formeName =
@@ -1021,9 +1113,12 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     }
     if (objet) {
       const o = sansConversion(objet);
-      if (ts.isIdentifier(o) && o.text === "Object" && acces) {
+      if (estObjectQualifie(o)) {
         if (REFLEXION_OBJECT_REFUSEE.has(nom)) c.ajouter("reflexion", `Object.${nom}`, nom, noeud);
-        else if (nom === "defineProperty") definePropertyAdmis(acces);
+        else if (nom === "defineProperty") {
+          if (acces && ts.isIdentifier(o)) definePropertyAdmis(acces);
+          else c.ajouter("reflexion", "Object.defineProperty", "defineProperty", noeud);
+        }
       }
       if (ts.isMetaProperty(o) && (nom === "resolve" || nom === "env")) c.ajouter("contournement", `import.meta.${nom}`, nom, noeud);
     }
@@ -1205,7 +1300,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
         const reel = methode === "importActual" || methode === "importMock";
         const original = reel || !litterale || chargeOriginal(fabrique);
         doubles.push({ specificateur: spec, original, ligne: numero(noeud) });
-        if (original && moduleACapacite(spec)) {
+        if (original && !doubleOriginalAdmis(chemin, spec)) {
           c.ajouter("regime-tests", reel || litterale ? "double-original" : "double-sans-fabrique-litterale", `${methode}(${spec})`, noeud);
         }
       }
@@ -1247,18 +1342,20 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
         const nom = ts.isIdentifier(nomBrut) || ts.isStringLiteral(nomBrut) || ts.isNumericLiteral(nomBrut) || ts.isComputedPropertyName(nomBrut) ? nomDePropriete(nomBrut as ts.PropertyName) : undefined;
         if (nom !== undefined) {
           if (ts.isComputedPropertyName(nomBrut) && NOMS_INTERDITS.has(nom)) c.ajouter("acces-calcule", "nom-interdit", nom, element);
-          lecturePropriete(nom, element, undefined, undefined);
+          // Objet source s'il est une expression (`const { getPrototypeOf } = globalThis.Object`) : bloquant 2.
+          lecturePropriete(nom, element, source && ts.isExpression(source) ? source : undefined, undefined);
         }
       }
     }
     if (ts.isObjectLiteralExpression(noeud) && estCibleDeDestructuration(noeud)) {
+      const sourceAffectee = sourceDAffectation(noeud);
       for (const propriete of noeud.properties) {
         if (ts.isSpreadAssignment(propriete)) {
           accesCalcule(propriete.getText(arbre), propriete, undefined, undefined, true);
           continue;
         }
         if (ts.isShorthandPropertyAssignment(propriete)) {
-          lecturePropriete(propriete.name.text, propriete, undefined, undefined);
+          lecturePropriete(propriete.name.text, propriete, sourceAffectee, undefined);
           continue;
         }
         if (ts.isPropertyAssignment(propriete)) {
@@ -1269,7 +1366,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
           const nom = nomDePropriete(propriete.name);
           if (nom !== undefined) {
             if (ts.isComputedPropertyName(propriete.name) && NOMS_INTERDITS.has(nom)) c.ajouter("acces-calcule", "nom-interdit", nom, propriete);
-            lecturePropriete(nom, propriete, undefined, undefined);
+            lecturePropriete(nom, propriete, sourceAffectee, undefined);
           }
         }
       }
@@ -1294,6 +1391,12 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
 
     ts.forEachChild(noeud, visiter);
   };
+
+  /** Membre droit d'une affectation par déstructuration `({ … } = <source>)`, s'il y en a une directe. */
+  function sourceDAffectation(motif: ts.ObjectLiteralExpression): ts.Expression | undefined {
+    const { parent, enfant } = parentEffectif(motif);
+    return ts.isBinaryExpression(parent) && parent.left === enfant && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken ? parent.right : undefined;
+  }
 
   /** Objet source d'un motif de déstructuration (initialiseur d'une déclaration), pour le vérificateur. */
   function sourceDeMotif(motif: ts.ObjectBindingPattern): ts.Node | undefined {

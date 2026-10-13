@@ -203,6 +203,7 @@ export const LIGNES_CAPACITE = [
       {
         capacite: "acces-calcule:type",
         formes: ['(donneesDe(requete.messages.at(-1)?.contenu ?? "") as Record<string, Vue[]>)[champ] (objet any/unknown)'],
+        nombre: 1,
       },
     ],
     ecart: "accès admis seulement par la conversion d'un `unknown` (0038 TL-5 point 7 ; PR 180) : 0040 D2, A7",
@@ -241,7 +242,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/contracts/b2.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : copie d'un objet sans les clés données (`omit`)",
-    capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"] }],
+    capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"], nombre: 1 }],
     ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : 0040 D6, accepté, permanent (portée test, ensemble de clés fini et typé)",
   },
   {
@@ -249,7 +250,7 @@ export const LIGNES_CAPACITE = [
     portee: "test",
     usage: "test des contrats de B2 : `omit` et altération d'un champ d'étape pour un cas négatif",
     capacites: [
-      { capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)", "(item.stop as Json)[cle] (objet any/unknown)"] },
+      { capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)", "(item.stop as Json)[cle] (objet any/unknown)"], nombre: 1 },
     ],
     ecart:
       "clé générique `K extends keyof T` et objet admis seulement par une conversion (0038 TL-5 point 7), B2 (PR 219) : 0040 D6, accepté, permanent (même régime que 0040 A7)",
@@ -258,50 +259,58 @@ export const LIGNES_CAPACITE = [
     fichier: "tests/unit/contracts/derived-storage.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : copie d'un objet sans les clés données (`omit`)",
-    capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"] }],
+    capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"], nombre: 1 }],
     ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : 0040 D6, accepté, permanent (portée test, ensemble de clés fini et typé)",
   },
   {
     fichier: "tests/unit/contracts/categories.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : paramètre local `module` de `exportedSchemas`",
-    capacites: [{ capacite: "identifiant:module", formes: ["declaration", "reference"] }],
+    capacites: [{ capacite: "identifiant:module", formes: ["declaration", "reference"], nombre: 1 }],
     ecart: "paramètre local nommé `module` : identifiant refusé sans analyse de portée (2.3), même cas que 0040 A2, B2 (PR 219) : 0040 D6, accepté, permanent (« ligne inutile » la retire si le paramètre est renommé)",
   },
   // Relevé de la mise à jour avec `main` après F10b (PR 212, fusionnée à 09:30 UTC le 2026-10-13, après la revue du
   // head `eb7e3bf`) : lignes exactes et bornées en nombre, tranchées par 0040 D6 (aucune règle élargie). Les lignes de
-  // portée application et `playwright.config.ts` sont acceptées sur le principe, verdict Sécurité dû ; `node:vm` dans
-  // `tests/unit/sw-route.test.ts` reste non tranché (0040, « Questions ouvertes »).
+  // portée application et `playwright.config.ts` ont reçu le verdict Sécurité de la revue consolidée du head `ad0b008`
+  // (sous condition de son bloquant 2 pour la portée application). `node:vm` n'est
+  // plus utilisé par `tests/unit/sw-route.test.ts` (chargement par `vi.stubGlobal("self", …)` et `import()` littéral) :
+  // sa ligne est retirée (revue du head `ad0b008`, bloquant 3).
   {
     fichier: "public/sw.js",
     portee: "application",
     usage:
       "service worker de la page de repli (F10b, F10-TL-4) : charge `public/sw-route.js` et sert `/hors-ligne` quand une navigation " +
-      "échoue (aucune autre origine, aucune donnée du voyage, selon F10-PO-11)",
+      "échoue (aucune autre origine, aucune donnée du voyage, selon F10-PO-11). Justification navigateur : `importScripts` d'un " +
+      "texte littéral de même origine ; `fetch` de la même origine ou de la requête interceptée, sans en-tête ni secret ajouté " +
+      "(`credentials: \"omit\"` pour la mise en cache)",
     capacites: [
       { capacite: "fichier:mode-non-strict", formes: [".js"], nombre: 1 },
       { capacite: "identifiant:importScripts", formes: ["reference"], nombre: 1 },
       { capacite: "identifiant:fetch", formes: ["reference"], nombre: 4 },
     ],
-    ecart: "script classique `.js` (section 1) et `fetch`/`importScripts` dans le service worker, F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : service worker, `importScripts` d'un texte littéral de même origine, `fetch` du même origine ou de la requête interceptée, sans en-tête ni secret ajouté (`credentials: 'omit'` pour la mise en cache)",
+    ecart: "script classique `.js` (section 1), `fetch` et `importScripts` dans le service worker, F10b (PR 212) : 0040 D6 ; verdict Sécurité : accepté par la revue consolidée du head `ad0b008`, sous condition de la correction de son bloquant 2",
   },
   {
     fichier: "public/sw-route.js",
     portee: "application",
-    usage: "aiguillage pur du service worker (F10b), chargé par `importScripts` dans `public/sw.js` ; publie ses fonctions sur `self`",
+    usage:
+      "aiguillage pur du service worker (F10b), chargé par `importScripts` dans `public/sw.js` ; publie ses fonctions sur `self`. " +
+      "Justification navigateur : accès calculé sur un objet local, `self` seulement pour publier ses fonctions",
     capacites: [
       { capacite: "fichier:mode-non-strict", formes: [".js"], nombre: 1 },
       { capacite: "acces-calcule:cle-non-litterale", formes: ["found[url.pathname + url.search]"], nombre: 1 },
       { capacite: "global:self", formes: ["autre"], nombre: 1 },
     ],
-    ecart: "script classique `.js` (section 1), accès calculé (2.6, règle fermée) et `self` passé en argument (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : aiguillage pur chargé dans le service worker, accès calculé sur un objet local, `self` seulement pour publier ses fonctions",
+    ecart: "script classique `.js` (section 1), accès calculé (2.6, règle fermée) et `self` passé en argument (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité : accepté par la revue consolidée du head `ad0b008`, sous condition de la correction de son bloquant 2",
   },
   {
     fichier: "src/lib/offline/register.ts",
     portee: "application",
-    usage: "enregistrement du service worker (F10b) : `window` comme valeur par défaut du paramètre `env` de `registerOfflineFallback`",
+    usage:
+      "enregistrement du service worker (F10b) : `window` comme valeur par défaut du paramètre `env` de `registerOfflineFallback`. " +
+      "Justification navigateur : `window` n'est lu que pour enregistrer le service worker",
     capacites: [{ capacite: "global:window", formes: ["autre"], nombre: 1 }],
-    ecart: "objet global passé comme valeur (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : `window` n'est lu que pour enregistrer le service worker",
+    ecart: "objet global passé comme valeur (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité : accepté par la revue consolidée du head `ad0b008`, sous condition de la correction de son bloquant 2",
   },
   {
     fichier: "scripts/icones-provisoires.mjs",
@@ -321,7 +330,9 @@ export const LIGNES_CAPACITE = [
     portee: "outil",
     usage: "drapeau Playwright des requêtes réseau des service workers (F10b, F10-TL-6), posé pour le processus principal et ses workers",
     capacites: [{ capacite: "environnement:ecriture", formes: ["PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS"], nombre: 1 }],
-    ecart: "écriture de `process.env` (section 5, refusée hors `vi.stubEnv`), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû (accepté sur le principe, permanent : nom littéral non secret, valeur constante)",
+    ecart:
+      "écriture de `process.env` (section 5, refusée hors `vi.stubEnv`), F10b (PR 212) : 0040 D6, permanent (nom littéral non secret, " +
+      "valeur constante) ; verdict Sécurité : accepté par la revue consolidée du head `ad0b008`",
   },
   {
     fichier: "tests/e2e/hors-ligne.e2e.spec.ts",
@@ -329,19 +340,6 @@ export const LIGNES_CAPACITE = [
     usage: "vérifie dans le service worker qu'une requête vers Google échoue (`fetch` évalué dans le worker par Playwright)",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; sentinelle : le worker ne met pas en cache les requêtes Google)",
-  },
-  {
-    fichier: "tests/unit/sw-route.test.ts",
-    portee: "test",
-    usage: "exécute `public/sw-route.js` dans un contexte isolé (`runInNewContext`, seuls `self` et `URL` fournis)",
-    capacites: [
-      { capacite: "module:node:vm", formes: ["runInNewContext"], nombre: 1 },
-      { capacite: "global:self", formes: ["autre"], nombre: 2 },
-    ],
-    ecart:
-      "module à capacité `node:vm` (évaluation de texte, proche de 2.4) et nom `self` lié localement, F10b (PR 212) : `self` local accepté, " +
-      "permanent, par 0040 D6 ; `node:vm` non tranché par 0040 D6, à trancher par une nouvelle décision avec verdict " +
-      "Sécurité ou à remplacer (0040, « Questions ouvertes ») ; ligne bornée à une occurrence en attendant",
   },
 ] as const satisfies readonly LigneCapacite[];
 

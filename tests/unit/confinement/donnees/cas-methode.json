@@ -706,6 +706,131 @@
       "chemin": "src/x.ts",
       "source": "export const o = { fetch: 1, process: 2, constructor: 3 };",
       "attendu": "admis"
+    },
+    {
+      "id": "methode-reflect-global-pointe",
+      "chemin": "src/x.ts",
+      "source": "export const F = globalThis.Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-window-crochets",
+      "chemin": "src/x.ts",
+      "source": "export const F = window[\"Reflect\"].get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-crochets-replies",
+      "chemin": "src/x.ts",
+      "source": "export const F = self[\"Ref\" + \"lect\"].get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-propriete-objet-quelconque",
+      "chemin": "src/x.ts",
+      "source": "export const F = outils.Reflect.apply(f, undefined, []);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-alias-global",
+      "chemin": "src/x.ts",
+      "source": "const g = globalThis;\nexport const F = g.Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-destructure-global",
+      "chemin": "src/x.ts",
+      "source": "const { Reflect: R } = globalThis;\nexport const F = R.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-reflect-destructure-affectation",
+      "chemin": "src/x.ts",
+      "source": "let R;\n({ Reflect: R } = globalThis);\nexport { R };",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-self-valeur",
+      "chemin": "src/x.ts",
+      "source": "export const P = self.Proxy;",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-new-global",
+      "chemin": "src/x.ts",
+      "source": "export const p = new globalThis.Proxy(f, { apply() { return 1; } });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-proxy-destructure-raccourci",
+      "chemin": "src/x.ts",
+      "source": "const { Proxy } = window;\nexport const p = new Proxy(f, {});",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-getprototypeof",
+      "chemin": "src/x.ts",
+      "source": "export const p = globalThis.Object.getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-crochets",
+      "chemin": "src/x.ts",
+      "source": "export const p = window[\"Object\"][\"getPrototypeOf\"](f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-descripteur",
+      "chemin": "src/x.ts",
+      "source": "export const d = self.Object.getOwnPropertyDescriptor(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-destructure",
+      "chemin": "src/x.ts",
+      "source": "const { getPrototypeOf } = globalThis.Object;\nexport const p = getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-alias",
+      "chemin": "src/x.ts",
+      "source": "export const O = globalThis.Object;",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-destructure-object",
+      "chemin": "src/x.ts",
+      "source": "const { Object: O } = globalThis;\nexport const p = O.getPrototypeOf(f);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-defineproperty",
+      "chemin": "src/x.ts",
+      "source": "globalThis.Object.defineProperty(globalThis, \"fetch\", { value: 1 });",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "methode-object-global-keys-admis",
+      "chemin": "src/x.ts",
+      "source": "export const k = globalThis.Object.keys(o);",
+      "attendu": "admis"
     }
   ]
 }

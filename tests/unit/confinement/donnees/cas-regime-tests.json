@@ -557,6 +557,136 @@
       "source": "import { vi } from \"vitest\";\nvi.stubEnv(\"OPENROUTER_API_KEY\", \"x\");",
       "attendu": "refus",
       "regle": "nom-secret"
+    },
+    {
+      "id": "tests-double-original-child-process-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"child_process\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-http-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"http\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-ws-nom-nu",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"ws\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-axios-nom-nu",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"axios\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-node-casse",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"node:HTTP\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-fabrique-parametre-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"child_process\", async (o) => o());",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-import-mock-casse",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importMock(\"NODE:child_process\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-spy-nom-nu",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"ws\", { spy: true });",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-sans-fabrique-casse",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.doMock(\"Undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-paquet-hors-zone",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"next/navigation\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-original-zone-sensible-nom-nu",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"ws\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-import-capacite-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { exec } from \"child_process\";\nexport const e = exec;",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-import-capacite-casse",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import http from \"node:HTTP\";\nexport const h = http;",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-vi-sur-objet-global",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "export const m = await globalThis.vi.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-crochets-objet-global",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "export const m = await window[\"vi\"].importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vitest-destructure-objet-global",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "const { vitest } = self;\nexport const m = await vitest.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-double-fabrique-litterale-nom-nu-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"ws\", () => ({}));",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-double-original-paquet-liste-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"react\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-double-original-relatif-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"@/contracts\");",
+      "attendu": "admis"
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { estFichierTest, moduleACapacite, resoudre, type RegleFermeture, type Resultat } from "./analyse";
+import { doubleOriginalAdmis, estFichierTest, estRelatif, moduleACapaciteNormalise, resoudre, type RegleFermeture, type Resultat } from "./analyse";
 import type { LigneCapacite } from "./listes/capacites";
 
 /**
@@ -42,10 +42,17 @@ export function atteignables(graphe: Graphe, departs: Iterable<string>): Set<str
   return vus;
 }
 
-/** Fichiers qui importent un module à capacité (section 3), directement. */
+/**
+ * Fichiers qui importent, directement, un module à capacité (section 3, spécificateur normalisé) ou un spécificateur
+ * que l'analyseur refuse (non listé, non résolu, hors zone) : échec fermé, un import inconnu compte comme une capacité.
+ */
 function importateursDeCapacite(resultats: readonly Resultat[]): Set<string> {
   const fichiers = new Set<string>();
-  for (const r of resultats) if (r.imports.some((i) => i.cible === undefined && moduleACapacite(i.specificateur))) fichiers.add(r.fichier);
+  for (const r of resultats) {
+    const capacite = r.imports.some((i) => i.cible === undefined && moduleACapaciteNormalise(i.specificateur));
+    const refuse = r.constats.some((c) => !c.admis && (c.regle === "specificateur" || c.regle === "module-capacite"));
+    if (capacite || refuse) fichiers.add(r.fichier);
+  }
   return fichiers;
 }
 
@@ -60,8 +67,10 @@ export type Violation = { readonly fichier: string; readonly regle: RegleFermetu
  *    ré-exports), depuis un fichier non-test autre que le module de composition (le parcours s'arrête au module de
  *    composition, seul point d'entrée admis) ;
  * 4. `fermeture-double-original` : un double de test qui charge le module réel (`importOriginal`, `vi.importActual`,
- *    `vi.importMock`, fabrique absente ou non littérale) d'un fichier qui atteint un module à capacité (section 4,
- *    forme 2).
+ *    `vi.importMock`, fabrique absente ou non littérale) d'un fichier qui atteint un module à capacité, d'un
+ *    spécificateur relatif non résolu, ou d'un spécificateur tiers que `doubleOriginalAdmis` refuse (nom nu, module à
+ *    capacité en toute casse et avec ou sans `node:`, paquet non listé) : section 4, forme 2 ; revue du head
+ *    `ad0b008`, bloquant 1. Aucun nom nu n'est admis comme « paquet sans capacité » sans ligne de la section 6.
  */
 export function verifierFermeture(
   resultats: readonly Resultat[],
@@ -100,9 +109,18 @@ export function verifierFermeture(
   const capacite = importateursDeCapacite(resultats);
   for (const r of resultats) {
     for (const d of r.doubles) {
-      if (!d.original || moduleACapacite(d.specificateur)) continue; // module à capacité : refusé par l'analyseur
+      if (!d.original) continue;
+      const refus = (motif: string) =>
+        violations.push({ fichier: r.fichier, regle: "fermeture-double-original", message: `${r.fichier}:${d.ligne} : double qui charge le module réel de ${d.specificateur} (${motif})` });
+      if (!estRelatif(d.specificateur)) {
+        if (!doubleOriginalAdmis(r.fichier, d.specificateur)) refus("spécificateur ni relatif, ni `@/`, ni listé sans capacité");
+        continue;
+      }
       const cible = resoudre(r.fichier, d.specificateur, existe);
-      if (cible === undefined) continue; // paquet sans capacité : admis (section 4, forme 2)
+      if (cible === undefined) {
+        refus("spécificateur relatif non résolu");
+        continue;
+      }
       const atteint = [...atteignables(graphe, [cible])].find((f) => capacite.has(f));
       if (atteint) {
         violations.push({

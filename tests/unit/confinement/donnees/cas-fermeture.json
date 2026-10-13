@@ -151,6 +151,81 @@
       "fichiers": {
         "src/lib/bas.ts": "import \"node:http\";"
       }
+    },
+    {
+      "id": "fermeture-double-original-nom-nu",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"ws\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-axios",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"axios\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"child_process\", async (o) => o());",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-http-sans-prefixe",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"http\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-casse",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"node:HTTP\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-relatif-non-resolu",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"@/lib/absent\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {}
+    },
+    {
+      "id": "fermeture-double-original-import-nu-indirect",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"@/lib/pont\", async (importOriginal) => importOriginal());",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {
+        "src/lib/pont.ts": "import \"ws\";"
+      }
+    },
+    {
+      "id": "fermeture-double-original-import-sans-prefixe-indirect",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"@/lib/pont\");",
+      "attendu": "refus",
+      "regle": "fermeture-double-original",
+      "fichiers": {
+        "src/lib/pont.ts": "import \"child_process\";"
+      }
+    },
+    {
+      "id": "fermeture-double-original-paquet-liste-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"react\");",
+      "attendu": "admis",
+      "fichiers": {}
     }
   ]
 }
