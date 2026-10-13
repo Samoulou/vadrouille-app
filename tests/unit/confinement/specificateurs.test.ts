@@ -2,13 +2,12 @@
 import { describe, expect, it } from "vitest";
 
 import { analyserPackageJson, ecartDuCas, lireCas, refusDuCas, type Cas } from "./analyse";
-import { fichiersSuivis, lireFichier } from "./fichiers";
+import { depotSuivi, lireFichier } from "./fichiers";
 import { CONSTRUITS, PAQUETS } from "./listes/paquets";
 
 /** `confinement: spécificateurs et paquets` (spécification P0c, section 6) : cas lus dans `donnees/cas-specificateurs.json`. */
 
-const suivis = new Set(fichiersSuivis().map((f) => f.chemin));
-const depot = { existe: (c: string) => suivis.has(c), lire: (c: string) => (suivis.has(c) ? lireFichier(c) : undefined) };
+const depot = depotSuivi();
 
 type Json = { [cle: string]: unknown };
 const estObjet = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);

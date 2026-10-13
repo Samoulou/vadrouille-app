@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { estFichierTest, moduleACapacite, resoudre, type Resultat } from "./analyse";
+import { estFichierTest, moduleACapacite, resoudre, type RegleFermeture, type Resultat } from "./analyse";
 import type { LigneCapacite } from "./listes/capacites";
 
 /**
@@ -49,26 +49,34 @@ function importateursDeCapacite(resultats: readonly Resultat[]): Set<string> {
   return fichiers;
 }
 
+/** Violation typée : le fichier en cause et la règle qui la refuse (0038 TL-1 point 4). */
+export type Violation = { readonly fichier: string; readonly regle: RegleFermeture; readonly message: string };
+
 /**
  * Contrôles de fermeture transitive ; renvoie les violations (vide si tout passe) :
- * 1. un fichier non-test qui importe un fichier de test ou un fichier de `tests/` ;
- * 2. une ligne de portée test ou outil atteinte depuis un fichier non-test de `src/` ou de `db/` ;
- * 3. un module de capacité de P0r1 importé par autre chose qu'un test ou le module de composition (barrels compris) ;
- * 4. un double de test qui charge le module réel (`importOriginal`, `vi.importActual`, `vi.importMock`) d'un fichier
- *    qui atteint un module à capacité (section 4, forme 2).
+ * 1. `fermeture-import-de-test` : un fichier non-test qui importe un fichier de test ou un fichier de `tests/` ;
+ * 2. `fermeture-portee` : une ligne de portée test ou outil atteinte depuis un fichier non-test de `src/` ou de `db/` ;
+ * 3. `fermeture-module-p0r1` : un module de capacité de P0r1 atteint, directement ou par des intermédiaires (barrels,
+ *    ré-exports), depuis un fichier non-test autre que le module de composition (le parcours s'arrête au module de
+ *    composition, seul point d'entrée admis) ;
+ * 4. `fermeture-double-original` : un double de test qui charge le module réel (`importOriginal`, `vi.importActual`,
+ *    `vi.importMock`, fabrique absente ou non littérale) d'un fichier qui atteint un module à capacité (section 4,
+ *    forme 2).
  */
 export function verifierFermeture(
   resultats: readonly Resultat[],
   lignes: readonly LigneCapacite[],
   existe: (chemin: string) => boolean,
-): string[] {
-  const violations: string[] = [];
+): Violation[] {
+  const violations: Violation[] = [];
   const graphe = construireGraphe(resultats);
 
   for (const r of resultats) {
     if (estFichierTest(r.fichier)) continue;
     for (const i of r.imports) {
-      if (i.cible !== undefined && estFichierTest(i.cible)) violations.push(`${r.fichier}:${i.ligne} : fichier non-test qui importe un fichier de test (${i.cible})`);
+      if (i.cible !== undefined && estFichierTest(i.cible)) {
+        violations.push({ fichier: r.fichier, regle: "fermeture-import-de-test", message: `${r.fichier}:${i.ligne} : fichier non-test qui importe un fichier de test (${i.cible})` });
+      }
     }
   }
 
@@ -76,15 +84,16 @@ export function verifierFermeture(
   const atteints = atteignables(graphe, applicatifs);
   for (const ligne of lignes) {
     if (ligne.portee !== "application" && atteints.has(ligne.fichier)) {
-      violations.push(`${ligne.fichier} : ligne de portée ${ligne.portee} atteinte depuis un fichier non-test de src/ ou db/`);
+      violations.push({ fichier: ligne.fichier, regle: "fermeture-portee", message: `${ligne.fichier} : ligne de portée ${ligne.portee} atteinte depuis un fichier non-test de src/ ou db/` });
     }
   }
 
+  const sansComposition = new Map([...graphe].map(([f, cibles]) => [f, f === MODULE_COMPOSITION ? new Set<string>() : cibles]));
   for (const r of resultats) {
-    for (const i of r.imports) {
-      if (i.cible !== undefined && MODULES_CAPACITE_P0R1.includes(i.cible) && !estFichierTest(r.fichier) && r.fichier !== MODULE_COMPOSITION) {
-        violations.push(`${r.fichier}:${i.ligne} : module de capacité de P0r1 importé hors des tests et du module de composition (${i.cible})`);
-      }
+    if (estFichierTest(r.fichier) || r.fichier === MODULE_COMPOSITION || MODULES_CAPACITE_P0R1.includes(r.fichier)) continue;
+    const atteint = [...atteignables(sansComposition, [r.fichier])].find((f) => f !== r.fichier && MODULES_CAPACITE_P0R1.includes(f));
+    if (atteint) {
+      violations.push({ fichier: r.fichier, regle: "fermeture-module-p0r1", message: `${r.fichier} : module de capacité de P0r1 atteint hors des tests et du module de composition (${atteint})` });
     }
   }
 
@@ -95,7 +104,13 @@ export function verifierFermeture(
       const cible = resoudre(r.fichier, d.specificateur, existe);
       if (cible === undefined) continue; // paquet sans capacité : admis (section 4, forme 2)
       const atteint = [...atteignables(graphe, [cible])].find((f) => capacite.has(f));
-      if (atteint) violations.push(`${r.fichier}:${d.ligne} : double qui charge le module réel de ${d.specificateur}, qui atteint un module à capacité (${atteint})`);
+      if (atteint) {
+        violations.push({
+          fichier: r.fichier,
+          regle: "fermeture-double-original",
+          message: `${r.fichier}:${d.ligne} : double qui charge le module réel de ${d.specificateur}, qui atteint un module à capacité (${atteint})`,
+        });
+      }
     }
   }
   return violations;

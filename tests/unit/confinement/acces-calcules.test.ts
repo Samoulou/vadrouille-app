@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ecartDuCas, lireCas, refusDuCas } from "./analyse";
-import { fichiersSuivis, lireFichier } from "./fichiers";
+import { depotSuivi } from "./fichiers";
 import { programmeDeCas } from "./programme";
 
 /**
@@ -11,8 +11,7 @@ import { programmeDeCas } from "./programme";
  * les cas de règle fermée (zone sensible, `.mjs`) sont analysés sans vérificateur.
  */
 
-const suivis = new Set(fichiersSuivis().map((f) => f.chemin));
-const depot = { existe: (c: string) => suivis.has(c), lire: (c: string) => (suivis.has(c) ? lireFichier(c) : undefined) };
+const depot = depotSuivi();
 const cas = lireCas("cas-acces-calcules.json");
 const types = cas.filter((c) => c.typage);
 const nomVirtuel = (id: string) => `${id}.${types.find((c) => c.id === id)?.chemin.endsWith(".tsx") ? "tsx" : "ts"}`;

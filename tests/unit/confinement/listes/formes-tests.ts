@@ -31,6 +31,6 @@ export const FORMES_NOMINATIVES_TESTS = [
     fichier: "tests/unit/accueil-prototype.test.tsx",
     forme: "stubEnv-table",
     valeur: "VERCEL_ENV,VADROUILLE_ENV",
-    motif: "écart : même forme que `accueil.test.tsx`, fichier apparu après `40b6738` (P0b1)",
+    motif: "écart : même forme que `accueil.test.tsx`, fichier apparu après `40b6738` (P0b1, PR 208) : ligne ordinaire B, 0040 D4",
   },
 ] as const satisfies readonly FormeNominativeTest[];

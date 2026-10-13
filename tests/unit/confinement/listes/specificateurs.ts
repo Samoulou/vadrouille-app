@@ -15,11 +15,17 @@ export type LigneSpecificateur = {
 };
 
 /**
- * Ligne nominative (fichier, spécificateur) : **écart** à la spécification, relevé sur `main` à la base de P0c1,
- * à trancher par le Tech Lead avec verdict Sécurité (description de la PR de P0c1). Aucun motif : un fichier, un
- * spécificateur.
+ * Ligne nominative (fichier, spécificateur, noms) : **écart** à la spécification, relevé sur `main` à la base de P0c1,
+ * avec le verdict de la décision 0040 (ou à trancher, pour les lignes relevées après elle). Aucun motif de chemin :
+ * un fichier, un spécificateur, ses noms importés exacts.
  */
-export type LigneSpecificateurNominative = { readonly fichier: string; readonly specificateur: string; readonly motif: string };
+export type LigneSpecificateurNominative = {
+  readonly fichier: string;
+  readonly specificateur: string;
+  /** Noms importés admis, exacts (`type:<nom>` pour un import de type, `default`, `*`, `effet`) : mineur 1, 0040 D2. */
+  readonly noms: readonly string[];
+  readonly motif: string;
+};
 
 const NEUTRES_SAUF = ["@src-non-test", "@sensible"] as const;
 
@@ -59,47 +65,91 @@ export const SPECIFICATEURS = [
   { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts"] },
 ] as const satisfies readonly LigneSpecificateur[];
 
-const PROTOTYPE_PUR = "écart : `src/prototype/**` (P0a1) hors des zones admises par la section 6 pour une zone sensible ; module pur (`zod`, `@/contracts`)";
+const CHARGEUR =
+  "module de Node dans un fichier non-test de `src/` (section 6) ; lecture bornée et gardée des programmes du prototype (P0b1, PR 208) ; " +
+  "justification côté serveur : chargé seulement par `prototype-instance.ts`, derrière `prototypeAdapterAllowed`, jamais dans le navigateur : 0040 D2, A5 (amendement A7)";
+
+const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement A7)";
 
 export const SPECIFICATEURS_NOMINATIFS = [
-  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/client.ts", specificateur: "@/prototype/config", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/config", motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/sorties.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/ancrage", motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/brief", motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/research/agent.ts", specificateur: "@/prototype/brief", motif: PROTOTYPE_PUR },
-  { fichier: "src/research/agent.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
-  { fichier: "src/research/agent.ts", specificateur: "@/prototype/config", motif: PROTOTYPE_PUR },
-  { fichier: "src/research/sources.ts", specificateur: "@/prototype/candidat", motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/client.ts", specificateur: "@/prototype/config", noms: ["MODELE_ID_PATTERN", "type:Routage"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", noms: ["TYPES_CRENEAU"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  {
+    fichier: "src/ai/requetes.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["type:Candidat", "type:TypeCreneau", "vuePourModele"],
+    motif: PROTOTYPE_PUR,
+  },
+  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
+  {
+    fichier: "src/ai/sorties.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["LONGUEURS_TEXTE", "NotesSchema", "TYPES_CRENEAU", "texteMaison", "type:Notes"],
+    motif: PROTOTYPE_PUR,
+  },
+  {
+    fichier: "src/grounding/ancrage.ts",
+    specificateur: "@/prototype/ancrage",
+    noms: ["type:Ancrage", "type:AncrageResolu", "type:Position", "type:Trajets"],
+    motif: PROTOTYPE_PUR,
+  },
+  { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  { fichier: "src/research/agent.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  {
+    fichier: "src/research/agent.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["CandidatSchema", "type:Candidat", "type:TypeCreneau"],
+    motif: PROTOTYPE_PUR,
+  },
+  { fichier: "src/research/agent.ts", specificateur: "@/prototype/config", noms: ["type:ConfigRecherche", "type:Routage"], motif: PROTOTYPE_PUR },
+  { fichier: "src/research/sources.ts", specificateur: "@/prototype/candidat", noms: ["type:ClasseSource"], motif: PROTOTYPE_PUR },
   {
     fichier: "src/research/extract-text.ts",
     specificateur: "parse5",
-    motif: "écart : paquet `parse5` (P0a1, PR 180) en zone sensible non-test, où la section 6 n'admet que `zod`",
+    noms: ["parse"],
+    motif: "paquet `parse5` (P0a1, PR 180) en zone sensible non-test, où la section 6 n'admet que `zod` : 0040 D2, A3 (amendement A7)",
   },
   {
     fichier: "src/research/fetch-page.test.ts",
     specificateur: "node:zlib",
-    motif: "écart : test de zone sensible (section 6 : `vitest`, `zod`, `node:fs`, `node:path` seulement) ; compression des corps de test",
+    noms: ["gzipSync"],
+    motif: "test de zone sensible (section 6 : `vitest`, `zod`, `node:fs`, `node:path` seulement), compression des corps de test (PR 180) : 0040 D2, A3",
   },
   {
     fichier: "src/adapters/prototype-loader.ts",
     specificateur: "node:fs",
-    motif: "écart : module de Node dans un fichier non-test de `src/` (section 6) ; lecture des programmes du prototype (P0b1)",
+    noms: ["constants"],
+    motif: CHARGEUR,
   },
   {
     fichier: "src/adapters/prototype-loader.ts",
     specificateur: "node:fs/promises",
-    motif: "écart : module de Node dans un fichier non-test de `src/` (section 6) ; lecture des programmes du prototype (P0b1)",
+    noms: ["lstat", "open", "readdir", "realpath"],
+    motif: CHARGEUR,
   },
   {
     fichier: "src/adapters/prototype-loader.ts",
     specificateur: "node:path",
-    motif: "écart : module de Node dans un fichier non-test de `src/` (section 6) ; lecture des programmes du prototype (P0b1)",
+    noms: ["isAbsolute", "join", "resolve"],
+    motif: CHARGEUR,
+  },
+  // Relevé de `ab683eb` (B2, PR 219, fusionnée après la revue du head `eb7e3bf`) : `zod` hors de `src/**` (section 6).
+  // À trancher par le Tech Lead avec verdict Sécurité dans la revue de PR 217 (élargir la zone de `zod` à `tests/unit/**`
+  // serait l'autre forme possible).
+  {
+    fichier: "tests/unit/contracts/categories.test.ts",
+    specificateur: "zod",
+    noms: ["z"],
+    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+  },
+  {
+    fichier: "tests/unit/contracts/derived-storage.test.ts",
+    specificateur: "zod",
+    noms: ["type:z"],
+    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
   },
 ] as const satisfies readonly LigneSpecificateurNominative[];

@@ -42,3 +42,9 @@ export function estAnalyse(chemin: string): boolean {
 export function lireFichier(chemin: string): string {
   return readFileSync(path.join(RACINE, chemin), "utf8");
 }
+
+/** Vue du dépôt pour l'analyseur (résolution et lecture des fichiers suivis), partagée par les fichiers de test. */
+export function depotSuivi(): { readonly existe: (chemin: string) => boolean; readonly lire: (chemin: string) => string | undefined } {
+  const suivis = new Set(fichiersSuivis().map((f) => f.chemin));
+  return { existe: (c) => suivis.has(c), lire: (c) => (suivis.has(c) ? lireFichier(c) : undefined) };
+}

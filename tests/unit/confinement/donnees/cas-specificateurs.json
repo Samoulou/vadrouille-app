@@ -303,6 +303,29 @@
       "attendu": "refus",
       "regle": "specificateur",
       "fusion": true
+    },
+    {
+      "id": "paquets-script-prebuild",
+      "chemin": "package.json",
+      "source": "{\"scripts\": {\"prebuild\": \"node x.mjs\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-script-postcss-sans-script-css",
+      "chemin": "package.json",
+      "source": "{\"scripts\": {\"postcss\": \"node x.mjs\"}}",
+      "attendu": "admis",
+      "fusion": true
+    },
+    {
+      "id": "paquets-script-preinstall-encadre",
+      "chemin": "package.json",
+      "source": "{\"scripts\": {\"preprepare\": \"node x.mjs\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
     }
   ]
 }

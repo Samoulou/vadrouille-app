@@ -76,7 +76,7 @@
     {
       "fichier": "src/adapters/prototype-instance.ts",
       "portee": "application",
-      "usage": "instance de l'adaptateur prototype en mémoire (P0b1), même forme que simulation.ts",
+      "usage": "portée application, justification (0040 D4) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `INSTANCE_KEY` (`Symbol.for(\"vadrouille.prototype\")`) ; côté serveur, garde une instance du chargeur et du relecteur simulé entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process` autre que `env` en valeur par défaut) ; côté navigateur, s'il y était inclus, ne ferait que cette même lecture et écriture d'une propriété à clé symbole",
       "capacites": [
         {
           "capacite": "global:globalThis",
@@ -86,7 +86,7 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : nouvelle ligne de portée application (P0b1)"
+      "ecart": "ligne ordinaire de portée application (P0b1, PR 208), acceptée par 0040 D4 ; permanente"
     },
     {
       "fichier": "src/adapters/prototype.test.ts",
@@ -135,7 +135,7 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : textes de test (titre, motifs) qui nomment un hôte surveillé et des noms secrets (P0b1)"
+      "ecart": "textes de test (titre, motifs) qui nomment un hôte surveillé et des noms secrets (P0b1, PR 208) : lignes ordinaires B, 0040 D4"
     },
     {
       "fichier": "tests/unit/ci/post-merge-cleanup.test.ts",
@@ -149,7 +149,7 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : nom à suffixe `_TOKEN` dans un titre de test"
+      "ecart": "nom à suffixe `_TOKEN` dans un titre de test (T20, PR 177) : ligne ordinaire B, 0040 D4"
     },
     {
       "fichier": "tests/unit/p0/depot.test.ts",
@@ -163,7 +163,7 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+      "ecart": "fichier de P0a1 (PR 180) : ligne ordinaire B, 0040 D4"
     },
     {
       "fichier": "tests/unit/p0/pipeline.test.ts",
@@ -183,50 +183,55 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+      "ecart": "valeurs sentinelles de P0a1 (PR 180) : 0040 D2, A7 (permanente pour les textes)"
     },
     {
       "fichier": "tests/unit/p0/cli.test.ts",
       "portee": "test",
-      "usage": "noms des variables de clé surveillées (valeurs factices)",
+      "usage": "noms des variables de clé surveillées (valeurs factices), seuls éléments du tableau littéral `const VARIABLES_DE_CLE = [ … ]`",
       "capacites": [
         {
           "capacite": "fragment:openrouter",
           "formes": [
             "OPENROUTER_API_KEY"
-          ]
+          ],
+          "nombre": 1
         },
         {
           "capacite": "secret:OPENROUTER_API_KEY",
           "formes": [
             "OPENROUTER_API_KEY"
-          ]
+          ],
+          "nombre": 1
         },
         {
           "capacite": "secret:OPENROUTER_API",
           "formes": [
             "OPENROUTER_API_KEY"
-          ]
+          ],
+          "nombre": 1
         },
         {
           "capacite": "secret:GOOGLE_MAPS_SERVER_KEY",
           "formes": [
             "GOOGLE_MAPS_SERVER_KEY"
-          ]
+          ],
+          "nombre": 1
         },
         {
           "capacite": "secret:MAPS_SERVER_KEY",
           "formes": [
             "GOOGLE_MAPS_SERVER_KEY"
-          ]
+          ],
+          "nombre": 1
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+      "ecart": "exception transitoire de 0040 D1 (amendement A5) ; retrait par la tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2"
     },
     {
       "fichier": "tests/unit/p0/imports.test.ts",
       "portee": "test",
-      "usage": "cas négatifs du test d'imports de #149 (P0a1), non modifiable par P0c1",
+      "usage": "cas négatifs du test d'imports de PR 149 (P0a1), non modifiable par P0c1",
       "capacites": [
         {
           "capacite": "hote:openrouter.ai",
@@ -244,7 +249,8 @@
           "capacite": "fragment:openrouter",
           "formes": [
             "const k = process.env.OPENROUTER_API_KEY;",
-            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;",
+            "const { OPENROUTER_API_KEY } = import.meta.env;"
           ]
         },
         {
@@ -252,7 +258,8 @@
           "formes": [
             "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
             "const k = process.env.OPENROUTER_API_KEY;",
-            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;",
+            "const { OPENROUTER_API_KEY } = import.meta.env;"
           ]
         },
         {
@@ -260,7 +267,8 @@
           "formes": [
             "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
             "const k = process.env.OPENROUTER_API_KEY;",
-            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;",
+            "const { OPENROUTER_API_KEY } = import.meta.env;"
           ]
         },
         {
@@ -278,7 +286,7 @@
           ]
         }
       ],
-      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : textes des cas négatifs d'un test qui ne peut pas être modifié (0038, TL-2 point 1)"
+      "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente)"
     }
   ]
 }

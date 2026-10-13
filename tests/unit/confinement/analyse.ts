@@ -68,6 +68,9 @@ export type Regle =
   | "nom-secret"
   | "regime-tests";
 
+/** Règles de la fermeture transitive (section 3, `graphe.ts`) ; un cas de `donnees/cas-fermeture.json` nomme l'une d'elles. */
+export type RegleFermeture = "fermeture-import-de-test" | "fermeture-portee" | "fermeture-module-p0r1" | "fermeture-double-original";
+
 export type Constat = {
   readonly fichier: string;
   readonly regle: Regle;
@@ -278,32 +281,22 @@ const REMPLACEMENTS = new Set(["mockImplementation", "mockResolvedValue", "mockR
 // --- Outils sur l'arbre ---------------------------------------------------------------------------------------
 
 /** Conversions de type transparentes (2.1). */
+const estConversion = (
+  n: ts.Node,
+): n is ts.ParenthesizedExpression | ts.AsExpression | ts.TypeAssertion | ts.NonNullExpression | ts.SatisfiesExpression =>
+  ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isTypeAssertionExpression(n) || ts.isNonNullExpression(n) || ts.isSatisfiesExpression(n);
+
 export function sansConversion(expression: ts.Expression): ts.Expression {
   let courante = expression;
-  for (;;) {
-    if (
-      ts.isParenthesizedExpression(courante) ||
-      ts.isAsExpression(courante) ||
-      ts.isTypeAssertionExpression(courante) ||
-      ts.isNonNullExpression(courante) ||
-      ts.isSatisfiesExpression(courante)
-    ) {
-      courante = courante.expression;
-    } else return courante;
-  }
+  while (estConversion(courante)) courante = courante.expression;
+  return courante;
 }
 
 /** Parent d'un nœud, en remontant les conversions qui l'enveloppent. */
 function parentEffectif(noeud: ts.Node): { parent: ts.Node; enfant: ts.Node } {
   let enfant = noeud;
   let parent = noeud.parent;
-  while (
-    ts.isParenthesizedExpression(parent) ||
-    ts.isAsExpression(parent) ||
-    ts.isTypeAssertionExpression(parent) ||
-    ts.isNonNullExpression(parent) ||
-    ts.isSatisfiesExpression(parent)
-  ) {
+  while (estConversion(parent)) {
     enfant = parent;
     parent = parent.parent;
   }
@@ -369,16 +362,20 @@ function nomAppele(appel: ts.CallExpression | ts.NewExpression): string | undefi
   return undefined;
 }
 
-/** `vi.<nom>(…)`. */
-function appelVi(noeud: ts.Node, ...noms: string[]): noeud is ts.CallExpression {
+/** Exports de `vitest` qui donnent l'objet `vi` (section 4) : `vi` et son alias `vitest`. */
+export const EXPORTS_VI = new Set(["vi", "vitest"]);
+
+/**
+ * `<objet vi>.<nom>(…)` : `nomsVi` contient les noms liés à l'objet `vi` dans le fichier (`vi`, `vitest`, et tout alias
+ * d'import `import { vi as v } from "vitest"`). Toute autre forme d'usage de ces noms est refusée par l'analyseur
+ * (section 4 : les formes admises sont des appels de membre, rien d'autre).
+ */
+function appelVi(noeud: ts.Node, nomsVi: ReadonlySet<string>, ...noms: string[]): noeud is ts.CallExpression {
   if (!ts.isCallExpression(noeud)) return false;
-  const cible = noeud.expression;
-  return (
-    ts.isPropertyAccessExpression(cible) &&
-    ts.isIdentifier(cible.expression) &&
-    cible.expression.text === "vi" &&
-    noms.includes(cible.name.text)
-  );
+  const cible = sansConversion(noeud.expression);
+  if (!ts.isPropertyAccessExpression(cible)) return false;
+  const objet = sansConversion(cible.expression);
+  return ts.isIdentifier(objet) && nomsVi.has(objet.text) && noms.includes(cible.name.text);
 }
 
 /** Positions de type et déclarations ambiantes (2.1) : ne comptent pas comme usage d'une capacité. */
@@ -479,6 +476,27 @@ export function secretsDe(texte: string): string[] {
 /** Nom secret (section 5), pour `vi.stubEnv` et les lignes de `process.env`. */
 export const estNomSecret = (nom: string) => secretsDe(nom).length > 0;
 
+/**
+ * Fichiers où une lecture de `process.env` peut porter un nom secret (section 5, « Noms secrets ») : modules non-test
+ * de `src/server/env/`. Le module de connexion de B1 s'y ajoutera par la PR qui le crée (son chemin n'est pas fixé sur
+ * `main`), avec verdict Sécurité.
+ */
+export const lectureSecreteAdmise = (fichier: string) => fichier.startsWith("src/server/env/") && !estFichierTest(fichier);
+
+/**
+ * Noms secrets des listes de `process.env` et de `vi.stubEnv` (section 5 ; bloquant 3 de la revue du head `eb7e3bf`) :
+ * une lecture hors des modules admis, ou tout nom de `vi.stubEnv` (section 4, forme 3), est une violation.
+ */
+export function nomsSecretsDesListes(
+  lectures: readonly { readonly fichier: string; readonly noms: readonly string[] }[],
+  tablesStubEnv: readonly { readonly fichier: string; readonly valeur: string }[],
+): string[] {
+  const violations: string[] = [];
+  for (const l of lectures) for (const nom of l.noms) if (estNomSecret(nom) && !lectureSecreteAdmise(l.fichier)) violations.push(`${l.fichier} : lecture de ${nom}`);
+  for (const t of tablesStubEnv) for (const nom of t.valeur.split(",")) if (estNomSecret(nom)) violations.push(`${t.fichier} : vi.stubEnv de ${nom}`);
+  return violations;
+}
+
 // --- Résolution des spécificateurs (2.2) -----------------------------------------------------------------------
 
 const SUFFIXES_RESOLUTION = ["", ".ts", ".tsx", ".mts", ".mjs", ".js", ".d.mts", ".d.ts", "/index.ts", "/index.tsx", "/index.mts", "/index.mjs", "/index.js", "/index.d.mts", "/index.d.ts"];
@@ -514,6 +532,8 @@ export const estRelatif = (s: string) => s.startsWith("./") || s.startsWith("../
 
 type Collecteur = {
   ajouter: (regle: Regle, capacite: string, forme: string, noeud: ts.Node | number, admis?: boolean, par?: string) => void;
+  /** Refus qu'aucune ligne ne peut couvrir (nom secret hors des modules admis, section 5). */
+  refuser: (regle: Regle, capacite: string, forme: string, noeud: ts.Node | number) => void;
 };
 
 /**
@@ -524,13 +544,18 @@ export function cleDeCapacite(regle: Regle, capacite: string): string {
   return /^(module|identifiant|global|hote|fragment|secret):/.test(capacite) ? capacite : `${regle}:${capacite}`;
 }
 
-/** Ligne de capacité qui couvre exactement (fichier, capacité, forme), par son identifiant. */
-function ligneDeCapacite(fichier: string, regle: Regle, capacite: string, forme: string): string | undefined {
+/**
+ * Ligne de capacité qui couvre exactement (fichier, capacité, forme) : son identifiant et, s'il est borné, le nombre
+ * d'occurrences admises de la forme dans le fichier (décision 0040 D1 : une occurrence de plus est refusée).
+ */
+function ligneDeCapacite(fichier: string, regle: Regle, capacite: string, forme: string): { id: string; nombre?: number } | undefined {
   const cle = cleDeCapacite(regle, capacite);
   for (const ligne of LIGNES_CAPACITE) {
     if (ligne.fichier !== fichier) continue;
     for (const entree of ligne.capacites) {
-      if (entree.capacite === cle && entree.formes.includes(forme)) return idLigneCapacite(fichier, cle, forme);
+      if (entree.capacite === cle && entree.formes.includes(forme)) {
+        return { id: idLigneCapacite(fichier, cle, forme), ...(entree.nombre !== undefined ? { nombre: entree.nombre } : {}) };
+      }
     }
   }
   return undefined;
@@ -556,15 +581,32 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       ? ts.ScriptKind.JS
       : ts.ScriptKind.TS;
   const arbre = contexte.arbre ?? ts.createSourceFile(chemin, source, ts.ScriptTarget.Latest, true, scriptKind);
+  const texteNormalise = (n: ts.Node) => n.getText(arbre).replace(/\s+/g, " ");
   const numero = (noeud: ts.Node | number) =>
     arbre.getLineAndCharacterOfPosition(typeof noeud === "number" ? noeud : noeud.getStart(arbre)).line + 1;
 
+  const occurrences = new Map<string, number>();
   const c: Collecteur = {
     ajouter(regle, capacite, forme, noeud, admis = false, par) {
       // Tout constat refusé peut être couvert par une ligne nominative exacte (fichier, capacité, forme) : section 3,
       // ou écart écrit dans la ligne (champ `ecart`), contrôlé par `depot.test.ts`.
-      const ligne = admis ? par : ligneDeCapacite(chemin, regle, capacite, forme);
-      constats.push({ fichier: chemin, regle, capacite, forme, ligne: numero(noeud), admis: admis || ligne !== undefined, ...(ligne ? { par: ligne } : {}) });
+      if (admis) {
+        constats.push({ fichier: chemin, regle, capacite, forme, ligne: numero(noeud), admis: true, ...(par ? { par } : {}) });
+        return;
+      }
+      const ligne = ligneDeCapacite(chemin, regle, capacite, forme);
+      if (ligne) {
+        const vu = (occurrences.get(ligne.id) ?? 0) + 1;
+        occurrences.set(ligne.id, vu);
+        if (ligne.nombre !== undefined && vu > ligne.nombre) {
+          constats.push({ fichier: chemin, regle, capacite, forme: `${forme} (occurrence ${vu}, ${ligne.nombre} admise(s))`, ligne: numero(noeud), admis: false });
+          return;
+        }
+      }
+      constats.push({ fichier: chemin, regle, capacite, forme, ligne: numero(noeud), admis: ligne !== undefined, ...(ligne ? { par: ligne.id } : {}) });
+    },
+    refuser(regle, capacite, forme, noeud) {
+      constats.push({ fichier: chemin, regle, capacite, forme, ligne: numero(noeud), admis: false });
     },
   };
   const capacite = (regle: Regle, nom: string, forme: string, noeud: ts.Node) => c.ajouter(regle, nom, forme, noeud);
@@ -578,7 +620,15 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
   const parametresEnv: { fonction: ts.Node; nom: string }[] = [];
   const fonctionsEnv = new Set<string>();
   const lignesParametres = PARAMETRES_ENV.filter((p) => p.fichier === chemin);
+  // Noms liés à l'objet `vi` (section 4) : `vi` et `vitest` (globaux de Vitest ou importés), plus les alias d'import.
+  const nomsVi = new Set<string>(EXPORTS_VI);
   const reperer = (noeud: ts.Node) => {
+    if (ts.isImportDeclaration(noeud) && ts.isStringLiteral(noeud.moduleSpecifier) && noeud.moduleSpecifier.text === "vitest") {
+      const liaisons = noeud.importClause?.namedBindings;
+      if (liaisons && ts.isNamedImports(liaisons)) {
+        for (const e of liaisons.elements) if (EXPORTS_VI.has((e.propertyName ?? e.name).text)) nomsVi.add(e.name.text);
+      }
+    }
     const nom = (noeud as { name?: ts.Node }).name;
     if (
       nom &&
@@ -650,7 +700,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
           : estContracts(cible) && !estFichierTest(cible);
         if (autorise) c.ajouter("specificateur", "projet", texte, noeud, true);
         else {
-          c.ajouter("specificateur", "zone", texte, noeud, ...nominatif(texte));
+          c.ajouter("specificateur", "zone", texte, noeud, ...nominatif(texte, forme));
         }
       }
       return;
@@ -671,7 +721,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
         c.ajouter("specificateur", "tiers", texte, noeud, true);
         return;
       }
-      c.ajouter("specificateur", "zone", texte, noeud, ...nominatif(texte));
+      c.ajouter("specificateur", "zone", texte, noeud, ...nominatif(texte, forme));
       return;
     }
     const ligneGenerale = SPECIFICATEURS.find(
@@ -681,12 +731,15 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
         !(l.sauf ?? []).some((zone) => dansZone(zone, chemin)),
     );
     if (ligneGenerale) c.ajouter("specificateur", "tiers", texte, noeud, true, `spec:${ligneGenerale.specificateur}`);
-    else c.ajouter("specificateur", "non-liste", texte, noeud, ...nominatif(texte));
+    else c.ajouter("specificateur", "non-liste", texte, noeud, ...nominatif(texte, forme));
   };
-  /** Ligne nominative de spécificateur (fichier, spécificateur), écart écrit dans la liste. */
-  const nominatif = (texte: string): [boolean, string | undefined] => {
+  /** Ligne nominative de spécificateur (fichier, spécificateur, noms), écart écrit dans la liste : tous les noms importés y figurent. */
+  const nominatif = (texte: string, formes: readonly string[]): [boolean, string | undefined] => {
     const ligne = SPECIFICATEURS_NOMINATIFS.find((l) => l.fichier === chemin && l.specificateur === texte);
-    return ligne ? [true, `spec-nominatif:${chemin}:${texte}`] : [false, undefined];
+    if (!ligne || !formes.every((f) => ligne.noms.includes(f))) return [false, undefined];
+    // Chaque nom de la ligne est soumis à « ligne inutile ».
+    for (const f of formes) constats.push({ fichier: chemin, regle: "specificateur", capacite: "nom", forme: `${texte}:${f}`, ligne: 0, admis: true, par: `spec-nom:${chemin}:${texte}:${f}` });
+    return [true, `spec-nominatif:${chemin}:${texte}`];
   };
 
   const formesImport = (clause: ts.ImportClause | undefined, typeSeul: boolean): string[] => {
@@ -728,6 +781,8 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     return ts.isPropertyAccessExpression(e) && e.name.text === "env" && ts.isIdentifier(sansConversion(e.expression)) && (sansConversion(e.expression) as ts.Identifier).text === "process";
   }
   const lectureEnv = (nom: string, noeud: ts.Node, via: string) => {
+    // Nom secret hors des modules admis : refus qu'aucune ligne ne couvre (section 5).
+    if (estNomSecret(nom) && !lectureSecreteAdmise(chemin)) c.refuser("nom-secret", `lecture:${nom}`, nom, noeud);
     if (nom === "NODE_ENV") {
       c.ajouter("environnement", "lecture", nom, noeud, true);
       return;
@@ -752,14 +807,25 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     if (ts.isElementAccessExpression(parent) && parent.expression === enfant) {
       const cle = texteLitteral(parent.argumentExpression);
       if (cle !== undefined) {
-        for (const nom of secretsDe(cle)) c.ajouter("nom-secret", `secret:${nom}`, cle, parent);
         if (estEcrit(parent)) c.ajouter("environnement", "ecriture", cle, parent);
         else lectureEnv(cle, parent, "propriete");
         return;
       }
       const constante = parametre ? undefined : constanteImportee(sansConversion(parent.argumentExpression));
       if (constante !== undefined && !estEcrit(parent)) lectureEnv(constante, parent, "constante");
-      else c.ajouter("environnement", "acces-calcule", parent.argumentExpression.getText(arbre), parent);
+      else {
+        // Décision 0040 D1 : `process.env[nom]` en lecture, `nom` variable d'un `for (const nom of [<textes>])` ; le
+        // tableau fait partie de la forme. Tout nom secret du tableau est refusé sans ligne (section 5).
+        const cle = sansConversion(parent.argumentExpression);
+        let forme = texteNormalise(parent);
+        const tableau = ts.isIdentifier(cle) && !estEcrit(parent) ? boucleDe(cle) : undefined;
+        if (tableau && ts.isArrayLiteralExpression(tableau) && tableau.elements.every((x) => ts.isStringLiteral(x))) {
+          const noms = tableau.elements.map((x) => (x as ts.StringLiteral).text);
+          for (const nom of noms) if (estNomSecret(nom) && !lectureSecreteAdmise(chemin)) c.refuser("nom-secret", `lecture:${nom}`, nom, parent);
+          forme += ` (for…of ${JSON.stringify(noms)})`;
+        }
+        c.ajouter("environnement", "acces-calcule", forme, parent);
+      }
       return;
     }
     if (ts.isParameter(parent) && parent.initializer === enfant) {
@@ -787,10 +853,38 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       return;
     }
     if (!parametre && ts.isBinaryExpression(parent) && parent.left === enfant && estAffectation(parent.operatorToken.kind)) {
-      c.ajouter("environnement", "ecriture", "process.env", noeud);
+      // Forme exacte : écriture simple (`=`) d'un identifiant ou d'un `new X(<cible>, …)` ; tout le reste est `autre`.
+      // Décision 0040 D1 : `process.env = original` n'est une forme que dans un bloc `finally` (restauration).
+      const droite = sansConversion(parent.right);
+      let valeur = "<autre>";
+      if (ts.isIdentifier(droite)) valeur = dansFinally(parent) ? `${droite.text} (finally)` : droite.text;
+      else if (ts.isNewExpression(droite) && ts.isIdentifier(droite.expression) && droite.expression.text === "Proxy") valeur = formeNewProxy(droite) ?? "<autre>";
+      const operateur = parent.operatorToken.kind === ts.SyntaxKind.EqualsToken ? "=" : parent.operatorToken.getText(arbre);
+      c.ajouter("environnement", "ecriture", `process.env ${operateur} ${valeur}`, noeud);
       return;
     }
-    c.ajouter("environnement", parametre ? "parametre" : "usage", noeud.getText(arbre), noeud);
+    if (!parametre && ts.isVariableDeclaration(parent) && parent.initializer === enfant && ts.isIdentifier(parent.name)) {
+      // Décision 0040 D1 : l'alias n'est une forme que si ses seules références sont la cible d'un `new Proxy` et le
+      // membre droit d'une restauration `process.env = <alias>` ; la fonction englobante fait partie de la forme.
+      const genre = ts.getCombinedNodeFlags(parent) & ts.NodeFlags.Const ? "const" : "let";
+      const nomAlias = parent.name.text;
+      let reutilise = false;
+      const portee = parent.parent.parent.parent ?? arbre;
+      const chercher = (n: ts.Node) => {
+        if (ts.isIdentifier(n) && n.text === nomAlias && n !== parent.name) {
+          const { parent: p, enfant: e } = parentEffectif(n);
+          const cibleProxy = ts.isNewExpression(p) && p.arguments?.[0] === e && ts.isIdentifier(p.expression) && p.expression.text === "Proxy";
+          const restauration = ts.isBinaryExpression(p) && p.right === e && p.operatorToken.kind === ts.SyntaxKind.EqualsToken && estProcessEnv(sansConversion(p.left));
+          if (!cibleProxy && !restauration) reutilise = true;
+        }
+        ts.forEachChild(n, chercher);
+      };
+      chercher(portee);
+      const contexte = reutilise ? "alias réutilisé" : `dans ${fonctionDe(parent) ?? "le module"}`;
+      c.ajouter("environnement", "usage", `${genre} ${nomAlias} = process.env (${contexte})`, noeud);
+      return;
+    }
+    c.ajouter("environnement", parametre ? "parametre" : "usage", `${noeud.getText(arbre)} (${ts.SyntaxKind[parent.kind]})`, noeud);
   };
 
   /** Constante importée d'un module relatif, déclarée `export const X = "<littéral>"` (section 5, forme 4). */
@@ -992,24 +1086,40 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     if (ts.isImportDeclaration(noeud)) {
       if (ts.isStringLiteral(noeud.moduleSpecifier)) {
         specificateur(noeud.moduleSpecifier.text, formesImport(noeud.importClause, noeud.importClause?.isTypeOnly ?? false), noeud);
+        // `vitest` : imports nommés seulement, pour que l'objet `vi` reste lié à un nom connu (section 4).
+        const clause = noeud.importClause;
+        if (noeud.moduleSpecifier.text === "vitest" && clause && !clause.isTypeOnly && (clause.name || (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)))) {
+          c.ajouter("regime-tests", "vitest-hors-import-nomme", clause.getText(arbre), noeud);
+        }
       }
       if (noeud.importClause) ts.forEachChild(noeud.importClause, visiter);
       return;
     }
     if (ts.isExportDeclaration(noeud)) {
-      if (noeud.moduleSpecifier && ts.isStringLiteral(noeud.moduleSpecifier)) specificateur(noeud.moduleSpecifier.text, ["reexport"], noeud);
+      if (noeud.moduleSpecifier && ts.isStringLiteral(noeud.moduleSpecifier)) {
+        specificateur(noeud.moduleSpecifier.text, ["reexport"], noeud);
+        if (noeud.moduleSpecifier.text === "vitest" && !noeud.isTypeOnly) c.ajouter("regime-tests", "vitest-hors-import-nomme", "reexport", noeud);
+      } else if (noeud.exportClause && ts.isNamedExports(noeud.exportClause)) {
+        // `export { vi as v }` : l'objet `vi` sortirait du fichier sous un autre nom.
+        for (const e of noeud.exportClause.elements) {
+          if (nomsVi.has((e.propertyName ?? e.name).text)) c.ajouter("regime-tests", "vi-hors-appel", e.getText(arbre), e);
+        }
+      }
       return;
     }
     if (ts.isImportEqualsDeclaration(noeud)) {
       if (ts.isExternalModuleReference(noeud.moduleReference) && ts.isStringLiteral(noeud.moduleReference.expression)) {
         specificateur(noeud.moduleReference.expression.text, ["require"], noeud);
+        if (noeud.moduleReference.expression.text === "vitest") c.ajouter("regime-tests", "vitest-hors-import-nomme", "require", noeud);
       }
       return;
     }
     if (ts.isCallExpression(noeud) && noeud.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const argument = noeud.arguments[0];
-      if (argument && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))) specificateur(argument.text, ["import()"], noeud);
-      else c.ajouter("contournement", "import-non-litteral", noeud.getText(arbre), noeud);
+      if (argument && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))) {
+        specificateur(argument.text, ["import()"], noeud);
+        if (argument.text === "vitest") c.ajouter("regime-tests", "vitest-hors-import-nomme", "import()", noeud);
+      } else c.ajouter("contournement", "import-non-litteral", noeud.getText(arbre), noeud);
     }
 
     // Instruction `with` (2.4).
@@ -1037,7 +1147,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     }
 
     // Régime des tests (section 4).
-    if (appelVi(noeud, "spyOn")) {
+    if (appelVi(noeud, nomsVi, "spyOn")) {
       const nom = noeud.arguments[1] && texteLitteral(noeud.arguments[1]);
       if (nom === undefined) {
         // Nom non littéral : admis seulement si son type est une union de littéraux sans nom de capacité (2.6).
@@ -1060,27 +1170,44 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
         }
       }
     }
-    if (appelVi(noeud, "stubGlobal") && (noeud.arguments[0] === undefined || texteLitteral(noeud.arguments[0]) === undefined)) {
+    if (appelVi(noeud, nomsVi, "stubGlobal") && (noeud.arguments[0] === undefined || texteLitteral(noeud.arguments[0]) === undefined)) {
       c.ajouter("regime-tests", "stubGlobal-non-litteral", noeud.getText(arbre), noeud);
     }
-    if (appelVi(noeud, "stubEnv")) {
+    if (appelVi(noeud, nomsVi, "stubEnv")) {
       const nom = noeud.arguments[0] && texteLitteral(noeud.arguments[0]);
+      // Nom secret : refus qu'aucune ligne (pas même une ligne de texte `secret:`) ne couvre (section 4, forme 3).
+      if (nom !== undefined && estNomSecret(nom)) c.refuser("nom-secret", `stubEnv:${nom}`, nom, noeud);
       if (nom === undefined) {
         const table = tableEach(noeud.arguments[0]);
         const forme = FORMES_NOMINATIVES_TESTS.find((f) => f.fichier === chemin && f.forme === "stubEnv-table" && f.valeur === table);
         const par = forme ? `forme-test:${chemin}:${forme.forme}` : undefined;
-        c.ajouter("regime-tests", "stubEnv-non-litteral", table ?? noeud.getText(arbre), noeud, par !== undefined, par);
+        // Décision 0040 D1 : `vi.stubEnv(nom, …)` dans un `for (const nom of <identifiant>)` ; la boucle fait partie de la forme.
+        const premier = noeud.arguments[0] && sansConversion(noeud.arguments[0]);
+        const boucle = premier && ts.isIdentifier(premier) ? boucleDe(premier) : undefined;
+        const texteAppel = texteNormalise(noeud) + (boucle && ts.isIdentifier(boucle) ? ` (for…of ${boucle.text})` : "");
+        c.ajouter("regime-tests", "stubEnv-non-litteral", table ?? texteAppel, noeud, par !== undefined, par);
       }
     }
-    if (appelVi(noeud, "mock", "doMock", "importActual", "importMock")) {
+    if (appelVi(noeud, nomsVi, "mock", "doMock", "importActual", "importMock")) {
       const spec = noeud.arguments[0] && texteLitteral(noeud.arguments[0]);
-      const methode = (noeud.expression as ts.PropertyAccessExpression).name.text;
+      const methode = (sansConversion(noeud.expression) as ts.PropertyAccessExpression).name.text;
       if (spec === undefined) c.ajouter("regime-tests", "double-non-litteral", noeud.getText(arbre), noeud);
       else {
-        let original = methode === "importActual" || methode === "importMock";
-        if (!original && noeud.arguments[1]) original = chargeOriginal(noeud.arguments[1]);
+        // Section 4, forme 2 : seule une fabrique littérale sans paramètre (flèche ou `function` en ligne, seul second
+        // argument) ne charge pas le module réel. Sans fabrique, avec des options (`{ spy: true }`) ou une fabrique
+        // passée par identifiant, Vitest charge (ou peut charger) le module réel.
+        const fabrique = noeud.arguments[1] && sansConversion(noeud.arguments[1]);
+        const litterale =
+          noeud.arguments.length === 2 &&
+          fabrique !== undefined &&
+          (ts.isArrowFunction(fabrique) || ts.isFunctionExpression(fabrique)) &&
+          fabrique.parameters.length === 0;
+        const reel = methode === "importActual" || methode === "importMock";
+        const original = reel || !litterale || chargeOriginal(fabrique);
         doubles.push({ specificateur: spec, original, ligne: numero(noeud) });
-        if (original && moduleACapacite(spec)) c.ajouter("regime-tests", "double-original", spec, noeud);
+        if (original && moduleACapacite(spec)) {
+          c.ajouter("regime-tests", reel || litterale ? "double-original" : "double-sans-fabrique-litterale", `${methode}(${spec})`, noeud);
+        }
       }
     }
 
@@ -1177,14 +1304,17 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     return undefined;
   }
 
-  /** La fabrique d'un `vi.mock` charge le module réel (`importOriginal`, `vi.importActual`, `vi.importMock`). */
+  /**
+   * La fabrique d'un `vi.mock` charge le module réel : paramètre (`importOriginal`), `arguments` (le même paramètre
+   * sans le nommer), `importOriginal`, `vi.importActual`, `vi.importMock`.
+   */
   function chargeOriginal(fabrique: ts.Expression): boolean {
     let trouve = false;
     const f = sansConversion(fabrique);
     if ((ts.isArrowFunction(f) || ts.isFunctionExpression(f)) && f.parameters.length > 0) trouve = true;
     const chercher = (n: ts.Node) => {
-      if (appelVi(n, "importActual", "importMock")) trouve = true;
-      if (ts.isIdentifier(n) && n.text === "importOriginal") trouve = true;
+      if (appelVi(n, nomsVi, "importActual", "importMock")) trouve = true;
+      if (ts.isIdentifier(n) && (n.text === "importOriginal" || n.text === "arguments")) trouve = true;
       ts.forEachChild(n, chercher);
     };
     chercher(f);
@@ -1213,9 +1343,108 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     return noms.join(",");
   }
 
+  /**
+   * Forme exacte d'un usage de `Reflect` ou de `Proxy` (2.3, 2.4 ; décision 0040 D1), contexte compris :
+   * - `process.env = new Proxy(<cible>, { <pièges> })` : `new Proxy` membre droit d'une écriture simple de
+   *   `process.env`, pièges tous méthodes nommées ; `new Proxy(<cible>, { <pièges> })` ailleurs ;
+   * - `Reflect.<m>(<paramètres>) (piège <m>)` : expression du `return` de la méthode `<m>` des pièges d'un
+   *   `new Proxy`, avec pour arguments les paramètres de cette méthode dans leur ordre ; `Reflect.<m>(<arguments>)`
+   *   ailleurs ;
+   * - `autre` pour tout le reste (alias, argument, accès calculé, `Proxy` sans `new`…).
+   * Une ligne nominative ne couvre donc que les appels écrits, dans leur contexte.
+   */
+  function formeReflexion(nom: string, parent: ts.Node, enfant: ts.Node): string {
+    if (nom === "Reflect" && ts.isPropertyAccessExpression(parent) && parent.expression === enfant) {
+      const appel = parentEffectif(parent);
+      if (ts.isCallExpression(appel.parent) && appel.parent.expression === appel.enfant) {
+        const membre = parent.name.text;
+        const forme = `Reflect.${membre}(${appel.parent.arguments.map(texteNormalise).join(", ")})`;
+        return dansPiege(appel.parent, membre) ? `${forme} (piège ${membre})` : forme;
+      }
+    }
+    if (nom === "Proxy" && ts.isNewExpression(parent) && parent.expression === enfant) {
+      const forme = formeNewProxy(parent);
+      if (forme === undefined) return "autre";
+      return ecritureDeProcessEnv(parent) ? `process.env = ${forme}` : forme;
+    }
+    return "autre";
+  }
+
+  /** `new Proxy(<cible>, { <pièges> })` si les pièges sont un littéral de méthodes nommées ; sinon `undefined`. */
+  function formeNewProxy(n: ts.NewExpression): string | undefined {
+    if (n.arguments?.length !== 2) return undefined;
+    const [cible, pieges] = n.arguments as unknown as [ts.Expression, ts.Expression];
+    const p = sansConversion(pieges);
+    if (!ts.isObjectLiteralExpression(p)) return undefined;
+    const noms = p.properties.map((m) => (ts.isMethodDeclaration(m) && ts.isIdentifier(m.name) ? m.name.text : "?"));
+    return noms.includes("?") ? undefined : `new Proxy(${texteNormalise(cible)}, { ${noms.join(", ")} })`;
+  }
+
+  /** Le nœud est le membre droit d'une écriture simple `process.env = <nœud>`. */
+  function ecritureDeProcessEnv(n: ts.Node): boolean {
+    const { parent, enfant } = parentEffectif(n);
+    return ts.isBinaryExpression(parent) && parent.right === enfant && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken && estProcessEnv(sansConversion(parent.left));
+  }
+
+  /**
+   * L'appel est l'expression d'un `return` de la méthode `<membre>` d'un littéral de pièges passé à `new Proxy`, et ses
+   * arguments sont exactement les paramètres de cette méthode, dans leur ordre.
+   */
+  function dansPiege(appel: ts.CallExpression, membre: string): boolean {
+    const retour = parentEffectif(appel);
+    if (!ts.isReturnStatement(retour.parent) || retour.parent.expression !== retour.enfant) return false;
+    let n: ts.Node = retour.parent;
+    while (!ts.isFunctionLike(n)) n = n.parent;
+    if (!ts.isMethodDeclaration(n) || !ts.isIdentifier(n.name) || n.name.text !== membre) return false;
+    const objet = n.parent;
+    const proxy = parentEffectif(objet);
+    if (!ts.isObjectLiteralExpression(objet) || !ts.isNewExpression(proxy.parent) || proxy.parent.arguments?.[1] !== proxy.enfant) return false;
+    const appele = sansConversion(proxy.parent.expression);
+    if (!ts.isIdentifier(appele) || appele.text !== "Proxy") return false;
+    const parametres = n.parameters.map((x) => (ts.isIdentifier(x.name) ? x.name.text : "?"));
+    const args = appel.arguments.map((a) => (ts.isIdentifier(a) ? a.text : "!"));
+    return parametres.length === args.length && parametres.every((x, i) => x === args[i]);
+  }
+
+  /** Variable d'un `for (const <id> of <expr>)` qui lie cet identifiant, et cette expression. */
+  function boucleDe(id: ts.Identifier): ts.Expression | undefined {
+    for (let n: ts.Node | undefined = id.parent; n; n = n.parent) {
+      if (ts.isForOfStatement(n) && ts.isVariableDeclarationList(n.initializer) && ts.getCombinedNodeFlags(n.initializer) & ts.NodeFlags.Const) {
+        const d = n.initializer.declarations[0];
+        if (n.initializer.declarations.length === 1 && d && ts.isIdentifier(d.name) && d.name.text === id.text) return n.expression;
+      }
+    }
+    return undefined;
+  }
+
+  /** Nom de la fonction déclarée qui contient le nœud. */
+  function fonctionDe(n: ts.Node): string | undefined {
+    for (let x: ts.Node | undefined = n.parent; x; x = x.parent) if (ts.isFunctionLike(x)) return nomDeFonction(x) ?? "?";
+    return undefined;
+  }
+
+  /** Le nœud est dans le bloc `finally` d'un `try`. */
+  function dansFinally(n: ts.Node): boolean {
+    for (let x: ts.Node = n; x.parent; x = x.parent) if (ts.isTryStatement(x.parent) && x.parent.finallyBlock === x) return true;
+    return false;
+  }
+
   function identifiant(id: ts.Identifier) {
     const nom = id.text;
     const { parent, enfant } = parentEffectif(id);
+
+    // Objet `vi` (section 4) : seul `<vi>.<membre>(…)` en position d'appel est admis. Alias (`const w = vi`),
+    // crochets (`vi["importActual"]`), déstructuration (`const { importActual } = vi`), argument, `.call`/`.bind`…
+    // sont refusés : sinon `vi.importActual`, `vi.stubEnv`, `vi.stubGlobal` ou `vi.spyOn` échapperaient au régime.
+    if (nomsVi.has(nom)) {
+      if (ts.isImportSpecifier(parent)) return; // liaison de l'import
+      const membre = ts.isPropertyAccessExpression(parent) && parent.expression === enfant ? parent : undefined;
+      const appel = membre ? parentEffectif(membre) : undefined;
+      if (!(appel && ts.isCallExpression(appel.parent) && appel.parent.expression === appel.enfant)) {
+        c.ajouter("regime-tests", "vi-hors-appel", (membre ?? parent).getText(arbre).replace(/\s+/g, " ").slice(0, 120), id);
+      }
+      return;
+    }
 
     if (IDENTIFIANTS_CAPACITE.has(nom)) {
       const declaration =
@@ -1241,7 +1470,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
     }
 
     if (nom === "Reflect" || nom === "Proxy") {
-      capacite("reflexion", nom, "toute forme", id);
+      capacite("reflexion", nom, formeReflexion(nom, parent, enfant), id);
       return;
     }
 
@@ -1268,7 +1497,7 @@ export function analyser(chemin: string, source: string, contexte: Contexte): Re
       }
       if (!estAlias && ts.isTypeOfExpression(parent)) return;
       if (!estAlias && test && (ts.isCallExpression(parent)) && parent.arguments[0] === enfant) {
-        if (appelVi(parent, "spyOn") && (nom === "globalThis" || nom === "window") && parent.arguments[1] && texteLitteral(parent.arguments[1]) !== undefined) {
+        if (appelVi(parent, nomsVi, "spyOn") && (nom === "globalThis" || nom === "window") && parent.arguments[1] && texteLitteral(parent.arguments[1]) !== undefined) {
           c.ajouter("objet-global", `global:${nomGlobal}`, "vi.spyOn", id, true);
           return;
         }
@@ -1358,7 +1587,10 @@ export function analyserPackageJson(
   if (!Array.isArray(construits) || JSON.stringify(construits) !== JSON.stringify(onlyBuiltDependencies)) refus("onlyBuiltDependencies", JSON.stringify(construits));
   const scripts = (json.scripts ?? {}) as Record<string, unknown>;
   for (const nom of Object.keys(scripts)) {
-    if (SCRIPTS_CYCLE_DE_VIE.has(nom) || /^(pre|post)/.test(nom)) refus("script-cycle-de-vie", nom);
+    // `pre<x>` et `post<x>` ne sont lancés que pour un script `<x>` existant ou un nom de cycle de vie (mineur 9).
+    const base = /^(pre|post)(.+)$/.exec(nom)?.[2];
+    const encadre = base !== undefined && (Object.hasOwn(scripts, base) || SCRIPTS_CYCLE_DE_VIE.has(base));
+    if (SCRIPTS_CYCLE_DE_VIE.has(nom) || encadre) refus("script-cycle-de-vie", nom);
   }
   const declares = new Map<string, unknown>();
   for (const section of ["dependencies", "devDependencies"]) {
@@ -1389,14 +1621,32 @@ export type Cas = {
   readonly chemin: string;
   readonly source: string;
   readonly attendu: "refus" | "admis";
-  readonly regle?: Regle;
+  /** Obligatoire pour un cas `refus` (vérifié par `lireCas`). */
+  readonly regle?: Regle | RegleFermeture;
   readonly fichiers?: Readonly<Record<string, string>>;
   readonly typage?: boolean;
   readonly fusion?: boolean;
 };
 
+/** Cas d'un fichier de `donnees/`, forme contrôlée à l'exécution : un cas mal formé fait échouer le test (échec fermé). */
 export function lireCas(nom: string): readonly Cas[] {
-  return (JSON.parse(readFileSync(new URL(`./donnees/${nom}`, import.meta.url), "utf8")) as { cas: Cas[] }).cas;
+  const lus: unknown = JSON.parse(readFileSync(new URL(`./donnees/${nom}`, import.meta.url), "utf8"));
+  const liste = (lus as { cas?: unknown }).cas;
+  if (!Array.isArray(liste) || liste.length === 0) throw new Error(`confinement: ${nom} : liste de cas absente`);
+  const ids = new Set<string>();
+  for (const brut of liste as Record<string, unknown>[]) {
+    const id = String(brut.id);
+    const ok =
+      typeof brut.id === "string" &&
+      typeof brut.chemin === "string" &&
+      typeof brut.source === "string" &&
+      (brut.attendu === "refus" || brut.attendu === "admis") &&
+      (brut.attendu === "admis" || typeof brut.regle === "string") &&
+      !ids.has(id);
+    if (!ok) throw new Error(`confinement: ${nom} : cas mal formé ou en double (${id}) ; un cas « refus » nomme sa règle`);
+    ids.add(id);
+  }
+  return liste as Cas[];
 }
 
 /** Constats refusés d'un cas, analysé sous son chemin simulé. */
@@ -1418,6 +1668,6 @@ export function refusDuCas(
 export function ecartDuCas(cas: Cas, refus: readonly Constat[]): string | undefined {
   const decrits = refus.map((c) => `[${c.regle}] ${c.capacite} — ${c.forme}`);
   if (cas.attendu === "admis") return refus.length === 0 ? undefined : `admis attendu, refusé : ${decrits.join(" ; ")}`;
-  if (refus.some((c) => c.regle === cas.regle)) return undefined;
+  if (cas.regle !== undefined && refus.some((c) => c.regle === cas.regle)) return undefined;
   return `refus par la règle ${cas.regle ?? "?"} attendu, obtenu : ${decrits.join(" ; ") || "aucun refus"}`;
 }

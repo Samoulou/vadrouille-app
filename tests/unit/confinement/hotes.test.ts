@@ -2,12 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ecartDuCas, lireCas, refusDuCas } from "./analyse";
-import { fichiersSuivis, lireFichier } from "./fichiers";
+import { depotSuivi, lireFichier } from "./fichiers";
 
 /** `confinement: hôtes normalisés` (spécification P0c, section 2.5) : cas lus dans `donnees/cas-hotes.json`. */
 
-const suivis = new Set(fichiersSuivis().map((f) => f.chemin));
-const depot = { existe: (c: string) => suivis.has(c), lire: (c: string) => (suivis.has(c) ? lireFichier(c) : undefined) };
+const depot = depotSuivi();
 
 describe("confinement: hôtes normalisés", () => {
   for (const cas of lireCas("cas-hotes.json")) {

@@ -378,6 +378,185 @@
       "chemin": "src/ai/x.ts",
       "source": "import { z } from \"zod\";\nimport type { TripSummary } from \"@/contracts\";\nexport const s: TripSummary | undefined = undefined;\nexport const t = z.string();",
       "attendu": "admis"
+    },
+    {
+      "id": "tests-vi-alias-vitest",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vitest } from \"vitest\";\nexport const m = await vitest.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-import",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi as v } from \"vitest\";\nexport const m = await v.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-variable",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nconst w = vi;\nexport const m = await w.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-crochets",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi[\"importActual\"](\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-destructuration",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nconst { importActual } = vi;\nexport const m = await importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-call",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await vi.importActual.call(vi, \"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-virgule",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const m = await (0, vi.importActual)(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-argument",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\naide(vi);",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-reexport",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport { vi as v };",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vitest-espace-de-noms",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import * as V from \"vitest\";\nexport const m = await V.vi.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vitest-reexport",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "export * from \"vitest\";",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vitest-import-dynamique",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "const V = await import(\"vitest\");\nexport const m = await V.vi.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-stubenv",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi as v } from \"vitest\";\nv.stubEnv(nom, \"x\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-stubglobal",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nconst { stubGlobal } = vi;\nstubGlobal(nom, double);",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-spyon",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi as v } from \"vitest\";\nv.spyOn(globalThis, \"fetch\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-vi-alias-mock-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi as v } from \"vitest\";\nv.mock(\"node:http\", () => ({ createServer: v.fn() }));",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-vi-optionnel-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.useFakeTimers?.();\nvi?.restoreAllMocks();",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-mock-capacite-sans-fabrique",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-options",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", { spy: true });",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-fabrique-identifiant",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nconst fabrique = async (importOriginal: () => Promise<object>) => importOriginal();\nvi.mock(\"node:http\", fabrique);",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-fabrique-identifiant-sans-parametre",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nconst fabrique = () => ({});\nvi.mock(\"node:http\", fabrique);",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-arguments",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", function () {\n  return arguments[0]();\n});",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-trois-arguments",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", () => ({}), { spy: true });",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-domock-capacite-sans-fabrique",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.doMock(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-mock-capacite-function-admis",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", function () {\n  return { createServer: vi.fn() };\n});",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-stubenv-secret-malgre-ligne-texte",
+      "chemin": "tests/unit/p0/cli.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubEnv(\"OPENROUTER_API_KEY\", \"x\");",
+      "attendu": "refus",
+      "regle": "nom-secret"
     }
   ]
 }
