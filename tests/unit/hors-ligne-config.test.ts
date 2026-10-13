@@ -73,7 +73,8 @@ describe("en-têtes du service worker (C26, F10-TL-8)", () => {
 describe("Playwright : service workers bloqués par défaut (F10-TL-6)", () => {
   it("use.serviceWorkers vaut « block » au niveau global, sans projet supplémentaire", () => {
     expect(playwrightConfig.use?.serviceWorkers).toBe("block");
-    expect(playwrightConfig.projects?.map((project) => project.name)).toEqual(["e2e", "a11y", "visual", "perf"]);
+    // `prototype-cache` vient de P0b1 (décision 0032 § A6.6), pas de F10b.
+    expect(playwrightConfig.projects?.map((project) => project.name)).toEqual(["e2e", "a11y", "visual", "prototype-cache", "perf"]);
   });
 
   it("seuls les tests du hors-ligne et le contrôle de persistance de la carte autorisent les service workers", () => {

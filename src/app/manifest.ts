@@ -5,7 +5,7 @@ import { PRODUCT_NAME } from "@/config/site";
 import designTokens from "../../docs/design-system/tokens.json";
 
 /** Valeur d'une couleur de Ligne, lue dans `docs/design-system/tokens.json` à la construction (F10-TL-9). */
-function colorToken(name: string): string {
+export function colorToken(name: string): string {
   const token = designTokens.color.tokens.find((candidate) => candidate.name === name);
   if (!token) throw new Error(`Token de couleur inconnu : ${name}`);
   return token.value;

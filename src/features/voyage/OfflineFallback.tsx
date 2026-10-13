@@ -9,6 +9,7 @@ import { messages } from "@/i18n";
 import { useOnline } from "@/lib/online";
 
 const t = messages.voyage.horsLigne;
+const etats = messages.etats;
 
 export interface OfflineFallbackProps {
   /** Historique de l'onglet (tests) ; celui du navigateur par défaut. */
@@ -23,8 +24,10 @@ export interface OfflineFallbackProps {
  * voyage, ni jeton, ni adresse demandée, ni stockage.
  *
  * « Réessayer » sert surtout l'application installée, sans bouton du navigateur : retour à la page d'où la personne
- * est partie, ou l'accueil dans un onglet sans page précédente. Au retour du réseau, « Connexion rétablie. » est
- * annoncé poliment.
+ * est partie, ou l'accueil dans un onglet sans page précédente. Au retour du réseau, titre et texte passent à
+ * « Connexion rétablie » et « Tu peux réessayer. », et « Connexion rétablie. » est annoncé poliment ; ils reviennent
+ * à « Tu es hors ligne » si le réseau se coupe de nouveau. Même mise en page et même lien d'accueil que la page
+ * introuvable (`EtatPage`, `etats.accueil`).
  */
 export function OfflineFallback({ history, assign }: OfflineFallbackProps) {
   const online = useOnline();
@@ -41,11 +44,11 @@ export function OfflineFallback({ history, assign }: OfflineFallbackProps) {
   };
 
   return (
-    <EtatPage title={t.titre} text={t.texte}>
+    <EtatPage title={state.announce ? t.retabliTitre : t.titre} text={state.announce ? t.retabliTexte : t.texte}>
       <Button onClick={retry}>{t.reessayer}</Button>
       <Button asChild variant="text">
         <Link href="/" prefetch={false}>
-          {t.accueil}
+          {etats.accueil}
         </Link>
       </Button>
       <p role="status" data-part="annonce" className="sr-only">

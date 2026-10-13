@@ -146,6 +146,12 @@ export default defineConfig([
     rules: { "ligne/no-service-worker-register": "off" },
   },
   {
+    // F10b (F10-TL-5, C26) : seul le service worker ouvre un cache ; son aiguillage (`public/sw-route.js`) reste
+    // soumis à la règle.
+    files: ["public/sw.js"],
+    rules: { "ligne/no-cache-storage-open": "off" },
+  },
+  {
     // F10b (F10-TL-5) : le service worker et son aiguillage. Script classique, globals du service worker ; Cache
     // Storage permis ; ni IndexedDB, ni Web Storage, ni cookie, ni lecture de l'heure ; aucun script d'une autre
     // origine (seul l'aiguillage de l'application est importé).
@@ -164,7 +170,6 @@ export default defineConfig([
       },
     },
     rules: {
-      "ligne/no-cache-storage-open": "off",
       "no-undef": "error",
       "no-restricted-globals": [
         "error",

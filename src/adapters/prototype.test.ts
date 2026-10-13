@@ -314,10 +314,12 @@ describe("adaptateurs: prototype sans cache", () => {
   // Décision 0032 § A6.2 : seuls `src/app/layout.tsx` et `src/app/voyages/layout.tsx` n'exportaient pas la constante.
   // Depuis F8a (après 0032), l'écran 1 de la création et son layout non plus : pages statiques, sans lecture de
   // données. Liste fermée : une nouvelle page sans l'export fait échouer le test ; un fichier de la liste ne lit
-  // aucune donnée (ni `@/adapters`, ni chargeur de `src/features`).
+  // aucune donnée (ni `@/adapters`, ni chargeur de `src/features`). F10b ajoute la page de repli hors ligne,
+  // rendue statiquement à la construction sans aucune donnée (`force-static`, F10-TL-4).
   const SANS_EXPORT = [
     "src/app/(creation)/layout.tsx",
     "src/app/(creation)/voyages/nouveau/page.tsx",
+    "src/app/hors-ligne/page.tsx",
     "src/app/layout.tsx",
     "src/app/voyages/layout.tsx",
   ];

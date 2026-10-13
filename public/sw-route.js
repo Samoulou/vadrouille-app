@@ -3,7 +3,7 @@
  * horloge ni stockage : `public/sw.js` les charge par `importScripts("/sw-route.js")`, et
  * `tests/unit/sw-route.test.ts` les exécute dans un contexte isolé.
  *
- * Trois réponses seulement :
+ * Quatre réponses seulement :
  * - `navigation` : navigation de l'application (`/p/` compris) ; réseau, sans écriture, réponse rendue telle
  *   quelle (erreurs HTTP comprises) ; redirection vers la page de repli seulement si le réseau échoue ;
  * - `repli` : navigation vers la page de repli elle-même ; réseau, puis la coquille du cache, jamais redirigée ;

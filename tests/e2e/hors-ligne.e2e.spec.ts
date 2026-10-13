@@ -3,8 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { edimbourgCarte } from "../../src/mocks/edimbourg-carte";
 
 import { ED, MOMENTS, openToday, R15, setClock } from "./aujourdhui-helpers";
+import { blockGoogle } from "./carte-helpers";
 import {
-  blockGoogleInContext,
   cacheBodies,
   controlNetwork,
   cacheEntries,
@@ -31,7 +31,7 @@ const PRESENTATION = `/voyages/${ED}/presentation`;
 let google: string[] = [];
 let setOffline: (offline: boolean) => Promise<void>;
 test.beforeEach(async ({ context, baseURL }) => {
-  google = await blockGoogleInContext(context);
+  google = await blockGoogle(context);
   setOffline = await controlNetwork(context, baseURL!);
 });
 test.afterEach(() => {
@@ -53,13 +53,16 @@ test.describe("manifeste (C21)", () => {
     page,
     request,
   }) => {
-    for (const path of ["/", SEJOUR, JOURNEE, R15, R_REPLI, "/voyages/inconnu"]) {
-      await page.goto(path);
-      await expect(page.locator("link[rel='manifest']"), path).toHaveAttribute("href", "/manifest.webmanifest");
-    }
     const response = await request.get("/manifest.webmanifest");
     expect(response.status()).toBe(200);
     const manifest = (await response.json()) as Record<string, unknown> & { icons: { src: string; sizes: string }[] };
+    for (const path of ["/", SEJOUR, JOURNEE, R15, R_REPLI, "/voyages/inconnu"]) {
+      await page.goto(path);
+      await expect(page.locator("link[rel='manifest']"), path).toHaveAttribute("href", "/manifest.webmanifest");
+      // Couleur de thème du manifeste et icône pour l'écran d'accueil d'iOS, sur chaque page.
+      await expect(page.locator("meta[name='theme-color']"), path).toHaveAttribute("content", String(manifest.theme_color));
+      await expect(page.locator("link[rel='apple-touch-icon']"), path).toHaveAttribute("href", "/icons/icone-192.png");
+    }
     expect(manifest).toMatchObject({ name: "Vadrouille", lang: "fr", display: "standalone", start_url: "/" });
     expect(manifest.icons.map((icon) => icon.sizes)).toEqual(expect.arrayContaining(["192x192", "512x512"]));
     for (const icon of manifest.icons) {
@@ -166,6 +169,7 @@ test("hors-ligne: page de repli", async ({ page, context }) => {
   await expect(page.locator("[data-part='annonce']")).toHaveText("");
   await setOffline(false);
   await expect(page.locator("[data-part='annonce']")).toHaveText("Connexion rétablie.");
+  await expect(page.getByRole("heading", { level: 1, name: "Connexion rétablie" })).toBeVisible();
   await page.getByRole("button", { name: "Réessayer" }).click();
   await expect(page).toHaveURL(SEJOUR);
 
@@ -227,23 +231,29 @@ test("hors-ligne: navigations interceptées sans stockage", async ({ page, conte
   for (const url of workerRequests) expect(pageRequests.has(url), url).toBe(true);
 });
 
-test("hors-ligne: le service worker ne fait passer aucune requête Google, en-têtes de /sw.js", async ({ page, request }) => {
-  // C26 et F10-TL-6 : une page contrôlée par le service worker demande une ressource Google ; le service worker
-  // n'y répond pas, la requête est interrompue par le blocage du contexte, et rien n'est enregistré.
+test("hors-ligne: le service worker ne fait passer aucune requête Google, en-têtes de /sw.js", async ({ context, page, request }) => {
+  // C26 et F10-TL-6 : le service worker lui-même demande une ressource Google ; la requête passe par le blocage du
+  // contexte, qui l'interrompt, elle est relevée dans `google`, et rien n'est enregistré dans le cache.
+  const fromWorker: string[] = [];
+  context.on("request", (req) => {
+    if (req.serviceWorker()) fromWorker.push(req.url());
+  });
   await openTodayWithWorker(page);
   const before = await cacheEntries(page);
-  await page.goto(SEJOUR);
-  expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
-  const outcome = await page.evaluate(async () => {
+  const worker = context.serviceWorkers().find((candidate) => new URL(candidate.url()).pathname === "/sw.js");
+  expect(worker, "service worker /sw.js").toBeDefined();
+  const googleURL = "https://maps.googleapis.com/maps/api/js?callback=x";
+  const outcome = await worker!.evaluate(async (url) => {
     try {
-      await fetch("https://maps.googleapis.com/maps/api/js?callback=x", { mode: "no-cors" });
+      await fetch(url, { mode: "no-cors" });
       return "réponse";
     } catch {
       return "interrompue";
     }
-  });
+  }, googleURL);
   expect(outcome).toBe("interrompue");
-  expect(google).toEqual(["https://maps.googleapis.com/maps/api/js?callback=x"]);
+  expect(google).toEqual([googleURL]);
+  expect(fromWorker).toContain(googleURL);
   google = [];
   expect(await cacheEntries(page)).toEqual(before);
 

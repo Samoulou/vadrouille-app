@@ -541,11 +541,13 @@
       }
     },
     "horsLigne": {
+      "titreDocument": "Tu es hors ligne · {produit}",
       "titre": "Tu es hors ligne",
-      "texte": "Cette page demande une connexion. Reconnecte-toi, puis rouvre-la.",
+      "texte": "Cette page demande une connexion. Reconnecte-\u2060toi, puis réessaie.",
       "reessayer": "Réessayer",
-      "accueil": "Accueil",
-      "retabli": "Connexion rétablie."
+      "retabli": "Connexion rétablie.",
+      "retabliTitre": "Connexion rétablie",
+      "retabliTexte": "Tu peux réessayer."
     }
   },
   "mesVoyages": {

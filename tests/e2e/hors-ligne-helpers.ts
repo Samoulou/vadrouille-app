@@ -1,26 +1,9 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
-import { GOOGLE_ROUTES, isGoogleHost } from "./carte-helpers";
-
 /** Aides des specs de F10b (manifeste, service worker, page de repli `R-repli`), en 390 × 844. */
 
 export const R_REPLI = "/hors-ligne";
 export const FALLBACK_TITLE = "Tu es hors ligne";
-
-/**
- * Bloque les domaines Google au niveau du contexte (F10-TL-6) : `context.route` couvre aussi les requêtes du
- * service worker. Relève toute requête qui les vise, de la page ou du service worker.
- */
-export async function blockGoogleInContext(context: BrowserContext): Promise<string[]> {
-  const requests: string[] = [];
-  for (const pattern of GOOGLE_ROUTES) {
-    await context.route(pattern, (route) => route.abort());
-  }
-  context.on("request", (request) => {
-    if (isGoogleHost(new URL(request.url()).hostname)) requests.push(request.url());
-  });
-  return requests;
-}
 
 /**
  * Réseau coupé ou rétabli pour la page **et** pour le service worker. Avec le drapeau de `playwright.config.ts`,
@@ -100,7 +83,9 @@ export async function expectNoOtherStorage(page: Page) {
 export async function expectFallback(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: FALLBACK_TITLE })).toBeVisible();
   await expect(page.getByRole("button", { name: "Réessayer" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Accueil" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Retour à l'accueil" })).toHaveAttribute("href", "/");
+  await expect(page).toHaveTitle("Tu es hors ligne · Vadrouille");
+  await expect(page.locator("meta[name='robots']")).toHaveAttribute("content", "noindex, nofollow");
   const url = new URL(page.url());
   expect(url.pathname).toBe(R_REPLI);
   expect(url.search).toBe("");

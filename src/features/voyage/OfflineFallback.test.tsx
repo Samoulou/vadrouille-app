@@ -24,13 +24,15 @@ afterEach(() => {
 });
 
 describe("OfflineFallback", () => {
-  it("textes, un seul titre de niveau 1, « Réessayer » et lien « Accueil » vers /", () => {
+  it("textes, un seul titre de niveau 1, « Réessayer » et lien « Retour à l'accueil » vers /", () => {
     render(<OfflineFallback />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "Tu es hors ligne" })).toBeInTheDocument();
-    expect(screen.getByText("Cette page demande une connexion. Reconnecte-toi, puis rouvre-la.")).toBeInTheDocument();
+    expect(screen.getByText(t.texte)).toBeInTheDocument();
+    // Trait d'union de « Reconnecte-toi » collé à la suite par un gluon (U+2060) : jamais coupé en fin de ligne.
+    expect(t.texte).toBe("Cette page demande une connexion. Reconnecte-\u2060toi, puis réessaie.");
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Accueil" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Retour à l'accueil" })).toHaveAttribute("href", "/");
     expect(t.titre).toBe("Tu es hors ligne");
   });
 
@@ -57,10 +59,15 @@ describe("OfflineFallback", () => {
     render(<OfflineFallback />);
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("");
+    expect(screen.getByRole("heading", { level: 1, name: "Tu es hors ligne" })).toBeInTheDocument();
     setOnline(true);
     expect(status).toHaveTextContent("Connexion rétablie.");
+    expect(screen.getByRole("heading", { level: 1, name: "Connexion rétablie" })).toBeInTheDocument();
+    expect(screen.getByText("Tu peux réessayer.")).toBeInTheDocument();
     setOnline(false);
     expect(status).toHaveTextContent("");
+    expect(screen.getByRole("heading", { level: 1, name: "Tu es hors ligne" })).toBeInTheDocument();
+    expect(screen.getByText(t.texte)).toBeInTheDocument();
   });
 
   it("aucune annonce si le réseau est là depuis l'ouverture", () => {

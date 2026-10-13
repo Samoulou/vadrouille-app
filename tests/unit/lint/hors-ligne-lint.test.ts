@@ -51,6 +51,12 @@ describe("Cache Storage (F10-TL-5)", () => {
     },
   );
 
+  it("caches.open refusé dans public/sw-route.js", async () => {
+    for (const statement of [`caches.open("a");`, `self.caches.open("a");`]) {
+      expect(await messagesFor(`${statement}\n`, "public/sw-route.js", [OPEN]), statement).toHaveLength(1);
+    }
+  });
+
   it("caches.open permis dans public/sw.js", async () => {
     expect(await messagesFor(`caches.open("vadrouille-interface-1");\n`, "public/sw.js")).toEqual([]);
   });
