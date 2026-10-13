@@ -7,6 +7,13 @@ import { collectEvents } from "./presentation-helpers";
 import {
   DEAN,
   DEV_REPLACE_DEAN,
+  FICHE_JARDIN,
+  moveButton,
+  moveDays,
+  moveSheet,
+  openMoveSheet,
+  placeHere,
+  previewMoveToJ4,
   PROPOSAL,
   REPLACE_DEAN,
   applyButton,
@@ -23,7 +30,8 @@ import { TRIP, dayList, dayMarkers, fiche, ficheTitle, openTrip, sheet } from ".
 
 /**
  * Critères F7a (spécification F7, critères [a] C11 à C18 et transverses C2, C3, C4, C9) : écran 14 « Remplacer une
- * étape », aperçu, « Appliquer », surlignage et toast partagé, en 390 × 844 sur le build de production. Les critères
+ * étape », aperçu, « Appliquer », surlignage et toast partagé ; critères F7b ([b] C19 à C22, part de F7b de C3, C4 et
+ * C9) : feuille « Déplacer », en 390 × 844 sur le build de production. Les critères
  * qui touchent la carte s'exécutent sur /dev/voyages (carte simulée) ; les autres sur /voyages.
  */
 
@@ -257,6 +265,142 @@ test.describe("Remplacer une étape", () => {
   });
 });
 
+const jardinLink = (page: Page) => dayList(page).getByRole("link", { name: /\[Jardin botanique royal\]/ });
+
+test.describe("Déplacer une étape", () => {
+  test("déplacer: bouton dans la fiche", async ({ page }) => {
+    await openFiche(page, FICHE_JARDIN);
+    const actions = fiche(page).getByRole("region", { name: "Actions" });
+    const names = await actions.locator("a, button").allInnerTexts();
+    expect(names.indexOf("Déplacer")).toBe(names.indexOf("Remplacer") + 1);
+    for (const path of [`/voyages/${TRIP}/jour/1?etape=${TATTOO}`, `${JOUR2}?etape=j2-concert-orgue`]) {
+      await openFiche(page, path);
+      await expect(fiche(page).getByRole("button", { name: "Déplacer" })).toHaveCount(0);
+    }
+  });
+
+  test("déplacer: jours complets", async ({ page }) => {
+    await openFiche(page, FICHE_JARDIN);
+    await openMoveSheet(page);
+    await expect(moveSheet(page)).toHaveAttribute("aria-modal", "true");
+    await expect(moveSheet(page).getByRole("heading", { level: 2 })).toHaveText("Déplacer [Jardin botanique royal]");
+    await expect(page).toHaveURL(FICHE_JARDIN);
+    const radios = moveDays(page).getByRole("radio");
+    await expect(radios).toHaveCount(6);
+    for (const n of [2, 3, 6]) {
+      const full = moveDays(page).getByRole("radio", { name: `Jour ${n}, complet` });
+      await expect(full).toHaveAttribute("aria-disabled", "true");
+      await expect(full).toContainText("complet");
+    }
+    for (const n of [1, 4, 5]) {
+      await expect(moveDays(page).getByRole("radio", { name: `Jour ${n}`, exact: true })).not.toHaveAttribute("aria-disabled", "true");
+    }
+    for (const radio of await radios.all()) await expect(radio).toHaveAttribute("aria-checked", "false");
+
+    // Flèches : focus sur un jour complet sans le cocher (J1 → J2).
+    await moveDays(page).getByRole("radio", { name: "Jour 1", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    const j2 = moveDays(page).getByRole("radio", { name: "Jour 2, complet" });
+    await expect(j2).toBeFocused();
+    await expect(j2).toHaveAttribute("aria-checked", "false");
+
+    // Tab reste dans la feuille.
+    for (let i = 0; i < 6; i += 1) {
+      await page.keyboard.press("Tab");
+      expect(await moveSheet(page).evaluate((node) => node.contains(document.activeElement))).toBe(true);
+    }
+
+    const before = await page.evaluate(() => document.querySelector("[data-part='fiche']")?.textContent);
+    await page.keyboard.press("Escape");
+    await expect(moveSheet(page)).toHaveCount(0);
+    await expect(moveButton(page)).toBeFocused();
+    await expect(page).toHaveURL(FICHE_JARDIN);
+    expect(await page.evaluate(() => document.querySelector("[data-part='fiche']")?.textContent)).toBe(before);
+  });
+
+  test("déplacer: sans glisser", async ({ page }) => {
+    await openFiche(page, FICHE_JARDIN);
+    await moveButton(page).focus();
+    await page.keyboard.press("Enter");
+    await expect(moveSheet(page).getByRole("heading", { level: 2 })).toBeFocused();
+    await expect(moveDays(page).getByRole("radio", { name: "Jour 3, complet" })).toHaveAttribute("aria-disabled", "true");
+
+    // Clavier seulement : Tab jusqu'au groupe (après « Fermer »), flèches jusqu'à J4, Tab jusqu'au point, Entrée.
+    await page.keyboard.press("Tab");
+    await expect(moveSheet(page).getByRole("button", { name: "Fermer" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(moveDays(page).getByRole("radio", { name: "Jour 1", exact: true })).toBeFocused();
+    for (let i = 0; i < 3; i += 1) await page.keyboard.press("ArrowRight");
+    const j4 = moveDays(page).getByRole("radio", { name: "Jour 4", exact: true });
+    await expect(j4).toBeFocused();
+    await expect(j4).toHaveAttribute("aria-checked", "true");
+    await expect(moveDays(page).locator("[aria-pressed]")).toHaveCount(0);
+    const point = placeHere(page, "15:45");
+    expect((await point.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await page.keyboard.press("Tab");
+    await expect(point).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(moveSheet(page).getByRole("heading", { level: 3, name: "Ce qui change" })).toBeFocused();
+    const moved = moveSheet(page).locator("[data-change='moved']");
+    await expect(moved).toHaveText("[Jardin botanique royal] : avant : J2 13:25 → après : J4 15:45");
+    await expect(moved.locator("del")).toHaveText("J2 13:25");
+    await expect(moved.getByText("avant :", { exact: true })).toHaveClass(/sr-only/);
+    const unchangedList = moveSheet(page).locator("[data-part='ne-bouge-pas']");
+    await expect(unchangedList).toContainText("19:00 [Bonne table de New Town]");
+    await expect(unchangedList).toContainText("19:00 [Petite adresse de l'Old Town]");
+    await expect(point).toHaveAttribute("aria-current", "true");
+    await expect(point).not.toHaveAttribute("aria-pressed");
+  });
+
+  test("déplacer: appliquer et annuler", async ({ page }) => {
+    const events = collectEvents(page);
+    await page.clock.install();
+    await openTrip(page, DEV_JOUR2);
+    const before = await dayLineText(page);
+    await jardinLink(page).click();
+    await expect(ficheTitle(page)).toBeFocused();
+    await openMoveSheet(page);
+    await previewMoveToJ4(page);
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    await moveSheet(page).getByRole("button", { name: "Appliquer" }).click();
+
+    await expect(moveSheet(page)).toHaveCount(0);
+    await expect(page).toHaveURL(`/dev/voyages/${TRIP}/jour/4`);
+    await expect(jardinLink(page)).toBeFocused();
+    await expect(rowOf(page, /\[Jardin botanique royal\]/)).toContainText("15:45");
+    await expect(highlighted(page)).toHaveCount(1);
+    await expect(toast(page)).toContainText("Étape déplacée.");
+    await page.clock.runFor(2_000);
+    await expect(highlighted(page)).toHaveCount(0);
+    expect(events.filter((event) => event.name === "stop_moved")).toEqual([{ name: "stop_moved", properties: { method: "button" } }]);
+
+    await toast(page).getByRole("button", { name: "Annuler" }).click();
+    await expect(jardinLink(page)).toHaveCount(0);
+    await expect(page.locator("[data-part='titre-jour']")).toBeFocused();
+    await expect(page.locator("[data-part='annonce-annulation']")).toHaveText("Modification annulée.");
+
+    // J2 : le jardin revient, programme d'avant ; sans « Annuler », J2 ne le contenait plus et gardait le dîner à 19:00.
+    await page.getByRole("link", { name: "Jour 2", exact: false }).first().click();
+    await expect(page).toHaveURL(`/dev/voyages/${TRIP}/jour/2`);
+    await expect(rowOf(page, /\[Jardin botanique royal\]/)).toContainText("13:25");
+    expect(await dayLineText(page)).toBe(before);
+    expect(events.filter((event) => event.name !== "stop_moved")).toEqual([]);
+  });
+
+  test("déplacer: J2 garde le dîner après « Appliquer »", async ({ page }) => {
+    await openFiche(page, FICHE_JARDIN);
+    await openMoveSheet(page);
+    await previewMoveToJ4(page);
+    await moveSheet(page).getByRole("button", { name: "Appliquer" }).click();
+    await expect(page).toHaveURL(`/voyages/${TRIP}/jour/4`);
+    await page.getByRole("link", { name: /^Jour 2/ }).first().click();
+    await expect(page).toHaveURL(JOUR2);
+    await expect(jardinLink(page)).toHaveCount(0);
+    await expect(rowOf(page, /\[Bonne table de New Town\]/)).toContainText("19:00");
+  });
+});
+
 test.describe("Révision : transverses", () => {
   test("revision: 404 hors programme", async ({ page }) => {
     for (const path of [
@@ -285,6 +429,13 @@ test.describe("Révision : transverses", () => {
     await expect(page).toHaveURL(JOUR2);
     await toast(page).getByRole("button", { name: "Annuler" }).click();
     await expect(deanLink(page)).toBeFocused();
+    // Déplacement appliqué (F7b).
+    await page.goto(FICHE_JARDIN);
+    await expect(ficheTitle(page)).toBeVisible();
+    await openMoveSheet(page);
+    await previewMoveToJ4(page);
+    await moveSheet(page).getByRole("button", { name: "Appliquer" }).click();
+    await expect(page).toHaveURL(`/voyages/${TRIP}/jour/4`);
 
     const stored = await page.evaluate(async () => ({
       local: localStorage.length,
@@ -307,6 +458,7 @@ test.describe("Révision : transverses", () => {
       expect(decoded).not.toContain("mock_place_");
       expect(decoded).not.toContain("dégustation");
       expect(decoded).not.toContain("Dean Village");
+      expect(decoded).not.toContain("Jardin botanique");
       for (const placeId of placeIds) expect(decoded).not.toContain(placeId);
     }
   });
@@ -336,6 +488,32 @@ test.describe("Révision : transverses", () => {
     await expect(page).toHaveURL(REPLACE_DEAN);
     await context.setOffline(false);
     await expect(applyButton(page)).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("revision: hors ligne, feuille « Déplacer »", async ({ page, context }) => {
+    await openFiche(page, FICHE_JARDIN);
+    await openMoveSheet(page);
+    await moveDays(page).getByRole("radio", { name: "Jour 4", exact: true }).click();
+    await context.setOffline(true);
+    const banner = moveSheet(page).getByText("Tu es hors ligne. Modifier ton programme demande une connexion.");
+    await expect(banner).toBeVisible();
+    await expect(placeHere(page, "15:45")).toHaveAttribute("aria-disabled", "true");
+    await placeHere(page, "15:45").focus();
+    await page.keyboard.press("Enter");
+    await expect(moveSheet(page).getByRole("heading", { name: "Ce qui change" })).toHaveCount(0);
+    await context.setOffline(false);
+    await expect(banner).toHaveCount(0);
+    await expect(placeHere(page, "15:45")).not.toHaveAttribute("aria-disabled", "true");
+    await placeHere(page, "15:45").click();
+    const apply = moveSheet(page).getByRole("button", { name: "Appliquer" });
+    await expect(apply).toBeVisible();
+    await context.setOffline(true);
+    await expect(apply).toHaveAttribute("aria-disabled", "true");
+    await apply.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(FICHE_JARDIN);
+    await context.setOffline(false);
+    await expect(apply).not.toHaveAttribute("aria-disabled", "true");
   });
 
   test("revision: pages de développement sans marqueur de recherche", async ({ page }) => {

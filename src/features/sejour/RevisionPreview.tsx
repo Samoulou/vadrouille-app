@@ -41,6 +41,8 @@ export interface RevisionPreviewProps {
   preview: RevisionPreviewData;
   /** Nom de la proposition (niveau 2) : reçoit le focus à l'affichage (F7-PO-5). */
   proposalTitleRef?: Ref<HTMLHeadingElement>;
+  /** Titre « Ce qui change » : reçoit le focus à l'affichage d'un aperçu sans proposition (déplacement, F7b). */
+  changesTitleRef?: Ref<HTMLHeadingElement>;
   onApply: () => void;
   onCancel: () => void;
   /** Hors ligne : « Appliquer » en `aria-disabled`, décrit par le bandeau (F7-PO-13). */
@@ -52,7 +54,7 @@ export interface RevisionPreviewProps {
  * (bloc `raised` à contour `outline`, proposée et pas encore appliquée), bandeau de trajet calculé sur le brouillon,
  * « Ce qui change », « Ce qui ne bouge pas », puis « Appliquer » et « Annuler » dans le flux, en fin de contenu.
  */
-export function RevisionPreview({ preview, proposalTitleRef, onApply, onCancel, disabledBy }: RevisionPreviewProps) {
+export function RevisionPreview({ preview, proposalTitleRef, changesTitleRef, onApply, onCancel, disabledBy }: RevisionPreviewProps) {
   const day = targetDay(preview);
   const banner = day ? travelBannerMessage(day) : null;
   const unchanged = preview.changes.flatMap((change) => (change.type === "unchanged" ? [change] : []));
@@ -99,7 +101,7 @@ export function RevisionPreview({ preview, proposalTitleRef, onApply, onCancel, 
       {banner ? <StatusBanner kind="travel" message={banner} /> : null}
 
       <section aria-labelledby={changesId} data-part="ce-qui-change" className="flex flex-col gap-3">
-        <h3 id={changesId} tabIndex={-1} className={BLOC}>
+        <h3 id={changesId} ref={changesTitleRef} tabIndex={-1} className={BLOC}>
           {t.ceQuiChange}
         </h3>
         <ChangeSet changes={preview.changes} />

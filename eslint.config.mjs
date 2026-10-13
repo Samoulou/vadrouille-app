@@ -352,6 +352,10 @@ export default defineConfig([
       "src/components/ligne/ChecklistRow.tsx",
       // F7a : aperçu des effets (spécification F7, C3).
       "src/components/ligne/ChangeSet.tsx",
+      // F7b : choix du jour de « Déplacer » (spécification F7, C3 ; décision 0019 § 1).
+      "src/components/ligne/DayBadge.tsx",
+      "src/components/ligne/DayBadgeGroup.tsx",
+      "src/components/ligne/useRadioGroup.ts",
       "src/lib/pointer.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}"],

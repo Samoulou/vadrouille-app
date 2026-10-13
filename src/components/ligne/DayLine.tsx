@@ -292,6 +292,27 @@ function OpenMeal({ time, meal }: DayLineOpenMealProps) {
   );
 }
 
+/**
+ * Ligne insérée dans la `DayLine` après l'élément de rang `afterIndex` (F7b : point « Placer ici, vers {heure} » de
+ * la feuille « Déplacer », décision 0018 § 11). Colonne d'heure vide, rail du temps libre s'il suit un temps libre,
+ * plein sinon ; le contenu (bouton) occupe la colonne de texte.
+ */
+export interface DayLineInsertion {
+  afterIndex: number;
+  key: string;
+  content: ReactNode;
+}
+
+function InsertionRow({ texture, children }: { texture: RailTexture; children: ReactNode }) {
+  return (
+    <li data-type="insertion" className={ROW}>
+      <Heure />
+      <Rail texture={texture} />
+      <div className="flex min-w-0 flex-col py-1">{children}</div>
+    </li>
+  );
+}
+
 export interface DayLineProps<S extends DayLineViewStop = Stop> {
   items: readonly DayLineViewItem<S>[];
   /** Adresse de la fiche étape d'un arrêt ; sans fonction, aucune étape n'est un lien (écran 15, vue partagée). */
@@ -309,6 +330,8 @@ export interface DayLineProps<S extends DayLineViewStop = Stop> {
   isPast?: (stop: S) => boolean;
   /** Identifiants des étapes surlignées après une modification (F7, décision 0016 § 9) ; sans la prop, rien ne change. */
   highlightedStopIds?: readonly string[];
+  /** Lignes insérées entre les éléments (points d'insertion de « Déplacer », F7b) ; sans la prop, rien ne change. */
+  insertions?: readonly DayLineInsertion[];
   className?: string;
 }
 
@@ -330,50 +353,63 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
   currentKey,
   isPast,
   highlightedStopIds,
+  insertions,
   className,
 }: DayLineProps<S>) {
   return (
     <ol className={cn("flex flex-col", className)}>
-      {items.map((item, index) => {
-        switch (item.type) {
-          case "terminus":
-            return <Terminus key={`terminus-${item.role}-${index}`} role={item.role} time={item.time} label={item.label} />;
-          case "stop": {
-            const key = stopKey(item.stop, index);
-            const state: DayLineStopState | undefined =
-              currentKey !== undefined && key === currentKey ? "current" : isPast?.(item.stop) ? "past" : undefined;
-            return (
-              <StopRow
-                key={`stop-${key}`}
-                stop={item.stop}
-                href={getStopHref?.(item.stop)}
-                compact={compact}
-                state={state}
-                highlighted={item.stop.id !== undefined && (highlightedStopIds?.includes(item.stop.id) ?? false)}
-                fades={highlightedStopIds !== undefined}
-              />
-            );
-          }
-          case "segment":
-            return <SegmentRow key={`segment-${index}`} segment={item.segment} />;
-          case "free":
-            return (
-              <FreeTime
-                key={`free-${index}`}
-                from={item.from}
-                to={item.to}
-                ideasHref={getIdeasHref?.({ from: item.from, to: item.to })}
-              />
-            );
-          case "openMeal":
-            return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
-        }
-      })}
+      {items.map((item, index) => [
+        row(item, index),
+        ...(insertions ?? [])
+          .filter((insertion) => insertion.afterIndex === index)
+          .map((insertion) => (
+            <InsertionRow key={`insertion-${insertion.key}`} texture={item.type === "free" ? "libre" : "plein"}>
+              {insertion.content}
+            </InsertionRow>
+          )),
+      ])}
     </ol>
   );
+
+  function row(item: DayLineViewItem<S>, index: number) {
+    switch (item.type) {
+      case "terminus":
+        return <Terminus key={`terminus-${item.role}-${index}`} role={item.role} time={item.time} label={item.label} />;
+      case "stop": {
+        const key = stopKey(item.stop, index);
+        const state: DayLineStopState | undefined =
+          currentKey !== undefined && key === currentKey ? "current" : isPast?.(item.stop) ? "past" : undefined;
+        return (
+          <StopRow
+            key={`stop-${key}`}
+            stop={item.stop}
+            href={getStopHref?.(item.stop)}
+            compact={compact}
+            state={state}
+            highlighted={item.stop.id !== undefined && (highlightedStopIds?.includes(item.stop.id) ?? false)}
+            fades={highlightedStopIds !== undefined}
+          />
+        );
+      }
+      case "segment":
+        return <SegmentRow key={`segment-${index}`} segment={item.segment} />;
+      case "free":
+        return (
+          <FreeTime
+            key={`free-${index}`}
+            from={item.from}
+            to={item.to}
+            ideasHref={getIdeasHref?.({ from: item.from, to: item.to })}
+          />
+        );
+      case "openMeal":
+        return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
+    }
+  }
 }
 
 export const DayLine = Object.assign(DayLineRoot, {
+  Insertion: InsertionRow,
   Terminus,
   Stop: StopRow,
   Segment: SegmentRow,
