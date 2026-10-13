@@ -1,4 +1,3 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -6,12 +5,13 @@ import {
   closeAll,
   connect,
   countAs,
+  type DbClient,
   expectNoEffect,
   expectRefused,
-  inTx,
   insertSql,
-  seedOrganization,
+  inTx,
   type SeedIds,
+  seedOrganization,
 } from "./helpers";
 
 /**
@@ -20,8 +20,8 @@ import {
  * croisées sont refusées (par la RLS là où le droit existe, par les droits sinon).
  */
 
-let app: pg.Client;
-let auth: pg.Client;
+let app: DbClient;
+let auth: DbClient;
 let a: SeedIds;
 let b: SeedIds;
 

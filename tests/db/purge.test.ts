@@ -1,15 +1,14 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { BUSINESS_TABLES, closeAll, connect, countAs, createOrg, expectRefused, inTx, PURGED_TABLES, seedOrganization, type SeedIds } from "./helpers";
+import { BUSINESS_TABLES, closeAll, connect, countAs, createOrg, type DbClient, expectRefused, inTx, PURGED_TABLES, type SeedIds, seedOrganization } from "./helpers";
 
 /**
  * `purge_organization_data` (décision 0007, « Suppression de compte » ; handover § 12, étape 1), appelée par le cas
  * d'usage `deleteAccount` dans une transaction `withOrg`, puis `SET LOCAL ROLE vadrouille_account_admin`.
  */
 
-let app: pg.Client;
-let auth: pg.Client;
+let app: DbClient;
+let auth: DbClient;
 let a: SeedIds;
 let b: SeedIds;
 

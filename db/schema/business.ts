@@ -29,6 +29,7 @@ import {
   sqlTextArray,
 } from "../jsonb-keys.ts";
 import { organizations, users } from "./auth.ts";
+import { uniqueKeyName } from "./naming.ts";
 
 /**
  * Tables métier (handover § 6, « Partie Q5 » § 6, décisions 0007, 0010 et 0011).
@@ -87,8 +88,8 @@ export const trips = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    unique("trips_organization_id_id_key").on(t.organizationId, t.id),
-    unique("trips_organization_id_request_id_key").on(t.organizationId, t.requestId),
+    unique(uniqueKeyName("trips_organization_id_id")).on(t.organizationId, t.id),
+    unique(uniqueKeyName("trips_organization_id_request_id")).on(t.organizationId, t.requestId),
     index("trips_organization_id_start_date_idx").on(t.organizationId, t.startDate),
     check("trips_status_check", oneOf(t.status, ["active", "archived"])),
     check("trips_dates_check", sql`${t.endDate} >= ${t.startDate}`),
@@ -116,7 +117,7 @@ export const briefs = pgTable(
   },
   (t) => [
     tripFk("briefs_trip_fk", t),
-    unique("briefs_organization_id_trip_id_version_key").on(t.organizationId, t.tripId, t.version),
+    unique(uniqueKeyName("briefs_organization_id_trip_id_version")).on(t.organizationId, t.tripId, t.version),
   ],
 );
 
@@ -169,8 +170,8 @@ export const tripVersions = pgTable(
   },
   (t) => [
     tripFk("trip_versions_trip_fk", t),
-    unique("trip_versions_organization_id_trip_id_version_key").on(t.organizationId, t.tripId, t.version),
-    unique("trip_versions_organization_id_trip_id_request_id_key").on(t.organizationId, t.tripId, t.requestId),
+    unique(uniqueKeyName("trip_versions_organization_id_trip_id_version")).on(t.organizationId, t.tripId, t.version),
+    unique(uniqueKeyName("trip_versions_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
     check("trip_versions_version_check", sql`${t.version} >= 1`),
     check("trip_versions_author_kind_check", oneOf(t.authorKind, ["user", "engine", "workflow"])),
     check("trip_versions_snapshot_check", sql`jsonb_typeof(${t.snapshot}) = 'object'`),
@@ -194,7 +195,7 @@ export const generationRuns = pgTable(
   },
   (t) => [
     tripFk("generation_runs_trip_fk", t),
-    unique("generation_runs_organization_id_id_key").on(t.organizationId, t.id),
+    unique(uniqueKeyName("generation_runs_organization_id_id")).on(t.organizationId, t.id),
     index("generation_runs_organization_id_trip_id_started_at_idx").on(t.organizationId, t.tripId, t.startedAt),
     check("generation_runs_kind_check", oneOf(t.kind, ["preview", "full", "batch", "mini"])),
   ],
@@ -226,7 +227,7 @@ export const researchRuns = pgTable(
       columns: [t.organizationId, t.generationRunId],
       foreignColumns: [generationRuns.organizationId, generationRuns.id],
     }),
-    unique("research_runs_organization_id_id_key").on(t.organizationId, t.id),
+    unique(uniqueKeyName("research_runs_organization_id_id")).on(t.organizationId, t.id),
     index("research_runs_organization_id_trip_id_idx").on(t.organizationId, t.tripId),
   ],
 );
@@ -264,7 +265,7 @@ export const candidates = pgTable(
       columns: [t.organizationId, t.researchRunId],
       foreignColumns: [researchRuns.organizationId, researchRuns.id],
     }),
-    unique("candidates_organization_id_id_key").on(t.organizationId, t.id),
+    unique(uniqueKeyName("candidates_organization_id_id")).on(t.organizationId, t.id),
     index("candidates_organization_id_trip_id_place_id_idx").on(t.organizationId, t.tripId, t.placeId),
     check("candidates_kind_check", oneOf(t.kind, ["place", "event"])),
     check("candidates_confidence_check", sql`${t.confidence} IS NULL OR ${oneOf(t.confidence, ["low", "medium", "high"])}`),
@@ -309,7 +310,7 @@ export const proposals = pgTable(
       columns: [t.organizationId, t.candidateId],
       foreignColumns: [candidates.organizationId, candidates.id],
     }),
-    unique("proposals_organization_id_trip_id_generation_run_id_phase_position_key").on(
+    unique(uniqueKeyName("proposals_organization_id_trip_id_generation_run_id_phase_position")).on(
       t.organizationId,
       t.tripId,
       t.generationRunId,
@@ -406,7 +407,7 @@ export const preferenceSignals = pgTable(
       columns: [t.organizationId, t.candidateId],
       foreignColumns: [candidates.organizationId, candidates.id],
     }),
-    unique("preference_signals_organization_id_trip_id_request_id_key").on(t.organizationId, t.tripId, t.requestId),
+    unique(uniqueKeyName("preference_signals_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
     index("preference_signals_organization_id_trip_id_category_idx").on(t.organizationId, t.tripId, t.category),
     check(
       "preference_signals_signal_check",
@@ -488,7 +489,7 @@ export const shareLinks = pgTable(
   },
   (t) => [
     tripFk("share_links_trip_fk", t),
-    unique("share_links_token_hash_key").on(t.tokenHash),
+    unique(uniqueKeyName("share_links_token_hash")).on(t.tokenHash),
     uniqueIndex("share_links_one_active_idx").on(t.organizationId, t.tripId).where(sql`${t.revokedAt} IS NULL`),
     check("share_links_token_hash_check", sql`octet_length(${t.tokenHash}) = 32`),
   ],
@@ -545,8 +546,8 @@ export const checkouts = pgTable(
   },
   (t) => [
     tripFk("checkouts_trip_fk", t),
-    unique("checkouts_stripe_checkout_session_id_key").on(t.stripeCheckoutSessionId),
-    unique("checkouts_organization_id_request_id_key").on(t.organizationId, t.requestId),
+    unique(uniqueKeyName("checkouts_stripe_checkout_session_id")).on(t.stripeCheckoutSessionId),
+    unique(uniqueKeyName("checkouts_organization_id_request_id")).on(t.organizationId, t.requestId),
     check("checkouts_amount_cents_check", sql`${t.amountCents} >= 0`),
     check("checkouts_currency_check", sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check("checkouts_method_check", oneOf(t.method, ["twint", "card"])),
@@ -580,8 +581,8 @@ export const billing = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique("billing_stripe_event_id_key").on(t.stripeEventId),
-    unique("billing_organization_id_id_key").on(t.organizationId, t.id),
+    unique(uniqueKeyName("billing_stripe_event_id")).on(t.stripeEventId),
+    unique(uniqueKeyName("billing_organization_id_id")).on(t.organizationId, t.id),
     check("billing_outcome_check", oneOf(t.outcome, ["granted", "alreadyGranted", "ignored", "rejected"])),
   ],
 );
@@ -604,7 +605,7 @@ export const entitlements = pgTable(
       columns: [t.organizationId, t.billingId],
       foreignColumns: [billing.organizationId, billing.id],
     }),
-    unique("entitlements_organization_id_trip_id_kind_key").on(t.organizationId, t.tripId, t.kind),
+    unique(uniqueKeyName("entitlements_organization_id_trip_id_kind")).on(t.organizationId, t.tripId, t.kind),
     check("entitlements_kind_check", oneOf(t.kind, ["preview", "tripUnlocked"])),
   ],
 );

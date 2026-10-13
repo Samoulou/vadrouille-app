@@ -79,7 +79,9 @@ export function assertDatabaseAllowed(env: Env): void {
 export function connectionStringFor(role: AppDatabaseRole, env: Env): string {
   assertDatabaseAllowed(env);
   const name = DATABASE_URL_VARIABLES[role];
-  const value = env[name];
+  // Lecture par propriété littérale (spécification P0c, section 5, forme 1) : seul module, avec `db/migrate.ts`, où
+  // un nom secret de la base peut être lu (lignes de `tests/unit/confinement/listes/process.ts`).
+  const value = role === "vadrouille_app" ? env.VADROUILLE_DATABASE_URL : env.VADROUILLE_DATABASE_URL_AUTH;
   if (value === undefined || value.trim() === "") {
     throw new DatabaseGuardError(`Connexion à la base impossible : la variable ${name} n'est pas posée.`);
   }

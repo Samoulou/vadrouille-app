@@ -1,7 +1,42 @@
-/** Variables de connexion des tests de base (`pnpm test:db`) ; en CI, posées par le job `db` (mots de passe jetables). */
+import { connectionStringFor, DATABASE_URL_VARIABLES, DatabaseGuardError, MIGRATOR_URL_VARIABLE } from "../../db/connection";
+import { migratorConnectionString } from "../../db/migrate";
+
+/**
+ * Variables de connexion des tests de base (`pnpm test:db`) ; en CI, posées par le job `db` (mots de passe jetables).
+ * Les noms de la base sont des noms secrets (spécification P0c, section 5) : ils ne sont écrits et lus que par
+ * `db/connection.ts` et `db/migrate.ts`, dont les tests reprennent les constantes et les lecteurs.
+ */
 export const DB_ENV = {
-  app: "VADROUILLE_DATABASE_URL",
-  auth: "VADROUILLE_DATABASE_URL_AUTH",
-  migrator: "VADROUILLE_DATABASE_URL_MIGRATOR",
+  app: DATABASE_URL_VARIABLES.vadrouille_app,
+  auth: DATABASE_URL_VARIABLES.vadrouille_auth,
+  migrator: MIGRATOR_URL_VARIABLE,
   admin: "VADROUILLE_DB_ADMIN_URL",
 } as const;
+
+export type Login = keyof typeof DB_ENV;
+
+/**
+ * Rôle d'amorçage nommé dans le test `rôles` (décision 0036, B1-TL-2 ; variable `VADROUILLE_DB_BOOTSTRAP_ROLE`) :
+ * superutilisateur `postgres` du conteneur en CI, qui ne reçoit pas de ligne ADMIN. Sa ligne est tolérée, non exigée.
+ */
+export const BOOTSTRAP_ROLE = process.env.VADROUILLE_DB_BOOTSTRAP_ROLE ?? "postgres";
+
+/** Adresse de connexion d'un login, ou `undefined` si sa variable n'est pas posée (ou vide). */
+export function readUrl(login: Login): string | undefined {
+  try {
+    switch (login) {
+      case "app":
+        return connectionStringFor("vadrouille_app", process.env);
+      case "auth":
+        return connectionStringFor("vadrouille_auth", process.env);
+      case "migrator":
+        return migratorConnectionString(process.env);
+      case "admin":
+        return process.env.VADROUILLE_DB_ADMIN_URL || undefined;
+    }
+  } catch (error) {
+    // Variable absente (ou garde de production) : le préalable le signale sans valeur (tests/db/global-setup.ts).
+    if (error instanceof DatabaseGuardError) return undefined;
+    throw error;
+  }
+}

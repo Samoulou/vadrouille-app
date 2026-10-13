@@ -18,9 +18,12 @@ const UNREACHABLE = (() => {
   return url.href;
 })();
 
+/**
+ * Environnement minimal du sous-processus : `PATH` et `HOME` seulement, plus les variables du cas. Rien d'autre de
+ * l'environnement du test n'est transmis (ni `CI`, ni `GITHUB_ACTIONS`, ni `SKIP_DB_TESTS`, ni aucune clé).
+ */
 function run(extra: Record<string, string | undefined>) {
-  const env: Record<string, string | undefined> = { ...process.env };
-  for (const name of ["SKIP_DB_TESTS", "CI", "GITHUB_ACTIONS"]) delete env[name];
+  const env: Record<string, string | undefined> = { PATH: process.env.PATH, HOME: process.env.HOME };
   Object.assign(env, {
     VADROUILLE_DATABASE_URL: UNREACHABLE,
     VADROUILLE_DATABASE_URL_AUTH: UNREACHABLE,

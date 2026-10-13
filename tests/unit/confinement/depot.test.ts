@@ -23,7 +23,7 @@ import { verifierFermeture } from "./graphe";
 import { LIGNES_CAPACITE, LIGNES_CAPACITE_TEXTES, type LigneCapacite } from "./listes/capacites";
 import { FORMES_NOMINATIVES_TESTS } from "./listes/formes-tests";
 import { CONSTRUITS, PAQUETS } from "./listes/paquets";
-import { ENV_ENTIER, LECTURES_ENV, PARAMETRES_ENV, PROPRIETES_PROCESS } from "./listes/process";
+import { ENV_ENTIER, LECTURES_ENV as LECTURES_ENV_LITTERALES, LECTURES_ENV_SECRETES, PARAMETRES_ENV, PROPRIETES_PROCESS } from "./listes/process";
 import { SPECIFICATEURS, SPECIFICATEURS_NOMINATIFS } from "./listes/specificateurs";
 import { construireProgramme } from "./programme";
 
@@ -33,6 +33,8 @@ import { construireProgramme } from "./programme";
  */
 
 const LIGNES: readonly LigneCapacite[] = [...LIGNES_CAPACITE, ...LIGNES_CAPACITE_TEXTES];
+/** Lectures de `process.env` : lignes des listes `.ts` et lignes de noms secrets lues dans les données du régime. */
+const LECTURES_ENV = [...LECTURES_ENV_LITTERALES, ...LECTURES_ENV_SECRETES];
 /**
  * Fichiers des tableaux de la section 3 (exceptions de `40b6738`, lignes du régime lui-même) et de la section 9
  * (`scripts/p0/enregistrer.mjs`) : seules lignes admises sans champ `ecart` (mineur 4 de la revue du head `eb7e3bf`).
@@ -252,6 +254,8 @@ describe("confinement: noms secrets dans les listes (section 5 ; bloquant 3 de l
   it("aucun nom de LECTURES_ENV ni de table de vi.stubEnv n'est secret hors de src/server/env/", () => {
     const tables = FORMES_NOMINATIVES_TESTS.filter((f) => f.forme === "stubEnv-table");
     expect(nomsSecretsDesListes(LECTURES_ENV, tables)).toEqual([]);
+    // Les données de noms secrets ne portent que des noms secrets ; tout autre nom reste dans les listes `.ts`.
+    expect(LECTURES_ENV_SECRETES.flatMap((l) => l.noms.filter((nom) => !estNomSecret(nom)).map((nom) => `${l.fichier} : ${nom}`))).toEqual([]);
   });
 
   it("seule exception : les vi.stubEnv de VARIABLES_DE_CLE de cli.test.ts (0040 D1)", () => {

@@ -333,6 +333,35 @@
         }
       ],
       "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; les hôtes sont des sentinelles qui prouvent que le worker ne met pas en cache les requêtes Google)"
+    },
+    {
+      "fichier": "db/connection.ts",
+      "portee": "application",
+      "usage": "noms des variables de connexion (décision 0036, B1-TL-3) dans le module de connexion de B1, seul module hors de src/server/env/ où un nom secret peut figurer (section 5) ; aucun texte de valeur",
+      "capacites": [
+        {
+          "capacite": "secret:VADROUILLE_DATABASE_URL",
+          "formes": [
+            "VADROUILLE_DATABASE_URL"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "secret:VADROUILLE_DATABASE_URL_AUTH",
+          "formes": [
+            "VADROUILLE_DATABASE_URL_AUTH"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "secret:VADROUILLE_DATABASE_URL_MIGRATOR",
+          "formes": [
+            "VADROUILLE_DATABASE_URL_MIGRATOR"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; Verdict Sécurité demandé (PR du ticket 242)"
     }
   ]
 }

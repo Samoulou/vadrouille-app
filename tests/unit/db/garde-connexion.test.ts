@@ -8,6 +8,7 @@ import {
   assertDatabaseAllowed,
   connectionStringFor,
   createGuardedPool,
+  DATABASE_URL_VARIABLES,
   DatabaseConnectionError,
   DatabaseGuardError,
   verifyConnectionRole,
@@ -58,8 +59,9 @@ describe("db : refus en production (décision 0034)", () => {
     }
   });
 
-  it("DATABASE_URL (posée par l'intégration Neon avec l'identifiant propriétaire) n'est jamais lue", () => {
-    expect(() => connectionStringFor("vadrouille_app", { DATABASE_URL: UNREACHABLE })).toThrow(/VADROUILLE_DATABASE_URL/);
+  // Les noms de la base sont des noms secrets (spécification P0c, section 5) : ils ne sont écrits que dans db/connection.ts.
+  it("la variable de l'intégration Neon (identifiant propriétaire) n'est jamais lue", () => {
+    expect(() => connectionStringFor("vadrouille_app", { DATABASE_URL: UNREACHABLE })).toThrow(DATABASE_URL_VARIABLES.vadrouille_app);
   });
 });
 
@@ -123,7 +125,7 @@ describe("db : contrôle du rôle de connexion", () => {
   });
 
   it("variable absente : message explicite, sans valeur", () => {
-    expect(() => connectionStringFor("vadrouille_auth", {})).toThrow(/VADROUILLE_DATABASE_URL_AUTH n'est pas posée/);
+    expect(() => connectionStringFor("vadrouille_auth", {})).toThrow(`${DATABASE_URL_VARIABLES.vadrouille_auth} n'est pas posée`);
   });
 });
 

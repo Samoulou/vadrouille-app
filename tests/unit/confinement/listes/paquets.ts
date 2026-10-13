@@ -8,6 +8,8 @@
 export type LignePaquet = { readonly paquet: string; readonly usage: string; readonly verdict: string };
 
 const EXISTANT = "existant au 2026-10-12 (`40b6738`)";
+/** Paquets de B1, fusionnés avant leur ligne : verdict Sécurité qui cite le lockfile demandé dans la PR du ticket 242. */
+const B1 = "B1 (PR 188, décision 0006) ; Verdict Sécurité demandé (PR du ticket 242, lockfile cité dans sa description)";
 
 export const PAQUETS = [
   { paquet: "@googlemaps/js-api-loader", usage: "carte Google du navigateur (F4) ; module à capacité", verdict: EXISTANT },
@@ -39,6 +41,12 @@ export const PAQUETS = [
   { paquet: "tailwindcss", usage: "styles", verdict: EXISTANT },
   { paquet: "typescript", usage: "vérification de types ; analyse du régime de confinement", verdict: EXISTANT },
   { paquet: "vitest", usage: "tests unitaires", verdict: EXISTANT },
+  // B1 (PR 188, fusionnée le 2026-10-13, `d1ba047` ; versions de la décision 0006) : relevé après P0c1.
+  { paquet: "drizzle-orm", usage: "requêtes et schéma de la base (`db/`)", verdict: B1 },
+  { paquet: "pg", usage: "pilote Postgres (`db/connection.ts`, `db/migrate.ts`, tests de base) ; module à capacité", verdict: B1 },
+  { paquet: "server-only", usage: "garde des modules serveur (`db/`, `src/server/`)", verdict: B1 },
+  { paquet: "@types/pg", usage: "types (sans import)", verdict: B1 },
+  { paquet: "drizzle-kit", usage: "génération des migrations (`drizzle.config.ts`, `pnpm db:generate`)", verdict: B1 },
 ] as const satisfies readonly LignePaquet[];
 
 /** `pnpm.onlyBuiltDependencies` exact (section 6). */
