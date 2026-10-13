@@ -23,7 +23,8 @@ import { describe, expect, it } from "vitest";
  *
  * `process` suit une liste d'autorisation : refusé partout, sauf dans `scripts/p0/main.ts` pour `argv`, `exitCode`,
  * `stdout.write` et `stderr.write` en accès littéral. `import.meta` aussi : seuls `url`, `dirname` et `filename` en
- * accès littéral (`env` est refusé). Les accès `x[expr]` non littéraux, les noms calculés en déstructuration (même
+ * accès littéral, et seulement dans `scripts/p0/fichiers.ts` et les fichiers de test ; `import.meta.env` est refusé
+ * partout, tests de `src/ai` et `src/research` compris (correction 1 de #216). Les accès `x[expr]` non littéraux, les noms calculés en déstructuration (même
  * à travers `as`, `<T>`, `!`, `satisfies` ou des parenthèses) et le reste d'objet (`...r`) déstructuré sont refusés
  * partout (revue Sécurité de #180). Une clé littérale n'admet, en fait de symbole, que la liste fermée
  * `Symbol.iterator`, `Symbol.asyncIterator`, `Symbol.toStringTag` et `Symbol.hasInstance` ; toute autre occurrence de
@@ -206,13 +207,24 @@ function cibleDeDestructuration(noeud: ts.ObjectLiteralExpression): boolean {
   return false;
 }
 
-/** Propriétés de `import.meta` lisibles en accès littéral (`env` est ensuite refusé comme `import.meta.env`). */
-const PROPRIETES_IMPORT_META = new Set(["url", "dirname", "filename", "env"]);
+/**
+ * Propriétés de `import.meta` lisibles en accès littéral. `env` n'y figure pas : sous Vitest, `import.meta.env` expose
+ * l'environnement du processus ; il est donc refusé partout, tests compris (revue de #216, bloquant 1).
+ */
+const PROPRIETES_IMPORT_META = new Set(["url", "dirname", "filename"]);
 const IMPORT_META_HORS_LISTE = "import.meta hors liste fermée";
 
-function importMetaAdmis(noeud: ts.MetaProperty): boolean {
+/**
+ * Fichiers qui ont besoin de `import.meta.url`, `.dirname` ou `.filename` : `scripts/p0/fichiers.ts` (racine des
+ * données) et les tests. Ailleurs, `new URL(…, import.meta.url)` pourrait être traité comme un asset par Vite
+ * (revue de #216, mineur 1).
+ */
+const importMetaPermis = (fichier: string) => fichier === "scripts/p0/fichiers.ts" || estTest(fichier);
+
+function importMetaAdmis(fichier: string, noeud: ts.MetaProperty): boolean {
   const acces = noeud.parent;
   return (
+    importMetaPermis(fichier) &&
     noeud.name.text === "meta" &&
     ts.isPropertyAccessExpression(acces) &&
     acces.expression === noeud &&
@@ -260,7 +272,9 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
     // classes. Admis seulement pour **créer** un littéral objet (`{ [cle]: valeur }` n'atteint aucune propriété
     // existante) et, avec une clé littérale ou un symbole de la liste fermée, pour nommer une méthode
     // (`[Symbol.asyncIterator]()`) ou un membre d'interface ou de type littéral (`[Symbol.iterator](): …`,
-    // `readonly [Symbol.toStringTag]: string` ; effacés à la compilation, ticket 195, mineur 3).
+    // `readonly [Symbol.toStringTag]: string` ; effacés à la compilation, ticket 195, mineur 3). Une propriété de
+    // classe (`PropertyDeclaration`) nommée par un symbole de la liste fermée (`[Symbol.toStringTag] = "X"`) reste
+    // refusée : faux positif connu et sans risque, accepté pour ne pas élargir la règle (revue de #216, mineur 4).
     if (ts.isComputedPropertyName(noeud)) {
       const membre = noeud.parent;
       const creation =
@@ -293,11 +307,13 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
       constructions.push(`Symbol hors liste fermée : ${noeud.parent.getText(sf).slice(0, 60)}`);
     }
     if (ts.isWithStatement(noeud)) constructions.push("with");
-    // `import.meta` : liste fermée (revue Sécurité du head 49837e5 de #180, bloquant 2 ; ticket 195). Seuls
-    // `import.meta.url`, `.dirname`, `.filename` et `.env` (refusé plus bas) sont des accès connus. Tout le reste est
-    // refusé : `import.meta.glob(…)` et `import.meta.resolve(…)` (Vite et Vitest chargent des modules hors de la liste
-    // d'autorisation des imports), `import.meta` seul, en alias, déstructuré, en accès calculé ou optionnel.
-    if (ts.isMetaProperty(noeud) && noeud.keywordToken === ts.SyntaxKind.ImportKeyword && !importMetaAdmis(noeud)) {
+    // `import.meta` : liste fermée (revue Sécurité du head 49837e5 de #180, bloquant 2 ; ticket 195 ; revue de #216).
+    // Seuls `import.meta.url`, `.dirname` et `.filename` sont admis, et seulement dans `scripts/p0/fichiers.ts` et les
+    // tests. Tout le reste est refusé, tests de `src/ai` et `src/research` compris : `import.meta.env` (environnement
+    // du processus sous Vitest), `import.meta.glob(…)` et `import.meta.resolve(…)` (Vite et Vitest chargent des modules
+    // hors de la liste d'autorisation des imports), `import.meta` seul, en alias, déstructuré, en accès calculé ou
+    // optionnel.
+    if (ts.isMetaProperty(noeud) && noeud.keywordToken === ts.SyntaxKind.ImportKeyword && !importMetaAdmis(fichier, noeud)) {
       constructions.push(IMPORT_META_HORS_LISTE);
     }
     if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text)) constructions.push(noeud.text);
@@ -548,7 +564,7 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
   it("les tests de P0 tournent dans l'environnement Vitest node (ticket 195, mineur 5)", () => {
     const tests = [...FICHIERS_P0, ...fichiers("tests/unit/p0")].filter(estTest);
     expect(tests).toContain("tests/unit/p0/imports.test.ts");
-    const horsNode = tests.filter((fichier) => readFileSync(path.join(RACINE, fichier), "utf8").split("\n")[0] !== "// @vitest-environment node");
+    const horsNode = tests.filter((fichier) => readFileSync(path.join(RACINE, fichier), "utf8").replace(/^\uFEFF/, "").split(/\r?\n/)[0] !== "// @vitest-environment node");
     expect(horsNode).toEqual([]);
   });
 
@@ -736,7 +752,9 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       });
     }
 
-    // Ticket ticket 195 (revue Sécurité du head 49837e5 de #180) : chaque cas doit être refusé **par la règle attendue**.
+    // Ticket 195 (revue Sécurité du head 49837e5 de #180) : pour chaque cas, la règle attendue figure parmi les
+    // violations (`some(includes)`, pas une égalité : un cas peut aussi déclencher d'autres règles, revue de #216,
+    // mineur 3). Le titre reprend la source entière pour rester unique.
     const casNommes: [string, string, string][] = [
       // Bloquant 1 : déstructuration à travers une conversion effacée.
       ["src/ai/client.ts", "({ [k]: e } as any) = x;", "nom de propriété calculé"],
@@ -765,7 +783,15 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["src/ai/client.ts", "const { glob } = import.meta;", IMPORT_META_HORS_LISTE],
       ["src/ai/client.ts", "const { url } = import.meta;", IMPORT_META_HORS_LISTE],
       ["src/ai/client.ts", "const h = import.meta.hot;", IMPORT_META_HORS_LISTE],
-      ["src/ai/client.ts", "const k = import.meta.env.X;", "import.meta.env"],
+      ["src/ai/client.ts", "const k = import.meta.env.X;", IMPORT_META_HORS_LISTE],
+      // Correction 1 de #216, bloquant 1 : import.meta.env refusé aussi dans les tests de src/ai et src/research.
+      ["src/ai/client.test.ts", "const k = import.meta.env.X;", IMPORT_META_HORS_LISTE],
+      ["src/research/agent.test.ts", "const { OPENROUTER_API_KEY } = import.meta.env;", IMPORT_META_HORS_LISTE],
+      ["scripts/p0/fichiers.ts", "const k = import.meta.env.X;", IMPORT_META_HORS_LISTE],
+      // Correction 1 de #216, mineur 1 : import.meta.url, dirname et filename réservés à fichiers.ts et aux tests.
+      ["src/ai/client.ts", 'const r = new URL("../", import.meta.url);', IMPORT_META_HORS_LISTE],
+      ["src/research/agent.ts", "const d = import.meta.dirname;", IMPORT_META_HORS_LISTE],
+      ["scripts/p0/main.ts", "const f = import.meta.filename;", IMPORT_META_HORS_LISTE],
       ["src/ai/client.test.ts", "const m = import.meta.glob('../server/*.ts', { eager: true });", IMPORT_META_HORS_LISTE],
       ["src/research/agent.test.ts", "const u = import.meta.resolve('node:https');", IMPORT_META_HORS_LISTE],
       // Mineur 3 : un nom calculé non littéral reste refusé dans une interface ou un type littéral.
@@ -784,7 +810,7 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["src/ai/client.ts", "type S = typeof Symbol;", "Symbol hors liste fermée"],
     ];
     for (const [fichier, source, attendu] of casNommes) {
-      it(`${fichier} : ${source.split("\n").at(-1)} (règle : ${attendu})`, () => {
+      it(`${fichier} : ${source.replaceAll("\n", " ⏎ ")} (règle : ${attendu})`, () => {
         expect(controler(fichier, source).some((violation) => violation.includes(attendu))).toBe(true);
       });
     }
@@ -810,10 +836,11 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       expect(controler("src/ai/client.ts", source)).toEqual([]);
     });
 
-    it("import.meta.url, import.meta.dirname et import.meta.filename passent (ticket 195)", () => {
+    it("import.meta.url, import.meta.dirname et import.meta.filename passent dans fichiers.ts et les tests (ticket 195, revue de la PR 216)", () => {
       const source = 'const r = new URL("../", import.meta.url);\nconst d = import.meta.dirname;\nconst f = import.meta.filename;';
-      expect(controler("src/ai/client.ts", source)).toEqual([]);
       expect(controler("scripts/p0/fichiers.ts", source)).toEqual([]);
+      expect(controler("src/ai/client.test.ts", source)).toEqual([]);
+      expect(controler("src/research/agent.test.ts", source)).toEqual([]);
     });
 
     it("une conversion de type hors déstructuration reste admise (ticket 195)", () => {
