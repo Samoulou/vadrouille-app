@@ -10,8 +10,8 @@ import type { PaymentStore } from "./simulation";
 
 /** Adaptateur de paiement simulé (décision 0020 § 2.2), construit avec une configuration injectée (§ 4). */
 
-const ctx = { organizationId: MOCK_ORGANIZATION_ID };
-const otherCtx = { organizationId: "mock_org_autre" };
+const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
+const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
 const TTL = 30 * 60_000;
 
 const OFFER: OfferConfig = {

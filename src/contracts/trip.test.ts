@@ -22,10 +22,12 @@ import {
   type Weekday,
 } from "./index";
 
-// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise, + Stop.commitment, + DayLineItem openMeal : décision 0015) ---
+// --- Forme du handover § 9, recopiée telle quelle (+ Trip.organizationId, + Proposal.category : décision 0013 ; + Day.surprise, + Stop.commitment, + DayLineItem openMeal : décision 0015 ; évolutions E1 à E4 et E9 de B2) ---
 type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "dim.";
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
+/** B2, E3 : faits structurés à la place du texte `meta`. */
+interface HandoverStopFacts { durationMinutes?: number; costPerPerson?: number; area?: string }
 interface HandoverStop {
   id: string;
   kind: "activity" | "meal" | "event";
@@ -33,7 +35,7 @@ interface HandoverStop {
   name: string;
   start: string;
   end?: string;
-  meta: string;
+  facts: HandoverStopFacts;
   reason?: string;
   source?: HandoverSource;
   verifiedAt?: string;
@@ -53,8 +55,6 @@ type HandoverDayLineItem =
 interface HandoverDay {
   index: number;
   date: string;
-  weekday: HandoverWeekday;
-  title: string;
   items: HandoverDayLineItem[];
   budgetPerPerson?: number;
   events: HandoverStop[];
@@ -69,12 +69,28 @@ interface HandoverSurpriseIdea {
   id: string;
   placeId?: string;
   name: string;
-  meta: string;
+  facts: HandoverStopFacts;
   reason: string;
   source: HandoverSource;
   verifiedAt?: string;
 }
-interface HandoverChecklistItem { id: string; label: string; when: string; done: boolean; bookingUrl?: string; sponsored: boolean }
+/** B2, E4 et E9 : moment structuré, étape concernée facultative. */
+type HandoverChecklistMoment = { type: "deadline"; date: string } | { type: "beforeDeparture" } | { type: "tripDay"; day: number };
+interface HandoverChecklistItem {
+  id: string;
+  label: string;
+  when: HandoverChecklistMoment;
+  done: boolean;
+  bookingUrl?: string;
+  sponsored: boolean;
+  stopId?: string;
+}
+/** B2, E2 : voisins du créneau, sans texte. */
+type HandoverProposalNeighbour =
+  | { type: "stop"; stopId: string }
+  | { type: "meal"; meal: "lunch" | "dinner" }
+  | { type: "free" }
+  | { type: "terminus"; role: "start" | "end" };
 interface HandoverTrip {
   id: string;
   organizationId: string;
@@ -91,8 +107,8 @@ interface HandoverTrip {
 interface HandoverProposal {
   id: string;
   kind: "activity" | "meal";
-  day: number; weekday: HandoverWeekday; time: string;
-  context: string;
+  day: number; time: string;
+  neighbours: { before?: HandoverProposalNeighbour; after?: HandoverProposalNeighbour };
   stop: HandoverStop;
   /** Ajout signalé (décision 0013, § 3.1), comme Trip.organizationId. */
   // Trois codes ajoutés par F8a (F8-TL-8, décision 0017 § 8, qui amende 0013 § 3.1) pour les envies du brief.
@@ -116,7 +132,7 @@ const validStop: Stop = {
   name: "[Lieu]",
   start: "10:45",
   end: "11:45",
-  meta: "[Quartier, 1 h, gratuit]",
+  facts: {},
   exceptions: [],
   locked: false,
 };
@@ -125,9 +141,8 @@ const validProposal: Proposal = {
   id: "p1",
   kind: "activity",
   day: 1,
-  weekday: "sam.",
   time: "10:45",
-  context: "[Entre ton déjeuner et [Distillerie]]",
+  neighbours: {},
   stop: validStop,
   category: "museum",
 };
@@ -191,7 +206,7 @@ describe("SurpriseIdeaSchema (décision 0015, § 3)", () => {
   const idea = {
     id: "idee-1",
     name: "[Idée]",
-    meta: "[1 h, gratuit]",
+    facts: {},
     reason: "[Tu as choisi les balades]",
     source: { label: "[Source]", url: "https://example.org/mock/idee" },
   };
@@ -296,8 +311,6 @@ describe("DaySchema", () => {
   const validDay: Day = {
     index: 1,
     date: "2026-08-29",
-    weekday: "sam.",
-    title: "Samedi 29 août",
     items: [
       { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
       { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
@@ -436,7 +449,7 @@ describe("TripSchema, ChecklistItem et Change", () => {
     travellers: { adults: 2, children: 0 },
     days: [],
     checklist: [
-      { id: "c1", label: "[Billet]", when: "[Avant le départ]", done: false, sponsored: false },
+      { id: "c1", label: "[Billet]", when: { type: "beforeDeparture" }, done: false, sponsored: false },
     ],
     unlocked: false,
   };

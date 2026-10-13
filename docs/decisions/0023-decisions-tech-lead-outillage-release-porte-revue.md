@@ -61,7 +61,8 @@ Met en œuvre 0019 § 3.3 et la consigne de Samuel du 2026-10-11.
    - échec si `techlead-approved` manque ;
    - échec si `changes-requested` est posé ;
    - si les deux coexistent : échec avec le message de 0019 § 3.3, point 1, retrait de `techlead-approved` et commentaire ;
-   - sur `synchronize` : échec et retrait de `techlead-approved`.
+   - sur `synchronize` : échec et retrait de `techlead-approved` ;
+   - pour une PR qui modifie `.github/workflows/` : échec aussi tant que `owner-approved`, posé par Samuel, manque ou ne vaut pas pour le contenu actuel de `.github/workflows/` (décision 0035).
 3. **Garde de course** (0019 § 3.3, point 4) : quand la porte passerait, elle cherche la dernière « Revue consolidée — head `<sha court>` », dans les commentaires et les revues de la PR.
    - Si cette revue porte un autre head que le head courant : échec et retrait de l'approbation.
    - Si aucune revue consolidée n'existe : la porte passe, avec un avertissement. Raison : tant que le texte du § 1 n'est pas collé dans R2, exiger le titre bloquerait toute fusion. Après le collage, la garde est complète.

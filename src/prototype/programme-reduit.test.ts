@@ -22,7 +22,7 @@ function exemple(): ProgrammeReduit {
     name: "Lieu maison 1",
     start: "14:00",
     end: "15:30",
-    meta: "1 h 30",
+    facts: { durationMinutes: 90 },
     reason: "Raison maison.",
     source: { label: "exemple.org", url: "https://exemple.org/lieu-1" },
     exceptions: ["toReserve" as const],
@@ -44,7 +44,6 @@ function exemple(): ProgrammeReduit {
           index: 1,
           date: "2026-11-23",
           weekday: "lun.",
-          title: "Balade",
           items: [
             { type: "terminus", role: "start", time: "12:00", label: "Logement" },
             { type: "segment", segment: { mode: "walk", estimated: false } },
@@ -65,9 +64,7 @@ function exemple(): ProgrammeReduit {
         id: "p1",
         kind: "activity",
         day: 1,
-        weekday: "lun.",
         time: "14:00",
-        context: "Activité du jour 1",
         stop: etape,
         category: "walk",
         travelFromPrevious: { mode: "walk", estimated: false },
@@ -108,7 +105,7 @@ describe("p0: schéma strict de la forme réduite", () => {
     avecIdee.trip.days[0]!.surprise = {
       id: "s1",
       name: "Idée maison",
-      meta: "",
+      facts: {},
       reason: "Raison maison.",
       source: { label: "exemple.org", url: "https://exemple.org/idee" },
     };
@@ -199,7 +196,7 @@ describe("p0: schéma strict de la forme réduite", () => {
       id: "s1",
       placeId: "ID_IDEE",
       name: "Idée maison",
-      meta: "",
+      facts: {},
       reason: "Raison maison.",
       source: { label: "exemple.org", url: "https://exemple.org/idee" },
     };

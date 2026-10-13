@@ -26,7 +26,7 @@ const clock = (value: number) => {
 };
 
 async function trips(): Promise<TripSummary[]> {
-  return mockTripAdapter.listTrips({ organizationId: MOCK_ORGANIZATION_ID });
+  return mockTripAdapter.listTrips({ organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const });
 }
 
 const section = (name: string) => screen.getByRole("region", { name });

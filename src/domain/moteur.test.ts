@@ -231,7 +231,7 @@ describe("p0: R1, R2, R4, R5, R6, R8 sur des jours de test", () => {
       kind: "event",
       name: "Concert de test",
       start: "19:30",
-      meta: "",
+      facts: {},
       source: { label: "agenda.example", url: "https://agenda.example/concert" },
       exceptions: [],
       locked: false,

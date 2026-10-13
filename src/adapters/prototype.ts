@@ -155,7 +155,10 @@ async function recomposerJour(programme: ProgrammeReduit, jour: JourReduit, rele
     return { type: "segment", segment: { mode: ligne.segment.mode, minutes: relu, estimated: false } };
   });
   const travelMinutes = minutes.reduce((total, valeur) => total + valeur, 0);
-  return DaySchema.parse({ ...jour, items, travelMinutes });
+  // `weekday` de la forme réduite n'est plus un champ de `Day` : l'interface le calcule depuis la date (B2, E1).
+  const reste: Partial<typeof jour> = { ...jour };
+  delete reste.weekday;
+  return DaySchema.parse({ ...reste, items, travelMinutes });
 }
 
 /**
@@ -191,6 +194,9 @@ async function recomposerPropositions(programme: ProgrammeReduit, relecteur: Rel
     const minutes = relues.get(index);
     const recomposee = {
       ...reste,
+      // Voisins calculés par le moteur à la lecture (B5, décision 0037 B2-TL-1) ; sans lui, aucun voisin : aucune
+      // ligne de contexte n'est affichée, rien n'est inventé (B2, E2).
+      neighbours: {},
       ...(travelFromPrevious && minutes !== undefined
         ? { travelFromPrevious: { mode: travelFromPrevious.mode, minutes, estimated: false } }
         : {}),
@@ -285,6 +291,13 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
     async listProposals(ctx, tripId) {
       const programme = await trouver(ctx, tripId);
       return programme ? recomposerPropositions(programme, relecteur) : [];
+    },
+    /**
+     * Les voyages du prototype sont toujours débloqués (`unlocked: true`, forme réduite) : la présentation lit
+     * `listProposals`, jamais l'aperçu. Liste vide (B2, évolution E7).
+     */
+    async listPreviewSlots() {
+      return [];
     },
     async getDayMap(ctx, tripId, index) {
       const programme = await trouver(ctx, tripId);

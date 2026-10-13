@@ -7,7 +7,7 @@ import { boundsOf, buildDayRoute, buildOverview, offsetCenter } from "./route";
 
 const stopItem = (id: string): DayLineItem => ({
   type: "stop",
-  stop: { id, kind: "activity", name: `[${id}]`, start: "10:00", meta: "", exceptions: [], locked: false },
+  stop: { id, kind: "activity", name: `[${id}]`, start: "10:00", facts: {}, exceptions: [], locked: false },
 });
 const segment = (mode: Segment["mode"]): DayLineItem => ({ type: "segment", segment: { mode, minutes: 10, estimated: false } });
 
@@ -15,8 +15,6 @@ function dayOf(lastMode: Segment["mode"] = "walk"): Day {
   return {
     index: 1,
     date: "2026-08-29",
-    weekday: "sam.",
-    title: "Samedi 29 août",
     items: [
       { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
       segment("walk"),
@@ -31,7 +29,7 @@ function dayOf(lastMode: Segment["mode"] = "walk"): Day {
       segment(lastMode),
       { type: "terminus", role: "end", time: "20:00", label: "[Hôtel]" },
     ],
-    events: [{ id: "e1", kind: "event", name: "[E]", start: "18:00", meta: "", exceptions: [], locked: false }],
+    events: [{ id: "e1", kind: "event", name: "[E]", start: "18:00", facts: {}, exceptions: [], locked: false }],
     generating: false,
     travelMinutes: 50,
     travelBudgetMinutes: 90,

@@ -56,3 +56,23 @@ describe("valeurs de F11a (décision 0021 § 1.1)", () => {
     expect(countToReserve([{ done: true }, { done: false }, { done: false }])).toBe(2);
   });
 });
+
+describe("TripSummarySchema dérivé de TripBaseSchema (B2)", () => {
+  it("contrats: TripSummary reste dérivé du voyage", async () => {
+    const { TripBaseSchema } = contracts;
+    // Mêmes clés qu'avant B2 ; chaque clé reprise du voyage est le schéma même de `TripBaseSchema` (pick, sans copie).
+    expect(Object.keys(TripSummarySchema.shape).sort()).toEqual(
+      ["dayCount", "destination", "destinationColor", "end", "id", "start", "timeZone", "toReserveCount", "travellers", "unlocked"].sort(),
+    );
+    const shape = TripSummarySchema.shape as Record<string, unknown>;
+    const base = TripBaseSchema.shape as Record<string, unknown>;
+    for (const key of ["id", "destination", "destinationColor", "start", "end", "timeZone", "travellers", "unlocked"]) {
+      expect(shape[key], key).toBe(base[key]);
+    }
+    // Résumés des données simulées : valides.
+    const { mockTripAdapter, MOCK_REQUEST_CONTEXT } = await import("@/adapters/mock");
+    const summaries = await mockTripAdapter.listTrips(MOCK_REQUEST_CONTEXT);
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const summary of summaries) expect(TripSummarySchema.parse(summary)).toEqual(summary);
+  });
+});
