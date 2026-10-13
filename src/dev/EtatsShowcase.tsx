@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { Button, StatusBanner, Tag, type StatusBannerKind, type TagKind } from "@/components/ligne";
 import { TripsScreen } from "@/features/compte/TripsScreen";
+import { noOptionMessage } from "@/features/presentation/contexte";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
 
@@ -41,8 +42,9 @@ const BANNERS: BannerState[] = [
   { kind: "offline", message: examples.offline, example: true },
   // Propriétaire : F7 (« Ton programme a changé depuis cet aperçu. Rien n'a été modifié. »), pas encore livré.
   { kind: "conflict", message: examples.conflict, example: true },
-  // Propriétaires : F7 et F8, pas encore livrés.
-  { kind: "noOption", message: examples.noOption, example: true },
+  // Présentation (écran 6, B2-PO-9) : aperçu avec une case `noOption`, celle du jeu simulé d'Édimbourg (J4 16:00).
+  // Libellé provisoire (B2-PO-10) ; F7 et F8 fourniront le leur.
+  { kind: "noOption", message: noOptionMessage([{ day: 4, time: "16:00", kind: "activity" }]), example: false },
   // Erreur de calcul de redaction.md : clé propre créée par F11c.
   { kind: "error", message: messages.etats.erreurCalcul, example: false },
   // Présentation (F6) et Journée (F5) : « Jour {n} en préparation ».

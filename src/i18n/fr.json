@@ -123,7 +123,18 @@
         "octobre",
         "novembre",
         "décembre"
-      ]
+      ],
+      "premier": "er",
+      "joursTitre": [
+        "Dimanche",
+        "Lundi",
+        "Mardi",
+        "Mercredi",
+        "Jeudi",
+        "Vendredi",
+        "Samedi"
+      ],
+      "titre": "{jour} {day} {month}"
     },
     "verrouillee": "Verrouillée",
     "repasNonChoisi": {
@@ -132,9 +143,20 @@
     },
     "checklist": {
       "reserver": "Réserver",
-      "remunere": "Lien rémunéré"
+      "remunere": "Lien rémunéré",
+      "moment": {
+        "deadline": "Avant le {date}",
+        "beforeDeparture": "Avant le départ",
+        "arrivee": "À l'arrivée",
+        "jour": "J{n}"
+      }
     },
-    "deduit": "déduit de ton récit"
+    "deduit": "déduit de ton récit",
+    "faits": {
+      "separateur": ", ",
+      "gratuit": "gratuit",
+      "cout": "≈ {n} CHF"
+    }
   },
   "carte": {
     "regionJour": "Carte du jour {n}",
@@ -239,12 +261,11 @@
           "hotel": "[Nom de l'hôtel]",
           "arret1": {
             "nom": "Calton Hill",
-            "meta": "Balade, 45 min, gratuit",
             "raison": "La ville entière vue d'en haut, à 10 min de l'hôtel."
           },
           "arret2": {
             "nom": "[Distillerie]",
-            "meta": "Visite et dégustation, 1 h 30"
+            "secteur": "[East Lothian]"
           },
           "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
           "rangeeJour": "Jours du séjour, démonstration J9 actif"
@@ -259,20 +280,18 @@
         "presentation": {
           "activite": {
             "nom": "[Distillerie]",
-            "meta": "[Visite et dégustation, 1 h 30]",
-            "contexte": "[Entre ton déjeuner et ton temps libre]",
+            "secteur": "[East Lothian]",
             "raison": "[Tu as demandé une distillerie sans voiture]",
             "detour": "[La distillerie la plus proche accessible sans voiture]"
           },
           "repas": {
             "nom": "[Bonne table]",
-            "meta": "[Cuisine écossaise, 1 h 30]",
-            "contexte": "[Avant ton concert]",
+            "secteur": "[Old Town]",
             "raison": "[Tu as choisi une bonne table le samedi soir]"
           },
           "repas2": {
             "nom": "[Bistrot]",
-            "meta": "[Bistrot, 1 h 30]"
+            "secteur": "[Old Town]"
           },
           "toast": "[Distillerie] écarté."
         },
@@ -286,8 +305,7 @@
           "raison": "[Tu as choisi Histoire et Balades en ville. Ancien village de meuniers au bord de la rivière.]",
           "source": "[Office du tourisme]",
           "verrouillee": {
-            "nom": "[Billets du concert]",
-            "meta": "[Concert, 1 h 30, billets réservés]"
+            "nom": "[Billets du concert]"
           },
           "plaque": {
             "noms": {
@@ -300,20 +318,16 @@
           },
           "checklist": {
             "aFaire": {
-              "label": "[Distillerie], visite",
-              "when": "J2, 15:00, 2 personnes"
+              "label": "[Distillerie], visite"
             },
             "faite": {
-              "label": "[Military Tattoo]",
-              "when": "J1, 21:30, déjà réservé"
+              "label": "[Military Tattoo]"
             },
             "sansLien": {
-              "label": "[Adaptateur électrique]",
-              "when": "[Avant le départ]"
+              "label": "[Adaptateur électrique]"
             },
             "remuneree": {
-              "label": "[Assurance voyage]",
-              "when": "[Avant le départ]"
+              "label": "[Assurance voyage]"
             }
           }
         },
@@ -419,6 +433,29 @@
       "vide": "Aucune proposition à trier",
       "debloquer": "Débloquer",
       "programme": "Voir le programme"
+    },
+    "contexte": {
+      "entre": "Entre {a} et {b}",
+      "apres": "Après {a}",
+      "avant": "Avant {b}",
+      "repas": {
+        "lunch": "ton déjeuner",
+        "dinner": "ton dîner"
+      },
+      "tempsLibre": "ton temps libre",
+      "terminus": {
+        "start": "le départ du logement",
+        "end": "le retour au logement"
+      }
+    },
+    "sansOption": {
+      "message": "Aucune proposition pour {creneaux}.",
+      "creneau": "J{n} {heure}, {kind}",
+      "separateur": " ; ",
+      "kind": {
+        "activity": "activité",
+        "meal": "repas"
+      }
     }
   },
   "sejour": {

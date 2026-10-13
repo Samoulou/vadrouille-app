@@ -10,7 +10,7 @@ import {
   SurpriseIdeaSchema,
   TimeSchema,
   TRIP_ID_PATTERN,
-  TripSchema,
+  TripBaseSchema,
   WeekdaySchema,
 } from "@/contracts";
 
@@ -43,7 +43,7 @@ export const EXCEPTIONS_REDUITES = ["toReserve", "unconfirmed"] as const;
 export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
 
 /** Longueurs maximales des textes écrits (spécification, « Sorties des modèles : schémas stricts »). */
-export const LONGUEURS = { nom: 80, raison: 280, detour: 280, meta: 120, libelle: 120, titre: 120, contexte: 120 } as const;
+export const LONGUEURS = { nom: 80, raison: 280, detour: 280, libelle: 120 } as const;
 
 /** Longueur maximale d'une URL de source (spécification, « URL source »). */
 export const URL_SOURCE_MAX = 2048;
@@ -72,7 +72,6 @@ const SourceReduiteSchema = z.strictObject({
 export const StopReduitSchema = StopSchema.omit({ verifiedAt: true, exceptions: true, commitment: true }).extend({
   placeId: PlaceIdSchema.optional(),
   name: texte(LONGUEURS.nom),
-  meta: z.string().max(LONGUEURS.meta),
   reason: texte(LONGUEURS.raison).optional(),
   source: SourceReduiteSchema.optional(),
   exceptions: z.array(z.enum(EXCEPTIONS_REDUITES)).max(2),
@@ -91,7 +90,6 @@ export type SegmentReduit = z.infer<typeof SegmentReduitSchema>;
 export const SurpriseReduiteSchema = SurpriseIdeaSchema.omit({ verifiedAt: true }).extend({
   placeId: PlaceIdSchema.optional(),
   name: texte(LONGUEURS.nom),
-  meta: z.string().max(LONGUEURS.meta),
   reason: texte(LONGUEURS.raison),
   source: SourceReduiteSchema,
 });
@@ -111,15 +109,19 @@ export const LigneReduiteSchema = z.discriminatedUnion("type", [
 ]);
 export type LigneReduite = z.infer<typeof LigneReduiteSchema>;
 
+/**
+ * Jour réduit. Il garde son propre `weekday` (spécification B2, E1 : ce n'est plus un champ de `Day`, la réduction
+ * le calcule depuis la date) ; il n'a plus de `title`, calculé par l'interface depuis la date.
+ */
 export const JourReduitSchema = DaySchema.omit({ travelMinutes: true, items: true, events: true, surprise: true }).extend({
-  title: texte(LONGUEURS.titre),
+  weekday: WeekdaySchema,
   items: z.array(LigneReduiteSchema),
   events: z.array(EventStopReduitSchema),
   surprise: SurpriseReduiteSchema.optional(),
 });
 export type JourReduit = z.infer<typeof JourReduitSchema>;
 
-export const VoyageReduitSchema = TripSchema.omit({
+export const VoyageReduitSchema = TripBaseSchema.omit({
   days: true,
   organizationId: true,
   id: true,
@@ -137,7 +139,8 @@ export const VoyageReduitSchema = TripSchema.omit({
 export type VoyageReduit = z.infer<typeof VoyageReduitSchema>;
 
 /**
- * Proposition sans `travelFromPrevious.minutes`, sans `photoUrl`, avec `detour` obligatoire. Recopiée champ par
+ * Proposition sans `travelFromPrevious.minutes`, sans `photoUrl`, sans `neighbours` (calculé à la lecture, B2), avec
+ * `detour` obligatoire. Recopiée champ par
  * champ de `ProposalSchema` (qui porte des raffinements, donc pas de `.omit`) ; le test vérifie que ses clés
  * restent un sous-ensemble de celles du contrat. `stop.commitment` est refusé par `StopReduitSchema`.
  */
@@ -146,9 +149,7 @@ export const PropositionReduiteSchema = z
     id: texte(64),
     kind: z.enum(["activity", "meal"]),
     day: z.number().int().positive(),
-    weekday: WeekdaySchema,
     time: TimeSchema,
-    context: texte(LONGUEURS.contexte),
     stop: StopReduitSchema,
     category: CategorySchema,
     option: z

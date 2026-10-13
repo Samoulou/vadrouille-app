@@ -30,7 +30,8 @@ import {
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
-import type { DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
+import type { ChecklistMoment, DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
+import { formatContexte } from "@/features/presentation/contexte";
 import { format, messages } from "@/i18n";
 
 const t = messages.dev.composants;
@@ -56,18 +57,18 @@ const TEN_DAYS = Array.from({ length: 10 }, (_, i) => ({
 }));
 
 /** Séquence du preview.html de DayLine : données de démonstration propres à la page (pas de src/mocks). */
-const DEMO_STOP_BASE: Pick<Stop, "kind" | "exceptions" | "locked"> = { kind: "activity", exceptions: [], locked: false };
+const DEMO_STOP_BASE: Pick<Stop, "kind" | "exceptions" | "locked" | "facts"> = { kind: "activity", exceptions: [], locked: false, facts: {} };
 const DEMO_LINE: DayLineItem[] = [
   { type: "terminus", role: "start", time: "09:15", label: lx.hotel },
   { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
   {
     type: "stop",
-    stop: { ...DEMO_STOP_BASE, id: "demo-1", name: lx.arret1.nom, start: "09:30", meta: lx.arret1.meta, reason: lx.arret1.raison },
+    stop: { ...DEMO_STOP_BASE, id: "demo-1", name: lx.arret1.nom, start: "09:30", facts: { durationMinutes: 45, costPerPerson: 0 }, reason: lx.arret1.raison },
   },
   { type: "segment", segment: { mode: "transit", minutes: 25, estimated: true } },
   {
     type: "stop",
-    stop: { ...DEMO_STOP_BASE, id: "demo-2", name: lx.arret2.nom, start: "15:00", meta: lx.arret2.meta, exceptions: ["toReserve"] },
+    stop: { ...DEMO_STOP_BASE, id: "demo-2", name: lx.arret2.nom, start: "15:00", facts: { area: lx.arret2.secteur, durationMinutes: 90 }, exceptions: ["toReserve"] },
   },
   { type: "free", from: "17:00", to: "19:00" },
   { type: "segment", segment: { mode: "walk", minutes: 6, estimated: false } },
@@ -92,7 +93,7 @@ const DEMO_ADDITIONS: DayLineItem[] = [
       id: "demo-verrou",
       name: ex.programme.verrouillee.nom,
       start: "21:30",
-      meta: ex.programme.verrouillee.meta,
+      facts: { durationMinutes: 90 },
       locked: true,
     },
   },
@@ -105,36 +106,39 @@ const DEMO_COMPACT: DayLineItem[] = [
   DEMO_LINE[1]!,
   DEMO_LINE[2]!,
   { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
-  { type: "stop", stop: { ...DEMO_STOP_BASE, id: "demo-3", name: pd.arret3, start: "11:00", end: "12:30", meta: lx.arret2.meta } },
+  { type: "stop", stop: { ...DEMO_STOP_BASE, id: "demo-3", name: pd.arret3, start: "11:00", end: "12:30", facts: { area: lx.arret2.secteur, durationMinutes: 90 } } },
   DEMO_LINE[3]!,
   DEMO_LINE[4]!,
 ];
 const isDemoPast = (stop: Stop) => stop.id === "demo-1";
 
-/** Éléments réduits de la vue partagée (F10-TL-12) : terminus sans libellé, étapes sans `id` ni raison. */
+/**
+ * Éléments réduits de la vue partagée (F10-TL-12) : terminus sans libellé, étapes sans `id` ni raison. L'étape
+ * n'a aucun fait (`facts: {}`, B2) : la ligne de faits n'est pas affichée.
+ */
 const DEMO_REDUITE: DayLineViewItem[] = [
   { type: "terminus", role: "start", time: "09:15" },
   { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
-  { type: "stop", stop: { key: "1", name: lx.arret1.nom, start: "09:30", meta: lx.arret1.meta, exceptions: [] } },
+  { type: "stop", stop: { key: "1", name: lx.arret1.nom, start: "09:30", facts: {}, exceptions: [] } },
   { type: "terminus", role: "end", time: "22:30" },
 ];
 
 /** Cartes de présentation de démonstration (DeckCard/preview.html), sans src/mocks. */
+const DEMO_CONCERT = { id: "demo-concert", name: ex.programme.verrouillee.nom };
 const px = ex.presentation;
 const DEMO_ACTIVITE: Proposal = {
   id: "demo-activite",
   kind: "activity",
   day: 5,
-  weekday: "mer.",
   time: "13:30",
-  context: px.activite.contexte,
+  neighbours: { before: { type: "meal", meal: "lunch" }, after: { type: "free" } },
   category: "tasting",
   stop: {
     ...DEMO_STOP_BASE,
     id: "demo-distillerie",
     name: px.activite.nom,
     start: "13:30",
-    meta: px.activite.meta,
+    facts: { area: px.activite.secteur, durationMinutes: 90 },
     reason: px.activite.raison,
     exceptions: ["toReserve", "toConfirm"],
   },
@@ -145,19 +149,32 @@ const DEMO_REPAS: Proposal = {
   id: "demo-repas-1",
   kind: "meal",
   day: 1,
-  weekday: "sam.",
   time: "18:45",
-  context: px.repas.contexte,
+  neighbours: { after: { type: "stop", stopId: DEMO_CONCERT.id } },
   category: "restaurant",
-  stop: { ...DEMO_STOP_BASE, kind: "meal", id: "demo-repas-1", name: px.repas.nom, start: "18:45", meta: px.repas.meta, reason: px.repas.raison, exceptions: ["toReserve"] },
+  stop: {
+    ...DEMO_STOP_BASE,
+    kind: "meal",
+    id: "demo-repas-1",
+    name: px.repas.nom,
+    start: "18:45",
+    facts: { area: px.repas.secteur, durationMinutes: 90, costPerPerson: 45 },
+    reason: px.repas.raison,
+    exceptions: ["toReserve"],
+  },
   option: { index: 1, total: 2 },
 };
 const DEMO_REPAS_2: Proposal = {
   ...DEMO_REPAS,
   id: "demo-repas-2",
-  stop: { ...DEMO_REPAS.stop, id: "demo-repas-2", name: px.repas2.nom, meta: px.repas2.meta },
+  // Proposition sans voisin (B2-PO-13) : aucune ligne de contexte.
+  neighbours: {},
+  stop: { ...DEMO_REPAS.stop, id: "demo-repas-2", name: px.repas2.nom, facts: { area: px.repas2.secteur, durationMinutes: 90 } },
   option: { index: 2, total: 2 },
 };
+/** Étapes du jour de démonstration, pour composer le contexte des cartes (comme `PresentationDay.stops`). */
+const DEMO_DAY_STOPS = [DEMO_CONCERT];
+const contextOf = (proposal: Proposal) => formatContexte(proposal.neighbours, DEMO_DAY_STOPS);
 const noop = () => {};
 
 /** Panneau coulissant à chacune de ses hauteurs, dans un cadre (F5) ; noms de région distincts. */
@@ -175,11 +192,18 @@ const DEST_COLORS: Trip["destinationColor"][] = ["bruyere", "azulejo", "ocre", "
 function ChecklistDemo() {
   const cl = pg.checklist;
   const [done, setDone] = useState<Record<string, boolean>>({ aFaire: false, faite: true, sansLien: false, remuneree: false });
-  const rows = [
-    { key: "aFaire", ...cl.aFaire, bookingUrl: "#reserver-distillerie", sponsored: false },
-    { key: "faite", ...cl.faite, bookingUrl: "#reserver-tattoo", sponsored: false },
-    { key: "sansLien", ...cl.sansLien, bookingUrl: undefined, sponsored: false },
-    { key: "remuneree", ...cl.remuneree, bookingUrl: "#reserver-assurance", sponsored: true },
+  // Les quatre moments (évolution E4 de B2) : « J2 », « À l'arrivée », « Avant le départ », « Avant le sam. 22.08 ».
+  const rows: { key: string; label: string; when: ChecklistMoment; bookingUrl: string | undefined; sponsored: boolean }[] = [
+    { key: "aFaire", ...cl.aFaire, when: { type: "tripDay", day: 2 }, bookingUrl: "#reserver-distillerie", sponsored: false },
+    { key: "faite", ...cl.faite, when: { type: "tripDay", day: 1 }, bookingUrl: "#reserver-tattoo", sponsored: false },
+    { key: "sansLien", ...cl.sansLien, when: { type: "beforeDeparture" }, bookingUrl: undefined, sponsored: false },
+    {
+      key: "remuneree",
+      ...cl.remuneree,
+      when: { type: "deadline", date: "2026-08-22" },
+      bookingUrl: "#reserver-assurance",
+      sponsored: true,
+    },
   ];
   return (
     <ul className="w-full">
@@ -436,13 +460,13 @@ export function ComposantsShowcase() {
           />
         </State>
         <State label={t.etats.deckActivite}>
-          <DeckCard proposal={DEMO_ACTIVITE} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+          <DeckCard proposal={DEMO_ACTIVITE} context={contextOf(DEMO_ACTIVITE)} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
         </State>
         <State label={t.etats.deckRepas}>
-          <DeckCard proposal={DEMO_REPAS} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+          <DeckCard proposal={DEMO_REPAS} context={contextOf(DEMO_REPAS)} onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
         </State>
         <State label={t.etats.deckDerniere}>
-          <DeckCard proposal={DEMO_REPAS_2} isLastOption onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
+          <DeckCard proposal={DEMO_REPAS_2} context={contextOf(DEMO_REPAS_2)} isLastOption onLike={noop} onDislike={noop} onOpen={noop} className="w-full" />
         </State>
         <State label={t.etats.toast}>
           <UndoToastRegion className="w-full">

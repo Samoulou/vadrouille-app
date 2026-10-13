@@ -132,7 +132,11 @@ test.describe("catalogue", () => {
     await expect(section("Erreur de calcul").getByRole("alert")).toHaveText(
       "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
     );
-    await expect(page.getByText("Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.")).toHaveCount(3);
+    // Le bandeau `noOption` porte le texte de l'écran 6 (B2-PO-9) : deux textes d'exemple restent.
+    await expect(section("Aucune option compatible").locator("[data-kind='noOption']")).toHaveText(
+      "Aucune proposition pour J4 16:00, activité.",
+    );
+    await expect(page.getByText("Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.")).toHaveCount(2);
     await expectTouchTargets(page);
   });
 

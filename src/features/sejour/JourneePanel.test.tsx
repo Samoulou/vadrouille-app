@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { DayTabs } from "@/components/ligne/DayTabs";
 import type { Day } from "@/contracts";
+import { jourAbrege } from "@/lib/dates";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
@@ -88,12 +90,12 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(4);
   });
 
-  it("lignes d'événements : nom et métadonnées en ink-2 sur muted (décision 0018 § 3)", () => {
+  it("lignes d'événements : nom et faits en ink-2 sur muted (décision 0018 § 3)", () => {
     render(<JourneePanel day={day(2)} routes={routes} />);
     const concert = within(screen.getByRole("region", { name: "Événements du jour" })).getByRole("link", { name: /Concert d'orgue/ });
     expect(concert).toHaveClass("bg-muted");
     expect(within(concert).getByText("[Concert d'orgue à St Giles]")).toHaveClass("text-ink-2");
-    expect(within(concert).getByText(day(2).events[0]!.meta)).toHaveClass("text-ink-2");
+    expect(within(concert).getByText("[Old Town], 1 h")).toHaveClass("text-ink-2");
     expect(within(concert).getByText("18:00 – 19:00")).toHaveClass("text-ink-2");
   });
 
@@ -118,7 +120,7 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     expect(mention).toHaveClass("text-corps-s", "text-ink-soft");
     expect(mention.compareDocumentPosition(within(panel).getByRole("heading", { level: 3 }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(within(panel).getByRole("heading", { level: 3 })).toHaveTextContent("[Circus Lane]");
-    expect(within(panel).getByText("[Stockbridge, 20 min, gratuit]")).toBeInTheDocument();
+    expect(within(panel).getByText("[Stockbridge], 20 min, gratuit")).toBeInTheDocument();
     expect(within(panel).getByText("Pourquoi pour toi")).toBeInTheDocument();
     expect(within(panel).getByRole("link", { name: /Source/ })).toHaveAttribute("href", "https://example.org/mock/circus-lane");
     fireEvent.click(button);
@@ -133,5 +135,24 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     unmount();
     const j5 = render(<JourneePanel day={day(5)} routes={routes} />);
     expect(await axeViolations(j5.container)).toEqual([]);
+  });
+});
+
+describe("Journée et onglets : dates calculées (B2, E1)", () => {
+  it("interface: jour de la semaine et titre calculés depuis la date", () => {
+    const { unmount } = render(<JourneePanel day={day(1)} routes={routes} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Samedi 29 août$/);
+    unmount();
+    render(<JourneePanel day={day(4)} routes={routes} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Mardi 1er septembre$/);
+    render(
+      <DayTabs
+        days={edimbourg.days.map((candidate) => ({ index: candidate.index, href: routes.jour(candidate.index), weekday: jourAbrege(candidate.date) }))}
+        current={1}
+        sejourHref={routes.sejour()}
+      />,
+    );
+    const nav = screen.getByRole("navigation");
+    for (const weekday of ["sam.", "dim.", "lun.", "mar.", "mer.", "jeu."]) expect(nav).toHaveTextContent(weekday);
   });
 });

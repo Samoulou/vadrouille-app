@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Tag } from "@/components/ligne/Tag";
 import type { Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 
 const t = messages.sejour.evenements;
 
@@ -40,7 +41,7 @@ export function EventLines({ events, getHref, getMoment = eventRange }: EventLin
           >
             <span className="text-corps-s font-bold text-ink-2 tabular-nums">{getMoment(event)}</span>
             <span className="text-arret font-bold text-ink-2">{event.name}</span>
-            <span className="text-corps-s text-ink-2">{event.meta}</span>
+            {formatFaits(event.facts) ? <span className="text-corps-s text-ink-2">{formatFaits(event.facts)}</span> : null}
             {event.exceptions.length > 0 ? (
               <span className="mt-1 flex flex-wrap gap-2">
                 {event.exceptions.map((exception) => (

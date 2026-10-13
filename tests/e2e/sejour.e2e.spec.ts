@@ -269,7 +269,7 @@ test.describe("Journée", () => {
     await expect(button).toHaveAttribute("aria-expanded", "true");
     await expect(button).toBeFocused();
     await expect(panel.getByRole("heading", { level: 3 })).toHaveText("[Circus Lane]");
-    await expect(panel).toContainText("[Stockbridge, 20 min, gratuit]");
+    await expect(panel).toContainText("[Stockbridge], 20 min, gratuit");
     await expect(panel).toContainText("Pourquoi pour toi");
     await expect(panel.getByRole("link", { name: "Source : [Office du tourisme d'Édimbourg]" })).toHaveAttribute(
       "href",
@@ -427,12 +427,14 @@ test.describe("Séjour", () => {
     await openTrip(page, SEJOUR);
     const links = jourParJour(page).getByRole("link");
     await expect(links).toHaveCount(6);
+    // Titres calculés par l'interface depuis la date (B2, E1), « 1er » pour le premier du mois (B2-PO-12).
+    const titles = ["Samedi 29 août", "Dimanche 30 août", "Lundi 31 août", "Mardi 1er septembre", "Mercredi 2 septembre", "Jeudi 3 septembre"];
     for (const day of edimbourg.days) {
       const link = links.nth(day.index - 1);
       const stops = day.items.filter((item) => item.type === "stop").length;
       await expect(link).toHaveAttribute("href", `/voyages/${TRIP}/jour/${day.index}`);
       await expect(link).toContainText(`J${day.index}`);
-      await expect(link).toContainText(day.title);
+      await expect(link).toContainText(titles[day.index - 1]!);
       await expect(link).toContainText(new RegExp(`${stops} étapes? · .+ de trajet`));
     }
     await expect(links.nth(1)).toContainText("1 h 25 de trajet");

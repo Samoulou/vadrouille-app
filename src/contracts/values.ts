@@ -37,6 +37,9 @@ export function countToReserve(checklist: readonly { done: boolean }[]): number 
 /** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
 export const DETOUR_THRESHOLD_MINUTES = 20;
 
+/** Cases de l'aperçu au plus (évolution E5, `PreviewSlotsSchema`) : les 8 propositions offertes (cadrage § 4). */
+export const MAX_PREVIEW_SLOTS = 8;
+
 /** Clé unique d'une référence de point de carte : « stop:<id> » ou « terminus:<role> ». */
 export function mapPointKey(ref: MapPointRef): string {
   return ref.type === "stop" ? `stop:${ref.stopId}` : `terminus:${ref.role}`;
@@ -100,6 +103,8 @@ export const API_ERROR_CODES = [
   "provider_error",
   "rate_limited",
   "cost_cap_reached",
+  // B2 (évolution E10, B2-PO-8) : version de base dépassée ; `ApiError.currentVersion` porte la version courante.
+  "version_conflict",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

@@ -25,8 +25,10 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { jourAbrege } from "@/lib/dates";
 
 import { createLocalDeckActions, type DeckActions } from "./actions";
+import { formatContexte, noOptionMessage } from "./contexte";
 import {
   currentCard,
   deckReducer,
@@ -37,6 +39,7 @@ import {
   type UndoToastInfo,
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
+import type { NoOptionSlot, PresentationDay } from "./load";
 
 /**
  * Chargement différé (décision 0024 § 1, T14) de ce que le premier rendu n'affiche pas : les deux feuilles, avec
@@ -65,6 +68,10 @@ export interface PresentationScreenProps {
   /** Jours encore en préparation (`Day.generating`), pour le `StatusBanner` (F6-PO-13). */
   generatingDays: number[];
   proposals: Proposal[];
+  /** Jours du voyage (date, noms des étapes), pour composer jour de la semaine et contexte (B2-PO-14). */
+  days: PresentationDay[];
+  /** Créneaux de l'aperçu sans proposition (B2-PO-9) : un bandeau `noOption` les nomme ; ce ne sont pas des cartes. */
+  noOptionSlots?: NoOptionSlot[];
   /**
    * Lien « Débloquer » de la fin de l'aperçu (F9-PO-19) : la page passe `paymentAvailable()`, pour qu'aucun
    * lien ne mène à une page 404 quand le paiement simulé n'est pas disponible.
@@ -108,6 +115,7 @@ function sendWith(lazyTrack: LazyTrack): Send {
   };
 }
 
+
 function toastMessage(toast: UndoToastInfo): string {
   if (toast.kind === "dayKept") {
     return format(t.toast.dayKept, { day: toast.day });
@@ -124,6 +132,8 @@ function Deck({
   unlocked,
   generatingDays,
   proposals,
+  days,
+  noOptionSlots = [],
   canUnlock = true,
   placesFromGoogle = false,
   actions: injected,
@@ -132,6 +142,7 @@ function Deck({
   const [state, dispatch] = useReducer(deckReducer, proposals, initDeck);
   const [actions] = useState<DeckActions>(() => injected ?? createLocalDeckActions());
   const [detail, setDetail] = useState<Proposal | null>(null);
+  const dayOf = (index: number) => days.find((day) => day.index === index);
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; serial: number } | null>(null);
   const cardRef = useRef<HTMLButtonElement>(null);
@@ -271,6 +282,9 @@ function Deck({
       {generatingDays.map((day) => (
         <StatusBanner key={day} kind="generating" message={format(t.generation, { n: day })} className="shrink-0" />
       ))}
+      {noOptionSlots.length > 0 ? (
+        <StatusBanner kind="noOption" message={noOptionMessage(noOptionSlots)} className="shrink-0" />
+      ) : null}
       <p role="status" className="sr-only" data-announce="">
         {announcement}
       </p>
@@ -302,6 +316,7 @@ function Deck({
           <DeckCard
             className="contents"
             proposal={card}
+            context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
             isLastOption={isLastOption(state)}
             cardRef={cardRef}
             onLike={(gesture) => decide("like", gesture, gesture === "button" ? "keep" : "card")}
@@ -335,6 +350,7 @@ function Deck({
         <Suspense fallback={null}>
           <ProposalDetailSheet
             proposal={detail}
+            weekday={jourAbrege(dayOf(detail.day)?.date ?? "")}
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
             placesFromGoogle={placesFromGoogle}

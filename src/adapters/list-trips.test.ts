@@ -16,8 +16,8 @@ import { withSimulatedUnlock } from "./mock-unlock";
 
 /** `listTrips` (F11a ; spécification F11, C15 ; décision 0021 § 1.2 et § 2). */
 
-const ctx = { organizationId: MOCK_ORGANIZATION_ID };
-const otherCtx = { organizationId: "mock_org_autre" };
+const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
+const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
 
 const byId = <T extends { id: string }>(list: readonly T[]) => [...list].sort((a, b) => a.id.localeCompare(b.id));
 
@@ -122,11 +122,11 @@ describe("voyages simulés ajoutés (F11-PO-15)", () => {
     expect(lisbonne.checklist.map((item) => item.done)).toEqual([true]);
     expect(porto.checklist.filter((item) => !item.done)).toHaveLength(2);
     expect(porto.checklist).toHaveLength(3);
-    const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
     for (const trip of [lisbonne, porto]) {
       trip.days.forEach((day, i) => {
         expect(day.index).toBe(i + 1);
-        expect(day.weekday).toBe(WEEKDAYS[new Date(`${day.date}T00:00:00Z`).getUTCDay()]);
+        // Jours consécutifs : le jour de la semaine est calculé par l'interface depuis la date (B2, E1).
+        expect(day.date).toBe(new Date(Date.parse(`${trip.start}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10));
       });
       expect(trip.days[0]?.date).toBe(trip.start);
       expect(trip.days.at(-1)?.date).toBe(trip.end);

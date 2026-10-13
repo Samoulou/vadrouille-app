@@ -10,7 +10,7 @@ import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
 import type { CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 
-export type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+export type { AdapterContext, CreationAdapter, MemberRole, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";

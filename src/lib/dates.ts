@@ -1,23 +1,52 @@
-import type { Trip } from "@/contracts";
+import type { Trip, Weekday } from "@/contracts";
 import { format, messages } from "@/i18n";
 
 const t = messages.ligne.dates;
 const plaque = messages.debloquer.plaque;
 
-/**
- * Date ISO « AAAA-MM-JJ » écrite en toutes lettres, comme une date dans une phrase (redaction.md) :
- * « 2026-08-15 » → « 15 août 2026 ». Lecture du texte seulement, sans fuseau horaire.
- */
-export function formatDateLongue(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number);
-  const name = month ? t.mois[month - 1] : undefined;
-  if (!year || !name || !day) return iso;
-  return format(t.longue, { day, month: name, year });
-}
-
 function parts(iso: string): { year: number; month: number; day: number } | null {
   const [year, month, day] = iso.split("-").map(Number);
   return year && month && day ? { year, month, day } : null;
+}
+
+/** Jour du mois : « 1er » pour le premier (B2-PO-12, suffixe de `fr.json`), le nombre seul sinon. */
+function jourDuMois(day: number): string {
+  return day === 1 ? `${day}${t.premier}` : String(day);
+}
+
+/** Rang du jour de la semaine (0 = dimanche), calculé en UTC (`Date.UTC`), sans fuseau horaire. */
+function rangSemaine(date: { year: number; month: number; day: number }): number {
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
+}
+
+/**
+ * Date ISO « AAAA-MM-JJ » écrite en toutes lettres, comme une date dans une phrase (redaction.md) :
+ * « 2026-08-15 » → « 15 août 2026 », « 2026-09-01 » → « 1er septembre 2026 ». Lecture du texte seulement, sans
+ * fuseau horaire.
+ */
+export function formatDateLongue(iso: string): string {
+  const date = parts(iso);
+  const name = date ? t.mois[date.month - 1] : undefined;
+  if (!date || !name) return iso;
+  return format(t.longue, { day: jourDuMois(date.day), month: name, year: date.year });
+}
+
+/**
+ * Titre d'une Journée, calculé depuis `Day.date` (évolution E1 de B2) : « Samedi 29 août »,
+ * « Mardi 1er septembre ».
+ */
+export function formatTitreJour(iso: string): string {
+  const date = parts(iso);
+  const month = date ? t.mois[date.month - 1] : undefined;
+  const jour = date ? t.joursTitre[rangSemaine(date)] : undefined;
+  if (!date || !month || !jour) return iso;
+  return format(t.titre, { jour, day: jourDuMois(date.day), month });
+}
+
+/** Jour de la semaine abrégé (« sam. »), calculé depuis `Day.date` (évolution E1 de B2). */
+export function jourAbrege(iso: string): Weekday {
+  const date = parts(iso);
+  return ((date ? plaque.jours[rangSemaine(date)] : undefined) ?? "") as Weekday;
 }
 
 const pad = (value: number) => String(value).padStart(2, "0");
@@ -29,7 +58,7 @@ const pad = (value: number) => String(value).padStart(2, "0");
 export function formatDateCourte(iso: string, withYear = false): string {
   const date = parts(iso);
   if (!date) return iso;
-  const jour = plaque.jours[new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay()] ?? "";
+  const jour = plaque.jours[rangSemaine(date)] ?? "";
   const values = { jour, date: `${pad(date.day)}.${pad(date.month)}`, annee: date.year };
   return format(withYear ? plaque.dateAnnee : plaque.date, values);
 }

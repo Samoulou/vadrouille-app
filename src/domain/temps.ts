@@ -42,11 +42,3 @@ const LIBELLES_JOUR: readonly Weekday[] = ["dim.", "lun.", "mar.", "mer.", "jeu.
 export function libelleJour(date: string): Weekday {
   return element(LIBELLES_JOUR, jourSemaine(date)) ?? "lun.";
 }
-
-/** « 1 h 30 », « 45 min », « 2 h ». */
-export function libelleDuree(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, "0")}`;
-}

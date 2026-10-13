@@ -1,4 +1,4 @@
-import type { ChecklistItem, Day, DayLineItem, Stop, Trip, Weekday } from "@/contracts";
+import type { ChecklistItem, ChecklistMoment, Day, DayLineItem, Stop, StopFacts, Trip } from "@/contracts";
 
 import { MOCK_ORGANIZATION_ID } from "./edimbourg";
 
@@ -22,13 +22,12 @@ const SIMULATED_TRAVEL_BUDGET_MINUTES = 90;
 
 interface PlannedStop {
   name: string;
-  meta: string;
+  /** Faits de l'étape (B2, E3) : seul le secteur, texte, garde les crochets. */
+  facts: StopFacts;
 }
 
 interface DayPlan {
   date: string;
-  weekday: Weekday;
-  title: string;
   activity: PlannedStop;
   meal: PlannedStop;
   /** Deuxième activité de l'après-midi, facultative. */
@@ -40,7 +39,7 @@ const walk = (minutes: number): DayLineItem => ({ type: "segment", segment: { mo
 function stop(id: string, kind: Stop["kind"], planned: PlannedStop, start: string, end: string): DayLineItem {
   return {
     type: "stop",
-    stop: { id, kind, name: planned.name, start, end, meta: planned.meta, exceptions: [], locked: false },
+    stop: { id, kind, name: planned.name, start, end, facts: planned.facts, exceptions: [], locked: false },
   };
 }
 
@@ -67,8 +66,6 @@ function buildDays(prefix: string, hotel: string, plans: readonly DayPlan[]): Da
     return {
       index,
       date: plan.date,
-      weekday: plan.weekday,
-      title: plan.title,
       items,
       events: [],
       generating: false,
@@ -78,7 +75,7 @@ function buildDays(prefix: string, hotel: string, plans: readonly DayPlan[]): Da
   });
 }
 
-function check(id: string, label: string, when: string, done: boolean): ChecklistItem {
+function check(id: string, label: string, when: ChecklistMoment, done: boolean): ChecklistItem {
   return { id, label, when, done, sponsored: false };
 }
 
@@ -96,35 +93,27 @@ export const lisbonne: Trip = {
   days: buildDays("lis", "[Hôtel, Baixa]", [
     {
       date: "2026-05-14",
-      weekday: "jeu.",
-      title: "Jeudi 14 mai",
-      activity: { name: "[Belvédère de Santa Luzia]", meta: "[Alfama, 1 h, gratuit]" },
-      meal: { name: "[Tasca de l'Alfama]", meta: "[Alfama, cuisine portugaise]" },
+      activity: { name: "[Belvédère de Santa Luzia]", facts: { area: "[Alfama]", durationMinutes: 60, costPerPerson: 0 } },
+      meal: { name: "[Tasca de l'Alfama]", facts: { area: "[Alfama]" } },
     },
     {
       date: "2026-05-15",
-      weekday: "ven.",
-      title: "Vendredi 15 mai",
-      activity: { name: "[Monastère des Hiéronymites]", meta: "[Belém, 1 h 30]" },
-      meal: { name: "[Pastelaria de Belém]", meta: "[Belém, pâtisserie]" },
-      afternoon: { name: "[Tour de Belém]", meta: "[Belém, 45 min]" },
+      activity: { name: "[Monastère des Hiéronymites]", facts: { area: "[Belém]", durationMinutes: 90 } },
+      meal: { name: "[Pastelaria de Belém]", facts: { area: "[Belém]" } },
+      afternoon: { name: "[Tour de Belém]", facts: { area: "[Belém]", durationMinutes: 45 } },
     },
     {
       date: "2026-05-16",
-      weekday: "sam.",
-      title: "Samedi 16 mai",
-      activity: { name: "[Musée des azulejos]", meta: "[Xabregas, 1 h 30]" },
-      meal: { name: "[Marché de la Ribeira]", meta: "[Cais do Sodré, halle gourmande]" },
+      activity: { name: "[Musée des azulejos]", facts: { area: "[Xabregas]", durationMinutes: 90 } },
+      meal: { name: "[Marché de la Ribeira]", facts: { area: "[Cais do Sodré]" } },
     },
     {
       date: "2026-05-17",
-      weekday: "dim.",
-      title: "Dimanche 17 mai",
-      activity: { name: "[Quartier du Chiado]", meta: "[Chiado, 1 h, gratuit]" },
-      meal: { name: "[Cave à vins du Bairro Alto]", meta: "[Bairro Alto, dégustation]" },
+      activity: { name: "[Quartier du Chiado]", facts: { area: "[Chiado]", durationMinutes: 60, costPerPerson: 0 } },
+      meal: { name: "[Cave à vins du Bairro Alto]", facts: { area: "[Bairro Alto]" } },
     },
   ]),
-  checklist: [check("lis-check-hotel", "[Hôtel, Baixa]", "[Déjà réservé]", true)],
+  checklist: [check("lis-check-hotel", "[Hôtel, Baixa]", { type: "beforeDeparture" }, true)],
   unlocked: true,
 };
 
@@ -142,38 +131,40 @@ export const porto: Trip = {
   days: buildDays("por", "[Hôtel, Ribeira]", [
     {
       date: "2027-05-08",
-      weekday: "sam.",
-      title: "Samedi 8 mai",
-      activity: { name: "[Quais de la Ribeira]", meta: "[Ribeira, 1 h, gratuit]" },
-      meal: { name: "[Taverne de la Ribeira]", meta: "[Ribeira, cuisine du Nord]" },
+      activity: { name: "[Quais de la Ribeira]", facts: { area: "[Ribeira]", durationMinutes: 60, costPerPerson: 0 } },
+      meal: { name: "[Taverne de la Ribeira]", facts: { area: "[Ribeira]" } },
     },
     {
       date: "2027-05-09",
-      weekday: "dim.",
-      title: "Dimanche 9 mai",
-      activity: { name: "[Librairie historique]", meta: "[Centre, 45 min]" },
-      meal: { name: "[Café de la place]", meta: "[Centre, café]" },
-      afternoon: { name: "[Caves de Vila Nova de Gaia]", meta: "[Gaia, 1 h 30, dégustation]" },
+      activity: { name: "[Librairie historique]", facts: { area: "[Centre]", durationMinutes: 45 } },
+      meal: { name: "[Café de la place]", facts: { area: "[Centre]" } },
+      afternoon: { name: "[Caves de Vila Nova de Gaia]", facts: { area: "[Gaia]", durationMinutes: 90 } },
     },
     {
       date: "2027-05-10",
-      weekday: "lun.",
-      title: "Lundi 10 mai",
-      activity: { name: "[Palais de la Bourse]", meta: "[Ribeira, 1 h]" },
-      meal: { name: "[Marché du Bolhão]", meta: "[Centre, marché couvert]" },
+      activity: { name: "[Palais de la Bourse]", facts: { area: "[Ribeira]", durationMinutes: 60 } },
+      meal: { name: "[Marché du Bolhão]", facts: { area: "[Centre]" } },
     },
     {
       date: "2027-05-11",
-      weekday: "mar.",
-      title: "Mardi 11 mai",
-      activity: { name: "[Jardins du Palais de Cristal]", meta: "[Massarelos, 1 h, gratuit]" },
-      meal: { name: "[Restaurant de la Foz]", meta: "[Foz, poisson]" },
+      activity: { name: "[Jardins du Palais de Cristal]", facts: { area: "[Massarelos]", durationMinutes: 60, costPerPerson: 0 } },
+      meal: { name: "[Restaurant de la Foz]", facts: { area: "[Foz]" } },
     },
   ]),
   checklist: [
-    check("por-check-hotel", "[Hôtel, Ribeira]", "[Déjà réservé]", true),
-    { ...check("por-check-caves", "[Visite des caves de Gaia]", "[Une semaine avant]", false), bookingUrl: "https://example.org/mock/caves" },
-    { ...check("por-check-librairie", "[Librairie historique]", "[La veille]", false), bookingUrl: "https://example.org/mock/librairie" },
+    check("por-check-hotel", "[Hôtel, Ribeira]", { type: "beforeDeparture" }, true),
+    // « Une semaine avant » : début du voyage moins 7 jours (B2, E4).
+    {
+      ...check("por-check-caves", "[Visite des caves de Gaia]", { type: "deadline", date: "2027-05-01" }, false),
+      bookingUrl: "https://example.org/mock/caves",
+      stopId: "por-j2-apres-midi",
+    },
+    // « La veille » de la visite du J2 : le J1, « À l'arrivée » (B2, E4).
+    {
+      ...check("por-check-librairie", "[Librairie historique]", { type: "tripDay", day: 1 }, false),
+      bookingUrl: "https://example.org/mock/librairie",
+      stopId: "por-j2-activite",
+    },
   ],
   unlocked: true,
 };

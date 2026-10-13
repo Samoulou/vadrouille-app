@@ -1,4 +1,4 @@
-import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
+import { WeekdaySchema, type Day, type DayLineItem, type Proposal, type Segment, type Stop, type SurpriseIdea, type Trip, type Weekday } from "@/contracts";
 import type { Position } from "@/prototype/ancrage";
 import {
   PROGRAMME_REDUIT_SCHEMA,
@@ -63,10 +63,20 @@ function ligne(item: DayLineItem): LigneReduite {
   }
 }
 
+/**
+ * Jour abrégé de la forme réduite, calculé depuis la date ISO en UTC (`Day` ne porte plus `weekday`, B2 E1).
+ * `WeekdaySchema.options` commence au lundi ; `getUTCDay()` au dimanche.
+ */
+function jourAbrege(date: string): Weekday {
+  const rang = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  return WeekdaySchema.options.at(rang) ?? "lun.";
+}
+
 function jour(valeur: Day): JourReduit {
   const { items, events, surprise } = valeur;
   return {
     ...sans(valeur, "travelMinutes", "items", "events", "surprise"),
+    weekday: jourAbrege(valeur.date),
     items: items.map(ligne),
     events: events.map(etape),
     ...(surprise === undefined ? {} : { surprise: idee(surprise) }),
@@ -76,7 +86,7 @@ function jour(valeur: Day): JourReduit {
 function proposition(valeur: Proposal, justification: string): PropositionReduite {
   const { travelFromPrevious, stop } = valeur;
   return {
-    ...sans(valeur, "travelFromPrevious", "photoUrl", "detour", "stop"),
+    ...sans(valeur, "travelFromPrevious", "photoUrl", "detour", "stop", "neighbours"),
     stop: etape(stop),
     ...(travelFromPrevious === undefined ? {} : { travelFromPrevious: segment(travelFromPrevious) }),
     detour: justification,

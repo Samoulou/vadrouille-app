@@ -6,6 +6,7 @@ import { Button } from "@/components/ligne/Button";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import type { SurpriseIdea } from "@/contracts";
 import { messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 
 const t = messages.sejour.surprise;
 
@@ -31,7 +32,7 @@ export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
               {t.mention}
             </p>
             <h3 className="text-arret font-bold text-ink">{idea.name}</h3>
-            <p className="text-corps-s text-ink-soft">{idea.meta}</p>
+            {formatFaits(idea.facts) ? <p className="text-corps-s text-ink-soft">{formatFaits(idea.facts)}</p> : null}
             <ReasonBlock
               text={idea.reason}
               sourceLabel={idea.source.label}

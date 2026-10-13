@@ -24,6 +24,7 @@ import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sh
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, Stop, Trip } from "@/contracts";
 import { messages } from "@/i18n";
+import { jourAbrege } from "@/lib/dates";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { useLargeScreen } from "@/lib/large-screen";
 import { useElementSize, type ElementSize } from "@/lib/use-element-size";
@@ -390,7 +391,7 @@ export function TripShell({
       days={trip.days.map((candidate) => ({
         index: candidate.index,
         href: routes.jour(candidate.index),
-        weekday: candidate.weekday,
+        weekday: jourAbrege(candidate.date),
       }))}
       current={day ? day.index : "sejour"}
       sejourHref={routes.sejour()}

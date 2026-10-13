@@ -4,6 +4,9 @@ import { MOCK_REQUEST_CONTEXT } from "./mock";
 import { assertPrototypeAllowed } from "./prototype-instance";
 import type { AdapterContext } from "./types";
 
+/** Personne fictive du prototype, propriétaire de `org_prototype` (évolution E6 de B2). */
+export const PROTOTYPE_USER_ID = "user_prototype";
+
 /**
  * Contexte d'organisation d'une requête de page (décision 0013, § 3.6).
  *
@@ -20,7 +23,7 @@ export function getRequestContext(
   const choice = value?.trim() || "mock";
   if (choice === "prototype") {
     assertPrototypeAllowed(env);
-    return { organizationId: PROTOTYPE_ORG_ID };
+    return { organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" };
   }
   if (choice !== "mock") {
     throw new Error(`contexte de requête indisponible avec DATA_ADAPTER « ${choice} » (authentification : B3)`);

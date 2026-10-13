@@ -44,7 +44,8 @@ test("parcours prototype : accueil, section « Prototype », présentation, Séj
 
   await page.locator("a[data-part='jour']").first().click();
   await expect(page).toHaveURL(`/voyages/${PROTOTYPE_TRIP}/jour/1`);
-  await expect(page.getByRole("heading", { level: 1, name: "Balade et dégustations (test)" })).toBeVisible();
+  // Titre calculé depuis la date (B2, E1) : la forme réduite n'a plus de titre.
+  await expect(page.getByRole("heading", { level: 1, name: "Lundi 23 novembre" })).toBeVisible();
   await expect(page.locator("#liste-etapes")).toContainText("[Lieu de test 1]");
 });
 
