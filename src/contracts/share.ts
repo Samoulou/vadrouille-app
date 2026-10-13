@@ -62,14 +62,19 @@ export const SharedDaySchema = DaySchema.pick({ index: true, date: true, generat
 });
 export type SharedDay = z.infer<typeof SharedDaySchema>;
 
-/** Voyage partagé : sans identifiant ni organisation ; voyageurs réduits à leur composition. */
+/**
+ * Voyage partagé : sans identifiant ni organisation ; voyageurs réduits à leur composition (`adults`, `children`),
+ * même si un contrat futur ajoute un champ à `Trip.travellers` (nom, âge, adresse : jamais transmis).
+ */
 export const SharedTripSchema = TripBaseSchema.pick({
   destination: true,
   destinationColor: true,
   start: true,
   end: true,
-  travellers: true,
-}).extend({ days: z.array(SharedDaySchema) });
+}).extend({
+  travellers: TripBaseSchema.shape.travellers.pick({ adults: true, children: true }),
+  days: z.array(SharedDaySchema),
+});
 export type SharedTrip = z.infer<typeof SharedTripSchema>;
 
 /** Point de carte d'une étape (F10-TL-14) : aucun terminus, relié à l'étape par sa clé locale au jour. */

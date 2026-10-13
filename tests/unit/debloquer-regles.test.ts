@@ -117,6 +117,18 @@ describe("configuration versionnée : drapeau du paiement simulé (décision 002
     }
   });
 
+  it("aucun fichier ne pose VADROUILLE_DEMO_SHARE, hors les lignes « docker run » du job docker qui vérifient la fermeture (F10-TL-7, C38)", () => {
+    for (const path of configs) {
+      const lines = readFileSync(join(ROOT, path), "utf8").split("\n");
+      const offenders = lines.filter((line) => /VADROUILLE_DEMO_SHARE/.test(line) && !/^\s*docker run .*-e VADROUILLE_DEMO_SHARE=1 /.test(line));
+      expect(offenders, path).toEqual([]);
+    }
+  });
+
+  it("playwright.config.ts pose le drapeau du partage pour les tests (F10-TL-7)", () => {
+    expect(readFileSync(join(ROOT, "playwright.config.ts"), "utf8")).toMatch(/VADROUILLE_DEMO_SHARE: "1"/);
+  });
+
   it("le Dockerfile pose VADROUILLE_ENV=production ; playwright.config.ts pose le drapeau pour les tests", () => {
     expect(readFileSync(join(ROOT, "Dockerfile"), "utf8")).toMatch(/VADROUILLE_ENV=production/);
     expect(readFileSync(join(ROOT, "playwright.config.ts"), "utf8")).toMatch(/VADROUILLE_DEMO_PAYMENT: "1"/);

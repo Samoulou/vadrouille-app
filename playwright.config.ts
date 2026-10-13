@@ -86,11 +86,13 @@ export default defineConfig({
       // relue par les tests (spécification F8, « Aucune persistance locale »).
       stdout: "pipe",
       stderr: "pipe",
-      // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ; seul
-      // fichier versionné qui le pose (tests/unit/dev-pages-env.test.ts).
+      // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ;
+      // VADROUILLE_DEMO_SHARE : partage simulé, idem (décision 0039, F10-TL-7). Seul fichier versionné qui les
+      // pose (tests/unit/debloquer-regles.test.ts).
       env: {
         VADROUILLE_DEV_PAGES: "1",
         VADROUILLE_DEMO_PAYMENT: "1",
+        VADROUILLE_DEMO_SHARE: "1",
         PORT: String(PORT),
         HOSTNAME: "127.0.0.1",
         [SERVER_LOG_ENV]: serverLogPath({ port: PORT, tmpDir: tmpdir() }),

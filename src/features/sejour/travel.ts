@@ -118,13 +118,22 @@ export function tripBudgetLine(days: readonly Pick<Day, "index" | "budgetPerPers
 
 /** Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet ». */
 export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
+  return format(ts.jourParJour.resume, { etapes: dayStopCount(day), duree: formatDuree(day.travelMinutes) });
+}
+
+/**
+ * Nombre d'étapes d'un jour : « 1 étape », « 6 étapes ». Seul résumé de « Jour par jour » dans la vue partagée,
+ * qui ne reçoit aucune durée de trajet totale (F10c).
+ */
+export function dayStopCount(day: { items: readonly { type: string }[] }): string {
   const count = day.items.filter((item) => item.type === "stop").length;
-  const etapes = count === 1 ? ts.jourParJour.etapes.un : format(ts.jourParJour.etapes.plusieurs, { n: count });
-  return format(ts.jourParJour.resume, { etapes, duree: formatDuree(day.travelMinutes) });
+  return count === 1 ? ts.jourParJour.etapes.un : format(ts.jourParJour.etapes.plusieurs, { n: count });
 }
 
 /** Événements de tous les jours (`Day.events`) pour « Pendant ton séjour » : par jour, puis par heure de début. */
-export function tripEvents<D extends Pick<Day, "index" | "events">>(days: readonly D[]): { day: D; event: Stop }[] {
+export function tripEvents<E extends Pick<Stop, "start">, D extends { index: number; events: readonly E[] }>(
+  days: readonly D[],
+): { day: D; event: D["events"][number] }[] {
   return [...days]
     .sort((a, b) => a.index - b.index)
     .flatMap((day) => [...day.events].sort((a, b) => a.start.localeCompare(b.start)).map((event) => ({ day, event })));

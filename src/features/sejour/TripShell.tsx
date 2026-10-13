@@ -16,7 +16,6 @@ import {
 import { flushSync } from "react-dom";
 
 import { DayMap } from "@/components/carte/DayMap";
-import type { FitPadding } from "@/components/carte/types";
 import { DayTabs } from "@/components/ligne/DayTabs";
 import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
@@ -25,9 +24,8 @@ import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, RevisionFixtures, Stop, Trip } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
 import { messages } from "@/i18n";
+import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
-import { useLargeScreen } from "@/lib/large-screen";
-import { useElementSize, type ElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
 
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
@@ -40,6 +38,7 @@ import {
   programmeReducer,
   type ProgrammeActions,
 } from "./programme";
+import { layoutFitPadding, layoutVisibleInsets, useMapLayout } from "./map-layout";
 import { HIGHLIGHT_MS, type RevisionActions } from "./revision";
 import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
@@ -161,22 +160,8 @@ function safeDecode(value: string): string {
   }
 }
 
-/**
- * Marge du cadrage (décision 0022 § 6, amende 0016 § 1.3) : `--touch-target` de chaque côté ; en mobile, le panneau
- * à 55 % de la hauteur de `main` en bas ; en grand écran, rien de plus (le panneau ne couvre pas la carte).
- */
-export function layoutFitPadding(main: ElementSize, largeScreen: boolean): FitPadding {
-  const side = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--touch-target")) || 0;
-  return { top: side, right: side, bottom: largeScreen ? side : DEFAULT_SNAP * main.height, left: side };
-}
-
-/**
- * Partie de la carte couverte par le panneau (décision 0015 § 4, 0022 § 6) : en mobile, `snap` de la hauteur de
- * `main` en bas ; en grand écran, aucune (le recentrage place l'étape au milieu de la zone de la carte).
- */
-export function layoutVisibleInsets(main: ElementSize, snap: SnapPoint, largeScreen: boolean): FitPadding {
-  return { top: 0, right: 0, bottom: largeScreen ? 0 : snap * main.height, left: 0 };
-}
+// Calculs de mise en page communs avec la vue partagée (décision 0039, F10-TL-14) ; réexportés pour les tests.
+export { layoutFitPadding, layoutVisibleInsets };
 
 /**
  * Fait défiler le contenu du panneau pour amener le lien de l'étape au milieu de sa zone visible : à la hauteur
@@ -209,6 +194,11 @@ export interface TripShellProps {
   revisionFixtures?: RevisionFixtures | null;
   /** Données de lieux Google (adaptateur `prototype`, spécification P0) ; `PLACES_FROM_GOOGLE` par défaut. */
   placesFromGoogle?: boolean;
+  /**
+   * Bouton « Partager » sur la carte (spécification F10, F10c) : décidé côté serveur par la mise en page (voyage
+   * débloqué, partage disponible et pas terminé, base `/voyages`) ; absent par défaut.
+   */
+  shareable?: boolean;
   children: ReactNode;
 }
 
@@ -228,6 +218,7 @@ export function TripShell({
   revision: injectedRevision,
   revisionFixtures = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
+  shareable = false,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -262,22 +253,10 @@ export function TripShell({
         : undefined
       : undefined;
 
+  // Hauteur du panneau, mesures de `main`, marge du cadrage et partie couverte de la carte (module commun).
   const [snap, setSnap] = useState<SnapPoint>(DEFAULT_SNAP);
+  const { mainRef, largeScreen, visibleInsets, fitPadding, fitScope } = useMapLayout(snap);
   const bodyRef = useRef<HTMLDivElement>(null);
-  // Mesures du conteneur, pas de la fenêtre (décision 0022 § 6) : `main`, base des hauteurs du panneau.
-  const [mainRef, main] = useElementSize<HTMLElement>();
-  const largeScreen = useLargeScreen();
-  const visibleInsets = useMemo<FitPadding | undefined>(
-    () => (main && main.height > 0 ? layoutVisibleInsets(main, snap, largeScreen) : undefined),
-    [main, snap, largeScreen],
-  );
-  // Marge du cadrage : calculée à la première mesure, puis seulement au passage du seuil (recadrage unique).
-  const [fit, setFit] = useState<{ largeScreen: boolean; padding: FitPadding } | null>(null);
-  if (main && main.height > 0 && (fit === null || fit.largeScreen !== largeScreen)) {
-    setFit({ largeScreen, padding: layoutFitPadding(main, largeScreen) });
-  }
-  const fitPadding = fit?.padding;
-  const fitScope = fit ? (fit.largeScreen ? "grand-ecran" : "mobile") : undefined;
 
   // Fiche : ouverte depuis le panneau du jour (« Fermer » revient dans l'historique) ou directement.
   // Adresse de la fiche marquée par un lien du panneau ; vidée dès que cette fiche se ferme ou change de jour.
@@ -538,6 +517,14 @@ export function TripShell({
     </Link>
   );
 
+  // Contrôles posés sur la carte : « Retour » en haut à gauche, « Partager » en haut à droite (F10c).
+  const controls = (
+    <>
+      {retour}
+      {shareable ? <ShareButton tripId={sourceTrip.id} timeZone={sourceTrip.timeZone} /> : null}
+    </>
+  );
+
   const tabs = (
     <DayTabs
       days={trip.days.map((candidate) => ({
@@ -596,7 +583,7 @@ export function TripShell({
               fitScope={fitScope}
               visibleInsets={visibleInsets}
               onSkipToList={onSkipToList}
-              controls={retour}
+              controls={controls}
               placesFromGoogle={placesFromGoogle}
             />
           ) : (
@@ -604,7 +591,7 @@ export function TripShell({
               mode="overview"
               days={trip.days}
               maps={maps}
-              controls={retour}
+              controls={controls}
               fitPadding={fitPadding}
               fitScope={fitScope}
               placesFromGoogle={placesFromGoogle}

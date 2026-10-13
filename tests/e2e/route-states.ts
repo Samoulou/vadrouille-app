@@ -3,6 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { R1, R2, continueButton, fillTrip, upcomingTrip } from "./creation-helpers";
 import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useScope as createScope } from "./debloquer-helpers";
 import { card, press, toast } from "./presentation-helpers";
+import { RP, RPJ, SHARE_TOKEN_VALIDE, useShareScope } from "./partage-helpers";
 import type { RouteJourneyName, RoutePreparationName, RouteStateName } from "./routes";
 import { askProposal } from "./revision-helpers";
 import { ficheTitle, listStops } from "./sejour-helpers";
@@ -72,6 +73,16 @@ export const ROUTE_PREPARATIONS = {
     await simulate(page, "Simuler un paiement réussi");
     await expectPath(page, R9_RETOUR);
     return { path: pathOf(page), scope: scope.name };
+  },
+  /** `RP` : Séjour partagé du jeton fixe valide, portée au 2026-08-30 (partage en cours). */
+  "partage-sejour": async (page, baseURL) => {
+    const scope = await useShareScope(page.context(), baseURL);
+    return { path: RP(SHARE_TOKEN_VALIDE), scope: scope.name };
+  },
+  /** `RPJ` jour 2 : même portée. */
+  "partage-jour": async (page, baseURL) => {
+    const scope = await useShareScope(page.context(), baseURL);
+    return { path: RPJ(SHARE_TOKEN_VALIDE, 2), scope: scope.name };
   },
 } satisfies Record<RoutePreparationName, RoutePreparation>;
 

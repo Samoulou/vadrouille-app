@@ -35,6 +35,9 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/serve-standalone.mjs", propriete: "on" },
   { fichier: "src/server/actions/creation.test.ts", propriete: "stdout" },
   { fichier: "src/server/actions/creation.test.ts", propriete: "stderr" },
+  // F10c (décision 0039, F10-TL-7) : espion du test « jeton jamais journalisé » (C35). Verdict Sécurité demandé.
+  { fichier: "src/server/actions/partage.test.ts", propriete: "stdout" },
+  { fichier: "src/server/actions/partage.test.ts", propriete: "stderr" },
   // Section 9 (P0a1) : `scripts/p0/main.ts`.
   { fichier: "scripts/p0/main.ts", propriete: "argv" },
   { fichier: "scripts/p0/main.ts", propriete: "exitCode" },
@@ -49,6 +52,8 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/context.ts", noms: ["DATA_ADAPTER"] },
   { fichier: "src/adapters/index.ts", noms: ["DATA_ADAPTER", "PAYMENT_ADAPTER"] },
   { fichier: "src/adapters/payment-guard.ts", noms: ["VADROUILLE_DEMO_PAYMENT", "PAYMENT_ADAPTER", "DATA_ADAPTER"] },
+  // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité demandé.
+  { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
   { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
@@ -64,6 +69,11 @@ export const ENV_ENTIER = [
   {
     fichier: "src/adapters/payment-guard.ts",
     formes: ["defaut:paymentDemoAllowed", "defaut:paymentAvailable", "argument:isProductionDeployment", "argument:paymentDemoAllowed"],
+  },
+  // F10c (décision 0039, F10-TL-7) : même forme que `payment-guard.ts`. Verdict Sécurité demandé.
+  {
+    fichier: "src/adapters/share-guard.ts",
+    formes: ["defaut:shareDemoAvailable", "defaut:shareAvailable", "argument:isProductionDeployment", "argument:shareDemoAvailable"],
   },
   { fichier: "src/adapters/simulation.ts", formes: ["defaut:simulationEnabled", "argument:devPagesEnabled", "argument:isProductionDeployment"] },
   { fichier: "src/dev/flags.ts", formes: ["defaut:devPagesEnabled", "defaut:isProductionDeployment", "defaut:prototypeAdapterAllowed", "argument:isProductionDeployment"] },
