@@ -1,7 +1,9 @@
 import type { Brief, Category, StopFacts, TripCommitment } from "@/contracts";
 
+import type { ConfigClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { Relectures } from "@/domain/relectures";
+import type { PorteeR1 } from "@/domain/validation";
 
 /**
  * Types d'entrée du moteur (décision 0045, B5-TL-1 ; spécification B5a, point 1), construits sur les types de
@@ -77,7 +79,11 @@ export type CandidatIdee = Omit<CandidatMoteur, "typeEtape"> & { raison: string 
 export const ETATS_CHOIX = ["choisi", "garde", "engagement", "ajout"] as const;
 export type EtatChoix = (typeof ETATS_CHOIX)[number];
 
-/** État de choix, par identifiant d'étape. */
+/**
+ * État de choix, par identifiant : identifiant d'étape pour une étape déjà dans le programme (validation R7) ;
+ * identifiant de candidat pour un repas ou une soirée à planifier (B5b : la personne choisit une proposition, qui
+ * désigne un candidat, avant que l'étape existe).
+ */
 export type EtatsDeChoix = ReadonlyMap<string, EtatChoix>;
 
 /** Entrée complète du moteur (B5b et B5c la consomment). */
@@ -91,7 +97,14 @@ export type EntreeMoteur = {
   idees: readonly CandidatIdee[];
   choix: EtatsDeChoix;
   configuration: ConfigurationMoteur;
+  /**
+   * Formule de classement (B5b point 2 ; décision 0045 § 4.4 : elle reste dans `prototype/config/classement.json`
+   * tant que P0 tourne, validée par `ConfigClassementSchema`) et âge maximal d'une source, en jours.
+   */
+  classement: { formule: ConfigClassement; ageSourceMaxJours: number };
   relectures: Relectures;
+  /** Portée de R1 (B5-PO-4) ; absente : `PORTEE_R1_PAR_DEFAUT` (question Q332 ouverte). */
+  porteeR1?: Partial<PorteeR1>;
   /** Date de référence (AAAA-MM-JJ) : jamais lue sur une horloge (0045 § 3.4). */
   dateReference: string;
   /** Numéro de la version à produire (identifiants `v<n>-j<jour>-<rang>`, 0045 § 3.5). */
