@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { isPrototypeAdapter } from "@/adapters";
+import { getRequestContext, getRevisionFixtures, isPrototypeAdapter } from "@/adapters";
 import { format, messages } from "@/i18n";
 
 import { findFicheTarget } from "./fiche";
-import { dayFromParam, loadTrip } from "./load";
+import { dayFromParam, loadTrip, replaceTargetOf } from "./load";
 import type { TripRoutesBase } from "./routes";
 import { SejourOriginProvider } from "./SejourOrigin";
 import { TripShell } from "./TripShell";
@@ -27,8 +27,16 @@ const ROBOTS = { index: false, follow: false } as const;
 export async function TripLayout({ tripId, base, children }: { tripId: string; base: TripRoutesBase; children: ReactNode }) {
   const data = await loadTrip(tripId);
   if (!data) notFound();
+  // Jeu simulé de révision (F7, décision 0016 § 6) : adaptateur `mock` seulement, sinon `null`.
+  const revisionFixtures = await getRevisionFixtures(getRequestContext(), tripId);
   return (
-    <TripShell trip={data.trip} maps={data.maps} base={base} placesFromGoogle={isPrototypeAdapter()}>
+    <TripShell
+      trip={data.trip}
+      maps={data.maps}
+      base={base}
+      placesFromGoogle={isPrototypeAdapter()}
+      revisionFixtures={revisionFixtures}
+    >
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>
   );
@@ -53,4 +61,13 @@ export async function journeeMetadata(tripId: string, n: string, etape?: string 
     ? format(t.etape, { name: fiche.stop.name, n: day.index })
     : format(t.jour, { destination: data.trip.destination, n: day.index });
   return { title, robots: ROBOTS };
+}
+
+/** Titre du document de l'écran 14 : « Remplacer {nom} · Jour {n} » (F7-PO-2) ; rien hors programme (404). */
+export async function remplacerMetadata(tripId: string, n: string, stopId: string): Promise<Metadata> {
+  const data = await loadTrip(tripId);
+  const day = data ? dayFromParam(data.trip, n) : null;
+  const stop = day ? replaceTargetOf(day, stopId) : null;
+  if (!day || !stop) return { robots: ROBOTS };
+  return { title: format(messages.revision.titreDocument.remplacer, { name: stop.name, n: day.index }), robots: ROBOTS };
 }

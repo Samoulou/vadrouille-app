@@ -126,6 +126,17 @@ export interface DayLineStopProps {
   /** Une ligne : heure, nom, étiquette d'état et `Tag` ; ni faits, ni raison, ni mention de verrou. */
   compact?: boolean;
   state?: DayLineStopState;
+  /**
+   * Étape modifiée, surlignée 2 s après « Appliquer » (F7, décision 0016 § 9 ; rendu de 0018 § 9) : fond `muted`
+   * derrière la ligne et arrêt plein `line`, texte en `ink` ; fondu bref à la fin, sans transition sous
+   * `prefers-reduced-motion`.
+   */
+  highlighted?: boolean;
+  /**
+   * Ligne d'une Journée qui peut être surlignée (`highlightedStopIds` fourni) : fondu bref du fond et du marqueur.
+   * Sans elle, aucune transition (section « Ligne » de /dev/composants, vues en lecture seule).
+   */
+  fades?: boolean;
 }
 
 /**
@@ -138,8 +149,13 @@ export interface DayLineStopProps {
  * complément (jamais la seule couleur), sans `Tag` : le jaune `quai` ne signale qu'une action requise
  * (handover § 0 règle 6, § 4.2), et une étape terminée n'en demande plus.
  */
-function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
+/** Fondu du surlignage (0018 § 9), retiré sous `prefers-reduced-motion`. */
+const FONDU = "transition-colors duration-200 motion-reduce:transition-none";
+
+function StopRow({ stop, href, compact = false, state, highlighted = false, fades = false }: DayLineStopProps) {
   const past = state === "past";
+  // Pendant le surlignage, tout le texte reste en `ink` sur `muted` (exception voulue, 0018 § 9).
+  const soft = highlighted ? "text-ink" : "text-ink-soft";
   const faits = formatFaits(stop.facts);
   const body = (
     <>
@@ -153,12 +169,12 @@ function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
         </>
       ) : null}
       {compact || faits === "" ? null : (
-        <span data-part="faits" className="text-corps-s text-ink-soft">
+        <span data-part="faits" className={cn("text-corps-s", soft)}>
           {faits}
         </span>
       )}
       {!compact && stop.locked ? (
-        <span data-part="verrou" className="text-legende text-ink-soft">
+        <span data-part="verrou" className={cn("text-legende", soft)}>
           {t.verrouillee}
         </span>
       ) : null}
@@ -177,11 +193,17 @@ function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
       data-type="stop"
       data-locked={stop.locked ? "true" : undefined}
       data-state={state}
+      data-highlighted={highlighted ? "true" : undefined}
       aria-current={state === "current" ? "step" : undefined}
-      className={ROW}
+      className={cn(
+        ROW,
+        "rounded-control",
+        fades ? FONDU : undefined,
+        highlighted ? "bg-muted" : "bg-transparent",
+      )}
     >
       <Heure className={past ? "text-ink-soft" : undefined}>{stop.start}</Heure>
-      <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" />} />
+      <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" filled={highlighted} className={fades ? FONDU : undefined} />} />
       {href === undefined ? (
         <div data-part="arret" className={cn("flex min-w-0 flex-col items-start gap-1", compact ? "pb-3" : "pb-4")}>
           {body}
@@ -285,6 +307,8 @@ export interface DayLineProps<S extends DayLineViewStop = Stop> {
   currentKey?: string;
   /** Étape passée : étiquette « Terminée ». Sans effet sur un terminus, un segment, un temps libre ou un repas. */
   isPast?: (stop: S) => boolean;
+  /** Identifiants des étapes surlignées après une modification (F7, décision 0016 § 9) ; sans la prop, rien ne change. */
+  highlightedStopIds?: readonly string[];
   className?: string;
 }
 
@@ -305,6 +329,7 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
   compact = false,
   currentKey,
   isPast,
+  highlightedStopIds,
   className,
 }: DayLineProps<S>) {
   return (
@@ -318,7 +343,15 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
             const state: DayLineStopState | undefined =
               currentKey !== undefined && key === currentKey ? "current" : isPast?.(item.stop) ? "past" : undefined;
             return (
-              <StopRow key={`stop-${key}`} stop={item.stop} href={getStopHref?.(item.stop)} compact={compact} state={state} />
+              <StopRow
+                key={`stop-${key}`}
+                stop={item.stop}
+                href={getStopHref?.(item.stop)}
+                compact={compact}
+                state={state}
+                highlighted={item.stop.id !== undefined && (highlightedStopIds?.includes(item.stop.id) ?? false)}
+                fades={highlightedStopIds !== undefined}
+              />
             );
           }
           case "segment":

@@ -4,6 +4,7 @@ import { R1, R2, continueButton, fillTrip, upcomingTrip } from "./creation-helpe
 import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useScope as createScope } from "./debloquer-helpers";
 import { card, press, toast } from "./presentation-helpers";
 import type { RouteJourneyName, RoutePreparationName, RouteStateName } from "./routes";
+import { askProposal } from "./revision-helpers";
 import { ficheTitle, listStops } from "./sejour-helpers";
 
 /**
@@ -25,6 +26,10 @@ export const ROUTE_STATES = {
     await expect(card(page)).toBeVisible();
     await press(page, "Pas pour moi");
     await expect(toast(page)).toBeVisible();
+  },
+  /** Écran 14 : raison « Pas mon style », proposition affichée avec son aperçu des effets (F7a, C29). */
+  "proposition-affichee": async (page) => {
+    await askProposal(page, "Pas mon style");
   },
 } satisfies Record<RouteStateName, RouteStateAction>;
 

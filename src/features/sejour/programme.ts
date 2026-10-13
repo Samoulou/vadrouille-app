@@ -1,4 +1,6 @@
-import type { ChecklistItem, Day, DayLineItem, Stop, Trip } from "@/contracts";
+import type { ChecklistItem, Day, DayLineItem, RevisionFixtures, RevisionPreview, Stop, Trip } from "@/contracts";
+
+import { abortReason, deepEqual, lockedStopViolations, type RevisionActions } from "./revision";
 
 /**
  * Actions locales du programme (spécification F5, F5-TL-6 ; décision 0015 § 6).
@@ -27,8 +29,13 @@ export interface ProgrammeActions {
 export interface ProgrammeState {
   /** Verrous modifiés, par identifiant d'étape ; une étape revenue à sa valeur d'origine n'y figure pas. */
   locks: Readonly<Record<string, boolean>>;
-  /** État avant la dernière modification annulable (verrou), ou `null`. */
-  previous: { locks: Readonly<Record<string, boolean>> } | null;
+  /**
+   * Jours remplacés par une révision appliquée (F7, décision 0016 § 5), par numéro de jour : brouillon complet
+   * du jour, à la place de celui de l'adaptateur.
+   */
+  days: Readonly<Record<number, Day>>;
+  /** État avant la dernière modification annulable (verrou ou révision), ou `null`. */
+  previous: { locks: Readonly<Record<string, boolean>>; days: Readonly<Record<number, Day>> } | null;
   /** Lignes de la liste modifiées, par identifiant ; une ligne revenue à sa valeur d'origine n'y figure pas. */
   checklist: Readonly<Record<string, boolean>>;
 }
@@ -37,10 +44,12 @@ export type ProgrammeEvent =
   /** `base` : valeur de `locked` dans les données de l'adaptateur. */
   | { type: "setStopLocked"; stopId: Stop["id"]; locked: boolean; base: boolean }
   | { type: "undo" }
+  /** Révision appliquée (remplacement ; ajout et déplacement avec F7b et F7c) : jours touchés du brouillon. */
+  | { type: "applyRevision"; days: readonly Day[] }
   /** `base` : valeur de `done` dans les données de l'adaptateur. */
   | { type: "setChecklistItemDone"; itemId: ChecklistItem["id"]; done: boolean; base: boolean };
 
-export const INITIAL_PROGRAMME: ProgrammeState = { locks: {}, previous: null, checklist: {} };
+export const INITIAL_PROGRAMME: ProgrammeState = { locks: {}, days: {}, previous: null, checklist: {} };
 
 /**
  * Réducteur pur : une modification du programme à la fois, annulable une fois (handover § 7). Cocher ou
@@ -52,10 +61,15 @@ export function programmeReducer(state: ProgrammeState, event: ProgrammeEvent): 
       const locks: Record<string, boolean> = { ...state.locks };
       if (event.locked === event.base) delete locks[event.stopId];
       else locks[event.stopId] = event.locked;
-      return { ...state, locks, previous: { locks: state.locks } };
+      return { ...state, locks, previous: { locks: state.locks, days: state.days } };
+    }
+    case "applyRevision": {
+      const days: Record<number, Day> = { ...state.days };
+      for (const day of event.days) days[day.index] = day;
+      return { ...state, days, previous: { locks: state.locks, days: state.days } };
     }
     case "undo":
-      return state.previous ? { ...state, locks: state.previous.locks, previous: null } : state;
+      return state.previous ? { ...state, locks: state.previous.locks, days: state.previous.days, previous: null } : state;
     case "setChecklistItemDone": {
       const checklist: Record<string, boolean> = { ...state.checklist };
       if (event.done === event.base) delete checklist[event.itemId];
@@ -74,14 +88,19 @@ function applyToItem(item: DayLineItem, locks: ProgrammeState["locks"]): DayLine
 /** Voyage affiché : données de l'adaptateur et écarts de l'état. Sans écart, le voyage est renvoyé tel quel. */
 export function applyProgramme(trip: Trip, state: ProgrammeState): Trip {
   const hasLocks = Object.keys(state.locks).length > 0;
+  const hasDays = Object.keys(state.days).length > 0;
   const checklist = state.checklist;
   const hasChecklist = Object.keys(checklist).length > 0;
-  if (!hasLocks && !hasChecklist) return trip;
+  if (!hasLocks && !hasChecklist && !hasDays) return trip;
   return {
     ...trip,
-    days: hasLocks
-      ? trip.days.map((day): Day => ({ ...day, items: day.items.map((item) => applyToItem(item, state.locks)) }))
-      : trip.days,
+    days:
+      hasLocks || hasDays
+        ? trip.days.map((source): Day => {
+            const day = state.days[source.index] ?? source;
+            return hasLocks ? { ...day, items: day.items.map((item) => applyToItem(item, state.locks)) } : day;
+          })
+        : trip.days,
     checklist: hasChecklist
       ? trip.checklist.map((item) => {
           const done = checklist[item.id];
@@ -106,20 +125,77 @@ export function baseChecklistDone(trip: Trip, itemId: ChecklistItem["id"]): bool
   return trip.checklist.find((item) => item.id === itemId)?.done ?? false;
 }
 
+/** Actions du programme et de la révision : un seul objet, une seule version (décision 0016 § 5). */
+export type MemoryProgramme = ProgrammeActions & RevisionActions;
+
 /**
- * Implémentation en mémoire (phase 0) : elle applique les événements au réducteur de l'écran par
- * `dispatch`. Elle n'envoie aucun événement de mesure (décision 0015 § 6).
+ * Implémentation en mémoire (phase 0) : elle applique les événements au réducteur de l'écran par `dispatch` et en
+ * garde une copie (même réducteur pur, mêmes événements), pour vérifier versions, verrous et jours courants. Une
+ * seule source de vérité pour le programme et la révision (décision 0016 § 5) : la version locale, à 0 au
+ * chargement, augmente à chaque verrou, application ou annulation ; poser un verrou rend un remplacement
+ * définitif, et inversement. Elle n'envoie aucun événement de mesure (décision 0015 § 6).
+ *
+ * `fixtures` : jeu simulé de révision lu par la mise en page du voyage ; sans lui, chaque demande d'aperçu répond
+ * « aucune option compatible ». Un brouillon n'est servi que si les jours qu'il touche sont encore ceux de
+ * l'adaptateur (limite assumée de la phase 0, sans moteur), et s'il ne touche aucune étape verrouillée.
  */
-export function createMemoryProgramme(trip: Trip, dispatch: (event: ProgrammeEvent) => void): ProgrammeActions {
+export function createMemoryProgramme(
+  trip: Trip,
+  dispatch: (event: ProgrammeEvent) => void,
+  fixtures: RevisionFixtures | null = null,
+): MemoryProgramme {
+  let state = INITIAL_PROGRAMME;
+  let version = 0;
+  let serial = 0;
+  const previews = new Map<string, RevisionPreview>();
+  const send = (event: ProgrammeEvent) => {
+    state = programmeReducer(state, event);
+    dispatch(event);
+  };
+  const currentDays = () => applyProgramme(trip, state).days;
+
   return {
     async setStopLocked(stopId, locked) {
-      dispatch({ type: "setStopLocked", stopId, locked, base: baseLocked(trip, stopId) });
+      send({ type: "setStopLocked", stopId, locked, base: baseLocked(trip, stopId) });
+      version += 1;
     },
     async undo() {
-      dispatch({ type: "undo" });
+      send({ type: "undo" });
+      version += 1;
     },
     async setChecklistItemDone(itemId, done) {
-      dispatch({ type: "setChecklistItemDone", itemId, done, base: baseChecklistDone(trip, itemId) });
+      send({ type: "setChecklistItemDone", itemId, done, base: baseChecklistDone(trip, itemId) });
+    },
+    version: () => version,
+    async previewReplacement(request, { signal }) {
+      await Promise.resolve();
+      if (signal.aborted) throw abortReason(signal);
+      if (request.baseVersion !== version) return { ok: false, error: "conflict" };
+      const draft = fixtures?.replacements.find((fixture) => fixture.stopId === request.stopId)?.draft;
+      if (!draft) return { ok: false, error: "noOption" };
+      const days = currentDays();
+      const unchanged = draft.days.every((draftDay) =>
+        deepEqual(
+          days.find((day) => day.index === draftDay.index),
+          trip.days.find((day) => day.index === draftDay.index),
+        ),
+      );
+      if (!unchanged) return { ok: false, error: "noOption" };
+      if (lockedStopViolations(days, draft.days).length > 0) return { ok: false, error: "lockedStop" };
+      serial += 1;
+      const preview: RevisionPreview = { kind: "replace", id: `apercu-${serial}`, baseVersion: version, ...draft };
+      previews.set(preview.id, preview);
+      return { ok: true, preview };
+    },
+    async apply(previewId) {
+      const preview = previews.get(previewId);
+      if (!preview) return { ok: false, error: "error" };
+      if (preview.baseVersion !== version) return { ok: false, error: "conflict" };
+      if (lockedStopViolations(currentDays(), preview.days).length > 0) return { ok: false, error: "lockedStop" };
+      send({ type: "applyRevision", days: preview.days });
+      version += 1;
+      previews.delete(previewId);
+      return { ok: true, version };
     },
   };
 }

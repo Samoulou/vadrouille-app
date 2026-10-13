@@ -81,3 +81,29 @@ describe("SegmentedControl", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 });
+
+describe("SegmentedControl vertical (raisons de l'écran 14, F7a)", () => {
+  it("`aria-orientation` vertical, nommé par un titre externe, aucune option cochée, coche sur l'option choisie", async () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(
+      <>
+        <h2 id="titre-raisons">Pourquoi ?</h2>
+        <SegmentedControl label="Pourquoi ?" labelledBy="titre-raisons" options={OPTIONS} value={null} orientation="vertical" onChange={onChange} />
+      </>,
+    );
+    const group = screen.getByRole("radiogroup", { name: "Pourquoi ?" });
+    expect(group).toHaveAttribute("aria-orientation", "vertical");
+    expect(group).toHaveAttribute("aria-labelledby", "titre-raisons");
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(screen.getByRole("radio", { name: "Soutenu" }));
+    expect(onChange).toHaveBeenCalledWith("soutenu");
+    rerender(
+      <>
+        <h2 id="titre-raisons">Pourquoi ?</h2>
+        <SegmentedControl label="Pourquoi ?" labelledBy="titre-raisons" options={OPTIONS} value="soutenu" orientation="vertical" onChange={onChange} />
+      </>,
+    );
+    expect(screen.getByRole("radio", { name: "Soutenu" })).toHaveAttribute("aria-checked", "true");
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});

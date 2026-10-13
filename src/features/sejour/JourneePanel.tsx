@@ -18,6 +18,8 @@ export interface JourneePanelProps {
   routes: TripRoutes;
   /** Mention « Données de lieux : Google » (adaptateur `prototype`) ; `PLACES_FROM_GOOGLE` par défaut. */
   placesFromGoogle?: boolean;
+  /** Étapes surlignées 2 s après une modification (F7, décision 0016 § 9). */
+  highlightedStopIds?: readonly string[];
 }
 
 /**
@@ -25,13 +27,20 @@ export interface JourneePanelProps {
  * ligne trajet/budget, bandeaux (préparation, trajet), ligne du jour, « Événements du jour »,
  * « Surprends-moi », mention d'attribution. Un jour en préparation n'affiche que son bandeau et ses événements.
  */
-export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE }: JourneePanelProps) {
+export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE, highlightedStopIds }: JourneePanelProps) {
   const banner = day.generating ? null : travelBannerMessage(day);
 
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
       <header className="flex flex-col gap-1">
-        <h1 className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{formatTitreJour(day.date)}</h1>
+        {/* Focusable par script seulement : cible du focus après l'annulation d'une modification (F7-PO-1). */}
+        <h1
+          tabIndex={-1}
+          data-part="titre-jour"
+          className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink"
+        >
+          {formatTitreJour(day.date)}
+        </h1>
         {day.generating ? null : (
           <p data-part="trajet-budget" className="text-corps-s text-ink-soft tabular-nums">
             {dayTravelLine(day)}
@@ -49,6 +58,7 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
             items={day.items}
             getStopHref={(stop) => routes.etape(day.index, stop.id)}
             getIdeasHref={(free) => routes.ajouter(day.index, free)}
+            highlightedStopIds={highlightedStopIds}
           />
         </div>
       )}

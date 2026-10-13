@@ -3,6 +3,7 @@ import {
   DaySchema,
   PreviewSlotsSchema,
   ProposalSchema,
+  RevisionFixturesSchema,
   TripSchema,
   TripSummarySchema,
   countToReserve,
@@ -10,6 +11,7 @@ import {
   type DayMap,
   type PreviewSlot,
   type Proposal,
+  type RevisionFixtures,
   type Trip,
   type TripSummary,
 } from "@/contracts";
@@ -26,6 +28,7 @@ import {
   propositionsDebloque,
 } from "@/mocks/edimbourg";
 import { deriveEdimbourgCarte, edimbourgCarte } from "@/mocks/edimbourg-carte";
+import { edimbourgRevision } from "@/mocks/edimbourg-revision";
 
 import type { AdapterContext, TripAdapter } from "./types";
 
@@ -170,3 +173,24 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
 }
 
 export const mockTripAdapter: TripAdapter = createMockTripAdapter();
+
+/** Jeux simulés de révision par voyage (décision 0016 § 6) : le voyage débloqué hérite de celui d'Édimbourg. */
+const REVISION_FIXTURES: Readonly<Record<string, RevisionFixtures>> = {
+  [EDIMBOURG_TRIP_ID]: edimbourgRevision,
+  [EDIMBOURG_DEBLOQUE_TRIP_ID]: edimbourgRevision,
+};
+
+/**
+ * Jeu simulé de révision d'un voyage (spécification F7, F7-TL-3 ; décision 0016 § 6), validé par
+ * `RevisionFixturesSchema` : même isolation par organisation que `getTrip` (`null` pour un voyage inconnu ou d'une
+ * autre organisation), `null` pour un voyage sans jeu de révision.
+ */
+export async function getMockRevisionFixtures(
+  ctx: AdapterContext,
+  tripId: string,
+  adapter: TripAdapter = mockTripAdapter,
+): Promise<RevisionFixtures | null> {
+  const trip = await adapter.getTrip(ctx, tripId);
+  if (!trip || !Object.hasOwn(REVISION_FIXTURES, tripId)) return null;
+  return RevisionFixturesSchema.parse(REVISION_FIXTURES[tripId]);
+}

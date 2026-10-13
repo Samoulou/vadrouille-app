@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import {
   ActionBanner,
   Button,
+  ChangeSet,
   ChecklistRow,
   Chip,
   Counter,
@@ -30,7 +31,7 @@ import {
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
-import type { ChecklistMoment, DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
+import type { Change, ChecklistMoment, DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
 import { formatContexte } from "@/features/presentation/contexte";
 import { format, messages } from "@/i18n";
 
@@ -98,6 +99,30 @@ const DEMO_ADDITIONS: DayLineItem[] = [
     },
   },
 ];
+
+/** F7a (critère C10) : un changement de chaque type, budget en hausse puis en baisse ; `unchanged` et un budget nul ne sont pas rendus. */
+const rv = ex.revision;
+const DEMO_CHANGES: Change[] = [
+  { type: "replaced", time: "10:55", before: rv.ancien, after: rv.nouveau },
+  { type: "added", time: "15:00", label: rv.ajoute },
+  { type: "moved", label: rv.deplace, before: { day: 2, time: "13:25" }, after: { day: 2, time: "14:10" } },
+  { type: "moved", label: rv.deplace, before: { day: 2, time: "13:25" }, after: { day: 4, time: "15:45" } },
+  { type: "segment", label: rv.nouveau, before: 20, after: 25, estimated: false },
+  { type: "segment", label: rv.trajet, before: 15, after: 10, estimated: true },
+  { type: "budget", deltaPerPerson: 15 },
+];
+const DEMO_CHANGES_DOWN: Change[] = [
+  { type: "unchanged", time: "19:00", label: rv.trajet },
+  { type: "budget", deltaPerPerson: 0 },
+  { type: "budget", deltaPerPerson: -8 },
+];
+/** Étape surlignée après « Appliquer » : la deuxième étape de la séquence de DayLine. */
+const DEMO_HIGHLIGHTED = ["demo-2"] as const;
+const REASON_DEMO_OPTIONS = [
+  { value: "notMyStyle", label: messages.revision.remplacer.raisons.notMyStyle },
+  { value: "tooBusy", label: messages.revision.remplacer.raisons.tooBusy },
+  { value: "other", label: messages.revision.remplacer.raisons.other },
+] as const;
 
 /** F10a (F10-TL-12) : ligne compacte de l'écran 15, en lecture seule, avec une étape terminée et une en cours. */
 const pd = ex.pendant;
@@ -517,6 +542,24 @@ export function ComposantsShowcase() {
         </State>
         <State label={t.etats.ligneReduite}>
           <DayLine items={DEMO_REDUITE} className="w-full" />
+        </State>
+      </Section>
+
+      <Section id="revision" title={rv.titre}>
+        <State label={t.etats.changeSet}>
+          <ChangeSet changes={DEMO_CHANGES} className="w-full" />
+        </State>
+        <State label={t.etats.changeSetBaisse}>
+          <ChangeSet changes={DEMO_CHANGES_DOWN} className="w-full" />
+        </State>
+        <State label={t.etats.surlignee}>
+          <DayLine items={DEMO_LINE} getStopHref={stopHref} highlightedStopIds={DEMO_HIGHLIGHTED} className="w-full" />
+        </State>
+        <State label={t.etats.raisonsVerticales}>
+          <div className="flex w-full flex-col gap-4">
+            <SegmentedControl label={rv.raisons} options={REASON_DEMO_OPTIONS} value={null} orientation="vertical" onChange={() => {}} />
+            <SegmentedControl label={rv.raisons} options={REASON_DEMO_OPTIONS} value="tooBusy" orientation="vertical" onChange={() => {}} />
+          </div>
         </State>
       </Section>
     </main>

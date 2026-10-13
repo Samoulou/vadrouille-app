@@ -20,6 +20,16 @@ export interface SegmentedControlProps<T extends string> {
   /** Nom accessible du groupe (« Rythme »). */
   label: string;
   /**
+   * Identifiant du titre qui nomme le groupe (« Pourquoi la remplacer ? ») : `aria-labelledby` à la place de
+   * `aria-label`, pour que le nom ne soit pas écrit deux fois.
+   */
+  labelledBy?: string;
+  /**
+   * `vertical` (décision 0016 § 8, rendu de 0018 § 6) : une option par rangée, pleine largeur, libellé aligné à
+   * gauche, coche de 20 px devant l'option choisie (indice non coloré). `horizontal` par défaut (rendu de 0012).
+   */
+  orientation?: "horizontal" | "vertical";
+  /**
    * Valeur déduite (brief raconté, décision 0017 § 6, F8-TL-4) : son option porte la marque « déduit » tant
    * qu'elle est choisie. L'écran la retire dès que la personne touche au groupe. Sans elle, rien ne change.
    */
@@ -48,6 +58,8 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   label,
+  labelledBy,
+  orientation = "horizontal",
   inferredValue,
   describedBy,
   invalid = false,
@@ -62,6 +74,7 @@ export function SegmentedControl<T extends string>({
   const tabStop = selectedIndex === -1 ? 0 : selectedIndex;
   const inferred = inferredValue !== undefined && value === inferredValue;
   const description = [inferred ? inferredId : undefined, describedBy].filter(Boolean).join(" ") || undefined;
+  const vertical = orientation === "vertical";
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let target: number;
@@ -92,11 +105,13 @@ export function SegmentedControl<T extends string>({
       ref={groupRef}
       id={id}
       role="radiogroup"
-      aria-label={label}
+      aria-label={labelledBy ? undefined : label}
+      aria-labelledby={labelledBy}
+      aria-orientation={vertical ? "vertical" : undefined}
       aria-describedby={description}
       aria-invalid={invalid || undefined}
       tabIndex={-1}
-      className={cn("flex w-full gap-1 rounded-control bg-muted p-1", className)}
+      className={cn("flex w-full gap-1 rounded-control bg-muted p-1", vertical && "flex-col", className)}
     >
       {options.map((option, index) => {
         const checked = option.value === value;
@@ -119,7 +134,8 @@ export function SegmentedControl<T extends string>({
             }}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "inline-flex min-h-(--touch-target) flex-1 cursor-pointer items-center justify-center gap-1 rounded-control px-3 text-corps",
+              "inline-flex min-h-(--touch-target) cursor-pointer items-center gap-1 rounded-control text-corps",
+              vertical ? "w-full justify-start px-4 text-left" : "flex-1 justify-center px-3",
               marked
                 ? "border-(length:--ligne-trait-controle) border-dashed border-ink bg-raised bg-clip-padding font-bold text-ink"
                 : checked
@@ -127,8 +143,13 @@ export function SegmentedControl<T extends string>({
                   : "bg-transparent font-semibold text-ink-2",
             )}
           >
-            {/* Coche du jeu Ligne, seulement sur l'option déduite : le pointillé n'est jamais la seule information. */}
-            {marked ? <IconCoche data-part="segment-check" className="size-(--ligne-icone-petite)" /> : null}
+            {/* Coche du jeu Ligne : option déduite (le pointillé n'est jamais la seule information), ou option choisie en vertical. */}
+            {marked || (vertical && checked) ? (
+              <IconCoche data-part="segment-check" className="size-(--ligne-icone-petite) shrink-0" />
+            ) : vertical ? (
+              // Place de la coche réservée : les libellés restent alignés (0018 § 6).
+              <span aria-hidden="true" className="size-(--ligne-icone-petite) shrink-0" />
+            ) : null}
             {option.label}
           </button>
         );

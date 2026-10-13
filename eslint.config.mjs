@@ -335,6 +335,8 @@ export default defineConfig([
       "src/components/ligne/sheet-model.ts",
       "src/components/ligne/ReasonBlock.tsx",
       "src/components/ligne/ChecklistRow.tsx",
+      // F7a : aperçu des effets (spécification F7, C3).
+      "src/components/ligne/ChangeSet.tsx",
       "src/lib/pointer.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}"],
