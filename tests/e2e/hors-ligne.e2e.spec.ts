@@ -14,6 +14,7 @@ import {
   R_REPLI,
   waitForActiveWorker,
 } from "./hors-ligne-helpers";
+import { RP, SHARE_TOKEN_VALIDE, createShareScope } from "./partage-helpers";
 
 /**
  * Manifeste, service worker et page de repli hors ligne (spécification F10, F10b ; critères C21 à C26). Les service
@@ -77,10 +78,11 @@ test.describe("manifeste (C21)", () => {
   });
 });
 
-test("hors-ligne: rien avant l'écran 15", async ({ page }) => {
-  // C22 : parcours Séjour, Journée, Fiche et présentation, sans ouvrir R15. La vue partagée (F10c) n'existe pas
-  // encore : F10c ajoute son adresse à ce parcours.
-  for (const path of [SEJOUR, JOURNEE, FICHE, PRESENTATION, "/"]) {
+test("hors-ligne: rien avant l'écran 15", async ({ page, context, baseURL }) => {
+  // C22 : parcours Séjour, Journée, Fiche, présentation et vue partagée (F10c, décision 0039), sans ouvrir R15.
+  // La vue partagée est lue dans une portée explicite, à une date où le lien fixe est valable.
+  await createShareScope(context, baseURL!);
+  for (const path of [SEJOUR, JOURNEE, FICHE, PRESENTATION, RP(SHARE_TOKEN_VALIDE), "/"]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(200);
   }

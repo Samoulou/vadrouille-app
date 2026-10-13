@@ -122,7 +122,7 @@ export function SharedShell({ token, days, current, maps, placesFromGoogle, chil
           />
         )}
       </div>
-      <Sheet label={t.region} snap={snap} onSnapChange={setSnap} header={tabs} sideOnLargeScreen>
+      <Sheet label={t.region} snap={snap} onSnapChange={setSnap} header={tabs} sideOnLargeScreen focusableBody>
         {children}
       </Sheet>
     </main>

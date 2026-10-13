@@ -20,9 +20,9 @@ const IMPORTS = ["no-restricted-imports", "@typescript-eslint/no-restricted-impo
 
 describe("partage : règles ESLint (F10c)", () => {
   it.each(FILES)("refuse src/mocks et les jetons fixes dans %s", async (filePath) => {
-    for (const module of ["@/mocks/edimbourg", "@/mocks/edimbourg-partage"]) {
-      const code = `import * as m from "${module}";\nexport const e = m;\n`;
-      expect(await messagesFor(code, filePath, IMPORTS), module).toHaveLength(1);
+    for (const specifier of ["@/mocks/edimbourg", "@/mocks/edimbourg-partage"]) {
+      const code = `import * as m from "${specifier}";\nexport const e = m;\n`;
+      expect(await messagesFor(code, filePath, IMPORTS), specifier).toHaveLength(1);
     }
   });
 
@@ -62,9 +62,9 @@ describe("partage : règles ESLint (F10c)", () => {
     const filePath = "src/features/partage/ShareSheet.tsx";
     const allowed = `import { createShareLink } from "@/server/actions/partage";\nexport const c = createShareLink;\n`;
     expect(await messagesFor(allowed, filePath, IMPORTS)).toEqual([]);
-    for (const module of ["@/server/actions/paiement", "@/server/parse-input", "@/server/config/offer", "../../server/actions/paiement"]) {
-      const code = `import * as s from "${module}";\nexport const x = s;\n`;
-      expect(await messagesFor(code, filePath, IMPORTS), module).toHaveLength(1);
+    for (const specifier of ["@/server/actions/paiement", "@/server/parse-input", "@/server/config/offer", "../../server/actions/paiement"]) {
+      const code = `import * as s from "${specifier}";\nexport const x = s;\n`;
+      expect(await messagesFor(code, filePath, IMPORTS), specifier).toHaveLength(1);
     }
   });
 

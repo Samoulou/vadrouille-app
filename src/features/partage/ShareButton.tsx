@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 /** Feuille chargée à la demande : hors du JavaScript initial du Séjour et de la Journée (décision 0039, F10-TL-10). */
 const loadSheet = () => import("./ShareSheet");
-const ShareSheet = lazy(() => loadSheet().then((module) => ({ default: module.ShareSheet })));
+const ShareSheet = lazy(() => loadSheet().then((loaded) => ({ default: loaded.ShareSheet })));
 
 /** Préchargement au survol ou au focus ; un échec (réseau) est retenté par l'ouverture elle-même. */
 function preload() {

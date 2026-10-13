@@ -103,10 +103,16 @@ describe("RP", () => {
   });
 
   it.each([
-    ["DATA_ADAPTER=api", { DATA_ADAPTER: "api" }],
-    ["déploiement de production", { VADROUILLE_ENV: "production", VADROUILLE_DEMO_SHARE: "1" }],
-  ])("garde fermée (%s) : 404 sans rien lire", async (_label, env) => {
-    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    ["DATA_ADAPTER=api", () => vi.stubEnv("DATA_ADAPTER", "api")],
+    [
+      "déploiement de production",
+      () => {
+        vi.stubEnv("VADROUILLE_ENV", "production");
+        vi.stubEnv("VADROUILLE_DEMO_SHARE", "1");
+      },
+    ],
+  ])("garde fermée (%s) : 404 sans rien lire", async (_label, close) => {
+    close();
     await expect(rp(SHARE_TOKEN_VALIDE)).rejects.toMatchObject(notFound);
     await expect(rpj(SHARE_TOKEN_VALIDE, "2")).rejects.toMatchObject(notFound);
     for (const spy of [adapters.getShareAdapter, adapters.getSimulationScope, adapters.getRequestContext, adapters.getTripReader]) {

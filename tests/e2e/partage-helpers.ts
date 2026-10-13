@@ -30,7 +30,7 @@ export async function controlScope(request: APIRequestContext, baseURL: string, 
 }
 
 /** Portée explicite pour tout le contexte, remise au `now` du partage (ou à l'instant donné). */
-export async function useShareScope(context: BrowserContext, baseURL: string, now = SHARE_NOW): Promise<Scope> {
+export async function createShareScope(context: BrowserContext, baseURL: string, now = SHARE_NOW): Promise<Scope> {
   const name = `f10c-${randomUUID()}`;
   await sendScope(context, baseURL, name);
   const control = (body: Record<string, unknown>) => controlScope(context.request, baseURL, name, body);

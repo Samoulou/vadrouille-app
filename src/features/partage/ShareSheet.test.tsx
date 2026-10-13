@@ -49,19 +49,17 @@ function renderSheet(injected: ShareActions) {
   return { dialog: screen.getByRole("dialog"), onReturnFocus, onOpenChange };
 }
 
-const button = (name: string) => within(screen.getByRole("dialog")).getByRole("button", { name, exact: true });
-const queryButton = (name: string) => within(screen.getByRole("dialog")).queryByRole("button", { name, exact: true });
+const button = (name: string) => within(screen.getByRole("dialog")).getByRole("button", { name });
+const queryButton = (name: string) => within(screen.getByRole("dialog")).queryByRole("button", { name });
 const loaded = () => waitFor(() => expect(screen.queryByText("Chargement du partage.")).toBeNull());
 
-/** Propriétés de `navigator` posées par un test (presse-papiers, partage natif), retirées après lui. */
-const defined: string[] = [];
-function defineNavigator(name: "clipboard" | "share", value: unknown) {
-  Object.defineProperty(window.navigator, name, { value, configurable: true, writable: true });
-  defined.push(name);
+/** `navigator` remplacé pour un test (presse-papiers, partage natif), rétabli après lui. */
+function stubNavigator(extra: { clipboard?: { writeText: (text: string) => Promise<void> }; share?: (data: ShareData) => Promise<void> }) {
+  vi.stubGlobal("navigator", { onLine: true, userAgent: window.navigator.userAgent, language: "fr", ...extra });
 }
 
 afterEach(() => {
-  for (const name of defined.splice(0)) delete (window.navigator as unknown as Record<string, unknown>)[name];
+  vi.unstubAllGlobals();
 });
 
 describe("ouverture et lecture de l'état (C27, C41)", () => {
@@ -131,7 +129,7 @@ describe("lien actif, création, copie (C28)", () => {
 
   it("« Copier le lien » écrit l'adresse dans le presse-papiers et annonce « Lien copié. »", async () => {
     const writeText = vi.fn(async () => {});
-    defineNavigator("clipboard", { writeText });
+    stubNavigator({ clipboard: { writeText } });
     renderSheet(actions({ getShareStatus: vi.fn(async () => NONE) }));
     await loaded();
     fireEvent.click(button("Créer un lien"));
@@ -142,7 +140,7 @@ describe("lien actif, création, copie (C28)", () => {
   });
 
   it("presse-papiers refusé : « Copie impossible. Sélectionne le lien pour le copier. », texte du champ sélectionné (C41)", async () => {
-    defineNavigator("clipboard", { writeText: vi.fn(async () => Promise.reject(new Error("refus"))) });
+    stubNavigator({ clipboard: { writeText: vi.fn(async () => Promise.reject(new Error("refus"))) } });
     renderSheet(actions({ getShareStatus: vi.fn(async () => NONE) }));
     await loaded();
     fireEvent.click(button("Créer un lien"));
@@ -163,7 +161,7 @@ describe("lien actif, création, copie (C28)", () => {
 
   it("« Envoyer… » avec navigator.share simulé", async () => {
     const share = vi.fn(async () => {});
-    defineNavigator("share", share);
+    stubNavigator({ share });
     renderSheet(actions({ getShareStatus: vi.fn(async () => NONE) }));
     await loaded();
     fireEvent.click(button("Créer un lien"));
