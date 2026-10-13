@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { CategorySchema, PreferenceAnswerSchema, PreferencePromptSchema, PreferenceReasonSchema } from "./index";
 
 describe("contrats de la présentation (décision 0013, § 3.1 et § 3.2)", () => {
-  it("CategorySchema : codes provisoires de F6-PO-10", () => {
-    expect(CategorySchema.options).toEqual(["museum", "walk", "nature", "tasting", "restaurant"]);
+  it("CategorySchema : codes de F6-PO-10, puis ceux des envies de F8 (F8-TL-8, décision 0017 § 8)", () => {
+    expect(CategorySchema.options).toEqual(["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"]);
   });
 
   it("PreferenceReasonSchema : codes de B0, dans l'ordre", () => {

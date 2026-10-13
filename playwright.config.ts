@@ -1,6 +1,9 @@
+import { tmpdir } from "node:os";
+
 import { defineConfig } from "@playwright/test";
 
 import { e2ePort } from "./scripts/e2e-port.mjs";
+import { SERVER_LOG_ENV, serverLogPath } from "./scripts/e2e-server-log.mjs";
 
 // Un port par worktree (décision 0017 § 14, Q107) : `E2E_PORT` s'il est fourni, sinon 3100 en CI, sinon un port
 // stable entre 3100 et 3899 tiré du chemin absolu du dépôt. Jamais de serveur réutilisé : un port occupé fait
@@ -51,8 +54,18 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: false,
     timeout: 180_000,
+    // Sortie du serveur transmise à Playwright et recopiée dans `serverLogPath` (scripts/serve-standalone.mjs),
+    // relue par les tests (spécification F8, « Aucune persistance locale »).
+    stdout: "pipe",
+    stderr: "pipe",
     // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ; seul
     // fichier versionné qui le pose (tests/unit/dev-pages-env.test.ts).
-    env: { VADROUILLE_DEV_PAGES: "1", VADROUILLE_DEMO_PAYMENT: "1", PORT: String(PORT), HOSTNAME: "127.0.0.1" },
+    env: {
+      VADROUILLE_DEV_PAGES: "1",
+      VADROUILLE_DEMO_PAYMENT: "1",
+      PORT: String(PORT),
+      HOSTNAME: "127.0.0.1",
+      [SERVER_LOG_ENV]: serverLogPath({ port: PORT, tmpDir: tmpdir() }),
+    },
   },
 });

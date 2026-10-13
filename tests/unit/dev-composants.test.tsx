@@ -167,8 +167,16 @@ describe("/dev/composants", () => {
     expect(code(groups[1]!)).toHaveLength(6);
 
     const options = messages.dev.composants.exemples.segmente.options;
-    fireEvent.click(screen.getByRole("radio", { name: options.a }));
-    expect(screen.getByRole("radio", { name: options.a })).toHaveAttribute("aria-checked", "true");
+    // Premier groupe : le SegmentedControl de F2 ; les deux suivants montrent la marque « déduit » (F8-TL-4).
+    const [segmented, inferred, empty] = within(screen.getByRole("region", { name: "SegmentedControl" })).getAllByRole("radiogroup");
+    fireEvent.click(within(segmented!).getByRole("radio", { name: options.a }));
+    expect(within(segmented!).getByRole("radio", { name: options.a })).toHaveAttribute("aria-checked", "true");
+
+    expect(inferred).toHaveAccessibleDescription(messages.ligne.deduit);
+    expect(within(inferred!).getByRole("radio", { name: options.b })).toHaveAttribute("data-inferred", "true");
+    fireEvent.click(within(inferred!).getByRole("radio", { name: options.c }));
+    expect(inferred).not.toHaveAccessibleDescription();
+    expect(within(empty!).getAllByRole("radio").filter((radio) => radio.getAttribute("aria-checked") === "true")).toEqual([]);
   });
 
   it("section Ligne : pastilles, deux rangées de jours, ligne du jour, segment en voiture, marqueurs", () => {

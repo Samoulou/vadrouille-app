@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "coutUsd": 2,
+  "recherchesWeb": 40,
+  "pagesLues": 60,
+  "candidatsTrouves": 80,
+  "placesTextSearch": 90,
+  "placesDetails": 90,
+  "routesRequetes": 60,
+  "routesElements": 4000,
+  "dureeMs": 900000
+}

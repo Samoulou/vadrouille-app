@@ -1,0 +1,81 @@
+name: post-merge-cleanup
+# Nettoyage après fusion (décision 0033). La fusion automatique est faite avec
+# GITHUB_TOKEN (auto-merge.yml) : GitHub ne ferme alors ni les tickets « Closes #n »
+# ni la branche, et aucun événement ne déclenche de workflow. Ce créneau rattrape :
+#   - les tickets de ce dépôt que GitHub relie à une PR fusionnée dans main, encore
+#     ouverts et pas rouverts depuis la fusion ;
+#   - les branches claude/… d'une PR fusionnée, sans push après la fusion, ni tête ni
+#     base d'une PR ouverte.
+# Plan calculé par scripts/ci/post-merge-cleanup.mjs (testé). Code de main seulement,
+# GITHUB_TOKEN seulement, aucun secret.
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+concurrency:
+  group: post-merge-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Samoulou/vadrouille-app'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Fermer les tickets réglés et supprimer les branches fusionnées
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api graphql -f owner="${REPO%/*}" -f name="${REPO#*/}" \
+            -f query="$(node scripts/ci/post-merge-cleanup.mjs query)" > response.json
+          node scripts/ci/post-merge-cleanup.mjs plan response.json > plan.txt
+          if [ ! -s plan.txt ]; then
+            echo "Rien à nettoyer."
+            exit 0
+          fi
+          status=0
+          # plan.txt est lu sur le descripteur 3 : les appels gh ne consomment pas le plan.
+          while read -r kind target pr oid <&3; do
+            if [ "$kind" != warn ] && { [ -z "$target" ] || [ -z "$pr" ] || { [ "$kind" = branch ] && [ -z "$oid" ]; }; }; then
+              echo "::error::Ligne de plan incomplète : $kind."
+              status=1
+            elif [ "$kind" = warn ]; then
+              echo "::warning::$target $pr $oid"
+              status=1
+            elif [ "$kind" = issue ]; then
+              # Pas de relecture de l'état ici : fermer un ticket déjà fermé ne change rien ;
+              # une réouverture survenue pendant la boucle serait annulée (décision 0033).
+              if gh issue close "$target" --repo "$REPO" --reason completed \
+                --comment "Fermé automatiquement : réglé par #$pr, fusionnée (décision 0033)." < /dev/null; then
+                echo "Ticket #$target fermé (PR #$pr)."
+              else
+                echo "::error::Ticket #$target : fermeture en échec."
+                status=1
+              fi
+            elif [ "$kind" = branch ]; then
+              # Relecture du commit juste avant la suppression : un push depuis le plan garde la
+              # branche. Les PR ouvertes ne sont pas relues (décision 0033, risque résiduel).
+              current=$(gh api "repos/$REPO/git/ref/heads/$target" --jq .object.sha < /dev/null) || current=""
+              if [ "$current" != "$oid" ]; then
+                echo "Branche $target : modifiée depuis le plan, gardée."
+                continue
+              fi
+              if gh api -X DELETE "repos/$REPO/git/refs/heads/$target" < /dev/null > /dev/null; then
+                echo "Branche $target supprimée (PR #$pr)."
+              else
+                echo "::error::Branche $target : suppression en échec."
+                status=1
+              fi
+            else
+              echo "::error::Ligne de plan inconnue : $kind."
+              status=1
+            fi
+          done 3< plan.txt
+          exit "$status"
