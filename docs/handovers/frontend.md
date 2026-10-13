@@ -85,7 +85,7 @@ src/
   contracts/             types et schémas Zod (§ 9)
   adapters/              accès aux données, mock ou réel
   mocks/                 jeux de données (Édimbourg)
-  i18n/                  fr.json
+  i18n/                  fr/ (un JSON par espace de noms, décision 0047), messages.ts
   analytics/             événements (§ 12)
   styles/                globals.css avec @theme
 tests/
@@ -403,7 +403,7 @@ Règles : les montants arrivent en nombres et sont formatés côté interface (`
 
 ## 10. Rédaction et langue
 
-Français uniquement au MVP, mais **toutes** les chaînes passent par `src/i18n/fr.json`. Tutoiement, phrases courtes, pas de point d'exclamation, pas d'emoji.
+Français uniquement au MVP, mais **toutes** les chaînes passent par `src/i18n/fr/` (un fichier par espace de noms, lus par `@/i18n/messages` ; décision 0047). Tutoiement, phrases courtes, pas de point d'exclamation, pas d'emoji.
 
 | Contexte | Mots imposés | Mots interdits |
 |---|---|---|
@@ -483,7 +483,7 @@ pnpm test:visual    # captures comparées à tests/visual
 
 1. Toutes les commandes ci-dessus passent.
 2. Les critères d'acceptation de la tâche sont couverts par des tests.
-3. Aucune valeur de style en dur, aucune chaîne hors `fr.json`.
+3. Aucune valeur de style en dur, aucune chaîne hors `src/i18n/fr/`.
 4. Les captures mobiles (390 × 844) des écrans touchés sont jointes à la PR, à côté de la maquette correspondante.
 5. Les écarts volontaires avec la maquette sont listés dans la PR.
 6. Les nouvelles questions sont listées dans la description de la PR (le CEO les reporte dans `QUESTIONS.md`).
@@ -548,7 +548,7 @@ Back-end, agent de recherche, ancrage Google côté serveur, paiement réel et w
 
 ## Toujours
 - Styles uniquement via les tokens Ligne (globals.css). Aucune couleur, taille ou rayon en dur.
-- Chaînes uniquement dans src/i18n/fr.json, avec le vocabulaire imposé.
+- Chaînes uniquement dans src/i18n/fr/, avec le vocabulaire imposé.
 - Données uniquement via src/adapters et les types de src/contracts.
 - Composants de src/components/ligne avant tout nouveau composant.
 - Gestes toujours doublés de boutons ; cibles ≥ 44 px ; focus visible.

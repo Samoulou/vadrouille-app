@@ -23,7 +23,7 @@ import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sh
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { Day, DayMap as DayMapData, RevisionFixtures, Stop, Trip } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { cn } from "@/lib/utils";

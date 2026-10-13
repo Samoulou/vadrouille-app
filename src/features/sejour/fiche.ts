@@ -1,5 +1,6 @@
 import type { Day, Stop } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 import { eventRange } from "./EventLines";

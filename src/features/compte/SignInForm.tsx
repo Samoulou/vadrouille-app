@@ -10,7 +10,8 @@ import { CreationShell, TITLE_CLASS } from "@/features/creation/CreationShell";
 import { useDraft } from "@/features/creation/DraftProvider";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldLabel, FieldMessage, INPUT_CLASS } from "@/features/creation/fields";
 import { creationRoutes } from "@/features/creation/routes";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import { requestCode, verifyCode } from "@/server/actions/compte";
 

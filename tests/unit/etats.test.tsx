@@ -12,7 +12,7 @@ import GlobalError from "@/app/global-error";
 import NotFound, { metadata as notFoundMetadata } from "@/app/not-found";
 import { PRODUCT_NAME } from "@/config/site";
 import { DEV_ERROR_MESSAGE, ETATS_ROUTES, EtatsShowcase } from "@/dev/EtatsShowcase";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { axeViolations } from "./axe";
 

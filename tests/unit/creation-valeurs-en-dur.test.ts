@@ -5,7 +5,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { CATEGORIES, MOBILITY_MODES, PACES } from "@/contracts/values";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Critères transverses de F8 (spécification F8) : aucune couleur, taille ni valeur en px en dur hors

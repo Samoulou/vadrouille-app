@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Critère C4 [c] (spécification F11) : aucune couleur, taille ni valeur en px en dur dans les fichiers de F11c ;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { devPagesEnabled } from "@/dev/flags";
 import { BriefScreen } from "@/features/creation/BriefScreen";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Le choix de l'enregistreur des mesures dépend de l'environnement du serveur (pages de développement).
 export const dynamic = "force-dynamic";

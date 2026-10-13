@@ -21,7 +21,8 @@ import {
 } from "@/contracts/values";
 import type { Category } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatNombre } from "@/lib/nombre";
 import { cn } from "@/lib/utils";
 

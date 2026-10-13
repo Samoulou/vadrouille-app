@@ -17,7 +17,7 @@ import { PrototypeSection } from "@/features/accueil/PrototypeSection";
 import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // `DATA_ADAPTER` lu à chaque requête, comme les pages du voyage (D1-PO-5).
 export const dynamic = "force-dynamic";

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fail, ok } from "@/contracts";
 import { DraftProvider } from "@/features/creation/DraftProvider";
 import { initialDraft, type DraftState } from "@/features/creation/draft";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { requestCode, verifyCode } from "@/server/actions/compte";
 
 import { axeViolations } from "../../../tests/unit/axe";

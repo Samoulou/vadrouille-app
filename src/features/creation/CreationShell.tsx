@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { IconButton } from "@/components/ligne/IconButton";
 import { IconRetour } from "@/components/ligne/icons";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Cadre commun des écrans de création (décision 0018 § 14) : fond `page`, une colonne bornée comme l'accueil,

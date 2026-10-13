@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fail, ok, type TripDraft } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { MOCK_DEMO_TRIP_DRAFT, MOCK_LODGING_SUGGESTION } from "@/mocks/creation-edimbourg";
 import { suggestLodging } from "@/server/actions/creation";
 

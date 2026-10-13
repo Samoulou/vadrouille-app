@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { getAuthAdapter } from "@/adapters";
 import { SignInForm } from "@/features/compte/SignInForm";
 import { normaliserSuite } from "@/features/compte/suite";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // L'adaptateur `auth` et sa garde (décision 0017 § 11.2) sont lus à chaque requête, jamais au build.
 export const dynamic = "force-dynamic";

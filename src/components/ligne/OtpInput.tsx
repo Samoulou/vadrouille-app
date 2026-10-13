@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent } from "react";
 
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 export interface OtpInputProps {

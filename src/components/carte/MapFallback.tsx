@@ -1,5 +1,5 @@
 import { Button } from "@/components/ligne/Button";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import { PlacesAttribution } from "./PlacesAttribution";

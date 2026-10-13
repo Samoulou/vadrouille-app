@@ -34,7 +34,8 @@ import {
 } from "@/components/ligne";
 import type { Change, ChecklistMoment, DayLineItem, Proposal, Stop, Trip, Weekday } from "@/contracts";
 import { formatContexte } from "@/features/presentation/contexte";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 const t = messages.dev.composants;
 const ex = t.exemples;

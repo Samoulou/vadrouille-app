@@ -1,6 +1,7 @@
 import type { Day, DayLineItem, Segment, Stop } from "@/contracts";
 import { segmentLabel } from "@/components/ligne/DayLine";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatDuree } from "@/lib/duree";
 import { formatNombre } from "@/lib/nombre";
 

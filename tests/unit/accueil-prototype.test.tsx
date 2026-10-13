@@ -10,7 +10,7 @@ import { createProgrammeLoader } from "@/adapters/prototype-loader";
 import HomePage from "@/app/page";
 import { presentationRoute } from "@/features/presentation/routes";
 import { tripRoutes } from "@/features/sejour/routes";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { createRelecteurSimule } from "@/mocks/prototype-relecteur";
 
 vi.mock("@/adapters", async (importOriginal) => {

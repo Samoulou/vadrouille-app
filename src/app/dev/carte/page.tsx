@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { MOCK_DEMO_TRIP, getTripAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { CarteDemo, type DemoConfig, type DemoRenderer, type DemoVue } from "./CarteDemo";
 

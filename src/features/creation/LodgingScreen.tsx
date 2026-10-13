@@ -8,7 +8,8 @@ import { Button } from "@/components/ligne/Button";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { LodgingSuggestion } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { suggestLodging } from "@/server/actions/creation";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";

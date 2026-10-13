@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { LodgingScreen } from "@/features/creation/LodgingScreen";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Convention de src/app (décision 0032 § A6.2) : rendu à chaque requête, aucune page en cache.
 export const dynamic = "force-dynamic";

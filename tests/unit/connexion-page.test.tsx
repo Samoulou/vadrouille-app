@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as adapters from "@/adapters";
 import ConnexionPage, { dynamic } from "@/app/(creation)/connexion/page";
 import { DraftProvider } from "@/features/creation/DraftProvider";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/server/actions/compte", () => ({ requestCode: vi.fn(), verifyCode: vi.fn() }));

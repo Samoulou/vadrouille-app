@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { MOCK_DEMO_DRAFT } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { draftForLodging } from "@/features/creation/draft";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { DevLogement } from "./DevLogement";
 

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { axeViolations } from "../../../tests/unit/axe";
 import { stubLayout, stubOnline } from "../../../tests/unit/carte-fixtures";

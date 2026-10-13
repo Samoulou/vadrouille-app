@@ -10,7 +10,7 @@ import HomePage, { dynamic } from "@/app/page";
 import { PRODUCT_NAME } from "@/config/site";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();

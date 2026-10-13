@@ -7,7 +7,8 @@ import { OfferScreen } from "@/features/presentation/OfferScreen";
 import { loadUnlockPage } from "@/features/presentation/unlock-load";
 import { tripRoutes } from "@/features/sejour/routes";
 import { plateMeta } from "@/features/voyage/plate";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Données lues à chaque requête, dans le contexte d'organisation et la portée de la requête.
 export const dynamic = "force-dynamic";

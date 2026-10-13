@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 

@@ -7,7 +7,8 @@ import { Chip } from "@/components/ligne/Chip";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason } from "@/contracts";
 import { PREFERENCE_REASONS } from "@/contracts/values";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 const t = messages.presentation;
 

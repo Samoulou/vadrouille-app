@@ -284,8 +284,8 @@ export default defineConfig([
     },
   },
   {
-    // F2 : aucun texte en dur dans les composants Ligne, tout vient de src/i18n/fr.json (handover § 10).
-    // Les valeurs d'attributs (classes, rôles) restent permises ; les textes affichés passent par fr.json.
+    // F2 : aucun texte en dur dans les composants Ligne, tout vient de src/i18n/fr/ (handover § 10, décision 0047).
+    // Les valeurs d'attributs (classes, rôles) restent permises ; les textes affichés passent par src/i18n/fr/.
     files: ["src/components/ligne/**/*.{jsx,tsx}"],
     ignores: ["**/*.test.{ts,tsx}"],
     rules: {
@@ -293,7 +293,7 @@ export default defineConfig([
     },
   },
   {
-    // F4 : aucun texte en dur dans la carte et sa démonstration, tout vient de src/i18n/fr.json.
+    // F4 : aucun texte en dur dans la carte et sa démonstration, tout vient de src/i18n/fr/.
     files: ["src/components/carte/**/*.{jsx,tsx}", "src/app/dev/carte/**/*.{jsx,tsx}"],
     ignores: ["**/*.test.{ts,tsx}"],
     rules: {

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CategorySchema } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { propositions } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";

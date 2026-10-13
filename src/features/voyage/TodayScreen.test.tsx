@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder } from "@/analytics/track";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";

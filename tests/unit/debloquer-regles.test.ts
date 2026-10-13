@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { OFFER_INCLUSIONS } from "@/contracts/values";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Règles transverses de F9a : source unique du prix (décision 0020 § 4), textes et vocabulaire (handover
@@ -27,11 +27,11 @@ function sources(dir: string, extensions = /\.(tsx?|css|json)$/): string[] {
 }
 
 describe("source unique du prix (décision 0020 § 4)", () => {
-  const files = ["src/features", "src/components", "src/analytics", "src/i18n/fr.json"].flatMap((dir) => sources(dir));
+  const files = ["src/features", "src/components", "src/analytics", "src/i18n/fr"].flatMap((dir) => sources(dir));
 
   it("couvre les écrans du paiement", () => {
     expect(files).toEqual(
-      expect.arrayContaining(["src/features/presentation/OfferScreen.tsx", "src/features/presentation/PaymentSimulation.tsx", "src/i18n/fr.json"]),
+      expect.arrayContaining(["src/features/presentation/OfferScreen.tsx", "src/features/presentation/PaymentSimulation.tsx", "src/i18n/fr/debloquer.json"]),
     );
   });
 

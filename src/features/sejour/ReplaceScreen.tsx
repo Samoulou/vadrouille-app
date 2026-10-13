@@ -15,7 +15,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { ApplyResult, PreferenceReason, RevisionError, RevisionPreview as RevisionPreviewData, Stop } from "@/contracts";
 import { PREFERENCE_REASONS, WISH_MAX_LENGTH } from "@/contracts/values";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, INPUT_CLASS } from "@/features/creation/fields";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 

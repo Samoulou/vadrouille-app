@@ -1,0 +1,29 @@
+{
+  "titreDocument": "Connexion",
+  "titre": "Connexion",
+  "titreCreation": "Connecte-toi pour recevoir tes propositions",
+  "retour": "Retour",
+  "aide": "Pas de mot de passe : on t'envoie un code à 6 chiffres.",
+  "simulee": "Connexion simulée : aucun email n'est envoyé et cette connexion est partagée avec toutes les personnes qui testent l'application. Ne saisis pas ta vraie adresse.",
+  "email": {
+    "libelle": "Ton adresse email",
+    "erreur": "Indique une adresse email complète, par exemple prenom@exemple.ch.",
+    "recevoir": "Recevoir un code"
+  },
+  "code": {
+    "envoyeAvant": "Code envoyé à",
+    "envoyeApres": ". Il est valable {minutes} minutes.",
+    "libelle": "Code reçu par email",
+    "verification": "Vérification du code…",
+    "nouveauCode": "Nouveau code envoyé.",
+    "renvoyer": "Renvoyer le code",
+    "changerAdresse": "Changer d'adresse"
+  },
+  "erreurs": {
+    "invalid_code": "Ce code ne correspond pas. Vérifie-le ou demande un nouveau code.",
+    "code_expired": "Ce code a expiré. Demande un nouveau code.",
+    "too_many_attempts": "Trop d'essais. Demande un nouveau code.",
+    "rate_limited": "Trop de demandes. Réessaie dans quelques minutes.",
+    "generique": "La connexion n'est pas disponible pour le moment. Réessaie dans quelques minutes."
+  }
+}
