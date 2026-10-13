@@ -1,6 +1,6 @@
 # 0033 — Nettoyage après fusion : tickets et branches
 
-Statut : décision déléguée (outillage de CI, « Qui décide quoi » de `docs/CONTEXT.md`), à confirmer par la revue du Tech Lead ; la PR touche `.github/workflows/` et attend `owner-approved` de Samuel (Q245). À lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-12 · Ticket #176 · PR #177
+Statut : décision déléguée (outillage de CI, « Qui décide quoi » de `docs/CONTEXT.md`), à confirmer par la revue du Tech Lead ; la PR touche `.github/workflows/` et attend `owner-approved` de Samuel (Q245). À lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-12 · Ticket #176 · PR #177 · Amendée le 2026-10-13 (Tech Lead, décision déléguée) : 100 PR fusionnées lues (ticket #201, PR #202), fenêtre de 2 jours (ticket #204, PR #206), à lister dans la note de version suivante
 
 ## Contexte
 
@@ -27,9 +27,11 @@ Une première version de #177 faisait faire la fusion avec un jeton personnel de
 
 ## Conséquences
 
-- À sa première exécution, le créneau ferme les tickets et supprime les branches des PR fusionnées depuis 7 jours : #154, #147, #151, #158, #159 et leurs branches, notamment. Les PR plus anciennes (#12, #27 et leurs tickets) sont hors fenêtre : à fermer à la main sur décision de Samuel.
+- Première exécution (2026-10-13, exécution 38325930616, encore avec la fenêtre de 7 jours) : 7 tickets fermés et 14 branches supprimées. Avec la fenêtre de 2 jours, une PR fusionnée depuis plus de 2 jours sans passage réussi du créneau est hors fenêtre. Les tickets et branches restés en dehors (par exemple `claude/dazzling-gauss-w82oer`, `claude/status-cycle-41`, `claude/31-chore-status`) sont à traiter à la main sur décision de Samuel.
 - `docs/studio/mise-en-place.md`, « Chaîne de fusion automatique », gagne une étape.
 
 ## Quand revoir cette décision
 
 Si la fusion automatique cesse d'utiliser `GITHUB_TOKEN`, le créneau devient inutile : le supprimer.
+
+Si le créneau reste en panne plus de 2 jours, les PR fusionnées pendant la panne sortent de la fenêtre : ni le créneau ni un lancement à la main ne les rattrapent, le nettoyage se fait à la main. GitHub désactive aussi un workflow planifié après 60 jours sans activité du dépôt : le réactiver dans l'onglet Actions.
