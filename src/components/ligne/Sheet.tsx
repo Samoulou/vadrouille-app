@@ -58,6 +58,11 @@ export interface SheetProps {
    * visible sous le seuil. Faux par défaut : panneau coulissant à toutes les tailles.
    */
   sideOnLargeScreen?: boolean;
+  /**
+   * Zone de contenu atteignable au clavier (`tabindex="0"`) : pour un contenu sans élément focalisable (vue
+   * partagée, spécification F10c), sinon la zone qui défile ne se parcourt pas au clavier (WCAG 2.1.1). Faux par défaut.
+   */
+  focusableBody?: boolean;
 }
 
 interface DragState {
@@ -96,6 +101,7 @@ export function Sheet({
   children,
   className,
   sideOnLargeScreen = false,
+  focusableBody = false,
 }: SheetProps) {
   const [internal, setInternal] = useState<SnapPoint>(defaultSnap);
   const snap = controlled ?? internal;
@@ -240,7 +246,15 @@ export function Sheet({
         </button>
       </div>
       {header ? <div className="shrink-0">{header}</div> : null}
-      <div ref={bodyRef} data-part="contenu" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div
+        ref={bodyRef}
+        data-part="contenu"
+        tabIndex={focusableBody ? 0 : undefined}
+        // Zone focalisable : rôle et nom, pour que le lecteur d'écran annonce ce qui reçoit le focus.
+        role={focusableBody ? "region" : undefined}
+        aria-label={focusableBody ? t.contenu : undefined}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         {children}
       </div>
       {above ? (

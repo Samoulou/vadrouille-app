@@ -166,6 +166,7 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
                 stop={stop}
                 selected={selected}
                 onPress={view.onMarkerPress}
+                interactive={view.interactive ?? true}
                 className={selected ? "absolute z-10 -translate-x-1/2 -translate-y-1/2" : "absolute -translate-x-1/2 -translate-y-1/2"}
                 style={at(stop.position)}
               />

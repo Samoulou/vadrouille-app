@@ -13,12 +13,12 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { IconRetour } from "@/components/ligne/icons";
 import type { Offer, Trip } from "@/contracts";
 import type { CheckoutFailure, OfferInclusion, PaymentMethod, PriceVariant } from "@/contracts/values";
-import { formatDateLongue } from "@/lib/dates";
+import { accessUntil, formatDateLongue } from "@/lib/dates";
 import { format, messages } from "@/i18n";
 import { startCheckout } from "@/server/actions/paiement";
 import { useTripSession } from "@/features/voyage/TripSessionProvider";
 
-import { accessUntil, formatPrice } from "./price";
+import { formatPrice } from "./price";
 
 const t = messages.debloquer;
 

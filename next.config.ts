@@ -12,6 +12,17 @@ export const RESPONSE_HEADERS = [
     headers: [{ key: "Cache-Control", value: "private, no-store" }],
   },
   {
+    // Vue partagée (`RP`, `RPJ` ; F10-TL-8) : toutes les réponses sous `/p/`, 200, 404 et 500 comprises. Ni cache
+    // partagé (un lien désactivé cesse de fonctionner dès la requête suivante), ni indexation, et seule l'origine
+    // part dans `Referer` : le chemin, donc le jeton, n'est jamais envoyé à une autre origine.
+    source: "/p/:path*",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ],
+  },
+  {
     source: "/sw.js",
     headers: [{ key: "Cache-Control", value: "no-cache" }],
   },

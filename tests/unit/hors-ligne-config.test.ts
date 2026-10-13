@@ -70,6 +70,18 @@ describe("en-têtes du service worker (C26, F10-TL-8)", () => {
   });
 });
 
+describe("en-têtes de la vue partagée (C39, F10-TL-8)", () => {
+  it("/p/:path* : privé et no-store, référent réduit à l'origine, jamais indexé", async () => {
+    expect(await nextConfig.headers?.()).toEqual(RESPONSE_HEADERS);
+    const rule = RESPONSE_HEADERS.find((entry) => entry.source === "/p/:path*");
+    expect(rule?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
+  });
+});
+
 describe("Playwright : service workers bloqués par défaut (F10-TL-6)", () => {
   it("use.serviceWorkers vaut « block » au niveau global, sans projet supplémentaire", () => {
     expect(playwrightConfig.use?.serviceWorkers).toBe("block");
@@ -81,6 +93,8 @@ describe("Playwright : service workers bloqués par défaut (F10-TL-6)", () => {
     const allowed = [
       "tests/e2e/carte.e2e.spec.ts",
       "tests/e2e/hors-ligne.e2e.spec.ts",
+      // F10c : bloc de C36 seulement (décision 0039, F10-TL-6 point 1).
+      "tests/e2e/partage.e2e.spec.ts",
       "tests/e2e/voyage.a11y.spec.ts",
       "tests/visual/voyage.visual.spec.ts",
     ];

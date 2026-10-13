@@ -8,6 +8,7 @@ import JourneePage, { generateMetadata as journeeMetadata } from "@/app/voyages/
 import RemplacerPage, { generateMetadata as remplacerMetadata } from "@/app/voyages/[id]/(programme)/jour/[n]/remplacer/[stopId]/page";
 import ProgrammeLayout from "@/app/voyages/[id]/(programme)/layout";
 import SejourPage, { generateMetadata as sejourMetadata } from "@/app/voyages/[id]/(programme)/page";
+import { TripLayout } from "@/features/sejour/screens";
 
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -116,5 +117,30 @@ describe("/dev/voyages (F5-TL-1)", () => {
     await expect(serverRender(DevTripLayout({ params: params({ id: TRIP }), children: null }))).resolves.toBeTruthy();
     await expect(serverRender(DevJourneePage({ params: params({ id: TRIP, n: "2" }) }))).resolves.toBeTruthy();
     await expect(serverRender(DevJourneePage({ params: params({ id: TRIP, n: "02" }) }))).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});
+
+describe("bouton « Partager » (F10c, C38 ; F10-PO-13)", () => {
+  const DEBLOQUE = "mock_trip_edimbourg_debloque";
+  const shareableOf = async (layout: Promise<unknown>) =>
+    ((await serverRender(layout)) as { props: { shareable?: boolean } }).props.shareable;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("voyage débloqué sous /voyages : proposé ; sous /dev/voyages : jamais", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-30T10:40:00+01:00"));
+    vi.stubEnv("NODE_ENV", "development");
+    expect(await shareableOf(ProgrammeLayout({ params: params({ id: DEBLOQUE }), children: null }))).toBe(true);
+    // `DevTripLayout` enveloppe `TripLayout` dans la carte simulée : la mise en page est lue directement.
+    expect(await shareableOf(TripLayout({ tripId: DEBLOQUE, base: "/dev/voyages", children: null }))).toBe(false);
+  });
+
+  it("voyage non débloqué sous /voyages : non proposé", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-30T10:40:00+01:00"));
+    expect(await shareableOf(ProgrammeLayout({ params: params({ id: TRIP }), children: null }))).toBe(false);
   });
 });

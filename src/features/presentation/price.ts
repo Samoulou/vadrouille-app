@@ -17,10 +17,3 @@ export function formatPrice(amount: number, currency: Currency): string {
   const montant = reste === 0 ? francs : `${francs}.${String(reste).padStart(2, "0")}`;
   return `${montant}${ESPACE_DEVISE}${currency}`;
 }
-
-/** Fin de l'accès : date ISO de fin du voyage + `days` jours (cadrage § 4), en ISO « AAAA-MM-JJ ». */
-export function accessUntil(end: string, days: number): string {
-  const [year, month, day] = end.split("-").map(Number);
-  const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, (day ?? 1) + days));
-  return date.toISOString().slice(0, 10);
-}

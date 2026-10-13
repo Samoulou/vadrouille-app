@@ -101,7 +101,8 @@
     },
     "panneau": {
       "agrandir": "Agrandir le panneau",
-      "reduire": "Réduire le panneau"
+      "reduire": "Réduire le panneau",
+      "contenu": "Contenu du panneau"
     },
     "raison": {
       "titre": "Pourquoi pour toi",
@@ -951,6 +952,59 @@
       "lent": "On cherche autour de {name}.",
       "moment": "{start} – {end}",
       "modifie": "Modifié."
+    }
+  },
+  "partage": {
+    "bouton": "Partager",
+    "feuille": {
+      "titre": "Partager ton voyage",
+      "texte": "Toute personne qui a ce lien voit ton programme et sa carte, sans pouvoir le modifier. Elle ne voit ni ton logement, ni ta liste à réserver, ni ton budget.",
+      "chargement": "Chargement du partage.",
+      "creer": "Créer un lien",
+      "champ": "Lien de partage",
+      "copier": "Copier le lien",
+      "envoyer": "Envoyer…",
+      "copieMaintenant": "Copie-le maintenant : il ne pourra plus s'afficher.",
+      "valable": "Valable jusqu'au {date}.",
+      "actif": "Un lien est actif depuis le {date}.",
+      "nouveau": "Créer un nouveau lien",
+      "desactiver": "Désactiver le lien",
+      "confirmationDesactiver": "Le lien ne fonctionnera plus pour personne.",
+      "confirmerDesactiver": "Désactiver",
+      "confirmationNouveau": "L'ancien lien ne fonctionnera plus pour personne.",
+      "annuler": "Annuler",
+      "fermer": "Fermer",
+      "copie": "Lien copié.",
+      "copieImpossible": "Copie impossible. Sélectionne le lien pour le copier.",
+      "desactive": "Lien désactivé.",
+      "horsLigne": "Tu es hors ligne. Partager demande une connexion.",
+      "erreur": "Impossible de modifier le partage pour le moment.",
+      "reessayer": "Réessayer"
+    },
+    "vue": {
+      "region": "Programme partagé",
+      "mention": "Programme partagé · lecture seule",
+      "retour": "Retour",
+      "pendant": {
+        "titre": "Pendant le séjour",
+        "vide": "Aucun événement pendant ces dates."
+      },
+      "jourParJour": {
+        "titre": "Jour par jour",
+        "enPreparation": "En préparation"
+      },
+      "evenementsJour": "Événements du jour",
+      "etapes": "Étapes du jour {n}",
+      "enPreparation": "Cette journée est encore en préparation.",
+      "titreDocument": {
+        "sejour": "{destination} · Programme partagé",
+        "jour": "{destination} · Jour {n} · Programme partagé",
+        "invalide": "Lien de partage non valide · {produit}"
+      }
+    },
+    "invalide": {
+      "titre": "Ce lien de partage n'est pas valide.",
+      "texte": "Demande un nouveau lien à la personne qui te l'a envoyé."
     }
   }
 }

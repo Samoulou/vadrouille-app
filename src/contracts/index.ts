@@ -148,6 +148,20 @@ export {
   TripDraftSchema,
 } from "./creation";
 export type { Brief, BriefRequest, InferredBrief, Lodging, OtherCity, TripCommitment, TripDraft } from "./creation";
+export type {
+  CreatedShareLink,
+  ShareRequest,
+  ShareStatus,
+  SharedDay,
+  SharedDayItem,
+  SharedDayMap,
+  SharedDayView,
+  SharedEvent,
+  SharedMapPoint,
+  SharedStop,
+  SharedTrip,
+  SharedTripView,
+} from "./share";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
 // Valeurs sans Zod (décision 0016 § 3.1 règle 1) : `mapPointKey`, `DETOUR_THRESHOLD_MINUTES`, `CATEGORIES`,

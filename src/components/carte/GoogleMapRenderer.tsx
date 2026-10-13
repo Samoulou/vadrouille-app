@@ -272,6 +272,7 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
                   stop={spec}
                   selected={spec.stopId === selectedStopId}
                   onPress={(stopId) => onMarkerPressRef.current?.(stopId)}
+                  interactive={view.mode === "day" ? (view.interactive ?? true) : true}
                 />,
                 element,
                 spec.stopId,
