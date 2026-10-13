@@ -137,8 +137,9 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 | Dossier | Seuls imports autorisés |
 |---|---|
 | `src/domain` | `@/contracts`, `zod`, fichiers de `src/domain` |
-| `src/ai` | `@/contracts`, `@/ai/*`, `zod`, `server-only`, SDK de modèles (`ai`, `@ai-sdk/*`), `@/server/env/ai` (clés des fournisseurs de modèles seulement ; jamais `@/server/env` ni un autre module d'environnement), `@/server/usage` (écriture de `usage_ledger`, sans accès à `src/grounding`) |
-| `src/research` | `@/contracts`, `@/ai`, `@/research/*`, `zod`, `server-only`, `node:dns`, `node:net`, client HTTP du lecteur de pages |
+| `src/ai` | `@/contracts`, `@/ai/*`, `zod`, `server-only`, SDK de modèles (`ai`, `@openrouter/ai-sdk-provider` : dans le seul module de capacité `src/ai/openrouter-client.ts`, P0r1), `@/server/env/ai` (clé du fournisseur de modèles seulement ; jamais `@/server/env` ni un autre module d'environnement), `@/server/env/egress` (barrière de sortie, codes fermés seulement), `@/server/usage/port` (port de consommation : le contrat seul, jamais une implémentation ni une écriture directe de `usage_ledger` ; décisions 0031 § 6 et 0046, D13), sans accès à `src/grounding` |
+| `src/grounding` | `@/contracts`, `@/grounding/*`, `zod`, `server-only`, `@/server/env/grounding` (clé serveur Google), `@/server/env/egress`, `@/server/usage/port` (le port seulement, jamais une implémentation) ; `fetch` global seulement comme transport par défaut des modules de capacité `places-client.ts` et `routes-client.ts` (P0r1, décision 0031 § 5 et § 6) |
+| `src/research` | `@/contracts`, `@/ai`, `@/research/*`, `zod`, `server-only`, `node:net` (`BlockList` et `isIP`, dans `ip-guard.ts` seulement) ; `node:dns/promises`, client HTTP du lecteur de pages (`undici`, `Agent` seulement) et `@/server/env/egress` confinés au seul module de capacité `src/research/undici-transport.ts` (P0r1, décision 0031 § 5 et § 6) |
 
 **Liste noire** pour les autres dossiers :
 | Dossier | Interdit |
@@ -150,6 +151,7 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 | tout sauf `src/workflows` | directives `"use workflow"` et `"use step"`, paquet `workflow` |
 | tout sauf `src/server/env.ts` (validation au démarrage, sans export de la valeur) et `src/server/env/grounding.ts` | lecture de `GOOGLE_MAPS_SERVER_KEY` (`process.env` et chaîne littérale) |
 | tout sauf `src/grounding` | import de `@/server/env/grounding` |
+| tout sauf `src/ai`, `src/grounding`, `src/research/undici-transport.ts` et `src/server/env/` | import de `@/server/env/egress` (règle `ligne/server-env-imports`, P0r1 ; décision 0031 § 6) |
 | tout sauf `src/ai` | import de `@/server/env/ai` ; lecture des clés des fournisseurs de modèles hors `src/server/env.ts` et `src/server/env/ai.ts` |
 | tout sauf `src/server/routes` et `src/server/payment` | import de `@/server/env/payment` |
 | tout sauf `src/tenancy` et `src/server/auth` | paquet `better-auth` et objet `auth.api` (décision 0008 : seules les opérations de la liste blanche sont appelées) |

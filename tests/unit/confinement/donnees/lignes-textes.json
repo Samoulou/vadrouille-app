@@ -207,7 +207,10 @@
           "formes": [
             "const k = process.env.OPENROUTER_API_KEY;",
             "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;",
-            "const { OPENROUTER_API_KEY } = import.meta.env;"
+            "const { OPENROUTER_API_KEY } = import.meta.env;",
+            "src/ai/openrouter-client.ts",
+            "@openrouter/ai-sdk-provider",
+            "import { createOpenRouter } from \"@openrouter/ai-sdk-provider\";"
           ]
         },
         {
@@ -243,7 +246,7 @@
           ]
         }
       ],
-      "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente)"
+      "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente) ; P0r1 (ticket 267, décision 0031 § 5) : exceptions nominatives et cas négatifs du client de modèles, verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "tests/e2e/hors-ligne.e2e.spec.ts",
@@ -319,6 +322,103 @@
         }
       ],
       "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)"
+    },
+    {
+      "fichier": "src/ai/openrouter-client.ts",
+      "portee": "application",
+      "usage": "client réel de modèles (P0r1), branché à aucun point d'entrée : AI SDK et fournisseur explicite, hôte figé, `fetch` global seulement comme valeur par défaut du paramètre `transport` de la fabrique, passé au fournisseur sous l'enveloppe. Justification côté serveur : module `server-only`, importé seulement par ses tests",
+      "capacites": [
+        {
+          "capacite": "module:@openrouter/ai-sdk-provider",
+          "formes": [
+            "createOpenRouter"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "module:ai",
+          "formes": [
+            "generateText"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "identifiant:fetch",
+          "formes": [
+            "reference"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:openrouter.ai",
+          "formes": [
+            "https://openrouter.ai",
+            "https://openrouter.ai/api/v1"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "src/grounding/places-client.ts",
+      "portee": "application",
+      "usage": "origine figée du client réel de Places (P0r1)",
+      "capacites": [
+        {
+          "capacite": "hote:places.googleapis.com",
+          "formes": [
+            "https://places.googleapis.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "src/grounding/routes-client.ts",
+      "portee": "application",
+      "usage": "origine figée du client réel de Routes (P0r1)",
+      "capacites": [
+        {
+          "capacite": "hote:routes.googleapis.com",
+          "formes": [
+            "https://routes.googleapis.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "src/server/env/egress.ts",
+      "portee": "application",
+      "usage": "code fermé « clé absente » des modules étroits et des clients réels (P0r1), écrit une seule fois ; ce n'est pas un nom de variable",
+      "capacites": [
+        {
+          "capacite": "secret:MISSING_KEY",
+          "formes": [
+            "missing_key"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "texte à suffixe `_KEY` (section 5) : code d'erreur `missing_key` imposé par la spécification de P0r1 (décision 0031 § 6), aucune lecture ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "tests/unit/p0/clients-reels.test.ts",
+      "portee": "test",
+      "usage": "tests transverses de P0r1 : chemin du client de modèles dans la liste des modules de capacité dont on relève les importateurs",
+      "capacites": [
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "src/ai/openrouter-client.ts"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "chemin d'un module de capacité de P0r1 nommé par la spécification (décision 0031 § 5), texte de test sans capacité ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     }
   ]
 }

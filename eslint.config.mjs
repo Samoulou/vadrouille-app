@@ -472,6 +472,9 @@ export default defineConfig([
       "src/research/recherche-web.simule.ts",
       "src/research/recherche-web.ts",
       "src/research/sources.ts",
+      // P0r1 : garde « aucune clé dans l'environnement des tests », chargée par la configuration de Playwright hors de
+      // Next.js, où `import "server-only"` lèverait une erreur ; ne rend aucune valeur (src/server/env/garde-cles.ts).
+      "src/server/env/garde-cles.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
@@ -495,6 +498,13 @@ export default defineConfig([
       "**/*.spec.{ts,tsx}",
     ],
     rules: { "ligne/no-p0-server-modules": "error" },
+  },
+  {
+    // P0r1 (spécification `specs/P0-suite-executions-reelles.md`, décision 0031 § 6) : confinement des imports des
+    // modules d'environnement étroits de `src/server/env/`. Règle propre au plugin, posée par ce seul bloc sur tout
+    // fichier du dépôt, tests compris (tests/unit/lint/server-env-imports-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/server-env-imports": "error" },
   },
   {
     // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).

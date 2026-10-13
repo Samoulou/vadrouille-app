@@ -5,13 +5,18 @@
  * de spécificateurs (ou de capacité) et un verdict Sécurité qui cite le lockfile.
  */
 
+import { PAQUETS_TEXTES } from "./specificateurs";
+
 export type LignePaquet = { readonly paquet: string; readonly usage: string; readonly verdict: string };
 
 const EXISTANT = "existant au 2026-10-12 (`40b6738`)";
 /** Paquets de B1, fusionnés avant leur ligne : verdict Sécurité qui cite le lockfile demandé dans la PR du ticket 242. */
 const B1 = "B1 (PR 188, décision 0006) ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242 ; lockfile cité dans sa description)";
 
-export const PAQUETS = [
+/** P0r1 (ticket 267) : paquets ajoutés, versions de l'amendement de 0006 ; lockfile cité dans la description de la PR. */
+const P0R1 = "P0r1 (ticket 267, décisions 0006 et 0031) ; verdict Sécurité à rendre sur la PR de P0r1, qui cite le lockfile";
+
+const PAQUETS_TS = [
   { paquet: "@googlemaps/js-api-loader", usage: "carte Google du navigateur (F4) ; module à capacité", verdict: EXISTANT },
   { paquet: "@radix-ui/react-dialog", usage: "composants Ligne", verdict: EXISTANT },
   { paquet: "@radix-ui/react-slot", usage: "composants Ligne", verdict: EXISTANT },
@@ -47,7 +52,11 @@ export const PAQUETS = [
   { paquet: "server-only", usage: "garde des modules serveur (`db/`, `src/server/`)", verdict: B1 },
   { paquet: "@types/pg", usage: "types (sans import)", verdict: B1 },
   { paquet: "drizzle-kit", usage: "génération des migrations (`drizzle.config.ts`, `pnpm db:generate`)", verdict: B1 },
+  { paquet: "ai", usage: "AI SDK du client réel de modèles (P0r1) ; module à capacité", verdict: P0R1 },
+  { paquet: "undici", usage: "transport réel de la lecture des pages (P0r1, `src/research/undici-transport.ts`) ; module à capacité", verdict: P0R1 },
 ] as const satisfies readonly LignePaquet[];
+
+export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];
 
 /** `pnpm.onlyBuiltDependencies` exact (section 6). */
 export const CONSTRUITS = ["sharp", "unrs-resolver"] as const;

@@ -19,7 +19,7 @@ import {
   type Resultat,
 } from "./analyse";
 import { estAnalyse, fichiersSuivis, lireFichier, RACINE, type FichierSuivi } from "./fichiers";
-import { verifierFermeture } from "./graphe";
+import { MODULES_CAPACITE_P0R1, verifierFermeture } from "./graphe";
 import { LIGNES_CAPACITE, LIGNES_CAPACITE_TEXTES, type LigneCapacite } from "./listes/capacites";
 import { FORMES_NOMINATIVES_TESTS } from "./listes/formes-tests";
 import { CONSTRUITS, PAQUETS } from "./listes/paquets";
@@ -179,7 +179,10 @@ describe("confinement: dépôt", () => {
         capacites.length > 0 &&
         capacites.every((c: Record<string, unknown>) =>
           typeof c.capacite === "string" &&
-          /^(hote|fragment|secret|global):/.test(c.capacite) &&
+          // P0r1 (ticket 267) : le chemin du client de modèles contient un fragment surveillé ; ses lignes de module et
+          // d'identifiant vivent donc ici, et seulement pour les modules de capacité de P0r1 (`refus.json`).
+          (/^(hote|fragment|secret|global):/.test(c.capacite) ||
+            (typeof x.fichier === "string" && MODULES_CAPACITE_P0R1.includes(x.fichier) && /^(module|identifiant):/.test(c.capacite))) &&
           Array.isArray(c.formes) &&
           c.formes.length > 0 &&
           c.formes.every((f: unknown) => typeof f === "string") &&

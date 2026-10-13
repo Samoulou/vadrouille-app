@@ -51,6 +51,8 @@ export const PROPRIETES_PROCESS = [
   { fichier: "db/migrate.ts", propriete: "exitCode" },
   { fichier: "scripts/test-db.mjs", propriete: "argv" },
   { fichier: "scripts/test-db.mjs", propriete: "exit" },
+  // P0r1 (ticket 267 ; spécification P0c, section 9) : options de Node lues par la barrière de sortie. Verdict Sécurité à rendre.
+  { fichier: "src/server/env/egress.ts", propriete: "execArgv" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
@@ -79,6 +81,31 @@ export const LECTURES_ENV = [
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", noms: ["PATH"] },
   // 0040 D2, A8 : environnement de `git` construit (P0c-suite-release, #222).
   { fichier: "scripts/ci/techlead-gate.mjs", noms: ["PATH", "HOME"] },
+  // P0r1 (ticket 267 ; décision 0031 § 6 ; spécification P0c, section 9) : variables de déploiement, de proxy et de TLS de
+  // la barrière de sortie, lues par propriété littérale, valeur jamais rendue. Verdict Sécurité à rendre.
+  {
+    fichier: "src/server/env/egress.ts",
+    noms: [
+      "VERCEL_ENV",
+      "VERCEL_TARGET_ENV",
+      "VADROUILLE_ENV",
+      "HTTP_PROXY",
+      "http_proxy",
+      "HTTPS_PROXY",
+      "https_proxy",
+      "ALL_PROXY",
+      "all_proxy",
+      "NODE_USE_ENV_PROXY",
+      "node_use_env_proxy",
+      "NODE_TLS_REJECT_UNAUTHORIZED",
+      "NODE_EXTRA_CA_CERTS",
+      "SSL_CERT_FILE",
+      "SSL_CERT_DIR",
+      "OPENSSL_CONF",
+      "SSLKEYLOGFILE",
+      "NODE_OPTIONS",
+    ],
+  },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [
@@ -112,6 +139,12 @@ export const ENV_ENTIER = [
   // `argument:isProductionForDatabase` : ajoutée par la correction 1 de la PR 244 (mineur 5 de la revue du head
   // a89d9a5 : garde de production distinguée des variables absentes) ; verdict Sécurité à renouveler sur ce head.
   { fichier: "tests/db/env.ts", formes: ["argument:connectionStringFor", "argument:migratorConnectionString", "argument:isProductionForDatabase"] },
+  // P0r1 (ticket 267 ; décision 0031 § 6 ; spécification P0c, section 9) : modules étroits, environnement lu à l'appel
+  // (jamais à l'import), passé entier à la seule barrière de sortie. Verdict Sécurité à rendre.
+  { fichier: "src/server/env/egress.ts", formes: ["defaut:verifierSortie"] },
+  { fichier: "src/server/env/ai.ts", formes: ["defaut:lireCleOpenRouter", "argument:verifierSortie"] },
+  { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
+  { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
 ] as const satisfies readonly LigneEnvEntier[];
 
 export const PARAMETRES_ENV = [

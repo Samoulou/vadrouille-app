@@ -6,6 +6,13 @@ import { defineConfig } from "@playwright/test";
 
 import { PROTOTYPE_PORT_OFFSET, e2ePort } from "./scripts/e2e-port.mjs";
 import { SERVER_LOG_ENV, serverLogPath } from "./scripts/e2e-server-log.mjs";
+import { clesDeServicePosees } from "./src/server/env/garde-cles";
+
+// P0r1 (`p0: aucune clé dans l'environnement des tests`) : Playwright ne démarre pas si une clé de service est posée.
+const clesPosees = clesDeServicePosees();
+if (clesPosees.length > 0) {
+  throw new Error(`Clé de service posée dans l'environnement de Playwright (${clesPosees.join(", ")}) : retire-la avant de lancer les tests.`);
+}
 
 // F10b (F10-TL-6) : requêtes réseau des service workers exposées à Playwright (Chromium) : `context.route` les
 // intercepte (blocage des domaines Google) et `context.setOffline` les coupe. Sans ce drapeau, le service worker

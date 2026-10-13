@@ -7,6 +7,8 @@
  * qui correspond l'emporte (`node:fs/promises` avant `node:fs`).
  */
 
+import { readFileSync } from "node:fs";
+
 export type LigneSpecificateur = {
   readonly specificateur: string;
   readonly zones: readonly string[];
@@ -77,7 +79,15 @@ const CHARGEUR =
 
 const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4)";
 
-export const SPECIFICATEURS_NOMINATIFS = [
+const SERVER_ONLY_P0R1 =
+  "marqueur `server-only` (sans capacité) d'un nouveau module de zone sensible de P0r1, exigé par `ligne/require-server-only` ; " +
+  "P0r1 (ticket 267), décision 0031 § 5 ; spécification P0c, section 9 ; verdict Sécurité à rendre";
+const PORT_P0R1 =
+  "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du " +
+  "head `335d925`, décisions 0031 § 5 et 0046 (D13) ; spécification P0c, section 9 ; verdict Sécurité à rendre";
+const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "horlogeSysteme", "type:Horloge", "type:Nature", "type:Periode", "type:Plafond", "type:PortConsommation"];
+
+const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/client.ts", specificateur: "@/prototype/config", noms: ["MODELE_ID_PATTERN", "type:Routage"], motif: PROTOTYPE_PUR },
@@ -157,4 +167,30 @@ export const SPECIFICATEURS_NOMINATIFS = [
     noms: ["type:z"],
     motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : 0040 D6, accepté en ligne nominative, permanent ; zone de `zod` non élargie",
   },
+  // P0r1 (ticket 267). Les lignes du client de modèles, dont le chemin contient un fragment surveillé, sont dans
+  // `donnees/lignes-textes-specificateurs.json`.
+  { fichier: "src/grounding/places-client.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/grounding/places-client.ts", specificateur: "@/server/usage/port", noms: [...NOMS_PORT, "type:DemandeReservation"], motif: PORT_P0R1 },
+  { fichier: "src/grounding/routes-client.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/grounding/routes-client.ts", specificateur: "@/server/usage/port", noms: NOMS_PORT, motif: PORT_P0R1 },
+  { fichier: "src/grounding/enveloppe-google.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/research/undici-transport.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/server/env/ai.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/server/env/grounding.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  { fichier: "src/server/env/egress.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
 ] as const satisfies readonly LigneSpecificateurNominative[];
+
+/**
+ * Lignes nominatives dont le chemin ou le spécificateur contient un hôte ou un fragment surveillé (P0r1 : client de
+ * modèles), lues dans `donnees/lignes-textes-specificateurs.json`, extension non analysée (section 1, « Données du
+ * régime »), comme `donnees/lignes-textes.json` pour les capacités.
+ */
+const DONNEES_TEXTES = JSON.parse(readFileSync(new URL("../donnees/lignes-textes-specificateurs.json", import.meta.url), "utf8")) as {
+  readonly nominatifs: readonly LigneSpecificateurNominative[];
+  readonly paquets: readonly { readonly paquet: string; readonly usage: string; readonly verdict: string }[];
+};
+
+export const SPECIFICATEURS_NOMINATIFS: readonly LigneSpecificateurNominative[] = [...SPECIFICATEURS_NOMINATIFS_TS, ...DONNEES_TEXTES.nominatifs];
+
+/** Paquets dont le nom contient un fragment surveillé, lus dans les mêmes données (fusionnés par `listes/paquets.ts`). */
+export const PAQUETS_TEXTES = DONNEES_TEXTES.paquets;

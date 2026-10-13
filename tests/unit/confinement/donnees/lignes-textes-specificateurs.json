@@ -1,0 +1,43 @@
+{
+  "_": "Lignes de spécificateurs et paquets dont le chemin ou le nom contient un hôte ou un fragment surveillé (spécification P0c, sections 1, 2.5 et 6) : même forme que listes/specificateurs.ts (SPECIFICATEURS_NOMINATIFS) et listes/paquets.ts. Propriété du Tech Lead, verdict Sécurité exigé ; chemin gardé (section 8).",
+  "nominatifs": [
+    {
+      "fichier": "src/ai/openrouter-client.ts",
+      "specificateur": "server-only",
+      "noms": [
+        "effet"
+      ],
+      "motif": "marqueur `server-only` (sans capacité) d'un nouveau module de zone sensible de P0r1, exigé par `ligne/require-server-only` ; P0r1 (ticket 267), décision 0031 § 5 ; spécification P0c, section 9 ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "src/ai/openrouter-client.ts",
+      "specificateur": "@/server/usage/port",
+      "noms": [
+        "avecReservation",
+        "DELAI_REQUETE_MS",
+        "horlogeSysteme",
+        "type:Horloge",
+        "type:Nature",
+        "type:Periode",
+        "type:Plafond",
+        "type:PortConsommation"
+      ],
+      "motif": "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du head `335d925`, décisions 0031 § 5 et 0046 (D13) ; spécification P0c, section 9 ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    },
+    {
+      "fichier": "src/ai/openrouter-client.ts",
+      "specificateur": "@/prototype/config",
+      "noms": [
+        "MODELE_ID_PATTERN"
+      ],
+      "motif": "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4) ; même import que `src/ai/client.ts`, P0r1 (ticket 267) ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+    }
+  ],
+  "paquets": [
+    {
+      "paquet": "@openrouter/ai-sdk-provider",
+      "usage": "fournisseur explicite du client réel de modèles (P0r1) ; module à capacité",
+      "verdict": "P0r1 (ticket 267, décisions 0006 et 0031) ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267), qui cite le lockfile"
+    }
+  ]
+}
