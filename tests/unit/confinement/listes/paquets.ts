@@ -14,7 +14,7 @@ const EXISTANT = "existant au 2026-10-12 (`40b6738`)";
 const B1 = "B1 (PR 188, décision 0006) ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242 ; lockfile cité dans sa description)";
 
 /** P0r1 (ticket 267) : paquets ajoutés, versions de l'amendement de 0006 ; lockfile cité dans la description de la PR. */
-const P0R1 = "P0r1 (ticket 267, décisions 0006 et 0031) ; verdict Sécurité à rendre sur la PR de P0r1, qui cite le lockfile";
+const P0R1 = "P0r1 (ticket 267, décisions 0006, 0031 et 0049 D1, D12) ; verdict Sécurité à rendre sur la PR de P0r1, qui cite le lockfile";
 
 const PAQUETS_TS = [
   { paquet: "@googlemaps/js-api-loader", usage: "carte Google du navigateur (F4) ; module à capacité", verdict: EXISTANT },

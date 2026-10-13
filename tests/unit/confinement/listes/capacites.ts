@@ -353,7 +353,7 @@ export const LIGNES_CAPACITE = [
       { capacite: "module:undici", formes: ["Agent"], nombre: 1 },
       { capacite: "module:node:dns", formes: ["lookup"], nombre: 1 },
     ],
-    ecart: "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
   },
   {
     fichier: "src/grounding/places-client.ts",
@@ -362,7 +362,7 @@ export const LIGNES_CAPACITE = [
       "client réel de Places (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createPlacesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
-    ecart: "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
   },
   {
     fichier: "src/grounding/routes-client.ts",
@@ -371,7 +371,7 @@ export const LIGNES_CAPACITE = [
       "client réel de Routes (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createRoutesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
-    ecart: "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)",
   },
 ] as const satisfies readonly LigneCapacite[];
 

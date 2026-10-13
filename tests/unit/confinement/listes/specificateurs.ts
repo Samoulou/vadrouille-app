@@ -81,10 +81,10 @@ const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/
 
 const SERVER_ONLY_P0R1 =
   "marqueur `server-only` (sans capacité) d'un nouveau module de zone sensible de P0r1, exigé par `ligne/require-server-only` ; " +
-  "P0r1 (ticket 267), décision 0031 § 5 ; spécification P0c, section 9 ; verdict Sécurité à rendre";
+  "P0r1 (ticket 267), décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9 ; verdict Sécurité à rendre";
 const PORT_P0R1 =
   "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du " +
-  "head `335d925`, décisions 0031 § 5 et 0046 (D13) ; spécification P0c, section 9 ; verdict Sécurité à rendre";
+  "head `335d925`, décisions 0031 § 5, 0046 (D13) et 0049 C1 (point 5) ; spécification P0c, section 9 ; verdict Sécurité à rendre";
 const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "horlogeSysteme", "type:Horloge", "type:Nature", "type:Periode", "type:Plafond", "type:PortConsommation"];
 
 const SPECIFICATEURS_NOMINATIFS_TS = [

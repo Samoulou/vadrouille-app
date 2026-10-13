@@ -1,5 +1,9 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { COUT_ELEMENT_MICROS, createRoutesClient, MASQUE_MATRICE, ORIGINE_ROUTES, SKU_MATRICE, type OptionsRoutes } from "@/grounding/routes-client";
@@ -56,6 +60,17 @@ async function erreurDe(promesse: Promise<unknown>): Promise<ErreurClientGoogle>
     throw erreur;
   }
   throw new Error("aucune erreur");
+}
+
+
+/** Prix d'un SKU dans la table commitée (`prototype/config/prix-google.json`), en micro-USD par unité (0049 E2). */
+function prixUnitaireMicros(sku: string): number {
+  const table = z
+    .object({ skus: z.record(z.string(), z.object({ prixPour1000: z.number() })) })
+    .parse(JSON.parse(readFileSync(path.join(import.meta.dirname, "../../prototype/config/prix-google.json"), "utf8")));
+  const ligne = new Map(Object.entries(table.skus)).get(sku);
+  if (ligne === undefined) throw new Error(`SKU absent de la table : ${sku}`);
+  return ligne.prixPour1000 * 1_000;
 }
 
 describe("p0: egress, un seul contrat (Routes)", () => {
@@ -184,5 +199,11 @@ describe("p0: réservation avant chaque requête (Routes)", () => {
     const { client, transport } = monter([], { plafonds: [{ portee: "jour", fournisseur: "google", methode: "routes_matrix", maxElements: 3 }] });
     expect((await erreurDe(client.matrice({ origines: ["A", "B"], destinations: ["C", "D"], mode: "walk" }))).code).toBe("cap_reached");
     expect(transport).not.toHaveBeenCalled();
+  });
+});
+
+describe("p0: coût estimé de la matrice égal à la table de prix (décision 0049 E2)", () => {
+  it("élément de matrice : constante du client = prix du SKU de la table", () => {
+    expect(COUT_ELEMENT_MICROS).toBe(prixUnitaireMicros(SKU_MATRICE));
   });
 });

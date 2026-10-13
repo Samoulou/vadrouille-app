@@ -1,8 +1,12 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
-import { createPlacesClient, MASQUE_DETAILS, MASQUE_TEXT_SEARCH, ORIGINE_PLACES, SKU_DETAILS, SKU_TEXT_SEARCH, type OptionsPlaces } from "@/grounding/places-client";
+import { COUT_ESTIME_MICROS, createPlacesClient, MASQUE_DETAILS, MASQUE_TEXT_SEARCH, ORIGINE_PLACES, SKU_DETAILS, SKU_TEXT_SEARCH, type OptionsPlaces } from "@/grounding/places-client";
 import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
@@ -77,6 +81,17 @@ const DETAILS = {
   displayName: { text: "SENTINELLE-NOM" },
   formattedAddress: "SENTINELLE-ADRESSE",
 };
+
+
+/** Prix d'un SKU dans la table commitée (`prototype/config/prix-google.json`), en micro-USD par unité (0049 E2). */
+function prixUnitaireMicros(sku: string): number {
+  const table = z
+    .object({ skus: z.record(z.string(), z.object({ prixPour1000: z.number() })) })
+    .parse(JSON.parse(readFileSync(path.join(import.meta.dirname, "../../prototype/config/prix-google.json"), "utf8")));
+  const ligne = new Map(Object.entries(table.skus)).get(sku);
+  if (ligne === undefined) throw new Error(`SKU absent de la table : ${sku}`);
+  return ligne.prixPour1000 * 1_000;
+}
 
 describe("p0: egress, un seul contrat (Places)", () => {
   it.each([
@@ -262,5 +277,12 @@ describe("p0: réservation avant chaque requête (Places)", () => {
     await horloge.avancer(10_000);
     expect((await issue).code).toBe("upstream_timeout");
     expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+  });
+});
+
+describe("p0: coûts estimés de Places égaux à la table de prix (décision 0049 E2)", () => {
+  it("Text Search et Details : constante du client = prix du SKU de la table", () => {
+    expect(COUT_ESTIME_MICROS.textSearch).toBe(prixUnitaireMicros(SKU_TEXT_SEARCH));
+    expect(COUT_ESTIME_MICROS.details).toBe(prixUnitaireMicros(SKU_DETAILS));
   });
 });

@@ -246,7 +246,7 @@
           ]
         }
       ],
-      "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente) ; P0r1 (ticket 267, décision 0031 § 5) : exceptions nominatives et cas négatifs du client de modèles, verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "textes des cas négatifs d'un test non modifiable par P0c1 (0038 TL-2 point 1, PR 149, PR 216) : 0040 D2, A2 (permanente) ; P0r1 (ticket 267, décisions 0031 § 5 et 0049 C3, extension de A2) : exceptions nominatives et cas négatifs du client de modèles, verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "tests/e2e/hors-ligne.e2e.spec.ts",
@@ -358,7 +358,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "module de capacité de P0r1 (décisions 0031 § 5, 0049 C1 et 0049 C3 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "src/grounding/places-client.ts",
@@ -373,7 +373,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "src/grounding/routes-client.ts",
@@ -388,7 +388,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "module de capacité de P0r1 (décision 0031 § 5 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "src/server/env/egress.ts",
@@ -403,7 +403,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "texte à suffixe `_KEY` (section 5) : code d'erreur `missing_key` imposé par la spécification de P0r1 (décision 0031 § 6), aucune lecture ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "texte à suffixe `_KEY` (section 5) : code d'erreur `missing_key` imposé par la spécification de P0r1 (décisions 0031 § 6 et 0049 C1, point 3), aucune lecture ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     },
     {
       "fichier": "tests/unit/p0/clients-reels.test.ts",
@@ -418,7 +418,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "chemin d'un module de capacité de P0r1 nommé par la spécification (décision 0031 § 5), texte de test sans capacité ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "ecart": "chemin d'un module de capacité de P0r1 nommé par la spécification (décisions 0031 § 5 et 0049 C1), texte de test sans capacité ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
     }
   ]
 }
