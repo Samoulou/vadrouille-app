@@ -15,10 +15,11 @@
     "test": "vitest run",
     "test:a11y": "playwright test --project=a11y",
     "test:e2e": "playwright test --project=e2e",
+    "test:prototype-cache": "playwright test --project=prototype-cache --no-deps --workers=1",
     "test:visual": "playwright test --project=visual",
     "test:visual:update": "playwright test --project=visual --update-snapshots",
     "test:perf": "playwright test --project=perf --workers=1",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && E2E_SKIP_BUILD=1 pnpm test:a11y && E2E_SKIP_BUILD=1 pnpm test:e2e && E2E_SKIP_BUILD=1 pnpm test:visual",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && E2E_SKIP_BUILD=1 pnpm test:a11y && E2E_SKIP_BUILD=1 pnpm test:e2e && E2E_SKIP_BUILD=1 pnpm test:prototype-cache && E2E_SKIP_BUILD=1 pnpm test:visual",
     "p0": "node --import ./scripts/p0/enregistrer.mjs scripts/p0/main.ts"
   },
   "pnpm": {

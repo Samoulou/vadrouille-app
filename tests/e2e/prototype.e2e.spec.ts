@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 import { blockGoogle } from "./carte-helpers";
-import { ATTRIBUTION, PROTOTYPE_TRIP, PROTOTYPE_URL, prototypeSection, relectures } from "./prototype-helpers";
+import { card } from "./presentation-helpers";
+import { ATTRIBUTION, PROTOTYPE_TRIP, PROTOTYPE_URL, prototypeSection } from "./prototype-helpers";
 
 /**
  * P0b1 (spécification P0, « Tests attendus ») sur le build de production, servi en mode prototype par le second
@@ -47,11 +48,29 @@ test("parcours prototype : accueil, section « Prototype », présentation, Séj
   await expect(page.locator("#liste-etapes")).toContainText("[Lieu de test 1]");
 });
 
-test("affichage: mention « Données de lieux : Google » en mode prototype (écrans 6, 11 et 12)", async ({ page }) => {
-  for (const path of [`/voyages/${PROTOTYPE_TRIP}/presentation`, `/voyages/${PROTOTYPE_TRIP}`, `/voyages/${PROTOTYPE_TRIP}/jour/1`]) {
+test("affichage: mention « Données de lieux : Google » en mode prototype (écrans 6, 11, 12 et 13)", async ({ page }) => {
+  for (const path of [
+    `/voyages/${PROTOTYPE_TRIP}/presentation`,
+    `/voyages/${PROTOTYPE_TRIP}`,
+    `/voyages/${PROTOTYPE_TRIP}/jour/1`,
+    `/voyages/${PROTOTYPE_TRIP}/jour/1?etape=j1-a1`,
+  ]) {
     await page.goto(path);
     await expect(page.locator("[data-part='attribution']", { hasText: ATTRIBUTION }).first(), path).toBeVisible();
   }
+  // Écran 13 : la fiche remplace le panneau du jour ; la mention est rendue dans la fiche elle-même.
+  await expect(page.locator("[data-part='fiche'] [data-part='attribution']")).toHaveText(ATTRIBUTION);
+});
+
+test("feuille de détail d'une proposition : mention Google et lien de source hors de l'application (écran 6)", async ({ page }) => {
+  await page.goto(`/voyages/${PROTOTYPE_TRIP}/presentation`);
+  await card(page).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator("[data-part='attribution']")).toHaveText(ATTRIBUTION);
+  const source = sheet.getByRole("link");
+  await expect(source).toHaveAttribute("target", "_blank");
+  await expect(source).toHaveAttribute("rel", "noopener noreferrer");
 });
 
 test("liens de source avec rel « noopener noreferrer », ouverts hors de l'application", async ({ page }) => {
@@ -60,24 +79,6 @@ test("liens de source avec rel « noopener noreferrer », ouverts hors de l'appl
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
   await expect(source).toHaveAttribute("target", "_blank");
   await expect(source).toHaveAttribute("href", "https://exemple.org/lieu-1");
-});
-
-test("prototype sans cache : deux chargements de la Journée rappellent deux fois le relecteur simulé", async ({ page }) => {
-  const avant = await relectures(page);
-  const premiere = await page.goto(`/voyages/${PROTOTYPE_TRIP}/jour/1`);
-  const apresPremier = await relectures(page);
-  const seconde = await page.goto(`/voyages/${PROTOTYPE_TRIP}/jour/1`);
-  const apresSecond = await relectures(page);
-  // Au moins une relecture par chargement (une par journée relue). « Au moins » : d'autres tests, en parallèle, peuvent
-  // charger des pages du même serveur entre deux lectures du compteur ; un cache, lui, laisserait le second à zéro.
-  expect(apresPremier - avant).toBeGreaterThanOrEqual(1);
-  expect(apresSecond - apresPremier).toBeGreaterThanOrEqual(1);
-  for (const response of [premiere, seconde]) {
-    const cacheControl = response?.headers()["cache-control"] ?? "";
-    expect(cacheControl).toContain("no-store");
-    expect(cacheControl).toContain("private");
-    expect(cacheControl).not.toMatch(/public|s-maxage|stale-while-revalidate/);
-  }
 });
 
 test("en-têtes sans cache sur l'accueil, la présentation et le Séjour en mode prototype", async ({ request }) => {

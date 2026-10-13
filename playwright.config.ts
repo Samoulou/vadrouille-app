@@ -54,6 +54,16 @@ export default defineConfig({
     { name: "e2e", testDir: "tests/e2e", testMatch: /.*\.e2e\.spec\.ts$/ },
     { name: "a11y", testDir: "tests/e2e", testMatch: /.*\.a11y\.spec\.ts$/ },
     { name: "visual", testDir: "tests/visual", testMatch: /.*\.visual\.spec\.ts$/ },
+    // « Prototype sans cache » (décision 0032 § A6.6, revue de la PR #208) : compteur du relecteur simulé lu sans
+    // bruit, donc sans parallélisme et après les projets qui chargent des pages du serveur prototype. Dans
+    // `pnpm verify`, invocation à part (`pnpm test:prototype-cache`, `--no-deps`) : serveurs neufs, aucun autre test.
+    {
+      name: "prototype-cache",
+      testDir: "tests/e2e",
+      testMatch: /.*\.prototype-cache\.spec\.ts$/,
+      fullyParallel: false,
+      dependencies: ["e2e", "a11y"],
+    },
     // Mesure Lighthouse (décision 0022 § 1 et § 2) : `pnpm test:perf`, hors de `pnpm verify`, un seul worker,
     // sans nouvelle tentative (elle cacherait un score instable).
     { name: "perf", testDir: "tests/perf", testMatch: /.*\.perf\.spec\.ts$/, retries: 0 },

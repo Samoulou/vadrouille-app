@@ -333,7 +333,12 @@ function Deck({
       ) : null}
       {detail ? (
         <Suspense fallback={null}>
-          <ProposalDetailSheet proposal={detail} onClose={() => setDetail(null)} onReturnFocus={returnFocus} />
+          <ProposalDetailSheet
+            proposal={detail}
+            onClose={() => setDetail(null)}
+            onReturnFocus={returnFocus}
+            placesFromGoogle={placesFromGoogle}
+          />
         </Suspense>
       ) : null}
     </main>

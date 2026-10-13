@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 import { PROTOTYPE_PORT_OFFSET, e2ePort } from "../../scripts/e2e-port.mjs";
 
@@ -15,8 +15,8 @@ export const ATTRIBUTION = "Données de lieux : Google";
 export const prototypeSection = (page: Page) => page.getByRole("region", { name: "Prototype" });
 
 /** Compteur du relecteur simulé (`GET /dev/api/prototype/relectures`, décision 0032 § A6.6). */
-export async function relectures(page: Page): Promise<number> {
-  const response = await page.request.get(`${PROTOTYPE_URL}/dev/api/prototype/relectures`);
+export async function relectures(request: APIRequestContext): Promise<number> {
+  const response = await request.get(`${PROTOTYPE_URL}/dev/api/prototype/relectures`);
   if (!response.ok()) throw new Error(`compteur du relecteur simulé : ${response.status()}`);
   const body = (await response.json()) as { relectures: number };
   return body.relectures;
