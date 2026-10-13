@@ -429,6 +429,74 @@ export default defineConfig([
     },
   },
   {
+    // B1 (décision 0006, handover § 3) : `import "server-only"` obligatoire dans db/ et les dossiers serveur.
+    // `src/server/actions/` est déjà protégé par "use server" ; les tests et la configuration de drizzle-kit, non.
+    files: [
+      "db/**/*.{js,mjs,ts,tsx,mts}",
+      "src/server/**/*.{js,jsx,ts,tsx}",
+      "src/tenancy/**/*.{js,jsx,ts,tsx}",
+      "src/ai/**/*.{js,jsx,ts,tsx}",
+      "src/research/**/*.{js,jsx,ts,tsx}",
+      "src/grounding/**/*.{js,jsx,ts,tsx}",
+      "src/workflows/**/*.{js,jsx,ts,tsx}",
+    ],
+    ignores: [
+      "src/server/actions/**",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+      // Exception nominative (fusion de main dans B1, #188) : ces modules de phase 0 sont aussi chargés par `pnpm p0`
+      // (`node --import ./scripts/p0/enregistrer.mjs`, hors Next.js et sans la condition `react-server`), où
+      // `import "server-only"` lèverait une erreur. La règle de 0020 § 11 (= 0017 § 3.3) ne vise que `src/server` :
+      // la garde de remplacement est `ligne/no-p0-server-modules` (bloc suivant : aucun chargement de src/ai,
+      // src/research, src/grounding hors des dossiers serveur). Liste fermée : tout nouveau fichier de ces dossiers
+      // reste soumis à la règle (tests/unit/lint/p0-server-modules-lint.test.ts).
+      // Condition de sortie : retirer la liste quand `pnpm p0` ne charge plus ces modules hors Next.js
+      // (amendement de la décision 0006 du 2026-10-13).
+      "src/ai/client.ts",
+      "src/ai/modeles.simule.ts",
+      "src/ai/prompts/notation.ts",
+      "src/ai/prompts/plan.ts",
+      "src/ai/prompts/raisons.ts",
+      "src/ai/prompts/recherche.ts",
+      "src/ai/requetes.ts",
+      "src/ai/sorties.ts",
+      "src/grounding/ancrage.ts",
+      "src/grounding/interfaces.ts",
+      "src/grounding/places.simule.ts",
+      "src/grounding/routes.simule.ts",
+      "src/research/agent.ts",
+      "src/research/extract-text.ts",
+      "src/research/fetch-page.ts",
+      "src/research/ip-guard.ts",
+      "src/research/pages.simule.ts",
+      "src/research/recherche-web.simule.ts",
+      "src/research/recherche-web.ts",
+      "src/research/sources.ts",
+    ],
+    rules: { "ligne/require-server-only": "error" },
+  },
+  {
+    // B1 (#188, correction 3), amendement de la décision 0006 du 2026-10-13 : garde de remplacement de l'exception
+    // ci-dessus. Périmètre inversé : tout fichier sauf les dossiers serveur, `db/`, `scripts/` et les tests. La règle
+    // lit import statique, import de type, réexport, `import()` (dont `next/dynamic`) et `require()`. Seul ce bloc la
+    // règle : aucun bloc plus bas ne peut la remplacer (tests/unit/lint/p0-server-modules-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: [
+      "src/server/**",
+      "src/tenancy/**",
+      "src/ai/**",
+      "src/research/**",
+      "src/grounding/**",
+      "src/workflows/**",
+      "db/**",
+      "scripts/**",
+      "tests/**",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+    ],
+    rules: { "ligne/no-p0-server-modules": "error" },
+  },
+  {
     // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).
     files: ["src/features/creation/**/*.{jsx,tsx}", "src/features/compte/**/*.{jsx,tsx}", "src/app/(creation)/**/*.{jsx,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
