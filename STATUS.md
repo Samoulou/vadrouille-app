@@ -1,40 +1,40 @@
-# État du studio — 2026-10-13 (50e cycle)
+# État du studio — 2026-10-13 (51e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 50e cycle a été lancé à la demande de Samuel (17:53 CEST), juste après le 49e.
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 51e cycle a été lancé à la demande de Samuel (18:39 CEST), juste après le 50e.
 
 ## Messages de Samuel traités (projet)
-- Fil du projet, 17:53 CEST : « non pour #238, lance un autre cycle, on a encore des tokens » → Q340 tranchée (non), 50e cycle lancé.
-- Fil « Avancement IA et choix de destination », 18:33 CEST : « Q328 et 329 je suis tes recos » → Q328 et Q329 tranchées.
-- Action faite par Samuel : `owner-approved` retiré puis reposé sur B1 (#188), fusionnée à 18:02 CEST.
-- #studio : aucun nouveau message depuis le 49e cycle.
+- Fil du projet, 18:39 CEST : « Aller lance encore un cycle » → 51e cycle lancé.
+- #studio : aucun nouveau message depuis le 50e cycle.
 
 ## Fait
-- Fusionnées : **F10c (#236)** après sa correction 2 ; **B1 (#188)**, socle base de données ; statut du 49e cycle (#239).
-- **`main` rouge après B1** : B1 avait été approuvée sur une base antérieure au régime P0c1 ; 6 tests de confinement échouent (84 capacités, `process.env` entier, fermeture transitive, `package.json`). Ticket #242 ; correctif en avant (rôle `data`), sans toucher `.github/` : **PR #244**, 484 tests de confinement au vert, lignes ajoutées marquées « Verdict Sécurité demandé ». Pas de retour de B1 : il toucherait `.github/workflows/` et attendrait Samuel. Deuxième cas du jour pour Q342.
-- **F7b (#245, ticket #240)** : « Déplacer une étape » (feuille « Déplacer {nom} », `useRadioGroup`, `DayBadgeGroup`, contrats `MoveRequest`, `MoveOptions`, `MoveDraft`). En revue ; captures à régénérer par le robot.
-- **Spec B3 (#243, ticket #241)** : compte et connexion ; propose B3a, B3b, B3c ; signale que F8b (code de l'adaptateur `auth` simulé et de `/connexion`) n'a pas de ticket et doit précéder B3c. En revue.
+- Fusionnée : statut du 50e cycle (#246).
+- **Correctif de `main` (#244)** : changements demandés par le Tech Lead (1 bloquant : aucun test pour l'admission élargie de `lectureSecreteAdmise`) ; correction 1 poussée (23d4ac6) : 18 cas de test ajoutés, 8 mineurs traités, 522 tests de confinement au vert. Verdict de la Sécurité à renouveler sur ce head.
+- **Spec B3 (#243)** : changements demandés (7 bloquants du Tech Lead, 6 de la Sécurité) ; correction 1 poussée (23e91e6) : variables requises par environnement, `ci.yml` déclaré pour B3a, amendement de 0017 en préalable, e2e déterministe, gardes Stripe, purge du limiteur, listes fermées pour `SMTP_URL` et `TRUSTED_IP_HEADER`.
+- **Spec B4 (#248, ticket #247)** : paiement simulé en base, droit accordé seulement par un événement signé reçu par le webhook ; découpage proposé B4a, B4b, B4c (Q351).
 
 ## En cours
-- En revue : #244 (correctif de `main`, prioritaire), #238 (code de #222), #245 (F7b), #243 (spec B3).
+- En revue : #244 (correctif de `main`, prioritaire), #243 (spec B3, correction 1), #248 (spec B4), #245 (F7b), #238 (code de #222).
 
 ## Bloqué
 - **Toutes les PR de code** : CI rouge tant que #244 n'est pas fusionnée.
-- **#238** : fusion de #244 d'abord (mêmes listes du régime), puis Q341.
-- **PR de code de #221** : après la fusion de #238 (mêmes fichiers).
+- **#245 (F7b)** : captures régénérées par le robot (c508ea3) ; la CI repart avec la fusion de `main` dans la branche, après #244.
+- **#238** : après #244 (mêmes listes du régime), puis Q341.
+- **PR de code de #221** : après la fusion de #238.
 - **B5a** : fin de la fenêtre de veto de 0041 (2026-10-15), Q333 et Q337.
-- **Code de B3** : fusion de #243, puis décision sur le découpage (Q343) ; B3c attend F8b.
+- **Code de B3** : fusion de #243 et décision de découpage (Q343) ; préalables du Tech Lead (amendements de 0017 et 0007) ; B3c attend F8b.
+- **Code de B4** : fusion de #248, décision de découpage (Q351), Q352 ; B4a après B3b.
 - **Exécutions réelles de P0 (P0r2)** : code de #221 et #222 ; Q330.
 
 ## Prochain cycle
-1. Suivre la revue de #244 et la faire fusionner en premier ; puis #238 fusionne `main`.
-2. Corrections éventuelles de #245, #243, #238.
+1. Faire fusionner #244 ; puis fusionner `main` dans #245 et #238 pour relancer leur CI.
+2. Corrections éventuelles de #243, #248, #245, #238.
 3. Après la fusion de #238 : code de #221 (rôle `ia`).
-4. Après la fusion de #243 : décision écrite sur le découpage de B3 (Q343), tickets B3a et F8b (avec l'entrée « Créer un voyage » sur l'accueil), F8b après F7b.
-5. Après le 2026-10-15 et Q333 : tickets B5a, B5b, B5c et lancement de B5a.
+4. Après la fusion de #243 et #248 : décisions écrites de découpage (Q343, Q351), tickets B3a et F8b (jamais dans le même cycle), puis B4a après B3b.
+5. Après le 2026-10-15 et Q333 : tickets B5a, B5b, B5c.
 
 ## Décisions attendues de Samuel
 - **Action** : plafond de quota de Maps JavaScript API (Q263).
-- **Nouvelle** : Q345 (avec le Tech Lead) : essai d'un en-tête sur une préversion protégée du staging.
+- **Nouvelles** : Q353 (essai Stripe en mode test : où et qui pose quoi ; ne bloque que l'essai final de B4), Q354 (plafond global d'envois d'e-mails, avant de lever Q25), Q345 (avec le Tech Lead).
 - **Déjà posées** (recommandations dans les questions) : Q330, Q332, Q319, Q321, Q322, Q323, Q325, Q317, Q296, Q297, Q294, Q288, P0c-Q2.
 - **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
 - **Toujours ouvertes** :
@@ -45,21 +45,20 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - Ligne : Q19 (avec Q226), Q37, Q108, Q130 ;
   - règles : Q23, Q274.
 - **Veto possible** :
-  - avant le 2026-10-15 : décisions B3-PO-1 à 13 de la spec B3 (#243, une fois fusionnée) ; décision 0041 (découpage de B5, dérogation limitée à « une tâche = une PR ») ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
+  - avant le 2026-10-15 : décisions B3-PO de la spec B3 (#243) et B4-PO-1 à 16 de la spec B4 (#248), une fois fusionnées ; décision 0041 (découpage de B5, dérogation limitée à « une tâche = une PR ») ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et son amendement (#211), 0037, 0040, décisions B1-PO-1 à 6 (#185), B1 désormais fusionnée ;
   - avant le 2026-10-14 : décision 0025.
 
 ## Questions ajoutées
-- Q343 (CEO), Q344 (Tech Lead et Sécurité), Q345 (Tech Lead et Samuel), Q346 (UX/UI) : spec B3.
-- Q347 et Q348 (Sécurité et Tech Lead) : correctif de `main` après B1.
-- Q349 (Tech Lead et UX/UI) et Q350 (Product owner) : F7b.
-- Mises à jour : Q340, Q328, Q329 tranchées par Samuel ; Q342 (deuxième cas).
+- Q351 (CEO), Q352 (Tech Lead et Sécurité), Q353 (Samuel), Q355 (CEO) : spec B4.
+- Q354 (Samuel) : spec B3.
+- Mise à jour : Q343 (B3a et F8b jamais dans le même cycle).
 
 ## Part d'usage estimée
-- 50e cycle : 3 sous-agents, 3 au plus en même temps :
-  - code de F7b (environ 1 M de jetons) ;
-  - spec B3 (0,28 M) ;
-  - correctif de `main` après B1 (0,29 M).
-- S'y ajoute le travail du CEO (environ 0,15 M).
-- Total : environ 1,7 M de jetons (estimation).
+- 51e cycle : 3 sous-agents, 2 au plus en même temps :
+  - correction 1 de la spec B3 (0,19 M de jetons) ;
+  - spec B4 (0,24 M) ;
+  - correction 1 du correctif de `main` (0,07 M).
+- S'y ajoute le travail du CEO (environ 0,1 M).
+- Total : environ 0,6 M de jetons (estimation).
 - Part de l'abonnement : impossible à mesurer depuis la routine.
