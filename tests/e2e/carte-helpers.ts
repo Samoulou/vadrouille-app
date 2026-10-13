@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page, type Request } from "@playwright/test";
 
 /**
  * Hôtes Google bloqués dans chaque spec de F4 et pendant la mesure Lighthouse : aucune dépendance au réseau
@@ -24,19 +24,21 @@ export function isGoogleHost(hostname: string): boolean {
 
 /**
  * Bloque les domaines Google (`route.abort()`) et relève toute requête qui les vise,
- * interceptée ou non. Renvoie la liste, à vérifier en fin de test.
+ * interceptée ou non. Renvoie la liste, à vérifier en fin de test. Sur un contexte (`BrowserContext`), le blocage
+ * couvre aussi les requêtes du service worker (F10b, F10-TL-6).
  */
-export async function blockGoogle(page: Page): Promise<string[]> {
+export async function blockGoogle(target: Page | BrowserContext): Promise<string[]> {
   const requests: string[] = [];
   for (const pattern of GOOGLE_ROUTES) {
-    await page.route(pattern, (route) => route.abort());
+    await target.route(pattern, (route) => route.abort());
   }
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (isGoogleHost(url.hostname)) {
+  const record = (request: Request) => {
+    if (isGoogleHost(new URL(request.url()).hostname)) {
       requests.push(request.url());
     }
-  });
+  };
+  if ("browser" in target) target.on("request", record);
+  else target.on("request", record);
   return requests;
 }
 

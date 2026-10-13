@@ -8,6 +8,8 @@ test-results
 coverage
 tests
 docs
+# F10b (F10-TL-9) : le manifeste lit ses couleurs dans les tokens Ligne à la construction.
+!docs/design-system/tokens.json
 specs
 *.md
 .env

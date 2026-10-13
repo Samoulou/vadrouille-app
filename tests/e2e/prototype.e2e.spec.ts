@@ -99,8 +99,15 @@ test("les routes du prototype ne sont pas prérendues : manifeste de build incha
     routes: Record<string, unknown>;
     dynamicRoutes: Record<string, unknown>;
   };
-  // Mêmes routes prérendues qu'avant P0b1 (aucune page servie par un adaptateur).
-  expect(Object.keys(manifest.routes).sort()).toEqual(["/_global-error", "/_not-found", "/voyages/nouveau"]);
+  // Mêmes routes prérendues qu'avant P0b1 (aucune page servie par un adaptateur), plus la page de repli hors ligne
+  // et le manifeste de F10b, construits sans aucune donnée (F10-TL-4, F10-TL-9).
+  expect(Object.keys(manifest.routes).sort()).toEqual([
+    "/_global-error",
+    "/_not-found",
+    "/hors-ligne",
+    "/manifest.webmanifest",
+    "/voyages/nouveau",
+  ]);
   expect(Object.keys(manifest.dynamicRoutes)).toEqual([]);
 });
 
