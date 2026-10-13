@@ -13,7 +13,8 @@ import { classer, type ParametresClassement } from "@/domain/classement";
 import type { CandidatEvenement, CandidatIdee, CandidatMoteur, EntreeMoteur, EtatChoix, Nuit } from "@/domain/entrees";
 import { identifiantEtape } from "@/domain/identifiant";
 import { planifierJour, type ResultatJour, type Trajet } from "@/domain/planification";
-import { INCONNU, memePoint, trajetLePlusRapide, type ModeTrajet, type Point, type Relectures } from "@/domain/relectures";
+import { finDuJour, tempsLibreAvant } from "@/domain/journee";
+import { INCONNU, trajetLePlusRapide, type ModeTrajet, type Point, type Relectures } from "@/domain/relectures";
 import {
   finOccupee,
   retirerCreneaux,
@@ -23,7 +24,7 @@ import {
   type JourSquelette,
 } from "@/domain/squelette";
 import { element } from "@/domain/tables";
-import { arrondi5, versHeure, versMinutes } from "@/domain/temps";
+import { versHeure, versMinutes } from "@/domain/temps";
 import {
   estBloquante,
   PORTEE_R1_PAR_DEFAUT,
@@ -67,9 +68,6 @@ export type ResultatReplanification =
   | RefusAucuneOption;
 
 const REFUS_AUCUNE_OPTION = { ok: false, code: "no_option" } as const;
-
-/** Heure de fin la plus tardive d'un terminus (le moteur ne planifie pas après minuit). */
-const DERNIERE_HEURE = 23 * 60 + 55;
 
 // --- Contexte commun ----------------------------------------------------------------------------------------
 
@@ -210,8 +208,6 @@ export function sansIdentifiant(stop: StopSnapshot): BlocFixe["stop"] {
 function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, contexte: Contexte): JourConstruit {
   const { entree } = contexte;
   const { configuration } = entree;
-  const marge = configuration.margeMinutes;
-  const seuil = configuration.seuilTempsLibreMinutes;
   const index = squeletteDuJour.index;
   const items: DayLineItemSnapshot[] = [
     { type: "terminus", role: "start", time: versHeure(squeletteDuJour.debut), label: etiquette(entree.nuits, squeletteDuJour.logementDepart) },
@@ -221,15 +217,10 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
   let fin = squeletteDuJour.debut;
   let rang = 0;
 
-  /**
-   * Temps libre avant un élément (B5-PO-9) : écart de `seuil` minutes ou plus entre la fin du précédent et le départ
-   * (début − trajet − marge) ; en dessous, c'est de la marge. Fin du temps libre sur la grille de 5 min.
-   */
+  /** Temps libre avant un élément (B5-PO-9), règle partagée avec les patches (`journee.ts`). */
   const libreAvant = (debut: number, trajet: number | undefined) => {
-    const depart = trajet === undefined ? debut : debut - trajet - marge;
-    if (depart - fin >= seuil) {
-      items.push({ type: "free", from: versHeure(fin), to: versHeure(Math.max(fin, Math.floor(depart / 5) * 5)) });
-    }
+    const libre = tempsLibreAvant(fin, debut, trajet, configuration);
+    if (libre !== undefined) items.push(libre);
   };
 
   for (const element of plan.elements) {
@@ -293,17 +284,8 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
         : derniere.bloc.stop.placeId === undefined
           ? { logement: squeletteDuJour.logementDepart }
           : { lieu: derniere.bloc.stop.placeId };
-  let finJour = fin;
-  if (!memePoint(position, arrivee) && plan.retour !== undefined) {
-    items.push({ type: "segment", segment: { mode: plan.retour.mode, estimated: plan.retour.estimee } });
-    finJour = fin + plan.retour.minutes;
-  }
-  items.push({
-    type: "terminus",
-    role: "end",
-    time: versHeure(Math.min(DERNIERE_HEURE, arrondi5(finJour))),
-    label: etiquette(entree.nuits, squeletteDuJour.logementArrivee),
-  });
+  // Retour au logement et terminus `end` : règle partagée avec les patches (`journee.ts`).
+  items.push(...finDuJour({ position, arrivee, fin, retour: () => plan.retour, label: etiquette(entree.nuits, squeletteDuJour.logementArrivee) }).items);
 
   return {
     jour: { index, date: squeletteDuJour.date, items, events: [], travelBudgetMinutes: squeletteDuJour.budgetTrajet },

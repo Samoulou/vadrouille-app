@@ -15,9 +15,10 @@ import {
 import { budgetParPersonne, changementDeBudget } from "@/domain/calculs";
 import type { EntreeMoteur, EtatChoix } from "@/domain/entrees";
 import { modesAdmis, sourceDe } from "@/domain/generation";
-import type { Trajet } from "@/domain/planification";
 import { etapesDuJour } from "@/domain/programme";
-import { INCONNU, logementsDuJour, memePoint, trajetLePlusRapide, type Point } from "@/domain/relectures";
+import { DERNIERE_HEURE, finDuJour, tempsLibreAvant } from "@/domain/journee";
+import type { Trajet } from "@/domain/planification";
+import { INCONNU, logementsDuJour, trajetLePlusRapide, type Point } from "@/domain/relectures";
 import { finOccupee, repasDeLHeure, squelette, type JourSquelette } from "@/domain/squelette";
 import { element, lire } from "@/domain/tables";
 import { arrondi5, versHeure, versMinutes } from "@/domain/temps";
@@ -73,9 +74,6 @@ export type EntreePatch = {
 export type ResultatPatch =
   | { ok: true; instantane: TripSnapshot; resultat: PatchResult; rapport: RapportValidation }
   | Refus;
-
-/** Heure la plus tardive qu'écrit le moteur (il ne planifie pas après minuit), comme la génération. */
-const DERNIERE_HEURE = 23 * 60 + 55;
 
 const refus = <C extends Exclude<Refus["code"], "version_conflict">>(code: C) => ({ ok: false, code }) as const;
 
@@ -150,7 +148,6 @@ type ContextePatch = {
 function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DaySnapshot | undefined {
   const { configuration, nuits } = contexte.moteur;
   const marge = configuration.margeMinutes;
-  const seuil = configuration.seuilTempsLibreMinutes;
   const origine = jour.origine;
   const index = origine.index;
   const bornes = contexte.squelettes.get(index);
@@ -178,9 +175,10 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   let precedentVerrouille = true;
   let dernierVerrouille = false;
 
+  /** Temps libre avant un élément (B5-PO-9), même règle que la génération (`journee.ts`). */
   const libreAvant = (debut: number, trajet: number | undefined) => {
-    const depart = trajet === undefined ? debut : debut - trajet - marge;
-    if (depart - fin >= seuil) items.push({ type: "free", from: versHeure(fin), to: versHeure(Math.max(fin, Math.floor(depart / 5) * 5)) });
+    const libre = tempsLibreAvant(fin, debut, trajet, configuration);
+    if (libre !== undefined) items.push(libre);
   };
 
   /** Pose une étape à `debut` ; `false` si une heure dépasse la journée. */
@@ -263,17 +261,11 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   }
   for (const fixe of fixes) if (!poserFixe(fixe)) return undefined;
 
-  let finJour = fin;
-  if (!memePoint(position, arrivee)) {
-    const retour = contexte.trajet(position, arrivee);
-    if (retour !== undefined) {
-      items.push({ type: "segment", segment: { mode: retour.mode, estimated: retour.estimee } });
-      finJour = fin + retour.minutes;
-    }
-  }
+  // Retour au logement et terminus `end` : même règle que la génération (`journee.ts`).
+  const finale = finDuJour({ position, arrivee, fin, retour: () => contexte.trajet(position, arrivee), label: labelFin });
   // Fin du jour : dans la fenêtre du squelette (ou la fin déjà écrite dans la base), sauf derrière une étape verrouillée (R3 prime).
-  if (arrondi5(finJour) > Math.max(bornes.fin, finBase) && !dernierVerrouille) return undefined;
-  items.push({ type: "terminus", role: "end", time: versHeure(Math.min(DERNIERE_HEURE, arrondi5(finJour))), label: labelFin });
+  if (arrondi5(finale.finJour) > Math.max(bornes.fin, finBase) && !dernierVerrouille) return undefined;
+  items.push(...finale.items);
 
   return {
     index,
@@ -399,7 +391,7 @@ function cleRapport(entree: EntreeRapport): string {
   return `${entree.regle}|${entree.etape ?? ""}|${entree.jour ?? ""}`;
 }
 
-/** Recopie d'un instantané (`revert`) : objets neufs, validés par `TripSnapshotSchema`. */
+/** Recopie de l'instantané de base : objets neufs, validés par `TripSnapshotSchema`. */
 function copie(instantane: TripSnapshot): TripSnapshot {
   return TripSnapshotSchema.parse(instantane);
 }
@@ -411,6 +403,11 @@ function jourDifferent(a: DaySnapshot | undefined, b: DaySnapshot | undefined): 
 /**
  * Applique un patch (voir l'en-tête du module). Résultat : `{ ok: true, instantane, resultat, rapport }` (version
  * `baseVersion + 1`), ou un refus typé de `REFUS_MOTEUR` (0045 § 5), sans détail sauf `currentVersion`.
+ *
+ * Entrée bloquante « nouvelle » : comparée au rapport des mêmes jours de la base par la clé `regle|etape|jour`
+ * (`cleRapport`). Cette clé ne distingue pas deux causes d'une même règle pour la même étape et le même jour : un
+ * patch qui aggrave une violation déjà présente (une seconde cause de R8 sur un jour qui en avait une, par exemple)
+ * n'est pas refusé. Limite acceptée (écart 1 de B5c) : les entrées du rapport n'ont pas de sous-cause.
  */
 export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   const { patch, moteur } = entree;
@@ -447,7 +444,10 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
     if (patch.operations.length !== 1 || cible === undefined || cible < 1 || cible >= patch.baseVersion || anterieure === undefined) {
       return refus("invalid_revert");
     }
-    const instantane = copie(anterieure);
+    // Instantané de l'historique invalide : refus typé, pas d'exception (on ne recopie jamais un instantané invalide).
+    const lu = TripSnapshotSchema.safeParse(anterieure);
+    if (!lu.success) return refus("invalid_revert");
+    const instantane = lu.data;
     const indexes = [...new Set([...base.days, ...instantane.days].map((jour) => jour.index))].sort((a, b) => a - b);
     const touches = indexes.filter((index) =>
       jourDifferent(

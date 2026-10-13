@@ -6,6 +6,7 @@ import {
   PatchResultSchema,
   TripSnapshotSchema,
   type DaySnapshot,
+  type Pace,
   type StopSnapshot,
   type TripCommitment,
   type TripPatch,
@@ -20,6 +21,7 @@ import { generer } from "@/domain/generation";
 import { appliquerPatch, type EntreePatch, type ResultatPatch } from "@/domain/patch";
 import { INCONNU, memePoint, type ModeTrajet, type Plage, type Point, type Relectures } from "@/domain/relectures";
 import { versMinutes } from "@/domain/temps";
+import { estBloquante } from "@/domain/validation";
 import { erreurDeVersion, REFUS_MOTEUR, type CodeRefus } from "@/domain/version";
 
 /**
@@ -102,6 +104,8 @@ const SOIREES = ["s1", "s2"].map((id) =>
 const RESERVE = {
   proche: candidat("proche", "activity", { faits: { costPerPerson: 25, durationMinutes: 60 }, notes: { matchesWishes: true, notForMeRisk: 1, mustSee: false, slotFit: [] } }),
   autre: candidat("autre", "activity", { faits: { costPerPerson: 10, durationMinutes: 60 }, notes: { matchesWishes: true, notForMeRisk: 1, mustSee: false, slotFit: [] } }),
+  /** Lieu « fermé définitivement » pour le double `validite` : un `replace` vers lui crée une entrée bloquante. */
+  ferme: candidat("ferme", "activity", { faits: { costPerPerson: 10, durationMinutes: 60 }, notes: { matchesWishes: true, notForMeRisk: 1, mustSee: false, slotFit: [] } }),
 };
 const TOUS_CHOISIS = new Map<string, EtatChoix>([...REPAS, ...SOIREES].map((c) => [c.id, "choisi"]));
 
@@ -115,13 +119,13 @@ const NUITS: Nuit[] = [
   { etiquette: "Logement de test", placeId: "SENTINELLE_PLACE_LOGEMENT" },
 ];
 
-function moteur(): EntreePatch["moteur"] {
+function moteur(pace: Pace = "relaxed"): EntreePatch["moteur"] {
   return {
     voyage: { destination: "Édimbourg", start: "2026-11-23", end: "2026-11-25", timeZone: "Europe/London", travellers: { adults: 2, children: 0 } },
-    brief: { travellers: { adults: 2, children: 0 }, pace: "relaxed", wishes: ["museum"], limits: [], mobility: ["walk", "transit"], inferredFields: [] },
+    brief: { travellers: { adults: 2, children: 0 }, pace, wishes: ["museum"], limits: [], mobility: ["walk", "transit"], inferredFields: [] },
     nuits: NUITS,
     engagements: [...VOLS, BILLET],
-    candidats: [...ACTIVITES, ...REPAS, ...SOIREES, RESERVE.proche, RESERVE.autre],
+    candidats: [...ACTIVITES, ...REPAS, ...SOIREES, RESERVE.proche, RESERVE.autre, RESERVE.ferme],
     evenements: [],
     idees: [],
     choix: TOUS_CHOISIS,
@@ -134,8 +138,8 @@ function moteur(): EntreePatch["moteur"] {
 }
 
 /** Version 2 générée par le moteur (B5b) : base des patches. */
-function version2(): TripSnapshot {
-  const resultat = generer({ ...moteur(), version: 2 });
+function version2(pace: Pace = "relaxed"): TripSnapshot {
+  const resultat = generer({ ...moteur(pace), version: 2 });
   if (!resultat.ok) throw new Error(`génération refusée : ${resultat.code}`);
   return resultat.instantane;
 }
@@ -281,6 +285,22 @@ describe("patch: tout ou rien", () => {
     expect(base).toEqual(gelee);
     expect(Object.keys(resultat)).toEqual(["ok", "code"]);
   });
+
+  it("une première opération valide puis une deuxième refusée (locked_stop, out_of_trip) : refus seul, base intacte", () => {
+    const base = version2();
+    const gelee = structuredClone(base);
+    const premiere: TripPatchOperation = { op: "replace", stopId: activiteDuJour(base, 2).id, candidateId: RESERVE.proche.id, newStopId: "n1" };
+    for (const [code, seconde] of [
+      ["locked_stop", { op: "move", stopId: billet(base).id, day: 3, time: "10:00" }],
+      ["out_of_trip", { op: "add", stopId: "n2", kind: "activity", day: 4, time: "10:00", name: "Hors séjour" }],
+    ] satisfies [CodeRefus, TripPatchOperation][]) {
+      expect(appliquerPatch(entree(base, patch(2, [seconde])))).toEqual({ ok: false, code });
+      const resultat = appliquerPatch(entree(base, patch(2, [premiere, seconde])));
+      expect(resultat).toEqual({ ok: false, code });
+      expect(Object.keys(resultat)).toEqual(["ok", "code"]);
+    }
+    expect(base).toEqual(gelee);
+  });
 });
 
 describe("patch: rejoué tel quel, même résultat", () => {
@@ -329,19 +349,26 @@ describe("patch: PatchResult", () => {
     expect(resultat.changes.filter((c) => c.type === "budget")).toEqual([{ type: "budget", deltaPerPerson: -10 }]);
   });
 
-  it("lock : le jour touché est replanifié sans rien déplacer ; toutes ses étapes sont « unchanged »", () => {
-    const base = version2();
-    for (const index of [1, 2, 3]) {
-      const activite = activiteDuJour(base, index);
-      const { instantane, resultat } = reussi(appliquerPatch(entree(base, patch(2, [{ op: "lock", stopId: activite.id }]))));
-      const attendu = structuredClone(base);
-      const jour = jourN(attendu, index);
-      jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === activite.id ? { ...item, stop: { ...item.stop, locked: true } } : item));
-      expect(instantane).toEqual(attendu);
-      expect(resultat.touchedDays).toEqual([index]);
-      expect(resultat.changes).toEqual(etapes(jourN(base, index)).map((stop) => ({ type: "unchanged", label: stop.name, time: stop.start })));
-    }
-  });
+  for (const pace of ["relaxed", "balanced", "intense"] satisfies Pace[]) {
+    it(`lock (${pace}) : chaque étape non verrouillée de chaque jour ; jour identique au drapeau près, toutes ses étapes « unchanged »`, () => {
+      const base = version2(pace);
+      let verifiees = 0;
+      for (const jourBase of base.days) {
+        for (const cible of etapes(jourBase).filter((stop) => !stop.locked)) {
+          const { instantane, resultat } = reussi(appliquerPatch({ ...entree(base, patch(2, [{ op: "lock", stopId: cible.id }])), moteur: moteur(pace) }));
+          const attendu = structuredClone(base);
+          const jour = jourN(attendu, jourBase.index);
+          jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === cible.id ? { ...item, stop: { ...item.stop, locked: true } } : item));
+          expect(instantane, `${pace}, jour ${jourBase.index}, ${cible.id}`).toEqual(attendu);
+          expect(resultat.touchedDays).toEqual([jourBase.index]);
+          expect(resultat.changes).toEqual(etapes(jourBase).map((stop) => ({ type: "unchanged", label: stop.name, time: stop.start })));
+          verifiees += 1;
+        }
+      }
+      // Chaque jour a au moins une étape non verrouillée : le test n'est jamais vide.
+      expect(verifiees).toBeGreaterThanOrEqual(base.days.length);
+    });
+  }
 
   it("replace : Change[replaced] et Change[segment] pour le trajet dont la durée change", () => {
     const base = version2();
@@ -404,6 +431,30 @@ describe("patch: refus typés", () => {
       operations: (base) => [{ op: "lock", stopId: activiteDuJour(base, 2).id }, { op: "revert", toVersion: 1 }],
       modif: { versionsAnterieures: new Map([[1, { days: [] }]]) },
     },
+    {
+      nom: "annulation invalide (toVersion égale à baseVersion)",
+      code: "invalid_revert",
+      operations: () => [{ op: "revert", toVersion: 2 }],
+      modif: { versionsAnterieures: new Map([[2, { days: [] }]]) },
+    },
+    {
+      nom: "annulation invalide (toVersion après baseVersion)",
+      code: "invalid_revert",
+      operations: () => [{ op: "revert", toVersion: 3 }],
+      modif: { versionsAnterieures: new Map([[3, { days: [] }]]) },
+    },
+    {
+      nom: "annulation invalide (toVersion 0)",
+      code: "invalid_revert",
+      operations: () => [{ op: "revert", toVersion: 0 }],
+      modif: { versionsAnterieures: new Map([[0, { days: [] }]]) },
+    },
+    {
+      nom: "annulation invalide (instantané de l'historique invalide)",
+      code: "invalid_revert",
+      operations: () => [{ op: "revert", toVersion: 1 }],
+      modif: { versionsAnterieures: new Map([[1, { days: [{ index: 0 }] } as unknown as TripSnapshot]]) },
+    },
   ];
 
   it("couvre chaque code de REFUS_MOTEUR", () => {
@@ -433,12 +484,52 @@ describe("patch: aucune option compatible", () => {
       [{ op: "move", stopId: activiteDuJour(base, 2).id, day: 2, time: "16:15" }],
       // Pas de place avant minuit.
       [{ op: "add", stopId: "n2", kind: "activity", day: 2, time: "23:00", name: "Trop tard" }],
+      // Début du jour (09:00, au logement) : le trajet et la marge ne tiennent pas avant l'étape posée à 09:00.
+      [{ op: "move", stopId: activiteDuJour(base, 3).id, day: 2, time: "09:00" }],
+      [{ op: "move", stopId: activiteDuJour(base, 2).id, day: 3, time: "09:00" }],
+      // Jour d'arrivée : 12:00 tombe avant la fin du vol d'arrivée et du transfert.
+      [{ op: "move", stopId: activiteDuJour(base, 2).id, day: 1, time: "12:00" }],
     ];
-    for (const operations of cas) expect(appliquerPatch(entree(base, patch(2, operations)))).toEqual({ ok: false, code: "no_option" });
+    for (const operations of cas) expect(appliquerPatch(entree(base, patch(2, operations))), JSON.stringify(operations)).toEqual({ ok: false, code: "no_option" });
     expect(base).toEqual(gelee);
   });
 });
 
+describe("patch: entrée bloquante nouvelle (validation des jours touchés)", () => {
+  it("replace par un candidat dont le lieu est fermé : entrée bloquante nouvelle, no_option, rien produit", () => {
+    const base = version2();
+    const gelee = structuredClone(base);
+    const activite = activiteDuJour(base, 2);
+    // Le même replace vers un lieu ouvert passe : seul le lieu fermé fait refuser.
+    reussi(appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: activite.id, candidateId: RESERVE.autre.id, newStopId: "n1" }]))));
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: activite.id, candidateId: RESERVE.ferme.id, newStopId: "n1" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(Object.keys(resultat)).toEqual(["ok", "code"]);
+    expect(base).toEqual(gelee);
+  });
+
+  it("une entrée bloquante déjà présente dans la base ne fait pas refuser un patch sans rapport sur le même jour", () => {
+    const base = version2();
+    const ancienne = activiteDuJour(base, 2);
+    const autre = etapes(jourN(base, 2)).find((stop) => !stop.locked && stop.id !== ancienne.id);
+    if (autre === undefined) throw new Error("autre étape absente");
+    // Base : le lieu d'une étape du J2 est désormais fermé (relecture d'ancrage postérieure à la version).
+    const fermee = structuredClone(base);
+    const jour = jourN(fermee, 2);
+    jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === ancienne.id ? { ...item, stop: { ...item.stop, placeId: place("ferme") } } : item));
+    const gelee = structuredClone(fermee);
+
+    const { instantane, resultat, rapport } = reussi(appliquerPatch(entree(fermee, patch(2, [{ op: "lock", stopId: autre.id }]))));
+    expect(resultat.touchedDays).toEqual([2]);
+    expect(etape(instantane, (stop) => stop.id === autre.id).locked).toBe(true);
+    // L'entrée bloquante R1 du lieu fermé est toujours dans le rapport du jour touché : elle n'a pas été créée par ce
+    // patch, qui n'est donc pas refusé (écart 1).
+    const bloquantes = rapport.filter((e) => estBloquante(e, instantane.days));
+    expect(bloquantes.length).toBeGreaterThan(0);
+    expect(bloquantes).toContainEqual(expect.objectContaining({ regle: "R1", etape: ancienne.id }));
+    expect(fermee).toEqual(gelee);
+  });
+});
 
 describe("moteur: durée estimée reprise dans le trajet", () => {
   const segments = (instantane: TripSnapshot) =>
