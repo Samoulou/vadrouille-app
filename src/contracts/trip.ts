@@ -138,7 +138,7 @@ export const DaySchema = z.strictObject({
   weekday: WeekdaySchema,
   title: TextSchema,
   items: z.array(DayLineItemSchema),
-  /** Nombre ; formaté côté interface (Intl.NumberFormat « fr-CH »). */
+  /** Nombre ; formaté côté interface (`fr-CH`, `formatNombre` de `src/lib/nombre.ts`, indépendant de l'ICU). */
   budgetPerPerson: z.number().nonnegative().optional(),
   /** Événements du jour seulement. */
   events: z.array(EventStopSchema),

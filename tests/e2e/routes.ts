@@ -98,6 +98,14 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "seuil", javascript: "seuil" },
   },
   {
+    // F10a : écran 15 « Aujourd'hui » ; hors des dates du voyage simulé, l'état mesuré est « avant le voyage ».
+    id: "R15",
+    path: `${TRIP}/aujourdhui`,
+    page: "voyages/[id]/aujourdhui/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "seuil" },
+  },
+  {
     id: "R6",
     path: `${TRIP}/presentation`,
     page: "voyages/[id]/presentation/page.tsx",

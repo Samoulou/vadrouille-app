@@ -4,6 +4,7 @@ import { OFFER_CONFIG } from "@/server/config/offer";
 import { counterpartOf, mockTripAdapter } from "./mock";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
+import { prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
@@ -14,6 +15,7 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
+export { prototypeRelectures } from "./prototype-instance";
 
 /**
  * Vrai quand l'adaptateur de données est `mock` (`DATA_ADAPTER` absent, vide ou `mock`), faux pour
@@ -25,19 +27,30 @@ export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPT
 }
 
 /**
+ * Vrai quand l'adaptateur de données est `prototype` (spécification P0, P0b1), sans lever d'erreur ni consulter
+ * la liste blanche : `getTripAdapter()` et `getRequestContext()` la consultent, et lèvent hors liste blanche.
+ */
+export function isPrototypeAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  return adapterChoice(value) === "prototype";
+}
+
+/**
  * Choisit l'adaptateur selon la variable serveur `DATA_ADAPTER`
  * (`mock` par défaut). Sans préfixe `NEXT_PUBLIC_`, elle n'est jamais
- * exposée au navigateur.
+ * exposée au navigateur. `prototype` (décision 0032 § A4) lève une erreur hors de la liste blanche
+ * `prototypeAdapterAllowed(env)`.
  */
-export function getTripAdapter(value: string | undefined = process.env.DATA_ADAPTER): TripAdapter {
+export function getTripAdapter(value: string | undefined = process.env.DATA_ADAPTER, env: NodeJS.ProcessEnv = process.env): TripAdapter {
   const choice = adapterChoice(value);
   switch (choice) {
     case "mock":
       return mockTripAdapter;
     case "api":
       throw new Error("adaptateur api non implémenté");
+    case "prototype":
+      return prototypeTripAdapter(env);
     default:
-      throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api)`);
+      throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api, prototype)`);
   }
 }
 
@@ -53,8 +66,10 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
       return createMockCreationAdapter();
     case "api":
       throw new Error("adaptateur api de création non implémenté (B9)");
+    case "prototype":
+      throw new Error("création indisponible avec l'adaptateur prototype (spécification P0)");
     default:
-      throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api)`);
+      throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api, prototype)`);
   }
 }
 

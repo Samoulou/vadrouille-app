@@ -148,9 +148,12 @@ describe("travel: ligne trajet et budget", () => {
     expect(dayTravelLine({ travelMinutes: 40, budgetPerPerson: undefined })).toBe("40 min de trajet");
   });
 
-  it("formate les montants en fr-CH", () => {
-    expect(formatMontant(1640)).toBe(new Intl.NumberFormat("fr-CH").format(1640));
+  it("formate les montants en fr-CH, sans dépendre de l'ICU (F-ICU, ticket 171)", () => {
     expect(formatMontant(95)).toBe("95");
+    expect(formatMontant(999)).toBe("999");
+    expect(formatMontant(1000)).toBe("1\u202F000");
+    expect(formatMontant(1640)).toBe("1\u202F640");
+    expect(formatMontant(12345)).toBe("12\u202F345");
   });
 });
 
@@ -176,9 +179,9 @@ describe("travel: budget total du Séjour (F5-PO-3)", () => {
     expect(tripBudgetLine([])).toBeNull();
   });
 
-  it("montant formaté par Intl.NumberFormat(\"fr-CH\")", () => {
+  it("montant formaté par formatNombre (milliers séparés par U+202F)", () => {
     expect(tripBudgetLine([{ index: 1, budgetPerPerson: 1200 }])).toBe(
-      `Budget estimé : environ ${new Intl.NumberFormat("fr-CH").format(1200)} CHF par personne`,
+      "Budget estimé : environ 1\u202F200 CHF par personne",
     );
   });
 });

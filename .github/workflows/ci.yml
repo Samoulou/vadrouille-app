@@ -200,3 +200,23 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/voyages/mock_trip_edimbourg/debloquer)" = "404" || { docker logs app-drapeau; exit 1; }
           if curl -fsS http://127.0.0.1:3001/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
           docker rm -f app-drapeau
+          # Adaptateur prototype refusé dans l'image (VADROUILLE_ENV=production), même avec le drapeau de CI
+          # (spécification P0, P0b1 ; décision 0032 § A4.4) : erreur 500 explicite, ni section « Prototype » ni
+          # programme. Attente d'un code HTTP quelconque (pas `curl -f` : la réponse attendue est un 500).
+          docker run -d --name app-prototype -p 3002:3000 -e DATA_ADAPTER=prototype app:ci
+          docker run -d --name app-prototype-drapeau -p 3003:3000 -e DATA_ADAPTER=prototype -e VADROUILLE_PROTOTYPE=1 -e CI=true app:ci
+          # Le 500 doit venir de la garde : son message est exigé dans les journaux du conteneur.
+          for cible in app-prototype:3002 app-prototype-drapeau:3003; do
+            name="${cible%%:*}"
+            port="${cible##*:}"
+            for i in $(seq 1 30); do
+              if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/")" != "000" ]; then break; fi
+              sleep 1
+            done
+            test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/")" = "500" || { docker logs "$name"; exit 1; }
+            body="$(curl -s "http://127.0.0.1:$port/")"
+            if printf '%s' "$body" | grep -q 'Prototype'; then echo "section Prototype servie par l'image (port $port)"; exit 1; fi
+            if printf '%s' "$body" | grep -q 'proto_'; then echo "programme du prototype servi par l'image (port $port)"; exit 1; fi
+            docker logs "$name" 2>&1 | grep -q 'adaptateur prototype refusé' || { echo "500 sans le refus de la garde ($name)"; docker logs "$name"; exit 1; }
+          done
+          docker rm -f app-prototype app-prototype-drapeau

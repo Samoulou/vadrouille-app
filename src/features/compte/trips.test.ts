@@ -144,10 +144,9 @@ describe("reopenTarget (F11-PO-5)", () => {
   const during = at("2026-08-30T10:40:00+01:00");
   const after = at("2026-10-09T12:00:00+01:00");
 
-  it("sans dernier onglet : Séjour d'un voyage débloqué, présentation d'un non débloqué à venir ou en cours, Séjour d'un non débloqué passé", () => {
+  it("sans dernier onglet : Séjour d'un voyage débloqué, présentation d'un non débloqué à venir, Séjour d'un non débloqué passé", () => {
     expect(reopenTarget(unlocked, before, undefined)).toBe(`/voyages/${ED_OK}`);
     expect(reopenTarget(locked, before, undefined)).toBe(`/voyages/${ED}/presentation`);
-    expect(reopenTarget(locked, during, undefined)).toBe(`/voyages/${ED}/presentation`);
     expect(reopenTarget(locked, after, undefined)).toBe(`/voyages/${ED}`);
   });
 
@@ -160,9 +159,18 @@ describe("reopenTarget (F11-PO-5)", () => {
     expect(reopenTarget(locked, before, { kind: "sejour" })).toBe(`/voyages/${ED}`);
   });
 
-  it("aux dates du voyage, sans écran 15 dans main (F10a) : le dernier onglet s'applique (C11)", () => {
-    expect(reopenTarget(unlocked, during, { kind: "jour", n: 3 })).toBe(`/voyages/${ED_OK}/jour/3`);
-    expect(reopenTarget(unlocked, during, undefined)).toBe(`/voyages/${ED_OK}`);
+  it("aux dates du voyage, écran 15 (règle 1, F10a) : avant le dernier onglet, voyage débloqué ou non (C11)", () => {
+    expect(reopenTarget(unlocked, during, { kind: "jour", n: 3 })).toBe(`/voyages/${ED_OK}/aujourdhui`);
+    expect(reopenTarget(unlocked, during, { kind: "sejour" })).toBe(`/voyages/${ED_OK}/aujourdhui`);
+    expect(reopenTarget(unlocked, during, undefined)).toBe(`/voyages/${ED_OK}/aujourdhui`);
+    expect(reopenTarget(locked, during, undefined)).toBe(`/voyages/${ED}/aujourdhui`);
+  });
+
+  it("bornes à la date de la destination : premier et dernier jour inclus ; veille et lendemain exclus", () => {
+    expect(reopenTarget(unlocked, at("2026-08-29T00:10:00+01:00"), undefined)).toBe(`/voyages/${ED_OK}/aujourdhui`);
+    expect(reopenTarget(unlocked, at("2026-09-03T23:50:00+01:00"), undefined)).toBe(`/voyages/${ED_OK}/aujourdhui`);
+    expect(reopenTarget(unlocked, at("2026-08-28T23:50:00+01:00"), undefined)).toBe(`/voyages/${ED_OK}`);
+    expect(reopenTarget(unlocked, at("2026-09-04T00:10:00+01:00"), undefined)).toBe(`/voyages/${ED_OK}`);
   });
 
   it("identifiant encodé", () => {
