@@ -8,11 +8,13 @@ import {
   assertDatabaseAllowed,
   connectionStringFor,
   createGuardedPool,
+  DATABASE_URL_VARIABLES,
   DatabaseConnectionError,
   DatabaseGuardError,
+  MIGRATOR_URL_VARIABLE,
   verifyConnectionRole,
 } from "../../../db/connection";
-import { runMigrations } from "../../../db/migrate";
+import { migratorConnectionString, runMigrations } from "../../../db/migrate";
 
 /**
  * Gardes de `db/` sans base (spécification B1 ; décision 0034, « Garde préalable à toute fusion ») : en production,
@@ -58,8 +60,9 @@ describe("db : refus en production (décision 0034)", () => {
     }
   });
 
-  it("DATABASE_URL (posée par l'intégration Neon avec l'identifiant propriétaire) n'est jamais lue", () => {
-    expect(() => connectionStringFor("vadrouille_app", { DATABASE_URL: UNREACHABLE })).toThrow(/VADROUILLE_DATABASE_URL/);
+  // Les noms de la base sont des noms secrets (spécification P0c, section 5) : ils ne sont écrits que dans db/connection.ts.
+  it("la variable de l'intégration Neon (identifiant propriétaire) n'est jamais lue", () => {
+    expect(() => connectionStringFor("vadrouille_app", { DATABASE_URL: UNREACHABLE })).toThrow(DATABASE_URL_VARIABLES.vadrouille_app);
   });
 });
 
@@ -123,7 +126,23 @@ describe("db : contrôle du rôle de connexion", () => {
   });
 
   it("variable absente : message explicite, sans valeur", () => {
-    expect(() => connectionStringFor("vadrouille_auth", {})).toThrow(/VADROUILLE_DATABASE_URL_AUTH n'est pas posée/);
+    expect(() => connectionStringFor("vadrouille_auth", {})).toThrow(`${DATABASE_URL_VARIABLES.vadrouille_auth} n'est pas posée`);
+  });
+
+  // Revue du head a89d9a5 (PR 244, mineur 1) : les noms sont écrits deux fois dans db/connection.ts (table et lectures
+  // littérales) ; chaque rôle lit exactement la variable que la table nomme, et aucune autre.
+  it.each(["vadrouille_app", "vadrouille_auth"] as const)("%s lit seulement la variable que la table des rôles lui donne", (role) => {
+    const autre = role === "vadrouille_app" ? "vadrouille_auth" : "vadrouille_app";
+    expect(connectionStringFor(role, { [DATABASE_URL_VARIABLES[role]]: UNREACHABLE })).toBe(UNREACHABLE);
+    expect(() => connectionStringFor(role, { [DATABASE_URL_VARIABLES[autre]]: UNREACHABLE, [MIGRATOR_URL_VARIABLE]: UNREACHABLE })).toThrow(
+      `${DATABASE_URL_VARIABLES[role]} n'est pas posée`,
+    );
+  });
+
+  it("les migrations lisent seulement la variable du rôle vadrouille_migrator", () => {
+    expect(migratorConnectionString({ [MIGRATOR_URL_VARIABLE]: UNREACHABLE })).toBe(UNREACHABLE);
+    const autres = Object.fromEntries(Object.values(DATABASE_URL_VARIABLES).map((nom) => [nom, UNREACHABLE]));
+    expect(() => migratorConnectionString(autres)).toThrow(`${MIGRATOR_URL_VARIABLE} n'est pas posée`);
   });
 });
 

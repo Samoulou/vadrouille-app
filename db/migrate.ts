@@ -49,12 +49,22 @@ export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
 
 export type MigrationReport = { applied: string[]; skipped: string[] };
 
-export async function runMigrations(env: Env, migrations: Migration[] = readMigrations()): Promise<MigrationReport> {
+/**
+ * Lit la variable de connexion de `vadrouille_migrator`, après la garde de production. Lecture par propriété
+ * littérale (spécification P0c, section 5, forme 1) ; seul lecteur de cette variable, que l'application ne lit jamais
+ * (décisions 0006 et 0029).
+ */
+export function migratorConnectionString(env: Env): string {
   assertDatabaseAllowed(env);
-  const connectionString = env[MIGRATOR_URL_VARIABLE];
+  const connectionString = env.VADROUILLE_DATABASE_URL_MIGRATOR;
   if (connectionString === undefined || connectionString.trim() === "") {
     throw new DatabaseGuardError(`Migrations impossibles : la variable ${MIGRATOR_URL_VARIABLE} n'est pas posée.`);
   }
+  return connectionString;
+}
+
+export async function runMigrations(env: Env, migrations: Migration[] = readMigrations()): Promise<MigrationReport> {
+  const connectionString = migratorConnectionString(env);
 
   const client = new pg.Client({ connectionString });
   try {

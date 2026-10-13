@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { closeAll, connect, createOrg, expectRefused, inTx, token } from "./helpers";
+import { closeAll, connect, createOrg, type DbClient, expectRefused, inTx, token } from "./helpers";
 
 /**
  * Vues partagées (décision 0007, « Lien privé » ; handover § 12). Le serveur lira le voyage d'un lien sous
@@ -14,7 +13,7 @@ const hex = (buffer: Buffer) => buffer.toString("hex");
 
 type Shared = { org: string; owner: string; trip: string; valid: Buffer; expired: Buffer; revoked: Buffer; otherTrip: string };
 
-let app: pg.Client;
+let app: DbClient;
 let a: Shared;
 let b: Shared;
 
@@ -111,7 +110,7 @@ const EXPECTED_SNAPSHOT = {
   ],
 };
 
-async function seedShared(auth: pg.Client, destination: string): Promise<Shared> {
+async function seedShared(auth: DbClient, destination: string): Promise<Shared> {
   const { org, owner } = await createOrg(auth);
   const valid = token();
   const expired = token();
