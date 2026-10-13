@@ -45,16 +45,20 @@ export const announcement = (page: Page): Locator => page.locator("[data-part='a
 export const dayLine = (page: Page): Locator => region(page, "Ta journée").locator("ol");
 export const stopRow = (page: Page, name: string): Locator => dayLine(page).locator("li[data-type='stop']", { hasText: name });
 
-/** Tout ce qui pourrait avoir été enregistré sur l'appareil (C20). */
+/**
+ * Tout ce qui pourrait avoir été enregistré sur l'appareil (C20), hors service worker. Le contrôle « aucun service
+ * worker enregistré » est retiré : avec `serviceWorkers: "block"` par défaut, il serait vrai par construction, et
+ * F10b enregistre un service worker depuis l'écran 15 ; C20 est remplacé par C22, C23 et C25
+ * (`hors-ligne.e2e.spec.ts`) selon la décision 0039 (Q146, F10-TL-13).
+ */
 export async function expectNothingPersisted(page: Page) {
   const storage = await page.evaluate(async () => ({
     local: window.localStorage.length,
     session: window.sessionStorage.length,
     databases: (await indexedDB.databases()).length,
     caches: (await caches.keys()).length,
-    workers: (await navigator.serviceWorker.getRegistrations()).length,
   }));
-  expect(storage).toEqual({ local: 0, session: 0, databases: 0, caches: 0, workers: 0 });
+  expect(storage).toEqual({ local: 0, session: 0, databases: 0, caches: 0 });
   expect(await page.context().cookies()).toEqual([]);
 }
 
