@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
 import { avecGardeDataCollection, ErreurModele, type ClientModeles, type RequeteModele } from "@/ai/client";
