@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { MOMENTS, openToday, setClock } from "../e2e/aujourdhui-helpers";
+import { ED, MOMENTS, openToday, setClock } from "../e2e/aujourdhui-helpers";
+import { controlNetwork, expectFallback, waitForActiveWorker } from "../e2e/hors-ligne-helpers";
 
 /**
  * Captures 390 × 844 de l'écran 15 « Aujourd'hui » (F10a ; rendus provisoires UX/UI, F10-Q5, écran non
@@ -43,4 +44,25 @@ test("aujourdhui : hors ligne", async ({ page, context }) => {
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("aujourdhui-hors-ligne.png", { fullPage: true });
   await context.setOffline(false);
+});
+
+/**
+ * Page de repli hors ligne (`R-repli`, F10b ; rendu provisoire UX/UI, F10-Q5, écran non maquetté) : servie par le
+ * service worker à une navigation qui échoue faute de réseau (service workers autorisés pour ce bloc, F10-TL-6).
+ */
+test.describe("page de repli", () => {
+  test.use({ serviceWorkers: "allow" });
+
+  test("hors-ligne : page de repli", async ({ page, context, baseURL }) => {
+    const setOffline = await controlNetwork(context, baseURL!);
+    await setClock(page, MOMENTS.prochaine);
+    await openToday(page);
+    await waitForActiveWorker(page);
+    await setOffline(true);
+    await page.goto(`/voyages/${ED}/jour/2`);
+    await expectFallback(page);
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot("hors-ligne-repli.png", { fullPage: true });
+    await setOffline(false);
+  });
 });

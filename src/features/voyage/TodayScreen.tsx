@@ -16,6 +16,7 @@ import { tripRoutes } from "@/features/sejour/routes";
 import { format, messages } from "@/i18n";
 import { formatTitreJour } from "@/lib/dates";
 import { formatFaits } from "@/lib/faits";
+import { registerOfflineFallback } from "@/lib/offline/register";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
@@ -299,6 +300,12 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
   if (announceKey !== null && announceKey !== announced.key) {
     setAnnounced({ key: announceKey, message: announced.key === null ? "" : announcementOf(current, next) });
   }
+
+  // Page de repli hors ligne (F10b, F10-PO-8) : le service worker s'enregistre à l'ouverture de l'écran avec le
+  // réseau, à toute date ; il ne contient aucune donnée du voyage. Aucun autre écran ne l'enregistre.
+  useEffect(() => {
+    registerOfflineFallback();
+  }, []);
 
   // Une mesure par chargement, à la sortie de « Chargement de ta journée », quel que soit le cas (F10-PO-16).
   const opened = useRef(false);
