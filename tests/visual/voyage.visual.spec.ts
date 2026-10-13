@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { ED, MOMENTS, openToday, setClock } from "../e2e/aujourdhui-helpers";
-import { controlNetwork, expectFallback, waitForActiveWorker } from "../e2e/hors-ligne-helpers";
+import {
+  controlNetwork,
+  expectFallback,
+  waitForActiveWorker,
+} from "../e2e/hors-ligne-helpers";
 import {
   createLink,
   createShareScope,
@@ -37,7 +41,9 @@ for (const [name, iso] of STATES) {
     await setClock(page, iso);
     await openToday(page);
     await page.evaluate(() => document.fonts.ready);
-    await expect(page).toHaveScreenshot(`aujourdhui-${name}.png`, { fullPage: true });
+    await expect(page).toHaveScreenshot(`aujourdhui-${name}.png`, {
+      fullPage: true,
+    });
   });
 }
 
@@ -54,7 +60,9 @@ test("aujourdhui : hors ligne", async ({ page, context }) => {
   await context.setOffline(true);
   await expect(page.locator("#aujourdhui-hors-ligne")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot("aujourdhui-hors-ligne.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("aujourdhui-hors-ligne.png", {
+    fullPage: true,
+  });
   await context.setOffline(false);
 });
 
@@ -74,7 +82,9 @@ test.describe("page de repli", () => {
     await page.goto(`/voyages/${ED}/jour/2`);
     await expectFallback(page);
     await page.evaluate(() => document.fonts.ready);
-    await expect(page).toHaveScreenshot("hors-ligne-repli.png", { fullPage: true });
+    await expect(page).toHaveScreenshot("hors-ligne-repli.png", {
+      fullPage: true,
+    });
     await setOffline(false);
   });
 });
@@ -82,7 +92,8 @@ test.describe("page de repli", () => {
 /**
  * Feuille « Partager », `RP`, `RPJ` et 404 de la vue partagée (F10c ; rendus provisoires UX/UI, F10-Q5, écrans non
  * maquettés, Q12). Portée de simulation au 2026-08-30 par test. Le champ du lien créé contient un jeton aléatoire :
- * il est masqué dans la capture.
+ * il est masqué dans la capture. Références `partage-*.png` générées par la CI (décision 0004) ; captures de revue
+ * correspondantes dans `docs/ux/captures/F10c/`.
  */
 test.describe("partage", () => {
   test.beforeEach(async ({ context, baseURL }) => {
@@ -111,7 +122,9 @@ test.describe("partage", () => {
     await sheetButton(page, "Désactiver").click();
     await createLink(page);
     await page.evaluate(() => document.fonts.ready);
-    await expect(page).toHaveScreenshot("partage-feuille-lien-cree.png", { mask: [shareSheet(page).getByRole("textbox")] });
+    await expect(page).toHaveScreenshot("partage-feuille-lien-cree.png", {
+      mask: [shareSheet(page).getByRole("textbox")],
+    });
   });
 
   for (const [name, path] of [
