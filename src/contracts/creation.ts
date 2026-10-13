@@ -14,6 +14,7 @@ import {
   KNOWN_LODGING_LENGTH,
   MAX_CITIES,
   MAX_COMMITMENTS,
+  MAX_SUGGESTED_LODGINGS,
   MEAL_BUDGET_CHF,
   MOBILITY_MODES,
   PACES,
@@ -24,7 +25,8 @@ import {
 /**
  * Contrats de phase 0 de la création du voyage (décision 0017 § 2, F8-TL-2) : objets stricts, noms du handover
  * back-end, aucun texte d'interface. Les bornes viennent de `values.ts` (aucune seconde copie). F8a livre
- * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b et F8c complètent ce module.
+ * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b `LodgingRequest` et `LodgingSuggestion` ; F8c complète
+ * ce module.
  */
 
 const text = (bounds: { min: number; max: number }) => z.string().trim().min(bounds.min).max(bounds.max);
@@ -190,3 +192,53 @@ export const InferredBriefSchema = z
     }
   });
 export type InferredBrief = z.infer<typeof InferredBriefSchema>;
+
+/*
+ * Écran 3 « Où loger » (0017 § 2.4, F8b).
+ */
+
+/** Textes maison des suggestions : jamais un nom Google (spécification F8, « Source des noms »). */
+const houseText = z.string().trim().min(1).max(160);
+const identifier = z.string().min(1).max(64);
+
+/**
+ * Demande de `suggestLodging` (0017 § 2.4) : le brouillon validé et la ville, `0` pour la destination, `i` pour
+ * `otherCities[i − 1]`. Ni `requestId` ni brief : c'est le « `TripRequest` sans logement » du handover.
+ */
+export const LodgingRequestSchema = z
+  .strictObject({
+    draft: TripDraftSchema,
+    city: z.number().int().min(0).max(MAX_CITIES - 1),
+  })
+  .superRefine((request, ctx) => {
+    if (request.city > request.draft.otherCities.length) {
+      ctx.addIssue({ code: "custom", path: ["city"], message: "ville absente du brouillon" });
+    }
+  });
+export type LodgingRequest = z.infer<typeof LodgingRequestSchema>;
+
+/**
+ * Quartier conseillé et jusqu'à 3 logements (0017 § 2.4) : identifiants, noms et raisons **maison** (entre
+ * crochets dans le jeu simulé), centre et rayon de la zone maison (jamais une géométrie Google). Aucun prix, aucune
+ * photo, aucun lien de réservation (F8-Q5, Q6).
+ */
+export const LodgingSuggestionSchema = z.strictObject({
+  area: z.strictObject({
+    areaId: identifier,
+    name: houseText,
+    reason: houseText,
+    center: z.strictObject({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
+    radiusM: z.number().int().min(50).max(20_000),
+  }),
+  lodgings: z
+    .array(
+      z.strictObject({
+        lodgingId: identifier,
+        placeId: identifier.optional(),
+        name: houseText,
+        meta: houseText,
+      }),
+    )
+    .max(MAX_SUGGESTED_LODGINGS),
+});
+export type LodgingSuggestion = z.infer<typeof LodgingSuggestionSchema>;

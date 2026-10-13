@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as adapters from "@/adapters";
 import { createMockCreationAdapter } from "@/adapters/mock-creation";
-import { fail, type BriefRequest } from "@/contracts";
-import { MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
+import { fail, type BriefRequest, type TripDraft } from "@/contracts";
+import { MOCK_DEMO_TRIP_DRAFT, MOCK_INFERRED_BRIEF, MOCK_LODGING_SUGGESTION } from "@/mocks/creation-edimbourg";
 
-import { structureBrief } from "./creation";
+import { structureBrief, suggestLodging } from "./creation";
 
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
@@ -131,5 +131,89 @@ describe("adaptateur de création simulé", () => {
     expect(actual.getCreationAdapter(undefined)).toBeDefined();
     expect(() => actual.getCreationAdapter("api")).toThrow();
     expect(() => actual.getCreationAdapter("autre")).toThrow();
+  });
+});
+
+/** Écran 3 (F8-PO-8, décision 0017 § 2.4) : `suggestLodging`, le serveur fait foi. */
+describe("suggestLodging", () => {
+  const DRAFT: TripDraft = MOCK_DEMO_TRIP_DRAFT;
+  const suggest = vi.fn();
+
+  function withLodgingAdapter(implementation: () => Promise<unknown>) {
+    suggest.mockReset();
+    suggest.mockImplementation(implementation);
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({ suggestLodging: suggest } as never);
+  }
+
+  it("adaptateur simulé : quartier et 3 logements pour Édimbourg, validés", async () => {
+    expect(await suggestLodging({ draft: DRAFT, city: 0 })).toEqual({ ok: true, value: MOCK_LODGING_SUGGESTION });
+    expect(MOCK_LODGING_SUGGESTION.lodgings).toHaveLength(3);
+  });
+
+  it.each(["Edinburgh", "edimbourg", "EDIMBOURG", "Édimbourg"])("%s : suggestion d'Édimbourg (casse et accents ignorés)", async (name) => {
+    const result = await suggestLodging({ draft: { ...DRAFT, destination: name }, city: 0 });
+    expect(result.ok).toBe(true);
+  });
+
+  it("ville inconnue du jeu simulé : no_option ; autre ville du séjour désignée par son rang", async () => {
+    expect(await suggestLodging({ draft: { ...DRAFT, destination: "Glasgow" }, city: 0 })).toEqual({ ok: false, error: { code: "no_option" } });
+    const twoCities: TripDraft = { ...DRAFT, otherCities: [{ name: "Glasgow", arrival: "2026-09-01", lodging: { kind: "none" } }] };
+    expect(await suggestLodging({ draft: twoCities, city: 1 })).toEqual({ ok: false, error: { code: "no_option" } });
+    expect((await suggestLodging({ draft: twoCities, city: 0 })).ok).toBe(true);
+  });
+
+  it.each([
+    ["ville absente du brouillon", { draft: DRAFT, city: 1 }, "city"],
+    ["rang négatif", { draft: DRAFT, city: -1 }, "city"],
+    ["rang non entier", { draft: DRAFT, city: 0.5 }, "city"],
+    ["brouillon absent", { city: 0 }, "draft"],
+    ["champ inconnu", { draft: DRAFT, city: 0, inconnu: 1 }, undefined],
+  ])("%s : validation_failed sans appeler l'adaptateur", async (_label, input, field) => {
+    withLodgingAdapter(async () => ({ ok: true, value: MOCK_LODGING_SUGGESTION }));
+    const result = await suggestLodging(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("validation_failed");
+      expect(result.error.field).toBe(field);
+    }
+    expect(suggest).not.toHaveBeenCalled();
+  });
+
+  it("une sortie non conforme (4 logements, nom vide, géométrie hors bornes) devient provider_error", async () => {
+    const lodging = MOCK_LODGING_SUGGESTION.lodgings[0]!;
+    for (const value of [
+      { ...MOCK_LODGING_SUGGESTION, lodgings: [lodging, lodging, lodging, lodging] },
+      { ...MOCK_LODGING_SUGGESTION, area: { ...MOCK_LODGING_SUGGESTION.area, name: " " } },
+      { ...MOCK_LODGING_SUGGESTION, area: { ...MOCK_LODGING_SUGGESTION.area, radiusM: 10 } },
+      { ...MOCK_LODGING_SUGGESTION, prix: 120 },
+    ]) {
+      withLodgingAdapter(async () => ({ ok: true, value }));
+      expect(await suggestLodging({ draft: DRAFT, city: 0 })).toEqual({ ok: false, error: { code: "provider_error" } });
+    }
+  });
+
+  it.each(["no_option", "rate_limited", "cost_cap_reached", "provider_error"] as const)("%s est transmis tel quel", async (code) => {
+    withLodgingAdapter(async () => fail(code));
+    expect(await suggestLodging({ draft: DRAFT, city: 0 })).toEqual({ ok: false, error: { code } });
+  });
+
+  it("toute autre erreur, ou une exception, devient provider_error ; rien n'est journalisé", async () => {
+    const spies = [
+      ...(["log", "info", "warn", "error", "debug"] as const).map((method) => vi.spyOn(console, method)),
+      vi.spyOn(process.stdout, "write"),
+      vi.spyOn(process.stderr, "write"),
+    ];
+    try {
+      withLodgingAdapter(async () => fail("not_found"));
+      expect(await suggestLodging({ draft: DRAFT, city: 0 })).toEqual({ ok: false, error: { code: "provider_error" } });
+      withLodgingAdapter(async () => {
+        throw new Error(DRAFT.destination);
+      });
+      expect(await suggestLodging({ draft: DRAFT, city: 0 })).toEqual({ ok: false, error: { code: "provider_error" } });
+      const written = spies.flatMap((spy) => spy.mock.calls.flat()).map(String).join("\n");
+      expect(written).not.toContain(DRAFT.destination);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });

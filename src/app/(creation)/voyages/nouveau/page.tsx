@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { CreateTripForm } from "@/features/creation/CreateTripForm";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 export const metadata: Metadata = {
   title: messages.creation.titreDocument.nouveau,

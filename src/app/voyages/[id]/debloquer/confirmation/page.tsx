@@ -7,7 +7,8 @@ import { PaymentReturn } from "@/features/presentation/PaymentReturn";
 import { presentationRoute } from "@/features/presentation/routes";
 import { loadCheckout } from "@/features/presentation/unlock-load";
 import { tripRoutes } from "@/features/sejour/routes";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 export const dynamic = "force-dynamic";
 

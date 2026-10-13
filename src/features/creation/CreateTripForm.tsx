@@ -18,7 +18,8 @@ import {
   type CommitmentKind,
 } from "@/contracts/values";
 import { formatDateCourte } from "@/features/voyage/plate";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";

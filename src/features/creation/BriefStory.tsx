@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ligne/Button";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { STORY_LENGTH } from "@/contracts/values";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import { structureBrief } from "@/server/actions/creation";
 

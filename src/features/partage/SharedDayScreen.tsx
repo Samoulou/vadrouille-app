@@ -4,7 +4,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { SharedDay, SharedStop } from "@/contracts";
 import { DAY_LIST_ID } from "@/features/sejour/constants";
 import { EventLines } from "@/features/sejour/EventLines";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 import { ReadOnlyMention } from "./ReadOnlyMention";

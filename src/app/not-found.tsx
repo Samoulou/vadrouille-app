@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import { EtatPage } from "@/features/etats/EtatPage";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 const t = messages.etats;
 const documentTitle = format(t.introuvable.titreDocument, { produit: PRODUCT_NAME });

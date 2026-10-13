@@ -1,4 +1,4 @@
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /** Mention de lecture seule, en tête du panneau de `RP` et de `RPJ` (spécification F10, F10c ; provisoire, UX/UI). */
 export function ReadOnlyMention() {

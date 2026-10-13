@@ -4,7 +4,7 @@ import { lazy, Suspense, useRef, useState } from "react";
 
 import { IconButton } from "@/components/ligne/IconButton";
 import { IconPartager } from "@/components/ligne/icons";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 /** Feuille chargée à la demande : hors du JavaScript initial du Séjour et de la Journée (décision 0039, F10-TL-10). */

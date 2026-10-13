@@ -14,7 +14,7 @@ import type { SharedDay, SharedDayMap } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
 import { DAY_LIST_ID } from "@/features/sejour/constants";
 import { useMapLayout } from "@/features/sejour/map-layout";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { sharedRoutes } from "./routes";
 

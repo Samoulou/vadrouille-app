@@ -5,7 +5,7 @@ import { getRequestContext, getTripReader, isPrototypeAdapter, paymentAvailable 
 import { devPagesEnabled } from "@/dev/flags";
 import { loadPresentation } from "@/features/presentation/load";
 import { PresentationScreen } from "@/features/presentation/PresentationScreen";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Données lues à chaque requête, dans le contexte d'organisation de la requête.
 export const dynamic = "force-dynamic";

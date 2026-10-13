@@ -10,7 +10,7 @@ import { Button } from "@/components/ligne/Button";
 import type { CheckoutStatusCode, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { isCheckoutFailure } from "@/contracts/values";
 import { useTripSession } from "@/features/voyage/TripSessionProvider";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { getCheckoutStatus } from "@/server/actions/paiement";
 
 import { CHECKOUT_POLL_SLOWDOWN_AFTER_MS, nextPollDelay } from "./payment-polling";

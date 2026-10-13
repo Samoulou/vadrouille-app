@@ -1,8 +1,18 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, getTripAdapter, isMockAdapter, isPrototypeAdapter } from "./index";
+import {
+  MOCK_DEMO_TRIP,
+  MOCK_DEMO_UNLOCKED_TRIP,
+  authAdapterChoice,
+  getAuthAdapter,
+  getTripAdapter,
+  isMockAdapter,
+  isPrototypeAdapter,
+  mockAuthAllowed,
+} from "./index";
 import { mockTripAdapter } from "./mock";
+import { explicitScope } from "./simulation";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -73,5 +83,54 @@ describe("MOCK_DEMO_UNLOCKED_TRIP (D1-PO-3)", () => {
     expect(trip?.unlocked).toBe(true);
     expect(MOCK_DEMO_UNLOCKED_TRIP.ctx).toEqual(MOCK_DEMO_TRIP.ctx);
     expect(MOCK_DEMO_UNLOCKED_TRIP.tripId).not.toBe(MOCK_DEMO_TRIP.tripId);
+  });
+});
+
+/**
+ * Garde de la connexion simulée (décision 0017 § 11.2, F8b) : levée à l'appel, fermée par défaut, aucun repli vers
+ * `mock`. `env` est passé explicitement : aucun changement de l'environnement du processus.
+ */
+describe("getAuthAdapter (décision 0017 § 11.2)", () => {
+  const env = (values: Record<string, string | undefined>) => values as unknown as NodeJS.ProcessEnv;
+  const scope = explicitScope("auth-garde");
+
+  it.each(["development", "test", "production"])(
+    "lève sur un déploiement de production, avec ou sans drapeau (NODE_ENV=%s)",
+    (nodeEnv) => {
+      for (const deployment of [{ VERCEL_ENV: "production" }, { VADROUILLE_ENV: "production" }, { VADROUILLE_ENV: " Production" }]) {
+        expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, ...deployment }) })).toThrow(/connexion simulée refusée/);
+        expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, VADROUILLE_DEMO_AUTH: "1", ...deployment }) })).toThrow(
+          /connexion simulée refusée/,
+        );
+      }
+    },
+  );
+
+  it("lève avec NODE_ENV=production sans le drapeau, ou avec un drapeau autre que « 1 »", () => {
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "production" }) })).toThrow(/connexion simulée refusée/);
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "production", VADROUILLE_DEMO_AUTH: "true" }) })).toThrow(/refusée/);
+    expect(() => getAuthAdapter({ scope, env: env({ VADROUILLE_DEMO_AUTH: " 1" }) })).toThrow(/refusée/);
+  });
+
+  it("ne lève pas avec NODE_ENV=production et le drapeau, hors déploiement de production (Playwright, CI)", () => {
+    const adapter = getAuthAdapter({ scope, env: env({ NODE_ENV: "production", VADROUILLE_DEMO_AUTH: "1", VERCEL_ENV: "preview" }) });
+    expect(adapter.mode).toBe("simulated");
+  });
+
+  it.each(["development", "test"])("ne lève pas en %s hors déploiement de production", (nodeEnv) => {
+    expect(getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv }) }).mode).toBe("simulated");
+    expect(getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, AUTH_ADAPTER: "mock" }) }).config.codeTtlMs).toBe(600_000);
+  });
+
+  it("lève pour AUTH_ADAPTER inconnu ou better-auth (avant B3), même en test", () => {
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "better-auth" }) })).toThrow(/better-auth non implémenté/);
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "magique" }) })).toThrow(/AUTH_ADAPTER inconnu/);
+  });
+
+  it("mockAuthAllowed et authAdapterChoice sont exportés pour l'écran 4 et les tests", () => {
+    expect(mockAuthAllowed(env({ NODE_ENV: "test" }))).toBe(true);
+    expect(mockAuthAllowed(env({}))).toBe(false);
+    expect(authAdapterChoice(env({}))).toBe("mock");
+    expect(authAdapterChoice(env({ AUTH_ADAPTER: " better-auth " }))).toBe("better-auth");
   });
 });

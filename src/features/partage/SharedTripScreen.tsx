@@ -7,7 +7,8 @@ import type { SharedTrip } from "@/contracts";
 import { EventLines, eventRange } from "@/features/sejour/EventLines";
 import { dayStopCount, tripEvents } from "@/features/sejour/travel";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 import { ReadOnlyMention } from "./ReadOnlyMention";

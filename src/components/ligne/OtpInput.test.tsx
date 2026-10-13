@@ -165,3 +165,42 @@ describe("OtpInput", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 });
+
+describe("OtpInput : libellé visible et focus initial (spécification F8, écran 4)", () => {
+  it("labelVisible : le libellé est affiché au-dessus des cases et nomme le groupe par aria-labelledby, sans aria-label", async () => {
+    const { container } = render(<OtpInput label="Code reçu par email" labelVisible />);
+    const group = screen.getByRole("group", { name: "Code reçu par email" });
+    expect(group).not.toHaveAttribute("aria-label");
+    const labelId = group.getAttribute("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    const label = document.getElementById(labelId as string);
+    expect(label).toHaveTextContent("Code reçu par email");
+    expect(label).toBeVisible();
+    expect((label as HTMLElement).compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("sans labelVisible : nom par aria-label, comportement de F2 inchangé", () => {
+    render(<OtpInput label="Code" />);
+    const group = screen.getByRole("group", { name: "Code" });
+    expect(group).toHaveAttribute("aria-label", "Code");
+    expect(group).not.toHaveAttribute("aria-labelledby");
+  });
+
+  it("autoFocus : focus sur « Chiffre 1 sur 6 » au montage ; un remontage vide les cases et rend le focus", () => {
+    const { rerender } = render(<OtpInput key={0} autoFocus />);
+    expect(positions()[0]).toHaveFocus();
+    expect(positions()[0]).toHaveAccessibleName("Chiffre 1 sur 6");
+    paste(positions()[0]!, "135791");
+    expect(values()).toBe("135791");
+    rerender(<OtpInput key={1} autoFocus invalid describedBy="x" />);
+    expect(values()).toBe("");
+    expect(positions()[0]).toHaveFocus();
+    for (const input of positions()) expect(input).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("sans autoFocus : aucun focus au montage", () => {
+    render(<OtpInput />);
+    expect(document.activeElement).toBe(document.body);
+  });
+});

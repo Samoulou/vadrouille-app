@@ -2,8 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { DayLineItem, Stop } from "@/contracts";
-import fr from "@/i18n/fr.json";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
@@ -74,7 +73,7 @@ describe("DayLine", () => {
   });
 
   it("terminus : heure dans la colonne heure, préfixes lus dans fr.json", () => {
-    expect(fr.ligne.terminus).toEqual({ start: "Départ de {label}", end: "Retour à {label}" });
+    expect(messages.ligne.terminus).toEqual({ start: "Départ de {label}", end: "Retour à {label}" });
     const { container } = renderLine();
     const [start, end] = Array.from(container.querySelectorAll("li[data-type='terminus']"));
     expect(start?.querySelector("[data-part='heure']")).toHaveTextContent("09:15");
@@ -111,8 +110,8 @@ describe("DayLine", () => {
     // Aucun badge « Vérifié » : aucune valeur de fr.json n'est ce mot, et l'espace ligne ne le contient pas.
     const values = (node: unknown): string[] =>
       typeof node === "string" ? [node] : Object.values(node as object).flatMap(values);
-    expect(values(fr).filter((value) => /^\s*vérifiée?s?\s*$/i.test(value))).toEqual([]);
-    expect(JSON.stringify(fr.ligne)).not.toMatch(/vérifié/i);
+    expect(values(messages).filter((value) => /^\s*vérifiée?s?\s*$/i.test(value))).toEqual([]);
+    expect(JSON.stringify(messages.ligne)).not.toMatch(/vérifié/i);
     expect(container.textContent).not.toMatch(/vérifié/i);
   });
 
