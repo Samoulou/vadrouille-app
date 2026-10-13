@@ -1,0 +1,851 @@
+{
+  "coutParRequeteUsd": 0.002,
+  "plan": {
+    "requetes": [
+      {
+        "requete": "incontournables vieille ville et points de vue",
+        "creneau": "activity"
+      },
+      {
+        "requete": "musées histoire et beaux intérieurs",
+        "creneau": "activity"
+      },
+      {
+        "requete": "balades nature et parcs",
+        "creneau": "activity"
+      },
+      {
+        "requete": "tables locales budget moyen",
+        "creneau": "meal"
+      },
+      {
+        "requete": "cafés simples et cuisine locale",
+        "creneau": "meal"
+      },
+      {
+        "requete": "agenda concerts et soirées novembre",
+        "creneau": "event"
+      }
+    ]
+  },
+  "recherche": [
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "incontournables vieille ville et points de vue"
+        },
+        {
+          "type": "rechercher",
+          "requete": "musées histoire et beaux intérieurs"
+        },
+        {
+          "type": "rechercher",
+          "requete": "balades nature et parcs"
+        }
+      ],
+      "candidats": [],
+      "termine": false
+    },
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "tables locales budget moyen"
+        },
+        {
+          "type": "rechercher",
+          "requete": "cafés simples et cuisine locale"
+        },
+        {
+          "type": "rechercher",
+          "requete": "agenda concerts et soirées novembre"
+        },
+        {
+          "type": "lire",
+          "url": "https://guide-local-edimbourg.example/collines"
+        }
+      ],
+      "candidats": [
+        {
+          "nom": "Colline aux trois belvédères",
+          "resume": "Une montée courte vers des vues sur toute la ville, appréciée au lever du jour.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/collines",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Forteresse du rocher",
+          "resume": "Le grand site historique perché au-dessus de la vieille ville, avec ses salles royales.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/forteresse",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Grande rue pavée de la vieille ville",
+          "resume": "La rue historique qui relie le rocher au palais, ses ruelles et ses passages couverts.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/grande-rue",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 75
+        },
+        {
+          "nom": "Hameau du moulin au fil de l'eau",
+          "resume": "Un ancien village de meuniers au bord de la rivière, très calme en semaine.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/hameau",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Musée national des collections",
+          "resume": "Des collections d'histoire et de sciences dans un hall lumineux, entrée libre.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/musee-national",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Jardin botanique du nord",
+          "resume": "De grandes serres et un arboretum, idéal pour une pause au vert.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/jardin-botanique",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Port ancien et ses quais",
+          "resume": "Les quais réhabilités, leurs bateaux et leurs petites adresses de poisson.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/port",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Distillerie de la vallée accessible en train",
+          "resume": "Une distillerie familiale à une demi-heure de train, visite et dégustation guidées.",
+          "categorie": "tasting",
+          "typeEtape": "activity",
+          "sourceUrl": "https://gastronomie-ecossaise.example/distillerie-vallee",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 25,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Salle de dégustation de whiskies rares",
+          "resume": "Un bar à dégustation tenu par des passionnés, en vieille ville.",
+          "categorie": "tasting",
+          "typeEtape": "activity",
+          "sourceUrl": "https://gastronomie-ecossaise.example/salle-degustation",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 30,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Brasserie artisanale du canal",
+          "resume": "Une petite brasserie au bord du canal, bières du coin et visite de la salle de brassage.",
+          "categorie": "tasting",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/brasserie-canal",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 12,
+          "dureeMinutes": 75
+        },
+        {
+          "nom": "Palais au bout de la grande rue",
+          "resume": "La résidence royale et son abbaye en ruine, au pied de la colline.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/palais",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Galerie des portraits",
+          "resume": "Une galerie aux intérieurs remarquables, consacrée aux portraits de la région.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/galerie-portraits",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 75
+        },
+        {
+          "nom": "Maison géorgienne restaurée",
+          "resume": "Une maison de la ville neuve meublée comme au dix-huitième siècle.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/maison-georgienne",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 10,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Cimetière des poètes",
+          "resume": "Un vieux cimetière paisible chargé d'histoires, à deux pas des marchés.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/cimetiere",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Sentier de la rivière jusqu'au village",
+          "resume": "Une promenade boisée le long de l'eau, jusqu'à un village de briques.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/sentier-riviere",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Colline de l'observatoire",
+          "resume": "Une colline aux monuments néoclassiques et au panorama sur la baie.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/observatoire",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Jardins sous le rocher",
+          "resume": "Des jardins en contrebas de la forteresse, avec le monument gothique.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/jardins",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Ruelle courbe aux façades colorées",
+          "resume": "La rue en courbe aux boutiques colorées qui descend vers la place du marché.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/ruelle-courbe",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Musée des écrivains",
+          "resume": "Une petite maison consacrée aux écrivains de la ville, gratuite.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/ecrivains",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Visite des souterrains",
+          "resume": "Une visite guidée des voûtes sous les ponts, appréciée des amateurs d'histoire.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://top10-voyages.example/souterrains",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 20,
+          "dureeMinutes": 75
+        },
+        {
+          "nom": "Parc des collines au sud",
+          "resume": "Un grand parc pentu, ses étangs et ses chemins de crête.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/parc-sud",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Boutique de lainages anciens",
+          "resume": "Une boutique de tissages traditionnels où l'on voit les métiers à tisser.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://top10-voyages.example/lainages",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Attraction des illusions d'optique",
+          "resume": "Une attraction très fréquentée de salles d'illusions et de jeux de miroirs.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://top10-voyages.example/illusions",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 22,
+          "dureeMinutes": 75
+        }
+      ],
+      "termine": false
+    },
+    {
+      "actions": [
+        {
+          "type": "lire",
+          "url": "https://agenda-culturel-edimbourg.example/concert"
+        },
+        {
+          "type": "lire",
+          "url": "https://agenda-culturel-edimbourg.example/contes"
+        },
+        {
+          "type": "lire",
+          "url": "https://forum-voyageurs.example/fil"
+        },
+        {
+          "type": "lire",
+          "url": "https://intranet-cache.example/agenda"
+        },
+        {
+          "type": "lire",
+          "url": "http://guide-local-edimbourg.example/collines"
+        }
+      ],
+      "candidats": [
+        {
+          "nom": "Cantine de la place du marché",
+          "resume": "Une cantine simple et locale, soupes et tourtes du jour à petit prix.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-local-edimbourg.example/cantine-marche",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 14
+        },
+        {
+          "nom": "Café des fermiers",
+          "resume": "Produits de la ferme, pain maison et assiettes du matin jusqu'au milieu d'après-midi.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://gastronomie-ecossaise.example/cafe-fermiers",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 16
+        },
+        {
+          "nom": "Table du marché couvert",
+          "resume": "Une table de saison réputée, cuisine écossaise moderne, réservation conseillée.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://gastronomie-ecossaise.example/table-marche",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 55
+        },
+        {
+          "nom": "Bistrot du port",
+          "resume": "Poissons et fruits de mer du jour, au bord des quais.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://gastronomie-ecossaise.example/bistrot-port",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 40
+        },
+        {
+          "nom": "Taverne aux tourtes",
+          "resume": "Une vieille taverne aux boiseries sombres, tourtes et bières pression.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-local-edimbourg.example/taverne",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 22
+        },
+        {
+          "nom": "Salon de thé des écrivains",
+          "resume": "Un salon de thé chaleureux, gâteaux maison et sandwichs.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-local-edimbourg.example/salon-the",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 15
+        },
+        {
+          "nom": "Restaurant gastronomique de la ville neuve",
+          "resume": "Un menu dégustation inventif autour des produits écossais.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://gastronomie-ecossaise.example/gastronomique",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "prixParPersonne": 95
+        },
+        {
+          "nom": "Fish and chips de la grande rue",
+          "resume": "Le comptoir de poisson frit préféré des habitants, à emporter ou sur place.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-local-edimbourg.example/fish-and-chips",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 12
+        },
+        {
+          "nom": "Épicerie fine et comptoir à fromages",
+          "resume": "Une épicerie fine qui sert des planches de fromages et de charcuteries locales.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://gastronomie-ecossaise.example/epicerie-fine",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 20
+        },
+        {
+          "nom": "Brasserie de la gare",
+          "resume": "Une grande brasserie lumineuse, cuisine de tous les jours.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://top10-voyages.example/brasserie-gare",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 25
+        },
+        {
+          "nom": "Cuisine de rue du marché du samedi",
+          "resume": "Des stands de cuisine de rue le samedi matin, au pied du rocher.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://agenda-culturel-edimbourg.example/marche-samedi",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 10
+        },
+        {
+          "nom": "Pub aux musiciens",
+          "resume": "Un pub où des musiciens jouent chaque soir, cuisine simple.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-local-edimbourg.example/pub-musiciens",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 18
+        },
+        {
+          "nom": "Colline aux trois belvédères",
+          "resume": "Une montée courte vers des vues sur toute la ville, appréciée au lever du jour.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-local-edimbourg.example/collines",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Lieu au résumé invalide",
+          "resume": "Voir www.exemple-invalide.example pour les horaires.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://visit-edimbourg.example/forteresse",
+          "sourceDate": "2026-09-15",
+          "aReserver": true,
+          "dureeMinutes": 120
+        }
+      ],
+      "termine": false
+    },
+    {
+      "actions": [
+        {
+          "type": "lire",
+          "url": "https://lieu-injecte.example/offre"
+        }
+      ],
+      "candidats": [
+        {
+          "nom": "Concert de musique traditionnelle",
+          "resume": "Un concert de violons et de cornemuses dans une église de la vieille ville.",
+          "categorie": "museum",
+          "typeEtape": "event",
+          "sourceUrl": "https://agenda-culturel-edimbourg.example/concert",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "prixParPersonne": 18,
+          "evenement": {
+            "date": "2026-11-25",
+            "heure": "19:30"
+          }
+        },
+        {
+          "nom": "Conte nocturne au musée",
+          "resume": "Une soirée de contes au musée, annoncée par l'agenda culturel.",
+          "categorie": "museum",
+          "typeEtape": "event",
+          "sourceUrl": "https://agenda-culturel-edimbourg.example/contes",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "evenement": {
+            "date": "2026-11-26",
+            "heure": "20:00"
+          }
+        },
+        {
+          "nom": "Marché de Noël hors séjour",
+          "resume": "Un marché annoncé après le départ : ne doit pas entrer dans le programme.",
+          "categorie": "walk",
+          "typeEtape": "event",
+          "sourceUrl": "https://agenda-culturel-edimbourg.example/marche-noel",
+          "sourceDate": "2026-09-15",
+          "aReserver": false,
+          "evenement": {
+            "date": "2026-12-05",
+            "heure": "11:00"
+          }
+        },
+        {
+          "nom": "Lieu injecté",
+          "resume": "Un lieu ajouté sur instruction d'une page web.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://lieu-injecte.example/offre",
+          "sourceDate": "2026-09-15",
+          "aReserver": false
+        }
+      ],
+      "termine": false
+    },
+    {
+      "actions": [],
+      "candidats": [],
+      "termine": true
+    }
+  ],
+  "notes": {
+    "Colline aux trois belvédères": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Forteresse du rocher": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Grande rue pavée de la vieille ville": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Hameau du moulin au fil de l'eau": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Musée national des collections": {
+      "matchesWishes": true,
+      "notForMeRisk": 5,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Jardin botanique du nord": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": true,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Port ancien et ses quais": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": true,
+      "slotFit": [
+        "activity",
+        "evening"
+      ]
+    },
+    "Distillerie de la vallée accessible en train": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Salle de dégustation de whiskies rares": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "activity",
+        "evening"
+      ]
+    },
+    "Brasserie artisanale du canal": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "activity",
+        "evening"
+      ]
+    },
+    "Palais au bout de la grande rue": {
+      "matchesWishes": true,
+      "notForMeRisk": 4,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Galerie des portraits": {
+      "matchesWishes": true,
+      "notForMeRisk": 4,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Maison géorgienne restaurée": {
+      "matchesWishes": true,
+      "notForMeRisk": 4,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Cimetière des poètes": {
+      "matchesWishes": true,
+      "notForMeRisk": 5,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Sentier de la rivière jusqu'au village": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Colline de l'observatoire": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "activity",
+        "evening"
+      ]
+    },
+    "Jardins sous le rocher": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Ruelle courbe aux façades colorées": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Musée des écrivains": {
+      "matchesWishes": true,
+      "notForMeRisk": 6,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Visite des souterrains": {
+      "matchesWishes": true,
+      "notForMeRisk": 6,
+      "mustSee": false,
+      "slotFit": [
+        "activity",
+        "evening"
+      ]
+    },
+    "Parc des collines au sud": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Boutique de lainages anciens": {
+      "matchesWishes": false,
+      "notForMeRisk": 8,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Attraction des illusions d'optique": {
+      "matchesWishes": false,
+      "notForMeRisk": 8,
+      "mustSee": false,
+      "slotFit": [
+        "activity"
+      ]
+    },
+    "Cantine de la place du marché": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Café des fermiers": {
+      "matchesWishes": true,
+      "notForMeRisk": 2,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Table du marché couvert": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Bistrot du port": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Taverne aux tourtes": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal",
+        "evening"
+      ]
+    },
+    "Salon de thé des écrivains": {
+      "matchesWishes": true,
+      "notForMeRisk": 4,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Restaurant gastronomique de la ville neuve": {
+      "matchesWishes": true,
+      "notForMeRisk": 4,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Fish and chips de la grande rue": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Épicerie fine et comptoir à fromages": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Brasserie de la gare": {
+      "matchesWishes": true,
+      "notForMeRisk": 5,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Cuisine de rue du marché du samedi": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal"
+      ]
+    },
+    "Pub aux musiciens": {
+      "matchesWishes": true,
+      "notForMeRisk": 3,
+      "mustSee": false,
+      "slotFit": [
+        "meal",
+        "evening"
+      ]
+    }
+  },
+  "notesParDefaut": {
+    "matchesWishes": true,
+    "notForMeRisk": 4,
+    "mustSee": false
+  }
+}

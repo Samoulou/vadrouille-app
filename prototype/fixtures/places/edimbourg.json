@@ -1,0 +1,1705 @@
+{
+  "lieux": {
+    "Vieille ville d'Édimbourg (Old Town)": {
+      "placeId": "SENTINELLE_PLACE_ID_LOGEMENT",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1883123
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Colline aux trois belvédères": {
+      "placeId": "SENTINELLE_PLACE_ID_001",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1873123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Forteresse du rocher": {
+      "placeId": "SENTINELLE_PLACE_ID_002",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1863123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Grande rue pavée de la vieille ville": {
+      "placeId": "SENTINELLE_PLACE_ID_003",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1853123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Hameau du moulin au fil de l'eau": {
+      "placeId": "SENTINELLE_PLACE_ID_004",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1843123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Musée national des collections": {
+      "placeId": "SENTINELLE_PLACE_ID_005",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1833123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Jardin botanique du nord": {
+      "placeId": "SENTINELLE_PLACE_ID_006",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1823123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Port ancien et ses quais": {
+      "placeId": "SENTINELLE_PLACE_ID_007",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1813123
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Distillerie de la vallée accessible en train": {
+      "placeId": "SENTINELLE_PLACE_ID_008",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1803123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Salle de dégustation de whiskies rares": {
+      "placeId": "SENTINELLE_PLACE_ID_009",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1793123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Brasserie artisanale du canal": {
+      "placeId": "SENTINELLE_PLACE_ID_010",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1783123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Palais au bout de la grande rue": {
+      "placeId": "SENTINELLE_PLACE_ID_011",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1773123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Galerie des portraits": {
+      "placeId": "SENTINELLE_PLACE_ID_012",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1763123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Maison géorgienne restaurée": {
+      "placeId": "SENTINELLE_PLACE_ID_013",
+      "statut": "CLOSED_PERMANENTLY",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1753123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Cimetière des poètes": {
+      "placeId": "SENTINELLE_PLACE_ID_014",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1743123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Sentier de la rivière jusqu'au village": {
+      "placeId": "SENTINELLE_PLACE_ID_015",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1733123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Colline de l'observatoire": {
+      "placeId": "SENTINELLE_PLACE_ID_016",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1723123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Jardins sous le rocher": {
+      "placeId": "SENTINELLE_PLACE_ID_017",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1713123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Musée des écrivains": {
+      "placeId": "SENTINELLE_PLACE_ID_019",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1693123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Visite des souterrains": {
+      "placeId": "SENTINELLE_PLACE_ID_020",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1683123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Parc des collines au sud": {
+      "placeId": "SENTINELLE_PLACE_ID_021",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1673123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Boutique de lainages anciens": {
+      "placeId": "SENTINELLE_PLACE_ID_022",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1663123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Attraction des illusions d'optique": {
+      "placeId": "SENTINELLE_PLACE_ID_023",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1653123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Cantine de la place du marché": {
+      "placeId": "SENTINELLE_PLACE_ID_024",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1643123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Café des fermiers": {
+      "placeId": "SENTINELLE_PLACE_ID_025",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1633123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Table du marché couvert": {
+      "placeId": "SENTINELLE_PLACE_ID_026",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1623123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Bistrot du port": {
+      "placeId": "SENTINELLE_PLACE_ID_027",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1613123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Taverne aux tourtes": {
+      "placeId": "SENTINELLE_PLACE_ID_028",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1603123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Salon de thé des écrivains": {
+      "placeId": "SENTINELLE_PLACE_ID_029",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1593123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Restaurant gastronomique de la ville neuve": {
+      "placeId": "SENTINELLE_PLACE_ID_030",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1583123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Fish and chips de la grande rue": {
+      "placeId": "SENTINELLE_PLACE_ID_031",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1573123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Épicerie fine et comptoir à fromages": {
+      "placeId": "SENTINELLE_PLACE_ID_032",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1563123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Brasserie de la gare": {
+      "placeId": "SENTINELLE_PLACE_ID_033",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1553123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Cuisine de rue du marché du samedi": {
+      "placeId": "SENTINELLE_PLACE_ID_034",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1543123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Pub aux musiciens": {
+      "placeId": "SENTINELLE_PLACE_ID_035",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1533123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 667,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 667,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Concert de musique traditionnelle": {
+      "placeId": "SENTINELLE_PLACE_ID_036",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1523123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Marché de Noël hors séjour": {
+      "placeId": "SENTINELLE_PLACE_ID_038",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 55.9533123,
+        "lng": -3.1503123
+      },
+      "horaires": [
+        {
+          "jour": 0,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 1,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 2,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 3,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 4,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 5,
+          "debut": 547,
+          "fin": 1433
+        },
+        {
+          "jour": 6,
+          "debut": 547,
+          "fin": 1433
+        }
+      ],
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    }
+  }
+}

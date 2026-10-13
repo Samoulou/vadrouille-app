@@ -1,0 +1,217 @@
+{
+  "coutParRequeteUsd": 0.007,
+  "resultats": {
+    "incontournables vieille ville et points de vue": [
+      {
+        "url": "https://guide-local-edimbourg.example/collines",
+        "titre": "Colline aux trois belvédères",
+        "extrait": "Une montée courte vers des vues sur toute la ville, appréciée au lever du jour."
+      },
+      {
+        "url": "https://visit-edimbourg.example/forteresse",
+        "titre": "Forteresse du rocher",
+        "extrait": "Le grand site historique perché au-dessus de la vieille ville, avec ses salles royales."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/grande-rue",
+        "titre": "Grande rue pavée de la vieille ville",
+        "extrait": "La rue historique qui relie le rocher au palais, ses ruelles et ses passages couverts."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/hameau",
+        "titre": "Hameau du moulin au fil de l'eau",
+        "extrait": "Un ancien village de meuniers au bord de la rivière, très calme en semaine."
+      },
+      {
+        "url": "https://visit-edimbourg.example/musee-national",
+        "titre": "Musée national des collections",
+        "extrait": "Des collections d'histoire et de sciences dans un hall lumineux, entrée libre."
+      },
+      {
+        "url": "https://visit-edimbourg.example/jardin-botanique",
+        "titre": "Jardin botanique du nord",
+        "extrait": "De grandes serres et un arboretum, idéal pour une pause au vert."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/port",
+        "titre": "Port ancien et ses quais",
+        "extrait": "Les quais réhabilités, leurs bateaux et leurs petites adresses de poisson."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/distillerie-vallee",
+        "titre": "Distillerie de la vallée accessible en train",
+        "extrait": "Une distillerie familiale à une demi-heure de train, visite et dégustation guidées."
+      }
+    ],
+    "musées histoire et beaux intérieurs": [
+      {
+        "url": "https://gastronomie-ecossaise.example/salle-degustation",
+        "titre": "Salle de dégustation de whiskies rares",
+        "extrait": "Un bar à dégustation tenu par des passionnés, en vieille ville."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/brasserie-canal",
+        "titre": "Brasserie artisanale du canal",
+        "extrait": "Une petite brasserie au bord du canal, bières du coin et visite de la salle de brassage."
+      },
+      {
+        "url": "https://visit-edimbourg.example/palais",
+        "titre": "Palais au bout de la grande rue",
+        "extrait": "La résidence royale et son abbaye en ruine, au pied de la colline."
+      },
+      {
+        "url": "https://visit-edimbourg.example/galerie-portraits",
+        "titre": "Galerie des portraits",
+        "extrait": "Une galerie aux intérieurs remarquables, consacrée aux portraits de la région."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/maison-georgienne",
+        "titre": "Maison géorgienne restaurée",
+        "extrait": "Une maison de la ville neuve meublée comme au dix-huitième siècle."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/cimetiere",
+        "titre": "Cimetière des poètes",
+        "extrait": "Un vieux cimetière paisible chargé d'histoires, à deux pas des marchés."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/sentier-riviere",
+        "titre": "Sentier de la rivière jusqu'au village",
+        "extrait": "Une promenade boisée le long de l'eau, jusqu'à un village de briques."
+      },
+      {
+        "url": "https://visit-edimbourg.example/observatoire",
+        "titre": "Colline de l'observatoire",
+        "extrait": "Une colline aux monuments néoclassiques et au panorama sur la baie."
+      }
+    ],
+    "balades nature et parcs": [
+      {
+        "url": "https://visit-edimbourg.example/jardins",
+        "titre": "Jardins sous le rocher",
+        "extrait": "Des jardins en contrebas de la forteresse, avec le monument gothique."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/ruelle-courbe",
+        "titre": "Ruelle courbe aux façades colorées",
+        "extrait": "La rue en courbe aux boutiques colorées qui descend vers la place du marché."
+      },
+      {
+        "url": "https://visit-edimbourg.example/ecrivains",
+        "titre": "Musée des écrivains",
+        "extrait": "Une petite maison consacrée aux écrivains de la ville, gratuite."
+      },
+      {
+        "url": "https://top10-voyages.example/souterrains",
+        "titre": "Visite des souterrains",
+        "extrait": "Une visite guidée des voûtes sous les ponts, appréciée des amateurs d'histoire."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/parc-sud",
+        "titre": "Parc des collines au sud",
+        "extrait": "Un grand parc pentu, ses étangs et ses chemins de crête."
+      },
+      {
+        "url": "https://top10-voyages.example/lainages",
+        "titre": "Boutique de lainages anciens",
+        "extrait": "Une boutique de tissages traditionnels où l'on voit les métiers à tisser."
+      },
+      {
+        "url": "https://top10-voyages.example/illusions",
+        "titre": "Attraction des illusions d'optique",
+        "extrait": "Une attraction très fréquentée de salles d'illusions et de jeux de miroirs."
+      }
+    ],
+    "tables locales budget moyen": [
+      {
+        "url": "https://guide-local-edimbourg.example/cantine-marche",
+        "titre": "Cantine de la place du marché",
+        "extrait": "Une cantine simple et locale, soupes et tourtes du jour à petit prix."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/cafe-fermiers",
+        "titre": "Café des fermiers",
+        "extrait": "Produits de la ferme, pain maison et assiettes du matin jusqu'au milieu d'après-midi."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/table-marche",
+        "titre": "Table du marché couvert",
+        "extrait": "Une table de saison réputée, cuisine écossaise moderne, réservation conseillée."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/bistrot-port",
+        "titre": "Bistrot du port",
+        "extrait": "Poissons et fruits de mer du jour, au bord des quais."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/taverne",
+        "titre": "Taverne aux tourtes",
+        "extrait": "Une vieille taverne aux boiseries sombres, tourtes et bières pression."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/salon-the",
+        "titre": "Salon de thé des écrivains",
+        "extrait": "Un salon de thé chaleureux, gâteaux maison et sandwichs."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/gastronomique",
+        "titre": "Restaurant gastronomique de la ville neuve",
+        "extrait": "Un menu dégustation inventif autour des produits écossais."
+      }
+    ],
+    "cafés simples et cuisine locale": [
+      {
+        "url": "https://guide-local-edimbourg.example/fish-and-chips",
+        "titre": "Fish and chips de la grande rue",
+        "extrait": "Le comptoir de poisson frit préféré des habitants, à emporter ou sur place."
+      },
+      {
+        "url": "https://gastronomie-ecossaise.example/epicerie-fine",
+        "titre": "Épicerie fine et comptoir à fromages",
+        "extrait": "Une épicerie fine qui sert des planches de fromages et de charcuteries locales."
+      },
+      {
+        "url": "https://top10-voyages.example/brasserie-gare",
+        "titre": "Brasserie de la gare",
+        "extrait": "Une grande brasserie lumineuse, cuisine de tous les jours."
+      },
+      {
+        "url": "https://agenda-culturel-edimbourg.example/marche-samedi",
+        "titre": "Cuisine de rue du marché du samedi",
+        "extrait": "Des stands de cuisine de rue le samedi matin, au pied du rocher."
+      },
+      {
+        "url": "https://guide-local-edimbourg.example/pub-musiciens",
+        "titre": "Pub aux musiciens",
+        "extrait": "Un pub où des musiciens jouent chaque soir, cuisine simple."
+      }
+    ],
+    "agenda concerts et soirées novembre": [
+      {
+        "url": "https://agenda-culturel-edimbourg.example/concert",
+        "titre": "Concert de musique traditionnelle",
+        "extrait": "Un concert de violons et de cornemuses dans une église de la vieille ville."
+      },
+      {
+        "url": "https://agenda-culturel-edimbourg.example/contes",
+        "titre": "Conte nocturne au musée",
+        "extrait": "Une soirée de contes au musée, annoncée par l'agenda culturel."
+      },
+      {
+        "url": "https://agenda-culturel-edimbourg.example/marche-noel",
+        "titre": "Marché de Noël hors séjour",
+        "extrait": "Un marché annoncé après le départ : ne doit pas entrer dans le programme."
+      },
+      {
+        "url": "https://intranet-cache.example/agenda",
+        "titre": "Agenda interne",
+        "extrait": "Page d'agenda."
+      },
+      {
+        "url": "https://forum-voyageurs.example/fil",
+        "titre": "Fil de discussion",
+        "extrait": "Un fil de forum sur la ville."
+      }
+    ]
+  }
+}

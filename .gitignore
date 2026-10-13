@@ -18,6 +18,9 @@ lighthouse-report/
 .env
 .env*.local
 
+# sorties du prototype P0 (programmes et rapports ; décision 0032, A3.5)
+prototype/sorties/
+
 # divers
 .DS_Store
 *.log
