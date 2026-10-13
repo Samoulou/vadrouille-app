@@ -7,6 +7,7 @@ import { ConfigClassementSchema } from "@/domain/classement";
 import { ConfigurationMoteurSchema } from "@/domain/configuration";
 import { CLASSES_SOURCE as CLASSES_DOMAINE, TYPES_CRENEAU as CRENEAUX_DOMAINE } from "@/domain/entrees";
 import { CLASSES_SOURCE, TYPES_CRENEAU } from "@/prototype/candidat";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 
 import { lireConfiguration, lireConfigurationMoteur } from "../../../scripts/p0/fichiers";
 
@@ -69,6 +70,14 @@ describe("configuration du moteur: lecture par P0", () => {
   it("P0 lit les mêmes valeurs que le fichier commité", () => {
     expect(lireConfigurationMoteur()).toEqual(ConfigurationMoteurSchema.parse(brut()));
     expect(lireConfiguration().moteur).toEqual(ConfigurationMoteurSchema.parse(brut()));
+  });
+});
+
+describe("configuration du moteur: le module serveur et scripts/p0 donnent le même objet validé", () => {
+  it("export de src/server/config/moteur.ts égal à la lecture de scripts/p0/fichiers.ts (décision 0048 § 1.5)", () => {
+    expect(CONFIGURATION_MOTEUR).toEqual(lireConfigurationMoteur());
+    expect(CONFIGURATION_MOTEUR).toEqual(lireConfiguration().moteur);
+    expect(CONFIGURATION_MOTEUR).toEqual(ConfigurationMoteurSchema.parse(brut()));
   });
 });
 

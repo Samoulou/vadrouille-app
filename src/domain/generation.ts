@@ -240,7 +240,7 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
         const source = candidat === undefined ? undefined : sourceDe(candidat);
         if (candidat === undefined || source === undefined) throw new Error("moteur : candidat planifié inconnu");
         libreAvant(etape.debut, etape.trajetAvant);
-        items.push({ type: "segment", segment: { mode: etape.modeAvant, estimated: false } });
+        items.push({ type: "segment", segment: { mode: etape.modeAvant, estimated: etape.estimeeAvant } });
         rang += 1;
         const id = identifiantEtape(entree.version, index, "etape", rang);
         items.push({
@@ -266,7 +266,7 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
         const { bloc } = element;
         libreAvant(bloc.debut, element.trajetAvant?.minutes);
         if (element.trajetAvant !== undefined) {
-          items.push({ type: "segment", segment: { mode: element.trajetAvant.mode, estimated: false } });
+          items.push({ type: "segment", segment: { mode: element.trajetAvant.mode, estimated: element.trajetAvant.estimee } });
         }
         rang += 1;
         const id = bloc.id ?? identifiantEtape(entree.version, index, "etape", rang);
@@ -295,7 +295,7 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
           : { lieu: derniere.bloc.stop.placeId };
   let finJour = fin;
   if (!memePoint(position, arrivee) && plan.retour !== undefined) {
-    items.push({ type: "segment", segment: { mode: plan.retour.mode, estimated: false } });
+    items.push({ type: "segment", segment: { mode: plan.retour.mode, estimated: plan.retour.estimee } });
     finJour = fin + plan.retour.minutes;
   }
   items.push({

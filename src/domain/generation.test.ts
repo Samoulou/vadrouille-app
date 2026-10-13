@@ -57,11 +57,12 @@ function relectures(doubles: Doubles = {}): Relectures {
     validite: (placeId) => (placeId === place("ferme") ? "ferme_definitivement" : "valide"),
     plages: (placeId, date) => doubles.plages?.(placeId, date) ?? [SENTINELLES.plage],
     duree(depuis: Point, vers: Point, mode: ModeTrajet) {
-      if (memePoint(depuis, vers)) return 0;
+      const mesure = (minutes: number) => ({ minutes, estimee: false });
+      if (memePoint(depuis, vers)) return mesure(0);
       const lieux = [depuis, vers].flatMap((point) => ("lieu" in point ? [point.lieu] : []));
-      if (lieux.includes(SENTINELLES.loin)) return 600;
-      if (mode === "walk") return SENTINELLES.marche;
-      if (mode === "transit") return SENTINELLES.transports;
+      if (lieux.includes(SENTINELLES.loin)) return mesure(600);
+      if (mode === "walk") return mesure(SENTINELLES.marche);
+      if (mode === "transit") return mesure(SENTINELLES.transports);
       return INCONNU;
     },
   };

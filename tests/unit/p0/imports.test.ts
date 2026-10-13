@@ -530,6 +530,53 @@ function graphe(depart: string): Set<string> {
   return vus;
 }
 
+/** Imports de projet résolus d'un fichier (un pas du graphe). */
+type Voisins = (fichier: string) => readonly string[];
+
+/** Mémoïsé : les deux parcours relisent les mêmes fichiers. */
+const voisinsLus = new Map<string, readonly string[]>();
+const voisinsReels: Voisins = (fichier) => {
+  const connus = voisinsLus.get(fichier);
+  if (connus !== undefined) return connus;
+  const lus = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8")).imports.flatMap(({ specificateur }) => {
+    const cible = resoudre(fichier, specificateur);
+    return cible.type === "projet" ? [cible.chemin] : [];
+  });
+  voisinsLus.set(fichier, lus);
+  return lus;
+};
+
+/** Fichiers de projet atteints depuis `depart` ; un fichier pour lequel `arreter` est vrai est atteint, pas parcouru. */
+function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) => boolean = () => false): Set<string> {
+  const vus = new Set<string>([depart]);
+  const pile = [depart];
+  while (pile.length > 0) {
+    const courant = pile.pop() as string;
+    if (courant !== depart && arreter(courant)) continue;
+    for (const cible of voisins(courant)) {
+      if (vus.has(cible)) continue;
+      vus.add(cible);
+      pile.push(cible);
+    }
+  }
+  return vus;
+}
+
+/** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1). */
+const interditPartout = (chemin: string) =>
+  ["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
+  (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts");
+
+/** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
+function violationsApplication(fichier: string, voisins: Voisins): string[] {
+  const violations = [...atteints(fichier, voisins)].filter(interditPartout);
+  if (!fichier.startsWith("src/server/")) {
+    const horsServeur = atteints(fichier, voisins, (chemin) => chemin.startsWith("src/server/"));
+    violations.push(...[...horsServeur].filter((chemin) => chemin.startsWith("src/domain/")));
+  }
+  return violations;
+}
+
 describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => {
   it("les dossiers de P0a1 ne contiennent que des fichiers .ts, enregistrer.mjs et des JSON de données", () => {
     expect(TOUS_FICHIERS_P0.filter((fichier) => !fichierAdmis(fichier))).toEqual([]);
@@ -907,16 +954,51 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     }
   });
 
-  it("le graphe de l'application n'importe ni @/ai, @/research, @/grounding, @/domain ni scripts/ ; de src/prototype, seulement programme-reduit", () => {
+  /*
+   * Décision 0048 § 1 : frontière « src/domain n'est atteint que par src/server ». Deux parcours sur le graphe de
+   * l'application : (1) parcours complet, @/ai, @/research, @/grounding, scripts/ et src/prototype (sauf
+   * programme-reduit) refusés pour tout fichier, src/server compris ; (2) parcours qui ne descend pas dans
+   * src/server/, src/domain/ refusé pour tout fichier hors src/server.
+   */
+  describe("graphe de l'application : @/domain seulement par src/server (décision 0048 § 1)", () => {
     const application = fichiers("src").filter((fichier) => !DOSSIERS_P0.some((d) => fichier.startsWith(`${d}/`)) && !fichier.startsWith("src/contracts/"));
     const configs = ["next.config.ts"].filter((fichier) => existsSync(path.join(RACINE, fichier)));
-    for (const fichier of [...application.filter((f) => !estTest(f)), ...configs]) {
-      for (const chemin of graphe(fichier)) {
-        const interdit =
-          ["src/ai/", "src/research/", "src/grounding/", "src/domain/", "scripts/"].some((d) => chemin.startsWith(d)) ||
-          (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts");
-        expect(interdit, `${fichier} → ${chemin}`).toBe(false);
-      }
-    }
+
+    it("aucun fichier n'atteint @/ai, @/research, @/grounding, scripts/ ni src/prototype (sauf programme-reduit) ; hors src/server, aucun n'atteint @/domain", () => {
+      const sources = [...application.filter((f) => !estTest(f)), ...configs];
+      expect(sources).toContain("src/server/config/moteur.ts");
+      for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
+      // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
+      expect([...atteints("src/server/config/moteur.ts", voisinsReels)]).toContain("src/domain/configuration.ts");
+    });
+
+    describe("cas fabriqués", () => {
+      const graphe = (aretes: Record<string, string[]>): Voisins => (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      it.each([
+        ["refusé : src/features → @/domain/configuration", { "src/features/x.ts": ["src/domain/configuration.ts"] }, "src/features/x.ts", ["src/domain/configuration.ts"]],
+        [
+          "refusé : src/lib → src/lib → @/domain/generation",
+          { "src/lib/x.ts": ["src/lib/y.ts"], "src/lib/y.ts": ["src/domain/generation.ts"] },
+          "src/lib/x.ts",
+          ["src/domain/generation.ts"],
+        ],
+        ["admis : src/server/config/moteur.ts → @/domain/configuration", { "src/server/config/moteur.ts": ["src/domain/configuration.ts"] }, "src/server/config/moteur.ts", []],
+        [
+          "admis : src/features → @/server/actions → @/domain/generation",
+          { "src/features/x.tsx": ["src/server/actions/y.ts"], "src/server/actions/y.ts": ["src/domain/generation.ts"] },
+          "src/features/x.tsx",
+          [],
+        ],
+        ["refusé : src/server → @/research/agent", { "src/server/x.ts": ["src/research/agent.ts"] }, "src/server/x.ts", ["src/research/agent.ts"]],
+        [
+          "refusé : src/features → src/server → @/grounding (parcours complet)",
+          { "src/features/x.ts": ["src/server/y.ts"], "src/server/y.ts": ["src/grounding/ancrage.ts"] },
+          "src/features/x.ts",
+          ["src/grounding/ancrage.ts"],
+        ],
+      ] satisfies [string, Record<string, string[]>, string, string[]][])("%s", (_nom, aretes, depart, attendu) => {
+        expect(violationsApplication(depart, graphe(aretes))).toEqual(attendu);
+      });
+    });
   });
 });

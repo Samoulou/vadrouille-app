@@ -22,11 +22,18 @@ export type Plage = { readonly debut: number; readonly fin: number };
 
 export type ModeTrajet = MobilityMode;
 
+/**
+ * Durée d'un trajet (décision 0048 § 3) : minutes et indication « estimée » (B8 estime à partir des coordonnées
+ * quand Routes ne répond pas, 0011 point 5). Le moteur n'estime jamais lui-même ; une durée estimée est une durée
+ * connue (seul `inconnu` rend un trajet non planifiable).
+ */
+export type Duree = { readonly minutes: number; readonly estimee: boolean };
+
 export type Relectures = {
   validite(placeId: string): Validite;
   /** Plages demandées **par date** (AAAA-MM-JJ) : B8 peut y refléter une fermeture temporaire. */
   plages(placeId: string, date: string): readonly Plage[] | Inconnu;
-  duree(depuis: Point, vers: Point, mode: ModeTrajet): number | Inconnu;
+  duree(depuis: Point, vers: Point, mode: ModeTrajet): Duree | Inconnu;
 };
 
 /** Ordre de départage des modes à durée égale (B5-PO-6) : marche, puis transports publics, puis voiture. */
@@ -41,20 +48,21 @@ export function memePoint(a: Point, b: Point): boolean {
 
 /**
  * Trajet le plus rapide parmi les modes admis dont l'interface donne une durée (B5-PO-6) ; à égalité, l'ordre de
- * `ORDRE_MODES`. Aucun mode admis avec une durée connue : `inconnu` (jamais estimé par le moteur).
+ * `ORDRE_MODES`. Le choix se fait sur `minutes` seules ; `estimee` est celle du mode retenu (0048 § 3.2). Aucun mode
+ * admis avec une durée connue : `inconnu` (jamais estimé par le moteur).
  */
 export function trajetLePlusRapide(
   relectures: Relectures,
   depuis: Point,
   vers: Point,
   modes: readonly ModeTrajet[],
-): { mode: ModeTrajet; minutes: number } | Inconnu {
-  let meilleur: { mode: ModeTrajet; minutes: number } | undefined;
+): { mode: ModeTrajet; minutes: number; estimee: boolean } | Inconnu {
+  let meilleur: { mode: ModeTrajet; minutes: number; estimee: boolean } | undefined;
   for (const mode of ORDRE_MODES) {
     if (!modes.includes(mode)) continue;
-    const minutes = relectures.duree(depuis, vers, mode);
-    if (minutes === INCONNU) continue;
-    if (meilleur === undefined || minutes < meilleur.minutes) meilleur = { mode, minutes };
+    const duree = relectures.duree(depuis, vers, mode);
+    if (duree === INCONNU) continue;
+    if (meilleur === undefined || duree.minutes < meilleur.minutes) meilleur = { mode, minutes: duree.minutes, estimee: duree.estimee };
   }
   return meilleur ?? INCONNU;
 }
