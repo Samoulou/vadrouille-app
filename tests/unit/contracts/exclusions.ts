@@ -23,6 +23,13 @@ export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "OtherCity", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
   { contract: "TripCommitment", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
   { contract: "Travellers", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
+  // F8b (décision 0017 § 2.4) : contrats de phase 0 jamais stockés ; « Contrats à créer » du handover back-end les
+  // attribue à F8b sans ligne au § 5, que le Tech Lead écrit (question de la PR F8b) avant de retirer ces entrées.
+  { contract: "LodgingRequest", task: "F8b", reason: "demande de suggestion de logement (0017 § 2.4), jamais stockée ; reprise par B9" },
+  { contract: "LodgingSuggestion", task: "F8b", reason: "suggestion simulée de quartier (0017 § 2.4), jamais stockée ; reprise par B9" },
+  { contract: "CodeRequest", task: "F8b", reason: "demande de code de connexion (0017 § 2.4), jamais stockée ; reprise par B3" },
+  { contract: "CodeVerification", task: "F8b", reason: "vérification du code (0017 § 2.4), jamais stockée ; reprise par B3" },
+  { contract: "Session", task: "B3", reason: "session lue par l'interface (0017 § 2.4), complétée par B3" },
   // F7a (décision 0016 § 4 et § 6) : contrats de phase 0 de la révision, jamais stockés ; B11 les reprend derrière
   // les Server Actions (`previewReplacement`, `applyPatch`) et en écrit les lignes.
   { contract: "ReplacementRequest", task: "B11", reason: "demande de remplacement (0016 § 4.1), action serveur de B11" },

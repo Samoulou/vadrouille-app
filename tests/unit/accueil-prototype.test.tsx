@@ -70,7 +70,8 @@ describe("accueil : section « Prototype »", () => {
     avecProgrammes(createProgrammeLoader({ dossier: join(DOSSIER_TEST, "absent") }));
     render(await HomePage());
     expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
   });
 
   it("aucune section avec l'adaptateur mock", async () => {

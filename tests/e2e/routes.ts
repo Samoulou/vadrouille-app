@@ -11,7 +11,7 @@
 export const INVENTORY_TRIP = "mock_trip_edimbourg";
 
 /** États nommés d'une route ; l'action de chacun est dans `route-states.ts` (`ROUTE_STATES`). */
-export type RouteStateName = "fiche-ouverte" | "annulation-proposee" | "proposition-affichee" | "deplacer-ouverte";
+export type RouteStateName = "fiche-ouverte" | "annulation-proposee" | "proposition-affichee" | "deplacer-ouverte" | "etape-code";
 
 /**
  * Préparations côté serveur : certaines adresses n'existent qu'après une action (un paiement commencé crée son
@@ -26,7 +26,7 @@ export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-atte
  * adresse par `R1`. L'action, dans `route-states.ts` (`ROUTE_JOURNEYS`), part de son adresse de départ, remplit
  * le brouillon et atteint l'adresse de l'entrée par navigation côté client, dans le même onglet.
  */
-export type RouteJourneyName = "brouillon-ecran-1";
+export type RouteJourneyName = "brouillon-ecran-1" | "brouillon-logement";
 
 /** `seuil` : budget bloquant ; `journal` : mesuré et journalisé sans seuil. */
 export type BudgetMode = "seuil" | "journal";
@@ -162,6 +162,23 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // F8b : écran 3, atteint par les écrans 1 et 2 remplis (voyage « Pas encore ») ; `journal` (F8-Q15).
+    id: "R3",
+    path: "/voyages/nouveau/logement",
+    page: "(creation)/voyages/nouveau/logement/page.tsx",
+    journey: "brouillon-logement",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F8b : écran 4, ouvert hors création (`suite` vers « Mes voyages ») ; état « étape code » ; `journal` (F8-Q15).
+    id: "R4",
+    path: "/connexion?suite=%2Fvoyages",
+    page: "(creation)/connexion/page.tsx",
+    states: ["etape-code"],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     // F10b : page de repli hors ligne, statique, sans donnée ; mesure journalisée (F10-TL-10).
     id: "R-repli",
     path: "/hors-ligne",
@@ -205,4 +222,6 @@ export const DEV_ROUTES: readonly Pick<RouteEntry, "id" | "path" | "states">[] =
   { id: "R12-dev", path: `/dev${TRIP}/jour/2`, states: ["fiche-ouverte", "deplacer-ouverte"] },
   { id: "R14-dev", path: `/dev${TRIP}/jour/2/remplacer/j2-dean-village`, states: ["proposition-affichee"] },
   { id: "R-erreur-dev", path: "/dev/etats/erreur", states: [] },
+  // F8b : écran 3 sur le brouillon de démonstration, avec la carte simulée (décision 0017 § 1 et § 7).
+  { id: "R3-dev", path: "/dev/voyages/nouveau/logement", states: [] },
 ];

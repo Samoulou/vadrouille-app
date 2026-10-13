@@ -210,3 +210,24 @@ export function boundsOf(positions: LatLng[]): Bounds | null {
     { north: -90, south: 90, east: -180, west: 180 },
   );
 }
+
+/** Mètres par degré de latitude (sphère moyenne). */
+const METRES_PAR_DEGRE = 111_320;
+
+/**
+ * Boîte d'un cercle de `radiusM` mètres autour de `center` (zone d'un quartier, `AreaMap`), en deux coins opposés :
+ * cadrage de la carte Google (`fitBounds`). La longitude est corrigée par la latitude.
+ */
+export function areaCorners(center: LatLng, radiusM: number): LatLng[] {
+  const dLat = radiusM / METRES_PAR_DEGRE;
+  const dLng = dLat / Math.max(Math.cos((center.lat * Math.PI) / 180), 0.01);
+  return [
+    { lat: center.lat - dLat, lng: center.lng - dLng },
+    { lat: center.lat + dLat, lng: center.lng + dLng },
+  ];
+}
+
+/** Rayon en degrés de latitude d'un cercle de `radiusM` mètres : carte simulée, projection équirectangulaire. */
+export function areaRadiusDegrees(radiusM: number): number {
+  return radiusM / METRES_PAR_DEGRE;
+}

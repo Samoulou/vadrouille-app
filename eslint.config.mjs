@@ -266,8 +266,9 @@ export default defineConfig([
   },
   {
     // F9a : horloge injectée, jamais l'horloge système dans l'adaptateur de paiement simulé (0017 § 10.1, 0020 § 2.2) ;
-    // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5).
-    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts"],
+    // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5) ; F8b : de même dans la connexion simulée
+    // et la création simulée (0017 § 10.1).
+    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -524,6 +525,10 @@ export default defineConfig([
       "src/features/compte/**/*.{js,jsx,ts,tsx}",
       "src/server/actions/creation.ts",
       "src/adapters/mock-creation.ts",
+      // F8b : ni email ni code dans un journal (décision 0017 § 3.5).
+      "src/server/actions/compte.ts",
+      "src/adapters/mock-auth.ts",
+      "src/adapters/auth-guard.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: { "no-console": "error" },

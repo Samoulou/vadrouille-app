@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   MOCK_DEMO_TRIP,
   MOCK_DEMO_UNLOCKED_TRIP,
@@ -7,10 +9,12 @@ import {
   isPrototypeAdapter,
   paymentAvailable,
 } from "@/adapters";
+import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import type { TripSummary } from "@/contracts";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { PrototypeSection } from "@/features/accueil/PrototypeSection";
+import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { messages } from "@/i18n";
@@ -40,8 +44,9 @@ function demoLinks(): DemoLink[] {
 }
 
 /**
- * Page d'accueil : nom et promesse. Avec l'adaptateur `mock` seulement, section « Démonstration » vers les
- * parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
+ * Page d'accueil : nom, promesse et « Créer un voyage » (`Button` `primary` en pleine largeur, lien vers l'écran 1
+ * `/voyages/nouveau` ; demande de Samuel transmise par le CEO, ticket #259), quel que soit l'adaptateur. Avec
+ * l'adaptateur `mock` seulement, section « Démonstration » vers les parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
  * Avec l'adaptateur `prototype` seulement, section « Prototype » (spécification P0, P0-PO-11) : un voyage par
  * programme du dossier, absente sans programme ; hors liste blanche, `getRequestContext()` lève (erreur 500).
  */
@@ -60,6 +65,9 @@ export default async function HomePage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">
       <h1 className="text-destination font-extrabold tracking-[-0.02em] text-ink">{PRODUCT_NAME}</h1>
       <p className="text-corps text-ink-soft">{messages.produit.promesse}</p>
+      <Button asChild className="mt-6 w-full">
+        <Link href={creationRoutes.nouveau()}>{messages.accueil.creer}</Link>
+      </Button>
       {demo ? (
         <div className="mt-6">
           <DemoSection destination={demo.destination} links={demoLinks()} />

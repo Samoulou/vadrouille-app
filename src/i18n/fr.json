@@ -48,7 +48,8 @@
           "precision": "Écran 17, voyages simulés"
         }
       }
-    }
+    },
+    "creer": "Créer un voyage"
   },
   "ligne": {
     "tag": {
@@ -182,7 +183,13 @@
     "indisponible": "Carte indisponible. La liste contient tout le programme.",
     "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
     "reessayer": "Réessayer",
-    "attribution": "Données de lieux : Google"
+    "attribution": "Données de lieux : Google",
+    "zone": {
+      "region": "Carte du quartier {nom}",
+      "horsLigne": "Carte indisponible hors ligne. Le quartier est décrit ci-dessus.",
+      "indisponible": "Carte indisponible. Le quartier est décrit ci-dessus.",
+      "erreur": "La carte n'a pas pu être chargée. Le quartier est décrit ci-dessus."
+    }
   },
   "dev": {
     "tokens": {
@@ -768,7 +775,8 @@
     "continuer": "Continuer",
     "titreDocument": {
       "nouveau": "Nouveau voyage · Destination et dates",
-      "brief": "Nouveau voyage · Ton brief"
+      "brief": "Nouveau voyage · Ton brief",
+      "logement": "Nouveau voyage · Où loger"
     },
     "ecran1": {
       "titre": "Ton voyage",
@@ -914,6 +922,48 @@
       "walk": "À pied",
       "transit": "Transports publics",
       "car": "Voiture"
+    },
+    "ecran3": {
+      "titre": "Où loger à {ville}",
+      "attente": "On cherche le quartier le mieux placé…",
+      "quartierConseille": "Quartier conseillé",
+      "logements": "Logements dans ce quartier",
+      "choisir": "Choisir ce logement",
+      "choisirNom": "Choisir ce logement : {nom}",
+      "partirDuQuartier": "Partir du quartier, choisir plus tard",
+      "aucunQuartier": "Aucun quartier à te proposer pour l'instant.",
+      "echec": "Impossible de chercher un quartier pour le moment.",
+      "reessayer": "Réessayer",
+      "continuerSansLogement": "Continuer sans logement"
+    }
+  },
+  "connexion": {
+    "titreDocument": "Connexion",
+    "titre": "Connexion",
+    "titreCreation": "Connecte-toi pour recevoir tes propositions",
+    "retour": "Retour",
+    "aide": "Pas de mot de passe : on t'envoie un code à 6 chiffres.",
+    "simulee": "Connexion simulée : aucun email n'est envoyé et cette connexion est partagée avec toutes les personnes qui testent l'application. Ne saisis pas ta vraie adresse.",
+    "email": {
+      "libelle": "Ton adresse email",
+      "erreur": "Indique une adresse email complète, par exemple prenom@exemple.ch.",
+      "recevoir": "Recevoir un code"
+    },
+    "code": {
+      "envoyeAvant": "Code envoyé à",
+      "envoyeApres": ". Il est valable {minutes} minutes.",
+      "libelle": "Code reçu par email",
+      "verification": "Vérification du code…",
+      "nouveauCode": "Nouveau code envoyé.",
+      "renvoyer": "Renvoyer le code",
+      "changerAdresse": "Changer d'adresse"
+    },
+    "erreurs": {
+      "invalid_code": "Ce code ne correspond pas. Vérifie-le ou demande un nouveau code.",
+      "code_expired": "Ce code a expiré. Demande un nouveau code.",
+      "too_many_attempts": "Trop d'essais. Demande un nouveau code.",
+      "rate_limited": "Trop de demandes. Réessaie dans quelques minutes.",
+      "generique": "La connexion n'est pas disponible pour le moment. Réessaie dans quelques minutes."
     }
   },
   "revision": {

@@ -108,7 +108,7 @@ export function DayMap(props: DayMapProps) {
     return null;
   }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive]);
 
-  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.rings.length > 0) : false;
+  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.mode === "overview" && view.rings.length > 0) : false;
   const needsConfig = !Simulated;
 
   useEffect(() => {
