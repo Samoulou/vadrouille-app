@@ -6,22 +6,24 @@ import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
 /**
- * B1 (#188, correction 2), amendement de la décision 0006 du 2026-10-13 :
- * 1. garde de remplacement de l'exception nominative de `ligne/require-server-only` : ni `src/ai`, ni
- *    `src/research`, ni `src/grounding` (alias ou chemin relatif) depuis `src/app`, `src/components`,
- *    `src/features`, `src/lib`, `src/analytics`, `src/i18n`, `src/dev` (`src/hooks` n'existe pas) ;
+ * B1 (#188, corrections 2 et 3), amendement de la décision 0006 du 2026-10-13 :
+ * 1. garde de remplacement de l'exception nominative de `ligne/require-server-only` : `ligne/no-p0-server-modules`
+ *    refuse `src/ai`, `src/research` et `src/grounding` (alias, chemin relatif, alias suivi de `../`) dans tout
+ *    fichier hors des dossiers serveur, `db/`, `scripts/` et des tests, sous toutes les formes de chargement
+ *    (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`) ; seul un bloc de la
+ *    configuration la règle, aucun bloc plus bas ne la remplace ;
  * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés ; un 21e fichier sans
  *    `import "server-only"` est refusé.
  * Configuration réelle du projet.
  */
 const eslint = new ESLint({ cwd: process.cwd() });
 
-const IMPORTS = ["no-restricted-imports", "@typescript-eslint/no-restricted-imports"];
+const GUARD = "ligne/no-p0-server-modules";
 const SERVER_ONLY = "ligne/require-server-only";
 
-async function importMessages(code: string, filePath: string) {
+async function guardMessages(code: string, filePath: string) {
   const [result] = await eslint.lintText(code, { filePath });
-  return result?.messages.filter((m) => m.ruleId !== null && IMPORTS.includes(m.ruleId)) ?? [];
+  return result?.messages.filter((m) => m.ruleId === GUARD) ?? [];
 }
 
 async function serverOnlyMessages(code: string, filePath: string) {
@@ -29,23 +31,38 @@ async function serverOnlyMessages(code: string, filePath: string) {
   return result?.messages.filter((m) => m.ruleId === SERVER_ONLY) ?? [];
 }
 
-const CLIENT_FILES = [
+/** Fichiers dans le périmètre : tous les dossiers chargés (ou chargeables) par le navigateur, listés ou non. */
+const IN_SCOPE = [
   "src/app/page.tsx",
   "src/app/dev/exemple/page.tsx",
   "src/app/voyages/[id]/exemple.tsx",
   "src/app/voyages/page.tsx",
   "src/app/(creation)/exemple/page.tsx",
+  "src/app/hors-ligne/page.tsx",
   "src/app/not-found.tsx",
   "src/components/ligne/Exemple.tsx",
   "src/components/carte/exemple.ts",
   "src/features/presentation/Exemple.tsx",
   "src/features/compte/Exemple.tsx",
   "src/features/etats/Exemple.tsx",
+  "src/features/creation/Exemple.tsx",
   "src/lib/exemple.ts",
+  "src/lib/offline/register.ts",
   "src/analytics/exemple.ts",
   "src/i18n/exemple.ts",
   "src/dev/Exemple.tsx",
   "src/dev/EtatsShowcase.tsx",
+  // Dossiers sans garde avant la correction 3 (revue du 2026-10-13 09:21).
+  "src/adapters/exemple.ts",
+  "src/adapters/mock-payment.ts",
+  "src/prototype/exemple.ts",
+  "src/domain/exemple.ts",
+  "src/config/exemple.ts",
+  "src/mocks/exemple.ts",
+  "src/contracts/exemple.ts",
+  "src/hooks/useExemple.ts",
+  "src/nouveau-dossier/exemple.tsx",
+  "prototype/exemple.js",
 ];
 
 const FORBIDDEN = [
@@ -61,33 +78,96 @@ const FORBIDDEN = [
   "../../research/agent",
   "../../../grounding/places.simule",
   "../../src/grounding",
+  "./ai/client",
+  "@/../src/ai/client",
+  "@/./ai/client",
+  "@/../src/research",
 ];
 
-const ALLOWED = ["@/lib/exemple", "../aide/exemple", "./grounding-note", "@/adapters", "../airline/x"];
+/** Toutes les formes de chargement d'un module (`S` est remplacé par la source). */
+const FORMS: Array<[string, string]> = [
+  ["import statique", `import { x } from "S";\nexport const y = x;\n`],
+  ["import nu", `import "S";\n`],
+  ["import de type", `import type { X } from "S";\nexport type Y = X;\n`],
+  ["réexport", `export { x } from "S";\n`],
+  ["réexport global", `export * from "S";\n`],
+  ["import()", `export async function f() {\n  return await import("S");\n}\n`],
+  ["import() d'un gabarit", "export const f = (n: string) => import(`S/${n}`);\n"],
+  [
+    "next/dynamic",
+    `import dynamic from "next/dynamic";\nexport const C = dynamic(() => import("S"));\n`,
+  ],
+  ["require()", `export const m = require("S");\n`],
+  ["import = require()", `import m = require("S");\nexport const y = m;\n`],
+  ["typeof import()", `export type M = typeof import("S");\n`],
+];
 
 describe("src/ai, src/research et src/grounding restent hors du code client (0006, amendement du 2026-10-13)", () => {
-  for (const filePath of CLIENT_FILES) {
+  for (const filePath of IN_SCOPE) {
     it.each(FORBIDDEN)(`import de %s refusé dans ${filePath}`, async (source) => {
-      const messages = await importMessages(`import { x } from "${source}";\nexport const y = x;\n`, filePath);
-      expect(messages.some((m) => m.message.includes("src/ai, src/research et src/grounding"))).toBe(true);
-      expect(messages.every((m) => m.severity === 2)).toBe(true);
+      const messages = await guardMessages(`import { x } from "${source}";\nexport const y = x;\n`, filePath);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.severity).toBe(2);
+      expect(messages[0]?.message).toContain("src/ai, src/research et src/grounding");
+    });
+
+    it.each(FORMS)(`%s refusé dans ${filePath}`, async (_label, template) => {
+      for (const source of ["@/ai/client", "../research/sources", "@/../src/grounding/ancrage"]) {
+        const messages = await guardMessages(template.replaceAll("S", source), filePath);
+        expect(messages, source).toHaveLength(1);
+        expect(messages[0]?.severity, source).toBe(2);
+      }
     });
   }
 
-  it.each(CLIENT_FILES)("import type et réexport refusés aussi dans %s", async (filePath) => {
-    expect(await importMessages(`import type { X } from "@/ai/sorties";\nexport type Y = X;\n`, filePath)).not.toHaveLength(0);
-    expect(await importMessages(`export { x } from "@/research/sources";\n`, filePath)).not.toHaveLength(0);
+  it.each([
+    "@/lib/exemple",
+    "../aide/exemple",
+    "./grounding-note",
+    "@/adapters",
+    "../airline/x",
+    "@/aide",
+    "@/researcher/x",
+    "next/dynamic",
+  ])("un chemin voisin (%s) n'est pas visé", async (source) => {
+    for (const [label, template] of FORMS) {
+      expect(await guardMessages(template.replaceAll("S", source), "src/lib/exemple.ts"), label).toHaveLength(0);
+    }
   });
 
-  it.each(ALLOWED)("un chemin voisin (%s) n'est pas visé", async (source) => {
-    const messages = await importMessages(`import { x } from "${source}";\nexport const y = x;\n`, "src/lib/exemple.ts");
-    expect(messages.filter((m) => m.message.includes("src/ai, src/research et src/grounding"))).toHaveLength(0);
+  it("un import() dont la source n'est pas fixe n'est pas lu (limite consignée dans 0006)", async () => {
+    const code = `export const f = (n: string) => import(n);\nexport const g = (n: string) => require(n);\n`;
+    expect(await guardMessages(code, "src/lib/exemple.ts")).toHaveLength(0);
   });
 
-  it("hors périmètre : src/server, src/adapters, src/ai entre eux, tests", async () => {
-    for (const filePath of ["src/server/exemple.ts", "src/adapters/exemple.ts", "src/ai/exemple.ts", "src/lib/exemple.test.ts"]) {
-      const messages = await importMessages(`import { x } from "@/research/sources";\nexport const y = x;\n`, filePath);
-      expect(messages.filter((m) => m.message.includes("src/ai, src/research et src/grounding")), filePath).toHaveLength(0);
+  it.each([
+    "src/server/exemple.ts",
+    "src/server/actions/exemple.ts",
+    "src/tenancy/exemple.ts",
+    "src/ai/exemple.ts",
+    "src/research/exemple.ts",
+    "src/grounding/exemple.ts",
+    "src/workflows/exemple.ts",
+    "db/exemple.ts",
+    "scripts/p0/exemple.ts",
+    "tests/unit/exemple.test.ts",
+    "src/lib/exemple.test.ts",
+    "src/features/x/Exemple.spec.tsx",
+  ])("hors périmètre : %s", async (filePath) => {
+    for (const [label, template] of FORMS) {
+      expect(await guardMessages(template.replaceAll("S", "@/research/sources"), filePath), label).toHaveLength(0);
+    }
+  });
+
+  it("aucun bloc plus bas ne remplace la règle : elle est active sur chaque fichier réel du périmètre", async () => {
+    const skipped = /^(src\/(server|tenancy|ai|research|grounding|workflows)|db|scripts|tests)\//;
+    const files = ["src", "prototype", "public", "eslint-rules"]
+      .flatMap((dir) => sourceFiles(dir, /\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/))
+      .filter((f) => !skipped.test(f) && !/\.(test|spec)\.(ts|tsx)$/.test(f));
+    expect(files.length).toBeGreaterThan(100);
+    for (const filePath of [...files, ...IN_SCOPE]) {
+      const config = await eslint.calculateConfigForFile(filePath);
+      expect(config?.rules?.[GUARD], filePath).toEqual([2]);
     }
   });
 });
@@ -116,11 +196,11 @@ const EXEMPTED = [
   "src/research/sources.ts",
 ];
 
-function sourceFiles(dir: string): string[] {
+function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return sourceFiles(path);
-    return /\.(js|jsx|ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name) ? [path] : [];
+    if (entry.isDirectory()) return sourceFiles(path, extensions);
+    return extensions.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name) ? [path] : [];
   });
 }
 
@@ -130,12 +210,12 @@ describe("exception de server-only : liste fermée de 20 fichiers", () => {
   it("la liste compte exactement 20 fichiers, tous présents dans le dépôt", () => {
     expect(EXEMPTED).toHaveLength(20);
     expect(new Set(EXEMPTED).size).toBe(20);
-    const present = ["src/ai", "src/research", "src/grounding"].flatMap(sourceFiles);
+    const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of EXEMPTED) expect(present, filePath).toContain(filePath);
   });
 
   it("aucun autre fichier de src/ai, src/research, src/grounding n'est exempté", async () => {
-    const present = ["src/ai", "src/research", "src/grounding"].flatMap(sourceFiles);
+    const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of present) {
       const config = await eslint.calculateConfigForFile(filePath);
       const exempted = config?.rules?.[SERVER_ONLY] === undefined;

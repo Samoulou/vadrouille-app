@@ -49,19 +49,6 @@ const SERVER_PATTERN = {
     "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) : la configuration et parse-input restent côté serveur.",
 };
 
-/**
- * B1 (#188, correction 2) : `src/ai`, `src/research` et `src/grounding` ne s'importent pas depuis le code des
- * routes, des écrans et des composants (`src/app`, `src/components`, `src/features`, `src/lib`, `src/analytics`,
- * `src/i18n`, `src/dev` ; `src/hooks` n'existe pas). Garde de remplacement de l'exception nominative de
- * `ligne/require-server-only` (amendement de la décision 0006 du 2026-10-13) : sans `import "server-only"`
- * dans ces 20 modules, c'est cette règle qui les tient hors du navigateur.
- */
-const P0_SERVER_MODULES_PATTERN = {
-  regex: "^(@/(ai|research|grounding)(/|$)|(\\.{1,2}/)+(.*/)?(ai|research|grounding)(/|$))",
-  message:
-    "src/ai, src/research et src/grounding restent côté serveur (décision 0006, amendement du 2026-10-13) : passe par une action ou une page serveur.",
-};
-
 /** F9a : la portée des simulations lit les en-têtes de la requête ; jamais dans un écran (décision 0017 § 10.2). */
 const SIMULATION_PATTERN = {
   group: ["@/adapters/simulation", "**/adapters/simulation"],
@@ -230,14 +217,7 @@ export default defineConfig([
     // F9a : src/server ne s'importe que par ses actions dans les routes (décision 0020 § 11) ; F1 tient toujours.
     files: ["src/app/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN),
-  },
-  {
-    // B1 (#188) : ni src/ai, ni src/research, ni src/grounding dans les catalogues de développement ; F1 tient toujours.
-    // `src/dev/EtatsShowcase.tsx` est repris plus bas par le bloc F11c, qui porte aussi ce motif.
-    files: ["src/dev/**/*.{js,jsx,ts,tsx}"],
-    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImports(MOCKS_PATTERN, P0_SERVER_MODULES_PATTERN),
+    rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN),
   },
   {
     // T4 (0016 § 3.1 règle 4) : composants, mesure, bibliothèque et textes : ni zod, ni valeur de @/contracts.
@@ -249,13 +229,13 @@ export default defineConfig([
       "src/i18n/**/*.{js,jsx,ts,tsx}",
     ],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN, SIMULATION_PATTERN),
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F5 : ni src/mocks ni la carte simulée dans les routes du voyage (décision 0015 § 1) ; F9a : ni src/server hors actions.
     files: ["src/app/voyages/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN),
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN),
   },
   {
     // F5 : ni src/mocks ni la carte simulée dans les écrans (décision 0015 § 1) ; F9a : ni src/server hors
@@ -263,7 +243,7 @@ export default defineConfig([
     // @/contracts (décision 0016 § 3.1 règle 4).
     files: ["src/features/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN, SIMULATION_PATTERN),
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F9a : aucun journal dans le paiement simulé (ni montant ni identifiant de paiement, décision 0020 § 11).
@@ -398,7 +378,7 @@ export default defineConfig([
     // l'emporte (décision 0015 § 1) : il reprend tous les motifs précédents.
     files: ["src/features/compte/**/*.{js,jsx,ts,tsx}", "src/app/voyages/page.tsx"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN, SIMULATION_PATTERN),
+    rules: clientImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F11c : aucun texte en dur, aucune persistance côté client dans les pages d'erreur et d'introuvable et
@@ -410,7 +390,7 @@ export default defineConfig([
       ...noClientStorage("États transverses", "décision 0021 § 10", "aucun service worker"),
       // Le dernier bloc l'emporte (décision 0015 § 1) : reprend src/mocks et la carte simulée, ajoute la carte ;
       // reprend aussi les interdits F9a (src/server hors actions, portée des simulations, décisions 0017 § 10.2 et 0020 § 11).
-      ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN, SIMULATION_PATTERN),
+      ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
       // Décision 0016 § 3.1 règle 4, appliquée à ces fichiers par 0021 § 10 : ni `zod`, ni valeur de @/contracts.
       "@typescript-eslint/no-restricted-imports": [
         "error",
@@ -446,9 +426,9 @@ export default defineConfig([
       // Exception nominative (fusion de main dans B1, #188) : ces modules de phase 0 sont aussi chargés par `pnpm p0`
       // (`node --import ./scripts/p0/enregistrer.mjs`, hors Next.js et sans la condition `react-server`), où
       // `import "server-only"` lèverait une erreur. La règle de 0020 § 11 (= 0017 § 3.3) ne vise que `src/server` :
-      // la garde de remplacement est P0_SERVER_MODULES_PATTERN (aucun import de src/ai, src/research, src/grounding
-      // depuis src/app, src/components, src/features, src/lib, src/analytics, src/i18n, src/dev). Liste fermée :
-      // tout nouveau fichier de ces dossiers reste soumis à la règle (tests/unit/lint/server-only-lint.test.ts).
+      // la garde de remplacement est `ligne/no-p0-server-modules` (bloc suivant : aucun chargement de src/ai,
+      // src/research, src/grounding hors des dossiers serveur). Liste fermée : tout nouveau fichier de ces dossiers
+      // reste soumis à la règle (tests/unit/lint/p0-server-modules-lint.test.ts).
       // Condition de sortie : retirer la liste quand `pnpm p0` ne charge plus ces modules hors Next.js
       // (amendement de la décision 0006 du 2026-10-13).
       "src/ai/client.ts",
@@ -475,6 +455,27 @@ export default defineConfig([
     rules: { "ligne/require-server-only": "error" },
   },
   {
+    // B1 (#188, correction 3), amendement de la décision 0006 du 2026-10-13 : garde de remplacement de l'exception
+    // ci-dessus. Périmètre inversé : tout fichier sauf les dossiers serveur, `db/`, `scripts/` et les tests. La règle
+    // lit import statique, import de type, réexport, `import()` (dont `next/dynamic`) et `require()`. Seul ce bloc la
+    // règle : aucun bloc plus bas ne peut la remplacer (tests/unit/lint/p0-server-modules-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: [
+      "src/server/**",
+      "src/tenancy/**",
+      "src/ai/**",
+      "src/research/**",
+      "src/grounding/**",
+      "src/workflows/**",
+      "db/**",
+      "scripts/**",
+      "tests/**",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+    ],
+    rules: { "ligne/no-p0-server-modules": "error" },
+  },
+  {
     // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).
     files: ["src/features/creation/**/*.{jsx,tsx}", "src/features/compte/**/*.{jsx,tsx}", "src/app/(creation)/**/*.{jsx,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
@@ -493,7 +494,7 @@ export default defineConfig([
     // la création (spécification F8, « Règles Google et données personnelles » ; décisions 0015 § 1, 0017 § 10.2, 0020 § 11).
     files: ["src/app/(creation)/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, P0_SERVER_MODULES_PATTERN, SIMULATION_PATTERN),
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
     // F8a : ni récit, ni destination, ni email dans un journal (spécification F8, « Données personnelles »).
