@@ -6,26 +6,26 @@ import { describe, expect, it } from "vitest";
 
 import {
   BORNES_PLAFONDS,
-  ConfigClassementSchema,
   ConfigModelesSchema,
   ConfigPlafondsSchema,
   ConfigRechercheSchema,
   modelesDeLaVariante,
   validerConfiguration,
 } from "./config";
-import { CLASSES_SOURCE, TYPES_CRENEAU } from "./candidat";
+import { TYPES_CRENEAU } from "./candidat";
 
 const DOSSIER = join(process.cwd(), "prototype", "config");
 const lire = (nom: string): unknown => JSON.parse(readFileSync(join(DOSSIER, `${nom}.json`), "utf8"));
 const brut = () => ({
   modeles: lire("modeles"),
   recherche: lire("recherche"),
-  classement: lire("classement"),
   plafonds: lire("plafonds"),
 });
 
 describe("p0: configuration commitée (décision 0032, A2)", () => {
-  it("les quatre fichiers de prototype/config passent leur schéma et les contrôles croisés", () => {
+  // `classement.json` : schéma dans `src/domain` depuis B5a (décision 0045 § 1.4), testé dans
+  // `tests/unit/p0/configuration-moteur.test.ts`.
+  it("les fichiers de prototype/config validés ici passent leur schéma et les contrôles croisés", () => {
     const configuration = validerConfiguration(brut());
     expect(configuration.modeles.routage.data_collection).toBe("deny");
   });
@@ -73,7 +73,6 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const schemas = {
       modeles: ConfigModelesSchema,
       recherche: ConfigRechercheSchema,
-      classement: ConfigClassementSchema,
       plafonds: ConfigPlafondsSchema,
     } as const;
     for (const [nom, schema] of Object.entries(schemas)) {
@@ -112,23 +111,8 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     expect(() => validerConfiguration(configuration)).toThrow(/cibles/);
   });
 
-  it("la formule de classement n'accepte aucune chaîne libre", () => {
-    const classement = lire("classement") as Record<string, unknown>;
-    expect(ConfigClassementSchema.safeParse({ ...classement, matchesWishesNon: "ignorer" }).success).toBe(false);
-    expect(ConfigClassementSchema.safeParse({ ...classement, prioriteMustSee: "Prends les plus connus" }).success).toBe(
-      false,
-    );
-    const poids = structuredClone(classement) as { poids: Record<string, unknown> };
-    poids.poids.mustSee = "25";
-    expect(ConfigClassementSchema.safeParse(poids).success).toBe(false);
-  });
-
-  it("les clés de créneau et de classe de source sont celles de candidat.ts (TYPES_CRENEAU, CLASSES_SOURCE)", () => {
+  it("les clés de créneau de recherche.json sont celles de candidat.ts (TYPES_CRENEAU)", () => {
     const trier = (cles: Iterable<string>) => [...cles].sort();
     expect(trier(Object.keys(ConfigRechercheSchema.shape.ciblesParCreneau.shape))).toEqual(trier(TYPES_CRENEAU));
-    expect(trier(Object.keys(ConfigClassementSchema.shape.poids.shape.source.shape))).toEqual(trier(CLASSES_SOURCE));
-    expect(trier(Object.keys(ConfigClassementSchema.shape.coutTrajetParMinute.shape))).toEqual(
-      trier([...TYPES_CRENEAU, "surprise"]),
-    );
   });
 });

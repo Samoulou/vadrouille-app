@@ -10,6 +10,7 @@ import {
   Chip,
   Counter,
   DayBadge,
+  DayBadgeGroup,
   DayLine,
   DayTabs,
   DeckCard,
@@ -214,6 +215,22 @@ const SHEET_DEMOS = [
 const DEST_COLORS: Trip["destinationColor"][] = ["bruyere", "azulejo", "ocre", "granit"];
 
 /** ChecklistRow dans ses quatre états, cliquable (F5c) : à faire, faite, sans lien, lien rémunéré. */
+/** Jours du groupe radio de démonstration (F7b, C10) : J3 « complet ». */
+const DAY_GROUP_DEMO = [{ day: 1 }, { day: 2 }, { day: 3, disabled: true }, { day: 4 }];
+
+/** Groupe radio `DayBadgeGroup` (décision 0019 § 1) : cocher un jour ne fait qu'afficher, rien n'est envoyé. */
+function DayBadgeGroupDemo({ id, initial }: { id: string; initial: number | null }) {
+  const [value, setValue] = useState<number | null>(initial);
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <h3 id={id} className="text-corps font-bold text-ink">
+        {rv.versQuelJour}
+      </h3>
+      <DayBadgeGroup days={DAY_GROUP_DEMO} value={value} onChange={setValue} labelledBy={id} />
+    </div>
+  );
+}
+
 function ChecklistDemo() {
   const cl = pg.checklist;
   const [done, setDone] = useState<Record<string, boolean>>({ aFaire: false, faite: true, sansLien: false, remuneree: false });
@@ -560,6 +577,12 @@ export function ComposantsShowcase() {
             <SegmentedControl label={rv.raisons} options={REASON_DEMO_OPTIONS} value={null} orientation="vertical" onChange={() => {}} />
             <SegmentedControl label={rv.raisons} options={REASON_DEMO_OPTIONS} value="tooBusy" orientation="vertical" onChange={() => {}} />
           </div>
+        </State>
+        <State label={t.etats.groupeJours}>
+          <DayBadgeGroupDemo id="demo-groupe-jours" initial={1} />
+        </State>
+        <State label={t.etats.groupeJoursVide}>
+          <DayBadgeGroupDemo id="demo-groupe-jours-vide" initial={null} />
         </State>
       </Section>
     </main>

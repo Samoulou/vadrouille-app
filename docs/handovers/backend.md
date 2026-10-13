@@ -143,7 +143,7 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 **Liste noire** pour les autres dossiers :
 | Dossier | Interdit |
 |---|---|
-| `src/domain` | en plus de la liste blanche : `process.env`, `fetch` (aucune entrée-sortie) |
+| `src/domain` | en plus de la liste blanche (`@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain` ; `vitest` en plus pour les `*.test.ts`, tout autre import refusé, `import type` et `export … from` compris) : `process` (tout accès), `fetch`, `Date.now`, `new Date()` et `Date()` sans argument, `Math.random`, `crypto`, `performance`, `globalThis`, `require`, `import()`, `eval`, `Function` ; `Date.parse`, `Date.UTC` et `new Date(argument)` restent permis (aucune entrée-sortie, ni horloge, ni hasard ; décision 0045 § 3, règle ESLint de `eslint.config.mjs`, test `lint: src/domain sans entrée-sortie`) |
 | `src/ai`, `src/research` | en plus de la liste blanche, vérifié explicitement : `@/grounding`, `db/` (aucune donnée Google ne peut atteindre un prompt ; la recherche écrit par le serveur) |
 | `src/app`, `src/features`, `src/components` | `db/`, `drizzle-orm`, `pg`, `better-auth`, `@/workflows`, `@/grounding`, `@/ai`, `@/research` (ils passent par les actions et `src/adapters`) |
 | tout sauf `src/ai` | SDK de modèles (`ai`, `@ai-sdk/*`, SDK des fournisseurs) |
@@ -219,8 +219,10 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `ReplacementFixture` | Brouillon de remplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7a ; remplacé par B11 |
 | `RevisionFixtures` | Jeu simulé de révision d'un voyage, lu par `getRevisionFixtures` (adaptateur `mock`, 0016 § 6) ; F7b et F7c le complètent | F7a ; remplacé par B11 |
 | `RevisionError` | Codes d'écran de la révision (0016 § 4.4), convertis depuis `ApiError` par l'adaptateur `api` | F7a |
-| `MoveRequest` | Déplacement d'une étape vers un point d'insertion (0016 § 4.1) | F7b |
-| `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b |
+| `MoveRequest` | Déplacement d'une étape vers un point d'insertion (0016 § 4.1) | F7b ; complété par B11 |
+| `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b ; complété par B11 |
+| `MoveDraft` | Brouillon simulé de déplacement : aperçu sans identifiant ni version (0016 § 6), phase 0 | F7b ; remplacé par le moteur en B11 |
+| `MoveFixture` | Options et brouillons de déplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7b ; remplacé par B11 |
 | `AddRequest` | Ajout d'un lieu : source opaque, nom saisi, moment (0016 § 4.1) | F7c |
 | `AddMoment` | Moment d'un ajout : temps libre ou repas laissé vide (0016 § 4.3) | F7c |
 | `PlaceSearchResult` | Résultat de recherche : `resultId`, `placeId`, nom chargé à la demande et jamais recopié dans `Stop.name`, moments (0016 § 4.3) | F7c ; complété par B11 |

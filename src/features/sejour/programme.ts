@@ -1,4 +1,4 @@
-import type { ChecklistItem, Day, DayLineItem, RevisionFixtures, RevisionPreview, Stop, Trip } from "@/contracts";
+import type { ChecklistItem, Day, DayLineItem, RevisionFixtures, RevisionPreview, RevisionResult, Stop, Trip } from "@/contracts";
 
 import { abortReason, deepEqual, lockedStopViolations, type RevisionActions } from "./revision";
 
@@ -44,7 +44,7 @@ export type ProgrammeEvent =
   /** `base` : valeur de `locked` dans les données de l'adaptateur. */
   | { type: "setStopLocked"; stopId: Stop["id"]; locked: boolean; base: boolean }
   | { type: "undo" }
-  /** Révision appliquée (remplacement ; ajout et déplacement avec F7b et F7c) : jours touchés du brouillon. */
+  /** Révision appliquée (remplacement, déplacement ; ajout avec F7c) : jours touchés du brouillon. */
   | { type: "applyRevision"; days: readonly Day[] }
   /** `base` : valeur de `done` dans les données de l'adaptateur. */
   | { type: "setChecklistItemDone"; itemId: ChecklistItem["id"]; done: boolean; base: boolean };
@@ -171,6 +171,26 @@ export function createMemoryProgramme(
   };
   const currentDays = () => applyProgramme(trip, store.state).days;
 
+  /**
+   * Sert un brouillon simulé comme aperçu (décision 0016 § 5) : seulement si les jours qu'il touche sont encore ceux
+   * de l'adaptateur (sinon « aucune option compatible ») et s'il ne touche aucune étape verrouillée.
+   */
+  const serve = (draft: Omit<RevisionPreview, "id" | "baseVersion">): RevisionResult => {
+    const days = currentDays();
+    const unchanged = draft.days.every((draftDay) =>
+      deepEqual(
+        days.find((day) => day.index === draftDay.index),
+        trip.days.find((day) => day.index === draftDay.index),
+      ),
+    );
+    if (!unchanged) return { ok: false, error: "noOption" };
+    if (lockedStopViolations(days, draft.days).length > 0) return { ok: false, error: "lockedStop" };
+    store.serial += 1;
+    const preview = { ...draft, id: `apercu-${store.serial}`, baseVersion: store.version } as RevisionPreview;
+    previews.set(preview.id, preview);
+    return { ok: true, preview };
+  };
+
   return {
     async setStopLocked(stopId, locked) {
       send({ type: "setStopLocked", stopId, locked, base: baseLocked(trip, stopId) });
@@ -190,19 +210,35 @@ export function createMemoryProgramme(
       if (request.baseVersion !== store.version) return { ok: false, error: "conflict" };
       const draft = fixtures?.replacements.find((fixture) => fixture.stopId === request.stopId)?.draft;
       if (!draft) return { ok: false, error: "noOption" };
+      return serve({ kind: "replace", ...draft });
+    },
+    async getMoveOptions(stopId) {
+      await Promise.resolve();
+      const options = fixtures?.moves.find((fixture) => fixture.options.stopId === stopId)?.options;
+      // Sans jeu simulé, ou si un jour touché a déjà changé, aucun point n'est proposé : tous les jours sont « complets ».
       const days = currentDays();
-      const unchanged = draft.days.every((draftDay) =>
-        deepEqual(
-          days.find((day) => day.index === draftDay.index),
-          trip.days.find((day) => day.index === draftDay.index),
-        ),
-      );
-      if (!unchanged) return { ok: false, error: "noOption" };
-      if (lockedStopViolations(days, draft.days).length > 0) return { ok: false, error: "lockedStop" };
-      store.serial += 1;
-      const preview: RevisionPreview = { kind: "replace", id: `apercu-${store.serial}`, baseVersion: store.version, ...draft };
-      previews.set(preview.id, preview);
-      return { ok: true, preview };
+      const changed = (index: number) =>
+        !deepEqual(
+          days.find((day) => day.index === index),
+          trip.days.find((day) => day.index === index),
+        );
+      const stopDay = days.find((day) => day.items.some((item) => item.type === "stop" && item.stop.id === stopId))?.index;
+      return {
+        stopId,
+        days: days.map((day) => {
+          const points = options?.days.find((candidate) => candidate.index === day.index)?.points ?? [];
+          return { index: day.index, points: stopDay === undefined || changed(day.index) || changed(stopDay) ? [] : points };
+        }),
+      };
+    },
+    async previewMove(request, { signal }) {
+      await Promise.resolve();
+      if (signal.aborted) throw abortReason(signal);
+      if (request.baseVersion !== store.version) return { ok: false, error: "conflict" };
+      const fixture = fixtures?.moves.find((candidate) => candidate.options.stopId === request.stopId);
+      const draft = fixture?.drafts.find((entry) => entry.pointId === request.pointId)?.draft;
+      if (!draft) return { ok: false, error: "noOption" };
+      return serve({ kind: "move", ...draft });
     },
     async apply(previewId) {
       const preview = previews.get(previewId);

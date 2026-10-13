@@ -140,15 +140,6 @@ export const LIGNES_CAPACITE = [
     ecart: "fichier de P0a1 (PR 180), section 9 : ligne ordinaire B, 0040 D4",
   },
   {
-    fichier: "src/research/fetch-page.test.ts",
-    portee: "test",
-    usage: "doubles du résolveur et de la couche HTTP de la lecture de pages (P0a1)",
-    capacites: [{ capacite: "acces-calcule:cle-non-litterale", formes: ["table[hote]", "pages[`https://${requete.nomHote}${requete.chemin}`]"] }],
-    ecart:
-      "accès calculés à clé non littérale dans un test de zone sensible (règle fermée de 2.6 ; PR 180) : 0040 D2, A6 ; transitoire, " +
-      "retrait par la tâche de suivi `ia` de 0040 D1 (`Map` ou `Object.hasOwn`)",
-  },
-  {
     fichier: "tests/unit/p0/imports.test.ts",
     portee: "test",
     usage: "test d'imports de PR 149 (P0a1), non modifiable par P0c1 (0038, TL-2 point 1)",
@@ -158,69 +149,19 @@ export const LIGNES_CAPACITE = [
   {
     fichier: "tests/unit/p0/cli.test.ts",
     portee: "test",
-    usage: "test de `pnpm p0` (P0a1) : espionne les modules réseau et surveille les lectures de `process.env` (fonction `surveillerEnv`)",
-    capacites: [
-      { capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 },
-      { capacite: "module:node:dns", formes: ["default"], nombre: 1 },
-      { capacite: "module:node:http", formes: ["default"], nombre: 1 },
-      { capacite: "module:node:https", formes: ["default"], nombre: 1 },
-      { capacite: "module:node:net", formes: ["default"], nombre: 1 },
-      { capacite: "module:node:tls", formes: ["default"], nombre: 1 },
-      { capacite: "identifiant:fetch", formes: ["declaration", "reference"] },
-      // Formes exactes de 0040 D1, contexte compris (voir `formeReflexion` de `analyse.ts`), une occurrence chacune.
-      { capacite: "reflexion:Proxy", formes: ["process.env = new Proxy(original, { get, has, ownKeys })"], nombre: 1 },
-      {
-        capacite: "reflexion:Reflect",
-        formes: ["Reflect.get(cible, nom, recepteur) (piège get)", "Reflect.has(cible, nom) (piège has)", "Reflect.ownKeys(cible) (piège ownKeys)"],
-        nombre: 1,
-      },
-      { capacite: "environnement:usage", formes: ["const original = process.env (dans surveillerEnv)"], nombre: 1 },
-      {
-        capacite: "environnement:ecriture",
-        formes: ["process.env = new Proxy(original, { get, has, ownKeys })", "process.env = original (finally)"],
-        nombre: 1,
-      },
-      {
-        capacite: "environnement:acces-calcule",
-        formes: ['process.env[nom] (for…of ["PATH","HOME","SystemRoot","TMPDIR","TEMP","TMP"])'],
-        nombre: 1,
-      },
-      {
-        capacite: "regime-tests:stubEnv-non-litteral",
-        formes: ["vi.stubEnv(nom, `valeur-de-test-${nom}`) (for…of VARIABLES_DE_CLE)"],
-        nombre: 2,
-      },
-    ],
-    ecart:
-      "exception transitoire unique à la section 2.4 : 0040 D1 (amendements M1 et M2) ; fichier de P0a1 (PR 180) ; retrait par la " +
-      "tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2",
-  },
-  {
-    fichier: "tests/unit/p0/pipeline.test.ts",
-    portee: "test",
-    usage: "test du pipeline de P0a1 : lecture d'un champ du message simulé",
-    capacites: [
-      {
-        capacite: "acces-calcule:type",
-        formes: ['(donneesDe(requete.messages.at(-1)?.contenu ?? "") as Record<string, Vue[]>)[champ] (objet any/unknown)'],
-        nombre: 1,
-      },
-    ],
-    ecart: "accès admis seulement par la conversion d'un `unknown` (0038 TL-5 point 7 ; PR 180) : 0040 D2, A7",
+    usage:
+      "test de `pnpm p0` (P0a1) : sous-processus `spawnSync(\"pnpm\", [\"-s\", \"p0\", …])` sans `shell`, arguments `pnpm` et `p0` " +
+      "fixes, environnement littéral (`NODE_ENV` et variables système lues par propriété littérale, aucune variable de clé)",
+    capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 }],
+    ecart: "sous-processus dans un test (section 4), fichier de P0a1 (PR 180) : ligne ordinaire, décision du Tech Lead 0042 ; ticket 221",
   },
   // Relevé de `f57153c` (T18, PR 199, fusionnée après la décision 0038).
   {
     fichier: "scripts/ci/techlead-gate.mjs",
     portee: "outil",
-    usage: "porte techlead-gate (0035) : `git cat-file` et `git ls-tree` sur le clone, environnement copié avec `GIT_LITERAL_PATHSPECS`",
-    capacites: [
-      { capacite: "module:node:child_process", formes: ["execFileSync"] },
-      { capacite: "environnement:entier", formes: ["etalement"] },
-      { capacite: "acces-calcule:cle-non-litterale", formes: ["files[files.length - 1]"] },
-    ],
-    ecart:
-      "script de CI (T18, PR 199) : 0040 D2, A8 (amendement M3) ; `execFileSync` permanent ; étalement de `process.env` et " +
-      "`files[files.length - 1]` transitoires, retrait par la tâche `release` de 0040 D2 (A8)",
+    usage: "porte techlead-gate (0035) : `git cat-file` et `git ls-tree` sur le clone, environnement restreint à `PATH`, `HOME` et `GIT_LITERAL_PATHSPECS`",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+    ecart: "script de CI (T18, PR 199) : 0040 D2, A8 ; `execFileSync` permanent (outil)",
   },
   {
     fichier: "tests/unit/ci/techlead-gate.test.ts",

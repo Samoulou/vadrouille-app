@@ -25,9 +25,14 @@ const FILES = [
   "src/features/sejour/screen-remplacer.tsx",
   "src/app/voyages/[id]/(programme)/jour/[n]/remplacer/[stopId]/page.tsx",
   "src/components/ligne/ChangeSet.tsx",
+  // F7b : feuille « Déplacer » et groupe radio des jours.
+  "src/features/sejour/MoveSheet.tsx",
+  "src/components/ligne/DayBadgeGroup.tsx",
+  "src/components/ligne/DayBadge.tsx",
+  "src/components/ligne/useRadioGroup.ts",
 ];
 
-describe("règles ESLint sur les fichiers de F7a", () => {
+describe("règles ESLint sur les fichiers de F7a et F7b", () => {
   it.each(FILES.filter((file) => !file.startsWith("src/components")))("refuse la carte simulée et src/mocks dans %s", async (filePath) => {
     const code =
       `import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";\n` +
@@ -60,7 +65,7 @@ const COLOR_FN = /\b(?:rgba?|hsla?)\(/i;
 const PX = /\d(?:\.\d+)?px\b/;
 const ARBITRARY = /\b[a-z-]+-\[[^\]]+\]/;
 
-describe("valeurs en dur dans les fichiers de F7a", () => {
+describe("valeurs en dur dans les fichiers de F7a et F7b", () => {
   it.each([...FILES, "src/features/sejour/revision.ts", "src/components/ligne/SegmentedControl.tsx", "src/components/ligne/StopMarker.tsx"])(
     "%s : ni couleur, ni px, ni valeur arbitraire",
     (file) => {

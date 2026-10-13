@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { donneesDe } from "@/ai/requetes";
 import { TripSchema, ProposalSchema } from "@/contracts";
 import type { Brief } from "@/prototype/brief";
-import type { Configuration } from "@/prototype/config";
+import type { Configuration } from "../../../scripts/p0/fichiers";
 import { ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
 import { charger, executerCapture } from "./harnais";
@@ -22,10 +22,16 @@ const lieux = fixturesBase.places.lieux;
 
 type Vue = { id: string; nom: string; resume: string; categorie: string; typeEtape: string; sourceDomaine?: string };
 
+/** Vue typée du message simulé, sans signature d'index (décision 0042, P0cS-TL-3). */
+type DonneesVues = { candidats?: Vue[]; lieux?: Vue[] };
+
 function vues(requetes: { etape: string; messages: { contenu: string }[] }[], etape: string, champ: "candidats" | "lieux") {
   return requetes
     .filter((requete) => requete.etape === etape)
-    .flatMap((requete) => (donneesDe(requete.messages.at(-1)?.contenu ?? "") as Record<string, Vue[]>)[champ] ?? []);
+    .flatMap((requete) => {
+      const donnees = donneesDe(requete.messages.at(-1)?.contenu ?? "") as DonneesVues;
+      return (champ === "candidats" ? donnees.candidats : donnees.lieux) ?? [];
+    });
 }
 
 function nomsDuProgramme(programme: ProgrammeReduit): Set<string> {

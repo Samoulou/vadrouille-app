@@ -19,8 +19,9 @@ import {
 const PUBLIQUE = "45.10.20.30";
 
 function resolveur(table: Record<string, string[]>): Resolveur {
+  const parHote = new Map(Object.entries(table));
   return async (hote) => {
-    const adresses = table[hote];
+    const adresses = parHote.get(hote);
     if (adresses === undefined) throw new Error("introuvable");
     return adresses;
   };
@@ -33,9 +34,10 @@ async function* corps(...morceaux: (string | Uint8Array)[]): AsyncIterable<Uint8
 type Page = { statut?: number; entetes?: Record<string, string>; corps?: () => AsyncIterable<Uint8Array> };
 
 function http(pages: Record<string, Page>, capture: RequeteHttp[] = []): CoucheHttp {
+  const parUrl = new Map(Object.entries(pages));
   return async (requete) => {
     capture.push(requete);
-    const page = pages[`https://${requete.nomHote}${requete.chemin}`];
+    const page = parUrl.get(`https://${requete.nomHote}${requete.chemin}`);
     if (page === undefined) return { statut: 404, entetes: {}, corps: corps() };
     return {
       statut: page.statut ?? 200,

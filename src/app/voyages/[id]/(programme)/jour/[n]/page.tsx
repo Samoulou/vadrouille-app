@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { devPagesEnabled } from "@/dev/flags";
 import { JourneeScreen } from "@/features/sejour/screen-journee";
 import { journeeMetadata } from "@/features/sejour/screens";
 
@@ -16,5 +17,5 @@ export async function generateMetadata({ params, searchParams }: { params: Param
 /** Écran 12 « Journée » (spécification F5). `n` hors des jours du voyage ou mal écrit : 404. */
 export default async function JourneePage({ params }: { params: Params }) {
   const { id, n } = await params;
-  return <JourneeScreen tripId={id} n={n} />;
+  return <JourneeScreen tripId={id} n={n} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

@@ -17,6 +17,7 @@ function renderFiche(n: number, stopId: string, overrides: Partial<Stop> = {}, p
   const target = findFicheTarget(day(n), stopId)!;
   const onClose = vi.fn();
   const onToggleLock = vi.fn();
+  const onMove = vi.fn();
   const result = render(
     <StopSheet
       stop={{ ...target.stop, ...overrides }}
@@ -25,10 +26,11 @@ function renderFiche(n: number, stopId: string, overrides: Partial<Stop> = {}, p
       routes={routes}
       onClose={onClose}
       onToggleLock={onToggleLock}
+      onMove={onMove}
       placesFromGoogle={placesFromGoogle}
     />,
   );
-  return { ...result, onClose, onToggleLock };
+  return { ...result, onClose, onToggleLock, onMove };
 }
 
 describe("fiche: fonctions pures", () => {
@@ -147,5 +149,26 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
       expect(await axeViolations(container)).toEqual([]);
       unmount();
     }
+  });
+});
+
+describe("StopSheet : « Déplacer » (F7b, F7-PO-15, C19)", () => {
+  it("Jardin botanique : « Déplacer » juste après « Remplacer », bouton qui ouvre une feuille", () => {
+    const { onMove } = renderFiche(2, "j2-jardin-botanique");
+    const actions = screen.getByRole("region", { name: "Actions" });
+    const names = Array.from(actions.querySelectorAll("a, button")).map((element) => element.textContent);
+    expect(names.indexOf("Déplacer")).toBe(names.indexOf("Remplacer") + 1);
+    const move = within(actions).getByRole("button", { name: "Déplacer" });
+    expect(move).toHaveAttribute("aria-haspopup", "dialog");
+    fireEvent.click(move);
+    expect(onMove).toHaveBeenCalledTimes(1);
+  });
+
+  it("ni pour le Tattoo (verrouillé), ni pour le concert (`Day.events`)", () => {
+    const { unmount } = renderFiche(1, "j1-tattoo");
+    expect(screen.queryByRole("button", { name: "Déplacer" })).toBeNull();
+    unmount();
+    renderFiche(2, "j2-concert-orgue");
+    expect(screen.queryByRole("button", { name: "Déplacer" })).toBeNull();
   });
 });

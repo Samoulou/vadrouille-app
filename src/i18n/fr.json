@@ -238,7 +238,9 @@
         "changeSet": "ChangeSet : remplacé, ajouté, déplacé (même jour, autre jour), trajet mesuré et estimé, budget en hausse",
         "changeSetBaisse": "ChangeSet : budget en baisse ; une ligne inchangée et un budget nul ne sont pas rendus",
         "surlignee": "DayLine : étape surlignée après « Appliquer » (2 s)",
-        "raisonsVerticales": "SegmentedControl vertical : aucune raison cochée, une raison cochée"
+        "raisonsVerticales": "SegmentedControl vertical : aucune raison cochée, une raison cochée",
+        "groupeJours": "DayBadgeGroup : J1 cochée, J2 et J4 non cochées, J3 complète (flèches : focus sans coche)",
+        "groupeJoursVide": "DayBadgeGroup sans jour coché : arrêt de tabulation sur le premier jour qui n'est pas complet"
       },
       "exemples": {
         "garder": "Garder",
@@ -358,7 +360,8 @@
           "ajoute": "[Librairie de Grassmarket]",
           "deplace": "[Musée national d'Écosse]",
           "trajet": "[Café de Stockbridge]",
-          "raisons": "Pourquoi la remplacer ?"
+          "raisons": "Pourquoi la remplacer ?",
+          "versQuelJour": "Vers quel jour ?"
         }
       }
     },
@@ -523,6 +526,7 @@
       "pourYAllerDepuis": "{segment} depuis {origin}",
       "actions": "Actions",
       "remplacer": "Remplacer",
+      "deplacer": "Déplacer",
       "verrouiller": "Verrouiller",
       "toastVerrouillee": "Étape verrouillée.",
       "toastDeverrouillee": "Verrou retiré.",
@@ -952,6 +956,13 @@
       "lent": "On cherche autour de {name}.",
       "moment": "{start} – {end}",
       "modifie": "Modifié."
+    },
+    "deplacer": {
+      "titre": "Déplacer {name}",
+      "versQuelJour": "Vers quel jour ?",
+      "placerIci": "Placer ici, vers {time}",
+      "aucunJour": "Aucun jour n'a de place pour cette étape. Ton programme est inchangé.",
+      "deplacee": "Étape déplacée."
     }
   },
   "partage": {

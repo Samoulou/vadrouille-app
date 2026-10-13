@@ -186,49 +186,6 @@
       "ecart": "valeurs sentinelles de P0a1 (PR 180) : 0040 D2, A7 (permanente pour les textes)"
     },
     {
-      "fichier": "tests/unit/p0/cli.test.ts",
-      "portee": "test",
-      "usage": "noms des variables de clé surveillées (valeurs factices), seuls éléments du tableau littéral `const VARIABLES_DE_CLE = [ … ]`",
-      "capacites": [
-        {
-          "capacite": "fragment:openrouter",
-          "formes": [
-            "OPENROUTER_API_KEY"
-          ],
-          "nombre": 1
-        },
-        {
-          "capacite": "secret:OPENROUTER_API_KEY",
-          "formes": [
-            "OPENROUTER_API_KEY"
-          ],
-          "nombre": 1
-        },
-        {
-          "capacite": "secret:OPENROUTER_API",
-          "formes": [
-            "OPENROUTER_API_KEY"
-          ],
-          "nombre": 1
-        },
-        {
-          "capacite": "secret:GOOGLE_MAPS_SERVER_KEY",
-          "formes": [
-            "GOOGLE_MAPS_SERVER_KEY"
-          ],
-          "nombre": 1
-        },
-        {
-          "capacite": "secret:MAPS_SERVER_KEY",
-          "formes": [
-            "GOOGLE_MAPS_SERVER_KEY"
-          ],
-          "nombre": 1
-        }
-      ],
-      "ecart": "exception transitoire de 0040 D1 (amendement M2) ; retrait par la tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2"
-    },
-    {
       "fichier": "tests/unit/p0/imports.test.ts",
       "portee": "test",
       "usage": "cas négatifs du test d'imports de PR 149 (P0a1), non modifiable par P0c1",

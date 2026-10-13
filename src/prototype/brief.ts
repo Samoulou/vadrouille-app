@@ -10,8 +10,6 @@ import { CategorySchema, CommitmentSchema, IsoDateSchema, TimeSchema, TimeZoneSc
  * Module pur, feuille : n'importe que `@/contracts` et `zod`.
  */
 
-/** Budget de trajet par rythme, en minutes par jour (PO-1, cadrage § 3.7). */
-export const BUDGET_TRAJET_PAR_RYTHME = { tranquille: 60, equilibre: 90, intense: 150 } as const;
 export const RYTHMES = ["tranquille", "equilibre", "intense"] as const;
 export type Rythme = (typeof RYTHMES)[number];
 

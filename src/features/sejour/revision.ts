@@ -1,6 +1,8 @@
 import type {
   ApplyResult,
   Day,
+  MoveOptions,
+  MoveRequest,
   ReplacementRequest,
   RevisionResult,
   Stop,
@@ -10,8 +12,8 @@ import type {
  * Révision unitaire du programme (spécification F7, F7-TL-2 ; décision 0016 § 5) : interface injectable et
  * fonctions pures. L'implémentation en mémoire de la phase 0 est la même que celle du programme
  * (`createMemoryProgramme`, `programme.ts`) : une seule version locale, une seule modification annulable. En B11,
- * des Server Actions derrière `src/adapters` (`previewReplacement`, `applyPatch`) se branchent sans changer les
- * écrans. L'annulation reste `ProgrammeActions.undo()`.
+ * des Server Actions derrière `src/adapters` (`previewReplacement`, `getMoveOptions`, `applyPatch`) se branchent
+ * sans changer les écrans. L'annulation reste `ProgrammeActions.undo()`.
  *
  * L'implémentation ne choisit ni ne planifie rien (« l'agent cherche, l'ancrage vérifie, le moteur planifie ») :
  * elle sert des brouillons précalculés et vérifie verrous et versions. Elle n'envoie aucun événement de mesure.
@@ -24,6 +26,13 @@ export interface RevisionActions {
    * rejetée par la raison de l'abandon.
    */
   previewReplacement(request: ReplacementRequest, options: { signal: AbortSignal }): Promise<RevisionResult>;
+  /**
+   * Jours et points d'insertion possibles pour déplacer une étape (F7b) : lus une fois à l'ouverture de la feuille
+   * « Déplacer » (décision 0019 § 1.2) ; un jour sans point est « complet ». Sans jeu simulé, tous les jours le sont.
+   */
+  getMoveOptions(stopId: string): Promise<MoveOptions>;
+  /** Aperçu d'un déplacement vers un point d'insertion ; même abandon que `previewReplacement`. */
+  previewMove(request: MoveRequest, options: { signal: AbortSignal }): Promise<RevisionResult>;
   /** Applique un aperçu ; refuse sans rien écrire si la version a changé (`conflict`) ou si un verrou serait touché. */
   apply(previewId: string): Promise<ApplyResult>;
 }

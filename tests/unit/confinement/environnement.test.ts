@@ -16,8 +16,8 @@ describe("confinement: environnement", () => {
   }
 });
 
-describe("confinement: exception transitoire de 0040 D1 (tests/unit/p0/cli.test.ts)", () => {
-  for (const cas of lireCas("cas-exception-d1.json")) {
+describe("confinement: absence de l'exception de 0040 D1 (tests/unit/p0/cli.test.ts ; retirée par ticket 221, décision 0042)", () => {
+  for (const cas of lireCas("cas-absence-exception-d1.json")) {
     it(`${cas.id} (${cas.attendu}${cas.regle ? ` par ${cas.regle}` : ""})`, () => {
       expect(ecartDuCas(cas, refusDuCas(cas, depot)), cas.source).toBeUndefined();
     });
