@@ -42,6 +42,9 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LABEL_NAME: ${{ github.event.label.name }}
         run: |
+          # Sans shell: explicite, run vaut bash -e sans pipefail : un échec de gh api
+          # produirait [] et l'étape réussirait. pipefail fait échouer l'étape.
+          set -o pipefail
           # Libellés lus maintenant, pas ceux de l'événement : une revue peut avoir retiré
           # le libellé opposé entre l'événement et l'exécution.
           gh api "repos/$REPO/issues/$PR/labels" --paginate --jq '.[].name' \
