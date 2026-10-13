@@ -2,6 +2,9 @@ import { headers } from "next/headers";
 
 import type { CheckoutOutcome, CheckoutStatusCode, Currency, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
+import { FIXED_SHARE_LINKS } from "@/mocks/edimbourg-partage";
+
+import { hashShareToken } from "./share-token";
 
 /**
  * Portée et horloge des simulations côté serveur (décision 0017 § 10, créée par F9a sans la partie
@@ -22,6 +25,8 @@ const RESERVED = new Set(["default", "__proto__", "constructor", "prototype"]);
 export const MAX_SCOPES = 1000;
 export const MAX_CHECKOUTS_PER_SCOPE = 50;
 export const MAX_ENTITLEMENTS_PER_SCOPE = 20;
+/** Liens de partage créés gardés par portée (F10-PO-18) ; au-delà, le plus ancien est retiré et répond 404. */
+export const MAX_SHARE_LINKS_PER_SCOPE = 20;
 
 export interface Clock {
   now(): number;
@@ -57,11 +62,32 @@ export interface PaymentStore {
   confirmationDelayMs: number;
 }
 
+/**
+ * Lien de partage simulé (spécification F10, F10-TL-7) : **empreinte** du jeton, jamais le jeton en clair ; voyage,
+ * organisation, personne propriétaire, instants. La date de fin n'est pas gardée : elle se calcule à la lecture.
+ */
+export interface ShareLinkRecord {
+  tokenHash: string;
+  tripId: string;
+  organizationId: string;
+  userId: string;
+  createdAt: number;
+  revokedAt?: number;
+  /** Lien fixe du jeu simulé (`src/mocks/edimbourg-partage.ts`) : jamais retiré par la limite de la portée. */
+  fixed: boolean;
+}
+
+export interface ShareStore {
+  /** Clé : empreinte du jeton. */
+  links: Map<string, ShareLinkRecord>;
+}
+
 export interface SimulationScope {
   name: string;
   explicit: boolean;
   clock: Clock;
   payment: PaymentStore;
+  share: ShareStore;
 }
 
 interface ManualClock extends Clock {
@@ -86,6 +112,24 @@ function emptyPaymentStore(): PaymentStore {
   return { checkouts: new Map(), entitlements: new Map(), confirmationDelayMs: 0 };
 }
 
+/** État initial du partage d'une portée : les deux liens fixes du jeu simulé (F10-PO-18), aucun lien créé. */
+export function initialShareStore(): ShareStore {
+  const links = new Map<string, ShareLinkRecord>();
+  for (const link of FIXED_SHARE_LINKS) {
+    const tokenHash = hashShareToken(link.token);
+    links.set(tokenHash, {
+      tokenHash,
+      tripId: link.tripId,
+      organizationId: link.organizationId,
+      userId: link.userId,
+      createdAt: Date.parse(link.createdAt),
+      ...(link.revokedAt === undefined ? {} : { revokedAt: Date.parse(link.revokedAt) }),
+      fixed: true,
+    });
+  }
+  return { links };
+}
+
 interface Registry {
   defaultScope: SimulationScope;
   explicit: Map<string, SimulationScope & { clock: ManualClock }>;
@@ -96,7 +140,13 @@ const REGISTRY_KEY = Symbol.for("vadrouille.simulation");
 function registry(): Registry {
   const holder = globalThis as typeof globalThis & { [REGISTRY_KEY]?: Registry };
   holder[REGISTRY_KEY] ??= {
-    defaultScope: { name: "default", explicit: false, clock: { now: () => Date.now() }, payment: emptyPaymentStore() },
+    defaultScope: {
+      name: "default",
+      explicit: false,
+      clock: { now: () => Date.now() },
+      payment: emptyPaymentStore(),
+      share: initialShareStore(),
+    },
     explicit: new Map(),
   };
   return holder[REGISTRY_KEY];
@@ -120,7 +170,7 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
     // Plus récemment utilisée : replacée en fin d'ordre d'insertion.
     scopes.delete(name);
   } else {
-    scope = { name, explicit: true, clock: manualClock(Date.now()), payment: emptyPaymentStore() };
+    scope = { name, explicit: true, clock: manualClock(Date.now()), payment: emptyPaymentStore(), share: initialShareStore() };
   }
   scopes.set(name, scope);
   while (scopes.size > MAX_SCOPES) {
@@ -131,10 +181,14 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
   return scope;
 }
 
-/** Vide paiements et droits de la portée, remet le délai de confirmation à 0 et fixe l'horloge. */
+/**
+ * Vide paiements et droits de la portée, remet le délai de confirmation à 0, efface les liens de partage créés et
+ * rétablit les liens fixes (F10-PO-18), et fixe l'horloge.
+ */
 export function resetScope(name: string, now: number): void {
   const scope = explicitScope(name);
   scope.payment = emptyPaymentStore();
+  scope.share = initialShareStore();
   scope.clock.set(now);
 }
 

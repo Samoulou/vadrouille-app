@@ -1,4 +1,4 @@
-import type { Day, DayMap, MapPointRef } from "@/contracts";
+import type { MapPointRef } from "@/contracts";
 import { mapPointKey } from "@/contracts/values";
 
 /**
@@ -10,6 +10,31 @@ import { mapPointKey } from "@/contracts/values";
 export interface LatLng {
   lat: number;
   lng: number;
+}
+
+/**
+ * Élément de la ligne du jour tel que la carte le lit : `DayLineItem` en est un sous-type, comme l'élément de la vue
+ * partagée converti par `SharedShell` (étape désignée par sa clé locale, spécification F10, F10-TL-14). La carte ne
+ * lit que l'identifiant et le nom d'une étape, le rôle d'un terminus et le mode d'un segment.
+ */
+export type RouteItem =
+  | { type: "stop"; stop: { id: string; name: string } }
+  | { type: "terminus"; role: "start" | "end" }
+  | { type: "segment"; segment: { mode: "walk" | "transit" | "car" } }
+  | { type: "free" }
+  | { type: "openMeal" };
+
+/** Jour tel que la carte le lit : `Day` en est un sous-type. */
+export interface RouteDay {
+  /** 1 = J1. */
+  index: number;
+  items: readonly RouteItem[];
+}
+
+/** Positions d'un jour telles que la carte les lit : `DayMap` en est un sous-type. */
+export interface RouteMap {
+  dayIndex: number;
+  points: readonly { ref: MapPointRef; lat: number; lng: number }[];
 }
 
 /** Marqueur d'étape : numéro = rang parmi les étapes de `day.items`, avec ou sans position. */
@@ -42,7 +67,7 @@ export interface DayRoute {
   positions: LatLng[];
 }
 
-function positionsByRef(map: DayMap | null | undefined): Map<string, LatLng> {
+function positionsByRef(map: RouteMap | null | undefined): Map<string, LatLng> {
   const byRef = new Map<string, LatLng>();
   for (const point of map?.points ?? []) {
     byRef.set(mapPointKey(point.ref), { lat: point.lat, lng: point.lng });
@@ -54,7 +79,7 @@ const keyOf = (ref: MapPointRef) => mapPointKey(ref);
 const samePosition = (a: LatLng, b: LatLng) => a.lat === b.lat && a.lng === b.lng;
 
 /** Le segment qui précède immédiatement le terminus de retour est-il à pied ? */
-function returnsOnFoot(day: Day): boolean {
+function returnsOnFoot(day: RouteDay): boolean {
   const endIndex = day.items.findIndex((item) => item.type === "terminus" && item.role === "end");
   if (endIndex <= 0) {
     return false;
@@ -64,7 +89,7 @@ function returnsOnFoot(day: Day): boolean {
 }
 
 /** Marqueurs, tracé et positions d'une journée. */
-export function buildDayRoute(day: Day, map: DayMap | null | undefined): DayRoute {
+export function buildDayRoute(day: RouteDay, map: RouteMap | null | undefined): DayRoute {
   const byRef = positionsByRef(map);
   const stops: StopMarkerSpec[] = [];
   let rank = 0;
@@ -115,7 +140,7 @@ export function buildDayRoute(day: Day, map: DayMap | null | undefined): DayRout
  * Vue d'ensemble : une position par étape positionnée de tous les jours, plus une par position
  * de terminus distincte (même position, même jour ou jours différents = un seul anneau).
  */
-export function buildOverview(maps: DayMap[]): LatLng[] {
+export function buildOverview(maps: readonly RouteMap[]): LatLng[] {
   const rings: LatLng[] = [];
   const termini: LatLng[] = [];
   for (const map of maps) {

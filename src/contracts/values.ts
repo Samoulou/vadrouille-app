@@ -120,6 +120,16 @@ export const CHECKOUT_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 export const TRIP_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
+ * Exceptions montrées par la vue partagée (spécification F10, F10-PO-14 ; décision 0039, F10-TL-1) : « À réserver »
+ * est une action de la personne qui voyage, jamais montrée au visiteur. Sous-ensemble de `ExceptionSchema` (test).
+ */
+export const SHARED_EXCEPTIONS = ["toConfirm", "unconfirmed"] as const;
+export type SharedException = (typeof SHARED_EXCEPTIONS)[number];
+
+/** Jeton de partage : 32 octets aléatoires en base64url, 43 caractères (F10-TL-7). Seule forme lue par `parseShareToken`. */
+export const SHARE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
  * Codes d'erreur des actions serveur (format commun de 0017 § 4, `snake_case`). F9a a créé les trois
  * premiers ; F8a ajoute ceux de `structureBrief` (0017 § 4) ; F8b, F8c et B6 l'étendent sans renommer.
  */

@@ -1,15 +1,37 @@
 name: ci
 on: [pull_request]
+# Moindre privilège : le jeton du workflow ne fait que lire le dépôt (revue de sécurité de #188).
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Décision 0036, B1-TL-1 : `pnpm verify` appelle `pnpm test:db`, qui ne s'ignore jamais en CI (point 4 : base jetable).
+    # Ce job a donc lui aussi sa base jetable ; le job `db` ci-dessous rejoue en plus amorçage et migrations.
+    # Le job s'exécute sur la machine du runner, pas dans un conteneur : le port du service doit être publié pour être
+    # joignable sur 127.0.0.1 (documentation GitHub, « Creating PostgreSQL service containers »).
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: vadrouille
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vadrouille"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    # Accès administrateur de la base jetable (PG*) : seulement dans les étapes qui en ont besoin, jamais au niveau du
+    # job ni dans $GITHUB_ENV ; les étapes suivantes (Lighthouse, artefacts) ne le reçoivent pas.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with: { fetch-depth: 0 }
       - id: diff
         name: Détecter une PR de documentation seule
+        # Branche de base passée par env, jamais interpolée dans le script (revue de sécurité de #188, mineur 5).
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          git diff --name-only "origin/${BASE_REF}"...HEAD > files.txt
           # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
           # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
           if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then
@@ -18,23 +40,40 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.diff.outputs.code == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
       - if: steps.diff.outputs.code == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: pnpm }
       - if: steps.diff.outputs.code == 'true'
         run: pnpm install --frozen-lockfile
       - if: steps.diff.outputs.code == 'true'
         run: pnpm exec playwright install --with-deps chromium
       - if: steps.diff.outputs.code == 'true'
-        run: pnpm verify
+        name: Préparer la base de test (amorçage, mots de passe jetables, migrations)
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGDATABASE: vadrouille
+        run: scripts/ci/db-setup.sh
+      # `pnpm verify` appelle `pnpm test:db` (décision 0036, B1-TL-1) : l'adresse d'administration n'est posée que pour
+      # cette étape. `next build` et les e2e, lancés par `pnpm verify`, la voient encore : sans mot de passe
+      # (« trust »), elle ne donne rien de plus que le conteneur jetable joignable sur 127.0.0.1.
+      - if: steps.diff.outputs.code == 'true'
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGDATABASE: vadrouille
+          VADROUILLE_DB_BOOTSTRAP_ROLE: postgres
+        run: VADROUILLE_DB_ADMIN_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}" pnpm verify
       # Mesure Lighthouse (décision 0022 § 1 et § 2) : réutilise le build de `pnpm verify`, aucun service externe.
       - if: steps.diff.outputs.code == 'true'
         name: Mesurer avec Lighthouse
         run: E2E_SKIP_BUILD=1 pnpm test:perf
       - if: always() && steps.diff.outputs.code == 'true'
         name: Envoyer les rapports Lighthouse en artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lighthouse
           path: lighthouse-report/
@@ -42,7 +81,7 @@ jobs:
           retention-days: 7
       - if: failure() && steps.diff.outputs.code == 'true'
         name: Envoyer les résultats de test en artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-results
           path: |
@@ -50,14 +89,75 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+  # Spécification B1 : base de référence des tests de base (décision B1-PO-1). Conteneur postgres:17.11 jetable,
+  # amorçage avec l'utilisateur administrateur du conteneur, migrations sous vadrouille_migrator (deux fois : la
+  # seconde ne fait rien), puis `pnpm test:db`, dont chaque test se connecte avec le rôle qu'il éprouve.
+  db:
+    runs-on: ubuntu-latest
+    # Port publié : nécessaire pour joindre le service sur 127.0.0.1 depuis la machine du runner (voir job verify).
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: vadrouille
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vadrouille"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { fetch-depth: 0 }
+      - id: diff
+        name: Détecter une PR de documentation seule
+        # Branche de base passée par env, jamais interpolée dans le script (revue de sécurité de #188, mineur 5).
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git diff --name-only "origin/${BASE_REF}"...HEAD > files.txt
+          # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
+          # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
+          if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - if: steps.diff.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: pnpm }
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.diff.outputs.code == 'true'
+        name: Amorçage et migrations, deux fois chacun
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGDATABASE: vadrouille
+          EXPECTED_SERVER_VERSION: "17.11"
+        run: scripts/ci/db-setup.sh --twice
+      # Refus de SKIP_DB_TESTS en CI : un seul endroit, scripts/test-db.mjs (testé dans tests/unit/db/).
+      - if: steps.diff.outputs.code == 'true'
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGDATABASE: vadrouille
+          VADROUILLE_DB_BOOTSTRAP_ROLE: postgres
+        run: VADROUILLE_DB_ADMIN_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}" pnpm test:db
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with: { fetch-depth: 0 }
       - id: diff
+        # Branche de base passée par env, jamais interpolée dans le script (revue de sécurité de #188, mineur 5).
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > files.txt
+          git diff --name-only "origin/${BASE_REF}"...HEAD > files.txt
           # Documentation seule (pas de tests) : STATUS, QUESTIONS, CLAUDE, LICENSE à la racine,
           # docs/, specs/, .claude/, et tout README*.md, à la racine ou dans un dossier.
           if grep -vqE '^((STATUS|QUESTIONS|CLAUDE|LICENSE)\.md|(.*/)?README[^/]*\.md)$|^(docs|specs|\.claude)/' files.txt; then

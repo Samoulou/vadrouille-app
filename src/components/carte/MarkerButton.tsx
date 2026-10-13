@@ -10,6 +10,11 @@ export interface MarkerButtonProps {
   stop: StopMarkerSpec;
   selected: boolean;
   onPress?: (stopId: string) => void;
+  /**
+   * Faux : marqueur non interactif (vue partagée, spécification F10, F10-TL-14), image nommée « Étape {numéro} :
+   * {name} », ni bouton ni cible du focus. Vrai par défaut.
+   */
+  interactive?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -19,13 +24,28 @@ export interface MarkerButtonProps {
  * `StopMarker` (26 ou 38 px, décorative), nommé « Étape {numéro} : {name} ».
  * Toucher = `onPress` (défilement de la liste), sans sélection ni fiche (F4-PO-4).
  */
-export function MarkerButton({ stop, selected, onPress, className, style }: MarkerButtonProps) {
+export function MarkerButton({ stop, selected, onPress, interactive = true, className, style }: MarkerButtonProps) {
+  const label = format(messages.carte.marqueur, { numero: stop.number, name: stop.name });
+  if (!interactive) {
+    return (
+      <span
+        role="img"
+        data-stop-id={stop.stopId}
+        data-number={stop.number}
+        aria-label={label}
+        style={style}
+        className={cn("flex min-h-(--touch-target) min-w-(--touch-target) items-center justify-center", className)}
+      >
+        <StopMarker kind="stop" number={stop.number} selected={selected} />
+      </span>
+    );
+  }
   return (
     <button
       type="button"
       data-stop-id={stop.stopId}
       data-number={stop.number}
-      aria-label={format(messages.carte.marqueur, { numero: stop.number, name: stop.name })}
+      aria-label={label}
       aria-current={selected ? "true" : undefined}
       style={style}
       onClick={() => onPress?.(stop.stopId)}

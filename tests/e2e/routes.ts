@@ -18,7 +18,7 @@ export type RouteStateName = "fiche-ouverte" | "annulation-proposee" | "proposit
  * identifiant). L'action, dans `route-states.ts` (`ROUTE_PREPARATIONS`), crée l'état dans une portée de
  * simulation explicite (0017 § 10.3) et renvoie l'adresse réelle à mesurer.
  */
-export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente";
+export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente" | "partage-sejour" | "partage-jour";
 
 /**
  * Parcours côté client (F8a, spécification F8, « Inventaire des routes ») : certaines pages n'ont de contenu
@@ -167,6 +167,24 @@ export const ROUTES: readonly RouteEntry[] = [
     page: "hors-ligne/page.tsx",
     states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F10c : vue partagée (`RP`, `RPJ`) avec le jeton fixe valide, dans une portée au 2026-08-30 (la portée par
+    // défaut suit l'heure réelle, à laquelle le partage simulé a pris fin) ; JavaScript au seuil (F10-TL-10).
+    id: "RP",
+    path: "/p/[token]",
+    page: "p/[token]/page.tsx",
+    prepare: "partage-sejour",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "seuil" },
+  },
+  {
+    id: "RPJ",
+    path: "/p/[token]/jour/2",
+    page: "p/[token]/jour/[n]/page.tsx",
+    prepare: "partage-jour",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "seuil" },
   },
   {
     id: "R-introuvable",

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRequestContext, getRevisionFixtures, isPrototypeAdapter } from "@/adapters";
+import { getRequestContext, getRevisionFixtures, isPrototypeAdapter, shareButtonVisible } from "@/adapters";
 import { format, messages } from "@/i18n";
 
 import { findFicheTarget } from "./fiche";
@@ -29,6 +29,8 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   if (!data) notFound();
   // Jeu simulé de révision (F7, décision 0016 § 6) : adaptateur `mock` seulement, sinon `null`.
   const revisionFixtures = await getRevisionFixtures(getRequestContext(), tripId);
+  // Bouton « Partager » (F10c) : routes `/voyages` seulement, voyage débloqué, partage disponible et pas terminé.
+  const shareable = base === "/voyages" && (await shareButtonVisible(data.trip));
   return (
     <TripShell
       trip={data.trip}
@@ -36,6 +38,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
       base={base}
       placesFromGoogle={isPrototypeAdapter()}
       revisionFixtures={revisionFixtures}
+      shareable={shareable}
     >
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>
