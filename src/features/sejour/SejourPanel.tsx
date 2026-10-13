@@ -15,6 +15,7 @@ import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { currentDayIndex } from "@/features/voyage/today";
 import { useClientNow } from "@/features/voyage/use-client-now";
 import { format, messages } from "@/i18n";
+import { formatTitreJour } from "@/lib/dates";
 
 import { EventLines, eventRange } from "./EventLines";
 import { useSejourOrigin } from "./SejourOrigin";
@@ -173,7 +174,7 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
               >
                 <DayBadge day={day.index} size="sm" />
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-corps font-bold text-ink">{day.title}</span>
+                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
                   <span className="text-corps-s text-ink-soft tabular-nums">
                     {day.generating ? ts.jourParJour.enPreparation : daySummary(day)}
                   </span>

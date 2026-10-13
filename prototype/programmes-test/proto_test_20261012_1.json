@@ -17,7 +17,6 @@
         "index": 1,
         "date": "2026-11-23",
         "weekday": "lun.",
-        "title": "Balade et dégustations (test)",
         "items": [
           {
             "type": "terminus",
@@ -41,7 +40,10 @@
               "name": "[Lieu de test 1]",
               "start": "12:30",
               "end": "14:00",
-              "meta": "1 h 30, gratuit d'après la source",
+              "facts": {
+                "durationMinutes": 90,
+                "costPerPerson": 0
+              },
               "reason": "Raison maison de test : promenade citée par la source.",
               "source": {
                 "label": "exemple.org",
@@ -67,7 +69,7 @@
               "name": "[Table de test 2]",
               "start": "14:15",
               "end": "15:15",
-              "meta": "Déjeuner",
+              "facts": {},
               "reason": "Raison maison de test : cuisine locale citée par la source.",
               "source": {
                 "label": "exemple.org",
@@ -93,7 +95,9 @@
               "name": "[Lieu de test 3]",
               "start": "16:00",
               "end": "17:30",
-              "meta": "1 h 30",
+              "facts": {
+                "durationMinutes": 90
+              },
               "reason": "Raison maison de test : visite citée par la source.",
               "source": {
                 "label": "exemple.org",
@@ -126,7 +130,7 @@
               "name": "[Table de test 4]",
               "start": "19:15",
               "end": "20:45",
-              "meta": "Dîner",
+              "facts": {},
               "reason": "Raison maison de test : table du soir citée par la source.",
               "source": {
                 "label": "exemple.org",
@@ -158,7 +162,6 @@
         "index": 2,
         "date": "2026-11-24",
         "weekday": "mar.",
-        "title": "Points de vue et marché (test)",
         "items": [
           {
             "type": "terminus",
@@ -182,7 +185,9 @@
               "name": "[Lieu de test 5]",
               "start": "09:30",
               "end": "11:30",
-              "meta": "2 h",
+              "facts": {
+                "durationMinutes": 120
+              },
               "reason": "Raison maison de test : point de vue cité par la source.",
               "source": {
                 "label": "exemple.org",
@@ -208,7 +213,7 @@
               "name": "[Table de test 6]",
               "start": "12:00",
               "end": "13:00",
-              "meta": "Déjeuner",
+              "facts": {},
               "reason": "Raison maison de test : marché cité par la source.",
               "source": {
                 "label": "exemple.org",
@@ -244,7 +249,7 @@
             "name": "[Événement de test]",
             "start": "20:00",
             "end": "22:00",
-            "meta": "Concert",
+            "facts": {},
             "reason": "Raison maison de test : événement annoncé par la source.",
             "source": {
               "label": "exemple.org",
@@ -262,7 +267,9 @@
           "id": "j2-surprise",
           "placeId": "SENTINELLE_PLACE_ID_7",
           "name": "[Idée de test 7]",
-          "meta": "1 h",
+          "facts": {
+            "durationMinutes": 60
+          },
           "reason": "Raison maison de test : idée citée par la source.",
           "source": {
             "label": "exemple.org",
@@ -279,9 +286,7 @@
       "id": "p1",
       "kind": "activity",
       "day": 1,
-      "weekday": "lun.",
       "time": "12:30",
-      "context": "Activité du jour 1",
       "stop": {
         "id": "j1-a1",
         "kind": "activity",
@@ -289,7 +294,10 @@
         "name": "[Lieu de test 1]",
         "start": "12:30",
         "end": "14:00",
-        "meta": "1 h 30, gratuit d'après la source",
+        "facts": {
+          "durationMinutes": 90,
+          "costPerPerson": 0
+        },
         "reason": "Raison maison de test : promenade citée par la source.",
         "source": {
           "label": "exemple.org",
@@ -309,9 +317,7 @@
       "id": "p2",
       "kind": "meal",
       "day": 1,
-      "weekday": "lun.",
       "time": "14:15",
-      "context": "Déjeuner du jour 1",
       "stop": {
         "id": "j1-dejeuner",
         "kind": "meal",
@@ -319,7 +325,7 @@
         "name": "[Table de test 2]",
         "start": "14:15",
         "end": "15:15",
-        "meta": "Déjeuner",
+        "facts": {},
         "reason": "Raison maison de test : cuisine locale citée par la source.",
         "source": {
           "label": "exemple.org",
@@ -343,9 +349,7 @@
       "id": "p3",
       "kind": "activity",
       "day": 1,
-      "weekday": "lun.",
       "time": "16:00",
-      "context": "Activité du jour 1",
       "stop": {
         "id": "j1-a2",
         "kind": "activity",
@@ -353,7 +357,9 @@
         "name": "[Lieu de test 3]",
         "start": "16:00",
         "end": "17:30",
-        "meta": "1 h 30",
+        "facts": {
+          "durationMinutes": 90
+        },
         "reason": "Raison maison de test : visite citée par la source.",
         "source": {
           "label": "exemple.org",
@@ -375,9 +381,7 @@
       "id": "p4",
       "kind": "meal",
       "day": 1,
-      "weekday": "lun.",
       "time": "19:15",
-      "context": "Dîner du jour 1",
       "stop": {
         "id": "j1-diner",
         "kind": "meal",
@@ -385,7 +389,7 @@
         "name": "[Table de test 4]",
         "start": "19:15",
         "end": "20:45",
-        "meta": "Dîner",
+        "facts": {},
         "reason": "Raison maison de test : table du soir citée par la source.",
         "source": {
           "label": "exemple.org",
@@ -409,9 +413,7 @@
       "id": "p5",
       "kind": "activity",
       "day": 2,
-      "weekday": "mar.",
       "time": "09:30",
-      "context": "Activité du jour 2",
       "stop": {
         "id": "j2-a1",
         "kind": "activity",
@@ -419,7 +421,9 @@
         "name": "[Lieu de test 5]",
         "start": "09:30",
         "end": "11:30",
-        "meta": "2 h",
+        "facts": {
+          "durationMinutes": 120
+        },
         "reason": "Raison maison de test : point de vue cité par la source.",
         "source": {
           "label": "exemple.org",
@@ -439,9 +443,7 @@
       "id": "p6",
       "kind": "meal",
       "day": 2,
-      "weekday": "mar.",
       "time": "12:00",
-      "context": "Déjeuner du jour 2",
       "stop": {
         "id": "j2-dejeuner",
         "kind": "meal",
@@ -449,7 +451,7 @@
         "name": "[Table de test 6]",
         "start": "12:00",
         "end": "13:00",
-        "meta": "Déjeuner",
+        "facts": {},
         "reason": "Raison maison de test : marché cité par la source.",
         "source": {
           "label": "exemple.org",

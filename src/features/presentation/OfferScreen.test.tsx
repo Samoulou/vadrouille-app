@@ -23,7 +23,7 @@ vi.mock("@/server/actions/paiement", () => ({
 /** Écran 9 « Débloquer » (F9a). */
 
 const TRIP = "mock_trip_edimbourg";
-const ctx = { organizationId: MOCK_ORGANIZATION_ID };
+const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
 const BASE: OfferConfig = {
   amount: 2900,
   currency: "CHF",

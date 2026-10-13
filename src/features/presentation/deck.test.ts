@@ -32,11 +32,10 @@ function activity(id: string, day: number, time: string, category: Category): Pr
     id,
     kind: "activity",
     day,
-    weekday: "sam.",
     time,
-    context: "[Contexte]",
+    neighbours: {},
     category,
-    stop: { id: `s-${id}`, kind: "activity", name: `[${id}]`, start: time, meta: "[Meta]", exceptions: [], locked: false },
+    stop: { id: `s-${id}`, kind: "activity", name: `[${id}]`, start: time, facts: {}, exceptions: [], locked: false },
   };
 }
 

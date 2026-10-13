@@ -18,7 +18,7 @@ const at = (iso: string) => Date.parse(iso);
 const ids = (list: readonly TripSummary[]) => list.map((summary) => summary.id);
 
 async function summaries() {
-  return mockTripAdapter.listTrips({ organizationId: MOCK_ORGANIZATION_ID });
+  return mockTripAdapter.listTrips({ organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const });
 }
 
 function summary(over: Partial<TripSummary>): TripSummary {

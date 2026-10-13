@@ -18,8 +18,8 @@ import { explicitScope, resetScope } from "./simulation";
 
 /** Vue débloquée du voyage simulé, forme B (décision 0020 § 3). */
 
-const ctx = { organizationId: MOCK_ORGANIZATION_ID };
-const otherCtx = { organizationId: "mock_org_autre" };
+const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
+const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
 
 const unlockedFor = (paid: Set<string>) => async (_ctx: { organizationId: string }, tripId: string) => ({ unlocked: paid.has(`${_ctx.organizationId}:${tripId}`) });
 

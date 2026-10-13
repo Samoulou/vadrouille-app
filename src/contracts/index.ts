@@ -1,38 +1,81 @@
 export {
   ChangeSchema,
   ChecklistItemSchema,
+  ChecklistMomentSchema,
   CommitmentSchema,
   DayLineItemSchema,
   DaySchema,
   ExceptionSchema,
+  HttpsUrlSchema,
   IsoDateSchema,
   MealSchema,
+  ProposalBaseSchema,
+  ProposalNeighbourSchema,
+  ProposalNeighboursSchema,
   ProposalSchema,
   SegmentSchema,
   SourceSchema,
+  StopFactsSchema,
   StopSchema,
   SurpriseIdeaSchema,
   TimeSchema,
   TimeZoneSchema,
+  TripBaseSchema,
   TripSchema,
   WeekdaySchema,
 } from "./trip";
 export type {
   Change,
   ChecklistItem,
+  ChecklistMoment,
   Commitment,
   Day,
   DayLineItem,
   Exception,
   Meal,
   Proposal,
+  ProposalNeighbour,
+  ProposalNeighbours,
   Segment,
   Source,
   Stop,
+  StopFacts,
   SurpriseIdea,
   Trip,
   Weekday,
 } from "./trip";
+export {
+  refineChecklistDays,
+  refineChecklistStops,
+  refineDetour,
+  refineEventKind,
+  refineNoCommitment,
+  refineSnapshotExceptions,
+} from "./refinements";
+export {
+  DayLineItemSnapshotSchema,
+  DaySnapshotSchema,
+  EventSnapshotSchema,
+  ProposalRecordSchema,
+  SegmentSnapshotSchema,
+  StopSnapshotSchema,
+  SurpriseIdeaSnapshotSchema,
+  TripSnapshotSchema,
+} from "./snapshot";
+export type {
+  DayLineItemSnapshot,
+  DaySnapshot,
+  EventSnapshot,
+  ProposalRecord,
+  SegmentSnapshot,
+  StopSnapshot,
+  SurpriseIdeaSnapshot,
+  TripSnapshot,
+} from "./snapshot";
+export { PreviewSlotSchema, PreviewSlotsSchema } from "./preview";
+export type { PreviewSlot } from "./preview";
+export { ADDED_STOP_NAME_MAX, PatchResultSchema, TripPatchOperationSchema, TripPatchSchema } from "./patch";
+export type { PatchResult, TripPatch, TripPatchOperation } from "./patch";
 export { TripSummarySchema } from "./trip-summary";
 export type { TripSummary } from "./trip-summary";
 export {

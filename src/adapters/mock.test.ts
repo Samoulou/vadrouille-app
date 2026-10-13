@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { DayMapSchema, TripSchema, validateDayMap } from "@/contracts";
+import { DayMapSchema, PreviewSlotsSchema, TripSchema, validateDayMap } from "@/contracts";
 import {
   EDIMBOURG_DEBLOQUE_TRIP_ID,
   EDIMBOURG_TRIP_ID,
   MOCK_ORGANIZATION_ID,
+  apercu,
   edimbourg,
   edimbourgDebloque,
 } from "@/mocks/edimbourg";
@@ -13,8 +14,8 @@ import { edimbourgCarte } from "@/mocks/edimbourg-carte";
 
 import { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP, createMockTripAdapter, mockTripAdapter } from "./mock";
 
-const ownCtx = { organizationId: MOCK_ORGANIZATION_ID };
-const otherCtx = { organizationId: "mock_org_autre" };
+const ownCtx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
+const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
 
 describe("adaptateur mock", () => {
   it("renvoie le voyage validé pour son organisation", async () => {
@@ -116,5 +117,15 @@ describe("adaptateur mock", () => {
       expect(await mockTripAdapter.getDayMap(otherCtx, tripId, 1)).toBeNull();
       expect(await mockTripAdapter.getTripMap(otherCtx, tripId)).toEqual([]);
     });
+  });
+});
+
+describe("aperçu (E7)", () => {
+  it("adaptateurs: listPreviewSlots", async () => {
+    const slots = await mockTripAdapter.listPreviewSlots(ownCtx, EDIMBOURG_TRIP_ID);
+    expect(slots).toEqual(apercu);
+    expect(() => PreviewSlotsSchema.parse(slots)).not.toThrow();
+    expect(await mockTripAdapter.listPreviewSlots(otherCtx, EDIMBOURG_TRIP_ID)).toEqual([]);
+    expect(await mockTripAdapter.listPreviewSlots(ownCtx, "mock_trip_inconnu")).toEqual([]);
   });
 });

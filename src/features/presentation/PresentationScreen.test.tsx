@@ -3,12 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder } from "@/analytics/track";
 import type { Category, Proposal } from "@/contracts";
-import { edimbourgDebloque, propositions, propositionsDebloque } from "@/mocks/edimbourg";
+import { apercu, edimbourg, edimbourgDebloque, propositions, propositionsDebloque } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
 import { createLocalDeckActions } from "./actions";
+import { presentationDay } from "./load";
+import { noOptionMessage } from "./contexte";
 import { PresentationScreen, type PresentationScreenProps } from "./PresentationScreen";
+
+const DAYS = edimbourg.days.map(presentationDay);
 
 function setup(props: Partial<PresentationScreenProps> = {}) {
   const recorder = createMemoryRecorder();
@@ -18,6 +22,7 @@ function setup(props: Partial<PresentationScreenProps> = {}) {
       unlocked={false}
       generatingDays={[]}
       proposals={propositions}
+      days={DAYS}
       recorder={recorder}
       {...props}
     />,
@@ -54,11 +59,10 @@ function activity(id: string, day: number, time: string, category: Category): Pr
     id,
     kind: "activity",
     day,
-    weekday: "sam.",
     time,
-    context: `[Contexte ${id}]`,
+    neighbours: {},
     category,
-    stop: { id: `s-${id}`, kind: "activity", name: `[${id}]`, start: time, meta: "[Meta]", exceptions: [], locked: false },
+    stop: { id: `s-${id}`, kind: "activity", name: `[${id}]`, start: time, facts: {}, exceptions: [], locked: false },
   };
 }
 
@@ -367,5 +371,32 @@ describe("PresentationScreen", () => {
     await click("Pas pour moi");
     await click("Je choisis");
     expect(await axeViolations(document.body)).toEqual([]);
+  });
+});
+
+describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () => {
+  const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal] : []));
+  const sansOption = apercu.flatMap((slot) => (slot.type === "noOption" ? [{ day: slot.day, time: slot.time, kind: slot.kind }] : []));
+
+  it("presentation: les cases noOption ne sont pas des cartes", async () => {
+    const { container } = setup({ proposals: cartes, noOptionSlots: sansOption });
+    expect(sansOption.length).toBeGreaterThan(0);
+    const banner = container.querySelector('[data-kind="noOption"]');
+    expect(banner).toHaveTextContent(noOptionMessage(sansOption));
+    expect(banner).toHaveTextContent("le jour 4, vers 16:00 (activité)");
+    expect(banner).toHaveAttribute("role", "status");
+    expect(progress()).toHaveAccessibleName(`Proposition 1 sur ${cartes.length}`);
+    expect(cartes).toHaveLength(7);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("sans case noOption : aucun bandeau", () => {
+    const { container } = setup();
+    expect(container.querySelector('[data-kind="noOption"]')).toBeNull();
+  });
+
+  it("la carte affiche le contexte composé depuis ses voisins", () => {
+    setup();
+    expect(card()).toHaveTextContent("Entre ton déjeuner et ton temps libre");
   });
 });
