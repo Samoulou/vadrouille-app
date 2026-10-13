@@ -13,24 +13,25 @@ import {
   type StopFacts,
   type Trip,
 } from "@/contracts";
+import { destinationColor, optionDeRepas } from "@/domain/calculs";
+import type { ConfigurationMoteur } from "@/domain/configuration";
+import type { Nuit } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
-import { MARGE_MINUTES } from "@/domain/squelette";
+import { element } from "@/domain/tables";
 import { arrondi5, versHeure } from "@/domain/temps";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
-import { element } from "@/domain/tables";
 
 /**
- * Assemblage du programme complet, en mémoire (spécification P0, « Sortie 1 »), puis validation par
- * `TripSchema`, `ProposalSchema` et un `DayMapSchema` par jour **avant** la réduction.
+ * Assemblage du programme complet de P0, en mémoire (spécification P0, « Sortie 1 »), puis validation par
+ * `TripSchema`, `ProposalSchema` et un `DayMapSchema` par jour **avant** la réduction. Sortie propre à P0 : il a
+ * quitté `src/domain` pour `scripts/p0` avec B5a (décision 0045 § 1.5) ; le moteur de production écrit un
+ * instantané (`TripSnapshotSchema`, B5b), et les positions sont recomposées à la lecture (B8).
  *
  * Le programme complet contient les durées de trajet (`Segment.minutes`, `Day.travelMinutes`) : il ne vit qu'en
  * mémoire. Seule sa forme réduite est écrite (`@/prototype/reduction`).
  */
-
-/** Écart minimal, en minutes, pour écrire un temps libre (en deçà, il compte comme marge). */
-export const TEMPS_LIBRE_AFFICHE = 30;
 
 /** Nombre de propositions de la présentation (cadrage § 4). */
 export const NOMBRE_PROPOSITIONS = 8;
@@ -40,6 +41,9 @@ export type Raison = { raison?: string; detour?: string };
 export type EntreeAssemblage = {
   tripId: string;
   brief: Brief;
+  /** Logement de chaque nuit (adaptateur `vers-moteur.ts`) : étiquette des terminus, `placeId` des cartes. */
+  nuits: readonly Nuit[];
+  configuration: ConfigurationMoteur;
   jours: readonly JourPlanifie[];
   candidats: ReadonlyMap<string, Candidat>;
   raisons: ReadonlyMap<string, Raison>;
@@ -55,14 +59,6 @@ export type ProgrammeComplet = {
   terminus: { jour: number; depart: string; arrivee: string }[];
   cartes: DayMap[];
 };
-
-const COULEURS = ["bruyere", "azulejo", "ocre", "granit"] as const;
-
-function couleur(destination: string): Trip["destinationColor"] {
-  let somme = 0;
-  for (const caractere of destination) somme = (somme + (caractere.codePointAt(0) ?? 0)) % 997;
-  return COULEURS.at(somme % COULEURS.length) ?? "granit";
-}
 
 function domaine(url: string): string {
   return new URL(url).hostname;
@@ -110,11 +106,14 @@ function stopDe(
 }
 
 export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
-  const { brief } = entree;
+  const { brief, nuits } = entree;
+  const marge = entree.configuration.margeMinutes;
+  const seuilTempsLibre = entree.configuration.seuilTempsLibreMinutes;
   const proposals: Proposal[] = [];
   const justifications = new Map<string, string>();
   const terminus: ProgrammeComplet["terminus"] = [];
-  const logementTexte = (index: number) => element(brief.logements, index)?.texte ?? brief.logements[0]?.texte ?? "Logement";
+  const logementTexte = (nuit: number) => element(nuits, nuit)?.etiquette ?? nuits[0]?.etiquette ?? "Logement";
+  const logementPlace = (nuit: number) => element(nuits, nuit)?.placeId ?? nuits[0]?.placeId ?? "";
 
   const days: Day[] = entree.jours.map((jour) => {
     const s = jour.squelette;
@@ -128,8 +127,8 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
       const candidat = entree.candidats.get(etape.candidatId);
       if (candidat === undefined) throw new Error("assemblage : candidat inconnu");
       // Bornes du temps libre arrondies à 5 min : elles ne recopient pas une durée de trajet à la minute près.
-      const depart = Math.floor((etape.debut - etape.trajetAvant - MARGE_MINUTES) / 5) * 5;
-      if (depart - fin >= TEMPS_LIBRE_AFFICHE) items.push({ type: "free", from: versHeure(fin), to: versHeure(depart) });
+      const depart = Math.floor((etape.debut - etape.trajetAvant - marge) / 5) * 5;
+      if (depart - fin >= seuilTempsLibre) items.push({ type: "free", from: versHeure(fin), to: versHeure(depart) });
       const segment: Segment = { mode: entree.mode, minutes: etape.trajetAvant, estimated: false };
       items.push({ type: "segment", segment });
       travelMinutes += etape.trajetAvant;
@@ -143,6 +142,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
 
       if (s.index <= 2 && proposals.length < NOMBRE_PROPOSITIONS && raison?.detour !== undefined) {
         const id = `p${proposals.length + 1}`;
+        const option = kind === "meal" ? optionDeRepas(1, Math.max(1, etape.options)) : undefined;
         const proposition: Proposal = {
           id,
           kind,
@@ -152,7 +152,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
           neighbours: {},
           stop,
           category: candidat.categorie,
-          ...(kind === "meal" ? { option: { index: 1, total: Math.max(1, etape.options) } } : {}),
+          ...(option === undefined ? {} : { option }),
           travelFromPrevious: segment,
           // En mémoire, `detour` suit la règle du contrat ; la forme réduite le porte sur chaque proposition.
           ...(etape.trajetAvant > DETOUR_THRESHOLD_MINUTES ? { detour: raison.detour } : {}),
@@ -167,7 +167,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
     travelMinutes += jour.retour;
     const arrivee = Math.min(23 * 60 + 55, arrondi5(retourDepart + jour.retour));
     items.push({ type: "terminus", role: "end", time: versHeure(arrivee), label: logementTexte(s.logementArrivee) });
-    terminus.push({ jour: s.index, depart: jour.logementDepart, arrivee: jour.logementArrivee });
+    terminus.push({ jour: s.index, depart: logementPlace(jour.logementDepart), arrivee: logementPlace(jour.logementArrivee) });
 
     const events: Stop[] = jour.evenements.flatMap((evenement, rang) => {
       const candidat = entree.candidats.get(evenement.candidatId);
@@ -222,7 +222,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
     id: entree.tripId,
     organizationId: "org_prototype",
     destination: brief.destination,
-    destinationColor: couleur(brief.destination),
+    destinationColor: destinationColor(brief.destination),
     start: brief.arrivee,
     end: brief.depart,
     timeZone: brief.fuseau,

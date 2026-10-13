@@ -4,13 +4,13 @@ import type { ClientPlaces, ClientRoutes, RequeteMatrice, RequeteTextSearch } fr
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import type { Brief } from "@/prototype/brief";
-import type { Configuration, Variante } from "@/prototype/config";
+import type { Variante } from "@/prototype/config";
 import { creerLecteurPages, type LecteurPages, type RequeteHttp } from "@/research/fetch-page";
 import { creerHttpSimule, creerResolveurSimule } from "@/research/pages.simule";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 import { creerRechercheSimulee } from "@/research/recherche-web.simule";
 
-import { lireBrief, lireConfiguration, lireFixtures, type Fixtures } from "../../../scripts/p0/fichiers";
+import { lireBrief, lireConfiguration, lireFixtures, type Configuration, type Fixtures } from "../../../scripts/p0/fichiers";
 import { creerJournal, creerRedacteur } from "../../../scripts/p0/journal";
 import { executer, type ResultatPipeline } from "../../../scripts/p0/pipeline";
 
