@@ -38,8 +38,11 @@ function Fleche({ before, after }: { before: string; after: string }) {
     <>
       <Masque>{t.avant} </Masque>
       <del className={ANCIEN}>{before}</del>{" "}
-      <span aria-hidden="true">{t.fleche}</span> <Masque>{t.apres} </Masque>
-      <span>{after}</span>
+      {/* Flèche liée à la valeur suivante : jamais seule en fin de ligne. */}
+      <span data-part="apres" className="whitespace-nowrap">
+        <span aria-hidden="true">{t.fleche}</span> <Masque>{t.apres} </Masque>
+        <span>{after}</span>
+      </span>
     </>
   );
 }

@@ -216,7 +216,7 @@ describe("remplacer: bandeaux", () => {
     expect(revision.previewReplacement).toHaveBeenCalledTimes(2);
   });
 
-  it("conflit à « Appliquer » : bandeau `conflict`, « Voir un nouvel aperçu », aucune navigation ni mesure", async () => {
+  it("conflit à « Appliquer » : bandeau `conflict`, « Revoir la proposition », aucune navigation ni mesure", async () => {
     const revision = fakeRevision({ ok: false, error: "conflict" });
     const { recorder } = renderScreen(revision);
     choose("Pas mon style");
@@ -227,10 +227,12 @@ describe("remplacer: bandeaux", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
     });
-    expect(screen.getByText("Ton programme a changé depuis cet aperçu. Rien n'a été modifié.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Voir un nouvel aperçu" })).toBeInTheDocument();
+    expect(screen.getByText("Ton programme a changé depuis cette proposition. Rien n'a été modifié.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoir la proposition" })).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
     expect(recorder.events).toEqual([]);
+    // Aucun texte visible de l'écran ne dit « aperçu » (décision 0018, « Portée » ; C7).
+    expect(document.body.textContent).not.toMatch(/aperçu/i);
   });
 });
 
@@ -258,9 +260,78 @@ describe("remplacer: hors ligne", () => {
     setOnline(true);
     expect(apply).not.toHaveAttribute("aria-disabled");
   });
+
+  it.each([
+    ["error", "Réessayer"],
+    ["conflict", "Revoir la proposition"],
+  ] as const)("hors ligne, bandeau `%s` : « %s » en `aria-disabled`, décrit par le bandeau hors ligne, sans relancer", async (kind, label) => {
+    const revision = fakeRevision({ ok: false, error: "conflict" });
+    renderScreen(revision);
+    choose("Pas mon style");
+    fireEvent.click(askButton());
+    await act(async () => {
+      if (kind === "error") revision.pending[0]!.reject(new Error("réseau"));
+      else revision.pending[0]!.resolve({ ok: true, preview: PREVIEW });
+    });
+    if (kind === "conflict") {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+      });
+    }
+    setOnline(false);
+    const action = screen.getByRole("button", { name: label });
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    expect(action).toHaveAccessibleDescription("Tu es hors ligne. Modifier ton programme demande une connexion.");
+    fireEvent.click(action);
+    expect(revision.previewReplacement).toHaveBeenCalledTimes(1);
+    setOnline(true);
+    expect(action).not.toHaveAttribute("aria-disabled");
+    fireEvent.click(action);
+    expect(revision.previewReplacement).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("remplacer: appliquer", () => {
+  it("double clic sur « Appliquer » : une seule application, aucun bandeau d'erreur", async () => {
+    const revision = fakeRevision();
+    let finish: (result: ApplyResult) => void = () => {};
+    vi.mocked(revision.apply).mockImplementation(() => new Promise<ApplyResult>((resolve) => (finish = resolve)));
+    renderScreen(revision);
+    choose("Trop loin");
+    fireEvent.click(askButton());
+    await act(async () => {
+      revision.pending[0]!.resolve({ ok: true, preview: PREVIEW });
+    });
+    const apply = screen.getByRole("button", { name: "Appliquer" });
+    fireEvent.click(apply);
+    fireEvent.click(apply);
+    await act(async () => {
+      finish({ ok: true, version: 1 });
+    });
+    expect(revision.apply).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("La proposition n'a pas pu être calculée. Ton programme est inchangé.")).not.toBeInTheDocument();
+  });
+
+  it("« Appliquer » rejeté (réseau, fournisseur) : bandeau `error`, aucune navigation ni mesure ; « Réessayer » relance", async () => {
+    const revision = fakeRevision();
+    vi.mocked(revision.apply).mockRejectedValueOnce(new Error("réseau"));
+    const { recorder } = renderScreen(revision);
+    choose("Trop loin");
+    fireEvent.click(askButton());
+    await act(async () => {
+      revision.pending[0]!.resolve({ ok: true, preview: PREVIEW });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+    expect(screen.getByText("La proposition n'a pas pu être calculée. Ton programme est inchangé.")).toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(recorder.events).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(revision.previewReplacement).toHaveBeenCalledTimes(2);
+  });
+
   it("« Appliquer » : `replace_applied` (raison, réserve, durée), navigation vers la Journée du jour visé", async () => {
     const revision = fakeRevision();
     const { recorder } = renderScreen(revision);

@@ -106,4 +106,22 @@ describe("SegmentedControl vertical (raisons de l'écran 14, F7a)", () => {
     expect(screen.getByRole("radio", { name: "Soutenu" })).toHaveAttribute("aria-checked", "true");
     expect(await axeViolations(container)).toEqual([]);
   });
+
+  it("choix invalide : `aria-invalid` et contour `ink` du rail (0018, « Champ invalide ») ; valide : ni l'un ni l'autre", () => {
+    const { rerender } = render(<SegmentedControl label="Rythme" options={OPTIONS} value={null} onChange={() => {}} invalid />);
+    const group = screen.getByRole("radiogroup", { name: "Rythme" });
+    expect(group).toHaveAttribute("aria-invalid", "true");
+    expect(group).toHaveClass("aria-invalid:ring-(length:--ligne-trait-controle)", "aria-invalid:ring-ink", "aria-invalid:ring-inset");
+    rerender(<SegmentedControl label="Rythme" options={OPTIONS} value={null} onChange={() => {}} />);
+    expect(group).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("focus clavier : l'option de l'arrêt de tabulation reçoit le focus ; aucune classe ne retire l'anneau global", () => {
+    render(<Harness />);
+    const radios = screen.getAllByRole("radio");
+    radios[1]!.focus();
+    fireEvent.keyDown(radios[1]!, { key: "ArrowRight" });
+    expect(radios[2]).toHaveFocus();
+    for (const radio of radios) expect(radio.className).not.toMatch(/(^|\s)(focus(-visible)?:)?(outline-none|outline-hidden|ring-0)/);
+  });
 });

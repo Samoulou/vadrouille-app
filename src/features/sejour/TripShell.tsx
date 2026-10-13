@@ -36,6 +36,7 @@ import {
   INITIAL_PROGRAMME,
   applyProgramme,
   createMemoryProgramme,
+  createMemoryProgrammeStore,
   programmeReducer,
   type ProgrammeActions,
 } from "./programme";
@@ -237,7 +238,13 @@ export function TripShell({
 
   // Programme : écarts aux données de l'adaptateur, en mémoire (décision 0015 § 6).
   const [programme, dispatch] = useReducer(programmeReducer, INITIAL_PROGRAMME);
-  const memory = useMemo(() => createMemoryProgramme(sourceTrip, dispatch, revisionFixtures), [sourceTrip, revisionFixtures]);
+  // Copie de l'état des actions en mémoire, gardée pour la vie du shell comme l'état du réducteur : recréer les
+  // actions (nouvelles données de l'adaptateur) ne remet ni la version ni les jours remplacés à zéro.
+  const [memoryStore] = useState(createMemoryProgrammeStore);
+  const memory = useMemo(
+    () => createMemoryProgramme(sourceTrip, dispatch, revisionFixtures, memoryStore),
+    [sourceTrip, revisionFixtures, memoryStore],
+  );
   const actions = injected ?? memory;
   const revision = injectedRevision ?? memory;
   const trip = useMemo(() => applyProgramme(sourceTrip, programme), [sourceTrip, programme]);

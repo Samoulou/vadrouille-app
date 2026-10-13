@@ -918,8 +918,8 @@
     "retourFiche": "Retour à la fiche",
     "compteur": "{n} sur {max} caractères",
     "horsLigne": "Tu es hors ligne. Modifier ton programme demande une connexion.",
-    "conflit": "Ton programme a changé depuis cet aperçu. Rien n'a été modifié.",
-    "voirNouvelApercu": "Voir un nouvel aperçu",
+    "conflit": "Ton programme a changé depuis cette proposition. Rien n'a été modifié.",
+    "revoirProposition": "Revoir la proposition",
     "erreur": "La proposition n'a pas pu être calculée. Ton programme est inchangé.",
     "reessayer": "Réessayer",
     "aucuneOption": "Aucune option compatible pour ce créneau. Ton programme est inchangé.",
@@ -949,7 +949,6 @@
       "souhaitAide": "Par exemple : une dégustation, quelque chose à l'abri.",
       "voirProposition": "Voir une proposition",
       "lent": "On cherche autour de {name}.",
-      "proposition": "Proposition",
       "moment": "{start} – {end}",
       "modifie": "Modifié."
     }

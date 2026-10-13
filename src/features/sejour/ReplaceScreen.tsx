@@ -12,7 +12,7 @@ import { IconButton } from "@/components/ligne/IconButton";
 import { IconCroix } from "@/components/ligne/icons";
 import { SegmentedControl } from "@/components/ligne/SegmentedControl";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
-import type { PreferenceReason, RevisionError, RevisionPreview as RevisionPreviewData, Stop } from "@/contracts";
+import type { ApplyResult, PreferenceReason, RevisionError, RevisionPreview as RevisionPreviewData, Stop } from "@/contracts";
 import { PREFERENCE_REASONS, WISH_MAX_LENGTH } from "@/contracts/values";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, INPUT_CLASS } from "@/features/creation/fields";
 import { format, messages } from "@/i18n";
@@ -96,6 +96,7 @@ export function ReplaceView({ stopId, recorderKind = "none", recorder, now }: Re
   const proposalRef = useRef<HTMLHeadingElement>(null);
   const noOptionRef = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
+  const applying = useRef(false);
   const token = useRef(0);
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [focusTarget, setFocusTarget] = useState<{ target: "proposal" | "noOption" | "ask"; serial: number } | null>(null);
@@ -232,10 +233,20 @@ export function ReplaceView({ stopId, recorderKind = "none", recorder, now }: Re
   };
 
   const apply = async () => {
-    if (!online || phase.type !== "preview" || reason === null) return;
+    // Un seul « Appliquer » à la fois : un second clic pendant l'application ne fait rien (l'aperçu est consommé).
+    if (!online || phase.type !== "preview" || reason === null || applying.current) return;
     const { preview, durationMs } = phase;
-    const result = await revision.apply(preview.id);
+    applying.current = true;
+    let result: ApplyResult;
+    try {
+      result = await revision.apply(preview.id);
+    } catch {
+      // Échec du fournisseur ou du réseau : erreur récupérable, programme inchangé (F7-PO-1).
+      result = { ok: false, error: "error" };
+    }
     if (!result.ok) {
+      // Après un échec, la garde est levée ; après un succès, l'écran est quitté et l'aperçu ne s'applique plus.
+      applying.current = false;
       setPhase({ type: "banner", kind: bannerFor(result.error) });
       setStatus(null);
       return;
@@ -415,7 +426,14 @@ export function ReplaceView({ stopId, recorderKind = "none", recorder, now }: Re
               announce={false}
               message={t.erreur}
               action={
-                <Button variant="secondary" size="sm" onClick={ask}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={ARIA_DISABLED}
+                  aria-disabled={online ? undefined : true}
+                  aria-describedby={online ? undefined : offlineId}
+                  onClick={ask}
+                >
                   {t.reessayer}
                 </Button>
               }
@@ -427,8 +445,15 @@ export function ReplaceView({ stopId, recorderKind = "none", recorder, now }: Re
               announce={false}
               message={t.conflit}
               action={
-                <Button variant="secondary" size="sm" onClick={ask}>
-                  {t.voirNouvelApercu}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={ARIA_DISABLED}
+                  aria-disabled={online ? undefined : true}
+                  aria-describedby={online ? undefined : offlineId}
+                  onClick={ask}
+                >
+                  {t.revoirProposition}
                 </Button>
               }
             />

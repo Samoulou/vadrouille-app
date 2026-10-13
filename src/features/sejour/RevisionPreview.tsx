@@ -1,6 +1,6 @@
 "use client";
 
-import type { Ref } from "react";
+import { useId, type Ref } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { ChangeSet } from "@/components/ligne/ChangeSet";
@@ -58,16 +58,21 @@ export function RevisionPreview({ preview, proposalTitleRef, onApply, onCancel, 
   const unchanged = preview.changes.flatMap((change) => (change.type === "unchanged" ? [change] : []));
   const proposal = preview.kind === "replace" ? preview.proposal : null;
   const faits = proposal ? formatFaits(proposal.facts) : "";
+  // Identifiants uniques : plusieurs aperçus (F7b, F7c) peuvent coexister dans le document.
+  const ids = useId();
+  const nameId = `${ids}-proposition-nom`;
+  const changesId = `${ids}-ce-qui-change`;
+  const unchangedId = `${ids}-ce-qui-ne-bouge-pas`;
 
   return (
     <div data-part="apercu" className="flex flex-col gap-6">
       {proposal ? (
         <section
-          aria-labelledby="proposition-nom"
+          aria-labelledby={nameId}
           data-part="proposition"
           className="flex flex-col gap-2 rounded-block border border-outline bg-raised p-4"
         >
-          <h2 id="proposition-nom" ref={proposalTitleRef} tabIndex={-1} className="text-section font-extrabold text-ink">
+          <h2 id={nameId} ref={proposalTitleRef} tabIndex={-1} className="text-section font-extrabold text-ink">
             {proposal.name}
           </h2>
           <p data-part="moment" className="text-corps-s text-ink-soft tabular-nums">
@@ -93,16 +98,16 @@ export function RevisionPreview({ preview, proposalTitleRef, onApply, onCancel, 
 
       {banner ? <StatusBanner kind="travel" message={banner} /> : null}
 
-      <section aria-labelledby="ce-qui-change" className="flex flex-col gap-3">
-        <h3 id="ce-qui-change" tabIndex={-1} className={BLOC}>
+      <section aria-labelledby={changesId} data-part="ce-qui-change" className="flex flex-col gap-3">
+        <h3 id={changesId} tabIndex={-1} className={BLOC}>
           {t.ceQuiChange}
         </h3>
         <ChangeSet changes={preview.changes} />
       </section>
 
       {unchanged.length > 0 ? (
-        <section aria-labelledby="ce-qui-ne-bouge-pas" className="flex flex-col gap-3">
-          <h3 id="ce-qui-ne-bouge-pas" className={BLOC}>
+        <section aria-labelledby={unchangedId} className="flex flex-col gap-3">
+          <h3 id={unchangedId} className={BLOC}>
             {t.ceQuiNeBougePas}
           </h3>
           <ul data-part="ne-bouge-pas" className="flex flex-col gap-2 text-corps text-ink">

@@ -140,3 +140,40 @@ describe("TripShell : grand écran (F12-PO-7 à F12-PO-10, décision 0022 § 6)"
     }
   });
 });
+
+describe("TripShell : toast partagé et surlignage (décision 0016 § 9, F7-PO-1)", () => {
+  const toasts = (container: HTMLElement) => Array.from(container.querySelectorAll("[data-undo-toast]"));
+  const applied = (message: string, stopId: string) => ({ message, dayIndex: 2, highlighted: [stopId], targetStopId: stopId });
+
+  it("une nouvelle modification (`notifyChange`) ferme le toast d'une révision et efface son surlignage", () => {
+    location.n = "2";
+    const { container } = render(tree());
+    act(() => shell().notifyApplied(applied("Modifié.", CONCERT)));
+    expect(shell().highlight).toEqual({ dayIndex: 2, stopIds: [CONCERT] });
+    expect(toasts(container).map((toast) => toast.textContent)).toEqual(["Modifié.Annuler"]);
+
+    act(() => shell().notifyChange("Étape verrouillée."));
+    expect(shell().highlight).toBeNull();
+    expect(toasts(container).map((toast) => toast.textContent)).toEqual(["Étape verrouillée.Annuler"]);
+  });
+
+  it("une nouvelle révision (`notifyApplied`) remplace le toast et le surlignage de la précédente", () => {
+    vi.useFakeTimers();
+    try {
+      location.n = "2";
+      const { container } = render(tree());
+      act(() => shell().notifyApplied(applied("Modifié.", CONCERT)));
+      act(() => vi.advanceTimersByTime(1_000));
+      act(() => shell().notifyApplied(applied("Lieu ajouté.", "j2-royal-mile")));
+      expect(shell().highlight).toEqual({ dayIndex: 2, stopIds: ["j2-royal-mile"] });
+      expect(toasts(container).map((toast) => toast.textContent)).toEqual(["Lieu ajouté.Annuler"]);
+      // Le minuteur de la première révision est annulé : le surlignage de la seconde dure ses 2 s entières.
+      act(() => vi.advanceTimersByTime(1_999));
+      expect(shell().highlight).not.toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(shell().highlight).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

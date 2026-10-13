@@ -125,6 +125,23 @@ export function baseChecklistDone(trip: Trip, itemId: ChecklistItem["id"]): bool
   return trip.checklist.find((item) => item.id === itemId)?.done ?? false;
 }
 
+/**
+ * Copie de l'état tenue par l'implémentation en mémoire : état du réducteur, version locale, numéro du dernier
+ * aperçu et aperçus servis. Le shell la garde pour toute la vie de l'écran, pour que recréer les actions (nouvelles
+ * données de l'adaptateur, jeu de révision) ne remette pas la version et les jours à zéro alors que le réducteur
+ * de l'écran les garde.
+ */
+export interface MemoryProgrammeStore {
+  state: ProgrammeState;
+  version: number;
+  serial: number;
+  readonly previews: Map<string, RevisionPreview>;
+}
+
+export function createMemoryProgrammeStore(): MemoryProgrammeStore {
+  return { state: INITIAL_PROGRAMME, version: 0, serial: 0, previews: new Map() };
+}
+
 /** Actions du programme et de la révision : un seul objet, une seule version (décision 0016 § 5). */
 export type MemoryProgramme = ProgrammeActions & RevisionActions;
 
@@ -135,6 +152,8 @@ export type MemoryProgramme = ProgrammeActions & RevisionActions;
  * chargement, augmente à chaque verrou, application ou annulation ; poser un verrou rend un remplacement
  * définitif, et inversement. Elle n'envoie aucun événement de mesure (décision 0015 § 6).
  *
+ * `store` : copie de l'état (`createMemoryProgrammeStore`), gardée par le shell entre deux créations des actions.
+ *
  * `fixtures` : jeu simulé de révision lu par la mise en page du voyage ; sans lui, chaque demande d'aperçu répond
  * « aucune option compatible ». Un brouillon n'est servi que si les jours qu'il touche sont encore ceux de
  * l'adaptateur (limite assumée de la phase 0, sans moteur), et s'il ne touche aucune étape verrouillée.
@@ -143,34 +162,32 @@ export function createMemoryProgramme(
   trip: Trip,
   dispatch: (event: ProgrammeEvent) => void,
   fixtures: RevisionFixtures | null = null,
+  store: MemoryProgrammeStore = createMemoryProgrammeStore(),
 ): MemoryProgramme {
-  let state = INITIAL_PROGRAMME;
-  let version = 0;
-  let serial = 0;
-  const previews = new Map<string, RevisionPreview>();
+  const previews = store.previews;
   const send = (event: ProgrammeEvent) => {
-    state = programmeReducer(state, event);
+    store.state = programmeReducer(store.state, event);
     dispatch(event);
   };
-  const currentDays = () => applyProgramme(trip, state).days;
+  const currentDays = () => applyProgramme(trip, store.state).days;
 
   return {
     async setStopLocked(stopId, locked) {
       send({ type: "setStopLocked", stopId, locked, base: baseLocked(trip, stopId) });
-      version += 1;
+      store.version += 1;
     },
     async undo() {
       send({ type: "undo" });
-      version += 1;
+      store.version += 1;
     },
     async setChecklistItemDone(itemId, done) {
       send({ type: "setChecklistItemDone", itemId, done, base: baseChecklistDone(trip, itemId) });
     },
-    version: () => version,
+    version: () => store.version,
     async previewReplacement(request, { signal }) {
       await Promise.resolve();
       if (signal.aborted) throw abortReason(signal);
-      if (request.baseVersion !== version) return { ok: false, error: "conflict" };
+      if (request.baseVersion !== store.version) return { ok: false, error: "conflict" };
       const draft = fixtures?.replacements.find((fixture) => fixture.stopId === request.stopId)?.draft;
       if (!draft) return { ok: false, error: "noOption" };
       const days = currentDays();
@@ -182,20 +199,20 @@ export function createMemoryProgramme(
       );
       if (!unchanged) return { ok: false, error: "noOption" };
       if (lockedStopViolations(days, draft.days).length > 0) return { ok: false, error: "lockedStop" };
-      serial += 1;
-      const preview: RevisionPreview = { kind: "replace", id: `apercu-${serial}`, baseVersion: version, ...draft };
+      store.serial += 1;
+      const preview: RevisionPreview = { kind: "replace", id: `apercu-${store.serial}`, baseVersion: store.version, ...draft };
       previews.set(preview.id, preview);
       return { ok: true, preview };
     },
     async apply(previewId) {
       const preview = previews.get(previewId);
       if (!preview) return { ok: false, error: "error" };
-      if (preview.baseVersion !== version) return { ok: false, error: "conflict" };
+      if (preview.baseVersion !== store.version) return { ok: false, error: "conflict" };
       if (lockedStopViolations(currentDays(), preview.days).length > 0) return { ok: false, error: "lockedStop" };
       send({ type: "applyRevision", days: preview.days });
-      version += 1;
+      store.version += 1;
       previews.delete(previewId);
-      return { ok: true, version };
+      return { ok: true, version: store.version };
     },
   };
 }

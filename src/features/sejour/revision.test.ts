@@ -5,7 +5,14 @@ import { RevisionFixturesSchema, RevisionPreviewSchema, type Day, type RevisionF
 import { edimbourg } from "@/mocks/edimbourg";
 import { degustationStockbridge, edimbourgRevision } from "@/mocks/edimbourg-revision";
 
-import { applyProgramme, createMemoryProgramme, INITIAL_PROGRAMME, programmeReducer, type ProgrammeEvent } from "./programme";
+import {
+  applyProgramme,
+  createMemoryProgramme,
+  createMemoryProgrammeStore,
+  INITIAL_PROGRAMME,
+  programmeReducer,
+  type ProgrammeEvent,
+} from "./programme";
 import { deepEqual, lockedStopViolations } from "./revision";
 
 /**
@@ -126,6 +133,48 @@ describe("revision: aperçu, application et annulation", () => {
     expect(actions.version()).toBe(2);
     expect(state()).toEqual(before);
     expect(shown()).toEqual(beforeTrip);
+  });
+
+  it("appliquer, puis verrouiller, puis annuler : seul le verrou est annulé, le remplacement devient définitif (F7-PO-1, 0016 § 5)", async () => {
+    const { actions, shown } = setup();
+    const result = await actions.previewReplacement(REQUEST, { signal: signal() });
+    if (!result.ok) throw new Error("aperçu attendu");
+    await actions.apply(result.preview.id);
+    const applied = structuredClone(shown());
+    await actions.setStopLocked("j2-bonne-table", true);
+    expect(actions.version()).toBe(2);
+    await actions.undo();
+    expect(actions.version()).toBe(3);
+    // Le remplacement reste ; le verrou revient à sa valeur d'avant.
+    expect(shown()).toEqual(applied);
+    const j2 = shown().days.find((candidate) => candidate.index === 2)!;
+    expect(j2.items.some((item) => item.type === "stop" && item.stop.id === degustationStockbridge.id)).toBe(true);
+    expect(j2.items.some((item) => item.type === "stop" && item.stop.id === DEAN)).toBe(false);
+    // Une seconde annulation ne rétablit pas Dean Village : une seule modification annulable.
+    await actions.undo();
+    expect(shown()).toEqual(applied);
+  });
+
+  it("actions recréées avec la même copie d'état (nouvelles données, `revalidatePath`) : version et jours gardés", async () => {
+    const store = createMemoryProgrammeStore();
+    let screen = INITIAL_PROGRAMME;
+    const dispatch = (event: ProgrammeEvent) => {
+      screen = programmeReducer(screen, event);
+    };
+    const first = createMemoryProgramme(edimbourg, dispatch, edimbourgRevision, store);
+    const result = await first.previewReplacement(REQUEST, { signal: signal() });
+    if (!result.ok) throw new Error("aperçu attendu");
+    await first.apply(result.preview.id);
+
+    const second = createMemoryProgramme(structuredClone(edimbourg), dispatch, edimbourgRevision, store);
+    expect(second.version()).toBe(1);
+    // Le jour remplacé est vu par les nouvelles actions comme par le réducteur de l'écran : pas de second aperçu.
+    await expect(second.previewReplacement({ ...REQUEST, baseVersion: 1 }, { signal: signal() })).resolves.toEqual({ ok: false, error: "noOption" });
+    await expect(second.previewReplacement(REQUEST, { signal: signal() })).resolves.toEqual({ ok: false, error: "conflict" });
+    await second.undo();
+    expect(second.version()).toBe(2);
+    expect(screen).toEqual(store.state);
+    expect(applyProgramme(edimbourg, screen)).toEqual(edimbourg);
   });
 
   it("un aperçu ne s'applique qu'une fois ; un identifiant inconnu est une erreur", async () => {

@@ -40,7 +40,7 @@ const examples = messages.dev.composants.exemples.bandeaux;
 const BANNERS: BannerState[] = [
   // Propriétaire : F10 (hors ligne, handover § 13), pas encore livré.
   { kind: "offline", message: examples.offline, example: true },
-  // Propriétaire : F7 (« Ton programme a changé depuis cet aperçu. Rien n'a été modifié. »), pas encore livré.
+  // Propriétaire : F7 (« Ton programme a changé depuis cette proposition. Rien n'a été modifié. »), pas encore livré.
   { kind: "conflict", message: examples.conflict, example: true },
   // Présentation (écran 6, B2-PO-9) : aperçu avec une case `noOption`, celle du jeu simulé d'Édimbourg (J4 16:00).
   // Libellé provisoire (B2-PO-10) ; F7 et F8 fourniront le leur.

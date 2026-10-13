@@ -54,6 +54,10 @@ describe("ChangeSet", () => {
     const masked = Array.from(other!.querySelectorAll(".sr-only")).map((node) => node.textContent?.trim());
     expect(masked).toEqual(["avant :", "après :"]);
     expect(other!.querySelector("[aria-hidden='true']")).toHaveTextContent("→");
+    // La flèche reste liée à la valeur suivante : jamais seule en fin de ligne.
+    const apres = other!.querySelector("[data-part='apres']")!;
+    expect(apres).toHaveClass("whitespace-nowrap");
+    expect(apres).toHaveTextContent("→ après : J4 15:45");
   });
 
   it("segment : « Trajet vers {nom} : » ; estimé en « environ {durée} (estimation) »", () => {

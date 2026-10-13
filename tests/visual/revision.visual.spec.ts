@@ -45,7 +45,7 @@ test("Écran 14, proposition affichée, panneau à 55 % puis à 92 %", async ({ 
   await capture(page, "revision-remplacer-proposition.png");
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();
   await expectSheetAt(page, 0.92);
-  await scrollSheetTo(page, "#ce-qui-change");
+  await scrollSheetTo(page, "[data-part='ce-qui-change']");
   await capture(page, "revision-remplacer-ce-qui-change.png");
 });
 

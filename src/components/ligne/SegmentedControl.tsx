@@ -52,6 +52,8 @@ const PREVIOUS_KEYS = new Set(["ArrowLeft", "ArrowUp"]);
  * Rendu décidé par UX/UI (décision 0012, Q13) : rail `muted`, option choisie en aplat `line`.
  * Option déduite choisie (0018 § 16 avec 0012) : fond `raised`, contour pointillé `ink`, texte `ink` 700,
  * coche de 20 px en `ink` ; la mention « déduit de ton récit » décrit le groupe (`aria-describedby`).
+ * Choix invalide : contour `ink` du rail et `aria-invalid` (0018, « Champ invalide »). Focus clavier : anneau
+ * global `line` (`:focus-visible`), jamais retiré, sur l'option qui porte l'arrêt de tabulation.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -111,7 +113,14 @@ export function SegmentedControl<T extends string>({
       aria-describedby={description}
       aria-invalid={invalid || undefined}
       tabIndex={-1}
-      className={cn("flex w-full gap-1 rounded-control bg-muted p-1", vertical && "flex-col", className)}
+      className={cn(
+        "flex w-full gap-1 rounded-control bg-muted p-1",
+        // Choix invalide (0018, « Champ invalide ») : contour `ink` intérieur, sans décaler les options ni masquer
+        // l'anneau de focus (`outline`) que le groupe reçoit avec l'erreur.
+        "aria-invalid:ring-(length:--ligne-trait-controle) aria-invalid:ring-ink aria-invalid:ring-inset",
+        vertical && "flex-col",
+        className,
+      )}
     >
       {options.map((option, index) => {
         const checked = option.value === value;
