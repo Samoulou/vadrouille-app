@@ -43,8 +43,12 @@ Bilan à la fin de S4 dans `suivi.md` : visites par `src`, préventes, réponses
 > Ton voyage, de l'hôtel à la soirée : quoi faire, où manger et ce qui se passe pendant ton séjour.
 > Vadrouille ouvre la précommande pour les voyages de printemps. 29 CHF le voyage, remboursé si ce n'est pas prêt à temps [sous réserve question 5]. Lien dans la bio.
 
+(Remboursement : règle proposée, non tranchée, question 5 ; le marqueur est retiré seulement après la réponse de Samuel.)
+
 **P2 — Le problème** (image : un itinéraire généré, une ligne barrée)
-> Un itinéraire généré par un assistant généraliste, c'est un brouillon : [écart relevé 1, par exemple un lieu fermé ce jour-là], [écart relevé 2, par exemple un trajet oublié entre deux étapes], un dîner réservé qui saute. Vadrouille part de là où ça casse.
+> Même les planificateurs par IA le disent : un itinéraire généré reste un brouillon. Dans notre test du [DATE DU TEST] sur Édimbourg, l'assistant généraliste a [écart relevé 1, par exemple placé un lieu fermé ce jour-là] et [écart relevé 2, par exemple oublié un trajet entre deux étapes]. Vadrouille part de là où ça casse.
+
+(Conditionnelle : publiée seulement après la démonstration réelle (`demo-avant-apres.md`, déroulé, étapes 1 à 6), avec les seuls écarts réellement relevés et vérifiables ; sans écart vérifiable, P2 n'est pas publiée. Première phrase : cadrage § 2, source [23] (Layla, « limites des planificateurs IA »), consultée le 6 octobre 2026. « Un dîner réservé qui saute » n'est écrit que si la demande de remplacement de l'étape 3 du déroulé l'a réellement montré.)
 
 **P3 — Fiable** (capture : Fiche étape avec source et date)
 > Chaque lieu est contrôlé avant d'apparaître, avec sa source et sa date. Ce qui reste incertain est marqué « À confirmer ».
@@ -61,9 +65,13 @@ Bilan à la fin de S4 dans `suivi.md` : visites par `src`, préventes, réponses
 > « Cette visite ne me tente pas, je préfère une dégustation, mais je garde mon restaurant à 19:00. » Remplacer, Appliquer. Le dîner ne bouge pas.
 
 **P7 — Avant/après complet** (carrousel : les 4 paires de captures de `demo-avant-apres.md`)
-> Même voyage à Édimbourg, même récit. À gauche, un assistant généraliste. À droite, Vadrouille. Quatre différences.
+> Version A, si l'« après » est un programme réel de Vadrouille (`demo-avant-apres.md`, possibilité 2) : Même voyage à Édimbourg, même récit. À gauche, un assistant généraliste, le [DATE DU TEST]. À droite, Vadrouille. [N] différences.
+>
+> Version B, si l'« après » vient des données simulées (possibilité 1) : Un voyage à Édimbourg. À gauche, la réponse d'un assistant généraliste le [DATE DU TEST]. À droite, la démonstration de Vadrouille, sur des données simulées. [N] différences.
+
+(Conditionnelle : [N] est le nombre de points où un écart a réellement été relevé, quatre au plus ; un point où l'assistant fait aussi bien est retiré (déroulé, étape 6). En version B, chaque capture porte la mention « Données simulées. Les lieux entre crochets ne sont pas vérifiés. »)
 
 **P8 — Printemps** (image : trois dates)
 > Pâques le 28 mars, l'Ascension le 6 mai, la Pentecôte le 16 mai. Les voyages de printemps se préparent de janvier à mars. Précommande dès aujourd'hui à 29 CHF, lien dans la bio.
 
-Sources des chiffres : 29 CHF (Q2) ; dates de printemps (cadrage § 5) ; restaurant à 19:00 (cadrage § 3.4) ; Tattoo et Édimbourg (cadrage § 2). Les crochets de P2 sont à remplir avec des écarts réellement relevés dans la démonstration avant publication.
+Sources des chiffres : 29 CHF (Q2) ; dates de printemps (cadrage § 5) ; restaurant à 19:00 (cadrage § 3.4) ; Tattoo et Édimbourg (cadrage § 2). Les crochets de P2 et P7 sont à remplir avec des écarts réellement relevés dans la démonstration avant publication ; « un itinéraire IA reste un brouillon » : cadrage § 2, source [23], consultée le 6 octobre 2026.

@@ -62,10 +62,14 @@ Tous les textes : tutoiement ou vouvoiement selon l'usage du lieu, pas de point 
 ### C. Communauté Reddit (si autorisé, sinon dans le fil prévu)
 > Titre : Je construis un planificateur de voyages qui source chaque adresse : vos critiques avant le lancement
 >
-> J'ai comparé un itinéraire d'Édimbourg fait par un assistant généraliste avec celui de mon outil, sur un voyage que j'ai vraiment fait. La comparaison est ici : [LIEN]. Ce qui m'intéresse : est-ce que vous paieriez pour un programme où chaque lieu est contrôlé avant d'apparaître, et où ce qui reste incertain est marqué « À confirmer », ou un assistant gratuit vous suffit-il ? Précommande ouverte pour le printemps, mais je cherche surtout des avis.
+> Le [DATE DU TEST], j'ai donné le récit d'un voyage que j'ai vraiment fait à Édimbourg à un assistant généraliste, et je l'ai comparé à [la démonstration de mon outil, sur des données simulées | le programme de mon outil]. Ce que j'ai relevé : [écarts réellement relevés]. La comparaison est ici : [LIEN]. Ce qui m'intéresse : est-ce que vous paieriez pour un outil qui vise à contrôler chaque lieu avant de l'afficher et à marquer « À confirmer » ce qui reste incertain, ou un assistant gratuit vous suffit-il ? Précommande ouverte pour le printemps, mais je cherche surtout des avis.
+
+(Conditionnel : publié seulement après la démonstration réelle (`demo-avant-apres.md`, déroulé, étapes 1 à 6). Garder « la démonstration de mon outil, sur des données simulées » tant que l'« après » vient des données simulées (possibilité 1), « le programme de mon outil » seulement pour un programme réel (possibilité 2). Le contrôle de chaque lieu est un objectif du produit, pas un résultat acquis (G0 non passé ; `page-prevente.md`, section 3).)
 
 ### D. Message à un créateur (proposition, question 9 ; envoyé par Samuel s'il le décide)
 > Bonjour. Je suis [PRÉNOM], je crée Vadrouille, un planificateur de voyages. Je suis tes week-ends en Europe et je pense que l'outil peut t'être utile pour ton prochain voyage. Je t'offre un voyage complet, sans contrepartie : si ça te plaît, tu en parles, sinon pas. Si tu en parles, merci d'indiquer que le voyage complet t'a été offert. La démonstration : [LIEN]
 
 ### E. Réseau personnel (message ou publication de Samuel)
 > Je lance Vadrouille, le planificateur de voyages que je construis. Si tu prépares un voyage ce printemps, ou si tu connais quelqu'un qui en prépare un, la précommande est ouverte : 29 CHF, remboursée si ce n'est pas prêt à temps [sous réserve question 5]. Le plus utile pour moi : transmettre ce lien à une personne qui part bientôt. [LIEN]
+
+(Remboursement : règle proposée, non tranchée, question 5 ; le marqueur est retiré seulement après la réponse de Samuel.)

@@ -15,6 +15,9 @@ Numérotation : « question N » renvoie à la question Q-C1-N à Samuel de la d
 | Achats ou préventes payés | 5 |
 | dont hors cercle proche | 3 |
 
+## Ce qu'est une visite (proposition, à confirmer par Samuel, question 7)
+Le seuil de 300 en dépend. Proposition : une visite est **un affichage de la page de prévente**, compté côté serveur **sans cookie ni identifiant personnel** ; sont exclus les robots déclarés (agent utilisateur de robot connu) et les visites de Samuel et du studio, faites par un lien de test `?src=interne` non compté. Sans cookie ni identifiant, aucun dédoublonnage par personne n'est possible : un rechargement ou un retour sur la page compte à nouveau. C'est une limite connue, qui surestime le nombre de personnes ; elle est acceptée pour ne collecter aucune donnée personnelle, et le seuil de 300 se lit donc en affichages. Outil et réglage exacts : tâche `frontend` ou `backend` ultérieure, avec l'accord de Samuel s'il engage un compte externe.
+
 Les autres conditions de G0 (prototype exploitable sur Édimbourg, présentation comprise par 4 testeurs sur 5) sont suivies ailleurs (`docs/roadmap.md`).
 
 ## Tableau hebdomadaire
@@ -60,7 +63,8 @@ Règle proposée, sans aucune vérification humaine ni donnée personnelle dans 
 1. **cercle proche** : achat venu d'un lien `src=proches` ; ou, si le rattachement au paiement est accepté (question 8), réponse « Je connais personnellement la personne qui crée Vadrouille » ou « Par un ami ou une amie » à la question 5 du questionnaire ;
 2. **hors cercle proche** : achat venu d'un lien `src` connu et non proche (`forum`, `groupe`, `reddit`, `instagram`, `instagram-pub`, `createur`), sans indice contraire (si le rattachement est accepté : aucune réponse « Je connais personnellement… » ni « Par un ami ou une amie ») ;
 3. **indéterminé** : tout le reste, notamment un achat sans `src` (lien direct ou transmis), ou des indices contradictoires. La question 5 du questionnaire étant facultative, une réponse absente ne fait jamais passer un achat hors cercle ;
-4. Samuel peut reclasser un achat indéterminé de son côté (il voit les paiements hors du dépôt) ; seuls les nombres entrent dans ce tableau.
+4. **Limite connue** : un lien `forum`, `groupe`, `reddit`, `instagram` ou `createur` peut être ouvert par un proche de Samuel ; sans rattachement au paiement (question 8), rien ne permet de le savoir. Dans le doute (par exemple un achat qui suit de près un message de Samuel à ses proches), l'achat est classé **indéterminé** ;
+5. Samuel peut reclasser un achat indéterminé de son côté (il voit les paiements hors du dépôt) ; seuls les nombres entrent dans ce tableau.
 
 Seuls les achats **hors cercle proche** comptent pour le seuil de 3 (décision 0044).
 
