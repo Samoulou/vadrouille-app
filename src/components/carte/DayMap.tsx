@@ -160,12 +160,13 @@ export function DayMap(props: DayMapProps) {
   return (
     <div data-day-map={props.mode} className={cn("relative h-full", props.className)}>
       {props.mode === "day" ? (
-        // Au focus, sous le bouton « Retour » (en haut à gauche, 44 px) pour ne pas le recouvrir, avec un contour visible.
+        // Au focus, sous « Retour » (en haut à gauche) pour ne pas le recouvrir, avec un contour ; `not-sr-only` remet
+        // le padding à 0 : il est reposé au focus, avec la hauteur de cible de 44 px.
         <a
           href={`#${props.listId}`}
           onClick={skipToList}
           data-part="evitement"
-          className="sr-only z-20 rounded-control bg-raised px-4 py-3 text-corps font-bold text-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-16 focus:outline-2 focus:outline-offset-2 focus:outline-line"
+          className="sr-only z-20 rounded-control bg-raised px-4 py-3 text-corps font-bold text-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-16 focus:min-h-(--touch-target) focus:px-4 focus:py-3 focus:outline-2 focus:outline-offset-2 focus:outline-line"
         >
           {t.evitement}
         </a>
