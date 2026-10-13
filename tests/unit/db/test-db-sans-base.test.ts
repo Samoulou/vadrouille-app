@@ -18,9 +18,12 @@ const UNREACHABLE = (() => {
   return url.href;
 })();
 
+/**
+ * Environnement minimal du sous-processus : `PATH` et `HOME` seulement, plus les variables du cas. Rien d'autre de
+ * l'environnement du test n'est transmis (ni `CI`, ni `GITHUB_ACTIONS`, ni `SKIP_DB_TESTS`, ni aucune clé).
+ */
 function run(extra: Record<string, string | undefined>) {
-  const env: Record<string, string | undefined> = { ...process.env };
-  for (const name of ["SKIP_DB_TESTS", "CI", "GITHUB_ACTIONS"]) delete env[name];
+  const env: Record<string, string | undefined> = { PATH: process.env.PATH, HOME: process.env.HOME };
   Object.assign(env, {
     VADROUILLE_DATABASE_URL: UNREACHABLE,
     VADROUILLE_DATABASE_URL_AUTH: UNREACHABLE,
@@ -44,6 +47,15 @@ describe("pnpm test:db sans base", () => {
     const { status, output } = run({ VADROUILLE_DB_ADMIN_URL: undefined, VADROUILLE_DATABASE_URL: "" });
     expect(status).not.toBe(0);
     expect(output).toContain("base de test non configurée");
+  }, 90_000);
+
+  // Revue du head a89d9a5 (PR 244, mineur 5) : la garde de production n'est pas rapportée comme des variables absentes.
+  it("garde de production : échec explicite, distinct des variables absentes, aucun secret", () => {
+    const { status, output } = run({ VERCEL_ENV: "production" });
+    expect(status).not.toBe(0);
+    expect(output).toContain("garde de production");
+    expect(output).not.toContain("base de test non configurée");
+    expect(output).not.toContain(PASSWORD);
   }, 90_000);
 
   it("SKIP_DB_TESTS=1 explicite hors CI : avertissement visible et succès ; refusée en CI ; autre valeur refusée", () => {

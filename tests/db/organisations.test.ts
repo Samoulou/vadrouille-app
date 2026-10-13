@@ -1,7 +1,6 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { closeAll, connect, createOrg, expectRefused, inTx, unique } from "./helpers";
+import { closeAll, connect, createOrg, type DbClient, expectRefused, inTx, unique } from "./helpers";
 
 /**
  * Invariant « exactement un propriétaire » (décisions 0007 et 0008, handover § 7) : à la validation de la
@@ -9,8 +8,8 @@ import { closeAll, connect, createOrg, expectRefused, inTx, unique } from "./hel
  * `vadrouille_auth`, seul rôle qui écrit dans `organizations` et `memberships`.
  */
 
-let auth: pg.Client;
-let app: pg.Client;
+let auth: DbClient;
+let app: DbClient;
 
 beforeAll(async () => {
   auth = await connect("auth");
@@ -20,7 +19,7 @@ beforeAll(async () => {
 afterAll(closeAll);
 
 /** Exécute une transaction sous vadrouille_auth ; renvoie le code d'erreur (à l'instruction ou à la validation). */
-async function authTx(fn: (c: pg.Client) => Promise<void>): Promise<string | undefined> {
+async function authTx(fn: (c: DbClient) => Promise<void>): Promise<string | undefined> {
   try {
     await inTx(auth, {}, fn);
     return undefined;
@@ -29,8 +28,8 @@ async function authTx(fn: (c: pg.Client) => Promise<void>): Promise<string | und
   }
 }
 
-const newUser = async (c: pg.Client) => (await c.query("INSERT INTO users (email) VALUES ($1) RETURNING id", [`p-${unique()}@exemple.ch`])).rows[0].id as string;
-const newOrg = async (c: pg.Client) =>
+const newUser = async (c: DbClient) => (await c.query("INSERT INTO users (email) VALUES ($1) RETURNING id", [`p-${unique()}@exemple.ch`])).rows[0].id as string;
+const newOrg = async (c: DbClient) =>
   (await c.query("INSERT INTO organizations (name, slug, kind) VALUES ('Organisation', $1, 'personal') RETURNING id", [`o-${unique()}`])).rows[0].id as string;
 
 describe("organisations: exactement un propriétaire", () => {

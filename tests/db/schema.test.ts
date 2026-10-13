@@ -1,12 +1,11 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { attempt, BUSINESS_TABLES, closeAll, connect, inTx, seedOrganization, type SeedIds } from "./helpers";
+import { attempt, BUSINESS_TABLES, closeAll, connect, type DbClient, inTx, type SeedIds, seedOrganization } from "./helpers";
 
 /** Tests de schéma de la spécification B1 (handover § 6, « Partie Q5 » § 6, décisions 0007, 0010 et 0011). */
 
-let app: pg.Client;
-let auth: pg.Client;
+let app: DbClient;
+let auth: DbClient;
 let a: SeedIds;
 
 beforeAll(async () => {

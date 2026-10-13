@@ -1,7 +1,6 @@
-import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { attempt, closeAll, connect, expectRefused, inTx, seedOrganization, type SeedIds } from "./helpers";
+import { attempt, closeAll, connect, type DbClient, expectRefused, inTx, type SeedIds, seedOrganization } from "./helpers";
 
 /**
  * Ajout seulement (décision 0007) : `trip_versions`, `billing`, `usage_ledger` refusent UPDATE, DELETE et TRUNCATE,
@@ -17,9 +16,9 @@ import { attempt, closeAll, connect, expectRefused, inTx, seedOrganization, type
 const APPEND_ONLY = ["trip_versions", "billing", "usage_ledger"] as const;
 const APPLICATIVE_ROLES = ["vadrouille_app", "vadrouille_auth", "vadrouille_share", "vadrouille_webhook", "vadrouille_account_admin", "vadrouille_limiter"];
 
-let app: pg.Client;
-let admin: pg.Client;
-let migrator: pg.Client;
+let app: DbClient;
+let admin: DbClient;
+let migrator: DbClient;
 let a: SeedIds;
 
 beforeAll(async () => {
@@ -31,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(closeAll);
 
-async function inAdminTx(fn: (c: pg.Client) => Promise<void>): Promise<void> {
+async function inAdminTx(fn: (c: DbClient) => Promise<void>): Promise<void> {
   await admin.query("BEGIN");
   try {
     // Un set_config quelconque ne lève pas le déclencheur (seul current_user compte).

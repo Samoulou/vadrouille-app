@@ -21,6 +21,9 @@ const eslint = new ESLint({ cwd: process.cwd() });
 const GUARD = "ligne/no-p0-server-modules";
 const SERVER_ONLY = "ligne/require-server-only";
 
+/** Règles de la configuration calculée d'un fichier, lues par `Map` (objet `any` d'ESLint : spécification P0c, 2.6). */
+const rulesOf = (config: { rules?: Record<string, unknown> } | undefined) => new Map(Object.entries(config?.rules ?? {}));
+
 async function guardMessages(code: string, filePath: string) {
   const [result] = await eslint.lintText(code, { filePath });
   return result?.messages.filter((m) => m.ruleId === GUARD) ?? [];
@@ -174,8 +177,8 @@ describe("src/ai, src/research et src/grounding restent hors du code client (000
       .filter((f) => !skipped.test(f) && !/\.(test|spec)\.(ts|tsx)$/.test(f));
     expect(files.length).toBeGreaterThan(100);
     for (const filePath of [...files, ...IN_SCOPE]) {
-      const config = await eslint.calculateConfigForFile(filePath);
-      expect(config?.rules?.[GUARD], filePath).toEqual([2]);
+      const rules = rulesOf(await eslint.calculateConfigForFile(filePath));
+      expect(rules.get(GUARD), filePath).toEqual([2]);
     }
   });
 });
@@ -225,8 +228,8 @@ describe("exception de server-only : liste fermée de 20 fichiers", () => {
   it("aucun autre fichier de src/ai, src/research, src/grounding n'est exempté", async () => {
     const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of present) {
-      const config = await eslint.calculateConfigForFile(filePath);
-      const exempted = config?.rules?.[SERVER_ONLY] === undefined;
+      const rules = rulesOf(await eslint.calculateConfigForFile(filePath));
+      const exempted = rules.get(SERVER_ONLY) === undefined;
       expect(exempted, filePath).toBe(EXEMPTED.includes(filePath));
     }
   });
