@@ -5,8 +5,9 @@ import { useRef } from "react";
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
-import type { Proposal } from "@/contracts";
+import type { Proposal, Weekday } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 
 const t = messages.presentation;
 
@@ -19,6 +20,11 @@ export function formatVerifiedAt(iso: string): string {
 export interface ProposalDetailSheetProps {
   /** Proposition affichée ; `null` ferme la feuille. */
   proposal: Proposal | null;
+  /**
+   * Jour de la semaine de la proposition, calculé par l'écran depuis la date de son jour (évolution E1 de B2) ;
+   * `null` si la date est illisible : la phrase s'écrit alors sans le jour de la semaine.
+   */
+  weekday: Weekday | null;
   onClose: () => void;
   /** Rend le focus à la carte à la fermeture (handover § 7). */
   onReturnFocus: () => void;
@@ -33,9 +39,10 @@ export interface ProposalDetailSheetProps {
  * Détail d'une proposition (F6-PO-12, provisoire UX/UI) : feuille modale en lecture seule ; aucune
  * décision ne s'y prend. Quand `ReasonBlock` existera (F5), le détail l'utilisera.
  */
-export function ProposalDetailSheet({ proposal, onClose, onReturnFocus, placesFromGoogle = false }: ProposalDetailSheetProps) {
+export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus, placesFromGoogle = false }: ProposalDetailSheetProps) {
   const title = useRef<HTMLHeadingElement>(null);
   const stop = proposal?.stop;
+  const faits = stop ? formatFaits(stop.facts) : "";
   return (
     <Dialog open={proposal !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
       {proposal && stop ? (
@@ -53,12 +60,14 @@ export function ProposalDetailSheet({ proposal, onClose, onReturnFocus, placesFr
         >
           <div className="flex flex-col gap-1">
             <p className="text-corps-s text-ink-soft tabular-nums">
-              {format(t.detail.moment, { day: proposal.day, weekday: proposal.weekday, time: proposal.time })}
+              {weekday
+                ? format(t.detail.moment, { day: proposal.day, weekday, time: proposal.time })
+                : format(t.detail.momentSansJour, { day: proposal.day, time: proposal.time })}
             </p>
             <DialogTitle ref={title} tabIndex={-1} className="text-section font-extrabold text-ink">
               {stop.name}
             </DialogTitle>
-            <p className="text-corps-s text-ink-soft">{stop.meta}</p>
+            {faits ? <p className="text-corps-s text-ink-soft">{faits}</p> : null}
           </div>
           {stop.reason ? <p className="rounded-block bg-muted px-4 py-3 text-corps text-ink-2">{stop.reason}</p> : null}
           {stop.source ? (

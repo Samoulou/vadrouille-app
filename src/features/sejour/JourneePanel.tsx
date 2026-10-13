@@ -3,6 +3,7 @@ import { DayLine } from "@/components/ligne/DayLine";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { Day } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { formatTitreJour } from "@/lib/dates";
 
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
 import { EventLines } from "./EventLines";
@@ -30,7 +31,7 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
       <header className="flex flex-col gap-1">
-        <h1 className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{day.title}</h1>
+        <h1 className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{formatTitreJour(day.date)}</h1>
         {day.generating ? null : (
           <p data-part="trajet-budget" className="text-corps-s text-ink-soft tabular-nums">
             {dayTravelLine(day)}

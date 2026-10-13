@@ -22,7 +22,7 @@ describe("sejour: 404 hors organisation ou hors limites (lecture)", () => {
   it("voyage inconnu ou d'une autre organisation : null", async () => {
     expect(await readTrip(adapter, MOCK_DEMO_TRIP.ctx, "inconnu")).toBeNull();
     expect(await readTrip(adapter, MOCK_DEMO_TRIP.ctx, "autre_trip")).toBeNull();
-    expect(await readTrip(adapter, { organizationId: "autre_org" }, MOCK_DEMO_TRIP.tripId)).toBeNull();
+    expect(await readTrip(adapter, { organizationId: "autre_org", userId: "user_test", role: "owner" as const }, MOCK_DEMO_TRIP.tripId)).toBeNull();
   });
 
   it.each(["0", "7", "02", "abc", "1.5", "-1", "", " 2"])("n = « %s » : hors limites", (n) => {

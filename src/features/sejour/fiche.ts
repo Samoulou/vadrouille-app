@@ -1,5 +1,6 @@
 import type { Day, Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { formatTitreJour } from "@/lib/dates";
 
 import { eventRange } from "./EventLines";
 
@@ -28,6 +29,6 @@ export function findFicheTarget(day: Day, etape: string | null | undefined): Fic
 }
 
 /** Moment de la fiche : « J2 · Dimanche 30 août · 10:50 – 11:50 », ou l'heure de début seule sans fin. */
-export function ficheMoment(day: Pick<Day, "index" | "title">, stop: Pick<Stop, "start" | "end">): string {
-  return format(messages.sejour.fiche.moment, { n: day.index, title: day.title, range: eventRange(stop) });
+export function ficheMoment(day: Pick<Day, "index" | "date">, stop: Pick<Stop, "start" | "end">): string {
+  return format(messages.sejour.fiche.moment, { n: day.index, title: formatTitreJour(day.date), range: eventRange(stop) });
 }

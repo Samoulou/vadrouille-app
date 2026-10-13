@@ -1,4 +1,4 @@
-import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
+import type { Day, DayLineItem, PreviewSlot, Proposal, ProposalNeighbours, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
 
 /**
  * Voyage simulé à Édimbourg (spécification F1).
@@ -18,6 +18,8 @@ import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } fr
  */
 
 export const MOCK_ORGANIZATION_ID = "mock_org_personnelle";
+/** Personne simulée, propriétaire de l'organisation simulée (évolution E6). */
+export const MOCK_USER_ID = "mock_user_proprietaire";
 export const EDIMBOURG_TRIP_ID = "mock_trip_edimbourg";
 
 /**
@@ -61,7 +63,7 @@ const j1Dejeuner: Stop = {
   name: "[Petite adresse du Grassmarket]",
   start: "12:45",
   end: "13:45",
-  meta: "[Grassmarket, cuisine écossaise, 1 h]",
+  facts: { area: "[Grassmarket]", durationMinutes: 60 },
   reason: "[Tu as demandé des adresses simples le midi]",
   exceptions: [],
   locked: false,
@@ -73,7 +75,7 @@ const j1Chateau: Stop = {
   name: "[Château d'Édimbourg]",
   start: "14:00",
   end: "16:00",
-  meta: "[Old Town, 2 h, billet]",
+  facts: { area: "[Old Town]", durationMinutes: 120 },
   reason: "[Tu as choisi l'histoire : le site le plus ancien de la ville]",
   exceptions: ["toReserve"],
   locked: false,
@@ -85,7 +87,7 @@ const j1Diner: Stop = {
   name: "[Bonne table de l'Old Town]",
   start: "18:45",
   end: "20:15",
-  meta: "[Old Town, cuisine écossaise moderne, 1 h 30]",
+  facts: { area: "[Old Town]", durationMinutes: 90 },
   reason: "[Tu as choisi une bonne table avant le Tattoo, à 15 min à pied]",
   exceptions: ["toReserve"],
   locked: false,
@@ -97,7 +99,7 @@ const j1DinerOption2: Stop = {
   name: "[Bistrot de Victoria Street]",
   start: "18:45",
   end: "20:15",
-  meta: "[Old Town, bistrot, 1 h 30]",
+  facts: { area: "[Old Town]", durationMinutes: 90 },
   reason: "[Tu as choisi une bonne table avant le Tattoo, à 10 min à pied]",
   exceptions: ["toReserve"],
   locked: false,
@@ -109,7 +111,7 @@ const j1Tattoo: Stop = {
   name: "[Royal Edinburgh Military Tattoo]",
   start: "21:30",
   end: "23:00",
-  meta: "[Esplanade du château, 1 h 30, billets réservés]",
+  facts: { area: "[Esplanade du château]", durationMinutes: 90 },
   reason: "[Ton engagement : billets déjà réservés pour le samedi]",
   source: { label: "[Site officiel du Tattoo]", url: "https://example.org/mock/tattoo" },
   verifiedAt: "2026-08-20",
@@ -127,7 +129,7 @@ const j2RoyalMile: Stop = {
   name: "[Royal Mile]",
   start: "09:15",
   end: "10:30",
-  meta: "[Old Town, 1 h 15, gratuit]",
+  facts: { area: "[Old Town]", durationMinutes: 75, costPerPerson: 0 },
   reason: "[Tu as choisi la flânerie dans les vieux quartiers]",
   exceptions: [],
   locked: false,
@@ -139,7 +141,7 @@ const j2DeanVillage: Stop = {
   name: "[Dean Village]",
   start: "10:50",
   end: "11:50",
-  meta: "[Water of Leith, 1 h, gratuit]",
+  facts: { area: "[Water of Leith]", durationMinutes: 60, costPerPerson: 0 },
   reason: "[Tu as choisi les balades : un village au bord de l'eau en pleine ville]",
   exceptions: [],
   locked: false,
@@ -150,7 +152,7 @@ const j2Dejeuner: Stop = {
   name: "[Café de Stockbridge]",
   start: "12:05",
   end: "13:15",
-  meta: "[Stockbridge, brunch, 1 h]",
+  facts: { area: "[Stockbridge]", durationMinutes: 60 },
   reason: "[Tu as demandé des adresses simples le midi]",
   exceptions: [],
   locked: false,
@@ -162,7 +164,7 @@ const j2Jardin: Stop = {
   name: "[Jardin botanique royal]",
   start: "13:25",
   end: "15:00",
-  meta: "[Inverleith, 1 h 30, gratuit]",
+  facts: { area: "[Inverleith]", durationMinutes: 90, costPerPerson: 0 },
   reason: "[Tu as choisi les parcs et jardins]",
   exceptions: [],
   locked: false,
@@ -173,7 +175,7 @@ const j2Diner: Stop = {
   name: "[Bonne table de New Town]",
   start: "19:00",
   end: "20:30",
-  meta: "[New Town, fruits de mer, 1 h 30]",
+  facts: { area: "[New Town]", durationMinutes: 90 },
   reason: "[Tu as choisi une bonne table le dimanche soir]",
   exceptions: ["toReserve"],
   locked: false,
@@ -184,7 +186,7 @@ const j2Concert: Stop = {
   name: "[Concert d'orgue à St Giles]",
   start: "18:00",
   end: "19:00",
-  meta: "[Old Town, 1 h]",
+  facts: { area: "[Old Town]", durationMinutes: 60 },
   reason: "[Tu as choisi la musique]",
   exceptions: ["unconfirmed"],
   locked: false,
@@ -197,7 +199,7 @@ const j3Excursion: Stop = {
   name: "[Excursion guidée dans les Highlands]",
   start: "08:00",
   end: "20:00",
-  meta: "[Journée entière en car, Glencoe et Loch Ness]",
+  facts: { area: "[Glencoe et Loch Ness]", durationMinutes: 720 },
   reason: "[Tu as demandé une journée dans les Highlands]",
   exceptions: ["toReserve"],
   locked: false,
@@ -208,7 +210,7 @@ const j3Diner: Stop = {
   name: "[Pub du Grassmarket]",
   start: "20:30",
   end: "21:30",
-  meta: "[Grassmarket, pub, 1 h]",
+  facts: { area: "[Grassmarket]", durationMinutes: 60 },
   reason: "[Près de l'arrivée du car, pour une soirée simple]",
   exceptions: [],
   locked: false,
@@ -222,7 +224,7 @@ const j4CaltonHill: Stop = {
   name: "[Calton Hill]",
   start: "09:15",
   end: "10:15",
-  meta: "[New Town, 1 h, gratuit]",
+  facts: { area: "[New Town]", durationMinutes: 60, costPerPerson: 0 },
   reason: "[Tu as choisi les points de vue]",
   exceptions: [],
   locked: false,
@@ -234,7 +236,7 @@ const j4Holyrood: Stop = {
   name: "[Palais de Holyrood]",
   start: "10:35",
   end: "12:00",
-  meta: "[Holyrood, 1 h 30, billet]",
+  facts: { area: "[Holyrood]", durationMinutes: 90 },
   reason: "[Tu as choisi l'histoire]",
   exceptions: ["toConfirm"],
   locked: false,
@@ -245,7 +247,7 @@ const j4Dejeuner: Stop = {
   name: "[Café de Canongate]",
   start: "12:10",
   end: "13:10",
-  meta: "[Canongate, soupes et sandwichs, 1 h]",
+  facts: { area: "[Canongate]", durationMinutes: 60 },
   reason: "[Sur ton chemin entre Holyrood et Arthur's Seat]",
   exceptions: [],
   locked: false,
@@ -257,7 +259,7 @@ const j4ArthursSeat: Stop = {
   name: "[Arthur's Seat]",
   start: "13:20",
   end: "15:30",
-  meta: "[Holyrood Park, 2 h, gratuit]",
+  facts: { area: "[Holyrood Park]", durationMinutes: 120, costPerPerson: 0 },
   reason: "[Tu as choisi les balades : le point de vue le plus connu de la ville]",
   exceptions: [],
   locked: false,
@@ -268,7 +270,7 @@ const j4Diner: Stop = {
   name: "[Petite adresse de l'Old Town]",
   start: "19:00",
   end: "20:15",
-  meta: "[Old Town, cuisine végétarienne, 1 h 15]",
+  facts: { area: "[Old Town]", durationMinutes: 75 },
   reason: "[Tu as demandé des adresses simples en semaine]",
   exceptions: [],
   locked: false,
@@ -279,7 +281,7 @@ const j4Marche: Stop = {
   name: "[Marché nocturne de Leith]",
   start: "17:00",
   end: "21:00",
-  meta: "[Leith, 4 h]",
+  facts: { area: "[Leith]", durationMinutes: 240 },
   reason: "[Tu as choisi les marchés]",
   exceptions: ["unconfirmed"],
   locked: false,
@@ -293,7 +295,7 @@ const j5Musee: Stop = {
   name: "[Musée national d'Écosse]",
   start: "09:45",
   end: "11:30",
-  meta: "[Old Town, 1 h 45, gratuit]",
+  facts: { area: "[Old Town]", durationMinutes: 105, costPerPerson: 0 },
   reason: "[Tu as choisi l'histoire]",
   exceptions: [],
   locked: false,
@@ -304,7 +306,7 @@ const j5Dejeuner: Stop = {
   name: "[Petite adresse de Chambers Street]",
   start: "11:40",
   end: "12:30",
-  meta: "[Old Town, cuisine écossaise, 50 min]",
+  facts: { area: "[Old Town]", durationMinutes: 50 },
   reason: "[Avant le bus pour la distillerie]",
   exceptions: [],
   locked: false,
@@ -316,7 +318,7 @@ const j5Distillerie: Stop = {
   name: "[Distillerie accessible en bus]",
   start: "13:30",
   end: "15:00",
-  meta: "[East Lothian, 1 h 30, dégustation]",
+  facts: { area: "[East Lothian]", durationMinutes: 90 },
   reason: "[Tu as demandé une distillerie sans voiture]",
   source: { label: "[Site de la distillerie]", url: "https://example.org/mock/distillerie" },
   verifiedAt: "2026-08-15",
@@ -329,7 +331,7 @@ const j5Diner: Stop = {
   name: "[Occasion spéciale à Leith]",
   start: "19:00",
   end: "21:00",
-  meta: "[Leith, menu dégustation, 2 h]",
+  facts: { area: "[Leith]", durationMinutes: 120 },
   reason: "[Tu as demandé une occasion spéciale pour l'avant-dernier soir]",
   exceptions: ["toReserve"],
   locked: false,
@@ -343,7 +345,7 @@ const j6Galerie: Stop = {
   name: "[Galerie nationale d'Écosse]",
   start: "09:15",
   end: "11:00",
-  meta: "[Princes Street, 1 h 45, gratuit]",
+  facts: { area: "[Princes Street]", durationMinutes: 105, costPerPerson: 0 },
   reason: "[Tu as choisi la peinture]",
   exceptions: [],
   locked: false,
@@ -354,7 +356,7 @@ const j6Brunch: Stop = {
   name: "[Brunch de New Town]",
   start: "11:15",
   end: "12:15",
-  meta: "[New Town, brunch, 1 h]",
+  facts: { area: "[New Town]", durationMinutes: 60 },
   reason: "[Près de la gare avant le départ]",
   exceptions: [],
   locked: false,
@@ -367,7 +369,7 @@ const j2Surprise: SurpriseIdea = {
   id: "j2-surprise-circus-lane",
   placeId: "mock_place_circus_lane",
   name: "[Circus Lane]",
-  meta: "[Stockbridge, 20 min, gratuit]",
+  facts: { area: "[Stockbridge]", durationMinutes: 20, costPerPerson: 0 },
   reason: "[Tu as choisi les balades : une ruelle fleurie à deux pas de ton déjeuner]",
   source: { label: "[Office du tourisme d'Édimbourg]", url: "https://example.org/mock/circus-lane" },
   verifiedAt: "2026-08-18",
@@ -376,7 +378,7 @@ const j4Surprise: SurpriseIdea = {
   id: "j4-surprise-dunbars-close",
   placeId: "mock_place_dunbars_close",
   name: "[Jardin de Dunbar's Close]",
-  meta: "[Canongate, 20 min, gratuit]",
+  facts: { area: "[Canongate]", durationMinutes: 20, costPerPerson: 0 },
   reason: "[Tu as choisi les parcs et jardins : un jardin caché sur ton chemin vers Holyrood]",
   source: { label: "[Site du jardin]", url: "https://example.org/mock/dunbars-close" },
 };
@@ -387,8 +389,6 @@ const days: Day[] = [
   {
     index: 1,
     date: "2026-08-29",
-    weekday: "sam.",
-    title: "Samedi 29 août",
     items: [
       startAt("12:00", "[Arrivée, aéroport d'Édimbourg]"),
       segment("car", 35, true),
@@ -413,8 +413,6 @@ const days: Day[] = [
   {
     index: 2,
     date: "2026-08-30",
-    weekday: "dim.",
-    title: "Dimanche 30 août",
     items: [
       startAt("09:00", HOTEL),
       walk(10),
@@ -441,8 +439,6 @@ const days: Day[] = [
   {
     index: 3,
     date: "2026-08-31",
-    weekday: "lun.",
-    title: "Lundi 31 août",
     items: [
       startAt("07:30", HOTEL),
       walk(15),
@@ -461,8 +457,6 @@ const days: Day[] = [
   {
     index: 4,
     date: "2026-09-01",
-    weekday: "mar.",
-    title: "Mardi 1er septembre",
     items: [
       startAt("09:00", HOTEL),
       walk(15),
@@ -489,8 +483,6 @@ const days: Day[] = [
   {
     index: 5,
     date: "2026-09-02",
-    weekday: "mer.",
-    title: "Mercredi 2 septembre",
     items: [
       startAt("09:30", HOTEL),
       walk(15),
@@ -517,8 +509,6 @@ const days: Day[] = [
   {
     index: 6,
     date: "2026-09-03",
-    weekday: "jeu.",
-    title: "Jeudi 3 septembre",
     items: [
       startAt("09:00", HOTEL),
       walk(15),
@@ -552,41 +542,47 @@ export const edimbourg: Trip = {
   travellers: { adults: 2, children: 0 },
   days,
   checklist: [
+    // Moments (évolution E4) : « Déjà réservé » et « Avant le départ » → `beforeDeparture` ; « Au plus tôt » →
+    // `beforeDeparture` (Q42, B2-PO-1) ; « Une semaine avant » → date limite au début du voyage moins 7 jours.
     {
       id: "check-tattoo",
       label: "[Billets du Tattoo]",
-      when: "[Déjà réservé]",
+      when: { type: "beforeDeparture" },
       done: true,
       sponsored: false,
+      stopId: "j1-tattoo",
     },
     {
       id: "check-excursion",
       label: "[Excursion dans les Highlands]",
-      when: "[Au plus tôt]",
+      when: { type: "beforeDeparture" },
       done: false,
       bookingUrl: "https://example.org/mock/excursion",
       sponsored: false,
+      stopId: "j3-excursion-highlands",
     },
     {
       id: "check-chateau",
       label: "[Château d'Édimbourg]",
-      when: "[Une semaine avant]",
+      when: { type: "deadline", date: "2026-08-22" },
       done: false,
       bookingUrl: "https://example.org/mock/chateau",
       sponsored: false,
+      stopId: "j1-chateau",
     },
     {
       id: "check-distillerie",
       label: "[Visite de la distillerie]",
-      when: "[Une semaine avant]",
+      when: { type: "deadline", date: "2026-08-22" },
       done: false,
       bookingUrl: "https://example.org/mock/distillerie",
       sponsored: false,
+      stopId: "j5-distillerie",
     },
     {
       id: "check-assurance",
       label: "[Assurance voyage]",
-      when: "[Avant le départ]",
+      when: { type: "beforeDeparture" },
       done: false,
       bookingUrl: "https://example.org/mock/assurance",
       sponsored: true,
@@ -597,14 +593,21 @@ export const edimbourg: Trip = {
 
 // --- Propositions (« Tes premières propositions », 8 cartes, D11) ----------
 
+/*
+ * Voisins (évolution E2) : éléments de la ligne du jour simulée qui précèdent et suivent le créneau, trajets
+ * ignorés (décision 0037, B2-TL-1). Valeurs fixes : le calcul appartient au moteur (B5).
+ */
+const LUNCH_THEN_FREE: ProposalNeighbours = { before: { type: "meal", meal: "lunch" }, after: { type: "free" } };
+/** Dîner du J1 : temps libre avant (16:00–18:30) et après (20:30–21:15, avant le Tattoo). */
+const FREE_AROUND: ProposalNeighbours = { before: { type: "free" }, after: { type: "free" } };
+
 export const propositions: Proposal[] = [
   {
     id: "prop-j1-chateau",
     kind: "activity",
     day: 1,
-    weekday: "sam.",
     time: j1Chateau.start,
-    context: "[Après ton déjeuner au Grassmarket]",
+    neighbours: LUNCH_THEN_FREE,
     stop: j1Chateau,
     category: "museum",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
@@ -613,9 +616,8 @@ export const propositions: Proposal[] = [
     id: "prop-j1-diner-1",
     kind: "meal",
     day: 1,
-    weekday: "sam.",
     time: j1Diner.start,
-    context: "[Avant le Tattoo]",
+    neighbours: FREE_AROUND,
     stop: j1Diner,
     category: "restaurant",
     option: { index: 1, total: 2 },
@@ -625,9 +627,8 @@ export const propositions: Proposal[] = [
     id: "prop-j1-diner-2",
     kind: "meal",
     day: 1,
-    weekday: "sam.",
     time: j1DinerOption2.start,
-    context: "[Avant le Tattoo]",
+    neighbours: FREE_AROUND,
     stop: j1DinerOption2,
     category: "restaurant",
     option: { index: 2, total: 2 },
@@ -637,9 +638,8 @@ export const propositions: Proposal[] = [
     id: "prop-j2-dean-village",
     kind: "activity",
     day: 2,
-    weekday: "dim.",
     time: j2DeanVillage.start,
-    context: "[Entre le Royal Mile et ton déjeuner]",
+    neighbours: { before: { type: "stop", stopId: j2RoyalMile.id }, after: { type: "meal", meal: "lunch" } },
     stop: j2DeanVillage,
     category: "walk",
     travelFromPrevious: { mode: "walk", minutes: 20, estimated: false },
@@ -648,9 +648,8 @@ export const propositions: Proposal[] = [
     id: "prop-j2-jardin-botanique",
     kind: "activity",
     day: 2,
-    weekday: "dim.",
     time: j2Jardin.start,
-    context: "[Après ton déjeuner à Stockbridge]",
+    neighbours: LUNCH_THEN_FREE,
     stop: j2Jardin,
     category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
@@ -659,9 +658,8 @@ export const propositions: Proposal[] = [
     id: "prop-j4-arthurs-seat",
     kind: "activity",
     day: 4,
-    weekday: "mar.",
     time: j4ArthursSeat.start,
-    context: "[Entre ton déjeuner et ton temps libre]",
+    neighbours: LUNCH_THEN_FREE,
     stop: j4ArthursSeat,
     category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 10, estimated: false },
@@ -670,9 +668,8 @@ export const propositions: Proposal[] = [
     id: "prop-j5-musee-national",
     kind: "activity",
     day: 5,
-    weekday: "mer.",
     time: j5Musee.start,
-    context: "[Avant ton déjeuner]",
+    neighbours: { before: { type: "terminus", role: "start" }, after: { type: "meal", meal: "lunch" } },
     stop: j5Musee,
     category: "museum",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
@@ -681,14 +678,48 @@ export const propositions: Proposal[] = [
     id: "prop-j5-distillerie",
     kind: "activity",
     day: 5,
-    weekday: "mer.",
     time: j5Distillerie.start,
-    context: "[Entre ton déjeuner et ton temps libre]",
+    neighbours: LUNCH_THEN_FREE,
     stop: j5Distillerie,
     category: "tasting",
     travelFromPrevious: { mode: "transit", minutes: 50, estimated: true },
     detour: "[La distillerie la plus proche accessible sans voiture]",
   },
+];
+
+// --- Aperçu (écran 6, évolution E5, B2-PO-9) ----------------------------------
+
+const [chateau, diner1, , deanVillage, jardin, arthursSeat, musee, distillerie] = propositions as [
+  Proposal,
+  Proposal,
+  Proposal,
+  Proposal,
+  Proposal,
+  Proposal,
+  Proposal,
+  Proposal,
+];
+
+/**
+ * Aperçu du voyage non débloqué : 8 cases dans l'ordre (jour, heure), 7 propositions et une case `noOption`.
+ *
+ * - Case `noOption` : J4 à 16:00, activité. L'après-midi du J4 est un temps libre dans la ligne du jour simulée
+ *   (15:30–18:45) : c'est le créneau d'activité pour lequel l'aperçu simulé n'a trouvé aucun lieu ancré. La case
+ *   n'a ni lieu ni texte ; l'écran la nomme dans un bandeau, jamais comme une carte.
+ * - Dîner du J1 : deux cases ne partagent pas un créneau (jour, heure) (`PreviewSlotsSchema`), donc une seule
+ *   option y figure, sans `option` (« 1 sur 2 » n'aurait pas de seconde carte). `listProposals` garde les deux.
+ */
+const diner1SansOption: Proposal = { ...diner1 };
+delete diner1SansOption.option;
+export const apercu: PreviewSlot[] = [
+  { type: "proposal", proposal: chateau },
+  { type: "proposal", proposal: diner1SansOption },
+  { type: "proposal", proposal: deanVillage },
+  { type: "proposal", proposal: jardin },
+  { type: "proposal", proposal: arthursSeat },
+  { type: "noOption", day: 4, time: "16:00", kind: "activity" },
+  { type: "proposal", proposal: musee },
+  { type: "proposal", proposal: distillerie },
 ];
 
 // --- Voyage débloqué (écran 6b, décision 0013 § 3.6) -----------------------
@@ -714,7 +745,7 @@ const j3DinerOption2: Stop = {
   name: "[Brasserie du Grassmarket]",
   start: "20:30",
   end: "21:30",
-  meta: "[Grassmarket, brasserie, 1 h]",
+  facts: { area: "[Grassmarket]", durationMinutes: 60 },
   reason: "[Près de l'arrivée du car, à 5 min à pied]",
   exceptions: [],
   locked: false,
@@ -726,7 +757,7 @@ const j3DinerOption3: Stop = {
   name: "[Petite adresse de Cowgate]",
   start: "20:30",
   end: "21:30",
-  meta: "[Cowgate, cuisine écossaise, 1 h]",
+  facts: { area: "[Cowgate]", durationMinutes: 60 },
   reason: "[Près de l'arrivée du car, à 10 min à pied]",
   exceptions: ["toConfirm"],
   locked: false,
@@ -736,9 +767,8 @@ const j3DinerOptions: Proposal[] = [j3Diner, j3DinerOption2, j3DinerOption3].map
   id: `prop-j3-diner-${i + 1}`,
   kind: "meal",
   day: 3,
-  weekday: "lun.",
   time: stop.start,
-  context: "[Après le retour du car]",
+  neighbours: { before: { type: "stop", stopId: j3Excursion.id }, after: { type: "terminus", role: "end" } },
   stop,
   category: "restaurant",
   option: { index: i + 1, total: 3 },
@@ -754,9 +784,8 @@ export const propositionsDebloque: Proposal[] = [
     id: "prop-j3-excursion-highlands",
     kind: "activity",
     day: 3,
-    weekday: "lun.",
     time: j3Excursion.start,
-    context: "[Ta journée dans les Highlands]",
+    neighbours: { before: { type: "terminus", role: "start" }, after: { type: "meal", meal: "dinner" } },
     stop: j3Excursion,
     category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
@@ -766,9 +795,8 @@ export const propositionsDebloque: Proposal[] = [
     id: "prop-j4-calton-hill",
     kind: "activity",
     day: 4,
-    weekday: "mar.",
     time: j4CaltonHill.start,
-    context: "[Pour commencer la journée]",
+    neighbours: { before: { type: "terminus", role: "start" }, after: { type: "stop", stopId: j4Holyrood.id } },
     stop: j4CaltonHill,
     category: "nature",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },
@@ -777,9 +805,8 @@ export const propositionsDebloque: Proposal[] = [
     id: "prop-j4-holyrood",
     kind: "activity",
     day: 4,
-    weekday: "mar.",
     time: j4Holyrood.start,
-    context: "[Entre Calton Hill et ton déjeuner]",
+    neighbours: { before: { type: "stop", stopId: j4CaltonHill.id }, after: { type: "meal", meal: "lunch" } },
     stop: j4Holyrood,
     category: "museum",
     travelFromPrevious: { mode: "walk", minutes: 20, estimated: false },
@@ -788,9 +815,8 @@ export const propositionsDebloque: Proposal[] = [
     id: "prop-j4-diner",
     kind: "meal",
     day: 4,
-    weekday: "mar.",
     time: j4Diner.start,
-    context: "[Après ton temps libre]",
+    neighbours: { before: { type: "free" }, after: { type: "terminus", role: "end" } },
     stop: j4Diner,
     category: "restaurant",
     travelFromPrevious: { mode: "walk", minutes: 15, estimated: false },

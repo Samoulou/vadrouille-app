@@ -9,7 +9,7 @@ import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, DUREE_SENTINELLE_MINUTES } from "@/mocks/prototype-relecteur";
 import { PROTOTYPE_ORG_ID, ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
-import { getRequestContext } from "./context";
+import { getRequestContext, PROTOTYPE_USER_ID } from "./context";
 import { getTripAdapter, prototypeRelectures } from "./index";
 import { createPrototypeAdapter, RelectureError, type PaireRelecture, type SourceProgrammes } from "./prototype";
 import { createProgrammeLoader } from "./prototype-loader";
@@ -17,7 +17,7 @@ import { createProgrammeLoader } from "./prototype-loader";
 const ROOT = process.cwd();
 const DOSSIER_TEST = realpathSync(join(ROOT, "prototype", "programmes-test"));
 const TRIP_ID = "proto_test_20261012_1";
-const ctx = { organizationId: PROTOTYPE_ORG_ID };
+const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owner" as const };
 
 function programmeDeTest(): ProgrammeReduit {
   return ProgrammeReduitSchema.parse(JSON.parse(readFileSync(join(DOSSIER_TEST, `${TRIP_ID}.json`), "utf8")));
@@ -81,7 +81,7 @@ describe("adaptateurs: prototype refusÃ© en production et hors liste blanche (dÃ
   ])("ouvert : %s", (_cas, valeurs) => {
     const env = asEnv(valeurs);
     expect(prototypeAdapterAllowed(env)).toBe(true);
-    expect(getRequestContext("prototype", env)).toEqual({ organizationId: PROTOTYPE_ORG_ID });
+    expect(getRequestContext("prototype", env)).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
     expect(() => getTripAdapter("prototype", env)).not.toThrow();
   });
 });
@@ -199,7 +199,7 @@ describe("adaptateurs: prototype ne renvoie rien pour une autre organisation", (
   it("getTrip, getDay, listProposals, getDayMap, getTripMap et listTrips", async () => {
     const relecteur = createRelecteurSimule();
     const adapter = createPrototypeAdapter({ programmes: source(), relecteurs: { trajets: relecteur } });
-    const autre = { organizationId: "mock_org_edimbourg" };
+    const autre = { organizationId: "mock_org_edimbourg", userId: "user_test", role: "owner" as const };
     expect(await adapter.getTrip(autre, TRIP_ID)).toBeNull();
     expect(await adapter.getDay(autre, TRIP_ID, 1)).toBeNull();
     expect(await adapter.listProposals(autre, TRIP_ID)).toEqual([]);

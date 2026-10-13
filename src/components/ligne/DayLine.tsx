@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { Meal, Segment, Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
+import { formatFaits } from "@/lib/faits";
 import { cn } from "@/lib/utils";
 
 import { StopMarker } from "./StopMarker";
@@ -101,7 +102,7 @@ function Terminus({ role, time, label }: DayLineTerminusProps) {
  * partagée (sans `id`, `reason`, `placeId`, `locked`, `source` ni `verifiedAt`, avec une clé locale au jour).
  * La ligne ne lit jamais `placeId`, `source` ni `verifiedAt`.
  */
-export type DayLineViewStop = Pick<Stop, "name" | "start" | "meta" | "exceptions"> &
+export type DayLineViewStop = Pick<Stop, "name" | "start" | "facts" | "exceptions"> &
   Partial<Pick<Stop, "id" | "end" | "reason" | "locked">> & {
     /** Clé locale au jour (vue partagée), quand l'étape n'a pas d'`id`. */
     key?: string;
@@ -122,7 +123,7 @@ export interface DayLineStopProps {
   stop: DayLineViewStop;
   /** Adresse de la fiche étape (écran 13) ; sans adresse, l'étape n'est pas interactive (même disposition). */
   href?: string;
-  /** Une ligne : heure, nom, étiquette d'état et `Tag` ; ni `meta`, ni raison, ni mention de verrou. */
+  /** Une ligne : heure, nom, étiquette d'état et `Tag` ; ni faits, ni raison, ni mention de verrou. */
   compact?: boolean;
   state?: DayLineStopState;
 }
@@ -139,6 +140,7 @@ export interface DayLineStopProps {
  */
 function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
   const past = state === "past";
+  const faits = formatFaits(stop.facts);
   const body = (
     <>
       <span className={cn("text-arret font-bold", past ? "text-ink-soft" : "text-ink")}>{stop.name}</span>
@@ -150,7 +152,11 @@ function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
           </span>
         </>
       ) : null}
-      {compact ? null : <span className="text-corps-s text-ink-soft">{stop.meta}</span>}
+      {compact || faits === "" ? null : (
+        <span data-part="faits" className="text-corps-s text-ink-soft">
+          {faits}
+        </span>
+      )}
       {!compact && stop.locked ? (
         <span data-part="verrou" className="text-legende text-ink-soft">
           {t.verrouillee}
@@ -273,7 +279,7 @@ export interface DayLineProps<S extends DayLineViewStop = Stop> {
    * fonction, pas de lien. Remplace l'ancienne prop `ideasHref`.
    */
   getIdeasHref?: (free: { from: string; to: string }) => string;
-  /** Écran 15 : une ligne par élément, ni `meta` ni raison (F10-TL-12). */
+  /** Écran 15 : une ligne par élément, ni faits ni raison (F10-TL-12). */
   compact?: boolean;
   /** Clé de l'étape en cours (`id`, sinon clé locale) : `aria-current="step"` et étiquette « En cours ». */
   currentKey?: string;

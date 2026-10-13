@@ -13,7 +13,7 @@ const scopeName = vi.hoisted(() => ({ value: "actions-1" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-vadrouille-simulation": scopeName.value }) }));
 const revalidate = vi.hoisted(() => vi.fn());
 vi.mock("next/cache", () => ({ revalidatePath: revalidate }));
-const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle" }));
+const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle", userId: "user_test", role: "owner" as const }));
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
   return {
@@ -124,7 +124,7 @@ describe("simulateCheckoutOutcome et getCheckoutStatus", () => {
     expect(await simulateCheckoutOutcome({ checkoutId, outcome: "succeeded" })).toMatchObject({ ok: true, value: { status: "succeeded" } });
     expect(revalidate).toHaveBeenCalledWith(`/voyages/${TRIP}`, "layout");
     const scope = await adapters.getSimulationScope();
-    expect((await adapters.getTripReader({ scope }).getTrip({ organizationId: MOCK_ORGANIZATION_ID }, TRIP))?.unlocked).toBe(true);
+    expect((await adapters.getTripReader({ scope }).getTrip({ organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const }, TRIP))?.unlocked).toBe(true);
   });
 
   it("refus : aucune invalidation, voyage non débloqué", async () => {

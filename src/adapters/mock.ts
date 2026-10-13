@@ -1,12 +1,14 @@
 import {
   DayMapSchema,
   DaySchema,
+  PreviewSlotsSchema,
   ProposalSchema,
   TripSchema,
   TripSummarySchema,
   countToReserve,
   validateDayMap,
   type DayMap,
+  type PreviewSlot,
   type Proposal,
   type Trip,
   type TripSummary,
@@ -16,6 +18,8 @@ import {
   EDIMBOURG_DEBLOQUE_TRIP_ID,
   EDIMBOURG_TRIP_ID,
   MOCK_ORGANIZATION_ID,
+  MOCK_USER_ID,
+  apercu,
   edimbourg,
   edimbourgDebloque,
   propositions,
@@ -28,12 +32,14 @@ import type { AdapterContext, TripAdapter } from "./types";
 interface MockEntry {
   trip: Trip;
   proposals: Proposal[];
+  /** Aperçu d'un voyage non débloqué (évolution E7), facultatif : sans aperçu, liste vide. */
+  previewSlots?: PreviewSlot[];
   /** Positions simulées des jours (F4), facultatives. */
   maps?: DayMap[];
 }
 
 const DEFAULT_ENTRIES: MockEntry[] = [
-  { trip: edimbourg, proposals: propositions, maps: edimbourgCarte },
+  { trip: edimbourg, proposals: propositions, previewSlots: apercu, maps: edimbourgCarte },
   // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué. Ses positions sont dérivées de celles
   // d'Édimbourg, sauf le J6 en préparation (bug n° 106, décision 0017 § 13).
   { trip: edimbourgDebloque, proposals: propositionsDebloque, maps: deriveEdimbourgCarte(edimbourgDebloque) },
@@ -62,15 +68,18 @@ export function toTripSummary(trip: Trip): TripSummary {
   });
 }
 
-/** Organisation simulée, lue seulement par `getRequestContext` quand DATA_ADAPTER vaut `mock`. */
-export const MOCK_REQUEST_CONTEXT: AdapterContext = { organizationId: MOCK_ORGANIZATION_ID };
+/**
+ * Contexte simulé (organisation, personne propriétaire), lu seulement par `getRequestContext` quand DATA_ADAPTER
+ * vaut `mock`.
+ */
+export const MOCK_REQUEST_CONTEXT: AdapterContext = { organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" };
 
 /**
  * Voyage simulé de démonstration, pour les pages de développement qui ne peuvent pas
  * importer `src/mocks` (/dev/carte).
  */
 export const MOCK_DEMO_TRIP = {
-  ctx: { organizationId: MOCK_ORGANIZATION_ID } satisfies AdapterContext,
+  ctx: MOCK_REQUEST_CONTEXT,
   tripId: EDIMBOURG_TRIP_ID,
 } as const;
 
@@ -79,7 +88,7 @@ export const MOCK_DEMO_TRIP = {
  * section « Démonstration » de la page d'accueil (spécification D1, D1-PO-3).
  */
 export const MOCK_DEMO_UNLOCKED_TRIP = {
-  ctx: { organizationId: MOCK_ORGANIZATION_ID } satisfies AdapterContext,
+  ctx: MOCK_REQUEST_CONTEXT,
   tripId: EDIMBOURG_DEBLOQUE_TRIP_ID,
 } as const;
 
@@ -138,6 +147,10 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
     async listProposals(ctx, tripId) {
       const entry = find(ctx, tripId);
       return entry ? ProposalSchema.array().parse(entry.proposals) : [];
+    },
+    async listPreviewSlots(ctx, tripId) {
+      const entry = find(ctx, tripId);
+      return entry ? PreviewSlotsSchema.parse(entry.previewSlots ?? []) : [];
     },
     async getDayMap(ctx, tripId, index) {
       const entry = find(ctx, tripId);

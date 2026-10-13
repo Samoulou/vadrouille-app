@@ -14,6 +14,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Tag } from "@/components/ligne/Tag";
 import { tripRoutes } from "@/features/sejour/routes";
 import { format, messages } from "@/i18n";
+import { formatTitreJour } from "@/lib/dates";
+import { formatFaits } from "@/lib/faits";
 import { registerOfflineFallback } from "@/lib/offline/register";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
@@ -103,6 +105,12 @@ function Tags({ stop }: { stop: TodayStop }) {
   );
 }
 
+/** Ligne de faits d'une étape (évolution E3 de B2) ; rien quand aucun fait n'est connu. */
+function Faits({ stop }: { stop: TodayStop }) {
+  const faits = formatFaits(stop.facts);
+  return faits ? <p className="text-corps-s text-ink-soft">{faits}</p> : null;
+}
+
 function CurrentBlock({ current }: { current: CurrentMoment }) {
   return (
     <Block id="en-ce-moment" title={t.enCeMoment.titre}>
@@ -112,7 +120,7 @@ function CurrentBlock({ current }: { current: CurrentMoment }) {
           {current.stop.end ? (
             <p className="text-heure-l font-bold text-ink-2 tabular-nums">{format(t.enCeMoment.jusqua, { end: current.stop.end })}</p>
           ) : null}
-          <p className="text-corps-s text-ink-soft">{current.stop.meta}</p>
+          <Faits stop={current.stop} />
           <Tags stop={current.stop} />
         </>
       ) : (
@@ -130,7 +138,7 @@ function NextBlock({ next, title, online }: { next: NextUp; title: string; onlin
         {stop.end ? format(t.prochaine.plage, { start: stop.start, end: stop.end }) : stop.start}
       </p>
       <p className="text-arret font-bold text-ink-2">{stop.name}</p>
-      <p className="text-corps-s text-ink-soft">{stop.meta}</p>
+      <Faits stop={stop} />
       <Tags stop={stop} />
       {segment ? (
         <p data-part="pour-y-aller" className="text-corps-s text-ink-soft tabular-nums">
@@ -331,7 +339,7 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
       <>
         <div className="flex flex-col gap-1">
           <p data-part="sous-titre" className="text-corps-s text-ink-soft">
-            {day ? format(t.sousTitre, { destination: trip.destination, n: day.index, title: day.title }) : trip.destination}
+            {day ? format(t.sousTitre, { destination: trip.destination, n: day.index, title: formatTitreJour(day.date) }) : trip.destination}
           </p>
           {deviceTimeDiffers(now, trip.timeZone, zone) ? (
             <p data-part="fuseau" className="text-legende text-ink-soft">
@@ -355,7 +363,7 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
                 ? t.apres
                 : moment.kind === "before" && moment.eve
                   ? t.veille
-                  : format(t.avant, { date: first ? inSentence(first.title) : "" })}
+                  : format(t.avant, { date: first ? inSentence(formatTitreJour(first.date)) : "" })}
             </p>
             {moment.kind === "before" && moment.eve ? <TomorrowBlock day={first} /> : null}
             <Link href={routes.sejour()} prefetch={false} data-part="voir-sejour" className={cn(LINK, "text-corps text-line")}>

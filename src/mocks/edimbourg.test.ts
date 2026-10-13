@@ -55,12 +55,8 @@ describe("jeu Édimbourg : calendrier", () => {
     });
   });
 
-  it("a un weekday cohérent avec la date (le J1 est un samedi)", () => {
-    for (const day of edimbourg.days) {
-      const weekday = WEEKDAYS[new Date(`${day.date}T00:00:00Z`).getUTCDay()];
-      expect(day.weekday, day.date).toBe(weekday);
-    }
-    expect(edimbourg.days[0]?.weekday).toBe("sam.");
+  it("commence un samedi (le jour de la semaine est calculé par l'interface, B2 E1)", () => {
+    expect(WEEKDAYS[new Date(`${edimbourg.days[0]!.date}T00:00:00Z`).getUTCDay()]).toBe("sam.");
   });
 
   it("place le Tattoo le samedi à 21:30, en étape verrouillée", () => {
@@ -217,11 +213,10 @@ describe("jeu Édimbourg : propositions", () => {
     for (const proposal of far) expect(proposal.detour).toBeTruthy();
   });
 
-  it("est cohérente avec le programme : jour, weekday, heure et étape identique", () => {
+  it("est cohérente avec le programme : jour, heure et étape identique", () => {
     for (const proposal of propositions) {
       const day = edimbourg.days.find((candidate) => candidate.index === proposal.day);
       expect(day, proposal.id).toBeDefined();
-      expect(proposal.weekday).toBe(day?.weekday);
       expect(proposal.time).toBe(proposal.stop.start);
       expect(proposal.stop.kind).toBe(proposal.kind);
       const inTrip = day && stopsOf(day).find((stop) => stop.id === proposal.stop.id);
@@ -264,9 +259,9 @@ describe("jeu Édimbourg : aucune donnée Google, montants en nombres", () => {
 
   it("écrit les contenus non vérifiés entre crochets (Q12)", () => {
     const texts = [
-      ...allStops().flatMap((stop) => [stop.name, stop.meta, stop.reason ?? "[]"]),
-      ...propositions.flatMap((p) => [p.context, p.detour ?? "[]", p.stop.name]),
-      ...edimbourg.checklist.flatMap((item) => [item.label, item.when]),
+      ...allStops().flatMap((stop) => [stop.name, stop.facts.area ?? "[]", stop.reason ?? "[]"]),
+      ...propositions.flatMap((p) => [p.detour ?? "[]", p.stop.name]),
+      ...edimbourg.checklist.map((item) => item.label),
       ...edimbourg.days.flatMap((day) =>
         day.items.flatMap((item) => (item.type === "terminus" ? [item.label] : [])),
       ),
@@ -293,7 +288,7 @@ describe("jeu Édimbourg : idées « Surprends-moi » (décision 0015 § 3)", ()
       const idea = day.surprise;
       if (!idea) continue;
       expect(SurpriseIdeaSchema.parse(idea)).toEqual(idea);
-      for (const text of [idea.name, idea.meta, idea.reason, idea.source.label]) expect(text).toMatch(/^\[.*\]$/);
+      for (const text of [idea.name, idea.facts.area ?? "[]", idea.reason, idea.source.label]) expect(text).toMatch(/^\[.*\]$/);
       expect(new URL(idea.source.url).hostname).toBe("example.org");
       if (idea.placeId) expect(idea.placeId).toMatch(/^mock_/);
     }
@@ -368,7 +363,6 @@ describe("jeu Édimbourg débloqué (écran 6b, décision 0013 § 3.6)", () => {
     for (const p of propositionsDebloque) {
       expect(preview.has(p.stop.id), p.id).toBe(false);
       expect(p.stop.locked).toBe(false);
-      expect(p.context).toMatch(/^\[.*\]$/);
       expect(p.stop.name).toMatch(/^\[.*\]$/);
       if (p.stop.placeId) expect(p.stop.placeId).toMatch(/^mock_/);
     }
@@ -383,10 +377,10 @@ describe("jeu Édimbourg débloqué (écran 6b, décision 0013 § 3.6)", () => {
     expect(propositionsDebloque.some((p) => p.day === 6)).toBe(false);
   });
 
-  it("est cohérent avec le programme : jour, weekday, heure", () => {
+  it("est cohérent avec le programme : jour, heure", () => {
     for (const proposal of propositionsDebloque) {
       const day = edimbourgDebloque.days.find((candidate) => candidate.index === proposal.day);
-      expect(proposal.weekday).toBe(day?.weekday);
+      expect(day, proposal.id).toBeDefined();
       expect(proposal.time).toBe(proposal.stop.start);
       expect(proposal.stop.kind).toBe(proposal.kind);
     }

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { propositions } from "../../src/mocks/edimbourg";
+import { apercu } from "../../src/mocks/edimbourg";
 
 import { blockGoogle } from "./carte-helpers";
 import {
@@ -37,15 +37,16 @@ test.afterEach(() => {
 test("presentation: ordre et filtrage du paquet", async ({ page }) => {
   await openDeck(page);
   await expect(page.getByRole("heading", { level: 1, name: "Tes premières propositions" })).toBeAttached();
+  // Aperçu (B2-PO-9) : les cases `proposal` dans l'ordre ; la case `noOption` est nommée par le bandeau, pas une carte.
+  const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal.stop.name] : []));
+  await expect(page.locator("[data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
   const seen: string[] = [];
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < cartes.length; i += 1) {
     seen.push(await cardName(page));
     await expect(progress(page)).toHaveAttribute("aria-valuenow", String(i + 1));
-    // Repas : « Option suivante » sur l'option 1, pour voir les deux options.
-    const next = page.getByRole("button", { name: "Option suivante", exact: true });
-    await ((await next.count()) > 0 ? next.click() : page.getByRole("button", { name: /^(J'aime|Je choisis)$/ }).click());
+    await page.getByRole("button", { name: /^(J'aime|Je choisis)$/ }).click();
   }
-  expect(seen).toEqual(propositions.map((p) => p.stop.name));
+  expect(seen).toEqual(cartes);
   await expect(page.getByRole("heading", { name: "Tu as vu tes premières propositions" })).toBeVisible();
 });
 
@@ -104,7 +105,8 @@ test("presentation: glisser décide ou revient", async ({ page }) => {
 test("presentation: boutons et clavier", async ({ page }) => {
   await openDeck(page);
   await press(page, "Pas pour moi");
-  await expect(page.getByRole("button", { name: "Option suivante" })).toBeFocused();
+  // Dîner du J1 sans seconde option dans l'aperçu (B2-PO-9) : le focus reste sur « Pas pour moi ».
+  await expect(page.getByRole("button", { name: "Pas pour moi" })).toBeFocused();
   await press(page, "Je choisis");
   await card(page).focus();
   await page.keyboard.press("ArrowRight");
@@ -132,9 +134,10 @@ test("presentation: boutons et clavier", async ({ page }) => {
 
 test("presentation: commandes toujours visibles", async ({ page }) => {
   await openDeck(page);
-  for (let i = 0; i < 8; i += 1) {
+  // 7 cartes : la huitième case de l'aperçu est une case `noOption` (B2-PO-9).
+  for (let i = 0; i < 7; i += 1) {
     const progressText = page.locator("[data-part='progression'] [data-part='texte']");
-    await expect(progressText).toHaveText(`${i + 1} sur 8`);
+    await expect(progressText).toHaveText(`${i + 1} sur 7`);
     const controls = [
       progress(page),
       progressText,
@@ -179,7 +182,7 @@ test("presentation: annuler restaure l'état exact", async ({ page }) => {
   await expect(progress(page)).toHaveAccessibleName("Proposition 3 sur 7");
   await expect(toast(page)).toHaveText(/\[Bonne table de l'Old Town\] choisi\./);
   await toast(page).getByRole("button", { name: "Annuler" }).click();
-  await expect(progress(page)).toHaveAccessibleName("Proposition 2 sur 8");
+  await expect(progress(page)).toHaveAccessibleName("Proposition 2 sur 7");
   expect(await cardName(page)).toBe("[Bonne table de l'Old Town]");
   await expect(card(page)).toBeFocused();
   await expect(toast(page)).toHaveCount(0);
@@ -203,17 +206,21 @@ test("presentation: le toast disparaît après 5 s", async ({ page }) => {
 });
 
 test("presentation: créneau de repas", async ({ page }) => {
-  await openDeck(page);
-  await press(page, "J'aime");
-  await expect(card(page)).toContainText("option 1 sur 2");
+  // Les options d'un créneau vivent dans la suite du tri : l'aperçu n'a qu'une case par créneau (B2-PO-9).
+  await openDeck(page, SUITE);
+  await press(page, "J'aime"); // excursion
+  await expect(card(page)).toContainText("option 1 sur 3");
   await expect(page.getByRole("button", { name: "Je choisis" })).toBeVisible();
   await press(page, "Option suivante");
-  await expect(card(page)).toContainText("option 2 sur 2");
+  await expect(card(page)).toContainText("option 2 sur 3");
+  await press(page, "Option suivante");
+  await expect(card(page)).toContainText("option 3 sur 3");
   await expect(page.locator("[data-action='dislike']")).toHaveAccessibleName("Pas pour moi");
   await toast(page).getByRole("button", { name: "Annuler" }).click();
+  await expect(card(page)).toContainText("option 2 sur 3");
   await press(page, "Je choisis");
-  await expect(progress(page)).toHaveAccessibleName("Proposition 3 sur 7");
-  expect(await cardName(page)).toBe("[Dean Village]");
+  await expect(progress(page)).toHaveAccessibleName("Proposition 4 sur 6");
+  expect(await cardName(page)).toBe("[Calton Hill]");
 });
 
 async function refuseTwoMuseums(page: Page) {
@@ -243,11 +250,11 @@ test("presentation: écarter deux musées et répondre", async ({ page }) => {
 });
 
 test("préférences: aucune généralisation sans réponse", async ({ page }) => {
-  await openDeck(page);
-  // Deux « Option suivante » ne la déclenchent jamais.
-  await press(page, "J'aime");
+  // Deux « Option suivante » ne la déclenchent jamais (options d'un créneau : suite du tri, B2-PO-9).
+  await openDeck(page, SUITE);
+  await press(page, "J'aime"); // excursion
   await press(page, "Option suivante");
-  await press(page, "Pas pour moi");
+  await press(page, "Option suivante");
   await expect(dialog(page)).toHaveCount(0);
   await openDeck(page);
   await refuseTwoMuseums(page);

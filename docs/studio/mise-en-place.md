@@ -45,7 +45,7 @@ Les horaires évitent l'heure pile, où un lancement peut prendre quelques minut
 1. R1 fait ouvrir une PR sur une branche `claude/…`, avec le libellé `needs-review` ; le workflow GitHub `auto-merge` active aussitôt la fusion automatique.
 2. La CI GitHub (`ci`) lance tous les tests.
 3. R2 relit et ajoute `techlead-approved`, ou demande des changements.
-4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4).
+4. La porte GitHub (`techlead-gate`) passe au vert quand `techlead-approved` est présent et `changes-requested` absent. Chaque nouveau push retire `techlead-approved` : le nouveau head doit être relu (décision 0023 § 4). Une PR qui modifie `.github/workflows/` attend en plus `owner-approved`, que seul Samuel pose ; la porte le retire si le contenu de `.github/workflows/` change ensuite (décision 0035).
 5. Les deux vérifications vertes, GitHub fusionne ; Vercel déploie `main` sur le staging.
    Comme la fusion est faite avec `GITHUB_TOKEN`, GitHub ne ferme pas les tickets « Closes #n » et ne supprime pas la branche : le workflow `post-merge-cleanup` les rattrape à HH:17 et HH:47 (décision 0033).
 6. Au créneau suivant, R3 écrit la note de version dans `docs/releases/` ; à sa fusion, le workflow `release` crée le tag (nom de la note sans `.md`) et la release GitHub, puis poste la note dans `#studio`.
@@ -241,9 +241,12 @@ Tu es le CEO du studio ; ta définition est dans .claude/agents/ceo.md. Exécute
 4. Pour chaque tâche, délègue au sous-agent du rôle : branche claude/<id>-<slug>, pnpm verify au vert, PR liée au ticket avec le modèle du dépôt (« Closes #<numéro> » en tête), libellé needs-review (le workflow auto-merge active la fusion automatique), puis retrait du libellé in-progress du ticket (consigne de Samuel). Préfixe les commits par le rôle entre crochets.
 5. Au plus deux tentatives de correction par tâche ; au-delà, documente le blocage dans STATUS.md et QUESTIONS.md.
 6. Toute décision réservée à Samuel (docs/CONTEXT.md, section « Qui décide quoi ») va dans #studio et QUESTIONS.md ; continue sur autre chose.
+6 bis. Pour chaque PR ouverte d'une branche claude/… dont le diff touche .github/workflows/ et qui n'a pas le libellé owner-approved : cherche dans l'historique de #studio le dernier message « owner-approved attendu — PR #<n> ». S'il n'y en a pas, ou s'il est antérieur à la date du dernier commit de la PR, poste « owner-approved attendu — PR #<n> : <titre> ; fichiers : <liste sous .github/workflows/> ; revue Tech Lead : <techlead-approved, changes-requested ou en attente>. <lien> », signé « Studio ». Liste ces PR dans STATUS.md, rubrique « Décisions attendues ». Ne pose jamais owner-approved.
 7. Termine par une PR « chore: status » qui met à jour STATUS.md (fait, en cours, bloqué, décisions attendues, part d'usage estimée), avec le libellé docs-only, puis un résumé de 5 lignes signé « Studio » dans #studio.
 Le cycle réussit si au moins une PR est prête ou si chaque blocage est documenté, et si STATUS.md est à jour.
 ```
+
+L'étape 6 bis (décision 0035) est proposée à Samuel, qui la colle dans la routine R1 ; d'ici là, le CEO applique la règle depuis `.claude/agents/ceo.md`.
 
 **R2 Revue**
 
@@ -334,7 +337,11 @@ name: techlead-gate
 # - chaque nouveau push (synchronize) retire techlead-approved, y compris un push du
 #   studio ou une fusion de main dans la branche (voulu par Samuel, 2026-10-11) ;
 # - libellés contradictoires ou revue consolidée d'un autre head : échec et retrait ;
-# - les PR qui ne touchent que STATUS.md, QUESTIONS.md ou docs/releases/ restent exemptées.
+# - les PR qui ne touchent que STATUS.md, QUESTIONS.md ou docs/releases/ restent exemptées ;
+# - décision 0035 : une PR qui modifie .github/workflows/ attend aussi owner-approved, posé par
+#   Samuel. La pose est enregistrée (commentaire à marqueur) pour le contenu de .github/workflows
+#   de la tête ; si ce contenu change, owner-approved est retiré. Le YAML ne filtre aucun chemin :
+#   la liste brute (git diff -z) et les données de l'API sont passées au script.
 # Un libellé retiré avec GITHUB_TOKEN ne déclenche pas de nouvelle exécution (unlabeled) :
 # rien ne s'appuie sur cette relance, l'exécution qui retire le libellé échoue elle-même.
 on:
@@ -353,26 +360,23 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 0 }
-      - id: diff
-        name: Détecter une PR exemptée (STATUS.md, QUESTIONS.md, docs/releases/)
+      - name: Lister les fichiers de la PR
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only "origin/${BASE_REF}...HEAD" > files.txt
-          if grep -vqE '^(STATUS\.md|QUESTIONS\.md|docs/releases/)' files.txt; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Lire les libellés et les revues consolidées
+          git diff -z --name-only --no-renames "origin/${BASE_REF}...HEAD" > files.nul
+      - name: Lire les libellés, les revues consolidées, les événements et les commentaires
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           ACTION: ${{ github.event.action }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          CODE: ${{ steps.diff.outputs.code }}
+          LABEL_NAME: ${{ github.event.label.name }}
         run: |
+          # Sans shell: explicite, run vaut bash -e sans pipefail : un échec de gh api
+          # produirait [] et l'étape réussirait. pipefail fait échouer l'étape.
+          set -o pipefail
           # Libellés lus maintenant, pas ceux de l'événement : une revue peut avoir retiré
           # le libellé opposé entre l'événement et l'exécution.
           gh api "repos/$REPO/issues/$PR/labels" --paginate --jq '.[].name' \
@@ -383,16 +387,26 @@ jobs:
             gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
               --jq '.[] | {body: (.body // ""), createdAt: .submitted_at}'
           } | jq -s . > reviews.json
-          jq -n --arg action "$ACTION" --arg head "$HEAD_SHA" --argjson code "$CODE" \
+          # Décision 0035 : historique des libellés et commentaires, sans filtre (le script trie).
+          gh api "repos/$REPO/issues/$PR/events" --paginate \
+            --jq '.[] | {event: .event, label: (if .label then {name: .label.name} else null end), created_at: .created_at}' \
+            | jq -s . > events.json
+          gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | {user: {login: (.user.login // "")}, body: (.body // ""), created_at: .created_at}' \
+            | jq -s . > comments.json
+          jq -n --arg action "$ACTION" --arg head "$HEAD_SHA" --arg labelName "$LABEL_NAME" \
             --slurpfile labels labels.json --slurpfile reviews reviews.json \
-            '{action: $action, headSha: $head, code: $code, labels: $labels[0], reviews: $reviews[0]}' \
+            --slurpfile events events.json --slurpfile comments comments.json \
+            '{action: $action, headSha: $head, labelName: $labelName, labels: $labels[0], reviews: $reviews[0], events: $events[0], comments: $comments[0]}' \
             > gate-input.json
       - id: decide
         name: Décider
         run: |
-          node scripts/ci/techlead-gate.mjs gate-input.json > decision.json
+          node scripts/ci/techlead-gate.mjs gate-input.json files.nul > decision.json
           cat decision.json
           echo "remove=$(jq -r .removeApproval decision.json)" >> "$GITHUB_OUTPUT"
+          echo "removeOwner=$(jq -r .removeOwnerApproval decision.json)" >> "$GITHUB_OUTPUT"
+          echo "recordOwner=$(jq -r '.recordOwnerApproval != null' decision.json)" >> "$GITHUB_OUTPUT"
       - if: steps.decide.outputs.remove == 'true'
         name: Retirer techlead-approved
         env:
@@ -405,6 +419,30 @@ jobs:
             jq -r '"techlead-gate : techlead-approved retiré.\n\n" + (.messages | map("- " + .) | join("\n"))' \
               decision.json > comment.md
             gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+          fi
+      - if: steps.decide.outputs.recordOwner == 'true'
+        name: Enregistrer owner-approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Décision 0035 : la pose vaut pour le contenu de .github/workflows de la tête.
+          jq -r '.recordOwnerApproval | "techlead-gate : owner-approved enregistré pour le contenu de .github/workflows/ du commit " + .sha + ".\n\n<!-- techlead-gate:owner-approved tree=" + .tree + " sha=" + .sha + " -->"' \
+            decision.json > owner-record.md
+          gh api "repos/$REPO/issues/$PR/comments" -F body=@owner-record.md > /dev/null
+      - if: steps.decide.outputs.removeOwner == 'true'
+        name: Retirer owner-approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # 404 si une exécution concurrente l'a déjà retiré : rien à commenter.
+          if gh api -X DELETE "repos/$REPO/issues/$PR/labels/owner-approved" > /dev/null; then
+            jq -r '"techlead-gate : owner-approved retiré.\n\n" + (.messages | map("- " + .) | join("\n"))' \
+              decision.json > owner-comment.md
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@owner-comment.md > /dev/null
           fi
       - name: Verdict
         run: |
