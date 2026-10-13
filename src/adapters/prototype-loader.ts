@@ -99,15 +99,16 @@ export function createProgrammeLoader({ dossier, fs = systemeFichiersNode }: Pro
     try {
       const stats = await descripteur.stat();
       if (!stats.isFile() || stats.nlink !== 1 || stats.size > PROGRAMME_MAX_OCTETS) return null;
-      // Lecture bornée par les octets réellement lus, pas par la taille annoncée.
-      const tampon = new Uint8Array(PROGRAMME_MAX_OCTETS + 1);
+      // Tampon dimensionné sur la taille annoncée (2 Mo au plus) plus un octet ; lecture bornée par les octets
+      // réellement lus : un fichier qui a grandi depuis `fstat` est refusé, jamais lu au-delà.
+      const tampon = new Uint8Array(stats.size + 1);
       let lus = 0;
       while (lus < tampon.length) {
         const { bytesRead } = await descripteur.read(tampon, lus, tampon.length - lus, null);
         if (bytesRead === 0) break;
         lus += bytesRead;
       }
-      if (lus > PROGRAMME_MAX_OCTETS) return null;
+      if (lus > stats.size) return null;
       const texte = new TextDecoder("utf-8", { fatal: true }).decode(tampon.subarray(0, lus));
       const resultat = ProgrammeReduitSchema.safeParse(JSON.parse(texte));
       if (!resultat.success || resultat.data.trip.id !== id) return null;
@@ -119,18 +120,29 @@ export function createProgrammeLoader({ dossier, fs = systemeFichiersNode }: Pro
     }
   };
 
-  const construireIndex = async (): Promise<Map<string, string>> => {
+  /**
+   * `realpath` du dossier, égal au chemin donné (décision 0032 § A4.3) ; `null` si le dossier est absent. Refait à
+   * chaque lecture, en plus de la construction de l'index : un dossier remplacé par un lien après le démarrage est
+   * refusé.
+   */
+  const dossierVerifie = async (): Promise<string | null> => {
     let reel: string;
     try {
       reel = await fs.realpath(dossier);
     } catch (erreur) {
       // Dossier absent : section « Prototype » absente, sans erreur.
-      if (codeErreur(erreur) === "ENOENT") return new Map();
+      if (codeErreur(erreur) === "ENOENT") return null;
       throw new Error("dossier des programmes du prototype illisible");
     }
     if (reel !== attendu) {
       throw new Error("dossier des programmes du prototype refusé : chemin canonique attendu, sans lien symbolique");
     }
+    return reel;
+  };
+
+  const construireIndex = async (): Promise<Map<string, string>> => {
+    const reel = await dossierVerifie();
+    if (reel === null) return new Map();
     const index = new Map<string, string>();
     for (const nom of (await fs.readdir(reel)).sort()) {
       if (!nom.endsWith(".json")) continue;
@@ -153,7 +165,8 @@ export function createProgrammeLoader({ dossier, fs = systemeFichiersNode }: Pro
       // Motif vérifié avant tout accès au système de fichiers.
       if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId)) return null;
       const chemin = (await indexer()).get(tripId);
-      return chemin === undefined ? null : lireFichier(chemin, tripId);
+      if (chemin === undefined || (await dossierVerifie()) === null) return null;
+      return lireFichier(chemin, tripId);
     },
   };
 }

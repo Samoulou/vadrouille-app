@@ -209,6 +209,38 @@ describe("adaptateurs: chargeur de programmes, index en mémoire", () => {
     await expect(loader.lire(TRIP_ID)).rejects.toThrow(/chemin canonique/);
   });
 
+  it("realpath du dossier refait à chaque lecture : dossier remplacé par un lien après l'indexation, refus", async () => {
+    const reel = join(dossier, "programmes");
+    const autre = join(dossier, "autre");
+    mkdirSync(reel);
+    mkdirSync(autre);
+    writeFileSync(join(reel, `${TRIP_ID}.json`), PROGRAMME);
+    writeFileSync(join(autre, `${TRIP_ID}.json`), PROGRAMME);
+    const loader = createProgrammeLoader({ dossier: reel });
+    expect(await loader.ids()).toEqual([TRIP_ID]);
+    expect(await loader.lire(TRIP_ID)).not.toBeNull();
+    rmSync(reel, { recursive: true });
+    symlinkSync(autre, reel);
+    await expect(loader.lire(TRIP_ID)).rejects.toThrow(/chemin canonique/);
+    rmSync(reel);
+    expect(await loader.lire(TRIP_ID)).toBeNull();
+  });
+
+  it("fichier qui grandit après fstat : refus, lecture bornée à la taille annoncée plus un octet", async () => {
+    writeFileSync(join(dossier, `${TRIP_ID}.json`), PROGRAMME);
+    const tailles: number[] = [];
+    const fs: SystemeFichiers = {
+      ...systemeFichiersNode,
+      open: async (): Promise<DescripteurFichier> => ({
+        stat: async () => ({ isFile: () => true, nlink: 1, size: 100 }),
+        read: async (tampon, _offset, length) => (tailles.push(tampon.length), { bytesRead: length }),
+        close: async () => {},
+      }),
+    };
+    expect(await createProgrammeLoader({ dossier, fs }).ids()).toEqual([]);
+    expect(tailles).toEqual([101]);
+  });
+
   it("chemin relatif : refus à la création", () => {
     expect(() => createProgrammeLoader({ dossier: "prototype/programmes-test" })).toThrow(/chemin absolu/);
   });

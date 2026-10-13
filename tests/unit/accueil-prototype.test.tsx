@@ -54,6 +54,15 @@ describe("accueil : section « Prototype »", () => {
         .getAllByRole("link")
         .map((link) => link.getAttribute("href")),
     ).toEqual([presentationRoute(TRIP_ID), tripRoutes("/voyages", TRIP_ID).sejour()]);
+    // Noms accessibles reliés au voyage : distincts quand plusieurs voyages sont listés.
+    expect(within(section).getByRole("link", { name: "Tes propositions J'aime / Pas pour moi Voyage : Ville de test" })).toHaveAttribute(
+      "href",
+      presentationRoute(TRIP_ID),
+    );
+    expect(within(section).getByRole("link", { name: "Séjour Le programme jour par jour Voyage : Ville de test" })).toHaveAttribute(
+      "href",
+      tripRoutes("/voyages", TRIP_ID).sejour(),
+    );
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
   });
 

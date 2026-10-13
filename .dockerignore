@@ -12,3 +12,5 @@ specs
 *.md
 .env
 .env*.local
+# Programmes de test et sorties du prototype P0 : jamais dans l'image (décision 0032 § A4.4).
+prototype

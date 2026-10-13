@@ -115,8 +115,9 @@ function paire(origine: string | undefined | null, destination: string | undefin
 
 function terminusDu(programme: ProgrammeReduit, jour: number): ProgrammeReduit["terminus"][number] {
   const terminus = programme.terminus.find((candidat) => candidat.jour === jour);
-  // Le schéma de la forme réduite impose un terminus par jour : son absence est un programme invalide.
-  if (!terminus) throw new Error("programme du prototype invalide : terminus absent");
+  // Le schéma de la forme réduite impose un terminus par jour (cas inatteignable avec un programme valide) : son
+  // absence est un lieu manquant, traité comme toute relecture impossible (état d'erreur et « Réessayer »).
+  if (!terminus) throw new RelectureError("missing_place");
   return terminus;
 }
 
