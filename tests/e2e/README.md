@@ -37,3 +37,12 @@ accessibilité = 100 à chaque passage. `perf: inventaire` : les autres entrées
 journalisé. Toute requête vers un autre hôte que l'application fait échouer la mesure. Rapports HTML et JSON, plus
 `summary.json`, dans `lighthouse-report/` (ignoré par git), envoyés en artefact `lighthouse` de la CI (7 jours), jamais
 ailleurs. En local : `pnpm build` puis `E2E_SKIP_BUILD=1 pnpm test:perf` (ou `pnpm test:perf`, qui reconstruit).
+
+## Service workers (F10b, F10-TL-6)
+`playwright.config.ts` bloque les service workers par défaut (`use.serviceWorkers: "block"`) et pose
+`PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1`, pour que les requêtes du service worker passent par `context.route` (blocage
+des domaines Google) et `context.setOffline`. Seuls `hors-ligne.e2e.spec.ts`, le bloc « page de repli » de
+`voyage.a11y.spec.ts` et de `tests/visual/voyage.visual.spec.ts`, et le contrôle de persistance de `carte.e2e.spec.ts` posent
+`test.use({ serviceWorkers: "allow" })` (liste vérifiée par `tests/unit/hors-ligne-config.test.ts`). Pour couper le réseau du
+service worker de façon fiable, ces tests passent par `controlNetwork` de `hors-ligne-helpers.ts` (`context.setOffline` et
+interruption des requêtes vers l'application par `context.route`).

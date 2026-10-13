@@ -10,3 +10,4 @@ Pendant et après le voyage.
 - `itineraire.ts` : seul module qui construit l'adresse « Itinéraire » vers Google Maps (exception testée dans
   `tests/unit/google-regles.test.ts`).
 - `plate.ts`, `trip-session.ts`, `TripSessionProvider.tsx` : plaque et mémoire d'onglet de « Mes voyages » (F11a).
+- `OfflineFallback.tsx` : page de repli hors ligne (`R-repli`, `/hors-ligne`, F10b) : « Tu es hors ligne », « Réessayer » (page précédente, ou l'accueil dans un onglet sans historique), « Accueil », annonce « Connexion rétablie. » ; aucune donnée, aucune lecture d'adresse ni de stockage. L'écran 15 enregistre le service worker par `@/lib/offline/register`.

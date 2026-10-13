@@ -524,6 +524,13 @@
         "enCeMoment": "En ce moment : {name}.",
         "prochaine": "Prochaine étape : {name} à {start}."
       }
+    },
+    "horsLigne": {
+      "titre": "Tu es hors ligne",
+      "texte": "Cette page demande une connexion. Reconnecte-toi, puis rouvre-la.",
+      "reessayer": "Réessayer",
+      "accueil": "Accueil",
+      "retabli": "Connexion rétablie."
     }
   },
   "mesVoyages": {

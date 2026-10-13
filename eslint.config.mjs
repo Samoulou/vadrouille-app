@@ -132,6 +132,71 @@ export default defineConfig([
     },
   },
   {
+    // F10b (F10-TL-5) : seul le module hors ligne désigné enregistre le service worker, et seul le service worker
+    // ouvre un cache. Les tests lisent le stockage du navigateur pour le contrôler : ils sont exclus.
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: ["tests/**", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "ligne/no-service-worker-register": "error",
+      "ligne/no-cache-storage-open": "error",
+    },
+  },
+  {
+    files: ["src/lib/offline/register.ts"],
+    rules: { "ligne/no-service-worker-register": "off" },
+  },
+  {
+    // F10b (F10-TL-5) : le service worker et son aiguillage. Script classique, globals du service worker ; Cache
+    // Storage permis ; ni IndexedDB, ni Web Storage, ni cookie, ni lecture de l'heure ; aucun script d'une autre
+    // origine (seul l'aiguillage de l'application est importé).
+    files: ["public/sw.js", "public/sw-route.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        Request: "readonly",
+        URL: "readonly",
+        Promise: "readonly",
+        importScripts: "readonly",
+      },
+    },
+    rules: {
+      "ligne/no-cache-storage-open": "off",
+      "no-undef": "error",
+      "no-restricted-globals": [
+        "error",
+        ...["indexedDB", "localStorage", "sessionStorage", "document", "Date", "performance", "cookieStore"].map((name) => ({
+          name,
+          message: `Service worker : ni stockage hors Cache Storage, ni cookie, ni heure (${name} ; spécification F10, F10-PO-11).`,
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["self", "globalThis"].flatMap((object) =>
+          ["indexedDB", "localStorage", "sessionStorage", "document", "Date", "performance", "cookieStore"].map((property) => ({
+            object,
+            property,
+            message: `Service worker : ni stockage hors Cache Storage, ni cookie, ni heure (spécification F10, F10-PO-11).`,
+          })),
+        ),
+        { object: "Date", property: "now", message: "Service worker : aucune lecture de l'heure (F10-TL-4)." },
+        { object: "performance", property: "now", message: "Service worker : aucune lecture de l'heure (F10-TL-4)." },
+        { object: "document", property: "cookie", message: "Service worker : aucun cookie (F10-PO-11)." },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.name='importScripts']:not([arguments.length=1][arguments.0.value='/sw-route.js'])",
+          message: "Service worker : seul /sw-route.js est importé ; aucun script d'une autre origine (F10-TL-5).",
+        },
+        { selector: "ImportExpression", message: "Service worker : aucun import dynamique (F10-TL-5)." },
+      ],
+    },
+  },
+  {
     // F1 : les jeux simulés ne passent que par les adaptateurs (handover § 9).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     ignores: [
@@ -368,6 +433,17 @@ export default defineConfig([
     ],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: { "no-console": "error" },
+  },
+  {
+    // F10b : page de repli hors ligne (F10-TL-5) : aucun texte en dur, aucune persistance côté client, ni
+    // src/mocks, ni carte (Google ou simulée), ni src/server hors actions, ni portée des simulations.
+    files: ["src/app/hors-ligne/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
+      ...noClientStorage("Page de repli", "spécification F10, F10-PO-9", "le service worker ne s'enregistre que depuis l'écran 15"),
+      ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+    },
   },
   {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.
