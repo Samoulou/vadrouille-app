@@ -16,9 +16,12 @@ const t = messages.sejour.fiche;
  * l'état survit aux changements d'adresse. Gère le retour du focus sur le lien d'origine à la fermeture
  * (handover § 7), l'étape absente du jour et le verrou annulable (F5-PO-10).
  */
+/** Aucune étape surlignée : la ligne garde son fondu pour la fin du surlignage (0018 § 9). */
+const NO_HIGHLIGHT: readonly string[] = [];
+
 export function JourneeView() {
   const shell = useTripShell();
-  const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape } = shell;
+  const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
 
   // `?etape=` absent des étapes et des événements du jour : journée sans fiche, adresse sans le paramètre, annonce.
@@ -39,14 +42,31 @@ export function JourneeView() {
     consumeClosedFiche();
   }, [fiche, day, closedFiche, routes, consumeClosedFiche]);
 
+  // Après « Appliquer » ou « Annuler » d'une modification (F7-PO-1) : lien de l'étape demandée s'il est dans la
+  // ligne du jour, sinon titre du jour. Déclaré après le retour de fiche : il passe en dernier.
+  useEffect(() => {
+    if (fiche || !day || !focusRequest || focusRequest.dayIndex !== day.index) return;
+    const href = focusRequest.stopId === undefined ? null : routes.etape(day.index, focusRequest.stopId);
+    const link = Array.from(contentRef.current?.querySelectorAll<HTMLAnchorElement>("a[data-part='arret']") ?? []).find(
+      (candidate) => candidate.getAttribute("href") === href,
+    );
+    (link ?? contentRef.current?.querySelector<HTMLElement>("[data-part='titre-jour']"))?.focus();
+    consumeFocusRequest();
+  }, [fiche, day, focusRequest, routes, consumeFocusRequest]);
+
   if (!day) return null;
 
   // Lien vers une fiche activé dans le panneau du jour : « Fermer » reviendra dans l'historique.
   const onClickCapture = (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const link = (event.target as Element).closest<HTMLAnchorElement>("a[data-part='arret'], a[data-part='evenement']");
+    const link = (event.target as Element).closest<HTMLAnchorElement>(
+      "a[data-part='arret'], a[data-part='evenement'], a[data-part='remplacer']",
+    );
     const href = link?.getAttribute("href");
-    if (href) shell.markOpenedFromPanel(href);
+    if (!href) return;
+    // « Remplacer » de la fiche (F7-PO-2) : « Retour à la fiche » de l'écran 14 reviendra dans l'historique.
+    if (link?.dataset.part === "remplacer") shell.markReplaceOrigin(href);
+    else shell.markOpenedFromPanel(href);
   };
 
   const onToggleLock = async (locked: boolean) => {
@@ -74,7 +94,12 @@ export function JourneeView() {
           placesFromGoogle={shell.placesFromGoogle}
         />
       ) : (
-        <JourneePanel day={day} routes={routes} placesFromGoogle={shell.placesFromGoogle} />
+        <JourneePanel
+          day={day}
+          routes={routes}
+          placesFromGoogle={shell.placesFromGoogle}
+          highlightedStopIds={shell.highlight?.dayIndex === day.index ? shell.highlight.stopIds : NO_HIGHLIGHT}
+        />
       )}
     </div>
   );

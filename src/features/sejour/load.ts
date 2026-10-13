@@ -1,7 +1,7 @@
 import { cache } from "react";
 
 import { getRequestContext, getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
-import type { Day, DayMap, Trip } from "@/contracts";
+import type { Day, DayMap, Stop, Trip } from "@/contracts";
 
 export interface TripData {
   trip: Trip;
@@ -34,4 +34,21 @@ export function dayFromParam(trip: Trip, n: string): Day | null {
   if (!/^[1-9]\d*$/.test(n)) return null;
   const index = Number(n);
   return trip.days.find((day) => day.index === index) ?? null;
+}
+
+/**
+ * Étape remplaçable désignée par le `stopId` de l'adresse (F7-PO-2) : une étape `stop` de la ligne du jour, sinon
+ * `null` (404) — un événement de `Day.events`, un terminus ou un repas pas encore choisi n'en sont pas.
+ */
+export function replaceTargetOf(day: Day, stopId: string): Stop | null {
+  let decoded = stopId;
+  try {
+    decoded = decodeURIComponent(stopId);
+  } catch {
+    return null;
+  }
+  for (const item of day.items) {
+    if (item.type === "stop" && item.stop.id === decoded) return item.stop;
+  }
+  return null;
 }

@@ -213,8 +213,11 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `AuthAdapter` | Adaptateur `auth` : demander un code, le vérifier, lire la session, se déconnecter | F8b ; adaptateur Better Auth par B3 |
 | `TripRequest` | `requestId`, brouillon, brief (0017 § 2.4) | F8c |
 | `GenerationStatus` | Phases, jours prêts, compteurs `expected` et `ready`, raison d'échec (0017 § 2.4) | F8c ; complété par B9 |
-| `ReplacementRequest` | Étape, raison (`PreferenceReason`), souhait, version de base (0016 § 4.1) | F7a |
+| `ReplacementRequest` | Étape, raison (`PreferenceReason`), souhait, version de base (0016 § 4.1) | F7a ; complété par B11 |
 | `RevisionPreview` | Aperçu d'une révision : jours touchés, `Change`, étape visée (0016 § 4.2) | F7a ; complété par B11 |
+| `ReplacementDraft` | Brouillon simulé de remplacement : aperçu sans identifiant ni version (0016 § 6), phase 0 | F7a ; remplacé par le moteur en B11 |
+| `ReplacementFixture` | Brouillon de remplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7a ; remplacé par B11 |
+| `RevisionFixtures` | Jeu simulé de révision d'un voyage, lu par `getRevisionFixtures` (adaptateur `mock`, 0016 § 6) ; F7b et F7c le complètent | F7a ; remplacé par B11 |
 | `RevisionError` | Codes d'écran de la révision (0016 § 4.4), convertis depuis `ApiError` par l'adaptateur `api` | F7a |
 | `MoveRequest` | Déplacement d'une étape vers un point d'insertion (0016 § 4.1) | F7b |
 | `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b |
@@ -423,9 +426,15 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Change[replaced].after` | calculé | Moteur, depuis `Stop.name` |
 | `Change[moved].type` | calculé | Moteur |
 | `Change[moved].label` | calculé | Moteur, depuis `Stop.name` |
-| `Change[moved].before` | calculé | Moteur (forme structurée de la décision 0016 § 4.5, appliquée par F7a) |
-| `Change[moved].after` | calculé | Moteur (idem) |
+| `Change[added].type` | calculé | Moteur (variante de la décision 0016 § 4.5, créée par F7a) |
+| `Change[added].time` | calculé | Moteur, heure de l'étape ajoutée |
+| `Change[added].label` | calculé | Moteur, nom saisi par la personne ; **jamais le nom Google** |
+| `Change[moved].before.day` | calculé | Moteur, jour d'origine (forme structurée de la décision 0016 § 4.5, appliquée par F7a) |
+| `Change[moved].before.time` | calculé | Moteur, heure d'origine |
+| `Change[moved].after.day` | calculé | Moteur, jour d'arrivée |
+| `Change[moved].after.time` | calculé | Moteur, heure d'arrivée |
 | `Change[segment].type` | calculé | Moteur |
+| `Change[segment].label` | calculé | Moteur, depuis `Stop.name` de l'étape d'arrivée (décision 0016 § 4.5, F7a) |
 | `Change[segment].estimated` | calculé | Moteur |
 | `Change[budget].type` | calculé | Moteur |
 | `Change[budget].deltaPerPerson` | calculé | Moteur (R9) |

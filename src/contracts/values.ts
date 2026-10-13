@@ -55,6 +55,12 @@ export function requireWeekday(date: string): (typeof WEEKDAYS)[number] {
   return jour;
 }
 
+/**
+ * Souhait facultatif de l'écran 14 « Remplacer une étape » : 200 caractères au plus (F7-PO-3). Source de
+ * `ReplacementRequestSchema.wish` et du compteur « {n} sur 200 caractères » (décision 0018).
+ */
+export const WISH_MAX_LENGTH = 200;
+
 /** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
 export const DETOUR_THRESHOLD_MINUTES = 20;
 

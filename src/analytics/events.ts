@@ -137,6 +137,29 @@ export const BriefCompletedEventSchema = z.strictObject({
     ),
 });
 
+/**
+ * Remplacement d'une étape (handover § 12, spécification F7, F7-PO-18 ; décision 0016 § 10) : code de raison,
+ * proposition tirée de la réserve, attente de la proposition appliquée en millisecondes. Ni nom, ni `placeId`,
+ * ni identifiant d'étape, ni souhait : l'objet strict les refuse.
+ */
+const ReplacementPropertiesSchema = z.strictObject({
+  reason: EventReasonSchema,
+  from_reserve: z.boolean(),
+  duration_ms: z.int().check(z.nonnegative()),
+});
+
+/** « Appliquer » d'un remplacement, une fois l'application résolue. */
+export const ReplaceAppliedEventSchema = z.strictObject({
+  name: z.literal("replace_applied"),
+  properties: ReplacementPropertiesSchema,
+});
+
+/** « Annuler » du toast après un remplacement : les trois valeurs du `replace_applied` annulé. */
+export const ReplaceUndoneEventSchema = z.strictObject({
+  name: z.literal("replace_undone"),
+  properties: ReplacementPropertiesSchema,
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -149,6 +172,8 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   ChecklistItemDoneEventSchema,
   TodayOpenedEventSchema,
   BriefCompletedEventSchema,
+  ReplaceAppliedEventSchema,
+  ReplaceUndoneEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

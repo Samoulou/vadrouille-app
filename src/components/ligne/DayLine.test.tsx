@@ -351,3 +351,23 @@ describe("DayLine en lecture seule (F10-TL-12)", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 });
+
+describe("DayLine : surlignage après « Appliquer » (F7a, handover § 7)", () => {
+  it("seules les étapes listées sont surlignées : fond `muted`, marqueur plein, faits en `ink`", async () => {
+    const { container } = render(<DayLine items={ITEMS} getStopHref={(s) => `#${s.id}`} highlightedStopIds={["s2"]} />);
+    const rows = Array.from(container.querySelectorAll("li[data-highlighted='true']"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("[Distillerie]");
+    expect(rows[0]).toHaveClass("bg-muted", "transition-colors", "motion-reduce:transition-none");
+    expect(rows[0]!.querySelector("[data-filled='true']")).not.toBeNull();
+    expect(container.querySelectorAll("[data-filled='true']")).toHaveLength(1);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("sans liste, aucune étape surlignée", () => {
+    const { container } = render(<DayLine items={ITEMS} getStopHref={(s) => `#${s.id}`} />);
+    expect(container.querySelector("[data-highlighted]")).toBeNull();
+    // Sans `highlightedStopIds`, aucune transition (section « Ligne » de /dev/composants).
+    expect(container.querySelector(".transition-colors")).toBeNull();
+  });
+});

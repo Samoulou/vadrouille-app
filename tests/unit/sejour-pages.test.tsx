@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DevJourneePage, { generateMetadata as devJourneeMetadata } from "@/app/dev/voyages/[id]/jour/[n]/page";
+import DevRemplacerPage, { generateMetadata as devRemplacerMetadata } from "@/app/dev/voyages/[id]/jour/[n]/remplacer/[stopId]/page";
 import DevTripLayout from "@/app/dev/voyages/[id]/layout";
 import DevSejourPage from "@/app/dev/voyages/[id]/page";
 import JourneePage, { generateMetadata as journeeMetadata } from "@/app/voyages/[id]/(programme)/jour/[n]/page";
+import RemplacerPage, { generateMetadata as remplacerMetadata } from "@/app/voyages/[id]/(programme)/jour/[n]/remplacer/[stopId]/page";
 import ProgrammeLayout from "@/app/voyages/[id]/(programme)/layout";
 import SejourPage, { generateMetadata as sejourMetadata } from "@/app/voyages/[id]/(programme)/page";
 
@@ -70,6 +72,32 @@ describe("sejour: 404 hors organisation ou hors limites (routes)", () => {
   });
 });
 
+describe("revision: 404 hors programme (écran 14, F7a)", () => {
+  const remplacer = (id: string, n: string, stopId: string) => serverRender(RemplacerPage({ params: params({ id, n, stopId }) }));
+
+  it("étape inconnue, événement du jour, étape d'un autre jour, jour ou voyage hors limites : 404", async () => {
+    for (const [id, n, stopId] of [
+      [TRIP, "2", "inconnue"],
+      [TRIP, "2", "j2-concert-orgue"],
+      [TRIP, "1", "j2-dean-village"],
+      [TRIP, "7", "j2-dean-village"],
+      [TRIP, "02", "j2-dean-village"],
+      [TRIP, "2", "mock_place_dean_village"],
+      ["inconnu", "2", "j2-dean-village"],
+    ] as const) {
+      await expect(remplacer(id, n, stopId), `${id}/${n}/${stopId}`).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+  });
+
+  it("étape du jour, verrouillée comprise : rendu ; titre « Remplacer {nom} · Jour {n} »", async () => {
+    await expect(remplacer(TRIP, "2", "j2-dean-village")).resolves.toBeTruthy();
+    await expect(remplacer(TRIP, "1", "j1-tattoo")).resolves.toBeTruthy();
+    const title = async (n: string, stopId: string) => (await remplacerMetadata({ params: params({ id: TRIP, n, stopId }) })).title;
+    expect(await title("2", "j2-dean-village")).toBe("Remplacer [Dean Village] · Jour 2");
+    expect(await title("2", "inconnue")).toBeUndefined();
+  });
+});
+
 describe("/dev/voyages (F5-TL-1)", () => {
   it("répond 404 en production sans VADROUILLE_DEV_PAGES=1", async () => {
     vi.stubEnv("NODE_ENV", "production");
@@ -78,6 +106,9 @@ describe("/dev/voyages (F5-TL-1)", () => {
     await expect(serverRender(DevSejourPage({ params: params({ id: TRIP }) }))).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(serverRender(DevJourneePage({ params: params({ id: TRIP, n: "2" }) }))).rejects.toThrow("NEXT_NOT_FOUND");
     expect(await devJourneeMetadata({ params: params({ id: TRIP, n: "2" }), searchParams: params({}) })).toEqual({});
+    // Écran 14 sur la carte simulée (F7a, C4).
+    await expect(serverRender(DevRemplacerPage({ params: params({ id: TRIP, n: "2", stopId: "j2-dean-village" }) }))).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await devRemplacerMetadata({ params: params({ id: TRIP, n: "2", stopId: "j2-dean-village" }) })).toEqual({});
   });
 
   it("s'affiche en développement, avec les mêmes 404 que les routes produit", async () => {
