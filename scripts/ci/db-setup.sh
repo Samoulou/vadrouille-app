@@ -24,7 +24,11 @@ if [ -n "${EXPECTED_SERVER_VERSION:-}" ]; then
   esac
 fi
 
-host_part="${VADROUILLE_DB_ADMIN_URL#*@}" # hôte:port/base
+case "$VADROUILLE_DB_ADMIN_URL" in
+  *@*) ;;
+  *) echo "VADROUILLE_DB_ADMIN_URL doit avoir la forme postgres://utilisateur@hôte:port/base (adresse non affichée)." >&2; exit 1 ;;
+esac
+host_part="${VADROUILLE_DB_ADMIN_URL##*@}" # hôte:port/base (après le dernier @ : un @ encodé du mot de passe n'y est pas)
 runs=1
 if [ "${1:-}" = "--twice" ]; then runs=2; fi
 

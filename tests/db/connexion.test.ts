@@ -56,7 +56,7 @@ describe("connexion: la garde refuse un rôle administrateur", () => {
     ] as const) {
       const error = await refusal(role, url);
       expect(error, `${role}`).toBeInstanceOf(DatabaseGuardError);
-      expect(error.message).toContain(`au lieu de « ${role} »`);
+      expect(error.message).toContain(`rôle de session n'est pas « ${role} »`);
       for (const secret of secretsOf(url)) expect(error.message).not.toContain(secret);
     }
   });
@@ -65,7 +65,9 @@ describe("connexion: la garde refuse un rôle administrateur", () => {
     const url = withRole(urlFor("admin"), "vadrouille_app");
     const error = await refusal("vadrouille_app", url);
     expect(error).toBeInstanceOf(DatabaseGuardError);
-    expect(error.message).toContain("rôle courant vadrouille_app");
+    expect(error.message).toContain("rôle de session n'est pas « vadrouille_app »");
+    // Le rôle reçu (superutilisateur du conteneur) n'est jamais nommé.
+    expect(error.message).not.toContain(`« ${new URL(url).username} »`);
     for (const secret of secretsOf(url)) expect(error.message).not.toContain(secret);
     await expect(runMigrations({ [DB_ENV.migrator]: withRole(urlFor("admin"), "vadrouille_migrator") })).rejects.toBeInstanceOf(
       DatabaseGuardError,

@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
-import { assertDatabaseAllowed, DatabaseGuardError, MIGRATOR_URL_VARIABLE, verifyConnectionRole } from "./connection.ts";
+import {
+  assertDatabaseAllowed,
+  DatabaseGuardError,
+  MIGRATOR_URL_VARIABLE,
+  sanitizeConnectionError,
+  verifyConnectionRole,
+} from "./connection.ts";
 
 /**
  * Applique les migrations SQL relues de `db/migrations/` (décision 0006), dans l'ordre du journal de drizzle-kit
@@ -18,7 +24,8 @@ import { assertDatabaseAllowed, DatabaseGuardError, MIGRATOR_URL_VARIABLE, verif
  * - Journal dans `vadrouille_migrations.applied` (nom, empreinte SHA-256) : une seconde exécution ne fait rien ;
  *   une migration déjà appliquée dont le fichier a changé arrête tout (on n'édite jamais une migration appliquée).
  * - Refus en production (décision 0034) et refus de tout autre rôle que `vadrouille_migrator`, sans `SUPERUSER`
- *   ni `BYPASSRLS`. Aucun message ne contient la chaîne de connexion.
+ *   ni `BYPASSRLS`. Aucun message ne contient la chaîne de connexion : une erreur d'ouverture n'en garde que le code
+ *   (`sanitizeConnectionError`).
  */
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations");
@@ -50,7 +57,13 @@ export async function runMigrations(env: Env, migrations: Migration[] = readMigr
   }
 
   const client = new pg.Client({ connectionString });
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (error) {
+    // Code seul, comme la garde applicative : le message de pg peut nommer l'hôte et le port.
+    await client.end().catch(() => undefined);
+    throw sanitizeConnectionError(error);
+  }
   try {
     // Même contrôle que la garde applicative (session_user et current_user, ni SUPERUSER ni BYPASSRLS).
     await verifyConnectionRole(client, MIGRATOR_ROLE);

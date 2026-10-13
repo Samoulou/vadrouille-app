@@ -14,7 +14,9 @@ import pg from "pg";
  *    pas le refus définitif). C'est ce qui rend vraie la règle de 0029 (« l'application ne lit jamais ces
  *    identifiants » d'administration) même si une variable est mal posée.
  * Aucun message d'erreur ne contient la chaîne de connexion, l'hôte ni un mot de passe : une erreur de `pg` à
- * l'ouverture ou pendant le contrôle est remplacée par une `DatabaseConnectionError` qui n'en garde que le code.
+ * l'ouverture ou pendant le contrôle est remplacée par une `DatabaseConnectionError` qui n'en garde que le code, et
+ * l'erreur d'une connexion inactive (évènement `error` du pool) n'est journalisée que par son code. Les refus de rôle
+ * ne nomment que le rôle attendu, jamais le rôle reçu.
  */
 
 export type AppDatabaseRole = "vadrouille_app" | "vadrouille_auth";
@@ -103,21 +105,34 @@ export async function verifyConnectionRole(
   if (!row) {
     throw new DatabaseGuardError("Connexion à la base refusée : rôle de connexion introuvable.");
   }
-  if (row.session_user !== expectedRole || row.current_user !== expectedRole) {
-    const received = row.session_user === row.current_user ? row.session_user : `${row.session_user} (rôle courant ${row.current_user})`;
+  // Les messages ne nomment que le rôle attendu : le rôle reçu (un compte d'administration mal posé, par exemple)
+  // n'entre jamais dans un journal.
+  if (row.session_user !== expectedRole) {
     throw new DatabaseGuardError(
-      `Connexion à la base refusée : rôle « ${received} » au lieu de « ${expectedRole} » (spécification B1, garde de connexion).`,
+      `Connexion à la base refusée : le rôle de session n'est pas « ${expectedRole} » (spécification B1, garde de connexion).`,
+    );
+  }
+  if (row.current_user !== expectedRole) {
+    throw new DatabaseGuardError(
+      `Connexion à la base refusée : le rôle courant n'est pas « ${expectedRole} » (spécification B1, garde de connexion).`,
     );
   }
   if (row.rolsuper || row.rolbypassrls) {
     throw new DatabaseGuardError(
-      `Connexion à la base refusée : le rôle « ${row.session_user} » a SUPERUSER ou BYPASSRLS (décision 0007).`,
+      `Connexion à la base refusée : le rôle « ${expectedRole} » a SUPERUSER ou BYPASSRLS (décision 0007).`,
     );
   }
 }
 
 type ConnectCallback = ((err: Error) => void) | ((err: null, c: pg.Client) => void);
 type LooseConnectCallback = (err: Error | null, c?: pg.Client) => void;
+
+/** Message journalisé quand une connexion inactive du pool tombe : code seul, ni hôte ni mot de passe. */
+export function idleConnectionErrorMessage(error: unknown): string {
+  const sanitized = sanitizeConnectionError(error);
+  const code = sanitized instanceof DatabaseConnectionError ? sanitized.code : "garde";
+  return `Connexion inactive à la base perdue (code ${code}) : le pool la retire, la demande suivante en ouvre une autre.`;
+}
 
 /**
  * Pool dont chaque connexion physique est contrôlée avant de servir. Après un premier refus de fond
@@ -126,6 +141,16 @@ type LooseConnectCallback = (err: Error | null, c?: pg.Client) => void;
  * transitoire de l'ouverture ou du contrôle (réseau, délai) ferme la connexion et remonte comme
  * `DatabaseConnectionError` (code seul, ni hôte ni mot de passe), sans rendre le refus définitif : la demande
  * suivante refait le contrôle.
+ *
+ * Une erreur d'authentification à l'ouverture (`28P01`, `28000`, `42501`…) reste transitoire, à dessein : elle ne
+ * révèle pas un rôle d'administration (le contrôle n'a pas eu lieu) et peut venir d'une rotation de mot de passe en
+ * cours ; la rendre définitive obligerait à redémarrer le processus après la rotation. Elle remonte comme les autres,
+ * code seul.
+ *
+ * Le pool a un écouteur `error` : `pg` émet cet évènement quand une connexion inactive tombe (suspension ou
+ * redémarrage du calcul Neon). Sans écouteur, Node lèverait une exception non interceptée et le processus tomberait ;
+ * avec lui, la connexion est retirée par `pg`, et seul le code de l'erreur est journalisé
+ * (`idleConnectionErrorMessage`), jamais son message d'origine, qui peut nommer l'hôte.
  */
 export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit<pg.PoolConfig, "connectionString" | "Client"> = {}): pg.Pool {
   const connectionString = connectionStringFor(role, env);
@@ -160,5 +185,9 @@ export function createGuardedPool(role: AppDatabaseRole, env: Env, options: Omit
     }
   }
 
-  return new pg.Pool({ ...options, connectionString, Client: GuardedClient });
+  const pool = new pg.Pool({ ...options, connectionString, Client: GuardedClient });
+  pool.on("error", (error) => {
+    console.warn(idleConnectionErrorMessage(error));
+  });
+  return pool;
 }

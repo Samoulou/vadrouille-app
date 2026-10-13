@@ -78,7 +78,9 @@ describe("db : contrôle du rôle de connexion", () => {
   });
 
   it("refuse un autre rôle ; accepte le rôle attendu sans attribut d'administration", async () => {
-    await expect(verifyConnectionRole(fake(as("neondb_owner", { rolbypassrls: true })), "vadrouille_app")).rejects.toThrow(/neondb_owner/);
+    await expect(verifyConnectionRole(fake(as("neondb_owner", { rolbypassrls: true })), "vadrouille_app")).rejects.toThrow(
+      /rôle de session n'est pas « vadrouille_app »/,
+    );
     await expect(verifyConnectionRole(fake(undefined), "vadrouille_app")).rejects.toThrow(DatabaseGuardError);
     await expect(verifyConnectionRole(fake(as("vadrouille_auth")), "vadrouille_auth")).resolves.toBeUndefined();
   });
@@ -86,15 +88,31 @@ describe("db : contrôle du rôle de connexion", () => {
   it("refuse une session administrateur qui a pris le rôle attendu (SET ROLE, options=-c role=…) : session_user compte", async () => {
     // Le rôle de session est neondb_owner (BYPASSRLS) ; current_user vaut le rôle attendu.
     const switched = as("neondb_owner", { current_user: "vadrouille_app", rolbypassrls: true });
-    await expect(verifyConnectionRole(fake(switched), "vadrouille_app")).rejects.toThrow(/neondb_owner \(rôle courant vadrouille_app\)/);
+    await expect(verifyConnectionRole(fake(switched), "vadrouille_app")).rejects.toThrow(/rôle de session n'est pas « vadrouille_app »/);
     // Même sans attribut d'administration, un rôle de session différent est refusé.
     await expect(verifyConnectionRole(fake(as("vadrouille_auth", { current_user: "vadrouille_app" })), "vadrouille_app")).rejects.toThrow(
       DatabaseGuardError,
     );
     // Rôle de session attendu mais rôle courant changé : refusé aussi.
     await expect(verifyConnectionRole(fake(as("vadrouille_app", { current_user: "vadrouille_share" })), "vadrouille_app")).rejects.toThrow(
-      DatabaseGuardError,
+      /rôle courant n'est pas « vadrouille_app »/,
     );
+  });
+
+  it("le message de refus ne nomme que le rôle attendu, jamais le rôle reçu (compte d'administration mal posé)", async () => {
+    for (const row of [
+      as("neondb_owner", { rolbypassrls: true }),
+      as("neondb_owner", { current_user: "vadrouille_app", rolbypassrls: true }),
+      as("vadrouille_app", { current_user: "neondb_owner" }),
+    ]) {
+      const error = await verifyConnectionRole(fake(row), "vadrouille_app").then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(DatabaseGuardError);
+      expect((error as Error).message).not.toContain("neondb_owner");
+      expect((error as Error).message).toContain("« vadrouille_app »");
+    }
   });
 
   it("le contrôle lit les attributs du rôle de session, pas du rôle courant", async () => {
@@ -187,6 +205,41 @@ describe("db : refus définitif seulement pour un refus de fond", () => {
       expect((error as Error).message).not.toContain(PASSWORD);
     } finally {
       await pool.end();
+    }
+  });
+
+  it("une connexion inactive qui tombe (évènement error du pool) ne fait pas tomber le processus et n'est journalisée que par son code", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = createGuardedPool("vadrouille_app", env);
+    try {
+      expect(pool.listenerCount("error")).toBeGreaterThan(0);
+      const idle = Object.assign(new Error(`Connection terminated unexpectedly ${UNREACHABLE} 127.0.0.1:1`), { code: "57P01" });
+      // Sans écouteur, EventEmitter#emit("error") lèverait l'erreur (exception non interceptée dans un vrai processus).
+      expect(() => pool.emit("error", idle, new pg.Client())).not.toThrow();
+      expect(warn).toHaveBeenCalledTimes(1);
+      const logged = warn.mock.calls.flat().map(String).join(" ");
+      expect(logged).toContain("code 57P01");
+      for (const secret of [PASSWORD, "127.0.0.1", "utilisateur", "postgres://", "terminated"]) {
+        expect(logged, secret).not.toContain(secret);
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("une erreur d'ouverture des migrations remonte sans l'adresse ni le mot de passe", async () => {
+    vi.spyOn(pg.Client.prototype, "connect").mockImplementation((async () => {
+      throw Object.assign(new Error(`connect ECONNREFUSED 127.0.0.1:1 ${UNREACHABLE}`), { code: "ECONNREFUSED" });
+    }) as never);
+    vi.spyOn(pg.Client.prototype, "end").mockImplementation((async () => undefined) as never);
+    const error = await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: UNREACHABLE }, []).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(DatabaseConnectionError);
+    expect(error).toMatchObject({ code: "ECONNREFUSED" });
+    for (const secret of [PASSWORD, "127.0.0.1", "utilisateur", "postgres://"]) {
+      expect((error as Error).message, secret).not.toContain(secret);
     }
   });
 
