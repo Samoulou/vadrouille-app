@@ -1,0 +1,383 @@
+{
+  "_": "Cas du régime des tests (spécification P0c, section 4, zones sensibles comprises).",
+  "cas": [
+    {
+      "id": "tests-admis-01",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(globalThis, \"fetch\").mockResolvedValue(r);",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-02",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(window, \"fetch\").mockImplementation(() => r);",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-03",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubGlobal(\"fetch\", double);\nvi.unstubAllGlobals();",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-04",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", () => ({ createServer: vi.fn() }));",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-05",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"@/adapters\", async (importOriginal) => ({ ...(await importOriginal<object>()) }));",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-06",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const a = await vi.importActual(\"@/adapters\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-07",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubEnv(\"DATA_ADAPTER\", \"mock\");\nvi.unstubAllEnvs();",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-08",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { fireEvent } from \"@testing-library/react\";\nfireEvent.pointerUp(window, {});",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-09",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "export const d = process.cwd();",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-10",
+      "chemin": "src/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(console, \"log\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-11",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { it } from \"vitest\";\nimport { z } from \"zod\";\nimport { readFileSync } from \"node:fs\";\nimport path from \"node:path\";\nimport { AnalyticsEventSchema } from \"@/contracts\";\nit(\"x\", () => { z.string(); readFileSync(path.join(\"a\")); AnalyticsEventSchema.parse({}); });",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-12",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", () => ({ request: vi.fn() }));\nvi.stubEnv(\"DATA_ADAPTER\", \"mock\");",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-refus-01",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(globalThis, \"fetch\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-02",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(window, \"WebSocket\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-03",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(globalThis, \"fetch\").mockRestore();",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-04",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(globalThis, nom);",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "tests-refus-05",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubGlobal(nom, double);",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-06",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", async (importOriginal) => importOriginal());",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-07",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(\"node:http\", async () => import(\"node:http\"));",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-08",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.doMock(\"undici\", async () => ({ ...(await vi.importActual(\"undici\")) }));",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-09",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const u = await vi.importActual(\"undici\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-10",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nexport const u = await vi.importMock(\"node:net\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-11",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.mock(nom, () => ({}));",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-12",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import http from \"node:http\";\nexport const s = http.createServer();",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-13",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubEnv(\"OPENROUTER_API_KEY\", \"x\");",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "tests-refus-14",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { vi } from \"vitest\";\nvi.stubEnv(nom, \"x\");",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-15",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { it, vi } from \"vitest\";\nit.each([[\"VERCEL_ENV\"], [\"OPENROUTER_API_KEY\"]])(\"%s\", (name) => { vi.stubEnv(name, \"x\"); });",
+      "attendu": "refus",
+      "regle": "regime-tests"
+    },
+    {
+      "id": "tests-refus-16",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "process.env.DATA_ADAPTER = \"mock\";",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "tests-refus-17",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "fetch(\"https://exemple.org\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "tests-refus-18",
+      "chemin": "src/x.ts",
+      "source": "import { vi } from \"vitest\";\nvi.spyOn(globalThis, \"x\").mockReturnValue(1);",
+      "attendu": "refus",
+      "regle": "objet-global"
+    },
+    {
+      "id": "tests-refus-19",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import ws from \"ws\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-20",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import axios from \"axios\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-21",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import nodeFetch from \"node-fetch\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-22",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import vm from \"node:vm\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-23",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import cluster from \"node:cluster\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-24",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import inspector from \"node:inspector\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-25",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { createRequire } from \"node:module\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-26",
+      "chemin": "src/ai/x.test.ts",
+      "source": "process.binding(\"tcp_wrap\");",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "tests-refus-27",
+      "chemin": "src/ai/x.test.ts",
+      "source": "const p = process;\np[\"get\" + \"BuiltinModule\"];",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "tests-refus-28",
+      "chemin": "src/ai/x.test.ts",
+      "source": "(() => {}).constructor(\"return fetch\")();",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "tests-refus-29",
+      "chemin": "src/ai/x.test.ts",
+      "source": "(() => {})[\"constructor\"](\"return fetch\")();",
+      "attendu": "refus",
+      "regle": "constructeur"
+    },
+    {
+      "id": "tests-refus-30",
+      "chemin": "src/ai/x.test.ts",
+      "source": "Reflect.get(f, \"constructor\");",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "tests-refus-31",
+      "chemin": "src/ai/x.test.ts",
+      "source": "export const k = process.env.OPENROUTER_API_KEY;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "tests-refus-32",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { readFileSync } from \"node:fs\";\nreadFileSync(\"/proc/self/environ\");",
+      "attendu": "refus",
+      "regle": "texte-interdit"
+    },
+    {
+      "id": "tests-refus-33",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import \"@testing-library/react\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-34",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { gzipSync } from \"node:zlib\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-35",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { a } from \"@/lib/utils\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-36",
+      "chemin": "src/ai/x.ts",
+      "source": "import { a } from \"../../tests/support/serveur-local\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-37",
+      "chemin": "src/ai/x.ts",
+      "source": "import { readFileSync } from \"node:fs\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-38",
+      "chemin": "src/ai/x.ts",
+      "source": "import { z } from \"zod/mini\";\nimport { vi } from \"vitest\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-39",
+      "chemin": "src/contracts/sonde.ts",
+      "source": "import https from \"node:https\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "tests-refus-40",
+      "chemin": "src/contracts/sonde.ts",
+      "source": "export const r = fetch(\"/x\");",
+      "attendu": "refus",
+      "regle": "identifiant"
+    },
+    {
+      "id": "tests-refus-41",
+      "chemin": "src/contracts/sonde.ts",
+      "source": "import { a } from \"@/lib/utils\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-refus-42",
+      "chemin": "src/contracts/sonde.ts",
+      "source": "import { clsx } from \"clsx\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "tests-admis-zone-support",
+      "chemin": "src/ai/x.test.ts",
+      "source": "import { demarrerServeurLocal } from \"../../tests/support/serveur-local\";\nexport { demarrerServeurLocal };",
+      "attendu": "admis"
+    },
+    {
+      "id": "tests-admis-zone-contracts",
+      "chemin": "src/ai/x.ts",
+      "source": "import { z } from \"zod\";\nimport type { TripSummary } from \"@/contracts\";\nexport const s: TripSummary | undefined = undefined;\nexport const t = z.string();",
+      "attendu": "admis"
+    }
+  ]
+}

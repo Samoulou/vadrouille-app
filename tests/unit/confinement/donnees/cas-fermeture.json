@@ -1,0 +1,96 @@
+{
+  "_": "Cas de la fermeture transitive (spécification P0c, section 3). Chaque cas est un petit dépôt virtuel.",
+  "cas": [
+    {
+      "id": "fermeture-non-test-importe-test",
+      "attendu": "refus",
+      "fichiers": {
+        "src/a.ts": "import { x } from \"./a.test\";\nexport const y = x;",
+        "src/a.test.ts": "export const x = 1;"
+      }
+    },
+    {
+      "id": "fermeture-non-test-importe-tests",
+      "attendu": "refus",
+      "fichiers": {
+        "src/a.ts": "import { x } from \"../tests/unit/aide\";\nexport const y = x;",
+        "tests/unit/aide.ts": "export const x = 1;"
+      }
+    },
+    {
+      "id": "fermeture-ligne-outil-atteinte",
+      "attendu": "refus",
+      "fichiers": {
+        "src/app/x.ts": "import \"./pont\";",
+        "src/app/pont.ts": "import \"../../scripts/serve-standalone.mjs\";",
+        "scripts/serve-standalone.mjs": "export {};"
+      }
+    },
+    {
+      "id": "fermeture-p0r1-barrel",
+      "attendu": "refus",
+      "fichiers": {
+        "src/research/index.ts": "export * from \"./undici-transport\";",
+        "src/research/undici-transport.ts": "export const t = 1;",
+        "src/app/x.ts": "import { t } from \"@/research\";\nexport const u = t;"
+      }
+    },
+    {
+      "id": "fermeture-p0r1-direct",
+      "attendu": "refus",
+      "fichiers": {
+        "src/grounding/places-client.ts": "export const c = 1;",
+        "src/app/x.ts": "import { c } from \"@/grounding/places-client\";\nexport const u = c;"
+      }
+    },
+    {
+      "id": "fermeture-p0r1-composition",
+      "attendu": "admis",
+      "fichiers": {
+        "src/grounding/places-client.ts": "export const c = 1;",
+        "src/server/composition/p0-reel.ts": "import { c } from \"@/grounding/places-client\";\nexport const u = c;",
+        "src/grounding/places-client.test.ts": "import { c } from \"./places-client\";\nexport const v = c;"
+      }
+    },
+    {
+      "id": "fermeture-double-original-capacite",
+      "attendu": "refus",
+      "fichiers": {
+        "tests/unit/x.test.ts": "import { vi } from \"vitest\";\nvi.mock(\"@/lib/reseau\", async (importOriginal) => importOriginal());",
+        "src/lib/reseau.ts": "export * from \"./bas\";",
+        "src/lib/bas.ts": "import \"node:http\";"
+      }
+    },
+    {
+      "id": "fermeture-import-actual-capacite",
+      "attendu": "refus",
+      "fichiers": {
+        "tests/unit/x.test.ts": "import { vi } from \"vitest\";\nexport const m = await vi.importActual(\"@/lib/bas\");",
+        "src/lib/bas.ts": "import \"node:http\";"
+      }
+    },
+    {
+      "id": "fermeture-double-original-pur",
+      "attendu": "admis",
+      "fichiers": {
+        "tests/unit/x.test.ts": "import { vi } from \"vitest\";\nvi.mock(\"@/lib/pur\", async (importOriginal) => importOriginal());",
+        "src/lib/pur.ts": "export const p = 1;"
+      }
+    },
+    {
+      "id": "fermeture-double-sans-original",
+      "attendu": "admis",
+      "fichiers": {
+        "tests/unit/x.test.ts": "import { vi } from \"vitest\";\nvi.mock(\"@/lib/bas\", () => ({}));",
+        "src/lib/bas.ts": "import \"node:http\";"
+      }
+    },
+    {
+      "id": "fermeture-non-resolu",
+      "attendu": "refus",
+      "fichiers": {
+        "src/a.ts": "import { x } from \"./absent\";\nexport const y = x;"
+      }
+    }
+  ]
+}

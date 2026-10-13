@@ -1,0 +1,308 @@
+{
+  "_": "Cas des spécificateurs et des paquets (spécification P0c, section 6). `fusion` : la source est fusionnée dans le package.json réel.",
+  "cas": [
+    {
+      "id": "spec-refus-01",
+      "chemin": "src/x.ts",
+      "source": "import axios from \"axios\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-02",
+      "chemin": "src/x.ts",
+      "source": "import got from \"got\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-03",
+      "chemin": "src/x.ts",
+      "source": "import nodeFetch from \"node-fetch\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-04",
+      "chemin": "src/x.ts",
+      "source": "import WebSocketServer from \"ws\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-05",
+      "chemin": "src/x.ts",
+      "source": "import fs from \"fs\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-06",
+      "chemin": "src/x.ts",
+      "source": "import path from \"path\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-07",
+      "chemin": "src/x.ts",
+      "source": "import { NextResponse } from \"next/server\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-08",
+      "chemin": "src/x.tsx",
+      "source": "import Image from \"next/image\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-09",
+      "chemin": "src/x.tsx",
+      "source": "import Script from \"next/script\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-10",
+      "chemin": "src/x.ts",
+      "source": "import { ImageResponse } from \"next/og\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-11",
+      "chemin": "src/x.ts",
+      "source": "import { readFileSync } from \"node:fs\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-12",
+      "chemin": "src/x.ts",
+      "source": "import { tmpdir } from \"node:os\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-13",
+      "chemin": "src/lib/x.ts",
+      "source": "import { describe } from \"vitest\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-14",
+      "chemin": "src/x.ts",
+      "source": "import { clsx } from \"clsx\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-15",
+      "chemin": "scripts/x.mjs",
+      "source": "import React from \"react\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-16",
+      "chemin": "src/x.ts",
+      "source": "import { parse } from \"parse5\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-17",
+      "chemin": "src/x.ts",
+      "source": "import ts from \"typescript\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-18",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import ts from \"typescript\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-19",
+      "chemin": "tests/unit/p0/autre.test.ts",
+      "source": "import ts from \"typescript\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-20",
+      "chemin": "src/x.ts",
+      "source": "import { promisify } from \"node:util\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-refus-21",
+      "chemin": "src/ai/x.ts",
+      "source": "import { randomUUID } from \"node:crypto\";",
+      "attendu": "refus",
+      "regle": "specificateur"
+    },
+    {
+      "id": "spec-admis-01",
+      "chemin": "src/x.tsx",
+      "source": "import Link from \"next/link\";\nexport { Link };",
+      "attendu": "admis"
+    },
+    {
+      "id": "spec-admis-02",
+      "chemin": "src/x.ts",
+      "source": "import { randomUUID } from \"node:crypto\";\nexport { randomUUID };",
+      "attendu": "admis"
+    },
+    {
+      "id": "spec-admis-03",
+      "chemin": "src/lib/x.ts",
+      "source": "import { clsx } from \"clsx\";\nexport { clsx };",
+      "attendu": "admis"
+    },
+    {
+      "id": "spec-admis-04",
+      "chemin": "tests/unit/confinement/x.test.ts",
+      "source": "import ts from \"typescript\";\nexport { ts };",
+      "attendu": "admis"
+    },
+    {
+      "id": "spec-admis-05",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { readFileSync } from \"node:fs\";\nexport { readFileSync };",
+      "attendu": "admis"
+    },
+    {
+      "id": "spec-admis-06",
+      "chemin": "src/x.ts",
+      "source": "import { z } from \"zod/mini\";\nexport { z };",
+      "attendu": "admis"
+    },
+    {
+      "id": "paquets-paquet-non-liste",
+      "chemin": "package.json",
+      "source": "{\"devDependencies\": {\"left-pad\": \"1.3.0\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-plage",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"^4.6.5\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-tilde",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"~4.6.5\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-npm",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"npm:zod@4.6.5\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-workspace",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"workspace:*\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-latest",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"latest\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-version-git",
+      "chemin": "package.json",
+      "source": "{\"dependencies\": {\"zod\": \"git+https://exemple.org/zod.git\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-cle-overrides",
+      "chemin": "package.json",
+      "source": "{\"overrides\": {\"zod\": \"4.6.5\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-cle-optional",
+      "chemin": "package.json",
+      "source": "{\"optionalDependencies\": {}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-pnpm-extensions",
+      "chemin": "package.json",
+      "source": "{\"pnpm\": {\"packageExtensions\": {}}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-pnpm-overrides",
+      "chemin": "package.json",
+      "source": "{\"pnpm\": {\"overrides\": {}}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-pnpm-construits",
+      "chemin": "package.json",
+      "source": "{\"pnpm\": {\"onlyBuiltDependencies\": [\"sharp\", \"unrs-resolver\", \"esbuild\"]}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-script-postinstall",
+      "chemin": "package.json",
+      "source": "{\"scripts\": {\"postinstall\": \"node x.mjs\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-script-prepare",
+      "chemin": "package.json",
+      "source": "{\"scripts\": {\"prepare\": \"node x.mjs\"}}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    },
+    {
+      "id": "paquets-gestionnaire",
+      "chemin": "package.json",
+      "source": "{\"packageManager\": \"pnpm@10.28.1\"}",
+      "attendu": "refus",
+      "regle": "specificateur",
+      "fusion": true
+    }
+  ]
+}

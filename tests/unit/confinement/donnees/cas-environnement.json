@@ -1,0 +1,352 @@
+{
+  "_": "Cas du confinement de l'environnement (spécification P0c, section 5). Noms secrets : données du régime.",
+  "cas": [
+    {
+      "id": "env-refus-01",
+      "chemin": "src/x.ts",
+      "source": "import process from \"node:process\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "env-refus-02",
+      "chemin": "src/x.ts",
+      "source": "import { env } from \"node:process\";",
+      "attendu": "refus",
+      "regle": "module-capacite"
+    },
+    {
+      "id": "env-refus-03",
+      "chemin": "src/x.ts",
+      "source": "const e = process.env;\nexport const v = e[k];",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-04",
+      "chemin": "src/x.ts",
+      "source": "export const e = process[\"env\"];",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-05",
+      "chemin": "src/x.ts",
+      "source": "const { env } = process;",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-06",
+      "chemin": "src/x.ts",
+      "source": "export const v = globalThis.process.env;",
+      "attendu": "refus",
+      "regle": "propriete"
+    },
+    {
+      "id": "env-refus-07",
+      "chemin": "src/x.ts",
+      "source": "f(process.env);",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-08",
+      "chemin": "src/x.ts",
+      "source": "export const x = { ...process.env };",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-09",
+      "chemin": "src/x.ts",
+      "source": "const { A } = process.env;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-10",
+      "chemin": "src/x.ts",
+      "source": "Object.keys(process.env);",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-11",
+      "chemin": "src/x.ts",
+      "source": "Reflect.get(process.env, k);",
+      "attendu": "refus",
+      "regle": "reflexion"
+    },
+    {
+      "id": "env-refus-12",
+      "chemin": "src/x.ts",
+      "source": "process.env.A = \"x\";",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-13",
+      "chemin": "src/x.ts",
+      "source": "delete process.env.A;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-14",
+      "chemin": "src/x.ts",
+      "source": "export const b = \"A\" in process.env;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-15",
+      "chemin": "src/x.ts",
+      "source": "export const e = import.meta.env;",
+      "attendu": "refus",
+      "regle": "contournement"
+    },
+    {
+      "id": "env-refus-16",
+      "chemin": "src/x.ts",
+      "source": "export const v = process.env.NON_LISTE;",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-17",
+      "chemin": "src/x.ts",
+      "source": "export const v = process.env[k];",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-18",
+      "chemin": "src/x.ts",
+      "source": "export const v = process.env[\"OPENROUTER\" + \"_API_KEY\"];",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-19",
+      "chemin": "src/dev/flags.ts",
+      "source": "export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env) {\n  return env[k];\n}",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-20",
+      "chemin": "src/dev/flags.ts",
+      "source": "export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env) {\n  return env.NON_LISTE;\n}",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-21",
+      "chemin": "src/dev/flags.ts",
+      "source": "export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env) {\n  return autre(env);\n}",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-22",
+      "chemin": "src/dev/flags.ts",
+      "source": "export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env) {\n  const copie = env;\n  return copie;\n}",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-23",
+      "chemin": "scripts/e2e-port.mjs",
+      "source": "export function e2ePort({ env, repoPath }) {\n  return env.HOME + repoPath;\n}",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "env-refus-24",
+      "chemin": "src/x.ts",
+      "source": "process.stdout.write(\"x\");",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-25",
+      "chemin": "src/x.ts",
+      "source": "export const x = process.argv;",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-26",
+      "chemin": "src/x.ts",
+      "source": "export const p = process;",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-27",
+      "chemin": "src/x.ts",
+      "source": "f(process);",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-28",
+      "chemin": "src/x.ts",
+      "source": "export const t = typeof process;",
+      "attendu": "refus",
+      "regle": "process"
+    },
+    {
+      "id": "env-refus-29",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"openrouter_api\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-30",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"MAPS_SERVER_KEY_X\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-31",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"oidc_token\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-32",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"STRIPE_SECRET\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-33",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"db_password\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-34",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"VADROUILLE_DATABASE_URL_AUTH\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-35",
+      "chemin": "src/x.ts",
+      "source": "export const n = \"GH_TOKEN\";",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-36",
+      "chemin": "src/x.ts",
+      "source": "export const n = `cle ${x} GOOGLE_MAPS_SERVER_KEY`;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-37",
+      "chemin": "src/x.tsx",
+      "source": "export const e = <p>AI_GATEWAY_API_KEY</p>;",
+      "attendu": "refus",
+      "regle": "nom-secret"
+    },
+    {
+      "id": "env-refus-38",
+      "chemin": "src/x.ts",
+      "source": "export const f = \".env.local\";",
+      "attendu": "refus",
+      "regle": "texte-interdit"
+    },
+    {
+      "id": "env-refus-39",
+      "chemin": "src/x.ts",
+      "source": "export const f = \"/app/.env\";",
+      "attendu": "refus",
+      "regle": "texte-interdit"
+    },
+    {
+      "id": "env-refus-40",
+      "chemin": "src/x.ts",
+      "source": "export const f = \"/proc/self/environ\";",
+      "attendu": "refus",
+      "regle": "texte-interdit"
+    },
+    {
+      "id": "env-refus-41",
+      "chemin": "src/x.ts",
+      "source": "export const f = \"/PROC/self/environ\";",
+      "attendu": "refus",
+      "regle": "texte-interdit"
+    },
+    {
+      "id": "env-admis-01",
+      "chemin": "src/x.ts",
+      "source": "export const o = { GH_TOKEN: \"jeton-factice\" };",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-02",
+      "chemin": "src/x.ts",
+      "source": "export const f = \".env.example\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-03",
+      "chemin": "src/x.ts",
+      "source": "export const m = \"environ dix minutes\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-04",
+      "chemin": "src/x.ts",
+      "source": "export const v = process.env.NODE_ENV;",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-05",
+      "chemin": "src/x.ts",
+      "source": "export const k = \"NEXT_PUBLIC_GOOGLE_MAPS_API_KEY\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-06",
+      "chemin": "src/dev/flags.ts",
+      "source": "export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env) {\n  return env.VADROUILLE_DEV_PAGES === \"1\" || env.NODE_ENV !== \"production\";\n}",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-07",
+      "chemin": "src/adapters/simulation.ts",
+      "source": "export function simulationEnabled(env: NodeJS.ProcessEnv = process.env) {\n  return devPagesEnabled(env) && !isProductionDeployment(env);\n}",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-08",
+      "chemin": "scripts/e2e-port.mjs",
+      "source": "export function e2ePort({ env, repoPath }) {\n  return env.CI ? 1 : env.E2E_PORT?.trim() ?? repoPath;\n}",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-09",
+      "chemin": "playwright.config.ts",
+      "source": "export const p = e2ePort({ env: process.env, repoPath: \".\" });\nexport const c = process.env.CI;",
+      "attendu": "admis"
+    },
+    {
+      "id": "env-admis-10",
+      "chemin": "tests/unit/x.test.ts",
+      "source": "import { it } from \"vitest\";\nit(\"x\", () => process.cwd());",
+      "attendu": "admis"
+    }
+  ]
+}

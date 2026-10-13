@@ -1,0 +1,284 @@
+{
+  "_": "Lignes de capacité dont la forme contient une valeur refusée (spécification P0c, sections 2.5, 3 et 5). Même forme que listes/capacites.ts. Propriété du Tech Lead, verdict Sécurité exigé ; chemin gardé (section 8).",
+  "lignes": [
+    {
+      "fichier": "tests/e2e/carte-helpers.ts",
+      "portee": "test",
+      "usage": "liste des hôtes Google bloqués dans les e2e",
+      "capacites": [
+        {
+          "capacite": "hote:googleapis.com",
+          "formes": [
+            "googleapis.com"
+          ]
+        }
+      ]
+    },
+    {
+      "fichier": "tests/e2e/carte.e2e.spec.ts",
+      "portee": "test",
+      "usage": "vérifie qu'aucune requête Google n'a lieu",
+      "capacites": [
+        {
+          "capacite": "hote:places.googleapis.com",
+          "formes": [
+            "places\\.googleapis\\.com|routes\\.googleapis\\.com"
+          ]
+        },
+        {
+          "capacite": "hote:routes.googleapis.com",
+          "formes": [
+            "places\\.googleapis\\.com|routes\\.googleapis\\.com"
+          ]
+        }
+      ]
+    },
+    {
+      "fichier": "src/prototype/config.ts",
+      "portee": "application",
+      "usage": "message d'erreur du schéma de configuration de P0 ; module pur, aucune capacité réseau",
+      "capacites": [
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "identifiant de modèle OpenRouter attendu"
+          ]
+        }
+      ]
+    },
+    {
+      "fichier": "src/prototype/config.test.ts",
+      "portee": "test",
+      "usage": "valeur d'un cas négatif : une configuration qui contient une adresse est refusée",
+      "capacites": [
+        {
+          "capacite": "hote:openrouter.ai",
+          "formes": [
+            "https://openrouter.ai"
+          ]
+        }
+      ]
+    },
+    {
+      "fichier": "src/adapters/simulation.ts",
+      "portee": "application",
+      "usage": "état simulé en mémoire (rechargement à chaud)",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[REGISTRY_KEY]"
+          ]
+        }
+      ]
+    },
+    {
+      "fichier": "src/adapters/prototype-instance.ts",
+      "portee": "application",
+      "usage": "instance de l'adaptateur prototype en mémoire (P0b1), même forme que simulation.ts",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[INSTANCE_KEY]"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : nouvelle ligne de portée application (P0b1)"
+    },
+    {
+      "fichier": "src/adapters/prototype.test.ts",
+      "portee": "test",
+      "usage": "vérifie que P0b1 n'appelle jamais Google",
+      "capacites": [
+        {
+          "capacite": "hote:googleapis.com",
+          "formes": [
+            "aucun hôte googleapis.com, aucun fetch, aucune lecture de GOOGLE_MAPS_SERVER_KEY ni d'OPENROUTER_API_KEY",
+            "googleapis\\.com"
+          ]
+        },
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:GOOGLE_MAPS_SERVER_KEY",
+          "formes": [
+            "aucun hôte googleapis.com, aucun fetch, aucune lecture de GOOGLE_MAPS_SERVER_KEY ni d'OPENROUTER_API_KEY",
+            "GOOGLE_MAPS_SERVER_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:MAPS_SERVER_KEY",
+          "formes": [
+            "aucun hôte googleapis.com, aucun fetch, aucune lecture de GOOGLE_MAPS_SERVER_KEY ni d'OPENROUTER_API_KEY",
+            "GOOGLE_MAPS_SERVER_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API_KEY",
+          "formes": [
+            "aucun hôte googleapis.com, aucun fetch, aucune lecture de GOOGLE_MAPS_SERVER_KEY ni d'OPENROUTER_API_KEY",
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API",
+          "formes": [
+            "aucun hôte googleapis.com, aucun fetch, aucune lecture de GOOGLE_MAPS_SERVER_KEY ni d'OPENROUTER_API_KEY",
+            "OPENROUTER_API_KEY"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : textes de test (titre, motifs) qui nomment un hôte surveillé et des noms secrets (P0b1)"
+    },
+    {
+      "fichier": "tests/unit/ci/post-merge-cleanup.test.ts",
+      "portee": "test",
+      "usage": "titre de test",
+      "capacites": [
+        {
+          "capacite": "secret:GITHUB_TOKEN",
+          "formes": [
+            "n'utilise que GITHUB_TOKEN, sans secret, et le code de main"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : nom à suffixe `_TOKEN` dans un titre de test"
+    },
+    {
+      "fichier": "tests/unit/p0/depot.test.ts",
+      "portee": "test",
+      "usage": "titre de test de P0a1",
+      "capacites": [
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "aucune forme de clé OpenRouter ou Google dans un fichier suivi"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+    },
+    {
+      "fichier": "tests/unit/p0/pipeline.test.ts",
+      "portee": "test",
+      "usage": "valeurs sentinelles d'un cas négatif de P0a1 (aucune fuite d'erreur fournisseur)",
+      "capacites": [
+        {
+          "capacite": "hote:places.googleapis.com",
+          "formes": [
+            " https://places.googleapis.com/v1/places/SENTINELLE_PLACE_ID_001?key="
+          ]
+        },
+        {
+          "capacite": "fragment:googleapis",
+          "formes": [
+            "googleapis"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+    },
+    {
+      "fichier": "tests/unit/p0/cli.test.ts",
+      "portee": "test",
+      "usage": "noms des variables de clé surveillées (valeurs factices)",
+      "capacites": [
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API_KEY",
+          "formes": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API",
+          "formes": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:GOOGLE_MAPS_SERVER_KEY",
+          "formes": [
+            "GOOGLE_MAPS_SERVER_KEY"
+          ]
+        },
+        {
+          "capacite": "secret:MAPS_SERVER_KEY",
+          "formes": [
+            "GOOGLE_MAPS_SERVER_KEY"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : fichier de P0a1 (PR 180)"
+    },
+    {
+      "fichier": "tests/unit/p0/imports.test.ts",
+      "portee": "test",
+      "usage": "cas négatifs du test d'imports de #149 (P0a1), non modifiable par P0c1",
+      "capacites": [
+        {
+          "capacite": "hote:openrouter.ai",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY"
+          ]
+        },
+        {
+          "capacite": "hote:googleapis.com",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY"
+          ]
+        },
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "const k = process.env.OPENROUTER_API_KEY;",
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API_KEY",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
+            "const k = process.env.OPENROUTER_API_KEY;",
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+          ]
+        },
+        {
+          "capacite": "secret:OPENROUTER_API",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
+            "const k = process.env.OPENROUTER_API_KEY;",
+            "const p = process;\nconst k = p.env.OPENROUTER_API_KEY;"
+          ]
+        },
+        {
+          "capacite": "secret:GOOGLE_MAPS_SERVER_KEY",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
+            "const cle = process.env.GOOGLE_MAPS_SERVER_KEY;"
+          ]
+        },
+        {
+          "capacite": "secret:MAPS_SERVER_KEY",
+          "formes": [
+            "openrouter\\.ai|googleapis\\.com|@\\/server\\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY",
+            "const cle = process.env.GOOGLE_MAPS_SERVER_KEY;"
+          ]
+        }
+      ],
+      "ecart": "écart relevé à la base de P0c1 (après `40b6738`), à trancher par le Tech Lead avec verdict Sécurité : textes des cas négatifs d'un test qui ne peut pas être modifié (0038, TL-2 point 1)"
+    }
+  ]
+}

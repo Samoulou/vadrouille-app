@@ -1,0 +1,128 @@
+{
+  "_": "Cas des hôtes normalisés (spécification P0c, section 2.5). Valeurs refusées : données du régime.",
+  "cas": [
+    {
+      "id": "hotes-refus-01",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"openrouter.ai\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-02",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"OpenRouter.AI\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-03",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"https://places.googleapis.com/v1\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-04",
+      "chemin": "src/x.ts",
+      "source": "export const r = /places\\.googleapis\\.com/;",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-05",
+      "chemin": "src/x.ts",
+      "source": "export const r = new RegExp(\"routes\\\\.googleapis\\\\.com\");",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-06",
+      "chemin": "src/x.ts",
+      "source": "export const r = /googleapis[.]com/;",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-07",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"openrouter\" + \".ai\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-08",
+      "chemin": "src/x.ts",
+      "source": "export const u = `${\"openrouter\"}.ai`;",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-09",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"openrouter%2Eai\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-10",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"googleapis\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-11",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"ai-gateway.vercel.sh\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-12",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"openrouter.ai.\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-13",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"ＯＰＥＮＲＯＵＴＥＲ.ai\";",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-14",
+      "chemin": "src/x.tsx",
+      "source": "export const e = <a href=\"https://maps.googleapis.com/x\">x</a>;",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-refus-15",
+      "chemin": "src/x.ts",
+      "source": "export const u = `https://${base}.googleapis.com`;",
+      "attendu": "refus",
+      "regle": "hote"
+    },
+    {
+      "id": "hotes-admis-01",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"notgoogleapis.community\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "hotes-admis-02",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"gstatic.com\";",
+      "attendu": "admis"
+    },
+    {
+      "id": "hotes-admis-03",
+      "chemin": "src/x.ts",
+      "source": "export const u = \"https://exemple.org\";",
+      "attendu": "admis"
+    }
+  ]
+}

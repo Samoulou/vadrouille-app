@@ -1,0 +1,57 @@
+{
+  "_": "Listes de refus du régime de confinement (spécification P0c, sections 2.4, 2.5 et 5). Valeurs refusées : jamais écrites dans un fichier analysé (section 1, « Données du régime »). Chemin gardé (section 8).",
+  "hotes": [
+    "openrouter.ai",
+    "googleapis.com",
+    "ai-gateway.vercel.sh"
+  ],
+  "fragments": [
+    "openrouter",
+    "googleapis"
+  ],
+  "nomsSecrets": [
+    "OPENROUTER_API_KEY",
+    "GOOGLE_MAPS_SERVER_KEY",
+    "AI_GATEWAY_API_KEY",
+    "VERCEL_OIDC_TOKEN"
+  ],
+  "suffixesSecrets": [
+    "_KEY",
+    "_TOKEN",
+    "_SECRET",
+    "PASSWORD"
+  ],
+  "contenusSecrets": [
+    "DATABASE_URL"
+  ],
+  "exceptionsSecrets": [
+    "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"
+  ],
+  "fragmentsSecrets": [
+    "OPENROUTER_API",
+    "MAPS_SERVER_KEY",
+    "AI_GATEWAY",
+    "OIDC_TOKEN"
+  ],
+  "motifsProc": [
+    "/proc/"
+  ],
+  "motifFichierEnv": "(^|/)\\.env(\\.[a-z0-9.-]+)?$",
+  "fichiersEnvAdmis": [
+    ".env.example"
+  ],
+  "paquetsCapacite": [
+    "undici",
+    "ai",
+    "@openrouter/ai-sdk-provider",
+    "pg",
+    "lighthouse",
+    "@googlemaps/js-api-loader"
+  ],
+  "modulesCapaciteP0r1": [
+    "src/ai/openrouter-client.ts",
+    "src/grounding/places-client.ts",
+    "src/grounding/routes-client.ts",
+    "src/research/undici-transport.ts"
+  ]
+}
