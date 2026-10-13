@@ -33,5 +33,8 @@ Options écartées :
 
 R15 passe sous le seuil avec environ 4,7 ko de marge ; les 19 mesures du test de budget passent. Le seuil de 200 000 octets ne change pas.
 
+## Références visuelles
+Régénérées sur la CI par `visual-update` (commit `1b5793d`, décision 0004) : 8 nouvelles références de F8b (connexion, logement) et 5 références modifiées (`accueil`, `brief-recit-bandeau-erreur`, `dev-composants-jours-focus-complet`, `revision-deplacer-jours`, `revision-deplacer-points`). Le découpage des textes ne change aucun texte : la revue compare ces 5 captures à celles de `main` et signale tout écart qui ne vient pas de l'entrée « Créer un voyage » de l'accueil.
+
 ## Ce que cette décision ne tranche pas
 Rien qui engage de l'argent, un compte externe ou des données personnelles. Aucune règle de Ligne ni aucun texte ne change.
