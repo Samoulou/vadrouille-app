@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { messages } from "../../src/i18n";
+import * as messages from "../../src/i18n/messages";
 
 /**
  * Capture 390 × 844 des démonstrations de F5c dans la section « Programme » de /dev/composants : les quatre

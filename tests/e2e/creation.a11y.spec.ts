@@ -2,7 +2,9 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "./carte-helpers";
-import { EDIMBOURG, R1, continueButton, fillTrip, installClock, reachBrief, reachReview } from "./creation-helpers";
+import { AUTH_CONFIG, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor, uniqueEmail } from "./connexion-helpers";
+import { EDIMBOURG, R1, R3, R3_DEV, continueButton, fillTrip, installClock, reachAfterBrief, reachBrief, reachReview } from "./creation-helpers";
+import { expectPath } from "./debloquer-helpers";
 
 /**
  * Axe (WCAG 2.2 AA), cibles de 44 × 44 px, contour de focus et titre de niveau 1 unique sur chaque état des
@@ -119,5 +121,66 @@ test("brief: aucune violation axe, vérification remplie soi-même avec erreurs 
   await continueButton(page).click();
   await expect(page.getByText("Choisis un rythme.")).toBeVisible();
   for (const name of [/^Déplacements/, /^À limiter/, /^Budget par repas/]) await page.getByRole("button", { name }).click();
+  await expectAccessible(page);
+});
+
+// F8b : écrans 3 et 4 (spécification F8, « Tests » ; critères transverses).
+
+test("logement: aucune violation axe, quartier et logements (configuration absente)", async ({ page }) => {
+  await reachAfterBrief(page);
+  await expectPath(page, R3);
+  await expect(page.getByRole("button", { name: "Partir du quartier, choisir plus tard" })).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("logement: aucune violation axe, carte simulée (R3-dev)", async ({ page }) => {
+  await page.goto(R3_DEV);
+  await expect(page.locator("[data-part='zone']")).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("logement: aucune violation axe, aucun quartier", async ({ page }) => {
+  await reachAfterBrief(page, { ...EDIMBOURG, destination: "Glasgow" });
+  await expect(page.getByText("Aucun quartier à te proposer pour l'instant.")).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("connexion: aucune violation axe, étape email", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await expect(emailField(page)).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("connexion: aucune violation axe, email invalide", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages"));
+  await emailField(page).fill("camille@");
+  await page.getByRole("button", { name: "Recevoir un code" }).click();
+  await expect(emailField(page)).toHaveAttribute("aria-invalid", "true");
+  await expectAccessible(page);
+});
+
+test("connexion: aucune violation axe, étape code", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages"));
+  await requestCodeFor(page, uniqueEmail());
+  await expectAccessible(page);
+});
+
+test("connexion: aucune violation axe, code faux", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages"));
+  await requestCodeFor(page, uniqueEmail());
+  await pasteCode(page, MOCK_WRONG_CODE);
+  await expect(codeAlert(page)).not.toHaveText("");
+  await expectAccessible(page);
+});
+
+test("connexion: aucune violation axe, trop d'essais", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages"));
+  await requestCodeFor(page, uniqueEmail());
+  for (let attempt = 1; attempt <= AUTH_CONFIG.maxAttempts; attempt += 1) {
+    await expect(page.getByRole("textbox", { name: "Chiffre 1 sur 6" })).toBeEnabled();
+    await pasteCode(page, MOCK_WRONG_CODE);
+    await expect(codeAlert(page)).not.toHaveText("");
+  }
+  await expect(codeAlert(page)).toHaveText(/^Trop d'essais/);
   await expectAccessible(page);
 });

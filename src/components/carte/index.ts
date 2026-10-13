@@ -1,10 +1,13 @@
 export { CarteProvider, isMapConfigComplete, readMapConfig, type CarteInjection, type MapConfig, type SimulatedRenderer } from "./config";
+export { AreaMap, type AreaMapProps } from "./AreaMap";
 export { DayMap, type DayMapProps } from "./DayMap";
 export { GoogleMapRenderer, LOAD_TIMEOUT_MS, MAPS_LIBRARIES, type GoogleMapRendererProps } from "./GoogleMapRenderer";
 export { MapFallback, type MapFallbackCause, type MapFallbackProps } from "./MapFallback";
 export { MarkerButton, type MarkerButtonProps } from "./MarkerButton";
 export { PlacesAttribution, type PlacesAttributionProps } from "./PlacesAttribution";
 export {
+  areaCorners,
+  areaRadiusDegrees,
   boundsOf,
   buildDayRoute,
   buildOverview,

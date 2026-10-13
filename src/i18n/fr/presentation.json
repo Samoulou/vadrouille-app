@@ -1,0 +1,110 @@
+{
+  "titre": {
+    "apercu": "Tes premières propositions",
+    "suite": "Suite du tri"
+  },
+  "paquet": "Propositions à trier",
+  "passer": "Passer",
+  "toutGarder": "Tout garder pour le jour {n}",
+  "progression": "Proposition {current} sur {total}",
+  "progressionVisible": "{current} sur {total}",
+  "generation": "Jour {n} en préparation",
+  "carte": {
+    "photo": "Photo du lieu",
+    "vers": "vers {time}",
+    "detail": "Voir le détail de {name}",
+    "option": "option {index} sur {total}"
+  },
+  "actions": {
+    "like": "J'aime",
+    "dislike": "Pas pour moi",
+    "choose": "Je choisis",
+    "next": "Option suivante"
+  },
+  "toast": {
+    "disliked": "{name} écarté.",
+    "liked": "{name} gardé.",
+    "chosen": "{name} choisi.",
+    "dayKept": "Jour {day} gardé.",
+    "annuler": "Annuler"
+  },
+  "question": {
+    "categorie": "On arrête {categorie} pour ce voyage ?",
+    "distance": "On reste plus près de ton hôtel ?",
+    "raison": "Pourquoi ? (facultatif)",
+    "oui": "Oui",
+    "non": "Non",
+    "fermer": "Fermer",
+    "retirees": "{nombre} propositions retirées",
+    "retiree": "1 proposition retirée"
+  },
+  "raisons": {
+    "notMyStyle": "Pas mon style",
+    "tooBusy": "Trop chargé",
+    "tooExpensive": "Trop cher",
+    "tooFar": "Trop loin",
+    "other": "Autre raison"
+  },
+  "categories": {
+    "museum": "les musées et monuments",
+    "walk": "les balades en ville",
+    "nature": "la nature et les points de vue",
+    "tasting": "les dégustations",
+    "restaurant": "les restaurants",
+    "heritage": "le patrimoine et les monuments",
+    "market": "les marchés",
+    "nightlife": "les bars et les soirées"
+  },
+  "detail": {
+    "moment": "Jour {day}, {weekday}, vers {time}",
+    "momentSansJour": "Jour {day}, vers {time}",
+    "source": "Source : ",
+    "verifie": "Informations vérifiées le {date}",
+    "mois": [
+      "janvier",
+      "février",
+      "mars",
+      "avril",
+      "mai",
+      "juin",
+      "juillet",
+      "août",
+      "septembre",
+      "octobre",
+      "novembre",
+      "décembre"
+    ],
+    "fermer": "Fermer"
+  },
+  "fin": {
+    "apercu": "Tu as vu tes premières propositions",
+    "suite": "Tu as tout trié",
+    "vide": "Aucune proposition à trier",
+    "debloquer": "Débloquer",
+    "programme": "Voir le programme"
+  },
+  "contexte": {
+    "entre": "Entre {a} et {b}",
+    "apres": "Après {a}",
+    "avant": "Avant {b}",
+    "repas": {
+      "lunch": "ton déjeuner",
+      "dinner": "ton dîner"
+    },
+    "tempsLibre": "ton temps libre",
+    "terminus": {
+      "start": "le départ du logement",
+      "end": "le retour au logement"
+    }
+  },
+  "sansOption": {
+    "message": "Pas de proposition pour {creneaux}. Ton programme reste ouvert à cet endroit.",
+    "messagePlusieurs": "Pas de proposition pour {creneaux}. Ton programme reste ouvert à ces endroits.",
+    "creneau": "le jour {n}, vers {heure} ({kind})",
+    "separateur": " ; ",
+    "kind": {
+      "activity": "activité",
+      "meal": "repas"
+    }
+  }
+}

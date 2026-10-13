@@ -1,0 +1,17 @@
+{
+  "regionJour": "Carte du jour {n}",
+  "regionSejour": "Carte du séjour",
+  "evitement": "Aller à la liste des étapes",
+  "marqueur": "Étape {numero} : {name}",
+  "horsLigne": "Carte indisponible hors ligne. La liste reste utilisable.",
+  "indisponible": "Carte indisponible. La liste contient tout le programme.",
+  "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
+  "reessayer": "Réessayer",
+  "attribution": "Données de lieux : Google",
+  "zone": {
+    "region": "Carte du quartier {nom}",
+    "horsLigne": "Carte indisponible hors ligne. Le quartier est décrit ci-dessus.",
+    "indisponible": "Carte indisponible. Le quartier est décrit ci-dessus.",
+    "erreur": "La carte n'a pas pu être chargée. Le quartier est décrit ci-dessus."
+  }
+}

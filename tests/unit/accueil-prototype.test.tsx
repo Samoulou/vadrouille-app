@@ -10,7 +10,7 @@ import { createProgrammeLoader } from "@/adapters/prototype-loader";
 import HomePage from "@/app/page";
 import { presentationRoute } from "@/features/presentation/routes";
 import { tripRoutes } from "@/features/sejour/routes";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { createRelecteurSimule } from "@/mocks/prototype-relecteur";
 
 vi.mock("@/adapters", async (importOriginal) => {
@@ -70,7 +70,8 @@ describe("accueil : section « Prototype »", () => {
     avecProgrammes(createProgrammeLoader({ dossier: join(DOSSIER_TEST, "absent") }));
     render(await HomePage());
     expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
   });
 
   it("aucune section avec l'adaptateur mock", async () => {

@@ -2,7 +2,8 @@ import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { DayLine } from "@/components/ligne/DayLine";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { Day } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";

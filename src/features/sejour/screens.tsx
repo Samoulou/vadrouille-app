@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { getRequestContext, getRevisionFixtures, isPrototypeAdapter, shareButtonVisible } from "@/adapters";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { findFicheTarget } from "./fiche";
 import { dayFromParam, loadTrip, replaceTargetOf } from "./load";

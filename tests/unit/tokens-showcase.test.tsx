@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TokensShowcase } from "@/dev/TokensShowcase";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { COLOR_TOKENS, RADIUS_TOKENS, TEXT_STYLES } from "@/styles/tokens";
 
 describe("TokensShowcase", () => {

@@ -9,7 +9,8 @@ import type { TripSummary } from "@/contracts";
 import { yearOf } from "@/features/voyage/today";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { useClientNow } from "@/features/voyage/use-client-now";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTripDates } from "@/lib/dates";
 
 import { classifyTrips, reopenTarget, tripToday, type TripSections } from "./trips";

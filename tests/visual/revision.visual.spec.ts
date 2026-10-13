@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { messages } from "../../src/i18n";
+import * as messages from "../../src/i18n/messages";
 import { blockGoogle } from "../e2e/carte-helpers";
 import {
   DEV_FICHE_JARDIN,

@@ -1,4 +1,4 @@
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { COLOR_TOKENS, RADIUS_TOKENS, TEXT_STYLES, type RadiusToken } from "@/styles/tokens";
 
 import { TokenValue } from "./TokenValue";

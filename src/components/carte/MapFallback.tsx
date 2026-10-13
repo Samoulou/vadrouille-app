@@ -1,5 +1,5 @@
 import { Button } from "@/components/ligne/Button";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import { PlacesAttribution } from "./PlacesAttribution";
@@ -19,6 +19,8 @@ export interface MapFallbackProps {
   /** « Réessayer », pour l'erreur de chargement seulement. */
   onRetry?: () => void;
   placesFromGoogle: boolean;
+  /** Texte propre à l'appelant (mini-carte d'un quartier, `AreaMap`) ; par défaut, celui de la cause. */
+  text?: string;
   className?: string;
 }
 
@@ -29,13 +31,13 @@ export interface MapFallbackProps {
  * la région live persistante de `DayMap`, dont seul le texte change ; le texte visible est donc masqué aux
  * technologies d'assistance pour ne pas être lu deux fois.
  */
-export function MapFallback({ cause, onRetry, placesFromGoogle, className }: MapFallbackProps) {
+export function MapFallback({ cause, onRetry, placesFromGoogle, text, className }: MapFallbackProps) {
   return (
     <div
       data-fallback={cause}
       className={cn("flex size-full flex-col items-center justify-center gap-3 bg-muted p-6 text-center text-corps text-ink-2", className)}
     >
-      <p aria-hidden="true">{MAP_FALLBACK_TEXTS[cause]}</p>
+      <p aria-hidden="true">{text ?? MAP_FALLBACK_TEXTS[cause]}</p>
       {cause === "error" && onRetry ? (
         <Button variant="secondary" size="sm" onClick={onRetry}>
           {messages.carte.reessayer}

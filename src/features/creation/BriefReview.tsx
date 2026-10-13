@@ -21,7 +21,8 @@ import {
 } from "@/contracts/values";
 import type { Category } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatNombre } from "@/lib/nombre";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ import { TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { IconMoinsProvisoire, NumberField } from "./NumberField";
 import { briefCompletedProperties } from "./brief-fields";
-import type { BriefValues, ChipField } from "./draft";
+import { pendingLodgingCities, type BriefValues, type ChipField } from "./draft";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldMessage, fieldId, focusField } from "./fields";
 import type { StageProps } from "./stage";
 import { creationRoutes } from "./routes";
@@ -74,7 +75,7 @@ function listSummary(labels: string[]): string | null {
  * État « Vérification » de l'écran 2 (F8-PO-5 à F8-PO-7, 0018 § 16). Voyageurs, rythme et envies toujours
  * ouverts ; déplacements, à limiter et budget par repas repliés, sauf s'ils contiennent une déduction. Une valeur
  * déduite est en pointillé et décrite par « déduit de ton récit » ; la toucher retire la marque. « Continuer »
- * valide, envoie `brief_completed` et mène à la suite du parcours.
+ * valide, envoie `brief_completed` et mène à l'écran 3 (une ville « Pas encore ») ou à l'écran 4.
  */
 export function BriefReview({ focusTitle, onStageChange }: StageProps) {
   const router = useRouter();
@@ -112,7 +113,10 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
     submitted.current = true;
     dispatch({ type: "briefReady" });
     track({ name: "brief_completed", properties: briefCompletedProperties(state.brief) });
-    router.push(connexionRoute(creationRoutes.lancer()));
+    // Écran 3 pour la première ville « Pas encore » (F8-PO-2, F8-PO-8), sinon l'écran 4 vers le lancement.
+    const lodgingCity = pendingLodgingCities(state.trip)[0] ?? null;
+    dispatch({ type: "lodgingCity", city: lodgingCity });
+    router.push(lodgingCity === null ? connexionRoute(creationRoutes.lancer()) : creationRoutes.logement());
   }
 
   function backToStory() {

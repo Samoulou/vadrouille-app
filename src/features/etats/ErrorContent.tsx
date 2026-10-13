@@ -6,7 +6,8 @@ import { startTransition } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { EtatPage } from "./EtatPage";
 

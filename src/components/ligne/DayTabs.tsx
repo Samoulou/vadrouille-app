@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useRef } from "react";
 
 import type { Weekday } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import { DayBadge } from "./DayBadge";
