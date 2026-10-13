@@ -56,8 +56,11 @@ const FICHIERS_SECTION_3 = [
   "tests/support/serveur-local.ts",
   "scripts/p0/enregistrer.mjs",
 ];
-/** Ligne d'exception de la décision 0040 D1 (seule exception à la section 2.4, transitoire). */
-const LIGNE_D1 = "tests/unit/p0/cli.test.ts";
+/**
+ * Fichier de l'ancienne exception de la décision 0040 D1 (section 2.4), retirée par ticket 221 (décision 0042) : il n'a plus
+ * qu'une ligne ordinaire (`module:node:child_process`, `spawnSync`).
+ */
+const CLI_P0 = "tests/unit/p0/cli.test.ts";
 
 let suivis: FichierSuivi[];
 let analyses: FichierSuivi[];
@@ -297,13 +300,16 @@ describe("confinement: noms secrets dans les listes (section 5 ; bloquant 3 de l
     expect(LECTURES_ENV_SECRETES.flatMap((l) => l.noms.filter((nom) => !estNomSecret(nom)).map((nom) => `${l.fichier} : ${nom}`))).toEqual([]);
   });
 
-  it("seule exception : les vi.stubEnv de VARIABLES_DE_CLE de cli.test.ts (0040 D1)", () => {
-    const parLigne = constats.filter((c) => c.capacite === "stubEnv-non-litteral" && c.par?.startsWith("capacite:"));
-    expect([...new Set(parLigne.map((c) => c.par))]).toEqual([
-      idLigneCapacite(LIGNE_D1, "regime-tests:stubEnv-non-litteral", "vi.stubEnv(nom, `valeur-de-test-${nom}`) (for…of VARIABLES_DE_CLE)"),
-    ]);
-    expect(parLigne).toHaveLength(2);
-    // Aucun vi.stubEnv littéral d'un nom secret n'est admis, où que ce soit.
+  it("aucune exception : aucun vi.stubEnv non littéral ni à nom secret admis par une ligne (0040 D1 retirée, 0042)", () => {
+    // Aucun constat `stubEnv-non-litteral` n'est admis par une ligne de capacité (les tables d'`it.each` de
+    // `listes/formes-tests.ts` restent jugées par le contrôle précédent).
+    expect(constats.filter((c) => c.capacite === "stubEnv-non-litteral" && c.par?.startsWith("capacite:")).map(decrire)).toEqual([]);
+    // Aucune ligne, dans `listes/*.ts` ni dans `donnees/lignes-textes.json`, ne porte une forme de `vi.stubEnv`.
+    expect(LIGNES.flatMap((l) => l.capacites.filter((c) => c.capacite.startsWith("regime-tests:stubEnv")).map((c) => `${l.fichier} ${c.capacite}`))).toEqual(
+      [],
+    );
+    // Aucun vi.stubEnv d'un nom secret n'est admis, où que ce soit.
+    expect(constats.filter((c) => c.capacite.startsWith("stubEnv:") && c.admis).map(decrire)).toEqual([]);
     expect(constats.filter((c) => c.regle === "nom-secret" && c.capacite.startsWith("stubEnv:")).map(decrire)).toEqual([]);
   });
 
@@ -316,36 +322,39 @@ describe("confinement: noms secrets dans les listes (section 5 ; bloquant 3 de l
   }
 });
 
-describe("confinement: exception unique à la section 2.4 (0040 D1)", () => {
-  it("aucune autre ligne n'admet reflexion:Proxy ni reflexion:Reflect", () => {
-    const autres = LIGNES.filter((l) => l.fichier !== LIGNE_D1 && l.capacites.some((c) => /^reflexion:(Proxy|Reflect)$/.test(c.capacite)));
-    expect(autres.map((l) => l.fichier)).toEqual([]);
-    const d1 = LIGNES.find((l) => l.fichier === LIGNE_D1);
-    expect(d1?.ecart).toMatch(/0040 D1/);
-    // Chaque forme d'exception de D1 est bornée en nombre.
-    for (const c of d1?.capacites ?? []) if (/^(reflexion|environnement|regime-tests):/.test(c.capacite)) expect(c.nombre, c.capacite).toBeDefined();
+describe("confinement: aucune exception à la section 2.4 (0040 D1 retirée par ticket 221, décision 0042)", () => {
+  it("aucune ligne n'admet reflexion:Proxy ni reflexion:Reflect ; aucun écart ne cite 0040 D1", () => {
+    // `LIGNES` réunit `listes/capacites.ts` et `donnees/lignes-textes.json`.
+    const reflexion = LIGNES.filter((l) => l.capacites.some((c) => /^reflexion:(Proxy|Reflect)$/.test(c.capacite)));
+    expect(reflexion.map((l) => l.fichier)).toEqual([]);
+    const ecrits = [
+      ...LIGNES.flatMap((l) => (l.ecart === undefined ? [] : [{ ou: l.fichier, texte: l.ecart }])),
+      ...SPECIFICATEURS_NOMINATIFS.map((l) => ({ ou: `${l.fichier} ${l.specificateur}`, texte: l.motif })),
+      ...FORMES_NOMINATIVES_TESTS.map((f) => ({ ou: f.fichier, texte: f.motif })),
+    ];
+    expect(ecrits.filter((e) => /0040 D1/.test(e.texte)).map((e) => e.ou)).toEqual([]);
+    // cli.test.ts : aucune ligne n'admet pour lui les formes de l'ancienne exception, un texte de nom secret ou un module réseau.
+    const formesD1 = /^(reflexion:|environnement:(usage|ecriture|acces-calcule)$|regime-tests:stubEnv-non-litteral$|secret:|fragment:|hote:|identifiant:fetch$|module:node:(dns|http|https|net|tls)(\/|$))/;
+    expect(LIGNES.filter((l) => l.fichier === CLI_P0).flatMap((l) => l.capacites.map((c) => c.capacite)).filter((c) => formesD1.test(c))).toEqual([]);
+    expect(LIGNES.filter((l) => l.fichier === CLI_P0).flatMap((l) => l.capacites.map((c) => c.capacite))).toEqual(["module:node:child_process"]);
   });
 
-  it("textes de noms secrets de cli.test.ts : seuls éléments du tableau VARIABLES_DE_CLE", () => {
-    const source = lireFichier(LIGNE_D1);
-    const arbre = ts.createSourceFile(LIGNE_D1, source, ts.ScriptTarget.Latest, true);
-    let ligneDeclaration = -1;
-    let elements: string[] = [];
-    for (const instruction of arbre.statements) {
-      if (!ts.isVariableStatement(instruction)) continue;
-      for (const d of instruction.declarationList.declarations) {
-        if (ts.isIdentifier(d.name) && d.name.text === "VARIABLES_DE_CLE" && d.initializer && ts.isArrayLiteralExpression(d.initializer)) {
-          ligneDeclaration = arbre.getLineAndCharacterOfPosition(d.getStart(arbre)).line + 1;
-          elements = d.initializer.elements.map((e) => (ts.isStringLiteral(e) ? e.text : "?"));
-        }
-      }
-    }
-    // Les noms ne sont pas écrits ici (le régime s'applique à lui-même) : deux éléments, tous deux des noms secrets.
-    expect(elements).toHaveLength(2);
-    expect(elements.every(estNomSecret)).toBe(true);
-    const textes = constats.filter((c) => c.fichier === LIGNE_D1 && (c.regle === "nom-secret" || c.regle === "hote") && c.par);
-    expect(textes.length).toBeGreaterThan(0);
-    expect(textes.filter((c) => c.ligne !== ligneDeclaration).map(decrire)).toEqual([]);
+  it("cli.test.ts ne contient aucun texte de nom secret ni d'hôte surveillé, et aucune lecture calculée de process.env", () => {
+    const source = lireFichier(CLI_P0);
+    const arbre = ts.createSourceFile(CLI_P0, source, ts.ScriptTarget.Latest, true);
+    // Aucun littéral de texte du fichier n'est un nom secret (le régime s'applique à lui-même : aucun nom n'est écrit ici).
+    const litteraux: string[] = [];
+    const visiter = (n: ts.Node) => {
+      if (ts.isStringLiteralLike(n)) litteraux.push(n.text);
+      ts.forEachChild(n, visiter);
+    };
+    visiter(arbre);
+    expect(litteraux.length).toBeGreaterThan(0);
+    expect(litteraux.filter(estNomSecret)).toEqual([]);
+    const duFichier = constats.filter((c) => c.fichier === CLI_P0);
+    expect(duFichier.filter((c) => c.regle === "nom-secret" || c.regle === "hote" || c.regle === "reflexion").map(decrire)).toEqual([]);
+    expect(duFichier.filter((c) => c.regle === "environnement" && c.capacite !== "lecture").map(decrire)).toEqual([]);
+    expect(duFichier.filter((c) => !c.admis).map(decrire)).toEqual([]);
   });
 });
 

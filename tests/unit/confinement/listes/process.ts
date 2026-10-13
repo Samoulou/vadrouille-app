@@ -72,8 +72,9 @@ export const LECTURES_ENV = [
   { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_ADMIN_URL", "VADROUILLE_DB_BOOTSTRAP_ROLE"] },
   { fichier: "tests/unit/db/test-db-sans-base.test.ts", noms: ["PATH", "HOME"] },
   { fichier: "src/components/carte/config.tsx", noms: ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID"] },
-  // Relevé de la base de P0c1 (P0a1, PR 180) : environnement minimal du sous-processus `pnpm p0`.
-  { fichier: "tests/unit/p0/cli.test.ts", noms: ["PATH", "HOME"] },
+  // Relevé de la base de P0c1 (P0a1, PR 180) : environnement minimal du sous-processus `pnpm p0`, six lectures par
+  // propriété littérale (décision 0042, P0cS-TL-5 ; ticket 221).
+  { fichier: "tests/unit/p0/cli.test.ts", noms: ["PATH", "HOME", "SystemRoot", "TMPDIR", "TEMP", "TMP"] },
   // Relevé de `f57153c` (T18) : `PATH` d'un sous-processus de test.
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", noms: ["PATH"] },
   // 0040 D2, A8 : environnement de `git` construit (P0c-suite-release, #222).

@@ -1,11 +1,12 @@
 {
-  "_": "Cas de l'exception transitoire de la décision 0040 D1 (ligne de tests/unit/p0/cli.test.ts) : formes exactes, contexte et nombre ; toute autre forme est refusée par la règle nommée.",
+  "_": "Cas de l'ancienne exception transitoire de la décision 0040 D1 (tests/unit/p0/cli.test.ts), retirée par ticket 221 (décision 0042, P0cS-TL-4) : sans ligne d'exception, chaque forme, y compris l'ancienne forme admise, est refusée par la règle nommée.",
   "cas": [
     {
-      "id": "d1-surveiller-env-admis",
+      "id": "d1-surveiller-env-refuse",
       "chemin": "tests/unit/p0/cli.test.ts",
       "source": "\n/** Enregistre toute lecture des variables de clé pendant `travail`. */\nasync function surveillerEnv<T>(travail: () => Promise<T>): Promise<{ valeur: T; lues: string[] }> {\n  const lues: string[] = [];\n  const original = process.env;\n  process.env = new Proxy(original, {\n    get(cible, nom, recepteur) {\n      if (typeof nom === \"string\" && VARIABLES_DE_CLE.includes(nom)) lues.push(nom);\n      return Reflect.get(cible, nom, recepteur);\n    },\n    has(cible, nom) {\n      if (typeof nom === \"string\" && VARIABLES_DE_CLE.includes(nom)) lues.push(nom);\n      return Reflect.has(cible, nom);\n    },\n    ownKeys(cible) {\n      lues.push(\"*\");\n      return Reflect.ownKeys(cible);\n    },\n  });\n  try {\n    return { valeur: await travail(), lues };\n  } finally {\n    process.env = original;\n  }\n}\n\n/** Double réseau : tout appel lève. */\n",
-      "attendu": "admis"
+      "attendu": "refus",
+      "regle": "reflexion"
     },
     {
       "id": "d1-reflect-get-constructor",
