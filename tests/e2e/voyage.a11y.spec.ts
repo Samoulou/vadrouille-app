@@ -1,8 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { MOMENTS, openToday, region, setClock } from "./aujourdhui-helpers";
+import { ED, MOMENTS, openToday, region, setClock } from "./aujourdhui-helpers";
 import { blockExternal, expectFocusOutlines, expectPageBasics, expectTouchTargets } from "./etats-helpers";
+import { controlNetwork, expectFallback, FALLBACK_TITLE, R_REPLI, waitForActiveWorker } from "./hors-ligne-helpers";
 
 /**
  * Axe (WCAG 2.2 AA) sur l'écran 15 « Aujourd'hui » (`R15`, F10a, C2) : en cours, temps libre, plus d'étape,
@@ -60,4 +61,34 @@ test("aujourdhui: cibles de 44 px et contour de focus de Ligne", async ({ page }
   await expect(region(page, "Prochaine étape")).toBeVisible();
   await expectTouchTargets(page);
   await expectFocusOutlines(page);
+});
+
+/**
+ * Page de repli hors ligne (`R-repli`, F10b) : ouverte directement, et servie par le service worker à une
+ * navigation qui échoue faute de réseau (service workers autorisés pour ce bloc, F10-TL-6).
+ */
+test.describe("page de repli", () => {
+  test.use({ serviceWorkers: "allow" });
+
+  test("hors-ligne: aucune violation axe, page de repli ouverte directement", async ({ page }) => {
+    await page.goto(R_REPLI);
+    await expect(page.getByRole("heading", { level: 1, name: FALLBACK_TITLE })).toBeVisible();
+    await expectPageBasics(page);
+    await expectNoViolations(page);
+    await expectTouchTargets(page);
+    await expectFocusOutlines(page);
+  });
+
+  test("hors-ligne: aucune violation axe, page de repli servie hors ligne", async ({ page, context, baseURL }) => {
+    const setOffline = await controlNetwork(context, baseURL!);
+    await setClock(page, MOMENTS.prochaine);
+    await openToday(page);
+    await waitForActiveWorker(page);
+    await setOffline(true);
+    await page.goto(`/voyages/${ED}/jour/2`);
+    await expectFallback(page);
+    await expectPageBasics(page);
+    await expectNoViolations(page);
+    await setOffline(false);
+  });
 });

@@ -43,3 +43,12 @@ ailleurs. En local : `pnpm build` puis `E2E_SKIP_BUILD=1 pnpm test:perf` (ou `pn
 port du premier + 1 000, `PROTOTYPE_URL` de `prototype-helpers.ts`), lancé avec `DATA_ADAPTER=prototype`,
 `VADROUILLE_PROTOTYPE=1`, `CI=true` et `VADROUILLE_PROTOTYPE_DIR` sur `prototype/programmes-test/` (programme fabriqué à la
 main, valeurs sentinelles, relecteur simulé). Aucune requête vers Google.
+
+## Service workers (F10b, F10-TL-6)
+`playwright.config.ts` bloque les service workers par défaut (`use.serviceWorkers: "block"`) et pose
+`PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1`, pour que les requêtes du service worker passent par `context.route` (blocage
+des domaines Google) et `context.setOffline`. Seuls `hors-ligne.e2e.spec.ts`, le bloc « page de repli » de
+`voyage.a11y.spec.ts` et de `tests/visual/voyage.visual.spec.ts`, et le contrôle de persistance de `carte.e2e.spec.ts` posent
+`test.use({ serviceWorkers: "allow" })` (liste vérifiée par `tests/unit/hors-ligne-config.test.ts`). Pour couper le réseau du
+service worker de façon fiable, ces tests passent par `controlNetwork` de `hors-ligne-helpers.ts` (`context.setOffline` et
+interruption des requêtes vers l'application par `context.route`).

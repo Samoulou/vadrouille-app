@@ -153,6 +153,14 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // F10b : page de repli hors ligne, statique, sans donnée ; mesure journalisée (F10-TL-10).
+    id: "R-repli",
+    path: "/hors-ligne",
+    page: "hors-ligne/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R-introuvable",
     path: "/voyages/inconnu",
     status: 404,

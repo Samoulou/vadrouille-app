@@ -317,29 +317,35 @@ test.describe("rendu Google", () => {
   });
 });
 
-test("carte: aucune donnée persistée côté client", async ({ page, context }) => {
-  await openSimulated(page);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await markers(page).nth(1).click();
-  await listStops(page).nth(2).click();
-  await page.getByRole("button", { name: "J4", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Carte du jour 4" })).toBeVisible();
-  await context.setOffline(true);
-  await expect(page.getByRole("region", { name: "Carte du jour 4" }).getByRole("status")).toHaveText(TEXTS.horsLigne);
-  await context.setOffline(false);
-  await expect(simulated(page)).toBeVisible();
-  await page.goto("/dev/carte?vue=ensemble");
-  await expect(page.getByRole("region", { name: "Carte du séjour" })).toBeVisible();
+test.describe("persistance", () => {
+  // F10-TL-6 : les service workers sont bloqués par défaut ; ce contrôle les autorise pour que son assertion
+  // `getRegistrations()` reste significative (aucun enregistrement par la carte).
+  test.use({ serviceWorkers: "allow" });
 
-  const storage = await page.evaluate(async () => ({
-    local: localStorage.length,
-    session: sessionStorage.length,
-    databases: (await indexedDB.databases()).length,
-    caches: (await caches.keys()).length,
-    workers: (await navigator.serviceWorker.getRegistrations()).length,
-    cookie: document.cookie,
-  }));
-  expect(storage).toEqual({ local: 0, session: 0, databases: 0, caches: 0, workers: 0, cookie: "" });
-  expect(await context.cookies()).toEqual([]);
-  expect(googleRequests).toEqual([]);
+  test("carte: aucune donnée persistée côté client", async ({ page, context }) => {
+    await openSimulated(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await markers(page).nth(1).click();
+    await listStops(page).nth(2).click();
+    await page.getByRole("button", { name: "J4", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Carte du jour 4" })).toBeVisible();
+    await context.setOffline(true);
+    await expect(page.getByRole("region", { name: "Carte du jour 4" }).getByRole("status")).toHaveText(TEXTS.horsLigne);
+    await context.setOffline(false);
+    await expect(simulated(page)).toBeVisible();
+    await page.goto("/dev/carte?vue=ensemble");
+    await expect(page.getByRole("region", { name: "Carte du séjour" })).toBeVisible();
+
+    const storage = await page.evaluate(async () => ({
+      local: localStorage.length,
+      session: sessionStorage.length,
+      databases: (await indexedDB.databases()).length,
+      caches: (await caches.keys()).length,
+      workers: (await navigator.serviceWorker.getRegistrations()).length,
+      cookie: document.cookie,
+    }));
+    expect(storage).toEqual({ local: 0, session: 0, databases: 0, caches: 0, workers: 0, cookie: "" });
+    expect(await context.cookies()).toEqual([]);
+    expect(googleRequests).toEqual([]);
+  });
 });
