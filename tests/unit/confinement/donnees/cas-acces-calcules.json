@@ -1,0 +1,397 @@
+{
+  "_": "Cas des accès calculés (spécification P0c, section 2.6 ; décision 0038, P0c-TL-5 point 4). `typage` : jugé par le programme de cas.",
+  "cas": [
+    {
+      "id": "acces-ferme-zone-refus-01",
+      "chemin": "src/ai/x.ts",
+      "source": "const Symbol = { c: \"constructor\" }; (() => {})[Symbol.c];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-02",
+      "chemin": "src/ai/x.ts",
+      "source": "Symbol.e = \"env\"; (() => {})[Symbol.e];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-03",
+      "chemin": "src/ai/x.ts",
+      "source": "function f(Symbol) { return (() => {})[Symbol.k]; }",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-04",
+      "chemin": "src/ai/x.ts",
+      "source": "export const v = o[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-05",
+      "chemin": "src/ai/x.ts",
+      "source": "const { [k]: v } = o;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-06",
+      "chemin": "src/ai/x.ts",
+      "source": "const { ...r } = process;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-07",
+      "chemin": "src/ai/x.ts",
+      "source": "const { a, ...r } = o;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-08",
+      "chemin": "src/ai/x.ts",
+      "source": "(() => {})[\"constructor\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-09",
+      "chemin": "src/ai/x.ts",
+      "source": "o[\"binding\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-10",
+      "chemin": "src/ai/x.ts",
+      "source": "o[\"call\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-zone-refus-11",
+      "chemin": "src/ai/x.ts",
+      "source": "import { Symbol } from \"./s\"; a[Symbol.iterator];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "fichiers": {
+        "src/ai/s.ts": "export const Symbol = { iterator: \"x\" };"
+      }
+    },
+    {
+      "id": "acces-ferme-zone-admis-01",
+      "chemin": "src/ai/x.ts",
+      "source": "export const it = a[Symbol.iterator];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-zone-admis-02",
+      "chemin": "src/ai/x.ts",
+      "source": "export const x = o[\"x\"];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-zone-admis-03",
+      "chemin": "src/ai/x.ts",
+      "source": "const [a1, ...r] = xs; export { a1, r };",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-zone-admis-04",
+      "chemin": "src/ai/x.ts",
+      "source": "export const t = o[0];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-01",
+      "chemin": "scripts/x.mjs",
+      "source": "const Symbol = { c: \"constructor\" }; (() => {})[Symbol.c];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-02",
+      "chemin": "scripts/x.mjs",
+      "source": "Symbol.e = \"env\"; (() => {})[Symbol.e];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-03",
+      "chemin": "scripts/x.mjs",
+      "source": "function f(Symbol) { return (() => {})[Symbol.k]; }",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-04",
+      "chemin": "scripts/x.mjs",
+      "source": "export const v = o[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-05",
+      "chemin": "scripts/x.mjs",
+      "source": "const { [k]: v } = o;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-06",
+      "chemin": "scripts/x.mjs",
+      "source": "const { ...r } = process;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-07",
+      "chemin": "scripts/x.mjs",
+      "source": "const { a, ...r } = o;",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-08",
+      "chemin": "scripts/x.mjs",
+      "source": "(() => {})[\"constructor\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-09",
+      "chemin": "scripts/x.mjs",
+      "source": "o[\"binding\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-refus-10",
+      "chemin": "scripts/x.mjs",
+      "source": "o[\"call\"];",
+      "attendu": "refus",
+      "regle": "acces-calcule"
+    },
+    {
+      "id": "acces-ferme-mjs-admis-01",
+      "chemin": "scripts/x.mjs",
+      "source": "export const it = a[Symbol.iterator];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-mjs-admis-02",
+      "chemin": "scripts/x.mjs",
+      "source": "export const x = o[\"x\"];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-mjs-admis-03",
+      "chemin": "scripts/x.mjs",
+      "source": "const [a1, ...r] = xs; export { a1, r };",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-ferme-mjs-admis-04",
+      "chemin": "scripts/x.mjs",
+      "source": "export const t = o[0];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-serveur-log-admis",
+      "chemin": "scripts/serve-standalone.mjs",
+      "source": "import { SERVER_LOG_ENV } from \"./e2e-server-log.mjs\";\nexport const p = process.env[SERVER_LOG_ENV];",
+      "attendu": "admis"
+    },
+    {
+      "id": "acces-serveur-log-autre-fichier",
+      "chemin": "scripts/autre.mjs",
+      "source": "import { SERVER_LOG_ENV } from \"./e2e-server-log.mjs\";\nexport const p = process.env[SERVER_LOG_ENV];",
+      "attendu": "refus",
+      "regle": "environnement"
+    },
+    {
+      "id": "acces-serveur-log-autre-valeur",
+      "chemin": "scripts/serve-standalone.mjs",
+      "source": "import { SERVER_LOG_ENV } from \"./e2e-server-log.mjs\";\nexport const p = process.env[SERVER_LOG_ENV];",
+      "attendu": "refus",
+      "regle": "environnement",
+      "fichiers": {
+        "scripts/e2e-server-log.mjs": "export const SERVER_LOG_ENV = \"AUTRE\";"
+      }
+    },
+    {
+      "id": "acces-serveur-log-non-const",
+      "chemin": "scripts/serve-standalone.mjs",
+      "source": "import { SERVER_LOG_ENV } from \"./e2e-server-log.mjs\";\nexport const p = process.env[SERVER_LOG_ENV];",
+      "attendu": "refus",
+      "regle": "environnement",
+      "fichiers": {
+        "scripts/e2e-server-log.mjs": "export let SERVER_LOG_ENV = \"E2E_SERVER_LOG\";"
+      }
+    },
+    {
+      "id": "acces-type-01",
+      "chemin": "src/x.ts",
+      "source": "declare const k: string;\n(() => {})[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-02",
+      "chemin": "src/x.ts",
+      "source": "declare const k: any;\n(() => {})[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-03",
+      "chemin": "src/x.ts",
+      "source": "declare const k: \"constructor\";\n(() => {})[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-04",
+      "chemin": "src/x.ts",
+      "source": "declare const k: 0 | 1;\n(() => {})[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-05",
+      "chemin": "src/x.ts",
+      "source": "declare const f: () => void;\ndeclare const k: string;\n(f as unknown as Record<string, unknown>)[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-06",
+      "chemin": "src/x.ts",
+      "source": "declare const k: \"a\" | \"b\";\nglobalThis[k];",
+      "attendu": "refus",
+      "regle": "objet-global",
+      "typage": true
+    },
+    {
+      "id": "acces-type-07",
+      "chemin": "src/x.ts",
+      "source": "export function g<K extends string>(o: Record<K, number>, k: K) {\n  return o[k];\n}",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-08",
+      "chemin": "src/x.ts",
+      "source": "declare const o: { a: number };\ndeclare const k: string;\no[k as \"a\"] = 1;",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-09",
+      "chemin": "src/x.ts",
+      "source": "declare const o: { a: number };\ndeclare const k: string;\nexport const v = (o as Record<string, number>)[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-10",
+      "chemin": "src/x.ts",
+      "source": "declare const o: { a: number };\ndeclare const k: string;\nexport const v = o[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-11",
+      "chemin": "src/x.ts",
+      "source": "declare const o: Record<string, number>;\ndeclare const k: `a${string}`;\nexport const v = o[k];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-12",
+      "chemin": "src/x.ts",
+      "source": "declare const texte: string;\nsetInterval(texte);",
+      "attendu": "refus",
+      "regle": "contournement",
+      "typage": true
+    },
+    {
+      "id": "acces-type-13",
+      "chemin": "src/x.ts",
+      "source": "declare const n: bigint;\ndeclare const o: Record<string, number>;\nexport const v = o[n as never];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-14",
+      "chemin": "src/x.ts",
+      "source": "declare const tableau: number[];\ndeclare const i: number;\nexport const v = tableau[i];",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-15",
+      "chemin": "src/x.ts",
+      "source": "declare const record: Record<string, string>;\ndeclare const id: string;\nexport const v = record[id];",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-16",
+      "chemin": "src/x.ts",
+      "source": "declare const labels: { a: string; b: string };\ndeclare const kind: \"a\" | \"b\";\nexport const v = labels[kind];",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-17",
+      "chemin": "src/x.ts",
+      "source": "export function f<F extends \"a\" | \"b\">(values: { a: number; b: number }, field: F) {\n  return values[field];\n}",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-18",
+      "chemin": "src/x.ts",
+      "source": "const CLE = Symbol.for(\"vadrouille.cas\");\ndeclare const tenant: { [CLE]?: number };\nexport const v = tenant[CLE];",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-19",
+      "chemin": "src/x.ts",
+      "source": "declare const xs: number[];\nexport const it = xs[Symbol.iterator];",
+      "attendu": "admis",
+      "typage": true
+    },
+    {
+      "id": "acces-type-20",
+      "chemin": "src/x.ts",
+      "source": "const Symbol = { iterator: \"x\" };\ndeclare const xs: Record<string, number>;\nexport const it = xs[Symbol.iterator];",
+      "attendu": "refus",
+      "regle": "acces-calcule",
+      "typage": true
+    },
+    {
+      "id": "acces-type-21",
+      "chemin": "src/x.ts",
+      "source": "declare const texte: () => void;\nsetInterval(texte, 10);",
+      "attendu": "admis",
+      "typage": true
+    }
+  ]
+}

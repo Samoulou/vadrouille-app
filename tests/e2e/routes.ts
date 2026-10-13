@@ -11,7 +11,7 @@
 export const INVENTORY_TRIP = "mock_trip_edimbourg";
 
 /** États nommés d'une route ; l'action de chacun est dans `route-states.ts` (`ROUTE_STATES`). */
-export type RouteStateName = "fiche-ouverte" | "annulation-proposee";
+export type RouteStateName = "fiche-ouverte" | "annulation-proposee" | "proposition-affichee";
 
 /**
  * Préparations côté serveur : certaines adresses n'existent qu'après une action (un paiement commencé crée son
@@ -98,6 +98,14 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "seuil", javascript: "seuil" },
   },
   {
+    // F7a : écran 14 « Remplacer une étape » (C29) ; budgets en `journal` (décision 0024 § 6, Q210).
+    id: "R14",
+    path: `${TRIP}/jour/2/remplacer/j2-dean-village`,
+    page: "voyages/[id]/(programme)/jour/[n]/remplacer/[stopId]/page.tsx",
+    states: ["proposition-affichee"],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     // F10a : écran 15 « Aujourd'hui » ; hors des dates du voyage simulé, l'état mesuré est « avant le voyage ».
     id: "R15",
     path: `${TRIP}/aujourdhui`,
@@ -176,5 +184,6 @@ export const ROUTES: readonly RouteEntry[] = [
 export const DEV_ROUTES: readonly Pick<RouteEntry, "id" | "path" | "states">[] = [
   { id: "R11-dev", path: `/dev${TRIP}`, states: [] },
   { id: "R12-dev", path: `/dev${TRIP}/jour/2`, states: ["fiche-ouverte"] },
+  { id: "R14-dev", path: `/dev${TRIP}/jour/2/remplacer/j2-dean-village`, states: ["proposition-affichee"] },
   { id: "R-erreur-dev", path: "/dev/etats/erreur", states: [] },
 ];

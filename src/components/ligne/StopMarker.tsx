@@ -12,12 +12,17 @@ export interface StopMarkerProps {
   selected?: boolean;
   /** Proposition (Q18) : « ligne » pour la ligne du jour, « carte » (par défaut) pour la carte. */
   variant?: "ligne" | "carte";
+  /**
+   * Arrêt de la ligne surligné après une modification (décision 0018 § 9) : plein `line` au lieu de l'anneau,
+   * comme l'arrêt sélectionné de la carte. Sans effet sur la carte et sur un terminus.
+   */
+  filled?: boolean;
   className?: string;
 }
 
 const ROND = "rounded-(--ligne-rayon-rond) box-border";
 
-function classes({ kind, selected, variant }: Required<Omit<StopMarkerProps, "number" | "className">>): string {
+function classes({ kind, selected, variant, filled }: Required<Omit<StopMarkerProps, "number" | "className">>): string {
   if (kind === "overview") {
     return cn(ROND, "size-(--ligne-stop-ensemble) border-(length:--ligne-anneau-carte) border-line bg-raised");
   }
@@ -27,7 +32,11 @@ function classes({ kind, selected, variant }: Required<Omit<StopMarkerProps, "nu
       : "size-(--ligne-terminus-carte) rounded-(--ligne-rayon-mini) bg-ink text-on-line";
   }
   if (variant === "ligne") {
-    return cn(ROND, "size-(--ligne-stop) border-(length:--ligne-stop-ring) border-line bg-raised");
+    return cn(
+      ROND,
+      "size-(--ligne-stop) border-(length:--ligne-stop-ring) border-line",
+      filled ? "bg-line" : "bg-raised",
+    );
   }
   return selected
     ? cn(
@@ -44,7 +53,7 @@ function classes({ kind, selected, variant }: Required<Omit<StopMarkerProps, "nu
  * Marqueur d'arrêt et de terminus, même forme sur la ligne et sur la carte. Design system : components/StopMarker.
  * Toujours décoratif (`aria-hidden`) : la liste porte l'information (handover § 11).
  */
-export function StopMarker({ kind, number, selected = false, variant = "carte", className }: StopMarkerProps) {
+export function StopMarker({ kind, number, selected = false, variant = "carte", filled = false, className }: StopMarkerProps) {
   const showNumber = kind === "stop" && variant === "carte" && number !== undefined;
   const showHouse = kind === "terminus" && variant === "carte";
   return (
@@ -53,9 +62,10 @@ export function StopMarker({ kind, number, selected = false, variant = "carte", 
       data-kind={kind}
       data-variant={variant}
       data-selected={kind === "stop" && variant === "carte" && selected ? "true" : undefined}
+      data-filled={kind === "stop" && variant === "ligne" && filled ? "true" : undefined}
       className={cn(
         "inline-flex shrink-0 items-center justify-center leading-none tabular-nums",
-        classes({ kind, selected, variant }),
+        classes({ kind, selected, variant, filled }),
         className,
       )}
     >

@@ -120,8 +120,10 @@ interface HandoverProposal {
 }
 type HandoverChange =
   | { type: "replaced"; time: string; before: string; after: string }
-  | { type: "moved"; label: string; before: string; after: string }
-  | { type: "segment"; before: number; after: number; estimated: boolean }
+  // Formes de la décision 0016 § 4.5 (F7a) : `added`, `moved` en jour et heure, `segment` nommé.
+  | { type: "added"; time: string; label: string }
+  | { type: "moved"; label: string; before: { day: number; time: string }; after: { day: number; time: string } }
+  | { type: "segment"; label: string; before: number; after: number; estimated: boolean }
   | { type: "budget"; deltaPerPerson: number }
   | { type: "unchanged"; label: string; time: string };
 
@@ -487,8 +489,9 @@ describe("TripSchema, ChecklistItem et Change", () => {
   it("valide les variantes de Change", () => {
     const changes: Change[] = [
       { type: "replaced", time: "10:45", before: "[A]", after: "[B]" },
-      { type: "moved", label: "[A]", before: "[J2]", after: "[J3]" },
-      { type: "segment", before: 10, after: 25, estimated: true },
+      { type: "added", time: "15:15", label: "[C]" },
+      { type: "moved", label: "[A]", before: { day: 2, time: "13:25" }, after: { day: 4, time: "15:45" } },
+      { type: "segment", label: "[B]", before: 10, after: 25, estimated: true },
       { type: "budget", deltaPerPerson: -12 },
       { type: "unchanged", label: "[Dîner]", time: "19:00" },
     ];
@@ -496,5 +499,11 @@ describe("TripSchema, ChecklistItem et Change", () => {
     expect(ChangeSchema.safeParse({ type: "budget", deltaPerPerson: "12 CHF" }).success).toBe(
       false,
     );
+    // Décision 0016 § 4.5 : plus de texte composé pour `moved`, `segment` sans nom refusé, jour ≥ 1.
+    expect(ChangeSchema.safeParse({ type: "moved", label: "[A]", before: "[J2]", after: "[J3]" }).success).toBe(false);
+    expect(ChangeSchema.safeParse({ type: "segment", before: 10, after: 25, estimated: true }).success).toBe(false);
+    expect(
+      ChangeSchema.safeParse({ type: "moved", label: "[A]", before: { day: 0, time: "13:25" }, after: { day: 4, time: "15:45" } }).success,
+    ).toBe(false);
   });
 });

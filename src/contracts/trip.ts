@@ -315,11 +315,23 @@ export const ProposalBaseSchema = z.strictObject({
 export const ProposalSchema = ProposalBaseSchema.superRefine(refineNoCommitment).superRefine(refineDetour);
 export type Proposal = z.infer<typeof ProposalSchema>;
 
+/** Moment d'une étape déplacée (décision 0016 § 4.5) : jour (1 = J1) et heure, sans texte composé (handover § 9). */
+const ChangeMomentSchema = z.strictObject({ day: z.number().int().positive(), time: TimeSchema });
+
+/**
+ * Changement de l'aperçu des effets (handover § 9, forme de la décision 0016 § 4.5, appliquée par F7a) : aucun
+ * texte d'interface, `ChangeSet` compose les lignes. Les noms (`label`, `before`, `after` de `replaced`) sont des
+ * noms maison (`Stop.name`, ou le nom saisi pour un ajout), jamais un nom Google.
+ */
 export const ChangeSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("replaced"), time: TimeSchema, before: TextSchema, after: TextSchema }),
-  z.strictObject({ type: z.literal("moved"), label: TextSchema, before: TextSchema, after: TextSchema }),
+  /** Étape ajoutée (F7c) : heure et nom saisi. */
+  z.strictObject({ type: z.literal("added"), time: TimeSchema, label: TextSchema }),
+  z.strictObject({ type: z.literal("moved"), label: TextSchema, before: ChangeMomentSchema, after: ChangeMomentSchema }),
   z.strictObject({
     type: z.literal("segment"),
+    /** Nom de l'étape d'arrivée, pour distinguer deux trajets (« Trajet vers {nom} »). */
+    label: TextSchema,
     before: MinutesSchema,
     after: MinutesSchema,
     estimated: z.boolean(),

@@ -22,7 +22,7 @@ import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
 import { DEFAULT_SNAP, SNAP_POINTS, type SnapPoint } from "@/components/ligne/sheet-model";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { Day, DayMap as DayMapData, Stop, Trip } from "@/contracts";
+import type { Day, DayMap as DayMapData, RevisionFixtures, Stop, Trip } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
 import { messages } from "@/i18n";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
@@ -36,9 +36,11 @@ import {
   INITIAL_PROGRAMME,
   applyProgramme,
   createMemoryProgramme,
+  createMemoryProgrammeStore,
   programmeReducer,
   type ProgrammeActions,
 } from "./programme";
+import { HIGHLIGHT_MS, type RevisionActions } from "./revision";
 import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
 const t = messages.sejour;
@@ -62,6 +64,37 @@ export interface ClosedFiche {
   stopId: Stop["id"];
 }
 
+/**
+ * Focus demandé à la Journée du jour `dayIndex` (F7-PO-1) : le lien de l'étape `stopId` s'il est dans la ligne du
+ * jour, sinon le titre du jour.
+ */
+export interface FocusRequest {
+  dayIndex: number;
+  stopId?: Stop["id"];
+}
+
+/** Étapes surlignées 2 s après « Appliquer » (décision 0016 § 9). */
+export interface Highlight {
+  dayIndex: number;
+  stopIds: readonly Stop["id"][];
+}
+
+/** Modification du programme appliquée (F7) : toast, surlignage, focus, puis effets de son annulation. */
+export interface AppliedChange {
+  /** « Modifié. », « Lieu ajouté. » ou « Étape déplacée. ». */
+  message: string;
+  /** Jour affiché après « Appliquer » : celui de l'étape nouvelle ou déplacée. */
+  dayIndex: number;
+  /** Étapes surlignées pendant `HIGHLIGHT_MS` (`changedStopIds`). */
+  highlighted: readonly Stop["id"][];
+  /** Étape nouvelle ou déplacée : son lien reçoit le focus. */
+  targetStopId: Stop["id"];
+  /** Étape d'origine : son lien reçoit le focus après « Annuler » s'il est dans le jour affiché. */
+  originStopId?: Stop["id"];
+  /** Appelé une fois l'annulation résolue (mesure `replace_undone`). */
+  onUndone?: () => void;
+}
+
 export interface TripShellValue {
   routes: TripRoutes;
   /** Voyage affiché : données de l'adaptateur et écarts du programme (verrous). */
@@ -79,6 +112,21 @@ export interface TripShellValue {
   actions: ProgrammeActions;
   /** Affiche le toast d'annulation d'une modification du programme ; « Annuler » appelle `actions.undo()`. */
   notifyChange: (message: string, afterUndo?: () => void) => void;
+  /** Actions de révision (F7, décision 0016 § 5), en mémoire en phase 0 : même objet que `actions` par défaut. */
+  revision: RevisionActions;
+  /**
+   * Révision appliquée (décision 0016 § 9) : toast partagé avec le verrou, surlignage de 2 s, focus sur l'étape
+   * visée ; « Annuler » rétablit l'état d'avant et annonce « Modification annulée. ».
+   */
+  notifyApplied: (change: AppliedChange) => void;
+  /** Étapes surlignées, ou `null`. */
+  highlight: Highlight | null;
+  /** Focus à poser par la Journée, ou `null` ; la Journée le consomme. */
+  focusRequest: FocusRequest | null;
+  consumeFocusRequest: () => void;
+  /** Adresse de l'écran 14 ouvert depuis la fiche (« Remplacer ») : « Retour à la fiche » revient alors dans l'historique. */
+  replaceOrigin: string | null;
+  markReplaceOrigin: (href: string | null) => void;
   /** Marque la fiche de `href` comme ouverte depuis le panneau de ce jour : « Fermer » revient alors dans l'historique. */
   markOpenedFromPanel: (href: string) => void;
   /** Ferme la fiche ouverte (« Fermer », Échap), sans toucher au focus (rendu par la Journée). */
@@ -102,6 +150,15 @@ export function useTripShell(): TripShellValue {
   const value = useContext(TripShellContext);
   if (!value) throw new Error("useTripShell hors de TripShell");
   return value;
+}
+
+/** Identifiant décodé d'un segment d'adresse ; tel quel s'il est mal encodé. */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**
@@ -146,6 +203,10 @@ export interface TripShellProps {
   base: TripRoutesBase;
   /** Actions du programme injectées (tests, B11) ; sinon l'implémentation en mémoire de la phase 0. */
   actions?: ProgrammeActions;
+  /** Actions de révision injectées (tests, B11) ; sinon l'implémentation en mémoire, la même que `actions`. */
+  revision?: RevisionActions;
+  /** Jeu simulé de révision lu par la mise en page (adaptateur `mock`) ; sans lui, aucune option compatible. */
+  revisionFixtures?: RevisionFixtures | null;
   /** Données de lieux Google (adaptateur `prototype`, spécification P0) ; `PLACES_FROM_GOOGLE` par défaut. */
   placesFromGoogle?: boolean;
   children: ReactNode;
@@ -164,24 +225,42 @@ export function TripShell({
   maps,
   base,
   actions: injected,
+  revision: injectedRevision,
+  revisionFixtures = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
   const router = useRouter();
-  const params = useParams<{ n?: string | string[] }>();
+  const params = useParams<{ n?: string | string[]; stopId?: string | string[] }>();
   const searchParams = useSearchParams();
   const etape = searchParams.get("etape");
 
   // Programme : écarts aux données de l'adaptateur, en mémoire (décision 0015 § 6).
   const [programme, dispatch] = useReducer(programmeReducer, INITIAL_PROGRAMME);
-  const memory = useMemo(() => createMemoryProgramme(sourceTrip, dispatch), [sourceTrip]);
+  // Copie de l'état des actions en mémoire, gardée pour la vie du shell comme l'état du réducteur : recréer les
+  // actions (nouvelles données de l'adaptateur) ne remet ni la version ni les jours remplacés à zéro.
+  const [memoryStore] = useState(createMemoryProgrammeStore);
+  const memory = useMemo(
+    () => createMemoryProgramme(sourceTrip, dispatch, revisionFixtures, memoryStore),
+    [sourceTrip, revisionFixtures, memoryStore],
+  );
   const actions = injected ?? memory;
+  const revision = injectedRevision ?? memory;
   const trip = useMemo(() => applyProgramme(sourceTrip, programme), [sourceTrip, programme]);
 
   const nParam = Array.isArray(params.n) ? params.n[0] : params.n;
   const day = nParam === undefined ? undefined : trip.days.find((candidate) => String(candidate.index) === nParam);
   const fiche = day ? findFicheTarget(day, etape) : null;
+  // Écran 14 (`…/remplacer/[stopId]`) : l'étape remplacée est sélectionnée sur la carte (F7-PO-2).
+  const stopParam = Array.isArray(params.stopId) ? params.stopId[0] : params.stopId;
+  const replaceStopId = stopParam === undefined ? undefined : safeDecode(stopParam);
+  const replaceTarget =
+    day && replaceStopId !== undefined
+      ? day.items.some((item) => item.type === "stop" && item.stop.id === replaceStopId)
+        ? replaceStopId
+        : undefined
+      : undefined;
 
   const [snap, setSnap] = useState<SnapPoint>(DEFAULT_SNAP);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -234,6 +313,12 @@ export function TripShell({
   const [tracked, setTracked] = useState<{ ficheKey: string | null; fiche?: ClosedFiche; dayIndex?: number }>({
     ficheKey: null,
   });
+  // Écran 14 ouvert : le panneau passe à 55 % s'il était à 25 % (F7-PO-2), comme pour une fiche.
+  const [trackedReplace, setTrackedReplace] = useState<string | undefined>(undefined);
+  if (replaceTarget !== trackedReplace) {
+    setTrackedReplace(replaceTarget);
+    if (replaceTarget !== undefined && snap === LOWEST && !largeScreen) setSnap(DEFAULT_SNAP);
+  }
   if (ficheKey !== tracked.ficheKey || dayIndex !== tracked.dayIndex) {
     setTracked({ ficheKey, fiche: fiche && day ? { dayIndex: day.index, stopId: fiche.stop.id } : undefined, dayIndex });
     // L'annonce d'étape absente ne vaut que pour le jour où elle a été faite : un changement de jour l'efface.
@@ -258,9 +343,11 @@ export function TripShell({
   const selectedStopId =
     fiche?.inProgramme === true
       ? fiche.stop.id
-      : !fiche && markerSelection && markerSelection.dayIndex === dayIndex
-        ? markerSelection.stopId
-        : undefined;
+      : replaceTarget !== undefined
+        ? replaceTarget
+        : !fiche && markerSelection && markerSelection.dayIndex === dayIndex
+          ? markerSelection.stopId
+          : undefined;
 
   // Marqueur touché : panneau relevé à 55 % s'il était à 25 %, liste défilée jusqu'à l'étape, focus laissé
   // sur le marqueur, adresse inchangée (F5-PO-7, F4-PO-4). Fiche ouverte : elle se ferme (adresse du jour
@@ -318,19 +405,70 @@ export function TripShell({
     router.replace(routes.jour(dayIndex), { scroll: false });
   }, [dayIndex, router, routes]);
 
-  // Toast d'annulation, partagé par les modifications du programme (décision 0016 § 9).
+  // Toast d'annulation, partagé par le verrou de F5 et les révisions de F7 (décision 0016 § 9) : une nouvelle
+  // modification ferme le toast précédent et rend la précédente définitive.
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastId = useRef(0);
-  const notifyChange = useCallback((message: string, afterUndo?: () => void) => {
-    toastId.current += 1;
-    setToast({ id: toastId.current, message, afterUndo });
+  // Surlignage de 2 s après « Appliquer » ; minuteur annulé par « Annuler », une nouvelle modification ou le démontage.
+  const [highlight, setHighlight] = useState<Highlight | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHighlight = useCallback(() => {
+    if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+    highlightTimer.current = null;
+    setHighlight(null);
   }, []);
+  useEffect(() => () => {
+    if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+  }, []);
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const consumeFocusRequest = useCallback(() => setFocusRequest(null), []);
+  // « Modification annulée. » : annonce de la région du toast après l'annulation d'une révision (F7-PO-1).
+  const [undone, setUndone] = useState<{ id: number } | null>(null);
+
+  const notifyChange = useCallback(
+    (message: string, afterUndo?: () => void) => {
+      toastId.current += 1;
+      clearHighlight();
+      setUndone(null);
+      setToast({ id: toastId.current, message, afterUndo });
+    },
+    [clearHighlight],
+  );
+  const notifyApplied = useCallback(
+    (change: AppliedChange) => {
+      toastId.current += 1;
+      const id = toastId.current;
+      clearHighlight();
+      setUndone(null);
+      setHighlight({ dayIndex: change.dayIndex, stopIds: change.highlighted });
+      highlightTimer.current = setTimeout(() => {
+        highlightTimer.current = null;
+        setHighlight(null);
+      }, HIGHLIGHT_MS);
+      setFocusRequest({ dayIndex: change.dayIndex, stopId: change.targetStopId });
+      setToast({
+        id,
+        message: change.message,
+        afterUndo: () => {
+          setUndone({ id });
+          // Étape d'origine si elle est dans le jour affiché, sinon titre du jour (F7-PO-1).
+          setFocusRequest({ dayIndex: change.dayIndex, stopId: change.originStopId });
+          change.onUndone?.();
+        },
+      });
+    },
+    [clearHighlight],
+  );
   const onUndo = useCallback(async () => {
     const current = toast;
     setToast(null);
+    clearHighlight();
     await actions.undo();
     current?.afterUndo?.();
-  }, [actions, toast]);
+  }, [actions, toast, clearHighlight]);
+
+  const [replaceOrigin, setReplaceOrigin] = useState<string | null>(null);
+  const markReplaceOrigin = useCallback((href: string | null) => setReplaceOrigin(href), []);
 
   const context = useMemo<TripShellValue>(
     () => ({
@@ -343,6 +481,13 @@ export function TripShell({
       setSnap,
       actions,
       notifyChange,
+      revision,
+      notifyApplied,
+      highlight,
+      focusRequest,
+      consumeFocusRequest,
+      replaceOrigin,
+      markReplaceOrigin,
       markOpenedFromPanel,
       closeFiche,
       closedFiche,
@@ -360,6 +505,13 @@ export function TripShell({
       snap,
       actions,
       notifyChange,
+      revision,
+      notifyApplied,
+      highlight,
+      focusRequest,
+      consumeFocusRequest,
+      replaceOrigin,
+      markReplaceOrigin,
       markOpenedFromPanel,
       closeFiche,
       closedFiche,
@@ -420,6 +572,10 @@ export function TripShell({
           onExpire={() => setToast(null)}
           className="pointer-events-auto"
         />
+      ) : undone ? (
+        <p key={`annulee-${undone.id}`} data-part="annonce-annulation" className="sr-only">
+          {messages.revision.annulee}
+        </p>
       ) : null}
     </UndoToastRegion>
   );

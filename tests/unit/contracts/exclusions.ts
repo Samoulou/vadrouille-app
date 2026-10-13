@@ -23,6 +23,13 @@ export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "OtherCity", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
   { contract: "TripCommitment", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
   { contract: "Travellers", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
+  // F7a (décision 0016 § 4 et § 6) : contrats de phase 0 de la révision, jamais stockés ; B11 les reprend derrière
+  // les Server Actions (`previewReplacement`, `applyPatch`) et en écrit les lignes.
+  { contract: "ReplacementRequest", task: "B11", reason: "demande de remplacement (0016 § 4.1), action serveur de B11" },
+  { contract: "RevisionPreview", task: "B11", reason: "aperçu d'une révision (0016 § 4.2), complété par B11" },
+  { contract: "ReplacementDraft", task: "B11", reason: "brouillon simulé de remplacement (0016 § 6), remplacé par le moteur en B11" },
+  { contract: "ReplacementFixture", task: "B11", reason: "jeu simulé de révision (0016 § 6), remplacé par B11" },
+  { contract: "RevisionFixtures", task: "B11", reason: "jeu simulé de révision (0016 § 6), remplacé par B11" },
 ];
 
 /**

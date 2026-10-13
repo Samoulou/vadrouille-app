@@ -1,5 +1,6 @@
 export { ActionBanner, type ActionBannerProps } from "./ActionBanner";
 export { Button, buttonVariants, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
+export { ChangeSet, isShownChange, type ChangeSetProps } from "./ChangeSet";
 export { ChecklistRow, type ChecklistRowProps } from "./ChecklistRow";
 export { Chip, type ChipProps } from "./Chip";
 export { Counter, type CounterProps } from "./Counter";

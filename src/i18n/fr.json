@@ -156,6 +156,20 @@
       "separateur": ", ",
       "gratuit": "gratuit",
       "cout": "≈ {n} CHF"
+    },
+    "changeSet": {
+      "aLaPlaceDe": "à la place de",
+      "ajoute": "ajouté",
+      "deplace": "{label} :",
+      "trajetVers": "Trajet vers {label} :",
+      "avant": "avant :",
+      "apres": "après :",
+      "fleche": "→",
+      "jourHeure": "J{day} {time}",
+      "estimation": "environ {duree} (estimation)",
+      "budget": "Budget du jour : environ {montant} CHF par personne",
+      "plus": "+",
+      "moins": "−"
     }
   },
   "carte": {
@@ -219,7 +233,11 @@
         "bandeauAction": "Bandeau d'action requise (ActionBanner, aplat quai)",
         "ligneCompacte": "Ligne compacte en lecture seule : étape terminée, étape en cours, étape à venir",
         "ligneReduite": "Ligne réduite : terminus sans libellé, étapes sans lien",
-        "segmenteDeduit": "Option déduite choisie, puis sans choix"
+        "segmenteDeduit": "Option déduite choisie, puis sans choix",
+        "changeSet": "ChangeSet : remplacé, ajouté, déplacé (même jour, autre jour), trajet mesuré et estimé, budget en hausse",
+        "changeSetBaisse": "ChangeSet : budget en baisse ; une ligne inchangée et un budget nul ne sont pas rendus",
+        "surlignee": "DayLine : étape surlignée après « Appliquer » (2 s)",
+        "raisonsVerticales": "SegmentedControl vertical : aucune raison cochée, une raison cochée"
       },
       "exemples": {
         "garder": "Garder",
@@ -331,7 +349,16 @@
             }
           }
         },
-        "verrouiller": "Verrouiller"
+        "verrouiller": "Verrouiller",
+        "revision": {
+          "titre": "Révision",
+          "ancien": "[Dean Village]",
+          "nouveau": "[Épicerie fine de Stockbridge]",
+          "ajoute": "[Librairie de Grassmarket]",
+          "deplace": "[Musée national d'Écosse]",
+          "trajet": "[Café de Stockbridge]",
+          "raisons": "Pourquoi la remplacer ?"
+        }
       }
     },
     "carte": {
@@ -882,6 +909,48 @@
       "walk": "À pied",
       "transit": "Transports publics",
       "car": "Voiture"
+    }
+  },
+  "revision": {
+    "titreDocument": {
+      "remplacer": "Remplacer {name} · Jour {n}"
+    },
+    "retourFiche": "Retour à la fiche",
+    "compteur": "{n} sur {max} caractères",
+    "horsLigne": "Tu es hors ligne. Modifier ton programme demande une connexion.",
+    "conflit": "Ton programme a changé depuis cette proposition. Rien n'a été modifié.",
+    "revoirProposition": "Revoir la proposition",
+    "erreur": "La proposition n'a pas pu être calculée. Ton programme est inchangé.",
+    "reessayer": "Réessayer",
+    "aucuneOption": "Aucune option compatible pour ce créneau. Ton programme est inchangé.",
+    "recherche": "Recherche d'une proposition.",
+    "arreter": "Arrêter",
+    "prete": "Proposition prête.",
+    "ceQuiChange": "Ce qui change",
+    "ceQuiNeBougePas": "Ce qui ne bouge pas",
+    "appliquer": "Appliquer",
+    "annuler": "Annuler",
+    "annulee": "Modification annulée.",
+    "remplacer": {
+      "titre": "Remplacer {name}",
+      "verrouillee": "Cette étape est verrouillée. Retire le verrou depuis sa fiche pour la remplacer.",
+      "absente": "Cette étape n'est plus dans ce jour.",
+      "retourJournee": "Retour à la Journée",
+      "pourquoi": "Pourquoi la remplacer ?",
+      "raisons": {
+        "notMyStyle": "Pas mon style",
+        "tooBusy": "Trop chargé",
+        "tooExpensive": "Trop cher",
+        "tooFar": "Trop loin",
+        "other": "Autre raison"
+      },
+      "choisisRaison": "Choisis une raison.",
+      "souhait": "Ce que tu préfères (facultatif)",
+      "souhaitAide": "Par exemple : une dégustation, quelque chose à l'abri.",
+      "voirProposition": "Voir une proposition",
+      "lent": "On cherche autour de {name}.",
+      "moment": "{start} – {end}",
+      "modifie": "Modifié."
     }
   }
 }

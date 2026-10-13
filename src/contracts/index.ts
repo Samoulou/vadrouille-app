@@ -76,6 +76,23 @@ export { PreviewSlotSchema, PreviewSlotsSchema } from "./preview";
 export type { PreviewSlot } from "./preview";
 export { ADDED_STOP_NAME_MAX, PatchResultSchema, TripPatchOperationSchema, TripPatchSchema } from "./patch";
 export type { PatchResult, TripPatch, TripPatchOperation } from "./patch";
+export {
+  ReplacementDraftSchema,
+  ReplacementFixtureSchema,
+  ReplacementRequestSchema,
+  RevisionFixturesSchema,
+  RevisionPreviewSchema,
+} from "./revision";
+export type {
+  ApplyResult,
+  ReplacementDraft,
+  ReplacementFixture,
+  ReplacementRequest,
+  RevisionError,
+  RevisionFixtures,
+  RevisionPreview,
+  RevisionResult,
+} from "./revision";
 export { TripSummarySchema } from "./trip-summary";
 export type { TripSummary } from "./trip-summary";
 export {

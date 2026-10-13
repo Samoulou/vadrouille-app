@@ -1,14 +1,15 @@
+import type { RevisionFixtures } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
-import { counterpartOf, mockTripAdapter } from "./mock";
+import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
-import type { CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
+import type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 
 export type { AdapterContext, CreationAdapter, MemberRole, PaymentAdapter, PaymentSimulator, TripAdapter } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
@@ -135,4 +136,19 @@ export function getTripReader(options: { scope?: SimulationScope } = {}): TripAd
     async (ctx, tripId) => mockPaymentFor(options.scope ?? (await getSimulationScope())).getEntitlement(ctx, tripId),
     counterpartOf,
   );
+}
+
+/**
+ * Jeu simulé de révision d'un voyage (spécification F7, F7-TL-3 ; décision 0016 § 6) : fonction à part, et non une
+ * méthode de `TripAdapter` (l'adaptateur `api` n'aurait rien à y renvoyer ; B11 remplace l'ensemble par les Server
+ * Actions). `null` quand l'adaptateur configuré n'est pas `mock`, et pour un voyage inconnu ou d'une autre
+ * organisation. Lu par la mise en page du voyage, qui le transmet à `TripShell`.
+ */
+export async function getRevisionFixtures(
+  ctx: AdapterContext,
+  tripId: string,
+  value: string | undefined = process.env.DATA_ADAPTER,
+): Promise<RevisionFixtures | null> {
+  if (!isMockAdapter(value)) return null;
+  return getMockRevisionFixtures(ctx, tripId);
 }
