@@ -56,18 +56,21 @@ export function classifyTrips(summaries: readonly TripSummary[], now: number): T
 
 /**
  * Cible du lien d'un voyage (F11-PO-5, règles de navigation du handover § 6) :
- * 1. aux dates du voyage, l'écran 15 « Pendant le voyage » — **pas encore dans `main`** (F10a) : F10a ajoute
- *    cette règle avec `tripRoutes(…).aujourdhui()` ;
+ * 1. aux dates du voyage (date de la destination entre `start` et `end` inclus), l'écran 15 « Pendant le
+ *    voyage » (`R15`, ajouté par F10a avec `tripRoutes(…).aujourdhui()`), quel que soit le dernier onglet ;
  * 2. sinon, le dernier onglet consulté dans l'onglet du navigateur (Séjour, ou Journée `n` si ce jour existe) ;
  * 3. sinon, le Séjour d'un voyage débloqué ou passé, la présentation (« Tes premières propositions ») d'un
  *    voyage non débloqué dont la fin n'est pas passée.
  */
 export function reopenTarget(summary: TripSummary, now: number, lastTab: LastTab | undefined): string {
   const routes = tripRoutes("/voyages", summary.id);
+  const today = tripToday(summary, now);
+  const aujourdhui = routes.aujourdhui();
+  if (aujourdhui && summary.start <= today && today <= summary.end) return aujourdhui;
   if (lastTab?.kind === "sejour") return routes.sejour();
   if (lastTab?.kind === "jour" && Number.isInteger(lastTab.n) && lastTab.n >= 1 && lastTab.n <= summary.dayCount) {
     return routes.jour(lastTab.n);
   }
-  if (!summary.unlocked && summary.end >= tripToday(summary, now)) return presentationRoute(summary.id);
+  if (!summary.unlocked && summary.end >= today) return presentationRoute(summary.id);
   return routes.sejour();
 }

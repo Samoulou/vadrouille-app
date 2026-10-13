@@ -203,6 +203,22 @@ describe("/dev/composants", () => {
     expect(markers.filter((marker) => !marker.closest("ol"))).toHaveLength(6);
   });
 
+  it("montre la section Pendant le voyage de F10a : ActionBanner, DayLine compacte et réduite (C19)", () => {
+    render(<ComposantsShowcase />);
+    const ex = messages.dev.composants.exemples.pendant;
+    const section = screen.getByRole("region", { name: ex.titre });
+    const banner = within(section).getByRole("region", { name: ex.bandeauTitre });
+    expect(banner).toHaveClass("bg-quai", "text-ink");
+    expect(banner).toHaveTextContent(ex.bandeauTexte);
+    const lines = within(section).getAllByRole("list").filter((list) => list.tagName === "OL");
+    expect(lines).toHaveLength(2);
+    for (const line of lines) expect(within(line).queryAllByRole("link")).toHaveLength(0);
+    expect(section.querySelectorAll("[aria-current='step']")).toHaveLength(1);
+    expect(within(section).getAllByText(messages.ligne.etape.terminee).length).toBeGreaterThan(0);
+    expect(within(section).getByText(messages.ligne.terminusSansLibelle.start)).toBeInTheDocument();
+    expect(within(section).getByText(messages.ligne.terminusSansLibelle.end)).toBeInTheDocument();
+  });
+
   it("n'a aucune violation axe", async () => {
     const { container } = render(<ComposantsShowcase />);
     expect(await axeViolations(container)).toEqual([]);

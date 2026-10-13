@@ -12,6 +12,8 @@ import { DayBadge } from "@/components/ligne/DayBadge";
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
 import type { ChecklistItem } from "@/contracts";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
+import { currentDayIndex } from "@/features/voyage/today";
+import { useClientNow } from "@/features/voyage/use-client-now";
 import { format, messages } from "@/i18n";
 
 import { EventLines, eventRange } from "./EventLines";
@@ -27,6 +29,8 @@ export interface SejourPanelProps {
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
   recorder?: EventRecorder;
+  /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
+  now?: () => number;
 }
 
 /** Nom accessible du compteur : « 1 réservation à faire », « 4 réservations à faire ». */
@@ -41,8 +45,16 @@ function counterLabel(remaining: number): string {
  * l'autre, en mémoire seulement (F5-PO-16). La validation de la mesure est chargée au premier cochage
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
-export function SejourPanel({ recorderKind = "none", recorder }: SejourPanelProps) {
+export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
   const { trip, routes, actions, placesFromGoogle } = useTripShell();
+  // Lien « Aujourd'hui · Jour {n} » (F10-PO-7) : aux dates du voyage, à la date de la destination, calculée dans
+  // le navigateur après le montage ; seulement avec la base `/voyages` (pas de page `R15` de développement).
+  // Décalage assumé : aux dates du voyage, le lien apparaît après le montage et pousse le panneau d'une hauteur
+  // de cible tactile. Réserver cette hauteur la laisserait vide sur tous les autres voyages (avant ou après les
+  // dates), qui sont le cas courant, puisque le jour courant n'est connu qu'une fois dans le navigateur.
+  const now = useClientNow({ now: clock });
+  const aujourdhui = routes.aujourdhui();
+  const todayIndex = now === null || aujourdhui === null ? null : currentDayIndex(trip, now);
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
   const origin = useSejourOrigin();
   const eventsRef = useRef<HTMLElement>(null);
@@ -75,6 +87,15 @@ export function SejourPanel({ recorderKind = "none", recorder }: SejourPanelProp
 
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
+      {aujourdhui && todayIndex !== null ? (
+        <Link
+          href={aujourdhui}
+          data-part="aujourdhui"
+          className="inline-flex min-h-(--touch-target) items-center self-start rounded-control text-corps font-bold text-line underline underline-offset-2"
+        >
+          {format(t.aujourdhui.lien, { n: todayIndex })}
+        </Link>
+      ) : null}
       <DestinationPlate name={trip.destination} meta={plateMeta(trip)} color={trip.destinationColor} />
 
       {budget ? (

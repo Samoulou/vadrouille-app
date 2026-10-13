@@ -80,6 +80,14 @@
       "start": "Départ de {label}",
       "end": "Retour à {label}"
     },
+    "terminusSansLibelle": {
+      "start": "Début de journée",
+      "end": "Fin de journée"
+    },
+    "etape": {
+      "enCours": "En cours",
+      "terminee": "Terminée"
+    },
     "segment": {
       "walk": "À pied",
       "transit": "Bus",
@@ -186,6 +194,9 @@
         "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus",
         "plaque": "Plaque destination : bruyère, azulejo, ocre, granit",
         "checklist": "Ligne à réserver : à faire, faite, sans lien, lien rémunéré (cliquable)",
+        "bandeauAction": "Bandeau d'action requise (ActionBanner, aplat quai)",
+        "ligneCompacte": "Ligne compacte en lecture seule : étape terminée, étape en cours, étape à venir",
+        "ligneReduite": "Ligne réduite : terminus sans libellé, étapes sans lien",
         "segmenteDeduit": "Option déduite choisie, puis sans choix"
       },
       "exemples": {
@@ -237,6 +248,13 @@
           },
           "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
           "rangeeJour": "Jours du séjour, démonstration J9 actif"
+        },
+        "pendant": {
+          "titre": "Pendant le voyage",
+          "bandeauTitre": "À réserver",
+          "bandeauLigne": "19:00 [Bonne table]",
+          "bandeauTexte": "Si c'est déjà réservé, ignore ce rappel.",
+          "arret3": "[Jardin]"
         },
         "presentation": {
           "activite": {
@@ -465,6 +483,61 @@
           "plusieurs": "{n} étapes"
         },
         "enPreparation": "En préparation"
+      }
+    },
+    "aujourdhui": {
+      "lien": "Aujourd'hui · Jour {n}"
+    }
+  },
+  "voyage": {
+    "aujourdhui": {
+      "titre": "Aujourd'hui",
+      "titreDocument": "{destination} · Aujourd'hui",
+      "sousTitre": "{destination} · Jour {n} · {title}",
+      "fuseau": "Heures de {destination}",
+      "fuseauElision": "Heures d'{destination}",
+      "retour": "Retour",
+      "chargement": "Chargement de ta journée.",
+      "sansJavascript": "Cet écran a besoin de JavaScript pour calculer ta journée.",
+      "voirSejour": "Voir le séjour",
+      "horsLigne": "Tu es hors ligne. Ce programme est celui du dernier chargement.",
+      "enCeMoment": {
+        "titre": "En ce moment",
+        "jusqua": "jusqu'à {end}",
+        "tempsLibre": "Temps libre jusqu'à {to}"
+      },
+      "prochaine": {
+        "titre": "Prochaine étape",
+        "ensuite": "Ensuite",
+        "plage": "{start} – {end}",
+        "pourYAller": "Pour y aller : {segment}",
+        "itineraire": "Itinéraire",
+        "itineraireNom": "Itinéraire vers {name} (nouvelle fenêtre)",
+        "plusDEtape": "Plus d'étape aujourd'hui.",
+        "aucuneEtape": "Pas d'étape prévue aujourd'hui."
+      },
+      "rappels": {
+        "titre": "À réserver",
+        "aujourdhui": "Aujourd'hui",
+        "demain": "Demain",
+        "ligne": "{time} {name}",
+        "avertissement": "Si c'est déjà réservé, ignore ce rappel."
+      },
+      "journee": {
+        "titre": "Ta journée",
+        "enPreparation": "Ta journée est encore en préparation."
+      },
+      "demain": {
+        "titre": "Demain",
+        "premiereEtape": "Première étape à {start} : {name}"
+      },
+      "carte": "Voir la journée sur la carte",
+      "avant": "Ton voyage commence le {date}.",
+      "veille": "Ton voyage commence demain.",
+      "apres": "Ton voyage est terminé.",
+      "annonce": {
+        "enCeMoment": "En ce moment : {name}.",
+        "prochaine": "Prochaine étape : {name} à {start}."
       }
     }
   },

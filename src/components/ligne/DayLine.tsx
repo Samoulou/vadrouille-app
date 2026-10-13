@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { DayLineItem, Meal, Segment, Stop } from "@/contracts";
+import type { Meal, Segment, Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
 import { formatDuree } from "@/lib/duree";
 import { cn } from "@/lib/utils";
@@ -72,11 +72,14 @@ function Heure({ children, className }: { children?: ReactNode; className?: stri
 export interface DayLineTerminusProps {
   role: "start" | "end";
   time: string;
-  /** Nom du logement. */
-  label: string;
+  /**
+   * Nom du logement. Sans libellé (vue partagée, F10-TL-12) : « Début de journée » ou « Fin de journée »,
+   * aucune information de logement n'est montrée.
+   */
+  label?: string;
 }
 
-/** Terminus de départ ou de retour : carré ink, « Départ de … » / « Retour à … ». */
+/** Terminus de départ ou de retour : carré ink, « Départ de … » / « Retour à … », ou sans libellé. */
 function Terminus({ role, time, label }: DayLineTerminusProps) {
   return (
     <li data-type="terminus" data-role={role} className={ROW}>
@@ -87,50 +90,106 @@ function Terminus({ role, time, label }: DayLineTerminusProps) {
         marker={<StopMarker kind="terminus" variant="ligne" />}
       />
       <p className={cn("text-corps font-bold text-ink", role === "start" ? "pb-3" : "")}>
-        {format(t.terminus[role], { label })}
+        {label === undefined ? t.terminusSansLibelle[role] : format(t.terminus[role], { label })}
       </p>
     </li>
   );
 }
 
+/**
+ * Étape telle que la ligne la lit (F10-TL-12) : `Stop` en est un sous-type, comme l'étape réduite de la vue
+ * partagée (sans `id`, `reason`, `placeId`, `locked`, `source` ni `verifiedAt`, avec une clé locale au jour).
+ * La ligne ne lit jamais `placeId`, `source` ni `verifiedAt`.
+ */
+export type DayLineViewStop = Pick<Stop, "name" | "start" | "meta" | "exceptions"> &
+  Partial<Pick<Stop, "id" | "end" | "reason" | "locked">> & {
+    /** Clé locale au jour (vue partagée), quand l'étape n'a pas d'`id`. */
+    key?: string;
+  };
+
+/** Élément accepté par `DayLine` : `DayLineItem` et les éléments réduits de la vue partagée en sont des sous-types. */
+export type DayLineViewItem<S extends DayLineViewStop = DayLineViewStop> =
+  | { type: "terminus"; role: "start" | "end"; time: string; label?: string }
+  | { type: "stop"; stop: S }
+  | { type: "segment"; segment: Segment }
+  | { type: "free"; from: string; to: string }
+  | { type: "openMeal"; time: string; meal: Meal };
+
+/** État d'une étape sur l'écran 15 : en cours (`aria-current="step"`) ou passée. */
+export type DayLineStopState = "current" | "past";
+
 export interface DayLineStopProps {
-  stop: Stop;
-  /** Adresse de la fiche étape (écran 13). */
-  href: string;
+  stop: DayLineViewStop;
+  /** Adresse de la fiche étape (écran 13) ; sans adresse, l'étape n'est pas interactive (même disposition). */
+  href?: string;
+  /** Une ligne : heure, nom, étiquette d'état et `Tag` ; ni `meta`, ni raison, ni mention de verrou. */
+  compact?: boolean;
+  state?: DayLineStopState;
 }
 
 /**
  * Arrêt : anneau line, nom, métadonnées, mention de verrou, justification et tags ; toute la zone ouvre
  * la fiche étape. Étape verrouillée (F5-PO-14) : « Verrouillée » en `legende` `ink-soft` sous les
  * métadonnées, texte seul tant que le tracé du cadenas manque (Q13, Q51) ; ce n'est pas une `Tag`.
+ *
+ * Écran 15 (F10-TL-12, rendu provisoire UX/UI) : étape en cours avec `aria-current="step"` et l'étiquette
+ * visible « En cours » ; étape passée avec l'étiquette visible « Terminée », nom et heure en `ink-soft` en
+ * complément (jamais la seule couleur), sans `Tag` : le jaune `quai` ne signale qu'une action requise
+ * (handover § 0 règle 6, § 4.2), et une étape terminée n'en demande plus.
  */
-function StopRow({ stop, href }: DayLineStopProps) {
+function StopRow({ stop, href, compact = false, state }: DayLineStopProps) {
+  const past = state === "past";
+  const body = (
+    <>
+      <span className={cn("text-arret font-bold", past ? "text-ink-soft" : "text-ink")}>{stop.name}</span>
+      {state ? (
+        <>
+          {" "}
+          <span data-part="etat-etape" className="text-legende font-bold text-ink">
+            {state === "current" ? t.etape.enCours : t.etape.terminee}
+          </span>
+        </>
+      ) : null}
+      {compact ? null : <span className="text-corps-s text-ink-soft">{stop.meta}</span>}
+      {!compact && stop.locked ? (
+        <span data-part="verrou" className="text-legende text-ink-soft">
+          {t.verrouillee}
+        </span>
+      ) : null}
+      {!compact && stop.reason ? <span className="text-corps-s text-ink">{stop.reason}</span> : null}
+      {!past && stop.exceptions.length > 0 ? (
+        <span className="mt-1 flex flex-wrap gap-(--ligne-espace-2)">
+          {stop.exceptions.map((exception) => (
+            <Tag key={exception} kind={exception} />
+          ))}
+        </span>
+      ) : null}
+    </>
+  );
   return (
-    <li data-type="stop" data-locked={stop.locked ? "true" : undefined} className={ROW}>
-      <Heure>{stop.start}</Heure>
+    <li
+      data-type="stop"
+      data-locked={stop.locked ? "true" : undefined}
+      data-state={state}
+      aria-current={state === "current" ? "step" : undefined}
+      className={ROW}
+    >
+      <Heure className={past ? "text-ink-soft" : undefined}>{stop.start}</Heure>
       <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" />} />
-      <Link
-        href={href}
-        scroll={false}
-        data-part="arret"
-        className="flex min-h-(--touch-target) min-w-0 flex-col items-start gap-1 rounded-badge pb-4"
-      >
-        <span className="text-arret font-bold text-ink">{stop.name}</span>
-        <span className="text-corps-s text-ink-soft">{stop.meta}</span>
-        {stop.locked ? (
-          <span data-part="verrou" className="text-legende text-ink-soft">
-            {t.verrouillee}
-          </span>
-        ) : null}
-        {stop.reason ? <span className="text-corps-s text-ink">{stop.reason}</span> : null}
-        {stop.exceptions.length > 0 ? (
-          <span className="mt-1 flex flex-wrap gap-(--ligne-espace-2)">
-            {stop.exceptions.map((exception) => (
-              <Tag key={exception} kind={exception} />
-            ))}
-          </span>
-        ) : null}
-      </Link>
+      {href === undefined ? (
+        <div data-part="arret" className={cn("flex min-w-0 flex-col items-start gap-1", compact ? "pb-3" : "pb-4")}>
+          {body}
+        </div>
+      ) : (
+        <Link
+          href={href}
+          scroll={false}
+          data-part="arret"
+          className="flex min-h-(--touch-target) min-w-0 flex-col items-start gap-1 rounded-badge pb-4"
+        >
+          {body}
+        </Link>
+      )}
     </li>
   );
 }
@@ -205,31 +264,57 @@ function OpenMeal({ time, meal }: DayLineOpenMealProps) {
   );
 }
 
-export interface DayLineProps {
-  items: DayLineItem[];
-  /** Adresse de la fiche étape d'un arrêt. */
-  getStopHref: (stop: Stop) => string;
+export interface DayLineProps<S extends DayLineViewStop = Stop> {
+  items: readonly DayLineViewItem<S>[];
+  /** Adresse de la fiche étape d'un arrêt ; sans fonction, aucune étape n'est un lien (écran 15, vue partagée). */
+  getStopHref?: (stop: S) => string;
   /**
    * Destination du lien « Idées » d'une plage de temps libre (F5-TL-8, décision 0015 § 8) ; sans
    * fonction, pas de lien. Remplace l'ancienne prop `ideasHref`.
    */
   getIdeasHref?: (free: { from: string; to: string }) => string;
+  /** Écran 15 : une ligne par élément, ni `meta` ni raison (F10-TL-12). */
+  compact?: boolean;
+  /** Clé de l'étape en cours (`id`, sinon clé locale) : `aria-current="step"` et étiquette « En cours ». */
+  currentKey?: string;
+  /** Étape passée : étiquette « Terminée ». Sans effet sur un terminus, un segment, un temps libre ou un repas. */
+  isPast?: (stop: S) => boolean;
   className?: string;
+}
+
+/** Clé d'une étape : son `id`, sinon sa clé locale, sinon son rang dans la ligne. */
+function stopKey(stop: DayLineViewStop, index: number): string {
+  return stop.id ?? stop.key ?? `#${index}`;
 }
 
 /**
  * La ligne du jour, du terminus de départ au terminus de retour. Design system : components/DayLine.
- * Liste ordonnée sémantique ; rail et marqueurs décoratifs.
+ * Liste ordonnée sémantique ; rail et marqueurs décoratifs. Sans `getStopHref` facultatif, `compact`,
+ * `currentKey` ni `isPast`, le rendu reste celui de F3 et F5.
  */
-function DayLineRoot({ items, getStopHref, getIdeasHref, className }: DayLineProps) {
+function DayLineRoot<S extends DayLineViewStop = Stop>({
+  items,
+  getStopHref,
+  getIdeasHref,
+  compact = false,
+  currentKey,
+  isPast,
+  className,
+}: DayLineProps<S>) {
   return (
     <ol className={cn("flex flex-col", className)}>
       {items.map((item, index) => {
         switch (item.type) {
           case "terminus":
             return <Terminus key={`terminus-${item.role}-${index}`} role={item.role} time={item.time} label={item.label} />;
-          case "stop":
-            return <StopRow key={`stop-${item.stop.id}`} stop={item.stop} href={getStopHref(item.stop)} />;
+          case "stop": {
+            const key = stopKey(item.stop, index);
+            const state: DayLineStopState | undefined =
+              currentKey !== undefined && key === currentKey ? "current" : isPast?.(item.stop) ? "past" : undefined;
+            return (
+              <StopRow key={`stop-${key}`} stop={item.stop} href={getStopHref?.(item.stop)} compact={compact} state={state} />
+            );
+          }
           case "segment":
             return <SegmentRow key={`segment-${index}`} segment={item.segment} />;
           case "free":

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
 import type { Day, DayMap as DayMapData } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import { isMapConfigComplete, useCarteInjection } from "./config";
@@ -57,24 +58,6 @@ export type DayMapProps =
       placesFromGoogle: boolean;
       className?: string;
     };
-
-function subscribeOnline(callback: () => void) {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-}
-
-/** `navigator.onLine`, mis à jour aux événements `online` et `offline` ; en ligne au rendu serveur. */
-function useOnline(): boolean {
-  return useSyncExternalStore(
-    subscribeOnline,
-    () => navigator.onLine,
-    () => true,
-  );
-}
 
 /**
  * Carte d'une journée ou vue d'ensemble du séjour (spécification F4).
