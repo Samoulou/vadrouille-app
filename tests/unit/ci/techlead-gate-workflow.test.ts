@@ -366,6 +366,33 @@ describe("décision 0035 et consignes : lecture par chaîne", () => {
     );
   });
 
+  it("lecture des libellés et commentaires : pipefail, un échec de gh api fait échouer l'étape", () => {
+    const script = runScript("Lire les libellés, les revues consolidées, les événements et les commentaires");
+    expect(script.split("\n").find((l) => l.trim() !== "" && !l.trim().startsWith("#"))).toBe("set -o pipefail");
+    const dir = mkdtempSync(join(tmpdir(), "techlead-gate-pipefail-"));
+    try {
+      const bin = join(dir, "bin");
+      mkdirSync(bin);
+      writeFileSync(join(bin, "gh"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+      const result = spawnSync("bash", ["-e", "-c", script], {
+        cwd: dir,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+      expect(result.status).not.toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("mise-en-place, annexe D : la copie de techlead-gate.yml est identique au workflow", () => {
+    const text = read("docs/studio/mise-en-place.md");
+    const head = "```yaml\n# .github/workflows/techlead-gate.yml\n";
+    const start = text.indexOf(head);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const body = text.slice(start + head.length, text.indexOf("```\n", start + head.length));
+    expect(body).toBe(WORKFLOW);
+  });
+
   it("consignes du CEO et du Tech Lead", () => {
     expect(read(".claude/agents/ceo.md")).toContain(
       "Toute PR ouverte d'une branche claude/… qui modifie .github/workflows/ et n'a pas owner-approved est signalée dans #studio. Tu ne poses ni ne retires owner-approved.",
