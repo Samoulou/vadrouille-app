@@ -167,7 +167,7 @@ export const PropositionReduiteSchema = z
   });
 export type PropositionReduite = z.infer<typeof PropositionReduiteSchema>;
 
-const PositionSchema = z.strictObject({
+export const PositionSchema = z.strictObject({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
 });
@@ -238,7 +238,7 @@ export const ProgrammeReduitSchema = z
       ctx.addIssue({ code: "custom", message: "indices de jour en double", path: ["trip", "days"] });
     }
     const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
-    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus[index] !== jour)) {
+    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus.at(index) !== jour)) {
       ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
     }
     const joursConnus = new Set(jours);

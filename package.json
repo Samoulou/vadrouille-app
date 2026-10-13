@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/serve-standalone.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.p0.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "test:a11y": "playwright test --project=a11y",
@@ -18,7 +18,8 @@
     "test:visual": "playwright test --project=visual",
     "test:visual:update": "playwright test --project=visual --update-snapshots",
     "test:perf": "playwright test --project=perf --workers=1",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && E2E_SKIP_BUILD=1 pnpm test:a11y && E2E_SKIP_BUILD=1 pnpm test:e2e && E2E_SKIP_BUILD=1 pnpm test:visual"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && E2E_SKIP_BUILD=1 pnpm test:a11y && E2E_SKIP_BUILD=1 pnpm test:e2e && E2E_SKIP_BUILD=1 pnpm test:visual",
+    "p0": "node --import ./scripts/p0/enregistrer.mjs scripts/p0/main.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -33,6 +34,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "next": "16.4.0",
+    "parse5": "8.0.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-merge": "3.7.0",

@@ -9,7 +9,7 @@ import { structureBrief } from "@/server/actions/creation";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { formatNombre } from "./brief-fields";
+import { formatNombre } from "@/lib/nombre";
 import { BriefScreen } from "./BriefScreen";
 import { DraftProvider, useDraft } from "./DraftProvider";
 import { initialDraft, type DraftState } from "./draft";
