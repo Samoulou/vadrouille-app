@@ -349,7 +349,35 @@ export default defineConfig([
       "src/grounding/**/*.{js,jsx,ts,tsx}",
       "src/workflows/**/*.{js,jsx,ts,tsx}",
     ],
-    ignores: ["src/server/actions/**", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    ignores: [
+      "src/server/actions/**",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+      // Exception nominative (fusion de main dans B1, #188) : ces modules de phase 0 sont aussi chargés par `pnpm p0`
+      // (`node --import ./scripts/p0/enregistrer.mjs`, hors Next.js et sans la condition `react-server`), où
+      // `import "server-only"` lèverait une erreur. Leur frontière reste tenue par la règle de lint de 0017 § 3.3
+      // (décision 0020). Tout nouveau fichier de ces dossiers reste soumis à la règle.
+      "src/ai/client.ts",
+      "src/ai/modeles.simule.ts",
+      "src/ai/prompts/notation.ts",
+      "src/ai/prompts/plan.ts",
+      "src/ai/prompts/raisons.ts",
+      "src/ai/prompts/recherche.ts",
+      "src/ai/requetes.ts",
+      "src/ai/sorties.ts",
+      "src/grounding/ancrage.ts",
+      "src/grounding/interfaces.ts",
+      "src/grounding/places.simule.ts",
+      "src/grounding/routes.simule.ts",
+      "src/research/agent.ts",
+      "src/research/extract-text.ts",
+      "src/research/fetch-page.ts",
+      "src/research/ip-guard.ts",
+      "src/research/pages.simule.ts",
+      "src/research/recherche-web.simule.ts",
+      "src/research/recherche-web.ts",
+      "src/research/sources.ts",
+    ],
     rules: { "ligne/require-server-only": "error" },
   },
   {
