@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { donneesDe } from "@/ai/requetes";
 import { TripSchema, ProposalSchema } from "@/contracts";
 import type { Brief } from "@/prototype/brief";
-import type { Configuration } from "@/prototype/config";
+import type { Configuration } from "../../../scripts/p0/fichiers";
 import { ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
 import { charger, executerCapture } from "./harnais";
