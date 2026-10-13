@@ -226,7 +226,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "exception transitoire de 0040 D1 (amendement A5) ; retrait par la tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2"
+      "ecart": "exception transitoire de 0040 D1 (amendement M2) ; retrait par la tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2"
     },
     {
       "fichier": "tests/unit/p0/imports.test.ts",
@@ -309,7 +309,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : à trancher par le Tech Lead avec verdict Sécurité dans la revue de la PR 217 (0038 TL-5 point 7)"
+      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; les hôtes sont des sentinelles qui prouvent que le worker ne met pas en cache les requêtes Google)"
     },
     {
       "fichier": "tests/unit/sw-route.test.ts",
@@ -332,7 +332,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : à trancher par le Tech Lead avec verdict Sécurité dans la revue de la PR 217 (0038 TL-5 point 7)"
+      "ecart": "relevé de la mise à jour avec main après F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; les hôtes sont des sentinelles qui prouvent que le worker ne met pas en cache les requêtes Google)"
     }
   ]
 }

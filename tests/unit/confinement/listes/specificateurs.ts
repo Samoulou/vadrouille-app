@@ -67,9 +67,9 @@ export const SPECIFICATEURS = [
 
 const CHARGEUR =
   "module de Node dans un fichier non-test de `src/` (section 6) ; lecture bornée et gardée des programmes du prototype (P0b1, PR 208) ; " +
-  "justification côté serveur : chargé seulement par `prototype-instance.ts`, derrière `prototypeAdapterAllowed`, jamais dans le navigateur : 0040 D2, A5 (amendement A7)";
+  "justification côté serveur : chargé seulement par `prototype-instance.ts`, derrière `prototypeAdapterAllowed`, jamais dans le navigateur : 0040 D2, A5 (amendement M4)";
 
-const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement A7)";
+const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4)";
 
 export const SPECIFICATEURS_NOMINATIFS = [
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
@@ -111,7 +111,7 @@ export const SPECIFICATEURS_NOMINATIFS = [
     fichier: "src/research/extract-text.ts",
     specificateur: "parse5",
     noms: ["parse"],
-    motif: "paquet `parse5` (P0a1, PR 180) en zone sensible non-test, où la section 6 n'admet que `zod` : 0040 D2, A3 (amendement A7)",
+    motif: "paquet `parse5` (P0a1, PR 180) en zone sensible non-test, où la section 6 n'admet que `zod` : 0040 D2, A3 (amendement M4)",
   },
   {
     fichier: "src/research/fetch-page.test.ts",
@@ -138,18 +138,17 @@ export const SPECIFICATEURS_NOMINATIFS = [
     motif: CHARGEUR,
   },
   // Relevé de `ab683eb` (B2, PR 219, fusionnée après la revue du head `eb7e3bf`) : `zod` hors de `src/**` (section 6).
-  // À trancher par le Tech Lead avec verdict Sécurité dans la revue de PR 217 (élargir la zone de `zod` à `tests/unit/**`
-  // serait l'autre forme possible).
+  // Accepté par 0040 D6 en lignes nominatives par fichier ; la zone de `zod` n'est pas élargie à `tests/unit/**`.
   {
     fichier: "tests/unit/contracts/categories.test.ts",
     specificateur: "zod",
     noms: ["z"],
-    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : 0040 D6, accepté en ligne nominative, permanent ; zone de `zod` non élargie",
   },
   {
     fichier: "tests/unit/contracts/derived-storage.test.ts",
     specificateur: "zod",
     noms: ["type:z"],
-    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    motif: "`zod` dans un test de contrats hors de `src/**` (B2, PR 219) : 0040 D6, accepté en ligne nominative, permanent ; zone de `zod` non élargie",
   },
 ] as const satisfies readonly LigneSpecificateurNominative[];

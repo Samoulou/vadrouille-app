@@ -192,7 +192,7 @@ export const LIGNES_CAPACITE = [
       },
     ],
     ecart:
-      "exception transitoire unique à la section 2.4 : 0040 D1 (amendements A4 et A5) ; fichier de P0a1 (PR 180) ; retrait par la " +
+      "exception transitoire unique à la section 2.4 : 0040 D1 (amendements M1 et M2) ; fichier de P0a1 (PR 180) ; retrait par la " +
       "tâche de suivi `ia` de 0040 D1 (option b), avant l'ouverture de la PR de P0r2",
   },
   {
@@ -218,7 +218,7 @@ export const LIGNES_CAPACITE = [
       { capacite: "acces-calcule:cle-non-litterale", formes: ["files[files.length - 1]"] },
     ],
     ecart:
-      "script de CI (T18, PR 199) : 0040 D2, A8 (amendement A6) ; `execFileSync` permanent ; étalement de `process.env` et " +
+      "script de CI (T18, PR 199) : 0040 D2, A8 (amendement M3) ; `execFileSync` permanent ; étalement de `process.env` et " +
       "`files[files.length - 1]` transitoires, retrait par la tâche `release` de 0040 D2 (A8)",
   },
   {
@@ -235,14 +235,14 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync", "spawnSync"] }],
     ecart: "fichier apparu avec T18 (PR 199) après `40b6738` : ligne ordinaire B, 0040 D4",
   },
-  // Relevé de `ab683eb` (B2, PR 219, fusionnée après la revue du head `eb7e3bf`) : à trancher par le Tech Lead avec verdict
-  // Sécurité (0038 TL-5 point 7 : pas d'assouplissement silencieux ; correction du code possible, au choix du Tech Lead).
+  // Relevé de `ab683eb` (B2, PR 219, fusionnée après la revue du head `eb7e3bf`) : accepté par 0040 D6 (lignes nominatives,
+  // exactes et bornées ; aucune règle élargie ; verdict Sécurité non requis, portée test).
   {
     fichier: "src/contracts/b2.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : copie d'un objet sans les clés données (`omit`)",
     capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"] }],
-    ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : à trancher dans la revue de PR 217",
+    ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : 0040 D6, accepté, permanent (portée test, ensemble de clés fini et typé)",
   },
   {
     fichier: "src/contracts/snapshot.test.ts",
@@ -252,37 +252,38 @@ export const LIGNES_CAPACITE = [
       { capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)", "(item.stop as Json)[cle] (objet any/unknown)"] },
     ],
     ecart:
-      "clé générique `K extends keyof T` et objet admis seulement par une conversion (0038 TL-5 point 7), B2 (PR 219) : à trancher dans la revue de PR 217",
+      "clé générique `K extends keyof T` et objet admis seulement par une conversion (0038 TL-5 point 7), B2 (PR 219) : 0040 D6, accepté, permanent (même régime que 0040 A7)",
   },
   {
     fichier: "tests/unit/contracts/derived-storage.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : copie d'un objet sans les clés données (`omit`)",
     capacites: [{ capacite: "acces-calcule:type", formes: ["copy[key] (type de clé non admis)"] }],
-    ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : à trancher dans la revue de PR 217",
+    ecart: "clé générique `K extends keyof T` (contrainte `string | number | symbol`, refusée par 2.6), B2 (PR 219) : 0040 D6, accepté, permanent (portée test, ensemble de clés fini et typé)",
   },
   {
     fichier: "tests/unit/contracts/categories.test.ts",
     portee: "test",
     usage: "test des contrats de B2 : paramètre local `module` de `exportedSchemas`",
     capacites: [{ capacite: "identifiant:module", formes: ["declaration", "reference"] }],
-    ecart: "paramètre local nommé `module` : identifiant refusé sans analyse de portée (2.3), même cas que 0040 A2, B2 (PR 219) : à trancher dans la revue de PR 217",
+    ecart: "paramètre local nommé `module` : identifiant refusé sans analyse de portée (2.3), même cas que 0040 A2, B2 (PR 219) : 0040 D6, accepté, permanent (« ligne inutile » la retire si le paramètre est renommé)",
   },
   // Relevé de la mise à jour avec `main` après F10b (PR 212, fusionnée à 09:30 UTC le 2026-10-13, après la revue du
-  // head `eb7e3bf`) : lignes exactes et bornées en nombre, à trancher par le Tech Lead avec verdict Sécurité dans la
-  // revue de la PR 217 (0038 TL-5 point 7 : aucune règle élargie). `node:vm` est une question ouverte (description).
+  // head `eb7e3bf`) : lignes exactes et bornées en nombre, tranchées par 0040 D6 (aucune règle élargie). Les lignes de
+  // portée application et `playwright.config.ts` sont acceptées sur le principe, verdict Sécurité dû ; `node:vm` dans
+  // `tests/unit/sw-route.test.ts` reste non tranché (0040, « Questions ouvertes »).
   {
     fichier: "public/sw.js",
     portee: "application",
     usage:
       "service worker de la page de repli (F10b, F10-TL-4) : charge `public/sw-route.js` et sert `/hors-ligne` quand une navigation " +
-      "échoue ; justification côté navigateur à écrire dans la revue (aucune autre origine, aucune donnée du voyage, selon F10-PO-11)",
+      "échoue (aucune autre origine, aucune donnée du voyage, selon F10-PO-11)",
     capacites: [
       { capacite: "fichier:mode-non-strict", formes: [".js"], nombre: 1 },
       { capacite: "identifiant:importScripts", formes: ["reference"], nombre: 1 },
       { capacite: "identifiant:fetch", formes: ["reference"], nombre: 4 },
     ],
-    ecart: "script classique `.js` (section 1) et `fetch`/`importScripts` dans le service worker, F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "script classique `.js` (section 1) et `fetch`/`importScripts` dans le service worker, F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : service worker, `importScripts` d'un texte littéral de même origine, `fetch` du même origine ou de la requête interceptée, sans en-tête ni secret ajouté (`credentials: 'omit'` pour la mise en cache)",
   },
   {
     fichier: "public/sw-route.js",
@@ -293,14 +294,14 @@ export const LIGNES_CAPACITE = [
       { capacite: "acces-calcule:cle-non-litterale", formes: ["found[url.pathname + url.search]"], nombre: 1 },
       { capacite: "global:self", formes: ["autre"], nombre: 1 },
     ],
-    ecart: "script classique `.js` (section 1), accès calculé (2.6, règle fermée) et `self` passé en argument (2.3), F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "script classique `.js` (section 1), accès calculé (2.6, règle fermée) et `self` passé en argument (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : aiguillage pur chargé dans le service worker, accès calculé sur un objet local, `self` seulement pour publier ses fonctions",
   },
   {
     fichier: "src/lib/offline/register.ts",
     portee: "application",
     usage: "enregistrement du service worker (F10b) : `window` comme valeur par défaut du paramètre `env` de `registerOfflineFallback`",
     capacites: [{ capacite: "global:window", formes: ["autre"], nombre: 1 }],
-    ecart: "objet global passé comme valeur (2.3), F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "objet global passé comme valeur (2.3), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû. Justification navigateur : `window` n'est lu que pour enregistrer le service worker",
   },
   {
     fichier: "scripts/icones-provisoires.mjs",
@@ -313,21 +314,21 @@ export const LIGNES_CAPACITE = [
         nombre: 1,
       },
     ],
-    ecart: "accès calculés numériques refusés par la règle fermée de 2.6 (fichier hors programme), F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "accès calculés numériques refusés par la règle fermée de 2.6 (fichier hors programme), F10b (PR 212) : 0040 D6, accepté, permanent (outil de génération, hors application)",
   },
   {
     fichier: "playwright.config.ts",
     portee: "outil",
     usage: "drapeau Playwright des requêtes réseau des service workers (F10b, F10-TL-6), posé pour le processus principal et ses workers",
     capacites: [{ capacite: "environnement:ecriture", formes: ["PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS"], nombre: 1 }],
-    ecart: "écriture de `process.env` (section 5, refusée hors `vi.stubEnv`), F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "écriture de `process.env` (section 5, refusée hors `vi.stubEnv`), F10b (PR 212) : 0040 D6 ; verdict Sécurité dû (accepté sur le principe, permanent : nom littéral non secret, valeur constante)",
   },
   {
     fichier: "tests/e2e/hors-ligne.e2e.spec.ts",
     portee: "test",
     usage: "vérifie dans le service worker qu'une requête vers Google échoue (`fetch` évalué dans le worker par Playwright)",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
-    ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : à trancher dans la revue de la PR 217 (0038 TL-5 point 7)",
+    ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; sentinelle : le worker ne met pas en cache les requêtes Google)",
   },
   {
     fichier: "tests/unit/sw-route.test.ts",
@@ -338,8 +339,9 @@ export const LIGNES_CAPACITE = [
       { capacite: "global:self", formes: ["autre"], nombre: 2 },
     ],
     ecart:
-      "module à capacité `node:vm` (évaluation de texte, proche de 2.4) et nom `self` lié localement, F10b (PR 212) : QUESTION ouverte " +
-      "pour le Tech Lead et la Sécurité dans la PR 217 (0038 TL-5 point 7) ; ligne bornée à une occurrence en attendant",
+      "module à capacité `node:vm` (évaluation de texte, proche de 2.4) et nom `self` lié localement, F10b (PR 212) : `self` local accepté, " +
+      "permanent, par 0040 D6 ; `node:vm` non tranché par 0040 D6, à trancher par une nouvelle décision avec verdict " +
+      "Sécurité ou à remplacer (0040, « Questions ouvertes ») ; ligne bornée à une occurrence en attendant",
   },
 ] as const satisfies readonly LigneCapacite[];
 
