@@ -578,6 +578,15 @@
         "enCeMoment": "En ce moment : {name}.",
         "prochaine": "Prochaine étape : {name} à {start}."
       }
+    },
+    "horsLigne": {
+      "titreDocument": "Tu es hors ligne · {produit}",
+      "titre": "Tu es hors ligne",
+      "texte": "Cette page demande une connexion. Reconnecte-\u2060toi, puis réessaie.",
+      "reessayer": "Réessayer",
+      "retabli": "Connexion rétablie.",
+      "retabliTitre": "Connexion rétablie",
+      "retabliTexte": "Tu peux réessayer."
     }
   },
   "mesVoyages": {

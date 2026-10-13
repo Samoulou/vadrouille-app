@@ -7,6 +7,11 @@ import { defineConfig } from "@playwright/test";
 import { PROTOTYPE_PORT_OFFSET, e2ePort } from "./scripts/e2e-port.mjs";
 import { SERVER_LOG_ENV, serverLogPath } from "./scripts/e2e-server-log.mjs";
 
+// F10b (F10-TL-6) : requêtes réseau des service workers exposées à Playwright (Chromium) : `context.route` les
+// intercepte (blocage des domaines Google) et `context.setOffline` les coupe. Sans ce drapeau, le service worker
+// garde le réseau quand la page est hors ligne. Posé ici pour le processus principal et ses workers.
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
+
 // Un port par worktree (décision 0017 § 14, Q107) : `E2E_PORT` s'il est fourni, sinon 3100 en CI, sinon un port
 // stable entre 3100 et 3899 tiré du chemin absolu du dépôt. Jamais de serveur réutilisé : un port occupé fait
 // échouer Playwright au lieu de tester le build d'un autre worktree, ou un ancien build resté en mémoire.
@@ -49,6 +54,9 @@ export default defineConfig({
     locale: "fr-CH",
     timezoneId: "Europe/Zurich",
     trace: "retain-on-failure",
+    // F10b (F10-TL-6) : service workers bloqués par défaut ; seuls les tests du hors-ligne (et le contrôle de
+    // persistance de la carte) posent `test.use({ serviceWorkers: "allow" })`.
+    serviceWorkers: "block",
   },
   projects: [
     { name: "e2e", testDir: "tests/e2e", testMatch: /.*\.e2e\.spec\.ts$/ },
