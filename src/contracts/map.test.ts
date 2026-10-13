@@ -7,14 +7,12 @@ import type { Day } from "./trip";
 const day: Day = {
   index: 2,
   date: "2026-08-30",
-  weekday: "dim.",
-  title: "Dimanche 30 août",
   items: [
     { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
     { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
     {
       type: "stop",
-      stop: { id: "a", kind: "activity", name: "[A]", start: "09:15", meta: "", exceptions: [], locked: false },
+      stop: { id: "a", kind: "activity", name: "[A]", start: "09:15", facts: {}, exceptions: [], locked: false },
     },
     { type: "free", from: "10:00", to: "11:00" },
     { type: "terminus", role: "end", time: "20:00", label: "[Hôtel]" },
@@ -90,7 +88,7 @@ describe("validateDayMap", () => {
   it("signale un stopId qui désigne un élément qui n'est pas une étape", () => {
     const withEvent: Day = {
       ...day,
-      events: [{ id: "evenement", kind: "event", name: "[E]", start: "18:00", meta: "", exceptions: [], locked: false }],
+      events: [{ id: "evenement", kind: "event", name: "[E]", start: "18:00", facts: {}, exceptions: [], locked: false }],
     };
     const map = { ...valid, points: [{ ref: { type: "stop" as const, stopId: "evenement" }, lat: 1, lng: 1 }] };
     expect(validateDayMap(withEvent, map, "voyage")).toHaveLength(1);

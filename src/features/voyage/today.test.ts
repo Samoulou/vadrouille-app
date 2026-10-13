@@ -114,12 +114,12 @@ describe("projectTodayTrip (F10-TL-2)", () => {
         name: "[Dean Village]",
         start: "10:50",
         end: "11:50",
-        meta: "[Water of Leith, 1 h, gratuit]",
+        facts: { area: "[Water of Leith]", durationMinutes: 60, costPerPerson: 0 },
         exceptions: [],
         placeId: "mock_place_dean_village",
       },
     });
-    expect(Object.keys(day(2)).sort()).toEqual(["date", "generating", "index", "items", "title"]);
+    expect(Object.keys(day(2)).sort()).toEqual(["date", "generating", "index", "items"]);
     const serialized = JSON.stringify(trip);
     for (const absent of ["reason", "source", "verifiedAt", "locked", "events", "surprise", "budgetPerPerson", "[Concert d'orgue à St Giles]"]) {
       expect(serialized).not.toContain(absent);
@@ -169,7 +169,7 @@ describe("nowAt, nextUp, isPastStop (F10-PO-4)", () => {
 
   it("étape sans end : jamais en cours, prochaine jusqu'à son heure, puis passée", () => {
     const sansFin = {
-      items: [{ type: "stop" as const, stop: { id: "a", kind: "activity" as const, name: "[A]", start: "10:00", meta: "", exceptions: [] } }],
+      items: [{ type: "stop" as const, stop: { id: "a", kind: "activity" as const, name: "[A]", start: "10:00", facts: {}, exceptions: [] } }],
     };
     expect(nowAt(sansFin, "10:00")).toBeNull();
     expect(nextUp(sansFin, "09:59")?.stop.id).toBe("a");

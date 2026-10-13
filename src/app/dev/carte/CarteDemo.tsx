@@ -7,6 +7,7 @@ import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";
 import { Button, DayLine } from "@/components/ligne";
 import type { Day, DayMap as DayMapData, Stop } from "@/contracts";
 import { format, messages } from "@/i18n";
+import { formatTitreJour } from "@/lib/dates";
 
 const t = messages.dev.carte;
 
@@ -121,7 +122,7 @@ export function CarteDemo({ days, maps, renderer, config, vue }: CarteDemoProps)
               <h2 className="text-corps font-bold text-ink">{t.sejour}</h2>
               <ol className="text-corps text-ink-2">
                 {days.map((candidate) => (
-                  <li key={candidate.index}>{candidate.title}</li>
+                  <li key={candidate.index}>{formatTitreJour(candidate.date)}</li>
                 ))}
               </ol>
             </div>

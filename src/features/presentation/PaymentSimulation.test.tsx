@@ -22,7 +22,7 @@ vi.mock("@/server/actions/paiement", () => ({
 
 const TRIP = "mock_trip_edimbourg";
 const ID = "c".repeat(22);
-const ctx = { organizationId: MOCK_ORGANIZATION_ID };
+const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
 const normalize = (text: string | null) => (text ?? "").replace(/[  ]/g, " ");
 
 /** Paiement créé par l'adaptateur simulé construit sur une configuration à 3900 (point d'injection de F9-TL-4). */

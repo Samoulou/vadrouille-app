@@ -96,7 +96,7 @@ test("debloquer: premières propositions accessibles sans payer", async ({ page,
   const expectApercu = async () => {
     await page.goto(R6);
     await expect(page.getByRole("heading", { level: 1, name: "Tes premières propositions" })).toBeAttached();
-    await expect(page.getByRole("progressbar")).toHaveAccessibleName("Proposition 1 sur 8");
+    await expect(page.getByRole("progressbar")).toHaveAccessibleName("Proposition 1 sur 7");
     await page.waitForTimeout(300);
     await expectPath(page, R6);
   };

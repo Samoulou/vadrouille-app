@@ -6,6 +6,7 @@ import { Button } from "@/components/ligne/Button";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import type { SurpriseIdea } from "@/contracts";
 import { messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 
 const t = messages.sejour.surprise;
 
@@ -18,6 +19,7 @@ const t = messages.sejour.surprise;
 export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const faits = formatFaits(idea.facts);
 
   return (
     <div data-part="surprise" className="flex flex-col items-start gap-3">
@@ -31,7 +33,7 @@ export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
               {t.mention}
             </p>
             <h3 className="text-arret font-bold text-ink">{idea.name}</h3>
-            <p className="text-corps-s text-ink-soft">{idea.meta}</p>
+            {faits ? <p className="text-corps-s text-ink-soft">{faits}</p> : null}
             <ReasonBlock
               text={idea.reason}
               sourceLabel={idea.source.label}

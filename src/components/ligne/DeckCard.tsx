@@ -20,6 +20,7 @@ import {
   type Gesture,
 } from "@/features/presentation/deck";
 import { format, messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 import { releaseVelocity, type PointerSample } from "@/lib/pointer";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,11 @@ export function deckCardLabels(proposal: Proposal, isLastOption = false): Record
 
 export interface DeckCardProps {
   proposal: Proposal;
+  /**
+   * Contexte du créneau (« Entre ton déjeuner et [Distillerie] »), composé par l'écran depuis `proposal.neighbours`
+   * et le jour du voyage (évolution E2 de B2) ; absent ou `null` : aucune ligne.
+   */
+  context?: string | null;
   /** Repas : dernière option du créneau (F6-PO-7). */
   isLastOption?: boolean;
   /** « J'aime » ou « Je choisis ». */
@@ -62,13 +68,23 @@ export interface DeckCardProps {
  * Carte de la présentation (design system : components/DeckCard). La carte entière est un bouton qui
  * ouvre le détail ; le glisser horizontal décide, doublé des deux boutons ronds toujours visibles.
  */
-export function DeckCard({ proposal, isLastOption = false, onLike, onDislike, onOpen, cardRef, className }: DeckCardProps) {
+export function DeckCard({
+  proposal,
+  context = null,
+  isLastOption = false,
+  onLike,
+  onDislike,
+  onOpen,
+  cardRef,
+  className,
+}: DeckCardProps) {
   const labels = deckCardLabels(proposal, isLastOption);
   return (
     <div data-deck-card="" data-kind={proposal.kind} className={cn("flex min-h-0 flex-col gap-4", className)}>
       <SwipeCard
         key={proposal.id}
         proposal={proposal}
+        context={context}
         labels={labels}
         onDecide={(decision) => (decision === "like" ? onLike("swipe") : onDislike("swipe"))}
         onOpen={onOpen}
@@ -129,12 +145,14 @@ function prefersReducedMotion(): boolean {
 
 function SwipeCard({
   proposal,
+  context,
   labels,
   onDecide,
   onOpen,
   cardRef,
 }: {
   proposal: Proposal;
+  context: string | null;
   labels: Record<Decision, string>;
   onDecide: (decision: Decision) => void;
   onOpen: () => void;
@@ -150,6 +168,7 @@ function SwipeCard({
   const [exit, setExit] = useState<"slide" | "fade" | null>(null);
 
   const { stop } = proposal;
+  const faits = formatFaits(stop.facts);
   const tag = deckCardTag(stop.exceptions);
   const travel =
     proposal.travelFromPrevious && proposal.travelFromPrevious.minutes > DETOUR_THRESHOLD_MINUTES
@@ -159,8 +178,8 @@ function SwipeCard({
   const describedBy = [
     id("moment"),
     proposal.option ? id("option") : null,
-    id("meta"),
-    id("contexte"),
+    faits ? id("faits") : null,
+    context ? id("contexte") : null,
     travel ? id("trajet") : null,
     travel && proposal.detour ? id("detour") : null,
     stop.reason ? id("raison") : null,
@@ -305,12 +324,16 @@ function SwipeCard({
         <span className="text-(length:--ligne-deck-nom) leading-(--ligne-deck-nom-interligne) font-extrabold tracking-(--ligne-deck-nom-approche)">
           {stop.name}
         </span>
-        <span id={id("meta")} className="text-corps-s text-ink-soft">
-          {stop.meta}
-        </span>
-        <span id={id("contexte")} data-part="contexte" className="text-corps-s text-ink-2">
-          {proposal.context}
-        </span>
+        {faits ? (
+          <span id={id("faits")} data-part="faits" className="text-corps-s text-ink-soft">
+            {faits}
+          </span>
+        ) : null}
+        {context ? (
+          <span id={id("contexte")} data-part="contexte" className="text-corps-s text-ink-2">
+            {context}
+          </span>
+        ) : null}
         {travel ? (
           <span data-part="trajet" className="flex flex-col text-corps-s text-ink-2">
             <span id={id("trajet")} className="font-semibold tabular-nums">
