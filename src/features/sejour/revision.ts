@@ -72,10 +72,10 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
   if (Array.isArray(a) !== Array.isArray(b)) return false;
-  const ka = Object.keys(a).filter((key) => (a as Record<string, unknown>)[key] !== undefined);
-  const kb = Object.keys(b).filter((key) => (b as Record<string, unknown>)[key] !== undefined);
-  if (ka.length !== kb.length) return false;
-  return ka.every((key) => deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
+  const ea = Object.entries(a).filter(([, value]) => value !== undefined);
+  const mb = new Map(Object.entries(b).filter(([, value]) => value !== undefined));
+  if (ea.length !== mb.size) return false;
+  return ea.every(([key, value]) => mb.has(key) && deepEqual(value, mb.get(key)));
 }
 
 /** Erreur d'abandon d'une demande, portée par `signal.reason` quand il en a une. */
