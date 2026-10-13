@@ -100,6 +100,8 @@ function EmailStep({ email, onEmailChange, onSent }: EmailStepProps) {
   const mounted = useRef(true);
 
   useEffect(() => {
+    // Remis à `true` à chaque montage : sous StrictMode, React monte, démonte puis remonte le composant.
+    mounted.current = true;
     // « Changer d'adresse » : retour à l'étape email, adresse conservée, focus sur le champ.
     if (email) inputRef.current?.focus();
     return () => {
@@ -197,12 +199,13 @@ function CodeStep({ email, minutes, onSignedIn, onChangeAddress }: CodeStepProps
   const mounted = useRef(true);
   const busy = useRef(false);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Remis à `true` à chaque montage : sous StrictMode, React monte, démonte puis remonte le composant.
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   async function verify(code: string) {
     if (busy.current) return;
@@ -288,7 +291,8 @@ function CodeStep({ email, minutes, onSignedIn, onChangeAddress }: CodeStepProps
           {error ? t.erreurs[error] : null}
         </p>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
+      {/* `-ml-2` compense le `px-2` des boutons `text` : le texte s'aligne sur la marge de la colonne. */}
+      <div className="-ml-2 flex flex-wrap gap-x-4 gap-y-2">
         <Button ref={resendRef} variant="text" size="sm" onClick={() => void resend()}>
           {t.code.renvoyer}
         </Button>

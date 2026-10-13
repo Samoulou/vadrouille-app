@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { headers } from "next/headers";
 
+import type { Session } from "@/contracts";
 import type { CheckoutOutcome, CheckoutStatusCode, Currency, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
 import { FIXED_SHARE_LINKS } from "@/mocks/edimbourg-partage";
@@ -108,7 +109,7 @@ export interface AuthStore {
   /** Clé : HMAC de l'adresse normalisée ; ordre d'insertion = ordre d'usage (la plus ancienne est retirée). */
   addresses: Map<string, AuthAddressRecord>;
   /** Session simulée de la portée (aucun cookie : 0017 § 3.5) ; une connexion vaut pour toute la portée. */
-  session: { sessionId: string; userId: string; organizationId: string } | null;
+  session: Session | null;
 }
 
 export interface SimulationScope {

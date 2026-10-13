@@ -143,7 +143,7 @@ function LodgingCity({ name, focusTitle, request, onChoose }: LodgingCityProps) 
       </h1>
       {status.kind === "loading" ? <Skeleton /> : null}
       {/* Attente puis « aucun quartier » : région présente dès l'affichage, texte visible (0018 § 17). */}
-      <p role="status" className={statusText ? "text-corps text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
+      <p role="status" className={statusText ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
         {statusText}
       </p>
       <div role="alert" className={status.kind === "failed" ? undefined : EMPTY_LIVE_REGION_CLASS}>
@@ -157,7 +157,7 @@ function LodgingCity({ name, focusTitle, request, onChoose }: LodgingCityProps) 
                 <Button variant="secondary" size="sm" onClick={retry}>
                   {t.reessayer}
                 </Button>
-                <Button variant="text" size="sm" onClick={withoutLodging}>
+                <Button variant="secondary" onClick={withoutLodging}>
                   {t.continuerSansLogement}
                 </Button>
               </div>

@@ -2,7 +2,6 @@
   "titreDocument": "Connexion",
   "titre": "Connexion",
   "titreCreation": "Connecte-toi pour recevoir tes propositions",
-  "retour": "Retour",
   "aide": "Pas de mot de passe : on t'envoie un code à 6 chiffres.",
   "simulee": "Connexion simulée : aucun email n'est envoyé et cette connexion est partagée avec toutes les personnes qui testent l'application. Ne saisis pas ta vraie adresse.",
   "email": {

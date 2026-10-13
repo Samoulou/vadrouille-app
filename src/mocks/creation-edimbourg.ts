@@ -26,7 +26,7 @@ const EDINBURGH_NAMES = new Set(["edimbourg", "edinburgh"]);
 export function isMockEdinburgh(city: string): boolean {
   const key = city
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
   return EDINBURGH_NAMES.has(key);

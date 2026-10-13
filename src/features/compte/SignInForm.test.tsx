@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -211,6 +212,48 @@ describe("SignInForm : étape code", () => {
     fireEvent.click(screen.getByRole("button", { name: t.code.changerAdresse }));
     expect(emailField()).toHaveValue(EMAIL);
     expect(emailField()).toHaveFocus();
+  });
+});
+
+describe("SignInForm : sous StrictMode (montage, démontage, remontage)", () => {
+  function renderStrict() {
+    return render(
+      <StrictMode>
+        <DraftProvider initial={initialDraft()}>
+          <SignInForm suite={LANCER} codeTtlMs={600_000} authMode="simulated" />
+        </DraftProvider>
+      </StrictMode>,
+    );
+  }
+
+  it("email puis code : le parcours va jusqu'à la redirection", async () => {
+    renderStrict();
+    await sendCode();
+    expect(requestCode).toHaveBeenCalledWith({ email: EMAIL });
+    expect(cells()).toHaveLength(6);
+    await typeCode("246810");
+    expect(verifyCode).toHaveBeenCalledWith({ email: EMAIL, code: "246810" });
+    expect(router.replace).toHaveBeenCalledWith(LANCER);
+  });
+
+  it("erreur à l'envoi : l'alerte s'affiche et le bouton redevient actif", async () => {
+    vi.mocked(requestCode).mockResolvedValue(fail("rate_limited"));
+    renderStrict();
+    await sendCode();
+    expect(screen.getByRole("alert")).toHaveTextContent(t.erreurs.rate_limited);
+    expect(screen.getByRole("button", { name: t.email.recevoir })).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("code faux puis renvoi : l'alerte s'affiche, puis « Nouveau code envoyé. »", async () => {
+    vi.mocked(verifyCode).mockResolvedValue(fail("invalid_code"));
+    renderStrict();
+    await sendCode();
+    await typeCode("135791");
+    expect(screen.getByRole("alert")).toHaveTextContent(t.erreurs.invalid_code);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.code.renvoyer }));
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(t.code.nouveauCode);
   });
 });
 
