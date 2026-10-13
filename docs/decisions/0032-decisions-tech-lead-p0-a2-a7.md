@@ -1,6 +1,6 @@
 # 0032 — Décisions du Tech Lead pour P0a1 et P0b1 : A2, A3, A4, A6 et A7
 
-Statut : décision déléguée, à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-12 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #174 (T19)
+Statut : décision déléguée, à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-12 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #174 (T19) · Amendée le 2026-10-13 (section « Amendements » : écarts acceptés en revue de P0a1, #179 et #180)
 
 Numérotation : 0029 est prise par la PR #165 (ticket #164 ; la décision 0030 cite le ticket), 0030 par la PR #149, 0031 par la PR #172 (vérifié le 2026-10-12 : chacune de ces PR ajoute le fichier correspondant). Aucune PR ouverte n'utilise 0032 (vérifié le 2026-10-12). 0032 est le prochain numéro libre.
 
@@ -291,6 +291,49 @@ L'e2e « prototype sans cache » charge deux fois la Journée et vérifie que le
 - Écart à la spécification déclaré : `node:module` dans `scripts/p0/enregistrer.mjs` (A3.4), sous revue Sécurité dans la PR de P0a1. Écart plus strict : clients simulés soumis à la liste d'autorisation (A3.2).
 - Les bornes de `plafonds.json` (A2) sont provisoires et non décisionnelles ; aucun plafond d'exécution réelle n'est fixé ici.
 - Variables nouvelles à documenter par P0b1 dans `docs/deploiement/variables-environnement.md` : `VADROUILLE_PROTOTYPE`, `VADROUILLE_PROTOTYPE_DIR`. P0a1 n'en ajoute aucune.
+
+## Amendements
+
+### Amendement du 2026-10-13 — écarts acceptés en revue de P0a1 (#179 et #180)
+Décision du **Tech Lead**, datée du **2026-10-13**, ticket #178. Elle consigne les écarts à cette décision et à la spécification P0 que la revue a acceptés pendant P0a1 : #179 (schéma et configuration, fusionnée au head `460a0b1`) et #180 (script en mode simulé, fusionnée au head `e1c9db6`). Les revues de #180 demandaient cet amendement en chore séparée (issuecomment-6124519111, mineur 7 de issuecomment-6127401145, mineur 8 de issuecomment-6130596687). Il ne change aucun code : il décrit ce qui est fusionné.
+
+Décision déléguée, à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») : définitive sans veto de Samuel dans les 2 jours qui suivent sa publication. Le délai ne repart pas pour le reste de 0032.
+
+Seules sources retenues : les revues consolidées et les décisions publiées sur #179 et #180 par Samoulou (routines du studio). Un point n'est consigné que si une revue l'a dit accepté ou confirmé corrigé.
+
+#### Écarts 1 à 8 de la description de #180
+Acceptés tous les huit par le Tech Lead dans la revue du head `5c92cbe` (issuecomment-6124519111). Numérotation de la section « Écarts avec la maquette » de la description de #180.
+
+1. **Garde « aucune sortie suivie » (amende A3.5).** Elle est un test Vitest, `tests/unit/p0/depot.test.ts` (`git ls-files prototype/sorties` vide, dossier ignoré par git), et non une étape de `ci.yml`. Le test tourne dans `pnpm test`, donc en CI. `.github/workflows/` n'est pas touché, et le libellé `owner-approved` (Q245) n'est pas requis. Une étape YAML, si elle est voulue un jour, passe par une PR à part avec `owner-approved` posé par Samuel.
+2. **Clé `terminus` dans la forme réduite** (`[{ jour, depart, arrivee }]`, introduite par #179 et listée dans ses écarts). Elle relie chaque jour aux `placeId` du logement de départ et d'arrivée, ce qu'aucun champ de `Trip` ne fait. Elle ne contient que des `placeId`.
+3. **`photoUrl` refusée dans une proposition réduite.** C'est plus strict que le contrat : le prototype ne recopie aucune photo Google.
+4. **`ageSourceMaxJours` dans `recherche.json`** (1 095 jours, entier borné, aucune chaîne libre ; ajout au tableau de A2). Il sert à pénaliser une source ancienne. Son déplacement vers `classement.json` est une exigence d'entrée de la spécification de #173 (mineur 8 de issuecomment-6124519111).
+5. **Test « clé Google en en-tête `X-Goog-Api-Key`, jamais dans l'URL » renvoyé à la spécification suivante.** P0a1 n'a aucun client Places réel. La partie « erreur de fournisseur contenant la clé, un `placeId` et une URL Places » est couverte. Ce renvoi figure dans les exigences d'entrée de #173 (mineur 6 de issuecomment-6127401145).
+6. **Avertissement `MODULE_TYPELESS_PACKAGE_JSON` sur `pnpm p0` (précise A3.4, « Faisabilité »).** `package.json` reste sans champ `type` : pas de `"type": "module"`, question tranchée par la même revue. Node détecte la syntaxe ES sans erreur, mais émet cet avertissement. Il n'est pas tu : A3.4 n'autorise que `--disable-warning=ExperimentalWarning`, et cette règle ne change pas. Le test du sous-processus (`tests/unit/p0/cli.test.ts`) le tolère explicitement.
+7. **Bornes du temps libre arrondies à 5 min**, et terminus de fin arrondi aux 5 min supérieures. Le programme ne recopie pas une durée de trajet à la minute près.
+8. **User-Agent fixe et neutre, `PrototypeRecherche/1.0`** (constante de `src/research/fetch-page.ts`). Le nom du produit ne vit que dans `src/config/site.ts` (test existant), que `src/research` ne peut pas importer (A3.2).
+
+#### Autres écarts acceptés en revue
+9. **`placeId` et `source` facultatifs dans `StopReduitSchema`**, comme dans le contrat `Stop`. Le schéma ne distingue pas seul une étape de lieu (terminus, temps libre, repas ouvert). La règle R1 est appliquée par le validateur du moteur (`src/domain/validation.ts`), livré par #180. Dans le même point, `urlSourceValide` (`src/prototype/programme-reduit.ts`) admet encore `https://localhost` et une IP littérale. La lecture des pages reste gardée par `fetch-page.ts` et `ip-guard.ts`, et `tests/unit/p0/copies.test.ts` vérifie que le lecteur n'est jamais plus permissif que la validation de source. Source : mineur 4 de la revue du head `8a3466e` de #179 (issuecomment-6132737831), « accepté » dans la revue du head `460a0b1` (issuecomment-6133126440).
+10. **Copies tenues égales par un test (amende A3.2, « Les types partagés […] ne sont définis qu'une fois »).** Trois définitions existent en plusieurs exemplaires, parce que les règles d'import de A3.2 interdisent de les partager :
+    - la validation d'URL de source : `src/prototype/programme-reduit.ts`, `src/domain/validation.ts` et `analyserUrl` de `src/research/fetch-page.ts` ;
+    - `PositionSchema` : `src/prototype/ancrage.ts` et `src/prototype/programme-reduit.ts` ;
+    - `MODES_ROUTES` (`src/grounding/interfaces.ts`) et `MODES_DEPLACEMENT` (`src/prototype/brief.ts`).
+
+    Le test à table `tests/unit/p0/copies.test.ts` les compare. Toute nouvelle copie de ce genre doit y entrer. Source : mineur 4 de issuecomment-6124519111 (head `5c92cbe`), correction confirmée dans la revue du head `e0074ab` (issuecomment-6127401145).
+11. **`tests/unit/p0/cli.test.ts` importe `node:net`** (et `node:http`, `node:https`, `node:tls`, `node:dns`), alors que la spécification réserve `node:net` à `ip-guard.ts`. Ces imports ne servent qu'à `vi.spyOn`, pour prouver qu'aucune connexion n'est ouverte. Le fichier est hors des dossiers contrôlés par `imports.test.ts`, et l'exemption est documentée en tête du fichier. Aucun fichier de production ne peut importer un fichier de test (point 12). Source : mineur 8 de issuecomment-6124519111, correction confirmée dans issuecomment-6127401145.
+12. **Règles plus strictes que A3.2 et A7.1**, ajoutées par les corrections de #180. Elles ne font que fermer.
+    - **`node:fs` et `node:fs/promises` sont réservés à `scripts/p0/fichiers.ts`.** Cela amende la ligne `scripts/p0/**/*.ts` du tableau de A3.2. Pour les autres fichiers de `scripts/p0/`, les modules externes permis sont `zod`, `node:path` et `node:util`. Source : point 4 de la décision du CEO avec le Tech Lead (issuecomment-6132707686), confirmé dans la revue du head `49837e5` (issuecomment-6132952347).
+    - **`process` est refusé partout**, alias compris. Seule exception : `scripts/p0/main.ts`, pour `process.argv`, `process.exitCode`, `process.stdout.write(…)` et `process.stderr.write(…)`, en accès littéral. A3.2 ne refusait que `process.env`. Sont aussi refusés partout : l'accès `x[expr]` non littéral, les noms calculés en déstructuration, le reste d'objet déstructuré et la réflexion sur les prototypes. Source : revue du head `2eecd59` (issuecomment-6130596687).
+    - **Clés calculées** : seulement chaîne, nombre, et `Symbol.iterator`, `Symbol.asyncIterator`, `Symbol.toStringTag`, `Symbol.hasInstance` ; tout identifiant `Symbol` lié est refusé. **Un fichier non test ne peut pas importer un fichier de test.** **Sélection des fichiers fermée** : dans les six dossiers contrôlés, seuls sont admis les `.ts`, `scripts/p0/enregistrer.mjs` et les JSON de données (hors `package.json`, `tsconfig*.json`, `jsconfig*.json`) ; tout autre fichier fait échouer le test. Source : points 1 à 3 de issuecomment-6132707686, confirmés dans issuecomment-6132952347.
+    - **Fichiers `*.test.ts` de `src/ai` et `src/research`** : ils refusent les modules réseau (`http`, `https`, `http2`, `tls`, `dgram`, `dns`, `child_process`, `worker_threads`, `undici`) et des constructions comme `fetch`, `getBuiltinModule`, `eval`, `Function` ou `import()`. A3.2 les excluait entièrement, hors règle `node:net`. Source : mineur 2 de issuecomment-6127401145, confirmé dans issuecomment-6130596687.
+    - **Plages refusées par `ip-guard.ts` en plus de celles de la spécification** (A7.1) : `2001::/23` (couvre Teredo), `2001:30::/28` (DRIP, RFC 9374), AS112 IPv4 (`192.31.196.0/24`, `192.52.193.0/24`, `192.175.48.0/24`) et AS112 IPv6 (`2620:4f:8000::/48`), un cas de test chacune. Source : mineur 7 de issuecomment-6124519111 et mineur 4 de issuecomment-6127401145, confirmés dans issuecomment-6127401145 et issuecomment-6130596687.
+
+#### Hors de cet amendement
+- Les points de la revue du head `49837e5` de #180 (2 bloquants tardifs, mineurs 3 à 7) : ticket #195, exigence d'entrée du code de P0r1 (issuecomment-6132967090). Ce ne sont pas des écarts acceptés.
+- Les mineurs 4 (régime des fichiers de test en liste d'autorisation) et 6 (`src/contracts` non contrôlé) de la revue du head `2eecd59` : renvoyés à P0c (#193) par issuecomment-6132707686.
+- Les 7 exigences d'entrée de la spécification de #173 (description de #180) : le Tech Lead vérifie leur reprise à la revue de cette spécification.
+- Les mineurs non bloquants restés ouverts sur #179 et #180 (commentaires, découpage d'un test, libellés de `src/domain/textes.ts`) : ce ne sont pas des écarts.
 
 ## Quand revoir cette décision
 - À la spécification suivante : A1, A5, élargissement de A3.2, conduite face au proxy des routines (A7.3), plafonds définitifs (bornes de A2 revues selon Q256, quota par méthode).

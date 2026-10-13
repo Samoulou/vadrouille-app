@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { DayLineItem, Stop } from "@/contracts";
 import fr from "@/i18n/fr.json";
@@ -7,7 +7,7 @@ import { messages } from "@/i18n";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { DayLine, segmentLabel } from "./DayLine";
+import { DayLine, segmentLabel, type DayLineProps, type DayLineViewItem, type DayLineViewStop } from "./DayLine";
 
 function stop(overrides: Partial<Stop> & Pick<Stop, "id" | "name" | "start">): Stop {
   return { kind: "activity", meta: "[Meta]", exceptions: [], locked: false, ...overrides };
@@ -247,6 +247,106 @@ describe("DayLine, ajouts de F5b (Q17)", () => {
 
   it("n'a aucune violation axe avec les ajouts", async () => {
     const { container } = render(<DayLine items={WITH_ADDITIONS} getStopHref={href} getIdeasHref={() => "/idees"} />);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+/** F10a (F10-TL-12, C19) : lecture seule, types réduits, ligne compacte de l'écran 15. Cas existants inchangés. */
+describe("DayLine en lecture seule (F10-TL-12)", () => {
+  const ROYAL = stop({ id: "r", name: "[Royal Mile]", start: "09:15", end: "10:30", meta: "[Old Town]" });
+  const DEAN = stop({ id: "d", name: "[Dean Village]", start: "10:50", end: "11:50", meta: "[Water of Leith]", reason: "[Raison]" });
+  const CAFE = stop({ id: "c", name: "[Café de Stockbridge]", start: "12:05", end: "13:15", meta: "[Stockbridge]", exceptions: ["toReserve"] });
+  const DAY: DayLineItem[] = [
+    { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+    { type: "stop", stop: ROYAL },
+    { type: "segment", segment: { mode: "walk", minutes: 20, estimated: false } },
+    { type: "stop", stop: DEAN },
+    { type: "stop", stop: CAFE },
+    { type: "free", from: "15:00", to: "18:30" },
+    { type: "terminus", role: "end", time: "20:45", label: "[Hôtel]" },
+  ];
+  const t = messages.ligne;
+  const row = (container: HTMLElement, name: string) =>
+    Array.from(container.querySelectorAll("li")).find((li) => li.textContent?.includes(name))!;
+
+  it("sans getStopHref : aucun lien dans l'<ol>, même nombre de lignes", () => {
+    render(<DayLine items={DAY} />);
+    const list = screen.getByRole("list");
+    expect(within(list).queryAllByRole("link")).toEqual([]);
+    expect(within(list).getAllByRole("listitem")).toHaveLength(DAY.length);
+  });
+
+  it("terminus sans libellé : « Début de journée » et « Fin de journée » ; étape sans id ni reason", () => {
+    const reduced: DayLineViewItem[] = [
+      { type: "terminus", role: "start", time: "09:00" },
+      { type: "stop", stop: { key: "1", name: "[Dean Village]", start: "10:50", meta: "[Meta]", exceptions: ["unconfirmed"] } },
+      { type: "stop", stop: { name: "[Sans clé]", start: "12:00", meta: "[Meta]", exceptions: [] } },
+      { type: "terminus", role: "end", time: "20:45" },
+    ];
+    render(<DayLine items={reduced} />);
+    const text = screen.getByRole("list").textContent ?? "";
+    expect(text).toContain(t.terminusSansLibelle.start);
+    expect(text).toContain(t.terminusSansLibelle.end);
+    expect(text).toContain("[Dean Village]");
+    expect(text).toContain("[Sans clé]");
+    expect(text).toContain(t.tag.unconfirmed);
+    expect(text).not.toContain("Départ de");
+  });
+
+  it("compact : ni meta ni raison, Tag gardée", () => {
+    render(<DayLine items={DAY} compact />);
+    const text = screen.getByRole("list").textContent ?? "";
+    expect(text).not.toContain("[Old Town]");
+    expect(text).not.toContain("[Raison]");
+    expect(text).toContain(t.tag.toReserve);
+  });
+
+  it("currentKey : un seul aria-current=\"step\", étiquette visible « En cours » ; isPast : « Terminée » visible dans le texte de la ligne", () => {
+    const { container } = render(<DayLine items={DAY} compact currentKey="d" isPast={(s) => s.id === "r"} />);
+    const current = container.querySelectorAll("[aria-current]");
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveAttribute("aria-current", "step");
+    expect(current[0]).toHaveTextContent("[Dean Village]");
+    expect(within(current[0] as HTMLElement).getByText(t.etape.enCours)).toBeVisible();
+    const past = row(container, "[Royal Mile]");
+    expect(within(past).getByText(t.etape.terminee)).toBeVisible();
+    expect(past.textContent).toContain(`[Royal Mile] ${t.etape.terminee}`);
+    const upcoming = row(container, "[Café de Stockbridge]");
+    expect(upcoming.textContent).not.toContain(t.etape.terminee);
+    expect(upcoming.textContent).not.toContain(t.etape.enCours);
+    // Ni terminus, ni segment, ni temps libre ne portent d'étiquette.
+    for (const li of container.querySelectorAll("li:not([data-type='stop'])")) {
+      expect(li.querySelector("[data-part='etat-etape']")).toBeNull();
+    }
+  });
+
+  it("étape passée : aucune Tag (le jaune quai ne signale qu'une action requise) ; sans isPast, Tag rendue", () => {
+    const { container, unmount } = render(<DayLine items={DAY} compact isPast={(s) => s.id === "c"} />);
+    const past = row(container, "[Café de Stockbridge]");
+    expect(past).toHaveAttribute("data-state", "past");
+    expect(within(past).getByText(t.etape.terminee)).toBeVisible();
+    expect(past.textContent).not.toContain(t.tag.toReserve);
+    unmount();
+    const { container: sans } = render(<DayLine items={DAY} compact />);
+    const cafe = row(sans, "[Café de Stockbridge]");
+    expect(cafe).not.toHaveAttribute("data-state");
+    expect(within(cafe).getByText(t.tag.toReserve)).toBeVisible();
+  });
+
+  it("sans les props de l'écran 15 : aucune étiquette, aucun aria-current", () => {
+    const { container } = render(<DayLine items={DAY} getStopHref={href} />);
+    expect(container.querySelector("[aria-current]")).toBeNull();
+    expect(container.querySelector("[data-part='etat-etape']")).toBeNull();
+  });
+
+  it("types : DayLineItem et les éléments réduits sont acceptés par DayLineProps.items", () => {
+    expectTypeOf<DayLineItem[]>().toExtend<DayLineProps["items"]>();
+    expectTypeOf<DayLineViewItem[]>().toExtend<DayLineProps<DayLineViewStop>["items"]>();
+    expectTypeOf<{ type: "terminus"; role: "start"; time: string }>().toExtend<DayLineViewItem>();
+  });
+
+  it("n'a aucune violation axe en lecture seule compacte", async () => {
+    const { container } = render(<DayLine items={DAY} compact currentKey="d" isPast={(s) => s.id === "r"} />);
     expect(await axeViolations(container)).toEqual([]);
   });
 });

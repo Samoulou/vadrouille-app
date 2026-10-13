@@ -82,6 +82,30 @@ describe("analytics: checklist_item_done (spécification F5, F5c)", () => {
   });
 });
 
+describe("analytics: today_opened (spécification F10, F10-PO-16, C18)", () => {
+  it("accepte { offline: false } et { offline: true } (propriété du contrat du handover § 12)", () => {
+    expect(AnalyticsEventSchema.safeParse({ name: "today_opened", properties: { offline: false } }).success).toBe(true);
+    expect(AnalyticsEventSchema.safeParse({ name: "today_opened", properties: { offline: true } }).success).toBe(true);
+  });
+
+  it.each([
+    ["tripId", "mock_trip_edimbourg"],
+    ["destination", "Édimbourg"],
+    ["name", "[Dean Village]"],
+    ["stopId", "j2-dean-village"],
+    ["placeId", "mock_place_dean_village"],
+    ["time", "10:40"],
+    ["day", 2],
+  ])("refuse la propriété %s", (key, value) => {
+    expect(AnalyticsEventSchema.safeParse({ name: "today_opened", properties: { offline: false, [key]: value } }).success).toBe(false);
+  });
+
+  it("refuse l'événement sans `offline` ou avec une valeur qui n'est pas un booléen", () => {
+    expect(AnalyticsEventSchema.safeParse({ name: "today_opened", properties: {} }).success).toBe(false);
+    expect(AnalyticsEventSchema.safeParse({ name: "today_opened", properties: { offline: "false" } }).success).toBe(false);
+  });
+});
+
 describe("analytics: enregistreurs", () => {
   afterEach(() => {
     vi.restoreAllMocks();

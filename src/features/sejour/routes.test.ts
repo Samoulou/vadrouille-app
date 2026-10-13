@@ -21,6 +21,12 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     expect(dev.mesVoyages()).toBe("/voyages");
   });
 
+  it("écran 15 (F10-TL-3, F10-PO-7) : `/voyages/{id}/aujourdhui` ; aucune adresse avec la base `/dev/voyages` (C16)", () => {
+    expect(routes.aujourdhui()).toBe("/voyages/mock_trip_edimbourg/aujourdhui");
+    expect(tripRoutes("/voyages", "a b/c").aujourdhui()).toBe("/voyages/a%20b%2Fc/aujourdhui");
+    expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").aujourdhui()).toBeNull();
+  });
+
   it("« Mes voyages » : une seule adresse, `/voyages` (décision 0021 § 6)", () => {
     expect(mesVoyagesRoute()).toBe("/voyages");
     expect(tripRoutes("/voyages", "a b").mesVoyages()).toBe(mesVoyagesRoute());

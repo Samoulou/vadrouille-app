@@ -15,3 +15,26 @@ export function devPagesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 export function isProductionDeployment(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.VADROUILLE_ENV === "production" || env.VERCEL_ENV === "production";
 }
+
+/**
+ * Liste blanche de l'adaptateur `prototype` (spécification P0, « Comportement de P0b » ; décision 0032 § A4.2),
+ * **stricte, sans normalisation** : vraie seulement si toutes les conditions suivantes le sont.
+ * 1. `isProductionDeployment(env)` est fausse : évaluée en premier, elle l'emporte toujours.
+ * 2. Ni `VADROUILLE_ENV` ni `VERCEL_ENV`, après `trim().toLowerCase()`, ne vaut `production`.
+ * 3. `VADROUILLE_ENV` est absente, ou vaut exactement `local` ou `ci`.
+ * 4. Et l'un des trois cas, comparé exactement :
+ *    - `VERCEL_ENV` vaut `preview` ou `development` ;
+ *    - `VERCEL_ENV` est absente et `NODE_ENV` vaut `development` ou `test` ;
+ *    - `VERCEL_ENV` est absente, `VADROUILLE_PROTOTYPE` vaut `1` et `CI` vaut exactement `true` (tests
+ *      Playwright sur le build de production, en CI seulement : `docs/deploiement/variables-environnement.md`).
+ * Toute autre combinaison ferme. Comme `isProductionDeployment`, cette garde ne lit que les variables reçues.
+ */
+export function prototypeAdapterAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isProductionDeployment(env)) return false;
+  const normalisee = (value: string | undefined) => value?.trim().toLowerCase();
+  if (normalisee(env.VADROUILLE_ENV) === "production" || normalisee(env.VERCEL_ENV) === "production") return false;
+  if (env.VADROUILLE_ENV !== undefined && env.VADROUILLE_ENV !== "local" && env.VADROUILLE_ENV !== "ci") return false;
+  if (env.VERCEL_ENV !== undefined) return env.VERCEL_ENV === "preview" || env.VERCEL_ENV === "development";
+  if (env.NODE_ENV === "development" || env.NODE_ENV === "test") return true;
+  return env.VADROUILLE_PROTOTYPE === "1" && env.CI === "true";
+}

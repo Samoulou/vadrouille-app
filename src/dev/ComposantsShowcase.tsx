@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 
 import {
+  ActionBanner,
   Button,
   ChecklistRow,
   Chip,
@@ -25,6 +26,7 @@ import {
   Tag,
   UndoToast,
   UndoToastRegion,
+  type DayLineViewItem,
   type StatusBannerKind,
   type TagKind,
 } from "@/components/ligne";
@@ -94,6 +96,27 @@ const DEMO_ADDITIONS: DayLineItem[] = [
       locked: true,
     },
   },
+];
+
+/** F10a (F10-TL-12) : ligne compacte de l'écran 15, en lecture seule, avec une étape terminée et une en cours. */
+const pd = ex.pendant;
+const DEMO_COMPACT: DayLineItem[] = [
+  DEMO_LINE[0]!,
+  DEMO_LINE[1]!,
+  DEMO_LINE[2]!,
+  { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
+  { type: "stop", stop: { ...DEMO_STOP_BASE, id: "demo-3", name: pd.arret3, start: "11:00", end: "12:30", meta: lx.arret2.meta } },
+  DEMO_LINE[3]!,
+  DEMO_LINE[4]!,
+];
+const isDemoPast = (stop: Stop) => stop.id === "demo-1";
+
+/** Éléments réduits de la vue partagée (F10-TL-12) : terminus sans libellé, étapes sans `id` ni raison. */
+const DEMO_REDUITE: DayLineViewItem[] = [
+  { type: "terminus", role: "start", time: "09:15" },
+  { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
+  { type: "stop", stop: { key: "1", name: lx.arret1.nom, start: "09:30", meta: lx.arret1.meta, exceptions: [] } },
+  { type: "terminus", role: "end", time: "22:30" },
 ];
 
 /** Cartes de présentation de démonstration (DeckCard/preview.html), sans src/mocks. */
@@ -455,6 +478,21 @@ export function ComposantsShowcase() {
         </State>
         <State label={t.etats.checklist}>
           <ChecklistDemo />
+        </State>
+      </Section>
+
+      <Section id="pendant" title={pd.titre}>
+        <State label={t.etats.bandeauAction}>
+          <ActionBanner title={pd.bandeauTitre} titleId="demo-a-reserver" headingLevel={3} className="w-full">
+            <p className="text-corps text-ink tabular-nums">{pd.bandeauLigne}</p>
+            <p className="text-corps-s text-ink">{pd.bandeauTexte}</p>
+          </ActionBanner>
+        </State>
+        <State label={t.etats.ligneCompacte}>
+          <DayLine items={DEMO_COMPACT} compact currentKey="demo-3" isPast={isDemoPast} className="w-full" />
+        </State>
+        <State label={t.etats.ligneReduite}>
+          <DayLine items={DEMO_REDUITE} className="w-full" />
         </State>
       </Section>
     </main>
