@@ -4,8 +4,10 @@ Rôle : `commercial` · Spécification : `specs/C1-prevente.md` (livrable 1) · 
 
 Statut : **proposition**. L'offre, le prix, les dates et les conditions sont réservés à Samuel (`docs/CONTEXT.md`, « Qui décide quoi »). Les valeurs entre crochets attendent sa réponse ; les questions sont dans la description de la PR.
 
+Numérotation : « question N » renvoie à la question Q-C1-N à Samuel de la description de la PR #256 ; une question du questionnaire en ligne est toujours dite « question N du questionnaire ».
+
 ## L'offre en une phrase
-Précommande aujourd'hui le **voyage complet** Vadrouille pour ton voyage de printemps : **29 CHF**, paiement unique, utilisable dès l'ouverture du produit, remboursé intégralement s'il n'est pas prêt à temps.
+Précommande aujourd'hui le **voyage complet** Vadrouille pour ton voyage de printemps : **29 CHF**, paiement unique, utilisable dès l'ouverture du produit, remboursé intégralement s'il n'est pas prêt à temps [sous réserve question 5].
 
 ## Ce que la personne achète
 Le « Voyage complet » du produit en libre-service (cadrage § 4, « Produit en libre-service ») :
@@ -26,7 +28,7 @@ Ce qui n'est **pas** inclus et ne doit jamais être promis : aucune aide humaine
 ## Prix
 - **29 CHF** par voyage, paiement unique, sans abonnement (Q2, tranchée par Samuel le 2026-10-08, « révisable » ; cadrage § 4 : pas d'abonnement grand public).
 - Moyens de paiement visés : TWINT ou carte (cadrage § 3.1, écran 9 ; § 4). Le paiement réel de l'application n'existe pas encore (Q26) : la manière d'encaisser une prévente est la question 2 de la PR.
-- Prix de lancement éventuel : **question à Samuel**. Recommandation : garder 29 CHF sans remise, pour que les préventes de G0 mesurent le prix réellement visé ; option alternative dans la fourchette déjà prévue au cadrage (19 CHF, D9 et § 4 « Prix à tester : 19, 29 et 39 CHF »).
+- Prix de lancement éventuel : **question 6 à Samuel**. Recommandation : garder 29 CHF sans remise, pour que les préventes de G0 mesurent le prix réellement visé ; option alternative dans la fourchette déjà prévue au cadrage (19 CHF, D9 et § 4 « Prix à tester : 19, 29 et 39 CHF »).
 
 ## Voyages visés
 Voyages de printemps 2027, qui se préparent surtout de janvier à mars (cadrage § 5, « Saisonnalité ») :
@@ -44,15 +46,15 @@ D3 n'est pas tranchée : « toutes possibles techniquement ; communication et me
 
 Proposition (à confirmer par Samuel) :
 - **Édimbourg** comme exemple principal : c'est le voyage de référence du benchmark (cadrage § 2), du prototype (`docs/roadmap.md`, G0) et des données de démonstration (`specs/D1-demo.md`).
-- La page dit « villes et régions d'Europe » sans liste fermée, et la question 3 du questionnaire (`questionnaire.md`) mesure les destinations demandées pour choisir les 2 ou 3 suivantes (D3).
+- La page dit « villes et régions d'Europe » sans liste fermée, et la question 1 du questionnaire (`questionnaire.md`) mesure les destinations demandées pour choisir les 2 ou 3 suivantes (D3).
 
 ## Date d'utilisation et livraison
 - Le voyage complet acheté en prévente est utilisable **à partir du [DATE D'OUVERTURE]**. Aucune date n'existe dans le dépôt : la phase 1 n'a pas d'échéance (`docs/roadmap.md` ; cadrage § 7).
-- Les préventes sont « livrées pendant la bêta » (cadrage § 4, « Pilote assisté », dernier paragraphe, toujours valable pour la prévente).
+- Les préventes sont « livrées pendant la bêta » (cadrage § 4, « Pilote assisté », dernier paragraphe). La section « Pilote assisté » est retirée par la décision 0043 § 4 (plus d'offre à vendre) ; seule cette phrase sur les préventes livrées pendant la bêta reste valable ici.
 - Recommandation (question 5) : fixer une date d'ouverture qui laisse au moins quelques semaines avant Pâques, puisque ces voyages se préparent de janvier à mars (cadrage § 5), et l'afficher sur la page.
 
 ## Remboursement si le produit n'est pas prêt
-Proposition de règle (question 5, relecture juridique éventuelle) :
+Proposition de règle, **non tranchée** [sous réserve question 5] (juridique réservé à Samuel ; relecture éventuelle) :
 - si le voyage complet n'est pas utilisable au [DATE D'OUVERTURE], remboursement intégral des 29 CHF, sans démarche autre qu'un clic ou une réponse au reçu ;
 - remboursement possible sur simple demande jusqu'à l'ouverture.
 
