@@ -64,9 +64,9 @@ test("mes-voyages: sections pendant et après", async ({ page }) => {
   await setClock(page, DATES.pendant);
   await openTrips(page);
   expect(await sectionTitles(page)).toEqual(["En cours", "À venir", "Pas encore débloqués", "Passés"]);
-  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}`);
+  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}/aujourdhui`);
   await expect(tripLink(page, "En cours", "Édimbourg")).toContainText("réservations à faire");
-  await expect(tripLink(page, "Pas encore débloqués", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED}/presentation`);
+  await expect(tripLink(page, "Pas encore débloqués", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED}/aujourdhui`); // Règle 1 de F11 : aux dates, R15 même non débloqué.
 
   await page.clock.setSystemTime(new Date(DATES.apres));
   await page.reload();
@@ -93,7 +93,7 @@ test.describe("date de la destination, appareil à Zurich (C8)", () => {
     await page.clock.setSystemTime(new Date("2026-08-29T01:30:00+02:00"));
     await page.reload();
     await openTrips(page);
-    await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}`);
+    await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}/aujourdhui`);
   });
 });
 
@@ -135,17 +135,23 @@ test("mes-voyages: réouverture", async ({ page }) => {
 });
 
 test("mes-voyages: réouverture aux dates du voyage", async ({ page }) => {
-  // Sans écran 15 dans `main` (F10a non fusionnée) : aux dates du voyage, le lien suit le dernier onglet (C11).
+  // Écran 15 dans `main` (F10a) : aux dates du voyage, le lien mène à `R15`, même après une visite de la
+  // Journée 3 (C11, règle 1 de F11-PO-5).
+  const aujourdhui = `/voyages/${ED_OK}/aujourdhui`;
   await setClock(page, DATES.pendant);
   await openTrips(page);
-  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}`);
+  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", aujourdhui);
+  // Navigation du routeur : `R15`, son « Retour » vers le Séjour, puis la Journée 3 (mémoire de l'onglet gardée).
   await tripLink(page, "En cours", "Édimbourg").click();
+  await expect(page).toHaveURL(aujourdhui);
+  await page.getByRole("link", { name: "Retour" }).click();
+  await expect(page).toHaveURL(`/voyages/${ED_OK}`);
   await sheet(page).getByRole("link", { name: "Jour 3, lun." }).click();
   await expect(page).toHaveURL(`/voyages/${ED_OK}/jour/3`);
-  await page.evaluate(() => window.history.go(-2));
+  await page.evaluate(() => window.history.go(-3));
   await expect(page).toHaveURL(R17);
-  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", `/voyages/${ED_OK}/jour/3`);
-  await expect(plate(page)).toHaveAttribute("href", `/voyages/${ED_OK}/jour/3`);
+  await expect(tripLink(page, "En cours", "Édimbourg")).toHaveAttribute("href", aujourdhui);
+  await expect(plate(page)).toHaveAttribute("href", aujourdhui);
 });
 
 test("mes-voyages: « Retour » du Séjour de chaque voyage mène à /voyages (200) ; R17 sans « Retour »", async ({ page }) => {

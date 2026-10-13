@@ -185,3 +185,42 @@ describe("SejourPanel : « Pendant ton séjour » et « Jour par jour »", () =>
     expect(await axeViolations(container)).toEqual([]);
   });
 });
+
+describe("SejourPanel : lien « Aujourd'hui · Jour {n} » (F10-PO-7, C16)", () => {
+  function renderAt(iso: string, base: "/voyages" | "/dev/voyages" = "/voyages") {
+    return render(
+      <TripShell trip={edimbourg} maps={[]} base={base}>
+        <SejourOriginProvider>
+          <SejourPanel recorder={recorder} now={() => Date.parse(iso)} />
+        </SejourOriginProvider>
+      </TripShell>,
+    );
+  }
+
+  it("aux dates du voyage, en tête du panneau, avant la plaque : lien vers l'écran 15", async () => {
+    const { container } = renderAt("2026-08-30T10:40:00+01:00");
+    const link = within(panel()).getByRole("link", { name: "Aujourd'hui · Jour 2" });
+    expect(link).toHaveAttribute("href", "/voyages/mock_trip_edimbourg/aujourdhui");
+    const plate = container.querySelector("[data-destination-plate]")!;
+    expect(link.compareDocumentPosition(plate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("date de la destination : 23:30 le 29.08 à Édimbourg est le jour 1", () => {
+    renderAt("2026-08-30T00:30:00+02:00");
+    expect(within(panel()).getByRole("link", { name: "Aujourd'hui · Jour 1" })).toBeInTheDocument();
+  });
+
+  it.each(["2026-08-01T12:00:00+01:00", "2026-08-28T23:30:00+01:00", "2026-09-04T00:30:00+01:00"])(
+    "hors des dates (%s) : pas de lien",
+    (iso) => {
+      renderAt(iso);
+      expect(within(panel()).queryByRole("link", { name: /^Aujourd'hui/ })).toBeNull();
+    },
+  );
+
+  it("base /dev/voyages : pas de lien (pas de page R15 de développement)", () => {
+    renderAt("2026-08-30T10:40:00+01:00", "/dev/voyages");
+    expect(within(panel()).queryByRole("link", { name: /^Aujourd'hui/ })).toBeNull();
+  });
+});
