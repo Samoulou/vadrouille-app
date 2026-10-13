@@ -2,7 +2,10 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { TRIP, sheet } from "./sejour-helpers";
 
-/** Aides des specs de F7a (écran 14 « Remplacer une étape »), en 390 × 844. */
+/**
+ * Aides des specs de F7a (écran 14 « Remplacer une étape »), en 390 × 844, partagées par les specs e2e, a11y et
+ * visuelles (références `revision-*.png` produites par la CI, décision 0004).
+ */
 
 export const DEAN = "j2-dean-village";
 export const PROPOSAL = "[Dégustation dans une épicerie fine de Stockbridge]";
