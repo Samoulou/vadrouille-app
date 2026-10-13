@@ -25,7 +25,8 @@ test("présentation : première carte", async ({ page }) => {
 test("présentation : carte repas et toast", async ({ page }) => {
   await openDeck(page);
   await press(page, "J'aime");
-  await expect(card(page)).toContainText("option 1 sur 2");
+  // Dîner du J1 : une seule case par créneau dans l'aperçu (B2-PO-9), sans « option 1 sur 2 ».
+  await expect(page.getByRole("button", { name: "Je choisis", exact: true })).toBeVisible();
   await expect(toast(page)).toBeVisible();
   // Le focus reste sur le bouton : on le retire pour une capture stable.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

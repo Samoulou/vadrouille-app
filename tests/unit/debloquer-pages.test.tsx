@@ -17,7 +17,7 @@ import { startCheckout, simulateCheckoutOutcome } from "@/server/actions/paiemen
 const scopeName = vi.hoisted(() => ({ value: "pages-1" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-vadrouille-simulation": scopeName.value }) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle" }));
+const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle", userId: "user_test", role: "owner" as const }));
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
   return { ...actual, getRequestContext: () => ({ ...contextMock }) };
@@ -108,7 +108,7 @@ describe("paramètre paiement sur R9 (F9-PO-20)", () => {
 
   describe("loadUnlockPage : autre voyage, autre organisation, réussi, expiré", () => {
     const OFFER: OfferConfig = { amount: 2900, currency: "CHF", priceVariant: "chf_29", methods: ["twint", "card"], includes: [], accessDaysAfterReturn: 30 };
-    const ctx = { organizationId: MOCK_ORGANIZATION_ID };
+    const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
     const other = { ...edimbourg, id: "mock_trip_autre" };
     const otherOrg = { ...edimbourg, id: "mock_trip_autre_org", organizationId: "mock_org_autre" };
     let t = 0;
@@ -137,7 +137,7 @@ describe("paramètre paiement sur R9 (F9-PO-20)", () => {
     });
 
     it("paiement d'une autre organisation : ignoré", async () => {
-      const otherCtx = { organizationId: "mock_org_autre" };
+      const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
       const start = await payment.createCheckout(otherCtx, { tripId: otherOrg.id, method: "card" });
       if (!start.ok) throw new Error();
       await payment.simulateOutcome(otherCtx, start.value.checkoutId, "declined");

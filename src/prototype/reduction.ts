@@ -1,4 +1,5 @@
 import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
+import { requireWeekday } from "@/contracts/values";
 import type { Position } from "@/prototype/ancrage";
 import {
   PROGRAMME_REDUIT_SCHEMA,
@@ -67,6 +68,7 @@ function jour(valeur: Day): JourReduit {
   const { items, events, surprise } = valeur;
   return {
     ...sans(valeur, "travelMinutes", "items", "events", "surprise"),
+    weekday: requireWeekday(valeur.date), // seul calcul partagé (`Day` ne porte plus `weekday`, B2 E1)
     items: items.map(ligne),
     events: events.map(etape),
     ...(surprise === undefined ? {} : { surprise: idee(surprise) }),
@@ -76,7 +78,7 @@ function jour(valeur: Day): JourReduit {
 function proposition(valeur: Proposal, justification: string): PropositionReduite {
   const { travelFromPrevious, stop } = valeur;
   return {
-    ...sans(valeur, "travelFromPrevious", "photoUrl", "detour", "stop"),
+    ...sans(valeur, "travelFromPrevious", "photoUrl", "detour", "stop", "neighbours"),
     stop: etape(stop),
     ...(travelFromPrevious === undefined ? {} : { travelFromPrevious: segment(travelFromPrevious) }),
     detour: justification,

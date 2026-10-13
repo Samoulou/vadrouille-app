@@ -1,6 +1,8 @@
 import { useId } from "react";
 
-import { messages } from "@/i18n";
+import type { ChecklistMoment } from "@/contracts";
+import { format, messages } from "@/i18n";
+import { formatDateCourte } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 import { IconCoche } from "./icons";
@@ -10,8 +12,8 @@ const t = messages.ligne.checklist;
 export interface ChecklistRowProps {
   /** Nom de la réservation ; c'est aussi le nom accessible de la case. */
   label: string;
-  /** Moment, affiché tel quel (« J2, 15:00, 2 personnes »). */
-  when: string;
+  /** Moment (évolution E4 de B2), dont la ligne compose le libellé (`formatChecklistMoment`). */
+  when: ChecklistMoment;
   done: boolean;
   /** Lien de réservation ; sans lien, pas de « Réserver ». */
   bookingUrl?: string;
@@ -20,6 +22,21 @@ export interface ChecklistRowProps {
   /** Nouvel état demandé par la case. */
   onToggle: (done: boolean) => void;
   className?: string;
+}
+
+/**
+ * Libellé d'un moment (évolution E4 de B2, libellés provisoires B2-PO-10) : « Avant le sam. 22.08 » pour une date
+ * limite, « Avant le départ », « À l'arrivée » pour le J1, « J{n} » pour un autre jour.
+ */
+export function formatChecklistMoment(moment: ChecklistMoment): string {
+  switch (moment.type) {
+    case "deadline":
+      return format(t.moment.deadline, { date: formatDateCourte(moment.date) });
+    case "beforeDeparture":
+      return t.moment.beforeDeparture;
+    case "tripDay":
+      return moment.day === 1 ? t.moment.arrivee : format(t.moment.jour, { n: moment.day });
+  }
 }
 
 /**
@@ -73,7 +90,7 @@ export function ChecklistRow({ label, when, done, bookingUrl, sponsored, onToggl
         <span id={labelId} className={cn("text-corps", done ? "font-semibold line-through" : "font-bold")}>
           {label}
         </span>
-        <span className="text-legende text-ink-soft tabular-nums">{when}</span>
+        <span className="text-legende text-ink-soft tabular-nums">{formatChecklistMoment(when)}</span>
       </div>
       {link ? (
         <span className="flex shrink-0 items-center gap-1">

@@ -11,6 +11,7 @@ import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
 import { messages } from "@/i18n";
+import { formatFaits } from "@/lib/faits";
 
 import { PLACES_FROM_GOOGLE } from "./constants";
 import { ficheMoment, type FicheTarget } from "./fiche";
@@ -65,6 +66,7 @@ export function StopSheet({
 
   const path = inProgramme ? pathTo(day.items, stop.id) : null;
   const titleId = `fiche-${stop.id}`;
+  const faits = formatFaits(stop.facts);
 
   return (
     <div data-part="fiche" data-stop-id={stop.id} onKeyDown={onKeyDown} className="flex flex-col gap-4 px-5 pt-2 pb-8">
@@ -90,9 +92,11 @@ export function StopSheet({
         <p data-part="moment" className="text-corps font-bold text-ink-2 tabular-nums">
           {ficheMoment(day, stop)}
         </p>
-        <p data-part="meta" className="text-corps-s text-ink-soft">
-          {stop.meta}
-        </p>
+        {faits ? (
+          <p data-part="faits" className="text-corps-s text-ink-soft">
+            {faits}
+          </p>
+        ) : null}
         {stop.exceptions.length > 0 ? (
           <span className="mt-1 flex flex-wrap gap-2">
             {stop.exceptions.map((exception) => (

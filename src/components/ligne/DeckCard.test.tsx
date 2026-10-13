@@ -14,9 +14,12 @@ const diner1 = byId("prop-j1-diner-1");
 const deanVillage = byId("prop-j2-dean-village");
 const distillerie = byId("prop-j5-distillerie");
 
-function renderCard(proposal: Proposal, isLastOption = false) {
+/** Contexte composé par l'écran (B2, E2) : la carte l'affiche tel quel. */
+const CONTEXTE = "Entre ton déjeuner et ton temps libre";
+
+function renderCard(proposal: Proposal, isLastOption = false, context: string | null = CONTEXTE) {
   const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
-  const view = render(<DeckCard proposal={proposal} isLastOption={isLastOption} {...handlers} />);
+  const view = render(<DeckCard proposal={proposal} context={context} isLastOption={isLastOption} {...handlers} />);
   const card = screen.getByRole("button", { name: `Voir le détail de ${proposal.stop.name}` });
   return { ...view, ...handlers, card };
 }
@@ -27,8 +30,8 @@ describe("DeckCard", () => {
     expect(within(card).getByText("J1")).toBeInTheDocument();
     expect(within(card).getByText("vers 14:00")).toBeInTheDocument();
     expect(within(card).getByText(chateau.stop.name)).toBeInTheDocument();
-    expect(within(card).getByText(chateau.stop.meta)).toBeInTheDocument();
-    expect(within(card).getByText(chateau.context)).toBeInTheDocument();
+    expect(within(card).getByText("[Old Town], 2 h")).toBeInTheDocument();
+    expect(within(card).getByText(CONTEXTE)).toBeInTheDocument();
     expect(within(card).getByText(chateau.stop.reason!)).toBeInTheDocument();
     expect(within(card).getByText("À réserver")).toBeInTheDocument();
   });
@@ -70,9 +73,17 @@ describe("DeckCard", () => {
       .split(" ")
       .map((id) => document.getElementById(id)?.textContent)
       .join(" ");
-    for (const part of ["J5", "vers 13:30", distillerie.stop.meta, distillerie.context, "Bus, environ 50 min (estimation)", distillerie.detour!, distillerie.stop.reason!, "À confirmer"]) {
+    for (const part of ["J5", "vers 13:30", "[East Lothian], 1 h 30", CONTEXTE, "Bus, environ 50 min (estimation)", distillerie.detour!, distillerie.stop.reason!, "À confirmer"]) {
       expect(description).toContain(part);
     }
+  });
+
+  it("sans contexte ni faits : aucune ligne vide, rien dans la description", () => {
+    const sansFaits = { ...chateau, stop: { ...chateau.stop, facts: {} } };
+    const { card, container } = renderCard(sansFaits, false, null);
+    expect(container.querySelector('[data-part="contexte"]')).toBeNull();
+    expect(container.querySelector('[data-part="faits"]')).toBeNull();
+    for (const id of card.getAttribute("aria-describedby")!.split(" ")) expect(document.getElementById(id)).not.toBeNull();
   });
 
   it("toucher, Entrée ou Espace ouvre le détail (bouton natif)", () => {

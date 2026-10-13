@@ -48,7 +48,7 @@ describe("fiche: fonctions pures", () => {
 });
 
 describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
-  it("Dean Village : titre de niveau 1, moment, meta, « Pour y aller », raison en texte simple sans ReasonBlock, actions", () => {
+  it("Dean Village : titre de niveau 1, moment, faits, « Pour y aller », raison en texte simple sans ReasonBlock, actions", () => {
     const { container } = renderFiche(2, "j2-dean-village");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     const title = screen.getByRole("heading", { level: 1 });
@@ -56,7 +56,7 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
     expect(title).toHaveAttribute("tabindex", "-1");
     expect(title).toHaveFocus();
     expect(container.querySelector("[data-part='moment']")).toHaveTextContent("J2 · Dimanche 30 août · 10:50 – 11:50");
-    expect(container.querySelector("[data-part='meta']")).toHaveTextContent("[Water of Leith, 1 h, gratuit]");
+    expect(container.querySelector("[data-part='faits']")).toHaveTextContent("[Water of Leith], 1 h, gratuit");
     const path = screen.getByRole("region", { name: "Pour y aller" });
     expect(path).toHaveTextContent("À pied, 20 min depuis [Royal Mile]");
     expect(container.querySelector("[data-part='raison']")).toBeNull();
