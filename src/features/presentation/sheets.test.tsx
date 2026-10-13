@@ -75,11 +75,11 @@ describe("ProposalDetailSheet", () => {
 
   it("lecture seule : nom, moment, métadonnées, justification, source, date de vérification, « Fermer »", () => {
     const onClose = vi.fn();
-    render(<ProposalDetailSheet proposal={distillerie} onClose={onClose} onReturnFocus={() => {}} />);
+    render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={onClose} onReturnFocus={() => {}} />);
     const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
     expect(document.activeElement).toBe(within(dialog).getByRole("heading"));
     expect(dialog).toHaveTextContent("Jour 5, mer., vers 13:30");
-    expect(dialog).toHaveTextContent(distillerie.stop.meta);
+    expect(dialog).toHaveTextContent("[East Lothian], 1 h 30");
     expect(dialog).toHaveTextContent(distillerie.stop.reason!);
     // Lien de source ouvert hors de l'application, sans accès à la page d'origine (spécification P0, P0b1).
     const source = within(dialog).getByRole("link", { name: "[Site de la distillerie]" });
@@ -97,15 +97,15 @@ describe("ProposalDetailSheet", () => {
   });
 
   it("adaptateur prototype : mention « Données de lieux : Google » dans la feuille (écran 6)", () => {
-    render(<ProposalDetailSheet proposal={distillerie} onClose={() => {}} onReturnFocus={() => {}} placesFromGoogle />);
+    render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} placesFromGoogle />);
     const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
     expect(within(dialog).getByText("Données de lieux : Google")).toHaveAttribute("data-part", "attribution");
   });
 
   it("fermé sans proposition ; aucune violation axe", async () => {
-    const { rerender } = render(<ProposalDetailSheet proposal={null} onClose={() => {}} onReturnFocus={() => {}} />);
+    const { rerender } = render(<ProposalDetailSheet proposal={null} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<ProposalDetailSheet proposal={distillerie} onClose={() => {}} onReturnFocus={() => {}} />);
+    rerender(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
     expect(await axeViolations(document.body)).toEqual([]);
   });
 });

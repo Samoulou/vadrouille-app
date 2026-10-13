@@ -159,7 +159,7 @@ describe("/dev/etats (catalogue des états)", () => {
     const banners: [string, string, string][] = [
       [s.offline, "offline", messages.dev.composants.exemples.bandeaux.offline],
       [s.conflict, "conflict", messages.dev.composants.exemples.bandeaux.conflict],
-      [s.noOption, "noOption", messages.dev.composants.exemples.bandeaux.noOption],
+      [s.noOption, "noOption", "Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit."],
       [s.error, "error", "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé."],
       [s.generating, "generating", "Jour 3 en préparation"],
       [s.travel, "travel", "2 h 40 de trajet ce jour, au-delà des 2 h 30 prévues pour ton rythme."],
@@ -169,8 +169,8 @@ describe("/dev/etats (catalogue des états)", () => {
       expect(banner, kind).not.toBeNull();
       expect(banner).toHaveTextContent(text);
     }
-    expect(screen.getAllByText(t.catalogue.exemple)).toHaveLength(3);
-    for (const title of [s.offline, s.conflict, s.noOption]) {
+    expect(screen.getAllByText(t.catalogue.exemple)).toHaveLength(2);
+    for (const title of [s.offline, s.conflict]) {
       expect(within(section(title)).getByText(t.catalogue.exemple)).toBeInTheDocument();
     }
 

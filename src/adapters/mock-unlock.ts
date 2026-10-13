@@ -91,6 +91,10 @@ export function withSimulatedUnlock(
       if (view.kind !== "counterpart") return base.listProposals(ctx, tripId);
       return ProposalSchema.array().parse(await base.listProposals(ctx, view.sourceId));
     },
+    /** L'aperçu ne sert qu'un voyage non débloqué : il est lu tel quel dans l'adaptateur de base. */
+    async listPreviewSlots(ctx, tripId) {
+      return base.listPreviewSlots(ctx, tripId);
+    },
     async getDayMap(ctx, tripId, index) {
       const view = await resolve(ctx, tripId);
       return dayMap(ctx, tripId, index, view);

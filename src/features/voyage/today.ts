@@ -68,7 +68,7 @@ export function deviceTimeDiffers(now: number, timeZone: string, deviceTimeZone:
 // --- Données de l'écran 15 ----------------------------------------------------------------------------
 
 /** Étape telle que l'écran 15 la reçoit : ni raison, ni source, ni date de vérification, ni verrou. */
-export type TodayStop = Pick<Stop, "id" | "kind" | "name" | "start" | "end" | "meta" | "exceptions" | "placeId">;
+export type TodayStop = Pick<Stop, "id" | "kind" | "name" | "start" | "end" | "facts" | "exceptions" | "placeId">;
 
 /** Élément de la ligne du jour reçu par l'écran 15. */
 export type TodayItem =
@@ -80,8 +80,8 @@ export type TodayItem =
 
 export interface TodayDay {
   index: number;
+  /** Le titre (« Samedi 29 août ») est calculé par l'écran depuis cette date (évolution E1 de B2). */
   date: IsoDate;
-  title: string;
   generating: boolean;
   items: TodayItem[];
 }
@@ -111,8 +111,8 @@ function projectTodayItem(item: DayLineItem): TodayItem {
     case "openMeal":
       return { type: "openMeal", time: item.time, meal: item.meal };
     case "stop": {
-      const { id, kind, name, start, end, meta, exceptions, placeId } = item.stop;
-      const stop: TodayStop = { id, kind, name, start, meta, exceptions: [...exceptions] };
+      const { id, kind, name, start, end, facts, exceptions, placeId } = item.stop;
+      const stop: TodayStop = { id, kind, name, start, facts: { ...facts }, exceptions: [...exceptions] };
       if (end !== undefined) stop.end = end;
       if (placeId !== undefined) stop.placeId = placeId;
       return { type: "stop", stop };
@@ -133,7 +133,6 @@ export function projectTodayTrip(trip: Pick<Trip, "id" | "destination" | "timeZo
     days: trip.days.map((day) => ({
       index: day.index,
       date: day.date,
-      title: day.title,
       generating: day.generating,
       items: day.items.map(projectTodayItem),
     })),

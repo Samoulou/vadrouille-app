@@ -3,11 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { ChecklistRow } from "./ChecklistRow";
+import type { ChecklistMoment } from "@/contracts";
+
+import { ChecklistRow, formatChecklistMoment } from "./ChecklistRow";
 
 const base = {
   label: "[Château d'Édimbourg]",
-  when: "[Une semaine avant]",
+  when: { type: "deadline", date: "2026-08-22" } as ChecklistMoment,
   bookingUrl: "https://example.org/mock/chateau",
   sponsored: false,
 };
@@ -18,7 +20,7 @@ describe("ChecklistRow", () => {
     const box = screen.getByRole("button", { name: "[Château d'Édimbourg]" });
     expect(box).toHaveAttribute("aria-pressed", "false");
     expect(box).toHaveClass("size-(--touch-target)");
-    expect(screen.getByText("[Une semaine avant]")).toHaveClass("text-legende", "text-ink-soft", "tabular-nums");
+    expect(screen.getByText("Avant le sam. 22.08")).toHaveClass("text-legende", "text-ink-soft", "tabular-nums");
     const link = screen.getByRole("link", { name: "Réserver" });
     expect(link).toHaveAttribute("href", base.bookingUrl);
     expect(link).toHaveAttribute("target", "_blank");
@@ -75,6 +77,24 @@ describe("ChecklistRow", () => {
     expect(link).toHaveAccessibleDescription("[Château d'Édimbourg] Lien rémunéré");
     rerender(<ChecklistRow {...base} sponsored done onToggle={() => {}} />);
     expect(screen.queryByText("Lien rémunéré")).not.toBeInTheDocument();
+  });
+
+  it("interface: moment d'une réservation composé depuis ChecklistMoment", () => {
+    expect(formatChecklistMoment({ type: "deadline", date: "2026-08-22" })).toBe("Avant le sam. 22.08");
+    expect(formatChecklistMoment({ type: "beforeDeparture" })).toBe("Avant le départ");
+    expect(formatChecklistMoment({ type: "tripDay", day: 1 })).toBe("À l'arrivée");
+    expect(formatChecklistMoment({ type: "tripDay", day: 3 })).toBe("J3");
+    const moments: ChecklistMoment[] = [
+      { type: "deadline", date: "2026-08-22" },
+      { type: "beforeDeparture" },
+      { type: "tripDay", day: 1 },
+      { type: "tripDay", day: 3 },
+    ];
+    for (const when of moments) {
+      const { unmount } = render(<ChecklistRow {...base} when={when} done={false} onToggle={() => {}} />);
+      expect(screen.getByText(formatChecklistMoment(when))).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("axe sans violation, à faire, faite et rémunérée", async () => {

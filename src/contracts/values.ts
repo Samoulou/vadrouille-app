@@ -34,8 +34,32 @@ export function countToReserve(checklist: readonly { done: boolean }[]): number 
   return checklist.filter((item) => !item.done).length;
 }
 
+/** Jours de la semaine abrégés, du lundi au dimanche (handover § 9). Source de `WeekdaySchema`. */
+export const WEEKDAYS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."] as const;
+
+/**
+ * Jour de la semaine abrégé d'une date ISO « AAAA-MM-JJ » (« 2026-08-29 » → « sam. »), calculé en UTC, sans fuseau
+ * horaire (évolution E1 de B2 : `Day` ne porte plus `weekday`). `null` si la date est illisible : chaque appelant
+ * choisit sa dégradation. Seul calcul de la règle, pour le moteur, la forme réduite du prototype et l'interface.
+ */
+export function weekdayOf(date: string): (typeof WEEKDAYS)[number] | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const rang = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return Number.isNaN(rang) ? null : (WEEKDAYS.at((rang + 6) % 7) ?? null);
+}
+
+/** `weekdayOf` pour une date déjà validée (moteur, forme réduite) : une date illisible est une erreur de programmation. */
+export function requireWeekday(date: string): (typeof WEEKDAYS)[number] {
+  const jour = weekdayOf(date);
+  if (jour === null) throw new RangeError(`date illisible : ${date}`);
+  return jour;
+}
+
 /** Au-delà de ce trajet, une proposition doit justifier son détour (cadrage § 3.7). */
 export const DETOUR_THRESHOLD_MINUTES = 20;
+
+/** Cases de l'aperçu au plus (évolution E5, `PreviewSlotsSchema`) : les 8 propositions offertes (cadrage § 4). */
+export const MAX_PREVIEW_SLOTS = 8;
 
 /** Clé unique d'une référence de point de carte : « stop:<id> » ou « terminus:<role> ». */
 export function mapPointKey(ref: MapPointRef): string {
@@ -100,6 +124,8 @@ export const API_ERROR_CODES = [
   "provider_error",
   "rate_limited",
   "cost_cap_reached",
+  // B2 (évolution E10, B2-PO-8) : version de base dépassée ; `ApiError.currentVersion` porte la version courante.
+  "version_conflict",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

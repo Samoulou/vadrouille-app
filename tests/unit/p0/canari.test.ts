@@ -109,11 +109,10 @@ describe("p0: canari, le programme ne contient que le placeId comme donnée Goog
     }
   });
 
-  it("Day.title, Proposal.context et detour ne contiennent ni sentinelle, ni placeId, ni durée", () => {
-    const textes = [
-      ...programme.trip.days.map((day) => day.title),
-      ...programme.proposals.flatMap((proposition) => [proposition.context, proposition.detour]),
-    ];
+  // B2 (E1, E2) : `Day.title` et `Proposal.context` ne sont plus des champs ; titre et contexte sont calculés par
+  // l'interface. Reste `detour`, seul texte de ce test encore écrit dans le programme.
+  it("detour ne contient ni sentinelle, ni placeId, ni durée", () => {
+    const textes = programme.proposals.map((proposition) => proposition.detour);
     expect(programme.proposals.length).toBeGreaterThan(0);
     for (const texte of textes) {
       expect(texte).not.toContain("SENTINELLE");

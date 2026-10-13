@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateCourte, formatDateLongue, formatTripDates, formatVoyageurs } from "./dates";
+import { formatDateCourte, formatDateLongue, formatTitreJour, formatTripDates, formatVoyageurs } from "./dates";
 
 describe("formatDateLongue", () => {
   it("écrit la date en toutes lettres", () => {
     expect(formatDateLongue("2026-08-15")).toBe("15 août 2026");
-    expect(formatDateLongue("2026-09-01")).toBe("1 septembre 2026");
+    // « 1er » pour le premier du mois (B2-PO-12).
+    expect(formatDateLongue("2026-09-01")).toBe("1er septembre 2026");
+    expect(formatDateLongue("2026-09-02")).toBe("2 septembre 2026");
   });
 
   it("rend la valeur telle quelle si elle n'est pas une date ISO", () => {
     expect(formatDateLongue("inconnue")).toBe("inconnue");
+  });
+});
+
+describe("formatTitreJour (B2, E1)", () => {
+  it("titre de la Journée calculé depuis la date, « 1er » pour le premier", () => {
+    expect(formatTitreJour("2026-08-29")).toBe("Samedi 29 août");
+    expect(formatTitreJour("2026-09-01")).toBe("Mardi 1er septembre");
+    expect(formatTitreJour("2026-08-30")).toBe("Dimanche 30 août");
+    expect(formatTitreJour("inconnue")).toBe("inconnue");
   });
 });
 

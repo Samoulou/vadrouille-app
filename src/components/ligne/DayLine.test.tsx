@@ -10,17 +10,17 @@ import { axeViolations } from "../../../tests/unit/axe";
 import { DayLine, segmentLabel, type DayLineProps, type DayLineViewItem, type DayLineViewStop } from "./DayLine";
 
 function stop(overrides: Partial<Stop> & Pick<Stop, "id" | "name" | "start">): Stop {
-  return { kind: "activity", meta: "[Meta]", exceptions: [], locked: false, ...overrides };
+  return { kind: "activity", facts: {}, exceptions: [], locked: false, ...overrides };
 }
 
 const CALTON = stop({
   id: "s1",
   name: "[Calton Hill]",
   start: "09:30",
-  meta: "[Balade, 45 min, gratuit]",
+  facts: { area: "[New Town]", durationMinutes: 45, costPerPerson: 0 },
   reason: "[La ville entière vue d'en haut]",
 });
-const DISTILLERIE = stop({ id: "s2", name: "[Distillerie]", start: "15:00", meta: "[Visite]", exceptions: ["toReserve", "toConfirm"] });
+const DISTILLERIE = stop({ id: "s2", name: "[Distillerie]", start: "15:00", facts: {}, exceptions: ["toReserve", "toConfirm"] });
 
 const ITEMS: DayLineItem[] = [
   { type: "terminus", role: "start", time: "09:15", label: "[Hôtel]" },
@@ -90,16 +90,17 @@ describe("DayLine", () => {
     expect(link).toHaveClass("min-h-(--touch-target)");
   });
 
-  it("arrêt : meta, reason seulement s'il existe, une Tag par exception", () => {
+  it("arrêt : faits, reason seulement s'il existe, une Tag par exception", () => {
     renderLine();
     const calton = screen.getByRole("link", { name: /Calton/ });
-    expect(calton).toHaveTextContent(CALTON.meta);
+    expect(calton).toHaveTextContent("[New Town], 45 min, gratuit");
     expect(calton).toHaveTextContent(CALTON.reason!);
     expect(within(calton).queryByText(messages.ligne.tag.toReserve)).toBeNull();
     expect(calton.querySelectorAll("[data-kind]")).toHaveLength(0);
 
     const distillerie = screen.getByRole("link", { name: /Distillerie/ });
-    expect(distillerie).toHaveTextContent(DISTILLERIE.meta);
+    // Étape sans faits (`facts: {}`) : aucune ligne de faits.
+    expect(distillerie.querySelector('[data-part="faits"]')).toBeNull();
     expect(distillerie.querySelectorAll("[data-kind]")).toHaveLength(2);
     expect(within(distillerie).getByText(messages.ligne.tag.toReserve)).toBeInTheDocument();
     expect(within(distillerie).getByText(messages.ligne.tag.toConfirm)).toBeInTheDocument();
@@ -176,7 +177,7 @@ describe("DayLine", () => {
 });
 
 describe("DayLine, ajouts de F5b (Q17)", () => {
-  const LOCKED = stop({ id: "s3", name: "[Concert]", start: "21:30", meta: "[Billets réservés]", locked: true });
+  const LOCKED = stop({ id: "s3", name: "[Concert]", start: "21:30", facts: { durationMinutes: 90 }, locked: true });
   const WITH_ADDITIONS: DayLineItem[] = [
     { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
     { type: "segment", segment: { mode: "walk", minutes: 10, estimated: false } },
@@ -190,13 +191,13 @@ describe("DayLine, ajouts de F5b (Q17)", () => {
     { type: "terminus", role: "end", time: "23:15", label: "[Hôtel]" },
   ];
 
-  it("étape verrouillée : « Verrouillée » en legende ink-soft sous meta, dans le nom accessible du lien, sans Tag (F5-PO-14)", () => {
+  it("étape verrouillée : « Verrouillée » en legende ink-soft sous les faits, dans le nom accessible du lien, sans Tag (F5-PO-14)", () => {
     render(<DayLine items={WITH_ADDITIONS} getStopHref={href} />);
     const link = screen.getByRole("link", { name: /\[Concert\]/ });
     expect(link).toHaveAccessibleName(expect.stringContaining("Verrouillée"));
     const mention = within(link).getByText("Verrouillée");
     expect(mention).toHaveClass("text-legende", "text-ink-soft");
-    expect(mention.previousElementSibling).toHaveTextContent("[Billets réservés]");
+    expect(mention.previousElementSibling).toHaveTextContent("1 h 30");
     expect(link.querySelectorAll("[data-kind]")).toHaveLength(0);
     expect(link.closest("li")).toHaveAttribute("data-locked", "true");
     // Étape non verrouillée : pas de mention.
@@ -253,9 +254,9 @@ describe("DayLine, ajouts de F5b (Q17)", () => {
 
 /** F10a (F10-TL-12, C19) : lecture seule, types réduits, ligne compacte de l'écran 15. Cas existants inchangés. */
 describe("DayLine en lecture seule (F10-TL-12)", () => {
-  const ROYAL = stop({ id: "r", name: "[Royal Mile]", start: "09:15", end: "10:30", meta: "[Old Town]" });
-  const DEAN = stop({ id: "d", name: "[Dean Village]", start: "10:50", end: "11:50", meta: "[Water of Leith]", reason: "[Raison]" });
-  const CAFE = stop({ id: "c", name: "[Café de Stockbridge]", start: "12:05", end: "13:15", meta: "[Stockbridge]", exceptions: ["toReserve"] });
+  const ROYAL = stop({ id: "r", name: "[Royal Mile]", start: "09:15", end: "10:30", facts: {} });
+  const DEAN = stop({ id: "d", name: "[Dean Village]", start: "10:50", end: "11:50", facts: {}, reason: "[Raison]" });
+  const CAFE = stop({ id: "c", name: "[Café de Stockbridge]", start: "12:05", end: "13:15", facts: {}, exceptions: ["toReserve"] });
   const DAY: DayLineItem[] = [
     { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
     { type: "stop", stop: ROYAL },
@@ -279,8 +280,8 @@ describe("DayLine en lecture seule (F10-TL-12)", () => {
   it("terminus sans libellé : « Début de journée » et « Fin de journée » ; étape sans id ni reason", () => {
     const reduced: DayLineViewItem[] = [
       { type: "terminus", role: "start", time: "09:00" },
-      { type: "stop", stop: { key: "1", name: "[Dean Village]", start: "10:50", meta: "[Meta]", exceptions: ["unconfirmed"] } },
-      { type: "stop", stop: { name: "[Sans clé]", start: "12:00", meta: "[Meta]", exceptions: [] } },
+      { type: "stop", stop: { key: "1", name: "[Dean Village]", start: "10:50", facts: {}, exceptions: ["unconfirmed"] } },
+      { type: "stop", stop: { name: "[Sans clé]", start: "12:00", facts: {}, exceptions: [] } },
       { type: "terminus", role: "end", time: "20:45" },
     ];
     render(<DayLine items={reduced} />);

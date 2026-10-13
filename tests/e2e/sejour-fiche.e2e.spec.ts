@@ -83,7 +83,7 @@ test.describe("Fiche étape", () => {
     await openDeanFromList(page, JOUR2);
     const panel = fiche(page);
     await expect(panel.locator("[data-part='moment']")).toHaveText("J2 · Dimanche 30 août · 10:50 – 11:50");
-    await expect(panel.locator("[data-part='meta']")).toHaveText("[Water of Leith, 1 h, gratuit]");
+    await expect(panel.locator("[data-part='faits']")).toHaveText("[Water of Leith], 1 h, gratuit");
     await expect(panel.getByRole("region", { name: "Pour y aller" })).toContainText("À pied, 20 min depuis [Royal Mile]");
     await expect(panel.locator("[data-part='raison-simple']")).toHaveText(
       "[Tu as choisi les balades : un village au bord de l'eau en pleine ville]",

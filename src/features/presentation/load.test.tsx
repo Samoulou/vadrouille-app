@@ -1,14 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMockTripAdapter } from "@/adapters/mock";
-import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, edimbourg, propositions } from "@/mocks/edimbourg";
+import {
+  EDIMBOURG_DEBLOQUE_TRIP_ID,
+  EDIMBOURG_TRIP_ID,
+  MOCK_ORGANIZATION_ID,
+  apercu,
+  edimbourg,
+  edimbourgDebloque,
+  propositionsDebloque,
+} from "@/mocks/edimbourg";
 
 import { buildDeck } from "./deck";
 import { loadPresentation } from "./load";
 
-const ownCtx = { organizationId: MOCK_ORGANIZATION_ID };
+const ownCtx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
 
-const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle" }));
+const contextMock = vi.hoisted(() => ({ organizationId: "mock_org_personnelle", userId: "user_test", role: "owner" as const }));
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
   return { ...actual, getRequestContext: () => ({ ...contextMock }) };
@@ -19,34 +27,57 @@ afterEach(() => {
 });
 
 describe("presentation: ordre et filtrage du paquet", () => {
-  it("lit les 8 propositions de l'aperçu dans l'ordre des données", async () => {
+  it("voyage non débloqué : lit l'aperçu (B2-PO-9), cartes dans l'ordre des cases, créneaux noOption à part", async () => {
     const data = await loadPresentation(createMockTripAdapter(), ownCtx, EDIMBOURG_TRIP_ID);
     expect(data?.unlocked).toBe(false);
     expect(data?.generatingDays).toEqual([]);
-    expect(buildDeck(data!.proposals).map((p) => p.id)).toEqual(propositions.map((p) => p.id));
+    const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal.id] : []));
+    expect(data!.proposals.map((p) => p.id)).toEqual(cartes);
+    expect(buildDeck(data!.proposals).map((p) => p.id)).toEqual(cartes);
+    expect(data!.noOptionSlots).toEqual([{ day: 4, time: "16:00", kind: "activity" }]);
   });
 
   it("une proposition locked injectée dans l'adaptateur n'est pas présentée", async () => {
-    const base = propositions[0]!;
+    const base = propositionsDebloque[0]!;
     const locked = { ...base, id: "prop-verrouillee", stop: { ...base.stop, id: "s-verrou", locked: true } };
-    const adapter = createMockTripAdapter([{ trip: edimbourg, proposals: [locked, ...propositions] }]);
-    const data = await loadPresentation(adapter, ownCtx, EDIMBOURG_TRIP_ID);
+    const adapter = createMockTripAdapter([{ trip: edimbourgDebloque, proposals: [locked, ...propositionsDebloque] }]);
+    const data = await loadPresentation(adapter, ownCtx, EDIMBOURG_DEBLOQUE_TRIP_ID);
     expect(data?.proposals.map((p) => p.id)).toContain("prop-verrouillee");
     expect(buildDeck(data!.proposals).map((p) => p.id)).not.toContain("prop-verrouillee");
-    expect(buildDeck(data!.proposals)).toHaveLength(8);
+    expect(buildDeck(data!.proposals)).toHaveLength(propositionsDebloque.length);
   });
 
-  it("voyage débloqué : J6 en préparation", async () => {
+  it("voyage débloqué : J6 en préparation, listProposals et aucun créneau noOption", async () => {
     const data = await loadPresentation(createMockTripAdapter(), ownCtx, EDIMBOURG_DEBLOQUE_TRIP_ID);
     expect(data?.unlocked).toBe(true);
     expect(data?.generatingDays).toEqual([6]);
+    expect(data!.proposals.map((p) => p.id)).toEqual(propositionsDebloque.map((p) => p.id));
+    expect(data!.noOptionSlots).toEqual([]);
+  });
+});
+
+describe("loadPresentation : projection des jours (B2-PO-14)", () => {
+  it("presentation: les données de l'écran ne transmettent ni placeId ni voyage complet", async () => {
+    const data = (await loadPresentation(createMockTripAdapter(), ownCtx, EDIMBOURG_TRIP_ID))!;
+    expect(Object.keys(data).sort()).toEqual(["days", "generatingDays", "noOptionSlots", "proposals", "tripId", "unlocked"]);
+    expect(data.days).toHaveLength(edimbourg.days.length);
+    for (const day of data.days) {
+      expect(Object.keys(day).sort()).toEqual(["date", "index", "stops"]);
+      for (const stop of day.stops) expect(Object.keys(stop).sort()).toEqual(["id", "name"]);
+    }
+    // Étapes et événements du jour, par identifiant et nom.
+    expect(data.days[1]!.stops.map((stop) => stop.id)).toContain("j2-concert-orgue");
+    const projection = JSON.stringify({ days: data.days, noOptionSlots: data.noOptionSlots });
+    expect(projection).not.toContain("placeId");
+    expect(projection).not.toContain("checklist");
+    expect(projection).not.toContain("organizationId");
   });
 });
 
 describe("presentation: 404 hors organisation", () => {
   it("loadPresentation renvoie null pour une autre organisation ou un voyage inconnu", async () => {
     const adapter = createMockTripAdapter();
-    expect(await loadPresentation(adapter, { organizationId: "mock_org_autre" }, EDIMBOURG_TRIP_ID)).toBeNull();
+    expect(await loadPresentation(adapter, { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const }, EDIMBOURG_TRIP_ID)).toBeNull();
     expect(await loadPresentation(adapter, ownCtx, "inconnu")).toBeNull();
   });
 

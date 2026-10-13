@@ -10,12 +10,12 @@ import {
   type Proposal,
   type Segment,
   type Stop,
+  type StopFacts,
   type Trip,
 } from "@/contracts";
 import type { JourPlanifie } from "@/domain/planification";
 import { MARGE_MINUTES } from "@/domain/squelette";
-import { arrondi5, libelleDuree, versHeure } from "@/domain/temps";
-import { contexteDeProposition, titreDuJour } from "@/domain/textes";
+import { arrondi5, versHeure } from "@/domain/temps";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
@@ -68,9 +68,18 @@ function domaine(url: string): string {
   return new URL(url).hostname;
 }
 
-function meta(candidat: Candidat, minutes: number): string {
-  const duree = libelleDuree(minutes);
-  return candidat.prixParPersonne === 0 ? `${duree}, gratuit` : duree;
+/**
+ * Faits de l'étape (spécification B2, E3) : durée prévue et gratuité, comme l'ancien texte `meta` (« 1 h 30,
+ * gratuit »). Le coût n'est repris que s'il est nul : la devise des prix trouvés sur le web n'est pas convertie
+ * (hors périmètre de B2, B7 ou B9).
+ */
+function faits(candidat: Candidat, minutes: number | undefined): StopFacts {
+  // `StopFacts.durationMinutes` est un entier strictement positif : une durée nulle ou non entière est omise.
+  const duree = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 ? minutes : undefined;
+  return {
+    ...(duree === undefined ? {} : { durationMinutes: duree }),
+    ...(candidat.prixParPersonne === 0 ? { costPerPerson: 0 } : {}),
+  };
 }
 
 function stopDe(
@@ -92,7 +101,7 @@ function stopDe(
     name: candidat.nom,
     start: versHeure(debut),
     ...(fin === undefined ? {} : { end: versHeure(fin) }),
-    meta: fin === undefined ? "" : meta(candidat, fin - debut),
+    facts: fin === undefined ? {} : faits(candidat, fin - debut),
     ...(raison === undefined ? {} : { reason: raison }),
     source: { label: domaine(candidat.source.url), url: candidat.source.url },
     exceptions,
@@ -114,7 +123,6 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
     let travelMinutes = 0;
     let budget = 0;
     let budgetComplet = jour.etapes.length > 0;
-    const categories: Candidat["categorie"][] = [];
 
     jour.etapes.forEach((etape, rang) => {
       const candidat = entree.candidats.get(etape.candidatId);
@@ -129,21 +137,19 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
       const raison = entree.raisons.get(candidat.id);
       const stop = stopDe(`j${s.index}-${rang + 1}`, candidat, kind, etape.placeId, etape.debut, etape.fin, raison?.raison);
       items.push({ type: "stop", stop });
-      categories.push(candidat.categorie);
       if (candidat.prixParPersonne === undefined) budgetComplet = false;
       else budget += candidat.prixParPersonne;
       fin = etape.fin;
 
       if (s.index <= 2 && proposals.length < NOMBRE_PROPOSITIONS && raison?.detour !== undefined) {
         const id = `p${proposals.length + 1}`;
-        const creneau = etape.repas ?? (etape.creneau === "evening" ? "evening" : "activity");
         const proposition: Proposal = {
           id,
           kind,
           day: s.index,
-          weekday: s.weekday,
           time: stop.start,
-          context: contexteDeProposition(creneau, s.index),
+          // Voisins : calculés à la lecture par le moteur (B5, décision 0037 B2-TL-1), jamais écrits ici.
+          neighbours: {},
           stop,
           category: candidat.categorie,
           ...(kind === "meal" ? { option: { index: 1, total: Math.max(1, etape.options) } } : {}),
@@ -176,7 +182,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
         kind: "event",
         name: engagement.libelle,
         start: engagement.heure,
-        meta: "",
+        facts: {},
         exceptions: [],
         locked: true,
         commitment: engagement.type,
@@ -192,7 +198,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
           id: `j${s.index}-idee`,
           placeId: jour.idee.placeId,
           name: candidat.nom,
-          meta: candidat.dureeMinutes === undefined ? "" : libelleDuree(candidat.dureeMinutes),
+          facts: faits(candidat, candidat.dureeMinutes),
           reason: raison,
           source: { label: domaine(candidat.source.url), url: candidat.source.url },
         };
@@ -202,8 +208,6 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
     return {
       index: s.index,
       date: s.date,
-      weekday: s.weekday,
-      title: titreDuJour(categories),
       items,
       ...(budgetComplet ? { budgetPerPerson: budget } : {}),
       events,

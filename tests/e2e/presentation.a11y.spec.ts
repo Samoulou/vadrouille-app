@@ -31,7 +31,8 @@ test("presentation: aucune violation axe, carte d'activité", async ({ page }) =
 test("presentation: aucune violation axe, carte repas et toast", async ({ page }) => {
   await openDeck(page);
   await press(page, "J'aime");
-  await expect(card(page)).toContainText("option 1 sur 2");
+  // Dîner du J1 : une seule case par créneau dans l'aperçu (B2-PO-9), sans « option 1 sur 2 ».
+  await expect(page.getByRole("button", { name: "Je choisis", exact: true })).toBeVisible();
   await expectNoViolations(page);
 });
 

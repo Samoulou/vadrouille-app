@@ -7,6 +7,7 @@ import type {
   DayMap,
   InferredBrief,
   Offer,
+  PreviewSlot,
   Proposal,
   Result,
   Trip,
@@ -14,13 +15,19 @@ import type {
 } from "@/contracts";
 import type { CheckoutOutcome } from "@/contracts/values";
 
+/** Rôle de la personne dans l'organisation (évolution E6). */
+export type MemberRole = "owner" | "member";
+
 /**
  * Contexte de chaque appel : toute donnée appartient à une organisation
  * (cadrage § 6.8). Un adaptateur ne renvoie jamais la donnée d'une autre
- * organisation.
+ * organisation. `userId` et `role` (évolution E6 de B2) viennent de la session avec B3 ; en phase 0, du
+ * contexte simulé.
  */
 export interface AdapterContext {
   organizationId: string;
+  userId: string;
+  role: MemberRole;
 }
 
 /** Accès aux voyages, simulé (`mock`) ou réel (`api`, avec le back-end). */
@@ -34,6 +41,11 @@ export interface TripAdapter {
   /** `index` : 1 = J1. */
   getDay(ctx: AdapterContext, tripId: string, index: number): Promise<Day | null>;
   listProposals(ctx: AdapterContext, tripId: string): Promise<Proposal[]>;
+  /**
+   * Aperçu d'un voyage non débloqué (évolution E7, écran 6) : 8 cases au plus, dans l'ordre, validées par
+   * `PreviewSlotsSchema`. Voyage inconnu ou d'une autre organisation : liste vide, comme `listProposals`.
+   */
+  listPreviewSlots(ctx: AdapterContext, tripId: string): Promise<PreviewSlot[]>;
   /**
    * Positions d'un jour pour la carte (F4-TL-1), `null` si le jour n'a aucune position.
    * Affichage seulement : jamais persistées côté client (handover § 8).
