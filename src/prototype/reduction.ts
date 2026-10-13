@@ -1,4 +1,5 @@
-import { WeekdaySchema, type Day, type DayLineItem, type Proposal, type Segment, type Stop, type SurpriseIdea, type Trip, type Weekday } from "@/contracts";
+import type { Day, DayLineItem, Proposal, Segment, Stop, SurpriseIdea, Trip } from "@/contracts";
+import { requireWeekday } from "@/contracts/values";
 import type { Position } from "@/prototype/ancrage";
 import {
   PROGRAMME_REDUIT_SCHEMA,
@@ -63,20 +64,11 @@ function ligne(item: DayLineItem): LigneReduite {
   }
 }
 
-/**
- * Jour abrégé de la forme réduite, calculé depuis la date ISO en UTC (`Day` ne porte plus `weekday`, B2 E1).
- * `WeekdaySchema.options` commence au lundi ; `getUTCDay()` au dimanche.
- */
-function jourAbrege(date: string): Weekday {
-  const rang = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
-  return WeekdaySchema.options.at(rang) ?? "lun.";
-}
-
 function jour(valeur: Day): JourReduit {
   const { items, events, surprise } = valeur;
   return {
     ...sans(valeur, "travelMinutes", "items", "events", "surprise"),
-    weekday: jourAbrege(valeur.date),
+    weekday: requireWeekday(valeur.date), // seul calcul partagé (`Day` ne porte plus `weekday`, B2 E1)
     items: items.map(ligne),
     events: events.map(etape),
     ...(surprise === undefined ? {} : { surprise: idee(surprise) }),

@@ -31,27 +31,30 @@ export interface EventLinesProps {
 export function EventLines({ events, getHref, getMoment = eventRange }: EventLinesProps) {
   return (
     <ul className="flex flex-col gap-2">
-      {events.map((event) => (
-        <li key={event.id}>
-          <Link
-            href={getHref(event)}
-            scroll={false}
-            data-part="evenement"
-            className="flex min-h-(--touch-target) flex-col items-start gap-1 rounded-block bg-muted p-3"
-          >
-            <span className="text-corps-s font-bold text-ink-2 tabular-nums">{getMoment(event)}</span>
-            <span className="text-arret font-bold text-ink-2">{event.name}</span>
-            {formatFaits(event.facts) ? <span className="text-corps-s text-ink-2">{formatFaits(event.facts)}</span> : null}
-            {event.exceptions.length > 0 ? (
-              <span className="mt-1 flex flex-wrap gap-2">
-                {event.exceptions.map((exception) => (
-                  <Tag key={exception} kind={exception} />
-                ))}
-              </span>
-            ) : null}
-          </Link>
-        </li>
-      ))}
+      {events.map((event) => {
+        const faits = formatFaits(event.facts);
+        return (
+          <li key={event.id}>
+            <Link
+              href={getHref(event)}
+              scroll={false}
+              data-part="evenement"
+              className="flex min-h-(--touch-target) flex-col items-start gap-1 rounded-block bg-muted p-3"
+            >
+              <span className="text-corps-s font-bold text-ink-2 tabular-nums">{getMoment(event)}</span>
+              <span className="text-arret font-bold text-ink-2">{event.name}</span>
+              {faits ? <span className="text-corps-s text-ink-2">{faits}</span> : null}
+              {event.exceptions.length > 0 ? (
+                <span className="mt-1 flex flex-wrap gap-2">
+                  {event.exceptions.map((exception) => (
+                    <Tag key={exception} kind={exception} />
+                  ))}
+                </span>
+              ) : null}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

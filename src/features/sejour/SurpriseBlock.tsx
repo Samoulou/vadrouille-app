@@ -19,6 +19,7 @@ const t = messages.sejour.surprise;
 export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const faits = formatFaits(idea.facts);
 
   return (
     <div data-part="surprise" className="flex flex-col items-start gap-3">
@@ -32,7 +33,7 @@ export function SurpriseBlock({ idea }: { idea: SurpriseIdea }) {
               {t.mention}
             </p>
             <h3 className="text-arret font-bold text-ink">{idea.name}</h3>
-            {formatFaits(idea.facts) ? <p className="text-corps-s text-ink-soft">{formatFaits(idea.facts)}</p> : null}
+            {faits ? <p className="text-corps-s text-ink-soft">{faits}</p> : null}
             <ReasonBlock
               text={idea.reason}
               sourceLabel={idea.source.label}

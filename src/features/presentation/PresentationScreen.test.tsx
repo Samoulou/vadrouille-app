@@ -383,7 +383,7 @@ describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () =>
     expect(sansOption.length).toBeGreaterThan(0);
     const banner = container.querySelector('[data-kind="noOption"]');
     expect(banner).toHaveTextContent(noOptionMessage(sansOption));
-    expect(banner).toHaveTextContent("J4 16:00, activité");
+    expect(banner).toHaveTextContent("le jour 4, vers 16:00 (activité)");
     expect(banner).toHaveAttribute("role", "status");
     expect(progress()).toHaveAccessibleName(`Proposition 1 sur ${cartes.length}`);
     expect(cartes).toHaveLength(7);

@@ -5,7 +5,7 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import type { Proposal, ProposalNeighbours } from "@/contracts";
 import { propositions } from "@/mocks/edimbourg";
 
-import { formatContexte } from "./contexte";
+import { formatContexte, noOptionMessage } from "./contexte";
 
 const STOPS = [
   { id: "j2-royal-mile", name: "[Royal Mile]" },
@@ -38,5 +38,21 @@ describe("formatContexte (B2, E2)", () => {
       <DeckCard proposal={{ ...proposal, neighbours: {} }} context={formatContexte({}, STOPS)} onLike={noop} onDislike={noop} onOpen={noop} />,
     );
     expect(container.querySelector('[data-part="contexte"]')).toBeNull();
+  });
+});
+
+describe("noOptionMessage (B2-PO-9, B2-PO-10)", () => {
+  it("interface: un créneau sans proposition, puis plusieurs", () => {
+    expect(noOptionMessage([{ day: 4, time: "16:00", kind: "activity" }])).toBe(
+      "Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.",
+    );
+    expect(
+      noOptionMessage([
+        { day: 1, time: "19:30", kind: "meal" },
+        { day: 4, time: "16:00", kind: "activity" },
+      ]),
+    ).toBe(
+      "Pas de proposition pour le jour 1, vers 19:30 (repas) ; le jour 4, vers 16:00 (activité). Ton programme reste ouvert à ces endroits.",
+    );
   });
 });

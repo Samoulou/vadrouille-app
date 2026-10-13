@@ -159,7 +159,7 @@ describe("/dev/etats (catalogue des états)", () => {
     const banners: [string, string, string][] = [
       [s.offline, "offline", messages.dev.composants.exemples.bandeaux.offline],
       [s.conflict, "conflict", messages.dev.composants.exemples.bandeaux.conflict],
-      [s.noOption, "noOption", "Aucune proposition pour J4 16:00, activité."],
+      [s.noOption, "noOption", "Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit."],
       [s.error, "error", "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé."],
       [s.generating, "generating", "Jour 3 en préparation"],
       [s.travel, "travel", "2 h 40 de trajet ce jour, au-delà des 2 h 30 prévues pour ton rythme."],

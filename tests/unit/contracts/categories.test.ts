@@ -136,6 +136,8 @@ interface DocRow {
   key: string;
   category: string;
   source: string;
+  /** Première cellule brute : elle ne doit porter qu'une clé. */
+  cell: string;
 }
 
 const cells = (line: string): string[] => line.split("|").slice(1, -1).map((cell) => cell.trim());
@@ -148,7 +150,7 @@ function tableRows(lines: string[], source: string): DocRow[] {
     const [first, second] = cells(line);
     if (first === undefined || second === undefined || !first.startsWith("`")) continue;
     const key = first.split("`")[1] ?? "";
-    rows.push({ key, category: second, source });
+    rows.push({ key, category: second, source, cell: first });
   }
   return rows;
 }
@@ -178,6 +180,9 @@ function decision0011Table(markdown: string): string[] {
 function categoriesOf(cell: string): string[] {
   return CATEGORIES.filter((c) => new RegExp(`(^|[^\\p{L}])${c}([^\\p{L}]|$)`, "u").test(cell));
 }
+
+/** Une cellule de clé valide porte exactement une clé entre accents graves, et rien d'autre (critère § 5 de B0). */
+const singleKey = (cell: string): boolean => /^`[^`]+`$/.test(cell);
 
 /** Une cellule valide commence par exactement une catégorie et n'en nomme pas d'autre. */
 const singleCategory = (cell: string): boolean =>
@@ -234,6 +239,7 @@ function compare(codeSet: string[], doc: DocRow[], excluded: Set<string>) {
     multipleCategories: rows
       .filter((r) => !singleCategory(r.category))
       .map((r) => `${r.key} (${r.source}) : « ${r.category} »`),
+    multipleKeys: rows.filter((r) => !singleKey(r.cell)).map((r) => `${r.key} (${r.source}) : « ${r.cell} »`),
   };
 }
 
@@ -268,7 +274,7 @@ describe("tableau des champs (handover § 5, décision 0011 point 5)", () => {
     expect(tableRows(decision0011Table(decision), "0011")).toHaveLength(7);
 
     const result = compare(codeKeys(exported, excluded), doc, excluded);
-    expect(result).toEqual({ missingFromTable: [], extraInTable: [], duplicates: [], multipleCategories: [] });
+    expect(result).toEqual({ missingFromTable: [], extraInTable: [], duplicates: [], multipleCategories: [], multipleKeys: [] });
   });
 
   it("le parcours suit la notation du critère § 5 (schémas de test)", () => {
@@ -307,6 +313,15 @@ describe("tableau des champs (handover § 5, décision 0011 point 5)", () => {
     expect(exclusionErrors([{ contract: "TripSummary", task: "", reason: "" }], exported, toCreate)).not.toEqual([]);
     expect(exclusionErrors([{ contract: "TripSummary", task: "B12", reason: "" }], exported, toCreate)).not.toEqual([]);
     expect(exclusionErrors([{ contract: "Inconnu", task: "B6", reason: "" }], exported, toCreate)).not.toEqual([]);
+  });
+
+  it("une cellule à deux clés, ou qui ajoute du texte à sa clé, est signalée", () => {
+    expect(singleKey("`Trip.id`")).toBe(true);
+    expect(singleKey("`Trip.id`, `Trip.title`")).toBe(false);
+    expect(singleKey("`Trip.id` et `Trip.title`")).toBe(false);
+    expect(singleKey("`Trip.id` (voir 0011)")).toBe(false);
+    const rows = tableRows(["| `Trip.id`, `Trip.title` | stocké | … |"], "test");
+    expect(compare(["Trip.id"], rows, new Set()).multipleKeys).toEqual(["Trip.id (test) : « `Trip.id`, `Trip.title` »"]);
   });
 
   it("une cellule à deux catégories ou sans catégorie en tête est signalée", () => {

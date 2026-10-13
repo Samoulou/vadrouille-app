@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { DayTabs } from "@/components/ligne/DayTabs";
 import type { Day } from "@/contracts";
-import { jourAbrege } from "@/lib/dates";
+import { weekdayOf } from "@/contracts/values";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
@@ -147,7 +147,7 @@ describe("Journée et onglets : dates calculées (B2, E1)", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Mardi 1er septembre$/);
     render(
       <DayTabs
-        days={edimbourg.days.map((candidate) => ({ index: candidate.index, href: routes.jour(candidate.index), weekday: jourAbrege(candidate.date) }))}
+        days={edimbourg.days.map((candidate) => ({ index: candidate.index, href: routes.jour(candidate.index), weekday: weekdayOf(candidate.date) ?? undefined }))}
         current={1}
         sejourHref={routes.sejour()}
       />,

@@ -74,8 +74,10 @@ function domaine(url: string): string {
  * (hors périmètre de B2, B7 ou B9).
  */
 function faits(candidat: Candidat, minutes: number | undefined): StopFacts {
+  // `StopFacts.durationMinutes` est un entier strictement positif : une durée nulle ou non entière est omise.
+  const duree = minutes !== undefined && Number.isInteger(minutes) && minutes > 0 ? minutes : undefined;
   return {
-    ...(minutes === undefined ? {} : { durationMinutes: minutes }),
+    ...(duree === undefined ? {} : { durationMinutes: duree }),
     ...(candidat.prixParPersonne === 0 ? { costPerPerson: 0 } : {}),
   };
 }

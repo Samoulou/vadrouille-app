@@ -39,11 +39,14 @@ export function formatContexte(neighbours: ProposalNeighbours, stops: readonly D
   return null;
 }
 
-/** « Aucune proposition pour J4 16:00, activité. » (libellé provisoire, B2-PO-10). */
+/**
+ * « Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit. »
+ * (libellé provisoire, B2-PO-10 ; formulation proposée par UX/UI à la revue de la PR 219, mineur 12).
+ */
 export function noOptionMessage(slots: readonly NoOptionSlot[]): string {
   const s = messages.presentation.sansOption;
   const creneaux = slots
     .map((slot) => format(s.creneau, { n: slot.day, heure: slot.time, kind: s.kind[slot.kind] }))
     .join(s.separateur);
-  return format(s.message, { creneaux });
+  return format(slots.length > 1 ? s.messagePlusieurs : s.message, { creneaux });
 }

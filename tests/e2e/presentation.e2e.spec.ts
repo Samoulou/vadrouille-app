@@ -39,7 +39,7 @@ test("presentation: ordre et filtrage du paquet", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Tes premières propositions" })).toBeAttached();
   // Aperçu (B2-PO-9) : les cases `proposal` dans l'ordre ; la case `noOption` est nommée par le bandeau, pas une carte.
   const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal.stop.name] : []));
-  await expect(page.locator("[data-kind='noOption']")).toHaveText("Aucune proposition pour J4 16:00, activité.");
+  await expect(page.locator("[data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
   const seen: string[] = [];
   for (let i = 0; i < cartes.length; i += 1) {
     seen.push(await cardName(page));

@@ -24,8 +24,8 @@ import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
+import { weekdayOf } from "@/contracts/values";
 import { format, messages } from "@/i18n";
-import { jourAbrege } from "@/lib/dates";
 
 import { createLocalDeckActions, type DeckActions } from "./actions";
 import { formatContexte, noOptionMessage } from "./contexte";
@@ -114,7 +114,6 @@ function sendWith(lazyTrack: LazyTrack): Send {
     });
   };
 }
-
 
 function toastMessage(toast: UndoToastInfo): string {
   if (toast.kind === "dayKept") {
@@ -350,7 +349,7 @@ function Deck({
         <Suspense fallback={null}>
           <ProposalDetailSheet
             proposal={detail}
-            weekday={jourAbrege(dayOf(detail.day)?.date ?? "")}
+            weekday={weekdayOf(dayOf(detail.day)?.date ?? "")}
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
             placesFromGoogle={placesFromGoogle}

@@ -20,8 +20,11 @@ export function formatVerifiedAt(iso: string): string {
 export interface ProposalDetailSheetProps {
   /** Proposition affichée ; `null` ferme la feuille. */
   proposal: Proposal | null;
-  /** Jour de la semaine de la proposition, calculé par l'écran depuis la date de son jour (évolution E1 de B2). */
-  weekday: Weekday;
+  /**
+   * Jour de la semaine de la proposition, calculé par l'écran depuis la date de son jour (évolution E1 de B2) ;
+   * `null` si la date est illisible : la phrase s'écrit alors sans le jour de la semaine.
+   */
+  weekday: Weekday | null;
   onClose: () => void;
   /** Rend le focus à la carte à la fermeture (handover § 7). */
   onReturnFocus: () => void;
@@ -57,7 +60,9 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
         >
           <div className="flex flex-col gap-1">
             <p className="text-corps-s text-ink-soft tabular-nums">
-              {format(t.detail.moment, { day: proposal.day, weekday, time: proposal.time })}
+              {weekday
+                ? format(t.detail.moment, { day: proposal.day, weekday, time: proposal.time })
+                : format(t.detail.momentSansJour, { day: proposal.day, time: proposal.time })}
             </p>
             <DialogTitle ref={title} tabIndex={-1} className="text-section font-extrabold text-ink">
               {stop.name}

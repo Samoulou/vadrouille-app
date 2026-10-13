@@ -1,4 +1,5 @@
-import type { Trip, Weekday } from "@/contracts";
+import type { Trip } from "@/contracts";
+import { weekdayOf } from "@/contracts/values";
 import { format, messages } from "@/i18n";
 
 const t = messages.ligne.dates;
@@ -43,22 +44,16 @@ export function formatTitreJour(iso: string): string {
   return format(t.titre, { jour, day: jourDuMois(date.day), month });
 }
 
-/** Jour de la semaine abrégé (« sam. »), calculé depuis `Day.date` (évolution E1 de B2). */
-export function jourAbrege(iso: string): Weekday {
-  const date = parts(iso);
-  return ((date ? plaque.jours[rangSemaine(date)] : undefined) ?? "") as Weekday;
-}
-
 const pad = (value: number) => String(value).padStart(2, "0");
 
 /**
- * « sam. 29.08 » : jour de la semaine calculé depuis la date ISO en UTC (`Date.UTC`), sans fuseau horaire ;
+ * « sam. 29.08 » : jour de la semaine par `weekdayOf` (`@/contracts/values`, seul calcul, en UTC) ;
  * avec `withYear`, « mar. 11.05.2027 ».
  */
 export function formatDateCourte(iso: string, withYear = false): string {
   const date = parts(iso);
   if (!date) return iso;
-  const jour = plaque.jours[rangSemaine(date)] ?? "";
+  const jour = weekdayOf(iso) ?? "";
   const values = { jour, date: `${pad(date.day)}.${pad(date.month)}`, annee: date.year };
   return format(withYear ? plaque.dateAnnee : plaque.date, values);
 }

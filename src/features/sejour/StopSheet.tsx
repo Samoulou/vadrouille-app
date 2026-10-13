@@ -66,6 +66,7 @@ export function StopSheet({
 
   const path = inProgramme ? pathTo(day.items, stop.id) : null;
   const titleId = `fiche-${stop.id}`;
+  const faits = formatFaits(stop.facts);
 
   return (
     <div data-part="fiche" data-stop-id={stop.id} onKeyDown={onKeyDown} className="flex flex-col gap-4 px-5 pt-2 pb-8">
@@ -91,9 +92,9 @@ export function StopSheet({
         <p data-part="moment" className="text-corps font-bold text-ink-2 tabular-nums">
           {ficheMoment(day, stop)}
         </p>
-        {formatFaits(stop.facts) ? (
+        {faits ? (
           <p data-part="faits" className="text-corps-s text-ink-soft">
-            {formatFaits(stop.facts)}
+            {faits}
           </p>
         ) : null}
         {stop.exceptions.length > 0 ? (

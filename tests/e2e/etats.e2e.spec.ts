@@ -134,7 +134,7 @@ test.describe("catalogue", () => {
     );
     // Le bandeau `noOption` porte le texte de l'écran 6 (B2-PO-9) : deux textes d'exemple restent.
     await expect(section("Aucune option compatible").locator("[data-kind='noOption']")).toHaveText(
-      "Aucune proposition pour J4 16:00, activité.",
+      "Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.",
     );
     await expect(page.getByText("Texte d'exemple : l'écran qui possède ce message n'est pas encore livré.")).toHaveCount(2);
     await expectTouchTargets(page);

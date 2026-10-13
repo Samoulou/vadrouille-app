@@ -8,7 +8,7 @@ import {
   refineEventKind,
   refineNoCommitment,
 } from "./refinements";
-import { STOP_KINDS } from "./values";
+import { STOP_KINDS, WEEKDAYS } from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -48,10 +48,11 @@ const MinutesSchema = z.number().int().nonnegative();
 const TextSchema = z.string().min(1);
 
 /**
- * Jour abrégé (« sam. »), calculé par l'interface depuis `Day.date` (évolution E1 de B2) : ce n'est plus un champ de
- * `Day` ni de `Proposal`. Il type `DayBadge`, `DayTabs` et la forme réduite du prototype, qui garde son champ.
+ * Jour abrégé (« sam. »), calculé depuis `Day.date` par `weekdayOf` (`./values`, seul calcul ; évolution E1 de B2) :
+ * ce n'est plus un champ de `Day` ni de `Proposal`. Il type `DayBadge`, `DayTabs` et la forme réduite du prototype,
+ * qui garde son champ.
  */
-export const WeekdaySchema = z.enum(["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]);
+export const WeekdaySchema = z.enum(WEEKDAYS);
 export type Weekday = z.infer<typeof WeekdaySchema>;
 
 /** Badges d'exception uniquement ; jamais « Vérifié » (handover § 0, règle 5). */

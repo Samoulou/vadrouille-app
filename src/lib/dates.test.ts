@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateCourte, formatDateLongue, formatTitreJour, formatTripDates, formatVoyageurs, jourAbrege } from "./dates";
+import { formatDateCourte, formatDateLongue, formatTitreJour, formatTripDates, formatVoyageurs } from "./dates";
 
 describe("formatDateLongue", () => {
   it("écrit la date en toutes lettres", () => {
@@ -15,13 +15,11 @@ describe("formatDateLongue", () => {
   });
 });
 
-describe("formatTitreJour et jourAbrege (B2, E1)", () => {
-  it("titre de la Journée et jour abrégé calculés depuis la date, « 1er » pour le premier", () => {
+describe("formatTitreJour (B2, E1)", () => {
+  it("titre de la Journée calculé depuis la date, « 1er » pour le premier", () => {
     expect(formatTitreJour("2026-08-29")).toBe("Samedi 29 août");
     expect(formatTitreJour("2026-09-01")).toBe("Mardi 1er septembre");
     expect(formatTitreJour("2026-08-30")).toBe("Dimanche 30 août");
-    expect(jourAbrege("2026-08-29")).toBe("sam.");
-    expect(jourAbrege("2026-09-01")).toBe("mar.");
     expect(formatTitreJour("inconnue")).toBe("inconnue");
   });
 });

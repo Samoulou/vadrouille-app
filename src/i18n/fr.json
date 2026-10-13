@@ -409,6 +409,7 @@
     },
     "detail": {
       "moment": "Jour {day}, {weekday}, vers {time}",
+      "momentSansJour": "Jour {day}, vers {time}",
       "source": "Source : ",
       "verifie": "Informations vérifiées le {date}",
       "mois": [
@@ -449,8 +450,9 @@
       }
     },
     "sansOption": {
-      "message": "Aucune proposition pour {creneaux}.",
-      "creneau": "J{n} {heure}, {kind}",
+      "message": "Pas de proposition pour {creneaux}. Ton programme reste ouvert à cet endroit.",
+      "messagePlusieurs": "Pas de proposition pour {creneaux}. Ton programme reste ouvert à ces endroits.",
+      "creneau": "le jour {n}, vers {heure} ({kind})",
       "separateur": " ; ",
       "kind": {
         "activity": "activité",
@@ -611,15 +613,6 @@
     "plaque": {
       "ligne": "{debut} – {fin} · {voyageurs}",
       "date": "{jour} {date}",
-      "jours": [
-        "dim.",
-        "lun.",
-        "mar.",
-        "mer.",
-        "jeu.",
-        "ven.",
-        "sam."
-      ],
       "adultes": {
         "un": "1 adulte",
         "plusieurs": "{n} adultes"

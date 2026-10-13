@@ -25,6 +25,21 @@ export interface ChecklistRowProps {
 }
 
 /**
+ * Libellé d'un moment (évolution E4 de B2, libellés provisoires B2-PO-10) : « Avant le sam. 22.08 » pour une date
+ * limite, « Avant le départ », « À l'arrivée » pour le J1, « J{n} » pour un autre jour.
+ */
+export function formatChecklistMoment(moment: ChecklistMoment): string {
+  switch (moment.type) {
+    case "deadline":
+      return format(t.moment.deadline, { date: formatDateCourte(moment.date) });
+    case "beforeDeparture":
+      return t.moment.beforeDeparture;
+    case "tripDay":
+      return moment.day === 1 ? t.moment.arrivee : format(t.moment.jour, { n: moment.day });
+  }
+}
+
+/**
  * Ligne de la liste « À faire avant de partir » (design system : components/ChecklistRow ; spécification F5,
  * F5-PO-4). Case de 22 px dans une zone de 44 px (`aria-pressed`, nom = `label`), nom en 15 px 700, moment en
  * `legende` `ink-soft`, lien « Réserver » en `line` 800 d'au moins 44 px de haut, dans un nouvel onglet. Faite,
@@ -42,21 +57,6 @@ export interface ChecklistRowProps {
  * initial (+4,9 Ko gzip mesurés sur l'accueil). Il est rendu côté client par les écrans qui l'importent
  * (Séjour, `/dev/composants`), qui fournissent `onToggle`. Ne pas l'utiliser depuis un composant serveur.
  */
-/**
- * Libellé d'un moment (évolution E4 de B2, libellés provisoires B2-PO-10) : « Avant le sam. 22.08 » pour une date
- * limite, « Avant le départ », « À l'arrivée » pour le J1, « J{n} » pour un autre jour.
- */
-export function formatChecklistMoment(moment: ChecklistMoment): string {
-  switch (moment.type) {
-    case "deadline":
-      return format(t.moment.deadline, { date: formatDateCourte(moment.date) });
-    case "beforeDeparture":
-      return t.moment.beforeDeparture;
-    case "tripDay":
-      return moment.day === 1 ? t.moment.arrivee : format(t.moment.jour, { n: moment.day });
-  }
-}
-
 export function ChecklistRow({ label, when, done, bookingUrl, sponsored, onToggle, className }: ChecklistRowProps) {
   const labelId = useId();
   const sponsoredId = useId();

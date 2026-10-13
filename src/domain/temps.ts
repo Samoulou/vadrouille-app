@@ -1,5 +1,5 @@
 import type { Weekday } from "@/contracts";
-import { element } from "@/domain/tables";
+import { requireWeekday } from "@/contracts/values";
 
 /** Aides de calcul d'heures et de dates du moteur (minutes depuis minuit, dates ISO en UTC). */
 
@@ -37,8 +37,7 @@ export function jourSemaine(date: string): number {
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
-const LIBELLES_JOUR: readonly Weekday[] = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-
+/** Jour abrégé d'une Journée du squelette, par le seul calcul partagé (`@/contracts/values`). */
 export function libelleJour(date: string): Weekday {
-  return element(LIBELLES_JOUR, jourSemaine(date)) ?? "lun.";
+  return requireWeekday(date);
 }
