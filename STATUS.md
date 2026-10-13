@@ -1,43 +1,42 @@
-# État du studio — 2026-10-13 (48e cycle)
+# État du studio — 2026-10-13 (49e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 48e cycle est le cycle planifié de 14:07 CEST.
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 49e cycle a été lancé à la demande de Samuel (15:49 CEST) ; le cycle planifié de 17:07 CEST l'a prolongé au lieu d'en ouvrir un autre.
 
 ## Messages de Samuel traités (projet)
-- #studio : aucun nouveau message depuis le 47e cycle.
+- Fil du projet, 15:25 CEST : « je suis votre reco, cache de coordonnées » → Q324 tranchée (option a), Q287 close.
+- Fil du projet, 15:49 CEST : « lance un cycle, j'ai des tokens dispo » → 49e cycle lancé.
+- #studio : aucun nouveau message depuis le 48e cycle.
 
 ## Fait
-- Fusionnée : **spec P0-suite-2 (#223)** après sa correction 1 (`placeId` retiré de l'état des étapes, choix délégués devenus propositions D19 à D24 au Tech Lead et à la Sécurité, exigence 6 et Q287 rendues à Samuel, positions réécrites à chaque exécution, aucun résultat dérivé de Google stocké).
-- **B1 (#188)** : quatrième tentative strictement bornée, décidée avec le Tech Lead (Q327) : normalisation des chemins alias dans `ligne/no-p0-server-modules`. La description de la PR, écrasée par erreur par celle de P0c1, est réparée (« Closes #184 » au lieu de « Closes #215 »). En revue.
-- **P0c1 (#217)**, correction 2 (la dernière) : doubles « original » normalisés, `Reflect`, `Proxy` et `Object` qualifiés refusés, `node:vm` retiré de `sw-route.test.ts`, lignes 0040 D6 bornées en nombre ; 484 tests du régime. En revue.
-- **F7a (#227, ticket #224)** : ouverte (écran 14 « Remplacer », `ChangeSet`, toast partagé), puis correction 1 : le mot « aperçu » retiré de l'interface, contour du choix invalide, boutons hors ligne, état du programme en mémoire stable, garde contre le double clic. En revue.
-- **Spec B5 (#229, ticket #228)** : moteur sans IA, découpé en B5a, B5b et B5c (à valider par le Tech Lead, Q333). En revue.
-- Tickets fermés, déjà livrés : #141 (F10b, #212), #163 (T18, #199), #195 (P0a1 bis, #216).
+- Fusionnées : **spec B5 (#229)** après sa correction 1 ; **décision 0041 (#232)**, découpage de B5 en B5a, B5b et B5c, séquentiel, après sa correction 1 (veto de Samuel possible jusqu'au 2026-10-15) ; **correctif de `main` (#235, ticket #234)**.
+- **`main` était rouge** depuis la fusion de F7a (#227) après P0c1 (#217) : le test de confinement refusait 4 accès calculés de `revision.ts`. Toutes les PR de code échouaient. Corrigé par #235 (`deepEqual` réécrit, sans ligne ajoutée aux listes). Question au Tech Lead pour éviter que ça recommence (Q342).
+- **Spec P0c-suite-release (#233, ticket #222)** : ouverte, corrigée une fois, fusionnée ; son code (rôle `release`) est ouvert en revue : PR #238 (variables d'environnement de `git` épinglées dans la porte du Tech Lead, deux tests ajoutés).
+- **Spec P0c-suite-ia (#231, ticket #221)** : ouverte, corrigée une fois, fusionnée. La décision 0042 qui consigne les réponses du Tech Lead et de la Sécurité (Q339) est fusionnée (#237).
+- Ticket #228 (spec B5) rouvert : 0041 le garde ouvert jusqu'à B5c (la fusion automatique l'avait fermé).
+- **F10c (#236, ticket #142)** : écran de partage et vue partagée en lecture seule, correction 2 (la dernière) poussée (3f4affc) : tests de C38, mineurs de revue, cible de 44 px du lien d'évitement. Tech Lead, Sécurité et UX/UI approuvent ce head ; fusion automatique quand la CI sera au vert. Reste au Tech Lead : écrire l'amendement de C38 dans `docs/decisions/`.
 
 ## En cours
-- En revue : #188, #217, #227, #229.
+- En revue : #238 (code de #222), #236 (F10c, approuvée), #188 (B1, approuvée, attend Samuel).
 
 ## Bloqué
-- **Fusion de P0c1 (#217)** : verdicts de la Sécurité (Q326) et du Tech Lead (Q336).
-- **P0c2** : réponse de Samuel à P0c-Q2 (texte de la routine de revue R2).
-- **Exécutions réelles de P0** : P0c1, P0c2, #221 et #222, puis réponses de Samuel à Q324, Q328, Q329 avant P0r2.
+- **B1 (#188)** : approuvée par le Tech Lead et la Sécurité, CI verte ; Samuel doit retirer puis reposer `owner-approved` pour que la fusion automatique parte.
+- **B5a** : fin de la fenêtre de veto de 0041 (2026-10-15) et décisions du Tech Lead sur B5-TL-1 à B5-TL-4 (Q333), Q337.
+- **PR de code de #221** : prête (0042 fusionnée), mais elle touche les mêmes listes du régime (`capacites.ts`, `process.ts`) que la PR de code de #222 ; elle part après sa fusion.
+- **PR de code de #222** : Q341 ; Q340 si Samuel veut `owner-approved`.
+- **Exécutions réelles de P0 (P0r2)** : #221 et #222, puis Q328 et Q329 de Samuel.
 
 ## Prochain cycle
-1. Suivre les revues de #188 (si la 4e tentative échoue : découpage de B1, Q327), #217, #227 et #229.
-2. F10c (#142), après la fusion de F7a (#227), pour ne pas toucher `fr.json` en même temps.
-3. Specs de #221 et #222 (rôle `product-owner`), après la fusion de #217.
-4. B5a, après la fusion de la spec B5 (#229) et les réponses du Tech Lead (Q333).
+1. Suivre la CI de #236, la revue de #238 et #188.
+2. Après la fusion de la PR de code de #222 : lancer le code de #221 (rôle `ia`).
+3. Après le 2026-10-15 et Q333 : ouvrir les tickets B5a, B5b, B5c et lancer B5a.
+4. Ensuite, dans l'ordre de `docs/roadmap.md` (lignes 13 et 14) : specs de B3 (compte) et B4 (paiement simulé) par le rôle `product-owner`, si une place se libère.
 
 ## Décisions attendues de Samuel
 - **Actions** :
-  - plafond de quota de Maps JavaScript API (Q263) ;
-  - **#188 (B1)** : une fois la nouvelle revue approuvée, retirer puis reposer `owner-approved` (la PR a reçu de nouveaux commits).
-- **Nouvelles** (recommandations dans les questions) :
-  - Q324 : où garder les positions des lieux ; **bloque P0r2** (recommandé : le cache de coordonnées déjà autorisé) ;
-  - Q328 : ce que couvrent les 3 USD par exécution (recommandé : modèles et recherche web) ;
-  - Q329 : comment compter l'enveloppe jusqu'à G0 (recommandé : tout, dès le premier appel réel) ;
-  - Q330 : unité du quota Routes, à lire dans la console Google ;
-  - Q332 : règle R1 pour un lieu ajouté par la personne (recommandé : vérifier seulement qu'il existe et n'est pas fermé).
-- **Déjà posées** : Q319, Q321 (élargie à `DATA_ADAPTER`), Q322, Q323, Q325, Q317, Q296, Q297, Q294, Q288, P0c-Q2.
+  - **#188 (B1)** : retirer puis reposer `owner-approved` (la revue est approuvée, CI verte) ;
+  - plafond de quota de Maps JavaScript API (Q263).
+- **Nouvelle** : Q340 (recommandé : non, et répondre « non » à Q274).
+- **Déjà posées** (recommandations dans les questions) : Q328, Q329 (budget de P0, bloquent P0r2), Q330, Q332, Q319, Q321, Q322, Q323, Q325, Q317, Q296, Q297, Q294, Q288, P0c-Q2.
 - **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
 - **Toujours ouvertes** :
   - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q75, Q127, Q150 ;
@@ -45,29 +44,27 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - offre : Q57, Q63, Q67, Q76, Q78, Q88 à Q90, Q128, Q133, Q135, Q149 ;
   - documents et environnement : Q12, Q59, Q40, Q101 ;
   - Ligne : Q19 (avec Q226), Q37, Q108, Q130 ;
-  - règles : Q23.
+  - règles : Q23, Q274.
 - **Veto possible** :
-  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et son amendement (#211), 0037, décisions B1-PO-1 à 6 (#185) ;
-  - avant le 2026-10-15 : décisions B2-PO de la spec B2 (#198), décisions B5-PO-1 à 15 de la spec B5 (#229, une fois fusionnée) ;
+  - avant le 2026-10-15 : décision 0041 (découpage de B5, dérogation limitée à « une tâche = une PR ») ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
+  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et son amendement (#211), 0037, 0040, décisions B1-PO-1 à 6 (#185) ;
   - avant le 2026-10-14 : décision 0025.
 
 ## Questions ajoutées
-- Q327 (CEO et Tech Lead, tranchée) : quatrième tentative bornée pour B1.
-- Q328 à Q330 (Samuel) et Q331 (Sécurité) : spec P0-suite-2.
-- Q332 (Samuel) et Q333 (Tech Lead) : spec B5.
-- Q334 (Product owner et UX/UI) et Q335 (Tech Lead) : F7a.
-- Q336 (Tech Lead) : P0c1.
-- Mises à jour : Q319, Q321, Q323, Q324, Q325 (spec fusionnée), Q326 (`node:vm` retiré), Q236 (plage de lignes corrigée).
+- Q337 et Q338 (Tech Lead) : spec B5.
+- Q339 (Tech Lead, rédaction CEO) : spec P0c-suite-ia.
+- Q340 (Samuel) et Q341 (Tech Lead et Sécurité) : spec P0c-suite-release.
+- Q342 (Tech Lead) : éviter un `main` rouge après fusion.
+- Mises à jour : Q324 tranchée, Q287, Q326 et Q336 closes, Q333 (découpage écrit dans 0041).
 
 ## Part d'usage estimée
-- Entre les 47e et 48e cycles : code de F7a (1,1 M de jetons), troisième tentative de B1 (0,12 M), alignement de P0c1 sur 0040 (0,09 M).
-- 48e cycle : 6 sous-agents, 3 au plus en même temps :
-  - consultation du Tech Lead sur B1 (0,07 M) ;
-  - quatrième tentative de B1 (0,09 M) ;
-  - correction 1 de la spec P0-suite-2 (0,19 M) ;
-  - correction 2 de P0c1 (0,23 M) ;
-  - correction 1 de F7a (0,18 M) ;
-  - spec B5 (0,29 M).
-- S'y ajoute le travail du CEO (environ 0,15 M).
-- Total : environ 1,2 M de jetons pour le cycle (estimation).
+- 49e cycle : 8 sous-agents, 3 au plus en même temps :
+  - correction 1 de la spec B5 (0,13 M de jetons) ;
+  - spec P0c-suite-ia (0,15 M) et sa correction 1 (0,10 M) ;
+  - spec P0c-suite-release (0,15 M) et sa correction 1 (0,10 M) ;
+  - code de F10c (0,38 M), puis sa correction 2 (0,13 M) ;
+  - code de #222 (0,11 M) ;
+  - correctif de `main` (0,07 M).
+- S'y ajoute le travail du CEO (environ 0,25 M), dont les décisions 0041 et 0042.
+- Total : environ 1,5 M de jetons (estimation).
 - Part de l'abonnement : impossible à mesurer depuis la routine.
