@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { TRIP_ID_PATTERN, TripSchema, type Stop, type Trip } from "@/contracts";
