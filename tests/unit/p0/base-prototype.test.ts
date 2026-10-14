@@ -44,8 +44,12 @@ describe("ancrage: masques de champs exacts", () => {
   });
 });
 
-describe("S6 : store_prototype_coordinates n'est nommée que par db/ et les tests de la base", () => {
-  it("aucun fichier de code hors de db/ et de tests/db/ ne nomme la fonction (module appelant : décision 0052)", () => {
+describe("imports: store_prototype_coordinates nommée par un seul module (S6 de 0046, resserrée par 0052 § 1.10)", () => {
+  const MODULE = "src/adapters/prototype-ecriture.ts";
+  /** Seul importateur admis hors des tests : l'étape finale de `p0Run` (0052 § 1.10). */
+  const IMPORTATEUR = "src/workflows/p0-run.ts";
+
+  it("hors de db/ et de tests/db/, seul src/adapters/prototype-ecriture.ts nomme la fonction", () => {
     const nom = ["store", "prototype", "coordinates"].join("_");
     const hors = fichiers().filter(
       (f) =>
@@ -58,7 +62,25 @@ describe("S6 : store_prototype_coordinates n'est nommée que par db/ et les test
         f !== CE_FICHIER &&
         (lire(f) ?? "").includes(nom),
     );
-    expect(hors).toEqual([]);
+    expect(hors).toEqual([MODULE]);
+  });
+
+  it("le module n'est importé que par src/workflows/p0-run.ts et les tests ; ni src/adapters/index.ts, ni src/server", () => {
+    // Toute mention du chemin du module (import statique, dynamique, `export … from`, `vi.mock`) compte.
+    const chemin = /["'](?:@\/adapters\/prototype-ecriture|(?:\.\.?\/)+(?:[\w-]+\/)*prototype-ecriture)(?:\.ts)?["']/;
+    const importateurs = fichiers().filter((f) => /\.(ts|tsx|mts|mjs|cjs|js)$/.test(f) && f !== MODULE && chemin.test(lire(f) ?? ""));
+    const horsTests = importateurs.filter((f) => !f.startsWith("tests/") && !/\.test\.tsx?$/.test(f));
+    expect(horsTests.filter((f) => f !== IMPORTATEUR)).toEqual([]);
+    // Contrôle du motif lui-même.
+    expect(chemin.test('import { ecrireProgramme } from "@/adapters/prototype-ecriture";')).toBe(true);
+    expect(chemin.test('export * from "./prototype-ecriture";')).toBe(true);
+    expect(chemin.test('import type { X } from "@/contracts/prototype-ecriture";')).toBe(false);
+  });
+
+  it("le module commence par import \"server-only\" et le contrat n'est pas réexporté par src/contracts/index.ts", () => {
+    expect((lire(MODULE) ?? "").startsWith('import "server-only";\n')).toBe(true);
+    expect(lire("src/contracts/index.ts") ?? "").not.toContain("prototype-ecriture");
+    expect(lire("src/adapters/index.ts") ?? "").not.toContain("prototype-ecriture");
   });
 });
 

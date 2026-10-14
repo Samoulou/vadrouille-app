@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { expect } from "vitest";
 
-import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl } from "./env";
+import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl, urlDeverrouillee } from "./env";
 
 /**
  * Outils des tests de base (`pnpm test:db`, spécification B1). Chaque test se connecte avec le rôle qu'il éprouve ;
@@ -29,6 +29,40 @@ export async function connect(login: Login): Promise<pg.Client> {
   await client.connect();
   open.push(client);
   return client;
+}
+
+/**
+ * Connexion à la seconde base jetable (`<base>_dv`, décision 0052 § 1, « Harnais des tests sous verrou ») : seuls les
+ * tests du § 1 qui appellent `store_prototype_coordinates` sous `vadrouille_prototype` s'y connectent.
+ */
+export async function connectDeverrouillee(login: "p0" | "admin"): Promise<pg.Client> {
+  const url = urlDeverrouillee(login);
+  if (!url) throw new Error(`variable ${DB_ENV[login]} absente (voir tests/db/global-setup.ts)`);
+  const client = new pg.Client({ connectionString: url });
+  await client.connect();
+  open.push(client);
+  return client;
+}
+
+/**
+ * Exécution d'org_prototype posée par l'administration dans **sa transaction en cours** (déclencheurs désactivés par
+ * `SET LOCAL session_replication_role = replica`, puis rétablis) : jour de quota passé tiré au hasard (index « une
+ * par jour »), début et statut voulus, organisation au choix (une autre que org_prototype pour éprouver un refus).
+ */
+export async function poserExecution(
+  admin: pg.Client,
+  options: { organisation: string; debut?: string; statut?: "en_cours" | "programme_ecrit" | "arretee" },
+): Promise<string> {
+  const statut = options.statut ?? "en_cours";
+  await admin.query("SET LOCAL session_replication_role = replica");
+  const { rows } = await admin.query(
+    `INSERT INTO prototype.runs (organization_id, quota_day, mode, brief, variant, status, stop_code, started_at, commit_sha)
+     VALUES ($1, '1901-01-01'::date + $2::integer, 'reel', 'brief-test.json', 'A', $3, $4, ${options.debut ?? "pg_catalog.now() - interval '1 minute'"}, $5)
+     RETURNING id`,
+    [options.organisation, Math.floor(Math.random() * 30_000), statut, statut === "arretee" ? "pipeline_failed" : null, "b".repeat(40)],
+  );
+  await admin.query("SET LOCAL session_replication_role = origin");
+  return rows[0].id as string;
 }
 
 export async function closeAll(): Promise<void> {

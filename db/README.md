@@ -14,7 +14,7 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 | `db/bootstrap/roles.sql` | Amorçage idempotent des 16 rôles des décisions 0007 et 0046, une fois par base, avant les migrations. Aucun mot de passe. |
 | `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
-| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17). |
+| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17) ; `0005_prototype_coordinates_run` (écrite à la main) remplace `store_prototype_coordinates` par sa forme à quatre paramètres liée à une exécution en cours (0052 § 1.7 et § 1.9), sans aucun `EXECUTE` hors de son propriétaire (verrou S8). |
 | `db/migrate.ts` | Applique les migrations sous `vadrouille_migrator`, une transaction par migration, journal dans `vadrouille_migrations.applied` (empreinte SHA-256 : une migration déjà appliquée et modifiée est refusée). |
 | `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034, sur l'environnement injecté **et** le vrai `process.env`, 0046 D21), liste d'autorisation de `vadrouille_prototype` (préversion ou développement seulement, D21) et garde de rôle (B1-PO-6). |
 | `db/index.ts` | `createDatabase("vadrouille_app" \| "vadrouille_auth" \| "vadrouille_prototype")` : client Drizzle sur un pool gardé. |
@@ -28,7 +28,7 @@ l'identifiant propriétaire) :
 | `VADROUILLE_DATABASE_URL` | `vadrouille_app` | application |
 | `VADROUILLE_DATABASE_URL_AUTH` | `vadrouille_auth` | application (Better Auth, B3) |
 | `VADROUILLE_DATABASE_URL_MIGRATOR` | `vadrouille_migrator` | environnement des migrations seulement, jamais dans Vercel (décision 0006) |
-| `P0_DATABASE_URL` | `vadrouille_prototype` | seule préversion de `p0-reel` (0046 S5), posée après la décision 0052 ; refusée sans `VERCEL_ENV` `preview` ou `development` |
+| `P0_DATABASE_URL` | `vadrouille_prototype` | seule préversion de `p0-reel` (0046 S5), posée selon la décision 0056 (workflow des migrations et déverrouillage) ; refusée sans `VERCEL_ENV` `preview` ou `development` |
 | `VADROUILLE_DB_ADMIN_URL` | administrateur de la base de test | tests de base seulement (CI, poste local) |
 | `VADROUILLE_DB_PROTOTYPE_URL`, `VADROUILLE_DB_PROTOTYPE_PURGE_URL` | `vadrouille_prototype`, `vadrouille_prototype_purge` | tests de base seulement (mots de passe jetables de `scripts/ci/db-setup.sh`) ; jamais une variable `P0_*` |
 
@@ -91,6 +91,7 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | `0002_place_coordinates` | irréversible | Elle crée `place_coordinates` et ses fonctions : son inverse supprimerait la table et ses lignes (règle du rôle `data`) ; une correction se fait vers l'avant. Les coordonnées expirent d'elles-mêmes (30 jours, 29 pour `org_prototype`) et sont purgées par les fonctions. |
 | `0003_prototype` | irréversible | Elle crée le schéma `prototype`, `org_prototype` et son utilisateur technique : son inverse supprimerait des données. Sa suppression à la fin de la phase 0 sera une migration corrective décidée par écrit (0046 D17 point 5). |
 | `0004_rate_limit_expires_at` | `0004_rate_limit_expires_at.down.sql` | Exception nommée (décision 0050, amendement de 0007, point 2 ; 0051, point 6.3) : la migration inverse supprime l'index puis la colonne `expires_at`, qui ne porte qu'une échéance technique recalculable (au pire `window_start` + 1 jour), sans donnée d'une personne ni d'une organisation ; les lignes restent. L'exception ne vaut que pour cette colonne. |
+| `0005_prototype_coordinates_run` | irréversible | Elle remplace la forme à trois paramètres de `store_prototype_coordinates`, qui écrivait une position sans exécution en cours, contraire à 0052 § 1.7 : la recréer rouvrirait ce chemin. Aucune donnée n'est supprimée ; une correction se fait vers l'avant. |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :
@@ -126,7 +127,8 @@ qu'il exige, pose les mots de passe des deux rôles de connexion (vérificateur 
 `p0-reel`) et les secrets de l'environnement GitHub `p0-purge`, sans jamais afficher une valeur, selon la procédure
 de 0046 S5 ; **Samuel lance lui-même la lecture de contrôle des rôles** (requête de l'étape 1 ci-dessous) dans la
 console Neon. Ces opérations viennent avec le premier passage des migrations sur la base réelle, donc **après la
-décision 0052** (0046, « Frontière »), qui ajoute ici l'application des migrations (Q294). Le reste de cette section
+décision 0056** (workflow `db-migrate`, chaque lot approuvé par Samuel : Q408), qui reprend de 0052 l'application des
+migrations (Q294). Le reste de cette section
 (rôles du MVP) est inchangé.
 
 **Acteur : Samuel, seul** (rôles du MVP). Tout se fait dans un navigateur (console Neon et tableau de bord Vercel), sans outil
@@ -224,4 +226,4 @@ Il ne se connecte pas à la base de staging, n'exécute rien dans la console Neo
 Vercel, ne reçoit aucun mot de passe et n'applique aucune migration à staging tant que la question 3 n'est pas
 tranchée. **Exception (Q321, amendement ci-dessus)** : l'amorçage des trois rôles du prototype, la connexion
 d'administration qu'il exige, la pose de leurs mots de passe, de `P0_DATABASE_URL` et des secrets de `p0-purge`, par
-le studio selon 0046 S5, après la décision 0052 ; la lecture de contrôle reste à Samuel.
+le studio selon 0046 S5, après la décision 0056 ; la lecture de contrôle reste à Samuel.
