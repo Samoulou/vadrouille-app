@@ -7,7 +7,8 @@ permissions:
   pull-requests: write
 jobs:
   enable:
-    if: github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only'
+    # D23 (décision 0055, section 5) : fusion automatique vers main seulement, jamais vers p0-reel ni une autre base.
+    if: github.event.pull_request.base.ref == 'main' && (github.event.label.name == 'needs-review' || github.event.label.name == 'docs-only')
     runs-on: ubuntu-latest
     steps:
       - run: gh pr merge --auto --squash "$PR" --repo "$REPO"
