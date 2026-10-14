@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   BORNES_MODE_REEL,
   BORNES_PLAFONDS,
-  CHAMPS_MODE_REEL_EN_ATTENTE,
+  CHAMPS_MODE_REEL_DECIDES_PO,
   ConfigModeReelSchema,
   ConfigModelesSchema,
   ConfigPlafondsSchema,
@@ -123,15 +123,28 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
 
 describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
   const fichier = () => lire("mode-reel") as Record<string, unknown>;
-  const complete = () => ({ ...fichier(), coutUsd: 3, fiches: { margeMinimum: 4, margePart: 0.2 } });
+  const complete = () => fichier();
 
-  it("fichier commité : valeurs décidées (500 éléments, 20 requêtes, unité éléments), refusé tant que Q391 et Q389 manquent", () => {
-    expect(fichier()).toMatchObject({ uniteQuotaRoutes: "elements", routesElements: 500, routesRequetes: 20, placesDetails: 90, placesTextSearch: 90, dureeMs: 900_000 });
-    for (const champ of CHAMPS_MODE_REEL_EN_ATTENTE) expect(Object.keys(fichier())).not.toContain(champ);
-    expect(validerConfigModeReel(fichier())).toEqual({ ok: false, code: "config_reel_incomplete" });
+  it("fichier commité : valeurs de l'amendement 1 du PO (PR 324) et de Samuel (Q330), acceptées", () => {
+    expect(fichier()).toEqual({
+      schema: 1,
+      uniteQuotaRoutes: "elements",
+      coutUsd: 3,
+      recherchesWeb: 40,
+      pagesLues: 100,
+      candidatsTrouves: 85,
+      placesTextSearch: 90,
+      placesDetails: 90,
+      routesRequetes: 30,
+      routesElements: 500,
+      dureeMs: 900_000,
+      fiches: { margeMinimum: 4, margePart: 0.2 },
+    });
+    for (const champ of CHAMPS_MODE_REEL_DECIDES_PO) expect(Object.keys(fichier())).toContain(champ);
+    expect(validerConfigModeReel(fichier())).toEqual({ ok: true, config: fichier() });
   });
 
-  it("complétée des décisions en attente, elle passe ; chaque champ obligatoire, sans valeur par défaut", () => {
+  it("chaque champ obligatoire, sans valeur par défaut : absent, refusé (config_reel_incomplete)", () => {
     expect(validerConfigModeReel(complete())).toMatchObject({ ok: true });
     for (const champ of Object.keys(ConfigModeReelSchema.shape)) {
       const sans: Record<string, unknown> = { ...complete() };

@@ -142,12 +142,12 @@ export const BORNES_MODE_REEL = {
 const LOGEMENTS_MAX = 5;
 
 /**
- * Champs du mode réel **sans valeur par défaut** tant que leur décision manque : `coutUsd` (Q391, Product Owner) et
- * `fiches` (marge de remplacement de l'étape finale, Q389, Product Owner). Absents du fichier, la configuration est
- * refusée (`config_reel_incomplete`) et aucune exécution réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6
- * point 2).
+ * Champs du mode réel **sans valeur par défaut**, décidés par le Product Owner (amendement 1 de la spécification
+ * P0-suite-2, 2026-10-14, PR 324) : `coutUsd` = 3 (Q391) et `fiches` = `{ margeMinimum: 4, margePart: 0,2 }`
+ * (Q389, P0S2-PO-17). Absents du fichier, la configuration est refusée (`config_reel_incomplete`) et aucune exécution
+ * réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6 point 2).
  */
-export const CHAMPS_MODE_REEL_EN_ATTENTE = ["coutUsd", "fiches"] as const;
+export const CHAMPS_MODE_REEL_DECIDES_PO = ["coutUsd", "fiches"] as const;
 
 const plafondReel = (max: number) => z.number().int().min(1).max(max);
 
