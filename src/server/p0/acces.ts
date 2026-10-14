@@ -3,7 +3,17 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { isProductionDeployment } from "@/dev/flags";
-import { CAUSES_ENV_P0, CODES_ENV_P0, decoderJetonSaisi, lireEnvP0, type CodeEnvP0, type DiagnosticSortie } from "@/server/env/p0";
+import {
+  CAUSES_ENV_P0,
+  CODES_ENV_P0,
+  decoderJetonSaisi,
+  EXCEPTIONS_ENV_P0,
+  lireEnvP0,
+  VERDICTS_ENV_P0,
+  ZONES_ENV_P0,
+  type CodeEnvP0,
+  type DiagnosticSortie,
+} from "@/server/env/p0";
 import { logEvent } from "@/server/log";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -98,6 +108,10 @@ export type CodeGardeFermee = CodeEnvP0 | "production_deployment";
 
 /** Causes que `p0.guard_closed` peut nommer (décision 0058) : celles de la barrière de sortie. */
 export const CAUSES_GARDE_FERMEE: readonly string[] = CAUSES_ENV_P0;
+/** Marques d'exception, classes de racine et verdicts que `p0.guard_closed` peut écrire (décision 0062 § 5). */
+export const EXCEPTIONS_GARDE_FERMEE: readonly string[] = EXCEPTIONS_ENV_P0;
+export const ZONES_GARDE_FERMEE: readonly string[] = ZONES_ENV_P0;
+export const VERDICTS_GARDE_FERMEE: readonly string[] = VERDICTS_ENV_P0;
 
 export type ResultatOuverture = { readonly ok: true; readonly attendu: Buffer } | { readonly ok: false; readonly code: CodeGardeFermee };
 
@@ -113,9 +127,9 @@ export function ouvertureP0(dependances: DependancesAcces = {}, journaliser = tr
 }
 
 /**
- * Ouverture et diagnostic de la barrière de sortie (décision 0058, ticket 319) : nom de la variable ou de l'option de
- * proxy ou de TLS en cause et marque de l'exception étroite, écrits avec le code dans `p0.guard_closed` ; jamais une
- * valeur.
+ * Ouverture et diagnostic de la barrière de sortie (décisions 0058 et 0062) : nom de la variable ou de l'option de
+ * proxy ou de TLS en cause, marque de l'exception, classe de racine et verdict de l'examen d'`OPENSSL_CONF`
+ * (`openssl_conf_zone`, `openssl_conf_verdict`), écrits avec le code dans `p0.guard_closed` ; jamais une valeur.
  */
 function ouvrir(dependances: DependancesAcces): { readonly resultat: ResultatOuverture; readonly diagnostic: DiagnosticSortie } {
   let diagnostic: DiagnosticSortie = {};

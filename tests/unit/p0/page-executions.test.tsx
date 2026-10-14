@@ -30,6 +30,9 @@ const etat = vi.hoisted(() => ({
 vi.mock("@/server/env/p0", () => ({
   CODES_ENV_P0: [],
   CAUSES_ENV_P0: [],
+  EXCEPTIONS_ENV_P0: [],
+  ZONES_ENV_P0: [],
+  VERDICTS_ENV_P0: [],
   lireEnvP0: () => (etat.ouvert ? { ok: true, jeton: etat.jeton } : { ok: false, code: "branch_refused" }),
   decoderJetonSaisi: (saisie: string) => (/^[0-9a-f]{64}$/.test(saisie) ? Buffer.from(saisie, "hex") : null),
 }));

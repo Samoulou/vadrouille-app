@@ -3,8 +3,15 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { formatLogLine, LOG_EXIT_CAUSES, LOG_GUARD_CODES } from "@/server/log";
-import { CAUSES_GARDE_FERMEE, CODES_GARDE_FERMEE, valeurCookieAcces } from "@/server/p0/acces";
+import { formatLogLine, LOG_EXIT_CAUSES, LOG_EXIT_EXCEPTIONS, LOG_GUARD_CODES, LOG_OPENSSL_CONF_VERDICTS, LOG_OPENSSL_CONF_ZONES } from "@/server/log";
+import {
+  CAUSES_GARDE_FERMEE,
+  CODES_GARDE_FERMEE,
+  EXCEPTIONS_GARDE_FERMEE,
+  valeurCookieAcces,
+  VERDICTS_GARDE_FERMEE,
+  ZONES_GARDE_FERMEE,
+} from "@/server/p0/acces";
 import { ouvrirGardeLancement, verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import type { ResultatLancement } from "@/server/usage/neon";
 
@@ -26,6 +33,8 @@ beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "preview");
   vi.stubEnv("VERCEL_TARGET_ENV", undefined);
   vi.stubEnv("VADROUILLE_ENV", undefined);
+  vi.stubEnv("VERCEL", undefined);
+  vi.stubEnv("OPENSSL_CONF", undefined);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -173,7 +182,14 @@ describe("p0: mode réel refusé (lancement)", () => {
     expect([...LOG_EXIT_CAUSES].sort()).toEqual([...CAUSES_GARDE_FERMEE].sort());
   });
 
-  it("le journal retire une cause ou une exception hors de la liste fermée (valeur, chemin, nom inconnu)", () => {
+  it("le journal admet exactement les exceptions, classes de racine et verdicts de la barrière (décision 0062)", () => {
+    expect([...LOG_EXIT_EXCEPTIONS].sort()).toEqual([...EXCEPTIONS_GARDE_FERMEE].sort());
+    expect([...LOG_OPENSSL_CONF_ZONES].sort()).toEqual([...ZONES_GARDE_FERMEE].sort());
+    expect([...LOG_OPENSSL_CONF_VERDICTS].sort()).toEqual([...VERDICTS_GARDE_FERMEE].sort());
+    expect(LOG_EXIT_EXCEPTIONS).toEqual(["vercel_runtime_openssl_conf"]);
+  });
+
+  it("le journal retire une cause, une exception, une zone ou un verdict hors de la liste fermée (valeur, chemin, nom inconnu)", () => {
     for (const valeur of ["/var/runtime/ca-cert.pem", "SENTINELLE", "node_extra_ca_certs"]) {
       expect(JSON.parse(formatLogLine("p0.guard_closed", { guard: "tls_env_refused", cause: valeur }))).toEqual({
         level: "info",
@@ -182,20 +198,53 @@ describe("p0: mode réel refusé (lancement)", () => {
         dropped: 1,
       });
     }
-    expect(JSON.parse(formatLogLine("p0.guard_closed", { exception: "autre" }))).toEqual({ level: "info", event: "p0.guard_closed", dropped: 1 });
+    for (const champs of [
+      { exception: "autre" },
+      { exception: "vercel_runtime_ca" },
+      { openssl_conf_zone: "/etc/ssl/SENTINELLE.cnf" },
+      { openssl_conf_zone: "tmp" },
+      { openssl_conf_verdict: "SENTINELLE" },
+      { openssl_conf_verdict: "ADMIS" },
+    ]) {
+      const ligne = formatLogLine("p0.guard_closed", champs);
+      expect(JSON.parse(ligne)).toEqual({ level: "info", event: "p0.guard_closed", dropped: 1 });
+      expect(ligne).not.toContain("SENTINELLE");
+    }
   });
 
-  it("garde fermée par TLS : le journal nomme la variable en cause, jamais sa valeur (décision 0058)", async () => {
+  it("garde fermée par TLS : le journal nomme la variable en cause, sa zone et son verdict, jamais sa valeur (0058, 0062)", async () => {
     const lignes: string[] = [];
     vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void lignes.push(String(ligne)));
     const dependances = { execArgv: [], maintenant: () => T0, cookie: undefined, reserver: async () => reservation() };
     await ouvrirGardeLancement({ ...dependances, env: preversion({ NODE_EXTRA_CA_CERTS: "/tmp/SENTINELLE.pem" }) });
+    // Exception de 0058 § 4 retirée : le chemin du runtime est refusé comme un autre.
+    await ouvrirGardeLancement({ ...dependances, env: preversion({ NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem" }) });
+    // OPENSSL_CONF hors préversion de Vercel : refus, zone et verdict, sans la valeur.
+    await ouvrirGardeLancement({ ...dependances, env: preversion({ OPENSSL_CONF: "/tmp/SENTINELLE.cnf" }) });
+    // OPENSSL_CONF admise (/dev/null, aucune lecture) : l'exception est marquée, la garde se ferme plus loin.
     vi.stubEnv("VERCEL", "1");
-    await ouvrirGardeLancement({ ...dependances, env: preversion({ VERCEL: "1", NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem", CI: "1" }) });
+    vi.stubEnv("OPENSSL_CONF", "/dev/null");
+    await ouvrirGardeLancement({ ...dependances, env: preversion({ VERCEL: "1", OPENSSL_CONF: "/dev/null", CI: "1" }) });
     expect(lignes.join("\n")).not.toContain("SENTINELLE");
     expect(lignes.map((l) => JSON.parse(l) as unknown)).toEqual([
       { level: "info", event: "p0.guard_closed", guard: "tls_env_refused", cause: "NODE_EXTRA_CA_CERTS" },
-      { level: "info", event: "p0.guard_closed", guard: "ci_refused", exception: "vercel_runtime_ca" },
+      { level: "info", event: "p0.guard_closed", guard: "tls_env_refused", cause: "NODE_EXTRA_CA_CERTS" },
+      {
+        level: "info",
+        event: "p0.guard_closed",
+        guard: "tls_env_refused",
+        cause: "OPENSSL_CONF",
+        openssl_conf_zone: "autre",
+        openssl_conf_verdict: "hors_preview",
+      },
+      {
+        level: "info",
+        event: "p0.guard_closed",
+        guard: "ci_refused",
+        exception: "vercel_runtime_openssl_conf",
+        openssl_conf_zone: "dev_null",
+        openssl_conf_verdict: "admis",
+      },
     ]);
   });
 });

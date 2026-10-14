@@ -21,8 +21,9 @@ export const LOG_EVENTS = [
   "rate_limit.purge_failed",
   "rate_limit.rows_high",
   "rate_limit.failed",
-  // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée ; champ `guard` (code fermé), et
-  // depuis 0058 `cause` et `exception` (noms d'une liste fermée, jamais une valeur).
+  // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée ; champ `guard` (code fermé), depuis
+  // 0058 `cause` et `exception`, depuis 0062 `openssl_conf_zone` et `openssl_conf_verdict` (listes fermées, jamais une
+  // valeur).
   "p0.guard_closed",
   "log.unknown_event",
 ] as const;
@@ -44,8 +45,12 @@ export type LogFields = {
   readonly guard?: string;
   /** Nom de la variable ou de l'option de proxy ou de TLS en cause (décision 0058), jamais une valeur. */
   readonly cause?: string;
-  /** Marque de l'exception étroite de la barrière de sortie (décision 0058) : `vercel_runtime_ca` seulement. */
+  /** Marque de l'exception de la barrière de sortie (décision 0062) : `vercel_runtime_openssl_conf` seulement. */
   readonly exception?: string;
+  /** Classe de racine du chemin d'`OPENSSL_CONF` (décision 0062 § 5.1, liste fermée de 7 valeurs), jamais le chemin. */
+  readonly openssl_conf_zone?: string;
+  /** Verdict fermé de l'examen d'`OPENSSL_CONF` (décision 0062 § 5.1). */
+  readonly openssl_conf_verdict?: string;
 };
 
 /**
@@ -144,7 +149,26 @@ export const LOG_EXIT_CAUSES: readonly string[] = [
   "--insecure-http-parser",
 ];
 const CAUSES: ReadonlySet<string> = new Set(LOG_EXIT_CAUSES);
-const EXCEPTIONS: ReadonlySet<string> = new Set(["vercel_runtime_ca"]);
+/**
+ * Marques d'exception (`exception`), classes de racine (`openssl_conf_zone`) et verdicts (`openssl_conf_verdict`) de la
+ * barrière de sortie (décision 0062 § 5) : copies des listes fermées d'`egress.ts` (que ce module n'importe pas :
+ * `ligne/server-env-imports`) ; l'égalité est vérifiée par le test de la garde.
+ */
+export const LOG_EXIT_EXCEPTIONS: readonly string[] = ["vercel_runtime_openssl_conf"];
+export const LOG_OPENSSL_CONF_ZONES: readonly string[] = ["dev_null", "etc", "usr", "var_runtime", "var_lang", "opt", "autre"];
+export const LOG_OPENSSL_CONF_VERDICTS: readonly string[] = [
+  "hors_preview",
+  "env_differente",
+  "nom_section_refuse",
+  "chemin_refuse",
+  "fichier_refuse",
+  "inclusion_refusee",
+  "section_nodejs",
+  "admis",
+];
+const EXCEPTIONS: ReadonlySet<string> = new Set(LOG_EXIT_EXCEPTIONS);
+const ZONES_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_ZONES);
+const VERDICTS_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_VERDICTS);
 const ENVIRONNEMENTS = new Set(["local", "ci", "staging", "production"]);
 const CODES: ReadonlySet<string> = new Set(API_ERROR_CODES);
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
@@ -166,6 +190,8 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["guard", (v) => chaine(v) && GARDES.has(v)],
   ["cause", (v) => chaine(v) && CAUSES.has(v)],
   ["exception", (v) => chaine(v) && EXCEPTIONS.has(v)],
+  ["openssl_conf_zone", (v) => chaine(v) && ZONES_OPENSSL.has(v)],
+  ["openssl_conf_verdict", (v) => chaine(v) && VERDICTS_OPENSSL.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
