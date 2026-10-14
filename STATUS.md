@@ -1,26 +1,24 @@
-# État du studio — 2026-10-14 (67e cycle)
+# État du studio — 2026-10-14 (68e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- 2026-10-14, 22:14 CEST (fil du cycle) : « on arrive bientôt sur l'app testable de n'importe quelle ville avec IA et Google ? ». Réponse : pas encore ; restent la préparation de l'essai (P0r3c-3 puis P0r3c-4), la garde TLS (0062 et son code), l'ouverture de la base d'essai (workflow des migrations, 0052), une vérification finale, et quelques clics de Samuel. Le premier message en annonçait moins ; il a été corrigé.
-- 2026-10-14, 22:21 CEST (projet) : « lance un cycle go » ; 67e cycle lancé à la demande.
-- #studio : aucun nouveau message de Samuel.
+- Aucun nouveau message depuis le 67e cycle (fini à 22:51 CEST), ni dans le projet ni dans #studio. Le clic `owner-approved` sur #332 reste attendu.
 
 ## Fait
-- Fusionnées : **décision 0061** (#339), **décision 0062** (#338, après sa correction 1 : la section 6 devient une analyse du Tech Lead, l'exception n'est effective qu'après l'avis de la Sécurité, lignes de confinement `node:fs` et `node:path`), statut du 66e cycle (#340).
-- **Décision 0060** (#336) : correction 1 poussée (dabc70f) ; cycles séparés pour B8c, écart entre purges strictement inférieur à 22 h, actions de Samuel à 18 h, test de moindre privilège exécutable. En revue.
-- **Code de 0062** : ticket #341 ouvert et lancé (back).
-- Libellé `owner-approved` demandé à Samuel sur #332.
+- Fusionnée : statut du 67e cycle (#342).
+- **Décision 0060** (#336) : le Tech Lead approuve ; la Sécurité garde un bloquant (la purge manuelle de repli, sous le propriétaire de l'intégration, échouerait faute de droit d'exécution). Correction comptée : **correction 2, la dernière**, lancée (Tech Lead).
+- **P0r3c-3** (#326) : la revue de la troisième tentative n'avait jamais démarré (libellé `needs-review` resté du push précédent, pas reposé après f06449c). Libellé basculé à 23:10 CEST ; revue relancée.
 
 ## En cours
 - **Code de 0062** (#341, back).
-- En revue : #326 (P0r3c-3, troisième tentative bornée), #336 (0060), #332 (approuvé par le Tech Lead, attend `owner-approved`).
+- **Décision 0060** (#336) : correction 2, dernière (Tech Lead). Si elle reste bloquée : le CEO et le Tech Lead choisissent une troisième tentative ou un découpage.
+- En revue : #326 (P0r3c-3, troisième tentative bornée), #332 (approuvé par le Tech Lead, attend `owner-approved`).
 
 ## Bloqué
 - **Premier essai réel** : P0r3c-3 (#326), puis P0r3c-4 ; code de 0062 et avis de la Sécurité (Q444), nouvelle mise à jour de `p0-reel` par Samuel et nouveau relevé ; P0r3d.
 - **Workflow des migrations** : `owner-approved` de Samuel ; Q387 (a) et (b).
-- **Purge `p0-purge`** : en échec toutes les 6 heures tant que ses secrets sont vides (attendu, Q387).
+- **Purge `p0-purge`** : en échec toutes les 6 heures (cause non relevée ; secrets vides probables, Q387).
 - **B8c** : fusion de 0060 ; cycles séparés (Q445). **B6a** : B3b. **B8a** : B7a, B7c, P0r3c-3. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
@@ -48,9 +46,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q427 : limite exacte réécrite (3 mots consécutifs, ou 7 caractères consécutifs en écriture sans espace).
-- Q438 complétée (actions de Samuel à 18 h). Q444 (Sécurité, avis sur 0062), Q445 (CEO, cycles de B8c), Q446 (CEO et release, 0062 dans la note de version).
+- Aucune.
 
 ## Part d'usage estimée
-- 67e cycle (à la demande) : sous-agents terminés : correction 1 de 0062, correction 1 de 0060 ; 3 au plus en même temps.
-- En cours, comptés au 68e cycle : code de 0062 (#341).
+- 68e cycle (routine) : sous-agents terminés : aucun ; lancé : correction 2 de 0060 ; 2 en même temps.
+- En cours, comptés au 69e cycle : code de 0062 (#341), correction 2 de 0060.
