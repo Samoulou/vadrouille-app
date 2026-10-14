@@ -179,6 +179,22 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/env/ai.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
   { fichier: "src/server/env/grounding.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
   { fichier: "src/server/env/egress.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  {
+    fichier: "src/server/env/index.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module d'environnement du serveur de B3a, zone sensible, exigé par " +
+      "`ligne/require-server-only` ; décision 0050, « Lignes du régime de confinement » ; verdict Sécurité : plafond accepté par 0051 point 6.7 (ticket 293)",
+  },
+  {
+    fichier: "tests/unit/server/env.test.ts",
+    specificateur: "node:util",
+    noms: ["inspect"],
+    motif:
+      "`util.inspect(error)` du critère A1 exigé par 0051 point 6.5 (aucune valeur sentinelle dans `util.inspect` d'un refus) ; " +
+      "B3a, ticket 293 ; ligne au-delà du plafond de 0050 : verdict Sécurité écrit exigé dans la PR de B3a (0051 point 6.7.7), à rendre",
+  },
 ] as const satisfies readonly LigneSpecificateurNominative[];
 
 /**

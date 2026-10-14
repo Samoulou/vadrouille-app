@@ -50,4 +50,11 @@ describe("server-only obligatoire", () => {
       expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(0);
     }
   });
+
+  it("B3a : src/server/env/resolve.ts sans import \"server-only\" est accepté ; tout autre fichier de src/server/env reste signalé", async () => {
+    expect(await messagesFor(WITHOUT, "src/server/env/resolve.ts")).toHaveLength(0);
+    for (const filePath of ["src/server/env/index.ts", "src/server/env/resolve2.ts", "src/server/env/sous/resolve.ts", "src/server/resolve.ts"]) {
+      expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(1);
+    }
+  });
 });
