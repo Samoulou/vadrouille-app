@@ -352,6 +352,40 @@ describe("env: gardes de configuration", () => {
   });
 });
 
+describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 2)", () => {
+  const code = () => ({ [NOM.P0_RUN_TOKEN]: hex(aleatoire()) });
+
+  it("toute variable P0_* présente en production → forbidden, libellé P0_* (jamais le nom exact ni la valeur)", () => {
+    const [INVENTEE = ""] = Object.keys({ P0_X: 0 });
+    for (const base of [vercel("production"), { VADROUILLE_ENV: "production" }, { VADROUILLE_ENV: "ci", VERCEL_ENV: "production" }]) {
+      refusParse({ ...base, P0_REAL_RUNS: "enabled" }, NOM["P0_*"], "forbidden");
+      refusParse({ ...base, ...code() }, NOM["P0_*"], "forbidden");
+      refusParse({ ...base, [INVENTEE]: SENTINELLE }, NOM["P0_*"], "forbidden");
+    }
+    // Préfixe exact, sensible à la casse : `p0_x` n'est pas une variable du prototype.
+    expect(() => parseServerEnv(vercel("production", { p0_x: SENTINELLE }))).not.toThrow();
+    // Hors production : admises.
+    for (const base of [vercel("preview"), ci(), { VADROUILLE_ENV: "local" }]) expect(() => parseServerEnv({ ...base, P0_REAL_RUNS: "enabled", ...code() })).not.toThrow();
+  });
+
+  it("P0_REAL_RUNS : enabled seulement, comparaison exacte, sans trim()", () => {
+    for (const valeur of ["Enabled", "enabled ", " enabled", "true", "1", SENTINELLE]) refusParse(ci({ P0_REAL_RUNS: valeur }), NOM.P0_REAL_RUNS, "invalid_value");
+    expect(() => parseServerEnv(ci({ P0_REAL_RUNS: "enabled" }))).not.toThrow();
+    expect(() => parseServerEnv(ci({ P0_REAL_RUNS: undefined }))).not.toThrow();
+  });
+
+  it("code d'accès présent : décodé comme tout secret (longueur, forme, motifs) et unique parmi les secrets", () => {
+    refusParse(ci({ [NOM.P0_RUN_TOKEN]: hex(aleatoire(31)) }), NOM.P0_RUN_TOKEN, "secret_too_short");
+    refusParse(ci({ [NOM.P0_RUN_TOKEN]: `${SENTINELLE}!` }), NOM.P0_RUN_TOKEN, "secret_encoding");
+    refusParse(ci({ [NOM.P0_RUN_TOKEN]: `${hex(aleatoire())}\n` }), NOM.P0_RUN_TOKEN, "secret_encoding");
+    refusParse(ci({ [NOM.P0_RUN_TOKEN]: "changeme".repeat(8) }), NOM.P0_RUN_TOKEN, "secret_trivial");
+    const octets = aleatoire();
+    refusParse(ci({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.P0_RUN_TOKEN]: hex(octets) }), NOM.P0_RUN_TOKEN, "secret_duplicate");
+    const config = parseServerEnv(ci(code()));
+    expect(Object.keys(config).sort()).toEqual(["authAdapter", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
+  });
+});
+
 describe("env: modules d'environnement", () => {
   it("@/server/env n'exporte ni clé Google ni clé de fournisseur de modèles", () => {
     expect(Object.keys(moduleEnv).filter((nom) => /google|maps|anthropic|openai|mistral|model|api_?key/i.test(nom))).toEqual([]);

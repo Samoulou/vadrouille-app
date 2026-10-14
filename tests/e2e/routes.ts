@@ -205,6 +205,16 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "seuil" },
   },
   {
+    // P0r3b (décision 0055, sections 1 et 2) : saisie du code d'accès du mode réel, page absente (404) hors de la
+    // préversion de `p0-reel` : c'est le cas de tout build mesuré (CI, poste). Elle sert alors la page introuvable.
+    id: "R-p0-acces",
+    path: "/prototype/executions",
+    page: "prototype/executions/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R-introuvable",
     path: "/voyages/inconnu",
     status: 404,

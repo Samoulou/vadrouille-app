@@ -1,0 +1,15 @@
+{
+  "acces": {
+    "titreDocument": "Prototype · Accès aux exécutions",
+    "titre": "Accès aux exécutions réelles",
+    "aide": "Saisis le code d'accès du prototype. Il ouvre l'accès pour 12 heures dans ce navigateur.",
+    "libelle": "Code d'accès",
+    "valider": "Ouvrir l'accès",
+    "ouverte": "Accès ouvert pour 12 heures dans ce navigateur.",
+    "erreurs": {
+      "invalid_code": "Code refusé.",
+      "too_many_attempts": "Trop d'essais : réessaie dans une heure.",
+      "erreur": "L'essai n'a pas pu être vérifié. Réessaie plus tard."
+    }
+  }
+}

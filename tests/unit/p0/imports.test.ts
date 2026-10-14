@@ -1241,31 +1241,53 @@ function importsClientDe(fichier: string, source: string): string[] {
  * Fermeture transitive depuis `departs`, `import()` compris ; rend les fichiers et paquets serveur seulement atteints,
  * avec le chemin qui y mène. `lire` est injecté pour jouer les cas négatifs sur un dépôt fictif.
  */
+/**
+ * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5) : la page de saisie
+ * du code d'accès du mode réel passe par une action serveur (`"use server"` : vue du navigateur, ses exports ne sont que
+ * des références, et ses imports n'entrent jamais dans un paquet client). Au-delà de cette action **seulement**, sont
+ * admis le module étroit du mode réel (`p0.ts`, qui ne lit aucune clé de service) et les modules de B3a qu'il importe ;
+ * tout autre module serveur seulement reste refusé, à travers l'action comme ailleurs (clés de service `ai.ts` et
+ * `grounding.ts`, `src/ai`, `src/grounding`, `src/research`, paquets). Verdicts Tech Lead et Sécurité demandés dans la
+ * PR de P0r3b.
+ */
+const FRONTIERE_ACTION_P0R3B = {
+  action: "src/server/actions/p0-acces.ts",
+  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/resolve.ts"],
+} as const;
+
 function atteintsServeurSeulement(
   departs: readonly string[],
   lire: (fichier: string) => string,
   resoudreCible: (depuis: string, specificateur: string) => Cible,
 ): string[] {
   const violations: string[] = [];
+  // Un nœud est un fichier ou un paquet, suivi deux fois au plus : hors de l'action de P0r3b, puis au-delà d'elle
+  // (`|action`). Un module atteint par les deux voies est donc contrôlé sur chacune.
+  const noeud = (cle: string, viaAction: boolean) => (viaAction ? `${cle}|action` : cle);
+  const fichierDe = (n: string) => n.replace(/\|action$/, "");
   const precedent = new Map<string, string | null>(departs.map((d) => [d, null]));
   const pile = [...departs];
   const chemin = (fin: string) => {
     const etapes = [fin];
     for (let courant = precedent.get(fin); courant !== null && courant !== undefined; courant = precedent.get(courant)) etapes.unshift(courant);
-    return etapes.join(" → ");
+    return etapes.map(fichierDe).join(" → ");
   };
   while (pile.length > 0) {
     const courant = pile.pop() as string;
-    for (const specificateur of importsClientDe(courant, lire(courant))) {
-      const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(courant, specificateur);
+    const fichierCourant = fichierDe(courant);
+    const viaAction = courant.endsWith("|action") || fichierCourant === FRONTIERE_ACTION_P0R3B.action;
+    for (const specificateur of importsClientDe(fichierCourant, lire(fichierCourant))) {
+      const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(fichierCourant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
-      if (precedent.has(cle)) continue;
-      precedent.set(cle, courant);
-      if (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral") {
-        violations.push(chemin(cle));
+      const suivant = noeud(cle, viaAction);
+      if (precedent.has(suivant)) continue;
+      precedent.set(suivant, courant);
+      const admis = viaAction && (FRONTIERE_ACTION_P0R3B.admis as readonly string[]).includes(cle);
+      if (!admis && (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral")) {
+        violations.push(chemin(suivant));
         continue;
       }
-      if (cible.type === "projet") pile.push(cible.chemin);
+      if (cible.type === "projet") pile.push(suivant);
     }
   }
   return violations;
@@ -1318,6 +1340,28 @@ describe("p0: clé côté serveur seulement", () => {
     expect(un("src/lib/client.ts")).toEqual(["src/lib/client.ts → externe:ai"]);
     expect(un("src/lib/calcule.ts")).toEqual(["src/lib/calcule.ts → externe:?import-non-litteral"]);
     expect(un("src/components/Sain.tsx")).toEqual([]);
+  });
+
+  it("frontière de P0r3b : au-delà de son action seulement, le module étroit du mode réel et ses modules de B3a ; aucune clé, aucune autre action", () => {
+    const depot = new Map<string, string>([
+      ["src/app/prototype/page.tsx", 'import { a } from "@/server/actions/p0-acces";\nimport { b } from "@/server/actions/autre";\n'],
+      ["src/server/actions/p0-acces.ts", '"use server";\nimport { c } from "@/server/p0/acces";\n'],
+      ["src/server/p0/acces.ts", 'import { d } from "@/server/env/p0";\nimport { e } from "@/server/env/ai";\n'],
+      ["src/server/env/p0.ts", 'import { f } from "@/server/env/egress";\nimport { g } from "@/server/env/grounding";\n'],
+      ["src/server/actions/autre.ts", '"use server";\nimport { h } from "@/server/env/p0";\n'],
+      ["src/features/Direct.tsx", '"use client";\nimport { i } from "@/server/env/p0";\n'],
+    ]);
+    const lireFictif = (fichier: string) => depot.get(fichier) ?? "";
+    const resoudreFictif = (_depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    expect(atteintsServeurSeulement(["src/app/prototype/page.tsx"], lireFictif, resoudreFictif).sort()).toEqual(
+      [
+        "src/app/prototype/page.tsx → src/server/actions/p0-acces.ts → src/server/p0/acces.ts → src/server/env/ai.ts",
+        "src/app/prototype/page.tsx → src/server/actions/p0-acces.ts → src/server/p0/acces.ts → src/server/env/p0.ts → src/server/env/grounding.ts",
+        "src/app/prototype/page.tsx → src/server/actions/autre.ts → src/server/env/p0.ts",
+      ].sort(),
+    );
+    expect(atteintsServeurSeulement(["src/features/Direct.tsx"], lireFictif, resoudreFictif)).toEqual(["src/features/Direct.tsx → src/server/env/p0.ts"]);
   });
 
   /**

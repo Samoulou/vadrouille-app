@@ -188,6 +188,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "`ligne/require-server-only` ; décision 0050, « Lignes du régime de confinement » ; verdict Sécurité : plafond accepté par 0051 point 6.7 (ticket 293)",
   },
   {
+    fichier: "src/server/env/p0.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module étroit du mode réel, zone sensible, exigé par `ligne/require-server-only` ; " +
+      "P0r3b (ticket 311), décision 0055, section 1 point 2 ; verdict Sécurité à rendre",
+  },
+  {
     fichier: "tests/unit/server/env.test.ts",
     specificateur: "node:util",
     noms: ["inspect"],

@@ -137,6 +137,24 @@ const CANONICAL_EMAIL_SYNTAX = [
 ];
 
 /**
+ * P0r3b (décision 0055, section 1 point 2 ; S-1 point 3) : la preuve `GardeOuverte` n'est fabriquée que par
+ * `src/server/p0/garde.ts`. Même interdiction que `CanonicalEmail`, ajoutée à la même règle (`no-restricted-syntax`,
+ * mêmes blocs) ; seule exemption en plus de `garde.ts` : les fichiers de `tests/` (le test « chaque étape revérifie la
+ * garde » fabrique une preuve hors des conditions). Aucune fabrique de test dans `src/`.
+ */
+const GARDE_OUVERTE_MESSAGE =
+  "GardeOuverte n'est fabriquée que par src/server/p0/garde.ts (décision 0055, section 1 point 2) : ni conversion, ni assertion, ni prédicat de type hors des tests de tests/.";
+const GARDE_OUVERTE_SYNTAX = [
+  { selector: "TSAsExpression > TSTypeReference.typeAnnotation[typeName.name='GardeOuverte']", message: GARDE_OUVERTE_MESSAGE },
+  { selector: "TSTypeAssertion > TSTypeReference.typeAnnotation[typeName.name='GardeOuverte']", message: GARDE_OUVERTE_MESSAGE },
+  { selector: "TSTypePredicate TSTypeReference[typeName.name='GardeOuverte']", message: GARDE_OUVERTE_MESSAGE },
+];
+/** Types de marque fabriqués par un seul module : liste reprise par chaque bloc qui règle `no-restricted-syntax`. */
+const MARQUES_SYNTAX = [...CANONICAL_EMAIL_SYNTAX, ...GARDE_OUVERTE_SYNTAX];
+/** Fichiers exemptés de l'interdiction de `GardeOuverte` (et d'elle seule). */
+const GARDE_OUVERTE_EXEMPTES = ["src/server/p0/garde.ts", "tests/**"];
+
+/**
  * B5a (décision 0045 § 3, B5-TL-3 ; handover § 3) : `src/domain` sans entrée-sortie. Liste blanche des imports
  * (`import`, `import type`, `export … from`) : `@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain`
  * (`@/domain/*` ou relatif sans remonter), et `vitest` pour les seuls `*.test.ts`. Constructions refusées : `process`
@@ -166,7 +184,7 @@ function domainSansEntreeSortie(avecVitest) {
       { selector: "CallExpression[callee.name='Date']", message: io },
       { selector: "CallExpression[callee.name='require']", message: io },
       { selector: "ImportExpression", message: io },
-      ...CANONICAL_EMAIL_SYNTAX,
+      ...MARQUES_SYNTAX,
     ],
   };
 }
@@ -193,8 +211,18 @@ export default defineConfig([
   {
     // B3a (décision 0050, B3-TL-6 point 6 ; 0051 point 4.4) : `CanonicalEmail` fabriqué par `src/server/email.ts` seul,
     // tests compris. Repris par les blocs plus bas qui règlent `no-restricted-syntax` (src/domain, adaptateurs simulés).
+    // P0r3b (décision 0055, section 1 point 2) : même règle pour `GardeOuverte`, fabriquée par `src/server/p0/garde.ts`
+    // seul, tests de `tests/` exceptés (deux blocs suivants).
     files: ["**/*.{ts,tsx,mts,cts}"],
-    ignores: ["src/server/email.ts"],
+    ignores: ["src/server/email.ts", ...GARDE_OUVERTE_EXEMPTES],
+    rules: { "no-restricted-syntax": ["error", ...MARQUES_SYNTAX] },
+  },
+  {
+    files: ["src/server/email.ts"],
+    rules: { "no-restricted-syntax": ["error", ...GARDE_OUVERTE_SYNTAX] },
+  },
+  {
+    files: GARDE_OUVERTE_EXEMPTES,
     rules: { "no-restricted-syntax": ["error", ...CANONICAL_EMAIL_SYNTAX] },
   },
   {
@@ -344,7 +372,7 @@ export default defineConfig([
           selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message: "Horloge de la portée seulement (option now) : pas de new Date() (décision 0020 § 2.2).",
         },
-        ...CANONICAL_EMAIL_SYNTAX,
+        ...MARQUES_SYNTAX,
       ],
     },
   },

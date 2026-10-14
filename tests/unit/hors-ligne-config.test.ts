@@ -82,6 +82,18 @@ describe("en-têtes de la vue partagée (C39, F10-TL-8)", () => {
   });
 });
 
+describe("en-têtes du mode réel du prototype (P0r3b ; décision 0055, S-2 point 5)", () => {
+  it("/prototype/:path* : privé et no-store, référent réduit à l'origine, jamais indexé", async () => {
+    expect(await nextConfig.headers?.()).toEqual(RESPONSE_HEADERS);
+    const rule = RESPONSE_HEADERS.find((entry) => entry.source === "/prototype/:path*");
+    expect(rule?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
+  });
+});
+
 describe("Playwright : service workers bloqués par défaut (F10-TL-6)", () => {
   it("use.serviceWorkers vaut « block » au niveau global, sans projet supplémentaire", () => {
     expect(playwrightConfig.use?.serviceWorkers).toBe("block");

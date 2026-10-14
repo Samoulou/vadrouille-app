@@ -21,6 +21,8 @@ export const LOG_EVENTS = [
   "rate_limit.purge_failed",
   "rate_limit.rows_high",
   "rate_limit.failed",
+  // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée ; champ `guard` seulement (code fermé).
+  "p0.guard_closed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -37,6 +39,8 @@ export type LogFields = {
   readonly rows?: number;
   readonly environment?: string;
   readonly errorName?: string;
+  /** Code fermé de la garde du mode réel (`src/server/p0/garde.ts`), jamais une valeur. */
+  readonly guard?: string;
 };
 
 /**
@@ -62,6 +66,9 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     STRIPE_SECRET_KEY: 0,
     STRIPE_PUBLISHABLE_KEY: 0,
     "STRIPE_*": 0,
+    P0_REAL_RUNS: 0,
+    P0_RUN_TOKEN: 0,
+    "P0_*": 0,
   }),
 );
 
@@ -80,6 +87,25 @@ const REGLES = new Set([
   "untrusted_header",
   "header_outside_vercel",
 ]);
+/**
+ * Codes de la garde fermée du mode réel (décision 0055, section 1 point 2) : ceux de `lireEnvP0`
+ * (`src/server/env/p0.ts`, que ce module n'importe pas : `ligne/server-env-imports`) et ceux de la garde
+ * (`src/server/p0/garde.ts`) ; l'égalité des listes est vérifiée par le test de la garde.
+ */
+export const LOG_GUARD_CODES: readonly string[] = [
+  "production_refused",
+  "proxy_env_refused",
+  "tls_env_refused",
+  "environment_refused",
+  "ci_refused",
+  "branch_refused",
+  "real_runs_disabled",
+  "database_missing",
+  "access_code_missing",
+  "access_code_invalid",
+  "production_deployment",
+];
+const GARDES: ReadonlySet<string> = new Set(LOG_GUARD_CODES);
 const ENVIRONNEMENTS = new Set(["local", "ci", "staging", "production"]);
 const CODES: ReadonlySet<string> = new Set(API_ERROR_CODES);
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
@@ -98,6 +124,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["rows", entierPositif],
   ["environment", (v) => chaine(v) && ENVIRONNEMENTS.has(v)],
   ["errorName", (v) => chaine(v) && NOM_ERREUR.test(v)],
+  ["guard", (v) => chaine(v) && GARDES.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
