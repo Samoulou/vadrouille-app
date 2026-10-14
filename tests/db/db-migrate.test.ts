@@ -17,15 +17,18 @@ import {
   lancer,
   ligneApprouvee,
   type Options,
+  remplacerListe,
   requeteAdmin,
   supprimerBases,
+  WORKFLOWS,
 } from "./workflows-harnais";
 
 /**
  * `ci: l'exécuteur de db-migrate.yml et db/migrate.ts tiennent le même journal` (décision 0056, « Tests imposés »),
  * sur le serveur de la CI (`postgres:17.11`), dans des bases jetables créées vides par le harnais
  * (`tests/db/workflows-harnais.ts`, Q412). Le bloc `run:` du workflow est joué tel quel, avec une liste d'approbation
- * posée par le test (la liste du workflow est vide) ; aucune base réelle, aucun secret réel.
+ * posée par le test, qui remplace le bloc entier de la liste du workflow quel qu'en soit le contenu (la liste du dépôt
+ * grandit, 0056 § 3.4) ; aucune base réelle, aucun secret réel.
  */
 
 afterAll(async () => {
@@ -37,7 +40,8 @@ const WF = "db-migrate.yml";
 const JOURNAL = readMigrations();
 const LISTE_JOURNAL = JOURNAL.map((m) => `${m.tag} ${m.sha256}`);
 
-function migrer(options: Options) {
+/** La liste est toujours explicite : les tests ne dépendent pas du contenu de la liste du dépôt. */
+function migrer(options: Options & { readonly liste: readonly string[] }) {
   return executer(WF, ETAPE_MIGRATE, options);
 }
 
@@ -171,19 +175,50 @@ describe("ci: l'exécuteur de db-migrate.yml et db/migrate.ts tiennent le même 
     expect(await existe(base, "prototype.runs")).toBe(false);
   });
 
-  it("liste vide (celle du workflow) : aucune connexion", async () => {
+  it("liste vide : aucune connexion", async () => {
     const base = await creerBase("dm_liste_vide");
-    const r = migrer({ base });
+    const r = migrer({ base, liste: [] });
     expect(r.code, r.sortie).toBe(0);
     expect(r.sortie).toContain("Aucune migration approuvée : aucune connexion.");
     expect(await journal(base)).toBeNull();
+  });
+
+  it("liste non vide dans le workflow (texte muté en mémoire) : le harnais la remplace en entier", async () => {
+    const yaml = readFileSync(path.join(WORKFLOWS, WF), "utf8");
+    const lignes = LISTE_JOURNAL.map((l) => `            "${l}"`).join("\n");
+    const mute = yaml.replace(/^( *)MIGRATIONS_APPROUVEES=\($/m, (debut) => `${debut}\n${lignes}`);
+    expect(mute).not.toBe(yaml);
+    const vide = await creerBase("dm_yaml_vide");
+    const r1 = migrer({ base: vide, liste: [], workflow: mute });
+    expect(r1.code, r1.sortie).toBe(0);
+    expect(r1.sortie).toContain("Aucune migration approuvée : aucune connexion.");
+    expect(await journal(vide)).toBeNull();
+    const une = await creerBase("dm_yaml_une");
+    const r2 = migrer({ base: une, liste: LISTE_JOURNAL.slice(0, 1), workflow: mute });
+    expect(r2.code, r2.sortie).toBe(0);
+    expect(await journal(une)).toEqual(LISTE_JOURNAL.slice(0, 1));
+  });
+});
+
+describe("harnais : remplacement de la liste d'approbation (motif à ancres, une seule occurrence)", () => {
+  const run = 'set -eo pipefail\nMIGRATIONS_APPROUVEES=(\n  "0000_a 00"\n  "0001_b 11"\n)\nfor l in "${MIGRATIONS_APPROUVEES[@]}"; do :; done\n';
+
+  it("remplace le bloc entier, liste vide comprise", () => {
+    expect(remplacerListe(run, [])).toBe('set -eo pipefail\nMIGRATIONS_APPROUVEES=(\n)\nfor l in "${MIGRATIONS_APPROUVEES[@]}"; do :; done\n');
+    expect(remplacerListe(run, ["0002_c 22"])).toContain('MIGRATIONS_APPROUVEES=(\n  "0002_c 22"\n)\nfor');
+  });
+
+  it("refuse un bloc absent ou en double", () => {
+    expect(() => remplacerListe("echo rien\n", [])).toThrow(/0 bloc/);
+    expect(() => remplacerListe(`${run}${run}`, [])).toThrow(/2 bloc/);
+    expect(() => remplacerListe(`${run}MIGRATIONS_APPROUVEES=()\n`, [])).toThrow(/2 affectation/);
   });
 });
 
 describe("db-migrate : refus sans connexion, rien n'est appliqué (0056 § 2.6.1)", () => {
   const SENTINELLE = "sentinelle0hote0secret";
 
-  async function refusSansConnexion(options: Omit<Options, "base">, message: RegExp): Promise<string> {
+  async function refusSansConnexion(options: Omit<Options, "base"> & { readonly liste: readonly string[] }, message: RegExp): Promise<string> {
     const base = await creerBase("dm_refus");
     const r = migrer({ base, ...options });
     expect(r.code, r.sortie).toBe(1);
@@ -366,7 +401,7 @@ describe("db-migrate : application, échecs et lots (0056 § 2.6.4)", () => {
     }
   });
 
-  it("SET search_path non local dans une migration : sans effet sur la migration suivante, ouverte dans une autre session (question à la revue)", async () => {
+  it("SET search_path non local dans une migration : sans effet sur la migration suivante, ouverte dans une autre session (cas accepté, sans effet : décision du Tech Lead à venir, revue de la PR 332)", async () => {
     const espace = espaceDeTravail();
     ecrireMigration(espace, "9060_chemin", "SET search_path = vadrouille_migrations;\n");
     ecrireMigration(espace, "9061_suivante", "CREATE TABLE t_suivante (v text);\n");

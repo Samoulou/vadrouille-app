@@ -479,7 +479,8 @@ describe("ci: sortie de db-releve en échec fermé", () => {
       const r = jouer(`${ENTETE}${`${R3_PIRE}\n`.repeat(596)}`);
       expect(r.code, r.sortie.slice(-300)).toBe(0);
       expect(COMPTEURS.exec(r.sortie)?.slice(1, 4)).toEqual(["600", "596", "4"]);
-      // Mesure jointe à la PR (§ 5.2) ; borne : moitié de timeout-minutes: 15.
+      // Mesure jointe à la PR (§ 5.2) : 171 s relevées sur ubuntu-24.04 (CI `verify` du head d647077, suite complète en
+      // parallèle), soit 2,6 fois sous la borne. Borne : moitié de timeout-minutes: 15, exigée par 0057 § 5.2.
       console.info(`db-releve : 600 lignes du pire cas filtrées en ${Math.round(r.duree / 1000)} s`);
       expect(r.duree).toBeLessThan(450_000);
     },

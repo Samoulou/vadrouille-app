@@ -114,6 +114,9 @@ arrière se fait **vers l'avant**, par une migration corrective :
    le verdict Sécurité G1 à G6 (0056 § 3), et attend `owner-approved` de Samuel (Q408). `db/migrate.ts` refuse tout
    hôte autre que `localhost`, `127.0.0.1` ou `::1` (0056 § 2.8). Relevé du catalogue en lecture : `db-releve.yml`
    (décision 0057), lancé par la Sécurité.
+   Liste vide : le workflow sort en succès sans aucune connexion. **Un run vert avec une liste vide ne teste ni les
+   secrets ni la connexion** ; seul un run qui applique au moins une migration approuvée les éprouve (réponse du
+   Tech Lead, revue de la PR 332).
 
 Test de restauration sur la base de staging (sauvegarde, point dans le temps) : renvoyé à la question 3 de la
 spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de conservation).
@@ -226,6 +229,7 @@ reprendre avec le Tech Lead.
 
 Il ne se connecte pas à la base de staging, n'exécute rien dans la console Neon, ne crée ni ne supprime de variable
 Vercel, ne reçoit aucun mot de passe et n'applique de migration que par le workflow `db-migrate.yml`
-(décision 0056), migration par migration approuvée par Samuel. **Exception (Q321, amendement ci-dessus)** : l'amorçage des trois rôles du prototype, la connexion
-d'administration qu'il exige, la pose de leurs mots de passe, de `P0_DATABASE_URL` et des secrets de `p0-purge`, par
-le studio selon 0046 S5, après la décision 0056 ; la lecture de contrôle reste à Samuel.
+(décision 0056), migration par migration approuvée par Samuel. **Exception (Q321, amendement ci-dessus)** :
+l'amorçage des trois rôles du prototype, la connexion d'administration qu'il exige, la pose de leurs mots de passe, de
+`P0_DATABASE_URL` et des secrets de `p0-purge`, par le studio selon 0046 S5, après la décision 0056 ; la lecture de
+contrôle reste à Samuel.

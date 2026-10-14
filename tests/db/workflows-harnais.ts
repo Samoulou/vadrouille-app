@@ -105,7 +105,13 @@ export function ligneApprouvee(espace: string, tag: string): string {
 
 export type Options = {
   readonly base: string;
+  /**
+   * Liste d'approbation posée par le test : remplace le bloc entier `MIGRATIONS_APPROUVEES=( … )` du workflow, quel
+   * qu'en soit le contenu (la liste du dépôt grandit, 0056 § 3.4) ; `[]` pose une liste vide.
+   */
   readonly liste?: readonly string[];
+  /** Texte du workflow à la place du fichier du dépôt (workflow muté en mémoire par le test). */
+  readonly workflow?: string;
   readonly espace?: string;
   readonly garderSsl?: boolean;
   readonly env?: Readonly<Record<string, string>>;
@@ -119,13 +125,26 @@ export type Resultat = { readonly code: number | null; readonly sortie: string; 
 
 export const SHA = "c0ffee".padEnd(40, "0");
 
+/** Bloc entier de la liste d'approbation, de `MIGRATIONS_APPROUVEES=(` à la première ligne `)` (ancres de ligne). */
+const BLOC_LISTE = /^MIGRATIONS_APPROUVEES=\($[\s\S]*?^\)$/gm;
+
+/**
+ * Remplace le bloc `MIGRATIONS_APPROUVEES=( … )` du bloc `run:` par la liste du test. Le bloc doit apparaître
+ * exactement une fois, et le nom `MIGRATIONS_APPROUVEES=` n'ouvrir aucune autre ligne.
+ */
+export function remplacerListe(run: string, liste: readonly string[]): string {
+  const blocs = run.match(BLOC_LISTE)?.length ?? 0;
+  const ouvertures = run.match(/^MIGRATIONS_APPROUVEES=/gm)?.length ?? 0;
+  if (blocs !== 1 || ouvertures !== 1) throw new Error(`liste d'approbation : ${blocs} bloc(s), ${ouvertures} affectation(s) au lieu d'une`);
+  const bloc = ["MIGRATIONS_APPROUVEES=(", ...liste.map((l) => `  "${l}"`), ")"].join("\n");
+  return run.replace(BLOC_LISTE, () => bloc);
+}
+
 /** Script et environnement de l'étape, prêts à être lancés. */
 export function preparer(fichier: string, nom: string, options: Options): { script: string; env: NodeJS.ProcessEnv; runnerTemp: string } {
-  const e = etape(readFileSync(path.join(WORKFLOWS, fichier), "utf8"), nom);
+  const e = etape(options.workflow ?? readFileSync(path.join(WORKFLOWS, fichier), "utf8"), nom);
   let run = e.run;
-  if (options.liste !== undefined) {
-    run = remplacerUneFois(run, "MIGRATIONS_APPROUVEES=(\n)", `MIGRATIONS_APPROUVEES=(\n${options.liste.map((l) => `  "${l}"`).join("\n")}\n)`);
-  }
+  if (options.liste !== undefined) run = remplacerListe(run, options.liste);
   for (const [avant, apres] of options.substitutions ?? []) run = remplacerUneFois(run, avant, apres);
   const sql: Record<string, string> = {};
   let ssl = 0;
@@ -174,10 +193,17 @@ export function executer(fichier: string, nom: string, options: Options): Result
 export function lancer(fichier: string, nom: string, options: Options): { arreter: () => void; fin: Promise<number | null> } {
   const { script, env } = preparer(fichier, nom, options);
   const enfant: ChildProcess = spawn("bash", [...BASH, script], { env, detached: true, stdio: "ignore" });
-  const fin = new Promise<number | null>((resolve) => enfant.on("exit", (code) => resolve(code)));
+  // Drapeau « enfant terminé » : une fois le groupe sorti, son numéro peut être réattribué ; on ne le vise plus.
+  let termine = false;
+  const fin = new Promise<number | null>((resolve) =>
+    enfant.on("exit", (code) => {
+      termine = true;
+      resolve(code);
+    }),
+  );
   return {
     arreter: () => {
-      if (enfant.pid !== undefined) process.kill(-enfant.pid, "SIGKILL");
+      if (!termine && enfant.pid !== undefined) process.kill(-enfant.pid, "SIGKILL");
     },
     fin,
   };

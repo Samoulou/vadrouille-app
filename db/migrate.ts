@@ -28,7 +28,8 @@ import {
  *   ni `BYPASSRLS`.
  * - Base locale seulement (décision 0056 § 2.8) : tout hôte autre que `localhost`, `127.0.0.1` ou `::1` est refusé
  *   avant la connexion. La base réelle ne reçoit de migration que par `.github/workflows/db-migrate.yml`, qui
- *   n'exécute aucun fichier du dépôt et n'applique que les migrations approuvées. Aucun message ne contient la chaîne de connexion : une erreur d'ouverture n'en garde que le code
+ *   n'exécute aucun fichier du dépôt et n'applique que les migrations approuvées.
+ * - Aucun message ne contient la chaîne de connexion : une erreur d'ouverture n'en garde que le code
  *   (`sanitizeConnectionError`).
  */
 
