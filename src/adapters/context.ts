@@ -4,8 +4,12 @@ import { MOCK_REQUEST_CONTEXT } from "./mock";
 import { assertPrototypeAllowed } from "./prototype-instance";
 import type { AdapterContext } from "./types";
 
-/** Personne fictive du prototype, propriétaire de `org_prototype` (évolution E6 de B2). */
-export const PROTOTYPE_USER_ID = "user_prototype";
+/**
+ * Utilisateur technique du prototype, seul propriétaire de `org_prototype` (évolution E6 de B2) : identifiant fixe de
+ * type `uuid`, égal à celui que crée la migration `db/migrations/0003_prototype.sql` (décision 0046, D15 point 4), sans
+ * compte ni session.
+ */
+export const PROTOTYPE_USER_ID = "5e1f0000-0000-4000-8000-000000000002";
 
 /**
  * Contexte d'organisation d'une requête de page (décision 0013, § 3.6).

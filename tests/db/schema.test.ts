@@ -27,12 +27,13 @@ async function publicColumns(): Promise<{ table: string; column: string }[]> {
 }
 
 describe("schéma", () => {
-  it("schéma: RLS activée et forcée partout", async () => {
+  it("schéma: RLS activée et forcée partout (schémas public et prototype, décision 0046)", async () => {
     const { rows } = await app.query(
-      `SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class
-       WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') ORDER BY relname`,
+      `SELECT relnamespace::regnamespace::text || '.' || relname AS relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class
+       WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p') ORDER BY relname`,
     );
-    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length);
+    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 7);
+    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(7);
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
     }
@@ -190,10 +191,40 @@ describe("schéma", () => {
       .filter((name) => !ALLOWED.has(name) && PATTERNS.some((pattern) => pattern.test(name.split(".")[1] ?? "")));
     expect(offending).toEqual([]);
     expect(columns.some((c) => c.table === "trip_versions" && c.column === "validation_report")).toBe(false);
+    // Étendu au schéma prototype sans exception de nom (0046 D15 point 3 : la table de travail s'appelle run_candidates).
     const tables = await app.query(
-      "SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p', 'v', 'm') AND relname ~ '(plan|work|scratch)'",
+      "SELECT relname FROM pg_catalog.pg_class WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p', 'v', 'm') AND relname ~ '(plan|work|scratch)'",
     );
     expect(tables.rows).toEqual([]);
+  });
+
+  it("schéma: aucune fonction ni table du schéma prototype accessible à PUBLIC (décision 0046, D15 point 3)", async () => {
+    const schema = await app.query(
+      `SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n, pg_catalog.aclexplode(COALESCE(n.nspacl, pg_catalog.acldefault('n', n.nspowner))) AS acl
+                      WHERE n.nspname = 'prototype' AND acl.grantee = 0) AS public`,
+    );
+    expect(schema.rows[0].public).toBe(false);
+    const fonctions = await app.query(
+      `SELECT p.proname FROM pg_catalog.pg_proc p
+       WHERE p.pronamespace = 'prototype'::regnamespace
+         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS acl WHERE acl.grantee = 0)`,
+    );
+    expect(fonctions.rows).toEqual([]);
+    const tables = await app.query(
+      `SELECT c.relname FROM pg_catalog.pg_class c
+       WHERE c.relnamespace = 'prototype'::regnamespace
+         AND (EXISTS (SELECT 1 FROM pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) AS acl WHERE acl.grantee = 0)
+              OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a, pg_catalog.aclexplode(a.attacl) AS acl
+                         WHERE a.attrelid = c.oid AND a.attacl IS NOT NULL AND acl.grantee = 0))`,
+    );
+    expect(tables.rows).toEqual([]);
+    // Les fonctions de coordonnées de public non plus (0011 § 6 ; S8 pour store_prototype_coordinates).
+    const coords = await app.query(
+      `SELECT p.proname FROM pg_catalog.pg_proc p
+       WHERE p.pronamespace = 'public'::regnamespace AND p.proname IN ('store_place_coordinates', 'store_prototype_coordinates', 'purge_expired_coordinates')
+         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS acl WHERE acl.grantee = 0)`,
+    );
+    expect(coords.rows).toEqual([]);
   });
 
   it("partage: la vue partagée n'expose jamais place_coordinates", async () => {

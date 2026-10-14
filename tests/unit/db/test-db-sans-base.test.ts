@@ -29,6 +29,9 @@ function run(extra: Record<string, string | undefined>) {
     VADROUILLE_DATABASE_URL_AUTH: UNREACHABLE,
     VADROUILLE_DATABASE_URL_MIGRATOR: UNREACHABLE,
     VADROUILLE_DB_ADMIN_URL: UNREACHABLE,
+    // P0r2 (décision 0046) : connexions des rôles du prototype, posées par `scripts/ci/db-setup.sh`.
+    VADROUILLE_DB_PROTOTYPE_URL: UNREACHABLE,
+    VADROUILLE_DB_PROTOTYPE_PURGE_URL: UNREACHABLE,
     ...extra,
   });
   const result = spawnSync("node", ["scripts/test-db.mjs"], { env: env as NodeJS.ProcessEnv, encoding: "utf8", timeout: 90_000 });

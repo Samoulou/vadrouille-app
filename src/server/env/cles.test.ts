@@ -1,10 +1,20 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lireCleOpenRouter } from "@/server/env/ai";
 import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 import { clesDeServicePosees } from "@/server/env/garde-cles";
 import { lireCleGoogle } from "@/server/env/grounding";
+
+// 0046 D21 : la barrière de sortie lit aussi le vrai `process.env` ; ces tests le posent en préversion, puis le rétablissent.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "preview");
+  vi.stubEnv("VERCEL_TARGET_ENV", undefined);
+  vi.stubEnv("VADROUILLE_ENV", undefined);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 /**
  * `p0: modules d'environnement étroits` et `p0: aucune clé dans l'environnement des tests` (P0r1). Chaque module ne

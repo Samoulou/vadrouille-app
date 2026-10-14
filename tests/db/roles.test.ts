@@ -1,8 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+
 import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, seedOrganization } from "./helpers";
 
-/** Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1. */
+/**
+ * Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1, amendés par la décision 0046 (P0r2 :
+ * 16 rôles, `place_coordinates`, schéma `prototype`, fonctions de coordonnées et de purge).
+ */
 
 const ROLES = {
   vadrouille_owner: false,
@@ -18,6 +23,10 @@ const ROLES = {
   vadrouille_fn_checkout: false,
   vadrouille_fn_coords: false,
   vadrouille_fn_purge: false,
+  // Décision 0046, D15 point 6 et D16 points 2 et 5.
+  vadrouille_prototype: true,
+  vadrouille_prototype_purge: true,
+  vadrouille_fn_prototype_purge: false,
 } as const;
 /** Attribut LOGIN attendu par rôle, lu par `Map` (clé venue de la base : aucun accès calculé, spécification P0c, 2.6). */
 const LOGIN_BY_ROLE = new Map<string, boolean>(Object.entries(ROLES));
@@ -50,6 +59,8 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     organizations: ["SELECT"],
     memberships: ["SELECT"],
     users: ["SELECT"],
+    // 0011 § 6, amendée par 0046 S2 : lecture bornée, hors org_prototype ; écriture par store_place_coordinates.
+    place_coordinates: ["SELECT"],
   },
   vadrouille_auth: {
     users: ["SELECT", "INSERT", "DELETE"],
@@ -71,8 +82,13 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_fn_share: {},
   vadrouille_fn_share_views: {},
   vadrouille_fn_checkout: {},
-  vadrouille_fn_coords: {},
+  vadrouille_fn_coords: { place_coordinates: ["INSERT", "DELETE"] },
   vadrouille_fn_purge: Object.fromEntries(PURGED_TABLES.map((t) => [t, ["DELETE"]])),
+  // 0046 D15 point 6 : lecture de place_coordinates seulement (organisation fixe, lignes vivantes) ; aucun droit sur
+  // une autre table de public, ni organizations ni usage_ledger.
+  vadrouille_prototype: { place_coordinates: ["SELECT"] },
+  vadrouille_prototype_purge: {},
+  vadrouille_fn_prototype_purge: {},
 };
 
 /** Droits par colonne attendus, en plus des droits de table. */
@@ -96,6 +112,7 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     checklist_items: { SELECT: ["booking_url", "done", "id", "kind", "label", "moment", "organization_id", "sponsored", "stop_id", "trip_id"] },
   },
   vadrouille_fn_checkout: { checkouts: { SELECT: ["organization_id", "stripe_checkout_session_id"] } },
+  vadrouille_fn_coords: { place_coordinates: { SELECT: ["expires_at", "organization_id", "place_id"] } },
   vadrouille_fn_purge: {
     memberships: { SELECT: ["organization_id", "role", "user_id"] },
     organizations: { SELECT: ["deletion_requested_at", "id"], UPDATE: ["deletion_requested_at"] },
@@ -206,7 +223,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
   });
 
   it("aucun rôle de connexion ne peut prendre un rôle vadrouille_fn_* ni vadrouille_owner (hors vadrouille_migrator)", async () => {
-    for (const login of ["app", "auth", "migrator"] as const) {
+    for (const login of ["app", "auth", "migrator", "p0", "p0_purge"] as const) {
       const client = await connect(login);
       for (const role of [...FN_ROLES, ...(login === "migrator" ? [] : ["vadrouille_owner"])]) {
         await expect(client.query(`SET ROLE ${role}`), `${login} → ${role}`).rejects.toMatchObject({ code: "42501" });
@@ -214,10 +231,10 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
     }
   });
 
-  it("seul vadrouille_owner possède des tables ; seul vadrouille_fn_share_views possède les vues partagées ; vadrouille_fn_coords ne possède rien", async () => {
+  it("seul vadrouille_owner possède des tables (public et prototype) ; seul vadrouille_fn_share_views possède les vues partagées ; vadrouille_fn_coords ne possède que ses trois fonctions", async () => {
     const owners = await app.query(
       `SELECT relname, relkind, pg_catalog.pg_get_userbyid(relowner) AS owner FROM pg_catalog.pg_class
-       WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p', 'v', 'm', 'S', 'f')`,
+       WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p', 'v', 'm', 'S', 'f')`,
     );
     for (const row of owners.rows) {
       if (row.relkind === "v") {
@@ -228,11 +245,19 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       }
     }
     expect(owners.rows.filter((r) => r.relkind === "v").map((r) => r.relname).sort()).toEqual(SHARED_VIEWS);
-    const coords = await app.query(
-      `SELECT (SELECT count(*) FROM pg_catalog.pg_class WHERE relowner = 'vadrouille_fn_coords'::regrole)
-            + (SELECT count(*) FROM pg_catalog.pg_proc WHERE proowner = 'vadrouille_fn_coords'::regrole) AS n`,
-    );
-    expect(Number(coords.rows[0].n)).toBe(0);
+    // 0011 § 6 et 0046 S2 : vadrouille_fn_coords possède ses trois fonctions et aucune table ; vadrouille_fn_prototype_purge
+    // possède la seule fonction de purge du prototype (0046 D16 point 2).
+    for (const [role, fonctions] of [
+      ["vadrouille_fn_coords", ["purge_expired_coordinates", "store_place_coordinates", "store_prototype_coordinates"]],
+      ["vadrouille_fn_prototype_purge", ["purge_expired"]],
+    ] as const) {
+      const tablesPossedees = await app.query("SELECT count(*) AS n FROM pg_catalog.pg_class WHERE relowner = $1::regrole", [role]);
+      expect(Number(tablesPossedees.rows[0].n), role).toBe(0);
+      const procs = await app.query("SELECT proname FROM pg_catalog.pg_proc WHERE proowner = $1::regrole ORDER BY proname", [role]);
+      expect(procs.rows.map((r) => r.proname), role).toEqual([...fonctions]);
+    }
+    const schema = await app.query("SELECT pg_catalog.pg_get_userbyid(nspowner) AS owner FROM pg_catalog.pg_namespace WHERE nspname = 'prototype'");
+    expect(schema.rows[0]?.owner).toBe("vadrouille_owner");
   });
 
   it("droits de table exactement ceux de la décision 0007, pour chaque rôle ; TRUNCATE à aucun", async () => {
@@ -305,8 +330,13 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       await migrator.query("SET LOCAL ROLE vadrouille_owner");
       // Même avec le contexte d'une organisation remplie : aucune politique ne vise vadrouille_owner.
       await migrator.query("SELECT set_config('app.organization_id', $1, true)", [seededOrg]);
-      for (const table of [...BUSINESS_TABLES, "organizations", "memberships", "users"]) {
+      for (const table of [...BUSINESS_TABLES, "organizations", "memberships", "users", "place_coordinates"]) {
         expect(Number((await migrator.query(`SELECT count(*) AS n FROM ${table}`)).rows[0].n), table).toBe(0);
+      }
+      // Schéma prototype (0046) : aucune politique ne vise vadrouille_owner, même avec le contexte d'org_prototype.
+      await migrator.query("SELECT set_config('app.organization_id', $1, true)", [PROTOTYPE_ORG_ID]);
+      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges"]) {
+        expect(Number((await migrator.query(`SELECT count(*) AS n FROM prototype.${table}`)).rows[0].n), `prototype.${table}`).toBe(0);
       }
       await migrator.query("RESET ROLE");
       for (const table of BUSINESS_TABLES) {
@@ -319,14 +349,22 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
 });
 
 describe("fonctions: SECURITY DEFINER durcies", () => {
+  // Amendé par 0046 (D16, « Tests imposés », et S8) : purge_expired() à vadrouille_prototype_purge seul ;
+  // purge_expired_coordinates à vadrouille_app et vadrouille_fn_prototype_purge ; store_place_coordinates à
+  // vadrouille_app seul ; store_prototype_coordinates à aucun rôle hors son propriétaire, PUBLIC compris (verrou S8 ;
+  // ce qui change au déverrouillage relève de 0052).
   const EXPECTED = {
     resolve_share_link: { owner: "vadrouille_fn_share", execute: ["vadrouille_app"] },
     checkout_organization: { owner: "vadrouille_fn_checkout", execute: ["vadrouille_webhook"] },
     purge_organization_data: { owner: "vadrouille_fn_purge", execute: ["vadrouille_account_admin"] },
+    store_place_coordinates: { owner: "vadrouille_fn_coords", execute: ["vadrouille_app"] },
+    store_prototype_coordinates: { owner: "vadrouille_fn_coords", execute: [] },
+    purge_expired_coordinates: { owner: "vadrouille_fn_coords", execute: ["vadrouille_app", "vadrouille_fn_prototype_purge"] },
+    purge_expired: { owner: "vadrouille_fn_prototype_purge", execute: ["vadrouille_prototype_purge"] },
   } as const;
   const EXPECTED_BY_NAME = new Map<string, (typeof EXPECTED)[keyof typeof EXPECTED]>(Object.entries(EXPECTED));
 
-  it("seules les trois fonctions prévues sont SECURITY DEFINER, avec search_path fixé, leur propriétaire vadrouille_fn_* et EXECUTE nominatif", async () => {
+  it("seules les sept fonctions prévues sont SECURITY DEFINER, avec search_path fixé, leur propriétaire vadrouille_fn_* et EXECUTE nominatif", async () => {
     const { rows } = await app.query(
       `SELECT p.oid, p.proname, pg_catalog.pg_get_userbyid(p.proowner) AS owner, p.proconfig,
               COALESCE((SELECT array_agg(CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(acl.grantee)::text END ORDER BY 1)::text[]
@@ -365,11 +403,151 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
 
   it("les fonctions nomment leurs objets avec leur schéma et n'utilisent aucun SQL dynamique", async () => {
     const { rows } = await app.query(
-      "SELECT proname, prosrc FROM pg_catalog.pg_proc WHERE prosecdef AND pronamespace = 'public'::regnamespace",
+      "SELECT proname, prosrc FROM pg_catalog.pg_proc WHERE prosecdef AND pronamespace IN ('public'::regnamespace, 'prototype'::regnamespace)",
     );
+    expect(rows.length).toBe(7);
     for (const row of rows) {
       expect(row.prosrc, row.proname).not.toMatch(/\bEXECUTE\b/i);
-      expect(row.prosrc, row.proname).not.toMatch(/\b(FROM|UPDATE|INTO|JOIN)\s+(?!public\.)[a-z_]+\b(?!\s*\()/i);
+      expect(row.prosrc, row.proname).not.toMatch(/\b(FROM|UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i);
     }
+  });
+});
+
+/**
+ * Schéma `prototype` (décision 0046, D15 point 6, D16 points 3 et 5) : droits de table et par colonne exacts, pour
+ * chacun des 16 rôles. Tout droit absent est refusé.
+ */
+describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
+  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "runs"];
+  const EXPECTED_PROTOTYPE: Record<string, Record<string, string[]>> = {
+    vadrouille_prototype: {
+      runs: ["SELECT"],
+      forfaits: ["SELECT"],
+      programmes: ["SELECT"],
+      jugements: ["SELECT"],
+      run_attempts: ["SELECT"],
+      run_candidates: ["SELECT", "DELETE"],
+      purges: ["SELECT"],
+    },
+    vadrouille_fn_prototype_purge: {
+      programmes: ["DELETE"],
+      jugements: ["DELETE"],
+      run_attempts: ["DELETE"],
+      run_candidates: ["DELETE"],
+      purges: ["INSERT", "DELETE"],
+    },
+  };
+  const EXPECTED_PROTOTYPE_COLUMNS: Record<string, Record<string, Record<string, string[]>>> = {
+    vadrouille_prototype: {
+      runs: {
+        INSERT: ["brief", "canary_ok", "commit_sha", "cost_models_micros", "mode", "phase", "status", "stop_code", "variant"],
+        UPDATE: ["canary_ok", "cost_models_micros", "phase", "status", "stop_code"],
+      },
+      forfaits: {
+        INSERT: [
+          "google_cost_micros",
+          "models_cost_micros",
+          "nature",
+          "place_details_requests",
+          "routes_elements",
+          "routes_requests",
+          "run_id",
+          "text_search_requests",
+        ],
+        UPDATE: [],
+      },
+      programmes: { INSERT: ["contenu", "run_id"], UPDATE: [] },
+      jugements: { INSERT: ["programme_id", "reponses"], UPDATE: [] },
+      run_attempts: { INSERT: ["resultat"], UPDATE: [] },
+      run_candidates: { INSERT: ["candidat", "cle", "place_id", "run_id"], UPDATE: [] },
+      purges: { INSERT: [], UPDATE: [] },
+    },
+    vadrouille_fn_prototype_purge: {
+      programmes: { SELECT: ["expires_at"] },
+      jugements: { SELECT: ["expires_at"] },
+      run_attempts: { SELECT: ["expires_at"] },
+      run_candidates: { SELECT: ["expires_at"] },
+      purges: { SELECT: ["purged_at"] },
+      runs: { SELECT: [] },
+      forfaits: { SELECT: [] },
+    },
+  };
+
+  // Les relevés du catalogue se font sous vadrouille_prototype : vadrouille_app n'a pas USAGE sur le schéma et ne
+  // peut même pas résoudre un nom `prototype.*` (D15 point 7, testé à part).
+  let proto: DbClient;
+  beforeAll(async () => {
+    proto = await connect("p0");
+  });
+
+  it("les tables du schéma prototype sont exactement celles de D15 point 3", async () => {
+    const { rows } = await proto.query(
+      "SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'prototype'::regnamespace AND relkind IN ('r', 'p', 'v', 'm', 'f') ORDER BY relname",
+    );
+    expect(rows.map((r) => r.relname)).toEqual(PROTOTYPE_TABLES);
+  });
+
+  // Propriétaire des tables (et vadrouille_migrator, par son appartenance) : droits de propriétaire, sans politique
+  // (RLS forcée : il ne lit aucune ligne, test « vadrouille_owner lit zéro ligne » étendu ci-dessous).
+  const NON_PROPRIETAIRES = Object.keys(ROLES).filter((r) => r !== "vadrouille_owner" && r !== "vadrouille_migrator");
+
+  it("droits de table exactement ceux de 0046, pour chacun des 14 rôles non propriétaires ; TRUNCATE à aucun", async () => {
+    for (const role of NON_PROPRIETAIRES) {
+      const expected = EXPECTED_PROTOTYPE[role] ?? {};
+      for (const table of PROTOTYPE_TABLES) {
+        const { rows } = await proto.query(
+          `SELECT p AS privilege FROM unnest($3::text[]) AS p WHERE pg_catalog.has_table_privilege($1, 'prototype.' || $2, p)`,
+          [role, table, TABLE_PRIVILEGES],
+        );
+        expect(rows.map((r) => r.privilege).sort(), `${role} sur prototype.${table}`).toEqual([...(expected[table] ?? [])].sort());
+      }
+    }
+  });
+
+  it("droits par colonne : INSERT de vadrouille_prototype sans id, organization_id, quota_day, started_at, created_at ni expires_at (S1) ; UPDATE sur runs seulement", async () => {
+    for (const [role, byTable] of Object.entries(EXPECTED_PROTOTYPE_COLUMNS)) {
+      for (const [table, byPrivilege] of Object.entries(byTable)) {
+        for (const [privilege, expected] of Object.entries(byPrivilege)) {
+          const { rows } = await proto.query(
+            `SELECT a.attname FROM pg_catalog.pg_attribute a
+             WHERE a.attrelid = ('prototype.' || $2)::regclass AND a.attnum > 0 AND NOT a.attisdropped
+               AND pg_catalog.has_column_privilege($1, a.attrelid, a.attnum, $3)
+             ORDER BY a.attname`,
+            [role, table, privilege],
+          );
+          expect(rows.map((r) => r.attname), `${role} ${privilege} sur prototype.${table}`).toEqual([...expected].sort());
+        }
+      }
+    }
+    // Aucun autre rôle n'a de droit de colonne sur une table du schéma.
+    for (const role of NON_PROPRIETAIRES.filter((r) => !(r in EXPECTED_PROTOTYPE_COLUMNS))) {
+      for (const table of PROTOTYPE_TABLES) {
+        const { rows } = await proto.query(
+          "SELECT pg_catalog.has_any_column_privilege($1, ('prototype.' || $2)::regclass, 'SELECT, INSERT, UPDATE, REFERENCES') AS any",
+          [role, table],
+        );
+        expect(rows[0].any, `${role} sur prototype.${table}`).toBe(false);
+      }
+    }
+  });
+
+  it("USAGE du schéma prototype : vadrouille_prototype, vadrouille_prototype_purge et vadrouille_fn_prototype_purge seulement (et son propriétaire) ; CREATE au propriétaire seul", async () => {
+    const { rows } = await proto.query(
+      "SELECT r AS role FROM unnest($1::text[]) AS r WHERE pg_catalog.has_schema_privilege(r, 'prototype', 'USAGE') ORDER BY 1",
+      [Object.keys(ROLES)],
+    );
+    // vadrouille_migrator par son appartenance à vadrouille_owner (décision 0036).
+    expect(rows.map((r) => r.role)).toEqual([
+      "vadrouille_fn_prototype_purge",
+      "vadrouille_migrator",
+      "vadrouille_owner",
+      "vadrouille_prototype",
+      "vadrouille_prototype_purge",
+    ]);
+    const create = await proto.query(
+      "SELECT r AS role FROM unnest($1::text[]) AS r WHERE pg_catalog.has_schema_privilege(r, 'prototype', 'CREATE') ORDER BY 1",
+      [Object.keys(ROLES)],
+    );
+    expect(create.rows.map((r) => r.role)).toEqual(["vadrouille_migrator", "vadrouille_owner"]);
   });
 });

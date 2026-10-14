@@ -1,11 +1,13 @@
--- Amorçage des rôles de la décision 0007 (spécification B1, « Amorçage des rôles »).
+-- Amorçage des rôles de la décision 0007 (spécification B1, « Amorçage des rôles »), amendée par la décision 0046
+-- (D17 point 2) : 16 rôles, dont les trois du prototype de recherche (P0r2).
 --
 -- À exécuter UNE FOIS PAR BASE, avant les migrations, par un utilisateur qui peut créer des rôles :
 --   - en CI : le superutilisateur du conteneur postgres:17.11 (job `db`) ;
 --   - sur la base Neon de staging : l'utilisateur propriétaire de l'intégration, par Samuel, dans l'éditeur SQL
 --     de la console Neon (procédure de `db/README.md`, « Passage aux rôles à moindre privilège »).
--- Idempotent : une seconde exécution ne change rien. Il ne contient AUCUN mot de passe : les trois rôles de
--- connexion (vadrouille_migrator, vadrouille_app, vadrouille_auth) reçoivent le leur hors du dépôt.
+-- Idempotent : une seconde exécution ne change rien. Il ne contient AUCUN mot de passe : les cinq rôles de
+-- connexion (vadrouille_migrator, vadrouille_app, vadrouille_auth, vadrouille_prototype,
+-- vadrouille_prototype_purge) reçoivent le leur hors du dépôt (pour les deux derniers : 0046, S5).
 -- Aucun rôle n'a SUPERUSER ni BYPASSRLS ; si un rôle existe déjà avec un attribut inattendu, le script s'arrête
 -- au lieu de le corriger en silence.
 
@@ -25,7 +27,12 @@ DECLARE
     ['vadrouille_fn_share_views', 'false'],
     ['vadrouille_fn_checkout', 'false'],
     ['vadrouille_fn_coords', 'false'],
-    ['vadrouille_fn_purge', 'false']
+    ['vadrouille_fn_purge', 'false'],
+    -- Prototype de recherche (décision 0046, D15 point 6 et D16) : connexion de l'adaptateur du prototype, connexion
+    -- du job de purge, propriétaire de la fonction de purge.
+    ['vadrouille_prototype', 'true'],
+    ['vadrouille_prototype_purge', 'true'],
+    ['vadrouille_fn_prototype_purge', 'false']
   ];
   i int;
   v_name text;
@@ -58,7 +65,8 @@ GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille
 
 -- Transfert de propriété (décision 0007) : vadrouille_migrator doit pouvoir accorder, le temps d'une migration,
 -- l'appartenance aux rôles vadrouille_fn_* (option ADMIN seule, sans SET ni INHERIT : décision 0036, B1-TL-2).
-GRANT vadrouille_fn_share, vadrouille_fn_share_views, vadrouille_fn_checkout, vadrouille_fn_coords, vadrouille_fn_purge
+GRANT vadrouille_fn_share, vadrouille_fn_share_views, vadrouille_fn_checkout, vadrouille_fn_coords, vadrouille_fn_purge,
+  vadrouille_fn_prototype_purge
   TO vadrouille_migrator WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
 -- Schéma public : vadrouille_owner y crée les tables ; l'option de transmission sert à accorder CREATE, le temps
@@ -71,10 +79,13 @@ CREATE SCHEMA IF NOT EXISTS vadrouille_migrations;
 REVOKE ALL ON SCHEMA vadrouille_migrations FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA vadrouille_migrations TO vadrouille_migrator;
 
--- Connexion à la base pour les trois rôles de connexion.
+-- Connexion à la base pour les cinq rôles de connexion. CREATE sur la base pour vadrouille_owner seul : la migration
+-- 0003_prototype crée le schéma prototype sous ce rôle (décision 0046, D15 point 3 : le schéma lui appartient).
 DO $$
 BEGIN
-  EXECUTE pg_catalog.format('GRANT CONNECT ON DATABASE %I TO vadrouille_migrator, vadrouille_app, vadrouille_auth',
+  EXECUTE pg_catalog.format(
+    'GRANT CONNECT ON DATABASE %I TO vadrouille_migrator, vadrouille_app, vadrouille_auth, vadrouille_prototype, vadrouille_prototype_purge',
     pg_catalog.current_database());
+  EXECUTE pg_catalog.format('GRANT CREATE ON DATABASE %I TO vadrouille_owner', pg_catalog.current_database());
 END
 $$;
