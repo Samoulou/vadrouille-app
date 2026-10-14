@@ -14,6 +14,7 @@ import { ouvrirGardeLancement, verifierGardeEtape } from "@/server/p0/garde";
 const jeton = vi.hoisted(() => Buffer.alloc(32, 7));
 vi.mock("@/server/env/p0", () => ({
   CODES_ENV_P0: [],
+  CAUSES_ENV_P0: [],
   lireEnvP0: () => ({ ok: true, jeton }),
   decoderJetonSaisi: () => null,
 }));

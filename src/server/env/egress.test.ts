@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-commune";
 
 
-import { OPTIONS_TLS, optionsDeNode, verifierSortie, type EnvSortie } from "./egress";
+import {
+  CAUSES_SORTIE,
+  CHEMIN_CA_RUNTIME_VERCEL,
+  OPTIONS_TLS,
+  optionsDeNode,
+  verifierSortie,
+  type EnvSortie,
+} from "./egress";
 
 /**
  * `p0: aucun client réel hors préversion ou développement`, `… derrière un proxy d'environnement`, `… avec un TLS
@@ -201,5 +208,100 @@ describe("p0: formes --no-… de NODE_OPTIONS et d'execArgv (bloquant 3, renvoy�
     expect(optionsDeNode("--no-tls-min-v1.2 --no-warnings", [])).toEqual(new Set(["--no-tls-min-v1.2", "--tls-min-v1.2", "--no-warnings", "--warnings"]));
     expect(sortie({ ...PREVIEW, NODE_OPTIONS: "--no-warnings --no-deprecation" })).toEqual({ ok: true });
     expect(sortie({ ...PREVIEW, NODE_OPTIONS: "--no-tls-min-v1.2" })).toEqual({ ok: true });
+  });
+});
+
+describe("p0: exception étroite de NODE_EXTRA_CA_CERTS sur le runtime de Vercel (décision 0058)", () => {
+  /** Cas exact admis : chemin du runtime, `VERCEL=1` et préversion, dans l'env lu et dans le vrai `process.env`. */
+  const RUNTIME: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL };
+  beforeEach(() => {
+    vi.stubEnv("VERCEL", "1");
+  });
+
+  it("le chemin admis est celui de la documentation AWS du runtime Node", () => {
+    expect(CHEMIN_CA_RUNTIME_VERCEL).toBe("/var/runtime/ca-cert.pem");
+  });
+  it("cas exact : admis", () => {
+    expect(sortie(RUNTIME)).toEqual({ ok: true });
+  });
+
+  const voisins: [string, EnvSortie][] = [
+    ["autre chemin", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/tmp/ca-cert.pem" }],
+    ["chemin suivi d'une espace", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL} ` }],
+    ["chemin précédé d'une espace", { ...RUNTIME, NODE_EXTRA_CA_CERTS: ` ${CHEMIN_CA_RUNTIME_VERCEL}` }],
+    ["chemin suivi d'un retour à la ligne", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL}\n` }],
+    ["chemin en majuscules", { ...RUNTIME, NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL.toUpperCase() }],
+    ["chemin relatif", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "var/runtime/ca-cert.pem" }],
+    ["chemin avec ..", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var/runtime/../runtime/ca-cert.pem" }],
+    ["chemin avec //", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var//runtime/ca-cert.pem" }],
+    ["chemin suivi de /", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL}/` }],
+    ["fichier voisin du runtime", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem.bak" }],
+    ["VERCEL absente", { ...RUNTIME, VERCEL: undefined }],
+    ["VERCEL vide", { ...RUNTIME, VERCEL: "" }],
+    ["VERCEL=0", { ...RUNTIME, VERCEL: "0" }],
+    ["VERCEL=true", { ...RUNTIME, VERCEL: "true" }],
+    ["VERCEL « 1 » avec espace", { ...RUNTIME, VERCEL: "1 " }],
+    ["development au lieu de preview", { ...RUNTIME, VERCEL_ENV: "development" }],
+    ["autre variable TLS posée avec l'exception", { ...RUNTIME, SSL_CERT_FILE: CHEMIN_CA_RUNTIME_VERCEL }],
+    ["NODE_TLS_REJECT_UNAUTHORIZED posée avec l'exception", { ...RUNTIME, NODE_TLS_REJECT_UNAUTHORIZED: "0" }],
+    ["option TLS avec l'exception", { ...RUNTIME, NODE_OPTIONS: "--use-openssl-ca" }],
+  ];
+  it.each(voisins)("%s : tls_env_refused", (_nom, env) => {
+    expect(sortie(env)).toEqual({ ok: false, code: "tls_env_refused" });
+  });
+  it("le chemin exact dans une autre variable TLS : refus", () => {
+    for (const nom of ["SSL_CERT_FILE", "SSL_CERT_DIR", "OPENSSL_CONF", "SSLKEYLOGFILE", "NODE_TLS_REJECT_UNAUTHORIZED"]) {
+      expect(sortie({ VERCEL_ENV: "preview", VERCEL: "1", [nom]: CHEMIN_CA_RUNTIME_VERCEL })).toEqual({ ok: false, code: "tls_env_refused" });
+    }
+  });
+  it("l'env injecté ne peut pas ouvrir l'exception (D21) : VERCEL ou VERCEL_ENV du vrai process.env", () => {
+    vi.stubEnv("VERCEL", undefined);
+    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
+    vi.stubEnv("VERCEL", "0");
+    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
+    vi.stubEnv("VERCEL", "1");
+    poserReel({ VERCEL_ENV: "development" });
+    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
+  });
+  it("l'exception ne masque ni la production ni un proxy", () => {
+    expect(sortie({ ...RUNTIME, VERCEL_ENV: "production" })).toEqual({ ok: false, code: "production_refused" });
+    expect(sortie({ ...RUNTIME, HTTPS_PROXY: "http://p" })).toEqual({ ok: false, code: "proxy_env_refused" });
+  });
+});
+
+/** Diagnostic rendu par le rappel de `verifierSortie` (décision 0058). */
+function diagnostiquer(env: EnvSortie, execArgv: readonly string[] = []) {
+  const recus: unknown[] = [];
+  verifierSortie(env, execArgv, (d) => void recus.push(d));
+  expect(recus.length).toBeLessThanOrEqual(1);
+  return recus[0];
+}
+
+describe("p0: diagnostic de la barrière, des noms seulement (décision 0058)", () => {
+  it("chaque nom de la liste fermée, posé seul, est rendu tel quel et sans sa valeur", () => {
+    for (const nom of CAUSES_SORTIE) {
+      const env: EnvSortie = nom.startsWith("--") ? { ...PREVIEW, NODE_OPTIONS: `${nom}=/SENTINELLE` } : { ...PREVIEW, [nom]: "/SENTINELLE" };
+      const diagnostic = diagnostiquer(env);
+      expect(diagnostic).toEqual({ cause: nom });
+      expect(JSON.stringify(diagnostic)).not.toContain("SENTINELLE");
+    }
+  });
+  it("une option est nommée par son nom canonique", () => {
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--tls_keylog=/SENTINELLE" })).toEqual({ cause: "--tls-keylog" });
+    expect(diagnostiquer(PREVIEW, ["--no-use-system-ca"])).toEqual({ cause: "--use-system-ca" });
+  });
+  it("sortie ouverte : diagnostic vide ; production refusée : aucun diagnostic", () => {
+    expect(diagnostiquer(PREVIEW)).toEqual({});
+    expect(diagnostiquer({ VERCEL_ENV: "production", SSL_CERT_FILE: "/x" })).toBeUndefined();
+  });
+  it("le proxy l'emporte sur le TLS, comme le code", () => {
+    expect(diagnostiquer({ ...PREVIEW, https_proxy: "http://p", SSL_CERT_FILE: "/x" })).toEqual({ cause: "https_proxy" });
+  });
+  it("l'exception appliquée est marquée ; une variante refusée est nommée", () => {
+    vi.stubEnv("VERCEL", "1");
+    const runtime: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL };
+    expect(diagnostiquer(runtime)).toEqual({ exception: "vercel_runtime_ca" });
+    expect(diagnostiquer({ ...runtime, SSL_CERT_DIR: "/x" })).toEqual({ cause: "SSL_CERT_DIR", exception: "vercel_runtime_ca" });
+    expect(diagnostiquer({ ...runtime, NODE_EXTRA_CA_CERTS: "/tmp/x" })).toEqual({ cause: "NODE_EXTRA_CA_CERTS" });
   });
 });
