@@ -243,10 +243,13 @@ Tu es le CEO du studio ; ta définition est dans .claude/agents/ceo.md. Exécute
 6. Toute décision réservée à Samuel (docs/CONTEXT.md, section « Qui décide quoi ») va dans #studio et QUESTIONS.md ; continue sur autre chose.
 6 bis. Pour chaque PR ouverte d'une branche claude/… dont le diff touche .github/workflows/ et qui n'a pas le libellé owner-approved : cherche dans l'historique de #studio le dernier message « owner-approved attendu — PR #<n> ». S'il n'y en a pas, ou s'il est antérieur à la date du dernier commit de la PR, poste « owner-approved attendu — PR #<n> : <titre> ; fichiers : <liste sous .github/workflows/> ; revue Tech Lead : <techlead-approved, changes-requested ou en attente>. <lien> », signé « Studio ». Liste ces PR dans STATUS.md, rubrique « Décisions attendues ». Ne pose jamais owner-approved.
 7. Termine par une PR « chore: status » qui met à jour STATUS.md (fait, en cours, bloqué, décisions attendues, part d'usage estimée), avec le libellé docs-only, puis un résumé de 5 lignes signé « Studio » dans #studio.
+7 bis. Mets à jour le tableau de bord produit selon docs/studio/tableau-de-bord.md : relis la version publiée, reporte l'état du cycle, republie au même lien et cite ce lien dans le résumé #studio.
 Le cycle réussit si au moins une PR est prête ou si chaque blocage est documenté, et si STATUS.md est à jour.
 ```
 
 L'étape 6 bis (décision 0035) est proposée à Samuel, qui la colle dans la routine R1 ; d'ici là, le CEO applique la règle depuis `.claude/agents/ceo.md`.
+
+L'étape 7 bis (demande de Samuel du 2026-10-14, ticket #306) suit le même chemin : le CEO l'applique depuis `.claude/agents/ceo.md` tant qu'elle n'est pas collée dans la routine R1.
 
 **R2 Revue**
 
