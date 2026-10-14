@@ -10,6 +10,7 @@ import {
   analyserPackageJson,
   estFichierTest,
   estNomSecret,
+  hotesDe,
   horsProgramme,
   idLigneCapacite,
   lireCas,
@@ -19,7 +20,7 @@ import {
   type Resultat,
 } from "./analyse";
 import { estAnalyse, fichiersSuivis, lireFichier, RACINE, type FichierSuivi } from "./fichiers";
-import { verifierFermeture } from "./graphe";
+import { MODULES_CAPACITE_P0R1, verifierFermeture } from "./graphe";
 import { LIGNES_CAPACITE, LIGNES_CAPACITE_TEXTES, type LigneCapacite } from "./listes/capacites";
 import { FORMES_NOMINATIVES_TESTS } from "./listes/formes-tests";
 import { CONSTRUITS, PAQUETS } from "./listes/paquets";
@@ -98,6 +99,68 @@ beforeAll(() => {
 
 const decrire = (c: Constat) => `${c.fichier}:${c.ligne} [${c.regle}] ${c.capacite} — ${c.forme}`;
 
+
+const texteNonVide = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+const clesExactes = (x: Record<string, unknown>, cles: readonly string[], facultatives: readonly string[] = []) =>
+  cles.every((k) => k in x) && Object.keys(x).every((k) => cles.includes(k) || facultatives.includes(k));
+/** Texte surveillé (hôte ou fragment de `refus.json`) : seule raison d'écrire une ligne dans les données plutôt qu'en TypeScript (0049 C2). */
+const contientTexteSurveille = (...textes: unknown[]) =>
+  textes.some((t) => typeof t === "string" && (hotesDe(t, false).hotes.length > 0 || hotesDe(t, false).fragments.length > 0));
+
+/**
+ * Forme d'une ligne de `donnees/lignes-textes.json`. Capacités de texte (`hote`, `fragment`, `secret`, `global`) ;
+ * `module:` et `identifiant:` seulement pour les modules de capacité de P0r1 de `refus.json`, dont le chemin contient
+ * un fragment surveillé (décision 0049 C3).
+ */
+function formeLigneTexteAdmise(l: unknown): boolean {
+  if (typeof l !== "object" || l === null) return false;
+  const x = l as Record<string, unknown>;
+  const capacites = x.capacites;
+  return (
+    typeof x.fichier === "string" &&
+    (x.portee === "test" || x.portee === "outil" || x.portee === "application") &&
+    typeof x.usage === "string" &&
+    (x.ecart === undefined || typeof x.ecart === "string") &&
+    Array.isArray(capacites) &&
+    capacites.length > 0 &&
+    capacites.every(
+      (c: Record<string, unknown>) =>
+        typeof c.capacite === "string" &&
+        (/^(hote|fragment|secret|global):/.test(c.capacite) ||
+          (typeof x.fichier === "string" && MODULES_CAPACITE_P0R1.includes(x.fichier) && /^(module|identifiant):/.test(c.capacite))) &&
+        Array.isArray(c.formes) &&
+        c.formes.length > 0 &&
+        c.formes.every((f: unknown) => typeof f === "string") &&
+        (c.nombre === undefined || (typeof c.nombre === "number" && Number.isInteger(c.nombre) && c.nombre > 0)),
+    ) &&
+    clesExactes(x, ["fichier", "portee", "usage", "capacites"], ["ecart"])
+  );
+}
+
+/** Ligne nominative de spécificateur lue dans les données (0049 C2) : forme exacte et texte surveillé obligatoire. */
+function formeNominatifTexteAdmise(l: unknown): boolean {
+  if (typeof l !== "object" || l === null) return false;
+  const x = l as Record<string, unknown>;
+  return (
+    clesExactes(x, ["fichier", "specificateur", "noms", "motif"]) &&
+    texteNonVide(x.fichier) &&
+    texteNonVide(x.specificateur) &&
+    texteNonVide(x.motif) &&
+    Array.isArray(x.noms) &&
+    x.noms.length > 0 &&
+    x.noms.every(texteNonVide) &&
+    new Set(x.noms).size === x.noms.length &&
+    contientTexteSurveille(x.fichier, x.specificateur)
+  );
+}
+
+/** Ligne de paquet lue dans les données (0049 C2) : forme exacte et texte surveillé obligatoire. */
+function formePaquetTexteAdmise(l: unknown): boolean {
+  if (typeof l !== "object" || l === null) return false;
+  const x = l as Record<string, unknown>;
+  return clesExactes(x, ["paquet", "usage", "verdict"]) && texteNonVide(x.paquet) && texteNonVide(x.usage) && texteNonVide(x.verdict) && contientTexteSurveille(x.paquet);
+}
+
 describe("confinement: dépôt", () => {
   it("énumère les fichiers suivis : liste non vide, aucun lien symbolique analysé", () => {
     expect(analyses.length).toBeGreaterThan(0);
@@ -166,29 +229,48 @@ describe("confinement: dépôt", () => {
   });
 
   it("confinement: forme des lignes lues dans donnees/lignes-textes.json (contrôle d'exécution)", () => {
-    const fautes: string[] = [];
-    for (const l of LIGNES_CAPACITE_TEXTES as readonly unknown[]) {
-      const x = l as Record<string, unknown>;
-      const capacites = x.capacites;
-      const ok =
-        typeof x.fichier === "string" &&
-        (x.portee === "test" || x.portee === "outil" || x.portee === "application") &&
-        typeof x.usage === "string" &&
-        (x.ecart === undefined || typeof x.ecart === "string") &&
-        Array.isArray(capacites) &&
-        capacites.length > 0 &&
-        capacites.every((c: Record<string, unknown>) =>
-          typeof c.capacite === "string" &&
-          /^(hote|fragment|secret|global):/.test(c.capacite) &&
-          Array.isArray(c.formes) &&
-          c.formes.length > 0 &&
-          c.formes.every((f: unknown) => typeof f === "string") &&
-          (c.nombre === undefined || (typeof c.nombre === "number" && Number.isInteger(c.nombre) && c.nombre > 0)),
-        ) &&
-        Object.keys(x).every((k) => ["fichier", "portee", "usage", "capacites", "ecart"].includes(k));
-      if (!ok) fautes.push(JSON.stringify(l).slice(0, 120));
-    }
+    const fautes = (LIGNES_CAPACITE_TEXTES as readonly unknown[]).filter((l) => !formeLigneTexteAdmise(l)).map((l) => JSON.stringify(l).slice(0, 120));
     expect(fautes).toEqual([]);
+  });
+
+  // Décision 0049 C3 : la forme élargie (`module:`, `identifiant:`) ne vaut que pour les modules de capacité de P0r1.
+  it("confinement: une ligne module: ou identifiant: de lignes-textes.json hors des modules de capacité de P0r1 est refusée", () => {
+    const ligne = (fichier: string, capacite: string) => ({ fichier, portee: "application", usage: "cas", capacites: [{ capacite, formes: ["Agent"], nombre: 1 }], ecart: "cas" });
+    const capaciteP0r1 = MODULES_CAPACITE_P0R1[0] ?? "";
+    expect(capaciteP0r1).not.toBe("");
+    expect(formeLigneTexteAdmise(ligne(capaciteP0r1, "module:undici"))).toBe(true);
+    expect(formeLigneTexteAdmise(ligne(capaciteP0r1, "identifiant:fetch"))).toBe(true);
+    for (const fichier of ["src/lib/exemple.ts", "src/grounding/enveloppe-google.ts", "src/research/fetch-page.ts", "tests/unit/p0/clients-reels.test.ts"]) {
+      expect(formeLigneTexteAdmise(ligne(fichier, "module:undici")), fichier).toBe(false);
+      expect(formeLigneTexteAdmise(ligne(fichier, "identifiant:fetch")), fichier).toBe(false);
+    }
+    expect(formeLigneTexteAdmise(ligne(capaciteP0r1, "acces-calcule:type"))).toBe(false);
+  });
+
+  // Décision 0049 C2 : contrôle de forme et d'admission de `donnees/lignes-textes-specificateurs.json`.
+  it("confinement: forme et admission des lignes lues dans donnees/lignes-textes-specificateurs.json (contrôle d'exécution)", () => {
+    const brut = JSON.parse(lireFichier("tests/unit/confinement/donnees/lignes-textes-specificateurs.json")) as Record<string, unknown>;
+    expect(Object.keys(brut).sort()).toEqual(["_", "nominatifs", "paquets"]);
+    expect(Array.isArray(brut.nominatifs) && Array.isArray(brut.paquets)).toBe(true);
+    const fautes = [
+      ...(brut.nominatifs as unknown[]).filter((l) => !formeNominatifTexteAdmise(l)),
+      ...(brut.paquets as unknown[]).filter((l) => !formePaquetTexteAdmise(l)),
+    ].map((l) => JSON.stringify(l).slice(0, 120));
+    expect(fautes).toEqual([]);
+  });
+
+  it("confinement: une entrée de lignes-textes-specificateurs.json sans texte surveillé ou mal formée est refusée", () => {
+    const motif = "cas";
+    expect(formeNominatifTexteAdmise({ fichier: "src/lib/exemple.ts", specificateur: "server-only", noms: ["effet"], motif })).toBe(false);
+    expect(formePaquetTexteAdmise({ paquet: "zod", usage: "u", verdict: "v" })).toBe(false);
+    const surveille = MODULES_CAPACITE_P0R1.find((f) => hotesDe(f, false).fragments.length > 0) ?? "";
+    expect(surveille).not.toBe("");
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "server-only", noms: ["effet"], motif })).toBe(true);
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "server-only", noms: ["effet"], motif, autre: 1 })).toBe(false);
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "server-only", noms: [], motif })).toBe(false);
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "server-only", noms: ["effet", "effet"], motif })).toBe(false);
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "", noms: ["effet"], motif })).toBe(false);
+    expect(formeNominatifTexteAdmise({ fichier: surveille, specificateur: "server-only", noms: ["effet"], motif: "" })).toBe(false);
   });
 
   // Revue du head a89d9a5 (PR 244, mineur 2) : les lignes de noms secrets sont lues par simple conversion de type.
