@@ -39,12 +39,25 @@ export type Forfait = {
   readonly coutModelesMicros: number | null;
 };
 
-/** Unité du quota Routes de la console Google (P0-Q31), fixée par configuration. */
+/**
+ * Unité du quota Routes de la console Google (P0-Q31), fixée par configuration. **Q330 tranchée par Samuel**
+ * (2026-10-14 13:51 CEST) : `"elements"`, sans plafond par jour, 3 000 éléments par minute. `"requetes"` reste
+ * l'hypothèse écartée, gardée pour les tests de 0055 § 6 point 2 (seuil du jour de 95 compté en requêtes).
+ */
 export type UniteQuotaRoutes = "requetes" | "elements";
 
 /**
+ * Quota Routes de la console en éléments par minute (Q330, captures de Samuel). Traduction du Tech Lead (revue de #318,
+ * réponse à la question 3b) : aucun seuil journalier pour Routes en unité `"elements"` ; le plafond d'éléments d'un
+ * forfait ne dépasse jamais ce quota, et l'étape finale cadence ses requêtes par fenêtre d'une minute
+ * (`src/grounding/budget-routes.ts`, `creerCadence`).
+ */
+export const QUOTA_ROUTES_ELEMENTS_PAR_MINUTE = 3_000;
+
+/**
  * Limites appliquées au lancement (0046 D13 point 3 ; spécification `specs/P0-suite-2.md`, tableau des plafonds) :
- * 95 par jour et par méthode dans l'unité du quota ; Google 20 USD par mois (Pacifique) et 40 USD jusqu'à G0 ;
+ * 95 par jour et par méthode dans l'unité du quota (Text Search et Place Details ; Routes seulement en unité
+ * `"requetes"`, Q330) ; Google 20 USD par mois (Pacifique) et 40 USD jusqu'à G0 ;
  * modèles 40 USD par mois (UTC) et 80 USD jusqu'à G0.
  */
 export const LIMITES_PROTOTYPE = {
@@ -120,16 +133,22 @@ export type SommesForfaits = {
 
 /**
  * Refus d'un forfait au vu des sommes déjà réservées, forfait à lancer compris (0046 D13 point 3), ou `null` s'il
- * tient. Ordre : quota du jour (`daily_quota_insufficient`, sans consommer le jour), enveloppe jusqu'à G0
+ * tient. Routes : seuil du jour en unité `"requetes"` ; en unité `"elements"` (Q330), forfait au plus égal au quota
+ * d'une minute, sans seuil du jour. Ordre : quota du jour (`daily_quota_insufficient`, sans consommer le jour), enveloppe jusqu'à G0
  * (`envelope_reached`), plafond du mois (`cap_reached`).
  */
 export function refusDuForfait(sommes: SommesForfaits, forfait: Forfait, limites: LimitesForfait, uniteRoutes: UniteQuotaRoutes): CodeRefusUsage | null {
   const jour = sommes.jour;
-  const routes = uniteRoutes === "requetes" ? jour.routesRequetes + forfait.routesRequetes : jour.routesElements + forfait.routesElements;
+  // Q330 : en éléments, aucun plafond par jour ; un forfait dont les éléments dépassent le quota d'une minute ne
+  // pourrait pas tenir dans la cadence : refusé comme un quota insuffisant, sans consommer le jour.
+  const routesRefusees =
+    uniteRoutes === "requetes"
+      ? jour.routesRequetes + forfait.routesRequetes > limites.quotaJourParMethode
+      : forfait.routesElements > QUOTA_ROUTES_ELEMENTS_PAR_MINUTE;
   if (
     jour.textSearchRequetes + forfait.textSearchRequetes > limites.quotaJourParMethode ||
     jour.placeDetailsRequetes + forfait.placeDetailsRequetes > limites.quotaJourParMethode ||
-    routes > limites.quotaJourParMethode
+    routesRefusees
   ) {
     return "daily_quota_insufficient";
   }

@@ -5,11 +5,15 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  BORNES_MODE_REEL,
   BORNES_PLAFONDS,
+  CHAMPS_MODE_REEL_EN_ATTENTE,
+  ConfigModeReelSchema,
   ConfigModelesSchema,
   ConfigPlafondsSchema,
   ConfigRechercheSchema,
   modelesDeLaVariante,
+  validerConfigModeReel,
   validerConfiguration,
 } from "./config";
 import { TYPES_CRENEAU } from "./candidat";
@@ -114,5 +118,49 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
   it("les clés de créneau de recherche.json sont celles de candidat.ts (TYPES_CRENEAU)", () => {
     const trier = (cles: Iterable<string>) => [...cles].sort();
     expect(trier(Object.keys(ConfigRechercheSchema.shape.ciblesParCreneau.shape))).toEqual(trier(TYPES_CRENEAU));
+  });
+});
+
+describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
+  const fichier = () => lire("mode-reel") as Record<string, unknown>;
+  const complete = () => ({ ...fichier(), coutUsd: 3, fiches: { margeMinimum: 4, margePart: 0.2 } });
+
+  it("fichier commité : valeurs décidées (500 éléments, 20 requêtes, unité éléments), refusé tant que Q391 et Q389 manquent", () => {
+    expect(fichier()).toMatchObject({ uniteQuotaRoutes: "elements", routesElements: 500, routesRequetes: 20, placesDetails: 90, placesTextSearch: 90, dureeMs: 900_000 });
+    for (const champ of CHAMPS_MODE_REEL_EN_ATTENTE) expect(Object.keys(fichier())).not.toContain(champ);
+    expect(validerConfigModeReel(fichier())).toEqual({ ok: false, code: "config_reel_incomplete" });
+  });
+
+  it("complétée des décisions en attente, elle passe ; chaque champ obligatoire, sans valeur par défaut", () => {
+    expect(validerConfigModeReel(complete())).toMatchObject({ ok: true });
+    for (const champ of Object.keys(ConfigModeReelSchema.shape)) {
+      const sans: Record<string, unknown> = { ...complete() };
+      delete sans[champ];
+      expect(validerConfigModeReel(sans), champ).toEqual({ ok: false, code: "config_reel_incomplete" });
+    }
+  });
+
+  it("bornes de Samuel et du PO : au-delà, refusée sans recopier la valeur", () => {
+    const cas: [string, unknown][] = [
+      ["routesElements", BORNES_MODE_REEL.routesElements + 1],
+      ["coutUsd", 3.01],
+      ["placesDetails", 91],
+      ["placesTextSearch", 91],
+      ["recherchesWeb", 61],
+      ["pagesLues", 151],
+      ["candidatsTrouves", 91],
+      ["dureeMs", 900_001],
+      ["uniteQuotaRoutes", "minutes"],
+      ["fiches", { margeMinimum: 4, margePart: 1.2 }],
+      ["mode", "SENTINELLE-MODE"],
+    ];
+    for (const [champ, valeur] of cas) {
+      const resultat = validerConfigModeReel({ ...complete(), [champ]: valeur });
+      expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
+      expect(JSON.stringify(resultat)).not.toContain(String(valeur));
+    }
+    // Contrôle croisé : 86 candidats + 5 logements dépassent 90 Text Search.
+    expect(validerConfigModeReel({ ...complete(), candidatsTrouves: 86 })).toEqual({ ok: false, code: "config_reel_invalide" });
+    expect(validerConfigModeReel(null)).toEqual({ ok: false, code: "config_reel_invalide" });
   });
 });
