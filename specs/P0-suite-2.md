@@ -1,6 +1,6 @@
 # P0 (suite 2) — Exécutions réelles du prototype de recherche : base, lancement, lecture, exécutions et jugement G0
 
-Rôle porteur : ia-recherche, avec revue Sécurité (ticket #173) · Rédaction : Product Owner · Date : 2026-10-13 (correction 1 le même jour, revue consolidée du head `f847e21`) · Ticket : #173 · Décisions : 0027, 0028, 0031 (découpage), 0034, 0011 (§ 1 à 3 et 6) et 0007 (stockage et rôles), 0009 (exécution durable, point 3 amendé par 0011 § 3), 0035 (`owner-approved`) · Suite de `specs/P0-suite-executions-reelles.md` (#172, cadre et P0r1), qui renvoie ici P0r2, P0r3, P0r4, P0a2, P0b2, P0a3, les valeurs des plafonds et la grille G0 (« Renvoyé à la spécification suivante »)
+Rôle porteur : ia-recherche, avec revue Sécurité (ticket #173) · Rédaction : Product Owner · Date : 2026-10-13 (correction 1 le même jour, revue consolidée du head `f847e21`) · Amendement 1 du Product Owner : 2026-10-14 (valeurs de l'essai réel, Q389, Q391, Q406) · Ticket : #173 · Décisions : 0027, 0028, 0031 (découpage), 0034, 0011 (§ 1 à 3 et 6) et 0007 (stockage et rôles), 0009 (exécution durable, point 3 amendé par 0011 § 3), 0035 (`owner-approved`) · Suite de `specs/P0-suite-executions-reelles.md` (#172, cadre et P0r1), qui renvoie ici P0r2, P0r3, P0r4, P0a2, P0b2, P0a3, les valeurs des plafonds et la grille G0 (« Renvoyé à la spécification suivante »)
 
 Cette spécification **ne lève pas le verrou** des exécutions réelles. Le verrou est celui de #172 (`specs/P0-suite-executions-reelles.md`, « Verrou des exécutions réelles »), qui fait foi : il porte sur toutes les exigences d'entrée (1 à 7 et chaque point « Ainsi que »), chacune vérifiée dans la PR de la tâche qui la porte, avec un verdict explicite du rôle Sécurité **et** l'accord écrit de Samuel dans cette PR. Cette spécification ne le change pas. Deux réponses attendues de Samuel le touchent et sont signalées comme telles : P0-Q27 (exigence 6 : sa décision écrite) et P0-Q25 (exigence 3 : la recommandation « sans relecteur obligatoire » **amenderait** l'exigence 3, qui ne serait alors pas vérifiée telle qu'écrite). Aucune exécution réelle n'a lieu avant la fusion de P0r3 et de P0r4, exigences vérifiées.
 
@@ -173,9 +173,9 @@ Le mode réel s'ouvre seulement si **toutes** ces conditions sont vraies, chacun
 Appliqués **avant chaque appel** par la réservation du port de consommation ; un plafond atteint arrête l'exécution sans programme partiel (`cap_reached`).
 | Plafond | Valeur | Source |
 |---|---|---|
-| Par exécution : modèles et recherche web (coût renvoyé par OpenRouter) | **3 USD** (périmètre : P0-Q29) | Samuel, Q270 |
-| Par exécution : Text Search, Place Details | 90, 90 requêtes | P0S2-PO-8, sous le quota de 100 par méthode |
-| Par exécution : Routes | 20 requêtes de matrice, 400 éléments au plus ; **valeur à revoir selon l'unité du quota (P0-Q31)** | P0S2-PO-8 |
+| Par exécution : modèles et recherche web (coût renvoyé par OpenRouter) | **3 USD** (périmètre : P0-Q29) ; `coutUsd` du mode réel = 3 USD (P0S2-PO-16) | Samuel, Q270 |
+| Par exécution : Text Search, Place Details | 90, 90 requêtes ; répartition des fiches et marge : P0S2-PO-17 | P0S2-PO-8, sous le quota de 100 par méthode |
+| Par exécution : Routes | **30 requêtes de matrice** (amendement 1 du PO), **500 éléments au plus par voyage**, part d'un jour `floor(500 / jours)` (0053) ; quota compté en éléments, sans plafond par jour (Q330) | Samuel (0053, Q330) ; P0S2-PO-8 amendé |
 | Par exécution : recherches web, pages lues, candidats | 60, 150, 90 | P0S2-PO-8 |
 | Par exécution : durée | 15 min | grille G0, A8 (P0-Q2) |
 | Par jour : exécutions réelles | 1 (réservation atomique ; une exécution échouée consomme le jour) | #149, #172 |
@@ -192,7 +192,7 @@ Appliqués **avant chaque appel** par la réservation du port de consommation ; 
 - **Lancement refusé si le jour est entamé** (P0S2-PO-11) : si les compteurs du jour ne laissent pas à l'exécution tous ses plafonds par méthode sous 95, le lancement est refusé (`daily_quota_insufficient`) **sans** consommer le jour.
 
 ### Essai d'intégration
-Un essai borné sur `p0-reel`, après la fusion de P0r4, avant la première exécution comptée : brief réduit à un jour de séjour ; plafonds 0,30 USD de modèles, 6 recherches web, 15 pages, 9 candidats, 9 Text Search, 9 Place Details, 2 requêtes de matrice Routes (40 éléments ; unité : P0-Q31), 5 min (P0S2-PO-12) ; il consomme le jour et compte dans l'enveloppe (sous réserve de P0-Q30) ; il ne compte pas pour G0. Son rapport est consigné comme les autres.
+Un essai borné sur `p0-reel`, après la fusion de P0r4, avant la première exécution comptée : brief réduit à un jour de séjour ; plafonds 0,30 USD de modèles, 6 recherches web, 15 pages, 9 candidats, **14 Text Search, 11 Place Details, 3 requêtes de matrice Routes, 120 éléments**, 5 min (P0S2-PO-12, amendé le 2026-10-14 : « Amendement 1 du Product Owner ») ; il consomme le jour et compte dans l'enveloppe (sous réserve de P0-Q30) ; il ne compte pas pour G0. Son rapport est consigné comme les autres.
 
 ## P0r4 — Lecture des programmes réels
 - **Source Neon** de l'adaptateur `prototype` de P0b1 : lecture par `vadrouille_prototype`, `expires_at > now()`, schéma strict de la forme réduite, `trip.id` validé ; positions recomposées depuis `place_coordinates` (lignes non expirées) ; **une position manquante ou expirée : programme non servi**, état d'erreur existant (« Expiration du programme et de ses positions ») ; le chargeur de dossier de P0b1 reste pour les tests.
@@ -324,6 +324,39 @@ Détails fonctionnels seulement. Les sujets d'architecture, de stockage et de s�
 - **P0S2-PO-13 — Exécution non aboutie** : relancée une fois au plus par brief et variante si la cause est externe ; sinon comptée ; décompte et refus par la page de lancement.
 - **P0S2-PO-14 — « Meilleure des deux »** désignée par le code à l'affichage (moins de cases « aucune option compatible », puis coût, puis ancienneté), **sous réserve du verdict Sécurité P0-Q32** sur le comptage des cases.
 - **P0S2-PO-15 — Zakynthos** : une exécution B par brief, pour information.
+
+### Amendement 1 du Product Owner (2026-10-14) — valeurs de l'essai réel (Q389, Q391, Q406)
+Rédigé par le Product Owner à la demande du CEO, pour compléter `prototype/config/mode-reel.json` (PR #323, P0r3c-2, refusé `config_reel_incomplete` tant que ces valeurs manquent) et la configuration de l'essai. Propositions reprises : 0055 § 6 points 1, 3, 6 et 7 ; PR #318 (« Propositions au Product Owner ») ; PR #323 (« Questions par destinataire », question 2). Cadre respecté sans le changer (bornes de Samuel) : 3 USD de modèles par exécution au plus (Q270), 80 USD de modèles et 40 USD Google jusqu'à G0 (Q270), 20 USD Google et 40 USD OpenRouter par mois (0027 § 2), 500 éléments Routes au plus par voyage (0053), quota Routes compté en éléments sans plafond par jour (Q330), marge de remplacement des fiches acceptée par Samuel (Q407). **Aucune valeur ci-dessous ne dépasse une de ces bornes** ; aucune question nouvelle à Samuel. Définitif sans veto de Samuel sous 2 jours après la fusion ; listé dans la note de version suivante (« Décisions prises par le studio »). Ce texte ne modifie ni le code ni la configuration : P0r3c-2 (#323) ou P0r3c-3 reporte les valeurs.
+
+- **P0S2-PO-16 — Plafond de coût des modèles par exécution (Q391)**
+  - **Mode réel (variantes A et B) : `coutUsd` = 3 USD.** Raison : le critère A7 de la grille G0 est « ≤ 3 USD » ; un plafond de 2 USD arrêterait (`cap_reached`) une exécution entre 2 et 3 USD qui franchit A7, et cette exécution compterait comme un échec (P0S2-PO-13). Le profil léger (0053, amendement 1, point 3) baisse la dépense, pas le plafond de sûreté. 3 USD est la borne de Samuel, pas au-delà.
+  - **Essai d'intégration : 0,30 USD** (P0S2-PO-12 inchangé). Raison : brief d'un jour, 9 candidats, 6 recherches et 15 pages, soit environ un dixième d'une exécution ; un plafond atteint à l'essai ne compte pas pour G0 et renseigne sur la dépense réelle.
+  - **Mode simulé** : `coutUsd` de `prototype/config/plafonds.json` reste 2 USD (valeur de P0a1, sans appel payant). Raison : il ne sert qu'aux exécutions simulées et à `scripts/p0`.
+  - Enveloppe (information) : 9 exécutions comptées de P0a2 à 3 USD et l'essai à 0,30 USD font 27,30 USD au plus, sous les 80 USD jusqu'à G0 ; 3 USD laissent 13 exécutions par mois sous les 40 USD d'OpenRouter.
+
+- **P0S2-PO-17 — Fiches Place Details par exécution et marge de remplacement (Q389)**
+  - **Plafond `placesDetails` : 90 par exécution, inchangé** (P0S2-PO-8). Raison : avec la règle ci-dessous, un voyage de 10 jours et un logement demande 72 fiches au plus (calcul de #318) ; les briefs d'Édimbourg (du 23 au 28 novembre, 6 jours, un logement, `n` = 8 sous 500 éléments) en demandent 55 au plus. L'abaisser ne baisserait que la réserve (Q329 : prix plein), pas la facture ; à revoir après la mesure de l'essai d'intégration (0055, question 8).
+  - **Étape d'ancrage : aucune fiche de candidat ; une fiche par logement.** Raison : amendement 1 de 0053 (fiches des seuls lieux retenus) ; le logement fixe la zone du séjour et un logement non résolu ou fermé arrête l'exécution (`lodging_unresolved`).
+  - **Étape finale : une fiche par logement, puis les fiches de la première série et de sa marge.** Raison : la position écrite vient de l'étape finale (0052 § 1.3), d'où **deux fiches par logement** et par exécution ; aucun lieu n'est planifié, présenté ni écrit sans fiche de l'étape finale (0055 § 6 point 3).
+  - **Première série** = étapes du programme + 8 propositions (0055 § 6 point 3). Raison : c'est la « première proposition de slider » de Samuel (0053, amendement 1, 06:48).
+  - **Marge = `max(4, ⌈20 % × première série⌉)`**, soit `fiches.margeMinimum` = **4** et `fiches.margePart` = **0,2** dans `mode-reel.json`. Raisons : 4 couvre un brief court (1 jour : 14 lieux, 4 remplacements, environ 28 %) où chaque case vide pèse ; 20 % suit la taille du programme sans mesure contraire (12 remplacements pour 10 jours) ; total `2 × logements + première série + marge` sous 90 dans les cas de 1, 4, 7 et 10 jours (20, 41, 62, 72 avec un logement, #318). À revoir avec le taux réel de lieux écartés à l'étape finale, mesuré par l'essai et les premières exécutions.
+  - **Ordre si le total dépasse le plafond** (long voyage, plusieurs logements) : la marge est réduite d'abord ; si la première série et les logements ne tiennent pas sous 90, l'exécution s'arrête (`cap_reached`) sans programme partiel ; jamais un lieu sans fiche. Raison : la série complète prime sur la réserve de remplacement, et un plafond atteint arrête l'exécution (« Plafonds »).
+
+- **P0S2-PO-8 amendé — Routes par exécution**
+  - **`routesRequetes` = 30** (au lieu de 20). Raisons : avec 20 requêtes, 6 reprises sur 7 jours et 5 sur 10 jours seulement sont possibles ; 30 admettent une reprise chaque jour dans les cas de 1, 4, 7 et 10 jours (calcul de #318, testé dans #323) ; Routes est facturé à l'élément et son quota compté en éléments (Q330) : le nombre de requêtes ne change ni la dépense, ni la réserve, ni le quota. Sous la borne de configuration (100).
+  - **`routesElements` = 500 par voyage, part d'un jour `floor(500 / jours)`** : valeur de Samuel (0053), reprise sans changement ; remplace les 400 éléments de la version initiale de P0S2-PO-8.
+  - Information pour Samuel (par le CEO, sans question nouvelle) : à 10 jours, `n` = 6 limite chaque jour à 5 lieux et un logement ; un rythme « intense » n'y tient pas sous 500 éléments (#318). Les briefs d'Édimbourg (6 jours, `n` = 8, 7 lieux par jour) ne sont pas touchés.
+
+- **P0S2-PO-12 amendé — Plafonds de l'essai d'intégration (Q406)** (brief d'un jour, 9 candidats, un logement)
+  | Plafond | Avant | Après | Raison |
+  |---|---|---|---|
+  | Text Search | 9 | **14** | besoin : 9 candidats + 1 logement = 10 ; 14 suit le contrôle croisé de `mode-reel.json` (#323 : candidats + 5 logements au plus ≤ Text Search), pour qu'une même règle vaille dans les deux configurations ; SKU « IDs only » sans coût, 14 reste sous le seuil de 95 du jour |
+  | Place Details | 9 | **11** | 9 candidats (une fiche chacun au plus, à l'étape finale) + 2 × 1 logement ; la marge ne peut pas dépasser les 9 candidats de l'essai |
+  | Requêtes de matrice Routes | 2 | **3** | une matrice (`n` ≤ 10, `BLOC_MATRICE` = 10) + 2 pour une reprise (ligne et colonne) |
+  | Éléments Routes | 40 | **120** | `n² + 2n` pour `n` = 9 + 1 = 10 ; sous 500 (0053) et sous 3 000 par minute (Q330) |
+  | Coût des modèles, recherches web, pages, candidats, durée | 0,30 USD, 6, 15, 9, 5 min | inchangés | P0S2-PO-16 ; le reste n'est pas touché par la conception de 0055 § 6 |
+  Réserve Google de l'essai au prix plein (Q329) : 11 × 20 / 1 000 + 120 × 5 / 1 000 = **0,82 USD**. Variante écartée : garder 9 fiches et 40 éléments (essai réduit à 4 lieux et un logement) ; raison : l'essai doit exercer le parcours de l'étape finale (première série, marge, reprise Routes) avant une exécution comptée. Avec 9 candidats, la première série d'un jour (6 lieux et 8 propositions) reste incomplète : attendu pour l'essai, qui ne compte pas pour G0.
+  - Enveloppe Google jusqu'à G0 (information, sans changement) : l'essai (0,82 USD) et 9 exécutions à leur réserve de 4,30 USD (0053) font 39,52 USD, sous les 40 USD ; une relance au plus (P0S2-PO-13) au prix de sa réserve les dépasserait. Comme le dit 0055 (question 8), la dépense réelle sera plus basse que la réserve ; le CEO reprend ce calcul avec Samuel après la mesure de l'essai.
 
 Retirées de cette rubrique par la correction 1 (numéros gardés pour la traçabilité) :
 - **P0S2-PO-1** (stockage des positions) : proposition à Samuel (P0-Q27, exigence 6) et au Tech Lead (D15), doublon de D15.
