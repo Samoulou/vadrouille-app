@@ -5,6 +5,7 @@
 // Seule exception : `SKIP_DB_TESTS=1` posé EXPLICITEMENT, pour les sessions sans Docker ; un avertissement est
 // affiché et la commande réussit. En CI (`CI` ou `GITHUB_ACTIONS` posée), cette variable est refusée.
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const skip = process.env.SKIP_DB_TESTS;
 const inCi = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
@@ -25,7 +26,11 @@ if (skip !== undefined && skip !== "") {
   process.exit(0);
 }
 
+// B3a (décisions 0050, « Acceptation par le Tech Lead de 0051 », point 4, et 0051, point 6.4.4) : le secret du limiteur
+// des tests de base est tiré au hasard à chaque exécution et posé dans le seul environnement du processus Vitest ; il
+// n'est ni écrit sur disque, ni journalisé, ni écrit dans `$GITHUB_ENV` (aucun workflow ne tire de secret de B3).
 const result = spawnSync("pnpm", ["exec", "vitest", "run", "--config", "vitest.db.config.mts", ...process.argv.slice(2)], {
   stdio: "inherit",
+  env: { ...process.env, RATE_LIMIT_HMAC_SECRET: randomBytes(32).toString("base64url") },
 });
 process.exit(result.status ?? 1);

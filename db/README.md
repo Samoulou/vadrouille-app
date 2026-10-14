@@ -57,7 +57,8 @@ Sur un poste qui dispose de Docker (facultatif, décision 0002) :
 1. `docker compose up -d db` (authentification « trust », port lié à `127.0.0.1` seulement) ;
 2. exécuter `db/bootstrap/roles.sql` avec `psql -v ON_ERROR_STOP=1 -f db/bootstrap/roles.sql`, connecté en
    `postgres` (hôte `127.0.0.1`, port `5432`, base `vadrouille`) ;
-3. poser, dans le shell, les quatre variables de connexion du tableau ci-dessus, toutes vers l'hôte `127.0.0.1`, le
+3. poser les quatre variables de connexion du tableau ci-dessus (les deux dernières sur la ligne de commande
+   seulement, voir le point 4), toutes vers l'hôte `127.0.0.1`, le
    port `5432` et la base `vadrouille`, sans mot de passe grâce à « trust » :
 
    | Variable | Rôle de connexion |
@@ -68,6 +69,12 @@ Sur un poste qui dispose de Docker (facultatif, décision 0002) :
    | `VADROUILLE_DB_ADMIN_URL` | `postgres` |
 
 4. `pnpm db:migrate`, puis `pnpm test:db`.
+
+   **Jamais dans un `export` de shell** pour `VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL`
+   (décision 0050, B3-TL-1 point 4) : le serveur (`pnpm dev`, `pnpm start`) refuse de démarrer quand l'une d'elles
+   est présente dans son processus (`register()`, `assertServerProcessEnv`). Pose la première sur la seule ligne de
+   commande de `pnpm db:migrate` (`VADROUILLE_DATABASE_URL_MIGRATOR=… pnpm db:migrate`), la seconde sur celle de
+   `pnpm test:db` ou de `pnpm verify` (`VADROUILLE_DB_ADMIN_URL=… pnpm test:db`).
 
 Les tests de base supposent une base jetable : ils créent des organisations et ne nettoient pas.
 
@@ -83,6 +90,7 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | `0001_securite` | irréversible | Elle active et force la RLS, pose les politiques, retire les droits et crée les fonctions et vues durcies : son inverse rouvrirait l'accès entre organisations. Aucun état antérieur n'est acceptable à restaurer. |
 | `0002_place_coordinates` | irréversible | Elle crée `place_coordinates` et ses fonctions : son inverse supprimerait la table et ses lignes (règle du rôle `data`) ; une correction se fait vers l'avant. Les coordonnées expirent d'elles-mêmes (30 jours, 29 pour `org_prototype`) et sont purgées par les fonctions. |
 | `0003_prototype` | irréversible | Elle crée le schéma `prototype`, `org_prototype` et son utilisateur technique : son inverse supprimerait des données. Sa suppression à la fin de la phase 0 sera une migration corrective décidée par écrit (0046 D17 point 5). |
+| `0004_rate_limit_expires_at` | `0004_rate_limit_expires_at.down.sql` | Exception nommée (décision 0050, amendement de 0007, point 2 ; 0051, point 6.3) : la migration inverse supprime l'index puis la colonne `expires_at`, qui ne porte qu'une échéance technique recalculable (au pire `window_start` + 1 jour), sans donnée d'une personne ni d'une organisation ; les lignes restent. L'exception ne vaut que pour cette colonne. |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :

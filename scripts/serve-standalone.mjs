@@ -2,6 +2,8 @@
 // comme dans l'image Docker : copie des fichiers statiques puis `node server.js`.
 // Si `E2E_SERVER_LOG` est posé (tests Playwright), la sortie standard et la sortie d'erreur du serveur sont
 // aussi recopiées dans ce fichier, vidé au démarrage, que les tests relisent (spécification F8).
+// B3a (spécification B3, B3a point 3) : le serveur reçoit un environnement explicite, celui de ce processus moins
+// les deux variables d'outillage de la base, que `register()` refuserait (décision 0050, B3-TL-1 point 4).
 import { spawn } from "node:child_process";
 import { closeSync, cpSync, existsSync, openSync, writeSync } from "node:fs";
 import { join } from "node:path";
@@ -21,10 +23,18 @@ if (existsSync(join(root, "public"))) {
   cpSync(join(root, "public"), join(standalone, "public"), { recursive: true });
 }
 
+// Environnement du serveur : copie de celui de ce processus, sans `VADROUILLE_DATABASE_URL_MIGRATOR` (écrite dans
+// `$GITHUB_ENV` par `scripts/ci/db-setup.sh`) ni `VADROUILLE_DB_ADMIN_URL` (posée pour l'étape `pnpm verify`).
+// Test : `tests/unit/server-env-config.test.ts`.
+const serverEnv = { ...process.env };
+delete serverEnv.VADROUILLE_DATABASE_URL_MIGRATOR;
+delete serverEnv.VADROUILLE_DB_ADMIN_URL;
+
 const logPath = process.env[SERVER_LOG_ENV];
 const log = logPath ? openSync(logPath, "w") : null;
 const server = spawn(process.execPath, ["server.js"], {
   cwd: standalone,
+  env: serverEnv,
   stdio: log === null ? "inherit" : ["inherit", "pipe", "pipe"],
 });
 if (log !== null) {

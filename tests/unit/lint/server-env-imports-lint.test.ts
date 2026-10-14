@@ -27,6 +27,15 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/env/exemple.test.ts", "@/server/env/ai"],
     ["tests/unit/setup.ts", "@/server/env/garde-cles"],
     ["playwright.config.ts", "./src/server/env/garde-cles"],
+    // B3a (décision 0050, B3-TL-1 point 1) : index, resolve, payment.
+    ["src/instrumentation.ts", "@/server/env"],
+    ["src/server/rate-limit.ts", "@/server/env"],
+    ["tests/unit/server/env.test.ts", "@/server/env"],
+    ["tests/unit/server/env.test.ts", "@/server/env/resolve"],
+    ["db/connection.ts", "../src/server/env/resolve.ts"],
+    ["src/server/env/index.ts", "./resolve"],
+    ["src/server/routes/exemple.ts", "@/server/env/payment"],
+    ["src/server/payment/exemple.ts", "@/server/env/payment"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
@@ -45,6 +54,15 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["tests/unit/exemple.test.ts", "@/server/env/egress"],
     ["src/ai/exemple.ts", "@/server/env"],
     ["src/ai/exemple.ts", "@/server/env/autre"],
+    // B3a : index, resolve, payment hors de leurs importateurs nommés.
+    ["src/server/actions/compte.ts", "@/server/env"],
+    ["src/server/actions/compte.ts", "@/server/env/index"],
+    ["src/app/page.tsx", "../server/env/index.ts"],
+    ["tests/unit/autre.test.ts", "@/server/env"],
+    ["db/index.ts", "../src/server/env/resolve.ts"],
+    ["src/server/rate-limit.ts", "@/server/env/resolve"],
+    ["src/instrumentation.ts", "@/server/env/payment"],
+    ["src/server/actions/paiement.ts", "@/server/env/payment"],
   ];
   it.each(REFUSES)("%s ne peut pas importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(1);

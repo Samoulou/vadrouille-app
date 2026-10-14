@@ -62,6 +62,9 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/test-db.mjs", propriete: "exit" },
   // P0r1 (ticket 267 ; spécification P0c, section 9) : options de Node lues par la barrière de sortie. Verdict Sécurité à rendre.
   { fichier: "src/server/env/egress.ts", propriete: "execArgv" },
+  // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement ») : arrêt du démarrage sur une configuration
+  // refusée (`register()`). Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
+  { fichier: "src/instrumentation.ts", propriete: "exit" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
@@ -123,6 +126,17 @@ export const LECTURES_ENV = [
       "NODE_OPTIONS",
     ],
   },
+  // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement » ; 0051 points 6.7.2 et 6.7.3) : environnement
+  // du serveur, lu par propriété littérale, valeur jamais rendue. `VADROUILLE_DB_ADMIN_URL` : présence seulement.
+  // Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion. `VERCEL_ENV` dans
+  // `index.ts` (garde « hors Vercel » de `TRUSTED_IP_HEADER`, 0051 point 2.2) : ligne au-delà du plafond, verdict
+  // Sécurité demandé dans la PR de B3a (0051 point 6.7.7).
+  { fichier: "src/instrumentation.ts", noms: ["NEXT_RUNTIME"] },
+  { fichier: "src/server/env/resolve.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV"] },
+  {
+    fichier: "src/server/env/index.ts",
+    noms: ["VERCEL", "HOSTNAME", "TRUSTED_IP_HEADER", "AUTH_ADAPTER", "SIMULATED_WEBHOOK_ENABLED", "VADROUILLE_DB_ADMIN_URL", "VERCEL_ENV"],
+  },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [
@@ -177,6 +191,21 @@ export const ENV_ENTIER = [
   { fichier: "src/server/env/ai.ts", formes: ["defaut:lireCleOpenRouter", "argument:verifierSortie"] },
   { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
   { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
+  // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement » ; 0051 point 6.7.3) : `process.env` entier
+  // passé à la validation (`register()`, `serverEnv()`) et à la résolution de l'environnement (garde de connexion).
+  // Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
+  { fichier: "src/instrumentation.ts", formes: ["argument:parseServerEnv", "argument:assertServerProcessEnv"] },
+  { fichier: "src/server/env/index.ts", formes: ["argument:parseServerEnv", "argument:resolveServerEnvironment"] },
+  { fichier: "db/connection.ts", formes: ["argument:resolveServerEnvironment"] },
+  // B3a (ticket 293 ; spécification B3, B3a point 3) : copie de l'environnement du lanceur, dont sont retirées
+  // `VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL`, passée au serveur autonome. Ligne au-delà du plafond
+  // de 0050 (la section 5, forme 3, ne prévoit l'étalement que dans des tests) : verdict Sécurité écrit exigé dans la
+  // PR de B3a (0051 point 6.7.7), à rendre.
+  { fichier: "scripts/serve-standalone.mjs", formes: ["etalement"] },
+  // B3a (ticket 293 ; 0050, « Acceptation par le Tech Lead de 0051 », point 4 ; 0051 point 6.4.4) : environnement du
+  // processus Vitest de `pnpm test:db`, plus le secret du limiteur tiré à l'exécution (clé de l'objet seulement).
+  // Relevée par l'analyseur : verdict Sécurité écrit exigé dans la PR de B3a (0051 point 6.7.7), à rendre.
+  { fichier: "scripts/test-db.mjs", formes: ["etalement"] },
 ] as const satisfies readonly LigneEnvEntier[];
 
 export const PARAMETRES_ENV = [
@@ -192,6 +221,11 @@ export const PARAMETRES_ENV = [
   { fichier: "db/connection.ts", fonction: "prototypeDatabaseAllowed", parametre: "env" },
   { fichier: "db/migrate.ts", fonction: "runMigrations", parametre: "env" },
   { fichier: "db/migrate.ts", fonction: "migratorConnectionString", parametre: "env" },
+  // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement »). Verdict Sécurité : plafond accepté par 0051
+  // point 6.7, lignes réelles à revoir au head de fusion.
+  { fichier: "src/server/env/index.ts", fonction: "parseServerEnv", parametre: "env" },
+  { fichier: "src/server/env/index.ts", fonction: "assertServerProcessEnv", parametre: "env" },
+  { fichier: "src/server/env/resolve.ts", fonction: "resolveServerEnvironment", parametre: "env" },
 ] as const satisfies readonly ParametreEnv[];
 
 /**

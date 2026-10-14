@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,6 +32,13 @@ const baseURL = `http://127.0.0.1:${PORT}`;
 const PROTOTYPE_PORT = PORT + PROTOTYPE_PORT_OFFSET;
 const prototypeURL = `http://127.0.0.1:${PROTOTYPE_PORT}`;
 const PROTOTYPE_DIR = realpathSync(join(__dirname, "prototype", "programmes-test"));
+
+// B3a (spécification B3, B3a point 3 ; décisions 0050, P2, et 0051, points 2.3 et 6.4) : les serveurs des e2e
+// tournent en `VADROUILLE_ENV=ci`. Le secret du limiteur est tiré au hasard à chaque exécution et posé dans le seul
+// `env` du serveur principal : ni écrit sur disque, ni journalisé, ni posé dans `process.env` de Playwright (aucun
+// rapport, trace ni artefact ne le reçoit). `TRUSTED_IP_HEADER` n'est posé que sur ce serveur autonome, lié à
+// `127.0.0.1` (garde de `assertServerProcessEnv`, test `tests/unit/server-env-config.test.ts`).
+const secretJetable = () => randomBytes(32).toString("base64url");
 
 // Tests sur le build de production, servi comme dans l'image Docker. `pnpm verify` construit une seule fois
 // puis passe E2E_SKIP_BUILD=1 ; un lancement isolé reconstruit l'application.
@@ -102,6 +110,9 @@ export default defineConfig({
         VADROUILLE_DEMO_PAYMENT: "1",
         VADROUILLE_DEMO_SHARE: "1",
         VADROUILLE_DEMO_AUTH: "1",
+        VADROUILLE_ENV: "ci",
+        TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
+        RATE_LIMIT_HMAC_SECRET: secretJetable(),
         PORT: String(PORT),
         HOSTNAME: "127.0.0.1",
         [SERVER_LOG_ENV]: serverLogPath({ port: PORT, tmpDir: tmpdir() }),
@@ -119,6 +130,7 @@ export default defineConfig({
         DATA_ADAPTER: "prototype",
         VADROUILLE_PROTOTYPE: "1",
         CI: "true",
+        VADROUILLE_ENV: "ci",
         VADROUILLE_PROTOTYPE_DIR: PROTOTYPE_DIR,
         // Compteur du relecteur simulé (`/dev/api/prototype/relectures`, décision 0032 § A6.6).
         VADROUILLE_DEV_PAGES: "1",

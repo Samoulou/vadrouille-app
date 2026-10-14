@@ -127,6 +127,36 @@ export const LIGNES_CAPACITE = [
     ecart: "module à capacité en zone sensible, absent du tableau de la section 3 (P0a1, PR 180) : 0040 D2, A4 (permanente)",
   },
   {
+    fichier: "src/server/env/index.ts",
+    portee: "application",
+    usage:
+      "garde de préfixe des variables `STRIPE_*` de B3a (ticket 293) : parcours des noms de l'environnement reçu, lecture des seules " +
+      "valeurs dont le nom commence par `STRIPE_`, comparées à des préfixes, jamais rendues ni journalisées",
+    capacites: [
+      { capacite: "environnement:parametre", formes: ["env (ForInStatement)"], nombre: 1 },
+      { capacite: "environnement:acces-calcule", formes: ["env[nom]"], nombre: 1 },
+    ],
+    ecart:
+      "parcours `STRIPE_*` admis en `src/server/env/` par P0c l. 239 et prévu par 0050 (« Lignes du régime de confinement ») ; " +
+      "ligne au-delà du plafond de 0050 : verdict Sécurité écrit exigé dans la PR de B3a (0051 point 6.7.7), à rendre",
+  },
+  {
+    fichier: "src/server/ip.ts",
+    portee: "application",
+    usage:
+      "adresse IP de confiance du limiteur (B3a, ticket 293) : `isIP` seulement, analyse d'adresse, aucune connexion, résolution ni écoute ; " +
+      "décision 0050, « Lignes du régime de confinement » ; verdict Sécurité : plafond accepté par 0051 point 6.7.4",
+    capacites: [{ capacite: "module:node:net", formes: ["isIP"] }],
+    ecart: "module à capacité hors du tableau de la section 3 (B3a, ticket 293) : décision 0050, « Lignes du régime de confinement », et 0051 point 6.7.4",
+  },
+  {
+    fichier: "tests/unit/server-env-config.test.ts",
+    portee: "test",
+    usage: "test de la configuration versionnée (variables d'environnement du serveur, B3a, ticket 293) : `git ls-files` seulement",
+    ecart: "décision 0050, « Lignes du régime de confinement », même ligne que `tests/unit/dev-pages-env.test.ts` ; verdict Sécurité : plafond accepté par 0051 point 6.7.5",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+  },
+  {
     fichier: "src/adapters/prototype-loader.test.ts",
     portee: "test",
     usage: "test du chargeur de programmes du prototype (P0b1)",
