@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "../e2e/carte-helpers";
-import { EDIMBOURG, R1, STORY, continueButton, fillTrip, installClock, reachBrief, reachReview } from "../e2e/creation-helpers";
+import { AUTH_CONFIG, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor } from "../e2e/connexion-helpers";
+import { EDIMBOURG, R1, R3_DEV, STORY, continueButton, fillTrip, installClock, reachAfterBrief, reachBrief, reachReview } from "../e2e/creation-helpers";
+import { useScope } from "../e2e/debloquer-helpers";
 
 /**
  * Captures des écrans 1 et 2 de la création en 390 × 844 (références de la CI, décision 0004), mêmes états que
@@ -89,4 +91,68 @@ test("brief: vérification remplie soi-même, sections ouvertes", async ({ page 
   await page.getByRole("radio", { name: "Tranquille" }).click();
   await page.getByRole("group", { name: "Envies" }).getByRole("button", { name: "Musées" }).click();
   await capture(page, "brief-verification-ouverte.png");
+});
+
+// F8b : écrans 3 et 4 (rendus provisoires, F8-Q1 ; 0018 § 17 et § 18). Adresse fixe dans une portée propre au test.
+const EMAIL = "camille@exemple.ch";
+
+test("logement: quartier et logements, configuration absente", async ({ page }) => {
+  await reachAfterBrief(page);
+  await expect(page.getByRole("button", { name: "Partir du quartier, choisir plus tard" })).toBeVisible();
+  await capture(page, "logement-quartier.png");
+});
+
+test("logement: carte simulée (R3-dev)", async ({ page }) => {
+  await page.goto(R3_DEV);
+  await expect(page.locator("[data-part='zone']")).toBeVisible();
+  await capture(page, "logement-carte-simulee.png");
+});
+
+test("logement: aucun quartier", async ({ page }) => {
+  await reachAfterBrief(page, { ...EDIMBOURG, destination: "Glasgow" });
+  await expect(page.getByText("Aucun quartier à te proposer pour l'instant.")).toBeVisible();
+  await capture(page, "logement-aucun-quartier.png");
+});
+
+test("connexion: étape email", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await expect(emailField(page)).toBeVisible();
+  await capture(page, "connexion-email.png");
+});
+
+test("connexion: email invalide", async ({ page }) => {
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await emailField(page).fill("camille@");
+  await page.getByRole("button", { name: "Recevoir un code" }).click();
+  await expect(emailField(page)).toHaveAttribute("aria-invalid", "true");
+  await capture(page, "connexion-email-erreur.png");
+});
+
+test("connexion: étape code", async ({ page, context, baseURL }) => {
+  await useScope(context, baseURL!);
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await requestCodeFor(page, EMAIL);
+  await capture(page, "connexion-code.png");
+});
+
+test("connexion: code faux", async ({ page, context, baseURL }) => {
+  await useScope(context, baseURL!);
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await requestCodeFor(page, EMAIL);
+  await pasteCode(page, MOCK_WRONG_CODE);
+  await expect(codeAlert(page)).not.toHaveText("");
+  await capture(page, "connexion-code-faux.png");
+});
+
+test("connexion: trop d'essais", async ({ page, context, baseURL }) => {
+  await useScope(context, baseURL!);
+  await page.goto(connexionRoute("/voyages/nouveau/lancer"));
+  await requestCodeFor(page, EMAIL);
+  for (let attempt = 1; attempt <= AUTH_CONFIG.maxAttempts; attempt += 1) {
+    await expect(page.getByRole("textbox", { name: "Chiffre 1 sur 6" })).toBeEnabled();
+    await pasteCode(page, MOCK_WRONG_CODE);
+    await expect(codeAlert(page)).not.toHaveText("");
+  }
+  await expect(codeAlert(page)).toHaveText(/^Trop d'essais/);
+  await capture(page, "connexion-trop-d-essais.png");
 });

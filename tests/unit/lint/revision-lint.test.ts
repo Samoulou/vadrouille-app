@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Critères transverses de F7a (spécification F7, C3, C4 et C7) sur les nouveaux fichiers : ni carte simulée ni

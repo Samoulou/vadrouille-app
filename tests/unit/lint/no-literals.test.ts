@@ -26,7 +26,7 @@ describe("règle react/jsx-no-literals", () => {
 
   it("accepte un texte venu de fr.json et les valeurs d'attributs", async () => {
     const messages = await literals(
-      `import { messages } from "@/i18n";\nexport function Exemple() {\n  return <span className="bg-quai text-ink">{messages.ligne.tag.toReserve}</span>;\n}\n`,
+      `import * as messages from "@/i18n/messages";\nexport function Exemple() {\n  return <span className="bg-quai text-ink">{messages.ligne.tag.toReserve}</span>;\n}\n`,
       component,
     );
     expect(messages).toHaveLength(0);

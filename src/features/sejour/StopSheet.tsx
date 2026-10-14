@@ -10,7 +10,7 @@ import { IconCroix } from "@/components/ligne/icons";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 
 import { PLACES_FROM_GOOGLE } from "./constants";

@@ -74,7 +74,17 @@ describe("création du voyage : aucun journal", () => {
     "src/features/compte/suite.ts",
     "src/server/actions/creation.ts",
     "src/adapters/mock-creation.ts",
+    "src/server/actions/compte.ts",
+    "src/adapters/mock-auth.ts",
+    "src/adapters/auth-guard.ts",
   ])("console refusé dans %s", async (filePath) => {
     expect(await messagesFor(`export function f(story: string) {\n  console.info(story);\n}\n`, filePath, ["no-console"])).toHaveLength(1);
+  });
+});
+
+describe("connexion et création simulées : horloge de la portée seulement (F8b, 0017 § 10.1)", () => {
+  it.each(["src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts"])("Date.now et new Date() refusés dans %s", async (filePath) => {
+    const code = `export function f() {\n  return [Date.now(), new Date()];\n}\n`;
+    expect(await messagesFor(code, filePath, ["no-restricted-syntax"])).toHaveLength(2);
   });
 });

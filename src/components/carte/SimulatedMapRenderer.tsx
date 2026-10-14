@@ -7,8 +7,8 @@ import { useElementSize } from "@/lib/use-element-size";
 
 import { defaultFitPadding } from "./css";
 import { MarkerButton } from "./MarkerButton";
-import type { LatLng } from "./route";
-import { drag, fitCamera, offsetCamera, project, type Camera } from "./simulated-model";
+import { areaRadiusDegrees, type LatLng } from "./route";
+import { drag, fitCamera, offsetCamera, project, scaleAt, type Camera } from "./simulated-model";
 import type { MapView } from "./types";
 
 /** Au-delà de ce déplacement (en pixels CSS), le geste est un glisser et non un toucher. */
@@ -28,6 +28,15 @@ interface DragState {
  * où elle est injectée par `CarteProvider` ; elle n'affiche que les données simulées du dépôt.
  * Son état `{ center, zoom }` est exposé en attributs `data-center-lat`, `data-center-lng`, `data-zoom`.
  */
+/** Coins de la zone d'un quartier dans la projection simulée (même échelle en latitude et en longitude). */
+function areaBox(center: LatLng, radiusM: number): LatLng[] {
+  const d = areaRadiusDegrees(radiusM);
+  return [
+    { lat: center.lat - d, lng: center.lng - d },
+    { lat: center.lat + d, lng: center.lng + d },
+  ];
+}
+
 export function SimulatedMapRenderer({ view }: { view: MapView }) {
   // Taille du conteneur, par le crochet commun (décision 0022 § 6) : la zone de la carte, pas la fenêtre.
   const [containerRef, size] = useElementSize<HTMLDivElement>();
@@ -39,7 +48,7 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
 
   // Cadrage au premier affichage et à chaque changement de jour seulement ; recentrage quand la
   // sélection change (zoom inchangé, sans transition). Ajusté pendant le rendu, sans effet.
-  const positions: LatLng[] = view.mode === "day" ? view.route.positions : view.rings;
+  const positions: LatLng[] = view.mode === "day" ? view.route.positions : view.mode === "area" ? areaBox(view.center, view.radiusM) : view.rings;
   let next = camera;
   if (size && (next === null || next.key !== view.fitKey)) {
     const fitted = fitCamera(positions, size, view.fitPadding ?? defaultFitPadding());
@@ -173,6 +182,18 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
             );
           })
         : null}
+
+      {ready && view.mode === "area" ? (
+        <svg aria-hidden="true" data-part="zone" className="absolute inset-0" width={size.width} height={size.height}>
+          <circle
+            cx={at(view.center).left}
+            cy={at(view.center).top}
+            r={areaRadiusDegrees(view.radiusM) * scaleAt(camera?.zoom ?? 0)}
+            className="fill-none stroke-line"
+            style={{ strokeWidth: "var(--ligne-rail)" }}
+          />
+        </svg>
+      ) : null}
 
       {ready && view.mode === "overview"
         ? view.rings.map((ring, index) => (

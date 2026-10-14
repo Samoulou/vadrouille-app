@@ -38,6 +38,9 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/serve-standalone.mjs", propriete: "on" },
   { fichier: "src/server/actions/creation.test.ts", propriete: "stdout" },
   { fichier: "src/server/actions/creation.test.ts", propriete: "stderr" },
+  // F8b (spécification F8, « Données personnelles ») : espion du test « ni adresse ni code journalisés ». Verdict Sécurité : à venir (PR F8b, ticket 259).
+  { fichier: "src/server/actions/compte.test.ts", propriete: "stdout" },
+  { fichier: "src/server/actions/compte.test.ts", propriete: "stderr" },
   // F10c (décision 0039, F10-TL-7) : espion du test « jeton jamais journalisé » (C35). Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/server/actions/partage.test.ts", propriete: "stdout" },
   { fichier: "src/server/actions/partage.test.ts", propriete: "stderr" },
@@ -64,6 +67,8 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/payment-guard.ts", noms: ["VADROUILLE_DEMO_PAYMENT", "PAYMENT_ADAPTER", "DATA_ADAPTER"] },
   // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
+  // F8b (décision 0017 § 11.2, F8-TL-10) : garde de la connexion simulée, même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
+  { fichier: "src/adapters/auth-guard.ts", noms: ["AUTH_ADAPTER", "VADROUILLE_DEMO_AUTH"] },
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
   { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
@@ -118,6 +123,18 @@ export const ENV_ENTIER = [
   {
     fichier: "src/adapters/share-guard.ts",
     formes: ["defaut:shareDemoAvailable", "defaut:shareAvailable", "argument:isProductionDeployment", "argument:shareDemoAvailable"],
+  },
+  // F8b (décision 0017 § 11.2, F8-TL-10) : même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
+  {
+    fichier: "src/adapters/auth-guard.ts",
+    formes: [
+      "defaut:authAdapterChoice",
+      "defaut:mockAuthAllowed",
+      "defaut:assertAuthAdapter",
+      "argument:isProductionDeployment",
+      "argument:authAdapterChoice",
+      "argument:mockAuthAllowed",
+    ],
   },
   { fichier: "src/adapters/simulation.ts", formes: ["defaut:simulationEnabled", "argument:devPagesEnabled", "argument:isProductionDeployment"] },
   { fichier: "src/dev/flags.ts", formes: ["defaut:devPagesEnabled", "defaut:isProductionDeployment", "defaut:prototypeAdapterAllowed", "argument:isProductionDeployment"] },

@@ -1,23 +1,28 @@
 import type {
   BriefRequest,
   CheckoutRequest,
+  CodeRequest,
+  CodeVerification,
   CheckoutStart,
   CheckoutStatus,
   CreatedShareLink,
   Day,
   DayMap,
   InferredBrief,
+  LodgingRequest,
+  LodgingSuggestion,
   Offer,
   PreviewSlot,
   Proposal,
   Result,
+  Session,
   ShareStatus,
   SharedDayView,
   SharedTripView,
   Trip,
   TripSummary,
 } from "@/contracts";
-import type { CheckoutOutcome } from "@/contracts/values";
+import type { AuthMode, CheckoutOutcome } from "@/contracts/values";
 
 /** Rôle de la personne dans l'organisation (évolution E6). */
 export type MemberRole = "owner" | "member";
@@ -90,6 +95,40 @@ export interface PaymentSimulator {
 export interface CreationAdapter {
   /** Seule étape IA des écrans 1 à 4 (0017 § 3.6) : le récit est une donnée, jamais une instruction. */
   structureBrief(request: BriefRequest): Promise<Result<InferredBrief>>;
+  /**
+   * Écran 3 (F8b) : quartier conseillé et jusqu'à 3 logements pour la ville `request.city`, ou `no_option`.
+   * Anonyme. Calculé par le moteur avec B9 (0017 § 3.6) ; noms et raisons maison. Sortie revalidée par l'action.
+   */
+  suggestLodging(request: LodgingRequest): Promise<Result<LodgingSuggestion>>;
+}
+
+/**
+ * Limites de la connexion par code (spécification F8, écran 4 ; F8-PO-9) : configuration de l'adaptateur, lue
+ * par l'interface (« valable 10 minutes ») et par les tests, jamais en dur ailleurs. Valeurs de phase 0 : elles
+ * décrivent la simulation et ne fixent pas les seuils réels de B3 (Q86).
+ */
+export interface AuthConfig {
+  codeTtlMs: number;
+  maxAttempts: number;
+  maxCodeRequests: number;
+  codeRequestWindowMs: number;
+}
+
+/**
+ * Connexion par email et code (décision 0017 § 3.1, F8-TL-3), simulée en phase 0 (`mock-auth.ts`), réelle avec
+ * B3. `requestCode` et `verifyCode` sont anonymes et suivent la même machine d'états pour une adresse connue ou
+ * inconnue : seules les sessions diffèrent (identifiant de personne), jamais la réponse visible (F8-PO-9, 0017 § 4).
+ */
+export interface AuthAdapter {
+  readonly config: AuthConfig;
+  /** `simulated` tant que l'adaptateur est `mock` : l'écran 4 affiche l'avertissement (0017 § 3.5). */
+  readonly mode: AuthMode;
+  /** Ouvre un code actif (durée `codeTtlMs`, essais à zéro) ; invalide le précédent ; `rate_limited` au-delà de la limite. */
+  requestCode(request: CodeRequest): Promise<Result<{ sent: true }>>;
+  /** `invalid_code`, `too_many_attempts`, `code_expired` ; la réussite ouvre la session de la portée. */
+  verifyCode(request: CodeVerification): Promise<Result<Session>>;
+  getSession(): Promise<Session | null>;
+  signOut(): Promise<void>;
 }
 
 /**

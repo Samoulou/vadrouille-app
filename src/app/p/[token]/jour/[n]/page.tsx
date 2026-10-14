@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { loadSharedDay } from "@/features/partage/load";
 import { SharedDayScreen } from "@/features/partage/SharedDayScreen";
 import { SharedShell } from "@/features/partage/SharedShell";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Lu à chaque requête (F10-PO-15) ; en-têtes privés et `no-store` posés par `next.config.ts` (F10-TL-8).
 export const dynamic = "force-dynamic";

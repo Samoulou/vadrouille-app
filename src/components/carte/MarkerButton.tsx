@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 
 import { StopMarker } from "@/components/ligne/StopMarker";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import type { StopMarkerSpec } from "./route";

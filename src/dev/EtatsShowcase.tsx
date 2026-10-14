@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { Button, StatusBanner, Tag, type StatusBannerKind, type TagKind } from "@/components/ligne";
 import { TripsScreen } from "@/features/compte/TripsScreen";
 import { noOptionMessage } from "@/features/presentation/contexte";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatDuree } from "@/lib/duree";
 
 const t = messages.etats.catalogue;

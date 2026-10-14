@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent } from "react";
 
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 export interface OtpInputProps {
@@ -14,6 +15,17 @@ export interface OtpInputProps {
   defaultValue?: string;
   /** Nom accessible du groupe ; par défaut « Code à 6 chiffres ». */
   label?: string;
+  /**
+   * Libellé visible (spécification F8, écran 4 ; décision 0012, Q30) : `label` est affiché au-dessus des cases
+   * (`corps` 700 `ink`) et nomme le groupe par `aria-labelledby`, sans `aria-label` (nom accessible et libellé
+   * visible identiques, WCAG 2.5.3). Faux par défaut : comportement de F2 inchangé.
+   */
+  labelVisible?: boolean;
+  /**
+   * Focus sur la première case au montage (étape code de l'écran 4). Pour vider les cases et rendre le focus à la
+   * première (code refusé), l'écran remonte le composant (nouvelle `key`).
+   */
+  autoFocus?: boolean;
   disabled?: boolean;
   /** Code refusé : contour `ink` et `aria-invalid="true"` sur chaque case (décision 0012, Q13). */
   invalid?: boolean;
@@ -40,11 +52,14 @@ export function OtpInput({
   onComplete,
   defaultValue = "",
   label,
+  labelVisible = false,
+  autoFocus = false,
   disabled = false,
   invalid = false,
   describedBy,
   className,
 }: OtpInputProps) {
+  const labelId = useId();
   const [digits, setDigits] = useState<string[]>(() =>
     Array.from({ length }, (_, index) => digitsOf(defaultValue)[index] ?? ""),
   );
@@ -55,6 +70,12 @@ export function OtpInput({
     input?.focus();
     input?.select();
   }
+
+  useEffect(() => {
+    if (autoFocus) refs.current[0]?.focus();
+    // Au montage seulement : un nouveau focus demande un nouveau montage (nouvelle `key`).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function commit(next: string[]) {
     const wasComplete = digits.every(Boolean);
@@ -112,12 +133,15 @@ export function OtpInput({
     }
   }
 
-  return (
+  const name = label ?? format(t.groupe, { length });
+  const visible = labelVisible && label !== undefined;
+  const group = (
     <div
       role="group"
-      aria-label={label ?? format(t.groupe, { length })}
+      aria-label={visible ? undefined : name}
+      aria-labelledby={visible ? labelId : undefined}
       aria-describedby={describedBy}
-      className={cn("flex gap-2", className)}
+      className={cn("flex gap-2", !visible && className)}
     >
       {digits.map((digit, index) => (
         <input
@@ -144,6 +168,15 @@ export function OtpInput({
           )}
         />
       ))}
+    </div>
+  );
+  if (!visible) return group;
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      <p id={labelId} className="text-corps font-bold text-ink">
+        {name}
+      </p>
+      {group}
     </div>
   );
 }

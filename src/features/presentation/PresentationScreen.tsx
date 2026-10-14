@@ -25,7 +25,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
 import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { createLocalDeckActions, type DeckActions } from "./actions";
 import { formatContexte, noOptionMessage } from "./contexte";

@@ -6,7 +6,8 @@ import { CarteProvider, DayMap, PlacesAttribution, type CarteInjection } from "@
 import { SimulatedMapRenderer } from "@/components/carte/SimulatedMapRenderer";
 import { Button, DayLine } from "@/components/ligne";
 import type { Day, DayMap as DayMapData, Stop } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 const t = messages.dev.carte;

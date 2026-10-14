@@ -2,7 +2,7 @@
 
 import { useId, type Ref } from "react";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import { IconCoche } from "./icons";

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { demoLinks, demoSection } from "./accueil-helpers";
+import { createLink, demoLinks, demoSection } from "./accueil-helpers";
 import { blockGoogle } from "./carte-helpers";
 
 /**
@@ -126,6 +126,9 @@ test("accueil: contour de focus 2 px line décalé de 2 px sur chaque lien", asy
   await page.goto("/");
   const line = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-line").trim());
   await page.keyboard.press("Tab");
+  // Ticket #259 : « Créer un voyage » précède la section « Démonstration » (vérifié dans son propre test).
+  await expect(createLink(page)).toBeFocused();
+  await page.keyboard.press("Tab");
   for (let index = 0; index < ARRIVALS.length; index += 1) {
     const link = demoLinks(page).nth(index);
     await expect(link).toBeFocused();
@@ -142,4 +145,41 @@ test("accueil: contour de focus 2 px line décalé de 2 px sur chaque lien", asy
     expect(style).toEqual({ width: "2px", style: "solid", offset: "2px", color: line });
     await page.keyboard.press("Tab");
   }
+});
+
+/** Demande de Samuel transmise par le CEO (ticket #259) : entrée « Créer un voyage » vers l'écran 1. */
+test("accueil: « Créer un voyage » mène à l'écran 1, accessible au clavier", async ({ page }) => {
+  await page.goto("/");
+  const link = createLink(page);
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "/voyages/nouveau");
+  // Après le nom et la promesse, avant la section « Démonstration ».
+  const order = await page.evaluate(() => {
+    const create = [...document.querySelectorAll("a")].find((a) => a.textContent === "Créer un voyage");
+    const promise = document.querySelector("main p");
+    const demo = document.querySelector("main section, main [role='region']");
+    const follows = (a: Node | null | undefined, b: Node | null | undefined) =>
+      Boolean(a && b && a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return { afterPromise: follows(promise, create), beforeDemo: follows(create, demo) };
+  });
+  expect(order).toEqual({ afterPromise: true, beforeDemo: true });
+
+  const box = await link.boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+
+  const line = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-line").trim());
+  await page.keyboard.press("Tab");
+  await expect(link).toBeFocused();
+  const style = await link.evaluate((el) => {
+    const s = getComputedStyle(el);
+    const rgb = s.outlineColor.match(/\d+/g)!.slice(0, 3).map(Number);
+    return { width: s.outlineWidth, style: s.outlineStyle, offset: s.outlineOffset, color: `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}` };
+  });
+  expect(style).toEqual({ width: "2px", style: "solid", offset: "2px", color: line });
+
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL("/voyages/nouveau");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText("This page could not be found")).toHaveCount(0);
 });

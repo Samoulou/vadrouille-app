@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
-import { R1, R2, continueButton, fillTrip, upcomingTrip } from "./creation-helpers";
+import { R1, R2, R3, continueButton, fillTrip, reachReview, upcomingTrip } from "./creation-helpers";
+import { emailField, uniqueEmail } from "./connexion-helpers";
 import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useScope as createScope } from "./debloquer-helpers";
 import { card, press, toast } from "./presentation-helpers";
 import { RP, RPJ, SHARE_TOKEN_VALIDE, createShareScope } from "./partage-helpers";
@@ -41,6 +42,15 @@ export const ROUTE_STATES = {
     await expect(ficheTitle(page)).toBeVisible();
     await openMoveSheet(page);
     await moveDays(page).getByRole("radio", { name: "Jour 4", exact: true }).click();
+  },
+  /**
+   * Écran 4 : adresse unique (la portée par défaut compte les demandes par adresse), « Recevoir un code », étape
+   * code affichée, focus sur la première case (F8b).
+   */
+  "etape-code": async (page) => {
+    await emailField(page).fill(uniqueEmail());
+    await page.getByRole("button", { name: "Recevoir un code" }).click();
+    await expect(page.getByRole("textbox", { name: "Chiffre 1 sur 6" })).toBeFocused();
   },
 } satisfies Record<RouteStateName, RouteStateAction>;
 
@@ -111,6 +121,19 @@ export const ROUTE_JOURNEYS = {
       await fillTrip(page, upcomingTrip());
       await continueButton(page).click();
       await expect.poll(() => new URL(page.url()).pathname).toBe(R2);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    },
+  },
+  /** `R3` : écran 1 « Pas encore », écran 2 validé avec le brief simulé ; l'écran 3 s'affiche (F8b). */
+  "brouillon-logement": {
+    start: R1,
+    run: async (page) => {
+      await fillTrip(page, upcomingTrip());
+      await continueButton(page).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(R2);
+      await reachReview(page);
+      await continueButton(page).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(R3);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     },
   },

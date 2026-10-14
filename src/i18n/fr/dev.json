@@ -1,0 +1,197 @@
+{
+  "tokens": {
+    "titre": "Tokens Ligne",
+    "intro": "Page de développement, désactivée en production.",
+    "couleurs": "Couleurs",
+    "textes": "Styles de texte",
+    "rayons": "Rayons",
+    "exemple": "Ton voyage, de l'hôtel à la soirée",
+    "chiffres": "10:45 – 11:45"
+  },
+  "composants": {
+    "titre": "Composants Ligne",
+    "intro": "Page de développement, désactivée en production. Les contenus entre crochets ne sont pas vérifiés.",
+    "etats": {
+      "variantes": "Variantes, taille md (52 px)",
+      "tailles": "Taille sm (44 px), texte ink-soft",
+      "desactive": "Désactivé",
+      "indisponible": "Indisponible (aria-disabled)",
+      "focus": "Focus",
+      "lien": "Lien (asChild)",
+      "formes": "Carré et rond",
+      "types": "Types",
+      "compteur": "Compteur (rien à 0)",
+      "selection": "Non sélectionnée, sélectionnée",
+      "deduit": "Déduite, non sélectionnée et sélectionnée",
+      "vide": "Vide",
+      "rempli": "Rempli",
+      "invalide": "Invalide, message relié au groupe",
+      "pastilles": "Inactive, active, désactivée, réduite",
+      "rangeeSejour": "« Séjour » actif",
+      "rangeeJour": "J9 actif",
+      "ligneDuJour": "Séquence du preview.html de DayLine",
+      "voiture": "Segment en voiture",
+      "marqueursLigne": "Arrêt et terminus de la ligne",
+      "marqueursCarte": "Carte : arrêt numéroté, sélectionné, terminus, vue d'ensemble",
+      "deckActivite": "Carte d'activité, avec trajet au-delà de 20 min",
+      "deckRepas": "Carte repas, option 1 sur 2",
+      "deckDerniere": "Carte repas, dernière option",
+      "progression": "Progression, 4 sur 8",
+      "toast": "Toast d'annulation",
+      "panneau": "Panneau à 25 %, 55 % et 92 % de son cadre",
+      "raison": "Avec date de consultation, sans date",
+      "bandeauTrajet": "Bandeau de trajet (type travel)",
+      "ligneAjouts": "Étape verrouillée, déjeuner et dîner pas encore choisis, lien « Idées » par plage",
+      "bascule": "Bascule (aria-pressed) : relâchée, enfoncée, enfoncée avec focus",
+      "plaque": "Plaque destination : bruyère, azulejo, ocre, granit",
+      "checklist": "Ligne à réserver : à faire, faite, sans lien, lien rémunéré (cliquable)",
+      "bandeauAction": "Bandeau d'action requise (ActionBanner, aplat quai)",
+      "ligneCompacte": "Ligne compacte en lecture seule : étape terminée, étape en cours, étape à venir",
+      "ligneReduite": "Ligne réduite : terminus sans libellé, étapes sans lien",
+      "segmenteDeduit": "Option déduite choisie, puis sans choix",
+      "changeSet": "ChangeSet : remplacé, ajouté, déplacé (même jour, autre jour), trajet mesuré et estimé, budget en hausse",
+      "changeSetBaisse": "ChangeSet : budget en baisse ; une ligne inchangée et un budget nul ne sont pas rendus",
+      "surlignee": "DayLine : étape surlignée après « Appliquer » (2 s)",
+      "raisonsVerticales": "SegmentedControl vertical : aucune raison cochée, une raison cochée",
+      "groupeJours": "DayBadgeGroup : J1 cochée, J2 et J4 non cochées, J3 complète (flèches : focus sans coche)",
+      "groupeJoursVide": "DayBadgeGroup sans jour coché : arrêt de tabulation sur le premier jour qui n'est pas complet"
+    },
+    "exemples": {
+      "garder": "Garder",
+      "remplacer": "Remplacer",
+      "appliquer": "Appliquer",
+      "passer": "Passer",
+      "plusTard": "Plus tard",
+      "reserver": "Réserver",
+      "debloquer": "Débloquer",
+      "retour": "Retour",
+      "partager": "Partager",
+      "compteurTitre": "À faire avant de partir",
+      "compteurLabel": "[4 réservations à faire]",
+      "compteurZeroLabel": "[Aucune réservation à faire]",
+      "codeInvalide": "Ce code ne correspond pas. Vérifie-le ou demande un nouveau code.",
+      "chips": {
+        "histoire": "Histoire",
+        "balades": "Balades en ville",
+        "musees": "[Musées]",
+        "marches": "[Marchés]"
+      },
+      "segmente": {
+        "label": "[Rythme]",
+        "options": {
+          "a": "[Option 1]",
+          "b": "[Option 2]",
+          "c": "[Option 3]"
+        }
+      },
+      "bandeaux": {
+        "offline": "Carte indisponible hors ligne",
+        "conflict": "[Conflit : message fourni par l'écran]",
+        "noOption": "[Aucune option : message fourni par l'écran]",
+        "error": "Les temps de trajet n'ont pas pu être recalculés. Ton programme précédent est conservé.",
+        "generating": "[Génération en cours : message fourni par l'écran]",
+        "travel": "[Bandeau de trajet : message composé par l'écran]"
+      },
+      "ligne": {
+        "hotel": "[Nom de l'hôtel]",
+        "arret1": {
+          "nom": "Calton Hill",
+          "raison": "La ville entière vue d'en haut, à 10 min de l'hôtel."
+        },
+        "arret2": {
+          "nom": "[Distillerie]",
+          "secteur": "[East Lothian]"
+        },
+        "rangeeSejour": "Jours du séjour, démonstration « Séjour » actif",
+        "rangeeJour": "Jours du séjour, démonstration J9 actif"
+      },
+      "pendant": {
+        "titre": "Pendant le voyage",
+        "bandeauTitre": "À réserver",
+        "bandeauLigne": "19:00 [Bonne table]",
+        "bandeauTexte": "Si c'est déjà réservé, ignore ce rappel.",
+        "arret3": "[Jardin]"
+      },
+      "presentation": {
+        "activite": {
+          "nom": "[Distillerie]",
+          "secteur": "[East Lothian]",
+          "raison": "[Tu as demandé une distillerie sans voiture]",
+          "detour": "[La distillerie la plus proche accessible sans voiture]"
+        },
+        "repas": {
+          "nom": "[Bonne table]",
+          "secteur": "[Old Town]",
+          "raison": "[Tu as choisi une bonne table le samedi soir]"
+        },
+        "repas2": {
+          "nom": "[Bistrot]",
+          "secteur": "[Old Town]"
+        },
+        "toast": "[Distillerie] écarté."
+      },
+      "programme": {
+        "panneaux": {
+          "petit": "[Panneau de démonstration à 25 %]",
+          "moyen": "[Panneau de démonstration à 55 %]",
+          "grand": "[Panneau de démonstration à 92 %]"
+        },
+        "contenu": "[Contenu du panneau, qui défile à l'intérieur]",
+        "raison": "[Tu as choisi Histoire et Balades en ville. Ancien village de meuniers au bord de la rivière.]",
+        "source": "[Office du tourisme]",
+        "verrouillee": {
+          "nom": "[Billets du concert]"
+        },
+        "plaque": {
+          "noms": {
+            "bruyere": "[Édimbourg]",
+            "azulejo": "[Lisbonne]",
+            "ocre": "[Séville]",
+            "granit": "[Porto]"
+          },
+          "meta": "[sam. 29.08 – jeu. 03.09 · 2 adultes]"
+        },
+        "checklist": {
+          "aFaire": {
+            "label": "[Distillerie], visite"
+          },
+          "faite": {
+            "label": "[Military Tattoo]"
+          },
+          "sansLien": {
+            "label": "[Adaptateur électrique]"
+          },
+          "remuneree": {
+            "label": "[Assurance voyage]"
+          }
+        }
+      },
+      "verrouiller": "Verrouiller",
+      "revision": {
+        "titre": "Révision",
+        "ancien": "[Dean Village]",
+        "nouveau": "[Épicerie fine de Stockbridge]",
+        "ajoute": "[Librairie de Grassmarket]",
+        "deplace": "[Musée national d'Écosse]",
+        "trajet": "[Café de Stockbridge]",
+        "raisons": "Pourquoi la remplacer ?",
+        "versQuelJour": "Vers quel jour ?"
+      }
+    }
+  },
+  "carte": {
+    "titre": "Carte",
+    "intro": "Page de développement, désactivée en production. Carte simulée sur données simulées : aucun fond de carte, aucune donnée Google.",
+    "jours": "Jour affiché",
+    "liste": "Étapes du jour {n}",
+    "sejour": "Jours du séjour",
+    "attribution": {
+      "titre": "Mention d'attribution",
+      "avec": "Avec placesFromGoogle vrai :",
+      "sans": "Avec placesFromGoogle faux : aucune mention (phase 0)."
+    }
+  },
+  "voyages": {
+    "titre": "Voyage (carte simulée)"
+  }
+}

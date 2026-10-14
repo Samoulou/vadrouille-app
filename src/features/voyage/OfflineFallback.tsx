@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { EtatPage } from "@/features/etats/EtatPage";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 
 const t = messages.voyage.horsLigne;

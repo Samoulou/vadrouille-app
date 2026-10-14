@@ -1,0 +1,69 @@
+{
+  "titreDocument": {
+    "sejour": "{destination} · Séjour",
+    "jour": "{destination} · Jour {n}",
+    "etape": "{name} · Jour {n}"
+  },
+  "region": "Programme",
+  "retour": "Retour",
+  "journee": {
+    "trajet": "{duree} de trajet",
+    "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
+    "enPreparation": "Jour {n} en préparation",
+    "etapes": "Étapes du jour {n}",
+    "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
+    "bandeauPlusLong": "Le plus long : {segment}, vers {name}."
+  },
+  "evenements": {
+    "titreJour": "Événements du jour",
+    "plage": "{start} – {end}",
+    "prefixe": "J{n} · {date} · {plage}"
+  },
+  "surprise": {
+    "bouton": "Surprends-moi",
+    "mention": "Une idée pour ta journée, pas encore dans ton programme."
+  },
+  "regionFiche": "Fiche étape",
+  "fiche": {
+    "fermer": "Fermer",
+    "moment": "J{n} · {title} · {range}",
+    "verrou": "Étape verrouillée : elle ne bougera pas quand tu modifies ton programme.",
+    "evenement": "Proposé pendant ton séjour, pas dans ton programme.",
+    "pourYAller": "Pour y aller",
+    "pourYAllerDepuis": "{segment} depuis {origin}",
+    "actions": "Actions",
+    "remplacer": "Remplacer",
+    "deplacer": "Déplacer",
+    "verrouiller": "Verrouiller",
+    "toastVerrouillee": "Étape verrouillée.",
+    "toastDeverrouillee": "Verrou retiré.",
+    "absente": "Cette étape n'est plus dans ce jour."
+  },
+  "sejour": {
+    "budget": "Budget estimé : environ {montant} CHF par personne",
+    "budgetSansJour": "(sans le jour {n})",
+    "aFaire": {
+      "titre": "À faire avant de partir",
+      "compteur": {
+        "un": "1 réservation à faire",
+        "plusieurs": "{n} réservations à faire"
+      }
+    },
+    "pendant": {
+      "titre": "Pendant ton séjour",
+      "vide": "Aucun événement retenu pour tes dates."
+    },
+    "jourParJour": {
+      "titre": "Jour par jour",
+      "resume": "{etapes} · {duree} de trajet",
+      "etapes": {
+        "un": "1 étape",
+        "plusieurs": "{n} étapes"
+      },
+      "enPreparation": "En préparation"
+    }
+  },
+  "aujourdhui": {
+    "lien": "Aujourd'hui · Jour {n}"
+  }
+}

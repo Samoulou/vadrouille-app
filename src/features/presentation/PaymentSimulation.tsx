@@ -9,7 +9,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { IconRetour } from "@/components/ligne/icons";
 import type { CheckoutOutcome, Currency, PaymentMethod } from "@/contracts/values";
 import { isCheckoutFailure } from "@/contracts/values";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { simulateCheckoutOutcome } from "@/server/actions/paiement";
 
 import { formatPrice } from "./price";

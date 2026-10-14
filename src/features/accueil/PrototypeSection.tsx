@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { TripSummary } from "@/contracts";
 import { presentationRoute } from "@/features/presentation/routes";
 import { tripRoutes } from "@/features/sejour/routes";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 export interface PrototypeSectionProps {
   /** Voyages du prototype, lus par l'adaptateur `prototype` (`listTrips`) ; la page ne rend pas la section sans voyage. */
