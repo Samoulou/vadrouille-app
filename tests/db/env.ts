@@ -88,3 +88,27 @@ export function urlDeverrouillee(login: Login): string | undefined {
   adresse.pathname = `/${baseDeverrouillee(url).nom}`;
   return adresse.toString();
 }
+
+/**
+ * Bases jetables des tests des workflows de la base (décisions 0056 et 0057, « Tests imposés » ; harnais confié à la
+ * PR du workflow par Q412) : `<base>_<suffixe>`, créées vides par le test sur le même serveur, puis supprimées. Mêmes
+ * gardes que la seconde base de 0052 : `127.0.0.1` ou `localhost` seulement, nom de 63 caractères au plus.
+ */
+export function nomBaseJetable(url: string, suffixe: string): string {
+  if (!/^[a-z0-9_]{1,20}$/.test(suffixe)) throw new Error("base jetable : suffixe hors forme");
+  const { modele } = baseDeverrouillee(url);
+  const nom = `${modele}_${suffixe}`;
+  if (!NOM_BASE.test(nom)) throw new Error("base jetable : nom de plus de 63 caractères");
+  return nom;
+}
+
+/** Adresse d'un login sur une base jetable. */
+export function urlBaseJetable(login: Login, nom: string): string {
+  const url = readUrl(login);
+  if (url === undefined) throw new Error(`variable ${DB_ENV[login]} absente (voir tests/db/global-setup.ts)`);
+  baseDeverrouillee(url);
+  if (!NOM_BASE.test(nom)) throw new Error("base jetable : nom hors forme");
+  const adresse = new URL(url);
+  adresse.pathname = `/${nom}`;
+  return adresse.toString();
+}

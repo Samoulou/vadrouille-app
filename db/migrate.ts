@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import pg from "pg";
+import { parse } from "pg-connection-string";
 
 import {
   assertDatabaseAllowed,
@@ -24,7 +25,11 @@ import {
  * - Journal dans `vadrouille_migrations.applied` (nom, empreinte SHA-256) : une seconde exécution ne fait rien ;
  *   une migration déjà appliquée dont le fichier a changé arrête tout (on n'édite jamais une migration appliquée).
  * - Refus en production (décision 0034) et refus de tout autre rôle que `vadrouille_migrator`, sans `SUPERUSER`
- *   ni `BYPASSRLS`. Aucun message ne contient la chaîne de connexion : une erreur d'ouverture n'en garde que le code
+ *   ni `BYPASSRLS`.
+ * - Base locale seulement (décision 0056 § 2.8) : tout hôte autre que `localhost`, `127.0.0.1` ou `::1` est refusé
+ *   avant la connexion. La base réelle ne reçoit de migration que par `.github/workflows/db-migrate.yml`, qui
+ *   n'exécute aucun fichier du dépôt et n'applique que les migrations approuvées.
+ * - Aucun message ne contient la chaîne de connexion : une erreur d'ouverture n'en garde que le code
  *   (`sanitizeConnectionError`).
  */
 
@@ -49,6 +54,36 @@ export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
 
 export type MigrationReport = { applied: string[]; skipped: string[] };
 
+/** Hôtes admis par `db/migrate.ts` (décision 0056 § 2.8) : CI et poste local seulement. */
+export const MIGRATION_LOCAL_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "::1"]);
+
+const NON_LOCAL_HOST =
+  "Migrations refusées : db/migrate.ts ne s'applique qu'à une base locale (localhost, 127.0.0.1 ou ::1). " +
+  "La base réelle ne reçoit de migration que par le workflow des migrations approuvées (décision 0056).";
+
+/**
+ * Refus de tout hôte non local (décision 0056 § 2.8), lu par l'analyseur de chaînes de `pg` (`pg-connection-string`,
+ * même version que celle que `pg` résout, vérifié par `tests/unit/db/hote-local-migrations.test.ts`) : hôte de l'URL,
+ * `?host=` (qui l'emporte), plusieurs hôtes (`a,b`, refusés tels quels), socket (`/…`), forme `clé=valeur` (lue par
+ * cet analyseur comme une adresse relative, d'hôte `base`). Une chaîne sans hôte passe ici : `pg` prend alors `PGHOST`,
+ * puis `localhost`, et c'est l'hôte résolu par `pg` qui est contrôlé ensuite (`assertResolvedHostLocal`). Le message
+ * ne contient ni la chaîne ni l'hôte.
+ */
+export function assertMigrationHostLocal(connectionString: string): void {
+  let host: string | null | undefined;
+  try {
+    host = parse(connectionString).host;
+  } catch {
+    throw new DatabaseGuardError(NON_LOCAL_HOST);
+  }
+  if (host && !MIGRATION_LOCAL_HOSTS.has(host)) throw new DatabaseGuardError(NON_LOCAL_HOST);
+}
+
+/** Hôte que `pg` a résolu pour ce client (chaîne, puis `PGHOST`, puis `localhost`) : même liste, avant la connexion. */
+function assertResolvedHostLocal(client: pg.Client): void {
+  if (!MIGRATION_LOCAL_HOSTS.has(client.host)) throw new DatabaseGuardError(NON_LOCAL_HOST);
+}
+
 /**
  * Lit la variable de connexion de `vadrouille_migrator`, après la garde de production. Lecture par propriété
  * littérale (spécification P0c, section 5, forme 1) ; seul lecteur de cette variable, que l'application ne lit jamais
@@ -65,8 +100,10 @@ export function migratorConnectionString(env: Env): string {
 
 export async function runMigrations(env: Env, migrations: Migration[] = readMigrations()): Promise<MigrationReport> {
   const connectionString = migratorConnectionString(env);
+  assertMigrationHostLocal(connectionString);
 
   const client = new pg.Client({ connectionString });
+  assertResolvedHostLocal(client);
   try {
     await client.connect();
   } catch (error) {

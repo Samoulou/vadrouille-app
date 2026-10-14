@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { expect } from "vitest";
 
-import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl, urlDeverrouillee } from "./env";
+import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl, urlBaseJetable, urlDeverrouillee } from "./env";
 
 /**
  * Outils des tests de base (`pnpm test:db`, spécification B1). Chaque test se connecte avec le rôle qu'il éprouve ;
@@ -63,6 +63,14 @@ export async function poserExecution(
   );
   await admin.query("SET LOCAL session_replication_role = origin");
   return rows[0].id as string;
+}
+
+/** Connexion d'un login à une base jetable des tests des workflows de la base (`tests/db/env.ts`, `urlBaseJetable`). */
+export async function connectBaseJetable(login: Login, nom: string): Promise<pg.Client> {
+  const client = new pg.Client({ connectionString: urlBaseJetable(login, nom) });
+  await client.connect();
+  open.push(client);
+  return client;
 }
 
 export async function closeAll(): Promise<void> {

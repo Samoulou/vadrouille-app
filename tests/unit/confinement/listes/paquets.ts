@@ -54,6 +54,13 @@ const PAQUETS_TS = [
   { paquet: "drizzle-kit", usage: "génération des migrations (`drizzle.config.ts`, `pnpm db:generate`)", verdict: B1 },
   { paquet: "ai", usage: "AI SDK du client réel de modèles (P0r1) ; module à capacité", verdict: P0R1 },
   { paquet: "undici", usage: "transport réel de la lecture des pages (P0r1, `src/research/undici-transport.ts`) ; module à capacité", verdict: P0R1 },
+  {
+    paquet: "pg-connection-string",
+    usage: "analyse des chaînes de connexion par `db/migrate.ts`, refus de tout hôte non local (0056 § 2.8) ; sans capacité",
+    verdict:
+      "PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre ; dépendance directe épinglée à la version que `pg` résout (2.14.1), déjà dans `pnpm-lock.yaml` : " +
+      "le verrou ne gagne que l'entrée de la racine, aucun paquet nouveau (test `tests/unit/db/hote-local-migrations.test.ts`)",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];

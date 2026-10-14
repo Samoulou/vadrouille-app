@@ -1,0 +1,152 @@
+name: db-releve
+# Relevé du catalogue de la base réelle, en lecture seule (décision 0057) : extensions, fonctions d'extension, rôles,
+# appartenances, droits par table et par colonne, fonctions, privilèges par défaut et verrou S8 (requêtes R1 à R8).
+# - Lancé à la main sur main par la Sécurité (§ 6), qui consigne le run, les compteurs, les lignes affichées et son
+#   verdict dans le ticket, sans valeur secrète. Aucune session d'agent ne se connecte à la base (P0S2-PO-7).
+# - Environnement db-releve (branche main seule, sans relecteur) et secrets RELEVE_PG* posés selon la question
+#   ouverte 1 de 0057 ; RELEVE_PGPASSWORD est une copie du mot de passe de vadrouille_prototype_purge, faite dans la
+#   même opération qu'une pose ou une rotation (§ 1). RELEVE_PGHOST désigne l'hôte direct, jamais l'hôte poolé.
+# - Aucune action, ni checkout : le job n'a aucun fichier du dépôt. Seules commandes externes : psql --version et
+#   psql -X. Textes SQL dans l'env: de l'étape, envoyés par des -c successifs ; session en lecture seule, sans COMMIT.
+# - Sortie publique (journaux d'un dépôt public) : seules les lignes R1 à R8 qui suivent le motif figé du § 5.1 et le
+#   nombre de colonnes de leur étiquette sont affichées, et seulement si tous les contrôles du § 5.3 passent ; sinon
+#   le job échoue en n'affichant que les compteurs, le code de sortie de psql et la cause.
+# Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
+on:
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: db-releve
+  cancel-in-progress: false
+jobs:
+  releve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: db-releve
+    timeout-minutes: 15
+    steps:
+      - name: Relever le catalogue
+        shell: bash
+        env:
+          LC_ALL: C
+          PGHOST: ${{ secrets.RELEVE_PGHOST }}
+          PGDATABASE: ${{ secrets.RELEVE_PGDATABASE }}
+          PGPASSWORD: ${{ secrets.RELEVE_PGPASSWORD }}
+          PGUSER: vadrouille_prototype_purge
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+          SQL_SET: "SET search_path = pg_catalog, pg_temp"
+          SQL_DO: |
+            DO $$
+            BEGIN
+              IF session_user <> 'vadrouille_prototype_purge' OR current_user <> 'vadrouille_prototype_purge' THEN RAISE EXCEPTION 'rôle de session inattendu'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'vadrouille_prototype_purge' AND (r.rolsuper OR r.rolbypassrls)) THEN RAISE EXCEPTION 'rôle privilégié'; END IF;
+              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class c WHERE c.relname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.proname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_type t WHERE t.typname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_extension e WHERE e.extname ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_extension e WHERE e.extversion ~ '[[:cntrl:]|]')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.proconfig::text ~ '[[:cntrl:]|]')
+              THEN RAISE EXCEPTION 'caractère de contrôle ou barre verticale dans un nom'; END IF;
+            END
+            $$
+          SQL_BEGIN: "BEGIN TRANSACTION READ ONLY"
+          SQL_R1: |
+            SELECT 'R1', e.extname, e.extversion, n.nspname
+            FROM pg_catalog.pg_extension e JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
+            ORDER BY e.extname
+          SQL_R2: |
+            SELECT 'R2', e.extname, p.oid::pg_catalog.regprocedure, p.prosecdef, pg_catalog.pg_get_userbyid(p.proowner), p.proacl::text,
+              pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')
+            FROM pg_catalog.pg_depend d
+            JOIN pg_catalog.pg_proc p ON d.classid = 'pg_proc'::regclass AND d.objid = p.oid
+            JOIN pg_catalog.pg_extension e ON d.refclassid = 'pg_extension'::regclass AND d.refobjid = e.oid
+            WHERE d.deptype = 'e'
+            ORDER BY e.extname, p.oid::pg_catalog.regprocedure::text
+          SQL_R3: |
+            SELECT 'R3', r.rolname, r.rolsuper, r.rolinherit, r.rolcreaterole, r.rolcreatedb, r.rolcanlogin, r.rolreplication, r.rolbypassrls
+            FROM pg_catalog.pg_roles r
+            ORDER BY r.rolname
+          SQL_R4: |
+            SELECT 'R4', pg_catalog.pg_get_userbyid(m.roleid), pg_catalog.pg_get_userbyid(m.member), pg_catalog.pg_get_userbyid(m.grantor),
+              m.admin_option, m.inherit_option, m.set_option
+            FROM pg_catalog.pg_auth_members m
+            ORDER BY 2, 3, 4
+          SQL_R5: |
+            SELECT 'R5', n.nspname, c.relname, c.relkind, pg_catalog.pg_get_userbyid(c.relowner), c.relacl::text, c.relrowsecurity, c.relforcerowsecurity
+            FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname IN ('public', 'prototype', 'vadrouille_migrations')
+            ORDER BY n.nspname, c.relname;
+            SELECT 'R5', n.nspname || '.' || c.relname, a.attname, a.attacl::text
+            FROM pg_catalog.pg_attribute a
+            JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname IN ('public', 'prototype', 'vadrouille_migrations') AND a.attacl IS NOT NULL
+            ORDER BY n.nspname, c.relname, a.attname
+          SQL_R6: |
+            SELECT 'R6', p.oid::pg_catalog.regprocedure, p.prosecdef, pg_catalog.pg_get_userbyid(p.proowner), p.proacl::text, p.proconfig::text
+            FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname IN ('public', 'prototype')
+            ORDER BY p.oid::pg_catalog.regprocedure::text
+          SQL_R7: |
+            SELECT 'R7', pg_catalog.pg_get_userbyid(d.defaclrole), n.nspname, d.defaclobjtype, d.defaclacl::text
+            FROM pg_catalog.pg_default_acl d LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+            ORDER BY 2, 3, 4
+          SQL_R8: |
+            SELECT 'R8', p.oid::pg_catalog.regprocedure, pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')
+            FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates'
+            ORDER BY p.oid::pg_catalog.regprocedure::text
+        run: |
+          set -u
+          refus() {
+            printf 'Échec : %s\n' "$1"
+            exit 1
+          }
+
+          # Contrôles avant connexion (§ 2) : aucun n'affiche la valeur contrôlée.
+          version_psql=$(psql --version) || refus "psql introuvable"
+          if [[ ! $version_psql =~ ^psql\ \(PostgreSQL\)\ (1[6-9]|[2-9][0-9])\. ]]; then refus "psql de version majeure inférieure à 16"; fi
+          if [[ ! $PGHOST =~ ^[a-z0-9.-]{1,253}$ ]]; then refus "PGHOST hors forme"; fi
+          if [[ $PGHOST == *-pooler* ]]; then refus "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi
+          if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then refus "PGDATABASE hors forme"; fi
+
+          # Session unique, en lecture seule (§ 3) ; sortie dans un fichier jamais affiché ni téléversé (§ 5).
+          sortie="$RUNNER_TEMP/db-releve.txt"
+          code=0
+          psql -X -v ON_ERROR_STOP=1 -A -t -F '|' -c "$SQL_SET" -c "$SQL_DO" -c "$SQL_BEGIN" -c "$SQL_DO" -c "$SQL_R1" -c "$SQL_R2" -c "$SQL_R3" -c "$SQL_R4" -c "$SQL_R5" -c "$SQL_R6" -c "$SQL_R7" -c "$SQL_R8" > "$sortie" 2>&1 || code=$?
+
+          # Lecture et filtrage (§ 5.1 à 5.4) : rien n'est affiché avant la fin de tous les contrôles.
+          motif='^R[1-8](\|[][A-Za-z0-9_.,:;=/{}"()*+$'"'"'@<>#\ -]{0,500}){1,8}$'
+          mapfile -t -n 601 lignes < "$sortie"
+          affichees=()
+          masquees=()
+          echec=
+          for ligne in "${lignes[@]}"; do
+            if [[ $ligne =~ $motif ]]; then
+              seps=${ligne//[^|]/}
+              case ${ligne:0:2}:${#seps} in
+                R1:3|R2:6|R3:8|R4:6|R5:3|R5:7|R6:5|R7:4|R8:2) affichees+=("$ligne") ;;
+                *) echec=colonnes ;;
+              esac
+            else
+              masquees+=("$ligne")
+            fi
+          done
+          if [[ ${#lignes[@]} == 601 ]]; then
+            echec=plafond
+          elif [[ $code != 0 ]]; then
+            echec=psql
+          elif [[ -z $echec ]] && [[ ${#masquees[@]} != 4 || ${masquees[0]} != SET || ${masquees[1]} != DO || ${masquees[2]} != BEGIN || ${masquees[3]} != DO ]]; then
+            echec="lignes masquées"
+          fi
+          if [[ -n $echec ]]; then
+            printf 'Lignes lues : %s ; affichées : %s ; masquées : %s ; code de sortie de psql : %s\n' "${#lignes[@]}" "${#affichees[@]}" "${#masquees[@]}" "$code"
+            refus "$echec"
+          fi
+          printf '%s\n' "${affichees[@]}"
+          printf 'Lignes lues : %s ; affichées : %s ; masquées : %s ; code de sortie de psql : %s\n' "${#lignes[@]}" "${#affichees[@]}" "${#masquees[@]}" "$code"
