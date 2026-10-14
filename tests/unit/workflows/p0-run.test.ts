@@ -246,6 +246,28 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("pipeline_failed");
   });
 
+  it("écriture du coût en échec : étape en erreur (pipeline_failed), candidats écrits mais étape suivante jamais lancée", async () => {
+    d.ecrireCoutModeles.mockRejectedValue(Object.assign(new Error(SENTINELLE_ERREUR), { code: "base" }));
+    const erreur = await refus(etapeRecherche({ runId: RUN_ID }));
+    expect(erreur.message).toBe("pipeline_failed");
+    expect(String(erreur.stack)).not.toContain(SENTINELLE_ERREUR);
+
+    vi.clearAllMocks();
+    d.ecrireCoutModeles.mockRejectedValue(new Error(SENTINELLE_ERREUR));
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.ancrage).not.toHaveBeenCalled();
+    expect(d.lireCandidats).not.toHaveBeenCalled();
+    expect(d.cloreExecution).toHaveBeenCalledTimes(1);
+    expect(d.cloreExecution.mock.calls[0]?.[2]).toBe("pipeline_failed");
+  });
+
+  it("écriture du coût en échec après une erreur du fournisseur : l'erreur d'origine reste celle qui sort", async () => {
+    d.chercherCandidats.mockRejectedValue(Object.assign(new Error(SENTINELLE_ERREUR), { code: "upstream_unavailable" }));
+    d.ecrireCoutModeles.mockRejectedValue(new Error(SENTINELLE_ERREUR));
+    expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("upstream_unavailable");
+    expect(d.ecrireCoutModeles).toHaveBeenCalledTimes(1);
+  });
+
   it("erreur inconnue : pipeline_failed ; brief inconnu : brief_invalid avant toute composition", async () => {
     d.chercherCandidats.mockRejectedValue(new Error(SENTINELLE_ERREUR));
     expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("pipeline_failed");

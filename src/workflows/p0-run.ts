@@ -229,6 +229,7 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
     const choisis = modelesDeLaVariante(modeles, contexte.execution.variante === "A" ? "a" : "b");
     const agent = composition.agent();
     marquerAppels();
+    let echec: { readonly erreur: unknown } | undefined;
     try {
       const { candidats } = await chercherCandidats(contexte.brief, {
         modeles: agent.modeles,
@@ -240,9 +241,18 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
       });
       if (candidats.length > contexte.config.candidatsTrouves) throw new ArretEtape(codePersiste("cap_reached", true));
       await remplacerCandidats(poolPrototype(), contexte.garde.runId, candidats.map((candidat) => ({ cle: candidat.id, candidat, placeId: null })));
-    } finally {
-      await compterCoutModeles(contexte, registre).catch(() => undefined);
+    } catch (erreur) {
+      echec = { erreur };
     }
+    // Coût écrit dans tous les cas, en mode fermé (bloquant 2 de la revue du head `608ee99`, PR 348) : c'est la seule
+    // mémoire durable du coût dépensé ; s'il n'est pas écrit, l'étape échoue (`pipeline_failed`, après appel payant)
+    // et l'étape suivante ne part pas. Une erreur de l'étape survenue avant reste celle qui sort (jamais masquée).
+    try {
+      await compterCoutModeles(contexte, registre);
+    } catch {
+      if (echec === undefined) throw new ArretEtape("pipeline_failed");
+    }
+    if (echec !== undefined) throw echec.erreur;
   });
 }
 etapeRecherche.maxRetries = 0;

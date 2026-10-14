@@ -29,7 +29,11 @@
     "onlyBuiltDependencies": [
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "@workflow/core>devalue": "5.9.4",
+      "@workflow/core>nanoid": "5.1.16"
+    }
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "2.1.3",

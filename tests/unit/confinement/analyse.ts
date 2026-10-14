@@ -1674,6 +1674,8 @@ export function analyserPackageJson(
   source: string,
   paquets: readonly { readonly paquet: string }[],
   onlyBuiltDependencies: readonly string[],
+  /** `pnpm.overrides` admis, exacts (`parent>paquet` → version exacte), chacun avec sa ligne et son verdict. */
+  overrides: Readonly<Record<string, string>> = {},
 ): Constat[] {
   const constats: Constat[] = [];
   const refus = (capacite: string, forme: string) =>
@@ -1688,7 +1690,16 @@ export function analyserPackageJson(
   for (const cle of Object.keys(json)) if (!CLES_PACKAGE.includes(cle)) refus("cle-package", cle);
   if (json.packageManager !== "pnpm@10.28.0") refus("packageManager", String(json.packageManager));
   const pnpm = (json.pnpm ?? {}) as Record<string, unknown>;
-  for (const cle of Object.keys(pnpm)) if (cle !== "onlyBuiltDependencies") refus("cle-pnpm", cle);
+  for (const cle of Object.keys(pnpm)) if (cle !== "onlyBuiltDependencies" && cle !== "overrides") refus("cle-pnpm", cle);
+  // P0r3c-4 (bloquant 3 de la revue du head `608ee99`, PR 348 ; décision 0063 point 1) : `overrides` admis seulement
+  // égal à la liste fermée, non vide, de `listes/paquets.ts` (versions exactes) ; toute autre forme reste refusée.
+  if (Object.hasOwn(pnpm, "overrides")) {
+    const lus = pnpm.overrides;
+    const admis = Object.keys(overrides).length > 0 && Object.values(overrides).every((v) => VERSION_EXACTE.test(v));
+    if (!admis || typeof lus !== "object" || lus === null || Array.isArray(lus) || JSON.stringify(Object.entries(lus).sort()) !== JSON.stringify(Object.entries(overrides).sort())) {
+      refus("override-non-liste", JSON.stringify(lus));
+    }
+  }
   const construits = pnpm.onlyBuiltDependencies;
   if (!Array.isArray(construits) || JSON.stringify(construits) !== JSON.stringify(onlyBuiltDependencies)) refus("onlyBuiltDependencies", JSON.stringify(construits));
   const scripts = (json.scripts ?? {}) as Record<string, unknown>;

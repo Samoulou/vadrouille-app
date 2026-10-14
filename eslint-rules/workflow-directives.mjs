@@ -44,6 +44,17 @@ function relatif(context) {
   return nom.startsWith(`${cwd}/`) ? nom.slice(cwd.length + 1) : nom;
 }
 
+/**
+ * Texte d'un spécificateur littéral : chaîne, ou gabarit sans substitution (`` `workflow` ``, mineur 5 de la revue du
+ * head `608ee99`, PR 348) ; `null` sinon.
+ */
+function texteLitteral(node) {
+  if (!node) return null;
+  if (node.type === "Literal" && typeof node.value === "string") return node.value;
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0 && node.quasis.length === 1) return node.quasis[0].value.cooked ?? null;
+  return null;
+}
+
 const rule = {
   meta: {
     type: "problem",
@@ -59,9 +70,8 @@ const rule = {
   create(context) {
     const fichier = relatif(context);
     function source(node, sourceNode) {
-      if (!sourceNode || sourceNode.type !== "Literal" || typeof sourceNode.value !== "string") return;
-      const valeur = sourceNode.value;
-      if (!estSdkWorkflow(valeur)) return;
+      const valeur = texteLitteral(sourceNode);
+      if (valeur === null || !estSdkWorkflow(valeur)) return;
       if (!importSdkAdmis(valeur, fichier)) context.report({ node, messageId: "import", data: { source: valeur } });
     }
     function noms(node) {
@@ -95,7 +105,8 @@ const rule = {
       },
       ImportExpression(node) {
         source(node, node.source);
-        if (node.source?.type === "Literal" && typeof node.source.value === "string" && estSdkWorkflow(node.source.value)) {
+        const valeur = texteLitteral(node.source);
+        if (valeur !== null && estSdkWorkflow(valeur)) {
           context.report({ node, messageId: "espace" });
         }
       },
@@ -103,7 +114,8 @@ const rule = {
         if (node.callee.type === "Identifier" && node.callee.name === "require") {
           const argument = node.arguments[0];
           source(node, argument);
-          if (argument?.type === "Literal" && typeof argument.value === "string" && estSdkWorkflow(argument.value)) {
+          const valeur = texteLitteral(argument);
+          if (valeur !== null && estSdkWorkflow(valeur)) {
             context.report({ node, messageId: "espace" });
           }
         }

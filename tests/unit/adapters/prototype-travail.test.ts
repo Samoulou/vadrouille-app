@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { cloreExecution, EchecTravail, ecrireCoutModeles, ecrirePhase, lireCandidats, lireExecution, remplacerCandidats } from "@/adapters/prototype-travail";
+import { CANDIDATS_MAX, cloreExecution, COUT_MAX_MICROS, EchecTravail, ecrireCoutModeles, ecrirePhase, lireCandidats, lireExecution, PHASES_TRAVAIL, remplacerCandidats } from "@/adapters/prototype-travail";
 import type { LigneCandidat } from "@/contracts/prototype-travail";
+import { PHASES } from "@/prototype/arret";
+import { BORNES_MODE_REEL, BORNES_PLAFONDS } from "@/prototype/config";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
@@ -56,6 +58,13 @@ async function echec(promesse: Promise<unknown>): Promise<EchecTravail> {
 }
 
 describe("p0: table de travail de p0Run (adaptateur unique)", () => {
+  it("bornes égales à leur source (mineur 1 de la revue du head `608ee99`) : phases, candidats, coût", () => {
+    expect(PHASES_TRAVAIL).toEqual(PHASES);
+    expect(CANDIDATS_MAX).toBe(BORNES_PLAFONDS.candidatsTrouves);
+    expect(COUT_MAX_MICROS).toBe(BORNES_PLAFONDS.coutUsd * 1_000_000);
+    expect(COUT_MAX_MICROS).toBe(BORNES_MODE_REEL.coutUsd * 1_000_000);
+  });
+
   it("lireExecution : transaction, contexte d'organisation, paramètres liés ; mode, brief, variante et coût", async () => {
     const { pool, requetes, liberations } = poolSimule({ execution: { mode: "essai", brief: "edimbourg-1.json", variant: "B", cost_models_micros: "120000" } });
     expect(await lireExecution(pool, RUN_ID)).toEqual({ mode: "essai", brief: "edimbourg-1.json", variante: "B", coutModelesMicros: 120_000 });

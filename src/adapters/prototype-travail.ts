@@ -22,11 +22,12 @@ const CLE = /^c_[0-9]{3}$/;
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 /** Forme d'un code d'arrêt ; la liste fermée est tenue par le `CHECK` de `prototype.runs.stop_code`. */
 const CODE_ARRET = /^[a-z_]{1,40}$/;
-const PHASES: readonly PhaseTravail[] = ["recherche", "ancrage", "notation", "planification", "raisons", "validation", "ecriture"];
-/** Candidats d'une exécution au plus (`BORNES_PLAFONDS.candidatsTrouves`, et la clé `c_000` à `c_999`). */
-const CANDIDATS_MAX = 300;
-/** Coût des modèles au plus, en micro-USD : 3 USD, plafond de Samuel (Q270). */
-const COUT_MAX_MICROS = 3_000_000;
+/** Égales à `PHASES` de `src/prototype/arret.ts` (test d'égalité ; l'application n'importe pas `src/prototype`, 0048 § 1). */
+export const PHASES_TRAVAIL: readonly PhaseTravail[] = ["recherche", "ancrage", "notation", "planification", "raisons", "validation", "ecriture"];
+/** Candidats d'une exécution au plus (`BORNES_PLAFONDS.candidatsTrouves`, test d'égalité ; clés `c_000` à `c_999`). */
+export const CANDIDATS_MAX = 300;
+/** Coût des modèles au plus, en micro-USD : 3 USD, plafond de Samuel (Q270) ; `BORNES_PLAFONDS.coutUsd`, test d'égalité. */
+export const COUT_MAX_MICROS = 3_000_000;
 const CENT_MICROS = 10_000;
 
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
@@ -106,7 +107,7 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
 /** Phase de l'exécution `en_cours` (S4 : remise à nul par la clôture ou l'écriture du programme). */
 export async function ecrirePhase(pool: PoolSql, runId: string, phase: PhaseTravail): Promise<void> {
   const id = runIdControle(runId);
-  if (!PHASES.includes(phase)) throw new EchecTravail("entree_refusee");
+  if (!PHASES_TRAVAIL.includes(phase)) throw new EchecTravail("entree_refusee");
   await transaction(pool, async (client) => {
     if ((await client.query(SQL_PHASE, [id, phase])).rows.length !== 1) throw new EchecTravail("execution_absente");
   });

@@ -83,8 +83,13 @@ describe("ligne/workflow-directives (décisions 0009 et 0063)", () => {
       `export * from "workflow/api";\n`,
       `export const f = () => import("workflow");\n`,
       `const w = require("workflow");\nexport default w;\n`,
+      "export const f = () => import(`workflow`);\n",
+      "const w = require(`workflow/api`);\nexport default w;\n",
     ];
     for (const code of formes) expect((await messages(code, "src/workflows/x.ts")).map((m) => m.messageId), code).toContain("espace");
+    // Gabarit sans substitution hors de src/workflows/ : refusé comme une chaîne (mineur 5 de la revue du head `608ee99`).
+    expect((await messages("export const f = () => import(`workflow/api`);\n", "src/server/x.ts")).map((m) => m.messageId)).toContain("import");
+    expect((await messages("const w = require(`@workflow/core`);\nexport default w;\n", "src/lib/x.ts")).map((m) => m.messageId)).toContain("import");
   });
 
   it("le dépôt réel passe la règle", async () => {

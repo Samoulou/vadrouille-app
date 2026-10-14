@@ -75,3 +75,13 @@ export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES
 
 /** `pnpm.onlyBuiltDependencies` exact (section 6). */
 export const CONSTRUITS = ["sharp", "unrs-resolver"] as const;
+
+/**
+ * `pnpm.overrides` admis, exacts (P0r3c-4, bloquant 3 de la revue du head `608ee99`, PR 348 ; décision 0063 point 1) :
+ * transitives épinglées par `@workflow/core` 5.1.0 à des versions sous avis, forcées vers la première version corrigée
+ * de même majeure, pour ce seul parent. Verdict Sécurité à rendre dans la PR. À retirer quand `workflow` les corrige.
+ */
+export const SUBSTITUTIONS: Readonly<Record<string, string>> = {
+  "@workflow/core>devalue": "5.9.4",
+  "@workflow/core>nanoid": "5.1.16",
+};

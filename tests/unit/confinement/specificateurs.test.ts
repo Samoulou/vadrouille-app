@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { analyserPackageJson, ecartDuCas, lireCas, refusDuCas, type Cas } from "./analyse";
 import { depotSuivi, lireFichier } from "./fichiers";
-import { CONSTRUITS, PAQUETS } from "./listes/paquets";
+import { CONSTRUITS, PAQUETS, SUBSTITUTIONS } from "./listes/paquets";
 
 /** `confinement: spécificateurs et paquets` (spécification P0c, section 6) : cas lus dans `donnees/cas-specificateurs.json`. */
 
@@ -23,7 +23,7 @@ function fusionner(base: Json, ajout: Json): Json {
 function refusPackage(cas: Cas) {
   const reel = JSON.parse(lireFichier("package.json")) as Json;
   const source = JSON.stringify(fusionner(reel, JSON.parse(cas.source) as Json));
-  return analyserPackageJson(source, PAQUETS, CONSTRUITS).filter((c) => !c.admis);
+  return analyserPackageJson(source, PAQUETS, CONSTRUITS, SUBSTITUTIONS).filter((c) => !c.admis);
 }
 
 describe("confinement: spécificateurs et paquets", () => {
@@ -35,6 +35,6 @@ describe("confinement: spécificateurs et paquets", () => {
   }
 
   it("le package.json réel passe", () => {
-    expect(analyserPackageJson(lireFichier("package.json"), PAQUETS, CONSTRUITS).filter((c) => !c.admis)).toEqual([]);
+    expect(analyserPackageJson(lireFichier("package.json"), PAQUETS, CONSTRUITS, SUBSTITUTIONS).filter((c) => !c.admis)).toEqual([]);
   });
 });
