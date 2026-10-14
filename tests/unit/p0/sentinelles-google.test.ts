@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RequeteModele } from "@/ai/client";
 import { createOpenRouterClient, ErreurOpenRouter } from "@/ai/openrouter-client";
@@ -13,6 +13,16 @@ import type { Periode } from "@/server/usage/port";
 import { creerHorlogeManuelle } from "../../support/horloge-manuelle";
 import { creerPortMemoire } from "../../support/port-consommation-memoire";
 import { charger, executerCapture, type Capture } from "./harnais";
+
+// 0046 D21 : la barrière de sortie lit aussi le vrai `process.env` ; ces tests le posent en préversion, puis le rétablissent.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "preview");
+  vi.stubEnv("VERCEL_TARGET_ENV", undefined);
+  vi.stubEnv("VADROUILLE_ENV", undefined);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 /**
  * Tests par **valeurs sentinelles** de P0r1 (spécification `specs/P0-suite-executions-reelles.md`, « Prompts et contenu

@@ -49,6 +49,12 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/p0/main.ts", propriete: "exitCode" },
   { fichier: "scripts/p0/main.ts", propriete: "stdout" },
   { fichier: "scripts/p0/main.ts", propriete: "stderr" },
+  // P0r2 (ticket 284 ; décision 0046, S5) : vérificateur SCRAM lu sur l'entrée standard, écrit seul sur la sortie
+  // standard ; le mot de passe n'est jamais pris en argument. Verdict Sécurité à rendre.
+  { fichier: "scripts/db/scram-verifier.ts", propriete: "stdin" },
+  { fichier: "scripts/db/scram-verifier.ts", propriete: "stdout" },
+  { fichier: "scripts/db/scram-verifier.ts", propriete: "stderr" },
+  { fichier: "scripts/db/scram-verifier.ts", propriete: "exitCode" },
   // B1 (PR 188, après P0c1 ; spécification P0c, section 9) : `pnpm db:migrate` et `pnpm test:db`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { fichier: "db/migrate.ts", propriete: "argv" },
   { fichier: "db/migrate.ts", propriete: "exitCode" },
@@ -75,8 +81,14 @@ export const LECTURES_ENV = [
   // B1 (PR 188, après P0c1 ; spécification P0c, sections 5 et 9 ; décision 0036). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   // Noms secrets de la base : `LECTURES_ENV_SECRETES` ci-dessous (module de connexion et outil de migration seulement).
   { fichier: "db/connection.ts", noms: ["VERCEL_ENV", "VADROUILLE_ENV"] },
+  // P0r2 (ticket 284 ; décision 0046, D21) : le vrai `process.env` est lu en plus de l'env injecté ; `VERCEL_TARGET_ENV`
+  // pour la liste d'autorisation de `vadrouille_prototype`. Verdict Sécurité à rendre.
+  { fichier: "db/connection.ts", noms: ["VERCEL_TARGET_ENV"] },
   { fichier: "scripts/test-db.mjs", noms: ["SKIP_DB_TESTS", "CI", "GITHUB_ACTIONS"] },
   { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_ADMIN_URL", "VADROUILLE_DB_BOOTSTRAP_ROLE"] },
+  // P0r2 (ticket 284 ; décision 0046) : connexions de test de `vadrouille_prototype` et `vadrouille_prototype_purge`,
+  // mots de passe jetables de la CI (`scripts/ci/db-setup.sh`). Verdict Sécurité à rendre.
+  { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_PROTOTYPE_URL", "VADROUILLE_DB_PROTOTYPE_PURGE_URL"] },
   { fichier: "tests/unit/db/test-db-sans-base.test.ts", noms: ["PATH", "HOME"] },
   { fichier: "src/components/carte/config.tsx", noms: ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID"] },
   // Relevé de la base de P0c1 (P0a1, PR 180) : environnement minimal du sous-processus `pnpm p0`, six lectures par
@@ -152,6 +164,9 @@ export const ENV_ENTIER = [
   // B1 (PR 188, après P0c1 ; spécification P0c, section 9). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { fichier: "db/index.ts", formes: ["defaut:createDatabase", "argument:createGuardedPool"] },
   { fichier: "db/connection.ts", formes: ["argument:connectionStringFor", "argument:assertDatabaseAllowed", "argument:isProductionForDatabase"] },
+  // P0r2 (ticket 284 ; décision 0046, D21) : liste d'autorisation de `vadrouille_prototype`, appliquée à l'env injecté
+  // (passé par `connectionStringFor`) et au vrai `process.env`. Verdict Sécurité à rendre.
+  { fichier: "db/connection.ts", formes: ["argument:prototypeDatabaseAllowed"] },
   { fichier: "db/migrate.ts", formes: ["argument:runMigrations", "argument:migratorConnectionString", "argument:assertDatabaseAllowed"] },
   // `argument:isProductionForDatabase` : ajoutée par la correction 1 de la PR 244 (mineur 5 de la revue du head
   // a89d9a5 : garde de production distinguée des variables absentes) ; verdict Sécurité à renouveler sur ce head.
@@ -173,6 +188,8 @@ export const PARAMETRES_ENV = [
   { fichier: "db/connection.ts", fonction: "connectionStringFor", parametre: "env" },
   { fichier: "db/connection.ts", fonction: "assertDatabaseAllowed", parametre: "env" },
   { fichier: "db/connection.ts", fonction: "isProductionForDatabase", parametre: "env" },
+  // P0r2 (ticket 284 ; décision 0046, D21). Verdict Sécurité à rendre.
+  { fichier: "db/connection.ts", fonction: "prototypeDatabaseAllowed", parametre: "env" },
   { fichier: "db/migrate.ts", fonction: "runMigrations", parametre: "env" },
   { fichier: "db/migrate.ts", fonction: "migratorConnectionString", parametre: "env" },
 ] as const satisfies readonly ParametreEnv[];

@@ -456,6 +456,12 @@ function regleDeBase(fichier: string): Regle | undefined {
   if (fichier === "src/prototype/reduction.ts") {
     return { projet: (c) => contrats(c) || proto("ancrage", "programme-reduit").includes(c), externes: ["zod"] };
   }
+  // P0r2 (ticket 284 ; décision 0046, D14 et D17) : codes d'arrêt (module pur, sans import) et découpage du programme
+  // réduit pour les tables du schéma `prototype` (programme réduit seulement).
+  if (fichier === "src/prototype/arret.ts") return { projet: contrats, externes: [] };
+  if (fichier === "src/prototype/decoupage.ts") {
+    return { projet: (c) => contrats(c) || proto("programme-reduit").includes(c), externes: [] };
+  }
   // Décision 0045 § 1.2 et § 3 (amendement de 0032 A3.2) : `@/contracts`, `zod` et `src/domain` seulement ; plus
   // aucun `@/prototype/*`. Même liste que la règle ESLint « src/domain sans entrée-sortie » (cas communs).
   if (fichier.startsWith("src/domain/")) {

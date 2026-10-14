@@ -321,9 +321,16 @@
             "VADROUILLE_DATABASE_URL_MIGRATOR"
           ],
           "nombre": 1
+        },
+        {
+          "capacite": "secret:P0_DATABASE_URL",
+          "formes": [
+            "P0_DATABASE_URL"
+          ],
+          "nombre": 1
         }
       ],
-      "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)"
+      "ecart": "B1 (PR 188, décision 0036) : spécification P0c, sections 5 et 9 ; verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242). P0r2 (ticket 284 ; décision 0046, D15 point 6 et D21) : nom de la variable de vadrouille_prototype ajouté ; verdict Sécurité à rendre"
     },
     {
       "fichier": "src/ai/openrouter-client.ts",
@@ -421,6 +428,27 @@
         }
       ],
       "ecart": "chemin d'un module de capacité de P0r1 nommé par la spécification (décisions 0031 § 5 et 0049 C1), texte de test sans capacité ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)"
+    },
+    {
+      "fichier": "tests/unit/ci/p0-purge.test.ts",
+      "portee": "test",
+      "usage": "test statique du workflow p0-purge : noms des secrets de l'environnement attendus en variables libpq",
+      "capacites": [
+        {
+          "capacite": "secret:P0_PURGE_PGPASSWORD",
+          "formes": [
+            "P0_PURGE_PGPASSWORD",
+            "PGPASSWORD: ${{ secrets.P0_PURGE_PGPASSWORD }}"
+          ]
+        },
+        {
+          "capacite": "secret:PGPASSWORD",
+          "formes": [
+            "PGPASSWORD: ${{ secrets.P0_PURGE_PGPASSWORD }}"
+          ]
+        }
+      ],
+      "ecart": "P0r2 (ticket 284 ; décision 0046, D16 point 7) : noms des secrets de l'environnement p0-purge, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
     }
   ]
 }

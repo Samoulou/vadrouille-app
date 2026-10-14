@@ -266,10 +266,13 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
     expect(rows.every((r) => r.qual !== "true")).toBe(true);
   });
 
-  it("liste fermée des politiques USING (true)", async () => {
+  // Amendée par 0046 D16 point 6 : politiques de prototype.purges (lecture de la date par vadrouille_prototype,
+  // insertion par la fonction de purge) ; le test couvre USING (true) et WITH CHECK (true), dans tous les schémas.
+  it("liste fermée des politiques USING (true) et WITH CHECK (true)", async () => {
     const { rows } = await app.query(
-      `SELECT tablename || ':' || array_to_string(roles::text[], ',') AS policy FROM pg_catalog.pg_policies
-       WHERE schemaname = 'public' AND (qual = 'true' OR with_check = 'true') ORDER BY 1`,
+      `SELECT CASE WHEN schemaname = 'public' THEN '' ELSE schemaname || '.' END || tablename || ':' || array_to_string(roles::text[], ',') AS policy
+       FROM pg_catalog.pg_policies
+       WHERE qual = 'true' OR with_check = 'true' ORDER BY 1`,
     );
     expect(rows.map((r) => r.policy)).toEqual(
       [
@@ -281,6 +284,8 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
         "sessions:vadrouille_auth",
         "users:vadrouille_auth",
         "verifications:vadrouille_auth",
+        "prototype.purges:vadrouille_fn_prototype_purge",
+        "prototype.purges:vadrouille_prototype",
       ].sort(),
     );
   });

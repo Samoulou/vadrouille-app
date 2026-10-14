@@ -15,6 +15,20 @@
       "when": 1791817440383,
       "tag": "0001_securite",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791945000000,
+      "tag": "0002_place_coordinates",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791945060000,
+      "tag": "0003_prototype",
+      "breakpoints": true
     }
   ]
 }

@@ -250,13 +250,17 @@ describe("p0: schéma strict de la forme réduite", () => {
     expect(ProgrammeReduitSchema.safeParse(doublon).success).toBe(true);
   });
 
-  it("exige un terminus par jour et une organisation org_prototype", () => {
+  it("exige un terminus par jour et l'organisation org_prototype (uuid fixe, 0046 D15 point 4)", () => {
     const sansTerminus = exemple();
     sansTerminus.terminus = [];
     expect(ProgrammeReduitSchema.safeParse(sansTerminus).success).toBe(false);
     const autreOrganisation = exemple();
     (autreOrganisation.trip as Record<string, unknown>).organizationId = "org_autre";
     expect(ProgrammeReduitSchema.safeParse(autreOrganisation).success).toBe(false);
+    // L'ancien identifiant textuel est refusé : seul l'uuid fixe de la migration est admis.
+    (autreOrganisation.trip as Record<string, unknown>).organizationId = "org_prototype";
+    expect(ProgrammeReduitSchema.safeParse(autreOrganisation).success).toBe(false);
+    expect(PROTOTYPE_ORG_ID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it("exige un identifiant de voyage conforme à TRIP_ID_PATTERN", () => {
