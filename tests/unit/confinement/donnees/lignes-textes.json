@@ -449,6 +449,35 @@
         }
       ],
       "ecart": "P0r2 (ticket 284 ; décision 0046, D16 point 7) : noms des secrets de l'environnement p0-purge, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "src/features/prototype/SaisieCodeAcces.tsx",
+      "portee": "application",
+      "usage": "type du champ de saisie du code d'accès du mode réel (`type=\"password\"`, décision 0055, section 2 point 5) ; ce n'est pas un nom de variable, aucune valeur",
+      "capacites": [
+        {
+          "capacite": "secret:PASSWORD",
+          "formes": [
+            "password"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "P0r3b (ticket 311 ; décision 0055, section 2 point 5, S-2 point 3) : texte `password` imposé par la décision (champ masqué) ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "tests/unit/p0/page-executions.test.tsx",
+      "portee": "test",
+      "usage": "vérifie que le champ de saisie du code d'accès est masqué (`type=\"password\"`, décision 0055, section 2 point 5)",
+      "capacites": [
+        {
+          "capacite": "secret:PASSWORD",
+          "formes": [
+            "type=\"password\""
+          ]
+        }
+      ],
+      "ecart": "P0r3b (ticket 311 ; décision 0055, S-2 point 3) : attribut HTML attendu dans le rendu de la page, aucun nom de variable : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
     }
   ]
 }

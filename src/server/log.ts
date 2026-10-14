@@ -21,6 +21,9 @@ export const LOG_EVENTS = [
   "rate_limit.purge_failed",
   "rate_limit.rows_high",
   "rate_limit.failed",
+  // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée ; champ `guard` (code fermé), et
+  // depuis 0058 `cause` et `exception` (noms d'une liste fermée, jamais une valeur).
+  "p0.guard_closed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -37,6 +40,12 @@ export type LogFields = {
   readonly rows?: number;
   readonly environment?: string;
   readonly errorName?: string;
+  /** Code fermé de la garde du mode réel (`src/server/p0/garde.ts`), jamais une valeur. */
+  readonly guard?: string;
+  /** Nom de la variable ou de l'option de proxy ou de TLS en cause (décision 0058), jamais une valeur. */
+  readonly cause?: string;
+  /** Marque de l'exception étroite de la barrière de sortie (décision 0058) : `vercel_runtime_ca` seulement. */
+  readonly exception?: string;
 };
 
 /**
@@ -62,6 +71,9 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     STRIPE_SECRET_KEY: 0,
     STRIPE_PUBLISHABLE_KEY: 0,
     "STRIPE_*": 0,
+    P0_REAL_RUNS: 0,
+    P0_RUN_TOKEN: 0,
+    "P0_*": 0,
   }),
 );
 
@@ -80,6 +92,59 @@ const REGLES = new Set([
   "untrusted_header",
   "header_outside_vercel",
 ]);
+/**
+ * Codes de la garde fermée du mode réel (décision 0055, section 1 point 2) : ceux de `lireEnvP0`
+ * (`src/server/env/p0.ts`, que ce module n'importe pas : `ligne/server-env-imports`) et ceux de la garde
+ * (`src/server/p0/garde.ts`) ; l'égalité des listes est vérifiée par le test de la garde.
+ */
+export const LOG_GUARD_CODES: readonly string[] = [
+  "production_refused",
+  "proxy_env_refused",
+  "tls_env_refused",
+  "environment_refused",
+  "ci_refused",
+  "branch_refused",
+  "real_runs_disabled",
+  "database_missing",
+  "access_code_missing",
+  "access_code_invalid",
+  "production_deployment",
+];
+const GARDES: ReadonlySet<string> = new Set(LOG_GUARD_CODES);
+/**
+ * Causes admises dans le champ `cause` (décision 0058, ticket 319) : noms de la liste fermée `CAUSES_SORTIE` de la
+ * barrière de sortie (`src/server/env/egress.ts`, que ce module n'importe pas : `ligne/server-env-imports`) ; l'égalité
+ * des deux listes est vérifiée par le test de la barrière. Des noms, jamais des valeurs.
+ */
+export const LOG_EXIT_CAUSES: readonly string[] = [
+  "HTTP_PROXY",
+  "http_proxy",
+  "HTTPS_PROXY",
+  "https_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "NODE_USE_ENV_PROXY",
+  "node_use_env_proxy",
+  "--use-env-proxy",
+  "NODE_TLS_REJECT_UNAUTHORIZED",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "OPENSSL_CONF",
+  "SSLKEYLOGFILE",
+  "--use-openssl-ca",
+  "--use-system-ca",
+  "--openssl-config",
+  "--openssl-legacy-provider",
+  "--openssl-shared-config",
+  "--tls-keylog",
+  "--tls-min-v1.0",
+  "--tls-min-v1.1",
+  "--tls-cipher-list",
+  "--insecure-http-parser",
+];
+const CAUSES: ReadonlySet<string> = new Set(LOG_EXIT_CAUSES);
+const EXCEPTIONS: ReadonlySet<string> = new Set(["vercel_runtime_ca"]);
 const ENVIRONNEMENTS = new Set(["local", "ci", "staging", "production"]);
 const CODES: ReadonlySet<string> = new Set(API_ERROR_CODES);
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
@@ -98,6 +163,9 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["rows", entierPositif],
   ["environment", (v) => chaine(v) && ENVIRONNEMENTS.has(v)],
   ["errorName", (v) => chaine(v) && NOM_ERREUR.test(v)],
+  ["guard", (v) => chaine(v) && GARDES.has(v)],
+  ["cause", (v) => chaine(v) && CAUSES.has(v)],
+  ["exception", (v) => chaine(v) && EXCEPTIONS.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

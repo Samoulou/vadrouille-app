@@ -352,7 +352,7 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
   // Amendé par 0046 (D16, « Tests imposés », et S8) : purge_expired() à vadrouille_prototype_purge seul ;
   // purge_expired_coordinates à vadrouille_app et vadrouille_fn_prototype_purge ; store_place_coordinates à
   // vadrouille_app seul ; store_prototype_coordinates à aucun rôle hors son propriétaire, PUBLIC compris (verrou S8 ;
-  // ce qui change au déverrouillage relève de 0052).
+  // forme à quatre paramètres de 0052 § 1.7 ; ce qui change au déverrouillage relève de 0056 § 4.3).
   const EXPECTED = {
     resolve_share_link: { owner: "vadrouille_fn_share", execute: ["vadrouille_app"] },
     checkout_organization: { owner: "vadrouille_fn_checkout", execute: ["vadrouille_webhook"] },
@@ -471,6 +471,17 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       runs: { SELECT: [] },
       forfaits: { SELECT: [] },
     },
+    // Décision 0052 § 1.9 (migration 0005_prototype_coordinates_run) : lecture des exécutions en cours, pour la seule
+    // fonction store_prototype_coordinates (started_at de l'exécution) ; rien d'autre dans le schéma.
+    vadrouille_fn_coords: {
+      runs: { SELECT: ["id", "organization_id", "started_at", "status"], INSERT: [], UPDATE: [] },
+      forfaits: { SELECT: [] },
+      programmes: { SELECT: [] },
+      jugements: { SELECT: [] },
+      run_attempts: { SELECT: [] },
+      run_candidates: { SELECT: [] },
+      purges: { SELECT: [] },
+    },
   };
 
   // Les relevés du catalogue se font sous vadrouille_prototype : vadrouille_app n'a pas USAGE sur le schéma et ne
@@ -531,13 +542,14 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
     }
   });
 
-  it("USAGE du schéma prototype : vadrouille_prototype, vadrouille_prototype_purge et vadrouille_fn_prototype_purge seulement (et son propriétaire) ; CREATE au propriétaire seul", async () => {
+  it("USAGE du schéma prototype : vadrouille_prototype, vadrouille_prototype_purge, vadrouille_fn_prototype_purge et vadrouille_fn_coords (0052 § 1.9) seulement (et son propriétaire) ; CREATE au propriétaire seul", async () => {
     const { rows } = await proto.query(
       "SELECT r AS role FROM unnest($1::text[]) AS r WHERE pg_catalog.has_schema_privilege(r, 'prototype', 'USAGE') ORDER BY 1",
       [Object.keys(ROLES)],
     );
     // vadrouille_migrator par son appartenance à vadrouille_owner (décision 0036).
     expect(rows.map((r) => r.role)).toEqual([
+      "vadrouille_fn_coords",
       "vadrouille_fn_prototype_purge",
       "vadrouille_migrator",
       "vadrouille_owner",

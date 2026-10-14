@@ -56,3 +56,35 @@ export function readUrl(login: Login): string | undefined {
     throw error;
   }
 }
+
+/**
+ * Seconde base jetable des tests sous verrou (décision 0052 § 1, « Harnais des tests sous verrou » ; 0055, section 8,
+ * ligne P0r3c) : `<base>_dv`, copie de la base migrée créée par le préalable (`tests/db/global-setup.ts`), où
+ * `vadrouille_prototype` a `EXECUTE` sur `store_prototype_coordinates`. Seulement sur `127.0.0.1` ou `localhost`
+ * (CI et poste local) : jamais la base réelle. Nom de 63 caractères au plus (limite des identifiants de PostgreSQL),
+ * refusé au-delà plutôt que tronqué.
+ */
+export const SUFFIXE_BASE_DEVERROUILLEE = "_dv";
+const HOTES_LOCAUX = new Set(["127.0.0.1", "localhost"]);
+const NOM_BASE = /^[a-z0-9_]{1,63}$/;
+
+export type BaseDeverrouillee = { readonly modele: string; readonly nom: string };
+
+/** Noms de la base migrée et de sa copie, lus dans une adresse de connexion ; refus hors hôte local ou nom hors forme. */
+export function baseDeverrouillee(url: string): BaseDeverrouillee {
+  const adresse = new URL(url);
+  if (!HOTES_LOCAUX.has(adresse.hostname)) throw new Error("seconde base jetable : hôte autre que 127.0.0.1 ou localhost refusé (0052 § 1)");
+  const modele = decodeURIComponent(adresse.pathname.replace(/^\//, ""));
+  const nom = `${modele}${SUFFIXE_BASE_DEVERROUILLEE}`;
+  if (!NOM_BASE.test(modele) || !NOM_BASE.test(nom)) throw new Error("seconde base jetable : nom de base hors forme ou de plus de 63 caractères (0052 § 1)");
+  return { modele, nom };
+}
+
+/** Adresse de la seconde base jetable pour un login : même adresse, base `<base>_dv`. */
+export function urlDeverrouillee(login: Login): string | undefined {
+  const url = readUrl(login);
+  if (url === undefined) return undefined;
+  const adresse = new URL(url);
+  adresse.pathname = `/${baseDeverrouillee(url).nom}`;
+  return adresse.toString();
+}

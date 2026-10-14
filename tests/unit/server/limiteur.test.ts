@@ -336,6 +336,8 @@ describe("module de journal", () => {
       "rate_limit.purge_failed",
       "rate_limit.rows_high",
       "rate_limit.failed",
+      // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée, code fermé seulement.
+      "p0.guard_closed",
       "log.unknown_event",
     ]);
   });

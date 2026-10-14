@@ -44,6 +44,18 @@ describe("imports de src/server hors de src/server", () => {
     );
   }
 
+  it("P0r3b : @/server/p0/page-acces admis dans la seule page /prototype/executions ; le reste de src/server y reste refusé", async () => {
+    const PAGE = "src/app/prototype/executions/page.tsx";
+    expect(await messagesFor(importOf("@/server/p0/page-acces"), PAGE, IMPORTS)).toHaveLength(0);
+    expect(await messagesFor(importOf("@/server/actions/p0-acces"), PAGE, IMPORTS)).toHaveLength(0);
+    for (const source of ["@/server/p0/acces", "@/server/p0/garde", "@/server/p0/page-acces/x", "@/server/config/offer", "../../../server/p0/acces"]) {
+      expect(await messagesFor(importOf(source), PAGE, IMPORTS), source).toHaveLength(1);
+    }
+    for (const autre of ["src/app/prototype/page.tsx", "src/app/prototype/executions/autre.tsx", "src/features/prototype/SaisieCodeAcces.tsx"]) {
+      expect(await messagesFor(importOf("@/server/p0/page-acces"), autre, IMPORTS), autre).toHaveLength(1);
+    }
+  });
+
   it("src/server et src/adapters peuvent importer la configuration", async () => {
     expect(await messagesFor(importOf("@/server/config/offer"), "src/server/actions/exemple.ts", IMPORTS)).toHaveLength(0);
     expect(await messagesFor(importOf("@/server/config/offer"), "src/adapters/exemple.ts", IMPORTS)).toHaveLength(0);
