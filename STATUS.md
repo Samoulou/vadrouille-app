@@ -1,41 +1,36 @@
-# État du studio — 2026-10-14 (63e cycle)
+# État du studio — 2026-10-14 (64e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- 2026-10-14, 15:13 à 15:41 CEST (fil du projet) : règle de la branche `p0-reel` créée par Samuel (Settings, Rules), puis activée avec la cible `p0-reel` (« done »).
-- 2026-10-14, 15:53 CEST (carte de décision) : « Garder » ; le code d'accès de l'essai réel (`P0_RUN_TOKEN`) reste tel quel, malgré son passage dans la trace d'un agent.
-- 2026-10-14, 16:13 CEST (carte de décision) : « Francfort » ; les fonctions de Vercel tournent en `fra1` (amendement de la décision 0002, #322).
-- #studio : aucun nouveau message depuis le 62e cycle.
+- 2026-10-14, 18:43 à 18:48 CEST (fil du cycle) : « je comprends pas tout », « jhe dois faire quoi dans la PR ? », « je vois pas le lien », « franchement je comprends rien » ; réponses simplifiées : rien à faire maintenant, un seul lien avec un seul bouton le moment venu. Les messages à Samuel suivent désormais ce format.
+- 2026-10-14, 18:49 CEST (projet) : « il reste des token, lance un cycle » ; 64e cycle lancé à la demande.
+- #studio : aucun nouveau message de Samuel.
 
 ## Fait
-- Fusionnées depuis le 62e cycle : **spec B8** (#301), **P0r3c-1** (workflow `p0Run` et composition, #318), **décision 0058** (barrière de sortie sur le runtime de Vercel, exception étroite TLS, #320), **P0r3c-2** (ancrage restreint, fiches et budgets Routes, #323), statut du 62e cycle (#317).
-- **P0r3c** découpée en trois PR par le CEO (P0r3c-1, -2, -3) ; les deux premières sont fusionnées.
-- **Branche `p0-reel`** : créée, protégée par la règle de Samuel ; `P0_REAL_RUNS` et `P0_RUN_TOKEN` posés par le connecteur Vercel (D22, Q402).
-- **Région `fra1`** (#322, ticket #321) : `vercel.json` et son test écrits ; description de la PR réécrite selon la revue.
+- Fusionnées depuis le 63e cycle : **plafonds de l'essai** (#324), **spec B6** (#308, troisième tentative bornée, sans découpage), **décision 0057** (relevé `db-releve`, #315), statut du 63e cycle (#325).
+- **P0r3c-3** (#326) : correction 1 poussée ; moteur de recherche web fixé (`exa`, le modèle de l'étape n'a pas de recherche native), filtre des requêtes, test sentinelle sur le logement.
+- **Décision 0059** (#328, ticket #327) : découpage de B6 (B6a, B6b) et de B8 (B8a, B8b, B8c) ; B8c n'attend ni B7a ni B7c.
+- **Région `fra1`** (#322) : branche remise à jour pour relancer la relecture, restée sans suite sur le même head.
 
 ## En cours
-- **P0r3c-3** (ia-recherche) : suite de la composition du workflow `p0Run`.
-- **Décision 0057** (#315) : correction 1 (Sécurité) ; trou du contrôle « fail-closed » et alignement du § 7.2 sur 0056 § 4.4.
-- **Plafonds de l'essai** (#324, amendement 1 de `specs/P0-suite-2.md`) : correction 1 (Product Owner) ; le seuil de 95 par jour ne vaut plus pour Routes (Q330).
-- En revue : région `fra1` (#322).
+- **Workflow des migrations et du relevé** (data) : `db-migrate.yml`, `db-releve.yml` et harnais de la seconde base jetable ; proposition pour Q419 à trancher par le Tech Lead à la revue.
+- En revue : région `fra1` (#322), P0r3c-3 (#326), décision 0059 (#328).
 
 ## Bloqué
-- **Spec B6** (#308) : deux corrections utilisées, deux bloquants restants (J5 `Segment.estimated`, J6 jour `generating` de `edimbourgDebloque`) ; troisième tentative bornée (Q423), lancée au prochain créneau libre.
-- **Relevé de la Sécurité sur `p0-reel`** (0055 § 1 point 3) : après #322, PR de `main` vers `p0-reel` ouverte par la Release et fusionnée par Samuel seul (D23 point 4).
-- **Premier essai réel** : P0r3c-3 puis P0r3d ; P0r4 ; sur la base réelle, la PR du workflow des migrations et l'`owner-approved` de Samuel par lot (Q408).
-- **PR du workflow des migrations** (`db-migrate.yml` et `db-releve.yml`, Q422) : Q419 (Tech Lead), fusion de 0057, `owner-approved` de Samuel.
+- **Premier essai réel** : réponse de Samuel sur la recherche web par Exa (Q427, carte du 18:55 CEST) ; P0r3c-4 (`p0Run`, paquet `workflow` 5.1.0) après #326 ; P0r3d ; PR de `main` vers `p0-reel` après #322, fusionnée par Samuel (D23) ; relevé de la Sécurité.
+- **Workflow des migrations** : `owner-approved` de Samuel après la revue ; Q387 (a) et (b).
 - **Purge `p0-purge`** : en échec toutes les 6 heures tant que ses secrets sont vides (attendu, Q387).
-- **B8** : décision de découpage (Q416), puis B7a et B7c. **B6a** : B3b. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
+- **B6a** : B3b. **B8a** : B7a, B7c, P0r3c-3. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
-1. Après la fusion de #322 : la Release ouvre la PR `main` vers `p0-reel` pour Samuel, puis relevé de la Sécurité (CI absente, `VERCEL_GIT_COMMIT_REF`, région, condition 6).
-2. Revue de P0r3c-3 ; P0r3d après sa fusion.
-3. Spec B6 : troisième tentative bornée (Q423).
-4. Décision de découpage de B8 (Q416).
+1. Après #322 : ouvrir la PR de `main` vers `p0-reel` et envoyer le lien à Samuel.
+2. Après #326 : lancer P0r3c-4.
+3. Revue du workflow des migrations ; `owner-approved` de Samuel.
+4. Après #328 : premier ticket de code prêt (B8c).
 
 ## Décisions attendues de Samuel
-- **Après la fusion de #322** : fusionner toi-même la PR de `main` vers `p0-reel` que la Release ouvrira (D23).
+- **Nouvelle** : Q427 (recherche web de l'essai par Exa, service américain ; reco : accepter pour les essais).
 - **Rappel** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307) ; Q387 (a) et (b).
 - **Déjà posées** : Q409, Q410, Q401, Q397, Q394, Q378, Q367, Q368, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
 - **Prévente** : Q357 et Q362 ; les documents sont fusionnés (#256).
@@ -50,13 +45,13 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Veto possible** :
   - avant le 2026-10-15 : décisions B3-PO de la spec B3 (#243) et B4-PO de la spec B4 (#248) ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
   - avant le 2026-10-16 : décision 0047 (découpage de `fr.json`, #269) ; décisions B7-PO de la spec B7 (#288) ;
-  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0058, décisions B1-PO-1 à 6 (#185).
+  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q423 (CEO, tranchée) : spec B6.
-- Q424 et Q425 (Tech Lead) : version du paquet `workflow` ; trace écrite de Q330 dans le port de consommation.
-- Q426 (Sécurité) : lieu de traitement des données avant le passage en `fra1`.
+- Q427 (Samuel) : recherche web par Exa.
+- Q428 (CEO, tranchée) : amendements de 0055 ; Q429 et Q430 (Tech Lead) ; Q431 (CEO, tranchée) : feuille de route ; Q432 (CEO, tranchée) : 0056 § 4.4.
+- Tranchées : Q415, Q416 (décision 0059, #328) ; Q424 (Tech Lead, revue de #326).
 
 ## Part d'usage estimée
-- 63e cycle (comptés depuis le 62e) : sous-agents terminés : spec B8 (bloquant tardif), réglages de `p0-reel` (Release), P0r3c-1 et P0r3c-2, décision 0058 ; 3 au plus en même temps.
-- En cours, comptés au 64e cycle : P0r3c-3, 0057 correction 1, plafonds correction 1.
+- 64e cycle (comptés depuis le 63e) : sous-agents terminés : P0r3c-3 (fin du premier passage), 0057 corrections 1 et 2, plafonds correction 1, spec B6 troisième tentative, P0r3c-3 correction 1, décision 0059 ; 3 au plus en même temps.
+- En cours, comptés au 65e cycle : workflow des migrations.
