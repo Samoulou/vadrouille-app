@@ -2,18 +2,23 @@ import "server-only";
 
 import pg from "pg";
 
+// Chemin relatif avec extension : seule forme que Node résout sous `pnpm db:migrate` (décision 0050, B3-TL-1 point 2).
+import { resolveServerEnvironment } from "../src/server/env/resolve.ts";
+
 /**
  * Seul point d'entrée des connexions applicatives à la base (spécification B1, « Garde de connexion » ;
  * décision B1-PO-6). Deux gardes, testées :
  * 1. **Production** (décision 0034, « Garde préalable à toute fusion ») : `main` est déployé automatiquement sur une
  *    adresse publique ; tant que la mise en public n'a pas eu sa passe de sécurité, aucune connexion n'est ouverte
- *    quand `VERCEL_ENV` ou `VADROUILLE_ENV` vaut `production` (comparaison après `trim().toLowerCase()`).
+ *    quand `resolveServerEnvironment` (`src/server/env/resolve.ts`) rend `production` : `VERCEL_ENV` ou
+ *    `VADROUILLE_ENV` vaut `production` après `trim().toLowerCase()`, ou l'une a une valeur inconnue (B3a, A13).
  *    **L'environnement injecté ne peut que resserrer** (décision 0046, D21) : `VERCEL_ENV` et `VADROUILLE_ENV` sont
  *    aussi lues dans le vrai `process.env`. Pour `vadrouille_prototype` (variable `P0_DATABASE_URL`, P0r2), la règle
  *    est la **liste d'autorisation** de la barrière `egress` (`VERCEL_ENV` exactement `preview` ou `development`,
  *    `VERCEL_TARGET_ENV` égale si présente, `VADROUILLE_ENV` différente de `production`), appliquée à l'environnement
  *    injecté **et** au vrai `process.env` : sans `VERCEL_ENV` (CI, poste, runner), aucune connexion du prototype. Les
- *    deux gardes restent distinctes (`db/` n'importe pas `src/server/env/`) ; leur table de cas est commune
+ *    deux gardes restent distinctes (`db/` n'importe de `src/server/env/` que `resolve.ts`, autonome et sans secret,
+ *    B3a) ; leur table de cas est commune
  *    (`tests/support/cas-production-commune.ts`).
  * 2. **Rôle** : à chaque nouvelle connexion physique du pool, avant toute requête, `session_user` et `current_user`
  *    doivent être le rôle attendu (`vadrouille_app`, `vadrouille_auth` ou `vadrouille_prototype`), et ce rôle ne doit avoir ni `SUPERUSER`
@@ -70,20 +75,35 @@ export function sanitizeConnectionError(error: unknown): DatabaseGuardError | Da
   return new DatabaseConnectionError(typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code) ? code : "inconnu");
 }
 
-const productionDeclaree = (vercelEnv: string | undefined, vadrouilleEnv: string | undefined): boolean =>
-  [vercelEnv, vadrouilleEnv].some((value) => value?.trim().toLowerCase() === "production");
+/**
+ * Vrai si `resolveServerEnvironment` (`src/server/env/resolve.ts`, seul calcul de l'environnement du serveur ;
+ * spécification B3, B3a point 1 et critère A13) rend `production` : `production` dans l'une des deux variables, après
+ * `trim().toLowerCase()`, ou une valeur inconnue (ce qui ne peut que fermer davantage).
+ *
+ * **Aucune variable déclarée → faux** (figé, décision 0050, mineur 15) : les scripts locaux de B1 (`pnpm db:migrate`,
+ * `pnpm test:db`) ne déclarent pas d'environnement, et la garde de production ne peut pas lire un environnement que
+ * rien ne déclare ; le serveur, lui, refuse de démarrer sans environnement déclaré (`register()`, `src/instrumentation.ts`).
+ */
+function production(resoudre: () => string): boolean {
+  try {
+    return resoudre() === "production";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Vrai pour un déploiement de production, quel que soit l'hébergeur (décisions 0017 § 11.0 et 0034) : liste de refus,
- * appliquée à l'environnement injecté **et** au vrai `process.env`, lu par propriété littérale (0046 D21).
+ * appliquée à l'environnement injecté **et** au vrai `process.env` (0046 D21 : l'environnement injecté ne peut que
+ * resserrer).
  */
 export function isProductionForDatabase(env: Env): boolean {
-  return productionDeclaree(env.VERCEL_ENV, env.VADROUILLE_ENV) || productionDeclaree(process.env.VERCEL_ENV, process.env.VADROUILLE_ENV);
+  return production(() => resolveServerEnvironment(env)) || production(() => resolveServerEnvironment(process.env));
 }
 
 const ENVIRONNEMENTS_PROTOTYPE: readonly string[] = ["preview", "development"];
 
-/** Liste d'autorisation de la barrière `egress` (0046 D21, verdict Sécurité), recopiée ici : `db/` n'importe pas `src/`. */
+/** Liste d'autorisation de la barrière `egress` (0046 D21, verdict Sécurité), recopiée ici : `db/` n'importe de `src/` que `resolve.ts`. */
 const deploiementAdmis = (vercelEnv: string | undefined, cible: string | undefined, vadrouilleEnv: string | undefined): boolean =>
   vercelEnv !== undefined &&
   ENVIRONNEMENTS_PROTOTYPE.includes(vercelEnv) &&

@@ -64,6 +64,47 @@ Dans le dépôt, seuls `playwright.config.ts` (tests sur le build local), `pnpm 
 2. Aucune des quatre variables du tableau n'est définie (`vercel env ls`, `docker inspect`), et `DATA_ADAPTER` ne vaut pas `prototype`.
 3. `GET /dev/composants`, `GET /voyages/mock_trip_edimbourg/debloquer` et `POST /dev/api/simulation` répondent 404.
 
+## Environnement du serveur, limiteur et secrets (B3a)
+
+Spécification B3 (B3a) ; décisions 0050 (P2, B3-TL-1, B3-TL-5, B3-TL-6) et 0051. Validation par `src/server/env/index.ts` ; calcul de l'environnement par `src/server/env/resolve.ts`.
+
+**Démarrage fatal partout.** Au démarrage (`register()`, `src/instrumentation.ts`), une variable refusée écrit l'événement `config_invalid` (nom de la variable et code de règle, jamais la valeur) puis arrête le processus (`process.exit(1)`), dans les quatre environnements, préversions comprises.
+
+### Environnement : `VADROUILLE_ENV` ou `VERCEL_ENV`
+
+L'une des deux est requise ; sans aucune, le serveur ne démarre pas. Comparaison après `trim().toLowerCase()`, valeur vide comptée comme absente. `local` ou `development` → `local` ; `ci` → `ci` ; `staging` ou `preview` → `staging` ; `production` **ou toute autre valeur** → `production`. Si les deux sont posées, la plus restrictive l'emporte (`production` > `staging` > `ci` > `local`).
+
+- `pnpm dev` pose `VADROUILLE_ENV=local` (script `dev`) ; `vercel dev` pose `VERCEL_ENV=development`, donc `local` aussi.
+- Les serveurs des tests Playwright et les jobs `verify` et `db` de la CI posent `VADROUILLE_ENV=ci`.
+- L'image Docker pose `VADROUILLE_ENV=production` dans son étape finale ; Vercel pose `VERCEL_ENV` (`preview` → `staging`, `production`).
+- `VADROUILLE_ENV` ne se pose nulle part ailleurs dans un fichier versionné, et `VERCEL` ou `VERCEL_ENV` dans aucun (`tests/unit/server-env-config.test.ts`).
+
+### `TRUSTED_IP_HEADER` (limiteur)
+
+- Seule valeur admise : `x-vercel-forwarded-for` (posé et réécrit par Vercel). `x-forwarded-for`, `x-real-ip`, `forwarded`, `cf-connecting-ip` ou toute autre valeur : démarrage refusé, partout.
+- **`staging` et `production`** : requise à l'usage du limiteur ; absente, le serveur démarre mais **toute action limitée est refusée** (`rate_limited`, événement `config_missing`). Admise seulement derrière Vercel (`VERCEL_ENV` déclarée et `VERCEL=1`, posées par la plateforme) : l'image Docker la refuse au démarrage.
+- **`local`** : refusée ; le limiteur range toutes les requêtes dans un compartiment commun.
+- **`ci`** : facultative, admise seulement si le serveur écoute sur la boucle locale (`HOSTNAME` à `127.0.0.1`, `::1` ou `localhost`).
+- Poser cette variable dans Vercel est une étape de Samuel ; la porte de fusion de B3a (question Q381, décision 0050) demande au CEO d'en relever les seuls **noms** de variables posés dans Vercel, jamais les valeurs.
+
+### Secrets : `RATE_LIMIT_HMAC_SECRET` (et, s'ils sont présents, `BETTER_AUTH_SECRET`, `SIMULATED_WEBHOOK_SECRET`)
+
+- **Tirage** : `openssl rand -base64 32` (44 caractères), une valeur **par environnement Vercel** (Preview, Production), jamais recopiée d'un `.env.local` ni d'un autre environnement, jamais committée.
+- **Règles** (refus au démarrage) : hexadécimal (longueur paire) ou base64 / base64url stricts ; au moins 32 octets décodés ; ni mot trivial répété (`changeme`, `secret`, `test`, …), ni bloc répété, ni suite d'octets, au moins 16 octets distincts ; deux secrets présents ne peuvent pas avoir les mêmes octets.
+- **Absent** : le serveur démarre ; le limiteur refuse toute action limitée (échec fermé).
+- **Rotation** : remplacer la valeur dans Vercel puis redéployer. Les clés du limiteur changent avec le secret : tous les compteurs repartent de zéro, et les anciennes lignes sont purgées à leur échéance. Aucune autre donnée n'en dépend.
+- Les tests tirent leurs propres secrets à l'exécution (`playwright.config.ts`, `scripts/test-db.mjs`) ; aucun workflow ne les pose.
+
+### Variables d'outillage de la base : jamais dans le processus serveur
+
+`VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL` présentes dans l'environnement du serveur : démarrage refusé. Posez la première **sur la seule ligne de commande** de `pnpm db:migrate`, la seconde sur celle de `pnpm test:db` (ou `pnpm verify`), **jamais dans un `export` de shell** : un `pnpm dev` lancé ensuite dans le même terminal refuserait de démarrer en nommant la variable. `pnpm start` (`scripts/serve-standalone.mjs`) les retire de l'environnement du serveur qu'il lance.
+
+### Autres gardes posées dès B3a
+
+- `STRIPE_*` : une valeur qui commence par `sk_live_`, `pk_live_` ou `rk_live_` (casse et espaces ignorés) est refusée dans tous les environnements ; `STRIPE_SECRET_KEY`, si présente, doit commencer par `sk_test_` (ou `rk_test_`).
+- `SIMULATED_WEBHOOK_ENABLED=true` : refusée en `production`.
+- `AUTH_ADAPTER` : `mock` (ou absente) seulement en B3a.
+
 ## Carte Google Maps (F4, Q3)
 
 Samuel seul pose les variables et déclenche les déploiements (`docs/CONTEXT.md`, « Qui décide quoi »). Aucune valeur n'est écrite dans ce dépôt.

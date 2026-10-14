@@ -122,6 +122,21 @@ function clientImports(...patterns) {
 }
 
 /**
+ * B3a (décision 0050, B3-TL-6 point 6 ; 0051 point 4.4) : le type de marque `CanonicalEmail` n'est fabriqué que par
+ * `parseEmailAddress` (`src/server/email.ts`) : ni conversion (`as CanonicalEmail`, `as unknown as CanonicalEmail`),
+ * ni assertion (`<CanonicalEmail>x`), ni prédicat de type (`x is CanonicalEmail`, `asserts x is CanonicalEmail`)
+ * ailleurs. En configuration plate, un bloc plus bas qui règle `no-restricted-syntax` remplace cette liste : chacun de
+ * ces blocs la reprend (tests/unit/lint/canonical-email-lint.test.ts).
+ */
+const CANONICAL_EMAIL_MESSAGE =
+  "CanonicalEmail n'est fabriqué que par parseEmailAddress (src/server/email.ts ; décision 0050, B3-TL-6 point 6) : ni conversion, ni assertion, ni prédicat de type.";
+const CANONICAL_EMAIL_SYNTAX = [
+  { selector: "TSAsExpression > TSTypeReference.typeAnnotation[typeName.name='CanonicalEmail']", message: CANONICAL_EMAIL_MESSAGE },
+  { selector: "TSTypeAssertion > TSTypeReference.typeAnnotation[typeName.name='CanonicalEmail']", message: CANONICAL_EMAIL_MESSAGE },
+  { selector: "TSTypePredicate TSTypeReference[typeName.name='CanonicalEmail']", message: CANONICAL_EMAIL_MESSAGE },
+];
+
+/**
  * B5a (décision 0045 § 3, B5-TL-3 ; handover § 3) : `src/domain` sans entrée-sortie. Liste blanche des imports
  * (`import`, `import type`, `export … from`) : `@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain`
  * (`@/domain/*` ou relatif sans remonter), et `vitest` pour les seuls `*.test.ts`. Constructions refusées : `process`
@@ -151,6 +166,7 @@ function domainSansEntreeSortie(avecVitest) {
       { selector: "CallExpression[callee.name='Date']", message: io },
       { selector: "CallExpression[callee.name='require']", message: io },
       { selector: "ImportExpression", message: io },
+      ...CANONICAL_EMAIL_SYNTAX,
     ],
   };
 }
@@ -173,6 +189,20 @@ export default defineConfig([
       "ligne/no-hardcoded-colors": "error",
       "@typescript-eslint/no-explicit-any": "error",
     },
+  },
+  {
+    // B3a (décision 0050, B3-TL-6 point 6 ; 0051 point 4.4) : `CanonicalEmail` fabriqué par `src/server/email.ts` seul,
+    // tests compris. Repris par les blocs plus bas qui règlent `no-restricted-syntax` (src/domain, adaptateurs simulés).
+    files: ["**/*.{ts,tsx,mts,cts}"],
+    ignores: ["src/server/email.ts"],
+    rules: { "no-restricted-syntax": ["error", ...CANONICAL_EMAIL_SYNTAX] },
+  },
+  {
+    // B3a (décision 0050, B3-TL-1 point 6 ; revue Sécurité de #243, 0006 § 3) : directive "use server" refusée dans
+    // src/, db/ et scripts/ hors de src/server/actions/, tests compris. Règle propre au plugin, posée par ce seul bloc
+    // (tests/unit/lint/use-server-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/use-server-only-in-actions": "error" },
   },
   {
     // F10b (F10-TL-5) : seul le module hors ligne désigné enregistre le service worker, et seul le service worker
@@ -314,6 +344,7 @@ export default defineConfig([
           selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message: "Horloge de la portée seulement (option now) : pas de new Date() (décision 0020 § 2.2).",
         },
+        ...CANONICAL_EMAIL_SYNTAX,
       ],
     },
   },
@@ -510,6 +541,10 @@ export default defineConfig([
       // P0r1 : garde « aucune clé dans l'environnement des tests », chargée par la configuration de Playwright hors de
       // Next.js, où `import "server-only"` lèverait une erreur ; ne rend aucune valeur (src/server/env/garde-cles.ts).
       "src/server/env/garde-cles.ts",
+      // B3a (décision 0050, B3-TL-1 point 2) : résolution de l'environnement, fonction pure sans aucun import, chargée
+      // sous Node nu par `db/connection.ts` (`pnpm db:migrate`), où `import "server-only"` ne se résout pas sans la
+      // condition `react-server` ; elle ne lit ni ne rend aucun secret. Seule exception de B3.
+      "src/server/env/resolve.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
@@ -575,6 +610,20 @@ export default defineConfig([
       "src/adapters/auth-guard.ts",
     ],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: { "no-console": "error" },
+  },
+  {
+    // B3a (décision 0050, B3-TL-1 point 5) : aucun journal hors du module de journal (`src/server/log.ts`, seul
+    // point d'écriture des journaux de B3, à champs en liste blanche).
+    files: [
+      "src/instrumentation.ts",
+      "src/server/env/index.ts",
+      "src/server/env/resolve.ts",
+      "src/server/email.ts",
+      "src/server/ip.ts",
+      "src/server/rate-limit.ts",
+      "src/server/config/limites.ts",
+    ],
     rules: { "no-console": "error" },
   },
   {

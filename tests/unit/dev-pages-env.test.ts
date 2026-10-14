@@ -5,6 +5,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { indentOf, workflowSteps } from "../support/workflow-steps";
+
 /**
  * Configuration versionnée et drapeaux d'ouverture (décision 0017 § 11.0 et § 11.3, F8b ; amende 0020 § 2.3) :
  * aucun fichier de configuration de déploiement ne pose `VADROUILLE_DEV_PAGES`, `VADROUILLE_DEMO_AUTH` ni
@@ -25,67 +27,6 @@ const EXPECTED_404: Record<(typeof OPENING_FLAGS)[number], RegExp[]> = {
   VADROUILLE_DEMO_AUTH: [/\/dev\/voyages\/nouveau\/logement\)" = "404"/, /-X POST .*\/dev\/api\/simulation\)" = "404"/],
   VADROUILLE_DEMO_PAYMENT: [/\/debloquer\)" = "404"/],
 };
-
-const indentOf = (line: string) => line.length - line.trimStart().length;
-
-interface Step {
-  job: string;
-  name: string | null;
-  start: number;
-  lines: string[];
-}
-
-/** Étapes d'un workflow : chaque élément `- ` de la liste `steps:` d'un job, jusqu'au suivant de même retrait. */
-export function workflowSteps(content: string): Step[] {
-  const lines = content.split("\n");
-  const steps: Step[] = [];
-  let inJobs = false;
-  let job = "";
-  let jobIndent = -1;
-  let stepIndent = -1;
-  let current: Step | null = null;
-  lines.forEach((line, index) => {
-    if (/^jobs:\s*$/.test(line)) {
-      inJobs = true;
-      return;
-    }
-    if (!inJobs || line.trim() === "" || line.trimStart().startsWith("#")) {
-      current?.lines.push(line);
-      return;
-    }
-    const indent = indentOf(line);
-    const jobMatch = /^(\s+)([A-Za-z0-9_-]+):\s*$/.exec(line);
-    if (jobMatch && (jobIndent === -1 || indent === jobIndent)) {
-      jobIndent = indent;
-      job = jobMatch[2] ?? "";
-      stepIndent = -1;
-      current = null;
-      return;
-    }
-    if (indent <= jobIndent) {
-      current = null;
-      return;
-    }
-    if (/^\s+steps:\s*$/.test(line)) {
-      current = null;
-      return;
-    }
-    if (/^\s+- /.test(line) && (stepIndent === -1 || indent === stepIndent)) {
-      stepIndent = indent;
-      current = { job, name: null, start: index + 1, lines: [line] };
-      steps.push(current);
-    } else if (current && indent > stepIndent) {
-      current.lines.push(line);
-    } else {
-      current = null;
-    }
-    if (current && current.name === null) {
-      const name = /^\s+(?:- )?name:\s*(.+?)\s*$/.exec(line);
-      if (name && indentOf(line.replace("- ", "  ")) === stepIndent + 2) current.name = name[1] ?? null;
-    }
-  });
-  return steps;
-}
 
 /** Une ligne qui nomme un drapeau d'ouverture et qui n'entre pas dans l'exception : `chemin:ligne`. */
 export function flagOffenders(path: string, content: string): string[] {
