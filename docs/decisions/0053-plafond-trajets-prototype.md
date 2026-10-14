@@ -1,6 +1,6 @@
 # 0053 — Plafond de trajets Routes d'un essai réel du prototype
 
-Statut : décision de Samuel (argent, budget des essais : « Qui décide quoi » de `docs/CONTEXT.md`), provisoire « dans un premier temps, pour faire les premiers tests » · Date : 2026-10-14 · Décideur : Samuel · Rédigée par le CEO · Liée à Q370 et Q389, à P0r2 (#287) et à P0r3
+Statut : décision de Samuel (argent, budget des essais : « Qui décide quoi » de `docs/CONTEXT.md`), provisoire « dans un premier temps, pour faire les premiers tests » ; amendement 1 du même jour (recommandation du CEO acceptée par Samuel, à valider à la fin de ses essais) · Date : 2026-10-14 · Décideur : Samuel · Rédigée par le CEO · Liée à Q370 et Q389, à P0r2 (#287) et à P0r3
 
 Numérotation (vérifiée le 2026-10-14) : `main` va de 0001 à 0051 ; la PR #283 ajoute 0052 ; aucune autre PR ouverte n'ajoute de fichier sous `docs/decisions/`. Cette PR ajoute `0053`.
 
@@ -30,24 +30,30 @@ Texte de Samuel : « Ok on pose la décision dans un premier temps pour faire le
 - **Non tranché ici** : le plafond d'une relecture Routes (P0r4), l'unité du quota Routes (P0-Q31), la répartition de `placesDetails` (Q389) et le plafond de coût des modèles (2 ou 3 USD, question 2 de #287). Si la répartition par jour gêne la qualité des programmes, le Tech Lead le signale à Samuel avec les mesures de ses essais.
 - Q370 reste ouverte pour Places Details au-delà des essais ; le statut suivant reporte cette décision dans `QUESTIONS.md`.
 
-## Amendement 1 — économies retenues et économies en réserve (Samuel, 2026-10-14 04:48 et 04:50 UTC, fil du projet)
-Texte de Samuel : « Ok je suis ta reco, et on valide a la fin des tests les solutions. Aussi on demande les fiches de lieux que des retenus et par retenu j'entends retenu pour la première proposition de slider. » ; puis « Oui go, prend bien note de toutes les optimisations qu'on garde sous le coude. »
+## Amendement 1 — économies des essais (Samuel, 2026-10-14, fil du projet)
+Mots de Samuel (heures de Paris) :
+- 06:42 : « Quand je peux faire l'essai réél? Comment réduire encore ces cours au delà du sabrage des trajet? »
+- 06:45 : « On ne peut pas déléguer a l'ia la recherche des trajets ? Garder db les trajets pour un prochain? Plusieurs personnes vont a Rome par exemple ? Ou trop personnalisable a chaque session user? »
+- 06:48 : « Ok je suis ta reco, et on valide a la fin des tests les solutions. Aussi on demande les fiches de lieux que des retenus et par retenu j'entends retenu pour la première proposition de slider. J'y pense apprès que la personne a dis les j'aime ou j'aime pas, on refait une analyse complète? Pour optimiser et affiner ? »
+- 06:50 : « Oui go, prend bien note de toutes les optimisations qu'on garde sous le coude. On a un plan je pense »
 
-### Retenues, appliquées par P0r3 (et reprises par B8 et B9 pour le MVP), validées par Samuel à la fin de ses essais
-1. **Fiches de lieux (Places Details) des seuls lieux retenus pour la première proposition de cartes à glisser** : aucun appel Places Details pour un candidat qui n'entre pas dans cette première série. Le champ demandé est le moins cher qui suffit (SKU Essentials quand les horaires ne servent pas ; le rôle ia-recherche documente le choix par champ dans la PR). Estimation du CEO, non mesurée : environ 0,50 USD par essai au lieu de 1,80.
-2. **Réutilisation du cache de positions** (`place_coordinates`, 29 jours, décisions 0011 et 0027) : un lieu déjà connu ne déclenche aucun nouvel appel pour sa position.
-3. **Profil d'IA « léger » pour les essais** : moins de recherches web et de pages lues, et un modèle moins cher pour le tri et la notation (dans les bornes de B7, `specs/B7-couche-ia-recherche.md` une fois fusionnée). Estimation du CEO, non mesurée : environ 1 USD par essai.
-4. **Premier tri par distance à vol d'oiseau**, calculé en mémoire par notre code à partir des positions, sans appel de modèle et sans écriture (0011 § 1) ; Routes n'est appelé que pour l'ordre final des lieux retenus de chaque jour. Estimation du CEO, non mesurée : 30 à 40 éléments par jour au lieu d'environ 100.
+La recommandation du CEO à laquelle il répond « je suis ta reco » contenait : fiches de lieux limitées, réutilisation du cache des positions, profil d'IA léger et modèle de tri moins cher, tri à vol d'oiseau dans notre code avant Routes ; refus des temps de trajet estimés par l'IA et du stockage des temps de trajet ; le reste en réserve. Ci-dessous : **recommandation du CEO acceptée par Samuel, à valider à la fin de ses essais**. Elle vaut pour les essais réels du prototype (P0r3) ; B8 et B9 pourront s'en inspirer, sur décision ultérieure.
 
-La réserve d'un essai reste au prix plein, sans gratuité (Q329).
+### Retenues pour P0r3
+1. **Fiches de lieux (Place Details) des seuls lieux retenus pour la première série de cartes à glisser** (mots de Samuel, 06:48), avec une petite marge pour remplacer un lieu refusé. Aucune fiche pour un autre candidat. Le masque reste celui de 0046 (point 8), horaires compris : rien d'autre sans nouvelle décision.
+2. **Réutilisation du cache des positions** (`place_coordinates`, 30 jours au plus selon 0011 § 6 et 0027 point 4 ; 29 jours pour `org_prototype` selon 0046 point 8). **Sans effet tant que l'écriture des positions du prototype (0052, réduite à S10, PR #283 en revue) n'est pas fusionnée** : d'ici là, le cache reste vide pour le prototype. Une position lue dans le cache ne remplace jamais la fiche d'un lieu planifié (0052).
+3. **Profil d'IA léger** : moins de recherches web et de pages lues, et un modèle moins cher pour le tri et la notation. Le choix du modèle et du profil revient au rôle ia-recherche dans sa PR, dans les plafonds fixés pour le mode réel.
+4. **Tri à vol d'oiseau avant Routes**, calculé en mémoire par notre code, sans appel de modèle ni écriture (0011 § 1). Il ne porte que sur des candidats dont la position est déjà connue (fiche de la première série, ou cache). Il sert à limiter les paires envoyées à Routes, pas à éviter des fiches. L'ordre exact des étapes est fixé par 0055 (#294, section 6) ; ce texte le suit.
 
-### En réserve (aucune n'est appliquée ; chacune revient à Samuel, à la fin de ses essais ou quand les volumes augmentent)
+La réserve d'un essai reste au prix plein, sans gratuité (Q329). Q380 (forfait plus strict que Q329) est une question distincte, ouverte pour le Tech Lead.
+
+### Refusées (recommandation du CEO acceptée par Samuel)
+- **Temps de trajet estimés par un modèle d'IA** : durées plausibles mais fausses, sans horaires ni travaux.
+- **Temps de trajet gardés en base pour d'autres voyageurs** (même ville) : exclu par la règle provisoire de Q5 (0011 § 1, aucune durée de trajet en base) ; réutilisation possible seulement en mémoire, pendant une même exécution.
+
+### En réserve (rien n'est appliqué ; chaque point revient à Samuel, à la fin de ses essais ou quand les volumes augmentent)
 - **Compter la gratuité Google dans la réserve d'un essai** (10 000 éléments Routes et 1 000 fiches Enterprise par mois) : le plus gros levier, mais il revient sur Q329.
-- **Relever le plafond Google** au-delà de 20 USD par mois (option 2 présentée le 2026-10-14 04:10 UTC).
-- **Calcul de trajets open source** (OSRM, Valhalla, GraphHopper, OpenRouteService ; OpenTripPlanner pour les transports en commun) : étude du Tech Lead pour plus tard. Obstacles relevés : les positions viennent de Google et ne peuvent servir hors de Google (0011, 0027), donc il faudrait aussi une source de lieux non Google ; les transports en commun demandent un serveur à nous, ville par ville.
-- **Recherche élargie après les « j'aime » et « j'aime pas »** : le recalcul par lot de B10 reste ciblé (jours touchés, lieux déjà trouvés, petite recherche si un type manque). Si les essais montrent qu'il n'affine pas assez, élargir la petite recherche ; une analyse complète est écartée (coût et attente doublés).
-
-### Écartées
-- **Faire estimer les temps de trajet par un modèle d'IA** : durées plausibles mais fausses, sans horaires ni travaux.
-- **Garder les temps de trajet en base pour d'autres voyageurs** (même ville) : interdit par les conditions de Google et par 0011 § 1 (aucune durée de trajet en base) ; réutilisation possible seulement en mémoire, pendant une même session.
-
+- **Relever le plafond Google** au-delà de 20 USD par mois (option 2 présentée le 2026-10-14 à 04:10 UTC).
+- **Autre forme de fiche** (autre masque, autre SKU, fiche sans horaires) : exige une décision nouvelle.
+- **Calcul de trajets open source** (OSRM, Valhalla, GraphHopper, OpenRouteService ; OpenTripPlanner pour les transports en commun) : piste du CEO, à étudier plus tard par le Tech Lead. Obstacles : les positions viennent de Google et ne peuvent servir hors de Google (0011, 0027), il faudrait donc une source de lieux non Google ; les transports en commun demandent un serveur à nous, ville par ville.
+- **Analyse complète après les « j'aime » et « j'aime pas »** (question de Samuel, 06:48) : proposition du CEO, garder le recalcul ciblé de B10 (jours touchés, lieux déjà trouvés, petite recherche si un type manque) ; si les essais montrent qu'il n'affine pas assez, élargir cette petite recherche plutôt que tout refaire (coût et attente doublés).
