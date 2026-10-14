@@ -128,7 +128,39 @@ Les relevés de la PR de P0r3 nommés par la spécification (l. 298 : réglages 
 - **B3b et B3c** : P0r3b, P0r3c et P0r3d ne sont jamais dans le même cycle qu'une sous-tâche de B3 qui touche `src/server/env/index.ts`, les listes du régime, `eslint-rules/**`, `eslint.config.mjs`, `package.json` ou `playwright.config.ts`. L'ordre entre elles relève du CEO ; recommandation : P0r3b à P0r3d avant B3b, qui attend encore les décisions P4.
 
 ## Avis de la Sécurité
-À écrire par le rôle Sécurité dans cette PR (commit `[secu]`).
+Rôle Sécurité, sur les sections 1 à 5 et 7 ; il **accepte**, **ajoute des conditions de revue** ou **demande un changement** ; un changement demandé est intégré par le Tech Lead à la revue de cette PR ou contesté par écrit, jamais tranché ici à sa place. Les noms de fichiers et de tests restent au Tech Lead.
+
+### S-1. Garde (section 1) : acceptée, avec conditions
+1. **Accepté** : B3a d'abord, aucun second calcul de l'environnement ; refus au démarrage des `P0_*` en production ; `P0_RUN_TOKEN` soumis à `decodeSecret` et à l'unicité (la règle « un secret ne sert qu'à un usage » de 0051 s'applique : `P0_RUN_TOKEN` n'est égal à aucun autre secret, et ses dérivés `K_cmp` et `K_cookie` ont des étiquettes distinctes).
+2. **Condition** : l'ordre des contrôles de `lireEnvP0` est testé de sorte qu'**aucune lecture de `P0_RUN_TOKEN` ni de `P0_DATABASE_URL` n'ait lieu** quand (1) à (5) refusent (espion sur l'objet d'environnement : les noms lus sont relevés, et ces deux noms n'y figurent pas).
+3. **Condition** : `GardeOuverte` est une marque de type sans valeur exploitable à l'exécution ; la sûreté repose sur `verifierGardeEtape` à l'entrée de chaque étape, pas sur le type seul. Le test « chaque étape revérifie la garde » appelle chaque étape avec une `GardeOuverte` fabriquée dans le test (conversion admise dans les seuls tests) hors des conditions : refus sans appel.
+4. **Condition** : le relevé « `CI` absente à l'exécution » (section 1 point 3) est joint au verdict de P0r3b ; une garde toujours fermée n'est pas corrigée par le retrait de la condition sans nouvel avis.
+
+### S-2. Jeton et cookie (section 2, D19) : acceptés, avec conditions
+1. **Accepté** : HMAC à clé dérivée du jeton, échéance de 12 heures dans le MAC, préfixe `__Host-`, `SameSite=Strict`, aucune donnée en base pour le cookie, invalidation par rotation. Un cookie volé reste valable jusqu'à son échéance (au plus 12 h) ou jusqu'à la rotation suivie d'un redéploiement : **risque accepté**, derrière l'authentification Vercel de la préversion et pour des données du prototype dont Samuel a accepté l'exposition aux préversions (Q366).
+2. **Risque accepté, consigné** (spécification, « Jeton d'accès ») : sans adresse IP, un tiers qui franchit la protection Vercel peut épuiser les 5 essais et bloquer Samuel une heure ; disponibilité seulement, jamais confidentialité.
+3. **Condition** : la saisie ne passe que par une action serveur (`POST`) ; le jeton n'apparaît dans aucun paramètre d'URL, en-tête de réponse, élément de page rendu ni état côté client ; test sentinelle sur la réponse HTML et sur l'objet d'état du formulaire.
+4. **Condition** : `prototype.run_attempts` ne reçoit aucune empreinte, aucun préfixe ni aucune longueur de la saisie : seulement `resultat` (déjà le cas du schéma de P0r2) ; test `p0: aucune trace du jeton en base`.
+5. **Condition** : la page de saisie et la page de lancement renvoient `Cache-Control: private, no-store` et ne sont jamais prérendues (page dynamique) ; sinon une copie servie par le CDN contournerait la garde.
+
+### S-3. Composition (section 3, D18) : acceptée
+1. **Accepté** tel quel ; le verdict sur les lignes du régime de `p0-reel.ts` est rendu dans la PR de P0r3c (C5 de 0049 en est le modèle).
+2. **Condition** : le test « seule composition » couvre aussi `import()` dynamique à spécificateur calculé (refusé partout par le régime) et les réexportations ; un module de capacité réexporté par un module intermédiaire compte comme importé par ce module.
+3. **Condition** (E3 de 0049) : sur la composition, l'appel de modèle reçoit toujours un objet modèle construit par `openrouter-client.ts`, jamais une chaîne ; le test « fetch global remplacé par un double qui échoue » est rejoué à travers `composerP0Reel`.
+
+### S-4. Code d'accès (section 4, D22) : accepté, risque à présenter à Samuel
+1. **Accepté** : génération et pose dans un seul tube, retour à la ligne retiré, type chiffré lisible par Samuel, portée Preview et `p0-reel` seulement, relevé sans valeur, rotation avec redéploiement.
+2. **Risque, à présenter à Samuel dans la PR de P0r3b si le relevé le confirme** : un jeton d'API Vercel qui a accès au projet peut lire une variable chiffrée. Les agents ne l'appellent jamais pour cette variable (consigne), mais rien ne l'empêche techniquement. Option offerte à Samuel, hors de la délégation de Q268 : poser lui-même la variable en type `sensitive`, avec une valeur qu'il génère et garde dans son gestionnaire de mots de passe ; personne, agents compris, ne peut alors la relire. Sans réponse, la procédure du point 4 s'applique.
+3. **Condition** : le jeton Vercel de l'agent (Q379) est **en lecture et écriture des variables du seul projet**, jamais un jeton de compte complet si Vercel en offre un plus étroit ; ses droits sont relevés et joints au verdict.
+4. **Condition** : la commande de pose est exécutée **hors de toute session dont la sortie est publiée** (CI, commentaire de PR) ; la transcription de l'agent ne contient que la commande et la sortie de la CLI, sans valeur. Si une valeur est un jour affichée, rotation immédiate.
+
+### S-5. Fusion automatique (section 5, D23) : acceptée, risque résiduel consigné
+1. **Accepté** : condition de base `main`, test statique, interdiction de toute autre fusion automatique dans les workflows, vérification par l'arbre de `p0-reel`.
+2. **Risque résiduel** (compte `Samoulou` partagé, 0035) : un agent peut techniquement fusionner une PR vers `p0-reel` ou modifier sa règle ; filets : consigne, relecture des fusions et de l'arbre à chaque verdict, suspension des exécutions sur tout écart. À lever quand les agents auront un compte distinct (0035).
+3. **Condition** : la règle de `p0-reel` interdit aussi la **suppression** de la branche et les poussées directes (PR obligatoire, y compris pour les administrateurs si GitHub l'offre sur la formule du dépôt) ; relevée par l'API GitHub et jointe au verdict de P0r3a.
+
+### S-6. Recherche web (section 7) : acceptée
+Aucune capacité réseau nouvelle si le client passe par `openrouter-client.ts` ; dans le cas contraire, verdict dans la PR de P0r3c. Le texte de requête est construit par l'agent à partir du brief seulement : test sentinelle « aucune donnée Google dans une requête de recherche web » (champ d'une fiche Places simulée absent de toute requête capturée).
 
 ## Conséquences
 - **Q320 close** (section 1) ; le CEO la reporte dans `QUESTIONS.md` avec Q389 et Q391 (propositions de la section 6, au Product Owner) et Q330 (rappel : bloque le premier lancement, pas le code).
