@@ -3,21 +3,25 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ExecutionsPage from "@/app/prototype/executions/page";
-import { valeurCookieAcces } from "@/server/p0/acces";
-import { etatPageExecutionsP0, saisirCodeAccesP0 } from "@/server/actions/p0-acces";
+import * as messages from "@/i18n/messages";
+import { saisirCodeAccesP0 } from "@/server/actions/p0-acces";
+import { DUREE_COOKIE_S, valeurCookieAcces } from "@/server/p0/acces";
+import { etatPageExecutionsP0 } from "@/server/p0/page-acces";
 
 import { baseEssais } from "../../support/base-essais-p0";
 
 /**
  * Page de saisie du code d'accès `/prototype/executions` et ses actions serveur (décision 0055, sections 1 et 2 ;
- * avis de la Sécurité S-2 points 3 et 5) : 404 quand la garde est fermée ; saisie par l'action seulement ; le code
+ * avis de la Sécurité S-2 points 3 et 5) : 404 quand la garde est fermée ; saisie par l'action seulement (l'état de
+ * la page est lu par un module ordinaire, `src/server/p0/page-acces.ts`, jamais exporté d'une action) ; le code
  * n'apparaît ni dans le HTML rendu, ni dans l'état du formulaire, ni dans un journal. Le module étroit est remplacé
  * par un double (ouvert ou fermé) : aucun nom secret n'est posé dans l'environnement du processus.
  */
 
 const etat = vi.hoisted(() => ({
   ouvert: true,
-  jeton: Buffer.from("5f1e3d7c9b2a4e6f8d0c1b3a5e7f9d2c4b6a8e0f1d3c5b7a9e2f4d6c8b0a1e3d", "hex"),
+  // Code tiré à l'exécution (revue du head 6be9299, mineur 10) : aucun secret de 32 octets écrit dans le dépôt.
+  jeton: Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(32))),
   cookies: new Map<string, string>(),
   poses: [] as { nom: string; valeur: string; options: unknown }[],
   base: undefined as undefined | { pool: unknown },
@@ -41,7 +45,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const CODE_HEX = "5f1e3d7c9b2a4e6f8d0c1b3a5e7f9d2c4b6a8e0f1d3c5b7a9e2f4d6c8b0a1e3d";
+const CODE_HEX = etat.jeton.toString("hex");
 const formulaire = (code: string) => {
   const donnees = new FormData();
   donnees.set("code", code);
@@ -106,5 +110,16 @@ describe("p0: page de saisie du code d'accès", () => {
     expect(await saisirCodeAccesP0({ statut: "attente" }, new FormData())).toEqual({ statut: "invalid_code" });
     for (let i = 0; i < 4; i += 1) await saisirCodeAccesP0({ statut: "attente" }, formulaire("faux"));
     expect(await saisirCodeAccesP0({ statut: "attente" }, formulaire(CODE_HEX))).toEqual({ statut: "too_many_attempts" });
+  });
+
+  it("le fichier d'action n'exporte que la saisie (aucun état de la garde appelable par un client)", async () => {
+    expect(Object.keys(await import("@/server/actions/p0-acces")).sort()).toEqual(["saisirCodeAccesP0"]);
+  });
+
+  it("les « 12 heures » des textes restent alignées sur la durée du cookie (Max-Age)", () => {
+    const heures = `${DUREE_COOKIE_S / 3600} heures`;
+    expect(DUREE_COOKIE_S).toBe(43_200);
+    expect(messages.prototype.acces.aide).toContain(heures);
+    expect(messages.prototype.acces.ouverte).toContain(heures);
   });
 });

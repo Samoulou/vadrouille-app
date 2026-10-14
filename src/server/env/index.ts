@@ -265,16 +265,18 @@ export function parseServerEnv(env: Env): ServerEnv {
   // Parcours des noms de l'objet reçu, un seul (0050, « Lignes du régime de confinement ») ; aucun nom de ces deux
   // familles n'est lu par propriété littérale :
   // - `P0_*` (P0r3b ; décision 0055, section 1 point 2 ; spécification `specs/P0-suite-2.md`, l. 148) : toute variable
-  //   dont le nom commence par `P0_` (préfixe exact, sensible à la casse), présente en production, refuse le
-  //   démarrage ; le refus porte le libellé fixe `P0_*`, jamais le nom exact ni la valeur ;
-  // - `STRIPE_*` : garde des préfixes de production (B3a).
+  //   dont le nom commence par `P0_` (préfixe exact, sensible à la casse) refuse le démarrage en production dès que
+  //   **la clé** est présente, vide ou faite d'espaces comprise (revue du head 6be9299, mineur 8) ; sa valeur n'est
+  //   jamais lue ici ; le refus porte le libellé fixe `P0_*`, jamais le nom exact ni la valeur ;
+  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes.
   for (const nom in env) {
-    const prototype = nom.startsWith("P0_");
-    if (!prototype && !nom.startsWith("STRIPE_")) continue;
+    if (nom.startsWith("P0_")) {
+      if (environment === "production") throw new ServerEnvError(V["P0_*"], "forbidden");
+      continue;
+    }
+    if (!nom.startsWith("STRIPE_")) continue;
     const valeur = env[nom];
-    if (!presente(valeur)) continue;
-    if (!prototype) verifierStripe(nom, valeur);
-    else if (environment === "production") throw new ServerEnvError(V["P0_*"], "forbidden");
+    if (presente(valeur)) verifierStripe(nom, valeur);
   }
 
   // `P0_REAL_RUNS` présente : `enabled` seulement, comparaison exacte, sans `trim()` (0055, section 1 point 2).

@@ -1211,14 +1211,32 @@ const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "
  */
 const PAQUETS_SERVEUR_SEULEMENT = ["externe:ai", "externe:undici"];
 
+/** Directives du prologue du fichier (`"use client"`, `"use server"`…), lues sur l'arbre syntaxique, pas par recherche de texte. */
+function directivesDuPrologue(fichier: string, source: string): string[] {
+  const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, false, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const directives: string[] = [];
+  for (const instruction of sf.statements) {
+    if (!ts.isExpressionStatement(instruction) || !ts.isStringLiteral(instruction.expression)) break;
+    directives.push(instruction.expression.text);
+  }
+  return directives;
+}
+
 /** Directive `"use client"` dans le prologue du fichier (arbre syntaxique, pas une recherche de texte). */
 function estFichierClient(fichier: string, source: string): boolean {
+  return directivesDuPrologue(fichier, source).includes("use client");
+}
+
+/** Import de bord `import "server-only";` au premier niveau du fichier (arbre syntaxique). */
+function importeServerOnly(fichier: string, source: string): boolean {
   const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, false, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  for (const instruction of sf.statements) {
-    if (!ts.isExpressionStatement(instruction) || !ts.isStringLiteral(instruction.expression)) return false;
-    if (instruction.expression.text === "use client") return true;
-  }
-  return false;
+  return sf.statements.some(
+    (instruction) =>
+      ts.isImportDeclaration(instruction) &&
+      instruction.importClause === undefined &&
+      ts.isStringLiteral(instruction.moduleSpecifier) &&
+      instruction.moduleSpecifier.text === "server-only",
+  );
 }
 
 /** Imports d'un fichier, `import()` littéraux compris (`next/dynamic`, chargement paresseux côté client). */
@@ -1238,31 +1256,51 @@ function importsClientDe(fichier: string, source: string): string[] {
 }
 
 /**
- * Fermeture transitive depuis `departs`, `import()` compris ; rend les fichiers et paquets serveur seulement atteints,
- * avec le chemin qui y mène. `lire` est injecté pour jouer les cas négatifs sur un dépôt fictif.
+ * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
+ * nommées, chacune admise **seulement si** sa propriété est vérifiée sur le fichier réel (arbre syntaxique) :
+ * - l'action serveur de la saisie du code (`src/server/actions/p0-acces.ts`), si son prologue porte `"use server"` : vue
+ *   du navigateur, ses exports ne sont que des références, et ses imports n'entrent jamais dans un paquet client ;
+ * - l'état de la page (`src/server/p0/page-acces.ts`, lu par le composant serveur de la page), si son prologue ne porte
+ *   ni `"use client"` ni `"use server"` (jamais un paquet client, jamais une action appelable : mineur 7 du head
+ *   6be9299) et s'il importe `server-only` (son entrée dans un paquet client ferait échouer la construction).
+ * Une entrée dont la propriété manque est un fichier ordinaire (aucune admission : cas négatifs). Au-delà d'une entrée
+ * admise **seulement**, sont admis le module étroit du mode réel (`p0.ts`, qui ne lit aucune clé de service) et les
+ * modules de B3a qu'il importe ; tout autre module serveur seulement reste refusé, à travers l'entrée comme ailleurs
+ * (clés de service `ai.ts` et `grounding.ts`, `src/ai`, `src/grounding`, `src/research`, paquets). Verdicts Tech Lead et
+ * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299).
  */
-/**
- * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5) : la page de saisie
- * du code d'accès du mode réel passe par une action serveur (`"use server"` : vue du navigateur, ses exports ne sont que
- * des références, et ses imports n'entrent jamais dans un paquet client). Au-delà de cette action **seulement**, sont
- * admis le module étroit du mode réel (`p0.ts`, qui ne lit aucune clé de service) et les modules de B3a qu'il importe ;
- * tout autre module serveur seulement reste refusé, à travers l'action comme ailleurs (clés de service `ai.ts` et
- * `grounding.ts`, `src/ai`, `src/grounding`, `src/research`, paquets). Verdicts Tech Lead et Sécurité demandés dans la
- * PR de P0r3b.
- */
-const FRONTIERE_ACTION_P0R3B = {
-  action: "src/server/actions/p0-acces.ts",
+const FRONTIERE_P0R3B = {
+  entrees: [
+    { fichier: "src/server/actions/p0-acces.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    {
+      fichier: "src/server/p0/page-acces.ts",
+      admise: (f: string, source: string) => {
+        const directives = directivesDuPrologue(f, source);
+        return !directives.includes("use client") && !directives.includes("use server") && importeServerOnly(f, source);
+      },
+    },
+  ],
   admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/resolve.ts"],
 } as const;
 
+/** Vrai si `fichier` est une entrée de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
+function entreeFrontiereAdmise(fichier: string, lire: (fichier: string) => string): boolean {
+  const entree = FRONTIERE_P0R3B.entrees.find((e) => e.fichier === fichier);
+  return entree !== undefined && entree.admise(fichier, lire(fichier));
+}
+
+/**
+ * Fermeture transitive depuis `departs`, `import()` compris ; rend les fichiers et paquets serveur seulement atteints,
+ * avec le chemin qui y mène. `lire` est injecté pour jouer les cas négatifs sur un dépôt fictif.
+ */
 function atteintsServeurSeulement(
   departs: readonly string[],
   lire: (fichier: string) => string,
   resoudreCible: (depuis: string, specificateur: string) => Cible,
 ): string[] {
   const violations: string[] = [];
-  // Un nœud est un fichier ou un paquet, suivi deux fois au plus : hors de l'action de P0r3b, puis au-delà d'elle
-  // (`|action`). Un module atteint par les deux voies est donc contrôlé sur chacune.
+  // Un nœud est un fichier ou un paquet, suivi deux fois au plus : hors de la frontière de P0r3b, puis au-delà d'une
+  // de ses entrées admises (`|action`). Un module atteint par les deux voies est donc contrôlé sur chacune.
   const noeud = (cle: string, viaAction: boolean) => (viaAction ? `${cle}|action` : cle);
   const fichierDe = (n: string) => n.replace(/\|action$/, "");
   const precedent = new Map<string, string | null>(departs.map((d) => [d, null]));
@@ -1275,14 +1313,14 @@ function atteintsServeurSeulement(
   while (pile.length > 0) {
     const courant = pile.pop() as string;
     const fichierCourant = fichierDe(courant);
-    const viaAction = courant.endsWith("|action") || fichierCourant === FRONTIERE_ACTION_P0R3B.action;
+    const viaAction = courant.endsWith("|action") || entreeFrontiereAdmise(fichierCourant, lire);
     for (const specificateur of importsClientDe(fichierCourant, lire(fichierCourant))) {
       const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(fichierCourant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
       const suivant = noeud(cle, viaAction);
       if (precedent.has(suivant)) continue;
       precedent.set(suivant, courant);
-      const admis = viaAction && (FRONTIERE_ACTION_P0R3B.admis as readonly string[]).includes(cle);
+      const admis = viaAction && (FRONTIERE_P0R3B.admis as readonly string[]).includes(cle);
       if (!admis && (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral")) {
         violations.push(chemin(suivant));
         continue;
@@ -1362,6 +1400,39 @@ describe("p0: clé côté serveur seulement", () => {
       ].sort(),
     );
     expect(atteintsServeurSeulement(["src/features/Direct.tsx"], lireFictif, resoudreFictif)).toEqual(["src/features/Direct.tsx → src/server/env/p0.ts"]);
+  });
+
+  it("frontière de P0r3b liée au fichier réel : action sans \"use server\", état de page sans server-only ou avec une directive → p0.ts redevient une violation", () => {
+    const fichiers = (action: string, etat: string) =>
+      new Map<string, string>([
+        ["src/app/prototype/page.tsx", 'import { a } from "@/server/actions/p0-acces";\nimport { b } from "@/server/p0/page-acces";\n'],
+        ["src/server/actions/p0-acces.ts", `${action}import { c } from "@/server/env/p0";\n`],
+        ["src/server/p0/page-acces.ts", `${etat}import { d } from "@/server/env/p0";\n`],
+      ]);
+    const resoudreFictif = (_depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const violations = (action: string, etat: string) => {
+      const depot = fichiers(action, etat);
+      return atteintsServeurSeulement(["src/app/prototype/page.tsx"], (f) => depot.get(f) ?? "", resoudreFictif).sort();
+    };
+    const VIA_ACTION = "src/app/prototype/page.tsx → src/server/actions/p0-acces.ts → src/server/env/p0.ts";
+    const VIA_ETAT = "src/app/prototype/page.tsx → src/server/p0/page-acces.ts → src/server/env/p0.ts";
+    const SERVEUR = 'import "server-only";\n';
+    // Propriétés vérifiées : les deux entrées sont admises.
+    expect(violations('"use server";\n', SERVEUR)).toEqual([]);
+    // Action sans directive (ou directive après une instruction, ou "use client") : fichier ordinaire.
+    for (const action of ["", 'import "x";\n"use server";\n', '"use client";\n', "// \"use server\"\n"]) {
+      expect(violations(action, SERVEUR), JSON.stringify(action)).toEqual([VIA_ACTION]);
+    }
+    // État de page : sans server-only, ou avec "use server" (action appelable), ou "use client" : fichier ordinaire.
+    for (const etat of ["", 'import { x } from "server-only";\n', `"use server";\n${SERVEUR}`, `"use client";\n${SERVEUR}`, 'const m = "server-only";\n']) {
+      expect(violations('"use server";\n', etat), JSON.stringify(etat)).toEqual([VIA_ETAT]);
+    }
+    expect(directivesDuPrologue("x.ts", '"use strict";\n"use server";\nexport {};\n')).toEqual(["use strict", "use server"]);
+  });
+
+  it("frontière de P0r3b sur le dépôt : les deux entrées réelles portent leur propriété", () => {
+    for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
   });
 
   /**

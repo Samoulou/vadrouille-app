@@ -15,13 +15,20 @@ import type { CodeRefusUsage } from "@/server/usage/port";
  */
 
 /**
- * Preuve que la garde est ouverte, pour une exécution réservée (`runId`). Type de marque : fabriqué **par ce module
- * seul** (aucune conversion, assertion ni prédicat de type ailleurs, tests exceptés : règle `no-restricted-syntax`
- * d'`eslint.config.mjs`, la même que celle de `CanonicalEmail`). La marque n'a pas de valeur exploitable à
- * l'exécution : la sûreté repose sur `verifierGardeEtape` à l'entrée de chaque étape, pas sur le type seul (S-1
- * point 3).
+ * Marque de `GardeOuverte` : symbole unique **non exporté** (déclaré seulement, sans valeur à l'exécution). Hors de ce
+ * module, aucune expression ne peut nommer la propriété `[MARQUE]` : un littéral `{ runId, … }` n'est jamais une
+ * `GardeOuverte` sans conversion (test de type `@ts-expect-error` dans `tests/unit/p0/garde-marque.test.ts`).
  */
-export type GardeOuverte = { readonly runId: string; readonly __brand: "GardeOuverte" };
+declare const MARQUE: unique symbol;
+
+/**
+ * Preuve que la garde est ouverte, pour une exécution réservée (`runId`). Type de marque fabriqué **par ce module
+ * seul** : la propriété `[MARQUE]` est infalsifiable hors d'ici, et toute conversion, assertion ou prédicat de type
+ * ailleurs est refusé (règle `no-restricted-syntax` d'`eslint.config.mjs`, la même que celle de `CanonicalEmail` ;
+ * tests de `tests/` exceptés). La marque n'a pas de valeur exploitable à l'exécution : la sûreté repose sur
+ * `verifierGardeEtape` à l'entrée de chaque étape, pas sur le type seul (S-1 point 3).
+ */
+export type GardeOuverte = { readonly runId: string; readonly [MARQUE]: true };
 
 /** Codes de la garde fermée : environnement et déploiement, accès, réservation, exécution. */
 export type CodeGarde = CodeGardeFermee | "access_refused" | "run_refused" | CodeRefusUsage;

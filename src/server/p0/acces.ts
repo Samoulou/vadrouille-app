@@ -100,25 +100,38 @@ export type ResultatOuverture = { readonly ok: true; readonly attendu: Buffer } 
 
 /**
  * Conditions (1) à (7) de `lireEnvP0`, puis `isProductionDeployment()` faux (0017 § 11.0, contrôlé seul bien qu'il
- * soit impliqué par la condition (2)). Un refus écrit `p0.guard_closed` avec son code fermé, jamais une valeur.
+ * soit impliqué par la condition (2)). Un refus écrit `p0.guard_closed` avec son code fermé, jamais une valeur, sauf
+ * si l'appelant passe `journaliser = false` (affichage de la page : voir `etatPageAcces`).
  */
-export function ouvertureP0(dependances: DependancesAcces = {}): ResultatOuverture {
+export function ouvertureP0(dependances: DependancesAcces = {}, journaliser = true): ResultatOuverture {
   const lu = lireEnvP0(dependances.env, dependances.execArgv);
   const resultat: ResultatOuverture = !lu.ok
     ? lu
     : isProductionDeployment(dependances.env)
       ? { ok: false, code: "production_deployment" }
       : { ok: true, attendu: lu.jeton };
-  if (!resultat.ok) logEvent("p0.guard_closed", { guard: resultat.code });
+  if (!resultat.ok && journaliser) logEvent("p0.guard_closed", { guard: resultat.code });
   return resultat;
 }
 
 /** État de la page de saisie : fermée (404), saisie attendue, ou accès déjà ouvert par un cookie valide. */
 export type EtatPageAcces = "fermee" | "saisie" | "ouverte";
 
+/** Refus propres à un déploiement de production : jamais journalisés à l'affichage de la page. */
+const REFUS_DE_PRODUCTION: ReadonlySet<CodeGardeFermee> = new Set(["production_refused", "environment_refused", "production_deployment"]);
+
+/**
+ * Lu à chaque affichage de la page (`GET`). Revue du head 6be9299, mineur 11 : en production, la page est publique et un
+ * robot pourrait inonder le journal ; l'affichage n'y écrit donc **rien** (refus de production, ou déploiement de
+ * production). Hors production (préversions, derrière la protection Vercel), `p0.guard_closed` reste écrit : c'est
+ * l'outil du relevé de la section 1 point 3 (ouvrir la page et lire le code). Les actions journalisent toujours.
+ */
 export function etatPageAcces(cookie: string | undefined, dependances: DependancesAcces = {}): EtatPageAcces {
-  const ouverture = ouvertureP0(dependances);
-  if (!ouverture.ok) return "fermee";
+  const ouverture = ouvertureP0(dependances, false);
+  if (!ouverture.ok) {
+    if (!REFUS_DE_PRODUCTION.has(ouverture.code) && !isProductionDeployment(dependances.env)) logEvent("p0.guard_closed", { guard: ouverture.code });
+    return "fermee";
+  }
   const maintenant = (dependances.maintenant ?? Date.now)();
   return cookieAccesValide(cookie, ouverture.attendu, maintenant) ? "ouverte" : "saisie";
 }

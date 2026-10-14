@@ -50,6 +50,18 @@ const SERVER_PATTERN = {
 };
 
 /**
+ * P0r3b (décision 0055, section 2 ; revue du head 6be9299, mineur 7) : exception nominative à F9a pour la seule page
+ * `src/app/prototype/executions/page.tsx` (composant serveur), qui lit l'état de la garde par
+ * `@/server/p0/page-acces`, module ordinaire : exporté d'une action (`"use server"`), cet état serait appelable par
+ * n'importe quel client. Tout autre module de `src/server` hors actions reste refusé, dans cette page comme ailleurs.
+ */
+const SERVER_PATTERN_PAGE_P0 = {
+  regex: "^(@/server/(?!actions/[^/]+$|p0/page-acces$)|(\\.{1,2}/)+(.*/)?server/(?!actions/[^/]+$))",
+  message:
+    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) ; la page /prototype/executions admet en plus @/server/p0/page-acces (P0r3b).",
+};
+
+/**
  * F10c (décision 0039, F10-TL-5) : depuis la feuille « Partager » et la vue partagée, seul le module d'actions du
  * partage s'importe de `src/server` ; ni la configuration, ni parse-input, ni les actions d'un autre écran.
  */
@@ -319,6 +331,11 @@ export default defineConfig([
     files: ["src/app/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN),
+  },
+  {
+    // P0r3b : la page de saisie du code d'accès lit l'état de la garde par un module ordinaire (SERVER_PATTERN_PAGE_P0).
+    files: ["src/app/prototype/executions/page.tsx"],
+    rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN_PAGE_P0),
   },
   {
     // T4 (0016 § 3.1 règle 4) : composants, mesure, bibliothèque et textes : ni zod, ni valeur de @/contracts.

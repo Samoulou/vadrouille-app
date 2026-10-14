@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import * as messages from "@/i18n/messages";
-import { etatPageExecutionsP0 } from "@/server/actions/p0-acces";
+import { etatPageExecutionsP0 } from "@/server/p0/page-acces";
 
 // Lue à chaque requête, jamais prérendue (S-2 point 5) : une copie servie par le CDN contournerait la garde.
 // `Cache-Control: private, no-store` et `X-Robots-Tag` sont posés par `next.config.ts`.

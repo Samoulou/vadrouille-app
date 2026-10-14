@@ -362,6 +362,11 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
       refusParse({ ...base, ...code() }, NOM["P0_*"], "forbidden");
       refusParse({ ...base, [INVENTEE]: SENTINELLE }, NOM["P0_*"], "forbidden");
     }
+    // Clé présente, valeur vide ou faite d'espaces : refus aussi (présence de la clé seulement, sans trim()).
+    for (const valeur of ["", " ", "\t\n"]) {
+      refusParse({ ...vercel("production"), P0_REAL_RUNS: valeur }, NOM["P0_*"], "forbidden");
+      refusParse({ ...vercel("production"), [INVENTEE]: valeur }, NOM["P0_*"], "forbidden");
+    }
     // Préfixe exact, sensible à la casse : `p0_x` n'est pas une variable du prototype.
     expect(() => parseServerEnv(vercel("production", { p0_x: SENTINELLE }))).not.toThrow();
     // Hors production : admises.

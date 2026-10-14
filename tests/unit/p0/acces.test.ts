@@ -141,6 +141,25 @@ describe("p0: cookie d'accès invalidé par la rotation du jeton et expiré apr�
       }),
     ).toBe("fermee");
   });
+
+  it("affichage de la page garde fermée : aucun p0.guard_closed en production ; écrit en préversion (relevé) et par les actions", async () => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void lignes.push(String(ligne)));
+    const lus = () => lignes.splice(0).map((l) => JSON.parse(l) as unknown);
+    // Production : refus de la barrière (VERCEL_ENV du processus), du calcul de l'environnement ou du déploiement.
+    vi.stubEnv("VERCEL_ENV", "production");
+    for (const env of [preversion(code, { VERCEL_ENV: "production" }), preversion(code, { VADROUILLE_ENV: "production" })]) {
+      for (let i = 0; i < 3; i += 1) expect(etatPageAcces(cookie, { env, execArgv: [], maintenant: () => T0 })).toBe("fermee");
+    }
+    expect(lus()).toEqual([]);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    // Préversion d'une autre branche : la page écrit le code fermé (outil du relevé de la section 1 point 3).
+    const ferme = { env: preversion(code, { VERCEL_GIT_COMMIT_REF: "main" }), execArgv: [], maintenant: () => T0 };
+    expect(etatPageAcces(cookie, ferme)).toBe("fermee");
+    expect(lus()).toEqual([{ level: "info", event: "p0.guard_closed", guard: "branch_refused" }]);
+    expect(await saisirCodeAcces("x", () => baseEssais(T0).pool, ferme)).toEqual({ ok: false, code: "fermee" });
+    expect(lus()).toEqual([{ level: "info", event: "p0.guard_closed", guard: "branch_refused" }]);
+  });
 });
 
 describe("p0: jeton limité à 5 essais par heure, masqué", () => {
