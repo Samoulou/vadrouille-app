@@ -1272,7 +1272,9 @@ function importsClientDe(fichier: string, source: string): string[] {
  * admise **seulement**, sont admis le module étroit du mode réel (`p0.ts`, qui ne lit aucune clé de service) et les
  * modules de B3a qu'il importe ; tout autre module serveur seulement reste refusé, à travers l'entrée comme ailleurs
  * (clés de service `ai.ts` et `grounding.ts`, `src/ai`, `src/grounding`, `src/research`, paquets). Verdicts Tech Lead et
- * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299).
+ * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299). Décision 0062 (ticket 341) : `openssl-conf.ts`,
+ * importé par `egress.ts` (examen d'`OPENSSL_CONF`, aucune clé ni variable d'environnement lue), est admis avec lui ;
+ * verdicts Tech Lead et Sécurité demandés dans la PR du ticket 341.
  */
 const FRONTIERE_P0R3B = {
   entrees: [
@@ -1285,7 +1287,7 @@ const FRONTIERE_P0R3B = {
       },
     },
   ],
-  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/resolve.ts"],
+  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts"],
 } as const;
 
 /** Vrai si `fichier` est une entrée de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */

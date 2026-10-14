@@ -3,21 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-commune";
 
-
 import {
   CAUSES_SORTIE,
-  CHEMIN_CA_RUNTIME_VERCEL,
+  EXCEPTIONS_SORTIE,
   OPTIONS_TLS,
   optionsDeNode,
+  VERDICTS_SORTIE,
   verifierSortie,
+  ZONES_SORTIE,
+  type DiagnosticSortie,
   type EnvSortie,
 } from "./egress";
+import type { SystemeFichiersOpenssl } from "./openssl-conf";
 
 /**
  * `p0: aucun client réel hors préversion ou développement`, `… derrière un proxy d'environnement`, `… avec un TLS
  * affaibli` et `p0: egress, un seul contrat` (spécification `specs/P0-suite-executions-reelles.md`). L'environnement
  * et `execArgv` sont injectés ; le vrai `process.env`, que la barrière lit aussi pour ses trois variables de
- * déploiement (0046 D21), est posé en préversion par `vi.stubEnv` et rétabli après chaque cas.
+ * déploiement (0046 D21), est posé en préversion par `vi.stubEnv` et rétabli après chaque cas ; `VERCEL` et
+ * `OPENSSL_CONF` (conditions 1.1 et 1.2 de 0062) y sont retirées, sauf dans les cas de l'exception de 0062.
  */
 
 /** Vrai `process.env` d'un cas : chaque variable absente de l'objet est retirée. */
@@ -29,6 +33,8 @@ function poserReel(reel: { readonly VERCEL_ENV?: string; readonly VERCEL_TARGET_
 
 beforeEach(() => {
   poserReel({ VERCEL_ENV: "preview" });
+  vi.stubEnv("VERCEL", undefined);
+  vi.stubEnv("OPENSSL_CONF", undefined);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -211,80 +217,209 @@ describe("p0: formes --no-… de NODE_OPTIONS et d'execArgv (bloquant 3, renvoy�
   });
 });
 
-describe("p0: exception étroite de NODE_EXTRA_CA_CERTS sur le runtime de Vercel (décision 0058)", () => {
-  /** Cas exact admis : chemin du runtime, `VERCEL=1` et préversion, dans l'env lu et dans le vrai `process.env`. */
-  const RUNTIME: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL };
+/**
+ * Faux système de fichiers de l'examen d'`OPENSSL_CONF` : une chaîne est un fichier ordinaire. Toute lecture est notée
+ * (espion) ; un chemin absent lève, comme `node:fs`.
+ */
+function fauxFs(fichiers: Readonly<Record<string, string>>): SystemeFichiersOpenssl & { readonly appels: string[] } {
+  const appels: string[] = [];
+  const contenus = new Map(Object.entries(fichiers));
+  const texte = (chemin: string) => {
+    const t = contenus.get(chemin);
+    if (t === undefined) throw new Error(`ENOENT ${chemin}`);
+    return t;
+  };
+  return {
+    appels,
+    realpathSync: (c) => (appels.push(`realpath ${c}`), texte(c), c),
+    lstatSync: (c) => (appels.push(`lstat ${c}`), { isFile: () => true, isDirectory: () => false, size: texte(c).length }),
+    readFileSync: (c) => (appels.push(`read ${c}`), new TextEncoder().encode(texte(c))),
+    readdirSync: (c) => {
+      appels.push(`readdir ${c}`);
+      throw new Error(`ENOTDIR ${c}`);
+    },
+  };
+}
+
+const CONF = "/etc/ssl/openssl.cnf";
+const FS_SANS_NODE = () => fauxFs({ [CONF]: "openssl_conf = defaut\n" });
+
+/** Préversion de Vercel avec `OPENSSL_CONF`, dans l'env lu et dans le vrai `process.env` (conditions 1.1 et 1.2). */
+function poserRuntime(valeur: string = CONF) {
+  vi.stubEnv("VERCEL", "1");
+  vi.stubEnv("OPENSSL_CONF", valeur);
+}
+const RUNTIME: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", OPENSSL_CONF: CONF };
+
+/** Diagnostic rendu par le rappel de `verifierSortie` (décisions 0058 et 0062). */
+function diagnostiquer(env: EnvSortie, execArgv: readonly string[] = [], fs: SystemeFichiersOpenssl = fauxFs({})): DiagnosticSortie | undefined {
+  const recus: DiagnosticSortie[] = [];
+  verifierSortie(env, execArgv, (d) => void recus.push(d), fs);
+  expect(recus.length).toBeLessThanOrEqual(1);
+  return recus[0];
+}
+
+describe("p0: exception bornée d'OPENSSL_CONF en préversion de Vercel (décision 0062)", () => {
   beforeEach(() => {
-    vi.stubEnv("VERCEL", "1");
+    poserRuntime();
   });
 
-  it("le chemin admis est celui de la documentation AWS du runtime Node", () => {
-    expect(CHEMIN_CA_RUNTIME_VERCEL).toBe("/var/runtime/ca-cert.pem");
-  });
-  it("cas exact : admis", () => {
-    expect(sortie(RUNTIME)).toEqual({ ok: true });
+  it("fichier sans nodejs_conf sous une racine du runtime : admis, exception marquée", () => {
+    const fs = FS_SANS_NODE();
+    expect(verifierSortie(RUNTIME, [], undefined, fs)).toEqual({ ok: true });
+    expect(diagnostiquer(RUNTIME, [], FS_SANS_NODE())).toEqual({
+      exception: "vercel_runtime_openssl_conf",
+      openssl_conf_zone: "etc",
+      openssl_conf_verdict: "admis",
+    });
   });
 
-  const voisins: [string, EnvSortie][] = [
-    ["autre chemin", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/tmp/ca-cert.pem" }],
-    ["chemin suivi d'une espace", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL} ` }],
-    ["chemin précédé d'une espace", { ...RUNTIME, NODE_EXTRA_CA_CERTS: ` ${CHEMIN_CA_RUNTIME_VERCEL}` }],
-    ["chemin suivi d'un retour à la ligne", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL}\n` }],
-    ["chemin en majuscules", { ...RUNTIME, NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL.toUpperCase() }],
-    ["chemin relatif", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "var/runtime/ca-cert.pem" }],
-    ["chemin avec ..", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var/runtime/../runtime/ca-cert.pem" }],
-    ["chemin avec //", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var//runtime/ca-cert.pem" }],
-    ["chemin suivi de /", { ...RUNTIME, NODE_EXTRA_CA_CERTS: `${CHEMIN_CA_RUNTIME_VERCEL}/` }],
-    ["fichier voisin du runtime", { ...RUNTIME, NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem.bak" }],
+  it("/dev/null : admis sans lecture", () => {
+    poserRuntime("/dev/null");
+    const fs = fauxFs({});
+    expect(verifierSortie({ ...RUNTIME, OPENSSL_CONF: "/dev/null" }, [], undefined, fs)).toEqual({ ok: true });
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("fichier qui nomme nodejs_conf : refus, verdict section_nodejs", () => {
+    const fs = fauxFs({ [CONF]: "nodejs_conf = n\n" });
+    expect(verifierSortie(RUNTIME, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(RUNTIME, [], fauxFs({ [CONF]: "nodejs_conf = n\n" }))).toEqual({
+      cause: "OPENSSL_CONF",
+      openssl_conf_zone: "etc",
+      openssl_conf_verdict: "section_nodejs",
+    });
+  });
+
+  it("fichier absent : refus, verdict fichier_refuse", () => {
+    expect(diagnostiquer(RUNTIME, [], fauxFs({}))).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "etc", openssl_conf_verdict: "fichier_refuse" });
+  });
+
+  // Le cas « /proc/self/… » de 0062 § 7.6 n'est pas écrit ici : le texte `/proc/` est refusé dans tout fichier analysé
+  // par le régime de confinement (`donnees/refus.json`, `motifsProc`). Il est couvert par la liste d'autorisation des
+  // racines (zone `autre`, comme `/tmp/…` et `/var/task/…`).
+  it.each([
+    ["relatif", "etc/ssl/openssl.cnf", "autre"],
+    ["avec ..", "/etc/ssl/../openssl.cnf", "etc"],
+    ["avec //", "/etc//ssl/openssl.cnf", "etc"],
+    ["/ final", "/etc/ssl/", "etc"],
+    ["espace avant", ` ${CONF}`, "autre"],
+    ["espace après", `${CONF} `, "etc"],
+    ["retour à la ligne", `${CONF}\n`, "etc"],
+    ["sous /tmp", "/tmp/openssl.cnf", "autre"],
+    ["sous /var/task", "/var/task/openssl.cnf", "autre"],
+    ["$", "/etc/ssl/$X.cnf", "etc"],
+    ["\\", "/etc/ssl\\openssl.cnf", "etc"],
+    ["guillemet", '/etc/ssl/"openssl.cnf', "etc"],
+  ])("chemin %s : refus, verdict chemin_refuse, zone rendue, aucune lecture", (_nom, chemin, zone) => {
+    poserRuntime(chemin);
+    const fs = FS_SANS_NODE();
+    const env = { ...RUNTIME, OPENSSL_CONF: chemin };
+    expect(verifierSortie(env, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(env, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: zone, openssl_conf_verdict: "chemin_refuse" });
+    expect(fs.appels).toEqual([]);
+  });
+
+  it.each<[string, EnvSortie]>([
     ["VERCEL absente", { ...RUNTIME, VERCEL: undefined }],
     ["VERCEL vide", { ...RUNTIME, VERCEL: "" }],
     ["VERCEL=0", { ...RUNTIME, VERCEL: "0" }],
     ["VERCEL=true", { ...RUNTIME, VERCEL: "true" }],
     ["VERCEL « 1 » avec espace", { ...RUNTIME, VERCEL: "1 " }],
-    ["development au lieu de preview", { ...RUNTIME, VERCEL_ENV: "development" }],
-    ["autre variable TLS posée avec l'exception", { ...RUNTIME, SSL_CERT_FILE: CHEMIN_CA_RUNTIME_VERCEL }],
-    ["NODE_TLS_REJECT_UNAUTHORIZED posée avec l'exception", { ...RUNTIME, NODE_TLS_REJECT_UNAUTHORIZED: "0" }],
-    ["option TLS avec l'exception", { ...RUNTIME, NODE_OPTIONS: "--use-openssl-ca" }],
-  ];
-  it.each(voisins)("%s : tls_env_refused", (_nom, env) => {
-    expect(sortie(env)).toEqual({ ok: false, code: "tls_env_refused" });
+    ["VERCEL_ENV development", { ...RUNTIME, VERCEL_ENV: "development" }],
+  ])("%s : refus, verdict hors_preview, zone rendue, aucune lecture", (_nom, env) => {
+    const fs = FS_SANS_NODE();
+    expect(verifierSortie(env, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(env, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "etc", openssl_conf_verdict: "hors_preview" });
+    expect(fs.appels).toEqual([]);
   });
-  it("le chemin exact dans une autre variable TLS : refus", () => {
-    for (const nom of ["SSL_CERT_FILE", "SSL_CERT_DIR", "OPENSSL_CONF", "SSLKEYLOGFILE", "NODE_TLS_REJECT_UNAUTHORIZED"]) {
-      expect(sortie({ VERCEL_ENV: "preview", VERCEL: "1", [nom]: CHEMIN_CA_RUNTIME_VERCEL })).toEqual({ ok: false, code: "tls_env_refused" });
+
+  it("l'env injecté ne peut pas ouvrir l'exception (D21) : VERCEL ou VERCEL_ENV du vrai process.env", () => {
+    const variantes = [
+      () => vi.stubEnv("VERCEL", undefined),
+      () => vi.stubEnv("VERCEL", "0"),
+      () => vi.stubEnv("VERCEL_ENV", "development"),
+    ];
+    for (const poserVariante of variantes) {
+      poserRuntime();
+      poserVariante();
+      const fs = FS_SANS_NODE();
+      expect(verifierSortie(RUNTIME, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(RUNTIME, [], fs)?.openssl_conf_verdict).toBe("hors_preview");
+      expect(fs.appels).toEqual([]);
     }
   });
-  it("l'env injecté ne peut pas ouvrir l'exception (D21) : VERCEL ou VERCEL_ENV du vrai process.env", () => {
-    vi.stubEnv("VERCEL", undefined);
-    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
-    vi.stubEnv("VERCEL", "0");
-    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
-    vi.stubEnv("VERCEL", "1");
-    poserReel({ VERCEL_ENV: "development" });
-    expect(sortie(RUNTIME)).toEqual({ ok: false, code: "tls_env_refused" });
+
+  it("vrai process.env différent de l'env injecté : refus, verdict env_differente, aucune lecture", () => {
+    for (const reel of [undefined, "", "/etc/ssl/autre.cnf", `${CONF} `]) {
+      vi.stubEnv("OPENSSL_CONF", reel);
+      const fs = FS_SANS_NODE();
+      expect(verifierSortie(RUNTIME, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(RUNTIME, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "etc", openssl_conf_verdict: "env_differente" });
+      expect(fs.appels).toEqual([]);
+    }
   });
-  it("l'exception ne masque ni la production ni un proxy", () => {
-    expect(sortie({ ...RUNTIME, VERCEL_ENV: "production" })).toEqual({ ok: false, code: "production_refused" });
-    expect(sortie({ ...RUNTIME, HTTPS_PROXY: "http://p" })).toEqual({ ok: false, code: "proxy_env_refused" });
+
+  it("proxy posé : ni lecture du fichier, ni champs openssl_conf_*", () => {
+    const fs = FS_SANS_NODE();
+    const env = { ...RUNTIME, HTTPS_PROXY: "http://p" };
+    expect(verifierSortie(env, [], undefined, fs)).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(diagnostiquer(env, [], fs)).toEqual({ cause: "HTTPS_PROXY" });
+    expect(diagnostiquer({ ...RUNTIME, NODE_OPTIONS: "--use-env-proxy" }, [], fs)).toEqual({ cause: "--use-env-proxy" });
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("l'exception ne masque ni la production, ni une autre variable TLS, ni une option TLS", () => {
+    expect(verifierSortie({ ...RUNTIME, VERCEL_ENV: "production" }, [], undefined, FS_SANS_NODE())).toEqual({ ok: false, code: "production_refused" });
+    for (const nom of ["NODE_TLS_REJECT_UNAUTHORIZED", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "SSLKEYLOGFILE"]) {
+      const env = { ...RUNTIME, [nom]: "/etc/x" };
+      expect(verifierSortie(env, [], undefined, FS_SANS_NODE())).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(env, [], FS_SANS_NODE())).toEqual({
+        cause: nom,
+        exception: "vercel_runtime_openssl_conf",
+        openssl_conf_zone: "etc",
+        openssl_conf_verdict: "admis",
+      });
+    }
+    for (const option of ["--openssl-shared-config", "--openssl-config=/etc/x", "--no-openssl-shared-config"]) {
+      expect(verifierSortie({ ...RUNTIME, NODE_OPTIONS: option }, [], undefined, FS_SANS_NODE())).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(verifierSortie(RUNTIME, [option], undefined, FS_SANS_NODE())).toEqual({ ok: false, code: "tls_env_refused" });
+    }
+  });
+
+  it("NODE_EXTRA_CA_CERTS=/var/runtime/ca-cert.pem (exception de 0058 § 4, retirée) : refusé", () => {
+    const env: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem" };
+    expect(verifierSortie(env, [], undefined, FS_SANS_NODE())).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(env)).toEqual({ cause: "NODE_EXTRA_CA_CERTS" });
+  });
+
+  it("le diagnostic ne contient jamais la valeur du chemin ni le contenu du fichier", () => {
+    const chemin = "/etc/SENTINELLE-CHEMIN.cnf";
+    poserRuntime(chemin);
+    const env = { ...RUNTIME, OPENSSL_CONF: chemin };
+    for (const contenu of ["# SENTINELLE-CONTENU\n", "nodejs_conf = SENTINELLE-CONTENU\n", ".include /etc/SENTINELLE-INCLUS.cnf\n"]) {
+      const diagnostic = diagnostiquer(env, [], fauxFs({ [chemin]: contenu }));
+      expect(JSON.stringify(diagnostic)).not.toContain("SENTINELLE");
+    }
+    poserRuntime("/tmp/SENTINELLE.cnf");
+    expect(JSON.stringify(diagnostiquer({ ...RUNTIME, OPENSSL_CONF: "/tmp/SENTINELLE.cnf" }))).not.toContain("SENTINELLE");
   });
 });
 
-/** Diagnostic rendu par le rappel de `verifierSortie` (décision 0058). */
-function diagnostiquer(env: EnvSortie, execArgv: readonly string[] = []) {
-  const recus: unknown[] = [];
-  verifierSortie(env, execArgv, (d) => void recus.push(d));
-  expect(recus.length).toBeLessThanOrEqual(1);
-  return recus[0];
-}
-
-describe("p0: diagnostic de la barrière, des noms seulement (décision 0058)", () => {
+describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et 0062)", () => {
   it("chaque nom de la liste fermée, posé seul, est rendu tel quel et sans sa valeur", () => {
     for (const nom of CAUSES_SORTIE) {
       const env: EnvSortie = nom.startsWith("--") ? { ...PREVIEW, NODE_OPTIONS: `${nom}=/SENTINELLE` } : { ...PREVIEW, [nom]: "/SENTINELLE" };
       const diagnostic = diagnostiquer(env);
-      expect(diagnostic).toEqual({ cause: nom });
+      const attendu = nom === "OPENSSL_CONF" ? { cause: nom, openssl_conf_zone: "autre", openssl_conf_verdict: "hors_preview" } : { cause: nom };
+      expect(diagnostic).toEqual(attendu);
       expect(JSON.stringify(diagnostic)).not.toContain("SENTINELLE");
     }
+  });
+  it("listes fermées de l'exception, des classes de racine et des verdicts", () => {
+    expect(EXCEPTIONS_SORTIE).toEqual(["vercel_runtime_openssl_conf"]);
+    expect(ZONES_SORTIE).toHaveLength(7);
+    expect(VERDICTS_SORTIE).toHaveLength(7);
   });
   it("une option est nommée par son nom canonique", () => {
     expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--tls_keylog=/SENTINELLE" })).toEqual({ cause: "--tls-keylog" });
@@ -296,12 +431,5 @@ describe("p0: diagnostic de la barrière, des noms seulement (décision 0058)", 
   });
   it("le proxy l'emporte sur le TLS, comme le code", () => {
     expect(diagnostiquer({ ...PREVIEW, https_proxy: "http://p", SSL_CERT_FILE: "/x" })).toEqual({ cause: "https_proxy" });
-  });
-  it("l'exception appliquée est marquée ; une variante refusée est nommée", () => {
-    vi.stubEnv("VERCEL", "1");
-    const runtime: EnvSortie = { VERCEL_ENV: "preview", VERCEL: "1", NODE_EXTRA_CA_CERTS: CHEMIN_CA_RUNTIME_VERCEL };
-    expect(diagnostiquer(runtime)).toEqual({ exception: "vercel_runtime_ca" });
-    expect(diagnostiquer({ ...runtime, SSL_CERT_DIR: "/x" })).toEqual({ cause: "SSL_CERT_DIR", exception: "vercel_runtime_ca" });
-    expect(diagnostiquer({ ...runtime, NODE_EXTRA_CA_CERTS: "/tmp/x" })).toEqual({ cause: "NODE_EXTRA_CA_CERTS" });
   });
 });

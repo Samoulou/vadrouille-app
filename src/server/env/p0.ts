@@ -1,6 +1,15 @@
 import "server-only";
 
-import { CAUSES_SORTIE, CODES_REFUS_SORTIE, verifierSortie, type DiagnosticSortie, type EnvSortie } from "@/server/env/egress";
+import {
+  CAUSES_SORTIE,
+  CODES_REFUS_SORTIE,
+  EXCEPTIONS_SORTIE,
+  VERDICTS_SORTIE,
+  verifierSortie,
+  ZONES_SORTIE,
+  type DiagnosticSortie,
+  type EnvSortie,
+} from "@/server/env/egress";
 import { decodeSecret } from "@/server/env/index";
 import { resolveServerEnvironment } from "@/server/env/resolve";
 
@@ -12,7 +21,8 @@ import { resolveServerEnvironment } from "@/server/env/resolve";
  *
  * `lireEnvP0` contrôle, dans cet ordre (le premier refus l'emporte, et rien n'est lu au-delà) :
  * 1. la barrière de sortie de P0r1 (`verifierSortie`, avec D21 : l'environnement injecté ne peut que resserrer), dont
- *    le diagnostic (nom de la cause, marque de l'exception de 0058, jamais une valeur) est passé au rappel facultatif ;
+ *    le diagnostic (nom de la cause, marque de l'exception de 0062, classe de racine et verdict de l'examen
+ *    d'`OPENSSL_CONF`, jamais une valeur) est passé au rappel facultatif ;
  * 2. l'environnement du serveur, par le **seul calcul** de B3a (`resolveServerEnvironment`) : `staging` seulement ;
  * 3. `CI` absente ou vide (Vercel la pose au build, jamais à l'exécution d'une fonction) ;
  * 4. `VERCEL_GIT_COMMIT_REF` égale à `p0-reel` (comparaison exacte) ;
@@ -40,6 +50,10 @@ export type CodeEnvP0 = (typeof CODES_ENV_P0)[number];
 
 /** Causes nommées par le diagnostic de la barrière de sortie (décision 0058) ; liste fermée, des noms seulement. */
 export const CAUSES_ENV_P0: readonly string[] = CAUSES_SORTIE;
+/** Marques d'exception, classes de racine et verdicts du diagnostic (décision 0062 § 5) ; listes fermées. */
+export const EXCEPTIONS_ENV_P0: readonly string[] = EXCEPTIONS_SORTIE;
+export const ZONES_ENV_P0: readonly string[] = ZONES_SORTIE;
+export const VERDICTS_ENV_P0: readonly string[] = VERDICTS_SORTIE;
 export type { DiagnosticSortie };
 
 export type ResultatEnvP0 = { readonly ok: true; readonly jeton: Buffer } | { readonly ok: false; readonly code: CodeEnvP0 };

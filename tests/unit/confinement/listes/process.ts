@@ -109,7 +109,8 @@ export const LECTURES_ENV = [
       "VERCEL_ENV",
       "VERCEL_TARGET_ENV",
       "VADROUILLE_ENV",
-      // Décision 0058 (ticket 319) : condition de l'exception étroite de `NODE_EXTRA_CA_CERTS`, comparée à `1`.
+      // Décision 0062 (ticket 341 ; remplace l'exception de 0058 § 4) : condition 1.1 de l'exception d'`OPENSSL_CONF`,
+      // comparée à `1`. `OPENSSL_CONF` (plus bas) est aussi lue dans le vrai `process.env` (condition 1.2).
       "VERCEL",
       "HTTP_PROXY",
       "http_proxy",

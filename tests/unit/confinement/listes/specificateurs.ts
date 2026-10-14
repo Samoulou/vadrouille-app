@@ -77,6 +77,11 @@ const CHARGEUR =
   "module de Node dans un fichier non-test de `src/` (section 6) ; lecture bornée et gardée des programmes du prototype (P0b1, PR 208) ; " +
   "justification côté serveur : chargé seulement par `prototype-instance.ts`, derrière `prototypeAdapterAllowed`, jamais dans le navigateur : 0040 D2, A5 (amendement M4)";
 
+const OPENSSL_CONF_0062 =
+  "module de Node en zone sensible non-test (section 6 : `zod` seulement), examen synchrone et borné du fichier désigné " +
+  "par `OPENSSL_CONF` (`examinerOpensslConf`, appelé par la barrière de sortie seulement) ; décision 0062, sections 6.5 et 7.4 " +
+  "(ticket 341) ; aucun autre module de `src/server/env/` n'importe `node:fs` ni `node:path` ; verdict Sécurité à rendre";
+
 const PROTOTYPE_PUR = "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4)";
 
 const SERVER_ONLY_P0R1 =
@@ -195,6 +200,23 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/env/ai.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
   { fichier: "src/server/env/grounding.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
   { fichier: "src/server/env/egress.ts", specificateur: "server-only", noms: ["effet"], motif: SERVER_ONLY_P0R1 },
+  // Décision 0062 (ticket 341) : les deux lignes nominatives de la section 6.5, puis le marqueur `server-only` exigé par
+  // la section 7.1 et par `ligne/require-server-only` (ligne non prévue par 0062 § 7.4 : verdict Sécurité demandé).
+  {
+    fichier: "src/server/env/openssl-conf.ts",
+    specificateur: "node:fs",
+    noms: ["lstatSync", "readFileSync", "readdirSync", "realpathSync"],
+    motif: OPENSSL_CONF_0062,
+  },
+  { fichier: "src/server/env/openssl-conf.ts", specificateur: "node:path", noms: ["posix"], motif: OPENSSL_CONF_0062 },
+  {
+    fichier: "src/server/env/openssl-conf.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module d'examen d'`OPENSSL_CONF`, zone sensible, exigé par 0062 § 7.1 et " +
+      "`ligne/require-server-only` ; ligne non listée par 0062 § 7.4 (ticket 341) ; verdict Sécurité à rendre",
+  },
   {
     fichier: "src/server/env/index.ts",
     specificateur: "server-only",

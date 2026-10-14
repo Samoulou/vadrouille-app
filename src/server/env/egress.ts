@@ -1,5 +1,16 @@
 import "server-only";
 
+import {
+  examinerOpensslConf,
+  FS_OPENSSL_REEL,
+  VERDICTS_OPENSSL_CONF,
+  ZONES_OPENSSL_CONF,
+  zoneOpensslConf,
+  type SystemeFichiersOpenssl,
+  type VerdictOpensslConf,
+  type ZoneOpensslConf,
+} from "./openssl-conf";
+
 /**
  * Barrière de sortie des clients réels (spécification `specs/P0-suite-executions-reelles.md`, « Modules
  * d'environnement étroits » ; décisions 0031 et 0034). Lit **seulement** les variables de déploiement, de proxy et de
@@ -10,9 +21,11 @@ import "server-only";
  *    normalisée : casse, espaces, NFKC) ;
  * 2. `proxy_env_refused` : une variable de proxy posée (majuscules ou minuscules) ou `--use-env-proxy` ;
  * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node ; seule exception,
- *    étroite : `NODE_EXTRA_CA_CERTS` égale au fichier d'autorités du runtime de Vercel (décision 0058, ci-dessous).
- * Diagnostic facultatif (décision 0058, ticket 319) : un rappel reçoit le **nom** de la variable ou de l'option en
- * cause (liste fermée `CAUSES_SORTIE`) et la marque de l'exception appliquée ; jamais une valeur.
+ *    étroite : `OPENSSL_CONF` dont le fichier n'a aucun effet sur Node, en préversion de Vercel (décision 0062,
+ *    ci-dessous ; elle remplace l'exception de `NODE_EXTRA_CA_CERTS` de 0058 § 4, retirée).
+ * Diagnostic facultatif (décisions 0058 et 0062) : un rappel reçoit le **nom** de la variable ou de l'option en cause
+ * (liste fermée `CAUSES_SORTIE`), la marque de l'exception appliquée et, pour `OPENSSL_CONF`, une classe de racine et un
+ * verdict pris dans des listes fermées ; jamais une valeur.
  *
  * Variable « posée » : présente avec une valeur non vide, sans retrait d'espaces. `NO_PROXY` n'a aucun effet.
  * Lecture paresseuse, à l'appel ; l'environnement est un paramètre (par défaut `process.env`) que les tests injectent.
@@ -20,7 +33,9 @@ import "server-only";
  * `VADROUILLE_ENV` sont aussi lues dans le vrai `process.env`, et `production_refused` est rendu si l'un **ou** l'autre
  * environnement ne passe pas la liste d'autorisation. La table de cas est commune avec la garde de connexion
  * `vadrouille_prototype` de `db/connection.ts` (`tests/support/cas-production-commune.ts`).
- * Module pur : aucun import hors de `server-only`.
+ * **Module non pur depuis 0062** : il importe `./openssl-conf`, qui fait des lectures **synchrones** du système de
+ * fichiers (injectable : quatrième paramètre de `verifierSortie`), seulement quand `OPENSSL_CONF` est posée, que le
+ * contrôle TLS est atteint et que les conditions 1.1 à 1.3 de 0062 § 4 passent (0062 § 5.4).
  */
 
 export const CODES_REFUS_SORTIE = ["production_refused", "proxy_env_refused", "tls_env_refused"] as const;
@@ -110,13 +125,14 @@ function productionRefusee(lu: Deploiement): boolean {
 /**
  * Variables de déploiement du **vrai** `process.env` (0046 D21), lues par propriété littérale à chaque appel, quel que
  * soit l'`env` reçu : un appelant qui passerait `{ ...process.env, VERCEL_ENV: "preview" }` sur un déploiement de
- * production est refusé.
+ * production est refusé. `OPENSSL_CONF` : condition 1.2 de 0062 § 4 (seule lecture ajoutée par 0062).
  */
-const deploiementReel = (): Deploiement & Pick<Lecture, "vercel"> => ({
+const deploiementReel = (): Deploiement & Pick<Lecture, "vercel"> & { readonly opensslConf: string | undefined } => ({
   vercelEnv: process.env.VERCEL_ENV,
   cible: process.env.VERCEL_TARGET_ENV,
   vadrouilleEnv: process.env.VADROUILLE_ENV,
   vercel: process.env.VERCEL,
+  opensslConf: process.env.OPENSSL_CONF,
 });
 
 /**
@@ -127,25 +143,24 @@ const deploiementReel = (): Deploiement & Pick<Lecture, "vercel"> => ({
 const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowerCase();
 
 /**
- * Exception étroite de la décision 0058 (ticket 319) : `NODE_EXTRA_CA_CERTS` **exactement** égale au fichier des
- * autorités d'Amazon du runtime Node de Lambda, sur lequel reposent les fonctions de Vercel (documentation AWS,
- * « CA certificate loading »). Ce fichier n'**ajoute** que des autorités d'Amazon, qui exécute déjà la fonction ; il
- * est dans l'arborescence du runtime, que la fonction ne peut pas écrire. Admise seulement si `VERCEL` vaut `1` et
- * `VERCEL_ENV` vaut `preview`, dans l'environnement lu **et** dans le vrai `process.env` (D21 : l'environnement injecté
- * ne peut que resserrer). Comparaison exacte, sans `trim()` ni normalisation ; toute autre valeur reste refusée, et
- * aucune autre variable ni option TLS n'a d'exception.
+ * Exception bornée de la décision 0062 (ticket 341) : `OPENSSL_CONF` posée est admise si, et seulement si,
+ * 1.1. `VERCEL` vaut `1` et `VERCEL_ENV` vaut `preview`, dans l'environnement lu **et** dans le vrai `process.env`
+ *      (D21 : l'environnement injecté ne peut que resserrer), comparaison exacte ;
+ * 1.2. la valeur lue est identique à celle du vrai `process.env`, toutes deux lues à l'appel (cohérence des deux
+ *      lectures seulement : Node a lu `OPENSSL_CONF` au démarrage, risque résiduel (b) de 0062 § 6) ;
+ * 1.3 à 1.6. le chemin et le fichier passent l'examen d'`examinerOpensslConf` (`./openssl-conf.ts`).
+ * Le fichier n'est lu que si 1.1 à 1.3 passent. Rend la classe de racine et le verdict fermé, jamais une valeur.
  */
-export const CHEMIN_CA_RUNTIME_VERCEL = "/var/runtime/ca-cert.pem";
-
-function exceptionCaRuntime(lu: Lecture): boolean {
+function examenOpensslConf(lu: Lecture, fs: SystemeFichiersOpenssl): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf } | undefined {
+  const valeur = lu.tls.OPENSSL_CONF;
+  if (valeur === undefined || !posee(valeur)) return undefined;
   const reel = deploiementReel();
-  return (
-    lu.tls.NODE_EXTRA_CA_CERTS === CHEMIN_CA_RUNTIME_VERCEL &&
-    lu.vercel === "1" &&
-    lu.vercelEnv === "preview" &&
-    reel.vercel === "1" &&
-    reel.vercelEnv === "preview"
-  );
+  const zone = zoneOpensslConf(valeur);
+  if (lu.vercel !== "1" || lu.vercelEnv !== "preview" || reel.vercel !== "1" || reel.vercelEnv !== "preview") {
+    return { zone, verdict: "hors_preview" };
+  }
+  if (reel.opensslConf !== valeur) return { zone, verdict: "env_differente" };
+  return examinerOpensslConf(valeur, fs);
 }
 
 /** Premier nom posé d'une famille de variables (clé de la lecture), jamais sa valeur. */
@@ -155,16 +170,30 @@ const premierePosee = (famille: Readonly<Record<string, string | undefined>>, ig
 const causeProxy = (lu: Lecture): string | undefined =>
   premierePosee(lu.proxy) ?? OPTIONS_PROXY.find((option) => lu.options.has(option));
 const causeTls = (lu: Lecture, exception: boolean): string | undefined =>
-  premierePosee(lu.tls, exception ? "NODE_EXTRA_CA_CERTS" : undefined) ?? OPTIONS_TLS.find((option) => lu.options.has(option));
+  premierePosee(lu.tls, exception ? "OPENSSL_CONF" : undefined) ?? OPTIONS_TLS.find((option) => lu.options.has(option));
 
-/** Marque de l'exception étroite de 0058, quand elle a été appliquée. */
-export const EXCEPTION_CA_RUNTIME = "vercel_runtime_ca";
+/** Marque de l'exception bornée de 0062, quand elle a été appliquée (remplace `vercel_runtime_ca` de 0058). */
+export const EXCEPTION_OPENSSL_CONF = "vercel_runtime_openssl_conf";
+
+/** Marques d'exception qu'un diagnostic peut rendre (liste fermée ; copie dans `src/server/log.ts`). */
+export const EXCEPTIONS_SORTIE: readonly string[] = [EXCEPTION_OPENSSL_CONF];
+
+/** Classes de racine et verdicts de l'examen d'`OPENSSL_CONF` (0062 § 5.1 ; copies dans `src/server/log.ts`). */
+export const ZONES_SORTIE: readonly string[] = ZONES_OPENSSL_CONF;
+export const VERDICTS_SORTIE: readonly string[] = VERDICTS_OPENSSL_CONF;
 
 /**
- * Diagnostic de la barrière (décision 0058) : `cause`, nom de la première variable ou option de proxy ou de TLS en
- * cause (liste fermée `CAUSES_SORTIE`) ; `exception`, marque de l'exception étroite appliquée. Jamais une valeur.
+ * Diagnostic de la barrière (décisions 0058 et 0062) : `cause`, nom de la première variable ou option de proxy ou de TLS
+ * en cause (liste fermée `CAUSES_SORTIE`) ; `exception`, marque de l'exception appliquée ; `openssl_conf_zone` et
+ * `openssl_conf_verdict`, rendus seulement si le contrôle TLS est atteint et qu'`OPENSSL_CONF` est posée dans
+ * l'environnement lu (0062 § 5.1). Jamais une valeur, une longueur, un condensat ni un préfixe de valeur.
  */
-export type DiagnosticSortie = { readonly cause?: string; readonly exception?: typeof EXCEPTION_CA_RUNTIME };
+export type DiagnosticSortie = {
+  readonly cause?: string;
+  readonly exception?: typeof EXCEPTION_OPENSSL_CONF;
+  readonly openssl_conf_zone?: ZoneOpensslConf;
+  readonly openssl_conf_verdict?: VerdictOpensslConf;
+};
 
 /**
  * Noms qu'un diagnostic peut rendre (liste fermée) : variables de proxy et de TLS lues par `verifierSortie`, options
@@ -195,13 +224,16 @@ export const CAUSES_SORTIE: readonly string[] = [
 ];
 
 /**
- * Contrôle de sortie, à appeler avant toute lecture de clé et toute connexion. `diagnostic` (facultatif, décision
- * 0058) reçoit, hors refus de production, le nom de la cause et la marque de l'exception : rien d'autre.
+ * Contrôle de sortie, à appeler avant toute lecture de clé et toute connexion. `diagnostic` (facultatif, décisions
+ * 0058 et 0062) reçoit, hors refus de production, le nom de la cause, la marque de l'exception et, pour `OPENSSL_CONF`,
+ * la classe de racine et le verdict : rien d'autre. `fs` (facultatif, 0062 § 7.2) : système de fichiers de l'examen
+ * d'`OPENSSL_CONF`, injecté par les tests ; les appelants ne le passent pas.
  */
 export function verifierSortie(
   env: EnvSortie = process.env,
   execArgv: readonly string[] = process.execArgv,
   diagnostic?: (resultat: DiagnosticSortie) => void,
+  fs: SystemeFichiersOpenssl = FS_OPENSSL_REEL,
 ): ResultatSortie {
   const lu: Lecture = {
     vercelEnv: env.VERCEL_ENV,
@@ -229,12 +261,20 @@ export function verifierSortie(
     options: optionsDeNode(env.NODE_OPTIONS, execArgv),
   };
   if (productionRefusee(lu) || productionRefusee(deploiementReel())) return { ok: false, code: "production_refused" };
-  const exception = exceptionCaRuntime(lu);
   const proxy = causeProxy(lu);
+  if (proxy !== undefined) {
+    // Refus de proxy : le fichier d'`OPENSSL_CONF` n'est pas lu, et les champs `openssl_conf_*` sont absents.
+    diagnostic?.({ cause: proxy });
+    return { ok: false, code: "proxy_env_refused" };
+  }
+  const examen = examenOpensslConf(lu, fs);
+  const exception = examen?.verdict === "admis";
   const tls = causeTls(lu, exception);
-  const cause = proxy ?? tls;
-  diagnostic?.({ ...(cause === undefined ? {} : { cause }), ...(exception ? { exception: EXCEPTION_CA_RUNTIME } : {}) });
-  if (proxy !== undefined) return { ok: false, code: "proxy_env_refused" };
+  diagnostic?.({
+    ...(tls === undefined ? {} : { cause: tls }),
+    ...(exception ? { exception: EXCEPTION_OPENSSL_CONF } : {}),
+    ...(examen === undefined ? {} : { openssl_conf_zone: examen.zone, openssl_conf_verdict: examen.verdict }),
+  });
   if (tls !== undefined) return { ok: false, code: "tls_env_refused" };
   return { ok: true };
 }
