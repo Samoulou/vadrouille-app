@@ -179,9 +179,9 @@ describe("vers-moteur: doubles des interfaces Relectures", () => {
 
   it("durées : matrice de P0, logement par index de nuit, mode ignoré ; trajet absent → inconnu", () => {
     const attendu = "SENTINELLE_LOGEMENT_B>SENTINELLE_LIEU".length;
-    expect(relectures.duree({ logement: 2 }, { lieu: "SENTINELLE_LIEU" }, "walk")).toBe(attendu);
-    expect(relectures.duree({ logement: 2 }, { lieu: "SENTINELLE_LIEU" }, "car")).toBe(attendu);
-    expect(relectures.duree({ logement: 0 }, { lieu: "SENTINELLE_LIEU" }, "walk")).toBe("SENTINELLE_LOGEMENT_A>SENTINELLE_LIEU".length);
+    expect(relectures.duree({ logement: 2 }, { lieu: "SENTINELLE_LIEU" }, "walk")).toEqual({ minutes: attendu, estimee: false });
+    expect(relectures.duree({ logement: 2 }, { lieu: "SENTINELLE_LIEU" }, "car")).toEqual({ minutes: attendu, estimee: false });
+    expect(relectures.duree({ logement: 0 }, { lieu: "SENTINELLE_LIEU" }, "walk")).toEqual({ minutes: "SENTINELLE_LOGEMENT_A>SENTINELLE_LIEU".length, estimee: false });
     expect(relectures.duree({ lieu: "SENTINELLE_LIEU" }, { lieu: "SENTINELLE_SANS_TRAJET" }, "walk")).toBe(INCONNU);
   });
 });

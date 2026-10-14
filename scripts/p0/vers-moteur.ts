@@ -2,7 +2,7 @@ import type { Brief as BriefContrat, Day, MobilityMode, Pace, TripCommitment } f
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatEvenement, CandidatMoteur, EtatChoix, Nuit, VoyageMoteur } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
-import { INCONNU, type Plage, type Point, type Relectures, type Validite } from "@/domain/relectures";
+import { INCONNU, type Duree, type Plage, type Point, type Relectures, type Validite } from "@/domain/relectures";
 import { element } from "@/domain/tables";
 import { compterParRegle, validerProgramme } from "@/domain/validation";
 import { jourSemaine } from "@/domain/temps";
@@ -160,11 +160,13 @@ export function relecturesDepuisAncrages(
       const jour = jourSemaine(date);
       return horaires.filter((plage) => plage.jour === jour).map((plage) => ({ debut: plage.debut, fin: plage.fin }));
     },
-    duree(depuis: Point, vers: Point): number | typeof INCONNU {
+    duree(depuis: Point, vers: Point): Duree | typeof INCONNU {
       const de = placeDe(depuis);
       const a = placeDe(vers);
       if (de === undefined || a === undefined) return INCONNU;
-      return trajets(de, a) ?? INCONNU;
+      const minutes = trajets(de, a);
+      // P0 ne sait pas si une durée est estimée (0048 § 3.3) : `estimee: false`, comme ses segments.
+      return minutes === undefined ? INCONNU : { minutes, estimee: false };
     },
   };
 }

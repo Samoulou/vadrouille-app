@@ -35,6 +35,8 @@ export type EtapePlanifiee = {
   trajetAvant: number;
   /** Mode du trajet depuis l'élément précédent (B5-PO-6) ; P0 : son seul mode. */
   modeAvant: ModeTrajet;
+  /** Durée de ce trajet estimée par l'interface (0048 § 3) : reprise dans `Segment.estimated`. */
+  estimeeAvant: boolean;
   /** Repas : nombre d'options classées pour ce créneau, 3 au plus (cadrage § 3.4). */
   options: number;
 };
@@ -44,7 +46,7 @@ export type EvenementPlanifie = { candidatId: string; placeId?: string; debut: n
 /** Élément d'un jour planifié, dans l'ordre de la ligne. */
 export type ElementPlanifie =
   | { genre: "candidat"; etape: EtapePlanifiee }
-  | { genre: "fixe"; bloc: BlocFixe; trajetAvant?: { mode: ModeTrajet; minutes: number } }
+  | { genre: "fixe"; bloc: BlocFixe; trajetAvant?: { mode: ModeTrajet; minutes: number; estimee: boolean } }
   | { genre: "repasLibre"; repas: "lunch" | "dinner"; debut: number; fin: number };
 
 export type JourPlanifie = {
@@ -92,7 +94,7 @@ function admisPourCreneau(candidat: CandidatMoteur, creneau: Creneau): boolean {
 }
 
 /** Trajet en mémoire : mode et minutes, ou `undefined` si aucune durée n'est connue (jamais estimée, B5-PO-6). */
-export type Trajet = (depuis: Point, vers: Point) => { mode: ModeTrajet; minutes: number } | undefined;
+export type Trajet = (depuis: Point, vers: Point) => { mode: ModeTrajet; minutes: number; estimee: boolean } | undefined;
 
 export type ContexteJour = {
   candidats: readonly CandidatMoteur[];
@@ -113,7 +115,7 @@ export type ResultatJour = {
   /** Fin du dernier élément du jour. */
   instant: number;
   /** Trajet de retour au logement du soir ; absent si aucune durée n'est connue. */
-  retour?: { mode: ModeTrajet; minutes: number };
+  retour?: { mode: ModeTrajet; minutes: number; estimee: boolean };
 };
 
 /**
@@ -207,6 +209,7 @@ export function planifierJour(jour: JourSquelette, contexte: ContexteJour): Resu
             fin: choix.fin,
             trajetAvant: choix.aller.minutes,
             modeAvant: choix.aller.mode,
+            estimeeAvant: choix.aller.estimee,
             options: Math.min(3, faisables.length),
           },
         });
@@ -247,8 +250,8 @@ export function planifier(entree: EntreePlanification): JourPlanifie[] {
   const lieuValide = (candidat: { placeId?: string }): string | undefined =>
     candidat.placeId !== undefined && relectures.validite(candidat.placeId) === "valide" ? candidat.placeId : undefined;
   const trajet: Trajet = (depuis, vers) => {
-    const minutes = relectures.duree(depuis, vers, entree.mode);
-    return minutes === INCONNU ? undefined : { mode: entree.mode, minutes };
+    const duree = relectures.duree(depuis, vers, entree.mode);
+    return duree === INCONNU ? undefined : { mode: entree.mode, minutes: duree.minutes, estimee: duree.estimee };
   };
   const resultat: JourPlanifie[] = [];
 
