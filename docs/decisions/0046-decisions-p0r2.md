@@ -4,6 +4,8 @@ Statut : décision déléguée (architecture, bibliothèques, outillage, tests :
 
 **Complétée par 0052** (ticket #282), qui reprend les points de la section « Frontière » : écriture des positions (S10 ; signature de `store_prototype_coordinates` et heures, qui amendent S2, S8 et D15 point 8), le workflow des migrations (D17 point 3, Q294) et le chemin de déverrouillage de S8 étant renvoyés à la décision 0056 « workflow des migrations et déverrouillage du prototype » (0052 § 2 et § 3, décisions du CEO, Q398 et Q400).
 
+**Workflow des migrations et levée du verrou S8 : lire 0056** (ticket #297) : toute mention de 0052 comme décision du workflow d'application des migrations ou du déverrouillage se lit 0056.
+
 **Amende, sans les réécrire** (un renvoi est ajouté en tête de 0007, de 0011 et de 0032) :
 - **0007** (rôles, droits, liste fermée des politiques `USING (true)` et `WITH CHECK (true)`, tests `rôles`, `fonctions` et `schéma`) : trois rôles ajoutés (16 au total), schéma `prototype`, droits de `vadrouille_prototype` et de `vadrouille_fn_prototype_purge`, politiques de `prototype.purges` ajoutées à la liste fermée, politique de lecture de `vadrouille_app` sur `place_coordinates` qui exclut `org_prototype` (D15, D16, S2) ;
 - **0011 § 6** : `EXECUTE` de `purge_expired_coordinates` aussi à `vadrouille_fn_prototype_purge` (D16 point 3) ; fonction dédiée `store_prototype_coordinates`, possédée par `vadrouille_fn_coords`, expiration à **29 jours**, **sans `EXECUTE` pour `vadrouille_prototype`** (S2, S8 ; tout déverrouillage relève de 0052, voir « Frontière ») ; `store_place_coordinates` refuse `org_prototype` (S2) ; portée étendue au prototype sous l'exigence S6. Les politiques de `vadrouille_fn_coords` sur `place_coordinates` **ne changent pas** ;

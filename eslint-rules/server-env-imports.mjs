@@ -13,6 +13,8 @@ import path from "node:path";
  * - `@/server/env` (`index.ts`, B3a) : depuis `src/instrumentation.ts`, le limiteur et son test unitaire seulement ;
  * - `@/server/env/resolve` (B3a) : depuis `db/connection.ts` et le même test seulement ;
  * - `@/server/env/payment` (B4) : depuis `src/server/routes/` et `src/server/payment/` seulement ;
+ * - `@/server/env/p0` (P0r3b) : depuis la garde et l'accès du mode réel (`src/server/p0/garde.ts`,
+ *   `src/server/p0/acces.ts`) seulement ;
  * - tout autre module de `src/server/env/` : depuis `src/server/env/` seulement.
  * Les fichiers de `src/server/env/` (tests compris) importent les modules de leur dossier. La source est résolue
  * (alias `@/` ou chemin relatif, segments `.` et `..` normalisés) avant la comparaison ; toutes les formes de
@@ -33,6 +35,9 @@ export const IMPORTATEURS_ADMIS = new Map([
   ["index", ["src/instrumentation.ts", "src/server/rate-limit.ts", "tests/unit/server/env.test.ts"]],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
   ["payment", ["src/server/routes/", "src/server/payment/"]],
+  // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, depuis la garde et l'accès seulement ; ses
+  // tests sont dans `src/server/env/` (`p0.test.ts`).
+  ["p0", ["src/server/p0/garde.ts", "src/server/p0/acces.ts"]],
 ]);
 
 /** Module de `src/server/env/` visé par une source, ou `null` (chemin relatif au dépôt de l'importateur). */

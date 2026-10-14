@@ -6,6 +6,8 @@ Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08
 
 **§ 6 complété par 0052** (ticket #282) : `store_prototype_coordinates` prend l'identifiant de l'exécution en cours et pose `fetched_at = started_at` et `expires_at = started_at + 29 jours` ; positions d'`org_prototype` écrites par la seule étape finale de `p0Run`, avec le programme, par le seul module `src/adapters/prototype-ecriture.ts` hors de `src/grounding` (exception ouverte par S6 de 0046) ; droits de `vadrouille_fn_coords` étendus à la lecture de quatre colonnes de `prototype.runs` ; levée du verrou S8 renvoyée à la décision 0056 (0052 § 3). **§ 3 n'est pas amendé.**
 
+**Workflow des migrations et levée du verrou S8 : lire 0056** (ticket #297) : toute mention de 0052 comme décision du workflow d'application des migrations ou du déverrouillage se lit 0056.
+
 **§ 2 amendé par 0055** (#294), pour l'exécution `p0Run` du prototype seulement : à l'étape d'ancrage, Text Search « IDs only » restreint à la zone du séjour, sans fiche Place Details pour un candidat (fiches des seuls logements) ; statut, position et horaires vérifiés à l'étape finale pour les lieux que le moteur s'apprête à planifier (fermé définitivement écarté avant la planification, aucun lieu planifié ni écrit sans cette fiche). Le mode simulé, `scripts/p0` et le MVP gardent le § 2 tel quel. **§ 1, § 3, § 4 et § 7 ne sont pas amendés.**
 
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.

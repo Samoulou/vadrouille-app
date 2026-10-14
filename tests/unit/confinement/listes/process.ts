@@ -137,6 +137,11 @@ export const LECTURES_ENV = [
     fichier: "src/server/env/index.ts",
     noms: ["VERCEL", "HOSTNAME", "TRUSTED_IP_HEADER", "AUTH_ADAPTER", "SIMULATED_WEBHOOK_ENABLED", "VADROUILLE_DB_ADMIN_URL", "VERCEL_ENV"],
   },
+  // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : réglage du mode réel validé au démarrage (`enabled`
+  // seulement, comparaison exacte), puis conditions (3) à (5) du module étroit `p0.ts` (`CI`, branche, réglage), lues
+  // par propriété littérale, à l'appel, valeur jamais rendue. Verdict Sécurité à rendre.
+  { fichier: "src/server/env/index.ts", noms: ["P0_REAL_RUNS"] },
+  { fichier: "src/server/env/p0.ts", noms: ["CI", "VERCEL_GIT_COMMIT_REF", "P0_REAL_RUNS"] },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [
@@ -191,6 +196,9 @@ export const ENV_ENTIER = [
   { fichier: "src/server/env/ai.ts", formes: ["defaut:lireCleOpenRouter", "argument:verifierSortie"] },
   { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
   { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
+  // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : module étroit du mode réel, environnement lu à l'appel,
+  // passé entier à la barrière de sortie et au seul calcul de l'environnement (B3a). Verdict Sécurité à rendre.
+  { fichier: "src/server/env/p0.ts", formes: ["defaut:lireEnvP0", "argument:verifierSortie", "argument:resolveServerEnvironment"] },
   // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement » ; 0051 point 6.7.3) : `process.env` entier
   // passé à la validation (`register()`, `serverEnv()`) et à la résolution de l'environnement (garde de connexion).
   // Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
