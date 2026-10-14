@@ -8,8 +8,15 @@ import pg from "pg";
  * 1. **Production** (décision 0034, « Garde préalable à toute fusion ») : `main` est déployé automatiquement sur une
  *    adresse publique ; tant que la mise en public n'a pas eu sa passe de sécurité, aucune connexion n'est ouverte
  *    quand `VERCEL_ENV` ou `VADROUILLE_ENV` vaut `production` (comparaison après `trim().toLowerCase()`).
+ *    **L'environnement injecté ne peut que resserrer** (décision 0046, D21) : `VERCEL_ENV` et `VADROUILLE_ENV` sont
+ *    aussi lues dans le vrai `process.env`. Pour `vadrouille_prototype` (variable `P0_DATABASE_URL`, P0r2), la règle
+ *    est la **liste d'autorisation** de la barrière `egress` (`VERCEL_ENV` exactement `preview` ou `development`,
+ *    `VERCEL_TARGET_ENV` égale si présente, `VADROUILLE_ENV` différente de `production`), appliquée à l'environnement
+ *    injecté **et** au vrai `process.env` : sans `VERCEL_ENV` (CI, poste, runner), aucune connexion du prototype. Les
+ *    deux gardes restent distinctes (`db/` n'importe pas `src/server/env/`) ; leur table de cas est commune
+ *    (`tests/support/cas-production-commune.ts`).
  * 2. **Rôle** : à chaque nouvelle connexion physique du pool, avant toute requête, `session_user` et `current_user`
- *    doivent être le rôle attendu (`vadrouille_app` ou `vadrouille_auth`), et ce rôle ne doit avoir ni `SUPERUSER`
+ *    doivent être le rôle attendu (`vadrouille_app`, `vadrouille_auth` ou `vadrouille_prototype`), et ce rôle ne doit avoir ni `SUPERUSER`
  *    ni `BYPASSRLS`. Sinon le pool refuse définitivement de servir (une erreur transitoire du contrôle, elle, ne rend
  *    pas le refus définitif). C'est ce qui rend vraie la règle de 0029 (« l'application ne lit jamais ces
  *    identifiants » d'administration) même si une variable est mal posée.
@@ -19,15 +26,17 @@ import pg from "pg";
  * ne nomment que le rôle attendu, jamais le rôle reçu.
  */
 
-export type AppDatabaseRole = "vadrouille_app" | "vadrouille_auth";
+export type AppDatabaseRole = "vadrouille_app" | "vadrouille_auth" | "vadrouille_prototype";
 
 /**
  * Variables de connexion (décision 0036, B1-TL-3) : des noms que l'intégration Neon de Vercel ne pose jamais (elle
- * injecte `DATABASE_URL` avec l'identifiant propriétaire). `DATABASE_URL` n'est jamais lue.
+ * injecte `DATABASE_URL` avec l'identifiant propriétaire). `DATABASE_URL` n'est jamais lue. `P0_DATABASE_URL` :
+ * rôle `vadrouille_prototype`, posée sur la seule préversion de `p0-reel` (0046 S5, après 0052).
  */
 export const DATABASE_URL_VARIABLES = {
   vadrouille_app: "VADROUILLE_DATABASE_URL",
   vadrouille_auth: "VADROUILLE_DATABASE_URL_AUTH",
+  vadrouille_prototype: "P0_DATABASE_URL",
 } as const satisfies Record<AppDatabaseRole, string>;
 
 /** Réservée à l'environnement des migrations (décision 0006) : jamais lue par l'application. */
@@ -61,9 +70,35 @@ export function sanitizeConnectionError(error: unknown): DatabaseGuardError | Da
   return new DatabaseConnectionError(typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code) ? code : "inconnu");
 }
 
-/** Vrai pour un déploiement de production, quel que soit l'hébergeur (décisions 0017 § 11.0 et 0034). */
+const productionDeclaree = (vercelEnv: string | undefined, vadrouilleEnv: string | undefined): boolean =>
+  [vercelEnv, vadrouilleEnv].some((value) => value?.trim().toLowerCase() === "production");
+
+/**
+ * Vrai pour un déploiement de production, quel que soit l'hébergeur (décisions 0017 § 11.0 et 0034) : liste de refus,
+ * appliquée à l'environnement injecté **et** au vrai `process.env`, lu par propriété littérale (0046 D21).
+ */
 export function isProductionForDatabase(env: Env): boolean {
-  return [env.VERCEL_ENV, env.VADROUILLE_ENV].some((value) => value?.trim().toLowerCase() === "production");
+  return productionDeclaree(env.VERCEL_ENV, env.VADROUILLE_ENV) || productionDeclaree(process.env.VERCEL_ENV, process.env.VADROUILLE_ENV);
+}
+
+const ENVIRONNEMENTS_PROTOTYPE: readonly string[] = ["preview", "development"];
+
+/** Liste d'autorisation de la barrière `egress` (0046 D21, verdict Sécurité), recopiée ici : `db/` n'importe pas `src/`. */
+const deploiementAdmis = (vercelEnv: string | undefined, cible: string | undefined, vadrouilleEnv: string | undefined): boolean =>
+  vercelEnv !== undefined &&
+  ENVIRONNEMENTS_PROTOTYPE.includes(vercelEnv) &&
+  (cible === undefined || cible === vercelEnv) &&
+  (vadrouilleEnv === undefined || vadrouilleEnv.normalize("NFKC").trim().toLowerCase() !== "production");
+
+/**
+ * Vrai si une connexion `vadrouille_prototype` est admise : liste d'autorisation vérifiée sur l'environnement injecté
+ * **et** sur le vrai `process.env` (0046 D21). Sans `VERCEL_ENV` (CI, poste, runner) : refusée.
+ */
+export function prototypeDatabaseAllowed(env: Env): boolean {
+  return (
+    deploiementAdmis(env.VERCEL_ENV, env.VERCEL_TARGET_ENV, env.VADROUILLE_ENV) &&
+    deploiementAdmis(process.env.VERCEL_ENV, process.env.VERCEL_TARGET_ENV, process.env.VADROUILLE_ENV)
+  );
 }
 
 /** Refus de toute connexion en production (décision 0034). À appeler avant de lire une variable de connexion. */
@@ -75,13 +110,22 @@ export function assertDatabaseAllowed(env: Env): void {
   }
 }
 
-/** Lit la variable de connexion d'un rôle, après la garde de production. */
+/**
+ * Lit la variable de connexion d'un rôle, après la garde de production (et, pour `vadrouille_prototype`, après la
+ * liste d'autorisation de D21).
+ */
 export function connectionStringFor(role: AppDatabaseRole, env: Env): string {
   assertDatabaseAllowed(env);
+  if (role === "vadrouille_prototype" && !prototypeDatabaseAllowed(env)) {
+    throw new DatabaseGuardError(
+      "Connexion à la base refusée : le rôle « vadrouille_prototype » n'est admis que sur une préversion ou en développement (décision 0046, D21).",
+    );
+  }
   const name = DATABASE_URL_VARIABLES[role];
   // Lecture par propriété littérale (spécification P0c, section 5, forme 1) : seul module, avec `db/migrate.ts`, où
   // un nom secret de la base peut être lu (lignes de `tests/unit/confinement/listes/process.ts`).
-  const value = role === "vadrouille_app" ? env.VADROUILLE_DATABASE_URL : env.VADROUILLE_DATABASE_URL_AUTH;
+  const value =
+    role === "vadrouille_app" ? env.VADROUILLE_DATABASE_URL : role === "vadrouille_auth" ? env.VADROUILLE_DATABASE_URL_AUTH : env.P0_DATABASE_URL;
   if (value === undefined || value.trim() === "") {
     throw new DatabaseGuardError(`Connexion à la base impossible : la variable ${name} n'est pas posée.`);
   }

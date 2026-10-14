@@ -1,13 +1,31 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-commune";
+
 
 import { OPTIONS_TLS, optionsDeNode, verifierSortie, type EnvSortie } from "./egress";
 
 /**
  * `p0: aucun client réel hors préversion ou développement`, `… derrière un proxy d'environnement`, `… avec un TLS
  * affaibli` et `p0: egress, un seul contrat` (spécification `specs/P0-suite-executions-reelles.md`). L'environnement
- * et `execArgv` sont toujours injectés : jamais celui du processus.
+ * et `execArgv` sont injectés ; le vrai `process.env`, que la barrière lit aussi pour ses trois variables de
+ * déploiement (0046 D21), est posé en préversion par `vi.stubEnv` et rétabli après chaque cas.
  */
+
+/** Vrai `process.env` d'un cas : chaque variable absente de l'objet est retirée. */
+function poserReel(reel: { readonly VERCEL_ENV?: string; readonly VERCEL_TARGET_ENV?: string; readonly VADROUILLE_ENV?: string }) {
+  vi.stubEnv("VERCEL_ENV", reel.VERCEL_ENV);
+  vi.stubEnv("VERCEL_TARGET_ENV", reel.VERCEL_TARGET_ENV);
+  vi.stubEnv("VADROUILLE_ENV", reel.VADROUILLE_ENV);
+}
+
+beforeEach(() => {
+  poserReel({ VERCEL_ENV: "preview" });
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const PREVIEW: EnvSortie = { VERCEL_ENV: "preview" };
 const sortie = (env: EnvSortie, execArgv: readonly string[] = []) => verifierSortie(env, execArgv);
@@ -135,5 +153,53 @@ describe("p0: egress, un seul contrat", () => {
   it("le résultat ne contient jamais une valeur lue", () => {
     const resultat = sortie({ VERCEL_ENV: "preview", HTTPS_PROXY: "http://SENTINELLE-PROXY:3128" });
     expect(JSON.stringify(resultat)).not.toContain("SENTINELLE");
+  });
+});
+
+describe("p0: egress refuse la production même avec un env injecté (0046 D21)", () => {
+  it.each(["VERCEL_ENV", "VERCEL_TARGET_ENV", "VADROUILLE_ENV"] as const)(
+    "%s « production » dans le vrai process.env, env injecté « preview » : production_refused",
+    (nom) => {
+      poserReel({ VERCEL_ENV: "preview", [nom]: "production" });
+      expect(sortie({ VERCEL_ENV: "preview", VERCEL_TARGET_ENV: "preview" })).toEqual({ ok: false, code: "production_refused" });
+    },
+  );
+
+  it.each(CAS_PRODUCTION_COMMUNS.map((cas) => [cas.nom, cas] as const))("table commune avec la garde de connexion : %s", (_nom, cas) => {
+    poserReel(cas.reel);
+    const attendu = cas.egress === "ok" ? { ok: true } : { ok: false, code: cas.egress };
+    expect(sortie(cas.injecte)).toEqual(attendu);
+  });
+
+  it("le vrai process.env est relu à chaque appel, jamais mis en cache", () => {
+    expect(sortie(PREVIEW)).toEqual({ ok: true });
+    poserReel({ VERCEL_ENV: "production" });
+    expect(sortie(PREVIEW)).toEqual({ ok: false, code: "production_refused" });
+    poserReel({ VERCEL_ENV: "preview" });
+    expect(sortie(PREVIEW)).toEqual({ ok: true });
+  });
+});
+
+describe("p0: formes --no-… de NODE_OPTIONS et d'execArgv (bloquant 3, renvoyé à P0r2 par 0049 T)", () => {
+  it.each([
+    ["--no-use-openssl-ca", "tls_env_refused"],
+    ["--no_use_openssl_ca", "tls_env_refused"],
+    ["--no-tls-keylog=/tmp/cles", "tls_env_refused"],
+    ['"--no-insecure-http-parser"', "tls_env_refused"],
+    ["--no-no-tls-cipher-list", "tls_env_refused"],
+    ["--no-use-env-proxy", "proxy_env_refused"],
+    ["--no_use_env_proxy", "proxy_env_refused"],
+  ] as const)("%s dans NODE_OPTIONS : %s (forme niée d'une option interdite, échec fermé)", (option, code) => {
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: `--max-old-space-size=4096 ${option}` })).toEqual({ ok: false, code });
+  });
+
+  it("forme niée dans execArgv injecté : refus", () => {
+    expect(sortie(PREVIEW, ["--no-use-system-ca"])).toEqual({ ok: false, code: "tls_env_refused" });
+  });
+
+  it("la forme niée ajoute le nom de base, sans confondre une option voisine", () => {
+    expect(optionsDeNode("--no-tls-min-v1.2 --no-warnings", [])).toEqual(new Set(["--no-tls-min-v1.2", "--tls-min-v1.2", "--no-warnings", "--warnings"]));
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: "--no-warnings --no-deprecation" })).toEqual({ ok: true });
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: "--no-tls-min-v1.2" })).toEqual({ ok: true });
   });
 });

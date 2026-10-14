@@ -1,0 +1,48 @@
+name: p0-purge
+# Purge du prototype (décision 0046, D16 point 7 ; exigence Sécurité S8) : appelle prototype.purge_expired() toutes
+# les 6 heures sous le rôle vadrouille_prototype_purge, qui n'a que EXECUTE sur cette fonction (aucun droit sur une
+# table). La fonction ne prend aucun paramètre et ne supprime que des lignes expirées.
+# - Aucune action tierce, ni checkout, ni installation de paquets : psql du runner (client PostgreSQL 16 de l'image
+#   ubuntu-24.04, requis pour PGSSLROOTCERT=system ; s'il manque, l'étape échoue, sans repli sur sslmode=require).
+# - Connexion par les seules variables libpq de l'étape, tirées des secrets de l'environnement p0-purge (branche de
+#   déploiement : main seulement ; sans relecteur obligatoire, réponse de Samuel à Q322). Secrets exposés à cette
+#   seule étape ; sortie de psql redirigée : seul le code de sortie est affiché.
+# - Avant la pose des secrets (après la décision 0052), le job échoue à chaque passage : ces échecs sont attendus.
+# Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: p0-purge
+  cancel-in-progress: false
+jobs:
+  purge:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: p0-purge
+    timeout-minutes: 5
+    steps:
+      - name: Purger les lignes expirées du prototype
+        env:
+          PGHOST: ${{ secrets.P0_PURGE_PGHOST }}
+          PGDATABASE: ${{ secrets.P0_PURGE_PGDATABASE }}
+          PGUSER: ${{ secrets.P0_PURGE_PGUSER }}
+          PGPASSWORD: ${{ secrets.P0_PURGE_PGPASSWORD }}
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+        run: |
+          status=0
+          psql -X -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' || status=$?
+          DO $$
+          BEGIN
+            IF session_user <> 'vadrouille_prototype_purge' THEN
+              RAISE EXCEPTION 'rôle de session inattendu';
+            END IF;
+          END
+          $$;
+          SELECT prototype.purge_expired();
+          SQL
+          echo "psql : code de sortie ${status}"
+          exit "${status}"

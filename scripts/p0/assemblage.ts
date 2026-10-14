@@ -22,6 +22,7 @@ import { arrondi5, versHeure } from "@/domain/temps";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 
 /**
  * Assemblage du programme complet de P0, en mémoire (spécification P0, « Sortie 1 »), puis validation par
@@ -220,7 +221,7 @@ export function assembler(entree: EntreeAssemblage): ProgrammeComplet {
 
   const trip: Trip = {
     id: entree.tripId,
-    organizationId: "org_prototype",
+    organizationId: PROTOTYPE_ORG_ID,
     destination: brief.destination,
     destinationColor: destinationColor(brief.destination),
     start: brief.arrivee,

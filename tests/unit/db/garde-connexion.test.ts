@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+
 import {
   assertDatabaseAllowed,
   connectionStringFor,
@@ -11,10 +12,13 @@ import {
   DATABASE_URL_VARIABLES,
   DatabaseConnectionError,
   DatabaseGuardError,
+  isProductionForDatabase,
   MIGRATOR_URL_VARIABLE,
+  prototypeDatabaseAllowed,
   verifyConnectionRole,
 } from "../../../db/connection";
 import { migratorConnectionString, runMigrations } from "../../../db/migrate";
+import { CAS_PRODUCTION_COMMUNS } from "../../support/cas-production-commune";
 
 /**
  * Gardes de `db/` sans base (spécification B1 ; décision 0034, « Garde préalable à toute fusion ») : en production,
@@ -271,6 +275,78 @@ describe("db : refus définitif seulement pour un refus de fond", () => {
       expect(query).toHaveBeenCalledTimes(1);
     } finally {
       await pool.end();
+    }
+  });
+});
+
+/** Vrai `process.env` d'un cas (0046 D21) : chaque variable absente de l'objet est retirée ; rétabli après chaque cas. */
+function poserReel(reel: { readonly VERCEL_ENV?: string; readonly VERCEL_TARGET_ENV?: string; readonly VADROUILLE_ENV?: string }) {
+  vi.stubEnv("VERCEL_ENV", reel.VERCEL_ENV);
+  vi.stubEnv("VERCEL_TARGET_ENV", reel.VERCEL_TARGET_ENV);
+  vi.stubEnv("VADROUILLE_ENV", reel.VADROUILLE_ENV);
+}
+
+describe("db : l'environnement injecté ne peut que resserrer (0046 D21)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const avecUrls = (env: Record<string, string>) => ({
+    ...env,
+    VADROUILLE_DATABASE_URL: UNREACHABLE,
+    VADROUILLE_DATABASE_URL_AUTH: UNREACHABLE,
+    [DATABASE_URL_VARIABLES.vadrouille_prototype]: UNREACHABLE,
+  });
+
+  it.each(["VERCEL_ENV", "VADROUILLE_ENV"] as const)("base: connexion refusée en production même avec un env injecté (%s réelle)", (nom) => {
+    poserReel({ VERCEL_ENV: "preview", [nom]: "production" });
+    const env = avecUrls({ VERCEL_ENV: "preview" });
+    expect(isProductionForDatabase(env)).toBe(true);
+    for (const role of ["vadrouille_app", "vadrouille_auth", "vadrouille_prototype"] as const) {
+      expect(() => createGuardedPool(role, env)).toThrow(DatabaseGuardError);
+    }
+  });
+
+  it("base: connexion vadrouille_prototype refusée sans VERCEL_ENV", () => {
+    poserReel({});
+    const env = avecUrls({});
+    expect(prototypeDatabaseAllowed(env)).toBe(false);
+    expect(() => connectionStringFor("vadrouille_prototype", env)).toThrow(DatabaseGuardError);
+    expect(() => connectionStringFor("vadrouille_prototype", env)).toThrow(/vadrouille_prototype/);
+    // Cas de la CI : vadrouille_app reste admise sans VERCEL_ENV.
+    expect(connectionStringFor("vadrouille_app", env)).toBe(UNREACHABLE);
+  });
+
+  it.each(CAS_PRODUCTION_COMMUNS.map((cas) => [cas.nom, cas] as const))("table commune avec egress : %s", (_nom, cas) => {
+    poserReel(cas.reel);
+    const env = avecUrls(cas.injecte);
+    const essai = (role: "vadrouille_app" | "vadrouille_auth" | "vadrouille_prototype") => {
+      try {
+        return connectionStringFor(role, env) === UNREACHABLE ? "admise" : "autre";
+      } catch (error) {
+        if (error instanceof DatabaseGuardError) return "refusee";
+        throw error;
+      }
+    };
+    expect(essai("vadrouille_prototype")).toBe(cas.prototype);
+    expect(essai("vadrouille_app")).toBe(cas.app);
+    expect(essai("vadrouille_auth")).toBe(cas.app);
+  });
+
+  it("vadrouille_prototype lit seulement la variable que la table des rôles lui donne, et le refus ne contient jamais la chaîne", () => {
+    poserReel({ VERCEL_ENV: "preview" });
+    const env = { VERCEL_ENV: "preview" };
+    expect(connectionStringFor("vadrouille_prototype", { ...env, [DATABASE_URL_VARIABLES.vadrouille_prototype]: UNREACHABLE })).toBe(UNREACHABLE);
+    expect(() =>
+      connectionStringFor("vadrouille_prototype", { ...env, VADROUILLE_DATABASE_URL: UNREACHABLE, VADROUILLE_DATABASE_URL_AUTH: UNREACHABLE }),
+    ).toThrow(`${DATABASE_URL_VARIABLES.vadrouille_prototype} n'est pas posée`);
+    poserReel({});
+    try {
+      connectionStringFor("vadrouille_prototype", { ...env, [DATABASE_URL_VARIABLES.vadrouille_prototype]: UNREACHABLE });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as Error).message).not.toContain(PASSWORD);
+      expect((error as Error).message).not.toContain("127.0.0.1");
     }
   });
 });
