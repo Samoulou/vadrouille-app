@@ -371,6 +371,35 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
     ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
+  // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre.
+  {
+    fichier: "tests/db/workflows-harnais.ts",
+    portee: "test",
+    usage: "harnais des tests des workflows de la base : bloc `run:` joué par bash sur des bases jetables du serveur de la CI, empreintes par `sha256sum`",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["type:ChildProcess", "spawn", "spawnSync"] }],
+  },
+  {
+    fichier: "tests/unit/ci/db-migrate.test.ts",
+    portee: "test",
+    usage: "test statique de db-migrate.yml ; listes du workflow aux commits de référence lues par `git` (ajout seulement)",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+  },
+  {
+    fichier: "tests/unit/ci/db-releve.test.ts",
+    portee: "test",
+    usage: "test de db-releve.yml : motif évalué par bash, bloc `run:` joué sur des fichiers préparés (sans base)",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"] }],
+  },
+  {
+    fichier: "tests/unit/db/hote-local-migrations.test.ts",
+    portee: "test",
+    usage: "refus de tout hôte non local par `db/migrate.ts` : `connect` de `pg` espionné ou simulé, aucune connexion réelle",
+    ecart: "module à capacité `pg` (section 3) dans un test sans connexion réelle (`connect` espionné ou simulé), comme `tests/unit/db/garde-connexion.test.ts` : PR du workflow des migrations (décision 0056 § 2.8) ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
+  },
   {
     fichier: "tests/unit/db/garde-connexion.test.ts",
     portee: "test",
