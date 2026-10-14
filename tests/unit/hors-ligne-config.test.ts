@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import manifest, { MANIFEST_ICONS } from "@/app/manifest";
 import { PRODUCT_NAME } from "@/config/site";
 
-import nextConfig, { RESPONSE_HEADERS } from "../../next.config";
+import { nextConfig, RESPONSE_HEADERS } from "../../next.config";
 import playwrightConfig from "../../playwright.config";
 
 /**

@@ -93,9 +93,20 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
 });
 
 describe("p0: run_candidates lue par aucun rapport", () => {
-  it("aucun module de scripts/ ni de src/ ne nomme la table de travail", () => {
-    const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && (lire(f) ?? "").includes("run_candidates"));
+  // Seule exception nominative : l'adaptateur de la table de travail (P0r3c-4, décision 0063 point 9), importé par
+  // `src/workflows/p0-run.ts` seul ; aucun rapport ni script ne la lit.
+  const ADAPTATEUR_TRAVAIL = "src/adapters/prototype-travail.ts";
+
+  it("aucun module de scripts/ ni de src/ ne nomme la table de travail, hors son adaptateur", () => {
+    const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && (lire(f) ?? "").includes("run_candidates"));
     expect(hors).toEqual([]);
+  });
+
+  it("l'adaptateur de la table de travail n'est importé que par p0Run", () => {
+    const importeurs = fichiers().filter(
+      (f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && /["']@\/adapters\/prototype-travail["']/.test(lire(f) ?? ""),
+    );
+    expect(importeurs).toEqual(["src/workflows/p0-run.ts"]);
   });
 });
 

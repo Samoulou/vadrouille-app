@@ -61,6 +61,14 @@ const PAQUETS_TS = [
       "PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre ; dépendance directe épinglée à la version que `pg` résout (2.14.1), déjà dans `pnpm-lock.yaml` : " +
       "le verrou ne gagne que l'entrée de la racine, aucun paquet nouveau (test `tests/unit/db/hote-local-migrations.test.ts`)",
   },
+  {
+    paquet: "workflow",
+    usage:
+      "Workflow SDK de `p0Run` (P0r3c-4, décisions 0009 et 0063) : `src/workflows/` et `withWorkflow` de `next.config.ts` ; module à capacité (exécution durable, file et stockage du monde Vercel)",
+    verdict:
+      "P0r3c-4 (ticket 316, décision 0063 points 1 et 2) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 5.1.0, " +
+      "`@swc/core`, `esbuild` et `cbor-extract` hors de `onlyBuiltDependencies` (build prouvé sans leurs scripts)",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];

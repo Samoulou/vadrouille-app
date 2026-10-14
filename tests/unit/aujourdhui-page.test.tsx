@@ -4,7 +4,10 @@ import * as adapters from "@/adapters";
 import AujourdhuiPage, { generateMetadata } from "@/app/voyages/[id]/aujourdhui/page";
 import { MOCK_ORGANIZATION_ID } from "@/mocks/edimbourg";
 
-import nextConfig, { RESPONSE_HEADERS } from "../../next.config";
+import { nextConfig, RESPONSE_HEADERS } from "../../next.config";
+
+// `workflow/next` charge esbuild, incompatible avec jsdom ; seule la configuration de Next est lue ici (décision 0063).
+vi.mock("workflow/next", () => ({ withWorkflow: <T,>(config: T) => config }));
 
 /** Page de l'écran 15 (`R15`, spécification F10, C6) : lecture par `getTripReader()`, 404, erreur, en-têtes. */
 

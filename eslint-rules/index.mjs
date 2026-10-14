@@ -4,6 +4,7 @@ import requireServerOnly from "./require-server-only.mjs";
 import serverEnvImports from "./server-env-imports.mjs";
 import { noCacheStorageOpen, noServiceWorkerRegister } from "./service-worker.mjs";
 import useServerOnlyInActions from "./use-server-only-in-actions.mjs";
+import workflowDirectives from "./workflow-directives.mjs";
 
 /** Plugin ESLint local du projet. */
 const plugin = {
@@ -16,6 +17,7 @@ const plugin = {
     "use-server-only-in-actions": useServerOnlyInActions,
     "no-service-worker-register": noServiceWorkerRegister,
     "no-cache-storage-open": noCacheStorageOpen,
+    "workflow-directives": workflowDirectives,
   },
 };
 

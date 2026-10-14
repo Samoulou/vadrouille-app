@@ -414,6 +414,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // n'importe rien.
   ...["prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   ["src/ai/recherche-web-reelle.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/research/recherche-web.ts"] }],
+  // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
+  // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.
+  ["src/research/plafonds-agent.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
   [
     "src/research/undici-transport.ts",
     {
@@ -664,8 +667,14 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
   return vus;
 }
 
-/** Ponts de l'application vers les modules de P0 (D18, décision 0055, section 3) : la seule composition du mode réel. */
-const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts"];
+/**
+ * Ponts de l'application vers les modules de P0 (D18, décision 0055, section 3) : la composition du mode réel et le
+ * workflow `p0Run` qui l'importe (P0r3c-4, décision 0063 point 9), seul importateur de la composition. Le parcours de
+ * la frontière s'arrête à un pont ; chaque pont a ses importateurs contrôlés à part (composition : `composition.test.ts` ;
+ * `p0Run` : `src/workflows/index.ts` seul, ci-dessous).
+ */
+const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/workflows/p0-run.ts"];
+const estPont = (chemin: string) => PONTS_P0.includes(chemin);
 
 /** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1). */
 const interditPartout = (chemin: string) =>
@@ -674,9 +683,9 @@ const interditPartout = (chemin: string) =>
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisins: Voisins): string[] {
-  const violations = [...atteints(fichier, voisins)].filter(interditPartout);
+  const violations = [...atteints(fichier, voisins, estPont)].filter(interditPartout);
   if (!fichier.startsWith("src/server/")) {
-    const horsServeur = atteints(fichier, voisins, (chemin) => chemin.startsWith("src/server/"));
+    const horsServeur = atteints(fichier, voisins, (chemin) => estPont(chemin) || chemin.startsWith("src/server/"));
     violations.push(...[...horsServeur].filter((chemin) => chemin.startsWith("src/domain/")));
   }
   return violations;
@@ -1162,6 +1171,13 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
       // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
       expect([...atteints("src/server/config/moteur.ts", voisinsReels)]).toContain("src/domain/configuration.ts");
+    });
+
+    it("le pont p0Run n'est importé que par src/workflows/index.ts, et l'index n'atteint P0 que par lui", () => {
+      const importeurs = application.filter((f) => !estTest(f) && voisinsReels(f).includes("src/workflows/p0-run.ts"));
+      expect(importeurs).toEqual(["src/workflows/index.ts"]);
+      // Sans arrêt aux ponts, l'index atteint bien les modules de P0 : la frontière est exercée sur un cas réel.
+      expect([...atteints("src/workflows/index.ts", voisinsReels)].some(interditPartout)).toBe(true);
     });
 
     describe("cas fabriqués", () => {
