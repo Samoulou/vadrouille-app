@@ -12,9 +12,9 @@ import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
+import { chercherCandidats, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/research/recherche-web";
 import { composerP0Reel, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
 import type { GardeOuverte } from "@/server/p0/garde";
 
@@ -588,6 +588,95 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
   it("récit cyrillique et japonais : protégés", () => {
     expect(requeteSansDonneeDuBrief("день рождения Марины ресторан", avec({ recit: "День рождения Марины" }))).toBe(false);
     expect(requeteSansDonneeDuBrief("家族で美術館が好き 東京", avec({ destination: "東京", pays: "日本", recit: "家族で美術館が好き" }))).toBe(false);
+  });
+
+  // --- Troisième tentative (bornée), bloquant 1 du head `3254723` : écritures sans espace fenêtrées par caractères ---
+
+  it(`récit japonais long : ${FENETRE_RECIT_CARACTERES} caractères consécutifs refusés, 7 admis`, () => {
+    const brief = avec({
+      destination: "東京",
+      pays: "日本",
+      recit: "家族で東京に行きます。美術館と古い寺を巡りたいです。夜は静かな居酒屋で地元の料理を食べたいです。子供は電車が大好きです。",
+    });
+    expect(FENETRE_RECIT_CARACTERES).toBe(8);
+    expect(requeteSansDonneeDuBrief("静かな居酒屋で地元 東京", brief)).toBe(false);
+    // Espaces insérées : les caractères sont comparés bout à bout.
+    expect(requeteSansDonneeDuBrief("静かな 居酒屋で 地元", brief)).toBe(false);
+    // Long extrait, qui passait au head `3254723` (le récit n'y était reconnu qu'en entier par segment).
+    expect(requeteSansDonneeDuBrief("夜は静かな居酒屋で地元の料理を食べたい", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("静かな居酒屋で 東京", brief)).toBe(true);
+    expect(requeteSansDonneeDuBrief("東京 美術館 おすすめ", brief)).toBe(true);
+  });
+
+  it(`récit chinois long sans ponctuation : ${FENETRE_RECIT_CARACTERES} caractères consécutifs refusés, 7 admis`, () => {
+    const brief = avec({ destination: "北京", pays: "中国", recit: "我们一家四口想去北京看故宫和长城晚上想吃正宗的北京烤鸭孩子喜欢动物园" });
+    expect(requeteSansDonneeDuBrief("晚上想吃正宗的北京烤鸭", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("我们一家四口想去北京看故宫和长城晚上想吃正宗的北京烤鸭", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("正宗的北京烤鸭", brief)).toBe(true);
+    expect(requeteSansDonneeDuBrief("北京 动物园 门票", brief)).toBe(true);
+  });
+
+  it("récit thaï : extrait de 8 caractères ou plus refusé, extrait court admis", () => {
+    const brief = avec({ destination: "กรุงเทพ", pays: "ไทย", recit: "เราอยากไปวัดพระแก้วและกินอาหารริมทางที่ตลาดนัด" });
+    expect(requeteSansDonneeDuBrief("กินอาหารริมทาง กรุงเทพ", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("ตลาดนัด กรุงเทพ", brief)).toBe(true);
+  });
+
+  it("récit court en écriture sans espace (moins de 8 caractères) : comparé en entier", () => {
+    const brief = avec({ destination: "東京", pays: "日本", recit: "誕生日のお祝い" });
+    expect(requeteSansDonneeDuBrief("誕生日のお祝い レストラン", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("誕生日 レストラン", brief)).toBe(true);
+  });
+
+  it(`mots courts : mot de ${LONGUEUR_FRAGMENT_MIN} caractères protégé ; texte dont tous les mots hors lieu sont plus courts, comparé en entier (sans le lieu)`, () => {
+    expect(LONGUEUR_FRAGMENT_MIN).toBe(3);
+    const logement = (texte: string): Brief => avec({ logements: [{ texte, nuits: 5 }] });
+    // Mineur 3a : « lac » protégé alors que le texte a d'autres mots.
+    expect(requeteSansDonneeDuBrief("restaurant lac", logement("Hôtel du Lac"))).toBe(false);
+    // Tous les mots hors lieu de moins de 3 caractères : « le 12 » comparé en entier, lieu exclu (mineur 3b).
+    expect(requeteSansDonneeDuBrief("brunch le 12", logement("Le 12, Édimbourg"))).toBe(false);
+    expect(requeteSansDonneeDuBrief("le marché Édimbourg", logement("Le 12, Édimbourg"))).toBe(true);
+    expect(requeteSansDonneeDuBrief("zen café Édimbourg", logement("Zen Édimbourg"))).toBe(false);
+    // Libellé d'engagement aux mots courts : même règle.
+    const engagement = avec({ engagements: [{ libelle: "Bal à 9h", date: base.arrivee, heure: "21:00", type: "reservation" }] });
+    expect(requeteSansDonneeDuBrief("bal folk Édimbourg", engagement)).toBe(false);
+    expect(requeteSansDonneeDuBrief("musées Édimbourg", engagement)).toBe(true);
+  });
+
+  it("logement japonais : un nom de 2 caractères suffit (mineur 3c) ; destination seule admise", () => {
+    const brief = avec({ destination: "東京", pays: "日本", logements: [{ texte: "新宿ホテル", nuits: 3 }] });
+    expect(requeteSansDonneeDuBrief("新宿 レストラン", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("新 宿 ラーメン", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("東京 美術館", brief)).toBe(true);
+    expect(requeteSansDonneeDuBrief("新宿hotel", avec({ logements: [{ texte: "Shinjuku hotel", nuits: 3 }] }))).toBe(false);
+  });
+
+  it("logement thaï : fenêtre de 4 caractères", () => {
+    const brief = avec({ destination: "กรุงเทพ", pays: "ไทย", logements: [{ texte: "โรงแรมริมน้ำสุขุมวิท", nuits: 3 }] });
+    expect(requeteSansDonneeDuBrief("ร้านอาหาร สุขุมวิท", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("ตลาดนัด กรุงเทพ", brief)).toBe(true);
+  });
+
+  it("mineur 4 : la requête est nettoyée avant le filtre, et c'est elle qui part", async () => {
+    expect(nettoyerRequeteWeb(" musées\u0000 <Édimbourg> ", 200)).toBe("musées   Édimbourg");
+    expect(nettoyerRequeteWeb(nettoyerRequeteWeb("a<b>c\u200b", 200), 200)).toBe(nettoyerRequeteWeb("a<b>c\u200b", 200));
+    const recues: string[] = [];
+    const reponses = [
+      JSON.stringify({ requetes: [{ requete: "musées Édimbourg", creneau: "activity" }] }),
+      // `<`, `>` et contrôles sont déjà refusés par le schéma des sorties (`texteMaison`) : seules les espaces de bord changent.
+      JSON.stringify({ actions: [{ type: "rechercher", requete: "  musées Édimbourg  " }], candidats: [], termine: false }),
+      JSON.stringify({ actions: [], candidats: [], termine: true }),
+    ];
+    const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
+    await chercherCandidats(avec({}), {
+      modeles: { envoyer: async () => ({ texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 }) },
+      modele: "fournisseur/recherche-test",
+      routage: { data_collection: "deny" },
+      recherche: { rechercher: async (requete) => (recues.push(requete), { resultats: [], coutUsd: 0 }) },
+      lecteur: { lire: async () => ({ ok: false, raison: "not_in_search_results" }) },
+      config,
+    });
+    expect(recues).toEqual(["musées Édimbourg"]);
   });
 });
 

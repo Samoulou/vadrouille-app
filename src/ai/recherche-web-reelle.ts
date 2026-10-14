@@ -5,7 +5,7 @@ import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
 import { DEBUT_DONNEES, FIN_DONNEES } from "@/ai/requetes";
 import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import type { Routage } from "@/prototype/config";
-import { LONGUEURS_RESULTAT, type ClientRechercheWeb, type ResultatWeb } from "@/research/recherche-web";
+import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/research/recherche-web";
 
 /**
  * Client réel de recherche web (décision 0055, section 7 ; Q396 : dans `src/ai`, écrit par P0r3, repris par B7b sans
@@ -38,8 +38,12 @@ const CONTROLES = /[\p{Cc}\p{Cf}]/gu;
 
 const nettoyer = (texte: string, max: number) => texte.replace(CONTROLES, " ").trim().slice(0, max);
 
-/** Requête : contrôles retirés, `<` et `>` retirés (le texte ne peut ni fermer le cadre ni ressembler à une balise). */
-const nettoyerRequete = (texte: string) => nettoyer(texte.replace(/[<>]/g, " "), LONGUEUR_MAX_REQUETE_WEB);
+/**
+ * Requête : contrôles retirés, `<` et `>` retirés (le texte ne peut ni fermer le cadre ni ressembler à une balise),
+ * `LONGUEUR_MAX_REQUETE_WEB` caractères au plus. Même fonction que celle que l'agent applique **avant** son filtre
+ * (`nettoyerRequeteWeb`, mineur 4 du head `3254723`) : idempotente, elle ne change plus rien ici à une requête de l'agent.
+ */
+const nettoyerRequete = (texte: string) => nettoyerRequeteWeb(texte, LONGUEUR_MAX_REQUETE_WEB);
 
 /** Message de l'utilisateur : la requête seule, encadrée comme une donnée. */
 export const messageRequete = (texte: string) => `${DEBUT_DONNEES}\n${texte}\n${FIN_DONNEES}`;

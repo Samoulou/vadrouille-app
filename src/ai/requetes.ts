@@ -57,7 +57,8 @@ export function briefPourModele(brief: Brief) {
  * (correction 2 de la PR 326). Les requêtes partent chez le moteur de recherche du fournisseur (Exa), hors du réglage
  * `data_collection: "deny"` : le modèle ne peut pas recopier un texte qu'il ne voit pas. Les engagements n'entrent dans
  * aucune vue. Le récit libre reste visible (Q197) ; ce qui peut en partir est borné par `requeteSansDonneeDuBrief`
- * (`src/research/agent.ts`).
+ * (`src/research/agent.ts`) : au plus 3 mots consécutifs (écriture à espaces) ou 7 caractères consécutifs (chinois,
+ * japonais, thaï, lao, khmer, birman), ou des mots épars. Flux accepté par Samuel le 2026-10-14 (Q427).
  */
 export function briefPourRecherche(brief: Brief): Omit<ReturnType<typeof briefPourModele>, "logements"> {
   return {
