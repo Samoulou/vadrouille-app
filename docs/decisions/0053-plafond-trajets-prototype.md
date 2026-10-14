@@ -2,7 +2,7 @@
 
 Statut : décision de Samuel (argent, budget des essais : « Qui décide quoi » de `docs/CONTEXT.md`), provisoire « dans un premier temps, pour faire les premiers tests » ; amendement 1 du même jour (recommandation du CEO acceptée par Samuel, à valider à la fin de ses essais) · Date : 2026-10-14 · Décideur : Samuel · Rédigée par le CEO · Liée à Q370 et Q389, à P0r2 (#287) et à P0r3
 
-Numérotation (vérifiée le 2026-10-14) : `main` va de 0001 à 0051 ; la PR #283 ajoute 0052 ; aucune autre PR ouverte n'ajoute de fichier sous `docs/decisions/`. Cette PR ajoute `0053`.
+Numérotation (relue le 2026-10-14 pour l'amendement 1) : `main` va de 0001 à 0053 (0052 fusionnée par #283, 0053 par #289) ; les PR ouvertes #298, #294 et #300 ajoutent 0054, 0055 et 0056. L'amendement 1 n'ajoute aucun fichier.
 
 ## Contexte
 Le port de consommation de P0r2 (#287, `src/server/usage/forfait.ts`) réserve avant chaque essai réel un forfait égal à la somme de ses plafonds par méthode, au prix catalogue plein et sans tranche gratuite (Q329). Avec la configuration de la branche de P0r2 (`prototype/config/plafonds.json` : `routesElements` 4 000, `placesDetails` 90, `placesTextSearch` 90), et les prix de `prototype/config/prix-google.json` (relevé du 2026-10-13), la réserve Google d'un essai vaut :
@@ -41,11 +41,15 @@ La recommandation du CEO à laquelle il répond « je suis ta reco » contenait 
 
 ### Retenues pour P0r3
 1. **Fiches de lieux (Place Details) des seuls lieux retenus pour la première série de cartes à glisser** (mots de Samuel, 06:48), avec une petite marge pour remplacer un lieu refusé. Aucune fiche pour un autre candidat. Le masque reste celui de 0046 (point 8), horaires compris : rien d'autre sans nouvelle décision.
-2. **Réutilisation du cache des positions** (`place_coordinates`, 30 jours au plus selon 0011 § 6 et 0027 point 4 ; 29 jours pour `org_prototype` selon 0046 point 8). **Sans effet tant que l'écriture des positions du prototype (0052, réduite à S10, PR #283 en revue) n'est pas fusionnée** : d'ici là, le cache reste vide pour le prototype. Une position lue dans le cache ne remplace jamais la fiche d'un lieu planifié (0052).
+2. **Réutilisation du cache des positions** (`place_coordinates`, 30 jours au plus selon 0011 § 6 et 0027 point 4 ; 29 jours pour `org_prototype` selon 0046 point 8). **Sans effet tant qu'aucune position du prototype n'est écrite**, ce que la fusion de 0052 ne suffit pas à faire. Il faut trois livraisons : la migration de remplacement à quatre paramètres de `store_prototype_coordinates`, livrée par P0r3c (0052 § 1.7) ; la levée du verrou S8, que 0052 laisse en place (§ 1 et § 3 : `vadrouille_prototype` sans `EXECUTE` sur la fonction) et renvoie à la décision 0056 (PR #300, en revue) ; et l'étape finale de `p0Run` (P0r3c), qui n'écrit que les `placeId` du programme (0052 § 1.2). La migration est fusionnée avant toute PR de déverrouillage (0052 § 1.7). L'économie ne porte donc, au mieux, que sur les lieux des programmes d'essais précédents encore vivants (29 jours) : le premier essai réel trouve le cache vide. Une position lue dans le cache ne remplace jamais la fiche d'un lieu planifié (0052 § 1.3).
 3. **Profil d'IA léger** : moins de recherches web et de pages lues, et un modèle moins cher pour le tri et la notation. Le choix du modèle et du profil revient au rôle ia-recherche dans sa PR, dans les plafonds fixés pour le mode réel.
-4. **Tri à vol d'oiseau avant Routes**, calculé en mémoire par notre code, sans appel de modèle ni écriture (0011 § 1). Il ne porte que sur des candidats dont la position est déjà connue (fiche de la première série, ou cache). Il sert à limiter les paires envoyées à Routes, pas à éviter des fiches. L'ordre exact des étapes est fixé par 0055 (#294, section 6) ; ce texte le suit.
+4. **Tri à vol d'oiseau avant Routes**, calculé en mémoire par notre code, sans appel de modèle ni écriture (0011 § 1), en deux temps dans l'étape finale, comme le décrit 0055 § 6.4 (PR #294, non fusionnée ; ce renvoi vaut à sa fusion) :
+   - **avant les fiches**, sur les seuls candidats dont le cache a déjà une position vivante (point 2) : un candidat trop loin des logements ou du groupe d'un jour peut être écarté sans fiche ; ce temps **évite des fiches**. Un candidat sans position en cache n'est jamais écarté pour la distance avant sa fiche ;
+   - **après les fiches de la première série** (point 1), sur leurs positions : regroupement par jour et ordre provisoire ; ce temps **limite les paires envoyées à Routes**, qui ne sert qu'à l'ordre final.
 
-La réserve d'un essai reste au prix plein, sans gratuité (Q329). Q380 (forfait plus strict que Q329) est une question distincte, ouverte pour le Tech Lead.
+   La position du cache ne sert qu'au premier temps, jamais à planifier, valider ou écrire un lieu.
+
+La réserve d'un essai reste au prix plein, sans gratuité (Q329), et reste de **4,30 USD** : le forfait est calculé sur le plafond `placesDetails` (90), pas sur le nombre de fiches demandées ; moins de fiches baissent la facture, pas la réserve, tant que ce plafond n'est pas abaissé (Q389, proposition au Product Owner dans 0055 § 6). Q380 (forfait plus strict que Q329) est une question distincte, ouverte pour le Tech Lead.
 
 ### Refusées (recommandation du CEO acceptée par Samuel)
 - **Temps de trajet estimés par un modèle d'IA** : durées plausibles mais fausses, sans horaires ni travaux.
