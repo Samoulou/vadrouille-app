@@ -133,6 +133,7 @@ Réécrits dans cette PR (`docs/handovers/backend.md`) :
 
 ## P5 — Position de la Sécurité
 Non écrite ici. Elle suit dans **0051** (rôle Sécurité), dans la même PR, après cette décision : liste fermée de `TRUSTED_IP_HEADER` et son refus hors Vercel, mesure, ordre de décodage et unicité des secrets (B3-TL-5), liste blanche de l'adresse e-mail, séparation des usages de `BETTER_AUTH_SECRET`. B3a ne démarre pas avant 0051.
+Rendue dans `0051-securite-b3a.md` : ses conditions et changements demandés s'ajoutent à cette décision pour la revue de B3a et de B3b (sur B3-TL-5, elle prévaut).
 
 ## Conséquences
 - **Fichiers de B3a** (liste de la spécification, « Vérifications d'ensemble », corrigée) : **sans** `src/dev/flags.ts` ; **avec** `db/schema/auth.ts`, `db/migrations/meta/*`, `db/README.md` (tableau du § 2), `tests/support/workflow-steps.ts` et l'import correspondant de `tests/unit/dev-pages-env.test.ts`, `docs/deploiement/variables-environnement.md` (consignes de `TRUSTED_IP_HEADER`, des secrets et du migrateur). B3a ne touche toujours ni `src/contracts`, ni `src/adapters`, ni `src/features`, ni `src/components`, ni `src/app`.
