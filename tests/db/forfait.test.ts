@@ -135,7 +135,8 @@ describe("p0: forfait réservé en base, une exécution par jour", () => {
         expect(await lancer(pool, { ...REGLES, limites: { ...LARGES, ...limite } }), JSON.stringify(limite)).toEqual({ ok: false, code });
       }
       expect((await proto.query("SELECT count(*) AS n FROM prototype.forfaits")).rows[0].n).toBe(sommes);
-      // Limites réelles (95 par jour) avec l'unité « éléments » pour Routes : 4 000 éléments dépassent le quota du jour.
+      // Unité « éléments » pour Routes (Q330 : aucun seuil du jour, 3 000 éléments par minute) : un forfait de 4 000 éléments
+      // ne tient pas dans le quota d'une minute, refusé sans rien écrire.
       expect(await lancer(pool, { ...REGLES, limites: { ...LIMITES_PROTOTYPE, enveloppeGoogleMicros: Number.MAX_SAFE_INTEGER, moisGoogleMicros: Number.MAX_SAFE_INTEGER }, uniteQuotaRoutes: "elements" })).toEqual({
         ok: false,
         code: "daily_quota_insufficient",

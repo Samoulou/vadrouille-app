@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "uniteQuotaRoutes": "elements",
+  "recherchesWeb": 40,
+  "pagesLues": 100,
+  "candidatsTrouves": 85,
+  "placesTextSearch": 90,
+  "placesDetails": 90,
+  "routesRequetes": 20,
+  "routesElements": 500,
+  "dureeMs": 900000
+}

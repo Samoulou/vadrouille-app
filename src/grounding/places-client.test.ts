@@ -214,6 +214,51 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
   });
 });
 
+describe("p0: Text Search restreint à la zone (Places, 0055 § 6 point 3)", () => {
+  const ZONE = { sudOuest: { lat: 48.6, lng: 2.0 }, nordEst: { lat: 49.1, lng: 2.7 } };
+
+  it("restriction : locationRestriction en rectangle, sans biais, même origine, masque et SKU", async () => {
+    const { client, appels, port } = monter([async () => json({ places: [{ id: PLACE_ID }] })]);
+    const reponse = await client.textSearch({ texte: "musée", biais: null, restriction: ZONE });
+    expect(reponse).toEqual({ placeIds: [PLACE_ID] });
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe("/v1/places:searchText");
+    expect(new Headers(init.headers).get("x-goog-fieldmask")).toBe(MASQUE_TEXT_SEARCH);
+    expect(JSON.parse(String(init.body))).toEqual({
+      textQuery: "musée",
+      pageSize: 5,
+      locationRestriction: { rectangle: { low: { latitude: 48.6, longitude: 2.0 }, high: { latitude: 49.1, longitude: 2.7 } } },
+    });
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku])).toEqual([["confirmee", "places_text_search", SKU_TEXT_SEARCH]]);
+  });
+
+  it("sans restriction : corps inchangé (biais seul ou rien), aucun champ locationRestriction", async () => {
+    const { client, appels } = monter([async () => json({}), async () => json({})]);
+    await client.textSearch({ texte: "a", biais: null });
+    await client.textSearch({ texte: "b", biais: { lat: 1, lng: 2, rayonMetres: 3 } });
+    expect(appels.map((appel) => JSON.parse(String(appel.init.body)))).toEqual([
+      { textQuery: "a", pageSize: 5 },
+      { textQuery: "b", pageSize: 5, locationBias: { circle: { center: { latitude: 1, longitude: 2 }, radius: 3 } } },
+    ]);
+  });
+
+  it.each([
+    ["biais et restriction ensemble", { biais: { lat: 48.8, lng: 2.3, rayonMetres: 1_000 }, restriction: ZONE }],
+    ["sud au nord du nord", { biais: null, restriction: { sudOuest: { lat: 49.2, lng: 2.0 }, nordEst: { lat: 49.1, lng: 2.7 } } }],
+    ["ouest à l'est de l'est", { biais: null, restriction: { sudOuest: { lat: 48.6, lng: 3.0 }, nordEst: { lat: 49.1, lng: 2.7 } } }],
+    ["latitude hors bornes", { biais: null, restriction: { sudOuest: { lat: -91, lng: 2.0 }, nordEst: { lat: 49.1, lng: 2.7 } } }],
+    ["longitude hors bornes", { biais: null, restriction: { sudOuest: { lat: 48.6, lng: 2.0 }, nordEst: { lat: 49.1, lng: 181 } } }],
+    ["NaN", { biais: null, restriction: { sudOuest: { lat: Number.NaN, lng: 2.0 }, nordEst: { lat: 49.1, lng: 2.7 } } }],
+    ["infini", { biais: null, restriction: { sudOuest: { lat: 48.6, lng: 2.0 }, nordEst: { lat: 49.1, lng: Number.POSITIVE_INFINITY } } }],
+  ])("%s : invalid_request avant toute réservation, transport jamais appelé", async (_cas, champs) => {
+    const { client, transport, port } = monter([]);
+    expect((await erreurDe(client.textSearch({ texte: "x", ...champs }))).code).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+});
+
 describe("p0: une réponse 30x ne déclenche aucune requête secondaire (Places)", () => {
   it.each([301, 302, 303, 307, 308])("%i : upstream_redirect, un seul appel, corps abandonné", async (statut) => {
     const { client, appels, port } = monter([

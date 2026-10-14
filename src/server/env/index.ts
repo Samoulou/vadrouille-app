@@ -43,6 +43,11 @@ const VARIABLES = {
   STRIPE_SECRET_KEY: 0,
   STRIPE_PUBLISHABLE_KEY: 0,
   "STRIPE_*": 0,
+  // P0r3b (décision 0055, section 1 point 2) : mode réel du prototype ; `P0_*` est le libellé fixe de toute variable
+  // de préfixe `P0_` refusée en production (jamais le nom exact).
+  P0_REAL_RUNS: 0,
+  P0_RUN_TOKEN: 0,
+  "P0_*": 0,
 } as const;
 export type ServerEnvVariable = keyof typeof VARIABLES;
 export const SERVER_ENV_VARIABLES: readonly ServerEnvVariable[] = Object.freeze(Object.keys(VARIABLES) as ServerEnvVariable[]);
@@ -152,10 +157,12 @@ function decoder(value: string): Buffer | null {
 
 /**
  * Seule fonction de lecture d'un secret (0050, B3-TL-5 point 1 ; 0051 point 3) : renvoie les octets décodés, ou lève
- * une `ServerEnvError` dans l'ordre décodage → longueur → motifs triviaux → octets distincts. Non exportée hors de ce
- * dossier ; l'unicité est contrôlée par l'appelant, sur les octets.
+ * une `ServerEnvError` dans l'ordre décodage → longueur → motifs triviaux → octets distincts. L'unicité est contrôlée
+ * par l'appelant, sur les octets. Exportée pour `src/server/env/p0.ts` seulement (décision 0055, section 1 point 2 :
+ * le code d'accès du mode réel et sa saisie passent par cette même fonction) ; `ligne/server-env-imports` ne laisse
+ * importer ce module qu'à ses importateurs nommés et aux modules de `src/server/env/`.
  */
-function decodeSecret(name: ServerEnvVariable, value: string): Buffer {
+export function decodeSecret(name: ServerEnvVariable, value: string): Buffer {
   const octets = decoder(value);
   if (octets === null) throw new ServerEnvError(name, "secret_encoding");
   if (octets.length < OCTETS_MIN) throw new ServerEnvError(name, "secret_too_short");
@@ -183,6 +190,8 @@ const ServerEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().optional(),
   SIMULATED_WEBHOOK_SECRET: z.string().optional(),
   SIMULATED_WEBHOOK_ENABLED: z.string().optional(),
+  P0_REAL_RUNS: z.string().optional(),
+  P0_RUN_TOKEN: z.string().optional(),
 });
 
 /** Préfixes de production des clés Stripe, comparés après `trim()` et sans tenir compte de la casse (handover § 2). */
@@ -223,6 +232,8 @@ export function parseServerEnv(env: Env): ServerEnv {
     BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
     SIMULATED_WEBHOOK_SECRET: env.SIMULATED_WEBHOOK_SECRET,
     SIMULATED_WEBHOOK_ENABLED: env.SIMULATED_WEBHOOK_ENABLED,
+    P0_REAL_RUNS: env.P0_REAL_RUNS,
+    P0_RUN_TOKEN: env.P0_RUN_TOKEN,
   });
   // Une issue de Zod peut porter l'entrée reçue : seul le nom de la variable est gardé, jamais le message.
   if (!lu.success) {
@@ -251,12 +262,34 @@ export function parseServerEnv(env: Env): ServerEnv {
     trustedIpHeader = admis;
   }
 
+  // Parcours des noms de l'objet reçu, un seul (0050, « Lignes du régime de confinement ») ; aucun nom de ces deux
+  // familles n'est lu par propriété littérale :
+  // - `P0_*` (P0r3b ; décision 0055, section 1 point 2 ; spécification `specs/P0-suite-2.md`, l. 148) : toute variable
+  //   dont le nom commence par `P0_` (préfixe exact, sensible à la casse) refuse le démarrage en production dès que
+  //   **la clé** est présente, vide ou faite d'espaces comprise (revue du head 6be9299, mineur 8) ; sa valeur n'est
+  //   jamais lue ici ; le refus porte le libellé fixe `P0_*`, jamais le nom exact ni la valeur ;
+  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes.
+  for (const nom in env) {
+    if (nom.startsWith("P0_")) {
+      if (environment === "production") throw new ServerEnvError(V["P0_*"], "forbidden");
+      continue;
+    }
+    if (!nom.startsWith("STRIPE_")) continue;
+    const valeur = env[nom];
+    if (presente(valeur)) verifierStripe(nom, valeur);
+  }
+
+  // `P0_REAL_RUNS` présente : `enabled` seulement, comparaison exacte, sans `trim()` (0055, section 1 point 2).
+  if (presente(brut.P0_REAL_RUNS) && brut.P0_REAL_RUNS !== "enabled") throw new ServerEnvError(V.P0_REAL_RUNS, "invalid_value");
+
   // Secrets : tout secret présent est décodé et contrôlé, utilisé ou non (0051 point 3.6), puis l'unicité est
   // comparée sur les octets décodés de tous les secrets présents (0051 point 3.5).
   const secrets: [ServerEnvVariable, string | undefined][] = [
     [V.RATE_LIMIT_HMAC_SECRET, brut.RATE_LIMIT_HMAC_SECRET],
     [V.BETTER_AUTH_SECRET, brut.BETTER_AUTH_SECRET],
     [V.SIMULATED_WEBHOOK_SECRET, brut.SIMULATED_WEBHOOK_SECRET],
+    // Code d'accès du mode réel (0055, section 1 point 2 ; S-1 point 1) : décodé, contrôlé et unique comme les autres.
+    [V.P0_RUN_TOKEN, brut.P0_RUN_TOKEN],
   ];
   const decodes: Buffer[] = [];
   let rateLimitHmacSecret: Buffer | null = null;
@@ -266,14 +299,6 @@ export function parseServerEnv(env: Env): ServerEnv {
     if (decodes.some((autre) => autre.equals(octets))) throw new ServerEnvError(nom, "secret_duplicate");
     decodes.push(octets);
     if (nom === V.RATE_LIMIT_HMAC_SECRET) rateLimitHmacSecret = octets;
-  }
-
-  // STRIPE_* : parcours des entrées dont le nom commence par `STRIPE_` (0050, « Lignes du régime de confinement »),
-  // sans lecture d'un nom Stripe par propriété littérale.
-  for (const nom in env) {
-    if (!nom.startsWith("STRIPE_")) continue;
-    const valeur = env[nom];
-    if (presente(valeur)) verifierStripe(nom, valeur);
   }
 
   if (environment === "production" && brut.SIMULATED_WEBHOOK_ENABLED?.trim().toLowerCase() === "true") {

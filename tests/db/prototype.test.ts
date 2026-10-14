@@ -11,7 +11,7 @@ import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { jourDeQuotaGoogle } from "@/server/usage/periodes";
 
 import { INSTANTS_JOUR_GOOGLE } from "../support/instants-d20";
-import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, inTx, type Org, unique } from "./helpers";
+import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, inTx, type Org, poserExecution, unique } from "./helpers";
 
 /**
  * Base du prototype (décision 0046 : D15, D16, D24, exigences S1 à S3 et S8 ; spécification `specs/P0-suite-2.md`,
@@ -29,6 +29,7 @@ const PRIX_GOOGLE = JSON.parse(readFileSync(path.join(RACINE, "prototype/config/
 
 const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges"] as const;
 const SHA = "a".repeat(40);
+const SIGNATURE_POSITIONS = "store_prototype_coordinates(uuid,text,double precision,double precision)";
 const CANDIDAT = { id: "c_001", nom: "Musée", resume: "Un musée.", aReserver: false };
 
 let admin: DbClient;
@@ -363,11 +364,13 @@ describe("S1 : valeurs posées par la base (0046)", () => {
     } finally {
       await proto.query("ROLLBACK");
     }
-    // Positions : store_prototype_coordinates pose 29 jours (appelée par l'administration : aucun rôle n'a EXECUTE, S8).
+    // Positions : store_prototype_coordinates pose 29 jours depuis le début de l'exécution (appelée par l'administration :
+    // aucun rôle n'a EXECUTE, S8 ; forme à quatre paramètres de 0052 § 1.7, tests détaillés dans positions-prototype.test.ts).
     await admin.query("BEGIN");
     try {
       const placeId = `ChIJtest${unique()}`;
-      await admin.query("SELECT public.store_prototype_coordinates($1, 55.95, -3.19)", [placeId]);
+      const runId = await poserExecution(admin, { organisation: PROTOTYPE_ORG_ID });
+      await admin.query("SELECT public.store_prototype_coordinates($1, $2, 55.95, -3.19)", [runId, placeId]);
       const { rows } = await admin.query("SELECT expires_at - fetched_at = interval '29 days' AS a29 FROM public.place_coordinates WHERE place_id = $1", [placeId]);
       expect(rows).toEqual([{ a29: true }]);
     } finally {
@@ -404,7 +407,7 @@ describe("S2 et S8 : coordonnées du prototype (0046)", () => {
     await inTx(app, { org: PROTOTYPE_ORG_ID }, async (c) => {
       expect(Number((await c.query("SELECT count(*) AS n FROM public.place_coordinates")).rows[0].n)).toBe(0);
       expect((await attempt(c, "SELECT public.store_place_coordinates('ChIJautre', 1, 1)")).code).toBe("42501");
-      await expectRefused(c, "SELECT public.store_prototype_coordinates('ChIJautre', 1, 1)");
+      await expectRefused(c, "SELECT public.store_prototype_coordinates(gen_random_uuid(), 'ChIJautre', 1, 1)");
     });
     expect(await compter("SELECT count(*) AS n FROM public.place_coordinates WHERE organization_id = $1 AND place_id = 'ChIJautre'", [PROTOTYPE_ORG_ID])).toBe(0);
     expect(await compter("SELECT count(*) AS n FROM public.place_coordinates WHERE place_id = $1", [placeProto])).toBe(1);
@@ -434,40 +437,56 @@ describe("S2 et S8 : coordonnées du prototype (0046)", () => {
   it("fonctions: store_prototype_coordinates sans paramètre d'organisation, écrit dans org_prototype seulement, expiration à 29 jours", async () => {
     const signature = await admin.query(
       `SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args, p.prosecdef, pg_catalog.pg_get_userbyid(p.proowner) AS owner
-       FROM pg_catalog.pg_proc p WHERE p.oid = 'public.store_prototype_coordinates(text, double precision, double precision)'::regprocedure`,
+       FROM pg_catalog.pg_proc p WHERE p.oid = 'public.store_prototype_coordinates(uuid, text, double precision, double precision)'::regprocedure`,
     );
-    expect(signature.rows[0]).toEqual({ args: "p_place_id text, p_lat double precision, p_lng double precision", prosecdef: true, owner: "vadrouille_fn_coords" });
+    expect(signature.rows[0]).toEqual({
+      args: "p_run_id uuid, p_place_id text, p_lat double precision, p_lng double precision",
+      prosecdef: true,
+      owner: "vadrouille_fn_coords",
+    });
     await admin.query("BEGIN");
     try {
       // Appelée avec le contexte d'une autre organisation : la ligne va quand même à org_prototype.
       await admin.query("SELECT set_config('app.organization_id', $1, true)", [a.org]);
+      const runId = await poserExecution(admin, { organisation: PROTOTYPE_ORG_ID });
       const placeId = `ChIJtest${unique()}`;
-      await admin.query("SELECT public.store_prototype_coordinates($1, 48.85, 2.35)", [placeId]);
+      await admin.query("SELECT public.store_prototype_coordinates($1, $2, 48.85, 2.35)", [runId, placeId]);
       const { rows } = await admin.query(
-        "SELECT organization_id::text, lat, lng, expires_at - fetched_at = interval '29 days' AS a29, fetched_at = now() AS maintenant FROM public.place_coordinates WHERE place_id = $1",
-        [placeId],
+        `SELECT c.organization_id::text, c.lat, c.lng, c.expires_at - c.fetched_at = interval '29 days' AS a29, c.fetched_at = r.started_at AS debut
+         FROM public.place_coordinates c, prototype.runs r WHERE c.place_id = $1 AND r.id = $2`,
+        [placeId, runId],
       );
-      expect(rows).toEqual([{ organization_id: PROTOTYPE_ORG_ID, lat: 48.85, lng: 2.35, a29: true, maintenant: true }]);
-      // Réécriture : une seule ligne, remplacée.
-      await admin.query("SELECT public.store_prototype_coordinates($1, 48.86, 2.36)", [placeId]);
-      expect((await admin.query("SELECT lat FROM public.place_coordinates WHERE place_id = $1", [placeId])).rows).toEqual([{ lat: 48.86 }]);
+      expect(rows).toEqual([{ organization_id: PROTOTYPE_ORG_ID, lat: 48.85, lng: 2.35, a29: true, debut: true }]);
     } finally {
       await admin.query("ROLLBACK");
     }
   });
 
   it("base: vadrouille_prototype ne peut écrire aucune coordonnée (verrou S8)", async () => {
-    const { rows } = await proto.query(
-      `SELECT r AS role FROM unnest(ARRAY['vadrouille_prototype', 'vadrouille_app', 'vadrouille_auth', 'vadrouille_prototype_purge', 'vadrouille_fn_prototype_purge', 'vadrouille_migrator', 'vadrouille_owner']) AS r
-       WHERE pg_catalog.has_function_privilege(r, 'public.store_prototype_coordinates(text, double precision, double precision)', 'EXECUTE')`,
-    );
-    expect(rows).toEqual([]);
+    // 0052 § 3 : toutes les surcharges de store_prototype_coordinates, désignées par leur oid ; aucun EXECUTE pour un
+    // rôle autre que leur propriétaire, PUBLIC compris (acl explicite ou par défaut).
+    const surcharges = await proto.query("SELECT p.oid::regprocedure::text AS signature, p.oid FROM pg_catalog.pg_proc p WHERE p.proname = 'store_prototype_coordinates'");
+    expect(surcharges.rows.map((r) => r.signature)).toEqual([SIGNATURE_POSITIONS]);
+    for (const { oid, signature } of surcharges.rows) {
+      const { rows } = await proto.query(
+        `SELECT r AS role FROM unnest(ARRAY['vadrouille_prototype', 'vadrouille_app', 'vadrouille_auth', 'vadrouille_prototype_purge', 'vadrouille_fn_prototype_purge', 'vadrouille_migrator', 'vadrouille_owner']) AS r
+         WHERE pg_catalog.has_function_privilege(r, $1::oid, 'EXECUTE')`,
+        [oid],
+      );
+      expect(rows, signature).toEqual([]);
+      const acl = await proto.query(
+        `SELECT COALESCE(NULLIF(a.grantee, 0)::regrole::text, 'PUBLIC') AS beneficiaire, a.privilege_type AS droit, pg_catalog.pg_get_userbyid(p.proowner) AS proprietaire
+         FROM pg_catalog.pg_proc p, LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) a WHERE p.oid = $1::oid`,
+        [oid],
+      );
+      expect(acl.rows.filter((r) => r.beneficiaire !== r.proprietaire), signature).toEqual([]);
+    }
     expect(
       (await proto.query("SELECT pg_catalog.has_function_privilege('vadrouille_prototype', 'public.store_place_coordinates(text, double precision, double precision)', 'EXECUTE') AS e"))
         .rows[0].e,
     ).toBe(false);
     await inTx(proto, { org: PROTOTYPE_ORG_ID }, async (c) => {
-      await expectRefused(c, "SELECT public.store_prototype_coordinates('ChIJverrou', 1, 1)");
+      await expectRefused(c, "SELECT public.store_prototype_coordinates(gen_random_uuid(), 'ChIJverrou', 1, 1)");
       await expectRefused(c, "SELECT public.store_place_coordinates('ChIJverrou', 1, 1)");
       await expectRefused(c, "SELECT public.purge_expired_coordinates()");
       await expectRefused(
@@ -476,7 +495,7 @@ describe("S2 et S8 : coordonnées du prototype (0046)", () => {
         [PROTOTYPE_ORG_ID],
       );
     });
-    // Aucune migration n'accorde EXECUTE sur la fonction (déverrouillage : décision 0052).
+    // Aucune migration n'accorde EXECUTE sur la fonction (déverrouillage : décision 0056 § 4.3).
     const dossier = path.join(RACINE, "db/migrations");
     for (const fichier of readdirSync(dossier).filter((f) => f.endsWith(".sql"))) {
       const texte = readFileSync(path.join(dossier, fichier), "utf8").replace(/--[^\n]*/g, "");
@@ -647,7 +666,7 @@ describe("purge du prototype (0046 D16)", () => {
     try {
       for (const table of TABLES) await expectRefused(purge, `SELECT * FROM prototype.${table}`);
       await expectRefused(purge, "SELECT public.purge_expired_coordinates()");
-      await expectRefused(purge, "SELECT public.store_prototype_coordinates('x', 1, 1)");
+      await expectRefused(purge, "SELECT public.store_prototype_coordinates(gen_random_uuid(), 'x', 1, 1)");
       await expectRefused(purge, "SELECT * FROM public.place_coordinates");
     } finally {
       await purge.query("ROLLBACK");

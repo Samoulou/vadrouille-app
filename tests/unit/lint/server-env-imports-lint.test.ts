@@ -36,6 +36,11 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/env/index.ts", "./resolve"],
     ["src/server/routes/exemple.ts", "@/server/env/payment"],
     ["src/server/payment/exemple.ts", "@/server/env/payment"],
+    // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
+    ["src/server/p0/garde.ts", "@/server/env/p0"],
+    ["src/server/p0/acces.ts", "@/server/env/p0"],
+    ["src/server/env/p0.test.ts", "./p0"],
+    ["src/server/env/p0.ts", "@/server/env/index"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
@@ -63,6 +68,13 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/rate-limit.ts", "@/server/env/resolve"],
     ["src/instrumentation.ts", "@/server/env/payment"],
     ["src/server/actions/paiement.ts", "@/server/env/payment"],
+    // P0r3b : `p0` hors de la garde et de l'accès (action, page, autre module de src/server/p0, tests de tests/).
+    ["src/server/actions/p0-acces.ts", "@/server/env/p0"],
+    ["src/app/prototype/executions/page.tsx", "@/server/env/p0"],
+    ["src/server/p0/base.ts", "@/server/env/p0"],
+    ["src/server/p0/garde.test.ts", "./../env/p0"],
+    ["tests/unit/p0/garde.test.ts", "@/server/env/p0"],
+    ["src/server/composition/p0-reel.ts", "@/server/env/p0"],
   ];
   it.each(REFUSES)("%s ne peut pas importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(1);
