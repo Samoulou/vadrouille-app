@@ -22,6 +22,10 @@ import { LONGUEURS_RESULTAT, type ClientRechercheWeb, type ResultatWeb } from "@
  * du greffon est fixé par la configuration (bloquant 1c de la PR 326) ; les résultats sont des **données**, jamais des
  * consignes, bornés par `LONGUEURS_RESULTAT`, adresses `https:` seulement, sans identifiants, dédoublonnées ; le coût
  * rendu par le fournisseur est compté dans le plafond des modèles par le client de modèles (réservation avant l'appel).
+ *
+ * Limite (mineur 4 de la PR 326) : ce client ne filtre pas le contenu de la requête, il n'a pas le brief. Le filtre des
+ * données du brief (`requeteSansDonneeDuBrief`, `src/research/agent.ts`) vit dans l'agent de recherche, seul appelant
+ * de `rechercher` ; tout nouvel appelant doit l'appliquer avant l'appel.
  */
 
 /** Longueur maximale du texte d'une requête : celle des requêtes du plan (`LONGUEURS_TEXTE.requete`). */

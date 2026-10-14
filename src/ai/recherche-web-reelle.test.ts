@@ -5,6 +5,7 @@ import type { PointEntreeRechercheWeb, RequeteRechercheWebFournisseur, SourceWeb
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
 import { creerRechercheWebReelle, LONGUEUR_MAX_REQUETE_WEB, messageRequete } from "@/ai/recherche-web-reelle";
 import { DEBUT_DONNEES, FIN_DONNEES } from "@/ai/requetes";
+import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/research/recherche-web";
 
 /**
@@ -91,9 +92,8 @@ describe("p0: recherche web réelle, capacité injectée", () => {
     expect(PROMPT_RECHERCHE_WEB.texte).toContain(DEBUT_DONNEES);
   });
 
-  it("longueur maximale de la requête : celle des requêtes du plan (mineur 6)", () => {
-    // `recherche-web-reelle.ts` importe `LONGUEURS_TEXTE.requete` (200) ; ce test ne peut pas importer `@/prototype/candidat`.
-    expect(LONGUEUR_MAX_REQUETE_WEB).toBe(200);
+  it("longueur maximale de la requête : celle des requêtes du plan (mineurs 6 et 10)", () => {
+    expect(LONGUEUR_MAX_REQUETE_WEB).toBe(LONGUEURS_TEXTE.requete);
   });
 
   it("source du fournisseur : même forme que ResultatWeb (mineur 7 ; le contrat vit dans @/ai/client, qui ne peut importer src/research)", () => {

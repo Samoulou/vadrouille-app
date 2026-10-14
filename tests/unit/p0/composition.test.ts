@@ -12,7 +12,7 @@ import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats } from "@/research/agent";
+import { chercherCandidats, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 import { composerP0Reel, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
@@ -499,7 +499,13 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
       JSON.stringify({ actions, candidats: [], termine: false }),
       JSON.stringify({ actions: [], candidats: [], termine: true }),
     ];
-    const modeles: ClientModeles = { envoyer: async () => ({ texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 }) };
+    const requetesModele: RequeteModele[] = [];
+    const modeles: ClientModeles = {
+      envoyer: async (requete) => {
+        requetesModele.push(requete);
+        return { texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 };
+      },
+    };
     const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
     const { compteurs } = await chercherCandidats(brief, {
       modeles,
@@ -516,6 +522,72 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
     expect(corps).toContain(DEBUT_DONNEES);
     expect(corps).toContain("musées Édimbourg histoire");
     for (const sentinelle of ["SENTINELLE", "sentinelle", "Imaginaire", "imaginaire", "Martine", "martine", "Paulette", "paulette"]) expect(corps, sentinelle).not.toContain(sentinelle);
+    // Correction 2 : les modèles du plan et de la recherche ne voient ni le logement ni l'engagement ; le récit, oui.
+    expect(requetesModele.map((r) => r.etape)).toEqual(["plan", "recherche", "recherche"]);
+    for (const requete of requetesModele) {
+      const vu = requete.messages.map((m) => m.contenu).join("\n");
+      for (const sentinelle of ["SENTINELLE-LOGEMENT", "Imaginaire", "SENTINELLE-ENGAGEMENT", "Paulette", "logements"]) expect(vu, sentinelle).not.toContain(sentinelle);
+      expect(vu).toContain("SENTINELLE-RECIT");
+    }
+  });
+
+  const base = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+  const avec = (champs: Partial<Brief>): Brief => ({ ...base, engagements: undefined, recit: undefined, ...champs });
+
+  it.each([
+    ["quartier seul", "Hôtel Balmoral, quartier de Marchmont", "restaurants près de Marchmont"],
+    ["nom d'hôtel seul", "Hôtel Balmoral, quartier de Marchmont", "brunch au BALMORAL"],
+    ["numéro et rue", "Appartement, 12 rue Imaginaire", "café 12 rue imaginaire"],
+    ["rue seule, accents et casse", "Appartement, 12 rue Éléonore-Dupré", "brunch rue Eleonore Dupre"],
+    ["cyrillique", "Гостиница Метрополь, Тверской район", "рестораны рядом с МЕТРОПОЛЬ"],
+    ["cyrillique, quartier", "Гостиница Метрополь, Тверской район", "бары тверской"],
+    ["lettres hors ASCII conservées", "Kærlighed Søndergade", "brunch søndergade"],
+  ])("logement, %s : requête refusée", (_cas, logement, requete) => {
+    expect(requeteSansDonneeDuBrief(requete, avec({ logements: [{ texte: logement, nuits: 5 }] }))).toBe(false);
+  });
+
+  it("japonais (écriture sans espace) : logement entier ou privé du nom de la destination refusé ; destination seule admise", () => {
+    const brief = avec({ destination: "東京", pays: "日本", logements: [{ texte: "パークハイアット東京", nuits: 3 }] });
+    expect(requeteSansDonneeDuBrief("パークハイアット東京 レストラン", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("パークハイアット周辺のレストラン", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("東京 美術館 おすすめ", brief)).toBe(true);
+  });
+
+  it("libellé d'engagement : un fragment suffit (cyrillique compris)", () => {
+    const engagement = (libelle: string): Brief => avec({ engagements: [{ libelle, date: base.arrivee, heure: "20:00", type: "reservation" }] });
+    expect(requeteSansDonneeDuBrief("horaires chez Paulette", engagement("Dîner chez Paulette"))).toBe(false);
+    expect(requeteSansDonneeDuBrief("Большой театр билеты", engagement("Балет в Большой театр"))).toBe(false);
+  });
+
+  it("mots de la destination et du pays : jamais des fragments ; requête sans fragment admise", () => {
+    const brief = avec({ logements: [{ texte: "Leith, Édimbourg, Royaume-Uni", nuits: 5 }] });
+    expect(requeteSansDonneeDuBrief("musées Édimbourg Royaume-Uni", brief)).toBe(true);
+    expect(requeteSansDonneeDuBrief("bars de Leith", brief)).toBe(false);
+  });
+
+  it("texte protégé vide après normalisation (logement, libellé ou récit) : toute requête refusée", () => {
+    expect(requeteSansDonneeDuBrief("musées Édimbourg", avec({ logements: [{ texte: "★ ★ ★", nuits: 5 }] }))).toBe(false);
+    expect(requeteSansDonneeDuBrief("musées Édimbourg", avec({ engagements: [{ libelle: "🎟️", date: base.arrivee, heure: "20:00", type: "reservation" }] }))).toBe(false);
+    expect(requeteSansDonneeDuBrief("musées Édimbourg", avec({ recit: "🎉 !!" }))).toBe(false);
+  });
+
+  it("récit court (moins de 6 mots) : comparé en entier", () => {
+    expect(requeteSansDonneeDuBrief("idées anniversaire de Martine Édimbourg", avec({ recit: "Anniversaire de Martine" }))).toBe(false);
+    expect(requeteSansDonneeDuBrief("jazz", avec({ recit: "Jazz" }))).toBe(false);
+    expect(requeteSansDonneeDuBrief("anniversaire Édimbourg", avec({ recit: "Anniversaire de Martine" }))).toBe(true);
+  });
+
+  it(`récit long : ${MOTS_RECIT_FENETRE} mots consécutifs refusés ; moins, admis (limite documentée)`, () => {
+    const brief = avec({ recit: "Nous fêtons les quarante ans de Martine avec toute la famille, et on aime les musées." });
+    expect(MOTS_RECIT_FENETRE).toBe(4);
+    expect(requeteSansDonneeDuBrief("quarante ans de Martine restaurant", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("restaurant avec toute la famille", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("ans de Martine", brief)).toBe(true);
+  });
+
+  it("récit cyrillique et japonais : protégés", () => {
+    expect(requeteSansDonneeDuBrief("день рождения Марины ресторан", avec({ recit: "День рождения Марины" }))).toBe(false);
+    expect(requeteSansDonneeDuBrief("家族で美術館が好き 東京", avec({ destination: "東京", pays: "日本", recit: "家族で美術館が好き" }))).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@
   "plan": {
     "requetes": [
       {
-        "requete": "incontournables vieille ville et points de vue",
+        "requete": "incontournables historiques et points de vue",
         "creneau": "activity"
       },
       {
@@ -33,7 +33,7 @@
       "actions": [
         {
           "type": "rechercher",
-          "requete": "incontournables vieille ville et points de vue"
+          "requete": "incontournables historiques et points de vue"
         },
         {
           "type": "rechercher",

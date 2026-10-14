@@ -52,6 +52,28 @@ export function briefPourModele(brief: Brief) {
   };
 }
 
+/**
+ * Ce que voient les modèles des étapes qui composent les requêtes web (plan et recherche) : le brief sans les logements
+ * (correction 2 de la PR 326). Les requêtes partent chez le moteur de recherche du fournisseur (Exa), hors du réglage
+ * `data_collection: "deny"` : le modèle ne peut pas recopier un texte qu'il ne voit pas. Les engagements n'entrent dans
+ * aucune vue. Le récit libre reste visible (Q197) ; ce qui peut en partir est borné par `requeteSansDonneeDuBrief`
+ * (`src/research/agent.ts`).
+ */
+export function briefPourRecherche(brief: Brief): Omit<ReturnType<typeof briefPourModele>, "logements"> {
+  return {
+    destination: brief.destination,
+    pays: brief.pays,
+    arrivee: brief.arrivee,
+    depart: brief.depart,
+    voyageurs: brief.voyageurs,
+    rythme: brief.rythme,
+    envies: brief.envies,
+    deplacements: brief.deplacements,
+    ...(brief.budgetRepas === undefined ? {} : { budgetRepas: brief.budgetRepas }),
+    ...(brief.recit === undefined ? {} : { recit: brief.recit }),
+  };
+}
+
 type Prompt = { id: string; version: number; texte: string };
 
 function requete(etape: EtapeRequete, prompt: Prompt, modele: string, routage: Routage, donnees: unknown): RequeteModele {
@@ -63,7 +85,7 @@ function requete(etape: EtapeRequete, prompt: Prompt, modele: string, routage: R
 }
 
 export function requetePlan(brief: Brief, modele: string, routage: Routage): RequeteModele {
-  return requete("plan", PROMPT_PLAN, modele, routage, { brief: briefPourModele(brief) });
+  return requete("plan", PROMPT_PLAN, modele, routage, { brief: briefPourRecherche(brief) });
 }
 
 export type ResultatRecherche = { url: string; titre: string; extrait: string };
@@ -83,7 +105,7 @@ export function requeteRecherche(
   routage: Routage,
 ): RequeteModele {
   return requete("recherche", PROMPT_RECHERCHE, modele, routage, {
-    brief: briefPourModele(entree.brief),
+    brief: briefPourRecherche(entree.brief),
     tour: entree.tour,
     plan: entree.plan,
     resultats: entree.resultats,

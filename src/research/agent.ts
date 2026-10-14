@@ -54,32 +54,85 @@ function cle(nom: string): string {
     .trim();
 }
 
-/** Texte comparable : minuscules, accents retirés, tout ce qui n'est ni lettre ni chiffre devient une espace. */
-function normaliser(texte: string): string {
-  return ` ${cle(texte)} `;
+/**
+ * Texte comparable pour le filtre des requêtes web, quelle que soit l'écriture : compatibilité Unicode (NFKD), marques
+ * diacritiques retirées, minuscules ; tout ce qui n'est ni lettre ni chiffre (`\p{L}`, `\p{N}`) devient une espace.
+ */
+function cleRequete(texte: string): string {
+  return texte
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 
-/** Nombre de mots consécutifs du récit au-delà duquel une requête est une recopie du texte libre du brief. */
-export const MOTS_RECIT_RECOPIES_MAX = 5;
+/** Écritures sans espace entre les mots : un fragment s'y cherche comme sous-chaîne, pas comme mot. */
+const SANS_ESPACE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+
+function contient(requete: string, fragment: string): boolean {
+  return SANS_ESPACE.test(fragment) ? requete.includes(fragment) : ` ${requete} `.includes(` ${fragment} `);
+}
+
+/** Longueur minimale (en caractères) d'un mot de logement ou de libellé d'engagement traité comme fragment. */
+export const LONGUEUR_FRAGMENT_MIN = 4;
+
+/** Nombre de mots consécutifs du récit libre qui suffit à refuser une requête (récit plus court : comparé en entier). */
+export const MOTS_RECIT_FENETRE = 4;
 
 /**
- * Requête de recherche web admise au regard du brief (correction 1 de la PR 326, bloquant 1d : la requête part chez le
- * moteur de recherche du fournisseur, hors du réglage `data_collection: "deny"`). Refusée si elle contient le texte d'un
- * logement (nom, quartier ou adresse), le libellé d'un engagement, ou plus de `MOTS_RECIT_RECOPIES_MAX` mots consécutifs
- * du récit libre. Comparaison après normalisation (casse, accents, ponctuation). Limite : une **partie** d'un texte de
- * logement (par exemple le seul nom du quartier) n'est pas détectée.
+ * Fragments d'un texte protégé (logement ou libellé d'engagement) : ses mots normalisés de `LONGUEUR_FRAGMENT_MIN`
+ * caractères ou plus, hors mots de la destination et du pays ; dans une écriture sans espace, le mot privé des mots de
+ * la destination et du pays qu'il contient. Sans aucun fragment, le texte normalisé entier, sauf s'il ne contient que
+ * des mots de la destination et du pays (rien à protéger). `undefined` : texte vide après normalisation.
+ */
+function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): string[] | undefined {
+  const normalise = cleRequete(texte);
+  if (normalise === "") return undefined;
+  const fragments: string[] = [];
+  let significatif = false;
+  for (const mot of normalise.split(" ")) {
+    if (motsLieu.has(mot)) continue;
+    significatif = true;
+    const parties = SANS_ESPACE.test(mot)
+      ? [...motsLieu].filter((lieu) => lieu !== "").reduce((morceaux, lieu) => morceaux.flatMap((m) => m.split(lieu)), [mot])
+      : [mot];
+    for (const partie of parties) if ([...partie].length >= LONGUEUR_FRAGMENT_MIN) fragments.push(partie);
+  }
+  if (!significatif) return [];
+  return fragments.length > 0 ? fragments : [normalise];
+}
+
+/**
+ * Requête de recherche web admise au regard du brief (PR 326, bloquant 1d et corrections 1 et 2 : la requête part
+ * chez le moteur de recherche du fournisseur, Exa, hors du réglage `data_collection: "deny"`). Filet de sécurité :
+ * depuis la correction 2, le modèle de l'étape de recherche ne voit ni les logements ni les engagements
+ * (`briefPourRecherche`). Refusée :
+ * - si un texte de logement ou un libellé d'engagement devient vide après normalisation (protection impossible) ;
+ * - dès qu'un fragment d'un logement ou d'un libellé y apparaît (`fragmentsProteges`) ;
+ * - si elle contient `MOTS_RECIT_FENETRE` mots consécutifs du récit libre, ou le récit entier s'il est plus court
+ *   (récit vide après normalisation : refusée).
+ * Limites : le modèle voit toujours le récit libre ; une requête peut en reprendre jusqu'à `MOTS_RECIT_FENETRE - 1`
+ * mots consécutifs, ou des mots épars. Dans une écriture sans espace (chinois, japonais, thaï…), un récit ou un mot de
+ * logement n'est reconnu qu'en entier (ou privé du nom de la destination), pas par morceau. Seul appelant du
+ * moteur de recherche web : cet agent (la composition `p0-reel` n'a pas le brief ; voir `src/ai/recherche-web-reelle.ts`).
  */
 export function requeteSansDonneeDuBrief(requete: string, brief: Brief): boolean {
-  const texte = normaliser(requete);
+  const texte = cleRequete(requete);
+  const motsLieu = new Set(`${cleRequete(brief.destination)} ${cleRequete(brief.pays)}`.split(" ").filter((mot) => mot !== ""));
   const proteges = [...brief.logements.map((l) => l.texte), ...(brief.engagements ?? []).map((e) => e.libelle)];
   for (const protege of proteges) {
-    const n = normaliser(protege);
-    if (n.trim() !== "" && texte.includes(n)) return false;
+    const fragments = fragmentsProteges(protege, motsLieu);
+    if (fragments === undefined) return false;
+    if (fragments.some((fragment) => contient(texte, fragment))) return false;
   }
   if (brief.recit !== undefined) {
-    const mots = cle(brief.recit).split(" ").filter((mot) => mot !== "");
-    for (let debut = 0; debut + MOTS_RECIT_RECOPIES_MAX < mots.length; debut += 1) {
-      if (texte.includes(` ${mots.slice(debut, debut + MOTS_RECIT_RECOPIES_MAX + 1).join(" ")} `)) return false;
+    const normalise = cleRequete(brief.recit);
+    if (normalise === "") return false;
+    const mots = normalise.split(" ");
+    const fenetre = Math.min(MOTS_RECIT_FENETRE, mots.length);
+    for (let debut = 0; debut + fenetre <= mots.length; debut += 1) {
+      if (contient(texte, mots.slice(debut, debut + fenetre).join(" "))) return false;
     }
   }
   return true;
@@ -202,7 +255,7 @@ export async function chercherCandidats(
     pages = [];
     for (const action of lecture.valeur.actions) {
       if (action.type === "rechercher") {
-        // Bloquant 1d de la PR 326 : aucune donnée de logement ni texte libre du brief dans une requête web.
+        // PR 326 (bloquant 1d, corrections 1 et 2) : aucune donnée de logement ni texte libre du brief dans une requête web.
         if (!requeteSansDonneeDuBrief(action.requete, brief)) {
           compteurs.sortiesRefusees.recherche += 1;
           continue;

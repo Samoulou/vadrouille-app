@@ -157,6 +157,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["LONGUEURS_TEXTE"],
     motif: `${PROTOTYPE_PUR} ; longueur des requêtes du plan, importée au lieu d'être recopiée (mineur 6 de la PR 326)`,
   },
+  {
+    fichier: "src/ai/recherche-web-reelle.test.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["LONGUEURS_TEXTE"],
+    motif: `${PROTOTYPE_PUR} ; égalité de la longueur des requêtes web et du plan, sans recopier la valeur (mineur 10 de la PR 326)`,
+  },
   { fichier: "src/ai/recherche-web-reelle.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
