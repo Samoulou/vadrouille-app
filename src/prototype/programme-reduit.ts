@@ -30,8 +30,12 @@ import {
  * l'importe tel quel.
  */
 
-/** Organisation fictive du prototype (décision 0032, A4.1). */
-export const PROTOTYPE_ORG_ID = "org_prototype";
+/**
+ * Organisation technique du prototype, `org_prototype` (décision 0032, A4.1) : identifiant fixe de type `uuid`, égal à
+ * celui que crée la migration `db/migrations/0003_prototype.sql` (décision 0046, D15 point 4, qui amende 0032 ; test
+ * `base: uuid d'org_prototype et de l'utilisateur technique égaux dans le code et la migration`).
+ */
+export const PROTOTYPE_ORG_ID = "5e1f0000-0000-4000-8000-000000000001";
 
 /** Version de la forme réduite. */
 export const PROGRAMME_REDUIT_SCHEMA = 1;

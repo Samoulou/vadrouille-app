@@ -13,6 +13,10 @@ import "server-only";
  *
  * Variable « posée » : présente avec une valeur non vide, sans retrait d'espaces. `NO_PROXY` n'a aucun effet.
  * Lecture paresseuse, à l'appel ; l'environnement est un paramètre (par défaut `process.env`) que les tests injectent.
+ * **L'environnement injecté ne peut que resserrer** (décision 0046, D21) : `VERCEL_ENV`, `VERCEL_TARGET_ENV` et
+ * `VADROUILLE_ENV` sont aussi lues dans le vrai `process.env`, et `production_refused` est rendu si l'un **ou** l'autre
+ * environnement ne passe pas la liste d'autorisation. La table de cas est commune avec la garde de connexion
+ * `vadrouille_prototype` de `db/connection.ts` (`tests/support/cas-production-commune.ts`).
  * Module pur : aucun import hors de `server-only`.
  */
 
@@ -56,6 +60,12 @@ const posee = (valeur: string | undefined) => valeur !== undefined && valeur !==
  * Options présentes dans `NODE_OPTIONS` et `execArgv`, sous leur nom seul (partie avant `=`), guillemets retirés et
  * `_` remplacé par `-` (Node accepte les deux graphies). La comparaison porte sur l'option entière, jamais sur une
  * sous-chaîne.
+ *
+ * **Formes `--no-…`** (bloquant 3 de la revue du head `335d925`, renvoyé à P0r2 par 0049 T) : Node accepte la forme
+ * niée d'une option booléenne (`--no-use-openssl-ca`, `--no_use_env_proxy`), et les options de V8 acceptent aussi
+ * `--no` suivi de `_` ou d'une autre graphie. Le sens exact d'une forme niée dépend de l'option et de la version de
+ * Node : la barrière ne l'interprète pas et **échoue fermée**. Une forme `--no-X` (préfixes `--no-` répétés compris)
+ * ajoute aussi `--X` à l'ensemble : une option interdite reste refusée sous sa forme niée.
  */
 export function optionsDeNode(nodeOptions: string | undefined, execArgv: readonly string[]): ReadonlySet<string> {
   const jetons = [...(nodeOptions ?? "").split(/\s+/), ...execArgv];
@@ -63,8 +73,13 @@ export function optionsDeNode(nodeOptions: string | undefined, execArgv: readonl
   for (const brut of jetons) {
     const jeton = brut.replace(/^["']+|["']+$/g, "");
     if (!jeton.startsWith("--")) continue;
-    const nom = jeton.split("=")[0] ?? "";
-    options.add(`--${nom.slice(2).replaceAll("_", "-")}`);
+    const nom = `--${(jeton.split("=")[0] ?? "").slice(2).replaceAll("_", "-")}`;
+    options.add(nom);
+    let base = nom;
+    while (base.startsWith("--no-")) {
+      base = `--${base.slice("--no-".length)}`;
+      options.add(base);
+    }
   }
   return options;
 }
@@ -79,11 +94,25 @@ type Lecture = {
   readonly options: ReadonlySet<string>;
 };
 
-function productionRefusee(lu: Lecture): boolean {
+/** Variables de déploiement d'un environnement : la liste d'autorisation porte sur elles seules. */
+type Deploiement = Pick<Lecture, "vercelEnv" | "cible" | "vadrouilleEnv">;
+
+function productionRefusee(lu: Deploiement): boolean {
   if (lu.vercelEnv === undefined || !ENVIRONNEMENTS_ADMIS.includes(lu.vercelEnv)) return true;
   if (lu.cible !== undefined && lu.cible !== lu.vercelEnv) return true;
   return lu.vadrouilleEnv !== undefined && normaliserEnv(lu.vadrouilleEnv) === "production";
 }
+
+/**
+ * Variables de déploiement du **vrai** `process.env` (0046 D21), lues par propriété littérale à chaque appel, quel que
+ * soit l'`env` reçu : un appelant qui passerait `{ ...process.env, VERCEL_ENV: "preview" }` sur un déploiement de
+ * production est refusé.
+ */
+const deploiementReel = (): Deploiement => ({
+  vercelEnv: process.env.VERCEL_ENV,
+  cible: process.env.VERCEL_TARGET_ENV,
+  vadrouilleEnv: process.env.VADROUILLE_ENV,
+});
 
 /**
  * `VADROUILLE_ENV` est une liste de **refus** (0046 D21) : la comparaison est donc normalisée (NFKC, espaces retirés,
@@ -114,7 +143,7 @@ export function verifierSortie(env: EnvSortie = process.env, execArgv: readonly 
     tls: [env.NODE_TLS_REJECT_UNAUTHORIZED, env.NODE_EXTRA_CA_CERTS, env.SSL_CERT_FILE, env.SSL_CERT_DIR, env.OPENSSL_CONF, env.SSLKEYLOGFILE],
     options: optionsDeNode(env.NODE_OPTIONS, execArgv),
   };
-  if (productionRefusee(lu)) return { ok: false, code: "production_refused" };
+  if (productionRefusee(lu) || productionRefusee(deploiementReel())) return { ok: false, code: "production_refused" };
   if (proxyPose(lu)) return { ok: false, code: "proxy_env_refused" };
   if (tlsAffaibli(lu)) return { ok: false, code: "tls_env_refused" };
   return { ok: true };

@@ -147,6 +147,14 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
     ecart: "fichier de P0a1 (PR 180), section 9 : ligne ordinaire B, 0040 D4",
   },
+  // P0r2 (ticket 284 ; décision 0046, S6 et « Tests imposés ») : garde du dépôt sur les fichiers suivis et nouveaux.
+  {
+    fichier: "tests/unit/p0/base-prototype.test.ts",
+    portee: "test",
+    usage: "test de P0r2 : gardes du dépôt (identifiants de lieu, coordonnées, URL de base) sur les fichiers de `git ls-files`",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+    ecart: "fichier de P0r2 (ticket 284, décision 0046) : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+  },
   {
     fichier: "tests/unit/p0/imports.test.ts",
     portee: "test",
