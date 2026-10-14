@@ -109,6 +109,8 @@ export const LECTURES_ENV = [
       "VERCEL_ENV",
       "VERCEL_TARGET_ENV",
       "VADROUILLE_ENV",
+      // Décision 0058 (ticket 319) : condition de l'exception étroite de `NODE_EXTRA_CA_CERTS`, comparée à `1`.
+      "VERCEL",
       "HTTP_PROXY",
       "http_proxy",
       "HTTPS_PROXY",

@@ -115,6 +115,22 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   },
   { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  // P0r3c-2 (ticket 316) : fonctions d'ancrage, de fiches et de budgets Routes de `p0Run` (décision 0055, section 6
+  // points 1, 3 et 4) ; types seuls des modules purs du prototype, comme `src/grounding/ancrage.ts`. Verdict Sécurité à rendre.
+  ...["ancrage-zone", "budget-routes", "fiches-finales", "zone"].map((nom) => ({
+    fichier: `src/grounding/${nom}.ts`,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/grounding` de `p0Run`, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-2 (ticket 316), décision 0055, section 6 ; verdict Sécurité à rendre",
+  })),
+  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
+  { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   { fichier: "src/research/agent.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   {
     fichier: "src/research/agent.ts",
@@ -201,7 +217,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif:
       "marqueur `server-only` (sans capacité) du module d'écriture des positions du prototype, exigé par 0052 § 1.10 " +
-      "(« le module commence par import \"server-only\" ») ; P0r3c (ticket 316, PR 318), décision 0055, section 8 ; verdict Sécurité à rendre",
+      "(« le module commence par import \"server-only\" ») ; P0r3c (ticket 316, PR 318), décision 0055, section 8 ; verdict Sécurité : accordée (revue consolidée de la PR 318, head ea7cc37)",
   },
   {
     fichier: "src/contracts/prototype-ecriture.ts",
@@ -210,7 +226,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif:
       "type seul (`import type`) du programme réduit dans le contrat d'écriture du prototype (0052 § 1.10) ; " +
       PROTOTYPE_PUR +
-      " ; P0r3c (ticket 316, PR 318) ; verdict Sécurité à rendre",
+      " ; P0r3c (ticket 316, PR 318) ; verdict Sécurité : accordée (revue consolidée de la PR 318, head ea7cc37)",
   },
   {
     fichier: "tests/unit/server/env.test.ts",

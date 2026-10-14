@@ -10,11 +10,23 @@
 
 export type Coordonnees = { lat: number; lng: number };
 
+/**
+ * Rectangle de la zone du séjour, en degrés (coin sud-ouest, coin nord-est), pour `locationRestriction` (décision
+ * 0055, section 6 point 3 : `p0Run` seulement). Calculé par `src/grounding/zone.ts` à partir des logements résolus.
+ */
+export type RectangleZone = { sudOuest: Coordonnees; nordEst: Coordonnees };
+
 export type RequeteTextSearch = {
   /** Texte maison : nom maison du candidat et destination. */
   texte: string;
   /** Biais géographique sur la zone du séjour. */
   biais: (Coordonnees & { rayonMetres: number }) | null;
+  /**
+   * Restriction à la zone du séjour (0055 § 6 point 3, ancrage de `p0Run`) : seuls des lieux du rectangle sont
+   * rendus. Exclusive du biais (le client réel refuse les deux ensemble, avant toute réservation). Absente : biais
+   * seul, comportement du mode simulé et de `scripts/p0`, inchangé.
+   */
+  restriction?: RectangleZone;
 };
 
 /** Text Search « IDs only » : seulement des identifiants de lieu. */

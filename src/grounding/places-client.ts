@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type RequeteGoogle, type Transport } from "@/grounding/enveloppe-google";
-import type { ClientPlaces, DetailsLieu, RequeteTextSearch } from "@/grounding/interfaces";
+import type { ClientPlaces, Coordonnees, DetailsLieu, RectangleZone, RequeteTextSearch } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
@@ -28,6 +28,8 @@ import {
  *   construit pas (erreur fermée du même code).
  * - Masques de champs minimaux : Text Search « IDs only » (`places.id`) ; Place Details : identifiant, statut,
  *   position et horaires réguliers (SKU Enterprise de la table de prix).
+ * - Text Search : biais (cercle) ou, pour `p0Run`, restriction à la zone du séjour (rectangle, 0055 § 6 point 3) ;
+ *   jamais les deux, et un rectangle invalide est refusé avant toute réservation (`invalid_request`).
  * - Chaque requête réserve une unité auprès du port de consommation avant l'appel (D13) ; délai de 10 s par requête.
  * Tout ce qui sort est une donnée Google : il reste en mémoire et n'atteint jamais un prompt.
  */
@@ -64,6 +66,18 @@ const DetailsSchema = z.object({
   location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
   regularOpeningHours: z.object({ periods: z.array(z.object({ open: PointSchema, close: PointSchema.optional() })).max(50) }).optional(),
 });
+
+/** Coin valide : nombres finis, latitude dans [-90, 90], longitude dans [-180, 180]. */
+const coinValide = (coin: Coordonnees): boolean =>
+  Number.isFinite(coin.lat) && Number.isFinite(coin.lng) && Math.abs(coin.lat) <= 90 && Math.abs(coin.lng) <= 180;
+
+/**
+ * Rectangle de restriction valide : deux coins valides, sud au plus égal au nord, ouest au plus égal à l'est (aucun
+ * rectangle à cheval sur l'antiméridien : `zone.ts` n'en produit pas).
+ */
+function rectangleValide(zone: RectangleZone): boolean {
+  return coinValide(zone.sudOuest) && coinValide(zone.nordEst) && zone.sudOuest.lat <= zone.nordEst.lat && zone.sudOuest.lng <= zone.nordEst.lng;
+}
 
 type Periodes = z.infer<typeof DetailsSchema>["regularOpeningHours"];
 
@@ -105,7 +119,14 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
   return {
     async textSearch(requete: RequeteTextSearch) {
       const corps: Record<string, unknown> = { textQuery: requete.texte, pageSize: 5 };
-      if (requete.biais !== null) {
+      if (requete.restriction !== undefined) {
+        // 0055 § 6 point 3 : restriction à la zone du séjour, jamais avec un biais ; refus avant toute réservation.
+        if (requete.biais !== null || !rectangleValide(requete.restriction)) throw new ErreurClientGoogle("invalid_request");
+        const { sudOuest, nordEst } = requete.restriction;
+        corps.locationRestriction = {
+          rectangle: { low: { latitude: sudOuest.lat, longitude: sudOuest.lng }, high: { latitude: nordEst.lat, longitude: nordEst.lng } },
+        };
+      } else if (requete.biais !== null) {
         corps.locationBias = {
           circle: { center: { latitude: requete.biais.lat, longitude: requete.biais.lng }, radius: requete.biais.rayonMetres },
         };

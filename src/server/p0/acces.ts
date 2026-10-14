@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { isProductionDeployment } from "@/dev/flags";
-import { CODES_ENV_P0, decoderJetonSaisi, lireEnvP0, type CodeEnvP0 } from "@/server/env/p0";
+import { CAUSES_ENV_P0, CODES_ENV_P0, decoderJetonSaisi, lireEnvP0, type CodeEnvP0, type DiagnosticSortie } from "@/server/env/p0";
 import { logEvent } from "@/server/log";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -96,6 +96,9 @@ export type DependancesAcces = {
 export const CODES_GARDE_FERMEE = [...CODES_ENV_P0, "production_deployment"] as const;
 export type CodeGardeFermee = CodeEnvP0 | "production_deployment";
 
+/** Causes que `p0.guard_closed` peut nommer (décision 0058) : celles de la barrière de sortie. */
+export const CAUSES_GARDE_FERMEE: readonly string[] = CAUSES_ENV_P0;
+
 export type ResultatOuverture = { readonly ok: true; readonly attendu: Buffer } | { readonly ok: false; readonly code: CodeGardeFermee };
 
 /**
@@ -104,14 +107,27 @@ export type ResultatOuverture = { readonly ok: true; readonly attendu: Buffer } 
  * si l'appelant passe `journaliser = false` (affichage de la page : voir `etatPageAcces`).
  */
 export function ouvertureP0(dependances: DependancesAcces = {}, journaliser = true): ResultatOuverture {
-  const lu = lireEnvP0(dependances.env, dependances.execArgv);
+  const { resultat, diagnostic } = ouvrir(dependances);
+  if (!resultat.ok && journaliser) logEvent("p0.guard_closed", { guard: resultat.code, ...diagnostic });
+  return resultat;
+}
+
+/**
+ * Ouverture et diagnostic de la barrière de sortie (décision 0058, ticket 319) : nom de la variable ou de l'option de
+ * proxy ou de TLS en cause et marque de l'exception étroite, écrits avec le code dans `p0.guard_closed` ; jamais une
+ * valeur.
+ */
+function ouvrir(dependances: DependancesAcces): { readonly resultat: ResultatOuverture; readonly diagnostic: DiagnosticSortie } {
+  let diagnostic: DiagnosticSortie = {};
+  const lu = lireEnvP0(dependances.env, dependances.execArgv, (resultat) => {
+    diagnostic = resultat;
+  });
   const resultat: ResultatOuverture = !lu.ok
     ? lu
     : isProductionDeployment(dependances.env)
       ? { ok: false, code: "production_deployment" }
       : { ok: true, attendu: lu.jeton };
-  if (!resultat.ok && journaliser) logEvent("p0.guard_closed", { guard: resultat.code });
-  return resultat;
+  return { resultat, diagnostic };
 }
 
 /** État de la page de saisie : fermée (404), saisie attendue, ou accès déjà ouvert par un cookie valide. */
@@ -127,9 +143,11 @@ const REFUS_DE_PRODUCTION: ReadonlySet<CodeGardeFermee> = new Set(["production_r
  * l'outil du relevé de la section 1 point 3 (ouvrir la page et lire le code). Les actions journalisent toujours.
  */
 export function etatPageAcces(cookie: string | undefined, dependances: DependancesAcces = {}): EtatPageAcces {
-  const ouverture = ouvertureP0(dependances, false);
+  const { resultat: ouverture, diagnostic } = ouvrir(dependances);
   if (!ouverture.ok) {
-    if (!REFUS_DE_PRODUCTION.has(ouverture.code) && !isProductionDeployment(dependances.env)) logEvent("p0.guard_closed", { guard: ouverture.code });
+    if (!REFUS_DE_PRODUCTION.has(ouverture.code) && !isProductionDeployment(dependances.env)) {
+      logEvent("p0.guard_closed", { guard: ouverture.code, ...diagnostic });
+    }
     return "fermee";
   }
   const maintenant = (dependances.maintenant ?? Date.now)();

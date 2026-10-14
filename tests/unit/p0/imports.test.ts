@@ -427,6 +427,11 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
     { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/server/env/grounding.ts", "src/server/usage/port.ts"] },
   ],
   ["src/grounding/enveloppe-google.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/server/env/egress.ts"] }],
+  // P0r3c-2 (ticket 316, décision 0055, section 6) : modules purs de `p0Run` (ancrage, fiches, budgets Routes, zone),
+  // marqueur `server-only` seul, aucun import de projet hors des règles de base.
+  ...["ancrage-zone", "budget-routes", "fiches-finales", "zone"].map(
+    (nom) => [`src/grounding/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
+  ),
   [
     "src/research/undici-transport.ts",
     {
