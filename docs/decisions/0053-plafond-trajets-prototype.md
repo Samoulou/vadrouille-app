@@ -29,3 +29,25 @@ Texte de Samuel : « Ok on pose la décision dans un premier temps pour faire le
 - **P0r3** fixe `routesElements` à 500 et applique la répartition par jour dans le plan de l'étape Routes ; un test vérifie qu'aucun jour ne dépasse sa part et que le total ne dépasse pas 500. P0r2 (#287) n'est pas modifiée : ses plafonds sont des paramètres, fixés par P0r3.
 - **Non tranché ici** : le plafond d'une relecture Routes (P0r4), l'unité du quota Routes (P0-Q31), la répartition de `placesDetails` (Q389) et le plafond de coût des modèles (2 ou 3 USD, question 2 de #287). Si la répartition par jour gêne la qualité des programmes, le Tech Lead le signale à Samuel avec les mesures de ses essais.
 - Q370 reste ouverte pour Places Details au-delà des essais ; le statut suivant reporte cette décision dans `QUESTIONS.md`.
+
+## Amendement 1 — économies retenues et économies en réserve (Samuel, 2026-10-14 04:48 et 04:50 UTC, fil du projet)
+Texte de Samuel : « Ok je suis ta reco, et on valide a la fin des tests les solutions. Aussi on demande les fiches de lieux que des retenus et par retenu j'entends retenu pour la première proposition de slider. » ; puis « Oui go, prend bien note de toutes les optimisations qu'on garde sous le coude. »
+
+### Retenues, appliquées par P0r3 (et reprises par B8 et B9 pour le MVP), validées par Samuel à la fin de ses essais
+1. **Fiches de lieux (Places Details) des seuls lieux retenus pour la première proposition de cartes à glisser** : aucun appel Places Details pour un candidat qui n'entre pas dans cette première série. Le champ demandé est le moins cher qui suffit (SKU Essentials quand les horaires ne servent pas ; le rôle ia-recherche documente le choix par champ dans la PR). Estimation du CEO, non mesurée : environ 0,50 USD par essai au lieu de 1,80.
+2. **Réutilisation du cache de positions** (`place_coordinates`, 29 jours, décisions 0011 et 0027) : un lieu déjà connu ne déclenche aucun nouvel appel pour sa position.
+3. **Profil d'IA « léger » pour les essais** : moins de recherches web et de pages lues, et un modèle moins cher pour le tri et la notation (dans les bornes de B7, `specs/B7-couche-ia-recherche.md` une fois fusionnée). Estimation du CEO, non mesurée : environ 1 USD par essai.
+4. **Premier tri par distance à vol d'oiseau**, calculé en mémoire par notre code à partir des positions, sans appel de modèle et sans écriture (0011 § 1) ; Routes n'est appelé que pour l'ordre final des lieux retenus de chaque jour. Estimation du CEO, non mesurée : 30 à 40 éléments par jour au lieu d'environ 100.
+
+La réserve d'un essai reste au prix plein, sans gratuité (Q329).
+
+### En réserve (aucune n'est appliquée ; chacune revient à Samuel, à la fin de ses essais ou quand les volumes augmentent)
+- **Compter la gratuité Google dans la réserve d'un essai** (10 000 éléments Routes et 1 000 fiches Enterprise par mois) : le plus gros levier, mais il revient sur Q329.
+- **Relever le plafond Google** au-delà de 20 USD par mois (option 2 présentée le 2026-10-14 04:10 UTC).
+- **Calcul de trajets open source** (OSRM, Valhalla, GraphHopper, OpenRouteService ; OpenTripPlanner pour les transports en commun) : étude du Tech Lead pour plus tard. Obstacles relevés : les positions viennent de Google et ne peuvent servir hors de Google (0011, 0027), donc il faudrait aussi une source de lieux non Google ; les transports en commun demandent un serveur à nous, ville par ville.
+- **Recherche élargie après les « j'aime » et « j'aime pas »** : le recalcul par lot de B10 reste ciblé (jours touchés, lieux déjà trouvés, petite recherche si un type manque). Si les essais montrent qu'il n'affine pas assez, élargir la petite recherche ; une analyse complète est écartée (coût et attente doublés).
+
+### Écartées
+- **Faire estimer les temps de trajet par un modèle d'IA** : durées plausibles mais fausses, sans horaires ni travaux.
+- **Garder les temps de trajet en base pour d'autres voyageurs** (même ville) : interdit par les conditions de Google et par 0011 § 1 (aucune durée de trajet en base) ; réutilisation possible seulement en mémoire, pendant une même session.
+
