@@ -835,7 +835,9 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
         if (specificateur === "parse5" || specificateur.startsWith("parse5/")) parParse5.push(fichier);
       }
     }
-    expect([...new Set(parNet)]).toEqual(["src/research/ip-guard.ts"]);
+    // B3a (ticket 293) : `src/server/ip.ts` (clé d'adresse du limiteur, `isIP` seulement) admis par la décision 0050,
+    // « Lignes du régime de confinement », et 0051 point 6.7.4 ; hors du code de P0a1.
+    expect([...new Set(parNet)].sort()).toEqual(["src/research/ip-guard.ts", "src/server/ip.ts"]);
     expect([...new Set(parParse5)]).toEqual(["src/research/extract-text.ts"]);
   });
 

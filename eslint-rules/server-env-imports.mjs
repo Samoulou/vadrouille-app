@@ -10,6 +10,9 @@ import path from "node:path";
  *   seulement ;
  * - `@/server/env/garde-cles` : depuis la mise en place de Vitest (`tests/unit/setup.ts`) et la configuration de
  *   Playwright seulement ;
+ * - `@/server/env` (`index.ts`, B3a) : depuis `src/instrumentation.ts`, le limiteur et son test unitaire seulement ;
+ * - `@/server/env/resolve` (B3a) : depuis `db/connection.ts` et le même test seulement ;
+ * - `@/server/env/payment` (B4) : depuis `src/server/routes/` et `src/server/payment/` seulement ;
  * - tout autre module de `src/server/env/` : depuis `src/server/env/` seulement.
  * Les fichiers de `src/server/env/` (tests compris) importent les modules de leur dossier. La source est résolue
  * (alias `@/` ou chemin relatif, segments `.` et `..` normalisés) avant la comparaison ; toutes les formes de
@@ -24,6 +27,12 @@ export const IMPORTATEURS_ADMIS = new Map([
   ["grounding", ["src/grounding/"]],
   ["egress", ["src/ai/", "src/grounding/", "src/research/undici-transport.ts"]],
   ["garde-cles", ["tests/unit/setup.ts", "playwright.config.ts"]],
+  // B3a (décision 0050, B3-TL-1 point 1) : module d'environnement du serveur (`@/server/env`), nommé fichier par
+  // fichier ; résolution de l'environnement, importée par la garde de connexion (`../src/server/env/resolve.ts`) ;
+  // module du paiement (B4), depuis les routes et le paiement serveur seulement (handover § 3).
+  ["index", ["src/instrumentation.ts", "src/server/rate-limit.ts", "tests/unit/server/env.test.ts"]],
+  ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
+  ["payment", ["src/server/routes/", "src/server/payment/"]],
 ]);
 
 /** Module de `src/server/env/` visé par une source, ou `null` (chemin relatif au dépôt de l'importateur). */

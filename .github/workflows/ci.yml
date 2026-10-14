@@ -6,6 +6,11 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # B3a (décision 0050, P2 point 1) : environnement du serveur `ci` pour tout le job (build, e2e, tests de base).
+    # Aucun secret de B3 n'est tiré ici ni écrit dans $GITHUB_ENV (0051 point 6.4.4) : playwright.config.ts et
+    # scripts/test-db.mjs les tirent pour leur seul processus enfant.
+    env:
+      VADROUILLE_ENV: ci
     # Décision 0036, B1-TL-1 : `pnpm verify` appelle `pnpm test:db`, qui ne s'ignore jamais en CI (point 4 : base jetable).
     # Ce job a donc lui aussi sa base jetable ; le job `db` ci-dessous rejoue en plus amorçage et migrations.
     # Le job s'exécute sur la machine du runner, pas dans un conteneur : le port du service doit être publié pour être
@@ -94,6 +99,9 @@ jobs:
   # seconde ne fait rien), puis `pnpm test:db`, dont chaque test se connecte avec le rôle qu'il éprouve.
   db:
     runs-on: ubuntu-latest
+    # B3a (décision 0050, P2 point 1) : environnement `ci` ; le secret du limiteur vient de scripts/test-db.mjs.
+    env:
+      VADROUILLE_ENV: ci
     # Port publié : nécessaire pour joindre le service sur 127.0.0.1 depuis la machine du runner (voir job verify).
     services:
       postgres:
@@ -234,3 +242,37 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/voyages/mock_trip_edimbourg/debloquer)" = "404" || { docker logs app-drapeau; exit 1; }
           if curl -fsS http://127.0.0.1:3001/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
           docker rm -f app-drapeau
+      # B3a (spécification B3, B3a point 3 ; décisions 0050, P2 point 3, et 0051, points 2 et 6.4) : l'image refuse de
+      # démarrer sur une configuration refusée. Chaque cas exige l'arrêt du conteneur avec un code non nul en moins de
+      # 30 secondes, un journal qui nomme la variable, et l'absence de la sentinelle dans ce journal. Aucune commande ne
+      # passe VADROUILLE_ENV, VERCEL_ENV ni VERCEL (l'image reste fermée par sa seule ligne VADROUILLE_ENV=production).
+      - if: steps.diff.outputs.code == 'true'
+        name: Gardes de configuration de l'image
+        run: |
+          sentinelle="$(openssl rand -hex 12)"
+          verifier() {
+            nom="$1"
+            variable="$2"
+            shift 2
+            docker run -d --name "$nom" "$@" app:ci > /dev/null
+            code=""
+            for i in $(seq 1 30); do
+              if [ "$(docker inspect -f '{{.State.Running}}' "$nom")" = "false" ]; then
+                code="$(docker inspect -f '{{.State.ExitCode}}' "$nom")"
+                break
+              fi
+              sleep 1
+            done
+            journal="$(docker logs "$nom" 2>&1)"
+            docker rm -f "$nom" > /dev/null
+            test -n "$code" || { echo "$nom : conteneur encore démarré après 30 secondes"; exit 1; }
+            test "$code" != "0" || { echo "$nom : code de sortie nul"; exit 1; }
+            printf '%s' "$journal" | grep -qF "\"variable\":\"$variable\"" || { echo "$nom : journal sans la variable $variable"; exit 1; }
+            if printf '%s' "$journal" | grep -qF "$sentinelle"; then echo "$nom : sentinelle dans le journal"; exit 1; fi
+          }
+          # En-tête dont l'élément de gauche est choisi par le client : refusé partout (untrusted_header).
+          verifier gardes-entete-xff TRUSTED_IP_HEADER -e "TRUSTED_IP_HEADER=x-forwarded-for"
+          # En-tête de Vercel hors de Vercel (image Docker) : refusé (header_outside_vercel).
+          verifier gardes-entete-vercel TRUSTED_IP_HEADER -e "TRUSTED_IP_HEADER=x-vercel-forwarded-for"
+          # Clé Stripe de production : refusée dans tous les environnements (production_prefix).
+          verifier gardes-stripe STRIPE_SECRET_KEY -e "STRIPE_SECRET_KEY=sk_live_${sentinelle}"

@@ -113,7 +113,14 @@ export const actionRateLimits = pgTable(
   {
     key: text("key").primaryKey(),
     windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    // B3a (amendement de 0007 par 0050) : échéance de la fenêtre, posée par la base (`now() + durée`), relisible
+    // pour la purge à l'écriture.
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     count: integer("count").notNull().default(0),
   },
-  (t) => [index("action_rate_limits_window_start_idx").on(t.windowStart), check("action_rate_limits_count_check", sql`${t.count} >= 0`)],
+  (t) => [
+    index("action_rate_limits_window_start_idx").on(t.windowStart),
+    index("action_rate_limits_expires_at_idx").on(t.expiresAt),
+    check("action_rate_limits_count_check", sql`${t.count} >= 0`),
+  ],
 );

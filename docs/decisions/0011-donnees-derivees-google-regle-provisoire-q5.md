@@ -8,6 +8,8 @@ Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08
 
 **Workflow des migrations et levée du verrou S8 : lire 0056** (ticket #297) : toute mention de 0052 comme décision du workflow d'application des migrations ou du déverrouillage se lit 0056.
 
+**§ 2 amendé par 0055** (#294), pour l'exécution `p0Run` du prototype seulement : à l'étape d'ancrage, Text Search « IDs only » restreint à la zone du séjour, sans fiche Place Details pour un candidat (fiches des seuls logements) ; statut, position et horaires vérifiés à l'étape finale pour les lieux que le moteur s'apprête à planifier (fermé définitivement écarté avant la planification, aucun lieu planifié ni écrit sans cette fiche). Le mode simulé, `scripts/p0` et le MVP gardent le § 2 tel quel. **§ 1, § 3, § 4 et § 7 ne sont pas amendés.**
+
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.
 
 ## Contexte
