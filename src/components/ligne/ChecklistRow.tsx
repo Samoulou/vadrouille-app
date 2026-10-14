@@ -1,7 +1,8 @@
 import { useId } from "react";
 
 import type { ChecklistMoment } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatDateCourte } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import { PRODUCT_NAME } from "@/config/site";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import "@/styles/globals.css";
 
 import { hankenGrotesk } from "./fonts";

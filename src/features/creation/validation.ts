@@ -11,7 +11,7 @@ import {
   STORY_LENGTH,
 } from "@/contracts/values";
 
-import { markedFields, type BriefForm, type BriefValues, type LodgingForm, type TripForm } from "./draft";
+import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
 /**
  * Validation de l'interface des écrans 1 et 2 (F8-PO-2 à F8-PO-5), fonctions pures. Les bornes viennent de
@@ -133,14 +133,15 @@ export function cityRanges(trip: Pick<TripForm, "destination" | "start" | "end" 
   return names.map((name, index) => ({ name, start: all[index] as string, end: all[index + 1] as string }));
 }
 
-function toLodging(lodging: LodgingForm): Lodging {
+function toLodging(lodging: LodgingForm, choice: LodgingChoice | undefined): Lodging {
   switch (lodging.answer) {
     case "known":
       return { kind: "known", label: lodging.label.trim() };
     case "area":
       return { kind: "area", label: lodging.label.trim() };
     default:
-      return { kind: "none" };
+      // « Pas encore » : le choix de l'écran 3 s'il y en a un (identifiants seulement), sinon « pas encore ».
+      return choice ?? { kind: "none" };
   }
 }
 
@@ -148,7 +149,7 @@ function toLodging(lodging: LodgingForm): Lodging {
  * `TripDraft` d'un écran 1 validé (contrat livré par F8a, 0017 § 2 ; lu par la création du voyage de F8c et par
  * le test de concordance). Un engagement sans type est une erreur d'appel, jamais remplacé par une valeur.
  */
-export function toTripDraft(trip: TripForm): TripDraft {
+export function toTripDraft(trip: TripForm, choices: Readonly<Record<string, LodgingChoice>> = {}): TripDraft {
   if (trip.commitments.some((commitment) => commitment.kind === null)) {
     throw new Error("toTripDraft : écran 1 non validé (engagement sans type).");
   }
@@ -156,8 +157,12 @@ export function toTripDraft(trip: TripForm): TripDraft {
     destination: trip.destination.trim(),
     start: trip.start,
     end: trip.end,
-    lodging: toLodging(trip.lodging),
-    otherCities: trip.otherCities.map((city) => ({ name: city.name.trim(), arrival: city.arrival, lodging: toLodging(city.lodging) })),
+    lodging: toLodging(trip.lodging, choices[DESTINATION_KEY]),
+    otherCities: trip.otherCities.map((city) => ({
+      name: city.name.trim(),
+      arrival: city.arrival,
+      lodging: toLodging(city.lodging, choices[city.key]),
+    })),
     commitments: trip.commitments.map((commitment) => ({
       kind: commitment.kind as NonNullable<typeof commitment.kind>,
       label: commitment.label.trim(),

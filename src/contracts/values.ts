@@ -142,6 +142,11 @@ export const API_ERROR_CODES = [
   "cost_cap_reached",
   // B2 (évolution E10, B2-PO-8) : version de base dépassée ; `ApiError.currentVersion` porte la version courante.
   "version_conflict",
+  // F8b (décision 0017 § 4) : aucun quartier à proposer (écran 3) ; code de connexion faux, expiré, trop d'essais.
+  "no_option",
+  "invalid_code",
+  "code_expired",
+  "too_many_attempts",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
@@ -177,6 +182,18 @@ export const CHILDREN = { min: 0, max: 9 } as const;
 export const MEAL_BUDGET_CHF = { min: 5, max: 500 } as const;
 export const EMAIL_MAX_LENGTH = 254;
 export const OTP_LENGTH = 6;
+/** Code de connexion : exactement `OTP_LENGTH` chiffres ASCII (0017 § 2.4). */
+export const OTP_PATTERN = /^[0-9]{6}$/;
+
+/**
+ * Mode de la connexion (0017 § 3.5) : `simulated` tant que l'adaptateur `auth` est `mock` (avertissement visible à
+ * l'écran 4, piloté par cette valeur serveur, jamais déduit côté client) ; `real` avec B3.
+ */
+export const AUTH_MODES = ["simulated", "real"] as const;
+export type AuthMode = (typeof AUTH_MODES)[number];
+
+/** Écran 3 : logements suggérés dans un quartier, au plus (cadrage § 3.1, écran 3). */
+export const MAX_SUGGESTED_LODGINGS = 3;
 
 /** Rythme du brief (cadrage § 3.7), dans l'ordre d'affichage. */
 export const PACES = ["relaxed", "balanced", "intense"] as const;

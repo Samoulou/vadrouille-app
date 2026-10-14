@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { loadSharedTrip } from "@/features/partage/load";
 import { SharedShell } from "@/features/partage/SharedShell";
 import { SharedTripScreen } from "@/features/partage/SharedTripScreen";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Lu à chaque requête : un lien désactivé ou expiré cesse de fonctionner dès la requête suivante (F10-PO-15) ;
 // en-têtes privés et `no-store` posés par `next.config.ts` (F10-TL-8).

@@ -1,0 +1,123 @@
+{
+  "tag": {
+    "toReserve": "À réserver",
+    "toConfirm": "À confirmer",
+    "unconfirmed": "Non confirmé"
+  },
+  "otp": {
+    "groupe": "Code à {length} chiffres",
+    "position": "Chiffre {position} sur {length}"
+  },
+  "duree": {
+    "minutes": "{minutes} min",
+    "heures": "{heures} h",
+    "heuresMinutes": "{heures} h {minutes}"
+  },
+  "jour": {
+    "pastille": "J{day}",
+    "nom": "Jour {day}",
+    "nomAvecJour": "Jour {day}, {weekday}",
+    "complet": "complet",
+    "nomComplet": "{nom}, complet"
+  },
+  "jours": {
+    "navigation": "Jours du séjour",
+    "sejour": "Séjour"
+  },
+  "terminus": {
+    "start": "Départ de {label}",
+    "end": "Retour à {label}"
+  },
+  "terminusSansLibelle": {
+    "start": "Début de journée",
+    "end": "Fin de journée"
+  },
+  "etape": {
+    "enCours": "En cours",
+    "terminee": "Terminée"
+  },
+  "segment": {
+    "walk": "À pied",
+    "transit": "Bus",
+    "car": "En voiture",
+    "libelle": "{mode}, {duree}",
+    "libelleEstime": "{mode}, environ {duree} (estimation)"
+  },
+  "tempsLibre": {
+    "texte": "Temps libre jusqu'à {to}",
+    "idees": "Idées"
+  },
+  "panneau": {
+    "agrandir": "Agrandir le panneau",
+    "reduire": "Réduire le panneau",
+    "contenu": "Contenu du panneau"
+  },
+  "raison": {
+    "titre": "Pourquoi pour toi",
+    "source": "Source : {label}",
+    "consultee": "Source consultée le {date}"
+  },
+  "dates": {
+    "longue": "{day} {month} {year}",
+    "mois": [
+      "janvier",
+      "février",
+      "mars",
+      "avril",
+      "mai",
+      "juin",
+      "juillet",
+      "août",
+      "septembre",
+      "octobre",
+      "novembre",
+      "décembre"
+    ],
+    "premier": "er",
+    "joursTitre": [
+      "Dimanche",
+      "Lundi",
+      "Mardi",
+      "Mercredi",
+      "Jeudi",
+      "Vendredi",
+      "Samedi"
+    ],
+    "titre": "{jour} {day} {month}"
+  },
+  "verrouillee": "Verrouillée",
+  "repasNonChoisi": {
+    "lunch": "Déjeuner pas encore choisi",
+    "dinner": "Dîner pas encore choisi"
+  },
+  "checklist": {
+    "reserver": "Réserver",
+    "remunere": "Lien rémunéré",
+    "moment": {
+      "deadline": "Avant le {date}",
+      "beforeDeparture": "Avant le départ",
+      "arrivee": "À l'arrivée",
+      "jour": "J{n}"
+    }
+  },
+  "deduit": "déduit de ton récit",
+  "faits": {
+    "separateur": ", ",
+    "gratuit": "gratuit",
+    "cout": "≈ {n} CHF"
+  },
+  "changeSet": {
+    "aLaPlaceDe": "à la place de",
+    "ajoute": "ajouté",
+    "deplace": "{label} :",
+    "trajetVers": "Trajet vers {label} :",
+    "avant": "avant :",
+    "apres": "après :",
+    "fleche": "→",
+    "jourHeure": "J{day} {time}",
+    "estimation": "environ {duree} (estimation)",
+    "budget": "Budget du jour : environ {montant} CHF par personne",
+    "plus": "+",
+    "moins": "−"
+  }
+}

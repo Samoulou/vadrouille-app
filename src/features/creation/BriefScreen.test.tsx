@@ -219,8 +219,20 @@ describe("BriefScreen : vérification", () => {
     expect(screen.getByRole("radiogroup", { name: "Rythme" })).not.toHaveAccessibleDescription();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(recorder.events).toEqual([{ name: "brief_completed", properties: { inferred_fields_count: 4, edited_fields_count: 2 } }]);
-    expect(router.push).toHaveBeenCalledWith("/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer");
+    // F8b : voyage « Pas encore » : écran 3 de la première ville sans logement (F8-PO-8, 0017 § 1).
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/logement");
     expect(latest?.briefReady).toBe(true);
+    expect(latest?.lodgingCity).toBe(0);
+  });
+
+  it("logement connu (« Oui ») : « Continuer » mène à l'écran 4 sans passer par l'écran 3 (F8b)", async () => {
+    const base = ready();
+    renderScreen({ ...base, trip: { ...base.trip, lodging: { answer: "known", label: "[Hôtel de test]" } } });
+    await prepare();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer");
+    expect(router.push).not.toHaveBeenCalledWith("/voyages/nouveau/logement");
+    expect(latest?.lodgingCity).toBeNull();
   });
 
   it("« Remplir moi-même » : aucun pointillé, rythme sans choix ; erreurs puis focus sur le rythme ; 0 champ déduit", async () => {

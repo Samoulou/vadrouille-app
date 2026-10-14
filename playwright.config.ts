@@ -87,12 +87,14 @@ export default defineConfig({
       stdout: "pipe",
       stderr: "pipe",
       // VADROUILLE_DEMO_PAYMENT : paiement simulé ouvert pour les tests seulement (décision 0020 § 2.3) ;
-      // VADROUILLE_DEMO_SHARE : partage simulé, idem (décision 0039, F10-TL-7). Seul fichier versionné qui les
-      // pose (tests/unit/debloquer-regles.test.ts).
+      // VADROUILLE_DEMO_SHARE : partage simulé, idem (décision 0039, F10-TL-7) ; VADROUILLE_DEMO_AUTH : connexion
+      // simulée, idem (décision 0017 § 11.3, F8b). Seul fichier versionné qui les pose
+      // (tests/unit/debloquer-regles.test.ts, tests/unit/dev-pages-env.test.ts).
       env: {
         VADROUILLE_DEV_PAGES: "1",
         VADROUILLE_DEMO_PAYMENT: "1",
         VADROUILLE_DEMO_SHARE: "1",
+        VADROUILLE_DEMO_AUTH: "1",
         PORT: String(PORT),
         HOSTNAME: "127.0.0.1",
         [SERVER_LOG_ENV]: serverLogPath({ port: PORT, tmpDir: tmpdir() }),

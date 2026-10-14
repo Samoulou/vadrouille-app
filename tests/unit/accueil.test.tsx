@@ -10,7 +10,7 @@ import HomePage, { dynamic } from "@/app/page";
 import { PRODUCT_NAME } from "@/config/site";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
@@ -140,10 +140,30 @@ describe("accueil : autre adaptateur", () => {
     await expect(HomePage()).resolves.toBeTruthy();
     await renderHome();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
     expect(screen.getByRole("heading", { level: 1, name: PRODUCT_NAME })).toBeInTheDocument();
     expect(screen.getByText(messages.produit.promesse)).toBeInTheDocument();
     expect(adapters.getTripAdapter).not.toHaveBeenCalled();
+  });
+});
+
+describe("accueil : « Créer un voyage » (ticket 259)", () => {
+  it.each([undefined, "mock", "api"])("DATA_ADAPTER=%j : lien vers l'écran 1, après la promesse, avant toute section", async (value) => {
+    vi.stubEnv("DATA_ADAPTER", value);
+    await renderHome();
+    const link = screen.getByRole("link", { name: "Créer un voyage" });
+    expect(link).toHaveAttribute("href", "/voyages/nouveau");
+    expect(link).toHaveAccessibleName(messages.accueil.creer);
+    // Ordre de lecture : nom, promesse, « Créer un voyage », puis la section « Démonstration » s'il y en a une.
+    const promesse = screen.getByText(messages.produit.promesse);
+    expect(promesse.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const demo = screen.queryByRole("region", { name: t.titre });
+    if (demo) expect(link.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Bouton Ligne principal (classes du composant, tokens Ligne), sans valeur arbitraire entre crochets.
+    expect(link.className).toMatch(/\bw-full\b/);
+    expect(link.className).toMatch(/\bbg-line\b/);
+    expect(link.className).not.toMatch(/\[/);
   });
 });
 

@@ -14,7 +14,8 @@ import type { ChecklistItem } from "@/contracts";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { currentDayIndex } from "@/features/voyage/today";
 import { useClientNow } from "@/features/voyage/use-client-now";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
 
 import { EventLines, eventRange } from "./EventLines";

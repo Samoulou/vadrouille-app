@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "react";
 
 import type { RecorderKind } from "@/analytics/track";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { JourneePanel } from "./JourneePanel";
 import { StopSheet } from "./StopSheet";

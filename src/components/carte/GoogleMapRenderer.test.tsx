@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DayMap } from "@/contracts";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 import { applyTokens, day2, day4, map2, map4, maps } from "../../../tests/unit/carte-fixtures";
 

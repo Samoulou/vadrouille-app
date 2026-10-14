@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
@@ -108,7 +109,7 @@ export function DayMap(props: DayMapProps) {
     return null;
   }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive]);
 
-  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.rings.length > 0) : false;
+  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.mode === "overview" && view.rings.length > 0) : false;
   const needsConfig = !Simulated;
 
   useEffect(() => {
