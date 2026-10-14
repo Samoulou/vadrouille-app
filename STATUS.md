@@ -1,30 +1,34 @@
-# État du studio — 2026-10-14 (68e cycle)
+# État du studio — 2026-10-14 (69e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 67e cycle (fini à 22:51 CEST), ni dans le projet ni dans #studio. Le clic `owner-approved` sur #332 reste attendu.
+- 2026-10-14, 23:33 CEST : libellé `owner-approved` posé sur #332 ; le workflow des migrations est fusionné.
+- 2026-10-14, 23:33 CEST (projet) : « RELANCE UN CYCLE STP » ; 69e cycle lancé à la demande.
+- 2026-10-14, 23:49 CEST (fil du cycle) : l'IA et Google restent bloqués, il ne comprend pas pourquoi. Réponse : la cause est la boucle de relecture (un défaut rare trouvé à chaque passage, une heure par aller-retour, pièces en série). Engagement du CEO : les trois places vont uniquement aux pièces de l'essai réel, aucune règle annexe nouvelle avant le premier essai.
+- 2026-10-14, 23:51 CEST (carte de décision) : **« Garder strict »** (Q448). Toute remarque de relecture reste bloquante pendant la phase privée.
+- 2026-10-14, 23:51 et 23:52 CEST : « combien de cycles avant l'essai de bout en bout ? », puis « comment avance ce cycle ? ». Estimation donnée : 6 à 10 cycles pour le premier vrai essai, 25 à 40 pour l'app complète avec IA et Google.
+- #studio : aucun nouveau message.
 
 ## Fait
-- Fusionnée : statut du 67e cycle (#342).
-- **Décision 0060** (#336) : le Tech Lead approuve ; la Sécurité garde un bloquant (la purge manuelle de repli, sous le propriétaire de l'intégration, échouerait faute de droit d'exécution). Correction comptée : **correction 2, la dernière**, lancée (Tech Lead).
-- **P0r3c-3** (#326) : la revue de la troisième tentative n'avait jamais démarré (libellé `needs-review` resté du push précédent, pas reposé après f06449c). Libellé basculé à 23:10 CEST ; revue relancée.
+- Fusionnés : **workflow des migrations** (#332), statut du 68e cycle (#344).
+- **P0r3c-3** (#326) : bloquant tardif de la Sécurité (non compté) corrigé dans le code (59878f0) ; les mots du récit sont comparés après remplacement des suites sans espace ; hangul, javanais et balinais rejoignent la fenêtre par caractères. La limite de Q427 reste vraie.
+- **Code de 0062** (#343) : correction 1 (757ed85) ; condition 1.7 (nom de section `nodejs_conf` vérifié par `process.config`), précisions du Tech Lead consignées dans 0062.
+- **Décision 0060** (#336) : la correction 2 a laissé un bloquant du Tech Lead (requête de contrôle filtrée sur le membre). Choix du CEO avec le Tech Lead : **troisième tentative bornée** (Q447), poussée (97f59c3).
 
 ## En cours
-- **Code de 0062** (#341, back).
-- **Décision 0060** (#336) : correction 2, dernière (Tech Lead). Si elle reste bloquée : le CEO et le Tech Lead choisissent une troisième tentative ou un découpage.
-- En revue : #326 (P0r3c-3, troisième tentative bornée), #332 (approuvé par le Tech Lead, attend `owner-approved`).
+- En revue : #326, #336, #343.
 
 ## Bloqué
-- **Premier essai réel** : P0r3c-3 (#326), puis P0r3c-4 ; code de 0062 et avis de la Sécurité (Q444), nouvelle mise à jour de `p0-reel` par Samuel et nouveau relevé ; P0r3d.
-- **Workflow des migrations** : `owner-approved` de Samuel ; Q387 (a) et (b).
+- **Premier essai réel** : P0r3c-3 (#326), puis P0r3c-4 ; code de 0062 (#343) et avis de la Sécurité (Q444), nouvelle mise à jour de `p0-reel` par Samuel et nouveau relevé ; ouverture de la base d'essai (0052) ; P0r3d.
 - **Purge `p0-purge`** : en échec toutes les 6 heures (cause non relevée ; secrets vides probables, Q387).
 - **B8c** : fusion de 0060 ; cycles séparés (Q445). **B6a** : B3b. **B8a** : B7a, B7c, P0r3c-3. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
-1. Après #341 : lien à Samuel pour remettre `p0-reel` à jour, puis relevé de la section 8 de 0062.
-2. Après #326 : P0r3c-4 (avec l'amendement de 0055 § 7 pour le flux Exa accepté) ; si #326 est encore bloquée : découpage.
-3. Après 0060 : ticket de B8c (data), seul de son lot (Q445) ; mise à jour de `docs/roadmap.md` (Q431).
+1. Seulement le chemin de l'essai réel (engagement du 69e cycle).
+2. Après #343 : lien à Samuel pour remettre `p0-reel` à jour, puis relevé de la section 8 de 0062.
+3. Après #326 : P0r3c-4. Si #326 est encore bloquée : découpage.
+4. Si #336 est encore bloquée : découpage (pas de quatrième tentative).
 
 ## Décisions attendues de Samuel
 - **Clic demandé** : libellé `owner-approved` sur #332 (workflow des migrations), demandé dans le fil du cycle à 22:25 CEST.
@@ -46,8 +50,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Aucune.
+- Q447 (CEO et Tech Lead : 0060, troisième tentative bornée), Q448 (Samuel : niveau de relecture pendant la phase privée, tranchée « Garder strict »).
 
 ## Part d'usage estimée
-- 68e cycle (routine) : sous-agents terminés : aucun ; lancé : correction 2 de 0060 ; 2 en même temps.
-- En cours, comptés au 69e cycle : code de 0062 (#341), correction 2 de 0060.
+- 69e cycle (à la demande) : sous-agents terminés : correction 2 de 0060 (lancée au 68e), code de 0062 (lancé au 67e), bloquant tardif de P0r3c-3, correction 1 du code de 0062, troisième tentative de 0060 ; 3 au plus en même temps.
