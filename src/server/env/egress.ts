@@ -9,7 +9,10 @@ import "server-only";
  *    `VERCEL_TARGET_ENV` égale si présente (même vide), `VADROUILLE_ENV` différente de `production` (comparaison
  *    normalisée : casse, espaces, NFKC) ;
  * 2. `proxy_env_refused` : une variable de proxy posée (majuscules ou minuscules) ou `--use-env-proxy` ;
- * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node.
+ * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node ; seule exception,
+ *    étroite : `NODE_EXTRA_CA_CERTS` égale au fichier d'autorités du runtime de Vercel (décision 0058, ci-dessous).
+ * Diagnostic facultatif (décision 0058, ticket 319) : un rappel reçoit le **nom** de la variable ou de l'option en
+ * cause (liste fermée `CAUSES_SORTIE`) et la marque de l'exception appliquée ; jamais une valeur.
  *
  * Variable « posée » : présente avec une valeur non vide, sans retrait d'espaces. `NO_PROXY` n'a aucun effet.
  * Lecture paresseuse, à l'appel ; l'environnement est un paramètre (par défaut `process.env`) que les tests injectent.
@@ -84,13 +87,14 @@ export function optionsDeNode(nodeOptions: string | undefined, execArgv: readonl
   return options;
 }
 
-/** Valeurs lues, jamais rendues : seulement comparées. */
+/** Valeurs lues, jamais rendues : seulement comparées. Les noms des variables sont les clés des objets. */
 type Lecture = {
   readonly vercelEnv: string | undefined;
   readonly cible: string | undefined;
   readonly vadrouilleEnv: string | undefined;
-  readonly proxy: readonly (string | undefined)[];
-  readonly tls: readonly (string | undefined)[];
+  readonly vercel: string | undefined;
+  readonly proxy: Readonly<Record<string, string | undefined>>;
+  readonly tls: Readonly<Record<string, string | undefined>>;
   readonly options: ReadonlySet<string>;
 };
 
@@ -108,10 +112,11 @@ function productionRefusee(lu: Deploiement): boolean {
  * soit l'`env` reçu : un appelant qui passerait `{ ...process.env, VERCEL_ENV: "preview" }` sur un déploiement de
  * production est refusé.
  */
-const deploiementReel = (): Deploiement => ({
+const deploiementReel = (): Deploiement & Pick<Lecture, "vercel"> => ({
   vercelEnv: process.env.VERCEL_ENV,
   cible: process.env.VERCEL_TARGET_ENV,
   vadrouilleEnv: process.env.VADROUILLE_ENV,
+  vercel: process.env.VERCEL,
 });
 
 /**
@@ -121,30 +126,115 @@ const deploiementReel = (): Deploiement => ({
  */
 const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowerCase();
 
-const proxyPose = (lu: Lecture) => lu.proxy.some(posee) || OPTIONS_PROXY.some((option) => lu.options.has(option));
-const tlsAffaibli = (lu: Lecture) => lu.tls.some(posee) || OPTIONS_TLS.some((option) => lu.options.has(option));
+/**
+ * Exception étroite de la décision 0058 (ticket 319) : `NODE_EXTRA_CA_CERTS` **exactement** égale au fichier des
+ * autorités d'Amazon du runtime Node de Lambda, sur lequel reposent les fonctions de Vercel (documentation AWS,
+ * « CA certificate loading »). Ce fichier n'**ajoute** que des autorités d'Amazon, qui exécute déjà la fonction ; il
+ * est dans l'arborescence du runtime, que la fonction ne peut pas écrire. Admise seulement si `VERCEL` vaut `1` et
+ * `VERCEL_ENV` vaut `preview`, dans l'environnement lu **et** dans le vrai `process.env` (D21 : l'environnement injecté
+ * ne peut que resserrer). Comparaison exacte, sans `trim()` ni normalisation ; toute autre valeur reste refusée, et
+ * aucune autre variable ni option TLS n'a d'exception.
+ */
+export const CHEMIN_CA_RUNTIME_VERCEL = "/var/runtime/ca-cert.pem";
 
-/** Contrôle de sortie, à appeler avant toute lecture de clé et toute connexion. */
-export function verifierSortie(env: EnvSortie = process.env, execArgv: readonly string[] = process.execArgv): ResultatSortie {
+function exceptionCaRuntime(lu: Lecture): boolean {
+  const reel = deploiementReel();
+  return (
+    lu.tls.NODE_EXTRA_CA_CERTS === CHEMIN_CA_RUNTIME_VERCEL &&
+    lu.vercel === "1" &&
+    lu.vercelEnv === "preview" &&
+    reel.vercel === "1" &&
+    reel.vercelEnv === "preview"
+  );
+}
+
+/** Premier nom posé d'une famille de variables (clé de la lecture), jamais sa valeur. */
+const premierePosee = (famille: Readonly<Record<string, string | undefined>>, ignorer?: string): string | undefined =>
+  Object.entries(famille).find(([nom, valeur]) => nom !== ignorer && posee(valeur))?.[0];
+
+const causeProxy = (lu: Lecture): string | undefined =>
+  premierePosee(lu.proxy) ?? OPTIONS_PROXY.find((option) => lu.options.has(option));
+const causeTls = (lu: Lecture, exception: boolean): string | undefined =>
+  premierePosee(lu.tls, exception ? "NODE_EXTRA_CA_CERTS" : undefined) ?? OPTIONS_TLS.find((option) => lu.options.has(option));
+
+/** Marque de l'exception étroite de 0058, quand elle a été appliquée. */
+export const EXCEPTION_CA_RUNTIME = "vercel_runtime_ca";
+
+/**
+ * Diagnostic de la barrière (décision 0058) : `cause`, nom de la première variable ou option de proxy ou de TLS en
+ * cause (liste fermée `CAUSES_SORTIE`) ; `exception`, marque de l'exception étroite appliquée. Jamais une valeur.
+ */
+export type DiagnosticSortie = { readonly cause?: string; readonly exception?: typeof EXCEPTION_CA_RUNTIME };
+
+/**
+ * Noms qu'un diagnostic peut rendre (liste fermée) : variables de proxy et de TLS lues par `verifierSortie`, options
+ * interdites de Node. Le test de ce module vérifie que chaque nom posé seul est rendu tel quel ; le journal
+ * (`src/server/log.ts`, champ `cause`) en tient une copie, dont l'égalité est vérifiée par le test de la garde.
+ */
+export const CAUSES_SORTIE: readonly string[] = [
+  ...Object.keys({
+    HTTP_PROXY: 0,
+    http_proxy: 0,
+    HTTPS_PROXY: 0,
+    https_proxy: 0,
+    ALL_PROXY: 0,
+    all_proxy: 0,
+    NODE_USE_ENV_PROXY: 0,
+    node_use_env_proxy: 0,
+  }),
+  ...OPTIONS_PROXY,
+  ...Object.keys({
+    NODE_TLS_REJECT_UNAUTHORIZED: 0,
+    NODE_EXTRA_CA_CERTS: 0,
+    SSL_CERT_FILE: 0,
+    SSL_CERT_DIR: 0,
+    OPENSSL_CONF: 0,
+    SSLKEYLOGFILE: 0,
+  }),
+  ...OPTIONS_TLS,
+];
+
+/**
+ * Contrôle de sortie, à appeler avant toute lecture de clé et toute connexion. `diagnostic` (facultatif, décision
+ * 0058) reçoit, hors refus de production, le nom de la cause et la marque de l'exception : rien d'autre.
+ */
+export function verifierSortie(
+  env: EnvSortie = process.env,
+  execArgv: readonly string[] = process.execArgv,
+  diagnostic?: (resultat: DiagnosticSortie) => void,
+): ResultatSortie {
   const lu: Lecture = {
     vercelEnv: env.VERCEL_ENV,
     cible: env.VERCEL_TARGET_ENV,
     vadrouilleEnv: env.VADROUILLE_ENV,
-    proxy: [
-      env.HTTP_PROXY,
-      env.http_proxy,
-      env.HTTPS_PROXY,
-      env.https_proxy,
-      env.ALL_PROXY,
-      env.all_proxy,
-      env.NODE_USE_ENV_PROXY,
-      env.node_use_env_proxy,
-    ],
-    tls: [env.NODE_TLS_REJECT_UNAUTHORIZED, env.NODE_EXTRA_CA_CERTS, env.SSL_CERT_FILE, env.SSL_CERT_DIR, env.OPENSSL_CONF, env.SSLKEYLOGFILE],
+    vercel: env.VERCEL,
+    proxy: {
+      HTTP_PROXY: env.HTTP_PROXY,
+      http_proxy: env.http_proxy,
+      HTTPS_PROXY: env.HTTPS_PROXY,
+      https_proxy: env.https_proxy,
+      ALL_PROXY: env.ALL_PROXY,
+      all_proxy: env.all_proxy,
+      NODE_USE_ENV_PROXY: env.NODE_USE_ENV_PROXY,
+      node_use_env_proxy: env.node_use_env_proxy,
+    },
+    tls: {
+      NODE_TLS_REJECT_UNAUTHORIZED: env.NODE_TLS_REJECT_UNAUTHORIZED,
+      NODE_EXTRA_CA_CERTS: env.NODE_EXTRA_CA_CERTS,
+      SSL_CERT_FILE: env.SSL_CERT_FILE,
+      SSL_CERT_DIR: env.SSL_CERT_DIR,
+      OPENSSL_CONF: env.OPENSSL_CONF,
+      SSLKEYLOGFILE: env.SSLKEYLOGFILE,
+    },
     options: optionsDeNode(env.NODE_OPTIONS, execArgv),
   };
   if (productionRefusee(lu) || productionRefusee(deploiementReel())) return { ok: false, code: "production_refused" };
-  if (proxyPose(lu)) return { ok: false, code: "proxy_env_refused" };
-  if (tlsAffaibli(lu)) return { ok: false, code: "tls_env_refused" };
+  const exception = exceptionCaRuntime(lu);
+  const proxy = causeProxy(lu);
+  const tls = causeTls(lu, exception);
+  const cause = proxy ?? tls;
+  diagnostic?.({ ...(cause === undefined ? {} : { cause }), ...(exception ? { exception: EXCEPTION_CA_RUNTIME } : {}) });
+  if (proxy !== undefined) return { ok: false, code: "proxy_env_refused" };
+  if (tls !== undefined) return { ok: false, code: "tls_env_refused" };
   return { ok: true };
 }
