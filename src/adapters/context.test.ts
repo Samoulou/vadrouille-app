@@ -37,6 +37,13 @@ describe("getRequestContext (décision 0013, § 3.6)", () => {
     expect(() => getRequestContext("prototype", { NODE_ENV: "production" })).toThrow(/adaptateur prototype refusé/);
   });
 
+  it("adaptateurs: org_prototype et son utilisateur technique ont des uuid fixes distincts (0046 D15 point 4)", () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    expect(PROTOTYPE_ORG_ID).toMatch(UUID);
+    expect(PROTOTYPE_USER_ID).toMatch(UUID);
+    expect(PROTOTYPE_USER_ID).not.toBe(PROTOTYPE_ORG_ID);
+  });
+
   it("renvoie une copie : la modifier ne change pas le contexte suivant", () => {
     const ctx = getRequestContext("mock");
     ctx.organizationId = "autre";

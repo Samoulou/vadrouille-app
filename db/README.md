@@ -1,8 +1,9 @@
 # `db/` : socle de la base de données
 
 Spécification B1 (`specs/B1-socle-base-de-donnees.md`), décisions 0006 (outils), 0007 (rôles, RLS, fonctions),
-0011 (données Google), 0029 (identifiants d'administration) et 0034 (aucune connexion en production avant la passe
-de sécurité de la mise en public).
+0011 (données Google), 0029 (identifiants d'administration), 0034 (aucune connexion en production avant la passe
+de sécurité de la mise en public) et 0046 (base du prototype, P0r2 : `place_coordinates`, schéma `prototype`, trois
+rôles, purge).
 
 Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une PR ou dans un journal de CI.
 
@@ -10,13 +11,14 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 
 | Chemin | Rôle |
 | --- | --- |
-| `db/bootstrap/roles.sql` | Amorçage idempotent des 13 rôles de la décision 0007, une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/bootstrap/roles.sql` | Amorçage idempotent des 16 rôles des décisions 0007 et 0046, une fois par base, avant les migrations. Aucun mot de passe. |
 | `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
-| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées). |
+| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17). |
 | `db/migrate.ts` | Applique les migrations sous `vadrouille_migrator`, une transaction par migration, journal dans `vadrouille_migrations.applied` (empreinte SHA-256 : une migration déjà appliquée et modifiée est refusée). |
-| `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034) et garde de rôle (B1-PO-6). |
-| `db/index.ts` | `createDatabase("vadrouille_app" \| "vadrouille_auth")` : client Drizzle sur un pool gardé. |
+| `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034, sur l'environnement injecté **et** le vrai `process.env`, 0046 D21), liste d'autorisation de `vadrouille_prototype` (préversion ou développement seulement, D21) et garde de rôle (B1-PO-6). |
+| `db/index.ts` | `createDatabase("vadrouille_app" \| "vadrouille_auth" \| "vadrouille_prototype")` : client Drizzle sur un pool gardé. |
+| `scripts/db/scram-verifier.ts` | Vérificateur SCRAM-SHA-256 d'un mot de passe lu sur l'entrée standard (0046 S5) : seul le vérificateur sort, pour `ALTER ROLE … PASSWORD`. |
 
 Variables (noms de la décision 0036, B1-TL-3 ; jamais `DATABASE_URL`, que l'intégration Neon de Vercel pose avec
 l'identifiant propriétaire) :
@@ -26,7 +28,13 @@ l'identifiant propriétaire) :
 | `VADROUILLE_DATABASE_URL` | `vadrouille_app` | application |
 | `VADROUILLE_DATABASE_URL_AUTH` | `vadrouille_auth` | application (Better Auth, B3) |
 | `VADROUILLE_DATABASE_URL_MIGRATOR` | `vadrouille_migrator` | environnement des migrations seulement, jamais dans Vercel (décision 0006) |
+| `P0_DATABASE_URL` | `vadrouille_prototype` | seule préversion de `p0-reel` (0046 S5), posée après la décision 0052 ; refusée sans `VERCEL_ENV` `preview` ou `development` |
 | `VADROUILLE_DB_ADMIN_URL` | administrateur de la base de test | tests de base seulement (CI, poste local) |
+| `VADROUILLE_DB_PROTOTYPE_URL`, `VADROUILLE_DB_PROTOTYPE_PURGE_URL` | `vadrouille_prototype`, `vadrouille_prototype_purge` | tests de base seulement (mots de passe jetables de `scripts/ci/db-setup.sh`) ; jamais une variable `P0_*` |
+
+Le job `.github/workflows/p0-purge.yml` (0046 D16 point 7) ne lit aucune de ces variables : il se connecte sous
+`vadrouille_prototype_purge` par les variables libpq de son étape, tirées des secrets `P0_PURGE_PGHOST`,
+`P0_PURGE_PGDATABASE`, `P0_PURGE_PGUSER` et `P0_PURGE_PGPASSWORD` de l'environnement GitHub `p0-purge`.
 
 Commandes :
 
@@ -73,6 +81,8 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | --- | --- | --- |
 | `0000_socle` | irréversible | Elle crée les tables : son inverse serait une suite de `DROP TABLE` qui supprime toutes les données des organisations (interdit par la règle du rôle `data`). |
 | `0001_securite` | irréversible | Elle active et force la RLS, pose les politiques, retire les droits et crée les fonctions et vues durcies : son inverse rouvrirait l'accès entre organisations. Aucun état antérieur n'est acceptable à restaurer. |
+| `0002_place_coordinates` | irréversible | Elle crée `place_coordinates` et ses fonctions : son inverse supprimerait la table et ses lignes (règle du rôle `data`) ; une correction se fait vers l'avant. Les coordonnées expirent d'elles-mêmes (30 jours, 29 pour `org_prototype`) et sont purgées par les fonctions. |
+| `0003_prototype` | irréversible | Elle crée le schéma `prototype`, `org_prototype` et son utilisateur technique : son inverse supprimerait des données. Sa suppression à la fin de la phase 0 sera une migration corrective décidée par écrit (0046 D17 point 5). |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :
@@ -99,7 +109,19 @@ spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de cons
 
 ## 3. Passage aux rôles à moindre privilège (base Neon de staging)
 
-**Acteur : Samuel, seul.** Tout se fait dans un navigateur (console Neon et tableau de bord Vercel), sans outil
+**Amendement Q321 (décision 0046, S5).** Réponse écrite de Samuel à Q321 (2026-10-13 21:01 CEST, fil « Routine
+cycle du studio » du projet claude.ai : « je suis tes recos ») : pour les **trois rôles du prototype**
+(`vadrouille_prototype`, `vadrouille_prototype_purge`, `vadrouille_fn_prototype_purge`), **le studio** (rôle `data`,
+vérification par le rôle Sécurité) fait l'amorçage par `db/bootstrap/roles.sql`, ouvre la connexion d'administration
+qu'il exige, pose les mots de passe des deux rôles de connexion (vérificateur SCRAM calculé par
+`scripts/db/scram-verifier.ts`, jamais de mot de passe en clair dans une requête), `P0_DATABASE_URL` (préversion de
+`p0-reel`) et les secrets de l'environnement GitHub `p0-purge`, sans jamais afficher une valeur, selon la procédure
+de 0046 S5 ; **Samuel lance lui-même la lecture de contrôle des rôles** (requête de l'étape 1 ci-dessous) dans la
+console Neon. Ces opérations viennent avec le premier passage des migrations sur la base réelle, donc **après la
+décision 0052** (0046, « Frontière »), qui ajoute ici l'application des migrations (Q294). Le reste de cette section
+(rôles du MVP) est inchangé.
+
+**Acteur : Samuel, seul** (rôles du MVP). Tout se fait dans un navigateur (console Neon et tableau de bord Vercel), sans outil
 local. Le studio ne touche ni aux réglages Neon ni aux variables Vercel, ne voit aucun mot de passe et n'en demande
 aucun. Il fournit ce script, les requêtes de contrôle ci-dessous (aucune ne renvoie de secret) et la garde de
 connexion de `db/connection.ts`.
@@ -118,8 +140,8 @@ spécification B1).
 Console Neon, projet de staging, branche principale, **SQL Editor**, base de l'application : coller le contenu de
 `db/bootstrap/roles.sql` et l'exécuter. Il peut être rejoué sans effet.
 
-Contrôle (13 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
-`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`) :
+Contrôle (16 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
+`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype` et `vadrouille_prototype_purge`) :
 
 ```sql
 SELECT rolname, rolsuper AS super, rolbypassrls AS bypassrls, rolcanlogin AS login
@@ -128,7 +150,7 @@ FROM pg_catalog.pg_roles WHERE rolname LIKE 'vadrouille\_%' ORDER BY rolname;
 
 Contrôle des appartenances (attendu : `vadrouille_app` membre de `vadrouille_share`, `vadrouille_webhook`,
 `vadrouille_account_admin`, `vadrouille_limiter` avec `inherit = false` ; `vadrouille_migrator` membre de
-`vadrouille_owner` avec `inherit = true`, et des cinq `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
+`vadrouille_owner` avec `inherit = true`, et des six `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
 `set = false` ; décision 0036, B1-TL-2. La ligne `ADMIN` seule du rôle d'amorçage sur chaque `vadrouille_fn_*`,
 créée par Postgres 16 et suivants quand il n'est pas superutilisateur, est admise ; elle n'apparaît pas ici) :
 
@@ -192,4 +214,6 @@ reprendre avec le Tech Lead.
 
 Il ne se connecte pas à la base de staging, n'exécute rien dans la console Neon, ne crée ni ne supprime de variable
 Vercel, ne reçoit aucun mot de passe et n'applique aucune migration à staging tant que la question 3 n'est pas
-tranchée.
+tranchée. **Exception (Q321, amendement ci-dessus)** : l'amorçage des trois rôles du prototype, la connexion
+d'administration qu'il exige, la pose de leurs mots de passe, de `P0_DATABASE_URL` et des secrets de `p0-purge`, par
+le studio selon 0046 S5, après la décision 0052 ; la lecture de contrôle reste à Samuel.

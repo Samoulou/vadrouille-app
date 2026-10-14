@@ -2,7 +2,7 @@
   "schema": 1,
   "trip": {
     "id": "proto_test_20261012_1",
-    "organizationId": "org_prototype",
+    "organizationId": "5e1f0000-0000-4000-8000-000000000001",
     "destination": "Ville de test",
     "destinationColor": "granit",
     "start": "2026-11-23",

@@ -1,38 +1,40 @@
-# État du studio — 2026-10-14 (56e cycle)
+# État du studio — 2026-10-14 (57e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 56e cycle a été lancé par la routine à 05:07 CEST.
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle. Le 57e cycle a été lancé à 06:51 CEST, à la demande de Samuel (fil du projet), avant l'heure de la routine.
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 54e cycle (fil du projet et #studio). Les cartes Q366 (2026-10-13 23:09 CEST) et Q383 (2026-10-14 02:52 CEST) restent sans réponse.
+- 2026-10-14, 06:10 à 06:50 CEST, fil du projet : coût d'un essai réel et économies. **Décision 0053** (#289, fusionnée) : 500 trajets Routes au plus par voyage, répartis par jour, gratuité Google réservée à ses essais, provisoire jusqu'à ses essais (Q390). **Amendement 1** (#290, en revue) : économies retenues pour P0r3 (fiches de lieux des seuls lieux de la première série de cartes, cache de positions, profil d'IA léger, tri à vol d'oiseau avant Routes) et économies en réserve (gratuité comptée dans la réserve, hausse du plafond Google, calcul de trajets open source, recherche élargie après les « j'aime »). Q329 confirmée.
+- 06:51 CEST : « Tu peux démarrer le cycle » ; ce cycle.
+- #studio : aucun nouveau message. Les cartes Q366 et Q383 restent sans réponse.
 
 ## Fait
-- Fusionnées depuis le 55e cycle : statut du 55e cycle (#281), **décision 0048** (#274), **décision 0046** (#266, préalables de P0r2), **P0r1** (#272, clients réels de l'IA et de Google sans point d'entrée, barrière de sortie, port de consommation ; test « clé côté serveur seulement » et tests à sentinelles Google ajoutés en correction 1).
-- **P0r2** (#284, base du prototype) : ticket ouvert, code en cours (rôle data). Vérifiée sur la base de la CI seulement ; aucune action sur la base réelle avant 0052.
-- **Décision 0052** (#283, déverrouillage du prototype : écriture des positions, workflow des migrations, verrou technique) : écrite par la Sécurité, correction 1 poussée (exécuteur de migrations minimal sans `pnpm install`, verrou S11 technique, module dans `src/adapters`).
-- **Décisions 0050 et 0051** (#280) : corrections 1 et 2 poussées ; le Tech Lead accepte les refus de la Sécurité (Q382) ; mode de démarrage tolérant en préversion retiré ; porte de fusion du code de B3a (relevé des noms des variables Vercel, Q381).
-- **B5c** (#276) : branche mise à jour depuis `main` pour relancer la revue (Q365).
+- Fusionnées depuis le 56e cycle : statut du 56e cycle (#285), **B5c** (#276, moteur sans IA complet), **décisions 0050 et 0051** (#280, préalables de B3a, troisième tentative), **décision 0053** (#289).
+- **P0r2** (#287, base du prototype) : approuvée par le Tech Lead et la Sécurité, CI au vert ; attend `owner-approved` de Samuel (la PR ajoute `.github/workflows/p0-purge.yml`).
+- **Décision 0052** (#283) : correction 2, la dernière, poussée (migrations exécutées dans un bloc `DO`, garde du `search_path`, exception d'empreinte calculée sur les fichiers).
+- **Spec B7** (#288, couche IA et recherche) : écrite par le product owner (ticket #286) ; découpage proposé en B7a, B7b et B7c.
 
 ## En cours
-- Fils actifs : P0r2 (#284, code), 0050 et 0051 troisième tentative bornée (#280, Q386), 0052 correction 2, la dernière (#283).
-- En revue : B5c (#276).
+- Fils actifs : spec B7 correction 1 (#288, 4 bloquants du Tech Lead sur les contrats, le schéma et la liste blanche d'imports) ; 0052, bloquant tardif non compté (#283, verrou S11 contournable par un déclencheur sur `vadrouille_migrations.applied`).
+- En revue : amendement 1 de 0053 (#290).
 
 ## Bloqué
-- **Vrais appels du prototype (P0r3, puis essai d'intégration)** : fusion de P0r2 (`owner-approved` de Samuel : la PR touche `.github/workflows/`), puis de 0052 ; sur la base réelle, Q366, Q367 et Q387.
-- **B8, B9, B11** : fusion de B5c (#276).
-- **Code de B3a** : fusion de #280 et levée du délai de veto (Q383) ou le 2026-10-16 ; porte de fusion Q381.
+- **Premier essai réel (P0r3, puis P0r4)** : `owner-approved` de Samuel sur P0r2 (#287) ; fusion de 0052 ; sur la base réelle, Q366, Q367, Q387 et Q394.
+- **Code de B7** : fusion de la spec (#288), décision 0054 (découpage, Q396), puis fusion de P0r3 pour B7a.
+- **Code de B3a** : levée du délai de veto (Q383) ou le 2026-10-16 ; porte de fusion Q381.
+- **B8** : spec à écrire après la spec B7 (dépend de ses interfaces).
 - **Code de B4** : Q351, Q352, Q364 ; B4a après B3b.
 
 ## Prochain cycle
-1. Après la fusion de B5c : ticket B8 (ou B9, B11) selon `docs/roadmap.md`.
-2. PR de P0r2 : demander `owner-approved` à Samuel dès qu'elle est approuvée.
-3. Si #280 ou #283 restent bloquées : découpage (Q386 ; pour 0052, décision avec le Tech Lead).
+1. Après la fusion de P0r2 : ticket P0r3 (ia-recherche, avec backend) avec les économies de 0053 et le client réel de recherche web dans `src/ai` (Q396).
+2. Après la fusion de la spec B7 : décision 0054 (découpage) et spec B8.
+3. Si #283 reste bloquée après le bloquant tardif : troisième tentative ou découpage, avec le Tech Lead.
 4. Vérifier à chaque cycle qu'aucune PR approuvée sans bloquant n'attend `techlead-approved`, et que les PR en `needs-review` ont bien été relues (Q365).
 
 ## Décisions attendues de Samuel
-- **Nouvelles** : Q387 (qui crée l'environnement et les secrets des migrations).
-- **Cartes en attente** : Q383 (lever le délai de veto sur le découpage de B3, reco : lever), Q366 (préversions et données du prototype, reco : accepter).
+- **Maintenant** : `owner-approved` sur P0r2 (#287) ; carte Q383 (lever le délai de veto sur le découpage de B3, reco : lever) ; carte Q366 (préversions et données du prototype, reco : accepter).
+- **Nouvelles** : Q394 (relevé des secrets avant chaque lancement des migrations), Q397 (plafonds du MVP, évaluations payantes, brief de Zakynthos).
 - **Prévente** : Q357 et Q362 ; les documents sont fusionnés (#256).
-- **Déjà posées** : Q381, Q378, Q367, Q368, Q370, Q263, Q353, Q354, Q345, Q330, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
+- **Déjà posées** : Q387, Q381, Q378, Q367, Q368, Q263, Q353, Q354, Q345, Q330, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
 - **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
 - **Toujours ouvertes** :
   - juridique : Q5 (validation formelle), Q6, Q29, Q34, Q38, Q44, Q46, Q47, Q75, Q127, Q150 ;
@@ -43,21 +45,19 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - règles : Q23, Q274.
 - **Veto possible** :
   - avant le 2026-10-15 : décisions B3-PO de la spec B3 (#243) et B4-PO de la spec B4 (#248) ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
-  - avant le 2026-10-16 : décision 0047 (découpage de `fr.json`, #269) ;
-  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, décisions B1-PO-1 à 6 (#185).
+  - avant le 2026-10-16 : décision 0047 (découpage de `fr.json`, #269) ; découpage de B3 (0050) ;
+  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q386 (CEO, avec le Tech Lead) : troisième tentative bornée de #280 (tranchée).
-- Q387 (Samuel), Q388 (Tech Lead), Q389 (Product owner) : décision 0052.
-- Tranchées ou closes : Q382 (Tech Lead), Q375 (#272 fusionnée). Q381 et Q365 complétées.
+- Q390 (Samuel, tranchée : décision 0053), Q391 (Product owner), Q392 et Q393 (Tech Lead) : P0r2.
+- Q394 (Samuel), Q395 (Tech Lead) : décision 0052.
+- Q396 (CEO, tranchée), Q397 (Samuel) : spec B7.
+- Complétées : Q329 (confirmée), Q370 et Q389 (0053).
 
 ## Part d'usage estimée
-- 56e cycle (comptés depuis le 55e) : 9 sous-agents, 3 au plus en même temps :
-  - correctifs tardifs de 0048 (0,09 M) et 0046 (0,13 M) ;
-  - 0052 : écriture (0,28 M) et correction 1 (0,24 M) ;
-  - 0050 et 0051 : corrections 1 (0,24 M) et 2 (0,2 M) ;
-  - P0r1 correction 1 (0,3 M) ;
-  - P0r2, 0050 et 0051 troisième tentative, 0052 correction 2 en cours (comptés au prochain cycle).
-- S'y ajoute le travail du CEO (environ 0,1 M).
-- Total : environ 1,6 M de jetons (estimation).
-- Part de l'abonnement : impossible à mesurer depuis la routine.
+- 57e cycle (comptés depuis le 56e) : 6 sous-agents, 3 au plus en même temps :
+  - P0r2 (0,14 M) ;
+  - 0050 et 0051 troisième tentative (0,22 M) ;
+  - 0052 correction 2 (0,2 M) ;
+  - spec B7 (0,31 M) ;
+  - spec B7 correction 1 et 0052 bloquant tardif en cours (comptés au prochain cycle).
