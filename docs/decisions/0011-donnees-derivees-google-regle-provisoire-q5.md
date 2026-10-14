@@ -4,6 +4,8 @@ Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08
 
 **§ 6 amendé par 0046** (#266) : `EXECUTE` de `purge_expired_coordinates` aussi à `vadrouille_fn_prototype_purge` ; coordonnées d'`org_prototype` écrites par la seule fonction dédiée `store_prototype_coordinates` (expiration à 29 jours, aucun `EXECUTE` pour `vadrouille_prototype` avant la décision 0052), que `store_place_coordinates` refuse ; lecture de `vadrouille_app` sans `org_prototype` ; politiques de `vadrouille_fn_coords` inchangées ; portée étendue au prototype sous l'exigence S6. **§ 2 et § 3 ne sont pas amendés** (0046, S4).
 
+**§ 6 complété par 0052** (ticket #282) : `store_prototype_coordinates` prend l'identifiant de l'exécution en cours et pose `fetched_at = started_at` et `expires_at = started_at + 29 jours` ; positions d'`org_prototype` écrites par la seule étape finale de `p0Run`, avec le programme, par le seul module `src/adapters/prototype-ecriture.ts` hors de `src/grounding` (exception ouverte par S6 de 0046) ; droits de `vadrouille_fn_coords` étendus à la lecture de quatre colonnes de `prototype.runs` ; levée du verrou S8 renvoyée à la décision 0056 (0052 § 3). **§ 3 n'est pas amendé.**
+
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.
 
 ## Contexte
