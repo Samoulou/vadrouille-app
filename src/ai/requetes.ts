@@ -58,7 +58,8 @@ export function briefPourModele(brief: Brief) {
  * `data_collection: "deny"` : le modèle ne peut pas recopier un texte qu'il ne voit pas. Les engagements n'entrent dans
  * aucune vue. Le récit libre reste visible (Q197) ; ce qui peut en partir est borné par `requeteSansDonneeDuBrief`
  * (`src/research/agent.ts`) : au plus 3 mots consécutifs (écriture à espaces) ou 7 caractères consécutifs (chinois,
- * japonais, thaï, lao, khmer, birman), ou des mots épars. Flux accepté par Samuel le 2026-10-14 (Q427).
+ * japonais, thaï, lao, khmer, birman, javanais, balinais, hangul), ou des mots épars, y compris dans un récit qui mêle
+ * les deux sortes d'écriture. Flux accepté par Samuel le 2026-10-14 (Q427).
  */
 export function briefPourRecherche(brief: Brief): Omit<ReturnType<typeof briefPourModele>, "logements"> {
   return {

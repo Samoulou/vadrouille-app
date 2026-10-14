@@ -7,10 +7,12 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { DEBUT_DONNEES } from "@/ai/requetes";
+import { lireTour } from "@/ai/sorties";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
+import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
 import { chercherCandidats, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
@@ -626,6 +628,74 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
     const brief = avec({ destination: "東京", pays: "日本", recit: "誕生日のお祝い" });
     expect(requeteSansDonneeDuBrief("誕生日のお祝い レストラン", brief)).toBe(false);
     expect(requeteSansDonneeDuBrief("誕生日 レストラン", brief)).toBe(true);
+  });
+
+  // --- Bloquant tardif du head `f06449c` : récit et requête mêlant écriture à espaces et écriture sans espace ---------
+
+  it("récit à espaces, requête dont les mots sont collés à des caractères sans espace (avant ou après) : refusée", () => {
+    const train = avec({ recit: "mon fils adore le train et les musees scientifiques" });
+    expect(requeteSansDonneeDuBrief("mon fils adore 国le train 宿et les musees scientifiques", train)).toBe(false);
+    expect(requeteSansDonneeDuBrief("国et les musees scientifiques宿", train)).toBe(false);
+    const hotel = avec({ recit: "hotel paris reservation near station" });
+    expect(requeteSansDonneeDuBrief("宿hotel paris reservation near station国", hotel)).toBe(false);
+    expect(requeteSansDonneeDuBrief("호텔hotel paris reservation near", hotel)).toBe(false);
+    // Trois mots consécutifs : admis (limite annoncée), collés ou non.
+    expect(requeteSansDonneeDuBrief("宿hotel paris reservation", hotel)).toBe(true);
+  });
+
+  it("récit mixte « 東京hotel … » : les mots à espaces fenêtrés comme les autres, la suite sans espace par caractères", () => {
+    const brief = avec({ destination: "東京", pays: "日本", recit: "東京hotel paris reservation near" });
+    expect(requeteSansDonneeDuBrief("東京 hotel paris reservation near", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("東京hotel paris reservation near", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("hotel paris reservation near", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("東京 hotel paris", brief)).toBe(true);
+    const long = avec({ destination: "東京", pays: "日本", recit: "家族で美術館と古い寺を巡りたい and we love trains" });
+    expect(requeteSansDonneeDuBrief("美術館と古い寺を巡り", long)).toBe(false);
+    expect(requeteSansDonneeDuBrief("寺and we love trains", long)).toBe(false);
+    expect(requeteSansDonneeDuBrief("東京 美術館 trains", long)).toBe(true);
+  });
+
+  it("récit mixte court : les mots à espaces comparés en entier ; une suite sans espace de moins de 8 caractères n'est pas protégée (limite)", () => {
+    const brief = avec({ destination: "東京", pays: "日本", recit: "誕生日のお祝い birthday" });
+    expect(requeteSansDonneeDuBrief("birthday restaurant 東京", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("誕生日のお祝い birthday", brief)).toBe(false);
+    expect(requeteSansDonneeDuBrief("誕生日のお祝い レストラン", brief)).toBe(true);
+  });
+
+  it(`hangul et javanais : fenêtrés par caractères (${FENETRE_RECIT_CARACTERES}), avec ou sans espace`, () => {
+    const colle = avec({ destination: "서울", pays: "대한민국", recit: "가족과함께서울에서맛집" });
+    expect(requeteSansDonneeDuBrief("가족과함께서울에서맛집", colle)).toBe(false);
+    expect(requeteSansDonneeDuBrief("함께서울에서맛집 추천", colle)).toBe(false);
+    expect(requeteSansDonneeDuBrief("서울 맛집 추천", colle)).toBe(true);
+    const espace = avec({ destination: "서울", pays: "대한민국", recit: "가족과 함께 서울에서 맛집을 찾고 싶어요" });
+    expect(requeteSansDonneeDuBrief("서울에서 맛집을 찾고", espace)).toBe(false);
+    expect(requeteSansDonneeDuBrief("서울 맛집", espace)).toBe(true);
+    // Syllabes saisies en jamos (forme décomposée) : recomposées par la normalisation.
+    expect(requeteSansDonneeDuBrief("함께서울에서맛집".normalize("NFD"), colle)).toBe(false);
+    const javanais = avec({ recit: "ꦏꦒꦤꦩꦱꦭꦥꦢꦠꦫꦕꦗ" });
+    expect(requeteSansDonneeDuBrief("ꦱꦭꦥꦢ ꦠꦫꦕꦗ", javanais)).toBe(false);
+    expect(requeteSansDonneeDuBrief("ꦱꦭꦥꦢꦠꦫꦕ", javanais)).toBe(true);
+  });
+
+  it("écriture sans espace : ponctuation et caractères de largeur nulle insérés ne cachent pas l'extrait, nettoyage compris", () => {
+    const brief = avec({
+      destination: "東京",
+      pays: "日本",
+      recit: "家族で東京に行きます。美術館と古い寺を巡りたいです。夜は静かな居酒屋で地元の料理を食べたいです。",
+    });
+    for (const requete of ["静かな、居酒屋で。地元", "静かな・居酒屋で「地元」", "静かな\u200b居酒屋で\u200d地元", "静か\u2060な居酒屋で\ufeff地元"]) {
+      expect(requeteSansDonneeDuBrief(requete, brief), requete).toBe(false);
+      expect(requeteSansDonneeDuBrief(nettoyerRequeteWeb(requete, LONGUEURS_TEXTE.requete), brief), requete).toBe(false);
+    }
+    expect(nettoyerRequeteWeb("静か\u2060な居酒屋で", LONGUEURS_TEXTE.requete)).toBe("静か な居酒屋で");
+  });
+
+  it("mineur 7 : le schéma des sorties borne la requête du modèle à la longueur de LONGUEURS_TEXTE.requete", () => {
+    const tour = (requete: string) => lireTour(JSON.stringify({ actions: [{ type: "rechercher", requete }], candidats: [], termine: false }));
+    expect(tour("a".repeat(LONGUEURS_TEXTE.requete)).valeur.actions).toHaveLength(1);
+    const trop = tour("a".repeat(LONGUEURS_TEXTE.requete + 1));
+    expect(trop.valeur.actions).toHaveLength(0);
+    expect(trop.refuses).toBe(1);
   });
 
   it(`mots courts : mot de ${LONGUEUR_FRAGMENT_MIN} caractères protégé ; texte dont tous les mots hors lieu sont plus courts, comparé en entier (sans le lieu)`, () => {

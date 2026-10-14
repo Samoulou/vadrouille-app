@@ -56,25 +56,28 @@ function cle(nom: string): string {
 
 /**
  * Texte comparable pour le filtre des requêtes web, quelle que soit l'écriture : compatibilité Unicode (NFKD), marques
- * diacritiques retirées, minuscules ; tout ce qui n'est ni lettre ni chiffre (`\p{L}`, `\p{N}`) devient une espace.
+ * diacritiques retirées, recomposition (NFC : les syllabes hangul, décomposées en jamos par NFKD, redeviennent un
+ * caractère chacune), minuscules ; tout ce qui n'est ni lettre ni chiffre (`\p{L}`, `\p{N}`) devient une espace.
  */
 function cleRequete(texte: string): string {
   return texte
     .normalize("NFKD")
     .replace(/\p{M}/gu, "")
+    .normalize("NFC")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
 /**
- * Écritures sans espace entre les mots (Han, hiragana, katakana, thaï, lao, khmer, birman), détectées par propriété
- * Unicode d'écriture. `Script_Extensions` plutôt que `Script` : il inclut les caractères partagés par ces écritures (la
- * marque d'allongement « ー », de script `Common`, appartient aux extensions hiragana et katakana).
+ * Écritures sans espace entre les mots (Han, hiragana, katakana, thaï, lao, khmer, birman, javanais, balinais), et
+ * hangul, souvent écrit ou tapé sans espace (mineur 3 du head `f06449c`), détectées par propriété Unicode d'écriture.
+ * Liste fermée : une écriture absente (tai tham, n'ko…) est traitée comme une écriture à espaces (limite).
+ * `Script_Extensions` plutôt que `Script` : il inclut les caractères partagés par ces écritures (la marque
+ * d'allongement « ー », de script `Common`, appartient aux extensions hiragana et katakana).
  */
 const CLASSE_SANS_ESPACE =
-  "\\p{scx=Han}\\p{scx=Hiragana}\\p{scx=Katakana}\\p{scx=Thai}\\p{scx=Lao}\\p{scx=Khmer}\\p{scx=Myanmar}";
-const SANS_ESPACE = new RegExp(`[${CLASSE_SANS_ESPACE}]`, "u");
+  "\\p{scx=Han}\\p{scx=Hiragana}\\p{scx=Katakana}\\p{scx=Thai}\\p{scx=Lao}\\p{scx=Khmer}\\p{scx=Myanmar}\\p{scx=Javanese}\\p{scx=Balinese}\\p{scx=Hangul}";
 const HORS_SANS_ESPACE = new RegExp(`[^${CLASSE_SANS_ESPACE}]+`, "gu");
 const SUITES_SANS_ESPACE = new RegExp(`[${CLASSE_SANS_ESPACE}]+`, "gu");
 /** Écritures idéographiques ou syllabiques (chinois, japonais) : un ou deux caractères y forment déjà un mot. */
@@ -108,8 +111,9 @@ export const LONGUEUR_FRAGMENT_MIN = 3;
 
 /**
  * Fenêtre des fragments d'un logement ou d'un libellé dans une écriture sans espace : 2 caractères consécutifs en
- * chinois et en japonais (un nom de lieu y tient en 2 ou 3 caractères : « 新宿 »), 4 en thaï, lao, khmer et birman
- * (alphasyllabaires : 2 lettres n'y font pas un mot). Mineur 3c du head `3254723`.
+ * chinois et en japonais (un nom de lieu y tient en 2 ou 3 caractères : « 新宿 »), 4 en thaï, lao, khmer, birman,
+ * javanais et balinais (alphasyllabaires : 2 lettres n'y font pas un mot) et en hangul (2 syllabes y sont souvent une
+ * particule : « 에서 »). Mineur 3c du head `3254723`.
  */
 export const FENETRE_FRAGMENT_IDEOGRAMMES = 2;
 export const FENETRE_FRAGMENT_ALPHASYLLABAIRES = 4;
@@ -122,8 +126,9 @@ export const MOTS_RECIT_FENETRE = 4;
  * head `3254723`, option a). Dans ces écritures, le découpage en mots par les espaces ne fonctionne pas (un récit sans
  * espace serait un seul « mot ») ; on fenêtre donc par caractères. 8 : un mot chinois ou japonais compte en moyenne
  * 1,5 à 2,5 caractères, 8 caractères en font 3 à 5, soit l'équivalent de la fenêtre de `MOTS_RECIT_FENETRE` mots ; en
- * thaï (marques retirées par la normalisation, 3 à 5 lettres par mot), c'est 2 mots environ, plus strict. Au plus 7
- * caractères consécutifs du récit peuvent donc partir ; moins aurait refusé les noms de lieux et d'activités usuels.
+ * thaï (marques retirées par la normalisation, 3 à 5 lettres par mot), c'est 2 mots environ, plus strict ; en hangul
+ * (syllabes recomposées, 2 à 4 par mot), 2 à 4 mots. Au plus 7 caractères consécutifs du récit peuvent donc partir ;
+ * moins aurait refusé les noms de lieux et d'activités usuels.
  */
 export const FENETRE_RECIT_CARACTERES = 8;
 
@@ -172,16 +177,23 @@ function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): Fragme
  * (`briefPourRecherche`). La requête est jugée telle qu'elle part (`nettoyerRequeteWeb` appliquée avant). Refusée :
  * - si un texte de logement ou un libellé d'engagement devient vide après normalisation (protection impossible) ;
  * - dès qu'un fragment d'un logement ou d'un libellé y apparaît (`fragmentsProteges`) ;
- * - écriture à espaces : si elle contient `MOTS_RECIT_FENETRE` mots consécutifs du récit libre, ou le récit entier
- *   s'il est plus court (récit vide après normalisation : refusée) ;
- * - écriture sans espace (chinois, japonais, thaï, lao, khmer, birman) : si ses caractères de ces écritures, mis bout à
- *   bout, contiennent `FENETRE_RECIT_CARACTERES` caractères consécutifs de ceux du récit (également mis bout à bout,
- *   ponctuation et espaces retirées), ou tous ceux du récit s'il en a moins et n'a pas d'autre mot.
+ * - écriture à espaces : si ses mots (suites sans espace retirées) contiennent `MOTS_RECIT_FENETRE` mots consécutifs
+ *   des mots du récit libre (suites sans espace retirées de même), ou tous ces mots s'il en a moins (récit vide après
+ *   normalisation : refusée) ;
+ * - écriture sans espace (`CLASSE_SANS_ESPACE` : chinois, japonais, thaï, lao, khmer, birman, javanais, balinais,
+ *   hangul) : si ses caractères de ces écritures, mis bout à bout, contiennent `FENETRE_RECIT_CARACTERES` caractères
+ *   consécutifs de ceux du récit (également mis bout à bout, ponctuation et espaces retirées), ou tous ceux du récit
+ *   s'il en a moins et n'a pas d'autre mot.
+ * Les deux règles s'appliquent à tout récit, y compris mêlant les deux sortes d'écriture (« 東京hotel … »).
  * Limites (description de la PR 326, question Q427) : le modèle voit toujours le récit libre ; une requête peut en
  * reprendre jusqu'à `MOTS_RECIT_FENETRE - 1` mots consécutifs (écriture à espaces) ou `FENETRE_RECIT_CARACTERES - 1`
- * caractères consécutifs (écriture sans espace), ou des mots épars. Logements et libellés : un mot de 1 ou 2 caractères
+ * caractères consécutifs (écriture sans espace), ou des mots épars ; dans un récit mixte, une suite sans espace de
+ * moins de `FENETRE_RECIT_CARACTERES` caractères n'est pas protégée (au plus 7 caractères, donc). Écritures hors de
+ * `CLASSE_SANS_ESPACE` (tai tham, n'ko…) traitées comme écritures à espaces : un récit qui y est écrit sans espace
+ * forme un seul « mot » et n'est protégé qu'en entier. Logements et libellés : un mot de 1 ou 2 caractères
  * n'est pas protégé seul quand le texte en a d'autres ; un texte dont tous les mots hors lieu font moins de
- * `LONGUEUR_FRAGMENT_MIN` caractères est comparé en entier (ces mots, dans l'ordre). Seul appelant du moteur de
+ * `LONGUEUR_FRAGMENT_MIN` caractères est comparé en entier (ces mots, dans l'ordre) ; un mot n'est reconnu qu'entier
+ * (particules ou suffixes collés : « 롯데호텔에서 », turc, finnois, composés allemands). Seul appelant du moteur de
  * recherche web : cet agent (la composition `p0-reel` n'a pas le brief ; voir `src/ai/recherche-web-reelle.ts`).
  */
 export function requeteSansDonneeDuBrief(requete: string, brief: Brief): boolean {
@@ -200,15 +212,22 @@ export function requeteSansDonneeDuBrief(requete: string, brief: Brief): boolean
   if (brief.recit !== undefined) {
     const normalise = cleRequete(brief.recit);
     if (normalise === "") return false;
-    const mots = normalise.split(" ");
+    // Mots du récit en écriture à espaces, séparés de toute suite sans espace collée (« 東京hotel ») et comparés aux
+    // mots de la requête séparés de même (`texteMots`) : un caractère sans espace collé à un mot, d'un côté ou de
+    // l'autre, ne cache pas l'extrait (bloquant tardif du head `f06449c`). Les suites sans espace du récit sont
+    // couvertes par la fenêtre de caractères ci-dessous.
+    const mots = normalise
+      .replace(SUITES_SANS_ESPACE, " ")
+      .split(" ")
+      .filter((mot) => mot !== "");
     const fenetre = Math.min(MOTS_RECIT_FENETRE, mots.length);
-    for (let debut = 0; debut + fenetre <= mots.length; debut += 1) {
-      const extrait = mots.slice(debut, debut + fenetre).join(" ");
-      if (SANS_ESPACE.test(extrait) ? texte.includes(extrait) : contientMots(texte, extrait)) return false;
+    if (fenetre > 0) {
+      for (let debut = 0; debut + fenetre <= mots.length; debut += 1) {
+        if (contientMots(texteMots, mots.slice(debut, debut + fenetre).join(" "))) return false;
+      }
     }
     const recitSansEspace = compactSansEspace(normalise);
-    const autresMots = normalise.replace(SUITES_SANS_ESPACE, " ").trim() !== "";
-    if (recitSansEspace !== "" && ([...recitSansEspace].length >= FENETRE_RECIT_CARACTERES || !autresMots)) {
+    if (recitSansEspace !== "" && ([...recitSansEspace].length >= FENETRE_RECIT_CARACTERES || mots.length === 0)) {
       if (fenetres(recitSansEspace, FENETRE_RECIT_CARACTERES).some((extrait) => texteSansEspace.includes(extrait))) return false;
     }
   }
