@@ -143,7 +143,10 @@ describe("moteur: champs calculés", () => {
   const relectures = (duree: (depuis: Point, vers: Point) => number | typeof INCONNU): Relectures => ({
     validite: () => "valide",
     plages: () => INCONNU,
-    duree,
+    duree: (depuis, vers) => {
+      const minutes = duree(depuis, vers);
+      return minutes === INCONNU ? INCONNU : { minutes, estimee: false };
+    },
   });
 
   it("travelMinutes : somme de tous les trajets du jour, retour au logement compris ; inconnu si un trajet l'est", () => {
@@ -156,13 +159,13 @@ describe("moteur: champs calculés", () => {
     const parMode: Relectures = {
       validite: () => "valide",
       plages: () => INCONNU,
-      duree: (_depuis, _vers, mode) => (mode === "walk" ? 30 : mode === "transit" ? 20 : 20),
+      duree: (_depuis, _vers, mode) => ({ minutes: mode === "walk" ? 30 : 20, estimee: mode === "car" }),
     };
     const a: Point = { lieu: "SENTINELLE_PLACE_A" };
     const b: Point = { lieu: "SENTINELLE_PLACE_B" };
-    expect(trajetLePlusRapide(parMode, a, b, ["walk", "transit", "car"])).toEqual({ mode: "transit", minutes: 20 });
-    expect(trajetLePlusRapide(parMode, a, b, ["car", "walk"])).toEqual({ mode: "car", minutes: 20 });
-    expect(trajetLePlusRapide(parMode, a, b, ["walk"])).toEqual({ mode: "walk", minutes: 30 });
+    expect(trajetLePlusRapide(parMode, a, b, ["walk", "transit", "car"])).toEqual({ mode: "transit", minutes: 20, estimee: false });
+    expect(trajetLePlusRapide(parMode, a, b, ["car", "walk"])).toEqual({ mode: "car", minutes: 20, estimee: true });
+    expect(trajetLePlusRapide(parMode, a, b, ["walk"])).toEqual({ mode: "walk", minutes: 30, estimee: false });
   });
 
   it("logements du jour : départ et arrivée bornés aux nuits du séjour", () => {

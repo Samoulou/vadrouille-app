@@ -348,6 +348,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 **Retenue, renforcée. Les deux gardes échouent fermées par défaut.**
 
 #### 11.0 Déploiement de production : une condition indépendante de l'hébergeur
+> **Amendé par la décision 0050, P2 (2026-10-14)** : `VADROUILLE_ENV=ci` est posé par le `webServer` de Playwright et par les jobs `verify` et `db` de `ci.yml`, `local` par le script `dev` ; liste fermée des emplacements, règles du job `docker` et de `VERCEL_ENV`, et ce que `local` et `ci` desserrent côté serveur : 0050, P2. Les deux phrases de ce paragraphe sur le `webServer` de Playwright et sur « ne peut que fermer » se lisent comme 0050, P2, point 6.
+
 - `isProductionDeployment(env)`, fonction pure de `src/dev/flags.ts`, est vraie si **l'une** de ces conditions est remplie :
   - `VADROUILLE_ENV` vaut `production` ;
   - `VERCEL_ENV` vaut `production`.
@@ -389,6 +391,8 @@ Tout ce que l'interface lit des contrats vit dans `src/contracts/values.ts`, san
 - Si Samuel décide d'ouvrir la démonstration sur un déploiement de production (par exemple celui de `main`, que Vercel nomme « Production », D1-Q1), cette garde se lève par un amendement écrit de cette décision, après sa décision. Elle ne se lève pas par une variable.
 
 #### 11.3 Playwright et configuration versionnée
+> **Amendé par la décision 0050, P2 (2026-10-14)** : interdictions des drapeaux d'ouverture et exception bornée inchangées ; règles de `VADROUILLE_ENV`, `VERCEL_ENV` et `VERCEL` vérifiées par `tests/unit/server-env-config.test.ts` (B3a) ; lecteur de workflow partagé dans `tests/support/workflow-steps.ts`, sans changement des attentes de `dev-pages-env.test.ts`.
+
 - **Playwright** : `playwright.config.ts` pose `VADROUILLE_DEMO_AUTH: "1"` dans `webServer.env`, à côté de `VADROUILLE_DEV_PAGES`.
 - **Configuration versionnée** : `tests/unit/dev-pages-env.test.ts` lit `Dockerfile`, `vercel.json` s'il existe et chaque fichier `.env*` suivi par Git (aujourd'hui `.env.example`). Il lit aussi `.github/workflows/*`, les fichiers compose (`compose*.y*ml`, `docker-compose*.y*ml`) s'il en existe, et `next.config.*`. Il échoue si l'un d'eux pose un drapeau d'ouverture : `VADROUILLE_DEV_PAGES`, `VADROUILLE_DEMO_AUTH`, et `VADROUILLE_DEMO_PAYMENT` (0020 § 2.3). `playwright.config.ts` n'est pas dans cette liste : il les pose pour les tests (ci-dessus).
 - **Exception unique et bornée, l'étape `Gardes fermées malgré les drapeaux` du § 11.0.** Dans les fichiers lus, un drapeau d'ouverture n'est accepté que si toutes ces conditions sont réunies :

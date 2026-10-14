@@ -75,7 +75,7 @@ function relectures(doubles: Doubles = {}): Relectures {
     duree(depuis: Point, vers: Point) {
       const lieux = [depuis, vers].flatMap((point) => ("lieu" in point ? [point.lieu] : []));
       if (lieux.includes(P_SANS_TRAJET)) return INCONNU;
-      return doubles.lent === true ? 600 : SENTINELLES.duree;
+      return { minutes: doubles.lent === true ? 600 : SENTINELLES.duree, estimee: false };
     },
   };
 }
