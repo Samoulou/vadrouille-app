@@ -331,3 +331,87 @@ describe("p0: fournisseur explicite (statique)", () => {
     for (const motif of [/\bapiKey\s*:\s*cle\b/, /\bbaseURL\s*:\s*BASE_URL\b/, /\bfetch\s*:\s*enveloppe\b/]) expect(creation).toMatch(motif);
   });
 });
+
+describe("p0: recherche web du fournisseur (0055 § 7 point 2)", () => {
+  const requeteWeb = (modifs: Record<string, unknown> = {}) => ({
+    modele: "fournisseur/recherche-test",
+    routage: { data_collection: "deny" as const },
+    prompt: { id: "recherche-web", version: 1 },
+    messages: [
+      { role: "system" as const, contenu: "Consigne." },
+      { role: "user" as const, contenu: "musées Édimbourg" },
+    ],
+    maxResultats: 3,
+    ...modifs,
+  });
+
+  const reponseWeb = (annotations: unknown[], cout = 0.0061) =>
+    new Response(
+      JSON.stringify({
+        id: "gen-2",
+        object: "chat.completion",
+        created: 1,
+        model: "fournisseur/recherche-test",
+        provider: "P",
+        choices: [{ index: 0, message: { role: "assistant", content: "SENTINELLE-TEXTE-MODELE", annotations }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost: cout },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+
+  const citation = (url: string, title: string, content: string) => ({ type: "url_citation", url_citation: { url, title, content, start_index: 0, end_index: 1 } });
+
+  it("même enveloppe et même réservation ; greffon web seul, borné ; sources rendues, texte du modèle ignoré", async () => {
+    const { client, appels, port } = monter([async () => reponseWeb([citation("https://exemple.org/a", "A", "Extrait A")])]);
+    const reponse = await client.rechercherWeb(requeteWeb());
+    expect(reponse).toEqual({ sources: [{ url: "https://exemple.org/a", titre: "A", extrait: "Extrait A" }], coutUsd: 0.0061 });
+    expect(JSON.stringify(reponse)).not.toContain("SENTINELLE-TEXTE-MODELE");
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_MODELES);
+    expect(init.redirect).toBe("manual");
+    const corps = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(corps.plugins).toEqual([{ id: "web", max_results: 3 }]);
+    expect(corps.provider).toEqual({ data_collection: "deny" });
+    expect(corps.model).toBe("fournisseur/recherche-test");
+    expect(String(init.body)).not.toContain(CLE);
+    expect(port.lignes.map((l) => [l.etat, l.coutReelMicros, l.demande.fournisseur, l.demande.methode, l.demande.sku])).toEqual([
+      ["confirmee", 6100, "modeles", "chat", "fournisseur/recherche-test"],
+    ]);
+  });
+
+  it("envoyer n'ajoute jamais le greffon web", async () => {
+    const { client, appels } = monter([async () => reponseOk()]);
+    await client.envoyer(requete());
+    expect(JSON.parse(String(premier(appels).init.body))).not.toHaveProperty("plugins");
+  });
+
+  it.each([0, 11, 2.5, Number.NaN])("nombre de résultats %s hors de [1, 10] : invalid_request, ni réservation ni requête", async (maxResultats) => {
+    const { client, transport, port } = monter([]);
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ maxResultats })))).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("data_collection absent, identifiant mal formé, rôle inconnu : refus avant toute réservation ni requête", async () => {
+    const { client, transport, port } = monter([]);
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ routage: { data_collection: "allow" } })))).toBe("data_collection_missing");
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ modele: "https://exemple.org/x" })))).toBe("model_id_invalid");
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ messages: [{ role: "assistant", contenu: "x" }] })))).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("erreur du fournisseur : code fermé, aucun texte de la réponse, un seul appel", async () => {
+    const { client, appels, port } = monter([async () => new Response('{"error":{"message":"SENTINELLE-FOURNISSEUR"}}', { status: 503 })]);
+    let erreur: unknown;
+    try {
+      await client.rechercherWeb(requeteWeb());
+    } catch (e) {
+      erreur = e;
+    }
+    expect((erreur as ErreurOpenRouter).code).toBe("upstream_unavailable");
+    expect(`${(erreur as Error).message} ${JSON.stringify(erreur)}`).not.toContain("SENTINELLE-FOURNISSEUR");
+    expect(appels).toHaveLength(1);
+    expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+  });
+});

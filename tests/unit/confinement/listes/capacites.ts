@@ -419,6 +419,16 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
   },
+  // P0r3c-3 (ticket 316 ; décision 0055, section 3 point 6 ; condition E4 de 0049). Verdict Sécurité à rendre dans la PR.
+  {
+    fichier: "tests/unit/p0/undici-contrat.test.ts",
+    portee: "test",
+    usage:
+      "test de contrat d'`undici` : `Agent` réel de la version épinglée avec `connect.lookup` = `lookupEpingle`, contre le serveur " +
+      "local de test (`127.0.0.1`, port `0`) seulement ; aucun autre hôte (les noms `.test` ne se résolvent pas)",
+    capacites: [{ capacite: "module:undici", formes: ["Agent"], nombre: 1 }],
+    ecart: "import d'un paquet à capacité dans un test, exigé par 0055 § 3 point 6 (E4 de 0049) avant la fusion de la composition : verdict Sécurité à rendre (PR de P0r3c-3, ticket 316)",
+  },
 ] as const satisfies readonly LigneCapacite[];
 
 /** Lignes de textes (hôtes, fragments, noms secrets), lues dans les données du régime. */

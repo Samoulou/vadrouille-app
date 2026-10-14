@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { RequeteModele } from "@/ai/client";
 import { createOpenRouterClient, ErreurOpenRouter } from "@/ai/openrouter-client";
+import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import { createPlacesClient } from "@/grounding/places-client";
@@ -250,6 +251,26 @@ describe("prompts: aucun prompt ne contient de donnée Google", () => {
     );
     for (const requete of capture.requetes) await client.envoyer(requete);
     expect(corps).toHaveLength(capture.requetes.length);
+    const { placeIds, autres } = sentinellesGoogle();
+    expect(presentes(corps.join("\n"), [...autres, ...placeIds, "SENTINELLE_PLACE_ID", CLE_GOOGLE])).toEqual([]);
+  });
+
+  it("aucune donnée Google dans une requête de recherche web : les corps émis par la recherche web réelle (mêmes requêtes) n'en contiennent aucune (0055 S-6)", async () => {
+    const { capture } = await executerAvecClientsReels();
+    const corps: string[] = [];
+    const horloge = creerHorlogeManuelle();
+    const client = createOpenRouterClient(
+      { usage: creerPortMemoire(horloge), contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, horloge, environnement: ENV_MODELES },
+      async (_url, init) => {
+        corps.push(typeof init.body === "string" ? init.body : "");
+        return reponseModeleOk();
+      },
+    );
+    const recherche = creerRechercheWebReelle(client.rechercherWeb, { modele: "fournisseur/recherche-test", routage: { data_collection: "deny" }, maxResultats: 5 });
+    for (const texte of capture.recherches) await recherche.rechercher(texte);
+    expect(capture.recherches.length).toBeGreaterThan(0);
+    expect(corps).toHaveLength(capture.recherches.length);
+    for (const c of corps) expect(JSON.parse(c)).toMatchObject({ plugins: [{ id: "web", max_results: 5 }] });
     const { placeIds, autres } = sentinellesGoogle();
     expect(presentes(corps.join("\n"), [...autres, ...placeIds, "SENTINELLE_PLACE_ID", CLE_GOOGLE])).toEqual([]);
   });
