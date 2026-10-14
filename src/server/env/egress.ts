@@ -3,6 +3,7 @@ import "server-only";
 import {
   examinerOpensslConf,
   FS_OPENSSL_REEL,
+  nomSectionOpensslAdmis,
   VERDICTS_OPENSSL_CONF,
   ZONES_OPENSSL_CONF,
   zoneOpensslConf,
@@ -14,7 +15,7 @@ import {
 /**
  * Barrière de sortie des clients réels (spécification `specs/P0-suite-executions-reelles.md`, « Modules
  * d'environnement étroits » ; décisions 0031 et 0034). Lit **seulement** les variables de déploiement, de proxy et de
- * TLS nommées ci-dessous, et `process.execArgv` ; ne rend **jamais** leur valeur : `{ ok: true }` ou un seul code
+ * TLS nommées ci-dessous, `process.execArgv` et, pour 0062, `process.config` ; ne rend **jamais** leur valeur : `{ ok: true }` ou un seul code
  * fermé, contrôlés dans cet ordre (le premier refus l'emporte) :
  * 1. `production_refused` : liste d'autorisation de `VERCEL_ENV` (`preview` ou `development`, comparaison exacte),
  *    `VERCEL_TARGET_ENV` égale si présente (même vide), `VADROUILLE_ENV` différente de `production` (comparaison
@@ -35,7 +36,8 @@ import {
  * `vadrouille_prototype` de `db/connection.ts` (`tests/support/cas-production-commune.ts`).
  * **Module non pur depuis 0062** : il importe `./openssl-conf`, qui fait des lectures **synchrones** du système de
  * fichiers (injectable : quatrième paramètre de `verifierSortie`), seulement quand `OPENSSL_CONF` est posée, que le
- * contrôle TLS est atteint et que les conditions 1.1 à 1.3 de 0062 § 4 passent (0062 § 5.4).
+ * contrôle TLS est atteint et que les conditions 1.1, 1.2, 1.7 et 1.3 de 0062 § 4 passent (0062 § 5.4). Il lit aussi
+ * `process.config` (condition 1.7, cinquième paramètre de `verifierSortie`, injectable) dans le même cas.
  */
 
 export const CODES_REFUS_SORTIE = ["production_refused", "proxy_env_refused", "tls_env_refused"] as const;
@@ -148,10 +150,16 @@ const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowe
  *      (D21 : l'environnement injecté ne peut que resserrer), comparaison exacte ;
  * 1.2. la valeur lue est identique à celle du vrai `process.env`, toutes deux lues à l'appel (cohérence des deux
  *      lectures seulement : Node a lu `OPENSSL_CONF` au démarrage, risque résiduel (b) de 0062 § 6) ;
+ * 1.7. la construction de Node lit la section `nodejs_conf` : `configNode` (`process.config` par défaut) passe
+ *      `nomSectionOpensslAdmis` (`./openssl-conf.ts`) ; jugée avant le chemin, sans accès au système de fichiers ;
  * 1.3 à 1.6. le chemin et le fichier passent l'examen d'`examinerOpensslConf` (`./openssl-conf.ts`).
- * Le fichier n'est lu que si 1.1 à 1.3 passent. Rend la classe de racine et le verdict fermé, jamais une valeur.
+ * Le fichier n'est lu que si 1.1, 1.2, 1.7 et 1.3 passent. Rend la classe de racine et le verdict fermé, jamais une valeur.
  */
-function examenOpensslConf(lu: Lecture, fs: SystemeFichiersOpenssl): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf } | undefined {
+function examenOpensslConf(
+  lu: Lecture,
+  fs: SystemeFichiersOpenssl,
+  configNode: unknown,
+): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf } | undefined {
   const valeur = lu.tls.OPENSSL_CONF;
   if (valeur === undefined || !posee(valeur)) return undefined;
   const reel = deploiementReel();
@@ -160,6 +168,7 @@ function examenOpensslConf(lu: Lecture, fs: SystemeFichiersOpenssl): { readonly 
     return { zone, verdict: "hors_preview" };
   }
   if (reel.opensslConf !== valeur) return { zone, verdict: "env_differente" };
+  if (!nomSectionOpensslAdmis(configNode)) return { zone, verdict: "nom_section_refuse" };
   return examinerOpensslConf(valeur, fs);
 }
 
@@ -227,13 +236,16 @@ export const CAUSES_SORTIE: readonly string[] = [
  * Contrôle de sortie, à appeler avant toute lecture de clé et toute connexion. `diagnostic` (facultatif, décisions
  * 0058 et 0062) reçoit, hors refus de production, le nom de la cause, la marque de l'exception et, pour `OPENSSL_CONF`,
  * la classe de racine et le verdict : rien d'autre. `fs` (facultatif, 0062 § 7.2) : système de fichiers de l'examen
- * d'`OPENSSL_CONF`, injecté par les tests ; les appelants ne le passent pas.
+ * d'`OPENSSL_CONF`, injecté par les tests ; les appelants ne le passent pas. `configNode` (facultatif, condition 1.7 de
+ * 0062 § 4) : configuration de construction de Node (`process.config`), injectée par les tests ; les appelants ne la
+ * passent pas.
  */
 export function verifierSortie(
   env: EnvSortie = process.env,
   execArgv: readonly string[] = process.execArgv,
   diagnostic?: (resultat: DiagnosticSortie) => void,
   fs: SystemeFichiersOpenssl = FS_OPENSSL_REEL,
+  configNode: unknown = process.config,
 ): ResultatSortie {
   const lu: Lecture = {
     vercelEnv: env.VERCEL_ENV,
@@ -267,7 +279,7 @@ export function verifierSortie(
     diagnostic?.({ cause: proxy });
     return { ok: false, code: "proxy_env_refused" };
   }
-  const examen = examenOpensslConf(lu, fs);
+  const examen = examenOpensslConf(lu, fs, configNode);
   const exception = examen?.verdict === "admis";
   const tls = causeTls(lu, exception);
   diagnostic?.({

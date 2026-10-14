@@ -259,6 +259,13 @@ function diagnostiquer(env: EnvSortie, execArgv: readonly string[] = [], fs: Sys
   return recus[0];
 }
 
+/** Diagnostic avec une configuration de construction de Node injectée (condition 1.7 de 0062 § 4). */
+function diagnostiquerAvec(env: EnvSortie, configNode: unknown): DiagnosticSortie | undefined {
+  const recus: DiagnosticSortie[] = [];
+  verifierSortie(env, [], (d) => void recus.push(d), FS_SANS_NODE(), configNode);
+  return recus[0];
+}
+
 describe("p0: exception bornée d'OPENSSL_CONF en préversion de Vercel (décision 0062)", () => {
   beforeEach(() => {
     poserRuntime();
@@ -360,6 +367,32 @@ describe("p0: exception bornée d'OPENSSL_CONF en préversion de Vercel (décisi
     }
   });
 
+  it.each<[string, unknown]>([
+    ["process.config sans target_defaults", {}],
+    ["defines absent", { target_defaults: {} }],
+    ["autre nom de section", { target_defaults: { defines: ["NODE_OPENSSL_CONF_NAME=openssl_conf"] } }],
+    ["deux noms de section", { target_defaults: { defines: ["NODE_OPENSSL_CONF_NAME=nodejs_conf", "NODE_OPENSSL_CONF_NAME=x"] } }],
+  ])("condition 1.7, %s : refus, verdict nom_section_refuse, zone rendue, aucune lecture", (_nom, configNode) => {
+    const fs = FS_SANS_NODE();
+    expect(verifierSortie(RUNTIME, [], undefined, fs, configNode)).toEqual({ ok: false, code: "tls_env_refused" });
+    const recus: DiagnosticSortie[] = [];
+    verifierSortie(RUNTIME, [], (d) => void recus.push(d), fs, configNode);
+    expect(recus).toEqual([{ cause: "OPENSSL_CONF", openssl_conf_zone: "etc", openssl_conf_verdict: "nom_section_refuse" }]);
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("condition 1.7 : construction injectée avec nodejs_conf seul, admis ; la construction réelle de Node du test l'est aussi", () => {
+    const configNode = { target_defaults: { defines: ["HAVE_OPENSSL=1", "NODE_OPENSSL_CONF_NAME=nodejs_conf"] } };
+    expect(verifierSortie(RUNTIME, [], undefined, FS_SANS_NODE(), configNode)).toEqual({ ok: true });
+    expect(verifierSortie(RUNTIME, [], undefined, FS_SANS_NODE())).toEqual({ ok: true });
+  });
+
+  it("condition 1.7 jugée après 1.1 et 1.2 : hors_preview et env_differente l'emportent", () => {
+    expect(diagnostiquerAvec({ ...RUNTIME, VERCEL: "0" }, {})?.openssl_conf_verdict).toBe("hors_preview");
+    vi.stubEnv("OPENSSL_CONF", "/etc/autre.cnf");
+    expect(diagnostiquerAvec(RUNTIME, {})?.openssl_conf_verdict).toBe("env_differente");
+  });
+
   it("proxy posé : ni lecture du fichier, ni champs openssl_conf_*", () => {
     const fs = FS_SANS_NODE();
     const env = { ...RUNTIME, HTTPS_PROXY: "http://p" };
@@ -419,7 +452,7 @@ describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et
   it("listes fermées de l'exception, des classes de racine et des verdicts", () => {
     expect(EXCEPTIONS_SORTIE).toEqual(["vercel_runtime_openssl_conf"]);
     expect(ZONES_SORTIE).toHaveLength(7);
-    expect(VERDICTS_SORTIE).toHaveLength(7);
+    expect(VERDICTS_SORTIE).toHaveLength(8);
   });
   it("une option est nommée par son nom canonique", () => {
     expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--tls_keylog=/SENTINELLE" })).toEqual({ cause: "--tls-keylog" });

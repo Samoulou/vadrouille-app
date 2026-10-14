@@ -159,6 +159,7 @@ export const LOG_OPENSSL_CONF_ZONES: readonly string[] = ["dev_null", "etc", "us
 export const LOG_OPENSSL_CONF_VERDICTS: readonly string[] = [
   "hors_preview",
   "env_differente",
+  "nom_section_refuse",
   "chemin_refuse",
   "fichier_refuse",
   "inclusion_refusee",

@@ -13,9 +13,12 @@ import { posix } from "node:path";
  * Pourquoi le contenu suffit (0062 § 3.2) : Node lit `OPENSSL_CONF` une fois, au démarrage, et ne charge que la section
  * `nodejs_conf` du fichier (et de ses inclusions), sans repli sur `openssl_conf` (drapeau `CONF_MFLAGS_DEFAULT_SECTION`
  * absent). Un fichier qui ne nomme nulle part `nodejs_conf` n'a donc **aucun effet** sur la configuration OpenSSL de
- * Node, donc aucun sur TLS. **Limite** : le nom `nodejs_conf` est fixé à la construction de Node (`configure.py`,
- * `--openssl-conf-name`) ; une construction qui le changerait, ou une version de Node qui changerait la section lue par
- * défaut (règle en vigueur depuis Node 18.5), rendrait cet examen insuffisant (risque résiduel (c) de 0062 § 6). **À
+ * Node, donc aucun sur TLS. Le nom `nodejs_conf` est fixé à la construction de Node (`configure.py`,
+ * `--openssl-conf-name`), qui l'écrit dans les `defines` de la construction, visibles dans
+ * `process.config.target_defaults.defines` (`NODE_OPENSSL_CONF_NAME=nodejs_conf`) : la condition 1.7 de 0062 § 4
+ * (`nomSectionOpensslAdmis`) le vérifie et refuse toute autre construction (`nom_section_refuse`). **Limite restante**
+ * (risque résiduel (c) de 0062 § 6) : une version de Node qui changerait la section lue par défaut (règle en vigueur
+ * depuis Node 18.5), ou qui cesserait d'exposer ce `define`, rendrait cet examen insuffisant ou toujours fermé. **À
  * relire à chaque passage à une version majeure de Node.**
  *
  * Le chemin est un paramètre : ce module ne lit **aucune** variable d'environnement. Le système de fichiers est
@@ -32,6 +35,7 @@ export type ZoneOpensslConf = (typeof ZONES_OPENSSL_CONF)[number];
 export const VERDICTS_OPENSSL_CONF = [
   "hors_preview",
   "env_differente",
+  "nom_section_refuse",
   "chemin_refuse",
   "fichier_refuse",
   "inclusion_refusee",
@@ -40,8 +44,8 @@ export const VERDICTS_OPENSSL_CONF = [
 ] as const;
 export type VerdictOpensslConf = (typeof VERDICTS_OPENSSL_CONF)[number];
 
-/** Verdicts rendus par l'examen du chemin et du fichier (les conditions 1.1 et 1.2 sont jugées par `egress.ts`). */
-export type VerdictExamen = Exclude<VerdictOpensslConf, "hors_preview" | "env_differente">;
+/** Verdicts rendus par l'examen du chemin et du fichier (les conditions 1.1, 1.2 et 1.7 sont jugées par `egress.ts`). */
+export type VerdictExamen = Exclude<VerdictOpensslConf, "hors_preview" | "env_differente" | "nom_section_refuse">;
 type Echec = Exclude<VerdictExamen, "admis" | "chemin_refuse">;
 
 /** Système de fichiers de l'examen : sous-ensemble synchrone de `node:fs`, injectable pour les tests. */
@@ -67,8 +71,12 @@ export const OPENSSL_CONF_MAX_ENTREES = 64;
 
 const DEV_NULL = "/dev/null";
 
-/** Racines en lecture seule du runtime (0062 § 4 point 1.3) et leur classe. Tout le reste est refusé. */
-const RACINES: readonly (readonly [string, ZoneOpensslConf])[] = [
+/**
+ * Classes de racine du chemin déclaré (0062 § 5.1). `/opt/` garde sa classe pour le diagnostic, mais n'est **pas** une
+ * racine admise : c'est le dossier des couches Lambda (contenu du déployeur, pas de la plateforme), qu'aucune source de
+ * 0062 ne justifie (mineur 2 de la revue du head `b0c1c45`).
+ */
+const CLASSES: readonly (readonly [string, ZoneOpensslConf])[] = [
   ["/etc/", "etc"],
   ["/usr/", "usr"],
   ["/var/runtime/", "var_runtime"],
@@ -76,13 +84,44 @@ const RACINES: readonly (readonly [string, ZoneOpensslConf])[] = [
   ["/opt/", "opt"],
 ];
 
+/** Racines en lecture seule du runtime admises (0062 § 4 point 1.3, sans `/opt/`). Tout le reste est refusé. */
+const RACINES: readonly string[] = ["/etc/", "/usr/", "/var/runtime/", "/var/lang/"];
+
 /** Classe de racine du chemin **déclaré**, sans accès au système de fichiers (0062 § 5.1). */
 export function zoneOpensslConf(chemin: string): ZoneOpensslConf {
   if (chemin === DEV_NULL) return "dev_null";
-  return RACINES.find(([racine]) => chemin.startsWith(racine))?.[1] ?? "autre";
+  return CLASSES.find(([racine]) => chemin.startsWith(racine))?.[1] ?? "autre";
 }
 
-const sousRacines = (chemin: string) => RACINES.some(([racine]) => chemin.startsWith(racine) && chemin.length > racine.length);
+const sousRacines = (chemin: string) => RACINES.some((racine) => chemin.startsWith(racine) && chemin.length > racine.length);
+
+/** Entrée des `defines` de la construction de Node qui fixe la section lue (`configure.py`, `--openssl-conf-name`). */
+const DEFINE_NOM_SECTION = "NODE_OPENSSL_CONF_NAME=";
+
+/**
+ * Condition 1.7 de 0062 § 4 (bloquant 1 de la revue du head `b0c1c45`) : `configNode` (en production,
+ * `process.config`, lu par `egress.ts` ; injecté par les tests) a la forme `{ target_defaults: { defines: string[] } }`,
+ * et `defines` contient exactement une entrée qui commence par `NODE_OPENSSL_CONF_NAME=`, égale à
+ * `NODE_OPENSSL_CONF_NAME=nodejs_conf`. Objet absent, `target_defaults` ou `defines` absent, `defines` qui n'est pas un
+ * tableau de chaînes, aucune entrée ou plusieurs : refus. Ne lève jamais (un accesseur qui lève vaut refus).
+ */
+export function nomSectionOpensslAdmis(configNode: unknown): boolean {
+  try {
+    if (typeof configNode !== "object" || configNode === null || !("target_defaults" in configNode)) return false;
+    const cible = configNode.target_defaults;
+    if (typeof cible !== "object" || cible === null || !("defines" in cible)) return false;
+    const defines = cible.defines;
+    if (!Array.isArray(defines)) return false;
+    const noms: string[] = [];
+    for (const entree of defines as readonly unknown[]) {
+      if (typeof entree !== "string") return false;
+      if (entree.startsWith(DEFINE_NOM_SECTION)) noms.push(entree);
+    }
+    return noms.length === 1 && noms[0] === `${DEFINE_NOM_SECTION}nodejs_conf`;
+  } catch {
+    return false;
+  }
+}
 
 /** Blancs (Unicode compris), `$`, `\`, guillemets, caractères de contrôle : refusés dans un chemin (0062 § 4 point 1.3). */
 const CARACTERE_REFUSE = /[\s$\\"'`\p{Cc}]/u;

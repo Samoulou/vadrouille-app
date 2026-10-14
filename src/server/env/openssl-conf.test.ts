@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyserTexteOpensslConf,
   examinerOpensslConf,
+  nomSectionOpensslAdmis,
   OPENSSL_CONF_MAX_OCTETS,
   VERDICTS_OPENSSL_CONF,
   ZONES_OPENSSL_CONF,
@@ -67,11 +68,12 @@ const verdict = (chemin: string, arbre: Readonly<Record<string, Noeud>>) => exam
 const SANS_NODE = "openssl_conf = defaut\n\n[defaut]\nssl_conf = ssl\n\n[ssl]\nsystem_default = sd\n\n[sd]\nMinProtocol = TLSv1\n";
 
 describe("openssl-conf: listes fermées (0062 § 5.1)", () => {
-  it("7 classes de racine et 7 verdicts, dans l'ordre de priorité", () => {
+  it("7 classes de racine et 8 verdicts, dans l'ordre de priorité", () => {
     expect([...ZONES_OPENSSL_CONF]).toEqual(["dev_null", "etc", "usr", "var_runtime", "var_lang", "opt", "autre"]);
     expect([...VERDICTS_OPENSSL_CONF]).toEqual([
       "hors_preview",
       "env_differente",
+      "nom_section_refuse",
       "chemin_refuse",
       "fichier_refuse",
       "inclusion_refusee",
@@ -93,7 +95,6 @@ describe("openssl-conf: cas admis", () => {
     ["/usr/lib/ssl/openssl.cnf", "usr"],
     ["/var/runtime/openssl.cnf", "var_runtime"],
     ["/var/lang/ssl/openssl.cnf", "var_lang"],
-    ["/opt/ssl/openssl.cnf", "opt"],
   ] as const)("fichier sous %s sans nodejs_conf : admis (zone %s)", (chemin, zone) => {
     expect(examinerOpensslConf(chemin, fauxFs({ [chemin]: SANS_NODE }))).toEqual({ zone, verdict: "admis" });
   });
@@ -252,10 +253,63 @@ describe("openssl-conf: chemin déclaré refusé (0062 § 4 point 1.3), sans acc
     ["guillemet", '/etc/"openssl.cnf', "etc"],
     ["caractère de contrôle", "/etc/open\u0007ssl.cnf", "etc"],
     ["/dev/null voisin", "/dev/null2", "autre"],
+    // Mineur 2 de la revue du head `b0c1c45` : `/opt/` (couches Lambda) n'est plus une racine admise ; sa classe reste.
+    ["sous /opt", "/opt/ssl/openssl.cnf", "opt"],
   ])("%s : chemin_refuse", (_nom, chemin, zone) => {
     const fs = fauxFs({});
     expect(examinerOpensslConf(chemin, fs)).toEqual({ zone, verdict: "chemin_refuse" });
     expect(fs.appels).toEqual([]);
+  });
+});
+
+describe("openssl-conf: /opt/ hors des racines admises (mineur 2 de la revue du head b0c1c45)", () => {
+  it("lien dont le chemin réel est sous /opt : fichier_refuse ; inclusion sous /opt : inclusion_refusee", () => {
+    expect(verdict("/etc/a.cnf", { "/etc/a.cnf": { lien: "/opt/a.cnf" }, "/opt/a.cnf": SANS_NODE })).toBe("fichier_refuse");
+    expect(verdict("/etc/a.cnf", { "/etc/a.cnf": ".include /opt/b.cnf\n", "/opt/b.cnf": SANS_NODE })).toBe("inclusion_refusee");
+  });
+});
+
+/** Configuration de construction de Node, forme de `process.config` (condition 1.7 de 0062 § 4). */
+const configNode = (defines: unknown) => ({ target_defaults: { defines } });
+const NOM_NODE = "NODE_OPENSSL_CONF_NAME=nodejs_conf";
+
+describe("openssl-conf: nom de section de la construction de Node (0062 § 4 point 1.7)", () => {
+  it("defines avec exactement NODE_OPENSSL_CONF_NAME=nodejs_conf : admis", () => {
+    expect(nomSectionOpensslAdmis(configNode([NOM_NODE]))).toBe(true);
+    expect(nomSectionOpensslAdmis(configNode(["NODE_WANT_INTERNALS=1", NOM_NODE, "HAVE_OPENSSL=1"]))).toBe(true);
+    expect(nomSectionOpensslAdmis({ variables: {}, target_defaults: { cflags: [], defines: [NOM_NODE] } })).toBe(true);
+  });
+
+  it.each<[string, unknown]>([
+    ["process.config absent", undefined],
+    ["process.config null", null],
+    ["process.config chaîne", "{}"],
+    ["target_defaults absent", { variables: {} }],
+    ["target_defaults null", { target_defaults: null }],
+    ["target_defaults chaîne", { target_defaults: "x" }],
+    ["defines absent", { target_defaults: {} }],
+    ["defines objet", configNode({ 0: NOM_NODE, length: 1 })],
+    ["defines chaîne", configNode(NOM_NODE)],
+    ["defines vide", configNode([])],
+    ["aucune entrée NODE_OPENSSL_CONF_NAME", configNode(["HAVE_OPENSSL=1"])],
+    ["autre nom de section", configNode(["NODE_OPENSSL_CONF_NAME=openssl_conf"])],
+    ["nom vide", configNode(["NODE_OPENSSL_CONF_NAME="])],
+    ["nom en majuscules", configNode(["NODE_OPENSSL_CONF_NAME=NODEJS_CONF"])],
+    ["nom suivi d'un blanc", configNode([`${NOM_NODE} `])],
+    ["deux entrées identiques", configNode([NOM_NODE, NOM_NODE])],
+    ["deux entrées différentes", configNode([NOM_NODE, "NODE_OPENSSL_CONF_NAME=autre"])],
+    ["entrée non textuelle", configNode([NOM_NODE, 1])],
+  ])("%s : refus", (_nom, config) => {
+    expect(nomSectionOpensslAdmis(config)).toBe(false);
+  });
+
+  it("un accesseur qui lève : refus, aucune erreur ne s'échappe", () => {
+    const piege = {
+      get target_defaults(): never {
+        throw new Error("SENTINELLE");
+      },
+    };
+    expect(nomSectionOpensslAdmis(piege)).toBe(false);
   });
 });
 

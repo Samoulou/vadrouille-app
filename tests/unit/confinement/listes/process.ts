@@ -62,6 +62,10 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/test-db.mjs", propriete: "exit" },
   // P0r1 (ticket 267 ; spécification P0c, section 9) : options de Node lues par la barrière de sortie. Verdict Sécurité à rendre.
   { fichier: "src/server/env/egress.ts", propriete: "execArgv" },
+  // Décision 0062, condition 1.7 (ticket 341 ; bloquant 1 de la revue du head `b0c1c45`) : `process.config`, valeur par
+  // défaut du cinquième paramètre de `verifierSortie`, dont seuls les `defines` `NODE_OPENSSL_CONF_NAME=` sont comparés ;
+  // rien n'en sort. Verdict Sécurité à rendre.
+  { fichier: "src/server/env/egress.ts", propriete: "config" },
   // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement ») : arrêt du démarrage sur une configuration
   // refusée (`register()`). Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
   { fichier: "src/instrumentation.ts", propriete: "exit" },
