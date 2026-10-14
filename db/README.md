@@ -108,10 +108,12 @@ arrière se fait **vers l'avant**, par une migration corrective :
 5. Ajouter la migration au tableau ci-dessus : « irréversible » motivé, ou fichier inverse relu
    `db/migrations/<tag>.down.sql` (le test `tests/unit/db/migrations-retour-arriere.test.ts` l'exige).
 6. CI : le job `db` applique les migrations deux fois (la seconde ne fait rien) puis `pnpm test:db`.
-7. Application à la base Neon de staging : selon la réponse à la question 3 de la spécification B1 ; jamais depuis
-   l'application. L'option « construction Vercel » de cette question contredit la décision 0006 (l'identifiant de
-   `vadrouille_migrator` n'entre jamais dans Vercel) : elle est remontée à Samuel (#188), seul le workflow GitHub
-   déclenché à la main reste compatible en l'état.
+7. Application à la base Neon : par `db-migrate.yml`, lancé à la main sur `main` (Q294 ; décision 0056), qui
+   n'applique que les migrations approuvées ; jamais depuis l'application, la construction Vercel ni `db/migrate.ts`.
+   Approbation : une PR de workflow ajoute la ligne `<tag> <sha256>` de la migration à `MIGRATIONS_APPROUVEES`, avec
+   le verdict Sécurité G1 à G6 (0056 § 3), et attend `owner-approved` de Samuel (Q408). `db/migrate.ts` refuse tout
+   hôte autre que `localhost`, `127.0.0.1` ou `::1` (0056 § 2.8). Relevé du catalogue en lecture : `db-releve.yml`
+   (décision 0057), lancé par la Sécurité.
 
 Test de restauration sur la base de staging (sauvegarde, point dans le temps) : renvoyé à la question 3 de la
 spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de conservation).
@@ -223,7 +225,7 @@ reprendre avec le Tech Lead.
 ### Ce que le studio ne fait pas
 
 Il ne se connecte pas à la base de staging, n'exécute rien dans la console Neon, ne crée ni ne supprime de variable
-Vercel, ne reçoit aucun mot de passe et n'applique aucune migration à staging tant que la question 3 n'est pas
-tranchée. **Exception (Q321, amendement ci-dessus)** : l'amorçage des trois rôles du prototype, la connexion
+Vercel, ne reçoit aucun mot de passe et n'applique de migration que par le workflow `db-migrate.yml`
+(décision 0056), migration par migration approuvée par Samuel. **Exception (Q321, amendement ci-dessus)** : l'amorçage des trois rôles du prototype, la connexion
 d'administration qu'il exige, la pose de leurs mots de passe, de `P0_DATABASE_URL` et des secrets de `p0-purge`, par
 le studio selon 0046 S5, après la décision 0056 ; la lecture de contrôle reste à Samuel.

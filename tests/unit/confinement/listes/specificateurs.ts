@@ -68,6 +68,9 @@ export const SPECIFICATEURS = [
   // données. `pg` est un module à capacité : lignes nominatives de `listes/capacites.ts`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   { specificateur: "server-only", zones: ["db/**", "src/server/**"] },
   { specificateur: "drizzle-orm", zones: ["db/**"] },
+  // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : analyseur de chaînes de
+  // connexion de `pg` (même version), pour le refus de tout hôte non local de `db/migrate.ts` (0056 § 2.8). Sans capacité.
+  { specificateur: "pg-connection-string", zones: ["db/migrate.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts"] },

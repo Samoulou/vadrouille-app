@@ -109,6 +109,8 @@ Conséquences directes :
 
 **4.4 Application.** Après la fusion, le rôle désigné lance `db-migrate` (§ 2.9) ; le déverrouillage n'est effectif qu'à cette application. Le relevé P0S2-PO-7 est refait selon la future décision 0057 (§ 2.11 ; Samuel seulement s'il l'a accepté par écrit) : `EXECUTE` à `vadrouille_prototype` seul (hors propriétaire), `PUBLIC` exclu ; résultat collé dans le ticket.
 
+*Amendement du 2026-10-14 (Q432, tranchée par le CEO ; recommandation de la Sécurité, question ouverte 6 de 0057)* : le premier lancement du prototype attend que ce relevé, fait avec `db-releve` (0057), soit consigné dans le ticket. Le reste du § 4.4 est inchangé.
+
 **4.5 Tests inversés ou retirés** (dans la PR du § 4.3) :
 - `base: vadrouille_prototype ne peut écrire aucune coordonnée (verrou S8)` devient `base: vadrouille_prototype écrit place_coordinates par store_prototype_coordinates seulement, dans org_prototype` (occurrence 14 de 0046) : `EXECUTE` vrai pour lui seul ; ni `INSERT`, ni `UPDATE`, ni `DELETE` direct ; écriture refusée hors exécution en cours ; `store_place_coordinates` toujours refusée pour `org_prototype` ;
 - `fonctions: SECURITY DEFINER durcies` : `EXECUTE` de `store_prototype_coordinates` à `vadrouille_prototype` seul ; `base: droits de vadrouille_prototype en liste fermée (D15 point 6)` : cet `EXECUTE` ajouté, rien d'autre ;

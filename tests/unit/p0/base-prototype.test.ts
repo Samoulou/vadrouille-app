@@ -62,7 +62,11 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
         f !== CE_FICHIER &&
         (lire(f) ?? "").includes(nom),
     );
-    expect(hors).toEqual([MODULE]);
+    // Décision 0057 (§ 4, R8 ; « Tests imposés ») : le relevé `db-releve` trouve chaque surcharge de la fonction par son
+    // nom dans `pg_proc` (jamais par une signature écrite), et son test recopie les cas figés du § 5.5. Lecture du
+    // catalogue seulement : ni appel ni import de la fonction. Admission proposée à la revue (Sécurité, Tech Lead).
+    const RELEVE = [".github/workflows/db-releve.yml", "tests/unit/ci/db-releve.test.ts"];
+    expect(hors.filter((f) => !RELEVE.includes(f))).toEqual([MODULE]);
   });
 
   it("le module n'est importé que par src/workflows/p0-run.ts et les tests ; ni src/adapters/index.ts, ni src/server", () => {
