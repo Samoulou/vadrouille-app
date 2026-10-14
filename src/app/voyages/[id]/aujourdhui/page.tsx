@@ -5,7 +5,8 @@ import { isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { loadToday } from "@/features/voyage/load-today";
 import { TodayScreen } from "@/features/voyage/TodayScreen";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Données lues à chaque requête, dans le contexte d'organisation de la requête ; `Cache-Control` privé et
 // `no-store` posé par `next.config.ts` (F10-TL-8).

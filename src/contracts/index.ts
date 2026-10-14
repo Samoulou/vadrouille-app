@@ -147,7 +147,9 @@ export {
   BriefRequestSchema,
   BriefSchema,
   InferredBriefSchema,
+  LodgingRequestSchema,
   LodgingSchema,
+  LodgingSuggestionSchema,
   MobilityModeSchema,
   OtherCitySchema,
   PaceSchema,
@@ -155,7 +157,19 @@ export {
   TripCommitmentSchema,
   TripDraftSchema,
 } from "./creation";
-export type { Brief, BriefRequest, InferredBrief, Lodging, OtherCity, TripCommitment, TripDraft } from "./creation";
+export type {
+  Brief,
+  BriefRequest,
+  InferredBrief,
+  Lodging,
+  LodgingRequest,
+  LodgingSuggestion,
+  OtherCity,
+  TripCommitment,
+  TripDraft,
+} from "./creation";
+export { CodeRequestSchema, CodeVerificationSchema, SessionSchema } from "./auth";
+export type { CodeRequest, CodeVerification, Session } from "./auth";
 export type {
   CreatedShareLink,
   ShareRequest,

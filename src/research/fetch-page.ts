@@ -43,6 +43,9 @@ export const RAISONS_REFUS_PAGE = [
   "too_large",
   "timeout",
   "proxy_required",
+  // P0r1 : refus de la barrière de sortie (module `egress` de `src/server/env`), transport réel désactivé en entier.
+  "production_refused",
+  "tls_env_refused",
 ] as const;
 export type RaisonRefusPage = (typeof RAISONS_REFUS_PAGE)[number];
 
@@ -65,6 +68,8 @@ export type ReponseHttp = {
   /** En-têtes, noms en minuscules. */
   entetes: Readonly<Record<string, string>>;
   corps: AsyncIterable<Uint8Array>;
+  /** Libère les ressources du saut (transport réel : ferme son `Agent`) ; appelé par la garde à la fin de chaque saut. */
+  fermer?: () => Promise<void>;
 };
 
 export type CoucheHttp = (requete: RequeteHttp) => Promise<ReponseHttp>;
@@ -81,6 +86,8 @@ export type DependancesLecteur = {
   http: CoucheHttp;
   /** L'environnement d'exécution n'autorise la sortie que par un proxy non vérifié : lecture désactivée (A7.3). */
   sortieParProxy?: boolean;
+  /** Le transport refuse toute lecture (barrière de sortie de P0r1) : aucune résolution ni connexion. */
+  refus?: RaisonRefusPage;
 };
 
 class Refus extends Error {
@@ -212,6 +219,7 @@ const REDIRECTIONS = new Set([301, 302, 303, 307, 308]);
 export function creerLecteurPages(dependances: DependancesLecteur): LecteurPages {
   return {
     async lire(url, urlsAutorisees) {
+      if (dependances.refus !== undefined) return { ok: false, raison: dependances.refus };
       if (dependances.sortieParProxy === true) return { ok: false, raison: "proxy_required" };
       const autorisees = new Set([...urlsAutorisees].flatMap((valeur) => urlNormalisee(valeur) ?? []));
       const controleur = new AbortController();
@@ -241,30 +249,34 @@ export function creerLecteurPages(dependances: DependancesLecteur): LecteurPages
             }),
             controleur.signal,
           );
-          if (REDIRECTIONS.has(reponse.statut)) {
-            const destination = reponse.entetes.location;
-            if (destination === undefined) throw new Refus("http_status");
-            if (redirections >= REDIRECTIONS_MAX) throw new Refus("too_many_redirects");
-            redirections += 1;
-            let suivante: string;
-            try {
-              suivante = new URL(destination, courante.href).href;
-            } catch {
-              throw new Refus("invalid_url");
+          try {
+            if (REDIRECTIONS.has(reponse.statut)) {
+              const destination = reponse.entetes.location;
+              if (destination === undefined) throw new Refus("http_status");
+              if (redirections >= REDIRECTIONS_MAX) throw new Refus("too_many_redirects");
+              redirections += 1;
+              let suivante: string;
+              try {
+                suivante = new URL(destination, courante.href).href;
+              } catch {
+                throw new Refus("invalid_url");
+              }
+              courante = analyserUrl(suivante);
+              continue;
             }
-            courante = analyserUrl(suivante);
-            continue;
+            if (reponse.statut !== 200) throw new Refus("http_status");
+            const type = (reponse.entetes["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+            if (type !== "text/html" && type !== "text/plain") throw new Refus("content_type");
+            const codage = (reponse.entetes["content-encoding"] ?? "identity").trim().toLowerCase();
+            if (codage !== "identity" && codage !== "gzip" && codage !== "deflate") throw new Refus("content_encoding");
+            const bruts = await lireBorne(reponse.corps, controleur.signal);
+            const morceaux = codage === "identity" ? bruts : await decompresser(bruts, codage, controleur.signal);
+            const contenu = new TextDecoder("utf-8", { fatal: false }).decode(concatener(morceaux));
+            const texte = type === "text/html" ? extraireTexte(contenu) : nettoyer(contenu).slice(0, TEXTE_MAX);
+            return { ok: true, texte };
+          } finally {
+            await reponse.fermer?.();
           }
-          if (reponse.statut !== 200) throw new Refus("http_status");
-          const type = (reponse.entetes["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-          if (type !== "text/html" && type !== "text/plain") throw new Refus("content_type");
-          const codage = (reponse.entetes["content-encoding"] ?? "identity").trim().toLowerCase();
-          if (codage !== "identity" && codage !== "gzip" && codage !== "deflate") throw new Refus("content_encoding");
-          const bruts = await lireBorne(reponse.corps, controleur.signal);
-          const morceaux = codage === "identity" ? bruts : await decompresser(bruts, codage, controleur.signal);
-          const contenu = new TextDecoder("utf-8", { fatal: false }).decode(concatener(morceaux));
-          const texte = type === "text/html" ? extraireTexte(contenu) : nettoyer(contenu).slice(0, TEXTE_MAX);
-          return { ok: true, texte };
         }
       } catch (erreur) {
         return { ok: false, raison: erreur instanceof Refus ? erreur.raison : "http_status" };

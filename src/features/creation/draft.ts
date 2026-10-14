@@ -1,4 +1,4 @@
-import type { Category, InferredBrief } from "@/contracts";
+import type { Category, InferredBrief, Lodging, TripDraft } from "@/contracts";
 import {
   ADULTS,
   BRIEF_FIELDS,
@@ -95,6 +95,15 @@ export interface BriefForm {
 
 export type BriefStage = "story" | "review";
 
+/**
+ * Choix de l'écran 3 pour une ville « Pas encore » (F8-PO-8) : un logement ou le quartier suggérés (identifiants
+ * seulement, jamais le nom affiché), ou « Continuer sans logement » (`none`).
+ */
+export type LodgingChoice = Extract<Lodging, { kind: "suggestedLodging" | "suggestedArea" | "none" }>;
+
+/** Clé d'une ville pour les choix de l'écran 3 : la destination, ou la clé stable d'une autre ville. */
+export const DESTINATION_KEY = "destination";
+
 export interface DraftState {
   trip: TripForm;
   /** L'écran 1 a été validé : l'écran 2 a un brouillon (sinon, retour à l'écran 1 avec l'annonce). */
@@ -104,6 +113,13 @@ export interface DraftState {
   brief: BriefForm;
   /** L'écran 2 a été validé (« Continuer » à l'état « Vérification »). */
   briefReady: boolean;
+  /** Choix de l'écran 3, par clé de ville (`DESTINATION_KEY` ou clé de l'autre ville) ; lus si la réponse est « Pas encore ». */
+  lodgingChoices: Record<string, LodgingChoice>;
+  /**
+   * Ville de l'écran 3 (0 = destination, i = `otherCities[i − 1]`) : celle affichée, puis la dernière affichée
+   * (« Retour » de l'écran 4 y ramène, F8-PO-2) ; `null` quand aucun écran 3 n'a été affiché depuis l'écran 2.
+   */
+  lodgingCity: number | null;
   /** Annonce à écrire sur l'écran 1 après un brouillon perdu (écrite après le premier rendu, 0018 § 14). */
   lostNotice: boolean;
   /** L'annonce du brouillon perdu est écrite dans sa région, jusqu'à la validation de l'écran 1. */
@@ -136,6 +152,8 @@ export function initialDraft(): DraftState {
     story: "",
     brief: { values: emptyBriefValues(), marks: noMarks(), shown: [], edited: [], touched: [] },
     briefReady: false,
+    lodgingChoices: {},
+    lodgingCity: null,
     lostNotice: false,
     noticeVisible: false,
     serial: 0,
@@ -226,6 +244,25 @@ export function applyInferred(brief: BriefForm, inferred: InferredBrief | null):
   return { values, marks, shown: markedFields(marks), edited: [], touched: brief.touched };
 }
 
+/** Clé de la ville `city` (0 = destination), ou `undefined` si elle n'existe plus. */
+export function cityKey(trip: TripForm, city: number): string | undefined {
+  return city === 0 ? DESTINATION_KEY : trip.otherCities[city - 1]?.key;
+}
+
+/** Villes qui attendent l'écran 3 (réponse « Pas encore »), dans l'ordre des villes (F8-PO-8). */
+export function pendingLodgingCities(trip: TripForm): number[] {
+  return [trip.lodging, ...trip.otherCities.map((city) => city.lodging)].flatMap((lodging, index) =>
+    lodging.answer === "none" ? [index] : [],
+  );
+}
+
+/** Ville « Pas encore » suivante (ou précédente) de l'écran 3, ou `null`. */
+export function adjacentLodgingCity(trip: TripForm, city: number, direction: 1 | -1): number | null {
+  const pending = pendingLodgingCities(trip);
+  const candidates = direction === 1 ? pending.filter((index) => index > city) : pending.filter((index) => index < city).reverse();
+  return candidates[0] ?? null;
+}
+
 export type DraftAction =
   | { type: "trip"; patch: Partial<Pick<TripForm, "destination" | "start" | "end">> }
   | { type: "lodging"; city: number; patch: Partial<LodgingForm> }
@@ -246,7 +283,9 @@ export type DraftAction =
   | { type: "pace"; pace: Pace }
   | { type: "toggle"; field: ChipField; value: Category | MobilityMode }
   | { type: "mealBudget"; value: string }
-  | { type: "briefReady" };
+  | { type: "briefReady" }
+  | { type: "lodgingCity"; city: number | null }
+  | { type: "lodgingChoice"; city: number; choice: LodgingChoice; next: number | null };
 
 function touch(brief: BriefForm, field: BriefField): BriefForm {
   return {
@@ -340,5 +379,66 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
     }
     case "briefReady":
       return { ...state, briefReady: true };
+    case "lodgingCity":
+      return { ...state, lodgingCity: action.city };
+    case "lodgingChoice": {
+      const key = cityKey(state.trip, action.city);
+      if (key === undefined) return state;
+      return {
+        ...state,
+        lodgingChoices: { ...state.lodgingChoices, [key]: action.choice },
+        // La dernière ville reste l'écran 3 courant : « Retour » de l'écran 4 y ramène.
+        lodgingCity: action.next ?? action.city,
+      };
+    }
   }
+}
+
+function lodgingForm(lodging: Lodging): LodgingForm {
+  switch (lodging.kind) {
+    case "known":
+    case "area":
+      return { answer: lodging.kind, label: lodging.label };
+    default:
+      return { answer: "none", label: "" };
+  }
+}
+
+/**
+ * Brouillon prêt pour l'écran 3 à partir d'un `TripDraft` (page de développement `R3-dev`, décision 0017 § 7, et
+ * tests) : écrans 1 et 2 validés (brief vide, « Remplir moi-même »), première ville « Pas encore » courante.
+ */
+export function draftForLodging(trip: TripDraft): DraftState {
+  const base = initialDraft();
+  const otherCities: CityForm[] = trip.otherCities.map((city, index) => ({
+    key: `ville-${index + 1}`,
+    name: city.name,
+    arrival: city.arrival,
+    lodging: lodgingForm(city.lodging),
+  }));
+  const commitments: CommitmentForm[] = trip.commitments.map((commitment, index) => ({
+    key: `engagement-${otherCities.length + index + 1}`,
+    kind: commitment.kind,
+    label: commitment.label,
+    date: commitment.date,
+    start: commitment.start,
+    end: commitment.end ?? "",
+  }));
+  const form: TripForm = {
+    destination: trip.destination,
+    start: trip.start,
+    end: trip.end,
+    lodging: lodgingForm(trip.lodging),
+    otherCities,
+    commitments,
+  };
+  return {
+    ...base,
+    trip: form,
+    tripReady: true,
+    stage: "review",
+    briefReady: true,
+    serial: otherCities.length + commitments.length,
+    lodgingCity: pendingLodgingCities(form)[0] ?? null,
+  };
 }

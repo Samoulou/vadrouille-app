@@ -1,0 +1,107 @@
+# Page de prévente — textes complets
+
+Rôle : `commercial` · Spécification : `specs/C1-prevente.md` (livrable 2) · Rédigé le 2026-10-13.
+
+Textes prêts à intégrer par le rôle `frontend` (tâche ultérieure, hors périmètre de C1) dans `src/i18n/fr.json`. Règles appliquées : `docs/handovers/frontend.md` § 10 (tutoiement, phrases courtes, pas de point d'exclamation, pas d'emoji ; « Payer avec TWINT », « Payer par carte » ; jamais « Acheter maintenant », « Premium », « Aperçu »).
+
+**Écart déclaré au § 10 (proposition)** : le § 10 impose « Débloquer » pour le paiement. Cette page ne l'emploie pas : ses boutons d'appel disent « Précommander pour 29 CHF », car rien n'est débloqué au moment du paiement (l'accès commence au [DATE D'OUVERTURE]) et « Débloquer » laisserait croire à un accès immédiat. Les boutons de paiement gardent « Payer avec TWINT » et « Payer par carte ». C'est une proposition, à valider par UX/UI (vocabulaire, rôle délégué) ; si elle est refusée, remplacer par « Débloquer le voyage complet pour 29 CHF » et préciser la date d'accès juste en dessous.
+
+Numérotation : « question N » renvoie à la question Q-C1-N à Samuel de la description de la PR #256 ; une question du questionnaire en ligne est toujours dite « question N du questionnaire ».
+
+Un vrai prix et un vrai paiement, pas une liste d'attente (cadrage § 5, « Acquisition initiale »). Aucune promesse d'aide humaine (décision 0043 § 4).
+
+Les valeurs entre crochets attendent Samuel : [DATE D'OUVERTURE] et la règle de remboursement (question 5), [N] remplacements (Q88), le moyen d'encaissement (question 2), la manière de recevoir l'accès (question 2, Q25, Q127).
+
+---
+
+## 1. En-tête
+- **Nom** : Vadrouille (Q1, tranchée le 2026-10-08)
+- **Titre (h1)** : Ton voyage, de l'hôtel à la soirée.
+- **Promesse** : Quoi faire, où manger et ce qui se passe pendant ton séjour. (promesse de travail, cadrage § 2 ; `docs/CONTEXT.md`)
+- **Sous-titre** : Précommande ton voyage complet pour le printemps : 29 CHF, utilisable dès le [DATE D'OUVERTURE].
+- **Bouton principal** : Précommander pour 29 CHF (ancre vers la section 6 ; écart au § 10 déclaré plus haut, proposition)
+
+## 2. Ce que fait Vadrouille
+- **Titre (h2)** : Un programme pensé pour être suivi
+- Tu racontes ton voyage en quelques phrases : dates, logement, envies, rythme.
+- Vadrouille cherche le meilleur de la destination et l'organise jour par jour : visites, repas, soirées, temps libre.
+- Tu tries les propositions : J'aime ou Pas pour moi. Le programme s'ajuste.
+- Tu remplaces une étape en gardant ce qui compte, comme ton restaurant de 19:00.
+
+(Parcours : cadrage § 3.1, écrans 2, 6, 14 ; exemple du restaurant : cadrage § 3.4.)
+
+## 3. Ce que Vadrouille vise
+- **Titre (h2)** : Ce que Vadrouille cherche à garantir
+- **Fiable** : chaque lieu contrôlé avant d'apparaître ; horaires et dates avec leur source et leur date ; ce qui reste incertain marqué « À confirmer ».
+- **Choisi** : pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source.
+- **D'actualité** : les événements réellement prévus pendant tes dates ; un événement sans source relue marqué « Non confirmé ».
+- **Adaptable** : une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes.
+
+(Quatre points de différenciation : cadrage § 2. La section ne compare pas Vadrouille aux assistants généralistes : aucune affirmation sur eux sans source datée. Seul fait sourcé disponible : « Les planificateurs reconnaissent eux-mêmes qu'ils peuvent se tromper sur les détails et qu'un itinéraire IA reste un brouillon » (cadrage § 2, source [23], consultée le 6 octobre 2026) ; une comparaison directe n'entre sur la page qu'avec les écarts réellement relevés dans la démonstration (`demo-avant-apres.md`, déroulé, étape 6). Ces phrases décrivent l'objectif du produit, pas un résultat acquis : G0 n'est pas passé. La page ne promet donc ni « aucun lieu inventé » ni « aucun lieu fermé », et ne publie aucun chiffre de fiabilité.)
+
+## 4. Démonstration
+**Section conditionnelle** : elle n'est publiée qu'après la démonstration réelle de Samuel (`demo-avant-apres.md`, déroulé, étapes 1 à 6), et ses textes dépendent de ce qui a vraiment été fait.
+- **Titre (h2)** : Le même voyage, deux résultats
+- **Introduction, si l'« après » est un programme réel de Vadrouille** (`demo-avant-apres.md`, possibilité 2) : Un vrai voyage à Édimbourg, fin août : arrivée à midi, le Tattoo le samedi à 21:30, une journée dans les Highlands. On a donné le même récit à un assistant généraliste et à Vadrouille.
+- **Introduction, si l'« après » vient des données simulées** (`demo-avant-apres.md`, possibilité 1) : Un vrai voyage à Édimbourg, fin août : arrivée à midi, le Tattoo le samedi à 21:30, une journée dans les Highlands. À gauche, la réponse d'un assistant généraliste à ce récit. À droite, le même voyage dans la démonstration de Vadrouille, sur des données simulées.
+- **Légende « avant »** : L'assistant généraliste, le [DATE DU TEST] : [écarts réellement relevés à l'étape 2 du déroulé, par exemple « un lieu fermé ce jour-là »]. Si aucun écart vérifiable n'est relevé, la section n'est pas publiée (déroulé, étape 6).
+- **Légende « après »** : Vadrouille : les étapes avec leur source, les trajets du jour, le Tattoo gardé à son horaire. [Ne garder que ce que la capture montre réellement.]
+- **Mention obligatoire tant que les captures viennent des données de démonstration** : Exemple réalisé sur des données simulées. Les lieux entre crochets ne sont pas vérifiés. (même mention que `specs/D1-demo.md`)
+- **Lien** : Voir la démonstration (vers la section « Démonstration » de l'accueil, `specs/D1-demo.md`)
+
+(Script et captures : `demo-avant-apres.md`. Brief : cadrage § 2, « Benchmark ».)
+
+## 5. Ce qui est inclus
+- **Titre (h2)** : Le voyage complet
+- Toutes les journées de ton voyage, repas et soirées compris
+- Les événements pendant ton séjour
+- Jusqu'à [N] remplacements pour ajuster ton programme
+- La liste à réserver avant de partir
+- Le calendrier et le partage avec tes proches
+- L'accès jusqu'à 30 jours après ton retour
+
+(Cadrage § 4, « Voyage complet » ; libellés repris de l'écran 9, `src/i18n/fr.json`, `debloquer.offre.inclus`.)
+
+- **Phrase sous la liste** : Tout se fait dans l'application, quand tu veux. Pas de rendez-vous, pas d'appel.
+
+## 6. Prix et paiement
+- **Titre (h2)** : 29 CHF pour un voyage
+- Paiement unique pour ce voyage, sans abonnement. (texte de l'écran 9, `debloquer.offre.paiementUnique` ; prix : Q2)
+- Utilisable dès le [DATE D'OUVERTURE], pour un voyage de 5 à 10 jours en Europe. (cible : cadrage § 1)
+- Si le voyage complet n'est pas prêt au [DATE D'OUVERTURE], tu es remboursé intégralement [sous réserve question 5]. (règle proposée, non tranchée ; le marqueur est retiré seulement après la réponse de Samuel)
+- **Boutons** : Payer avec TWINT · Payer par carte (`docs/handovers/frontend.md` § 10 ; afficher seulement les moyens réellement ouverts par Samuel, question 2)
+- **Après le paiement** : Merci. Ta précommande est enregistrée. [Comment et quand l'accès au voyage complet est remis : à écrire après Samuel. Envoyer un accès suppose un reçu de paiement, un e-mail ou un compte, donc des données personnelles : question 2 (encaissement), Q25 (envoi des codes de connexion), Q127 (mentions avant paiement), question 5 (date).] Deux minutes pour nous dire où tu pars ? (lien vers le questionnaire, `questionnaire.md`)
+
+## 7. Questions fréquentes
+- **Qu'est-ce que j'achète exactement ?**
+  Le voyage complet pour un voyage : toutes les journées, repas, soirées, événements, la liste à réserver et l'accès jusqu'à 30 jours après ton retour.
+- **Quand pourrai-je l'utiliser ?**
+  À partir du [DATE D'OUVERTURE]. Tu prépares alors ton voyage dans l'application, au moment qui te convient.
+- **Et si ce n'est pas prêt à temps ?**
+  Tu es remboursé intégralement [sous réserve question 5]. [Règle exacte, conditions et délai : question 5.] (Le marqueur est retiré seulement après la réponse de Samuel.)
+- **Pour quelles destinations ?**
+  Les villes et régions d'Europe. Tu nous dis la tienne dans le questionnaire après la précommande : on s'en sert pour choisir les destinations mises en avant.
+- **Est-ce un abonnement ?**
+  Non. Un paiement, un voyage.
+- **Vadrouille réserve-t-il à ma place ?**
+  Non. Vadrouille te dit ce qui est « À réserver », avec le lien, et tu réserves toi-même.
+- **Comment les adresses sont-elles choisies ?**
+  C'est notre objectif : contrôler chaque lieu à partir de ses sources avant de l'afficher dans ton programme, donner pour les horaires et les dates leur source et leur date, et marquer « À confirmer » ou « Non confirmé » ce qui reste incertain. (objectif du produit, cadrage § 2 et § 3.2, pas un résultat acquis tant que G0 n'est pas passé ; formulation à aligner sur le produit livré)
+- **Quelqu'un relit-il mon programme ?**
+  Non. Vadrouille est entièrement en libre-service : tout se fait dans l'application.
+- **Que devient ce que je saisis ?**
+  [Texte à fournir après la décision de Samuel sur les données personnelles et les conditions de vente : Q127 et question 5.]
+
+## 8. Appel final
+- **Titre (h2)** : Ton printemps se prépare dès janvier
+- Pâques, l'Ascension, la Pentecôte : les voyages de printemps se préparent de janvier à mars. Précommande dès aujourd'hui, prépare ton voyage dès l'ouverture. (dates et saisonnalité : cadrage § 5)
+- **Bouton** : Précommander pour 29 CHF (écart au § 10, proposition)
+
+## 9. Pied de page
+- Vendeur, conditions de vente, remboursement, données personnelles : [à fournir par Samuel ; Q127 (mentions avant paiement), question 5].
+- Aucun lien vers des réseaux sociaux tant que les comptes ne sont pas ouverts par Samuel (question 4).
+
+## Mesure (pour la tâche frontend)
+- Compter chaque visite de la page sans donnée personnelle (décision 0044, « Conséquences » ; outil à proposer à Samuel s'il engage un compte externe). Définition d'une visite : `suivi.md`, « Ce qu'est une visite » (proposition, question 7).
+- Lire la provenance par un paramètre de lien par lieu de diffusion (`?src=forum`, `?src=instagram`, `?src=proches`…), sans cookie ni identifiant personnel ; liste des valeurs : `suivi.md`. Le lien de test `?src=interne` (Samuel et le studio) est exclu de tous les comptes.
+- Réutiliser les événements `paywall_viewed`, `payment_started`, `payment_succeeded` (`docs/handovers/frontend.md` § 12), avec `price_variant`.

@@ -14,7 +14,8 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { ApplyResult, Day, MoveOptions, RevisionError, RevisionPreview as RevisionPreviewData, Stop } from "@/contracts";
 import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 

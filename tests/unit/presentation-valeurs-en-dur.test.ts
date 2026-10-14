@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 /**
  * Critère F6 : aucune couleur, taille ni valeur en px en dur hors provisoire.css dans les fichiers de

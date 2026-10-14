@@ -28,4 +28,12 @@ export type MapView =
       fitKey: string;
       rings: LatLng[];
       fitPadding?: FitPadding;
+    }
+  | {
+      /** Zone d'un quartier (écran 3, `AreaMap`, décision 0017 § 7) : un cercle, sans marqueur en phase 0. */
+      mode: "area";
+      fitKey: string;
+      center: LatLng;
+      radiusM: number;
+      fitPadding?: FitPadding;
     };

@@ -89,6 +89,17 @@ describe("horloge et remise à zéro", () => {
     expect(after.payment.confirmationDelayMs).toBe(0);
   });
 
+  it("reset vide aussi les codes, compteurs et session de la connexion simulée (F8b)", () => {
+    const scope = explicitScope("vider-auth");
+    scope.auth.addresses.set("h", { requests: [0], code: { expiresAt: 1, attempts: 2, locked: true } });
+    scope.auth.session = { sessionId: "s", userId: "u", organizationId: "o" };
+    resetScope("vider-auth", 0);
+    const after = explicitScope("vider-auth");
+    expect(after.auth.addresses.size).toBe(0);
+    expect(after.auth.session).toBeNull();
+    expect(explicitScope("autre-auth").auth.addresses.size).toBe(0);
+  });
+
   it("portées isolées ; au plus 1 000 portées explicites", () => {
     explicitScope("a1").payment.entitlements.set("x", { organizationId: "o", tripId: "t", at: 0 });
     expect(explicitScope("a2").payment.entitlements.size).toBe(0);

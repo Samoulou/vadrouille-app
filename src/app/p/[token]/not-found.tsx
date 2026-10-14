@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 
 import { PRODUCT_NAME } from "@/config/site";
 import { EtatPage } from "@/features/etats/EtatPage";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 const t = messages.partage.invalide;
 const documentTitle = format(messages.partage.vue.titreDocument.invalide, { produit: PRODUCT_NAME });

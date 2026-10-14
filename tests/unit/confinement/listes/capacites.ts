@@ -62,6 +62,14 @@ export const LIGNES_CAPACITE = [
     usage: "test des règles de déblocage",
     capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
   },
+  // F8b (décision 0017 § 11.3) : liste des fichiers suivis par Git (`git ls-files`). Verdict Sécurité : à venir (PR F8b, ticket 259).
+  {
+    fichier: "tests/unit/dev-pages-env.test.ts",
+    portee: "test",
+    usage: "test de la configuration versionnée (drapeaux d'ouverture)",
+    ecart: "fichier apparu après `40b6738` (F8b, ticket 259 ; décision 0017 § 11.3) : ligne ordinaire B, 0040 D4",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+  },
   {
     fichier: "src/lib/large-screen.test.tsx",
     portee: "test",
@@ -338,6 +346,40 @@ export const LIGNES_CAPACITE = [
     usage: "lance `node scripts/test-db.mjs` sans base joignable (environnement réduit à `PATH`, `HOME` et aux variables du cas)",
     capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 }],
     ecart: "sous-processus dans un test (section 4), critère « sans base joignable » de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
+  },
+  // P0r1 (ticket 267 ; spécification de P0r1, « Modules de capacité réseau » ; décision 0031 § 5 ; spécification P0c,
+  // section 9). Les lignes dont la forme contient un hôte ou un fragment surveillé (client de modèles, hôtes Google)
+  // sont dans `donnees/lignes-textes.json`. Verdict Sécurité à rendre sur la PR de P0r1.
+  {
+    fichier: "src/research/undici-transport.ts",
+    portee: "application",
+    usage:
+      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché à aucun point d'entrée : un `Agent` " +
+      "par saut dont `connect.lookup` rend l'adresse vérifiée, résolveur réel `lookup` (`all: true`). Justification côté serveur : " +
+      "module `server-only`, importé seulement par ses tests (fermeture `fermeture-module-p0r1`)",
+    capacites: [
+      { capacite: "module:undici", formes: ["Agent"], nombre: 1 },
+      { capacite: "module:node:dns", formes: ["lookup"], nombre: 1 },
+    ],
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
+  },
+  {
+    fichier: "src/grounding/places-client.ts",
+    portee: "application",
+    usage:
+      "client réel de Places (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "`transport` de `createPlacesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
+  },
+  {
+    fichier: "src/grounding/routes-client.ts",
+    portee: "application",
+    usage:
+      "client réel de Routes (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "`transport` de `createRoutesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
   },
 ] as const satisfies readonly LigneCapacite[];
 

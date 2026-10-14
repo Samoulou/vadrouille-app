@@ -4,7 +4,20 @@ import type { InferredBrief } from "@/contracts";
 import { MAX_CITIES, MAX_COMMITMENTS } from "@/contracts/values";
 
 import { briefCompletedProperties } from "./brief-fields";
-import { draftReducer, initialDraft, markedFields, type DraftAction, type DraftState } from "./draft";
+import { MOCK_DEMO_TRIP_DRAFT } from "@/mocks/creation-edimbourg";
+
+import {
+  adjacentLodgingCity,
+  cityKey,
+  draftForLodging,
+  draftReducer,
+  initialDraft,
+  markedFields,
+  pendingLodgingCities,
+  type DraftAction,
+  type DraftState,
+} from "./draft";
+import { toTripDraft } from "./validation";
 
 /** Brouillon en mémoire de l'onglet (F8-PO-1, F8-PO-5, F8-PO-7) : réducteur pur. */
 
@@ -145,5 +158,73 @@ describe("brief_completed : comptes", () => {
   it("un champ non déduit modifié ne compte pas", () => {
     const state = run([{ type: "inferred", brief: EDIMBOURG }, { type: "mealBudget", value: "40" }]);
     expect(briefCompletedProperties(state.brief)).toEqual({ inferred_fields_count: 4, edited_fields_count: 0 });
+  });
+});
+
+describe("brouillon : écran 3 (F8b, F8-PO-8)", () => {
+  /** Destination « Pas encore », Glasgow « Oui », Stirling « Pas encore ». */
+  function threeCities(): DraftState {
+    return run([
+      { type: "trip", patch: { destination: "Édimbourg", start: "2026-08-29", end: "2026-09-06" } },
+      { type: "lodging", city: 0, patch: { answer: "none" } },
+      { type: "addCity" },
+      { type: "city", index: 0, patch: { name: "Glasgow", arrival: "2026-09-01" } },
+      { type: "lodging", city: 1, patch: { answer: "known", label: "[Hôtel]" } },
+      { type: "addCity" },
+      { type: "city", index: 1, patch: { name: "Stirling", arrival: "2026-09-04" } },
+      { type: "lodging", city: 2, patch: { answer: "none" } },
+      { type: "tripReady" },
+      { type: "briefReady" },
+    ]);
+  }
+
+  it("villes à loger dans l'ordre ; suivante et précédente", () => {
+    const { trip } = threeCities();
+    expect(pendingLodgingCities(trip)).toEqual([0, 2]);
+    expect(adjacentLodgingCity(trip, 0, 1)).toBe(2);
+    expect(adjacentLodgingCity(trip, 2, 1)).toBeNull();
+    expect(adjacentLodgingCity(trip, 2, -1)).toBe(0);
+    expect(adjacentLodgingCity(trip, 0, -1)).toBeNull();
+    expect(cityKey(trip, 0)).toBe("destination");
+    expect(cityKey(trip, 2)).toBe(trip.otherCities[1]?.key);
+    expect(cityKey(trip, 5)).toBeUndefined();
+  });
+
+  it("choix gardé par clé de ville ; la ville courante avance, puis reste la dernière (retour de l'écran 4)", () => {
+    let state = run([{ type: "lodgingCity", city: 0 }], threeCities());
+    state = draftReducer(state, { type: "lodgingChoice", city: 0, choice: { kind: "suggestedArea", areaId: "zone" }, next: 2 });
+    expect(state.lodgingCity).toBe(2);
+    state = draftReducer(state, { type: "lodgingChoice", city: 2, choice: { kind: "none" }, next: null });
+    expect(state.lodgingCity).toBe(2);
+    expect(state.lodgingChoices).toEqual({ destination: { kind: "suggestedArea", areaId: "zone" }, [cityKey(state.trip, 2)!]: { kind: "none" } });
+    // Le brouillon transmis porte le choix (identifiants seulement) et garde le logement connu de Glasgow.
+    const draft = toTripDraft(state.trip, state.lodgingChoices);
+    expect(draft.lodging).toEqual({ kind: "suggestedArea", areaId: "zone" });
+    expect(draft.otherCities.map((city) => city.lodging)).toEqual([{ kind: "known", label: "[Hôtel]" }, { kind: "none" }]);
+  });
+
+  it("un choix de logement ne garde que ses identifiants", () => {
+    const state = draftReducer(threeCities(), {
+      type: "lodgingChoice",
+      city: 0,
+      choice: { kind: "suggestedLodging", lodgingId: "logement-1", placeId: "lieu-1" },
+      next: 2,
+    });
+    expect(toTripDraft(state.trip, state.lodgingChoices).lodging).toEqual({ kind: "suggestedLodging", lodgingId: "logement-1", placeId: "lieu-1" });
+  });
+
+  it("brouillon perdu : choix et ville courante effacés", () => {
+    let state = draftReducer(threeCities(), { type: "lodgingChoice", city: 0, choice: { kind: "none" }, next: 2 });
+    state = draftReducer(state, { type: "lost" });
+    expect(state.lodgingChoices).toEqual({});
+    expect(state.lodgingCity).toBeNull();
+  });
+
+  it("draftForLodging : brouillon prêt pour l'écran 3 de la première ville sans logement", () => {
+    const state = draftForLodging(MOCK_DEMO_TRIP_DRAFT);
+    expect(state.tripReady).toBe(true);
+    expect(state.briefReady).toBe(true);
+    expect(state.lodgingCity).toBe(0);
+    expect(toTripDraft(state.trip)).toEqual(MOCK_DEMO_TRIP_DRAFT);
   });
 });

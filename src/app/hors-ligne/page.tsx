@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 
 import { PRODUCT_NAME } from "@/config/site";
 import { OfflineFallback } from "@/features/voyage/OfflineFallback";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 // Rendu statique à la construction (F10-TL-4) : aucune lecture d'adaptateur, aucun paramètre, aucune donnée.
 export const dynamic = "force-static";

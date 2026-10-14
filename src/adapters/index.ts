@@ -2,7 +2,9 @@ import type { RevisionFixtures, Trip } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
+import { assertAuthAdapter } from "./auth-guard";
 import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock";
+import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
@@ -10,11 +12,13 @@ import { prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
-import { defaultScope, getSimulationScope, type SimulationScope } from "./simulation";
-import type { AdapterContext, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
+import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, type SimulationScope } from "./simulation";
+import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
 export type {
   AdapterContext,
+  AuthAdapter,
+  AuthConfig,
   CreationAdapter,
   MemberRole,
   PaymentAdapter,
@@ -23,6 +27,12 @@ export type {
   TripAdapter,
 } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
+/**
+ * Brouillon de démonstration de `R3-dev` (décision 0017 § 7) : réservé aux pages de développement et aux tests,
+ * comme `MOCK_DEMO_TRIP`. Jamais lu par une route produit.
+ */
+export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
+export { authAdapterChoice, mockAuthAllowed } from "./auth-guard";
 export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { shareAvailable, shareDemoAvailable } from "./share-guard";
@@ -69,7 +79,7 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
 /**
  * Création du voyage (décision 0017 § 3.1), selon la variable serveur `DATA_ADAPTER` (`mock` par défaut, même
  * normalisation que `getTripAdapter`, erreur pour une valeur inconnue). Sans portée de simulation (§ 10) :
- * `structureBrief` ne garde rien ; F8b et F8c ajouteront la portée pour y ranger leur état.
+ * `structureBrief` et `suggestLodging` ne gardent rien ; F8c ajoutera la portée pour y ranger son état.
  */
 export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER): CreationAdapter {
   const choice = adapterChoice(value);
@@ -83,6 +93,24 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
     default:
       throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api, prototype)`);
   }
+}
+
+/**
+ * Connexion (décision 0017 § 3.1 et § 11.2), selon la variable serveur `AUTH_ADAPTER` (`mock` par défaut). **Garde
+ * fermée par défaut** : lève une erreur à l'appel pour l'adaptateur `mock` sur un déploiement de production ou
+ * hors `development`/`test` sans `VADROUILLE_DEMO_AUTH=1`, et pour un adaptateur inconnu ou pas encore livré
+ * (`better-auth`, B3). Aucun repli permissif. L'état simulé vit dans la portée `options.scope` (portée par défaut
+ * sinon) ; `env` sert aux tests.
+ */
+export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.ProcessEnv } = {}): AuthAdapter {
+  assertAuthAdapter(options.env);
+  const scope = options.scope ?? defaultScope();
+  return createMockAuthAdapter({
+    now: () => scope.clock.now(),
+    store: scope.auth,
+    key: authHmacKey(),
+    maxAddresses: MAX_AUTH_ADDRESSES_PER_SCOPE,
+  });
 }
 
 /** Durées de la simulation de paiement (décision 0020 § 6). */

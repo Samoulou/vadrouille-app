@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { Tag } from "@/components/ligne/Tag";
 import type { Stop } from "@/contracts";
-import { format, messages } from "@/i18n";
+import { format } from "@/i18n";
+import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 
 const t = messages.sejour.evenements;

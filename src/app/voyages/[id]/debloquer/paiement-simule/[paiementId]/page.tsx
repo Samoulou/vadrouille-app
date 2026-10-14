@@ -5,7 +5,7 @@ import { getPaymentAdapter, getRequestContext, getSimulationScope, getTripReader
 import { PaymentSimulation } from "@/features/presentation/PaymentSimulation";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { loadCheckout } from "@/features/presentation/unlock-load";
-import { messages } from "@/i18n";
+import * as messages from "@/i18n/messages";
 
 export const dynamic = "force-dynamic";
 

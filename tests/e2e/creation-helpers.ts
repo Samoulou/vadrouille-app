@@ -10,6 +10,13 @@ import { expectPath } from "./debloquer-helpers";
 
 export const R1 = "/voyages/nouveau";
 export const R2 = "/voyages/nouveau/brief";
+/** Écran 3 « Où loger » (F8b, décision 0017 § 1). */
+export const R3 = "/voyages/nouveau/logement";
+/** Écran 3 sur le brouillon de démonstration, carte simulée (pages de développement). */
+export const R3_DEV = "/dev/voyages/nouveau/logement";
+/** Adresse du lancement (`R-lancer`, F8c) : seule l'adresse atteinte est vérifiée en F8b (0017 § 1). */
+export const R_LANCER = "/voyages/nouveau/lancer";
+export const R4_LANCER = "/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer";
 export const NOW = "2026-08-01T08:00:00+02:00";
 
 /** Récit du jeu simulé (voyage d'Édimbourg du cadrage § 2) ; l'adaptateur simulé renvoie toujours le même brief. */
@@ -64,4 +71,11 @@ export async function reachReview(page: Page) {
 export function upcomingTrip(now: Date = new Date()): TripInput {
   const day = (offset: number) => new Date(now.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
   return { ...EDIMBOURG, start: day(30), end: day(35) };
+}
+
+/** Écrans 1 et 2 validés avec le brief simulé (« Continuer » de la vérification). */
+export async function reachAfterBrief(page: Page, trip: TripInput = EDIMBOURG) {
+  await reachBrief(page, trip);
+  await reachReview(page);
+  await continueButton(page).click();
 }
