@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "releve": "2026-10-13",
+  "source": "Page de tarifs Google Maps Platform (developers.google.com/maps/billing-and-pricing/pricing), mise à jour le 2026-10-08, relevée le 2026-10-13 par ia-recherche",
+  "devise": "USD",
+  "palierMax": 100000,
+  "skus": {
+    "places_text_search_essentials_ids_only": { "methode": "places_text_search", "unite": "requete", "gratuitParMois": null, "prixPour1000": 0 },
+    "places_text_search_pro": { "methode": "places_text_search", "unite": "requete", "gratuitParMois": 5000, "prixPour1000": 32 },
+    "places_details_essentials": { "methode": "places_details", "unite": "requete", "gratuitParMois": 10000, "prixPour1000": 5 },
+    "places_details_pro": { "methode": "places_details", "unite": "requete", "gratuitParMois": 5000, "prixPour1000": 17 },
+    "places_details_enterprise": { "methode": "places_details", "unite": "requete", "gratuitParMois": 1000, "prixPour1000": 20 },
+    "routes_matrix_essentials": { "methode": "routes_matrix", "unite": "element", "gratuitParMois": 10000, "prixPour1000": 5 },
+    "routes_matrix_pro": { "methode": "routes_matrix", "unite": "element", "gratuitParMois": 5000, "prixPour1000": 10 },
+    "routes_matrix_enterprise": { "methode": "routes_matrix", "unite": "element", "gratuitParMois": 1000, "prixPour1000": 15 }
+  }
+}
