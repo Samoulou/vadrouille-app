@@ -24,6 +24,7 @@ La spécification B7 propose trois sous-tâches (section « Découpage »). Ses 
      | B7b | B7a ; B7-TL-4, TL-5, TL-7 et TL-8 |
      | B7c | B7a ; P0r2 fusionnée (fait : #287) ; B7-TL-6, TL-9 et TL-10 ; verdict de la Sécurité sur B7-TL-9 et TL-7 (question 9 de la spécification), qui bloque la fusion de B7c |
 3. **Suite** : B8 (ancrage) attend B7a et B7c ; B9 (workflows) attend les trois (spécification, ligne sous le tableau « Découpage »). Ordre de tâche décidé par le CEO : la spécification B8 peut être écrite dès maintenant, sur les interfaces de la section « Ce que B7 expose à B8 et B9 ».
+   § 3 amendé pour B8c par 0059 : B8c n'attend ni B7a ni B7c ; B8a et B8b restent soumis à ce § 3.
 4. **Limite de corrections** : la règle du studio (au plus deux corrections par tâche, puis troisième tentative ou découpage avec le Tech Lead) s'applique à chaque sous-tâche séparément.
 
 ## Conséquences
