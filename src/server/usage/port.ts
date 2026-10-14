@@ -4,7 +4,7 @@ import "server-only";
  * Port de consommation `@/server/usage` (spécification `specs/P0-suite-executions-reelles.md`, « Port de
  * consommation » ; forme fixée par la décision 0046, D13). Les clients réels (`src/ai`, `src/grounding`) reçoivent
  * une implémentation de ce port à leur création ; ils ne connaissent ni la base ni le schéma. Implémentations : en
- * mémoire (P0r1, tests seulement, `tests/support/port-consommation-memoire.ts`), Neon (`prototype.run_calls`, P0r2), `usage_ledger` (B7, B9).
+ * mémoire (P0r1, tests seulement, `tests/support/port-consommation-memoire.ts`), Neon (P0r2 : forfait réservé en base dans `prototype.forfaits`, registre en mémoire par appel, sans ligne par appel ; 0046 D13 point 3), `usage_ledger` (B7, B9).
  *
  * Types maison stricts : **aucun champ** pour une donnée Google, un prompt ou un texte libre. Les périodes sont
  * calculées par l'appelant (D20) ; le port ne calcule aucun fuseau. Une réservation couvre **une seule** requête au

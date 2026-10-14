@@ -14,7 +14,7 @@ import type {
  * Implémentation **en mémoire** du port de consommation (P0r1 : tests seulement, d'où sa place sous `tests/support/` ;
  * décision 0046, D13). Réservation
  * atomique par construction : la vérification des plafonds et l'insertion de la ligne se font sans `await` entre les
- * deux. L'implémentation Neon (`prototype.run_calls`) arrive avec P0r2.
+ * deux. L'implémentation Neon (forfait `prototype.forfaits`, 0046 D13 point 3) arrive avec P0r2.
  */
 
 export type LigneMemoire = {
