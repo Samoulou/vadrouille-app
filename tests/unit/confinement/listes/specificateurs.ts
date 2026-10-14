@@ -196,6 +196,23 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "P0r3b (ticket 311), décision 0055, section 1 point 2 ; verdict Sécurité à rendre",
   },
   {
+    fichier: "src/adapters/prototype-ecriture.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module d'écriture des positions du prototype, exigé par 0052 § 1.10 " +
+      "(« le module commence par import \"server-only\" ») ; P0r3c (ticket 316, PR 318), décision 0055, section 8 ; verdict Sécurité à rendre",
+  },
+  {
+    fichier: "src/contracts/prototype-ecriture.ts",
+    specificateur: "@/prototype/programme-reduit",
+    noms: ["type:ProgrammeReduit"],
+    motif:
+      "type seul (`import type`) du programme réduit dans le contrat d'écriture du prototype (0052 § 1.10) ; " +
+      PROTOTYPE_PUR +
+      " ; P0r3c (ticket 316, PR 318) ; verdict Sécurité à rendre",
+  },
+  {
     fichier: "tests/unit/server/env.test.ts",
     specificateur: "node:util",
     noms: ["inspect"],
