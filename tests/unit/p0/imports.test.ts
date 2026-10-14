@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { IMPORTS_DOMAINE, sourcesDomaine } from "../lint/domaine-cas-communs";
+import { RACINE, rel, resoudre, type Cible } from "./resolution";
 
 /**
  * `p0: aucun client réel ni accès réseau dans le code de P0a1` — liste d'autorisation des imports (décision 0032,
@@ -33,8 +33,6 @@ import { IMPORTS_DOMAINE, sourcesDomaine } from "../lint/domaine-cas-communs";
  * l'identifiant `Symbol` (redéclaré, réaffecté, en alias, `typeof Symbol`…) et `with` sont refusés.
  */
 
-const RACINE = fileURLToPath(new URL("../../../", import.meta.url));
-const rel = (absolu: string) => path.relative(RACINE, absolu).split(path.sep).join("/");
 
 function fichiers(dossier: string, extensions = [".ts", ".tsx"]): string[] {
   const absolu = path.join(RACINE, dossier);
@@ -50,29 +48,7 @@ function fichiers(dossier: string, extensions = [".ts", ".tsx"]): string[] {
 
 const estTest = (fichier: string) => /\.test\.tsx?$/.test(fichier);
 
-// --- Résolution des spécificateurs --------------------------------------------------------------------------
-
-type Cible = { type: "projet"; chemin: string } | { type: "externe"; nom: string };
-
-function resoudreProjet(base: string): string | undefined {
-  for (const candidat of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]) {
-    const absolu = path.join(RACINE, candidat);
-    if (existsSync(absolu) && statSync(absolu).isFile()) return rel(absolu);
-  }
-  return undefined;
-}
-
-function resoudre(depuis: string, specificateur: string): Cible {
-  if (specificateur.startsWith("@/")) {
-    const chemin = resoudreProjet(path.posix.join("src", specificateur.slice(2)));
-    return chemin ? { type: "projet", chemin } : { type: "externe", nom: specificateur };
-  }
-  if (specificateur.startsWith("./") || specificateur.startsWith("../")) {
-    const chemin = resoudreProjet(path.posix.normalize(path.posix.join(path.posix.dirname(depuis), specificateur)));
-    return chemin ? { type: "projet", chemin } : { type: "externe", nom: specificateur };
-  }
-  return { type: "externe", nom: specificateur };
-}
+// --- Résolution des spécificateurs : module d'appui partagé (`./resolution`, P0r3c-3 ; 0055 § 3 point 2) -------------
 
 // --- Analyse d'un fichier -----------------------------------------------------------------------------------
 
@@ -432,6 +408,12 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   ...["ancrage-zone", "budget-routes", "fiches-finales", "zone"].map(
     (nom) => [`src/grounding/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
   ),
+  // P0r3c-3 (ticket 316, décision 0055, sections 3 et 7) : prompt et client réel de recherche web, rédaction des raisons ;
+  // marqueur `server-only`. Le client réel de recherche web importe le seul type `ClientRechercheWeb` et les longueurs
+  // de `src/research/recherche-web.ts` (interface inchangée ; 0055 § 7 point 1 : « src/ai importe ce type »), qui
+  // n'importe rien.
+  ...["prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
+  ["src/ai/recherche-web-reelle.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/research/recherche-web.ts"] }],
   [
     "src/research/undici-transport.ts",
     {
@@ -681,6 +663,9 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
   }
   return vus;
 }
+
+/** Ponts de l'application vers les modules de P0 (D18, décision 0055, section 3) : la seule composition du mode réel. */
+const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts"];
 
 /** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1). */
 const interditPartout = (chemin: string) =>
@@ -1168,7 +1153,11 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     const configs = ["next.config.ts"].filter((fichier) => existsSync(path.join(RACINE, fichier)));
 
     it("aucun fichier n'atteint @/ai, @/research, @/grounding, scripts/ ni src/prototype (sauf programme-reduit) ; hors src/server, aucun n'atteint @/domain", () => {
-      const sources = [...application.filter((f) => !estTest(f)), ...configs];
+      // D18 (décision 0055, section 3) : la composition du mode réel est le seul pont de l'application vers les modules
+      // de P0 ; elle est contrôlée à part (`tests/unit/p0/composition.test.ts` : seul importateur des modules de
+      // capacité, importée par le seul workflow `p0Run`). Tout autre fichier qui l'atteint reste une violation ici.
+      const sources = [...application.filter((f) => !estTest(f) && !PONTS_P0.includes(f)), ...configs];
+      expect(PONTS_P0.every((f) => application.includes(f))).toBe(true);
       expect(sources).toContain("src/server/config/moteur.ts");
       for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
       // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
@@ -1208,8 +1197,11 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
 
 // --- Clé côté serveur seulement (spécification de P0r1, « Clients réels » ; mineur 15 de la revue du head `fab6c81`) ---
 
-/** Dossiers que rien de ce qui part vers le navigateur ne doit atteindre : clients réels, lecture des pages, modules de clé. */
-const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "src/server/env/"];
+/**
+ * Dossiers que rien de ce qui part vers le navigateur ne doit atteindre : clients réels, lecture des pages, modules de clé,
+ * et la composition du mode réel (P0r3c-3 : test de P0r1 « clé côté serveur » étendu à `p0-reel.ts`, 0055 § 3 point 6).
+ */
+const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "src/server/env/", "src/server/composition/"];
 /**
  * Paquets des clients réels : jamais atteints depuis le code client non plus. Le fournisseur de modèles n'est admis que
  * dans le client de modèles (exceptions nominatives) : l'atteindre suppose d'atteindre `src/ai`.
@@ -1385,6 +1377,21 @@ describe("p0: clé côté serveur seulement", () => {
     expect(un("src/lib/client.ts")).toEqual(["src/lib/client.ts → externe:ai"]);
     expect(un("src/lib/calcule.ts")).toEqual(["src/lib/calcule.ts → externe:?import-non-litteral"]);
     expect(un("src/components/Sain.tsx")).toEqual([]);
+  });
+
+  it("composition du mode réel (0055 § 3 point 6) : un composant client ou une page qui l'atteint, même par un intermédiaire, est refusé", () => {
+    const depot = new Map<string, string>([
+      ["src/app/prototype/page.tsx", 'import { x } from "@/server/p0/intermediaire";\n'],
+      ["src/server/p0/intermediaire.ts", 'export { composerP0Reel as x } from "@/server/composition/p0-reel";\n'],
+      ["src/features/Direct.tsx", '"use client";\nconst c = () => import("@/server/composition/p0-reel");\n'],
+    ]);
+    const lireFictif = (fichier: string) => depot.get(fichier) ?? "";
+    const resoudreFictif = (_depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    expect(atteintsServeurSeulement(["src/app/prototype/page.tsx"], lireFictif, resoudreFictif)).toEqual([
+      "src/app/prototype/page.tsx → src/server/p0/intermediaire.ts → src/server/composition/p0-reel.ts",
+    ]);
+    expect(atteintsServeurSeulement(["src/features/Direct.tsx"], lireFictif, resoudreFictif)).toEqual(["src/features/Direct.tsx → src/server/composition/p0-reel.ts"]);
   });
 
   it("frontière de P0r3b : au-delà de son action seulement, le module étroit du mode réel et ses modules de B3a ; aucune clé, aucune autre action", () => {

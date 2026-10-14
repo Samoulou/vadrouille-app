@@ -87,7 +87,7 @@ function monter(reponses: (() => Promise<Response>)[], options: Partial<OptionsO
     return suivante();
   });
   const client = createOpenRouterClient(
-    { usage: port, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 10_000, horloge, environnement: ENV, ...options },
+    { usage: port, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 10_000, coutEstimeRechercheWebMicros: 25_000, horloge, environnement: ENV, ...options },
     transport,
   );
   return { client, port, horloge, appels, transport };
@@ -121,7 +121,7 @@ describe("p0: egress, un seul contrat (client de modèles)", () => {
     const horloge = creerHorlogeManuelle();
     let erreur: unknown;
     try {
-      createOpenRouterClient({ usage: creerPortMemoire(horloge), contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, horloge, environnement }, transport);
+      createOpenRouterClient({ usage: creerPortMemoire(horloge), contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, coutEstimeRechercheWebMicros: 1, horloge, environnement }, transport);
     } catch (e) {
       erreur = e;
     }
@@ -135,7 +135,7 @@ describe("p0: egress, un seul contrat (client de modèles)", () => {
     for (const environnement of [{ VERCEL_ENV: "preview" }, { VERCEL_ENV: "preview", OPENROUTER_API_KEY: "" }]) {
       const horloge = creerHorlogeManuelle();
       expect(() =>
-        createOpenRouterClient({ usage: creerPortMemoire(horloge), contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, horloge, environnement }, vi.fn()),
+        createOpenRouterClient({ usage: creerPortMemoire(horloge), contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, coutEstimeRechercheWebMicros: 1, horloge, environnement }, vi.fn()),
       ).toThrow(CODE_CLE_ABSENTE);
     }
   });
@@ -262,7 +262,7 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
       },
     };
     const transport = vi.fn();
-    const client = createOpenRouterClient({ usage, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, horloge, environnement: ENV }, transport);
+    const client = createOpenRouterClient({ usage, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, coutEstimeRechercheWebMicros: 1, horloge, environnement: ENV }, transport);
     expect(await codeDe(client.envoyer(requete()))).toBe("usage_unavailable");
     expect(transport).not.toHaveBeenCalled();
   });
@@ -272,7 +272,7 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
     const port = creerPortMemoire(horloge);
     const usage = { ...port, reserve: () => new Promise<never>(() => undefined) };
     const transport = vi.fn();
-    const client = createOpenRouterClient({ usage, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, horloge, environnement: ENV }, transport);
+    const client = createOpenRouterClient({ usage, contexte: CONTEXTE, plafonds: [], coutEstimeMicros: 1, coutEstimeRechercheWebMicros: 1, horloge, environnement: ENV }, transport);
     const issue = codeDe(client.envoyer(requete()));
     await horloge.avancer(1_999);
     await horloge.avancer(1);
@@ -329,5 +329,121 @@ describe("p0: fournisseur explicite (statique)", () => {
     expect(source).toMatch(/const\s+modele\s*=\s*fournisseur\s*\.\s*chat\s*\(\s*requete\s*\.\s*modele\s*,/);
     const creation = source.match(/=\s*createOpenRouter\s*\(\s*\{([^}]*)\}\s*\)/)?.[1] ?? "";
     for (const motif of [/\bapiKey\s*:\s*cle\b/, /\bbaseURL\s*:\s*BASE_URL\b/, /\bfetch\s*:\s*enveloppe\b/]) expect(creation).toMatch(motif);
+  });
+});
+
+describe("p0: recherche web du fournisseur (0055 § 7 point 2)", () => {
+  const requeteWeb = (modifs: Record<string, unknown> = {}) => ({
+    modele: "fournisseur/recherche-test",
+    routage: { data_collection: "deny" as const },
+    moteur: "exa" as const,
+    prompt: { id: "recherche-web", version: 2 },
+    messages: [
+      { role: "system" as const, contenu: "Consigne." },
+      { role: "user" as const, contenu: "musées Édimbourg" },
+    ],
+    maxResultats: 3,
+    ...modifs,
+  });
+
+  const reponseWeb = (annotations: unknown[], cout = 0.0061) =>
+    new Response(
+      JSON.stringify({
+        id: "gen-2",
+        object: "chat.completion",
+        created: 1,
+        model: "fournisseur/recherche-test",
+        provider: "P",
+        choices: [{ index: 0, message: { role: "assistant", content: "SENTINELLE-TEXTE-MODELE", annotations }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost: cout },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+
+  const citation = (url: string, title: string, content: string) => ({ type: "url_citation", url_citation: { url, title, content, start_index: 0, end_index: 1 } });
+
+  it("même enveloppe et même réservation ; greffon web seul, borné ; sources rendues, texte du modèle ignoré", async () => {
+    const { client, appels, port } = monter([async () => reponseWeb([citation("https://exemple.org/a", "A", "Extrait A")])]);
+    const reponse = await client.rechercherWeb(requeteWeb());
+    expect(reponse).toEqual({ sources: [{ url: "https://exemple.org/a", titre: "A", extrait: "Extrait A" }], coutUsd: 0.0061 });
+    expect(JSON.stringify(reponse)).not.toContain("SENTINELLE-TEXTE-MODELE");
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_MODELES);
+    expect(init.redirect).toBe("manual");
+    const corps = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(corps.plugins).toEqual([{ id: "web", engine: "exa", max_results: 3 }]);
+    expect(corps.provider).toEqual({ data_collection: "deny" });
+    expect(corps.model).toBe("fournisseur/recherche-test");
+    expect(String(init.body)).not.toContain(CLE);
+    expect(port.lignes.map((l) => [l.etat, l.coutReelMicros, l.demande.fournisseur, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", 6100, "modeles", "chat", "fournisseur/recherche-test", 25_000],
+    ]);
+  });
+
+  it("moteur fixé (bloquant 1c de la PR 326) : `native` envoyé tel quel ; moteur absent ou inconnu : invalid_request, ni réservation ni requête", async () => {
+    const { client, appels } = monter([async () => reponseWeb([])]);
+    await client.rechercherWeb(requeteWeb({ moteur: "native" }));
+    expect((JSON.parse(String(premier(appels).init.body)) as { plugins: unknown }).plugins).toEqual([{ id: "web", engine: "native", max_results: 3 }]);
+    for (const moteur of [undefined, "auto", "firecrawl", "parallel", "EXA"]) {
+      const refus = monter([]);
+      expect(await codeDe(refus.client.rechercherWeb(requeteWeb({ moteur }))), String(moteur)).toBe("invalid_request");
+      expect(refus.transport).not.toHaveBeenCalled();
+      expect(refus.port.lignes).toEqual([]);
+    }
+  });
+
+  it("estimation distincte (mineur 2 de la PR 326) : la recherche web réserve son propre coût estimé, repli quand le coût réel manque", async () => {
+    const sansCout = new Response(
+      JSON.stringify({
+        id: "gen-3",
+        object: "chat.completion",
+        created: 1,
+        model: "fournisseur/recherche-test",
+        provider: "P",
+        choices: [{ index: 0, message: { role: "assistant", content: "x", annotations: [] }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+    const { client, port } = monter([async () => sansCout, async () => reponseOk()]);
+    expect((await client.rechercherWeb(requeteWeb())).coutUsd).toBe(0.025);
+    await client.envoyer(requete());
+    expect(port.lignes.map((l) => l.demande.coutEstimeMicros)).toEqual([25_000, 10_000]);
+  });
+
+  it("envoyer n'ajoute jamais le greffon web", async () => {
+    const { client, appels } = monter([async () => reponseOk()]);
+    await client.envoyer(requete());
+    expect(JSON.parse(String(premier(appels).init.body))).not.toHaveProperty("plugins");
+  });
+
+  it.each([0, 11, 2.5, Number.NaN])("nombre de résultats %s hors de [1, 10] : invalid_request, ni réservation ni requête", async (maxResultats) => {
+    const { client, transport, port } = monter([]);
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ maxResultats })))).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("data_collection absent, identifiant mal formé, rôle inconnu : refus avant toute réservation ni requête", async () => {
+    const { client, transport, port } = monter([]);
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ routage: { data_collection: "allow" } })))).toBe("data_collection_missing");
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ modele: "https://exemple.org/x" })))).toBe("model_id_invalid");
+    expect(await codeDe(client.rechercherWeb(requeteWeb({ messages: [{ role: "assistant", contenu: "x" }] })))).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("erreur du fournisseur : code fermé, aucun texte de la réponse, un seul appel", async () => {
+    const { client, appels, port } = monter([async () => new Response('{"error":{"message":"SENTINELLE-FOURNISSEUR"}}', { status: 503 })]);
+    let erreur: unknown;
+    try {
+      await client.rechercherWeb(requeteWeb());
+    } catch (e) {
+      erreur = e;
+    }
+    expect((erreur as ErreurOpenRouter).code).toBe("upstream_unavailable");
+    expect(`${(erreur as Error).message} ${JSON.stringify(erreur)}`).not.toContain("SENTINELLE-FOURNISSEUR");
+    expect(appels).toHaveLength(1);
+    expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
   });
 });

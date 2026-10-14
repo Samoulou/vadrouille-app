@@ -34,8 +34,30 @@ export const RoutageSchema = z.strictObject({
 });
 export type Routage = z.infer<typeof RoutageSchema>;
 
+/**
+ * Moteurs admis du greffon de recherche web d'OpenRouter (correction 1 de la PR 326, bloquant 1c de la revue du head
+ * `e096176`) : le moteur est **fixé** par la configuration et envoyé sur chaque requête, jamais laissé au défaut variable
+ * du fournisseur (natif si le modèle en a un, sinon Exa). `native` : recherche du fournisseur du modèle ; `exa` : Exa,
+ * sous-traitant américain d'OpenRouter, hors du réglage `data_collection: "deny"` (question pour Samuel, PR 326).
+ */
+export const MOTEURS_RECHERCHE_WEB = ["native", "exa"] as const;
+export type MoteurRechercheWeb = (typeof MOTEURS_RECHERCHE_WEB)[number];
+
+/**
+ * Familles de modèles (préfixe `fournisseur/`) dont OpenRouter offre la recherche **native** (documentation OpenRouter,
+ * « Web Search », consultée le 2026-10-14 : Anthropic, Google, OpenAI, Perplexity, xAI). À revérifier à chaque
+ * changement du modèle de l'étape `recherche`.
+ */
+export const FAMILLES_RECHERCHE_NATIVE: readonly string[] = ["anthropic", "google", "openai", "perplexity", "x-ai"];
+
+/** Moteur exigé pour un modèle (avis de la Sécurité, PR 326) : `native` si le modèle l'offre, sinon `exa`. */
+export function moteurRechercheWebAttendu(modele: string): MoteurRechercheWeb {
+  return FAMILLES_RECHERCHE_NATIVE.includes(modele.split("/")[0] ?? "") ? "native" : "exa";
+}
+
 /** `modeles.json` : modèles de la variante B, et la seule différence de la variante A (P0-PO-12). */
-export const ConfigModelesSchema = z.strictObject({
+export const ConfigModelesSchema = z
+  .strictObject({
   schema: Version,
   etapes: z.strictObject({
     recherche: ModeleIdSchema,
@@ -47,7 +69,14 @@ export const ConfigModelesSchema = z.strictObject({
     a: z.strictObject({ notation: ModeleIdSchema }),
   }),
   routage: RoutageSchema,
-});
+  /** Recherche web du fournisseur (modèle de l'étape `recherche`) : moteur fixé, cohérent avec ce modèle. */
+  rechercheWeb: z.strictObject({ moteur: z.enum(MOTEURS_RECHERCHE_WEB) }),
+  })
+  .superRefine((config, contexte) => {
+    if (config.rechercheWeb.moteur !== moteurRechercheWebAttendu(config.etapes.recherche)) {
+      contexte.addIssue({ code: "custom", path: ["rechercheWeb", "moteur"], message: "moteur de recherche web incohérent avec le modèle de l'étape recherche" });
+    }
+  });
 export type ConfigModeles = z.infer<typeof ConfigModelesSchema>;
 
 export const VARIANTES = ["a", "b"] as const;
@@ -142,12 +171,12 @@ export const BORNES_MODE_REEL = {
 const LOGEMENTS_MAX = 5;
 
 /**
- * Champs du mode réel **sans valeur par défaut** tant que leur décision manque : `coutUsd` (Q391, Product Owner) et
- * `fiches` (marge de remplacement de l'étape finale, Q389, Product Owner). Absents du fichier, la configuration est
- * refusée (`config_reel_incomplete`) et aucune exécution réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6
- * point 2).
+ * Champs du mode réel **sans valeur par défaut**, décidés par le Product Owner (amendement 1 de la spécification
+ * P0-suite-2, 2026-10-14, PR 324) : `coutUsd` = 3 (Q391) et `fiches` = `{ margeMinimum: 4, margePart: 0,2 }`
+ * (Q389, P0S2-PO-17). Absents du fichier, la configuration est refusée (`config_reel_incomplete`) et aucune exécution
+ * réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6 point 2).
  */
-export const CHAMPS_MODE_REEL_EN_ATTENTE = ["coutUsd", "fiches"] as const;
+export const CHAMPS_MODE_REEL_DECIDES_PO = ["coutUsd", "fiches"] as const;
 
 const plafondReel = (max: number) => z.number().int().min(1).max(max);
 

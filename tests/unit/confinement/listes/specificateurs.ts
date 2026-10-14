@@ -73,7 +73,9 @@ export const SPECIFICATEURS = [
   { specificateur: "pg-connection-string", zones: ["db/migrate.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
-  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts"] },
+  // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
+  // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité à rendre.
+  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts"] },
 ] as const satisfies readonly LigneSpecificateur[];
 
 const CHARGEUR =
@@ -94,12 +96,20 @@ const PORT_P0R1 =
   "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du " +
   "head `335d925`, décisions 0031 § 5, 0046 (D13) et 0049 C1 (point 5) ; spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)" +
   " ; correction 1 de la PR 272 (mutualisation du contexte d'appel et de la demande de réservation, mineur de la revue du head `353bb20` : `demandeDe` et `type:ContexteAppel` remplacent `type:Nature` et `type:Periode`) : verdict Sécurité d'incrément à rendre";
+const COMPOSITION_P0R3C =
+  "module de composition du mode réel (D18) : câblage seul, garde exigée (type `GardeOuverte`), contexte d'appel et périodes (D20) " +
+  "du port de consommation ; P0r3c-3 (ticket 316), décision 0055, section 3 points 1 et 7, avis S-3 ; verdict Sécurité à rendre";
 const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"];
 
 const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/client.ts", specificateur: "@/prototype/config", noms: ["MODELE_ID_PATTERN", "type:Routage"], motif: PROTOTYPE_PUR },
+  {
+    fichier: "src/ai/client.ts",
+    specificateur: "@/prototype/config",
+    noms: ["MODELE_ID_PATTERN", "MOTEURS_RECHERCHE_WEB", "type:MoteurRechercheWeb", "type:Routage"],
+    motif: `${PROTOTYPE_PUR} ; moteurs du greffon web ajoutés par la correction 1 de la PR 326 (bloquant 1c), verdict Sécurité à rendre`,
+  },
   { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", noms: ["TYPES_CRENEAU"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   {
@@ -139,6 +149,32 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
+  // P0r3c-3 (ticket 316) : recherche web réelle, rédaction des raisons et composition du mode réel (décision 0055,
+  // sections 3 et 7). Verdict Sécurité à rendre dans la PR (format de la section 8 de la spécification P0c).
+  ...["src/ai/prompts/recherche-web.ts", "src/ai/recherche-web-reelle.ts", "src/ai/rediger-raisons.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité à rendre",
+  })),
+  {
+    fichier: "src/ai/recherche-web-reelle.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["LONGUEURS_TEXTE"],
+    motif: `${PROTOTYPE_PUR} ; longueur des requêtes du plan, importée au lieu d'être recopiée (mineur 6 de la PR 326)`,
+  },
+  {
+    fichier: "src/ai/recherche-web-reelle.test.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["LONGUEURS_TEXTE"],
+    motif: `${PROTOTYPE_PUR} ; égalité de la longueur des requêtes web et du plan, sans recopier la valeur (mineur 10 de la PR 326)`,
+  },
+  { fichier: "src/ai/recherche-web-reelle.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
   { fichier: "src/research/agent.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   {
     fichier: "src/research/agent.ts",
@@ -252,6 +288,28 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "type seul (`import type`) du programme réduit dans le contrat d'écriture du prototype (0052 § 1.10) ; " +
       PROTOTYPE_PUR +
       " ; P0r3c (ticket 316, PR 318) ; verdict Sécurité : accordée (revue consolidée de la PR 318, head ea7cc37)",
+  },
+  // P0r3c-3 (ticket 316) : module de composition du mode réel (D18, décision 0055, section 3 point 7) : les lignes que
+  // l'analyseur relève pour `p0-reel.ts`, et rien d'autre. Verdict Sécurité à rendre dans la PR.
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: COMPOSITION_P0R3C,
+  },
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "@/prototype/config",
+    noms: ["moteurRechercheWebAttendu", "type:MoteurRechercheWeb", "type:Routage"],
+    motif: `${PROTOTYPE_PUR} ; ${COMPOSITION_P0R3C} ; moteur du greffon web contrôlé à la construction (bloquant 1c de la PR 326)`,
+  },
+  { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/p0/garde", noms: ["type:GardeOuverte"], motif: COMPOSITION_P0R3C },
+  { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_P0R3C },
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "@/server/usage/port",
+    noms: ["horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"],
+    motif: COMPOSITION_P0R3C,
   },
   {
     fichier: "tests/unit/server/env.test.ts",
