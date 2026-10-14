@@ -93,7 +93,7 @@ function fichiers(dossier: string): string[] {
 }
 
 describe("p0: modules de capacité branchés à aucun point d'entrée", () => {
-  it("seuls leurs propres tests (et ce test) importent les quatre modules de capacité", () => {
+  it("seuls leurs propres tests (et les tests transverses de P0r1) importent les quatre modules de capacité", () => {
     const importateurs = new Map<string, string[]>(MODULES_CAPACITE.map((m) => [m, []]));
     for (const fichier of [...fichiers("src"), ...fichiers("scripts"), ...fichiers("tests"), ...fichiers("db")]) {
       const source = lire(fichier);
@@ -109,9 +109,9 @@ describe("p0: modules de capacité branchés à aucun point d'entrée", () => {
       }
     }
     expect(Object.fromEntries(importateurs)).toEqual({
-      [CLIENT_MODELES]: [CLIENT_MODELES.replace(/\.ts$/, ".test.ts"), "tests/unit/p0/clients-reels.test.ts"],
-      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", "tests/unit/p0/clients-reels.test.ts"],
-      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", "tests/unit/p0/clients-reels.test.ts"],
+      [CLIENT_MODELES]: [CLIENT_MODELES.replace(/\.ts$/, ".test.ts"), "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"],
+      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"],
+      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"],
       "src/research/undici-transport.ts": ["src/research/undici-transport.test.ts", "tests/unit/p0/clients-reels.test.ts"],
     });
   });

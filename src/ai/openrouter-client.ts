@@ -11,10 +11,10 @@ import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 import {
   avecReservation,
   DELAI_REQUETE_MS,
+  demandeDe,
   horlogeSysteme,
+  type ContexteAppel,
   type Horloge,
-  type Nature,
-  type Periode,
   type Plafond,
   type PortConsommation,
 } from "@/server/usage/port";
@@ -76,12 +76,6 @@ export class ErreurOpenRouter extends Error {
     this.name = "ErreurOpenRouter";
   }
 }
-
-export type ContexteAppel = {
-  readonly nature: Nature;
-  readonly executionId: string | null;
-  readonly periodes: { readonly jour: Periode; readonly mois: Periode };
-};
 
 export type OptionsOpenRouter = {
   readonly usage: PortConsommation;
@@ -157,27 +151,24 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
       if (typeof requete.modele !== "string" || requete.modele.length > 100 || !MODELE_ID_PATTERN.test(requete.modele)) {
         throw new ErreurOpenRouter("model_id_invalid");
       }
+      // Rôle hors de `system` et `user` (aucun autre n'est prévu par l'interface) : refusé, jamais ignoré en silence.
+      if (!Array.isArray(requete.messages) || requete.messages.some((m) => m.role !== "system" && m.role !== "user")) {
+        throw new ErreurOpenRouter("invalid_request");
+      }
       const systeme = requete.messages.filter((m) => m.role === "system").map((m) => m.contenu);
       const utilisateur = requete.messages.filter((m) => m.role === "user").map((m) => ({ role: "user" as const, content: m.contenu }));
       const modele = fournisseur.chat(requete.modele, {
         provider: { data_collection: "deny", ...(requete.routage.zdr === undefined ? {} : { zdr: requete.routage.zdr }) },
         usage: { include: true },
       });
-      const contexte = options.contexte();
       let etat: EtatAppel | undefined;
       const issue = await avecReservation(
         { port: options.usage, horloge },
-        {
-          nature: contexte.nature,
-          fournisseur: "modeles",
-          methode: "chat",
-          sku: requete.modele,
-          unites: { requetes: 1, elements: 0 },
-          coutEstimeMicros: options.coutEstimeMicros,
-          executionId: contexte.executionId,
-          periodes: contexte.periodes,
-          plafonds: options.plafonds,
-        },
+        demandeDe(
+          options.contexte(),
+          { fournisseur: "modeles", methode: "chat", sku: requete.modele, unites: { requetes: 1, elements: 0 }, coutEstimeMicros: options.coutEstimeMicros },
+          options.plafonds,
+        ),
         DELAI_REQUETE_MS.openrouter,
         async (signal, transportAppele) => {
           etat = { appele: transportAppele, redirection: false };

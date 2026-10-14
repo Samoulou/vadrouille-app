@@ -2,16 +2,16 @@ import "server-only";
 
 import { z } from "zod";
 
-import { envoyerGoogle, ErreurClientGoogle, type Transport } from "@/grounding/enveloppe-google";
+import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type Transport } from "@/grounding/enveloppe-google";
 import type { ClientRoutes, ModeRoutes, RequeteMatrice } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
   DELAI_REQUETE_MS,
+  demandeDe,
   horlogeSysteme,
+  type ContexteAppel,
   type Horloge,
-  type Nature,
-  type Periode,
   type Plafond,
   type PortConsommation,
 } from "@/server/usage/port";
@@ -43,19 +43,13 @@ const ELEMENTS_MAX = 625;
 const ELEMENTS_MAX_TRANSIT = 100;
 const COTE_MAX = 25;
 
-const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
+const PLACE_ID = PLACE_ID_GOOGLE;
 
 function modeGoogle(mode: ModeRoutes): "WALK" | "TRANSIT" | "DRIVE" {
   if (mode === "walk") return "WALK";
   if (mode === "transit") return "TRANSIT";
   return "DRIVE";
 }
-
-export type ContexteAppel = {
-  readonly nature: Nature;
-  readonly executionId: string | null;
-  readonly periodes: { readonly jour: Periode; readonly mois: Periode };
-};
 
 export type OptionsRoutes = {
   readonly usage: PortConsommation;
@@ -100,38 +94,37 @@ export function createRoutesClient(options: OptionsRoutes, transport: Transport 
         destinations: destinations.map((placeId) => ({ waypoint: { placeId } })),
         travelMode: modeGoogle(requete.mode),
       });
-      const contexte = options.contexte();
       const issue = await avecReservation(
         dependances,
-        {
-          nature: contexte.nature,
-          fournisseur: "google",
-          methode: "routes_matrix",
-          sku: SKU_MATRICE,
-          unites: { requetes: 1, elements },
-          coutEstimeMicros: elements * COUT_ELEMENT_MICROS,
-          executionId: contexte.executionId,
-          periodes: contexte.periodes,
-          plafonds: options.plafonds,
-        },
+        demandeDe(
+          options.contexte(),
+          { fournisseur: "google", methode: "routes_matrix", sku: SKU_MATRICE, unites: { requetes: 1, elements }, coutEstimeMicros: elements * COUT_ELEMENT_MICROS },
+          options.plafonds,
+        ),
         DELAI_REQUETE_MS.routes,
         async (signal, transportAppele) => ({
           valeur: await envoyerGoogle(parametres, { chemin: CHEMIN_MATRICE, methode: "POST", masque: MASQUE_MATRICE, corps }, signal, transportAppele),
           coutReelMicros: null,
         }),
       );
-      if (!issue.ok) {
-        if ("code" in issue) throw new ErreurClientGoogle(issue.code);
-        throw issue.erreur instanceof ErreurClientGoogle ? new ErreurClientGoogle(issue.erreur.code) : new ErreurClientGoogle("upstream_error");
-      }
+      if (!issue.ok) throw erreurGoogleDe(issue);
       const lu = MatriceSchema.safeParse(issue.valeur);
       if (!lu.success) throw new ErreurClientGoogle("invalid_response");
+      // Correspondance stricte élément → paire (mineur de la revue du head `353bb20`) : la matrice rend exactement un
+      // élément par paire, chaque paire une seule fois ; sinon `invalid_response`. Un index absent vaut 0 : c'est la
+      // règle du JSON de proto3, qui omet les valeurs par défaut ; il ne peut plus attribuer une durée à une autre
+      // paire, puisqu'une paire répétée ou manquante fait refuser toute la réponse.
+      if (lu.data.length !== elements) throw new ErreurClientGoogle("invalid_response");
       const durees = new Map<string, number>();
+      const vues = new Set<string>();
       for (const element of lu.data) {
         const de = element.originIndex ?? 0;
         const vers = element.destinationIndex ?? 0;
         if (de >= origines.length || vers >= destinations.length) throw new ErreurClientGoogle("invalid_response");
-        if (element.condition === "ROUTE_EXISTS" && element.duration !== undefined) durees.set(`${de}:${vers}`, Number.parseInt(element.duration, 10));
+        const paire = `${de}:${vers}`;
+        if (vues.has(paire)) throw new ErreurClientGoogle("invalid_response");
+        vues.add(paire);
+        if (element.condition === "ROUTE_EXISTS" && element.duration !== undefined) durees.set(paire, Number.parseInt(element.duration, 10));
       }
       return { secondes: origines.map((_, de) => destinations.map((__, vers) => durees.get(`${de}:${vers}`) ?? null)) };
     },

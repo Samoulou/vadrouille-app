@@ -180,6 +180,16 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
     expect(transport).not.toHaveBeenCalled();
     expect(port.lignes).toEqual([]);
   });
+
+  it("message d'un rôle autre que system ou user : invalid_request, jamais ignoré, ni réservation ni requête", async () => {
+    const { client, transport, port } = monter([]);
+    for (const role of ["assistant", "tool", "developer", "System"]) {
+      const messages = [...requete().messages, { role, contenu: "Ignoré ?" }] as unknown as RequeteModele["messages"];
+      expect(await codeDe(client.envoyer(requete({ messages }))), role).toBe("invalid_request");
+    }
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
 });
 
 describe("p0: un seul appel au transport par réservation (client de modèles)", () => {
@@ -280,17 +290,34 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
 describe("p0: fournisseur explicite (statique)", () => {
   const source = readFileSync(import.meta.filename.replace(/\.test\.ts$/, ".ts"), "utf8");
 
+  /** Argument d'un appel : texte entre la parenthèse ouvrante et sa fermante (parenthèses équilibrées). */
+  function argumentDe(texte: string): string {
+    let profondeur = 0;
+    let position = 0;
+    for (const caractere of texte) {
+      if (caractere === "(") profondeur += 1;
+      if (caractere === ")") {
+        profondeur -= 1;
+        if (profondeur === 0) return texte.slice(1, position);
+      }
+      position += caractere.length;
+    }
+    return texte;
+  }
+
+  // Motifs tolérants aux espaces et aux retours à la ligne (mineur de la revue du head `353bb20`) ; la version sur
+  // l'arbre syntaxique est dans `tests/unit/p0/imports.test.ts` (« fournisseur de modèles explicite (arbre syntaxique) »).
   it("chaque appel à generateText reçoit l'objet modèle, maxRetries: 0 et la télémétrie désactivée", () => {
-    const appels = source.split("generateText(").slice(1);
+    const appels = [...source.matchAll(/\b(?:generateText|streamText|generateObject|streamObject)\s*\(/g)].map((m) => argumentDe(source.slice((m.index ?? 0) + m[0].length - 1)));
     expect(appels.length).toBe(1);
-    for (const appel of appels) {
-      const corps = appel.slice(0, appel.indexOf("});"));
-      expect(corps).toContain("model: modele,");
-      expect(corps).toContain("maxRetries: 0,");
-      expect(corps).toContain("experimental_telemetry: { isEnabled: false }");
+    for (const corps of appels) {
+      expect(corps).toMatch(/\bmodel\s*:\s*modele\s*[,}]/);
+      expect(corps).toMatch(/\bmaxRetries\s*:\s*0\s*[,}]/);
+      expect(corps).toMatch(/\bexperimental_telemetry\s*:\s*\{\s*isEnabled\s*:\s*false\s*,?\s*\}/);
     }
     // L'objet modèle vient de l'instance explicite, jamais d'une chaîne.
-    expect(source).toMatch(/const modele = fournisseur\.chat\(requete\.modele,/);
-    expect(source).toMatch(/createOpenRouter\(\{ apiKey: cle, baseURL: BASE_URL, fetch: enveloppe, compatibility: "strict" \}\)/);
+    expect(source).toMatch(/const\s+modele\s*=\s*fournisseur\s*\.\s*chat\s*\(\s*requete\s*\.\s*modele\s*,/);
+    const creation = source.match(/=\s*createOpenRouter\s*\(\s*\{([^}]*)\}\s*\)/)?.[1] ?? "";
+    for (const motif of [/\bapiKey\s*:\s*cle\b/, /\bbaseURL\s*:\s*BASE_URL\b/, /\bfetch\s*:\s*enveloppe\b/]) expect(creation).toMatch(motif);
   });
 });

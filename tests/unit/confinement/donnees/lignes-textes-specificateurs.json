@@ -7,7 +7,7 @@
       "noms": [
         "effet"
       ],
-      "motif": "marqueur `server-only` (sans capacité) d'un nouveau module de zone sensible de P0r1, exigé par `ligne/require-server-only` ; P0r1 (ticket 267), décisions 0031 § 5, 0049 C1 et 0049 C2 ; spécification P0c, section 9 ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "motif": "marqueur `server-only` (sans capacité) d'un nouveau module de zone sensible de P0r1, exigé par `ligne/require-server-only` ; P0r1 (ticket 267), décisions 0031 § 5, 0049 C1 et 0049 C2 ; spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)"
     },
     {
       "fichier": "src/ai/openrouter-client.ts",
@@ -15,14 +15,14 @@
       "noms": [
         "avecReservation",
         "DELAI_REQUETE_MS",
+        "demandeDe",
         "horlogeSysteme",
+        "type:ContexteAppel",
         "type:Horloge",
-        "type:Nature",
-        "type:Periode",
         "type:Plafond",
         "type:PortConsommation"
       ],
-      "motif": "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du head `335d925`, décisions 0031 § 5, 0046 (D13), 0049 C1 (point 5) et 0049 C2 ; spécification P0c, section 9 ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "motif": "port de consommation (contrat seul, jamais une implémentation) importé par un client réel de P0r1 : bloquant 2 de la revue du head `335d925`, décisions 0031 § 5, 0046 (D13), 0049 C1 (point 5) et 0049 C2 ; spécification P0c, section 9 ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267) ; correction 1 de la PR 272 (mutualisation du contexte d'appel et de la demande de réservation, mineur de la revue du head `353bb20` : `demandeDe` et `type:ContexteAppel` remplacent `type:Nature` et `type:Periode`) : verdict Sécurité d'incrément à rendre"
     },
     {
       "fichier": "src/ai/openrouter-client.ts",
@@ -30,14 +30,14 @@
       "noms": [
         "MODELE_ID_PATTERN"
       ],
-      "motif": "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4) ; même import que `src/ai/client.ts`, P0r1 (ticket 267), 0049 C1 (point 4) et 0049 C2 ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267)"
+      "motif": "`src/prototype/**` (P0a1, PR 180), module pur (`zod`, `@/contracts`), hors des zones admises en zone sensible : 0040 D2, A3 et D3 (amendement M4) ; même import que `src/ai/client.ts`, P0r1 (ticket 267), 0049 C1 (point 4) et 0049 C2 ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)"
     }
   ],
   "paquets": [
     {
       "paquet": "@openrouter/ai-sdk-provider",
       "usage": "fournisseur explicite du client réel de modèles (P0r1) ; module à capacité",
-      "verdict": "P0r1 (ticket 267, décisions 0006, 0031 et 0049 D1, C2) ; verdict Sécurité à rendre sur la PR de P0r1 (ticket 267), qui cite le lockfile"
+      "verdict": "P0r1 (ticket 267, décisions 0006, 0031 et 0049 D1, C2) ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267), qui cite le lockfile"
     }
   ]
 }

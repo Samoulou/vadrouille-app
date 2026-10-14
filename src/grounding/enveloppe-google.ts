@@ -19,6 +19,12 @@ import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 /** Signature du transport : celle du `fetch` global, toujours appelée à travers l'enveloppe. */
 export type Transport = (url: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * Identifiant de lieu Google (base64url, 256 caractères au plus) : contrôlé avant toute interpolation dans un chemin
+ * ou un corps, et sur chaque identifiant rendu. Commun à Places et Routes.
+ */
+export const PLACE_ID_GOOGLE = /^[A-Za-z0-9_-]{1,256}$/;
+
 export const CODES_ERREUR_GOOGLE = [
   "production_refused",
   "proxy_env_refused",
@@ -49,6 +55,16 @@ export class ErreurClientGoogle extends Error {
     this.retryable = REESSAYABLES.has(code);
     this.name = "ErreurClientGoogle";
   }
+}
+
+/**
+ * Erreur levée par un client Google pour une issue refusée de `avecReservation` (forme structurelle : ce module
+ * n'importe pas le port) : code de refus ou de délai tel quel ; erreur de l'enveloppe recréée par son code (aucune
+ * pile ni cause d'origine ne sort) ; toute autre erreur, `upstream_error`.
+ */
+export function erreurGoogleDe(issue: { readonly code: CodeErreurGoogle } | { readonly erreur: unknown }): ErreurClientGoogle {
+  if ("code" in issue) return new ErreurClientGoogle(issue.code);
+  return new ErreurClientGoogle(issue.erreur instanceof ErreurClientGoogle ? issue.erreur.code : "upstream_error");
 }
 
 export type RequeteGoogle = {

@@ -26,6 +26,12 @@ describe("p0: aucun client réel hors préversion ou développement (liste d'aut
     ["environnement personnalisé", { VERCEL_ENV: "preview", VERCEL_TARGET_ENV: "p0-reel" }],
     ["VADROUILLE_ENV production", { VERCEL_ENV: "preview", VADROUILLE_ENV: "production" }],
     ["development et VADROUILLE_ENV production", { VERCEL_ENV: "development", VADROUILLE_ENV: "production" }],
+    // Comparaison normalisée de VADROUILLE_ENV (liste de refus) : casse, espaces, retour à la ligne, forme Unicode.
+    ["VADROUILLE_ENV Production", { VERCEL_ENV: "preview", VADROUILLE_ENV: "Production" }],
+    ["VADROUILLE_ENV PRODUCTION", { VERCEL_ENV: "preview", VADROUILLE_ENV: "PRODUCTION" }],
+    ["VADROUILLE_ENV précédée d'une espace", { VERCEL_ENV: "preview", VADROUILLE_ENV: " production" }],
+    ["VADROUILLE_ENV suivie d'un retour à la ligne", { VERCEL_ENV: "preview", VADROUILLE_ENV: "production\n" }],
+    ["VADROUILLE_ENV en lettres pleine chasse", { VERCEL_ENV: "preview", VADROUILLE_ENV: "\uFF50roduction" }],
   ];
   it.each(refuses)("%s : production_refused", (_nom, env) => {
     expect(sortie(env)).toEqual({ ok: false, code: "production_refused" });

@@ -60,6 +60,34 @@ export type DemandeReservation = {
   readonly plafonds: readonly Plafond[];
 };
 
+/**
+ * Contexte d'un appel, rendu à chaque requête par l'appelant (composition de P0r3) : nature, identifiant d'exécution
+ * et périodes (D20). Commun aux trois clients réels.
+ */
+export type ContexteAppel = {
+  readonly nature: Nature;
+  readonly executionId: string | null;
+  readonly periodes: { readonly jour: Periode; readonly mois: Periode };
+};
+
+/** Ce qu'un client connaît d'une requête facturée : le reste de la demande vient du contexte et des plafonds. */
+export type AppelFacture = Pick<DemandeReservation, "fournisseur" | "methode" | "sku" | "unites" | "coutEstimeMicros">;
+
+/** Demande de réservation d'une requête : seul constructeur, commun aux trois clients réels. */
+export function demandeDe(contexte: ContexteAppel, appel: AppelFacture, plafonds: readonly Plafond[]): DemandeReservation {
+  return {
+    nature: contexte.nature,
+    fournisseur: appel.fournisseur,
+    methode: appel.methode,
+    sku: appel.sku,
+    unites: appel.unites,
+    coutEstimeMicros: appel.coutEstimeMicros,
+    executionId: contexte.executionId,
+    periodes: contexte.periodes,
+    plafonds,
+  };
+}
+
 export const CODES_REFUS_USAGE = ["cap_reached", "envelope_reached", "daily_quota_insufficient", "usage_unavailable"] as const;
 export type CodeRefusUsage = (typeof CODES_REFUS_USAGE)[number];
 

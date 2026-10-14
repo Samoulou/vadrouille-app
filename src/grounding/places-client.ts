@@ -2,17 +2,17 @@ import "server-only";
 
 import { z } from "zod";
 
-import { envoyerGoogle, ErreurClientGoogle, type RequeteGoogle, type Transport } from "@/grounding/enveloppe-google";
+import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type RequeteGoogle, type Transport } from "@/grounding/enveloppe-google";
 import type { ClientPlaces, DetailsLieu, RequeteTextSearch } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
   DELAI_REQUETE_MS,
+  demandeDe,
   horlogeSysteme,
+  type ContexteAppel,
   type DemandeReservation,
   type Horloge,
-  type Nature,
-  type Periode,
   type Plafond,
   type PortConsommation,
 } from "@/server/usage/port";
@@ -44,13 +44,7 @@ export const SKU_DETAILS = "places_details_enterprise";
 export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000 } as const;
 
 /** Identifiant de lieu Google : jamais interpolé dans un chemin sans ce contrôle. */
-const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
-
-export type ContexteAppel = {
-  readonly nature: Nature;
-  readonly executionId: string | null;
-  readonly periodes: { readonly jour: Periode; readonly mois: Periode };
-};
+const PLACE_ID = PLACE_ID_GOOGLE;
 
 export type OptionsPlaces = {
   readonly usage: PortConsommation;
@@ -96,20 +90,8 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
   const parametres = { origine: ORIGINE_PLACES, cle: cle.cle, transport };
   const dependances = { port: options.usage, horloge: options.horloge ?? horlogeSysteme };
 
-  const demande = (methode: DemandeReservation["methode"], sku: string, coutEstimeMicros: number): DemandeReservation => {
-    const contexte = options.contexte();
-    return {
-      nature: contexte.nature,
-      fournisseur: "google",
-      methode,
-      sku,
-      unites: { requetes: 1, elements: 0 },
-      coutEstimeMicros,
-      executionId: contexte.executionId,
-      periodes: contexte.periodes,
-      plafonds: options.plafonds,
-    };
-  };
+  const demande = (methode: DemandeReservation["methode"], sku: string, coutEstimeMicros: number): DemandeReservation =>
+    demandeDe(options.contexte(), { fournisseur: "google", methode, sku, unites: { requetes: 1, elements: 0 }, coutEstimeMicros }, options.plafonds);
 
   async function appeler(requete: RequeteGoogle, reservation: DemandeReservation): Promise<unknown> {
     const issue = await avecReservation(dependances, reservation, DELAI_REQUETE_MS.places, async (signal, transportAppele) => ({
@@ -117,8 +99,7 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
       coutReelMicros: null,
     }));
     if (issue.ok) return issue.valeur;
-    if ("code" in issue) throw new ErreurClientGoogle(issue.code);
-    throw issue.erreur instanceof ErreurClientGoogle ? new ErreurClientGoogle(issue.erreur.code) : new ErreurClientGoogle("upstream_error");
+    throw erreurGoogleDe(issue);
   }
 
   return {

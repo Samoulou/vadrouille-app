@@ -6,7 +6,8 @@ import "server-only";
  * TLS nommées ci-dessous, et `process.execArgv` ; ne rend **jamais** leur valeur : `{ ok: true }` ou un seul code
  * fermé, contrôlés dans cet ordre (le premier refus l'emporte) :
  * 1. `production_refused` : liste d'autorisation de `VERCEL_ENV` (`preview` ou `development`, comparaison exacte),
- *    `VERCEL_TARGET_ENV` égale si présente (même vide), `VADROUILLE_ENV` différente de `production` ;
+ *    `VERCEL_TARGET_ENV` égale si présente (même vide), `VADROUILLE_ENV` différente de `production` (comparaison
+ *    normalisée : casse, espaces, NFKC) ;
  * 2. `proxy_env_refused` : une variable de proxy posée (majuscules ou minuscules) ou `--use-env-proxy` ;
  * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node.
  *
@@ -81,8 +82,15 @@ type Lecture = {
 function productionRefusee(lu: Lecture): boolean {
   if (lu.vercelEnv === undefined || !ENVIRONNEMENTS_ADMIS.includes(lu.vercelEnv)) return true;
   if (lu.cible !== undefined && lu.cible !== lu.vercelEnv) return true;
-  return lu.vadrouilleEnv === "production";
+  return lu.vadrouilleEnv !== undefined && normaliserEnv(lu.vadrouilleEnv) === "production";
 }
+
+/**
+ * `VADROUILLE_ENV` est une liste de **refus** (0046 D21) : la comparaison est donc normalisée (NFKC, espaces retirés,
+ * casse ignorée), pour que `Production`, ` production` ou `PRODUCTION\n` soient refusés comme `production` (mineur de
+ * la revue du head `353bb20`). `VERCEL_ENV` reste une liste d'autorisation à comparaison exacte.
+ */
+const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowerCase();
 
 const proxyPose = (lu: Lecture) => lu.proxy.some(posee) || OPTIONS_PROXY.some((option) => lu.options.has(option));
 const tlsAffaibli = (lu: Lecture) => lu.tls.some(posee) || OPTIONS_TLS.some((option) => lu.options.has(option));

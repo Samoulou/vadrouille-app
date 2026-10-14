@@ -149,7 +149,7 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     ["transit", "TRANSIT"],
     ["car", "DRIVE"],
   ] as const)("mode %s : %s", async (mode, attendu) => {
-    const { client, appels } = monter([async () => json([])]);
+    const { client, appels } = monter([async () => json([{ originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" }])]);
     await client.matrice({ origines: ["A"], destinations: ["B"], mode });
     expect(JSON.parse(String(appels[0]?.init.body)).travelMode).toBe(attendu);
   });
@@ -167,6 +167,46 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     }
     expect(transport).not.toHaveBeenCalled();
     expect(port.lignes).toEqual([]);
+  });
+
+  it.each([
+    ["matrice incomplète (une paire manquante)", [{ originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" }]],
+    [
+      "paire répétée",
+      [
+        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: "90s", condition: "ROUTE_EXISTS" },
+      ],
+    ],
+    [
+      "index absent qui répète une paire (lu 0, déjà présente)",
+      [
+        { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, duration: "90s", condition: "ROUTE_EXISTS" },
+      ],
+    ],
+    [
+      "élément en trop",
+      [
+        { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
+      ],
+    ],
+  ])("%s : invalid_response (jamais une durée attribuée à une autre paire)", async (_nom, elements) => {
+    const { client } = monter([async () => json(elements)]);
+    expect((await erreurDe(client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "walk" }))).code).toBe("invalid_response");
+  });
+
+  it("index absent (valeur par défaut omise par le JSON de proto3) : lu 0, dans une matrice complète", async () => {
+    const { client } = monter([
+      async () =>
+        json([
+          { destinationIndex: 1, duration: "90s", condition: "ROUTE_EXISTS" },
+          { duration: "60s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    expect(await client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "walk" })).toEqual({ secondes: [[60, 90]] });
   });
 
   it("index hors de la matrice : invalid_response", async () => {
