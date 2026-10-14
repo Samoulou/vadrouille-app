@@ -8,7 +8,7 @@ import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zon
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import { createPlacesClient } from "@/grounding/places-client";
 import { createRoutesClient } from "@/grounding/routes-client";
-import type { Routage } from "@/prototype/config";
+import { moteurRechercheWebAttendu, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
 import { creerLecteurPages, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 import { createUndiciTransport } from "@/research/undici-transport";
@@ -40,8 +40,11 @@ import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, typ
 /** Réglages des modèles du mode réel, lus par l'appelant dans la configuration (aucune valeur ici). */
 export type ReglagesModeles = {
   readonly routage: Routage;
-  /** Modèle de la recherche web du fournisseur (celui de l'étape `recherche`). */
-  readonly rechercheWeb: { readonly modele: string; readonly maxResultats: number };
+  /**
+   * Recherche web du fournisseur : modèle de l'étape `recherche`, moteur fixé du greffon (`modeles.json`,
+   * `rechercheWeb.moteur`, bloquant 1c de la PR 326) et nombre de résultats.
+   */
+  readonly rechercheWeb: { readonly modele: string; readonly moteur: MoteurRechercheWeb; readonly maxResultats: number };
   /** Modèle de la rédaction des raisons (étape `raisons`). */
   readonly raisons: { readonly modele: string };
 };
@@ -53,6 +56,11 @@ export type OptionsComposition = {
   readonly plafonds: readonly Plafond[];
   /** Coût estimé d'une requête de modèle, en micro-USD (réservé avant l'appel). */
   readonly coutEstimeModelesMicros: number;
+  /**
+   * Coût estimé d'une recherche web du fournisseur (jetons du modèle et frais du moteur), en micro-USD, réservé avant
+   * l'appel et distinct de celui d'une requête ordinaire (mineur 2 de la PR 326).
+   */
+  readonly coutEstimeRechercheWebMicros: number;
   readonly modeles: ReglagesModeles;
   readonly horloge?: Horloge;
 };
@@ -77,7 +85,18 @@ export type CompositionP0Reel = {
   readonly etapeFinale: () => CapacitesEtapeFinale;
 };
 
+/**
+ * Signature `(garde, options)` au lieu de `(garde, runId)` de 0055 § 3 point 1 : l'identifiant d'exécution est lu dans
+ * la garde, jamais passé à part (écart demandé par le mineur 9 de la revue de la PR 326 ; ligne d'amendement de 0055
+ * § 3 point 1 proposée dans la PR, à écrire par le CEO).
+ *
+ * Moteur de recherche web : refusé à la construction s'il n'est pas celui qu'exige le modèle de l'étape (`native` si le
+ * modèle l'offre, sinon `exa`), même règle que la configuration (défense en profondeur).
+ */
 export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition): CompositionP0Reel {
+  if (options.modeles.rechercheWeb.moteur !== moteurRechercheWebAttendu(options.modeles.rechercheWeb.modele)) {
+    throw new RangeError("composition : moteur de recherche web incohérent avec le modèle de l'étape recherche");
+  }
   const horloge = options.horloge ?? horlogeSysteme;
   const executionId = garde.runId;
   const contexte =
@@ -89,6 +108,7 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
       contexte: contexte("modeles"),
       plafonds: options.plafonds,
       coutEstimeMicros: options.coutEstimeModelesMicros,
+      coutEstimeRechercheWebMicros: options.coutEstimeRechercheWebMicros,
       horloge,
     });
   const google = { usage: options.usage, contexte: contexte("google"), plafonds: options.plafonds, horloge };

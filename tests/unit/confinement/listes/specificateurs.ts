@@ -96,7 +96,12 @@ const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeS
 const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/client.ts", specificateur: "@/prototype/config", noms: ["MODELE_ID_PATTERN", "type:Routage"], motif: PROTOTYPE_PUR },
+  {
+    fichier: "src/ai/client.ts",
+    specificateur: "@/prototype/config",
+    noms: ["MODELE_ID_PATTERN", "MOTEURS_RECHERCHE_WEB", "type:MoteurRechercheWeb", "type:Routage"],
+    motif: `${PROTOTYPE_PUR} ; moteurs du greffon web ajoutés par la correction 1 de la PR 326 (bloquant 1c), verdict Sécurité à rendre`,
+  },
   { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", noms: ["TYPES_CRENEAU"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   {
@@ -146,6 +151,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité à rendre",
   })),
+  {
+    fichier: "src/ai/recherche-web-reelle.ts",
+    specificateur: "@/prototype/candidat",
+    noms: ["LONGUEURS_TEXTE"],
+    motif: `${PROTOTYPE_PUR} ; longueur des requêtes du plan, importée au lieu d'être recopiée (mineur 6 de la PR 326)`,
+  },
   { fichier: "src/ai/recherche-web-reelle.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
@@ -255,7 +266,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: COMPOSITION_P0R3C,
   },
-  { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: `${PROTOTYPE_PUR} ; ${COMPOSITION_P0R3C}` },
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "@/prototype/config",
+    noms: ["moteurRechercheWebAttendu", "type:MoteurRechercheWeb", "type:Routage"],
+    motif: `${PROTOTYPE_PUR} ; ${COMPOSITION_P0R3C} ; moteur du greffon web contrôlé à la construction (bloquant 1c de la PR 326)`,
+  },
   { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/p0/garde", noms: ["type:GardeOuverte"], motif: COMPOSITION_P0R3C },
   { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_P0R3C },
   {

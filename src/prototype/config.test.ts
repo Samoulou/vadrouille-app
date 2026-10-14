@@ -13,6 +13,7 @@ import {
   ConfigPlafondsSchema,
   ConfigRechercheSchema,
   modelesDeLaVariante,
+  moteurRechercheWebAttendu,
   validerConfigModeReel,
   validerConfiguration,
 } from "./config";
@@ -54,6 +55,36 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const autre = structuredClone(brut().modeles) as { variantes: { a: Record<string, string> } };
     autre.variantes.a.recherche = "autre/modele";
     expect(ConfigModelesSchema.safeParse(autre).success).toBe(false);
+  });
+
+  it("moteur de recherche web fixé (bloquant 1c de la PR 326) : exa pour le modèle de recherche choisi, cohérent avec le modèle, jamais absent", () => {
+    const { modeles } = validerConfiguration(brut());
+    expect(modeles.rechercheWeb).toEqual({ moteur: "exa" });
+    expect(moteurRechercheWebAttendu(modeles.etapes.recherche)).toBe("exa");
+    for (const [modele, attendu] of [
+      ["deepseek/deepseek-v4.1-flash", "exa"],
+      ["openai/gpt-x", "native"],
+      ["anthropic/claude-x", "native"],
+      ["google/gemini-x", "native"],
+      ["perplexity/sonar-x", "native"],
+      ["x-ai/grok-x", "native"],
+      ["mistralai/mistral-x", "exa"],
+    ] as const) {
+      expect(moteurRechercheWebAttendu(modele), modele).toBe(attendu);
+    }
+    const avec = (recherche: string, moteur: unknown) => {
+      const config = structuredClone(brut().modeles) as { etapes: Record<string, string>; rechercheWeb: Record<string, unknown> };
+      config.etapes.recherche = recherche;
+      config.rechercheWeb.moteur = moteur;
+      return ConfigModelesSchema.safeParse(config).success;
+    };
+    expect(avec("deepseek/deepseek-v4.1-flash", "native")).toBe(false);
+    expect(avec("openai/gpt-x", "exa")).toBe(false);
+    expect(avec("openai/gpt-x", "native")).toBe(true);
+    for (const moteur of ["auto", "firecrawl", "parallel", "", undefined]) expect(avec("deepseek/deepseek-v4.1-flash", moteur), String(moteur)).toBe(false);
+    const sans = structuredClone(brut().modeles) as Record<string, unknown>;
+    delete sans.rechercheWeb;
+    expect(ConfigModelesSchema.safeParse(sans).success).toBe(false);
   });
 
   it("refuse une configuration de modèles sans data_collection deny", () => {

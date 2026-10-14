@@ -54,6 +54,37 @@ function cle(nom: string): string {
     .trim();
 }
 
+/** Texte comparable : minuscules, accents retirés, tout ce qui n'est ni lettre ni chiffre devient une espace. */
+function normaliser(texte: string): string {
+  return ` ${cle(texte)} `;
+}
+
+/** Nombre de mots consécutifs du récit au-delà duquel une requête est une recopie du texte libre du brief. */
+export const MOTS_RECIT_RECOPIES_MAX = 5;
+
+/**
+ * Requête de recherche web admise au regard du brief (correction 1 de la PR 326, bloquant 1d : la requête part chez le
+ * moteur de recherche du fournisseur, hors du réglage `data_collection: "deny"`). Refusée si elle contient le texte d'un
+ * logement (nom, quartier ou adresse), le libellé d'un engagement, ou plus de `MOTS_RECIT_RECOPIES_MAX` mots consécutifs
+ * du récit libre. Comparaison après normalisation (casse, accents, ponctuation). Limite : une **partie** d'un texte de
+ * logement (par exemple le seul nom du quartier) n'est pas détectée.
+ */
+export function requeteSansDonneeDuBrief(requete: string, brief: Brief): boolean {
+  const texte = normaliser(requete);
+  const proteges = [...brief.logements.map((l) => l.texte), ...(brief.engagements ?? []).map((e) => e.libelle)];
+  for (const protege of proteges) {
+    const n = normaliser(protege);
+    if (n.trim() !== "" && texte.includes(n)) return false;
+  }
+  if (brief.recit !== undefined) {
+    const mots = cle(brief.recit).split(" ").filter((mot) => mot !== "");
+    for (let debut = 0; debut + MOTS_RECIT_RECOPIES_MAX < mots.length; debut += 1) {
+      if (texte.includes(` ${mots.slice(debut, debut + MOTS_RECIT_RECOPIES_MAX + 1).join(" ")} `)) return false;
+    }
+  }
+  return true;
+}
+
 function borner(texte: string, max: number): string {
   return texte.replace(/[\p{Cc}\p{Cf}]/gu, " ").slice(0, max);
 }
@@ -171,6 +202,11 @@ export async function chercherCandidats(
     pages = [];
     for (const action of lecture.valeur.actions) {
       if (action.type === "rechercher") {
+        // Bloquant 1d de la PR 326 : aucune donnée de logement ni texte libre du brief dans une requête web.
+        if (!requeteSansDonneeDuBrief(action.requete, brief)) {
+          compteurs.sortiesRefusees.recherche += 1;
+          continue;
+        }
         compteurs.recherches += 1;
         const { resultats: trouvesWeb } = await dependances.recherche.rechercher(action.requete);
         for (const resultat of trouvesWeb) {

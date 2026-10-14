@@ -6,9 +6,13 @@ import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import type { ClientModeles, RequeteModele } from "@/ai/client";
+import { DEBUT_DONNEES } from "@/ai/requetes";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
+import type { Brief } from "@/prototype/brief";
+import { ConfigRechercheSchema } from "@/prototype/config";
+import { chercherCandidats } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 import { composerP0Reel, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
@@ -37,7 +41,12 @@ const COMPOSITION = "src/server/composition/p0-reel.ts";
 /** Seul importateur admis de la composition hors des tests (0055 § 3 point 3), livré avec le workflow `p0Run`. */
 const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
 
-const estTest = (fichier: string) => /\.(test|spec)\.(ts|tsx|mts)$/.test(fichier) || fichier.startsWith("tests/");
+/**
+ * Fichiers exemptés : les fichiers de test (`*.test.*`, `*.spec.*`) et les supports de test (`tests/support/`) seulement
+ * (mineur 10 de la PR 326) ; les autres fichiers de `tests/` (bouchons, e2e, perf, visuels) et les fichiers de
+ * configuration de la racine sont analysés.
+ */
+const estTest = (fichier: string) => /\.(test|spec)\.(ts|tsx|mts)$/.test(fichier) || fichier.startsWith("tests/support/");
 
 function fichiers(dossier: string): string[] {
   const absolu = path.join(RACINE, dossier);
@@ -142,8 +151,10 @@ function atteints(depot: Depot, depart: string): Set<string> {
 }
 
 const lireDepot = (fichier: string) => readFileSync(path.join(RACINE, fichier), "utf8");
+/** Fichiers de configuration de la racine (`*.config.ts`, `*.mjs`…), analysés comme le reste du dépôt (mineur 10). */
+const racine = () => readdirSync(RACINE).filter((nom) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(nom) && !nom.endsWith(".d.ts") && statSync(path.join(RACINE, nom)).isFile());
 const DEPOT: Depot = {
-  fichiers: ["src", "scripts", "db", "tests"].flatMap(fichiers),
+  fichiers: [...["src", "scripts", "db", "tests", "eslint-rules"].flatMap((dossier) => (statSync(path.join(RACINE, dossier), { throwIfNoEntry: false })?.isDirectory() === true ? fichiers(dossier) : [])), ...racine()],
   lire: lireDepot,
   resoudre,
 };
@@ -321,7 +332,12 @@ function monter(reponses: (() => Promise<Response>)[]) {
     usage: port,
     plafonds: [],
     coutEstimeModelesMicros: 10_000,
-    modeles: { routage: { data_collection: "deny" }, rechercheWeb: { modele: "fournisseur/recherche-test", maxResultats: 3 }, raisons: { modele: "fournisseur/raisons-test" } },
+    coutEstimeRechercheWebMicros: 20_000,
+    modeles: {
+      routage: { data_collection: "deny" },
+      rechercheWeb: { modele: "fournisseur/recherche-test", moteur: "exa", maxResultats: 3 },
+      raisons: { modele: "fournisseur/raisons-test" },
+    },
     horloge,
   });
   return { composition, appels, port, fetchDouble };
@@ -401,9 +417,24 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     expect(resultats).toEqual([{ url: "https://exemple.org/a", titre: "A", extrait: "Extrait A" }]);
     expect(coutUsd).toBe(0.003);
     const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
-    expect(corps.plugins).toEqual([{ id: "web", max_results: 3 }]);
+    expect(corps.plugins).toEqual([{ id: "web", engine: "exa", max_results: 3 }]);
     expect(corps.model).toBe("fournisseur/recherche-test");
-    expect(port.lignes.map((l) => [l.demande.executionId, l.demande.methode, l.demande.sku])).toEqual([[RUN, "chat", "fournisseur/recherche-test"]]);
+    expect(port.lignes.map((l) => [l.demande.executionId, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([[RUN, "chat", "fournisseur/recherche-test", 20_000]]);
+  });
+
+  it("moteur de recherche web incohérent avec le modèle de l'étape (natif demandé pour un modèle sans recherche native) : refusé à la construction", () => {
+    const { composition } = monter([]);
+    expect(composition).toBeDefined();
+    const options = {
+      usage: creerPortMemoire(creerHorlogeManuelle()),
+      plafonds: [],
+      coutEstimeModelesMicros: 1,
+      coutEstimeRechercheWebMicros: 1,
+      modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "deepseek/x", moteur: "native" as const, maxResultats: 3 }, raisons: { modele: "fournisseur/r" } },
+    };
+    expect(() => composerP0Reel(GARDE, options)).toThrow(RangeError);
+    expect(() => composerP0Reel(GARDE, { ...options, modeles: { ...options.modeles, rechercheWeb: { modele: "openai/x", moteur: "exa", maxResultats: 3 } } })).toThrow(RangeError);
+    expect(() => composerP0Reel(GARDE, { ...options, modeles: { ...options.modeles, rechercheWeb: { modele: "openai/x", moteur: "native", maxResultats: 3 } } })).not.toThrow();
   });
 
   it("l'agent se construit quand la clé Google est refusée ; l'ancrage et l'étape finale exigent la leur (construction paresseuse, par famille d'étapes)", () => {
@@ -435,5 +466,91 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
     expect(corps.model).toBe("fournisseur/raisons-test");
     expect(corps.plugins).toBeUndefined();
+  });
+});
+
+// --- Bloquant 1d de la PR 326 : requête web sans logement ni texte libre du brief --------------------------------------
+
+describe("p0: requête de recherche web, aucune donnée de logement ni texte libre du brief (bloquant 1d de la PR 326)", () => {
+  const LOGEMENT = "Appartement SENTINELLE-LOGEMENT 12 rue Imaginaire";
+  const RECIT = "Nous fêtons les quarante ans de SENTINELLE-RECIT Martine avec toute la famille, et on aime les musées.";
+  const ENGAGEMENT = "Dîner SENTINELLE-ENGAGEMENT chez Paulette";
+
+  it("l'agent, branché sur la recherche web de la composition : seule la requête propre part ; logement, récit recopié et engagement sont refusés", async () => {
+    const { composition, appels } = monter([
+      async () => reponseModele({ content: "x", annotations: [] }),
+      async () => reponseModele({ content: "x", annotations: [] }),
+    ]);
+    const base = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    const brief: Brief = {
+      ...base,
+      logements: [{ texte: LOGEMENT, nuits: 5 }],
+      recit: RECIT,
+      engagements: [{ libelle: ENGAGEMENT, date: base.arrivee, heure: "20:00", type: "reservation" }],
+    };
+    const actions = [
+      { type: "rechercher", requete: `restaurants près de ${LOGEMENT}` },
+      { type: "rechercher", requete: "quarante ans de sentinelle recit martine avec toute la famille" },
+      { type: "rechercher", requete: `${ENGAGEMENT} horaires` },
+      { type: "rechercher", requete: "musées Édimbourg histoire" },
+    ];
+    const reponses = [
+      JSON.stringify({ requetes: [{ requete: "musées Édimbourg", creneau: "activity" }] }),
+      JSON.stringify({ actions, candidats: [], termine: false }),
+      JSON.stringify({ actions: [], candidats: [], termine: true }),
+    ];
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 }) };
+    const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
+    const { compteurs } = await chercherCandidats(brief, {
+      modeles,
+      modele: "fournisseur/recherche-test",
+      routage: { data_collection: "deny" },
+      recherche: composition.agent().rechercheWeb,
+      lecteur: { lire: async () => ({ ok: false, raison: "not_in_search_results" }) },
+      config,
+    });
+    expect(compteurs.recherches).toBe(1);
+    expect(compteurs.sortiesRefusees.recherche).toBe(3);
+    expect(appels).toHaveLength(1);
+    const corps = appels.map((a) => String(a.init.body)).join("\n");
+    expect(corps).toContain(DEBUT_DONNEES);
+    expect(corps).toContain("musées Édimbourg histoire");
+    for (const sentinelle of ["SENTINELLE", "sentinelle", "Imaginaire", "imaginaire", "Martine", "martine", "Paulette", "paulette"]) expect(corps, sentinelle).not.toContain(sentinelle);
+  });
+});
+
+// --- Mineur 3 de la PR 326 : lecture de pages à travers la composition, adresses locales refusées --------------------
+
+
+describe("p0: lecture de pages de la composition, adresses locales refusées (mineur 3 de la PR 326)", () => {
+  beforeEach(() => {
+    // Barrière de sortie ouverte (préversion, ni proxy ni réglage TLS) : le refus vient du lecteur, pas de la barrière.
+    vi.stubEnv("HTTP_PROXY", "");
+    vi.stubEnv("http_proxy", "");
+    vi.stubEnv("HTTPS_PROXY", "");
+    vi.stubEnv("https_proxy", "");
+    vi.stubEnv("ALL_PROXY", "");
+    vi.stubEnv("all_proxy", "");
+    vi.stubEnv("NODE_USE_ENV_PROXY", "");
+    vi.stubEnv("node_use_env_proxy", "");
+    vi.stubEnv("NODE_TLS_REJECT_UNAUTHORIZED", "");
+    vi.stubEnv("NODE_EXTRA_CA_CERTS", "");
+    vi.stubEnv("SSL_CERT_FILE", "");
+    vi.stubEnv("SSL_CERT_DIR", "");
+    vi.stubEnv("OPENSSL_CONF", "");
+    vi.stubEnv("SSLKEYLOGFILE", "");
+    vi.stubEnv("NODE_OPTIONS", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_TARGET_ENV", "preview");
+    vi.stubEnv("VADROUILLE_ENV", "preview");
+  });
+
+  it.each([
+    ["https://127.0.0.1/", "ip_literal"],
+    ["https://localhost/", "address_blocked"],
+  ])("%s, pourtant parmi les résultats de recherche : refusée (%s), aucune connexion", async (url, raison) => {
+    const { composition, fetchDouble } = monter([]);
+    expect(await composition.agent().pages.lire(url, new Set([url]))).toEqual({ ok: false, raison });
+    expect(fetchDouble).not.toHaveBeenCalled();
   });
 });

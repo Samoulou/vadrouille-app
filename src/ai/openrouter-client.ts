@@ -5,8 +5,17 @@ import { generateText } from "ai";
 import { z } from "zod";
 
 import { MODELE_ID_PATTERN } from "@/prototype/config";
-import type { ClientModeles, Message, RequeteModele, ReponseModele } from "@/ai/client";
-import { MAX_RESULTATS_WEB, type PointEntreeRechercheWeb, type SourceWebFournisseur } from "@/ai/recherche-web-reelle";
+import {
+  MAX_RESULTATS_WEB,
+  MOTEURS_GREFFON_WEB,
+  type ClientModeles,
+  type Message,
+  type MoteurGreffonWeb,
+  type PointEntreeRechercheWeb,
+  type RequeteModele,
+  type ReponseModele,
+  type SourceWebFournisseur,
+} from "@/ai/client";
 import { lireCleOpenRouter } from "@/server/env/ai";
 import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 import {
@@ -40,9 +49,14 @@ import {
  * - **Recherche web du fournisseur** (P0r3c, décision 0055, section 7 point 2 ; verdict Sécurité dans la PR) :
  *   `rechercherWeb`, point d'entrée remis par la composition au client de recherche web (`recherche-web-reelle.ts`,
  *   sans capacité réseau propre). Même instance, même enveloppe, même réservation (méthode `chat`, plafond des
- *   modèles) ; seul le greffon `web` est ajouté au corps, avec un nombre de résultats borné. L'enveloppe exige ce
- *   greffon pour `rechercherWeb` et le refuse pour `envoyer` (aucune recherche web cachée dans un appel ordinaire).
- *   Seules les sources (citations d'adresses) sont rendues ; le texte du modèle est ignoré.
+ *   modèles) ; seul le greffon `web` est ajouté au corps, avec un **moteur fixé** (`engine`, valeur de la
+ *   configuration : `native` ou `exa`, jamais le défaut variable du fournisseur ; bloquant 1c de la PR 326) et un nombre
+ *   de résultats borné. L'enveloppe exige ce greffon, avec ce moteur, pour `rechercherWeb` et le refuse pour `envoyer`
+ *   (aucune recherche web cachée dans un appel ordinaire). Seules les sources (citations d'adresses) sont rendues ; le
+ *   texte du modèle est ignoré. Le moteur `exa` sort du réglage `data_collection: "deny"` (sous-traitant d'OpenRouter) :
+ *   question pour Samuel dans la PR 326, aucune exécution réelle sans sa réponse écrite.
+ * - **Coût estimé distinct** pour `rechercherWeb` (`coutEstimeRechercheWebMicros` : jetons du modèle et frais du
+ *   moteur), réservé avant l'appel et repli quand le coût réel n'est pas rendu (mineur 2 de la PR 326).
  */
 
 /** Origine figée, exportée pour les tests (qui n'écrivent pas l'hôte, surveillé par le régime de confinement). */
@@ -90,17 +104,24 @@ export type OptionsOpenRouter = {
   readonly plafonds: readonly Plafond[];
   /** Coût estimé d'une requête, en micro-USD (réservé avant l'appel, remplacé par le coût réel s'il est rendu). */
   readonly coutEstimeMicros: number;
+  /** Coût estimé d'une recherche web (`rechercherWeb` : jetons du modèle et frais du moteur), en micro-USD. */
+  readonly coutEstimeRechercheWebMicros: number;
   readonly horloge?: Horloge;
   readonly environnement?: Readonly<Record<string, string | undefined>>;
   readonly execArgv?: readonly string[];
 };
 
 /** État propre à un appel, noté par l'enveloppe et lu par le client sur toute erreur de l'AI SDK. */
-type EtatAppel = { appele: () => void; redirection: boolean; greffonWeb: number | null };
+type EtatAppel = { appele: () => void; redirection: boolean; greffonWeb: GreffonWeb | null };
+
+/** Greffon `web` d'un appel de `rechercherWeb` : moteur fixé et nombre de résultats. */
+type GreffonWeb = { readonly moteur: MoteurGreffonWeb; readonly maxResultats: number };
 
 const CorpsSchema = z.object({ provider: z.object({ data_collection: z.literal("deny") }), plugins: z.unknown().optional() });
-/** Seul greffon admis, et seulement pour `rechercherWeb` : `web` et son nombre de résultats. */
-const GreffonsWebSchema = z.tuple([z.strictObject({ id: z.literal("web"), max_results: z.number().int().min(1).max(MAX_RESULTATS_WEB) })]);
+/** Seul greffon admis, et seulement pour `rechercherWeb` : `web`, son moteur fixé (littéral) et son nombre de résultats. */
+const GreffonsWebSchema = z.tuple([
+  z.strictObject({ id: z.literal("web"), engine: z.enum(MOTEURS_GREFFON_WEB), max_results: z.number().int().min(1).max(MAX_RESULTATS_WEB) }),
+]);
 const CoutSchema = z.object({ openrouter: z.object({ usage: z.object({ cost: z.number().nonnegative() }) }) });
 
 /** Client réel : `envoyer` (interface `ClientModeles`) et le point d'entrée de recherche web du fournisseur. */
@@ -111,7 +132,7 @@ type AppelModele = {
   readonly modele: string;
   readonly routage: RequeteModele["routage"];
   readonly messages: readonly Message[];
-  readonly greffonWeb: number | null;
+  readonly greffonWeb: GreffonWeb | null;
 };
 
 /** Résultat brut d'un appel : texte, sources (citations d'adresses) et coût. */
@@ -154,8 +175,13 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
     const lu = CorpsSchema.safeParse(json);
     if (!lu.success) throw new ErreurOpenRouter("data_collection_missing");
     const greffons = lu.data.plugins;
-    if (etat.greffonWeb === null ? greffons !== undefined : !GreffonsWebSchema.safeParse(greffons).success || (greffons as [{ max_results: number }])[0].max_results !== etat.greffonWeb) {
-      throw new ErreurOpenRouter("invalid_request");
+    if (etat.greffonWeb === null) {
+      if (greffons !== undefined) throw new ErreurOpenRouter("invalid_request");
+    } else {
+      const greffon = GreffonsWebSchema.safeParse(greffons);
+      if (!greffon.success || greffon.data[0].engine !== etat.greffonWeb.moteur || greffon.data[0].max_results !== etat.greffonWeb.maxResultats) {
+        throw new ErreurOpenRouter("invalid_request");
+      }
     }
     const entetes = new Headers(init?.headers);
     // `Authorization` est posé par le fournisseur ; il ne part que vers l'origine figée (contrôlée ci-dessus).
@@ -192,20 +218,29 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
       throw new ErreurOpenRouter("invalid_request");
     }
     const greffonWeb = requete.greffonWeb;
-    if (greffonWeb !== null && (!Number.isSafeInteger(greffonWeb) || greffonWeb < 1 || greffonWeb > MAX_RESULTATS_WEB)) throw new ErreurOpenRouter("invalid_request");
+    if (
+      greffonWeb !== null &&
+      (!Number.isSafeInteger(greffonWeb.maxResultats) ||
+        greffonWeb.maxResultats < 1 ||
+        greffonWeb.maxResultats > MAX_RESULTATS_WEB ||
+        !(MOTEURS_GREFFON_WEB as readonly string[]).includes(greffonWeb.moteur))
+    ) {
+      throw new ErreurOpenRouter("invalid_request");
+    }
+    const coutEstimeMicros = greffonWeb === null ? options.coutEstimeMicros : options.coutEstimeRechercheWebMicros;
     const systeme = requete.messages.filter((m) => m.role === "system").map((m) => m.contenu);
     const utilisateur = requete.messages.filter((m) => m.role === "user").map((m) => ({ role: "user" as const, content: m.contenu }));
     const modele = fournisseur.chat(requete.modele, {
       provider: { data_collection: "deny", ...(requete.routage.zdr === undefined ? {} : { zdr: requete.routage.zdr }) },
       usage: { include: true },
-      ...(greffonWeb === null ? {} : { plugins: [{ id: "web" as const, max_results: greffonWeb }] }),
+      ...(greffonWeb === null ? {} : { plugins: [{ id: "web" as const, engine: greffonWeb.moteur, max_results: greffonWeb.maxResultats }] }),
     });
     let etat: EtatAppel | undefined;
     const issue = await avecReservation(
       { port: options.usage, horloge },
       demandeDe(
         options.contexte(),
-        { fournisseur: "modeles", methode: "chat", sku: requete.modele, unites: { requetes: 1, elements: 0 }, coutEstimeMicros: options.coutEstimeMicros },
+        { fournisseur: "modeles", methode: "chat", sku: requete.modele, unites: { requetes: 1, elements: 0 }, coutEstimeMicros },
         options.plafonds,
       ),
       DELAI_REQUETE_MS.openrouter,
@@ -230,7 +265,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
               if (source.success) sources.push({ url: source.data.url, titre: source.data.title ?? "", extrait: source.data.providerMetadata?.openrouter?.content ?? "" });
             }
           }
-          return { valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? options.coutEstimeMicros) / 1_000_000 }, coutReelMicros };
+          return { valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? coutEstimeMicros) / 1_000_000 }, coutReelMicros };
         } finally {
           etats.delete(signal);
         }
@@ -250,7 +285,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
       return { texte, coutUsd };
     },
     async rechercherWeb(requete) {
-      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: requete.maxResultats });
+      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats } });
       return { sources, coutUsd };
     },
   };
