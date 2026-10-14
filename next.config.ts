@@ -23,6 +23,16 @@ export const RESPONSE_HEADERS = [
     ],
   },
   {
+    // Mode réel du prototype (décision 0055, section 2 point 5 ; S-2 point 5) : pages de saisie du code et de
+    // lancement, jamais gardées par un cache ni indexées ; le chemin ne part vers aucune autre origine.
+    source: "/prototype/:path*",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ],
+  },
+  {
     source: "/sw.js",
     headers: [{ key: "Cache-Control", value: "no-cache" }],
   },
