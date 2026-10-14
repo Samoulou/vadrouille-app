@@ -212,6 +212,8 @@ export default defineConfig([
     "playwright-report/**",
     "test-results/**",
     "coverage/**",
+    // Routes générées par le Workflow SDK au build (`withWorkflow`, décision 0063) ; ignorées par git.
+    "src/app/.well-known/workflow/**",
   ]),
   {
     plugins: { ligne },
@@ -620,6 +622,14 @@ export default defineConfig([
     // fichier du dépôt, tests compris (tests/unit/lint/server-env-imports-lint.test.ts).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "ligne/server-env-imports": "error" },
+  },
+  {
+    // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
+    // Workflow SDK dans `src/workflows/` seulement (`workflow/next` admis dans `next.config.ts`) ; `createWebhook`,
+    // `createHook`, `defineHook`, `resumeHook`, `resumeWebhook` et `getHookByToken` interdits partout. Règle propre au
+    // plugin, posée par ce seul bloc sur tout fichier (tests/unit/lint/workflow-directives-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/workflow-directives": "error" },
   },
   {
     // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).

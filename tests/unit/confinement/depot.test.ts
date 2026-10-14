@@ -23,7 +23,7 @@ import { estAnalyse, fichiersSuivis, lireFichier, RACINE, type FichierSuivi } fr
 import { MODULES_CAPACITE_P0R1, verifierFermeture } from "./graphe";
 import { LIGNES_CAPACITE, LIGNES_CAPACITE_TEXTES, type LigneCapacite } from "./listes/capacites";
 import { FORMES_NOMINATIVES_TESTS } from "./listes/formes-tests";
-import { CONSTRUITS, PAQUETS } from "./listes/paquets";
+import { CONSTRUITS, PAQUETS, SUBSTITUTIONS } from "./listes/paquets";
 import { ENV_ENTIER, LECTURES_ENV_SECRETES, LECTURES_ENV_TOUTES, PARAMETRES_ENV, PROPRIETES_PROCESS } from "./listes/process";
 import { SPECIFICATEURS, SPECIFICATEURS_NOMINATIFS } from "./listes/specificateurs";
 import { construireProgramme } from "./programme";
@@ -345,7 +345,11 @@ describe("confinement: fermeture transitive", () => {
 
 describe("confinement: spécificateurs et paquets (dépôt)", () => {
   it("package.json : clés, pnpm, versions exactes, aucun script de cycle de vie, liste des paquets", () => {
-    const resultat = analyserPackageJson(lireFichier("package.json"), PAQUETS, CONSTRUITS);
+    expect((JSON.parse(lireFichier("package.json")) as { pnpm?: { overrides?: unknown } }).pnpm?.overrides).toEqual(SUBSTITUTIONS);
+    expect(analyserPackageJson(JSON.stringify({ packageManager: "pnpm@10.28.0", pnpm: { onlyBuiltDependencies: [...CONSTRUITS], overrides: { "x>y": "1.0.0" } } }), [], CONSTRUITS, SUBSTITUTIONS).map((c) => c.capacite)).toEqual([
+      "override-non-liste",
+    ]);
+    const resultat = analyserPackageJson(lireFichier("package.json"), PAQUETS, CONSTRUITS, SUBSTITUTIONS);
     expect(resultat.filter((c) => !c.admis).map((c) => `${c.capacite} — ${c.forme}`)).toEqual([]);
   });
 

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 /**
  * En-têtes posés sur les réponses (spécification F10, F10-TL-8). L'écran 15 (`R15`) n'est jamais gardé par un
@@ -43,7 +44,7 @@ export const RESPONSE_HEADERS = [
 ];
 
 // Décision 0002 : Next.js standard, image autonome pour rester portable hors de Vercel.
-const nextConfig: NextConfig = {
+export const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
@@ -55,4 +56,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Workflow SDK (décision 0009 ; décision 0063 : `workflow` 5.1.0 épinglé, `@swc/core` sans script d'installation).
+ * `withWorkflow` compile les directives `"use workflow"` et `"use step"` de `src/workflows/` (seul dossier admis, règle
+ * `ligne/workflow-directives`) et génère les routes `/.well-known/workflow/v1/*` dans `src/app/.well-known/workflow/`
+ * (fichiers de build, ignorés par git). Hors de Vercel, le monde est le monde local ; chaque étape de `p0Run`
+ * revérifie la garde à son entrée (décision 0055, S-1 point 3), qui refuse hors de la préversion de `p0-reel`.
+ */
+export default withWorkflow(nextConfig);

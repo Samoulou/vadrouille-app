@@ -177,6 +177,9 @@ describe("src/ai, src/research et src/grounding restent hors du code client (000
       .filter((f) => !skipped.test(f) && !/\.(test|spec)\.(ts|tsx)$/.test(f));
     expect(files.length).toBeGreaterThan(100);
     for (const filePath of [...files, ...IN_SCOPE]) {
+      // Sorties générées et ignorées par ESLint (`globalIgnores`, ex. les routes du SDK `workflow` produites par le
+      // build, décision 0063) : aucune configuration n'y est calculée ; elles ne sont pas commitées.
+      if (await eslint.isPathIgnored(filePath)) continue;
       const rules = rulesOf(await eslint.calculateConfigForFile(filePath));
       expect(rules.get(GUARD), filePath).toEqual([2]);
     }

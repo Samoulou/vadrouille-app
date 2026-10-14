@@ -180,7 +180,10 @@ export const CHAMPS_MODE_REEL_DECIDES_PO = ["coutUsd", "fiches"] as const;
 
 const plafondReel = (max: number) => z.number().int().min(1).max(max);
 
-/** `mode-reel.json` : plafonds par exécution du mode réel, unité du quota Routes et marge des fiches. */
+/** Coût estimé d'un appel de modèle au plus, en micro-USD (1 USD) : borne de forme, pas un plafond. */
+export const COUT_ESTIME_MAX_MICROS = 1_000_000;
+
+/** `mode-reel.json` (et `essai.json`) : plafonds par exécution, unité du quota Routes, marge des fiches, coûts estimés. */
 export const ConfigModeReelSchema = z.strictObject({
   schema: Version,
   /** Unité du quota Routes (Q330 : `"elements"`), obligatoire, sans valeur par défaut. */
@@ -198,6 +201,15 @@ export const ConfigModeReelSchema = z.strictObject({
   fiches: z.strictObject({
     margeMinimum: z.number().int().min(0).max(BORNES_MODE_REEL.placesDetails),
     margePart: z.number().finite().min(0).max(1),
+  }),
+  /**
+   * Coûts **estimés** réservés avant chaque appel de modèle, en micro-USD (P0r3c-4, décision 0063 point 6) : une
+   * requête ordinaire, et une recherche web du fournisseur (jetons du modèle et frais du moteur, mineur 2 de la PR 326).
+   * Ils bornent la réservation et servent de repli quand le fournisseur ne rend pas le coût réel.
+   */
+  coutsEstimesMicros: z.strictObject({
+    requeteModele: z.number().int().min(1).max(COUT_ESTIME_MAX_MICROS),
+    rechercheWeb: z.number().int().min(1).max(COUT_ESTIME_MAX_MICROS),
   }),
 });
 export type ConfigModeReel = z.infer<typeof ConfigModeReelSchema>;
@@ -220,6 +232,47 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
   if (!lu.success) return { ok: false, code: "config_reel_invalide" };
   if (lu.data.candidatsTrouves + LOGEMENTS_MAX > lu.data.placesTextSearch) return { ok: false, code: "config_reel_invalide" };
   return { ok: true, config: lu.data };
+}
+
+/**
+ * Plafonds de l'**essai d'intégration** (P0S2-PO-12, amendé le 2026-10-14 par le Product Owner, spécification
+ * P0 suite 2, « Essai d'intégration » ; proposés par #318 selon la règle de 0055 § 6 point 7) : 0,30 USD de
+ * modèles, 6 recherches web, 15 pages, 9 candidats, 14 Text Search (9 candidats et 5 logements au plus), 11 Place
+ * Details (9 candidats et 2 × 1 logement), 3 requêtes de matrice et 120 éléments (`n² + 2n`, `n` = 10), 5 min. Ce
+ * sont des maxima : `essai.json` ne peut pas les dépasser.
+ */
+export const BORNES_ESSAI = {
+  coutUsd: 0.3,
+  recherchesWeb: 6,
+  pagesLues: 15,
+  candidatsTrouves: 9,
+  placesTextSearch: 14,
+  placesDetails: 11,
+  routesRequetes: 3,
+  routesElements: 120,
+  dureeMs: 300_000,
+} as const;
+
+/**
+ * Configuration de l'essai d'intégration (`prototype/config/essai.json`) : même schéma que le mode réel
+ * (`ConfigModeReelSchema`, mêmes codes fermés), puis chaque plafond sous `BORNES_ESSAI`.
+ */
+export function validerConfigEssai(brut: unknown): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+  const lu = validerConfigModeReel(brut);
+  if (!lu.ok) return lu;
+  const c = lu.config;
+  const b = BORNES_ESSAI;
+  const dansLesBornes =
+    c.coutUsd <= b.coutUsd &&
+    c.recherchesWeb <= b.recherchesWeb &&
+    c.pagesLues <= b.pagesLues &&
+    c.candidatsTrouves <= b.candidatsTrouves &&
+    c.placesTextSearch <= b.placesTextSearch &&
+    c.placesDetails <= b.placesDetails &&
+    c.routesRequetes <= b.routesRequetes &&
+    c.routesElements <= b.routesElements &&
+    c.dureeMs <= b.dureeMs;
+  return dansLesBornes ? lu : { ok: false, code: "config_reel_invalide" };
 }
 
 /**

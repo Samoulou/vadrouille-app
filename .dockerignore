@@ -16,3 +16,13 @@ specs
 .env*.local
 # Programmes de test et sorties du prototype P0 : jamais dans l'image (décision 0032 § A4.4).
 prototype
+# P0r3c-4 (décision 0063 point 11) : seuls les briefs et la configuration lus par `src/workflows/p0-run.ts` (imports
+# JSON résolus à la construction) sont ré-inclus, nommément ; programmes de test, fixtures et sorties restent exclus.
+!prototype/briefs/edimbourg-1.json
+!prototype/briefs/edimbourg-2.json
+!prototype/briefs/edimbourg-3.json
+!prototype/config/essai.json
+!prototype/config/modeles.json
+!prototype/config/mode-reel.json
+!prototype/config/recherche.json
+!prototype/config/recherche-essai.json

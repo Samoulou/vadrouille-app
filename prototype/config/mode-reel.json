@@ -13,5 +13,9 @@
   "fiches": {
     "margeMinimum": 4,
     "margePart": 0.2
+  },
+  "coutsEstimesMicros": {
+    "requeteModele": 20000,
+    "rechercheWeb": 40000
   }
 }

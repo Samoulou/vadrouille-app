@@ -72,9 +72,12 @@ export const SPECIFICATEURS = [
   // connexion de `pg` (même version), pour le refus de tout hôte non local de `db/migrate.ts` (0056 § 2.8). Sans capacité.
   { specificateur: "pg-connection-string", zones: ["db/migrate.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
+  // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
+  // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.
+  { specificateur: "workflow", zones: ["src/workflows/**", "next.config.ts", "tests/unit/workflows/**"] },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
-  // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité à rendre.
+  // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
   { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts"] },
 ] as const satisfies readonly LigneSpecificateur[];
 
@@ -98,7 +101,10 @@ const PORT_P0R1 =
   " ; correction 1 de la PR 272 (mutualisation du contexte d'appel et de la demande de réservation, mineur de la revue du head `353bb20` : `demandeDe` et `type:ContexteAppel` remplacent `type:Nature` et `type:Periode`) : verdict Sécurité d'incrément à rendre";
 const COMPOSITION_P0R3C =
   "module de composition du mode réel (D18) : câblage seul, garde exigée (type `GardeOuverte`), contexte d'appel et périodes (D20) " +
-  "du port de consommation ; P0r3c-3 (ticket 316), décision 0055, section 3 points 1 et 7, avis S-3 ; verdict Sécurité à rendre";
+  "du port de consommation ; P0r3c-3 (ticket 316), décision 0055, section 3 points 1 et 7, avis S-3 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)";
+const SERVER_ONLY_P0R3C4 =
+  "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
+  "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
 const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"];
 
 const SPECIFICATEURS_NOMINATIFS_TS = [
@@ -108,7 +114,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     fichier: "src/ai/client.ts",
     specificateur: "@/prototype/config",
     noms: ["MODELE_ID_PATTERN", "MOTEURS_RECHERCHE_WEB", "type:MoteurRechercheWeb", "type:Routage"],
-    motif: `${PROTOTYPE_PUR} ; moteurs du greffon web ajoutés par la correction 1 de la PR 326 (bloquant 1c), verdict Sécurité à rendre`,
+    motif: `${PROTOTYPE_PUR} ; moteurs du greffon web ajoutés par la correction 1 de la PR 326 (bloquant 1c), verdict Sécurité : approuvé sur le head \`59878f0\` (PR 326)`,
   },
   { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", noms: ["TYPES_CRENEAU"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
@@ -134,14 +140,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
   // P0r3c-2 (ticket 316) : fonctions d'ancrage, de fiches et de budgets Routes de `p0Run` (décision 0055, section 6
-  // points 1, 3 et 4) ; types seuls des modules purs du prototype, comme `src/grounding/ancrage.ts`. Verdict Sécurité à rendre.
+  // points 1, 3 et 4) ; types seuls des modules purs du prototype, comme `src/grounding/ancrage.ts`. Verdict Sécurité : approuvé sur le head `bc0ff4c` (PR 323).
   ...["ancrage-zone", "budget-routes", "fiches-finales", "zone"].map((nom) => ({
     fichier: `src/grounding/${nom}.ts`,
     specificateur: "server-only",
     noms: ["effet"],
     motif:
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/grounding` de `p0Run`, exigé par `ligne/require-server-only` " +
-      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-2 (ticket 316), décision 0055, section 6 ; verdict Sécurité à rendre",
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-2 (ticket 316), décision 0055, section 6 ; verdict Sécurité : approuvé sur le head `bc0ff4c` (PR 323)",
   })),
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
@@ -150,14 +156,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   // P0r3c-3 (ticket 316) : recherche web réelle, rédaction des raisons et composition du mode réel (décision 0055,
-  // sections 3 et 7). Verdict Sécurité à rendre dans la PR (format de la section 8 de la spécification P0c).
+  // sections 3 et 7). Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
   ...["src/ai/prompts/recherche-web.ts", "src/ai/recherche-web-reelle.ts", "src/ai/rediger-raisons.ts"].map((fichier) => ({
     fichier,
     specificateur: "server-only",
     noms: ["effet"],
     motif:
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
-      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité à rendre",
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)",
   })),
   {
     fichier: "src/ai/recherche-web-reelle.ts",
@@ -290,7 +296,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       " ; P0r3c (ticket 316, PR 318) ; verdict Sécurité : accordée (revue consolidée de la PR 318, head ea7cc37)",
   },
   // P0r3c-3 (ticket 316) : module de composition du mode réel (D18, décision 0055, section 3 point 7) : les lignes que
-  // l'analyseur relève pour `p0-reel.ts`, et rien d'autre. Verdict Sécurité à rendre dans la PR.
+  // l'analyseur relève pour `p0-reel.ts`, et rien d'autre. Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
   {
     fichier: "src/server/composition/p0-reel.ts",
     specificateur: "server-only",
@@ -311,6 +317,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"],
     motif: COMPOSITION_P0R3C,
   },
+  // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
+  // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
+  ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: SERVER_ONLY_P0R3C4,
+  })),
   {
     fichier: "tests/unit/server/env.test.ts",
     specificateur: "node:util",
