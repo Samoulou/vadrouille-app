@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CODES_REFUS_SORTIE, verifierSortie, type EnvSortie } from "@/server/env/egress";
+import { CAUSES_SORTIE, CODES_REFUS_SORTIE, verifierSortie, type DiagnosticSortie, type EnvSortie } from "@/server/env/egress";
 import { decodeSecret } from "@/server/env/index";
 import { resolveServerEnvironment } from "@/server/env/resolve";
 
@@ -11,7 +11,8 @@ import { resolveServerEnvironment } from "@/server/env/resolve";
  * `src/server/env/` (lint `ligne/server-env-imports`).
  *
  * `lireEnvP0` contrôle, dans cet ordre (le premier refus l'emporte, et rien n'est lu au-delà) :
- * 1. la barrière de sortie de P0r1 (`verifierSortie`, avec D21 : l'environnement injecté ne peut que resserrer) ;
+ * 1. la barrière de sortie de P0r1 (`verifierSortie`, avec D21 : l'environnement injecté ne peut que resserrer), dont
+ *    le diagnostic (nom de la cause, marque de l'exception de 0058, jamais une valeur) est passé au rappel facultatif ;
  * 2. l'environnement du serveur, par le **seul calcul** de B3a (`resolveServerEnvironment`) : `staging` seulement ;
  * 3. `CI` absente ou vide (Vercel la pose au build, jamais à l'exécution d'une fonction) ;
  * 4. `VERCEL_GIT_COMMIT_REF` égale à `p0-reel` (comparaison exacte) ;
@@ -37,6 +38,10 @@ export const CODES_ENV_P0 = [
 ] as const;
 export type CodeEnvP0 = (typeof CODES_ENV_P0)[number];
 
+/** Causes nommées par le diagnostic de la barrière de sortie (décision 0058) ; liste fermée, des noms seulement. */
+export const CAUSES_ENV_P0: readonly string[] = CAUSES_SORTIE;
+export type { DiagnosticSortie };
+
 export type ResultatEnvP0 = { readonly ok: true; readonly jeton: Buffer } | { readonly ok: false; readonly code: CodeEnvP0 };
 
 /** Branche d'essais du mode réel (décision 0055, section 5 ; Q268). */
@@ -51,8 +56,12 @@ const [NOM_CODE_ACCES] = Object.keys({ P0_RUN_TOKEN: 0 }) as ["P0_RUN_TOKEN"];
 const posee = (valeur: string | undefined): valeur is string => valeur !== undefined && valeur !== "";
 
 /** Conditions (1) à (7) de la décision 0055, section 1 point 2. */
-export function lireEnvP0(env: EnvSortie = process.env, execArgv?: readonly string[]): ResultatEnvP0 {
-  const sortie = verifierSortie(env, execArgv);
+export function lireEnvP0(
+  env: EnvSortie = process.env,
+  execArgv?: readonly string[],
+  diagnostic?: (resultat: DiagnosticSortie) => void,
+): ResultatEnvP0 {
+  const sortie = verifierSortie(env, execArgv, diagnostic);
   if (!sortie.ok) return sortie;
   let environnement: string;
   try {

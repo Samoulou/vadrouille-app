@@ -19,3 +19,9 @@ Alternative étudiée : Coolify (plateforme de déploiement libre, auto-héberg�
 
 ## Conséquences
 Basculer vers Coolify ou un autre hébergeur reste un chantier d'une journée environ : variables d'environnement, image Docker, stockage de l'état des workflows à fournir (à vérifier au moment de la bascule).
+
+## Amendement du 2026-10-14 — région des fonctions
+Décision de Samuel, 2026-10-14 14:13 UTC (carte de décision du fil du projet) : « Francfort ». Les fonctions serveur de Vercel tournent en `fra1` (Francfort) au lieu de `iad1` (région par défaut de Vercel, relevée par la Sécurité sur la préversion `p0-reel`) : au plus près de la base Neon de Francfort (Q24) et traitement des données en UE. Le surcoût de calcul (environ 40 % sur la formule Pro, tarifs régionaux de Vercel) est accepté.
+- Forme : `vercel.json` à la racine, `"regions": ["fra1"]` ([documentation de Vercel](https://vercel.com/docs/functions/configuring-functions/region), lue le 2026-10-14 : le fichier l'emporte sur le réglage du projet ; une seule région est permise sur toutes les formules). Aucun `preferredRegion` ni `functions` par route : toutes les fonctions suivent la région du projet. Le middleware de routage de Vercel reste déployé partout (comportement de la plateforme).
+- Aucun réglage du compte ni du tableau de bord, aucun KV ni Edge Config ; le fichier ne porte que la région (`tests/unit/vercel-config.test.ts`). La portabilité est intacte : hors de Vercel, le fichier est ignoré.
+- Contexte : décision 0058 (PR #320), section région ; ticket #321.

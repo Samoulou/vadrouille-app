@@ -3,8 +3,8 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LOG_GUARD_CODES } from "@/server/log";
-import { CODES_GARDE_FERMEE, valeurCookieAcces } from "@/server/p0/acces";
+import { formatLogLine, LOG_EXIT_CAUSES, LOG_GUARD_CODES } from "@/server/log";
+import { CAUSES_GARDE_FERMEE, CODES_GARDE_FERMEE, valeurCookieAcces } from "@/server/p0/acces";
 import { ouvrirGardeLancement, verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import type { ResultatLancement } from "@/server/usage/neon";
 
@@ -167,6 +167,36 @@ describe("p0: mode réel refusé (lancement)", () => {
       reserver: async () => reservation(),
     });
     expect(lignes.map((l) => JSON.parse(l) as unknown)).toEqual([{ level: "info", event: "p0.guard_closed", guard: "ci_refused" }]);
+  });
+
+  it("le journal admet exactement les causes de la barrière de sortie (décision 0058)", () => {
+    expect([...LOG_EXIT_CAUSES].sort()).toEqual([...CAUSES_GARDE_FERMEE].sort());
+  });
+
+  it("le journal retire une cause ou une exception hors de la liste fermée (valeur, chemin, nom inconnu)", () => {
+    for (const valeur of ["/var/runtime/ca-cert.pem", "SENTINELLE", "node_extra_ca_certs"]) {
+      expect(JSON.parse(formatLogLine("p0.guard_closed", { guard: "tls_env_refused", cause: valeur }))).toEqual({
+        level: "info",
+        event: "p0.guard_closed",
+        guard: "tls_env_refused",
+        dropped: 1,
+      });
+    }
+    expect(JSON.parse(formatLogLine("p0.guard_closed", { exception: "autre" }))).toEqual({ level: "info", event: "p0.guard_closed", dropped: 1 });
+  });
+
+  it("garde fermée par TLS : le journal nomme la variable en cause, jamais sa valeur (décision 0058)", async () => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void lignes.push(String(ligne)));
+    const dependances = { execArgv: [], maintenant: () => T0, cookie: undefined, reserver: async () => reservation() };
+    await ouvrirGardeLancement({ ...dependances, env: preversion({ NODE_EXTRA_CA_CERTS: "/tmp/SENTINELLE.pem" }) });
+    vi.stubEnv("VERCEL", "1");
+    await ouvrirGardeLancement({ ...dependances, env: preversion({ VERCEL: "1", NODE_EXTRA_CA_CERTS: "/var/runtime/ca-cert.pem", CI: "1" }) });
+    expect(lignes.join("\n")).not.toContain("SENTINELLE");
+    expect(lignes.map((l) => JSON.parse(l) as unknown)).toEqual([
+      { level: "info", event: "p0.guard_closed", guard: "tls_env_refused", cause: "NODE_EXTRA_CA_CERTS" },
+      { level: "info", event: "p0.guard_closed", guard: "ci_refused", exception: "vercel_runtime_ca" },
+    ]);
   });
 });
 

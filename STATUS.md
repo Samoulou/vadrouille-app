@@ -1,43 +1,37 @@
-# État du studio — 2026-10-14 (61e cycle)
+# État du studio — 2026-10-14 (65e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- 2026-10-14, 12:23 CEST : `owner-approved` sur P0r3a (#305), fusionnée.
-- 2026-10-14, 12:36 CEST (fil du projet) : « go faire tourner un cycle » ; 61e cycle lancé à la demande.
-- #studio : aucun nouveau message depuis le 60e cycle.
+- Aucun nouveau message de Samuel depuis le 64e cycle (projet et #studio). Carte Exa (Q427) et fusion de #330 toujours en attente.
 
 ## Fait
-- Fusionnées depuis le 60e cycle : **P0r3a** (fusion automatique limitée à `main`, #305), statut du 60e cycle (#309).
-- **P0r3b** (#312, ticket #311) : garde du mode réel, code d'accès et page `/prototype/executions` (404 hors `p0-reel`), codés ; le relevé de 0055 § 1 point 3 se fait après la fusion, par la Sécurité, une fois `p0-reel` créée.
-- **Décision 0056** (#300) : troisième tentative bornée poussée (Q418 ; motif de sortie de `db-releve` corrigé).
-- **Spec B8** (#301) : correction 2, la dernière, poussée (fiche relue `chargee` ou `introuvable`, échec d'appel sans `toConfirm`).
-- **Spec B6** (#308) : correction 1 poussée (règle de 0011 sur `toConfirm` appliquée, cartes sans relecture).
-- **Tableau de bord** (#307) : correction 1 poussée (ordre 7, 7 bis, 8 ; repli si l'Artifact est introuvable).
+- Fusionnées depuis le 64e cycle : **décision 0059** (#328, correction 1 : B9 attend aussi B6b, numérotation vérifiée), statut du 64e cycle (#329), **région `fra1`** (#322).
+- **PR de `main` vers `p0-reel`** ouverte (#330) : met à jour la branche des essais (exception TLS de 0058, région `fra1`). Aucun essai réel ne démarre. Fusion par Samuel seul (D23).
+- **P0r3c-3** (#326) : correction 2, la dernière, poussée (3254723). Aux étapes plan et recherche, le modèle reçoit le brief **sans les logements** ; le filtre des requêtes reste comme filet (normalisation Unicode, fragments de 4 caractères, récit court). Tests en cyrillique et japonais.
+- Ticket **#333** : décision 0060 du Tech Lead (port du cache de positions et purge du MVP, B8-TL-2 et B8-TL-3), préalable du ticket de B8c (0059 § 4).
 
 ## En cours
-- Aucun fil actif.
-- En revue : P0r3b (#312), 0056 (#300, troisième tentative), spec B8 (#301, dernière correction), spec B6 (#308), tableau de bord (#307).
+- **Décision 0060** (Tech Lead, #333).
+- **Workflow des migrations et du relevé** (#332) : correction 1 (data). Un bloquant du Tech Lead (harnais cassé dès que la liste des migrations approuvées n'est plus vide) ; Sécurité : approuvé sur d647077.
+- En revue : P0r3c-3 (#326, dernière correction).
 
 ## Bloqué
-- **P0r3c** : P0r3b, et fin du délai de veto de Samuel sur 0055 (2026-10-16) ou sa réponse à Q407.
-- **Pose du code d'accès et des variables de P0r3b** : fusion de #312, création de `p0-reel` (rôle Release, Q414), Q402.
-- **Premier essai réel** : P0r3b à P0r3d ; Q330 ; sur la base réelle, la fusion de 0056 et Q408.
-- **PR du workflow des migrations** : fusion de 0056 et Q419 (Tech Lead).
-- **Code de B7** : P0r3 fusionnée. **B8** : fusion de la spec, décision de découpage, puis B7a et B7c. **B6a** : B3b.
-- **B3c** : Q401 (variables du limiteur dans Vercel).
-- **Code de B4** : Q351, Q352, Q364 ; B4a après B3b.
+- **Premier essai réel** : réponse de Samuel sur la recherche web par Exa (Q427, limite précisée par la correction 2 de #326) ; fusion de #330 par Samuel ; relevé de la Sécurité sur la préversion de `p0-reel` ; P0r3c-4 après #326 ; P0r3d.
+- **Workflow des migrations** : revue de la correction 1 ; puis `owner-approved` de Samuel ; Q387 (a) et (b).
+- **Purge `p0-purge`** : en échec toutes les 6 heures tant que ses secrets sont vides (attendu, Q387).
+- **B8c** : décision 0060. **B6a** : B3b. **B8a** : B7a, B7c, P0r3c-3. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
-1. Après la fusion de P0r3b : relevé de la Sécurité et création de `p0-reel` (Release) ; ticket P0r3c dès l'échéance du veto (2026-10-16) ou la réponse de Samuel à Q407.
-2. Après la fusion des specs B8 et B6 : décisions de découpage du CEO (Q415, Q416).
-3. Si 0056 reste bloquée : `db-releve` sort vers une décision à part (Q418), sans quatrième tentative.
-4. Si la spec B8 reste bloquée après sa dernière correction : troisième tentative ou découpage avec le Tech Lead.
+1. Après la fusion de #330 par Samuel : relevé de la Sécurité sur la préversion de `p0-reel`.
+2. Après #326 : lancer P0r3c-4 ; si #326 reste bloquée, troisième tentative ou découpage (CEO et Tech Lead).
+3. Après 0060 : ticket de B8c (data), mise à jour de `docs/roadmap.md` (Q431) ; vérifier qu'aucune PR ouverte n'ajoute une migration dans le même cycle (0059 § 4).
+4. Revue de la correction 1 de #332, puis `owner-approved` de Samuel ; décision du Tech Lead consignant ses réponses (0061 réservé).
 
 ## Décisions attendues de Samuel
-- **Maintenant** : Q330 (unité du quota Routes dans la console Google) ; Q402 (source du jeton Vercel, rappelée par P0r3b #312, bloque la pose du code d'accès).
-- **Nouvelles** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307) ; Q417 (préversion qui lit la base avant G0 ; reco : non).
-- **Déjà posées** : Q407, Q408, Q409, Q410, Q401, Q402, Q397, Q394, Q387, Q378, Q367, Q368, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
+- **En attente** : Q427 (recherche web de l'essai par Exa ; reco : accepter pour les essais) ; fusion de #330 (un clic).
+- **Rappel** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307) ; Q387 (a) et (b).
+- **Déjà posées** : Q409, Q410, Q401, Q397, Q394, Q378, Q367, Q368, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
 - **Prévente** : Q357 et Q362 ; les documents sont fusionnés (#256).
 - **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
 - **Toujours ouvertes** :
@@ -49,14 +43,14 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - règles : Q23, Q274.
 - **Veto possible** :
   - avant le 2026-10-15 : décisions B3-PO de la spec B3 (#243) et B4-PO de la spec B4 (#248) ; décisions B5-PO-1 à 16 de la spec B5 (#229) ; décisions B2-PO de la spec B2 (#198) ;
-  - avant le 2026-10-16 : décision 0047 (découpage de `fr.json`, #269) ; décisions B7-PO de la spec B7 (#288) ; décision 0055 (#294, dont l'amendement de 0011 § 2 pour `p0Run` et Q407) ;
-  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, décisions B1-PO-1 à 6 (#185).
+  - avant le 2026-10-16 : décision 0047 (découpage de `fr.json`, #269) ; décisions B7-PO de la spec B7 (#288) ;
+  - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q418 (CEO, tranchée) : décision 0056.
-- Q419 (Tech Lead) : décision 0056.
-- Q420 (Samuel) : tableau de bord.
+- Q433 et Q434 (Tech Lead, tranchées à la revue de #332) : `SET search_path` non local, liste vide ; Q435 (Tech Lead, tranchée) : `push: main` dans une petite PR dédiée ; Q436 (Tech Lead, tranchée) : test des 600 lignes conservé.
+- Q437 (Product Owner) : le filet de #326 refuse aussi des requêtes légitimes (« vieille ville » pour Édimbourg).
+- Q427 précisée (correction 2 de #326) ; Q419 tranchée (voie 1).
 
 ## Part d'usage estimée
-- 61e cycle (comptés depuis le 60e) : 5 sous-agents terminés, 3 au plus en même temps :
-  - P0r3b (0,37 M) ; 0056 troisième tentative (0,16 M) ; spec B8 correction 2 (0,12 M) ; spec B6 correction 1 (0,18 M) ; tableau de bord correction 1 (0,09 M).
+- 65e cycle : sous-agents terminés : workflow des migrations (fin du premier passage), décision 0059 correction 1, P0r3c-3 correction 2 ; 3 au plus en même temps.
+- En cours, comptés au 66e cycle : décision 0060, workflow des migrations correction 1.

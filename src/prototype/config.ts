@@ -117,6 +117,82 @@ export const ConfigPlafondsSchema = z.strictObject({
 export type ConfigPlafonds = z.infer<typeof ConfigPlafondsSchema>;
 export type CompteurPlafonne = Exclude<keyof ConfigPlafonds, "schema">;
 
+/** Unités possibles du quota Routes de la console (P0-Q31) ; égales à `UniteQuotaRoutes` de `@/server/usage/forfait` (test). */
+export const UNITES_QUOTA_ROUTES = ["requetes", "elements"] as const;
+
+/**
+ * Bornes de la configuration du **mode réel** (`prototype/config/mode-reel.json`, décision 0055, section 6) : valeurs de
+ * Samuel et du Product Owner, jamais relevées par le studio. Coût des modèles : 3 USD (Samuel, Q270) ; Text Search et
+ * Place Details : 90 (P0S2-PO-8) ; recherches web, pages lues et candidats : 60, 150 et 90 au plus (P0S2-PO-8) ; Routes :
+ * 500 éléments (Samuel, 0053), sous le quota de 3 000 éléments par minute (Q330) ; durée : 15 min (A8).
+ */
+export const BORNES_MODE_REEL = {
+  coutUsd: 3,
+  recherchesWeb: 60,
+  pagesLues: 150,
+  candidatsTrouves: 90,
+  placesTextSearch: 90,
+  placesDetails: 90,
+  routesRequetes: BORNES_PLAFONDS.routesRequetes,
+  routesElements: 500,
+  dureeMs: 900_000,
+} as const;
+
+/** Logements d'un brief au plus (`BriefSchema`) : chacun demande un Text Search à l'ancrage. */
+const LOGEMENTS_MAX = 5;
+
+/**
+ * Champs du mode réel **sans valeur par défaut** tant que leur décision manque : `coutUsd` (Q391, Product Owner) et
+ * `fiches` (marge de remplacement de l'étape finale, Q389, Product Owner). Absents du fichier, la configuration est
+ * refusée (`config_reel_incomplete`) et aucune exécution réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6
+ * point 2).
+ */
+export const CHAMPS_MODE_REEL_EN_ATTENTE = ["coutUsd", "fiches"] as const;
+
+const plafondReel = (max: number) => z.number().int().min(1).max(max);
+
+/** `mode-reel.json` : plafonds par exécution du mode réel, unité du quota Routes et marge des fiches. */
+export const ConfigModeReelSchema = z.strictObject({
+  schema: Version,
+  /** Unité du quota Routes (Q330 : `"elements"`), obligatoire, sans valeur par défaut. */
+  uniteQuotaRoutes: z.enum(UNITES_QUOTA_ROUTES),
+  coutUsd: z.number().finite().gt(0).max(BORNES_MODE_REEL.coutUsd),
+  recherchesWeb: plafondReel(BORNES_MODE_REEL.recherchesWeb),
+  pagesLues: plafondReel(BORNES_MODE_REEL.pagesLues),
+  candidatsTrouves: plafondReel(BORNES_MODE_REEL.candidatsTrouves),
+  placesTextSearch: plafondReel(BORNES_MODE_REEL.placesTextSearch),
+  placesDetails: plafondReel(BORNES_MODE_REEL.placesDetails),
+  routesRequetes: plafondReel(BORNES_MODE_REEL.routesRequetes),
+  routesElements: plafondReel(BORNES_MODE_REEL.routesElements),
+  dureeMs: plafondReel(BORNES_MODE_REEL.dureeMs),
+  /** Marge de remplacement de l'étape finale : `max(margeMinimum, ⌈margePart × première série⌉)` (Q389). */
+  fiches: z.strictObject({
+    margeMinimum: z.number().int().min(0).max(BORNES_MODE_REEL.placesDetails),
+    margePart: z.number().finite().min(0).max(1),
+  }),
+});
+export type ConfigModeReel = z.infer<typeof ConfigModeReelSchema>;
+
+export const CODES_CONFIG_MODE_REEL = ["config_reel_incomplete", "config_reel_invalide"] as const;
+export type CodeConfigModeReel = (typeof CODES_CONFIG_MODE_REEL)[number];
+
+/**
+ * Configuration du mode réel, ou un code fermé (jamais la valeur reçue) : `config_reel_incomplete` si un champ
+ * obligatoire manque (décision en attente), `config_reel_invalide` sinon. Contrôle croisé : chaque candidat et chaque
+ * logement demandent un Text Search, `candidatsTrouves + 5 ≤ placesTextSearch`.
+ */
+export function validerConfigModeReel(brut: unknown): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+  if (typeof brut === "object" && brut !== null && !Array.isArray(brut)) {
+    const presents = new Set(Object.keys(brut));
+    const obligatoires = Object.keys(ConfigModeReelSchema.shape);
+    if (obligatoires.some((cle) => !presents.has(cle))) return { ok: false, code: "config_reel_incomplete" };
+  }
+  const lu = ConfigModeReelSchema.safeParse(brut);
+  if (!lu.success) return { ok: false, code: "config_reel_invalide" };
+  if (lu.data.candidatsTrouves + LOGEMENTS_MAX > lu.data.placesTextSearch) return { ok: false, code: "config_reel_invalide" };
+  return { ok: true, config: lu.data };
+}
+
 /**
  * Fichiers de configuration de P0 validés ici. `classement.json` est validé par `ConfigClassementSchema`, défini
  * dans `src/domain` depuis B5a (décision 0045 § 1.4, amendement de 0032 A2), par `scripts/p0/fichiers.ts`.

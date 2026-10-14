@@ -2,10 +2,11 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
+import type { UNITES_QUOTA_ROUTES } from "@/prototype/config";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
-import { ErreurForfait, forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, refusDuForfait, type SommesForfaits } from "@/server/usage/forfait";
+import { ErreurForfait, forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, refusDuForfait, type SommesForfaits, type UniteQuotaRoutes } from "@/server/usage/forfait";
 
 /** Forfait d'une exécution ou d'une relecture (décision 0046, D13 point 3, S4). */
 
@@ -77,7 +78,30 @@ describe("p0: plafonds du lancement comparés aux forfaits", () => {
   it("jour entamé : daily_quota_insufficient, dans l'unité du quota Routes", () => {
     expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 6 } }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("daily_quota_insufficient");
     expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 5 } }, forfait, LIMITES_PROTOTYPE, "requetes")).toBeNull();
-    expect(refusDuForfait(VIDE, forfait, LIMITES_PROTOTYPE, "elements")).toBe("daily_quota_insufficient");
+  });
+
+  it("p0: Q330, quota Routes en éléments sans seuil du jour, 3 000 par minute", () => {
+    expect(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE).toBe(3_000);
+    // Unités de la configuration du mode réel (`src/prototype/config.ts`, module pur) égales à celles du port.
+    expectTypeOf<(typeof UNITES_QUOTA_ROUTES)[number]>().toEqualTypeOf<UniteQuotaRoutes>();
+    // 400 éléments, jour déjà chargé en éléments et en requêtes Routes : aucun seuil du jour en unité « éléments ».
+    const jourCharge = { ...VIDE, jour: { ...VIDE.jour, routesElements: 10_000, routesRequetes: 1_000 } };
+    expect(refusDuForfait(jourCharge, forfait, LIMITES_PROTOTYPE, "elements")).toBeNull();
+    // Le même jour en unité « requêtes » (hypothèse écartée) : refusé au seuil de 95.
+    expect(refusDuForfait(jourCharge, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("daily_quota_insufficient");
+    // 500 éléments (0053) : accepté ; 3 000 : accepté ; 3 001 : refusé, il ne tiendrait pas dans la cadence d'une minute.
+    for (const [elements, attendu] of [
+      [500, null],
+      [3_000, null],
+      [3_001, "daily_quota_insufficient"],
+    ] as const) {
+      const f = forfaitExecution(TABLE, SKUS, { ...PLAFONDS, routesElements: elements }, 3_000_000);
+      // Montants Google hors de cause ici (3 000 éléments dépassent les 20 USD du mois) : seule l'unité Routes est éprouvée.
+      const limites = { ...LIMITES_PROTOTYPE, moisGoogleMicros: Number.MAX_SAFE_INTEGER, enveloppeGoogleMicros: Number.MAX_SAFE_INTEGER };
+      expect(refusDuForfait(VIDE, f, limites, "elements"), String(elements)).toBe(attendu);
+    }
+    // Text Search et Place Details gardent le seuil du jour de 95 en unité « éléments ».
+    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, textSearchRequetes: 6 } }, forfait, LIMITES_PROTOTYPE, "elements")).toBe("daily_quota_insufficient");
   });
 
   it("enveloppe jusqu'à G0 puis plafond du mois", () => {
