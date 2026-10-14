@@ -44,6 +44,11 @@ export type Options = {
   /** Remplace un client après capture (par exemple pour simuler une erreur de fournisseur). */
   modeles?: (client: ClientModeles) => ClientModeles;
   places?: (client: ClientPlaces) => ClientPlaces;
+  /**
+   * Clients Places et Routes à placer **sous** la capture, à la place des doubles sur fixtures (par exemple les
+   * clients réels de P0r1 sur un transport de test à valeurs sentinelles).
+   */
+  google?: { places: ClientPlaces; routes: ClientRoutes };
   secrets?: string[];
 };
 
@@ -99,7 +104,7 @@ export async function executerCapture(options: Options = {}): Promise<{ resultat
       return lecteurSimule.lire(url, autorisees);
     },
   };
-  const placesSimule = creerPlacesSimule(fixtures.places);
+  const placesSimule = options.google?.places ?? creerPlacesSimule(fixtures.places);
   const placesCaptures: ClientPlaces = {
     async textSearch(requete) {
       capture.textSearch.push(structuredClone(requete));
@@ -112,7 +117,7 @@ export async function executerCapture(options: Options = {}): Promise<{ resultat
       return placesSimule.details(placeId);
     },
   };
-  const routesSimule = creerRoutesSimule(fixtures.routes);
+  const routesSimule = options.google?.routes ?? creerRoutesSimule(fixtures.routes);
   const routes: ClientRoutes = {
     async matrice(requete) {
       capture.matrices.push(structuredClone(requete));

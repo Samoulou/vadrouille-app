@@ -102,6 +102,11 @@ const IDENTIFIANTS_INTERDITS = new Set([
   "Reflect",
   "WebAssembly",
   "Worker",
+  // P0r1 (spécification de P0r1, « Lecture des pages », proxy) : agents de proxy et répartiteur global d'`undici`.
+  "EnvHttpProxyAgent",
+  "ProxyAgent",
+  "setGlobalDispatcher",
+  "getGlobalDispatcher",
 ]);
 const PROPRIETES_INTERDITES = new Set(["constructor", "connect", "createConnection"]);
 // Revue Sécurité de #180 (bloquant 1, correction 2) : réflexion sur les prototypes et les descripteurs, qui
@@ -235,6 +240,46 @@ function importMetaAdmis(fichier: string, noeud: ts.MetaProperty): boolean {
   );
 }
 
+/**
+ * P0r1, exceptions nominatives (0031 § 5 ; spécification de P0r1, « Règles d'import ») : le `fetch` global n'est
+ * admis que dans les trois clients à `fetch`, et seulement comme valeur par défaut du paramètre `transport` de leur
+ * fabrique exportée, plus, dans `openrouter-client.ts`, comme nom de l'option `fetch: enveloppe` de l'appel
+ * `createOpenRouter({ … })`. Toute autre occurrence reste refusée, dans ces fichiers comme ailleurs.
+ */
+const FABRIQUES_A_FETCH = new Map([
+  ["src/ai/openrouter-client.ts", "createOpenRouterClient"],
+  ["src/grounding/places-client.ts", "createPlacesClient"],
+  ["src/grounding/routes-client.ts", "createRoutesClient"],
+]);
+
+function fetchAdmis(fichier: string, noeud: ts.Identifier): boolean {
+  const fabrique = FABRIQUES_A_FETCH.get(fichier);
+  if (fabrique === undefined || noeud.text !== "fetch") return false;
+  const parent = noeud.parent;
+  if (ts.isParameter(parent) && parent.initializer === noeud) {
+    const fonction = parent.parent;
+    return (
+      ts.isIdentifier(parent.name) &&
+      parent.name.text === "transport" &&
+      ts.isFunctionDeclaration(fonction) &&
+      fonction.name?.text === fabrique &&
+      (ts.getCombinedModifierFlags(fonction) & ts.ModifierFlags.Export) !== 0
+    );
+  }
+  if (fichier !== "src/ai/openrouter-client.ts" || !ts.isPropertyAssignment(parent) || parent.name !== noeud) return false;
+  const objet = parent.parent;
+  const appel = objet.parent;
+  return (
+    ts.isIdentifier(parent.initializer) &&
+    parent.initializer.text === "enveloppe" &&
+    ts.isObjectLiteralExpression(objet) &&
+    ts.isCallExpression(appel) &&
+    appel.arguments[0] === objet &&
+    ts.isIdentifier(appel.expression) &&
+    appel.expression.text === "createOpenRouter"
+  );
+}
+
 function analyser(fichier: string, source: string): { imports: Import[]; constructions: string[] } {
   const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, true, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const imports: Import[] = [];
@@ -318,7 +363,7 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
     if (ts.isMetaProperty(noeud) && noeud.keywordToken === ts.SyntaxKind.ImportKeyword && !importMetaAdmis(fichier, noeud)) {
       constructions.push(IMPORT_META_HORS_LISTE);
     }
-    if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text)) constructions.push(noeud.text);
+    if (ts.isIdentifier(noeud) && IDENTIFIANTS_INTERDITS.has(noeud.text) && !fetchAdmis(fichier, noeud)) constructions.push(noeud.text);
     if (ts.isPropertyAccessExpression(noeud)) {
       const nom = noeud.name.text;
       const objet = noeud.expression.getText(sf);
@@ -349,12 +394,64 @@ const FEUILLES_PROTOTYPE = ["brief", "config", "candidat", "ancrage", "programme
 const proto = (...noms: string[]) => noms.map((nom) => `src/prototype/${nom}.ts`);
 const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossier}/`);
 
-type Regle = { projet: (chemin: string) => boolean; externes: readonly string[] };
+type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
 const contrats = sous("src/contracts");
 const FICHIER_FS = "scripts/p0/fichiers.ts";
 
+/**
+ * P0r1 : exceptions nominatives à la liste d'autorisation (0031 § 5 ; spécification de P0r1, « Règles d'import »),
+ * fichier par fichier, avec la **forme exacte** de chaque import externe. `server-only` (marqueur sans capacité,
+ * exigé par `ligne/require-server-only` pour tout nouveau fichier de ces dossiers) est admis sous la seule forme
+ * `import "server-only";` dans les nouveaux fichiers non test de P0r1.
+ */
+const SERVER_ONLY = 'import "server-only";';
+const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>; projet: readonly string[] }>([
+  [
+    "src/ai/openrouter-client.ts",
+    {
+      externes: new Map([
+        ["server-only", SERVER_ONLY],
+        ["ai", 'import { generateText } from "ai";'],
+        ["@openrouter/ai-sdk-provider", 'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'],
+      ]),
+      projet: ["src/server/env/ai.ts", "src/server/env/egress.ts", "src/server/usage/port.ts"],
+    },
+  ],
+  [
+    "src/grounding/places-client.ts",
+    { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/server/env/grounding.ts", "src/server/usage/port.ts"] },
+  ],
+  [
+    "src/grounding/routes-client.ts",
+    { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/server/env/grounding.ts", "src/server/usage/port.ts"] },
+  ],
+  ["src/grounding/enveloppe-google.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/server/env/egress.ts"] }],
+  [
+    "src/research/undici-transport.ts",
+    {
+      externes: new Map([
+        ["server-only", SERVER_ONLY],
+        ["undici", 'import { Agent } from "undici";'],
+        ["node:dns/promises", 'import { lookup as resoudreDns } from "node:dns/promises";'],
+      ]),
+      projet: ["src/server/env/egress.ts"],
+    },
+  ],
+]);
+
 function regleDe(fichier: string): Regle | undefined {
+  const regle = regleDeBase(fichier);
+  const exception = EXCEPTIONS_P0R1.get(fichier);
+  if (regle === undefined || exception === undefined) return regle;
+  return {
+    projet: (c) => regle.projet(c) || exception.projet.includes(c),
+    externes: [...regle.externes, ...exception.externes.keys()],
+    formes: exception.externes,
+  };
+}
+
+function regleDeBase(fichier: string): Regle | undefined {
   if (FEUILLES_PROTOTYPE.includes(fichier)) return { projet: contrats, externes: ["zod"] };
   if (fichier === "src/prototype/reduction.ts") {
     return { projet: (c) => contrats(c) || proto("ancrage", "programme-reduit").includes(c), externes: ["zod"] };
@@ -471,6 +568,8 @@ function controler(fichier: string, source: string): string[] {
       violations.push(`module refusé : ${cible.nom}`);
     } else if (cible.nom === "node:net" && forme !== 'import { BlockList, isIP } from "node:net";') {
       violations.push(`forme refusée : ${forme}`);
+    } else if (regle.formes?.has(cible.nom) === true && regle.formes.get(cible.nom) !== forme) {
+      violations.push(`forme refusée : ${forme}`);
     }
   }
   for (const construction of constructions) if (construction !== "net") violations.push(`construction refusée : ${construction}`);
@@ -512,14 +611,24 @@ const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
 const FICHIERS_P0 = TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts"));
 const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
+/** Imports de chaque fichier, analysés une seule fois pour tous les graphes du fichier de test (durée, P0r1). */
+const IMPORTS_LUS = new Map<string, readonly string[]>();
+function importsDe(fichier: string): readonly string[] {
+  let lus = IMPORTS_LUS.get(fichier);
+  if (lus === undefined) {
+    lus = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8")).imports.map((i) => i.specificateur);
+    IMPORTS_LUS.set(fichier, lus);
+  }
+  return lus;
+}
+
 /** Graphe des imports de projet d'un fichier, transitif. */
 function graphe(depart: string): Set<string> {
   const vus = new Set<string>([depart]);
   const pile = [depart];
   while (pile.length > 0) {
     const courant = pile.pop() as string;
-    const source = readFileSync(path.join(RACINE, courant), "utf8");
-    for (const { specificateur } of analyser(courant, source).imports) {
+    for (const specificateur of importsDe(courant)) {
       const cible = resoudre(courant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
       if (vus.has(cle)) continue;
@@ -576,10 +685,91 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
   }
 
   it("aucun hôte réel ni module d'environnement de clé dans le code de P0a1", () => {
+    // P0r1 (0031 § 5) : chaque module de capacité ne nomme que son hôte et son module étroit ; `egress` est admis dans
+    // `src/ai`, `src/grounding` et le seul `undici-transport.ts`. Aucun nom de variable de clé nulle part.
+    // Hôte attendu de chaque client : comparé au texte de l'origine figée (`https://<hôte>"`), sans être écrit ici.
+    const HOTE = "hôte";
+    const MODULE_ENV = "@/server/env";
+    const ADMIS = new Map<string, readonly string[]>([
+      ["src/ai/openrouter-client.ts", [HOTE, MODULE_ENV]],
+      ["src/grounding/places-client.ts", [HOTE, MODULE_ENV]],
+      ["src/grounding/routes-client.ts", [HOTE, MODULE_ENV]],
+      ["src/grounding/enveloppe-google.ts", [MODULE_ENV]],
+      ["src/research/undici-transport.ts", [MODULE_ENV]],
+    ]);
+    const MOTIF = new RegExp(/openrouter\.ai|googleapis\.com|@\/server\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY/.source, "g");
+    // Un hôte contient un point ; un nom de variable n'en contient pas (il est rendu tel quel, donc refusé).
+    const nature = (texte: string) => (texte === MODULE_ENV ? MODULE_ENV : texte.includes(".") ? HOTE : texte);
     for (const fichier of SOURCES_P0) {
       const source = readFileSync(path.join(RACINE, fichier), "utf8");
-      expect(source, fichier).not.toMatch(/openrouter\.ai|googleapis\.com|@\/server\/env|OPENROUTER_API_KEY|GOOGLE_MAPS_SERVER_KEY/);
+      const trouves = [...new Set([...source.matchAll(MOTIF)].map((m) => nature(m[0])))].sort();
+      expect(trouves, fichier).toEqual([...(ADMIS.get(fichier) ?? [])].sort());
     }
+    // Chaque client ne nomme qu'une origine, la sienne (préfixe de son nom de fichier).
+    const origines = (fichier: string) =>
+      [...readFileSync(path.join(RACINE, fichier), "utf8").matchAll(/"https:\/\/([a-z0-9.-]+)[/"]/g)].map((m) => m[1] ?? "");
+    expect(new Set(origines("src/grounding/places-client.ts").map((h) => h.split(".")[0]))).toEqual(new Set(["places"]));
+    expect(new Set(origines("src/grounding/routes-client.ts").map((h) => h.split(".")[0]))).toEqual(new Set(["routes"]));
+    expect(origines("src/ai/openrouter-client.ts").length).toBe(2);
+    for (const fichier of ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"]) {
+      expect(origines(fichier).every((h) => h.endsWith(".com") && h.split(".").length === 3), fichier).toBe(true);
+    }
+  });
+
+  it("P0r1 : le fetch global seulement comme transport par défaut des trois clients (et l'option fetch du fournisseur)", () => {
+    const admis = (fichier: string, source: string) => controler(fichier, source).filter((v) => v.includes("fetch"));
+    // Formes admises.
+    expect(admis("src/grounding/places-client.ts", "export function createPlacesClient(o: O, transport: T = fetch) {}")).toEqual([]);
+    expect(
+      admis("src/ai/openrouter-client.ts", "export function createOpenRouterClient(o: O, transport: T = fetch) { createOpenRouter({ apiKey, fetch: enveloppe }); }"),
+    ).toEqual([]);
+    // Formes refusées, y compris dans les fichiers d'exception.
+    const refuses: [string, string][] = [
+      ["src/grounding/places-client.ts", "await fetch('https://exemple.org');"],
+      ["src/grounding/places-client.ts", "function createPlacesClient(o: O, transport: T = fetch) {}"],
+      ["src/grounding/places-client.ts", "export function autre(o: O, transport: T = fetch) {}"],
+      ["src/grounding/places-client.ts", "export function createPlacesClient(o: O, envoi: T = fetch) {}"],
+      ["src/grounding/places-client.ts", "export function createPlacesClient(o: O, transport: T = fetch) { transport = fetch; }"],
+      ["src/grounding/routes-client.ts", "const f = fetch;"],
+      ["src/grounding/enveloppe-google.ts", "export function createRoutesClient(o: O, transport: T = fetch) {}"],
+      ["src/ai/openrouter-client.ts", "createOpenRouter({ fetch: fetch });"],
+      ["src/ai/openrouter-client.ts", "autre({ fetch: enveloppe });"],
+      ["src/ai/client.ts", "export function createOpenRouterClient(o: O, transport: T = fetch) {}"],
+      ["src/research/undici-transport.ts", "export function createUndiciTransport(o: O, transport: T = fetch) {}"],
+    ];
+    for (const [fichier, source] of refuses) expect(admis(fichier, source).length, `${fichier} : ${source}`).toBeGreaterThan(0);
+  });
+
+  it("P0r1 : modules et formes d'import des exceptions nominatives, fichier par fichier", () => {
+    const refuses: [string, string][] = [
+      // Test négatif de la spécification : undici dans fetch-page.ts, fetch dans un autre fichier de src/ai.
+      ["src/research/fetch-page.ts", 'import { Agent } from "undici";'],
+      ["src/ai/requetes.ts", "await fetch('https://exemple.org');"],
+      ["src/research/undici-transport.ts", 'import { Agent, ProxyAgent } from "undici";'],
+      ["src/research/undici-transport.ts", 'import { EnvHttpProxyAgent } from "undici";'],
+      ["src/research/undici-transport.ts", 'import { Agent, setGlobalDispatcher } from "undici";'],
+      ["src/research/undici-transport.ts", 'import * as undici from "undici";'],
+      ["src/research/undici-transport.ts", 'import { lookup } from "node:dns";'],
+      ["src/research/undici-transport.ts", 'import { Resolver as resoudreDns } from "node:dns/promises";'],
+      ["src/research/undici-transport.ts", 'import { createGunzip } from "node:zlib";'],
+      ["src/research/undici-transport.ts", 'import { lireCleOpenRouter } from "@/server/env/ai";'],
+      ["src/research/agent.ts", 'import { verifierSortie } from "@/server/env/egress";'],
+      ["src/research/agent.ts", 'import "server-only";'],
+      ["src/ai/openrouter-client.ts", 'import { generateText, streamText } from "ai";'],
+      ["src/ai/openrouter-client.ts", 'import { gateway } from "ai";'],
+      ["src/ai/openrouter-client.ts", 'import { createGateway } from "@ai-sdk/gateway";'],
+      ["src/ai/openrouter-client.ts", 'import { lireCleGoogle } from "@/server/env/grounding";'],
+      ["src/ai/openrouter-client.ts", 'import { creerPortMemoire } from "../../tests/support/port-consommation-memoire";'],
+      ["src/ai/openrouter-client.ts", 'import { coutSku } from "@/server/usage/cout-google";'],
+      ["src/ai/requetes.ts", 'import { avecReservation } from "@/server/usage/port";'],
+      ["src/ai/requetes.ts", 'import { generateText } from "ai";'],
+      ["src/grounding/places-client.ts", 'import { lireCleOpenRouter } from "@/server/env/ai";'],
+      ["src/grounding/places-client.ts", 'import "server-only.js";'],
+      ["src/grounding/places-client.ts", 'import x from "server-only";'],
+      ["src/grounding/enveloppe-google.ts", 'import { avecReservation } from "@/server/usage/port";'],
+      ["src/grounding/ancrage.ts", 'import { lireCleGoogle } from "@/server/env/grounding";'],
+    ];
+    for (const [fichier, source] of refuses) expect(controler(fichier, source).length, `${fichier} : ${source}`).toBeGreaterThan(0);
   });
 
   it("node:net seulement dans ip-guard.ts, parse5 seulement dans extract-text.ts", () => {
@@ -918,5 +1108,249 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         expect(interdit, `${fichier} → ${chemin}`).toBe(false);
       }
     }
+  });
+});
+
+// --- Clé côté serveur seulement (spécification de P0r1, « Clients réels » ; mineur 15 de la revue du head `fab6c81`) ---
+
+/** Dossiers que rien de ce qui part vers le navigateur ne doit atteindre : clients réels, lecture des pages, modules de clé. */
+const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "src/server/env/"];
+/**
+ * Paquets des clients réels : jamais atteints depuis le code client non plus. Le fournisseur de modèles n'est admis que
+ * dans le client de modèles (exceptions nominatives) : l'atteindre suppose d'atteindre `src/ai`.
+ */
+const PAQUETS_SERVEUR_SEULEMENT = ["externe:ai", "externe:undici"];
+
+/** Directive `"use client"` dans le prologue du fichier (arbre syntaxique, pas une recherche de texte). */
+function estFichierClient(fichier: string, source: string): boolean {
+  const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, false, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  for (const instruction of sf.statements) {
+    if (!ts.isExpressionStatement(instruction) || !ts.isStringLiteral(instruction.expression)) return false;
+    if (instruction.expression.text === "use client") return true;
+  }
+  return false;
+}
+
+/** Imports d'un fichier, `import()` littéraux compris (`next/dynamic`, chargement paresseux côté client). */
+function importsClientDe(fichier: string, source: string): string[] {
+  const specificateurs = analyser(fichier, source).imports.map((i) => i.specificateur);
+  const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, true, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const visiter = (noeud: ts.Node) => {
+    if (ts.isCallExpression(noeud) && noeud.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const argument = noeud.arguments[0];
+      // Un import() non littéral est refusé dans le code client : la fermeture ne pourrait pas être vérifiée.
+      specificateurs.push(argument !== undefined && ts.isStringLiteralLike(argument) ? argument.text : "?import-non-litteral");
+    }
+    ts.forEachChild(noeud, visiter);
+  };
+  visiter(sf);
+  return specificateurs;
+}
+
+/**
+ * Fermeture transitive depuis `departs`, `import()` compris ; rend les fichiers et paquets serveur seulement atteints,
+ * avec le chemin qui y mène. `lire` est injecté pour jouer les cas négatifs sur un dépôt fictif.
+ */
+function atteintsServeurSeulement(
+  departs: readonly string[],
+  lire: (fichier: string) => string,
+  resoudreCible: (depuis: string, specificateur: string) => Cible,
+): string[] {
+  const violations: string[] = [];
+  const precedent = new Map<string, string | null>(departs.map((d) => [d, null]));
+  const pile = [...departs];
+  const chemin = (fin: string) => {
+    const etapes = [fin];
+    for (let courant = precedent.get(fin); courant !== null && courant !== undefined; courant = precedent.get(courant)) etapes.unshift(courant);
+    return etapes.join(" → ");
+  };
+  while (pile.length > 0) {
+    const courant = pile.pop() as string;
+    for (const specificateur of importsClientDe(courant, lire(courant))) {
+      const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(courant, specificateur);
+      const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
+      if (precedent.has(cle)) continue;
+      precedent.set(cle, courant);
+      if (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral") {
+        violations.push(chemin(cle));
+        continue;
+      }
+      if (cible.type === "projet") pile.push(cible.chemin);
+    }
+  }
+  return violations;
+}
+
+/** Nom de variable publique (exposée au navigateur par Next.js) qui désignerait une clé serveur. */
+const MOTIF_PUBLIQUE_SERVEUR = /NEXT_PUBLIC_\w*(?:OPENROUTER|MAPS_SERVER)/i;
+
+describe("p0: clé côté serveur seulement", () => {
+  const sourcesSrc = fichiers("src", [".ts", ".tsx", ".js", ".jsx", ".mjs"]).filter((f) => !estTest(f) && !/\.spec\.tsx?$/.test(f));
+  const lireDepot = (fichier: string) => readFileSync(path.join(RACINE, fichier), "utf8");
+  const clients = sourcesSrc.filter((f) => estFichierClient(f, lireDepot(f)));
+  const departs = [
+    ...new Set([...sourcesSrc.filter((f) => ["src/app/", "src/features/", "src/components/"].some((d) => f.startsWith(d))), ...clients]),
+  ].sort();
+
+  it("les départs couvrent src/app, src/features, src/components et chaque fichier \"use client\" du dépôt", () => {
+    for (const dossier of ["src/app/", "src/features/", "src/components/"]) expect(departs.some((f) => f.startsWith(dossier)), dossier).toBe(true);
+    // Des fichiers "use client" hors de ces trois dossiers existent (src/lib, src/analytics…) : ils sont des départs.
+    expect(clients.some((f) => !["src/app/", "src/features/", "src/components/"].some((d) => f.startsWith(d)))).toBe(true);
+    for (const f of clients) expect(departs).toContain(f);
+  });
+
+  it("aucun fichier de src/app, src/features, src/components ni aucun fichier \"use client\" n'atteint src/ai, src/grounding, src/research ou src/server/env", () => {
+    expect(atteintsServeurSeulement(departs, lireDepot, resoudre)).toEqual([]);
+  });
+
+  it("cas négatifs : un composant client qui atteint un client réel ou un module de clé, même par un intermédiaire ou import(), est refusé", () => {
+    const depot = new Map<string, string>([
+      ["src/components/Direct.tsx", '"use client";\nimport { client } from "@/grounding/client-fictif";\n'],
+      ["src/features/x/Barrel.tsx", 'import { y } from "./index";\n'],
+      ["src/features/x/index.ts", 'export * from "@/server/env/grounding";\n'],
+      ["src/app/page.tsx", 'const C = () => import("@/ai/client-fictif");\n'],
+      ["src/lib/client.ts", '"use client";\nimport { generateText } from "ai";\n'],
+      ["src/lib/calcule.ts", '"use client";\nconst m = "x";\nvoid import(m);\n'],
+      ["src/components/Sain.tsx", '"use client";\nimport { z } from "zod";\nimport type { Trip } from "@/contracts";\n'],
+    ]);
+    const lireFictif = (fichier: string) => depot.get(fichier) ?? "";
+    const resoudreFictif = (depuis: string, specificateur: string): Cible => {
+      if (specificateur.startsWith("@/")) return { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` };
+      if (specificateur.startsWith(".")) return { type: "projet", chemin: path.posix.normalize(path.posix.join(path.posix.dirname(depuis), `${specificateur}.ts`)) };
+      return { type: "externe", nom: specificateur };
+    };
+    expect(estFichierClient("src/lib/client.ts", depot.get("src/lib/client.ts") ?? "")).toBe(true);
+    expect(estFichierClient("x.ts", 'import "a";\n"use client";\n')).toBe(false);
+    const un = (depart: string) => atteintsServeurSeulement([depart], lireFictif, resoudreFictif);
+    expect(un("src/components/Direct.tsx")).toEqual(["src/components/Direct.tsx → src/grounding/client-fictif.ts"]);
+    expect(un("src/features/x/Barrel.tsx")).toEqual(["src/features/x/Barrel.tsx → src/features/x/index.ts → src/server/env/grounding.ts"]);
+    expect(un("src/app/page.tsx")).toEqual(["src/app/page.tsx → src/ai/client-fictif.ts"]);
+    expect(un("src/lib/client.ts")).toEqual(["src/lib/client.ts → externe:ai"]);
+    expect(un("src/lib/calcule.ts")).toEqual(["src/lib/calcule.ts → externe:?import-non-litteral"]);
+    expect(un("src/components/Sain.tsx")).toEqual([]);
+  });
+
+  /**
+   * Fichiers lus pour les noms publics : code (extensions analysées) de `src`, `scripts`, `db`, `eslint-rules` et
+   * `tests`, workflows, `.env.example`, configuration de Next.js et configurations racine. Ce fichier (motif et cas
+   * négatifs) est exclu ; les données du régime de confinement (JSON qui décrivent des textes admis) ne sont pas du code.
+   */
+  const CODE = /\.(?:[cm]?[jt]sx?|ya?ml)$/;
+  const fichiersNoms = [
+    ...["src", "scripts", "db", "eslint-rules", "tests", ".github"].flatMap((d) => tousLesFichiers(d)).filter((f) => CODE.test(f)),
+    ...[".env.example", "next.config.ts", "package.json", "playwright.config.ts", "vitest.config.mts", "eslint.config.mjs"],
+  ].filter((f) => existsSync(path.join(RACINE, f)) && f !== "tests/unit/p0/imports.test.ts");
+
+  it("aucune variable NEXT_PUBLIC_* au nom de clé serveur (modèles ou Google serveur) dans le code, .env.example ou la configuration de Next.js", () => {
+    expect(fichiersNoms).toContain(".env.example");
+    expect(fichiersNoms).toContain("next.config.ts");
+    const trouves = fichiersNoms.filter((f) => MOTIF_PUBLIQUE_SERVEUR.test(lireDepot(f)));
+    expect(trouves).toEqual([]);
+    // Cas négatifs du motif (casse comprise) ; la clé publique de la carte (navigateur, F4) reste admise.
+    for (const nom of ["NEXT_PUBLIC_OPENROUTER", "next_public_maps_server_cle", "NEXT_PUBLIC_GOOGLE_MAPS_SERVER"]) {
+      expect(nom).toMatch(MOTIF_PUBLIQUE_SERVEUR);
+    }
+    expect("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY").not.toMatch(MOTIF_PUBLIQUE_SERVEUR);
+  });
+
+  it("la configuration de Next.js n'expose aucune variable au navigateur par sa clé env", () => {
+    const source = lireDepot("next.config.ts");
+    const sf = ts.createSourceFile("next.config.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const clesEnv: string[] = [];
+    const visiter = (noeud: ts.Node) => {
+      if (ts.isPropertyAssignment(noeud) || ts.isShorthandPropertyAssignment(noeud) || ts.isMethodDeclaration(noeud)) {
+        const nom = noeud.name;
+        if ((ts.isIdentifier(nom) || ts.isStringLiteral(nom)) && nom.text === "env") clesEnv.push(noeud.getText(sf).slice(0, 80));
+      }
+      ts.forEachChild(noeud, visiter);
+    };
+    visiter(sf);
+    expect(clesEnv).toEqual([]);
+  });
+});
+
+// --- Fournisseur explicite, sur l'arbre syntaxique (mineur de la revue du head `353bb20` : le test du client de
+// modèles compare des motifs du source ; celui-ci ne dépend pas de la mise en forme) ---
+
+describe("p0: fournisseur de modèles explicite (arbre syntaxique)", () => {
+  const FICHIER = "src/ai/openrouter-client.ts";
+  const APPELS_AI_SDK = new Set(["generateText", "streamText", "generateObject", "streamObject"]);
+
+  /** Appels de l'AI SDK du fichier, avec la forme de leurs propriétés `model`, `maxRetries` et `experimental_telemetry`. */
+  function appelsAiSdk(source: string) {
+    const sf = ts.createSourceFile(FICHIER, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const appels: { model?: ts.Expression; maxRetries?: ts.Expression; telemetrie?: ts.Expression; objet: boolean }[] = [];
+    const visiter = (noeud: ts.Node) => {
+      if (ts.isCallExpression(noeud) && ts.isIdentifier(noeud.expression) && APPELS_AI_SDK.has(noeud.expression.text)) {
+        const argument = noeud.arguments[0];
+        const appel: (typeof appels)[number] = { objet: argument !== undefined && ts.isObjectLiteralExpression(argument) };
+        if (argument !== undefined && ts.isObjectLiteralExpression(argument)) {
+          for (const propriete of argument.properties) {
+            if (!ts.isPropertyAssignment(propriete) || !ts.isIdentifier(propriete.name)) continue;
+            if (propriete.name.text === "model") appel.model = propriete.initializer;
+            if (propriete.name.text === "maxRetries") appel.maxRetries = propriete.initializer;
+            if (propriete.name.text === "experimental_telemetry") appel.telemetrie = propriete.initializer;
+          }
+        }
+        appels.push(appel);
+      }
+      ts.forEachChild(noeud, visiter);
+    };
+    visiter(sf);
+    return { sf, appels };
+  }
+
+  /** `const modele = fournisseur.chat(…)` : l'objet modèle de l'instance explicite. */
+  function modeleExplicite(sf: ts.SourceFile, nom: string): boolean {
+    let trouve = false;
+    const visiter = (noeud: ts.Node) => {
+      if (ts.isVariableDeclaration(noeud) && ts.isIdentifier(noeud.name) && noeud.name.text === nom && noeud.initializer !== undefined) {
+        const init = noeud.initializer;
+        trouve =
+          ts.isCallExpression(init) &&
+          ts.isPropertyAccessExpression(init.expression) &&
+          ts.isIdentifier(init.expression.expression) &&
+          init.expression.expression.text === "fournisseur" &&
+          init.expression.name.text === "chat";
+      }
+      ts.forEachChild(noeud, visiter);
+    };
+    visiter(sf);
+    return trouve;
+  }
+
+  function verifier(source: string): string[] {
+    const { sf, appels } = appelsAiSdk(source);
+    const fautes: string[] = [];
+    if (appels.length === 0) fautes.push("aucun appel de l'AI SDK");
+    for (const appel of appels) {
+      if (!appel.objet) fautes.push("argument non littéral");
+      const model = appel.model;
+      if (model === undefined || !ts.isIdentifier(model) || !modeleExplicite(sf, model.text)) fautes.push("model : pas l'objet modèle de l'instance explicite");
+      if (appel.maxRetries === undefined || !ts.isNumericLiteral(appel.maxRetries) || appel.maxRetries.text !== "0") fautes.push("maxRetries : pas le littéral 0");
+      const t = appel.telemetrie;
+      const desactivee =
+        t !== undefined &&
+        ts.isObjectLiteralExpression(t) &&
+        t.properties.some((p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "isEnabled" && p.initializer.kind === ts.SyntaxKind.FalseKeyword);
+      if (!desactivee) fautes.push("télémétrie non désactivée");
+    }
+    return fautes;
+  }
+
+  it("chaque appel de l'AI SDK reçoit l'objet modèle de l'instance explicite, maxRetries: 0 et la télémétrie désactivée", () => {
+    expect(verifier(readFileSync(path.join(RACINE, FICHIER), "utf8"))).toEqual([]);
+  });
+
+  it("cas négatifs : identifiant en chaîne, maxRetries absent ou non nul, télémétrie active, mise en forme quelconque", () => {
+    const base = "const modele = fournisseur.chat(id, {});\n";
+    expect(verifier(`${base}generateText({\n  model:\n    modele,\n  maxRetries:   0,\n  experimental_telemetry: {\n isEnabled: false },\n});`)).toEqual([]);
+    expect(verifier(`${base}generateText({ model: "fournisseur/modele", maxRetries: 0, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
+    expect(verifier(`${base}streamText({ model: \`x/\${y}\`, maxRetries: 0, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
+    expect(verifier(`const autre = "x";\ngenerateObject({ model: autre, maxRetries: 0, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
+    expect(verifier(`${base}generateText({ model: modele, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
+    expect(verifier(`${base}generateText({ model: modele, maxRetries: 2, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
+    expect(verifier(`${base}streamObject({ model: modele, maxRetries: 0, experimental_telemetry: { isEnabled: true } });`).length).toBeGreaterThan(0);
+    expect(verifier(`${base}generateText(options);`).length).toBeGreaterThan(0);
   });
 });
