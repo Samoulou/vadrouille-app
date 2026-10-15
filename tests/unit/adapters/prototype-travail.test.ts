@@ -19,7 +19,9 @@ const CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)"
 
 type Requete = { texte: string; valeurs: readonly unknown[] | undefined };
 
-function poolSimule(reponses: { enCours?: boolean; execution?: Record<string, unknown>; candidats?: Record<string, unknown>[]; echecSur?: string } = {}) {
+function poolSimule(
+  reponses: { enCours?: boolean; execution?: Record<string, unknown>; candidats?: Record<string, unknown>[]; echecSur?: string; phase?: string | null } = {},
+) {
   const requetes: Requete[] = [];
   let liberations = 0;
   const pool: PoolSql = {
@@ -31,6 +33,7 @@ function poolSimule(reponses: { enCours?: boolean; execution?: Record<string, un
         }
         const enCours = reponses.enCours ?? true;
         if (texte.startsWith("SELECT mode")) return { rows: reponses.execution === undefined ? [] : [reponses.execution] };
+        if (texte.startsWith("SELECT phase FROM prototype.runs")) return { rows: enCours ? [{ phase: reponses.phase ?? null }] : [] };
         if (texte.startsWith("SELECT 1 FROM prototype.runs")) return { rows: enCours ? [{ "?column?": 1 }] : [] };
         if (texte.startsWith("UPDATE prototype.runs")) return { rows: enCours ? [{ id: RUN_ID }] : [] };
         if (texte.startsWith("SELECT cle")) return { rows: reponses.candidats ?? [] };
@@ -43,6 +46,8 @@ function poolSimule(reponses: { enCours?: boolean; execution?: Record<string, un
   };
   return { pool, requetes, liberations: () => liberations };
 }
+
+const EXECUTION = { mode: "essai", brief: "edimbourg-1.json", variant: "B", cost_models_micros: null, jour_quota: "2026-10-15", ecoule_ms: "4250" };
 
 const ligne = (n: number, placeId: string | null = null): LigneCandidat => ({ cle: `c_00${n}`, candidat: { id: `c_00${n}`, nom: "Lieu maison" }, placeId });
 
@@ -66,8 +71,11 @@ describe("p0: table de travail de p0Run (adaptateur unique)", () => {
   });
 
   it("lireExecution : transaction, contexte d'organisation, paramètres liés ; mode, brief, variante et coût", async () => {
-    const { pool, requetes, liberations } = poolSimule({ execution: { mode: "essai", brief: "edimbourg-1.json", variant: "B", cost_models_micros: "120000" } });
-    expect(await lireExecution(pool, RUN_ID)).toEqual({ mode: "essai", brief: "edimbourg-1.json", variante: "B", coutModelesMicros: 120_000 });
+    const { pool, requetes, liberations } = poolSimule({ execution: { ...EXECUTION, cost_models_micros: "120000" } });
+    expect(await lireExecution(pool, RUN_ID)).toEqual({ mode: "essai", brief: "edimbourg-1.json", variante: "B", coutModelesMicros: 120_000, jourQuota: "2026-10-15", ecouleMs: 4_250 });
+    // Jour de quota et temps écoulé lus de la base (horloge de la base, jamais celle du serveur).
+    expect(requetes[2]?.texte).toContain("pg_catalog.to_char(quota_day, 'YYYY-MM-DD')");
+    expect(requetes[2]?.texte).toContain("pg_catalog.now() - started_at");
     expect(requetes[0]?.texte).toBe("BEGIN");
     expect(requetes[1]).toEqual({ texte: CONTEXTE, valeurs: ["5e1f0000-0000-4000-8000-000000000001"] });
     expect(requetes[2]?.valeurs).toEqual([RUN_ID]);
@@ -78,8 +86,13 @@ describe("p0: table de travail de p0Run (adaptateur unique)", () => {
 
   it("exécution absente ou plus en cours : execution_absente ; ligne mal formée : base", async () => {
     expect((await echec(lireExecution(poolSimule().pool, RUN_ID))).code).toBe("execution_absente");
-    const { pool } = poolSimule({ execution: { mode: "simule", brief: "x.json", variant: "A", cost_models_micros: null } });
+    const { pool } = poolSimule({ execution: { ...EXECUTION, mode: "simule" } });
     expect((await echec(lireExecution(pool, RUN_ID))).code).toBe("base");
+    for (const mal of [{ jour_quota: null }, { jour_quota: "15/10/2026" }, { ecoule_ms: null }, { ecoule_ms: "1.5" }, { ecoule_ms: "9007199254740993" }]) {
+      expect((await echec(lireExecution(poolSimule({ execution: { ...EXECUTION, ...mal } }).pool, RUN_ID))).code).toBe("base");
+    }
+    // Horloges décalées : un écoulé négatif compte pour zéro.
+    expect((await lireExecution(poolSimule({ execution: { ...EXECUTION, ecoule_ms: -30 } }).pool, RUN_ID)).ecouleMs).toBe(0);
     expect((await echec(ecrirePhase(poolSimule({ enCours: false }).pool, RUN_ID, "ancrage"))).code).toBe("execution_absente");
   });
 
@@ -165,5 +178,31 @@ describe("p0: table de travail de p0Run (adaptateur unique)", () => {
     const close = poolSimule({ enCours: false });
     await cloreExecution(close.pool, RUN_ID, "pipeline_failed");
     expect(textes(close.requetes).some((t) => t.startsWith("DELETE") || t.startsWith("UPDATE"))).toBe(false);
+  });
+
+  it("ecrirePhase, garde d'idempotence (mineur 6 de la PR 348) : ligne verrouillée, phase écrite seulement après la précédente", async () => {
+    const { pool, requetes } = poolSimule({ phase: "raisons" });
+    await ecrirePhase(pool, RUN_ID, "validation");
+    expect(textes(requetes)).toEqual(["BEGIN", "SELECT pg_catalog.set_config('app.organization_id', $1,", "SELECT phase FROM", "UPDATE prototype.runs SET", "COMMIT"]);
+    expect(requetes[2]?.texte).toContain("FOR UPDATE");
+    expect(requetes[2]?.valeurs).toEqual([RUN_ID]);
+    expect(requetes[3]?.valeurs).toEqual([RUN_ID, "validation"]);
+    // `recherche` : aucune phase avant elle.
+    await ecrirePhase(poolSimule({ phase: null }).pool, RUN_ID, "recherche");
+  });
+
+  it("ecrirePhase rejouée ou hors d'ordre : phase_deja_passee, rien n'est écrit, ROLLBACK", async () => {
+    for (const [enBase, ecrite] of [
+      ["notation", "notation"],
+      ["planification", "notation"],
+      ["recherche", "recherche"],
+      [null, "ancrage"],
+      ["ancrage", "planification"],
+    ] as const) {
+      const { pool, requetes } = poolSimule({ phase: enBase });
+      expect((await echec(ecrirePhase(pool, RUN_ID, ecrite))).code).toBe("phase_deja_passee");
+      expect(textes(requetes).some((t) => t.startsWith("UPDATE"))).toBe(false);
+      expect(requetes.at(-1)?.texte).toBe("ROLLBACK");
+    }
   });
 });

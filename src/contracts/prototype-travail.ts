@@ -20,6 +20,16 @@ export type ExecutionEnCours = {
   readonly variante: "A" | "B";
   /** Coût des modèles déjà compté par les étapes précédentes, en micro-USD (arrondi au cent supérieur, D24). */
   readonly coutModelesMicros: number;
+  /**
+   * Jour de quota de l'exécution (`prototype.runs.quota_day`, posé par la base, S1), `AAAA-MM-JJ` : une seule exécution
+   * par jour de quota (index unique), d'où un identifiant de voyage unique (P0r3c-5, étape finale).
+   */
+  readonly jourQuota: string;
+  /**
+   * Temps écoulé depuis le début de l'exécution, en millisecondes, mesuré par la base (`now() - started_at`) : borne
+   * l'échéance de l'étape sous la durée maximale du mode (P0r3c-5, marge de durée). Lu en mémoire, jamais écrit.
+   */
+  readonly ecouleMs: number;
 };
 
 /** Ligne de la table de travail : clé `c_000`, contenu (clés de `CandidatSchema`), `place_id` éventuel. */
@@ -34,7 +44,9 @@ export type PhaseTravail = "recherche" | "ancrage" | "notation" | "planification
 
 /**
  * Codes d'échec, liste fermée, sans valeur : `execution_absente` (aucune exécution `en_cours` de cet identifiant) ;
- * `entree_refusee` (contrôle du module, aucune requête envoyée) ; `base` (erreur de la base, transaction annulée).
+ * `entree_refusee` (contrôle du module, aucune requête envoyée) ; `base` (erreur de la base, transaction annulée) ;
+ * `phase_deja_passee` (la phase précédente en base n'est pas celle qu'attend la phase écrite : étape rejouée ou hors
+ * d'ordre, garde d'idempotence de P0r3c-5, mineur 6 de la revue du head `608ee99`, PR 348).
  */
-export const CODES_ECHEC_TRAVAIL = ["execution_absente", "entree_refusee", "base"] as const;
+export const CODES_ECHEC_TRAVAIL = ["execution_absente", "entree_refusee", "base", "phase_deja_passee"] as const;
 export type CodeEchecTravail = (typeof CODES_ECHEC_TRAVAIL)[number];

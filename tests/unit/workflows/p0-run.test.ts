@@ -7,7 +7,7 @@ import { FatalError } from "workflow";
 
 import type { LigneCandidat } from "@/contracts/prototype-travail";
 import type { Candidat } from "@/prototype/candidat";
-import { etapeAncrage, etapeClore, etapeRecherche, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
+import { etapeAncrage, etapeClore, etapeFinale, etapeRecherche, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
 
 /**
  * Workflow `p0Run` (P0r3c-4, décisions 0009, 0055 et 0063), sur des doubles seulement : garde, table de travail,
@@ -75,7 +75,7 @@ const textSearch = vi.fn();
 const detailsLogement = vi.fn();
 
 function execution(mode: "reel" | "essai" = "reel", brief = "edimbourg-1.json") {
-  return { mode, brief, variante: "A" as const, coutModelesMicros: 0 };
+  return { mode, brief, variante: "A" as const, coutModelesMicros: 0, jourQuota: "2026-10-15", ecouleMs: 0 };
 }
 
 beforeEach(() => {
@@ -116,6 +116,7 @@ describe("p0Run : garde à l'entrée de chaque étape (0055 § 1 point 2, répon
   it.each([
     ["recherche", etapeRecherche],
     ["ancrage", etapeAncrage],
+    ["finale", etapeFinale],
   ])("garde fermée : l'étape %s s'arrête (FatalError, real_mode_unavailable) sans lecture, composition ni appel", async (_nom, etape) => {
     d.verifierGardeEtape.mockResolvedValue({ ok: false, code: "deployment_refused" });
     const erreur = await refus(etape({ runId: RUN_ID }));
@@ -225,8 +226,10 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
       ["c_002", null],
     ]);
     const plafonds = (d.composerP0Reel.mock.calls[0]?.[1] as { plafonds: { methode?: string; maxRequetes?: number }[] }).plafonds;
-    expect(plafonds.find((p) => p.methode === "places_text_search")?.maxRequetes).toBe(90);
+    // Une requête Text Search par logement est laissée à l'étape finale, qui relit le logement (0063, amendement P0r3c-5).
+    expect(plafonds.find((p) => p.methode === "places_text_search")?.maxRequetes).toBe(89);
     expect(plafonds.find((p) => p.methode === "places_details")?.maxRequetes).toBe(1);
+    expect(plafonds.find((p) => p.methode === "routes_matrix")).toMatchObject({ maxRequetes: 0, maxElements: 0 });
   });
 });
 
@@ -284,15 +287,30 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     expect(d.ancrage).not.toHaveBeenCalled();
   });
 
-  it("p0Run : recherche puis ancrage, puis clôture (étape finale en P0r3c-5) ; sortie { runId } seule", async () => {
+  it("p0Run : recherche, ancrage puis étape finale (famille etapeFinale() seule) ; étape finale arrêtée : clôture ; sortie { runId } seule", async () => {
     d.lireCandidats.mockResolvedValue([]);
     d.ancrerCandidatsDansZone.mockResolvedValue(new Map());
+    d.etapeFinale.mockImplementation(() => {
+      throw Object.assign(new Error(SENTINELLE_ERREUR), { code: "upstream_unavailable" });
+    });
     const sortie = await p0Run({ runId: RUN_ID });
     expect(sortie).toEqual({ runId: RUN_ID });
     expect(Object.keys(sortie)).toEqual(["runId"]);
-    expect(d.ecrirePhase.mock.calls.map((appel) => appel[2])).toEqual(["recherche", "ancrage"]);
-    expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "pipeline_failed");
-    expect(d.etapeFinale).not.toHaveBeenCalled();
+    expect(d.ecrirePhase.mock.calls.map((appel) => appel[2])).toEqual(["recherche", "ancrage", "notation"]);
+    expect(d.composerP0Reel).toHaveBeenCalledTimes(3);
+    expect(d.agent).toHaveBeenCalledTimes(1);
+    expect(d.ancrage).toHaveBeenCalledTimes(1);
+    expect(d.etapeFinale).toHaveBeenCalledTimes(1);
+    expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "upstream_unavailable");
+  });
+
+  it("phase déjà passée (étape redistribuée après expiration) : arrêt avant toute composition, pipeline_failed", async () => {
+    d.ecrirePhase.mockRejectedValue(Object.assign(new Error(SENTINELLE_ERREUR), { code: "phase_deja_passee" }));
+    for (const etape of [etapeRecherche, etapeAncrage, etapeFinale]) {
+      expect((await refus(etape({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+    }
+    aucunAppel();
+    expect(d.ecrireCoutModeles).not.toHaveBeenCalled();
   });
 
   it("p0Run : étape arrêtée, exécution close avec son code ; l'étape suivante ne part pas", async () => {
@@ -314,19 +332,19 @@ describe("p0Run : forme du module (décision 0063)", () => {
   const index = readFileSync(path.join(process.cwd(), "src/workflows/index.ts"), "utf8");
 
   it("aucune étape relancée (maxRetries = 0)", () => {
-    for (const etape of [etapeRecherche, etapeAncrage, etapeClore]) expect((etape as unknown as { maxRetries: number }).maxRetries).toBe(0);
+    for (const etape of [etapeRecherche, etapeAncrage, etapeFinale, etapeClore]) expect((etape as unknown as { maxRetries: number }).maxRetries).toBe(0);
   });
 
-  it("un workflow, trois étapes ; ni webhook ni hook dans src/workflows", () => {
+  it("un workflow, quatre étapes (recherche, ancrage, étape finale, clôture) ; ni webhook ni hook dans src/workflows", () => {
     expect(source.match(/^\s*"use workflow";$/gm)).toHaveLength(1);
-    expect(source.match(/^\s*"use step";$/gm)).toHaveLength(3);
+    expect(source.match(/^\s*"use step";$/gm)).toHaveLength(4);
     for (const texte of [source, index]) expect(texte).not.toMatch(/createWebhook|createHook|defineHook|resumeHook|resumeWebhook|getHookByToken/);
     expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["index.ts", "p0-run.ts"]);
   });
 
   it("aucune composition, aucun client ni registre au niveau du module (fabriques appelées dans l'étape)", () => {
     const horsFonctions = source.split("\n").filter((ligne) => /^(const|let|var|export const) /.test(ligne));
-    for (const ligne of horsFonctions) expect(ligne).not.toMatch(/composerP0Reel|creerRegistreForfait|poolPrototype\(\)|\.agent\(|\.ancrage\(/);
+    for (const ligne of horsFonctions) expect(ligne).not.toMatch(/composerP0Reel|creerRegistreForfait|poolPrototype\(\)|\.agent\(|\.ancrage\(|\.etapeFinale\(/);
   });
 
   it("NOMS_BRIEFS : exactement les fichiers de prototype/briefs/", () => {

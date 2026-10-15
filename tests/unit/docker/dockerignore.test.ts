@@ -49,7 +49,8 @@ const importsJson = fichiers("src/workflows")
 
 describe("contexte de l'image : prototype/ exclu sauf ce que lit p0Run (0032 § A4.4, 0063)", () => {
   it("chaque JSON importé par src/workflows/ est dans le contexte", () => {
-    expect(importsJson.length).toBeGreaterThanOrEqual(8);
+    expect(importsJson.length).toBeGreaterThanOrEqual(9);
+    expect(importsJson).toContain("prototype/config/classement.json");
     expect(importsJson.filter(exclu)).toEqual([]);
   });
 
