@@ -1,37 +1,32 @@
-# État du studio — 2026-10-14 (69e cycle)
+# État du studio — 2026-10-15 (70e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- 2026-10-14, 23:33 CEST : libellé `owner-approved` posé sur #332 ; le workflow des migrations est fusionné.
-- 2026-10-14, 23:33 CEST (projet) : « RELANCE UN CYCLE STP » ; 69e cycle lancé à la demande.
-- 2026-10-14, 23:49 CEST (fil du cycle) : l'IA et Google restent bloqués, il ne comprend pas pourquoi. Réponse : la cause est la boucle de relecture (un défaut rare trouvé à chaque passage, une heure par aller-retour, pièces en série). Engagement du CEO : les trois places vont uniquement aux pièces de l'essai réel, aucune règle annexe nouvelle avant le premier essai.
-- 2026-10-14, 23:51 CEST (carte de décision) : **« Garder strict »** (Q448). Toute remarque de relecture reste bloquante pendant la phase privée.
-- 2026-10-14, 23:51 et 23:52 CEST : « combien de cycles avant l'essai de bout en bout ? », puis « comment avance ce cycle ? ». Estimation donnée : 6 à 10 cycles pour le premier vrai essai, 25 à 40 pour l'app complète avec IA et Google.
-- #studio : aucun nouveau message.
+- #studio et fil du cycle : aucun nouveau message depuis le 69e cycle (dernier : 2026-10-14, 23:52 CEST).
 
 ## Fait
-- Fusionnés : **workflow des migrations** (#332), statut du 68e cycle (#344).
-- **P0r3c-3** (#326) : bloquant tardif de la Sécurité (non compté) corrigé dans le code (59878f0) ; les mots du récit sont comparés après remplacement des suites sans espace ; hangul, javanais et balinais rejoignent la fenêtre par caractères. La limite de Q427 reste vraie.
-- **Code de 0062** (#343) : correction 1 (757ed85) ; condition 1.7 (nom de section `nodejs_conf` vérifié par `process.config`), précisions du Tech Lead consignées dans 0062.
-- **Décision 0060** (#336) : la correction 2 a laissé un bloquant du Tech Lead (requête de contrôle filtrée sur le membre). Choix du CEO avec le Tech Lead : **troisième tentative bornée** (Q447), poussée (97f59c3).
+- Fusionnés depuis le 69e cycle : **P0r3c-3** (#326), **code de 0062** (#343), **décision 0060** (#336, troisième tentative), statut du 69e cycle (#346), puis **P0r3c-4** (#348 : `workflow` 5.1.0, `p0Run` branché pour la recherche et l'ancrage, décision 0063).
+- P0r3c-4 : construction de l'image corrigée (`.dockerignore` ré-inclut les 8 fichiers JSON lus par `p0-run.ts`) ; correction 1 de la revue (pont fermé vers `src/domain`, écriture du coût en mode fermé, `devalue` 5.9.4 et `nanoid` 5.1.16 par substitutions en liste fermée).
+- **Découpage de P0r3c-4** accepté par le CEO (Q449) : l'étape finale passe en P0r3c-5 ; d'ici là, `startWorkflow` refuse tout démarrage.
+- **P0r3c-5a** (#350, ticket #349) : `assemblage` et `vers-moteur` sortent de `scripts/p0` vers `src/server/p0` ; approuvée par le Tech Lead, fusion automatique en attente de la CI.
+- Mise à jour de `p0-reel` depuis `main` (#347) ouverte, en attente du clic de Samuel.
 
 ## En cours
-- En revue : #326, #336, #343.
+- En revue : #350 (P0r3c-5a).
 
 ## Bloqué
-- **Premier essai réel** : P0r3c-3 (#326), puis P0r3c-4 ; code de 0062 (#343) et avis de la Sécurité (Q444), nouvelle mise à jour de `p0-reel` par Samuel et nouveau relevé ; ouverture de la base d'essai (0052) ; P0r3d.
+- **Premier essai réel** : P0r3c-5 (étape finale, notation, build montrant `p0Run`) après #350 ; mise à jour de `p0-reel` par Samuel (#347) puis relevé de la section 8 de 0062 ; ouverture de la base d'essai (0052) ; P0r3d (dont l'e2e de la route du workflow, bloquant pour le premier lancement).
 - **Purge `p0-purge`** : en échec toutes les 6 heures (cause non relevée ; secrets vides probables, Q387).
-- **B8c** : fusion de 0060 ; cycles séparés (Q445). **B6a** : B3b. **B8a** : B7a, B7c, P0r3c-3. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
+- **B8c** : cycles séparés (Q445), après le premier essai. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
 1. Seulement le chemin de l'essai réel (engagement du 69e cycle).
-2. Après #343 : lien à Samuel pour remettre `p0-reel` à jour, puis relevé de la section 8 de 0062.
-3. Après #326 : P0r3c-4. Si #326 est encore bloquée : découpage.
-4. Si #336 est encore bloquée : découpage (pas de quatrième tentative).
+2. Après #350 : P0r3c-5 (ticket #316).
+3. Après le clic de Samuel sur #347 : relevé de la section 8 de 0062 sur la préversion de `p0-reel`.
 
 ## Décisions attendues de Samuel
-- **Clic demandé** : libellé `owner-approved` sur #332 (workflow des migrations), demandé dans le fil du cycle à 22:25 CEST.
+- **Clic demandé** : fusionner #347 (mise à jour de `p0-reel` depuis `main`), demandé dans le fil du cycle.
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307) ; Q387 (a) et (b).
 - **Déjà posées** : Q409, Q410, Q401, Q397, Q394, Q378, Q367, Q368, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -50,7 +45,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q447 (CEO et Tech Lead : 0060, troisième tentative bornée), Q448 (Samuel : niveau de relecture pendant la phase privée, tranchée « Garder strict »).
+- Q449 (CEO : découpage de P0r3c-4, tranchée), Q450 (Tech Lead et Sécurité : garder la ré-inclusion des JSON de `prototype/` dans l'image ou les déplacer).
 
 ## Part d'usage estimée
-- 69e cycle (à la demande) : sous-agents terminés : correction 2 de 0060 (lancée au 68e), code de 0062 (lancé au 67e), bloquant tardif de P0r3c-3, correction 1 du code de 0062, troisième tentative de 0060 ; 3 au plus en même temps.
+- 70e cycle (routine) : sous-agents terminés depuis le 69e : P0r3c-4 (code, construction de l'image, correction 1), P0r3c-5a ; 1 au plus en même temps.
