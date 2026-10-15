@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CLES_CONTENU_ECRIT, EchecEcritureProgramme, ecrireProgramme } from "@/adapters/prototype-ecriture";
+import { CLES_CONTENU_ECRIT, EchecEcritureProgramme, ecrireProgramme, FONCTION_POSITIONS, SQL_VERROU_S8, verrouS8Leve } from "@/adapters/prototype-ecriture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
@@ -152,5 +152,50 @@ describe("p0: échec de la base, transaction annulée, erreur sans valeur (0052 
     const pool: PoolSql = { connect: () => Promise.reject(Object.assign(new Error(`postgres://u:secret@h/b ${LAT}`), { code: "08001" })) };
     const echec = ecrireProgramme(entree(), pool);
     await expect(echec).rejects.toMatchObject({ code: "base", sqlstate: "08001", message: "écriture du programme refusée (base, 08001)" });
+  });
+});
+
+describe("verrou S8 lu au lancement (P0r3d ; 0052 § 3, 0056 § 4)", () => {
+  /** Pool d'une seule réponse ; note la requête et la libération. */
+  function poolVerrou(reponse: () => Promise<{ rows: Record<string, unknown>[] }>) {
+    const requetes: Requete[] = [];
+    let liberations = 0;
+    const pool: PoolSql = {
+      connect: async (): Promise<ClientSql> => ({
+        query: async (texte, valeurs) => {
+          requetes.push({ texte, valeurs });
+          return reponse();
+        },
+        release: () => void (liberations += 1),
+      }),
+    };
+    return { pool, requetes, liberations: () => liberations };
+  }
+
+  it("droit EXECUTE sur la signature exacte de la fonction, en paramètre lié ; catalogue lu, fonction jamais appelée", async () => {
+    expect(FONCTION_POSITIONS).toBe(`public.${FONCTION}(uuid, text, double precision, double precision)`);
+    expect(SQL_VERROU_S8).toBe(
+      "SELECT COALESCE(pg_catalog.has_function_privilege(pg_catalog.to_regprocedure($1), 'EXECUTE'), false) AS leve",
+    );
+    expect(SQL_VERROU_S8).not.toContain(FONCTION);
+    for (const leve of [true, false]) {
+      const b = poolVerrou(async () => ({ rows: [{ leve }] }));
+      expect(await verrouS8Leve(b.pool)).toBe(leve);
+      expect(b.requetes).toEqual([{ texte: SQL_VERROU_S8, valeurs: [FONCTION_POSITIONS] }]);
+      expect(b.liberations()).toBe(1);
+    }
+  });
+
+  it("réponse illisible, requête ou connexion en échec : EchecEcritureProgramme base, sans message d'origine", async () => {
+    for (const reponse of [async () => ({ rows: [] }), async () => ({ rows: [{ leve: "t" }] }), () => Promise.reject(new Error("SENTINELLE_PG"))]) {
+      const b = poolVerrou(reponse);
+      const echec = await verrouS8Leve(b.pool).catch((e: unknown) => e);
+      expect(echec).toBeInstanceOf(EchecEcritureProgramme);
+      expect(echec).toMatchObject({ code: "base" });
+      expect(String((echec as Error).message)).not.toContain("SENTINELLE_PG");
+      expect(b.liberations()).toBe(1);
+    }
+    const panne: PoolSql = { connect: () => Promise.reject(new Error("SENTINELLE_PG")) };
+    await expect(verrouS8Leve(panne)).rejects.toMatchObject({ code: "base", message: "écriture du programme refusée (base)" });
   });
 });

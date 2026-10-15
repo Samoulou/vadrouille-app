@@ -105,6 +105,8 @@ const COMPOSITION_P0R3C =
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
+const P0R3D =
+  "P0r3d (ticket 354), décision 0055 section 8 et décision 0063 points 7 et 10 ; verdict Sécurité approuvé (revue consolidée du head `193603d`, PR 357)";
 const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"];
 
 const SPECIFICATEURS_NOMINATIFS_TS = [
@@ -337,6 +339,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     specificateur: "server-only",
     noms: ["effet"],
     motif: SERVER_ONLY_P0R3C4,
+  })),
+  // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
+  // marqueurs `server-only` sans capacité.
+  ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: `marqueur \`server-only\` (sans capacité) d'un nouveau module serveur du lancement, exigé par \`ligne/require-server-only\` ; ${P0R3D}`,
   })),
   {
     fichier: "tests/unit/server/env.test.ts",

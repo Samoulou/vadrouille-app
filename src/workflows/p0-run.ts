@@ -56,7 +56,9 @@ import {
   relecturesDepuisAncrages,
   violationsP0,
 } from "@/server/p0/vers-moteur";
-import { QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait } from "@/server/usage/forfait";
+import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
+import { forfaitExecution, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type SkusForfait } from "@/server/usage/forfait";
+import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
 
@@ -69,6 +71,7 @@ import configEssai from "../../prototype/config/essai.json";
 import configModeles from "../../prototype/config/modeles.json";
 import configModeReel from "../../prototype/config/mode-reel.json";
 import configRecherche from "../../prototype/config/recherche.json";
+import prixGoogle from "../../prototype/config/prix-google.json";
 import configRechercheEssai from "../../prototype/config/recherche-essai.json";
 
 /**
@@ -160,6 +163,82 @@ function briefDe(nom: string): Brief {
   const lu = brut === undefined ? undefined : BriefSchema.safeParse(brut);
   if (lu === undefined || !lu.success) throw new ArretEtape("brief_invalid");
   return lu.data;
+}
+
+/** Brief admis et valide (`BriefSchema`) : contrôlé au lancement, avant toute réservation (P0r3d). */
+export function briefLancable(nom: string): boolean {
+  try {
+    briefDe(nom);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Verrou S8 (0052 § 3, 0056 § 4), lu par le lancement avant toute réservation : l'adaptateur n'est importé qu'ici. */
+export { verrouS8Leve } from "@/adapters/prototype-ecriture";
+
+/**
+ * SKU facturés par les clients réels de Google (P0r1), pour le forfait réservé au lancement : recopiés, parce que les
+ * modules de capacité ne sont atteints que par la composition et que le code hors étapes de ce module entre dans le
+ * paquet des workflows (aucun module Node n'y est admis) ; égaux à `SKU_TEXT_SEARCH`, `SKU_DETAILS` et `SKU_MATRICE`
+ * (test d'égalité).
+ */
+export const SKUS_FORFAIT: SkusForfait = Object.freeze({
+  textSearch: "places_text_search_essentials_ids_only",
+  details: "places_details_enterprise",
+  matrice: "routes_matrix_essentials",
+});
+
+/** Réservation d'une exécution du mode : forfait (0046, D13 point 3) et règles de la transaction de P0r2. */
+export type LancementDuMode = { readonly forfait: Forfait; readonly regles: ReglesForfait };
+
+/**
+ * Forfait et règles de la réservation d'une exécution du mode (P0r3d), calculés comme les étapes lisent leur
+ * configuration ; `null` si la configuration du mode, celle de l'agent, celle du classement ou la table de prix est
+ * refusée : le lancement est alors refusé **avant** la réservation, sans consommer le jour (une étape l'arrêterait
+ * sinon `config_invalid`).
+ *
+ * - Forfait : plafonds par méthode du mode au prix plein de `prototype/config/prix-google.json` (Q329), SKU des clients
+ *   réels (`SKUS_FORFAIT`), plus le plafond de coût des modèles du mode (`coutUsd`). Google, Text Search (identifiants
+ *   seulement) à 0 USD, fiches à 20 USD les 1 000, éléments Routes à 5 USD les 1 000 :
+ *   - mode réel (`mode-reel.json`, 0053) : 90 × 0 + 90 × 0,020 + 500 × 0,005 = 0 + 1,80 + 2,50 = **4,30 USD** ;
+ *   - essai (`essai.json`, spécification P0-suite-2, « Enveloppe Google ») : 17 × 0 + 14 × 0,020 + 120 × 0,005
+ *     = 0 + 0,28 + 0,60 = **0,88 USD**.
+ *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
+ * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
+ *   en cours n'est jamais close comme orpheline par le lancement d'un essai.
+ */
+export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode | null {
+  if (mode !== "reel" && mode !== "essai") return null;
+  const reel = validerConfigModeReel(configModeReel);
+  const table = TablePrixGoogleSchema.safeParse(prixGoogle);
+  if (!reel.ok || !table.success) return null;
+  try {
+    const config = configurationDuMode(mode);
+    configurationAgent(mode, config);
+    if (lireClassement(configClassement) === undefined) return null;
+    const forfait = forfaitExecution(
+      table.data,
+      SKUS_FORFAIT,
+      { placesTextSearch: config.placesTextSearch, placesDetails: config.placesDetails, routesRequetes: config.routesRequetes, routesElements: config.routesElements },
+      Math.round(config.coutUsd * 1_000_000),
+    );
+    return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs } };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clôture d'une exécution réservée dont le démarrage par le SDK a échoué (P0r3d) : `upstream_unavailable`, cause externe
+ * qui ouvre la relance (P0S2-PO-13) ; aucun appel payant n'est parti. Si le SDK a tout de même mis l'exécution en file,
+ * sa première étape la trouve close et s'arrête à la garde (`verifierGardeEtape` : exécution `en_cours` exigée). Le pool
+ * est celui de l'appelant : le code hors étapes de ce module entre dans le paquet des workflows, qui n'admet ni `pg` ni
+ * aucun module Node (`WorkflowBuildError`).
+ */
+export async function cloreExecutionNonDemarree(pool: PoolSql, garde: GardeOuverte): Promise<void> {
+  await cloreExecution(pool, garde.runId, "upstream_unavailable");
 }
 
 /**
