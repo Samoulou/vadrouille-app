@@ -1,30 +1,34 @@
-# État du studio — 2026-10-15 (77e cycle, à la demande de Samuel)
+# État du studio — 2026-10-15 (78e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-15 : 12:45 UTC, « les trois fichier sont commit » → tests protégés de #376 déposés par Samuel (426b08f, identiques aux versions préparées), revue relancée. 13:20 UTC, « c'est quoi l'état ? » → réponse. 13:36 UTC, `owner-approved` sur #376 et « c'est fait » ; question « on avance ou on stagne ? » → liste des étapes restantes. 13:38 UTC, délai de veto ramené à 6 heures → décision 0068 (#378) ; confirmation et portée demandées par carte (13:46 UTC). 13:44 UTC, « go lance un cycle » → ce 77e cycle.
+- Fil du cycle, 2026-10-15 : 13:47 UTC, carte « Oui, partout » (délai de 6 heures aussi pour les décisions en attente) → décision 0068 ; 13:57 UTC, commentaire « Je confirme 00068 » sur #378 → fusion de 0068. 14:32 UTC, « Ça avance ? » → état et lien du lot 2. 14:33 UTC, `owner-approved` sur #380 (« Done ») → fusion, lot 2 appliqué.
 - #studio : aucun nouveau message.
 
 ## Fait
-- Fusionnés depuis le 76e cycle : #376 (contrôle de chiffrement côté client, décision 0067, avec `owner-approved` ; Samuel accepte par ce clic le risque résiduel proxy→compute de Neon), #377 (état du 76e cycle).
-- **A13 fait** : `db-migrate` sur main (run 38744422089, 13:38 UTC) : **lot 1 appliqué à la vraie base** (0000_socle, 0001_securite, 0002_place_coordinates, 0003_prototype, 0004_rate_limit_expires_at).
-- **A15 fait** : premier lancement manuel de `p0-purge` réussi (run 38744737862, 13:40 UTC).
+- Fusionnés depuis le 77e cycle : #378 (décision 0068, délai de veto de 6 heures ; un amendement se compte à part), #380 (lot 2 approuvé), #379 (état du 77e cycle).
+- **Lot 2 appliqué à la vraie base** : `db-migrate` (run 38752814907, 14:40 UTC) applique `0005_prototype_coordinates_run` ; 0000 à 0004 ignorées (déjà appliquées).
+- **A16 fait, favorable** : `db-releve` (run 38753837888) ; R8 `f` (verrou S8 tenu), R6 conforme, `plpgsql` seule extension, aucun rôle `vadrouille_*` super-utilisateur ; consigné sur #374. Condition 4 de 0056 § 4.1 déclarée à 19:37 UTC sans veto (0057 § 7.1).
+- **A11 fait** : relevé de 0065 § 7 sur `p0-reel` : barrière TLS et garde ouvertes, fonction en `fra1`, règle de `p0-reel` conforme (consigné sur #369). Q426 close.
+- Liste de contrôle de l'essai remise à jour par la Sécurité (`/mnt/project-files/essai-reel/checklist-essai.md`, 15:10 UTC).
 
 ## En cours
-- data : A14, PR d'approbation du lot 2 (`0005_prototype_coordinates_run`), verdict Sécurité à la revue, puis `owner-approved` de Samuel.
-- #378 (décision 0068) : changements demandés par le Tech Lead (gabarit de note de version, renvois aux spécifications, portée rétroactive) ; correction après la réponse de Samuel à la carte.
+- data : A17, PR de déverrouillage #381 en **brouillon** (migration 0006, retour arrière identique au texte figé). Les changements de `tests/db/` exigés par 0056 § 4.5 sont refusés aux agents par le filtre de sécurité : Samuel les applique lui-même (Q457).
+- Sécurité : e2e de la préversion par le lien de partage du connecteur (option iii, décidée par le CEO, Q458) : amendement de 0063 point 8, puis relevé avant le déverrouillage.
+- Product Owner : A5, P0r4 avant ou après l'essai d'intégration.
 
 ## Bloqué
-- **Premier essai réel** (lancé par Samuel seul) : lot 2 (A14, `owner-approved`), relevés `db-releve` par la Sécurité (A16 ; 0057 définitive selon la portée de 0068), PR de déverrouillage (A17), limites de dépense OpenRouter et Google (Q325) ; accord écrit de Samuel (0055).
+- **Premier essai réel** (lancé par Samuel seul) : relevé S7 dans la console Neon (Q456), tests de `tests/db/` (Q457), conditions 1 et 4 à 19:37 UTC (ou Q455), revue de #381 puis `owner-approved`, application (A18) et relevé (A19) ; P0r4 (A5) ; limites de dépense (Q325) ; accord écrit de Samuel (0055).
 - **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
 1. Seulement le chemin de l'essai réel.
-2. Lot 2 (A14) puis A16 (`db-releve`) et A17 (déverrouillage) ; correction de #378 selon la carte.
+2. Consigner le relevé S7 dès la réponse de Samuel ; #381 en revue dès les tests posés ; e2e de préversion ; P0r4.
+3. Surveiller `p0-purge` planifié (18:17 UTC) : condition 5 (succès de moins de 12 h).
 
 ## Décisions attendues de Samuel
-- **Réponse demandée** : carte « Appliquer le délai de 6 heures aussi aux décisions déjà en attente ? » (fil du cycle, 13:46 UTC). Bientôt : `owner-approved` sur le lot 2.
+- **Réponses demandées** : Q455 (carte, lever le délai sur les parties de 0057 amendées par 0066 et 0067), Q456 (relevé S7 dans la console Neon), Q457 (tests de `tests/db/` pour #381). Bientôt : Q325 (limites de dépense).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -43,7 +47,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Aucune.
+- Q455 à Q458.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
