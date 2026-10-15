@@ -63,6 +63,7 @@ import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/regis
 import edimbourg1 from "../../prototype/briefs/edimbourg-1.json";
 import edimbourg2 from "../../prototype/briefs/edimbourg-2.json";
 import edimbourg3 from "../../prototype/briefs/edimbourg-3.json";
+import edimbourgCourt from "../../prototype/briefs/edimbourg-court.json";
 import configClassement from "../../prototype/config/classement.json";
 import configEssai from "../../prototype/config/essai.json";
 import configModeles from "../../prototype/config/modeles.json";
@@ -114,6 +115,7 @@ const BRIEFS: ReadonlyMap<string, unknown> = new Map([
   ["edimbourg-1.json", edimbourg1],
   ["edimbourg-2.json", edimbourg2],
   ["edimbourg-3.json", edimbourg3],
+  ["edimbourg-court.json", edimbourgCourt],
 ]);
 
 /** Noms de fichiers des briefs admis (pour le test d'égalité avec `prototype/briefs/`). */
