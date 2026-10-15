@@ -12,7 +12,7 @@ import type { Candidat, CandidatNote } from "@/prototype/candidat";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
 import { reduireProgramme, ReductionRefusee } from "@/prototype/reduction";
 
-import { assembler } from "../../../scripts/p0/assemblage";
+import { assembler } from "@/server/p0/assemblage";
 import { lireConfiguration, lireConfigurationMoteur } from "../../../scripts/p0/fichiers";
 import {
   briefDepuisBrief,
@@ -22,7 +22,7 @@ import {
   evenementVersMoteur,
   relecturesDepuisAncrages,
   violationsP0,
-} from "../../../scripts/p0/vers-moteur";
+} from "@/server/p0/vers-moteur";
 
 /**
  * Moteur de P0 de bout en bout (spécification P0, étapes 5 à 11), sur des jours de test fabriqués ici, sans

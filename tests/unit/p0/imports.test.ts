@@ -370,6 +370,15 @@ const FEUILLES_PROTOTYPE = ["brief", "config", "candidat", "ancrage", "programme
 const proto = (...noms: string[]) => noms.map((nom) => `src/prototype/${nom}.ts`);
 const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossier}/`);
 
+/**
+ * P0r3c-5a (ticket 349, amendement de 0063 ; réponse 2 du Tech Lead à la revue de #348) : assemblage du programme et
+ * adaptateur du moteur, sortis de `scripts/p0` pour que `p0Run` les atteigne sans importer `scripts/`. Ils gardent la
+ * liste d'autorisation de A3.2 (contrôlés avec les fichiers de P0) et n'importent de `src/prototype` que le programme
+ * réduit (admis partout) et, **en `import type` seulement**, les trois feuilles ci-dessous (contrats et `zod` seulement).
+ */
+const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts"];
+const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", "candidat");
+
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
 const contrats = sous("src/contracts");
@@ -442,6 +451,12 @@ function regleDe(fichier: string): Regle | undefined {
 }
 
 function regleDeBase(fichier: string): Regle | undefined {
+  if (MODULES_SERVEUR_P0.includes(fichier)) {
+    return {
+      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts"].includes(c),
+      externes: [],
+    };
+  }
   if (FEUILLES_PROTOTYPE.includes(fichier)) return { projet: contrats, externes: ["zod"] };
   if (fichier === "src/prototype/reduction.ts") {
     return { projet: (c) => contrats(c) || proto("ancrage", "programme-reduit").includes(c), externes: ["zod"] };
@@ -483,7 +498,8 @@ function regleDeBase(fichier: string): Regle | undefined {
     return {
       projet: (c) =>
         contrats(c) ||
-        ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"].some((d) => sous(d)(c)),
+        ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"].some((d) => sous(d)(c)) ||
+        MODULES_SERVEUR_P0.includes(c),
       // Revue Sécurité de #180, mineur 5 (décision du CEO, 43e cycle, point 4) : `node:fs` et `node:fs/promises`
       // réservés à `scripts/p0/fichiers.ts` (pas de `readFileSync("/proc/self/environ")` ailleurs, 0032 A3.2).
       externes: ["zod", "node:path", "node:util", ...(fichier === FICHIER_FS ? ["node:fs", "node:fs/promises"] : [])],
@@ -604,7 +620,7 @@ function fichierAdmis(fichier: string): boolean {
 
 /** Tous les fichiers présents des six dossiers (sur-ensemble des fichiers suivis). */
 const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
-const FICHIERS_P0 = TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts"));
+const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0];
 const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
 /** Imports de chaque fichier, analysés une seule fois pour tous les graphes du fichier de test (durée, P0r1). */
@@ -681,8 +697,16 @@ const interditPartout = (chemin: string) =>
   ["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
   (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts");
 
+/**
+ * Seules arêtes de l'application vers `src/prototype` (hors programme réduit) admises : d'un module serveur de P0 vers
+ * une feuille de types (P0r3c-5a). Ces imports sont des `import type` (test ci-dessous) : rien de `src/prototype`
+ * n'est chargé à l'exécution, et les feuilles n'importent que les contrats et `zod`.
+ */
+const areteAdmise = (de: string, vers: string) => MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers);
+
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
-function violationsApplication(fichier: string, voisins: Voisins): string[] {
+function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
+  const voisins: Voisins = (courant) => voisinsBruts(courant).filter((cible) => !areteAdmise(courant, cible));
   const violations = [...atteints(fichier, voisins, estPont)].filter(interditPartout);
   if (!fichier.startsWith("src/server/")) {
     // L'arrêt aux ponts ne vaut que pour `interditPartout` : la règle de src/domain traverse les ponts (bloquant 1 de la
@@ -1201,7 +1225,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         { "src/workflows/p0-run.ts": ["src/research/agent.ts"], "src/research/agent.ts": ["src/domain/generation.ts"] },
         ["src/domain/generation.ts"],
       ],
-      ["refusé : pont → scripts/p0", { "src/workflows/p0-run.ts": ["scripts/p0/assemblage.ts"] }, ["scripts/p0/assemblage.ts"]],
+      ["refusé : pont → scripts/p0", { "src/workflows/p0-run.ts": ["scripts/p0/pipeline.ts"] }, ["scripts/p0/pipeline.ts"]],
       ["admis : pont → @/research, @/prototype", { "src/workflows/p0-run.ts": ["src/research/agent.ts", "src/prototype/config.ts"] }, []],
       ["admis : pont → src/server → @/domain", { "src/workflows/p0-run.ts": ["src/server/p0/x.ts"], "src/server/p0/x.ts": ["src/domain/generation.ts"] }, []],
     ] satisfies [string, Record<string, string[]>, string[]][])("cas fabriqué du pont : %s", (_nom, aretes, attendu) => {
@@ -1211,6 +1235,30 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       const avecIndex: Voisins = (fichier) => (fichier === "src/workflows/index.ts" ? ["src/workflows/p0-run.ts"] : graphe(fichier));
       const domaine = (liste: readonly string[]) => liste.filter((c) => c.startsWith("src/domain/"));
       expect(domaine(violationsApplication("src/workflows/index.ts", avecIndex))).toEqual(domaine(attendu));
+    });
+
+    it("P0r3c-5a : assemblage et vers-moteur n'atteignent ni scripts/ ni src/prototype hors des feuilles de types, importées en type seulement", () => {
+      for (const fichier of MODULES_SERVEUR_P0) {
+        expect(application, fichier).toContain(fichier);
+        const atteint = [...atteints(fichier, voisinsReels)];
+        expect(atteint.filter((c) => c.startsWith("scripts/")), fichier).toEqual([]);
+        expect(
+          atteint.filter((c) => c.startsWith("src/prototype/") && !TYPES_PROTOTYPE_SERVEUR_P0.includes(c) && c !== "src/prototype/programme-reduit.ts"),
+          fichier,
+        ).toEqual([]);
+        const { imports } = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8"));
+        const versTypes = imports.filter(({ specificateur }) => {
+          const cible = resoudre(fichier, specificateur);
+          return cible.type === "projet" && TYPES_PROTOTYPE_SERVEUR_P0.includes(cible.chemin);
+        });
+        expect(versTypes.length, fichier).toBeGreaterThan(0);
+        for (const { forme } of versTypes) expect(forme, fichier).toMatch(/^import type \{/);
+      }
+      // scripts/p0 les ré-importe ; rien d'autre de src/server n'est importé par scripts/p0.
+      const importsScripts = fichiers("scripts/p0")
+        .filter((f) => !estTest(f))
+        .flatMap((f) => voisinsReels(f).filter((c) => c.startsWith("src/server/")));
+      expect([...new Set(importsScripts)].sort()).toEqual([...MODULES_SERVEUR_P0].sort());
     });
 
     it("le pont p0Run n'est importé que par src/workflows/index.ts, et l'index n'atteint P0 que par lui", () => {
@@ -1238,6 +1286,22 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
           [],
         ],
         ["refusé : src/server → @/research/agent", { "src/server/x.ts": ["src/research/agent.ts"] }, "src/server/x.ts", ["src/research/agent.ts"]],
+        // P0r3c-5a : arêtes admises de src/server/p0 vers les feuilles de types de src/prototype, et rien d'autre.
+        [
+          "admis : src/server/p0/assemblage.ts → @/prototype/brief, candidat, ancrage, programme-reduit",
+          { "src/server/p0/assemblage.ts": [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", "src/domain/temps.ts"] },
+          "src/server/p0/assemblage.ts",
+          [],
+        ],
+        ["refusé : src/server/p0/vers-moteur.ts → @/prototype/config", { "src/server/p0/vers-moteur.ts": ["src/prototype/config.ts"] }, "src/server/p0/vers-moteur.ts", ["src/prototype/config.ts"]],
+        ["refusé : src/server/p0/garde.ts → @/prototype/brief", { "src/server/p0/garde.ts": ["src/prototype/brief.ts"] }, "src/server/p0/garde.ts", ["src/prototype/brief.ts"]],
+        ["refusé : src/server/p0/assemblage.ts → scripts/p0", { "src/server/p0/assemblage.ts": ["scripts/p0/pipeline.ts"] }, "src/server/p0/assemblage.ts", ["scripts/p0/pipeline.ts"]],
+        [
+          "refusé : src/server/p0/assemblage.ts → src/server/x → @/prototype/brief",
+          { "src/server/p0/assemblage.ts": ["src/server/x.ts"], "src/server/x.ts": ["src/prototype/brief.ts"] },
+          "src/server/p0/assemblage.ts",
+          ["src/prototype/brief.ts"],
+        ],
         [
           "refusé : src/features → src/server → @/grounding (parcours complet)",
           { "src/features/x.ts": ["src/server/y.ts"], "src/server/y.ts": ["src/grounding/ancrage.ts"] },
