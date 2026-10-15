@@ -41,7 +41,6 @@ jobs:
             BEGIN
               IF session_user <> 'vadrouille_prototype_purge' OR current_user <> 'vadrouille_prototype_purge' THEN RAISE EXCEPTION 'rôle de session inattendu'; END IF;
               IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'vadrouille_prototype_purge' AND (r.rolsuper OR r.rolbypassrls)) THEN RAISE EXCEPTION 'rôle privilégié'; END IF;
-              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;
               IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname ~ '[[:cntrl:]|]')
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname ~ '[[:cntrl:]|]')
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class c WHERE c.relname ~ '[[:cntrl:]|]')
@@ -114,6 +113,10 @@ jobs:
           if [[ ! $PGHOST =~ ^[a-z0-9.-]{1,253}$ ]]; then refus "PGHOST hors forme"; fi
           if [[ $PGHOST == *-pooler* ]]; then refus "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi
           if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then refus "PGDATABASE hors forme"; fi
+          # Chiffrement (0056 § 2.6.2, amendé par 0067) : derrière le proxy de Neon, pg_stat_ssl du compute ne voit pas le
+          # TLS du client ; la garantie est celle de libpq, qui refuse sous verify-full toute connexion sans TLS ou dont le
+          # certificat ne nomme pas PGHOST. Seules les six variables PG* de l'étape (aucun PGSERVICE ni autre réglage hérité).
+          if [[ "${!PG*}" != "PGDATABASE PGHOST PGPASSWORD PGSSLMODE PGSSLROOTCERT PGUSER" || $PGSSLMODE != verify-full || $PGSSLROOTCERT != system ]]; then refus "chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full"; fi
 
           # Session unique, en lecture seule (§ 3) ; sortie dans un fichier jamais affiché ni téléversé (§ 5).
           sortie="$RUNNER_TEMP/db-releve.txt"

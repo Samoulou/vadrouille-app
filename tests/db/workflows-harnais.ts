@@ -18,17 +18,23 @@ import { connect, connectBaseJetable, type DbClient, urlFor } from "./helpers";
  *   base Neon avant les migrations (S5 de 0046).
  * - `executer` : le bloc `run:` de l'étape, extrait du YAML, joué par `bash --noprofile --norc -eo pipefail` (forme de
  *   GitHub pour `shell: bash`) avec les textes SQL de l'`env:` de l'étape et un environnement posé par le test : hôte
- *   local, `PGSSLMODE=disable`, `GITHUB_WORKSPACE`, `RUNNER_TEMP`, `GITHUB_SHA`. Le contrôle `ssl` (aucun chiffrement
- *   sur le serveur de la CI) est retiré par une substitution qui doit trouver exactement une occurrence, sauf si le test
- *   le garde pour vérifier son échec.
+ *   local, `PGSSLMODE=disable`, `GITHUB_WORKSPACE`, `RUNNER_TEMP`, `GITHUB_SHA`. Le contrôle de chiffrement côté client
+ *   (décision 0067 : `PGSSLMODE=verify-full` et les six seules variables `PG*` de l'étape ; aucun chiffrement sur le
+ *   serveur de la CI, qui reçoit aussi `PGPORT` et `PGCONNECT_TIMEOUT`) est retiré du bloc `run:` par une substitution
+ *   qui doit trouver exactement une occurrence, sauf si le test le garde pour vérifier le refus sans connexion. L'ancien
+ *   contrôle `pg_stat_ssl` ne doit plus figurer dans aucun texte SQL.
  */
 
 const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 export const WORKFLOWS = path.join(RACINE, ".github/workflows");
 export const ETAPE_MIGRATE = "Appliquer les migrations approuvées";
 export const ETAPE_RELEVE = "Relever le catalogue";
-export const CONTROLE_SSL =
-  "IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;";
+/**
+ * Ligne du contrôle de chiffrement côté client (0067), identique dans les trois workflows à la fonction d'échec près ; la
+ * liste exacte des variables est figée par les tests statiques de `tests/unit/ci/`.
+ */
+export const CONTROLE_CHIFFREMENT =
+  /^[ \t]*if \[\[ "\$\{!PG\*\}" != "[A-Z ]+" \|\| \$PGSSLMODE != verify-full \|\| \$PGSSLROOTCERT != system \]\]; then (echec|refus) "chiffrement : variables PG\* hors liste, ou PGSSLMODE autre que verify-full"; fi$/gm;
 
 const temporaires: string[] = [];
 const bases: string[] = [];
@@ -113,6 +119,7 @@ export type Options = {
   /** Texte du workflow à la place du fichier du dépôt (workflow muté en mémoire par le test). */
   readonly workflow?: string;
   readonly espace?: string;
+  /** Garde le contrôle de chiffrement côté client (refus attendu sans connexion : `PGSSLMODE=disable`, `PGPORT`). */
   readonly garderSsl?: boolean;
   readonly env?: Readonly<Record<string, string>>;
   /** Rôle de connexion (login de `tests/db/env.ts`) dont le mot de passe est passé dans `PGPASSWORD`. */
@@ -146,14 +153,15 @@ export function preparer(fichier: string, nom: string, options: Options): { scri
   let run = e.run;
   if (options.liste !== undefined) run = remplacerListe(run, options.liste);
   for (const [avant, apres] of options.substitutions ?? []) run = remplacerUneFois(run, avant, apres);
+  const chiffrement = run.match(CONTROLE_CHIFFREMENT)?.length ?? 0;
+  if (chiffrement !== 1) throw new Error(`contrôle de chiffrement : ${chiffrement} occurrence(s) au lieu d'une`);
+  if (!options.garderSsl) run = run.replace(CONTROLE_CHIFFREMENT, "");
   const sql: Record<string, string> = {};
-  let ssl = 0;
   for (const [cle, valeur] of Object.entries(e.env)) {
     if (!cle.startsWith("SQL_")) continue;
-    ssl += valeur.split(CONTROLE_SSL).length - 1;
-    sql[cle] = options.garderSsl ? valeur : valeur.replace(CONTROLE_SSL, "");
+    if (valeur.includes("pg_stat_ssl")) throw new Error(`${cle} : contrôle pg_stat_ssl, remplacé par le contrôle côté client (0067)`);
+    sql[cle] = valeur;
   }
-  if (ssl !== 1) throw new Error(`contrôle ssl : ${ssl} occurrence(s) au lieu d'une`);
   const login = options.login ?? "migrator";
   const adresse = new URL(urlBaseJetable(login, options.base));
   const runnerTemp = dossierTemporaire("runner-temp-");
