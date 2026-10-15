@@ -123,16 +123,19 @@ describe("p0: page de lancement", () => {
   it("accès ouvert : choix du brief (briefs admis), de la variante et de la nature, obligatoires, sans valeur par défaut", async () => {
     const html = renderToString(await ExecutionsPage());
     expect(html).not.toContain('name="code"');
-    for (const brief of ["edimbourg-1.json", "edimbourg-2.json"]) expect(html).toContain(`name="brief" value="${brief}"`);
-    for (const valeur of ["B", "A"]) expect(html).toContain(`name="variante" value="${valeur}"`);
-    for (const valeur of ["essai", "reel"]) expect(html).toContain(`name="mode" value="${valeur}"`);
-    expect(html).not.toMatch(/checked/);
-    expect(html.match(/type="radio"[^>]*required/g)).toHaveLength(6);
+    // Trois groupes Ligne (radiogroup), aucune option choisie ; champs cachés vides pour l'action.
+    expect(html.match(/role="radiogroup"/g)).toHaveLength(3);
+    for (const libelle of ["edimbourg-1.json", "edimbourg-2.json", t.formulaire.variantes.B, t.formulaire.variantes.A, t.formulaire.modes.essai, t.formulaire.modes.reel]) {
+      expect(html).toContain(html$(libelle));
+    }
+    expect(html.match(/role="radio"/g)).toHaveLength(6);
+    expect(html).not.toContain('aria-checked="true"');
+    for (const nom of ["brief", "variante", "mode"]) expect(html).toContain(`type="hidden" name="${nom}" value=""`);
+    expect(html).not.toMatch(/type="radio"|required/);
     expect(html).toContain(t.formulaire.lancer);
     expect(html).toContain(html$(t.suivi.aucune));
     expect(html.replaceAll("<!-- -->", "")).toContain(`${t.suivi.dernierePurge} : 14 octobre 2026 à 03:00 (UTC)`);
     expect(html).not.toContain("2026-10-14T03:00:00Z");
-    expect(html.match(/type="radio"[^>]*class="size-5 shrink-0 accent-line"/g)).toHaveLength(6);
   });
 
   it("exécution en cours : statut, phase, coût et durée ; aucun rapport", async () => {

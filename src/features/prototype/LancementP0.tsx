@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 
 import { Button } from "@/components/ligne/Button";
+import { SegmentedControl } from "@/components/ligne/SegmentedControl";
 import type { ExecutionSuivie, ModeleLancementP0 } from "@/contracts/prototype-suivi";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -17,18 +18,28 @@ const ETAT_INITIAL: EtatLancementP0 = { statut: "attente" };
 
 /** Bouton pendant le lancement : mêmes couleurs que `disabled:` de `Button`, sans retirer le bouton du focus. */
 const BOUTON_EN_COURS = "aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-ink-soft";
-/**
- * Choix unique : contrôle natif, sélection à la couleur `line` (`accent-line`). Aucun composant Ligne de choix unique
- * n'existe ; décision de forme 0064, point 2.
- */
-const RADIO_CLASS = "size-5 shrink-0 accent-line";
-const OPTION_CLASS = "flex min-h-11 items-center gap-3 text-corps text-ink";
-const LEGENDE_CLASS = "mb-2 text-corps font-bold text-ink";
+const LEGENDE_CLASS = "text-corps font-bold text-ink";
 const TITRE_SECTION_CLASS = "text-section font-extrabold text-ink";
 /** Région d'annonce vide, hors du flux (même règle que les formulaires de création), présente dès l'affichage. */
 const REGION_VIDE_CLASS = "absolute";
 
 const ALERTE_ID = "lancement-alerte";
+
+/** Les trois choix du formulaire, dans l'ordre d'affichage (champ envoyé à l'action, nom du groupe). */
+const CHOIX = ["brief", "variante", "mode"] as const;
+type NomChoix = (typeof CHOIX)[number];
+type Choix = { readonly [N in NomChoix]: string | null };
+const AUCUN_CHOIX: Choix = { brief: null, variante: null, mode: null };
+
+/**
+ * Groupes signalés par un refus `entree_invalide` : ceux qui étaient vides à l'envoi ; tous remplis, le brief (refusé
+ * par le serveur : plus admis ou invalide). Un groupe changé depuis l'envoi n'est plus signalé.
+ */
+function groupesInvalides(envoye: Choix, actuel: Choix): ReadonlySet<NomChoix> {
+  const vides = CHOIX.filter((nom) => envoye[nom] === null);
+  const signales = vides.length > 0 ? vides : (["brief"] as const);
+  return new Set(signales.filter((nom) => actuel[nom] === envoye[nom]));
+}
 
 /** Durée écoulée au format de rédaction de Ligne (« 3 min », « 1 h 05 ») ; moins d'une minute en toutes lettres. */
 function duree(ms: number): string {
@@ -84,24 +95,41 @@ function Execution({ execution }: { execution: ExecutionSuivie }) {
  *
  * - Un seul envoi à la fois (chaque lancement réservé consomme le jour) : un second envoi est ignoré tant que le premier
  *   n'a pas répondu ; le bouton reste focalisable, `aria-disabled`, libellé « Lancement… ».
+ * - Choix : trois `SegmentedControl` Ligne verticaux (décision 0064, point 2), contrôlés, sans choix par défaut
+ *   (`value` nul) ; l'action reçoit des champs cachés `brief`, `variante` et `mode`. Les choix sont gardés après un
+ *   envoi, même refusé (l'état est dans React, pas dans les champs que React 19 réinitialise après l'action).
  * - Annonces (handover § 11) : les régions `status` (lancement accepté, copie) et la région `alert` (refus) sont
- *   présentes dès l'affichage, vides. Choix incomplet (`entree_invalide`) : le refus est relié aux choix
- *   (`aria-invalid`, `aria-describedby`) et le focus passe au premier choix. Autre issue : le focus reste sur le bouton.
+ *   présentes dès l'affichage, vides. Choix incomplet ou refusé (`entree_invalide`, rendu par l'action : aucune
+ *   validation native) : les groupes en cause portent `aria-invalid` et sont décrits par le refus, et le focus passe au
+ *   premier d'entre eux (`groupRef`). Autre issue : le focus reste sur le bouton.
  * - « Actualiser » relit la page côté serveur (`router.refresh()`) sans perdre l'état du formulaire ni le message.
- * - Aucun choix par défaut : brief, variante et nature sont obligatoires (`required`).
  */
 export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
   const [etat, envoyer, enCours] = useActionState(lancerExecutionP0Action, ETAT_INITIAL);
   const router = useRouter();
   const envoiEnVol = useRef(false);
-  const premierChoix = useRef<HTMLInputElement>(null);
+  const [choix, setChoix] = useState<Choix>(AUCUN_CHOIX);
+  // Choix tels qu'envoyés : un refus `entree_invalide` se rapporte à eux.
+  const [envoye, setEnvoye] = useState<Choix>(AUCUN_CHOIX);
+  const groupeBrief = useRef<HTMLDivElement>(null);
+  const groupeVariante = useRef<HTMLDivElement>(null);
+  const groupeMode = useRef<HTMLDivElement>(null);
+  const groupes: Record<NomChoix, RefObject<HTMLDivElement | null>> = { brief: groupeBrief, variante: groupeVariante, mode: groupeMode };
+  const etatTraite = useRef(etat);
   // Copie liée au texte copié : un autre rapport efface le message.
   const [copie, setCopie] = useState<{ readonly texte: string; readonly issue: "copie" | "copieImpossible" } | null>(null);
 
+  const invalides = etat.statut === "entree_invalide" ? groupesInvalides(envoye, choix) : new Set<NomChoix>();
+  const premierInvalide = CHOIX.find((nom) => invalides.has(nom)) ?? null;
+
+  // À chaque réponse de l'action (et seulement alors) : envoi suivant permis, focus au premier groupe en cause.
   useEffect(() => {
+    if (etatTraite.current === etat) return;
+    etatTraite.current = etat;
     envoiEnVol.current = false;
-    if (etat.statut === "entree_invalide") premierChoix.current?.focus();
-  }, [etat]);
+    const groupe = { brief: groupeBrief, variante: groupeVariante, mode: groupeMode };
+    if (premierInvalide !== null) groupe[premierInvalide].current?.focus();
+  }, [etat, premierInvalide]);
 
   const surEnvoi = (evenement: FormEvent<HTMLFormElement>) => {
     if (envoiEnVol.current || enCours) {
@@ -109,6 +137,7 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
       return;
     }
     envoiEnVol.current = true;
+    setEnvoye(choix);
   };
 
   const copier = async (texte: string) => {
@@ -123,8 +152,12 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
   const { suivi, rapport } = modele;
   const accepte = etat.statut === "lancee" ? t.statuts.lancee : null;
   const refus = etat.statut === "attente" || etat.statut === "lancee" ? null : t.statuts[etat.statut];
-  const choixInvalide = etat.statut === "entree_invalide";
-  const attributsChoix = { required: true, "aria-invalid": choixInvalide || undefined, "aria-describedby": choixInvalide ? ALERTE_ID : undefined };
+  const options: Record<NomChoix, { value: string; label: string }[]> = {
+    brief: modele.briefs.map((brief) => ({ value: brief, label: brief })),
+    variante: (["B", "A"] as const).map((variante) => ({ value: variante, label: t.formulaire.variantes[variante] })),
+    mode: (["essai", "reel"] as const).map((mode) => ({ value: mode, label: t.formulaire.modes[mode] })),
+  };
+  const legendes: Record<NomChoix, string> = { brief: t.formulaire.brief, variante: t.formulaire.variante, mode: t.formulaire.mode };
   const copieAffichee = copie !== null && rapport !== null && copie.texte === rapport.texte ? t.rapport[copie.issue] : null;
 
   return (
@@ -142,33 +175,26 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
           <p className="text-corps text-ink">{t.formulaire.aucunBrief}</p>
         ) : (
           <form action={envoyer} onSubmit={surEnvoi} className="flex flex-col gap-6">
-            <fieldset>
-              <legend className={LEGENDE_CLASS}>{t.formulaire.brief}</legend>
-              {modele.briefs.map((brief, rang) => (
-                <label key={brief} className={OPTION_CLASS}>
-                  <input ref={rang === 0 ? premierChoix : undefined} type="radio" name="brief" value={brief} className={RADIO_CLASS} {...attributsChoix} />
-                  {brief}
-                </label>
-              ))}
-            </fieldset>
-            <fieldset>
-              <legend className={LEGENDE_CLASS}>{t.formulaire.variante}</legend>
-              {(["B", "A"] as const).map((variante) => (
-                <label key={variante} className={OPTION_CLASS}>
-                  <input type="radio" name="variante" value={variante} className={RADIO_CLASS} {...attributsChoix} />
-                  {t.formulaire.variantes[variante]}
-                </label>
-              ))}
-            </fieldset>
-            <fieldset>
-              <legend className={LEGENDE_CLASS}>{t.formulaire.mode}</legend>
-              {(["essai", "reel"] as const).map((mode) => (
-                <label key={mode} className={OPTION_CLASS}>
-                  <input type="radio" name="mode" value={mode} className={RADIO_CLASS} {...attributsChoix} />
-                  {t.formulaire.modes[mode]}
-                </label>
-              ))}
-            </fieldset>
+            {CHOIX.map((nom) => (
+              <div key={nom} className="flex flex-col gap-2">
+                <p id={`choix-${nom}-titre`} className={LEGENDE_CLASS}>
+                  {legendes[nom]}
+                </p>
+                <SegmentedControl
+                  id={`choix-${nom}`}
+                  groupRef={groupes[nom]}
+                  orientation="vertical"
+                  label={legendes[nom]}
+                  labelledBy={`choix-${nom}-titre`}
+                  options={options[nom]}
+                  value={choix[nom]}
+                  onChange={(valeur) => setChoix((avant) => ({ ...avant, [nom]: valeur }))}
+                  invalid={invalides.has(nom)}
+                  describedBy={invalides.has(nom) ? ALERTE_ID : undefined}
+                />
+                <input type="hidden" name={nom} value={choix[nom] ?? ""} />
+              </div>
+            ))}
             <Button type="submit" className={`w-full ${BOUTON_EN_COURS}`} aria-disabled={enCours || undefined}>
               {enCours ? t.formulaire.lancement : t.formulaire.lancer}
             </Button>

@@ -26,7 +26,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
  * (`handleCallback` → `consumeMessage` → `processMessage`) ; seule la protection de la plateforme (« Consumer function
  * security ») l'arrête. Critère, fermé : chaque requête est refusée par la plateforme (401 ou 403) ; toute autre réponse
  * fait échouer le relevé, et la Sécurité décide. Sans ces variables, le bloc est ignoré. L'adresse doit être en `https:`
- * sur `*.vercel.app` : contrôlée avant tout envoi du jeton.
+ * sur une préversion du projet : contrôlée avant tout envoi du jeton ; aucune redirection n'est suivie.
  */
 
 const FLUX = "/.well-known/workflow/v1/flow";
@@ -53,11 +53,20 @@ const ENTETES_CLOUDEVENT = {
 
 type Sonde = { readonly nom: string; readonly envoyer: (requete: APIRequestContext, base: string, entetes: Record<string, string>) => ReturnType<APIRequestContext["get"]> };
 
+/** Aucune redirection suivie : le jeton de contournement ne part jamais vers une autre adresse (mineur 6 du head `b85e797`). */
+const SANS_REDIRECTION = { maxRedirects: 0 } as const;
+
 const SONDES: readonly Sonde[] = [
-  { nom: "GET sans en-têtes", envoyer: (r, base, e) => r.get(`${base}${FLUX}`, { headers: e }) },
-  { nom: "POST sans en-têtes", envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { headers: e, data: { runId: RUN_FORGE } }) },
-  { nom: "POST x-vqs-* forgé", envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { headers: { ...e, ...ENTETES_VQS }, data: { runId: RUN_FORGE } }) },
-  { nom: "POST CloudEvent forgé", envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { headers: { ...e, ...ENTETES_CLOUDEVENT }, data: { runId: RUN_FORGE } }) },
+  { nom: "GET sans en-têtes", envoyer: (r, base, e) => r.get(`${base}${FLUX}`, { ...SANS_REDIRECTION, headers: e }) },
+  { nom: "POST sans en-têtes", envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { ...SANS_REDIRECTION, headers: e, data: { runId: RUN_FORGE } }) },
+  {
+    nom: "POST x-vqs-* forgé",
+    envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { ...SANS_REDIRECTION, headers: { ...e, ...ENTETES_VQS }, data: { runId: RUN_FORGE } }),
+  },
+  {
+    nom: "POST CloudEvent forgé",
+    envoyer: (r, base, e) => r.post(`${base}${FLUX}`, { ...SANS_REDIRECTION, headers: { ...e, ...ENTETES_CLOUDEVENT }, data: { runId: RUN_FORGE } }),
+  },
 ];
 
 /** Identifiant de l'action de lancement dans le build servi (manifeste des références serveur de Next). */
@@ -109,8 +118,11 @@ test.describe("p0-flux: build de la CI (monde local, garde fermée)", () => {
 
 /**
  * Origine de la préversion, contrôlée **avant** tout envoi du jeton de contournement (mineur 19 de la revue du head
- * `193603d`) : `https:` et un hôte `*.vercel.app` seulement, sans identifiants ni port ; sinon, erreur sans requête.
+ * `193603d`) : `https:` et un hôte de préversion **du projet** seulement (`vadrouille-…-sams-projects-47a8db3e.vercel.app`,
+ * forme des adresses de préversion relevées dans `docs/releases/` ; mineur 5 du head `b85e797`), sans identifiants ni
+ * port ; sinon, erreur sans requête.
  */
+const HOTE_PREVERSION = /^vadrouille-[a-z0-9]+(?:-[a-z0-9]+)*-sams-projects-47a8db3e\.vercel\.app$/;
 function originePreversion(adresse: string): string {
   let url: URL;
   try {
@@ -118,20 +130,25 @@ function originePreversion(adresse: string): string {
   } catch {
     throw new Error("E2E_P0_REEL_URL : adresse invalide");
   }
-  if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app") || url.hostname === ".vercel.app" || url.username || url.password || url.port) {
-    throw new Error("E2E_P0_REEL_URL : https et *.vercel.app seulement");
+  if (url.protocol !== "https:" || !HOTE_PREVERSION.test(url.hostname) || url.username || url.password || url.port) {
+    throw new Error("E2E_P0_REEL_URL : https et préversion du projet seulement");
   }
   return url.origin;
 }
 
 test("p0-flux: adresse de préversion contrôlée avant l'envoi du jeton (aucune requête)", () => {
-  expect(originePreversion("https://vadrouille-git-p0-reel-x.vercel.app/prototype")).toBe("https://vadrouille-git-p0-reel-x.vercel.app");
+  for (const hote of ["vadrouille-git-p0-reel-sams-projects-47a8db3e.vercel.app", "vadrouille-mh95ppiqd-sams-projects-47a8db3e.vercel.app"]) {
+    expect(originePreversion(`https://${hote}/prototype`)).toBe(`https://${hote}`);
+  }
   for (const adresse of [
-    "http://vadrouille.vercel.app",
+    "https://vadrouille-git-p0-reel-autre-equipe.vercel.app",
+    "https://tiers-sams-projects-47a8db3e.vercel.app",
+    "https://vadrouille-x-sams-projects-47a8db3e.vercel.app.example.com",
+    "http://vadrouille-x-sams-projects-47a8db3e.vercel.app",
     "https://vadrouille.vercel.app.example.com",
     "https://example.com",
-    "https://jeton@vadrouille.vercel.app",
-    "https://vadrouille.vercel.app:8443",
+    "https://jeton@vadrouille-x-sams-projects-47a8db3e.vercel.app",
+    "https://vadrouille-x-sams-projects-47a8db3e.vercel.app:8443",
     "pas une adresse",
   ]) {
     expect(() => originePreversion(adresse), adresse).toThrow(/E2E_P0_REEL_URL/);

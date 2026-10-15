@@ -42,10 +42,18 @@ const modele = (texte = "Rapport A"): ModeleLancementP0 => ({
   rapport: { execution: execution(), criteres: { A1: "non", A2: "non", A3: "non", A4: "non", A5: "non", A6: "non", A7: "non_releve", A8: "non_releve", A9: "non_releve" }, texte },
 });
 
-async function lancer() {
-  for (const nom of ["edimbourg-1.json", t.formulaire.variantes.B, t.formulaire.modes.essai]) fireEvent.click(screen.getByLabelText(nom));
+const groupe = (nom: string) => screen.getByRole("radiogroup", { name: nom });
+
+function choisir(choix: readonly string[] = ["edimbourg-1.json", t.formulaire.variantes.B, t.formulaire.modes.essai]) {
+  for (const nom of choix) fireEvent.click(screen.getByRole("radio", { name: nom }));
+}
+
+async function lancer(choix?: readonly string[]) {
+  choisir(choix);
+  const bouton = screen.getByRole("button", { name: t.formulaire.lancer });
+  bouton.focus();
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: t.formulaire.lancer }));
+    fireEvent.click(bouton);
   });
 }
 
@@ -65,11 +73,21 @@ describe("p0: interface de la page de lancement", () => {
     expect(statuts).toHaveLength(2);
     for (const region of statuts) expect(region).toBeEmptyDOMElement();
     expect(screen.getByRole("alert")).toBeEmptyDOMElement();
-    for (const radio of screen.getAllByRole("radio")) {
-      expect(radio).not.toHaveAttribute("aria-invalid");
-      expect(radio).toHaveClass("accent-line");
-      expect(radio).toBeRequired();
+    // Trois SegmentedControl Ligne verticaux, nommés par leur titre, sans option choisie ni validation native.
+    for (const nom of [t.formulaire.brief, t.formulaire.variante, t.formulaire.mode]) {
+      expect(groupe(nom)).toHaveAttribute("aria-orientation", "vertical");
+      expect(groupe(nom)).not.toHaveAttribute("aria-invalid");
     }
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveAttribute("aria-checked", "false");
+    expect(document.querySelectorAll("input[required], input[type=radio]")).toHaveLength(0);
+  });
+
+  it("choix transmis à l'action par les champs cachés brief, variante et mode", async () => {
+    d.action.mockResolvedValue({ statut: "lancee" });
+    render(<LancementP0 modele={modele()} />);
+    await lancer(["edimbourg-2.json", t.formulaire.variantes.A, t.formulaire.modes.reel]);
+    const donnees = d.action.mock.calls[0]![1] as FormData;
+    expect(Object.fromEntries(donnees.entries())).toEqual({ brief: "edimbourg-2.json", variante: "A", mode: "reel" });
   });
 
   it("lancement accepté : annoncé par `status`, rien dans `alert`", async () => {
@@ -87,20 +105,39 @@ describe("p0: interface de la page de lancement", () => {
     await lancer();
     expect(screen.getByRole("alert")).toHaveTextContent(t.statuts.run_quota_reached);
     for (const region of screen.getAllByRole("status")) expect(region).toBeEmptyDOMElement();
-    expect(screen.getAllByRole("radio")[0]).not.toHaveAttribute("aria-invalid");
+    for (const nom of [t.formulaire.brief, t.formulaire.variante, t.formulaire.mode]) expect(groupe(nom)).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("button", { name: t.formulaire.lancer })).toHaveFocus();
+    // Choix gardés après le refus (composants contrôlés ; React 19 réinitialise le formulaire après l'action).
+    expect(screen.getByRole("radio", { name: "edimbourg-1.json" })).toHaveAttribute("aria-checked", "true");
+    expect(document.querySelector<HTMLInputElement>('input[name="brief"]')?.value).toBe("edimbourg-1.json");
   });
 
-  it("choix incomplet : refus relié à chaque choix (aria-invalid, aria-describedby) ; focus sur le premier choix", async () => {
+  it("choix incomplet : envoyé tel quel, refus `entree_invalide` relié aux seuls groupes vides ; focus sur le premier", async () => {
+    d.action.mockResolvedValue({ statut: "entree_invalide" });
+    render(<LancementP0 modele={modele()} />);
+    await lancer([t.formulaire.variantes.B]);
+    expect(d.action).toHaveBeenCalledTimes(1);
+    const alerte = screen.getByRole("alert");
+    expect(alerte).toHaveTextContent(t.statuts.entree_invalide);
+    for (const nom of [t.formulaire.brief, t.formulaire.mode]) {
+      expect(groupe(nom)).toHaveAttribute("aria-invalid", "true");
+      expect(groupe(nom)).toHaveAttribute("aria-describedby", alerte.id);
+    }
+    expect(groupe(t.formulaire.variante)).not.toHaveAttribute("aria-invalid");
+    expect(groupe(t.formulaire.brief)).toHaveFocus();
+    // Un groupe rempli depuis le refus n'est plus signalé.
+    fireEvent.click(screen.getByRole("radio", { name: "edimbourg-1.json" }));
+    expect(groupe(t.formulaire.brief)).not.toHaveAttribute("aria-invalid");
+    expect(groupe(t.formulaire.mode)).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("choix complet refusé `entree_invalide` (brief plus admis) : le groupe du brief est signalé et reçoit le focus", async () => {
     d.action.mockResolvedValue({ statut: "entree_invalide" });
     render(<LancementP0 modele={modele()} />);
     await lancer();
-    const alerte = screen.getByRole("alert");
-    expect(alerte).toHaveTextContent(t.statuts.entree_invalide);
-    for (const radio of screen.getAllByRole("radio")) {
-      expect(radio).toHaveAttribute("aria-invalid", "true");
-      expect(radio).toHaveAttribute("aria-describedby", alerte.id);
-    }
-    expect(screen.getByLabelText("edimbourg-1.json")).toHaveFocus();
+    expect(groupe(t.formulaire.brief)).toHaveAttribute("aria-invalid", "true");
+    expect(groupe(t.formulaire.variante)).not.toHaveAttribute("aria-invalid");
+    expect(groupe(t.formulaire.brief)).toHaveFocus();
   });
 
   it("« Actualiser » : bouton qui relit la page côté serveur, sans lien ni rechargement", () => {
