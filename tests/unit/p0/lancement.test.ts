@@ -33,6 +33,7 @@ vi.mock("@/server/env/p0", () => ({
   EXCEPTIONS_ENV_P0: [],
   ZONES_ENV_P0: [],
   VERDICTS_ENV_P0: [],
+  DIRECTIVES_ENV_P0: [],
   lireEnvP0: () => {
     d.journal.push("garde");
     return d.ouvert ? { ok: true, jeton: d.jeton } : { ok: false, code: "branch_refused" };
