@@ -61,6 +61,8 @@ Sources lues le 2026-10-14, relues par le Tech Lead le même jour vers 20:25 UTC
 
 ## 5. Diagnostic (TL ; amende 0058 § 3)
 
+> Verdict `contenu_audite` et champ `openssl_conf_directives` ajoutés par 0065 (`docs/decisions/0065-nodejs-conf-runtime-vercel.md`, section 4 points 2 et 3).
+
 1. `DiagnosticSortie` gagne deux champs facultatifs, valeurs prises dans des listes fermées, **jamais** une valeur, une longueur, un condensat ni un préfixe de la valeur. **Exception assumée** : `openssl_conf_zone` est une **classe de racine** du chemin déclaré, prise dans une liste fermée de 7 valeurs ; c'est la seule information sur le chemin qui sorte, et elle ne nomme qu'une des racines déjà écrites dans cette décision, ou `autre`.
    - `openssl_conf_zone` : `dev_null`, `etc`, `usr`, `var_runtime`, `var_lang`, `opt` ou `autre` ; calculée sur la valeur de l'environnement lu, sans accès au système de fichiers ;
    - `openssl_conf_verdict`, **dans cet ordre de priorité** (le premier échec l'emporte) : `hors_preview` (1.1), `env_differente` (1.2), `nom_section_refuse` (1.7, ajouté par la PR de code), `chemin_refuse` (1.3), puis, fichier par fichier dans l'ordre de lecture, `fichier_refuse` (1.4 : absent, illisible, pas un fichier ordinaire, trop grand, chemin réel hors racines), `inclusion_refusee` (1.6, dont les bornes de nombre, de profondeur et d'entrées de dossier), `section_nodejs` (1.5) ; sinon `admis`.

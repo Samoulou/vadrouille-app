@@ -22,8 +22,8 @@ export const LOG_EVENTS = [
   "rate_limit.rows_high",
   "rate_limit.failed",
   // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée ; champ `guard` (code fermé), depuis
-  // 0058 `cause` et `exception`, depuis 0062 `openssl_conf_zone` et `openssl_conf_verdict` (listes fermées, jamais une
-  // valeur).
+  // 0058 `cause` et `exception`, depuis 0062 `openssl_conf_zone` et `openssl_conf_verdict`, depuis 0065
+  // `openssl_conf_directives` (listes fermées, jamais une valeur).
   "p0.guard_closed",
   "log.unknown_event",
 ] as const;
@@ -51,6 +51,11 @@ export type LogFields = {
   readonly openssl_conf_zone?: string;
   /** Verdict fermé de l'examen d'`OPENSSL_CONF` (décision 0062 § 5.1). */
   readonly openssl_conf_verdict?: string;
+  /**
+   * Directives d'un fichier `section_nodejs` (décision 0065 § 4 point 3) : jetons de `LOG_OPENSSL_CONF_DIRECTIVES`,
+   * sans doublon, séparés par `,` ; jamais une valeur, un nom de section ni un nom de groupe.
+   */
+  readonly openssl_conf_directives?: string;
 };
 
 /**
@@ -164,11 +169,51 @@ export const LOG_OPENSSL_CONF_VERDICTS: readonly string[] = [
   "fichier_refuse",
   "inclusion_refusee",
   "section_nodejs",
+  "contenu_audite",
   "admis",
+];
+/**
+ * Jetons admis dans `openssl_conf_directives` (décision 0065 § 4 point 3 et § 5 point 4) : copie de
+ * `DIRECTIVES_OPENSSL_CONF` (`src/server/env/openssl-conf.ts`) ; l'égalité est vérifiée par le test de la garde.
+ */
+export const LOG_OPENSSL_CONF_DIRECTIVES: readonly string[] = [
+  "nodejs_conf",
+  "openssl_conf",
+  "ssl_conf",
+  "system_default",
+  "providers",
+  "alg_section",
+  "default_properties",
+  "engines",
+  "random",
+  "activate",
+  "module",
+  "minprotocol",
+  "maxprotocol",
+  "protocol",
+  "cipherstring",
+  "ciphersuites",
+  "options",
+  "verifymode",
+  "verifycafile",
+  "verifycapath",
+  "verifycastore",
+  "chaincafile",
+  "chaincapath",
+  "chaincastore",
+  "requestcafile",
+  "signaturealgorithms",
+  "clientsignaturealgorithms",
+  "groups_admis",
+  "groups_autres",
+  "include",
+  "pragma",
+  "autre",
 ];
 const EXCEPTIONS: ReadonlySet<string> = new Set(LOG_EXIT_EXCEPTIONS);
 const ZONES_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_ZONES);
 const VERDICTS_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_VERDICTS);
+const DIRECTIVES_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_DIRECTIVES);
 const ENVIRONNEMENTS = new Set(["local", "ci", "staging", "production"]);
 const CODES: ReadonlySet<string> = new Set(API_ERROR_CODES);
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
@@ -176,6 +221,16 @@ const NOM_ERREUR = /^[A-Za-z]{1,40}$/;
 
 const entierPositif = (valeur: unknown): valeur is number => typeof valeur === "number" && Number.isSafeInteger(valeur) && valeur >= 0;
 const chaine = (valeur: unknown): valeur is string => typeof valeur === "string";
+
+/**
+ * `openssl_conf_directives` (0065 § 5 point 4) : forme `jeton(,jeton)*`, chaque jeton dans la liste fermée, sans
+ * doublon. Toute autre valeur (chaîne vide comprise) est retirée.
+ */
+function directivesAdmises(valeur: unknown): boolean {
+  if (!chaine(valeur) || !/^[a-z_]+(?:,[a-z_]+)*$/.test(valeur)) return false;
+  const jetons = valeur.split(",");
+  return new Set(jetons).size === jetons.length && jetons.every((jeton) => DIRECTIVES_OPENSSL.has(jeton));
+}
 
 /** Contrôle de chaque champ admis ; tout autre champ est retiré. */
 const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<keyof LogFields, (valeur: unknown) => boolean>([
@@ -192,6 +247,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["exception", (v) => chaine(v) && EXCEPTIONS.has(v)],
   ["openssl_conf_zone", (v) => chaine(v) && ZONES_OPENSSL.has(v)],
   ["openssl_conf_verdict", (v) => chaine(v) && VERDICTS_OPENSSL.has(v)],
+  ["openssl_conf_directives", directivesAdmises],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

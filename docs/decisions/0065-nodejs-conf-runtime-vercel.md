@@ -2,7 +2,7 @@
 
 Statut : décision déléguée, proposée (architecture, outillage et tests : Tech Lead, « Qui décide quoi » de `docs/CONTEXT.md`). **L'admission de la section 4 n'est effective qu'après l'avis de la Sécurité** (0055 S-1 point 4 : une garde toujours fermée n'est pas corrigée par l'assouplissement d'une condition sans nouvel avis ; même forme que 0058 et 0062). La section 5 est une analyse du Tech Lead, **pas** un avis de la Sécurité ; cet avis est rendu au plus tard à la revue de la PR de code (section 6), qui ne peut pas être fusionnée sans lui. À lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel **2 jours après sa fusion**. Aucune dépense, aucun compte externe, aucune donnée personnelle : rien n'est réservé à Samuel.
 
-Date : 2026-10-15 · Décideur : Tech Lead · Avis de la Sécurité : à rendre (section 5) · Ticket #359 · Complète 0062 (section 4, condition 1.5 ; section 5.1) et corrige la conclusion de 0062 § 2. Ce diff ajoute une ligne de renvoi en tête de 0062 § 2 ; la PR de code ajoute celle de 0062 § 5.1 (section 6 point 6).
+Date : 2026-10-15 · Décideur : Tech Lead · Avis de la Sécurité : rendu le 2026-10-15, acceptée avec réserves (section 5, « Avis de la Sécurité ») · Ticket #359 · Complète 0062 (section 4, condition 1.5 ; section 5.1) et corrige la conclusion de 0062 § 2. Ce diff ajoute une ligne de renvoi en tête de 0062 § 2 ; la PR de code ajoute celle de 0062 § 5.1 (section 6 point 6).
 
 ## 1. Constat
 
@@ -109,6 +109,16 @@ _Rédigée par le **Tech Lead**, auteur de cette décision, en suivant la grille
 5. **Condition proposée (dépendances)** : aucune bibliothèque, aucun import nouveau dans `src/server/env/` ; aucune ligne nouvelle du régime de confinement. Le contenu audité est une constante du module `openssl-conf.ts`.
 6. **Condition proposée (échec fermé)** : toute erreur pendant le calcul des directives est rattrapée : le verdict reste `section_nodejs` et le champ est absent.
 
+### Avis de la Sécurité (0055 S-1 point 4)
+
+Rendu dans la revue consolidée de la PR de code #364, head `e7fe172`, 2026-10-15 06:04 UTC ; consigné ici par la PR de code (bloquant 3 de cette revue).
+
+1. **Verdict** : section 5 **acceptée avec réserves**. Aucun bloquant de code ; le code est conforme à la section 4 et à la section 6 points 1 à 4 (égalité octet à octet au niveau 0 seulement, liste fermée et filtre du journal, échec fermé, exception limitée à la préversion, aucun import nouveau).
+2. **Risque (d) accepté**, l'absence de protection post-quantique des sessions : acceptable en préversion de `p0-reel` **seulement**. À rouvrir avant la mise en public (0034, point 1) et à chaque changement de version du runtime ou de Node. La décision reste celle du Tech Lead ; la Sécurité conseille seulement.
+3. **Écart « Web Crypto dans le test »** accepté : le SHA-256 de la constante est calculé par `crypto.subtle` (global, sans import), parce que le régime de confinement refuse l'import de `node:crypto` dans `src/server/env/` et que la section 5 point 5 n'ajoute aucune ligne.
+4. **Fenêtre de course `lstat` / lecture** : entre le contrôle du fichier et sa lecture, le fichier peut changer ; c'est le risque résiduel (b) de 0062 § 6 (le fichier examiné peut ne pas être celui que Node a chargé), que l'égalité d'octets n'aggrave pas. Accepté dans le même cadre.
+5. **Provenance du fichier de 505 octets** (image `aws/aws-lambda-base-images`, branche `nodejs24.x`, section 2 point 1) : non vérifiable hors ligne par les relecteurs, **tenue pour hypothèse**, avec échec fermé (un autre fichier laisse `section_nodejs`). Le relevé de la section 7 en est le contrôle de fait.
+
 ## 6. Code attendu (petit ticket de code, rôle back ou secu)
 
 1. **`src/server/env/openssl-conf.ts`** : constante `CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24` (les 505 octets de la section 2 point 1, avec en commentaire la source, la couche, la version `24.21.0-6ac9237d` et le SHA-256) ; dans `examinerCible`, **au niveau 0 seulement**, après les contrôles existants (chemin réel, fichier ordinaire, taille, octet nul) et avant `analyserTexteOpensslConf`, égalité octet à octet au sens de la section 4 point 1 (`Buffer.equals` ou équivalent strict, jamais un texte décodé en UTF-8) → `contenu_audite`. `contenu_audite` ajouté à `VERDICTS_OPENSSL_CONF` entre `section_nodejs` et `admis`. Fonction pure `directivesOpensslConf(texte): string` (section 4 point 3) ; `examinerOpensslConf` rend `directives` avec le verdict `section_nodejs` seulement.
@@ -123,13 +133,15 @@ _Rédigée par le **Tech Lead**, auteur de cette décision, en suivant la grille
 
 ## 7. Relevé suivant (Sécurité, après l'avis, la fusion du code et une nouvelle mise à jour de `p0-reel` par Samuel)
 
+> Puce « `section_nodejs` sans `openssl_conf_directives` » amendée par la PR de code #364 (bloquant 2 de la revue du head `e7fe172`) : un fichier sans aucune directive ne transmet pas de chaîne vide, le champ est absent.
+
 Ouvrir la page de saisie de la préversion de `p0-reel`, lire la ligne `p0.guard_closed` (ou son absence), en noms et codes seulement :
 
 - un autre code avec `exception: "vercel_runtime_openssl_conf"` : le fichier est celui audité ; le relevé continue avec les étapes de 0062 § 8 (`ci_refused`, `branch_refused`, `VERCEL_ENV`, condition 6 de 0055) ;
 - `section_nodejs` avec `openssl_conf_directives` :
   - exactement `groups_admis,nodejs_conf,ssl_conf,system_default` : même forme, contenu différent (autre version du runtime) ; nouvelle décision courte, règle structurelle (section 4 point 6), avec avis Sécurité ;
   - tout autre jeton : la directive en cause est nommée ; nouvelle décision selon la section 3 (refus par défaut) ;
-- `section_nodejs` sans `openssl_conf_directives` : le calcul a échoué (section 5 point 6) ; ticket de code ;
+- `section_nodejs` sans `openssl_conf_directives` : soit le calcul a échoué (section 5 point 6), soit le fichier ne contient aucune directive (par exemple `nodejs_conf` seulement en commentaire ou en en-tête de section : la chaîne vide n'est jamais transmise) ; ticket de code seulement si le fichier est reconnu autrement ;
 - un autre verdict ou une autre `cause` : lecture de 0062 § 8, inchangée.
 
 ## Questions ouvertes
