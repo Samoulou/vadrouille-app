@@ -127,6 +127,13 @@ const APPEL_PSQL =
 
 // --- Contrôle statique -----------------------------------------------------------------------------------------
 
+/**
+ * Contrôle de chiffrement côté client (décision 0067, amendement de 0056 § 2.6.2) : il remplace le contrôle
+ * `pg_stat_ssl`, aveugle derrière le proxy de Neon. Une ligne, avant toute connexion ; aucun texte SQL ne lit `pg_stat_ssl`.
+ */
+/** Les six variables PG* de l'étape, dans l'ordre où bash les rend (`${!PG*}` : ordre alphabétique). */
+const LISTE_PG = [...ENV_ATTENDU.filter((k) => k.startsWith("PG"))].sort().join(" ");
+const CHIFFREMENT = `if [[ "\${!PG*}" != "${LISTE_PG}" || $PGSSLMODE != verify-full || $PGSSLROOTCERT != system ]]; then refus "chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full"; fi`;
 const COMMANDES_ADMISES = new Set([
   "set",
   "refus",
@@ -212,7 +219,12 @@ function ecartsReleve(texte: string): string[] {
   if (et.brut.SQL_BEGIN !== '"BEGIN TRANSACTION READ ONLY"') e.add("lecture-seule");
   if (et.brut.SQL_SET !== '"SET search_path = pg_catalog, pg_temp"') e.add("chemin");
   const doBloc = et.env.SQL_DO ?? "";
-  if (!/^DO \$\$/.test(doBloc) || !doBloc.includes("session_user <> 'vadrouille_prototype_purge'") || !doBloc.includes("rolbypassrls") || !doBloc.includes("pg_catalog.pg_stat_ssl")) e.add("controle-role");
+  if (!/^DO \$\$/.test(doBloc) || !doBloc.includes("session_user <> 'vadrouille_prototype_purge'") || !doBloc.includes("r.rolsuper OR r.rolbypassrls")) e.add("controle-role");
+  // Chiffrement (0067) : contrôle côté client unique, avant la première connexion ; plus aucun contrôle pg_stat_ssl.
+  const iChiffrement = runCode.indexOf(CHIFFREMENT);
+  const iPremiereConnexion = runCode.indexOf("psql -X -v ON_ERROR_STOP=1");
+  if (runCode.split("\n").filter((l) => l.trim() === CHIFFREMENT).length !== 1 || runCode.split(CHIFFREMENT).length !== 2 || iChiffrement < 0 || iPremiereConnexion < 0 || iChiffrement > iPremiereConnexion) e.add("chiffrement");
+  if (Object.entries(et.env).some(([k, v]) => k.startsWith("SQL_") && v.includes("pg_stat_ssl"))) e.add("ssl-serveur");
   for (const colonne of COLONNES_CONTROLE) if (!doBloc.includes(`${colonne} ~ '[[:cntrl:]|]'`)) e.add("controle-caracteres");
   const requetes = [et.env.SQL_R1, et.env.SQL_R2, et.env.SQL_R3, et.env.SQL_R4, et.env.SQL_R5, et.env.SQL_R6, et.env.SQL_R7, et.env.SQL_R8];
   for (const [i, requete] of requetes.entries()) {
@@ -295,6 +307,13 @@ const MUTATIONS: [string, string, string, string][] = [
   ["valeur de PGHOST affichée", 'refus "PGHOST hors forme"', 'refus "PGHOST hors forme : $PGHOST"', "valeur-affichee"],
   ["valeur de PGDATABASE affichée", 'refus "PGDATABASE hors forme"', 'refus "PGDATABASE hors forme : ${PGDATABASE:0:3}"', "valeur-affichee"],
   ["affichage de l'environnement", "          set -u\n", "          set -u\n          printenv\n", "commande-interdite"],
+  ["contrôle de rôle sans rolbypassrls", "r.rolsuper OR r.rolbypassrls", "r.rolsuper", "controle-role"],
+  ["contrôle de chiffrement absent", `          ${CHIFFREMENT}\n`, "", "chiffrement"],
+  ["contrôle de chiffrement doublé", `          ${CHIFFREMENT}\n`, `          ${CHIFFREMENT}\n          ${CHIFFREMENT}\n`, "chiffrement"],
+  ["chiffrement : PGSSLMODE require admis", "$PGSSLMODE != verify-full", "$PGSSLMODE == disable", "chiffrement"],
+  ["chiffrement : PGSSLROOTCERT non contrôlé", " || $PGSSLROOTCERT != system ]]", " ]]", "chiffrement"],
+  ["chiffrement : PGSERVICE admis", `"${LISTE_PG}"`, `"${LISTE_PG} PGSERVICE"`, "chiffrement"],
+  ["contrôle pg_stat_ssl réintroduit", "RAISE EXCEPTION 'rôle privilégié'; END IF;", "RAISE EXCEPTION 'rôle privilégié'; END IF;\n              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;", "ssl-serveur"],
 ];
 
 describe("ci: workflow db-releve conforme à 0057", () => {
@@ -383,8 +402,13 @@ function jouer(contenu: string, options: { code?: number; env?: Record<string, s
   const debut = Date.now();
   const r = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", script], {
     env: envBash({
+      // Les six variables PG* de l'étape (contrôle de chiffrement côté client, décision 0067) ; aucune n'est un secret.
+      ...Object.fromEntries(LISTE_PG.split(" ").map((k) => [k, "x"])),
       PGHOST: "db.exemple.invalid",
       PGDATABASE: "base",
+      PGUSER: "vadrouille_prototype_purge",
+      PGSSLMODE: "verify-full",
+      PGSSLROOTCERT: "system",
       RUNNER_TEMP: dossier,
       FICHIER_PREPARE: prepare,
       CODE_PREPARE: String(options.code ?? 0),

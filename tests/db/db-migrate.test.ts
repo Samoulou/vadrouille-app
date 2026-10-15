@@ -413,11 +413,12 @@ describe("db-migrate : application, échecs et lots (0056 § 2.6.4)", () => {
     expect(await existe(base, "vadrouille_migrations.t_suivante")).toBe(false);
   });
 
-  it("contrôle ssl gardé : refusé sans chiffrement (serveur de la CI), rien n'est créé", async () => {
+  it("contrôle de chiffrement gardé : refusé sans connexion (PGSSLMODE=disable, PGPORT), rien n'est créé (0067)", async () => {
     const base = await creerBase("dm_ssl");
     const r = migrer({ base, liste: LISTE_JOURNAL, garderSsl: true });
     expect(r.code).toBe(1);
-    expect(r.sortie).toMatch(/Échec : connexion, rôle ou journal ; code de sortie 1 ; SQLSTATE P0001/);
+    expect(r.sortie).toMatch(/Échec : chiffrement : variables PG\* hors liste, ou PGSSLMODE autre que verify-full/);
+    expect(r.sortie).not.toMatch(/connexion, rôle ou journal/);
     expect(await journal(base)).toBeNull();
   });
 

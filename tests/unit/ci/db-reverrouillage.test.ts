@@ -52,6 +52,13 @@ const COMMANDES_ADMISES = new Set([
   "realpath",
   "psql",
 ]);
+/**
+ * Contrôle de chiffrement côté client (décision 0067, amendement de 0056 § 2.6.2) : il remplace le contrôle
+ * `pg_stat_ssl`, aveugle derrière le proxy de Neon. Une ligne, avant toute connexion ; aucun texte SQL ne lit `pg_stat_ssl`.
+ */
+/** Les six variables PG* de l'étape, dans l'ordre où bash les rend (`${!PG*}` : ordre alphabétique). */
+const LISTE_PG = [...ENV_PG].sort().join(" ");
+const CHIFFREMENT = `if [[ "\${!PG*}" != "${LISTE_PG}" || $PGSSLMODE != verify-full || $PGSSLROOTCERT != system ]]; then echec "chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full"; fi`;
 const RETRAIT =
   'psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -c "$SQL_DELAIS" -c "BEGIN" -c "$SQL_VERROU" -c "$SQL_REPERE" -c "$texte" ' +
   '-c "$SQL_APRES_CHEMIN" -c "$SQL_APRES" -c "COMMIT" -c "$SQL_SESSION" -c "$SQL_CONTROLE" > "$sortie" 2>&1 || code=$?';
@@ -171,7 +178,12 @@ function ecartsReverrouillage(texte: string): string[] {
   if (iLecture < 0 || run.split(LECTURE).length !== 2) e.add("controle-nul");
   if (run.split("\n").filter((l) => /<\s*"\$f"|\$\(<|\bcat\b/.test(l)).length !== 1) e.add("relecture");
   for (const k of ["SQL_ROLE", "SQL_APRES", "SQL_CONTROLE"]) if (!/^DO \$\$\nBEGIN\n/.test(et.env[k] ?? "")) e.add("controle-do");
-  if (!(et.env.SQL_ROLE ?? "").includes("pg_catalog.pg_stat_ssl") || !(et.env.SQL_ROLE ?? "").includes("rolbypassrls")) e.add("controle-do");
+  if (!(et.env.SQL_ROLE ?? "").includes("r.rolsuper OR r.rolbypassrls")) e.add("controle-do");
+  // Chiffrement (0067) : contrôle côté client unique, avant la première connexion ; plus aucun contrôle pg_stat_ssl.
+  const iChiffrement = run.indexOf(CHIFFREMENT);
+  const iPremiereConnexion = run.indexOf("psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -q");
+  if (run.split("\n").filter((l) => l.trim() === CHIFFREMENT).length !== 1 || run.split(CHIFFREMENT).length !== 2 || iChiffrement < 0 || iPremiereConnexion < 0 || iChiffrement > iPremiereConnexion) e.add("chiffrement");
+  if (Object.entries(et.env).some(([k, v]) => k.startsWith("SQL_") && v.includes("pg_stat_ssl"))) e.add("ssl-serveur");
   if (!(et.env.SQL_APRES ?? "").includes("pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text")) e.add("controle-do");
   if (!(et.env.SQL_APRES ?? "").includes("current_setting('session_replication_role') <> 'origin'")) e.add("controle-do");
   if (!(et.env.SQL_APRES ?? "").includes("IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION")) e.add("controle-do");
@@ -256,7 +268,13 @@ const MUTATIONS: [string, string, string, string][] = [
   ["contrôle NUL absent", LECTURE, `IFS= read -r -d '' texte < "$f" || true`, "controle-nul"],
   ["contrôle NUL écrit autrement", LECTURE, `if read -d '' -r texte < "$f"; then echec "texte figé : octet NUL"; fi`, "controle-nul"],
   ["contrôle de rôle en -c SELECT", "SQL_APRES: |\n            DO $$", "SQL_APRES: |\n            SELECT 1; DO $$", "controle-do"],
-  ["contrôle de connexion sans ssl", "pg_catalog.pg_stat_ssl s", "pg_catalog.pg_stat_activity s", "controle-do"],
+  ["contrôle de rôle sans rolbypassrls", "r.rolsuper OR r.rolbypassrls", "r.rolsuper", "controle-do"],
+  ["contrôle de chiffrement absent", `          ${CHIFFREMENT}\n`, "", "chiffrement"],
+  ["contrôle de chiffrement doublé", `          ${CHIFFREMENT}\n`, `          ${CHIFFREMENT}\n          ${CHIFFREMENT}\n`, "chiffrement"],
+  ["chiffrement : PGSSLMODE require admis", "$PGSSLMODE != verify-full", "$PGSSLMODE == disable", "chiffrement"],
+  ["chiffrement : PGSSLROOTCERT non contrôlé", " || $PGSSLROOTCERT != system ]]", " ]]", "chiffrement"],
+  ["chiffrement : PGSERVICE admis", `"${LISTE_PG}"`, `"${LISTE_PG} PGSERVICE"`, "chiffrement"],
+  ["contrôle pg_stat_ssl réintroduit", "RAISE EXCEPTION 'rôle privilégié'; END IF;", "RAISE EXCEPTION 'rôle privilégié'; END IF;\n              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;", "ssl-serveur"],
   ["repère de transaction non contrôlé", "IS DISTINCT FROM pg_catalog.txid_current()::text", "IS NULL", "controle-do"],
   ["lock_timeout absent", `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`, `"SET statement_timeout = '5min'"`, "delais"],
   ["statement_timeout absent", `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`, `"SET lock_timeout = '10s'"`, "delais"],

@@ -144,12 +144,13 @@ describe("ci: db-reverrouillage retire l'EXECUTE de vadrouille_prototype (0056 �
     expect(await appartenancesResiduelles(base)).toBe(0);
   });
 
-  it("contrôle de connexion gardé : refusé sans chiffrement (serveur de la CI), droit inchangé", async () => {
+  it("contrôle de chiffrement gardé : refusé sans connexion (PGSSLMODE=disable, PGPORT), droit inchangé (0067)", async () => {
     const base = await baseMigree("dr_ssl");
     await accorder(base);
     const r = reverrouiller({ base, garderSsl: true });
     expect(r.code).toBe(1);
-    expect(r.sortie).toMatch(/Échec : connexion ou rôle ; code de sortie 1 ; SQLSTATE P0001/);
+    expect(r.sortie).toMatch(/Échec : chiffrement : variables PG\* hors liste, ou PGSSLMODE autre que verify-full/);
+    expect(r.sortie).not.toMatch(/connexion ou rôle/);
     expect(await privileges(base)).toEqual(deverrouille);
   });
 });
