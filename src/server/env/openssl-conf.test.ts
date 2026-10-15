@@ -386,6 +386,17 @@ describe("openssl-conf: contenu audité du runtime Lambda nodejs24.x (0065 § 4 
     expect(verdict(RUNTIME, { [RUNTIME]: texte })).toBe("section_nodejs");
   });
 
+  it("octet 0x80 (non UTF-8) à la place d'un caractère du commentaire, ou ajouté : section_nodejs", () => {
+    const audite = new TextEncoder().encode(AUDITE);
+    const remplace = Uint8Array.from(audite);
+    remplace[2] = 0x80; // « # O… » : le « O » du commentaire de tête.
+    const ajoute = Uint8Array.from([...audite, 0x80]);
+    for (const octets of [remplace, ajoute]) {
+      const fs = { ...fauxFs({ [RUNTIME]: AUDITE }), readFileSync: () => octets };
+      expect(examinerOpensslConf(RUNTIME, fs).verdict).toBe("section_nodejs");
+    }
+  });
+
   it("contenu audité comme inclusion d'un autre fichier : section_nodejs (niveau 0 seulement)", () => {
     expect(verdict("/etc/a.cnf", { "/etc/a.cnf": `.include ${RUNTIME}\n`, [RUNTIME]: AUDITE })).toBe("section_nodejs");
     expect(verdict("/etc/a.cnf", { "/etc/a.cnf": ".include /etc/d\n", "/etc/d": ["x.cnf"], "/etc/d/x.cnf": AUDITE })).toBe("section_nodejs");
@@ -421,11 +432,16 @@ describe("openssl-conf: diagnostic des directives (0065 § 4 point 3)", () => {
     ["Curves hors liste", "curves = P-256\n", "groups_autres"],
     ["groupe vide", "Groups = X25519::X448\n", "groups_autres"],
     ["groupe préfixé", "Groups = ?X25519\n", "groups_autres"],
+    ["casse différente", "Groups = x25519\n", "groups_autres"],
+    ["groupe hors liste ffdhe1536", "Groups = ffdhe1536\n", "groups_autres"],
+    ["variable", "Groups = $g\n", "groups_autres"],
+    ["séparateur doublé", "Groups = X25519::secp256r1\n", "groups_autres"],
     ["VerifyCAFile", "VerifyCAFile = /tmp/ca.pem\n", "verifycafile"],
     ["CipherString", "CipherString = DEFAULT@SECLEVEL=0\n", "cipherstring"],
     ["providers", "providers = prov\n", "providers"],
     ["clé inconnue", "inconnue = x\n", "autre"],
     ["ligne sans =", "rien\n", "autre"],
+    ["clé vide", "= x\n", "autre"],
     ["clé avec blancs et casse", " Min Protocol = TLSv1.3\n", "minprotocol"],
     [".include", ".include /etc/x.cnf\n", "include"],
     [".include=", ".include=/etc/x.cnf\n", "include"],
