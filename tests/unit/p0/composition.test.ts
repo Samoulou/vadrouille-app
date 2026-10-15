@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { DEBUT_DONNEES } from "@/ai/requetes";
 import { lireTour } from "@/ai/sorties";
+import type { EntreeNotation, NoterCandidats } from "@/ai/noter-candidats";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -257,17 +258,32 @@ describe("p0: port de consommation isolé", () => {
 // --- Séparation des capacités (0055 § 3 point 5) ---------------------------------------------------------------------
 
 describe("p0: séparation des capacités de la composition (types)", () => {
-  it("agent : modèles, recherche web et pages ; ancrage : textSearch et detailsLogement ; étape finale : places (fiches), routes, redigerRaisons", () => {
+  it("agent : modèles, recherche web et pages ; ancrage : textSearch et detailsLogement ; étape finale : places (fiches), routes, detailsLogement, noterCandidats, redigerRaisons", () => {
     expectTypeOf<keyof CapacitesAgent>().toEqualTypeOf<"modeles" | "rechercheWeb" | "pages">();
     expectTypeOf<CapacitesAgent["modeles"]>().toEqualTypeOf<ClientModeles>();
     expectTypeOf<CapacitesAgent["rechercheWeb"]>().toEqualTypeOf<ClientRechercheWeb>();
     expectTypeOf<CapacitesAgent["pages"]>().toEqualTypeOf<LecteurPages>();
     expectTypeOf<keyof CapacitesAncrage>().toEqualTypeOf<"textSearch" | "detailsLogement">();
-    expectTypeOf<keyof CapacitesEtapeFinale>().toEqualTypeOf<"places" | "routes" | "redigerRaisons">();
+    expectTypeOf<keyof CapacitesEtapeFinale>().toEqualTypeOf<"places" | "routes" | "detailsLogement" | "noterCandidats" | "redigerRaisons">();
     expectTypeOf<CapacitesEtapeFinale["places"]>().toEqualTypeOf<Pick<ClientPlaces, "details">>();
     expectTypeOf<keyof CapacitesEtapeFinale["places"]>().toEqualTypeOf<"details">();
     expectTypeOf<CapacitesEtapeFinale["routes"]>().toEqualTypeOf<ClientRoutes>();
     expectTypeOf<CapacitesEtapeFinale["redigerRaisons"]>().toEqualTypeOf<RedigerRaisons>();
+    // Amendement A3 de 0055 § 3 point 5 (P0r3c-5) : la notation et la relecture du logement passent à l'étape finale,
+    // qui ne reçoit toujours ni client de modèles, ni recherche web, ni pages, ni textSearch libre.
+    expectTypeOf<CapacitesEtapeFinale["noterCandidats"]>().toEqualTypeOf<NoterCandidats>();
+    expectTypeOf<CapacitesEtapeFinale["detailsLogement"]>().toEqualTypeOf<CapacitesAncrage["detailsLogement"]>();
+    expectTypeOf<CapacitesEtapeFinale>().not.toHaveProperty("modeles");
+    expectTypeOf<CapacitesEtapeFinale>().not.toHaveProperty("textSearch");
+  });
+
+  it("notation des candidats : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
+    expectTypeOf<keyof EntreeNotation>().toEqualTypeOf<"brief" | "lot">();
+    type Lieu = EntreeNotation["lot"][number];
+    expectTypeOf<Lieu>().not.toHaveProperty("placeId");
+    expectTypeOf<Lieu>().not.toHaveProperty("position");
+    expectTypeOf<Lieu>().not.toHaveProperty("statut");
+    expectTypeOf<Lieu>().not.toHaveProperty("horaires");
   });
 
   it("rédaction des raisons : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
@@ -338,6 +354,7 @@ function monter(reponses: (() => Promise<Response>)[]) {
     modeles: {
       routage: { data_collection: "deny" },
       rechercheWeb: { modele: "fournisseur/recherche-test", moteur: "exa", maxResultats: 3 },
+      notation: { modele: "fournisseur/notation-test" },
       raisons: { modele: "fournisseur/raisons-test" },
     },
     horloge,
@@ -432,7 +449,7 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
       plafonds: [],
       coutEstimeModelesMicros: 1,
       coutEstimeRechercheWebMicros: 1,
-      modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "deepseek/x", moteur: "native" as const, maxResultats: 3 }, raisons: { modele: "fournisseur/r" } },
+      modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "deepseek/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" } },
     };
     expect(() => composerP0Reel(GARDE, options)).toThrow(RangeError);
     expect(() => composerP0Reel(GARDE, { ...options, modeles: { ...options.modeles, rechercheWeb: { modele: "openai/x", moteur: "exa", maxResultats: 3 } } })).toThrow(RangeError);
@@ -456,10 +473,10 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
 
   it("ancrage et étape finale : exactement leurs capacités à l'exécution", async () => {
     cles.google.present = true;
-    const { composition, appels } = monter([async () => reponseModele({ content: '{"raisons":[]}' })]);
+    const { composition, appels } = monter([async () => reponseModele({ content: '{"raisons":[]}' }), async () => reponseModele({ content: '{"notes":[]}' })]);
     expect(Object.keys(composition.ancrage()).sort()).toEqual(["detailsLogement", "textSearch"]);
     const finale = composition.etapeFinale();
-    expect(Object.keys(finale).sort()).toEqual(["places", "redigerRaisons", "routes"]);
+    expect(Object.keys(finale).sort()).toEqual(["detailsLogement", "noterCandidats", "places", "redigerRaisons", "routes"]);
     expect(Object.keys(finale.places)).toEqual(["details"]);
     expect(Object.keys(finale.routes)).toEqual(["matrice"]);
     // La rédaction des raisons passe par le client de modèles réel, sans greffon, avec le modèle des raisons.
@@ -468,6 +485,11 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
     expect(corps.model).toBe("fournisseur/raisons-test");
     expect(corps.plugins).toBeUndefined();
+    // La notation aussi : client de modèles réel, sans greffon, avec le modèle de la notation (amendement A3 de 0055).
+    await finale.noterCandidats({ brief, lot: [] });
+    const notation = JSON.parse(String(appels[1]?.init.body)) as Record<string, unknown>;
+    expect(notation.model).toBe("fournisseur/notation-test");
+    expect(notation.plugins).toBeUndefined();
   });
 });
 

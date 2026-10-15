@@ -82,3 +82,53 @@ export function ordreVolOiseau<T extends { readonly position: Coordonnees }>(dep
   }
   return ordre;
 }
+
+/** Demande d'un jour par type de créneau, et nombre de lieux que sa matrice Routes admet en plus de ses logements. */
+export type JourARegrouper<K extends string> = { readonly demande: Readonly<Record<K, number>>; readonly capacite: number };
+
+/**
+ * Regroupement par jour à vol d'oiseau (0053, amendement 1, point 4 ; 0055 § 6 point 4, « après les fiches ») : sur les
+ * positions des fiches de l'étape finale, avant Routes, qui ne sert qu'à l'ordre final. Jour après jour : le premier
+ * lieu restant (ordre d'entrée, celui du classement) ouvre le jour ; puis, tant qu'un type reste demandé et que la
+ * capacité du jour le permet, le lieu restant le plus proche à vol d'oiseau du premier, d'un type encore demandé
+ * (égalité : ordre d'entrée). Aucun lieu n'est mis dans deux jours ; un lieu non regroupé n'est pas planifié. Module
+ * pur : les positions ne sortent pas d'ici, seuls les identifiants sont rendus.
+ */
+export function regrouperParJour<K extends string, T extends { readonly id: string; readonly type: K; readonly position: Coordonnees }>(
+  lieux: readonly T[],
+  jours: readonly JourARegrouper<K>[],
+): string[][] {
+  const restants = [...lieux];
+  return jours.map(({ demande, capacite }) => {
+    const reste = new Map<K, number>(Object.entries(demande) as [K, number][]);
+    const voulu = (lieu: T) => (reste.get(lieu.type) ?? 0) > 0;
+    const groupe: string[] = [];
+    const prendre = (indice: number) => {
+      const [lieu] = restants.splice(indice, 1);
+      if (lieu === undefined) return undefined;
+      reste.set(lieu.type, (reste.get(lieu.type) ?? 0) - 1);
+      groupe.push(lieu.id);
+      return lieu;
+    };
+    if (capacite <= 0) return groupe;
+    const premierIndice = restants.findIndex(voulu);
+    if (premierIndice < 0) return groupe;
+    const premier = prendre(premierIndice);
+    if (premier === undefined) return groupe;
+    while (groupe.length < capacite) {
+      let meilleur = -1;
+      let distance = Number.POSITIVE_INFINITY;
+      restants.forEach((lieu, indice) => {
+        if (!voulu(lieu)) return;
+        const d = distanceVolOiseauMetres(premier.position, lieu.position);
+        if (d < distance) {
+          distance = d;
+          meilleur = indice;
+        }
+      });
+      if (meilleur < 0) break;
+      prendre(meilleur);
+    }
+    return groupe;
+  });
+}

@@ -178,6 +178,19 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif: `${PROTOTYPE_PUR} ; égalité de la longueur des requêtes web et du plan, sans recopier la valeur (mineur 10 de la PR 326)`,
   },
   { fichier: "src/ai/recherche-web-reelle.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
+  // P0r3c-5 (ticket 352) : capacité de notation de l'étape finale (réponse 1 du Tech Lead à la revue de la PR 348 ;
+  // amendement A3 de 0055 § 3 point 5). Verdict Sécurité demandé dans la PR du ticket 352.
+  {
+    fichier: "src/ai/noter-candidats.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-5 (ticket 352), amendement A3 de 0055 § 3 point 5 ; verdict Sécurité demandé (PR du ticket 352)",
+  },
+  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
+  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
   { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },

@@ -3,6 +3,7 @@ import "server-only";
 import type { ClientModeles } from "@/ai/client";
 import { createOpenRouterClient } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
+import { creerNoterCandidats, type NoterCandidats } from "@/ai/noter-candidats";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -31,8 +32,9 @@ import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, typ
  *   que ses clients (une étape de l'agent ne lit pas la clé Google) :
  *   - `agent()` : modèles, recherche web et pages, rien de Google ;
  *   - `ancrage()` : `textSearch` et `detailsLogement` seulement, rien d'autre de Places, aucun modèle ;
- *   - `etapeFinale()` : fiches Place Details, Routes, et `redigerRaisons` (jamais le client de modèles brut, ni la
- *     recherche web, ni les pages).
+ *   - `etapeFinale()` : fiches Place Details, Routes, `noterCandidats` et `redigerRaisons` (jamais le client de modèles
+ *     brut, ni la recherche web, ni les pages), et `detailsLogement` (logements du brief seulement : leurs identifiants
+ *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5).
  * - **Port de consommation** : chaque client reçoit le port et les plafonds du mode (réservation avant chaque appel) ;
  *   le contexte de chaque appel porte l'exécution de la garde et les périodes du fournisseur (D20), calculées à l'appel.
  */
@@ -45,6 +47,8 @@ export type ReglagesModeles = {
    * `rechercheWeb.moteur`, bloquant 1c de la PR 326) et nombre de résultats.
    */
   readonly rechercheWeb: { readonly modele: string; readonly moteur: MoteurRechercheWeb; readonly maxResultats: number };
+  /** Modèle de la notation (étape `notation`, selon la variante). */
+  readonly notation: { readonly modele: string };
   /** Modèle de la rédaction des raisons (étape `raisons`). */
   readonly raisons: { readonly modele: string };
 };
@@ -72,10 +76,16 @@ export type CapacitesAgent = {
   readonly pages: LecteurPages;
 };
 
-/** Capacités de l'étape finale : fiches Place Details, Routes et rédaction des raisons ; rien d'autre. */
+/**
+ * Capacités de l'étape finale (0055 § 3 point 5, amendement A3) : fiches Place Details, Routes, notation et rédaction des
+ * raisons, et la fiche d'un **logement du brief** (`detailsLogement`, même capacité que l'ancrage : entrée = brief et
+ * indice, jamais un `placeId`) ; rien d'autre.
+ */
 export type CapacitesEtapeFinale = {
   readonly places: Pick<ClientPlaces, "details">;
   readonly routes: ClientRoutes;
+  readonly detailsLogement: CapacitesAncrage["detailsLogement"];
+  readonly noterCandidats: NoterCandidats;
   readonly redigerRaisons: RedigerRaisons;
 };
 
@@ -128,10 +138,13 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
     },
     etapeFinale() {
       const places = createPlacesClient(google);
+      const client = modeles();
       return {
         places: { details: (placeId) => places.details(placeId) },
         routes: createRoutesClient(google),
-        redigerRaisons: creerRedigerRaisons(modeles(), { modele: options.modeles.raisons.modele, routage: options.modeles.routage }),
+        detailsLogement: capacitesAncrage(places).detailsLogement,
+        noterCandidats: creerNoterCandidats(client, { modele: options.modeles.notation.modele, routage: options.modeles.routage }),
+        redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: options.modeles.routage }),
       };
     },
   };

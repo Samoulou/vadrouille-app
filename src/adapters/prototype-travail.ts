@@ -31,8 +31,12 @@ export const COUT_MAX_MICROS = 3_000_000;
 const CENT_MICROS = 10_000;
 
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
-const SQL_EXECUTION = `SELECT mode, brief, variant, cost_models_micros FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours'`;
+const SQL_EXECUTION = `SELECT mode, brief, variant, cost_models_micros, pg_catalog.to_char(quota_day, 'YYYY-MM-DD') AS jour_quota,
+  pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now() - started_at) * 1000)::bigint AS ecoule_ms
+FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours'`;
+const SQL_PHASE_EN_COURS = `SELECT phase FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours' FOR UPDATE`;
 const SQL_PHASE = `UPDATE prototype.runs SET phase = $2 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
+const JOUR = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const SQL_COUT = `UPDATE prototype.runs SET cost_models_micros = GREATEST(COALESCE(cost_models_micros, 0), $2::bigint)
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 const SQL_EN_COURS = `SELECT 1 FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours' FOR UPDATE`;
@@ -96,19 +100,41 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
     const ligne = (await client.query(SQL_EXECUTION, [id])).rows[0];
     if (ligne === undefined) throw new EchecTravail("execution_absente");
     const cout = ligne.cost_models_micros === null ? 0 : Number(ligne.cost_models_micros);
-    const { mode, brief, variant } = ligne;
-    if ((mode !== "reel" && mode !== "essai") || typeof brief !== "string" || (variant !== "A" && variant !== "B") || !Number.isSafeInteger(cout) || cout < 0) {
+    const ecoule = typeof ligne.ecoule_ms === "string" || typeof ligne.ecoule_ms === "number" ? Number(ligne.ecoule_ms) : Number.NaN;
+    const { mode, brief, variant, jour_quota: jourQuota } = ligne;
+    if (
+      (mode !== "reel" && mode !== "essai") ||
+      typeof brief !== "string" ||
+      (variant !== "A" && variant !== "B") ||
+      !Number.isSafeInteger(cout) ||
+      cout < 0 ||
+      typeof jourQuota !== "string" ||
+      !JOUR.test(jourQuota) ||
+      !Number.isSafeInteger(ecoule)
+    ) {
       throw new EchecTravail("base");
     }
-    return { mode, brief, variante: variant, coutModelesMicros: cout };
+    // Horloges de la base et du serveur légèrement décalées : un écoulé négatif compte pour zéro.
+    return { mode, brief, variante: variant, coutModelesMicros: cout, jourQuota, ecouleMs: Math.max(0, ecoule) };
   });
 }
 
-/** Phase de l'exécution `en_cours` (S4 : remise à nul par la clôture ou l'écriture du programme). */
+/**
+ * Phase de l'exécution `en_cours` (S4 : remise à nul par la clôture ou l'écriture du programme). **Garde
+ * d'idempotence** (P0r3c-5 ; mineur 6 de la revue du head `608ee99`, PR 348) : chaque phase n'est écrite qu'une fois, et
+ * seulement si la phase en base est celle qui la précède dans `PHASES_TRAVAIL` (aucune pour `recherche`), sous verrou de
+ * la ligne. Une étape redistribuée par la file après expiration retrouve sa propre phase déjà écrite : refus
+ * `phase_deja_passee`, avant tout appel, au lieu de repayer ses appels.
+ */
 export async function ecrirePhase(pool: PoolSql, runId: string, phase: PhaseTravail): Promise<void> {
   const id = runIdControle(runId);
-  if (!PHASES_TRAVAIL.includes(phase)) throw new EchecTravail("entree_refusee");
+  const rang = PHASES_TRAVAIL.indexOf(phase);
+  if (rang < 0) throw new EchecTravail("entree_refusee");
+  const precedente = rang === 0 ? null : PHASES_TRAVAIL[rang - 1];
   await transaction(pool, async (client) => {
+    const ligne = (await client.query(SQL_PHASE_EN_COURS, [id])).rows[0];
+    if (ligne === undefined) throw new EchecTravail("execution_absente");
+    if (ligne.phase !== precedente) throw new EchecTravail("phase_deja_passee");
     if ((await client.query(SQL_PHASE, [id, phase])).rows.length !== 1) throw new EchecTravail("execution_absente");
   });
 }

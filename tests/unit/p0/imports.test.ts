@@ -421,7 +421,7 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // marqueur `server-only`. Le client réel de recherche web importe le seul type `ClientRechercheWeb` et les longueurs
   // de `src/research/recherche-web.ts` (interface inchangée ; 0055 § 7 point 1 : « src/ai importe ce type »), qui
   // n'importe rien.
-  ...["prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
+  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   ["src/ai/recherche-web-reelle.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/research/recherche-web.ts"] }],
   // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
   // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.

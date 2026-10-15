@@ -16,8 +16,9 @@ import { p0Run } from "./p0-run";
  *   des messages peuvent être stockés **temporairement dans une région voisine** (relevé 3 de la PR 326 ; Q28).
  * - **Garde exigée** : `p0Run` ne démarre que pour une exécution réservée par une garde ouverte (`GardeOuverte`) ; son
  *   entrée est l'identifiant d'exécution seul.
- * - **`p0Run` incomplet** : tant que son étape finale n'est pas livrée (P0r3c-5), `startWorkflow` refuse de le démarrer
- *   (`real_mode_unavailable`), sans appel au SDK : aucune exécution ne peut dépenser sans pouvoir écrire de programme.
+ * - **`p0Run` non démarrable** : tant que `P0RUN_COMPLET` est faux, `startWorkflow` refuse de le démarrer
+ *   (`real_mode_unavailable`), sans appel au SDK. L'étape finale est livrée (P0r3c-5) ; restent les conditions du point 7
+ *   de l'amendement P0r3c-5 de 0063 (verdict Sécurité, action de lancement de P0r3d, levée du verrou S8, brief d'essai).
  */
 
 export const REGION_WORKFLOWS = "fra1";
@@ -25,7 +26,7 @@ export const REGION_WORKFLOWS = "fra1";
 /** Workflows démarrables ; B9 ajoute les siens. */
 export type NomWorkflow = "p0Run";
 
-/** Vrai quand `p0Run` porte son étape finale (P0r3c-5) ; jusque-là, aucun démarrage. */
+/** Vrai seulement quand les conditions du point 7 de l'amendement P0r3c-5 de 0063 sont remplies ; jusque-là, aucun démarrage. */
 export const P0RUN_COMPLET = false;
 
 export type ResultatDemarrage = { readonly ok: true; readonly workflowRunId: string } | { readonly ok: false; readonly code: "real_mode_unavailable" };

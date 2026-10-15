@@ -21,6 +21,8 @@ prototype
 !prototype/briefs/edimbourg-1.json
 !prototype/briefs/edimbourg-2.json
 !prototype/briefs/edimbourg-3.json
+# P0r3c-5 (ticket 352) : formule de classement lue par l'étape finale de `p0Run`.
+!prototype/config/classement.json
 !prototype/config/essai.json
 !prototype/config/modeles.json
 !prototype/config/mode-reel.json

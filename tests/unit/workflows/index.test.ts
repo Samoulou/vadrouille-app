@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 describe("src/workflows/index.ts", () => {
-  it("p0Run incomplet (étape finale en P0r3c-5) : démarrage refusé, SDK jamais appelé", async () => {
+  it("P0RUN_COMPLET faux (conditions du point 7 de l'amendement P0r3c-5 de 0063) : démarrage refusé, SDK jamais appelé", async () => {
     expect(P0RUN_COMPLET).toBe(false);
     expect(await startWorkflow("p0Run", GARDE)).toEqual({ ok: false, code: "real_mode_unavailable" });
     expect(d.start).not.toHaveBeenCalled();
