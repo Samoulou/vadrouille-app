@@ -30,8 +30,15 @@ declare const MARQUE: unique symbol;
  */
 export type GardeOuverte = { readonly runId: string; readonly [MARQUE]: true };
 
+/**
+ * Refus du lancement rendus par `reserver` **avant** la réservation, garde déjà ouverte (P0r3d) : choix refusé
+ * (`entree_invalide`), mode réel indisponible (`real_mode_unavailable` : `p0Run` non démarrable, configuration refusée
+ * ou verrou S8 fermé) et décompte atteint (`run_quota_reached`, D24). Rien n'est écrit.
+ */
+export type CodeRefusAvantReservation = "entree_invalide" | "real_mode_unavailable" | "run_quota_reached";
+
 /** Codes de la garde fermée : environnement et déploiement, accès, réservation, exécution. */
-export type CodeGarde = CodeGardeFermee | "access_refused" | "run_refused" | CodeRefusUsage;
+export type CodeGarde = CodeGardeFermee | "access_refused" | "run_refused" | CodeRefusUsage | CodeRefusAvantReservation;
 
 export type ResultatGarde = { readonly ok: true; readonly garde: GardeOuverte } | { readonly ok: false; readonly code: CodeGarde };
 
@@ -43,8 +50,11 @@ const FORME_RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export type DependancesLancement = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête de lancement. */
   readonly cookie: string | undefined;
-  /** Réservation du jour et des plafonds par le port de consommation de P0r2 (`reserverExecution`). */
-  readonly reserver: () => Promise<ResultatLancement>;
+  /**
+   * Réservation du jour et des plafonds par le port de consommation de P0r2 (`reserverExecution`), précédée des
+   * contrôles du lancement qui peuvent la refuser sans rien écrire (`CodeRefusAvantReservation`).
+   */
+  readonly reserver: () => Promise<ResultatLancement | { readonly ok: false; readonly code: CodeRefusAvantReservation }>;
 };
 
 /**
@@ -57,7 +67,7 @@ export async function ouvrirGardeLancement(dependances: DependancesLancement): P
   if (!ouverture.ok) return ouverture;
   const maintenant = (dependances.maintenant ?? Date.now)();
   if (!cookieAccesValide(dependances.cookie, ouverture.attendu, maintenant)) return { ok: false, code: "access_refused" };
-  let reservation: ResultatLancement;
+  let reservation: Awaited<ReturnType<DependancesLancement["reserver"]>>;
   try {
     reservation = await dependances.reserver();
   } catch {

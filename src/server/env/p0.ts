@@ -97,6 +97,19 @@ export function lireEnvP0(
   }
 }
 
+/** Forme d'un commit Git complet (`prototype.runs.commit_sha`, `CHECK` de la migration `0003`). */
+const FORME_COMMIT = /^[0-9a-f]{40}$/;
+
+/**
+ * Commit du déploiement (`VERCEL_GIT_COMMIT_SHA`, posée par Vercel sur chaque déploiement lié à Git), consigné avec
+ * l'exécution réservée (0046, D24) ; `null` s'il est absent ou n'a pas la forme d'un commit complet. Lu à l'appel,
+ * jamais à l'import ; un identifiant public, pas un secret. Appelé par la garde du lancement seulement.
+ */
+export function commitDuDeploiement(env: EnvSortie = process.env): string | null {
+  const commit = env.VERCEL_GIT_COMMIT_SHA;
+  return typeof commit === "string" && FORME_COMMIT.test(commit) ? commit : null;
+}
+
 /**
  * Décode une saisie du code d'accès par **la même fonction** `decodeSecret` que la variable (mêmes formes admises,
  * mêmes règles, aucune normalisation ni `trim()`) : octets, ou `null` sur tout refus, sans valeur ni motif.

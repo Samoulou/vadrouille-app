@@ -44,6 +44,14 @@ const SQL_PROGRAMME = "INSERT INTO prototype.programmes (run_id, contenu) VALUES
 const SQL_STATUT = `UPDATE prototype.runs SET status = 'programme_ecrit', phase = NULL, cost_models_micros = NULL
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 
+/**
+ * Signature de la fonction d'écriture des positions (0052 § 1.7, migration `0005`). Le verrou S8 (0046, 0052 § 3,
+ * 0056 § 4) est levé si et seulement si `vadrouille_prototype` peut l'exécuter.
+ */
+export const FONCTION_POSITIONS = "public.store_prototype_coordinates(uuid, text, double precision, double precision)";
+/** Droit d'exécution de la fonction des positions pour le rôle courant ; faux si elle n'existe pas sous cette signature. */
+export const SQL_VERROU_S8 = "SELECT COALESCE(pg_catalog.has_function_privilege(pg_catalog.to_regprocedure($1), 'EXECUTE'), false) AS leve";
+
 /** Échec d'écriture : code de la liste fermée et, pour `base`, le SQLSTATE seul. Aucune valeur. */
 export class EchecEcritureProgramme extends Error {
   constructor(
@@ -114,6 +122,31 @@ export async function ecrireProgramme(entree: EcritureProgrammePrototype, pool: 
     if (enTransaction) await client.query("ROLLBACK").catch(() => undefined);
     if (erreur instanceof EchecEcritureProgramme) throw erreur;
     throw new EchecEcritureProgramme("base", codeSql(erreur));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Verrou S8 levé : `vadrouille_prototype` peut exécuter la fonction d'écriture des positions (lecture du catalogue
+ * seulement, aucun appel de la fonction). Fermé, aucun programme ne peut être écrit (étape (i) refusée) : le lancement
+ * est refusé avant toute réservation (P0r3d ; 0063 point 10 : aucune exécution ne dépense sans pouvoir écrire). Toute
+ * erreur, ou une réponse illisible, devient `EchecEcritureProgramme` (`base`, sans valeur) : l'appelant refuse.
+ */
+export async function verrouS8Leve(pool: PoolSql): Promise<boolean> {
+  let client: ClientSql;
+  try {
+    client = await pool.connect();
+  } catch {
+    throw new EchecEcritureProgramme("base");
+  }
+  try {
+    const leve = (await client.query(SQL_VERROU_S8, [FONCTION_POSITIONS])).rows[0]?.leve;
+    if (typeof leve !== "boolean") throw new EchecEcritureProgramme("base");
+    return leve;
+  } catch (erreur) {
+    if (erreur instanceof EchecEcritureProgramme) throw erreur;
+    throw new EchecEcritureProgramme("base");
   } finally {
     client.release();
   }
