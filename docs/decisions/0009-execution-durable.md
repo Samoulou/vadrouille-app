@@ -2,6 +2,8 @@
 
 Statut : proposé · Date : 2026-10-08, reprise le 2026-10-11 dans B0a (découpage de #27, Q43) sans ce qui dépend de Q5 · Décideur : Tech Lead (architecture, délégation « Qui décide quoi » ; le choix de Vercel Workflows est une décision de Samuel, cadrage D7) · Définitif sans veto de Samuel avant le 2026-10-13 ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio »
 
+**Installée par P0r3c-4** (ticket #316) : `workflow` 5.1.0, sans amendement de version ; réponses de la revue de #326 (épinglage exact, `@swc/core` sans script, directives, webhooks interdits, région `fra1`, barrière hors de Vercel) consignées dans la décision 0063.
+
 ## Contexte
 Cadrage D7 (tranché) : Vercel Workflows. Décision 0002 : portabilité préservée, aucune API propre à Vercel dans le code métier. Spécification B0 : l'état sérialisé des étapes est un stockage durable ; il ne contient aucune donnée Google. Q28 : la région de cet état est à vérifier ; l'état contenait le brief (données personnelles).
 

@@ -371,6 +371,35 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
     ecart: "connexion réelle dans un test (section 4), tests de base de B1 (décisions 0006, 0036) : verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242)",
   },
+  // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre.
+  {
+    fichier: "tests/db/workflows-harnais.ts",
+    portee: "test",
+    usage: "harnais des tests des workflows de la base : bloc `run:` joué par bash sur des bases jetables du serveur de la CI, empreintes par `sha256sum`",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["type:ChildProcess", "spawn", "spawnSync"] }],
+  },
+  {
+    fichier: "tests/unit/ci/db-migrate.test.ts",
+    portee: "test",
+    usage: "test statique de db-migrate.yml ; listes du workflow aux commits de référence lues par `git` (ajout seulement)",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["execFileSync"] }],
+  },
+  {
+    fichier: "tests/unit/ci/db-releve.test.ts",
+    portee: "test",
+    usage: "test de db-releve.yml : motif évalué par bash, bloc `run:` joué sur des fichiers préparés (sans base)",
+    ecart: "fichier apparu après `40b6738` (PR du workflow des migrations ; décisions 0056 et 0057, « Tests imposés ») : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"] }],
+  },
+  {
+    fichier: "tests/unit/db/hote-local-migrations.test.ts",
+    portee: "test",
+    usage: "refus de tout hôte non local par `db/migrate.ts` : `connect` de `pg` espionné ou simulé, aucune connexion réelle",
+    ecart: "module à capacité `pg` (section 3) dans un test sans connexion réelle (`connect` espionné ou simulé), comme `tests/unit/db/garde-connexion.test.ts` : PR du workflow des migrations (décision 0056 § 2.8) ; verdict Sécurité à rendre",
+    capacites: [{ capacite: "module:pg", formes: ["default"], nombre: 1 }],
+  },
   {
     fichier: "tests/unit/db/garde-connexion.test.ts",
     portee: "test",
@@ -392,9 +421,9 @@ export const LIGNES_CAPACITE = [
     fichier: "src/research/undici-transport.ts",
     portee: "application",
     usage:
-      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché à aucun point d'entrée : un `Agent` " +
+      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : un `Agent` " +
       "par saut dont `connect.lookup` rend l'adresse vérifiée, résolveur réel `lookup` (`all: true`). Justification côté serveur : " +
-      "module `server-only`, importé seulement par ses tests (fermeture `fermeture-module-p0r1`)",
+      "module `server-only`, importé par ses tests et par la composition du mode réel (fermeture `fermeture-module-p0r1`)",
     capacites: [
       { capacite: "module:undici", formes: ["Agent"], nombre: 1 },
       { capacite: "module:node:dns", formes: ["lookup"], nombre: 1 },
@@ -405,7 +434,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/grounding/places-client.ts",
     portee: "application",
     usage:
-      "client réel de Places (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "client réel de Places (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createPlacesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
@@ -414,10 +443,20 @@ export const LIGNES_CAPACITE = [
     fichier: "src/grounding/routes-client.ts",
     portee: "application",
     usage:
-      "client réel de Routes (P0r1), branché à aucun point d'entrée : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "client réel de Routes (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createRoutesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
+  },
+  // P0r3c-3 (ticket 316 ; décision 0055, section 3 point 6 ; condition E4 de 0049). Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
+  {
+    fichier: "tests/unit/p0/undici-contrat.test.ts",
+    portee: "test",
+    usage:
+      "test de contrat d'`undici` : `Agent` réel de la version épinglée avec `connect.lookup` = `lookupEpingle`, contre le serveur " +
+      "local de test (`127.0.0.1`, port `0`) seulement ; aucun autre hôte (les noms `.test` ne se résolvent pas)",
+    capacites: [{ capacite: "module:undici", formes: ["Agent"], nombre: 1 }],
+    ecart: "import d'un paquet à capacité dans un test, exigé par 0055 § 3 point 6 (E4 de 0049) avant la fusion de la composition : verdict Sécurité : approuvé sur le head `59878f0` (PR 326), P0r3c-3, ticket 316",
   },
 ] as const satisfies readonly LigneCapacite[];
 

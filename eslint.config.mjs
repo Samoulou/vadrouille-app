@@ -212,6 +212,8 @@ export default defineConfig([
     "playwright-report/**",
     "test-results/**",
     "coverage/**",
+    // Routes générées par le Workflow SDK au build (`withWorkflow`, décision 0063) ; ignorées par git.
+    "src/app/.well-known/workflow/**",
   ]),
   {
     plugins: { ligne },
@@ -590,6 +592,12 @@ export default defineConfig([
       // sous Node nu par `db/connection.ts` (`pnpm db:migrate`), où `import "server-only"` ne se résout pas sans la
       // condition `react-server` ; elle ne lit ni ne rend aucun secret. Seule exception de B3.
       "src/server/env/resolve.ts",
+      // P0r3c-5a (ticket 349, amendement de 0063, réponse 2 du Tech Lead à la revue de #348) : assemblage et adaptateur
+      // du moteur de P0, sortis de `scripts/p0` ; toujours chargés par `pnpm p0` sous Node nu, où `import "server-only"`
+      // lèverait une erreur. Modules purs (aucune entrée-sortie) ; hors de src/server, F9a interdit de les importer.
+      // Condition de sortie : celle des modules de phase 0 ci-dessus.
+      "src/server/p0/assemblage.ts",
+      "src/server/p0/vers-moteur.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
@@ -620,6 +628,14 @@ export default defineConfig([
     // fichier du dépôt, tests compris (tests/unit/lint/server-env-imports-lint.test.ts).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "ligne/server-env-imports": "error" },
+  },
+  {
+    // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
+    // Workflow SDK dans `src/workflows/` seulement (`workflow/next` admis dans `next.config.ts`) ; `createWebhook`,
+    // `createHook`, `defineHook`, `resumeHook`, `resumeWebhook` et `getHookByToken` interdits partout. Règle propre au
+    // plugin, posée par ce seul bloc sur tout fichier (tests/unit/lint/workflow-directives-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/workflow-directives": "error" },
   },
   {
     // F8a : aucun texte en dur dans la création du voyage et le compte (handover § 10, spécification F8).

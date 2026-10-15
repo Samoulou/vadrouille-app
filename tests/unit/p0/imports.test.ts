@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { IMPORTS_DOMAINE, sourcesDomaine } from "../lint/domaine-cas-communs";
+import { RACINE, rel, resoudre, type Cible } from "./resolution";
 
 /**
  * `p0: aucun client réel ni accès réseau dans le code de P0a1` — liste d'autorisation des imports (décision 0032,
@@ -33,8 +33,6 @@ import { IMPORTS_DOMAINE, sourcesDomaine } from "../lint/domaine-cas-communs";
  * l'identifiant `Symbol` (redéclaré, réaffecté, en alias, `typeof Symbol`…) et `with` sont refusés.
  */
 
-const RACINE = fileURLToPath(new URL("../../../", import.meta.url));
-const rel = (absolu: string) => path.relative(RACINE, absolu).split(path.sep).join("/");
 
 function fichiers(dossier: string, extensions = [".ts", ".tsx"]): string[] {
   const absolu = path.join(RACINE, dossier);
@@ -50,29 +48,7 @@ function fichiers(dossier: string, extensions = [".ts", ".tsx"]): string[] {
 
 const estTest = (fichier: string) => /\.test\.tsx?$/.test(fichier);
 
-// --- Résolution des spécificateurs --------------------------------------------------------------------------
-
-type Cible = { type: "projet"; chemin: string } | { type: "externe"; nom: string };
-
-function resoudreProjet(base: string): string | undefined {
-  for (const candidat of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]) {
-    const absolu = path.join(RACINE, candidat);
-    if (existsSync(absolu) && statSync(absolu).isFile()) return rel(absolu);
-  }
-  return undefined;
-}
-
-function resoudre(depuis: string, specificateur: string): Cible {
-  if (specificateur.startsWith("@/")) {
-    const chemin = resoudreProjet(path.posix.join("src", specificateur.slice(2)));
-    return chemin ? { type: "projet", chemin } : { type: "externe", nom: specificateur };
-  }
-  if (specificateur.startsWith("./") || specificateur.startsWith("../")) {
-    const chemin = resoudreProjet(path.posix.normalize(path.posix.join(path.posix.dirname(depuis), specificateur)));
-    return chemin ? { type: "projet", chemin } : { type: "externe", nom: specificateur };
-  }
-  return { type: "externe", nom: specificateur };
-}
+// --- Résolution des spécificateurs : module d'appui partagé (`./resolution`, P0r3c-3 ; 0055 § 3 point 2) -------------
 
 // --- Analyse d'un fichier -----------------------------------------------------------------------------------
 
@@ -394,6 +370,15 @@ const FEUILLES_PROTOTYPE = ["brief", "config", "candidat", "ancrage", "programme
 const proto = (...noms: string[]) => noms.map((nom) => `src/prototype/${nom}.ts`);
 const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossier}/`);
 
+/**
+ * P0r3c-5a (ticket 349, amendement de 0063 ; réponse 2 du Tech Lead à la revue de #348) : assemblage du programme et
+ * adaptateur du moteur, sortis de `scripts/p0` pour que `p0Run` les atteigne sans importer `scripts/`. Ils gardent la
+ * liste d'autorisation de A3.2 (contrôlés avec les fichiers de P0) et n'importent de `src/prototype` que le programme
+ * réduit (admis partout) et, **en `import type` seulement**, les trois feuilles ci-dessous (contrats et `zod` seulement).
+ */
+const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts"];
+const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", "candidat");
+
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
 const contrats = sous("src/contracts");
@@ -432,6 +417,15 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   ...["ancrage-zone", "budget-routes", "fiches-finales", "zone"].map(
     (nom) => [`src/grounding/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
   ),
+  // P0r3c-3 (ticket 316, décision 0055, sections 3 et 7) : prompt et client réel de recherche web, rédaction des raisons ;
+  // marqueur `server-only`. Le client réel de recherche web importe le seul type `ClientRechercheWeb` et les longueurs
+  // de `src/research/recherche-web.ts` (interface inchangée ; 0055 § 7 point 1 : « src/ai importe ce type »), qui
+  // n'importe rien.
+  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
+  ["src/ai/recherche-web-reelle.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/research/recherche-web.ts"] }],
+  // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
+  // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.
+  ["src/research/plafonds-agent.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
   [
     "src/research/undici-transport.ts",
     {
@@ -457,6 +451,12 @@ function regleDe(fichier: string): Regle | undefined {
 }
 
 function regleDeBase(fichier: string): Regle | undefined {
+  if (MODULES_SERVEUR_P0.includes(fichier)) {
+    return {
+      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts"].includes(c),
+      externes: [],
+    };
+  }
   if (FEUILLES_PROTOTYPE.includes(fichier)) return { projet: contrats, externes: ["zod"] };
   if (fichier === "src/prototype/reduction.ts") {
     return { projet: (c) => contrats(c) || proto("ancrage", "programme-reduit").includes(c), externes: ["zod"] };
@@ -498,7 +498,8 @@ function regleDeBase(fichier: string): Regle | undefined {
     return {
       projet: (c) =>
         contrats(c) ||
-        ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"].some((d) => sous(d)(c)),
+        ["src/prototype", "src/domain", "src/ai", "src/research", "src/grounding", "scripts/p0"].some((d) => sous(d)(c)) ||
+        MODULES_SERVEUR_P0.includes(c),
       // Revue Sécurité de #180, mineur 5 (décision du CEO, 43e cycle, point 4) : `node:fs` et `node:fs/promises`
       // réservés à `scripts/p0/fichiers.ts` (pas de `readFileSync("/proc/self/environ")` ailleurs, 0032 A3.2).
       externes: ["zod", "node:path", "node:util", ...(fichier === FICHIER_FS ? ["node:fs", "node:fs/promises"] : [])],
@@ -619,7 +620,7 @@ function fichierAdmis(fichier: string): boolean {
 
 /** Tous les fichiers présents des six dossiers (sur-ensemble des fichiers suivis). */
 const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
-const FICHIERS_P0 = TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts"));
+const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0];
 const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
 /** Imports de chaque fichier, analysés une seule fois pour tous les graphes du fichier de test (durée, P0r1). */
@@ -682,19 +683,51 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
   return vus;
 }
 
+/**
+ * Ponts de l'application vers les modules de P0 (D18, décision 0055, section 3) : la composition du mode réel et le
+ * workflow `p0Run` qui l'importe (P0r3c-4, décision 0063 point 9), seul importateur de la composition. Le parcours de
+ * la frontière s'arrête à un pont ; chaque pont a ses importateurs contrôlés à part (composition : `composition.test.ts` ;
+ * `p0Run` : `src/workflows/index.ts` seul, ci-dessous).
+ */
+const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/workflows/p0-run.ts"];
+const estPont = (chemin: string) => PONTS_P0.includes(chemin);
+
 /** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1). */
 const interditPartout = (chemin: string) =>
   ["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
   (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts");
 
+/**
+ * Seules arêtes de l'application vers `src/prototype` (hors programme réduit) admises : d'un module serveur de P0 vers
+ * une feuille de types (P0r3c-5a). Ces imports sont des `import type` (test ci-dessous) : rien de `src/prototype`
+ * n'est chargé à l'exécution, et les feuilles n'importent que les contrats et `zod`.
+ */
+const areteAdmise = (de: string, vers: string) => MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers);
+
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
-function violationsApplication(fichier: string, voisins: Voisins): string[] {
-  const violations = [...atteints(fichier, voisins)].filter(interditPartout);
+function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
+  const voisins: Voisins = (courant) => voisinsBruts(courant).filter((cible) => !areteAdmise(courant, cible));
+  const violations = [...atteints(fichier, voisins, estPont)].filter(interditPartout);
   if (!fichier.startsWith("src/server/")) {
+    // L'arrêt aux ponts ne vaut que pour `interditPartout` : la règle de src/domain traverse les ponts (bloquant 1 de la
+    // revue du head `608ee99`, PR 348).
     const horsServeur = atteints(fichier, voisins, (chemin) => chemin.startsWith("src/server/"));
     violations.push(...[...horsServeur].filter((chemin) => chemin.startsWith("src/domain/")));
   }
   return violations;
+}
+
+/** Modules de P0 auxquels un pont peut mener (réponse 3 du Tech Lead, PR 348) : jamais src/domain ni scripts/. */
+const OUVERTURES_PONT = ["src/research/", "src/grounding/", "src/ai/", "src/prototype/"];
+
+/**
+ * Violations d'un pont hors de src/server (`src/workflows/p0-run.ts`) : tout ce qu'il atteint sans descendre dans
+ * src/server/ est de l'application, des contrats ou un module de P0 ouvert ; src/domain/ et scripts/ sont refusés.
+ */
+function violationsPont(fichier: string, voisins: Voisins): string[] {
+  return [...atteints(fichier, voisins, (chemin) => chemin.startsWith("src/server/"))].filter(
+    (chemin) => chemin.startsWith("src/domain/") || chemin.startsWith("scripts/") || (interditPartout(chemin) && !OUVERTURES_PONT.some((d) => chemin.startsWith(d))),
+  );
 }
 
 describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => {
@@ -1168,11 +1201,71 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     const configs = ["next.config.ts"].filter((fichier) => existsSync(path.join(RACINE, fichier)));
 
     it("aucun fichier n'atteint @/ai, @/research, @/grounding, scripts/ ni src/prototype (sauf programme-reduit) ; hors src/server, aucun n'atteint @/domain", () => {
-      const sources = [...application.filter((f) => !estTest(f)), ...configs];
+      // D18 (décision 0055, section 3) : la composition du mode réel est le seul pont de l'application vers les modules
+      // de P0 ; elle est contrôlée à part (`tests/unit/p0/composition.test.ts` : seul importateur des modules de
+      // capacité, importée par le seul workflow `p0Run`). Tout autre fichier qui l'atteint reste une violation ici.
+      const sources = [...application.filter((f) => !estTest(f) && !PONTS_P0.includes(f)), ...configs];
+      expect(PONTS_P0.every((f) => application.includes(f))).toBe(true);
       expect(sources).toContain("src/server/config/moteur.ts");
       for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
       // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
       expect([...atteints("src/server/config/moteur.ts", voisinsReels)]).toContain("src/domain/configuration.ts");
+    });
+
+    it("pont p0Run : ouvert vers src/research, src/grounding, src/ai et src/prototype seulement, jamais src/domain ni scripts/", () => {
+      const ponts = PONTS_P0.filter((f) => !f.startsWith("src/server/"));
+      expect(ponts).toEqual(["src/workflows/p0-run.ts"]);
+      for (const pont of ponts) expect(violationsPont(pont, voisinsReels), pont).toEqual([]);
+    });
+
+    it.each([
+      ["refusé : pont → @/domain", { "src/workflows/p0-run.ts": ["src/domain/configuration.ts"] }, ["src/domain/configuration.ts"]],
+      [
+        "refusé : pont → @/research → @/domain",
+        { "src/workflows/p0-run.ts": ["src/research/agent.ts"], "src/research/agent.ts": ["src/domain/generation.ts"] },
+        ["src/domain/generation.ts"],
+      ],
+      ["refusé : pont → scripts/p0", { "src/workflows/p0-run.ts": ["scripts/p0/pipeline.ts"] }, ["scripts/p0/pipeline.ts"]],
+      ["admis : pont → @/research, @/prototype", { "src/workflows/p0-run.ts": ["src/research/agent.ts", "src/prototype/config.ts"] }, []],
+      ["admis : pont → src/server → @/domain", { "src/workflows/p0-run.ts": ["src/server/p0/x.ts"], "src/server/p0/x.ts": ["src/domain/generation.ts"] }, []],
+    ] satisfies [string, Record<string, string[]>, string[]][])("cas fabriqué du pont : %s", (_nom, aretes, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsPont("src/workflows/p0-run.ts", graphe)).toEqual(attendu);
+      // L'index qui importe le pont est refusé de même : la règle de src/domain traverse le pont.
+      const avecIndex: Voisins = (fichier) => (fichier === "src/workflows/index.ts" ? ["src/workflows/p0-run.ts"] : graphe(fichier));
+      const domaine = (liste: readonly string[]) => liste.filter((c) => c.startsWith("src/domain/"));
+      expect(domaine(violationsApplication("src/workflows/index.ts", avecIndex))).toEqual(domaine(attendu));
+    });
+
+    it("P0r3c-5a : assemblage et vers-moteur n'atteignent ni scripts/ ni src/prototype hors des feuilles de types, importées en type seulement", () => {
+      for (const fichier of MODULES_SERVEUR_P0) {
+        expect(application, fichier).toContain(fichier);
+        const atteint = [...atteints(fichier, voisinsReels)];
+        expect(atteint.filter((c) => c.startsWith("scripts/")), fichier).toEqual([]);
+        expect(
+          atteint.filter((c) => c.startsWith("src/prototype/") && !TYPES_PROTOTYPE_SERVEUR_P0.includes(c) && c !== "src/prototype/programme-reduit.ts"),
+          fichier,
+        ).toEqual([]);
+        const { imports } = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8"));
+        const versTypes = imports.filter(({ specificateur }) => {
+          const cible = resoudre(fichier, specificateur);
+          return cible.type === "projet" && TYPES_PROTOTYPE_SERVEUR_P0.includes(cible.chemin);
+        });
+        expect(versTypes.length, fichier).toBeGreaterThan(0);
+        for (const { forme } of versTypes) expect(forme, fichier).toMatch(/^import type \{/);
+      }
+      // scripts/p0 les ré-importe ; rien d'autre de src/server n'est importé par scripts/p0.
+      const importsScripts = fichiers("scripts/p0")
+        .filter((f) => !estTest(f))
+        .flatMap((f) => voisinsReels(f).filter((c) => c.startsWith("src/server/")));
+      expect([...new Set(importsScripts)].sort()).toEqual([...MODULES_SERVEUR_P0].sort());
+    });
+
+    it("le pont p0Run n'est importé que par src/workflows/index.ts, et l'index n'atteint P0 que par lui", () => {
+      const importeurs = application.filter((f) => !estTest(f) && voisinsReels(f).includes("src/workflows/p0-run.ts"));
+      expect(importeurs).toEqual(["src/workflows/index.ts"]);
+      // Sans arrêt aux ponts, l'index atteint bien les modules de P0 : la frontière est exercée sur un cas réel.
+      expect([...atteints("src/workflows/index.ts", voisinsReels)].some(interditPartout)).toBe(true);
     });
 
     describe("cas fabriqués", () => {
@@ -1193,6 +1286,22 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
           [],
         ],
         ["refusé : src/server → @/research/agent", { "src/server/x.ts": ["src/research/agent.ts"] }, "src/server/x.ts", ["src/research/agent.ts"]],
+        // P0r3c-5a : arêtes admises de src/server/p0 vers les feuilles de types de src/prototype, et rien d'autre.
+        [
+          "admis : src/server/p0/assemblage.ts → @/prototype/brief, candidat, ancrage, programme-reduit",
+          { "src/server/p0/assemblage.ts": [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", "src/domain/temps.ts"] },
+          "src/server/p0/assemblage.ts",
+          [],
+        ],
+        ["refusé : src/server/p0/vers-moteur.ts → @/prototype/config", { "src/server/p0/vers-moteur.ts": ["src/prototype/config.ts"] }, "src/server/p0/vers-moteur.ts", ["src/prototype/config.ts"]],
+        ["refusé : src/server/p0/garde.ts → @/prototype/brief", { "src/server/p0/garde.ts": ["src/prototype/brief.ts"] }, "src/server/p0/garde.ts", ["src/prototype/brief.ts"]],
+        ["refusé : src/server/p0/assemblage.ts → scripts/p0", { "src/server/p0/assemblage.ts": ["scripts/p0/pipeline.ts"] }, "src/server/p0/assemblage.ts", ["scripts/p0/pipeline.ts"]],
+        [
+          "refusé : src/server/p0/assemblage.ts → src/server/x → @/prototype/brief",
+          { "src/server/p0/assemblage.ts": ["src/server/x.ts"], "src/server/x.ts": ["src/prototype/brief.ts"] },
+          "src/server/p0/assemblage.ts",
+          ["src/prototype/brief.ts"],
+        ],
         [
           "refusé : src/features → src/server → @/grounding (parcours complet)",
           { "src/features/x.ts": ["src/server/y.ts"], "src/server/y.ts": ["src/grounding/ancrage.ts"] },
@@ -1208,8 +1317,11 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
 
 // --- Clé côté serveur seulement (spécification de P0r1, « Clients réels » ; mineur 15 de la revue du head `fab6c81`) ---
 
-/** Dossiers que rien de ce qui part vers le navigateur ne doit atteindre : clients réels, lecture des pages, modules de clé. */
-const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "src/server/env/"];
+/**
+ * Dossiers que rien de ce qui part vers le navigateur ne doit atteindre : clients réels, lecture des pages, modules de clé,
+ * et la composition du mode réel (P0r3c-3 : test de P0r1 « clé côté serveur » étendu à `p0-reel.ts`, 0055 § 3 point 6).
+ */
+const ZONES_SERVEUR_SEULEMENT = ["src/ai/", "src/grounding/", "src/research/", "src/server/env/", "src/server/composition/"];
 /**
  * Paquets des clients réels : jamais atteints depuis le code client non plus. Le fournisseur de modèles n'est admis que
  * dans le client de modèles (exceptions nominatives) : l'atteindre suppose d'atteindre `src/ai`.
@@ -1272,7 +1384,9 @@ function importsClientDe(fichier: string, source: string): string[] {
  * admise **seulement**, sont admis le module étroit du mode réel (`p0.ts`, qui ne lit aucune clé de service) et les
  * modules de B3a qu'il importe ; tout autre module serveur seulement reste refusé, à travers l'entrée comme ailleurs
  * (clés de service `ai.ts` et `grounding.ts`, `src/ai`, `src/grounding`, `src/research`, paquets). Verdicts Tech Lead et
- * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299).
+ * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299). Décision 0062 (ticket 341) : `openssl-conf.ts`,
+ * importé par `egress.ts` (examen d'`OPENSSL_CONF`, aucune clé ni variable d'environnement lue), est admis avec lui ;
+ * verdicts Tech Lead et Sécurité demandés dans la PR du ticket 341.
  */
 const FRONTIERE_P0R3B = {
   entrees: [
@@ -1285,7 +1399,7 @@ const FRONTIERE_P0R3B = {
       },
     },
   ],
-  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/resolve.ts"],
+  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts"],
 } as const;
 
 /** Vrai si `fichier` est une entrée de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
@@ -1383,6 +1497,21 @@ describe("p0: clé côté serveur seulement", () => {
     expect(un("src/lib/client.ts")).toEqual(["src/lib/client.ts → externe:ai"]);
     expect(un("src/lib/calcule.ts")).toEqual(["src/lib/calcule.ts → externe:?import-non-litteral"]);
     expect(un("src/components/Sain.tsx")).toEqual([]);
+  });
+
+  it("composition du mode réel (0055 § 3 point 6) : un composant client ou une page qui l'atteint, même par un intermédiaire, est refusé", () => {
+    const depot = new Map<string, string>([
+      ["src/app/prototype/page.tsx", 'import { x } from "@/server/p0/intermediaire";\n'],
+      ["src/server/p0/intermediaire.ts", 'export { composerP0Reel as x } from "@/server/composition/p0-reel";\n'],
+      ["src/features/Direct.tsx", '"use client";\nconst c = () => import("@/server/composition/p0-reel");\n'],
+    ]);
+    const lireFictif = (fichier: string) => depot.get(fichier) ?? "";
+    const resoudreFictif = (_depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    expect(atteintsServeurSeulement(["src/app/prototype/page.tsx"], lireFictif, resoudreFictif)).toEqual([
+      "src/app/prototype/page.tsx → src/server/p0/intermediaire.ts → src/server/composition/p0-reel.ts",
+    ]);
+    expect(atteintsServeurSeulement(["src/features/Direct.tsx"], lireFictif, resoudreFictif)).toEqual(["src/features/Direct.tsx → src/server/composition/p0-reel.ts"]);
   });
 
   it("frontière de P0r3b : au-delà de son action seulement, le module étroit du mode réel et ses modules de B3a ; aucune clé, aucune autre action", () => {

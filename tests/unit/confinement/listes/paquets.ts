@@ -54,9 +54,34 @@ const PAQUETS_TS = [
   { paquet: "drizzle-kit", usage: "génération des migrations (`drizzle.config.ts`, `pnpm db:generate`)", verdict: B1 },
   { paquet: "ai", usage: "AI SDK du client réel de modèles (P0r1) ; module à capacité", verdict: P0R1 },
   { paquet: "undici", usage: "transport réel de la lecture des pages (P0r1, `src/research/undici-transport.ts`) ; module à capacité", verdict: P0R1 },
+  {
+    paquet: "pg-connection-string",
+    usage: "analyse des chaînes de connexion par `db/migrate.ts`, refus de tout hôte non local (0056 § 2.8) ; sans capacité",
+    verdict:
+      "PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre ; dépendance directe épinglée à la version que `pg` résout (2.14.1), déjà dans `pnpm-lock.yaml` : " +
+      "le verrou ne gagne que l'entrée de la racine, aucun paquet nouveau (test `tests/unit/db/hote-local-migrations.test.ts`)",
+  },
+  {
+    paquet: "workflow",
+    usage:
+      "Workflow SDK de `p0Run` (P0r3c-4, décisions 0009 et 0063) : `src/workflows/` et `withWorkflow` de `next.config.ts` ; module à capacité (exécution durable, file et stockage du monde Vercel)",
+    verdict:
+      "P0r3c-4 (ticket 316, décision 0063 points 1 et 2) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 5.1.0, " +
+      "`@swc/core`, `esbuild` et `cbor-extract` hors de `onlyBuiltDependencies` (build prouvé sans leurs scripts)",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];
 
 /** `pnpm.onlyBuiltDependencies` exact (section 6). */
 export const CONSTRUITS = ["sharp", "unrs-resolver"] as const;
+
+/**
+ * `pnpm.overrides` admis, exacts (P0r3c-4, bloquant 3 de la revue du head `608ee99`, PR 348 ; décision 0063 point 1) :
+ * transitives épinglées par `@workflow/core` 5.1.0 à des versions sous avis, forcées vers la première version corrigée
+ * de même majeure, pour ce seul parent. Verdict Sécurité à rendre dans la PR. À retirer quand `workflow` les corrige.
+ */
+export const SUBSTITUTIONS: Readonly<Record<string, string>> = {
+  "@workflow/core>devalue": "5.9.4",
+  "@workflow/core>nanoid": "5.1.16",
+};

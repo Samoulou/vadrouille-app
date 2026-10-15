@@ -12,7 +12,8 @@ import type { Candidat, CandidatNote } from "@/prototype/candidat";
 
 /**
  * Adaptateur de P0 vers les entrées du moteur (décision 0045 § 1.3, B5-TL-1) : **seul** fichier qui convertit les
- * types de P0 (`src/prototype`) en types du moteur (`src/domain/entrees.ts`). Le moteur parle le vocabulaire des
+ * types de P0 (`src/prototype`) en types du moteur (`src/domain/entrees.ts`). Déplacé de `scripts/p0` (P0r3c-5a,
+ * amendement de 0063). Le moteur parle le vocabulaire des
  * contrats, P0 le sien ; la conversion est une fonction testée (`tests/unit/p0/vers-moteur.test.ts`), pas une copie
  * de types.
  *

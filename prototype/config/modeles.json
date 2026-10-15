@@ -12,5 +12,8 @@
   },
   "routage": {
     "data_collection": "deny"
+  },
+  "rechercheWeb": {
+    "moteur": "exa"
   }
 }

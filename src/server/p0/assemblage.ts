@@ -27,8 +27,8 @@ import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 /**
  * Assemblage du programme complet de P0, en mémoire (spécification P0, « Sortie 1 »), puis validation par
  * `TripSchema`, `ProposalSchema` et un `DayMapSchema` par jour **avant** la réduction. Sortie propre à P0 : il a
- * quitté `src/domain` pour `scripts/p0` avec B5a (décision 0045 § 1.5) ; le moteur de production écrit un
- * instantané (`TripSnapshotSchema`, B5b), et les positions sont recomposées à la lecture (B8).
+ * quitté `src/domain` pour `scripts/p0` avec B5a (décision 0045 § 1.5), puis `scripts/p0` pour `src/server/p0` (P0r3c-5a,
+ * amendement de 0063) ; le moteur de production écrit un instantané (`TripSnapshotSchema`, B5b), et les positions sont recomposées à la lecture (B8).
  *
  * Le programme complet contient les durées de trajet (`Segment.minutes`, `Day.travelMinutes`) : il ne vit qu'en
  * mémoire. Seule sa forme réduite est écrite (`@/prototype/reduction`).

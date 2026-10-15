@@ -62,7 +62,15 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
         f !== CE_FICHIER &&
         (lire(f) ?? "").includes(nom),
     );
-    expect(hors).toEqual([MODULE]);
+    // Décision 0057 (§ 4, R8 ; « Tests imposés ») : le relevé `db-releve` trouve chaque surcharge de la fonction par son
+    // nom dans `pg_proc` (jamais par une signature écrite), et son test recopie les cas figés du § 5.5. Lecture du
+    // catalogue seulement : ni appel ni import de la fonction. Admission proposée à la revue (Sécurité, Tech Lead).
+    const RELEVE = [".github/workflows/db-releve.yml", "tests/unit/ci/db-releve.test.ts"];
+    expect(hors.filter((f) => !RELEVE.includes(f))).toEqual([MODULE]);
+    // Dans le workflow : une seule mention, jamais suivie de `(` (aucun appel, aucune signature écrite).
+    const yaml = lire(RELEVE[0]!) ?? "";
+    expect(yaml.split(nom).length - 1).toBe(1);
+    expect(yaml).not.toMatch(new RegExp(`${nom}\\s*\\(`));
   });
 
   it("le module n'est importé que par src/workflows/p0-run.ts et les tests ; ni src/adapters/index.ts, ni src/server", () => {
@@ -85,9 +93,20 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
 });
 
 describe("p0: run_candidates lue par aucun rapport", () => {
-  it("aucun module de scripts/ ni de src/ ne nomme la table de travail", () => {
-    const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && (lire(f) ?? "").includes("run_candidates"));
+  // Seule exception nominative : l'adaptateur de la table de travail (P0r3c-4, décision 0063 point 9), importé par
+  // `src/workflows/p0-run.ts` seul ; aucun rapport ni script ne la lit.
+  const ADAPTATEUR_TRAVAIL = "src/adapters/prototype-travail.ts";
+
+  it("aucun module de scripts/ ni de src/ ne nomme la table de travail, hors son adaptateur", () => {
+    const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && (lire(f) ?? "").includes("run_candidates"));
     expect(hors).toEqual([]);
+  });
+
+  it("l'adaptateur de la table de travail n'est importé que par p0Run", () => {
+    const importeurs = fichiers().filter(
+      (f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && /["']@\/adapters\/prototype-travail["']/.test(lire(f) ?? ""),
+    );
+    expect(importeurs).toEqual(["src/workflows/p0-run.ts"]);
   });
 });
 

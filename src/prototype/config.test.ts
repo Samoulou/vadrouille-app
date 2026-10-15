@@ -5,14 +5,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  BORNES_ESSAI,
   BORNES_MODE_REEL,
   BORNES_PLAFONDS,
-  CHAMPS_MODE_REEL_EN_ATTENTE,
+  CHAMPS_MODE_REEL_DECIDES_PO,
   ConfigModeReelSchema,
   ConfigModelesSchema,
   ConfigPlafondsSchema,
   ConfigRechercheSchema,
   modelesDeLaVariante,
+  moteurRechercheWebAttendu,
+  validerConfigEssai,
   validerConfigModeReel,
   validerConfiguration,
 } from "./config";
@@ -54,6 +57,36 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const autre = structuredClone(brut().modeles) as { variantes: { a: Record<string, string> } };
     autre.variantes.a.recherche = "autre/modele";
     expect(ConfigModelesSchema.safeParse(autre).success).toBe(false);
+  });
+
+  it("moteur de recherche web fixé (bloquant 1c de la PR 326) : exa pour le modèle de recherche choisi, cohérent avec le modèle, jamais absent", () => {
+    const { modeles } = validerConfiguration(brut());
+    expect(modeles.rechercheWeb).toEqual({ moteur: "exa" });
+    expect(moteurRechercheWebAttendu(modeles.etapes.recherche)).toBe("exa");
+    for (const [modele, attendu] of [
+      ["deepseek/deepseek-v4.1-flash", "exa"],
+      ["openai/gpt-x", "native"],
+      ["anthropic/claude-x", "native"],
+      ["google/gemini-x", "native"],
+      ["perplexity/sonar-x", "native"],
+      ["x-ai/grok-x", "native"],
+      ["mistralai/mistral-x", "exa"],
+    ] as const) {
+      expect(moteurRechercheWebAttendu(modele), modele).toBe(attendu);
+    }
+    const avec = (recherche: string, moteur: unknown) => {
+      const config = structuredClone(brut().modeles) as { etapes: Record<string, string>; rechercheWeb: Record<string, unknown> };
+      config.etapes.recherche = recherche;
+      config.rechercheWeb.moteur = moteur;
+      return ConfigModelesSchema.safeParse(config).success;
+    };
+    expect(avec("deepseek/deepseek-v4.1-flash", "native")).toBe(false);
+    expect(avec("openai/gpt-x", "exa")).toBe(false);
+    expect(avec("openai/gpt-x", "native")).toBe(true);
+    for (const moteur of ["auto", "firecrawl", "parallel", "", undefined]) expect(avec("deepseek/deepseek-v4.1-flash", moteur), String(moteur)).toBe(false);
+    const sans = structuredClone(brut().modeles) as Record<string, unknown>;
+    delete sans.rechercheWeb;
+    expect(ConfigModelesSchema.safeParse(sans).success).toBe(false);
   });
 
   it("refuse une configuration de modèles sans data_collection deny", () => {
@@ -123,15 +156,29 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
 
 describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
   const fichier = () => lire("mode-reel") as Record<string, unknown>;
-  const complete = () => ({ ...fichier(), coutUsd: 3, fiches: { margeMinimum: 4, margePart: 0.2 } });
+  const complete = () => fichier();
 
-  it("fichier commité : valeurs décidées (500 éléments, 20 requêtes, unité éléments), refusé tant que Q391 et Q389 manquent", () => {
-    expect(fichier()).toMatchObject({ uniteQuotaRoutes: "elements", routesElements: 500, routesRequetes: 20, placesDetails: 90, placesTextSearch: 90, dureeMs: 900_000 });
-    for (const champ of CHAMPS_MODE_REEL_EN_ATTENTE) expect(Object.keys(fichier())).not.toContain(champ);
-    expect(validerConfigModeReel(fichier())).toEqual({ ok: false, code: "config_reel_incomplete" });
+  it("fichier commité : valeurs de l'amendement 1 du PO (PR 324) et de Samuel (Q330), acceptées", () => {
+    expect(fichier()).toEqual({
+      schema: 1,
+      uniteQuotaRoutes: "elements",
+      coutUsd: 3,
+      recherchesWeb: 40,
+      pagesLues: 100,
+      candidatsTrouves: 85,
+      placesTextSearch: 90,
+      placesDetails: 90,
+      routesRequetes: 30,
+      routesElements: 500,
+      dureeMs: 900_000,
+      fiches: { margeMinimum: 4, margePart: 0.2 },
+      coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
+    });
+    for (const champ of CHAMPS_MODE_REEL_DECIDES_PO) expect(Object.keys(fichier())).toContain(champ);
+    expect(validerConfigModeReel(fichier())).toEqual({ ok: true, config: fichier() });
   });
 
-  it("complétée des décisions en attente, elle passe ; chaque champ obligatoire, sans valeur par défaut", () => {
+  it("chaque champ obligatoire, sans valeur par défaut : absent, refusé (config_reel_incomplete)", () => {
     expect(validerConfigModeReel(complete())).toMatchObject({ ok: true });
     for (const champ of Object.keys(ConfigModeReelSchema.shape)) {
       const sans: Record<string, unknown> = { ...complete() };
@@ -153,6 +200,9 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       ["uniteQuotaRoutes", "minutes"],
       ["fiches", { margeMinimum: 4, margePart: 1.2 }],
       ["mode", "SENTINELLE-MODE"],
+      ["coutsEstimesMicros", { requeteModele: 0, rechercheWeb: 40_000 }],
+      ["coutsEstimesMicros", { requeteModele: 20_000, rechercheWeb: 1_000_001 }],
+      ["coutsEstimesMicros", { requeteModele: 20_000 }],
     ];
     for (const [champ, valeur] of cas) {
       const resultat = validerConfigModeReel({ ...complete(), [champ]: valeur });
@@ -162,5 +212,65 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
     // Contrôle croisé : 86 candidats + 5 logements dépassent 90 Text Search.
     expect(validerConfigModeReel({ ...complete(), candidatsTrouves: 86 })).toEqual({ ok: false, code: "config_reel_invalide" });
     expect(validerConfigModeReel(null)).toEqual({ ok: false, code: "config_reel_invalide" });
+  });
+});
+
+describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décision 0063)", () => {
+  const essai = () => lire("essai") as Record<string, unknown>;
+
+  it("fichier commité : bornes de P0S2-PO-12 amendé (17, 14, 3, 120 ; 12 candidats ; relevées par le ticket 355), acceptées", () => {
+    expect(essai()).toEqual({
+      schema: 1,
+      uniteQuotaRoutes: "elements",
+      coutUsd: 0.3,
+      recherchesWeb: 6,
+      pagesLues: 15,
+      candidatsTrouves: 12,
+      placesTextSearch: 17,
+      placesDetails: 14,
+      routesRequetes: 3,
+      routesElements: 120,
+      dureeMs: 300_000,
+      fiches: { margeMinimum: 4, margePart: 0.2 },
+      coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
+    });
+    expect(validerConfigEssai(essai())).toEqual({ ok: true, config: essai() });
+    // Chaque valeur commitée est exactement la borne : le fichier ne peut que descendre.
+    for (const [champ, borne] of Object.entries(BORNES_ESSAI)) expect(essai()[champ], champ).toBe(borne);
+  });
+
+  it("au-delà d'une borne de l'essai (mais sous celles du mode réel), refusée sans recopier la valeur", () => {
+    const cas: [string, number][] = [
+      ["coutUsd", 0.31],
+      ["recherchesWeb", 7],
+      ["pagesLues", 16],
+      ["candidatsTrouves", 13],
+      ["placesTextSearch", 18],
+      ["placesDetails", 15],
+      ["routesRequetes", 4],
+      ["routesElements", 121],
+      ["dureeMs", 300_001],
+    ];
+    expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());
+    for (const [champ, valeur] of cas) {
+      const brutEssai = { ...essai(), [champ]: valeur };
+      expect(validerConfigModeReel(brutEssai).ok, champ).toBe(champ !== "candidatsTrouves" || valeur + 5 <= 17);
+      const resultat = validerConfigEssai(brutEssai);
+      expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
+      expect(JSON.stringify(resultat)).not.toContain(String(valeur));
+    }
+  });
+
+  it("mêmes codes que le mode réel : champ absent, config_reel_incomplete", () => {
+    const sans: Record<string, unknown> = { ...essai() };
+    delete sans.coutsEstimesMicros;
+    expect(validerConfigEssai(sans)).toEqual({ ok: false, code: "config_reel_incomplete" });
+  });
+
+  it("recherche-essai.json : 12 candidats, validé par le schéma de recherche", () => {
+    const recherche = ConfigRechercheSchema.parse(lire("recherche-essai"));
+    expect(recherche.totalCandidats).toBe(BORNES_ESSAI.candidatsTrouves);
+    const cibles = Object.values(recherche.ciblesParCreneau).reduce((a, b) => a + b, 0);
+    expect(cibles).toBeLessThanOrEqual(recherche.totalCandidats);
   });
 });

@@ -1,0 +1,194 @@
+name: db-migrate
+# Application des migrations à la base réelle (décision 0056, exigence Sécurité S9 révisée ; Q294 : « Bouton GitHub »).
+# - N'applique que les migrations dont le nom et l'empreinte SHA-256 figurent dans MIGRATIONS_APPROUVEES, plus bas,
+#   que seul Samuel approuve (owner-approved, décision 0035). Tout le reste est refusé. La liste est la seule source
+#   des noms de migration : le journal de drizzle-kit n'est pas lu.
+# - Aucun fichier du dépôt n'est exécuté ni chargé : bash, sha256sum, stat, realpath et psql -X du runner. Le texte
+#   d'une migration est lu une fois, haché, comparé à la liste, puis seulement envoyé par un -c de psql.
+# - Lancé à la main sur main, avec sha_attendu = tête de main relevée juste avant (§ 2.9) ; le lanceur consigne la
+#   conclusion du run, le commit et les migrations appliquées et ignorées dans le ticket ou la PR, sans valeur secrète.
+# - Environnement db-migrate (branche main seule) et secrets MIGRATOR_PG* posés par Samuel (Q387) ; MIGRATOR_PGHOST
+#   désigne l'hôte direct de Neon, jamais l'hôte poolé. Aucun agent ne modifie l'environnement ni ses secrets.
+# - Un run en attente dans le groupe db-migrate est annulé par GitHub si un autre lancement arrive : le lanceur
+#   vérifie la conclusion de son run et relance s'il a été annulé (§ 2.7).
+# - Lot partiel (§ 2.6.4) : chaque migration a sa session et sa transaction ; les migrations appliquées avant un échec
+#   restent journalisées. Aucun nouveau lancement avant l'analyse de la Sécurité et du data.
+# Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
+on:
+  workflow_dispatch:
+    inputs:
+      sha_attendu:
+        description: "Commit de main relevé juste avant le lancement (40 caractères hexadécimaux)"
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+jobs:
+  migrer:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: db-migrate
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+      - name: Appliquer les migrations approuvées
+        shell: bash
+        env:
+          SHA_ATTENDU: ${{ inputs.sha_attendu }}
+          LC_ALL: C
+          PGHOST: ${{ secrets.MIGRATOR_PGHOST }}
+          PGDATABASE: ${{ secrets.MIGRATOR_PGDATABASE }}
+          PGPASSWORD: ${{ secrets.MIGRATOR_PGPASSWORD }}
+          PGUSER: vadrouille_migrator
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+          # Textes SQL de l'exécuteur, envoyés par des -c distincts (§ 2.6.2 à 2.6.4). @TAG@ et @SHA256@ sont remplacés
+          # par une ligne de la liste, vérifiée par son motif (aucune apostrophe possible).
+          SQL_SESSION: "SET search_path = pg_catalog, pg_temp"
+          SQL_ROLE: |
+            DO $$
+            BEGIN
+              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle de session inattendu'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'vadrouille_migrator' AND (r.rolsuper OR r.rolbypassrls)) THEN RAISE EXCEPTION 'rôle privilégié'; END IF;
+              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;
+            END
+            $$
+          SQL_JOURNAL: "CREATE TABLE IF NOT EXISTS vadrouille_migrations.applied (tag text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())"
+          SQL_LIRE_JOURNAL: "SELECT a.tag, a.sha256 FROM vadrouille_migrations.applied a ORDER BY a.tag"
+          SQL_DELAIS: "SET lock_timeout = '10s'; SET statement_timeout = '5min'"
+          SQL_VERROU: "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vadrouille_migrations'))"
+          SQL_REPERE: "SELECT pg_catalog.set_config('vadrouille_migrate.txid', pg_catalog.txid_current()::text, true)"
+          SQL_NON_APPLIQUEE: |
+            DO $$
+            BEGIN
+              IF EXISTS (SELECT 1 FROM vadrouille_migrations.applied a WHERE a.tag = '@TAG@') THEN RAISE EXCEPTION 'migration déjà journalisée'; END IF;
+            END
+            $$
+          SQL_APRES_CHEMIN: "SET LOCAL search_path = pg_catalog, pg_temp"
+          SQL_APRES: |
+            DO $$
+            BEGIN
+              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle changé par la migration'; END IF;
+              IF pg_catalog.current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION 'session_replication_role changé par la migration'; END IF;
+              IF pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text THEN RAISE EXCEPTION 'transaction changée par la migration'; END IF;
+            END
+            $$
+          SQL_INSERER: "INSERT INTO vadrouille_migrations.applied (tag, sha256) VALUES ('@TAG@', '@SHA256@')"
+        run: |
+          set -u
+          echec() {
+            printf 'Échec : %s\n' "$1"
+            exit 1
+          }
+
+          # Liste d'approbation (§ 2.4) : une ligne « <tag> <sha256> » par migration, dans l'ordre du journal, en ajout
+          # seulement. Chaque ajout est une PR de workflow qui attend owner-approved, avec le verdict Sécurité G1 à G6.
+          MIGRATIONS_APPROUVEES=(
+          )
+
+          # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
+          if [[ ! $SHA_ATTENDU =~ ^[0-9a-f]{40}$ ]]; then echec "sha_attendu hors forme"; fi
+          if [[ "$SHA_ATTENDU" == "$GITHUB_SHA" ]]; then :; else echec "sha_attendu différent du commit lancé"; fi
+          version_psql=$(psql -X --version) || echec "psql introuvable"
+          if [[ ! $version_psql =~ ^psql\ \(PostgreSQL\)\ (1[6-9]|[2-9][0-9])\. ]]; then echec "psql de version majeure inférieure à 16"; fi
+          if [[ ! $PGHOST =~ ^[a-z0-9.-]{1,253}$ ]]; then echec "PGHOST hors forme"; fi
+          if [[ $PGHOST == *-pooler* ]]; then echec "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi
+          if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then echec "PGDATABASE hors forme"; fi
+
+          motif_liste='^([0-9]{4}_[a-z0-9_]{1,60}) ([0-9a-f]{64})$'
+          tags=()
+          empreintes=()
+          textes=()
+          for ligne in "${MIGRATIONS_APPROUVEES[@]}"; do
+            if [[ ! $ligne =~ $motif_liste ]]; then echec "ligne de la liste d'approbation hors forme"; fi
+            tag=${BASH_REMATCH[1]}
+            empreinte=${BASH_REMATCH[2]}
+            f="$GITHUB_WORKSPACE/db/migrations/$tag.sql"
+            chemin=$(realpath -e -- "$f") || echec "migration $tag absente"
+            if [[ "$chemin" != "$f" ]]; then echec "migration $tag : lien symbolique"; fi
+            if [[ ! -f $f || -L $f ]]; then echec "migration $tag : fichier non ordinaire"; fi
+            taille=$(stat -c %s -- "$f") || echec "migration $tag : taille illisible"
+            if [[ ! $taille =~ ^(0|[1-9][0-9]{0,8})$ ]]; then echec "migration $tag : taille illisible"; fi
+            if [[ $taille == 0 ]]; then echec "migration $tag : fichier vide"; fi
+            if [[ $taille -gt 102400 ]]; then echec "migration $tag : plus de 100 Kio"; fi
+            if IFS= read -r -d '' texte < "$f"; then echec "migration $tag : octet NUL"; fi
+            if [[ ${#texte} != "$taille" ]]; then echec "migration $tag : texte tronqué"; fi
+            lue=$(printf '%s' "$texte" | sha256sum)
+            lue=${lue%% *}
+            if [[ "$lue" != "$empreinte" ]]; then echec "migration $tag : empreinte différente de la liste d'approbation"; fi
+            if [[ $texte == '\'* ]]; then echec "migration $tag : commence par une barre oblique inverse"; fi
+            if [[ ${texte,,} == *vadrouille_migrate.* ]]; then echec "migration $tag : nomme un paramètre vadrouille_migrate"; fi
+            tags+=("$tag")
+            empreintes+=("$empreinte")
+            textes+=("$texte")
+          done
+          echo "Lignes de la liste d'approbation : ${#tags[@]}"
+          if [[ ${#tags[@]} == 0 ]]; then
+            echo "Aucune migration approuvée : aucune connexion."
+            exit 0
+          fi
+
+          # 2 et 3. Connexion, rôle et journal, dans une première session (§ 2.6.2 et 2.6.3). Sortie dans un fichier
+          # jamais affiché : une erreur de connexion nomme l'hôte.
+          journal="$RUNNER_TEMP/db-migrate-journal.txt"
+          traces="$RUNNER_TEMP/db-migrate-traces.txt"
+          code=0
+          psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -q -A -t -F '|' -c "$SQL_SESSION" -c "$SQL_ROLE" -c "$SQL_JOURNAL" -c "$SQL_LIRE_JOURNAL" > "$journal" 2> "$traces" || code=$?
+          if [[ $code != 0 ]]; then
+            etat=inconnu
+            while IFS= read -r ligne; do
+              if [[ $ligne =~ ^(ERROR|FATAL):\ +([0-9A-Z]{5})$ ]]; then etat=${BASH_REMATCH[2]}; fi
+            done < "$traces"
+            echec "connexion, rôle ou journal ; code de sortie $code ; SQLSTATE $etat"
+          fi
+          motif_journal='^([0-9]{4}_[a-z0-9_]{1,60})\|([0-9a-f]{64})$'
+          journal_tags=()
+          journal_empreintes=()
+          while IFS= read -r ligne; do
+            if [[ ! $ligne =~ $motif_journal ]]; then echec "ligne du journal hors forme"; fi
+            journal_tags+=("${BASH_REMATCH[1]}")
+            journal_empreintes+=("${BASH_REMATCH[2]}")
+          done < "$journal"
+
+          # Classement avant toute application : appliquée avec la même empreinte, ignorée ; avec une autre, échec.
+          a_appliquer=()
+          for i in "${!tags[@]}"; do
+            etat=nouvelle
+            for j in "${!journal_tags[@]}"; do
+              if [[ "${journal_tags[$j]}" == "${tags[$i]}" ]]; then
+                if [[ "${journal_empreintes[$j]}" == "${empreintes[$i]}" ]]; then etat=ignoree; else etat=modifiee; fi
+              fi
+            done
+            if [[ $etat == modifiee ]]; then echec "migration ${tags[$i]} déjà appliquée avec une autre empreinte : écrire une nouvelle migration"; fi
+            if [[ $etat == ignoree ]]; then echo "Ignorée (déjà appliquée) : ${tags[$i]}"; else a_appliquer+=("$i"); fi
+          done
+
+          # 4. Application, dans l'ordre de la liste : une session et une transaction par migration (§ 2.6.4).
+          for i in "${a_appliquer[@]}"; do
+            tag=${tags[$i]}
+            non_appliquee=${SQL_NON_APPLIQUEE//@TAG@/$tag}
+            inserer=${SQL_INSERER//@TAG@/$tag}
+            inserer=${inserer//@SHA256@/${empreintes[$i]}}
+            sortie="$RUNNER_TEMP/db-migrate-$tag.txt"
+            code=0
+            psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -c "$SQL_DELAIS" -c "BEGIN" -c "$SQL_VERROU" -c "$SQL_REPERE" -c "$non_appliquee" -c "${textes[$i]}" -c "$SQL_APRES_CHEMIN" -c "$SQL_APRES" -c "$inserer" -c "COMMIT" > "$sortie" 2>&1 || code=$?
+            if [[ $code != 0 ]]; then
+              etat=inconnu
+              while IFS= read -r ligne; do
+                if [[ $ligne =~ ^(ERROR|FATAL):\ +([0-9A-Z]{5})$ ]]; then etat=${BASH_REMATCH[2]}; fi
+              done < "$sortie"
+              echec "migration $tag ; code de sortie $code ; SQLSTATE $etat"
+            fi
+            echo "Appliquée : $tag"
+          done
+          echo "Terminé."

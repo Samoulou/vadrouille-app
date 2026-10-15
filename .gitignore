@@ -25,3 +25,7 @@ prototype/sorties/
 .DS_Store
 *.log
 .vercel
+
+# routes générées par le Workflow SDK au build (withWorkflow, décision 0063)
+src/app/.well-known/workflow/
+/.swc

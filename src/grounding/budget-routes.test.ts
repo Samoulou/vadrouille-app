@@ -13,7 +13,7 @@ import {
   type HorlogeCadence,
 } from "@/grounding/budget-routes";
 import type { ClientRoutes, RequeteMatrice } from "@/grounding/interfaces";
-import { distanceVolOiseauMetres, ordreVolOiseau, zoneDuSejour } from "@/grounding/zone";
+import { distanceVolOiseauMetres, ordreVolOiseau, regrouperParJour, zoneDuSejour } from "@/grounding/zone";
 
 /** Budgets Routes de `p0Run` (0055 § 6 point 1 ; 0053 ; Q330) : client Routes simulé, aucun appel réel. */
 
@@ -211,5 +211,51 @@ describe("p0: premier tri à vol d'oiseau (0053, amendement 1, point 4)", () => 
     expect(pole.nordEst).toEqual({ lat: 90, lng: 180 });
     expect(() => zoneDuSejour([], 30_000)).toThrow(RangeError);
     expect(() => zoneDuSejour([{ lat: Number.NaN, lng: 0 }], 30_000)).toThrow(RangeError);
+  });
+});
+
+describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 amendement 1 point 4 ; 0055 § 6 point 4)", () => {
+  type Type = "activity" | "meal" | "evening";
+  const lieu = (id: string, type: Type, lat: number, lng: number) => ({ id, type, position: { lat, lng } });
+  // Deux quartiers éloignés (~ 5 km) : A autour de 55.95/-3.19, B autour de 55.95/-3.11.
+  const LIEUX = [
+    lieu("a1", "activity", 55.95, -3.19),
+    lieu("b1", "activity", 55.95, -3.11),
+    lieu("a2", "meal", 55.951, -3.191),
+    lieu("b2", "meal", 55.951, -3.111),
+    lieu("a3", "activity", 55.952, -3.189),
+    lieu("b3", "evening", 55.949, -3.112),
+    lieu("a4", "evening", 55.949, -3.192),
+    lieu("b4", "activity", 55.952, -3.109),
+  ];
+  const jour = (activity: number, meal: number, evening: number, capacite: number) => ({ demande: { activity, meal, evening }, capacite });
+
+  it("le premier lieu restant ouvre le jour ; puis le plus proche d'un type encore demandé ; aucun lieu dans deux jours", () => {
+    const groupes = regrouperParJour(LIEUX, [jour(2, 1, 1, 10), jour(2, 1, 1, 10)]);
+    expect(groupes).toEqual([
+      // a2 à ~130 m de a1, a4 à ~170 m, a3 à ~230 m.
+      ["a1", "a2", "a4", "a3"],
+      ["b1", "b2", "b3", "b4"],
+    ]);
+    expect(new Set(groupes.flat()).size).toBe(groupes.flat().length);
+  });
+
+  it("capacité de la matrice du jour : jamais dépassée ; capacité nulle : jour vide", () => {
+    const groupes = regrouperParJour(LIEUX, [jour(2, 1, 1, 2), jour(2, 1, 1, 0), jour(2, 1, 1, 3)]);
+    expect(groupes[0]).toHaveLength(2);
+    expect(groupes[1]).toEqual([]);
+    expect(groupes[2]?.length).toBeLessThanOrEqual(3);
+  });
+
+  it("demande par type respectée : un type déjà servi n'est plus pris ; un lieu d'aucun type demandé n'ouvre pas le jour", () => {
+    const groupes = regrouperParJour(LIEUX, [jour(0, 1, 0, 10)]);
+    expect(groupes).toEqual([["a2"]]);
+    expect(regrouperParJour(LIEUX, [jour(0, 0, 0, 10)])).toEqual([[]]);
+  });
+
+  it("égalité de distance : ordre d'entrée ; lieux restants non regroupés (non planifiés)", () => {
+    const egaux = [lieu("x", "activity", 0, 0), lieu("y", "activity", 0, 1), lieu("z", "activity", 0, -1)];
+    expect(regrouperParJour(egaux, [jour(2, 0, 0, 5)])).toEqual([["x", "y"]]);
+    expect(regrouperParJour(egaux, [jour(1, 0, 0, 5), jour(1, 0, 0, 5)])).toEqual([["x"], ["y"]]);
   });
 });

@@ -335,7 +335,7 @@
     {
       "fichier": "src/ai/openrouter-client.ts",
       "portee": "application",
-      "usage": "client réel de modèles (P0r1), branché à aucun point d'entrée : AI SDK et fournisseur explicite, hôte figé, `fetch` global seulement comme valeur par défaut du paramètre `transport` de la fabrique, passé au fournisseur sous l'enveloppe. Justification côté serveur : module `server-only`, importé seulement par ses tests",
+      "usage": "client réel de modèles (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : AI SDK et fournisseur explicite, hôte figé, `fetch` global seulement comme valeur par défaut du paramètre `transport` de la fabrique, passé au fournisseur sous l'enveloppe. Justification côté serveur : module `server-only`, importé par ses tests et par la composition du mode réel",
       "capacites": [
         {
           "capacite": "module:@openrouter/ai-sdk-provider",
@@ -478,6 +478,48 @@
         }
       ],
       "ecart": "P0r3b (ticket 311 ; décision 0055, S-2 point 3) : attribut HTML attendu dans le rendu de la page, aucun nom de variable : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "tests/unit/ci/db-migrate.test.ts",
+      "portee": "test",
+      "usage": "test statique du workflow db-migrate : noms des secrets de l'environnement db-migrate attendus en variables libpq",
+      "capacites": [
+        {
+          "capacite": "secret:MIGRATOR_PGPASSWORD",
+          "formes": [
+            "MIGRATOR_PGPASSWORD",
+            "${{ secrets.MIGRATOR_PGPASSWORD }}"
+          ]
+        },
+        {
+          "capacite": "secret:PGPASSWORD",
+          "formes": [
+            "PGPASSWORD"
+          ]
+        }
+      ],
+      "ecart": "PR du workflow des migrations (décisions 0056 et 0057, « Tests imposés » : secrets exacts affectés à leur variable) : noms des secrets, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "tests/unit/ci/db-releve.test.ts",
+      "portee": "test",
+      "usage": "test statique du workflow db-releve : noms des secrets de l'environnement db-releve attendus en variables libpq",
+      "capacites": [
+        {
+          "capacite": "secret:RELEVE_PGPASSWORD",
+          "formes": [
+            "RELEVE_PGPASSWORD",
+            "${{ secrets.RELEVE_PGPASSWORD }}"
+          ]
+        },
+        {
+          "capacite": "secret:PGPASSWORD",
+          "formes": [
+            "PGPASSWORD"
+          ]
+        }
+      ],
+      "ecart": "PR du workflow des migrations (décisions 0056 et 0057, « Tests imposés » : secrets exacts affectés à leur variable) : noms des secrets, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
     }
   ]
 }

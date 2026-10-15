@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "ciblesParCreneau": {
+    "activity": 6,
+    "meal": 5,
+    "evening": 1
+  },
+  "totalCandidats": 12,
+  "tailleLotNotation": 9,
+  "toursMax": 3,
+  "ageSourceMaxJours": 1095
+}

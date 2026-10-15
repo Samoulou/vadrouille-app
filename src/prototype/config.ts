@@ -34,8 +34,30 @@ export const RoutageSchema = z.strictObject({
 });
 export type Routage = z.infer<typeof RoutageSchema>;
 
+/**
+ * Moteurs admis du greffon de recherche web d'OpenRouter (correction 1 de la PR 326, bloquant 1c de la revue du head
+ * `e096176`) : le moteur est **fixé** par la configuration et envoyé sur chaque requête, jamais laissé au défaut variable
+ * du fournisseur (natif si le modèle en a un, sinon Exa). `native` : recherche du fournisseur du modèle ; `exa` : Exa,
+ * sous-traitant américain d'OpenRouter, hors du réglage `data_collection: "deny"` (question pour Samuel, PR 326).
+ */
+export const MOTEURS_RECHERCHE_WEB = ["native", "exa"] as const;
+export type MoteurRechercheWeb = (typeof MOTEURS_RECHERCHE_WEB)[number];
+
+/**
+ * Familles de modèles (préfixe `fournisseur/`) dont OpenRouter offre la recherche **native** (documentation OpenRouter,
+ * « Web Search », consultée le 2026-10-14 : Anthropic, Google, OpenAI, Perplexity, xAI). À revérifier à chaque
+ * changement du modèle de l'étape `recherche`.
+ */
+export const FAMILLES_RECHERCHE_NATIVE: readonly string[] = ["anthropic", "google", "openai", "perplexity", "x-ai"];
+
+/** Moteur exigé pour un modèle (avis de la Sécurité, PR 326) : `native` si le modèle l'offre, sinon `exa`. */
+export function moteurRechercheWebAttendu(modele: string): MoteurRechercheWeb {
+  return FAMILLES_RECHERCHE_NATIVE.includes(modele.split("/")[0] ?? "") ? "native" : "exa";
+}
+
 /** `modeles.json` : modèles de la variante B, et la seule différence de la variante A (P0-PO-12). */
-export const ConfigModelesSchema = z.strictObject({
+export const ConfigModelesSchema = z
+  .strictObject({
   schema: Version,
   etapes: z.strictObject({
     recherche: ModeleIdSchema,
@@ -47,7 +69,14 @@ export const ConfigModelesSchema = z.strictObject({
     a: z.strictObject({ notation: ModeleIdSchema }),
   }),
   routage: RoutageSchema,
-});
+  /** Recherche web du fournisseur (modèle de l'étape `recherche`) : moteur fixé, cohérent avec ce modèle. */
+  rechercheWeb: z.strictObject({ moteur: z.enum(MOTEURS_RECHERCHE_WEB) }),
+  })
+  .superRefine((config, contexte) => {
+    if (config.rechercheWeb.moteur !== moteurRechercheWebAttendu(config.etapes.recherche)) {
+      contexte.addIssue({ code: "custom", path: ["rechercheWeb", "moteur"], message: "moteur de recherche web incohérent avec le modèle de l'étape recherche" });
+    }
+  });
 export type ConfigModeles = z.infer<typeof ConfigModelesSchema>;
 
 export const VARIANTES = ["a", "b"] as const;
@@ -142,16 +171,19 @@ export const BORNES_MODE_REEL = {
 const LOGEMENTS_MAX = 5;
 
 /**
- * Champs du mode réel **sans valeur par défaut** tant que leur décision manque : `coutUsd` (Q391, Product Owner) et
- * `fiches` (marge de remplacement de l'étape finale, Q389, Product Owner). Absents du fichier, la configuration est
- * refusée (`config_reel_incomplete`) et aucune exécution réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6
- * point 2).
+ * Champs du mode réel **sans valeur par défaut**, décidés par le Product Owner (amendement 1 de la spécification
+ * P0-suite-2, 2026-10-14, PR 324) : `coutUsd` = 3 (Q391) et `fiches` = `{ margeMinimum: 4, margePart: 0,2 }`
+ * (Q389, P0S2-PO-17). Absents du fichier, la configuration est refusée (`config_reel_incomplete`) et aucune exécution
+ * réelle ne démarre (même règle que `uniteQuotaRoutes`, 0055 § 6 point 2).
  */
-export const CHAMPS_MODE_REEL_EN_ATTENTE = ["coutUsd", "fiches"] as const;
+export const CHAMPS_MODE_REEL_DECIDES_PO = ["coutUsd", "fiches"] as const;
 
 const plafondReel = (max: number) => z.number().int().min(1).max(max);
 
-/** `mode-reel.json` : plafonds par exécution du mode réel, unité du quota Routes et marge des fiches. */
+/** Coût estimé d'un appel de modèle au plus, en micro-USD (1 USD) : borne de forme, pas un plafond. */
+export const COUT_ESTIME_MAX_MICROS = 1_000_000;
+
+/** `mode-reel.json` (et `essai.json`) : plafonds par exécution, unité du quota Routes, marge des fiches, coûts estimés. */
 export const ConfigModeReelSchema = z.strictObject({
   schema: Version,
   /** Unité du quota Routes (Q330 : `"elements"`), obligatoire, sans valeur par défaut. */
@@ -169,6 +201,15 @@ export const ConfigModeReelSchema = z.strictObject({
   fiches: z.strictObject({
     margeMinimum: z.number().int().min(0).max(BORNES_MODE_REEL.placesDetails),
     margePart: z.number().finite().min(0).max(1),
+  }),
+  /**
+   * Coûts **estimés** réservés avant chaque appel de modèle, en micro-USD (P0r3c-4, décision 0063 point 6) : une
+   * requête ordinaire, et une recherche web du fournisseur (jetons du modèle et frais du moteur, mineur 2 de la PR 326).
+   * Ils bornent la réservation et servent de repli quand le fournisseur ne rend pas le coût réel.
+   */
+  coutsEstimesMicros: z.strictObject({
+    requeteModele: z.number().int().min(1).max(COUT_ESTIME_MAX_MICROS),
+    rechercheWeb: z.number().int().min(1).max(COUT_ESTIME_MAX_MICROS),
   }),
 });
 export type ConfigModeReel = z.infer<typeof ConfigModeReelSchema>;
@@ -191,6 +232,49 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
   if (!lu.success) return { ok: false, code: "config_reel_invalide" };
   if (lu.data.candidatsTrouves + LOGEMENTS_MAX > lu.data.placesTextSearch) return { ok: false, code: "config_reel_invalide" };
   return { ok: true, config: lu.data };
+}
+
+/**
+ * Plafonds de l'**essai d'intégration** (P0S2-PO-12, amendé le 2026-10-14 par le Product Owner, spécification
+ * P0 suite 2, « Essai d'intégration » ; proposés par #318 selon la règle de 0055 § 6 point 7) : 0,30 USD de
+ * modèles, 6 recherches web, 15 pages, 12 candidats (série de 10 lieux du brief court et 2 de marge), 17 Text
+ * Search (12 candidats et 5 logements au plus), 14 Place Details (10 lieux, 2 de marge et 2 × 1 logement),
+ * 3 requêtes de matrice et 120 éléments (`n² + 2n`, `n` = 10), 5 min. Candidats, Text Search et fiches relevés
+ * par le ticket 355 (0063, amendement P0r3c-5, points 8 et 9). Ce sont des maxima : `essai.json` ne peut pas
+ * les dépasser.
+ */
+export const BORNES_ESSAI = {
+  coutUsd: 0.3,
+  recherchesWeb: 6,
+  pagesLues: 15,
+  candidatsTrouves: 12,
+  placesTextSearch: 17,
+  placesDetails: 14,
+  routesRequetes: 3,
+  routesElements: 120,
+  dureeMs: 300_000,
+} as const;
+
+/**
+ * Configuration de l'essai d'intégration (`prototype/config/essai.json`) : même schéma que le mode réel
+ * (`ConfigModeReelSchema`, mêmes codes fermés), puis chaque plafond sous `BORNES_ESSAI`.
+ */
+export function validerConfigEssai(brut: unknown): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+  const lu = validerConfigModeReel(brut);
+  if (!lu.ok) return lu;
+  const c = lu.config;
+  const b = BORNES_ESSAI;
+  const dansLesBornes =
+    c.coutUsd <= b.coutUsd &&
+    c.recherchesWeb <= b.recherchesWeb &&
+    c.pagesLues <= b.pagesLues &&
+    c.candidatsTrouves <= b.candidatsTrouves &&
+    c.placesTextSearch <= b.placesTextSearch &&
+    c.placesDetails <= b.placesDetails &&
+    c.routesRequetes <= b.routesRequetes &&
+    c.routesElements <= b.routesElements &&
+    c.dureeMs <= b.dureeMs;
+  return dansLesBornes ? lu : { ok: false, code: "config_reel_invalide" };
 }
 
 /**

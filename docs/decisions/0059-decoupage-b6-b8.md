@@ -4,6 +4,8 @@ Statut : décision déléguée (ordre et découpage des tâches, « Qui décide 
 
 Numérotation (vérifiée le 2026-10-14) : `main` va de 0001 à 0058 ; aucune PR ouverte n'ajoute un 0059.
 
+**§ 4 précisé par 0060** (ticket #333, fichier commun `eslint.config.mjs`) : B8c n'est dans le même cycle ni que B8a, ni que B3c, ni que B6a, ni qu'une PR qui modifie `eslint.config.mjs` ou ses tests de confinement ; la phrase « [B8a] peut être dans le même cycle que B8c » ne vaut plus.
+
 ## Contexte
 Les deux spécifications proposent un découpage qui déroge à la règle « une tâche = une spécification = une branche = une PR » (`CLAUDE.md`) et renvoient son écriture à une décision du CEO avant le premier ticket de code (B6 : section « Découpage » et question 1 au CEO ; B8 : section « Découpage proposé » et question 1). Le CEO a accepté les deux découpages sur le principe (Q415, Q416) ; restait à les écrire et à fixer l'ordre de B8c par rapport à B7a et B7c, que la décision 0054 § 3 place avant tout B8.
 

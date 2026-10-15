@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "uniteQuotaRoutes": "elements",
+  "coutUsd": 0.3,
+  "recherchesWeb": 6,
+  "pagesLues": 15,
+  "candidatsTrouves": 12,
+  "placesTextSearch": 17,
+  "placesDetails": 14,
+  "routesRequetes": 3,
+  "routesElements": 120,
+  "dureeMs": 300000,
+  "fiches": {
+    "margeMinimum": 4,
+    "margePart": 0.2
+  },
+  "coutsEstimesMicros": {
+    "requeteModele": 20000,
+    "rechercheWeb": 40000
+  }
+}

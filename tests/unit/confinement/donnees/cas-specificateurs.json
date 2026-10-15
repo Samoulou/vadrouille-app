@@ -267,7 +267,7 @@
     {
       "id": "paquets-pnpm-overrides",
       "chemin": "package.json",
-      "source": "{\"pnpm\": {\"overrides\": {}}}",
+      "source": "{\"pnpm\": {\"overrides\": {\"esbuild\": \"0.25.0\"}}}",
       "attendu": "refus",
       "regle": "specificateur",
       "fusion": true

@@ -20,7 +20,7 @@ import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 
-import { assembler, type Raison } from "./assemblage";
+import { assembler, type Raison } from "@/server/p0/assemblage";
 import type { Configuration } from "./fichiers";
 import { codeErreur, type Journal } from "./journal";
 import {
@@ -44,7 +44,7 @@ import {
   relecturesDepuisAncrages,
   violationsP0,
   type ViolationsP0,
-} from "./vers-moteur";
+} from "@/server/p0/vers-moteur";
 
 /**
  * Orchestrateur du prototype (spécification P0, « Déroulement » ; décision 0032, A3.1) : seul fichier qui compose

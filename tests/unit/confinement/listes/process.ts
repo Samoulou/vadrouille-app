@@ -62,9 +62,16 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/test-db.mjs", propriete: "exit" },
   // P0r1 (ticket 267 ; spécification P0c, section 9) : options de Node lues par la barrière de sortie. Verdict Sécurité à rendre.
   { fichier: "src/server/env/egress.ts", propriete: "execArgv" },
+  // Décision 0062, condition 1.7 (ticket 341 ; bloquant 1 de la revue du head `b0c1c45`) : `process.config`, valeur par
+  // défaut du cinquième paramètre de `verifierSortie`, dont seuls les `defines` `NODE_OPENSSL_CONF_NAME=` sont comparés ;
+  // rien n'en sort. Verdict Sécurité à rendre.
+  { fichier: "src/server/env/egress.ts", propriete: "config" },
   // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement ») : arrêt du démarrage sur une configuration
   // refusée (`register()`). Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
   { fichier: "src/instrumentation.ts", propriete: "exit" },
+  // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : arrêt du groupe de
+  // processus de l'exécuteur joué par le test « job arrêté » (0056, « Tests imposés »), comme le runner le ferait.
+  { fichier: "tests/db/workflows-harnais.ts", propriete: "kill" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
@@ -99,6 +106,12 @@ export const LECTURES_ENV = [
   { fichier: "tests/unit/p0/cli.test.ts", noms: ["PATH", "HOME", "SystemRoot", "TMPDIR", "TEMP", "TMP"] },
   // Relevé de `f57153c` (T18) : `PATH` d'un sous-processus de test.
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", noms: ["PATH"] },
+  // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : `PATH` des scripts bash des
+  // workflows de la base, joués avec un environnement construit (aucune autre variable héritée) ; `GITHUB_EVENT_NAME`
+  // choisit la référence de « liste approuvée en ajout seulement » (premier parent sur un `push` vers `main`).
+  { fichier: "tests/db/workflows-harnais.ts", noms: ["PATH"] },
+  { fichier: "tests/unit/ci/db-releve.test.ts", noms: ["PATH"] },
+  { fichier: "tests/unit/ci/db-migrate.test.ts", noms: ["GITHUB_EVENT_NAME"] },
   // 0040 D2, A8 : environnement de `git` construit (P0c-suite-release, #222).
   { fichier: "scripts/ci/techlead-gate.mjs", noms: ["PATH", "HOME"] },
   // P0r1 (ticket 267 ; décision 0031 § 6 ; spécification P0c, section 9) : variables de déploiement, de proxy et de TLS de
@@ -109,7 +122,8 @@ export const LECTURES_ENV = [
       "VERCEL_ENV",
       "VERCEL_TARGET_ENV",
       "VADROUILLE_ENV",
-      // Décision 0058 (ticket 319) : condition de l'exception étroite de `NODE_EXTRA_CA_CERTS`, comparée à `1`.
+      // Décision 0062 (ticket 341 ; remplace l'exception de 0058 § 4) : condition 1.1 de l'exception d'`OPENSSL_CONF`,
+      // comparée à `1`. `OPENSSL_CONF` (plus bas) est aussi lue dans le vrai `process.env` (condition 1.2).
       "VERCEL",
       "HTTP_PROXY",
       "http_proxy",
