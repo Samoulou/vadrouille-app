@@ -1,34 +1,32 @@
-# État du studio — 2026-10-15 (78e cycle)
+# État du studio — 2026-10-15 (79e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-15 : 13:47 UTC, carte « Oui, partout » (délai de 6 heures aussi pour les décisions en attente) → décision 0068 ; 13:57 UTC, commentaire « Je confirme 00068 » sur #378 → fusion de 0068. 14:32 UTC, « Ça avance ? » → état et lien du lot 2. 14:33 UTC, `owner-approved` sur #380 (« Done ») → fusion, lot 2 appliqué.
+- Fil du cycle, 2026-10-15 : 15:26 UTC, carte « Lever maintenant » (Q455, délai de 6 heures levé sur les parties de 0057 amendées par 0066 et 0067). Le filtre de sécurité refuse que le studio déclare la condition 4 sur la seule foi de la carte : demandé à Samuel à 15:46 UTC d'écrire la levée de sa main sur #374.
 - #studio : aucun nouveau message.
 
 ## Fait
-- Fusionnés depuis le 77e cycle : #378 (décision 0068, délai de veto de 6 heures ; un amendement se compte à part), #380 (lot 2 approuvé), #379 (état du 77e cycle).
-- **Lot 2 appliqué à la vraie base** : `db-migrate` (run 38752814907, 14:40 UTC) applique `0005_prototype_coordinates_run` ; 0000 à 0004 ignorées (déjà appliquées).
-- **A16 fait, favorable** : `db-releve` (run 38753837888) ; R8 `f` (verrou S8 tenu), R6 conforme, `plpgsql` seule extension, aucun rôle `vadrouille_*` super-utilisateur ; consigné sur #374. Condition 4 de 0056 § 4.1 déclarée à 19:37 UTC sans veto (0057 § 7.1).
-- **A11 fait** : relevé de 0065 § 7 sur `p0-reel` : barrière TLS et garde ouvertes, fonction en `fra1`, règle de `p0-reel` conforme (consigné sur #369). Q426 close.
-- Liste de contrôle de l'essai remise à jour par la Sécurité (`/mnt/project-files/essai-reel/checklist-essai.md`, 15:10 UTC).
+- Fusionnés depuis le 78e cycle : #384 (décision 0069, méthode du relevé de la route de flux, amende 0063 point 8), #382 (état du 78e cycle).
+- **e2e de la préversion fait, favorable** (0063 point 8 selon 0069) : relevé de 15:37 UTC consigné sur #369 (commentaire 6196117262). Témoins 200 avant et après, `POST x-vqs` sans cookie 401 ; les quatre sondes rendent 404 avec `x-matched-path: /404` ; 3 invocations, toutes des témoins, 0 sur la route de flux. Le lien et le cookie ne sont écrits nulle part.
+- **`p0-purge` planifié réussi** à 17:01 UTC (run 38773854059) : condition 5 tenue jusqu'à 05:01 UTC le 2026-10-16.
 
 ## En cours
-- data : A17, PR de déverrouillage #381 en **brouillon** (migration 0006, retour arrière identique au texte figé). Les changements de `tests/db/` exigés par 0056 § 4.5 sont refusés aux agents par le filtre de sécurité : Samuel les applique lui-même (Q457).
-- Sécurité : e2e de la préversion par le lien de partage du connecteur (option iii, décidée par le CEO, Q458) : amendement de 0063 point 8, puis relevé avant le déverrouillage.
-- Product Owner : A5, P0r4 avant ou après l'essai d'intégration.
+- CEO : correction 1 (comptée) de #383 (A5, P0r4 après l'essai) : 3 bloquants Tech Lead (P0r4 encore cité en 0055 l. 219, la partie verrou de l'amendement dépend du verdict Sécurité et de la confirmation de Samuel, références de code) et les mineurs. Sécurité : approuvée.
+- data : A17, #381 en brouillon, attend les tests de `tests/db/` posés par Samuel (Q457).
 
 ## Bloqué
-- **Premier essai réel** (lancé par Samuel seul) : relevé S7 dans la console Neon (Q456), tests de `tests/db/` (Q457), conditions 1 et 4 à 19:37 UTC (ou Q455), revue de #381 puis `owner-approved`, application (A18) et relevé (A19) ; P0r4 (A5) ; limites de dépense (Q325) ; accord écrit de Samuel (0055).
+- **Premier essai réel** (lancé par Samuel seul) : levée écrite sur #374 (Q455), relevé S7 dans la console Neon (Q456), tests de `tests/db/` (Q457), revue de #381 puis `owner-approved`, application (A18) et relevé (A19) ; #383 ; limites de dépense (Q325) ; accord écrit de Samuel (0055).
 - **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
 1. Seulement le chemin de l'essai réel.
-2. Consigner le relevé S7 dès la réponse de Samuel ; #381 en revue dès les tests posés ; e2e de préversion ; P0r4.
-3. Surveiller `p0-purge` planifié (18:17 UTC) : condition 5 (succès de moins de 12 h).
+2. Déclarer la condition 4 dès la levée écrite de Samuel ; consigner S7 dès sa réponse ; #381 en revue dès les tests posés ; fusion de #383.
+3. Avant A18 : `p0-purge` réussi depuis moins de 12 heures (dernier : 17:01 UTC).
+4. Mineur 12 de la revue de #384 et mineur 13 (0063 l. 5, « 2 jours ») : à reprendre dans un chore.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : Q455 (carte, lever le délai sur les parties de 0057 amendées par 0066 et 0067), Q456 (relevé S7 dans la console Neon), Q457 (tests de `tests/db/` pour #381). Bientôt : Q325 (limites de dépense).
+- **Réponses demandées** : Q455 (écrire sur #374 la levée choisie sur la carte), Q456 (relevé S7 dans la console Neon), Q457 (tests de `tests/db/` pour #381). Bientôt : Q325 (limites de dépense).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -47,7 +45,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q455 à Q458.
+- Aucune.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
