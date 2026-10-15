@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   analyserTexteOpensslConf,
+  CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24,
+  DIRECTIVES_OPENSSL_CONF,
+  directivesOpensslConf,
   examinerOpensslConf,
   nomSectionOpensslAdmis,
   OPENSSL_CONF_MAX_OCTETS,
@@ -68,7 +71,7 @@ const verdict = (chemin: string, arbre: Readonly<Record<string, Noeud>>) => exam
 const SANS_NODE = "openssl_conf = defaut\n\n[defaut]\nssl_conf = ssl\n\n[ssl]\nsystem_default = sd\n\n[sd]\nMinProtocol = TLSv1\n";
 
 describe("openssl-conf: listes fermées (0062 § 5.1)", () => {
-  it("7 classes de racine et 8 verdicts, dans l'ordre de priorité", () => {
+  it("7 classes de racine et 9 verdicts, dans l'ordre de priorité (contenu_audite : 0065 § 4 point 2)", () => {
     expect([...ZONES_OPENSSL_CONF]).toEqual(["dev_null", "etc", "usr", "var_runtime", "var_lang", "opt", "autre"]);
     expect([...VERDICTS_OPENSSL_CONF]).toEqual([
       "hors_preview",
@@ -78,6 +81,7 @@ describe("openssl-conf: listes fermées (0062 § 5.1)", () => {
       "fichier_refuse",
       "inclusion_refusee",
       "section_nodejs",
+      "contenu_audite",
       "admis",
     ]);
   });
@@ -344,5 +348,161 @@ describe("openssl-conf: ordre des verdicts et échec fermé", () => {
   it("le résultat ne contient jamais le chemin ni le contenu", () => {
     const resultat = examinerOpensslConf("/etc/SENTINELLE.cnf", fauxFs({ "/etc/SENTINELLE.cnf": "# SENTINELLE\nnodejs_conf = s\n" }));
     expect(JSON.stringify(resultat)).not.toContain("SENTINELLE");
+  });
+});
+
+describe("openssl-conf: contenu audité du runtime Lambda nodejs24.x (0065 § 4 points 1 et 2)", () => {
+  const RUNTIME = "/var/runtime/openssl_conf/openssl.cnf";
+  const AUDITE = CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24;
+
+  // SHA-256 par Web Crypto (`crypto.subtle`, global) : le régime de confinement refuse l'**import** de `node:crypto`
+  // dans `src/server/env/` (pas la capacité de calculer un condensat), et 0065 § 5 point 5 n'ajoute aucune ligne.
+  it("la constante est le fichier audité : 505 caractères ASCII, 505 octets, SHA-256 d95efaf0…2a88", async () => {
+    // `egalAuContenuAudite` compare octet à charCodeAt : la constante doit être en ASCII (mineur 6).
+    expect(AUDITE.length).toBe(505);
+    expect([...AUDITE].every((caractere) => caractere.charCodeAt(0) < 0x80)).toBe(true);
+    const octets = new TextEncoder().encode(AUDITE);
+    expect(octets.byteLength).toBe(505);
+    const condensat = Buffer.from(await crypto.subtle.digest("SHA-256", octets)).toString("hex");
+    expect(condensat).toBe("d95efaf0856ecfa40c7f1012b99848eb98f770c5c8850320d22492b06b0f2a88");
+  });
+
+  it("contenu audité sous /var/runtime/ : contenu_audite, sans directives", () => {
+    expect(examinerOpensslConf(RUNTIME, fauxFs({ [RUNTIME]: AUDITE }))).toEqual({ zone: "var_runtime", verdict: "contenu_audite" });
+  });
+
+  it("contenu audité sous une autre racine admise, ou par un lien dont le chemin réel est sous une racine : contenu_audite", () => {
+    expect(verdict("/etc/ssl/openssl.cnf", { "/etc/ssl/openssl.cnf": AUDITE })).toBe("contenu_audite");
+    expect(verdict("/etc/a.cnf", { "/etc/a.cnf": { lien: RUNTIME }, [RUNTIME]: AUDITE })).toBe("contenu_audite");
+  });
+
+  it.each([
+    ["fins de ligne \\r\\n", AUDITE.replaceAll("\n", "\r\n")],
+    ["un espace ajouté", AUDITE.replace("nodejs_conf = ", "nodejs_conf  = ")],
+    ["un espace final ajouté", `${AUDITE} `],
+    ["sans le dernier \\n", AUDITE.slice(0, -1)],
+    ["un octet changé", AUDITE.replace("ffdhe8192", "ffdhe8193")],
+    ["un commentaire de plus", `${AUDITE}# commentaire\n`],
+    ["une ligne MinProtocol = TLSv1 ajoutée", `${AUDITE}MinProtocol = TLSv1\n`],
+    ["casse changée", AUDITE.replace("Groups", "groups")],
+  ])("%s : section_nodejs", (_nom, texte) => {
+    expect(verdict(RUNTIME, { [RUNTIME]: texte })).toBe("section_nodejs");
+  });
+
+  it("octet 0x80 (non UTF-8) à la place d'un caractère du commentaire, ou ajouté : section_nodejs", () => {
+    const audite = new TextEncoder().encode(AUDITE);
+    const remplace = Uint8Array.from(audite);
+    remplace[2] = 0x80; // « # O… » : le « O » du commentaire de tête.
+    const ajoute = Uint8Array.from([...audite, 0x80]);
+    for (const octets of [remplace, ajoute]) {
+      const fs = { ...fauxFs({ [RUNTIME]: AUDITE }), readFileSync: () => octets };
+      expect(examinerOpensslConf(RUNTIME, fs).verdict).toBe("section_nodejs");
+    }
+  });
+
+  it("contenu audité comme inclusion d'un autre fichier : section_nodejs (niveau 0 seulement)", () => {
+    expect(verdict("/etc/a.cnf", { "/etc/a.cnf": `.include ${RUNTIME}\n`, [RUNTIME]: AUDITE })).toBe("section_nodejs");
+    expect(verdict("/etc/a.cnf", { "/etc/a.cnf": ".include /etc/d\n", "/etc/d": ["x.cnf"], "/etc/d/x.cnf": AUDITE })).toBe("section_nodejs");
+  });
+
+  it("contenu audité au chemin réel sous /tmp (lien) : fichier_refuse", () => {
+    expect(verdict(RUNTIME, { [RUNTIME]: { lien: "/tmp/openssl.cnf" }, "/tmp/openssl.cnf": AUDITE })).toBe("fichier_refuse");
+  });
+
+  it("contenu audité au chemin déclaré hors racines : chemin_refuse, sans lecture", () => {
+    const fs = fauxFs({ "/tmp/openssl.cnf": AUDITE });
+    expect(examinerOpensslConf("/tmp/openssl.cnf", fs).verdict).toBe("chemin_refuse");
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("contenu audité suivi d'un octet nul : fichier_refuse", () => {
+    expect(verdict(RUNTIME, { [RUNTIME]: `${AUDITE}\0` })).toBe("fichier_refuse");
+  });
+
+  it("taille annoncée trop grande : fichier_refuse avant la comparaison", () => {
+    expect(verdict(RUNTIME, { [RUNTIME]: { taille: OPENSSL_CONF_MAX_OCTETS + 1, texte: AUDITE } })).toBe("fichier_refuse");
+  });
+});
+
+describe("openssl-conf: diagnostic des directives (0065 § 4 point 3)", () => {
+  it("fichier audité : groups_admis,nodejs_conf,ssl_conf,system_default", () => {
+    expect(directivesOpensslConf(CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24)).toBe("groups_admis,nodejs_conf,ssl_conf,system_default");
+  });
+
+  it.each([
+    ["groupe hors liste", "Groups = X25519:brainpoolP256r1\n", "groups_autres"],
+    ["Curves admis", "Curves = X25519:X25519MLKEM768:SecP256r1MLKEM768:SecP384r1MLKEM1024\n", "groups_admis"],
+    ["Curves hors liste", "curves = P-256\n", "groups_autres"],
+    ["groupe vide", "Groups = X25519::X448\n", "groups_autres"],
+    ["groupe préfixé", "Groups = ?X25519\n", "groups_autres"],
+    ["casse différente", "Groups = x25519\n", "groups_autres"],
+    ["groupe hors liste ffdhe1536", "Groups = ffdhe1536\n", "groups_autres"],
+    ["variable", "Groups = $g\n", "groups_autres"],
+    ["séparateur doublé", "Groups = X25519::secp256r1\n", "groups_autres"],
+    ["VerifyCAFile", "VerifyCAFile = /tmp/ca.pem\n", "verifycafile"],
+    ["CipherString", "CipherString = DEFAULT@SECLEVEL=0\n", "cipherstring"],
+    ["providers", "providers = prov\n", "providers"],
+    ["clé inconnue", "inconnue = x\n", "autre"],
+    ["ligne sans =", "rien\n", "autre"],
+    ["clé vide", "= x\n", "autre"],
+    ["0xA0 après le dernier groupe (lu en latin1)", "Groups = X25519\u00a0\n", "groups_autres"],
+    ["0xA0 avant le premier groupe", "Groups =\u00a0X25519\n", "groups_autres"],
+    ["0xA0 dans la clé", "Gro\u00a0ups = X25519\n", "autre"],
+    ["tabulations et retour chariot autour des groupes", "Groups\t=\tX25519:X448\t\r\n", "groups_admis"],
+    ["clé avec blancs et casse", " Min Protocol = TLSv1.3\n", "minprotocol"],
+    [".include", ".include /etc/x.cnf\n", "include"],
+    [".include=", ".include=/etc/x.cnf\n", "include"],
+    [".pragma", ".pragma dollarid:true\n", "pragma"],
+    ["section::clé", "s::nodejs_conf = x\n", "autre"],
+  ])("%s : %s", (_nom, texte, attendu) => {
+    expect(directivesOpensslConf(texte)).toBe(attendu);
+  });
+
+  it("jetons sans doublon, triés ; en-têtes, commentaires et lignes vides jamais rendus", () => {
+    const texte = "# SENTINELLE\n[ SENTINELLE_SECTION ]\nssl_conf = a # SENTINELLE\n\nSSL_CONF = b\nVerifyMode = Peer\nnodejs_conf = x\n";
+    expect(directivesOpensslConf(texte)).toBe("nodejs_conf,ssl_conf,verifymode");
+  });
+
+  it("lignes continuées jointes avant la lecture des clés", () => {
+    expect(directivesOpensslConf("Cipher\\\nString = x\n")).toBe("cipherstring");
+  });
+
+  it("aucune valeur, aucun nom de section ni de groupe dans le résultat ; chaque jeton dans la liste fermée", () => {
+    const texte = "[SENTINELLE]\nGroups = SENTINELLE:X25519\nSENTINELLE = SENTINELLE\nnodejs_conf = SENTINELLE\n.include /etc/SENTINELLE.cnf\n";
+    const resultat = directivesOpensslConf(texte);
+    expect(resultat).not.toMatch(/sentinelle/i);
+    for (const jeton of resultat.split(",")) expect(DIRECTIVES_OPENSSL_CONF).toContain(jeton);
+  });
+
+  it("32 jetons, sans doublon", () => {
+    expect(DIRECTIVES_OPENSSL_CONF).toHaveLength(32);
+    expect(new Set(DIRECTIVES_OPENSSL_CONF).size).toBe(32);
+  });
+
+  it("examinerOpensslConf rend les directives avec section_nodejs seulement, sur le fichier en cause", () => {
+    expect(examinerOpensslConf("/etc/a.cnf", fauxFs({ "/etc/a.cnf": "nodejs_conf = n\n[n]\nssl_conf = s\n" }))).toEqual({
+      zone: "etc",
+      verdict: "section_nodejs",
+      directives: "nodejs_conf,ssl_conf",
+    });
+    // Fichier inclus qui donne section_nodejs : ses directives, pas celles du fichier qui l'inclut.
+    const inclus = fauxFs({ "/etc/a.cnf": "x = y\n.include /etc/b.cnf\n", "/etc/b.cnf": "nodejs_conf = n\n" });
+    expect(examinerOpensslConf("/etc/a.cnf", inclus)).toEqual({ zone: "etc", verdict: "section_nodejs", directives: "nodejs_conf" });
+    expect(examinerOpensslConf("/etc/a.cnf", fauxFs({ "/etc/a.cnf": "a = b\n" }))).toEqual({ zone: "etc", verdict: "admis" });
+    const refusee = fauxFs({ "/etc/a.cnf": "nodejs_conf = n\n.include relatif\n" });
+    expect(examinerOpensslConf("/etc/a.cnf", refusee)).toEqual({ zone: "etc", verdict: "inclusion_refusee" });
+  });
+
+  it("octet 0xA0 lu du fichier après la valeur de Groups : directives groups_autres (mineur 4)", () => {
+    const octets = Uint8Array.from([...new TextEncoder().encode("nodejs_conf = n\nGroups = X25519"), 0xa0, 0x0a]);
+    const fs = { ...fauxFs({ "/etc/a.cnf": "x" }), lstatSync: () => ({ isFile: () => true, isDirectory: () => false, size: octets.byteLength }), readFileSync: () => octets };
+    expect(examinerOpensslConf("/etc/a.cnf", fs)).toEqual({ zone: "etc", verdict: "section_nodejs", directives: "groups_autres,nodejs_conf" });
+  });
+
+  it("aucune erreur ne s'échappe, quel que soit le texte ; sans directive, chaîne vide", () => {
+    for (const texte of ["", "\0", "=", "[", "\\", "#", "nodejs_conf", "a=b=c", "ÿþ = x", "Groups ="]) {
+      expect(() => directivesOpensslConf(texte)).not.toThrow();
+    }
+    expect(directivesOpensslConf("[nodejs_conf]\n")).toBe("");
   });
 });

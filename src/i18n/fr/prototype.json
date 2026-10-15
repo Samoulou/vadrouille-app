@@ -1,6 +1,5 @@
 {
   "acces": {
-    "titreDocument": "Prototype · Accès aux exécutions",
     "titre": "Accès aux exécutions réelles",
     "aide": "Saisis le code d'accès du prototype. Il ouvre l'accès pour 12 heures dans ce navigateur.",
     "libelle": "Code d'accès",
@@ -11,6 +10,137 @@
       "invalid_code": "Code refusé. Vérifie-le et réessaie.",
       "too_many_attempts": "Trop d'essais : réessaie dans une heure.",
       "erreur": "L'essai n'a pas pu être vérifié. Réessaie plus tard."
+    }
+  },
+  "lancement": {
+    "titreDocument": "Prototype · Exécutions réelles",
+    "titre": "Exécutions réelles",
+    "intro": "Choisis un brief, une variante et une nature, puis lance. Une seule exécution par jour de quota Google ; une exécution échouée consomme le jour.",
+    "formulaire": {
+      "titre": "Lancer une exécution",
+      "brief": "Brief",
+      "variante": "Variante",
+      "variantes": {
+        "B": "B, recherche de l'agent",
+        "A": "A, mesure de référence"
+      },
+      "mode": "Nature",
+      "modes": {
+        "essai": "Essai d'intégration, ne compte pas pour G0",
+        "reel": "Exécution comptée"
+      },
+      "lancer": "Lancer",
+      "lancement": "Lancement…",
+      "aucunBrief": "Aucun brief disponible.",
+      "briefRefuse": "Ce brief n'est plus proposé : choisis-en un autre, puis relance."
+    },
+    "statuts": {
+      "lancee": "Exécution lancée. Utilise « Actualiser » pour suivre son avancement.",
+      "fermee": "Lancement impossible : la page n'est plus ouverte. Recharge-la.",
+      "acces_refuse": "Accès expiré : recharge la page et saisis de nouveau le code d'accès.",
+      "entree_invalide": "Choix incomplet : sélectionne un brief, une variante et une nature.",
+      "real_mode_unavailable": "Lancement indisponible : le mode réel n'est pas encore ouvert (programme impossible à écrire).",
+      "run_quota_reached": "Lancement refusé : ce brief et cette variante ont déjà toutes leurs exécutions comptées et leur relance.",
+      "daily_quota_insufficient": "Lancement refusé : le quota Google du jour est déjà entamé. Le jour n'est pas consommé ; réessaie demain.",
+      "envelope_reached": "Lancement refusé : l'enveloppe jusqu'à G0 est atteinte.",
+      "cap_reached": "Lancement refusé : une exécution a déjà eu lieu ce jour de quota, ou le plafond du mois est atteint.",
+      "usage_unavailable": "Lancement refusé : la base du prototype ne répond pas. Rien n'a été réservé.",
+      "demarrage_impossible": "L'exécution réservée n'a pas pu démarrer : elle est close avec une cause externe et pourra être relancée un autre jour.",
+      "erreur": "Le lancement n'a pas pu aboutir. Réessaie plus tard."
+    },
+    "suivi": {
+      "titre": "Suivi",
+      "titreExecution": "{brief}, variante {variante}, jour du {jour}",
+      "aucune": "Aucune exécution pour l'instant.",
+      "indisponible": "Le suivi est indisponible : la base du prototype ne répond pas.",
+      "actualiser": "Actualiser",
+      "statut": "Statut",
+      "statuts": {
+        "en_cours": "En cours",
+        "programme_ecrit": "Programme écrit",
+        "arretee": "Arrêtée"
+      },
+      "phase": "Phase",
+      "phases": {
+        "recherche": "Recherche des candidats",
+        "ancrage": "Ancrage des lieux",
+        "notation": "Notation",
+        "planification": "Planification",
+        "raisons": "Rédaction des raisons",
+        "validation": "Validation",
+        "ecriture": "Écriture du programme"
+      },
+      "cout": "Coût des modèles",
+      "montantUsd": "{montant} USD",
+      "duree": "Durée",
+      "moinsDUneMinute": "moins d'une minute",
+      "codeArret": "Cause de l'arrêt",
+      "codesArret": {
+        "production_refused": "refusée en production",
+        "real_mode_unavailable": "mode réel indisponible",
+        "brief_invalid": "brief invalide",
+        "config_invalid": "configuration invalide",
+        "data_collection_missing": "réglage de non-collecte des données absent",
+        "model_id_invalid": "modèle invalide",
+        "upstream_unavailable": "service externe indisponible",
+        "upstream_redirect": "redirection d'un service externe",
+        "usage_unavailable": "base d'usage indisponible",
+        "pipeline_failed": "échec du traitement"
+      },
+      "jourQuota": "Jour de quota",
+      "dernierePurge": "Dernière purge réussie",
+      "aucunePurge": "Aucune purge réussie",
+      "instantUtc": "{date} à {heure} (UTC)"
+    },
+    "decompte": {
+      "titre": "Décompte",
+      "intro": "Exécutions comptées et relances, par brief et variante. Une exécution arrêtée par une cause externe est relancée une fois au plus ; toute autre fin compte.",
+      "brief": "Brief",
+      "variante": "Variante",
+      "comptees": "Comptées",
+      "relances": "Relances",
+      "caption": "Exécutions comptées et relances par brief et variante"
+    },
+    "rapport": {
+      "titreSection": "Rapport de la dernière exécution",
+      "texteAria": "Texte du rapport",
+      "copier": "Copier le rapport",
+      "copie": "Rapport copié.",
+      "copieImpossible": "Copie impossible : sélectionne le texte et copie-le à la main.",
+      "titre": "Rapport d'exécution du prototype",
+      "mode": "Nature",
+      "modes": {
+        "essai": "essai d'intégration",
+        "reel": "exécution comptée"
+      },
+      "brief": "Brief",
+      "variante": "Variante",
+      "jourQuota": "Jour de quota",
+      "commit": "Commit",
+      "issue": "Issue",
+      "issues": {
+        "programme_ecrit": "programme écrit",
+        "arretee": "arrêtée"
+      },
+      "codeArret": "Code d'arrêt",
+      "criteres": {
+        "A1": "programme valide",
+        "A2": "étapes de lieu avec identifiant et source",
+        "A3": "événements dans les dates et sourcés",
+        "A4": "horaires, trajets, logement et rythme",
+        "A5": "aucun trou",
+        "A6": "propositions de la présentation",
+        "A7": "coût sous le plafond",
+        "A8": "durée sous le plafond",
+        "A9": "test canari"
+      },
+      "valeurs": {
+        "oui": "oui",
+        "non": "non",
+        "non_releve": "non relevé"
+      },
+      "dernierePurge": "Dernière purge réussie",
+      "aucunePurge": "aucune"
     }
   }
 }

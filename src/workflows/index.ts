@@ -4,7 +4,12 @@ import { getRun as runDuSdk, start } from "workflow/api";
 
 import type { GardeOuverte } from "@/server/p0/garde";
 
+import { P0RUN_COMPLET } from "./complet";
 import { p0Run } from "./p0-run";
+
+export { P0RUN_COMPLET };
+/** Pièces du lancement (P0r3d), lues dans le pont `p0-run.ts` : l'application n'importe pas `src/prototype` (0048 § 1). */
+export { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, verrouS8Leve, type LancementDuMode } from "./p0-run";
 
 /**
  * Interface stable des workflows (décision 0009 point 2) : le reste du code ne connaît que ce module, jamais le paquet
@@ -16,9 +21,11 @@ import { p0Run } from "./p0-run";
  *   des messages peuvent être stockés **temporairement dans une région voisine** (relevé 3 de la PR 326 ; Q28).
  * - **Garde exigée** : `p0Run` ne démarre que pour une exécution réservée par une garde ouverte (`GardeOuverte`) ; son
  *   entrée est l'identifiant d'exécution seul.
- * - **`p0Run` non démarrable** : tant que `P0RUN_COMPLET` est faux, `startWorkflow` refuse de le démarrer
- *   (`real_mode_unavailable`), sans appel au SDK. L'étape finale est livrée (P0r3c-5) ; restent les conditions du point 7
- *   de l'amendement P0r3c-5 de 0063 (verdict Sécurité, action de lancement de P0r3d, levée du verrou S8, brief d'essai).
+ * - **`p0Run` non démarrable** : tant que `P0RUN_COMPLET` (`./complet.ts`) est faux, `startWorkflow` refuse de le
+ *   démarrer (`real_mode_unavailable`), sans appel au SDK. L'étape finale (P0r3c-5) et l'action de lancement (P0r3d)
+ *   sont livrées ; restent les conditions du point 7 de l'amendement P0r3c-5 de 0063 que `./complet.ts` énumère.
+ * - **Démarrage échoué** : une erreur du SDK rend `start_failed`, jamais son message ; l'appelant clôt l'exécution
+ *   réservée (`cloreExecutionNonDemarree`).
  */
 
 export const REGION_WORKFLOWS = "fra1";
@@ -26,16 +33,21 @@ export const REGION_WORKFLOWS = "fra1";
 /** Workflows démarrables ; B9 ajoute les siens. */
 export type NomWorkflow = "p0Run";
 
-/** Vrai seulement quand les conditions du point 7 de l'amendement P0r3c-5 de 0063 sont remplies ; jusque-là, aucun démarrage. */
-export const P0RUN_COMPLET = false;
-
-export type ResultatDemarrage = { readonly ok: true; readonly workflowRunId: string } | { readonly ok: false; readonly code: "real_mode_unavailable" };
+export type ResultatDemarrage =
+  | { readonly ok: true; readonly workflowRunId: string }
+  | { readonly ok: false; readonly code: "real_mode_unavailable" | "start_failed" };
 
 /** Démarre un workflow pour l'exécution réservée par la garde ; rend l'identifiant de l'exécution du SDK. */
 export async function startWorkflow(nom: NomWorkflow, garde: GardeOuverte): Promise<ResultatDemarrage> {
   if (nom !== "p0Run" || !P0RUN_COMPLET) return { ok: false, code: "real_mode_unavailable" };
-  const run = await start(p0Run, [{ runId: garde.runId }], { region: REGION_WORKFLOWS });
-  return { ok: true, workflowRunId: run.runId };
+  let workflowRunId: unknown;
+  try {
+    const run = await start(p0Run, [{ runId: garde.runId }], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
 }
 
 /** États d'une exécution du SDK, sans autre donnée (aucune entrée ni sortie relue ici). */

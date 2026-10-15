@@ -338,8 +338,12 @@ describe("p0Run : forme du module (décision 0063)", () => {
   it("un workflow, quatre étapes (recherche, ancrage, étape finale, clôture) ; ni webhook ni hook dans src/workflows", () => {
     expect(source.match(/^\s*"use workflow";$/gm)).toHaveLength(1);
     expect(source.match(/^\s*"use step";$/gm)).toHaveLength(4);
-    for (const texte of [source, index]) expect(texte).not.toMatch(/createWebhook|createHook|defineHook|resumeHook|resumeWebhook|getHookByToken/);
-    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["index.ts", "p0-run.ts"]);
+    // P0r3d : `complet.ts`, l'interrupteur de démarrage seul (une constante, aucune directive, aucun import hors server-only).
+    const complet = readFileSync(path.join(process.cwd(), "src/workflows/complet.ts"), "utf8");
+    for (const texte of [source, index, complet]) expect(texte).not.toMatch(/createWebhook|createHook|defineHook|resumeHook|resumeWebhook|getHookByToken/);
+    expect(complet).not.toMatch(/"use (?:workflow|step|server|client)"/);
+    expect([...complet.matchAll(/^import .*$/gm)].map((m) => m[0])).toEqual(['import "server-only";']);
+    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["complet.ts", "index.ts", "p0-run.ts"]);
   });
 
   it("aucune composition, aucun client ni registre au niveau du module (fabriques appelées dans l'étape)", () => {
