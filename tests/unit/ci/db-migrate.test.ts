@@ -128,7 +128,7 @@ function ecartsMigrate(texte: string): string[] {
     .filter((l) => !l.trim().startsWith("#"))
     .join("\n");
   if (/\$\{\{/.test(run)) e.add("expression-run");
-  for (const mot of commandes(run)) if (!COMMANDES_ADMISES.has(mot)) e.add("commande-interdite");
+  for (const mot of commandes(sansLignesDeListe(run))) if (!COMMANDES_ADMISES.has(mot)) e.add("commande-interdite");
   if (/\b(eval|exec|trap|export|declare|let|source|pnpm|npm|npx|node|corepack|tsx|make|cat|bash)\b|\(\(|\$\(\(|\$\(<|set -x|printenv|\benv\b/.test(run)) e.add("commande-interdite");
   if (/(^|[;&|]|then|do)\s*\.\s/m.test(run)) e.add("commande-interdite");
   if (/_journal\.json|meta\//.test(texte)) e.add("journal-lu");
@@ -170,6 +170,27 @@ function ecartsMigrate(texte: string): string[] {
   return [...e];
 }
 
+/**
+ * Retire, pour la lecture des commandes seulement, les éléments de `MIGRATIONS_APPROUVEES` : les lignes de forme exacte
+ * `"<tag> <sha256>"` situées entre `MIGRATIONS_APPROUVEES=(` et la première `)`. Toute autre ligne, dans le bloc ou
+ * hors du bloc, reste lue comme une commande (Q452).
+ */
+function sansLignesDeListe(run: string): string {
+  let dedans = false;
+  return run
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim();
+      if (t === "MIGRATIONS_APPROUVEES=(") {
+        dedans = true;
+        return true;
+      }
+      if (dedans && t === ")") dedans = false;
+      return !(dedans && /^"[0-9]{4}_[a-z0-9_]{1,60} [0-9a-f]{64}"$/.test(t));
+    })
+    .join("\n");
+}
+
 const MUTATIONS: [string, string, string, string][] = [
   ["déclencheur ajouté", "on:\n  workflow_dispatch:\n", "on:\n  push:\n  workflow_dispatch:\n", "declencheur"],
   ["autre inputs", "        type: string\n", "        type: string\n      lot:\n        type: string\n", "inputs"],
@@ -195,6 +216,8 @@ const MUTATIONS: [string, string, string, string][] = [
   ["bash fichier", '          echo "Terminé."\n', '          echo "Terminé."\n          bash script.sh\n', "commande-interdite"],
   ["eval", '          echo "Terminé."\n', '          echo "Terminé."\n          eval "$x"\n', "commande-interdite"],
   ["export", "          set -u\n", "          set -u\n          export PGPORT=5432\n", "commande-interdite"],
+  ["ligne de liste hors du bloc", '          echo "Terminé."\n', `          echo "Terminé."\n          "0000_socle ${"0".repeat(64)}"\n`, "commande-interdite"],
+  ["commande entre guillemets dans la liste", "MIGRATIONS_APPROUVEES=(\n", 'MIGRATIONS_APPROUVEES=(\n            "touch" x\n', "commande-interdite"],
   ["arithmétique", '          echo "Terminé."\n', '          echo "Terminé."\n          n=$((1 + 1))\n', "commande-interdite"],
   ["psql -f", '-c "COMMIT" > "$sortie"', '-f "$f" > "$sortie"', "psql-entree"],
   ["entrée redirigée vers psql", '-c "COMMIT" > "$sortie" 2>&1', '-c "COMMIT" < "$f" > "$sortie" 2>&1', "psql-entree"],
@@ -328,7 +351,7 @@ describe("ci: liste approuvée = préfixe du journal", () => {
 
   it("lecture de la liste : une ligne hors forme est refusée", () => {
     const avec = (lignes: string) => remplacerUneFois(WORKFLOW, "MIGRATIONS_APPROUVEES=(\n", `MIGRATIONS_APPROUVEES=(\n${lignes}`);
-    expect(liste(avec(`            "${complete[0]}"\n`))).toEqual([complete[0]]);
+    expect(liste(avec(`            "${complete[0]}"\n`))).toEqual([complete[0], ...liste(WORKFLOW)]);
     expect(() => liste(avec(`            ${complete[0]}\n`))).toThrow(/hors forme/);
     expect(() => liste(avec(`            "${complete[0]!.toUpperCase()}"\n`))).toThrow(/hors forme/);
   });
