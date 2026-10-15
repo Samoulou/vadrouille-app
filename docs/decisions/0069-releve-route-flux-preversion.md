@@ -2,7 +2,7 @@
 
 Statut : décision déléguée (exigence de sécurité : Sécurité, décideur du point 8 de 0063), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel 6 heures après sa fusion (0068). Aucune dépense, aucun compte externe, aucune clé nouvelle, aucune donnée personnelle : rien n'est réservé à Samuel.
 
-Date : 2026-10-15 · Autrice : Sécurité · Validée par le CEO (option (iii) de la section 0.3 de la liste de contrôle de l'essai réel) · Amende 0063, point 8 (condition du premier lancement réel), et la phrase du point 4 de son amendement P0r3c-5 qui en fait un « relevé humain » · Numérotation : `main` va jusqu'à 0068 ; aucune PR ouverte n'ajoute 0069.
+Date : 2026-10-15 · Autrice : Sécurité · Validée par le CEO (option (iii) de la section 0.3 de la liste de contrôle de l'essai réel) · Amende 0063, point 8 (condition du premier lancement réel, dont son critère : 404 prouvé admis, point 3), et la phrase du point 4 de son amendement P0r3c-5 qui en fait un « relevé humain » · Numérotation : `main` va jusqu'à 0068 ; aucune PR ouverte n'ajoute 0069.
 
 ## Contexte
 
@@ -23,21 +23,29 @@ Deux constats changent la situation :
    - **Jeton d'automatisation** : il n'est ni créé ni lu. Samuel n'a rien à faire.
    - **Le lien et le cookie** ne sont écrits dans aucun fichier, aucun journal, aucun commentaire ni aucune description. Seuls les codes de réponse sont consignés.
 2. **Sonde témoin, obligatoire et en premier.** Avec le même accès, `GET /prototype/executions` doit rendre **200** et le formulaire de saisie. Sinon, la protection de déploiement n'est pas franchie, et le relevé est nul : on ne conclut rien des sondes suivantes. Aucune action n'est soumise (ni saisie de code, ni lancement).
-3. **Sondes et critère, inchangés.** Ce sont les quatre sondes du bloc versionné vers `/.well-known/workflow/v1/flow`. Les trois `POST` portent le corps `{"runId": "wrun_01FORGE…"}`, qui vise une exécution forgée :
+3. **Sondes et critère élargi.** Ce sont les quatre sondes du bloc versionné vers `/.well-known/workflow/v1/flow`. Les trois `POST` portent le corps `{"runId": "wrun_01FORGE…"}`, qui vise une exécution forgée :
    - `GET` sans en-têtes ;
    - `POST` sans en-têtes ;
    - `POST` avec les en-têtes `x-vqs-*` du bloc ;
    - `POST` avec les en-têtes du CloudEvent binaire du bloc.
 
-   Les trois `POST` passent avant le `GET`. **Chaque sonde doit rendre 401 ou 403.** Toute autre réponse arrête le relevé et bloque le premier lancement, en attendant la décision de la Sécurité selon 0063 : 400 ou 500 (le gestionnaire est atteint), 404 ou 405 (route non servie pour cette méthode), 2xx ou redirection. À noter : lors du relevé de 0065 § 7 (2026-10-15), un `GET` de cette route a rendu 404.
+   Les trois `POST` passent avant le `GET`. **Une sonde est conforme si elle rend :**
+   - **401 ou 403** : refus de la plateforme (critère de 0063) ;
+   - **ou 404 servi sans invocation de fonction.** La route de file n'est alors pas exposée en HTTP : c'est un refus plus strict que 401 ou 403. La preuve est exigée pour chaque sonde :
+     - (a) l'en-tête `x-matched-path` est relevé : il vaut `/404` ou il est absent ; il ne nomme jamais la route de flux ;
+     - (b) le journal d'exécution du déploiement, lu avec le connecteur Vercel sur la fenêtre du relevé, est vide pour ce chemin.
+
+   **Toute autre réponse** arrête le relevé et bloque le déverrouillage et le premier lancement, en attendant la décision de la Sécurité. C'est le cas pour 400 ou 500, 405, un 2xx ou une redirection. C'est aussi le cas pour un 404 dont la preuve manque, ou s'il existe le moindre signe que le gestionnaire a tourné : une ligne de journal sur la route de flux, ou un `x-matched-path` qui la nomme.
+
+   Ce critère élargi (401, 403, ou 404 prouvé) est rédigé par la Sécurité, sur l'avis du CEO, après le premier relevé du 2026-10-15 à 15:11 UTC (#369). Ce relevé avait rendu 404 au `POST` sans en-têtes, après le témoin en 200. Un `GET` de cette route avait aussi rendu 404 au relevé de 0065 § 7 : page 404 statique, `x-matched-path: /404`.
 4. **Moment.** Le relevé se fait **avant le déverrouillage** (0056 § 4). Une requête forgée acceptée ne pourrait alors rien lancer :
    - l'exécution visée est inconnue ;
    - chaque étape de `p0Run` exige d'abord une exécution réservée en base (`verifierGardeEtape`, sinon `run_refused`, avant toute clé et tout appel) ;
    - seule l'action de lancement réserve une exécution, et elle est refusée tant que S8 tient (`verrouS8Leve`).
 
    Le relevé est refait à toute mise à jour de `p0-reel` qui change la version du Workflow SDK, de `@vercel/queue` ou du runtime.
-5. **Consignation.** Le relevé est consigné sur la PR qui a mis `p0-reel` à jour, comme pour 0062 § 8 et 0065 § 7. On y écrit le déploiement, le commit, la méthode, et pour chaque sonde son code de réponse. On n'écrit ni corps de réponse, ni lien, ni cookie.
-6. **Suite.** Une PR de test ajoutera la sonde témoin au bloc versionné de `tests/e2e/p0-flux.e2e.spec.ts`. C'est un test e2e, revu par le Tech Lead et la Sécurité, et ce n'est pas une condition de ce relevé. Le bloc reste jouable par Samuel avec `E2E_P0_REEL_BYPASS` s'il le souhaite.
+5. **Consignation.** Le relevé est consigné sur la PR qui a mis `p0-reel` à jour, comme pour 0062 § 8 et 0065 § 7. On y écrit le déploiement, le commit, la méthode, et pour chaque sonde son code de réponse, avec la preuve du point 3 pour un 404. On n'écrit ni corps de réponse, ni lien, ni cookie.
+6. **Suite.** Une PR de test ajoutera la sonde témoin au bloc versionné de `tests/e2e/p0-flux.e2e.spec.ts`. C'est un test e2e, revu par le Tech Lead et la Sécurité, et ce n'est pas une condition de ce relevé. Le bloc reste jouable par Samuel avec `E2E_P0_REEL_BYPASS` s'il le souhaite. La même PR aligne le critère du bloc sur le point 3. Un 404 n'y est accepté qu'avec `x-matched-path` égal à `/404` ou absent ; la lecture du journal reste faite par la Sécurité.
 
 ## Risques résiduels (Sécurité)
 
