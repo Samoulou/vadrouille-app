@@ -1,0 +1,151 @@
+name: db-reverrouillage
+# Coupure d'urgence de l'écriture des positions du prototype (décision 0056 § 4.6, point 1 ; condition 7 du § 4.1).
+# - Retire à vadrouille_prototype l'EXECUTE de store_prototype_coordinates, sans nouvelle PR : le seul texte envoyé est
+#   le texte figé db/reverrouillage/retour-deverrouillage.sql, lu une fois et vérifié contre REVERROUILLAGE_SHA256,
+#   plus bas, écrite en clair. Le fichier de retour arrière de la future migration de déverrouillage (§ 4.2) en est une
+#   copie à l'identique ; changer ce texte passe par une PR de ce workflow (owner-approved, décision 0035).
+# - Aucun fichier du dépôt n'est exécuté ni chargé : bash, sha256sum, stat, realpath et psql -X du runner.
+# - Transaction ouverte comme pour une migration (§ 2.6.4) : délais, verrou consultatif des migrations (un GRANT en
+#   cours d'application est validé avant que le REVOKE ne passe, jamais après), texte, contrôle de rôle, COMMIT ; puis,
+#   dans la même session, un bloc DO qui échoue si vadrouille_prototype garde l'EXECUTE d'une surcharge existante.
+#   Rien n'est écrit dans le journal des migrations. Sans effet s'il n'y a rien à retirer : peut être relancé.
+# - Lancé à la main sur main par la Sécurité au plus tard 2 heures après la constatation d'un déclencheur (§ 4.6), ou
+#   à défaut par le rôle désigné pour les migrations, avec sha_attendu = tête de main relevée juste avant. Le lanceur
+#   vérifie la conclusion success de son run (un run en attente du groupe est annulé par un autre lancement) et
+#   relance sinon ; il consigne le run dans le ticket, sans valeur secrète, et alerte le CEO.
+# - Environnement db-migrate (branche main seule) et secrets MIGRATOR_PG*, ceux du workflow des migrations ; même
+#   groupe de concurrence : les deux ne tournent jamais en même temps. Aucun agent ne modifie l'environnement.
+# Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
+on:
+  workflow_dispatch:
+    inputs:
+      sha_attendu:
+        description: "Commit de main relevé juste avant le lancement (40 caractères hexadécimaux)"
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+jobs:
+  reverrouiller:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: db-migrate
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+      - name: Retirer l'EXECUTE de vadrouille_prototype
+        shell: bash
+        env:
+          SHA_ATTENDU: ${{ inputs.sha_attendu }}
+          LC_ALL: C
+          PGHOST: ${{ secrets.MIGRATOR_PGHOST }}
+          PGDATABASE: ${{ secrets.MIGRATOR_PGDATABASE }}
+          PGPASSWORD: ${{ secrets.MIGRATOR_PGPASSWORD }}
+          PGUSER: vadrouille_migrator
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+          # Textes SQL de l'exécuteur, envoyés par des -c distincts (0056 § 2.6.2 et 2.6.4, § 4.6 point 1).
+          SQL_SESSION: "SET search_path = pg_catalog, pg_temp"
+          SQL_ROLE: |
+            DO $$
+            BEGIN
+              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle de session inattendu'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'vadrouille_migrator' AND (r.rolsuper OR r.rolbypassrls)) THEN RAISE EXCEPTION 'rôle privilégié'; END IF;
+              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;
+            END
+            $$
+          SQL_DELAIS: "SET lock_timeout = '10s'; SET statement_timeout = '5min'"
+          SQL_VERROU: "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vadrouille_migrations'))"
+          SQL_REPERE: "SELECT pg_catalog.set_config('vadrouille_migrate.txid', pg_catalog.txid_current()::text, true)"
+          SQL_APRES_CHEMIN: "SET LOCAL search_path = pg_catalog, pg_temp"
+          SQL_APRES: |
+            DO $$
+            BEGIN
+              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle changé par le texte figé'; END IF;
+              IF pg_catalog.current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION 'session_replication_role changé par le texte figé'; END IF;
+              IF pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text THEN RAISE EXCEPTION 'transaction changée par le texte figé'; END IF;
+            END
+            $$
+          # Contrôle final (§ 4.6, point 1) : chaque surcharge existante, désignée par son oid trouvé dans pg_proc par nom
+          # et schéma (une signature écrite absente ne lèverait pas d'erreur).
+          SQL_CONTROLE: |
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates') THEN RAISE EXCEPTION 'aucune surcharge de store_prototype_coordinates'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates' AND pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')) THEN RAISE EXCEPTION 'vadrouille_prototype garde l''EXECUTE d''une surcharge de store_prototype_coordinates'; END IF;
+            END
+            $$
+        run: |
+          set -u
+          echec() {
+            printf 'Échec : %s\n' "$1"
+            exit 1
+          }
+
+          # Empreinte SHA-256 du texte figé db/reverrouillage/retour-deverrouillage.sql (0056 § 4.6, point 1), vérifiée
+          # par le test « ci: texte figé de db-reverrouillage ». Toute modification est une PR de workflow (owner-approved).
+          REVERROUILLAGE_SHA256=9ff7cb9ef439b405cd1b277980d9828115d47f7aad733c3e124d03a3a849bd4c
+
+          # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
+          if [[ ! $SHA_ATTENDU =~ ^[0-9a-f]{40}$ ]]; then echec "sha_attendu hors forme"; fi
+          if [[ "$SHA_ATTENDU" == "$GITHUB_SHA" ]]; then :; else echec "sha_attendu différent du commit lancé"; fi
+          version_psql=$(psql -X --version) || echec "psql introuvable"
+          if [[ ! $version_psql =~ ^psql\ \(PostgreSQL\)\ (1[6-9]|[2-9][0-9])\. ]]; then echec "psql de version majeure inférieure à 16"; fi
+          if [[ ! $PGHOST =~ ^[a-z0-9.-]{1,253}$ ]]; then echec "PGHOST hors forme"; fi
+          if [[ $PGHOST == *-pooler* ]]; then echec "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi
+          if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then echec "PGDATABASE hors forme"; fi
+          if [[ ! $REVERROUILLAGE_SHA256 =~ ^[0-9a-f]{64}$ ]]; then echec "REVERROUILLAGE_SHA256 hors forme"; fi
+
+          f="$GITHUB_WORKSPACE/db/reverrouillage/retour-deverrouillage.sql"
+          chemin=$(realpath -e -- "$f") || echec "texte figé absent"
+          if [[ "$chemin" != "$f" ]]; then echec "texte figé : lien symbolique"; fi
+          if [[ ! -f $f || -L $f ]]; then echec "texte figé : fichier non ordinaire"; fi
+          taille=$(stat -c %s -- "$f") || echec "texte figé : taille illisible"
+          if [[ ! $taille =~ ^(0|[1-9][0-9]{0,8})$ ]]; then echec "texte figé : taille illisible"; fi
+          if [[ $taille == 0 ]]; then echec "texte figé : fichier vide"; fi
+          if [[ $taille -gt 102400 ]]; then echec "texte figé : plus de 100 Kio"; fi
+          if IFS= read -r -d '' texte < "$f"; then echec "texte figé : octet NUL"; fi
+          if [[ ${#texte} != "$taille" ]]; then echec "texte figé : texte tronqué"; fi
+          lue=$(printf '%s' "$texte" | sha256sum)
+          lue=${lue%% *}
+          if [[ "$lue" != "$REVERROUILLAGE_SHA256" ]]; then echec "texte figé : empreinte différente de REVERROUILLAGE_SHA256"; fi
+          if [[ $texte == '\'* ]]; then echec "texte figé : commence par une barre oblique inverse"; fi
+          if [[ ${texte,,} == *vadrouille_migrate.* ]]; then echec "texte figé : nomme un paramètre vadrouille_migrate"; fi
+          echo "Texte figé vérifié contre REVERROUILLAGE_SHA256."
+
+          # 2. Connexion et rôle, dans une première session (§ 2.6.2). Sortie dans un fichier jamais affiché : une
+          # erreur de connexion nomme l'hôte.
+          traces="$RUNNER_TEMP/db-reverrouillage-traces.txt"
+          code=0
+          psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -q -c "$SQL_SESSION" -c "$SQL_ROLE" > "$traces" 2>&1 || code=$?
+          if [[ $code != 0 ]]; then
+            etat=inconnu
+            while IFS= read -r ligne; do
+              if [[ $ligne =~ ^(ERROR|FATAL):\ +([0-9A-Z]{5})$ ]]; then etat=${BASH_REMATCH[2]}; fi
+            done < "$traces"
+            echec "connexion ou rôle ; code de sortie $code ; SQLSTATE $etat"
+          fi
+
+          # 3. Retrait, en une transaction ouverte comme pour une migration (§ 2.6.4), puis contrôle final dans la même
+          # session (§ 4.6, point 1). Aucune écriture dans le journal des migrations.
+          sortie="$RUNNER_TEMP/db-reverrouillage-retrait.txt"
+          code=0
+          psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -c "$SQL_DELAIS" -c "BEGIN" -c "$SQL_VERROU" -c "$SQL_REPERE" -c "$texte" -c "$SQL_APRES_CHEMIN" -c "$SQL_APRES" -c "COMMIT" -c "$SQL_SESSION" -c "$SQL_CONTROLE" > "$sortie" 2>&1 || code=$?
+          if [[ $code != 0 ]]; then
+            etat=inconnu
+            while IFS= read -r ligne; do
+              if [[ $ligne =~ ^(ERROR|FATAL):\ +([0-9A-Z]{5})$ ]]; then etat=${BASH_REMATCH[2]}; fi
+            done < "$sortie"
+            echec "retrait ou contrôle final ; code de sortie $code ; SQLSTATE $etat"
+          fi
+          echo "EXECUTE de vadrouille_prototype retiré ; contrôle final passé."

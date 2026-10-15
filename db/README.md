@@ -117,6 +117,11 @@ arrière se fait **vers l'avant**, par une migration corrective :
    Liste vide : le workflow sort en succès sans aucune connexion. **Un run vert avec une liste vide ne teste ni les
    secrets ni la connexion** ; seul un run qui applique au moins une migration approuvée les éprouve (réponse du
    Tech Lead, revue de la PR 332).
+   Coupure d'urgence de l'écriture des positions du prototype : `db-reverrouillage.yml` (0056 § 4.6, point 1),
+   lancé à la main sur `main` par la Sécurité dans les 2 heures d'un déclencheur ; il n'envoie que le texte figé
+   `db/reverrouillage/retour-deverrouillage.sql` (`REVOKE EXECUTE … FROM vadrouille_prototype`, vérifié contre
+   `REVERROUILLAGE_SHA256`), n'écrit pas dans le journal des migrations et peut être relancé sans effet. Le fichier de
+   retour arrière de la future migration de déverrouillage en sera une copie à l'identique (§ 4.2).
 
 Test de restauration sur la base de staging (sauvegarde, point dans le temps) : renvoyé à la question 3 de la
 spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de conservation).
