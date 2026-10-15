@@ -20,6 +20,8 @@ On ne connaît pas la valeur de `OPENSSL_CONF` : le diagnostic, volontairement, 
 
 ## 2. Pourquoi le runtime pose `OPENSSL_CONF` : ce qui est établi, ce qui ne l'est pas
 
+> **Conclusion corrigée par 0065** (`docs/decisions/0065-nodejs-conf-runtime-vercel.md`, section 2 point 2) : la variable est posée par le `bootstrap` de l'image publique du runtime Lambda `nodejs24.x`, vers `/var/runtime/openssl_conf/openssl.cnf`.
+
 Sources lues le 2026-10-14, relues par le Tech Lead le même jour vers 20:25 UTC.
 
 - **Vercel** ([Reserved environment variables](https://vercel.com/docs/environment-variables/reserved-environment-variables), mise à jour du 2025-12-10 ; recherche dans la documentation par le MCP Vercel, `search_vercel_documentation`, sujet « `OPENSSL_CONF` ») : aucune page ne nomme `OPENSSL_CONF`, ni aucune variable OpenSSL ou TLS. Les variables réservées sont celles de Lambda (`AWS_LAMBDA_*`, `LAMBDA_TASK_ROOT`, `LAMBDA_RUNTIME_DIR`, `TZ`).
