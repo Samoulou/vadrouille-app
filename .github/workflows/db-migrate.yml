@@ -98,6 +98,7 @@ jobs:
             "0002_place_coordinates 5d88c571a20c220bceada1aeddfe6818b8a075db06f6e6989685b1257aa62006"
             "0003_prototype e75ab97b8cd8dfbac73e909cbe79153c051cc92ecfa97936b6297e715ecde843"
             "0004_rate_limit_expires_at f637564fe843325e9afe70c6f017680616c0bff098a8304d9502e8c8c8f2352d"
+            "0005_prototype_coordinates_run fe1a524fca2816ad76a09b75baff36770234f653c9c2d9ce9cd7af5a0bfb4145"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
