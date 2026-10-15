@@ -421,7 +421,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/research/undici-transport.ts",
     portee: "application",
     usage:
-      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : un `Agent` " +
+      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage, permis depuis `P0RUN_COMPLET` à vrai (PR 367), reste refusé à chaque lancement tant que la garde est fermée ou que le verrou S8 n'est pas levé : un `Agent` " +
       "par saut dont `connect.lookup` rend l'adresse vérifiée, résolveur réel `lookup` (`all: true`). Justification côté serveur : " +
       "module `server-only`, importé par ses tests et par la composition du mode réel (fermeture `fermeture-module-p0r1`)",
     capacites: [
@@ -434,7 +434,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/grounding/places-client.ts",
     portee: "application",
     usage:
-      "client réel de Places (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "client réel de Places (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage, permis depuis `P0RUN_COMPLET` à vrai (PR 367), reste refusé à chaque lancement tant que la garde est fermée ou que le verrou S8 n'est pas levé : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createPlacesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
@@ -443,7 +443,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/grounding/routes-client.ts",
     portee: "application",
     usage:
-      "client réel de Routes (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage reste refusé tant que l'étape finale manque (`P0RUN_COMPLET`) : `fetch` global seulement comme valeur par défaut du paramètre " +
+      "client réel de Routes (P0r1), branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage, permis depuis `P0RUN_COMPLET` à vrai (PR 367), reste refusé à chaque lancement tant que la garde est fermée ou que le verrou S8 n'est pas levé : `fetch` global seulement comme valeur par défaut du paramètre " +
       "`transport` de `createRoutesClient`, toujours appelé à travers l'enveloppe. Justification côté serveur : module `server-only`",
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)",
