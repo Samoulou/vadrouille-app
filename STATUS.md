@@ -1,29 +1,30 @@
-# État du studio — 2026-10-15 (76e cycle)
+# État du studio — 2026-10-15 (77e cycle, à la demande de Samuel)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-15 : 11:37 UTC, `owner-approved` sur #374 → fusionnée. 11:50 UTC, résultat de la requête en lecture demandée dans l'éditeur SQL de Neon pour `vadrouille_migrator` : `rolsuper` faux, `rolbypassrls` faux, `ssl` faux → les attributs du rôle sont corrects ; cause retenue : le contrôle `pg_stat_ssl` du workflow derrière le proxy Neon.
+- Fil du cycle, 2026-10-15 : 12:45 UTC, « les trois fichier sont commit » → tests protégés de #376 déposés par Samuel (426b08f, identiques aux versions préparées), revue relancée. 13:20 UTC, « c'est quoi l'état ? » → réponse. 13:36 UTC, `owner-approved` sur #376 et « c'est fait » ; question « on avance ou on stagne ? » → liste des étapes restantes. 13:38 UTC, délai de veto ramené à 6 heures → décision 0068 (#378) ; confirmation et portée demandées par carte (13:46 UTC). 13:44 UTC, « go lance un cycle » → ce 77e cycle.
 - #studio : aucun nouveau message.
 
 ## Fait
-- Fusionnés depuis le 75e cycle : #374 (A12, lot 1 des migrations approuvé), #375 (état du 75e cycle).
-- **A13 lancé puis refusé** : `db-migrate` sur main 585b09c (run 38728887188), échec dans le contrôle de session (SQLSTATE P0001), **aucune migration appliquée**, consigné sur #374. Pas de nouveau lancement avant l'analyse (0056 § 2.6.4).
+- Fusionnés depuis le 76e cycle : #376 (contrôle de chiffrement côté client, décision 0067, avec `owner-approved` ; Samuel accepte par ce clic le risque résiduel proxy→compute de Neon), #377 (état du 76e cycle).
+- **A13 fait** : `db-migrate` sur main (run 38744422089, 13:38 UTC) : **lot 1 appliqué à la vraie base** (0000_socle, 0001_securite, 0002_place_coordinates, 0003_prototype, 0004_rate_limit_expires_at).
+- **A15 fait** : premier lancement manuel de `p0-purge` réussi (run 38744737862, 13:40 UTC).
 
 ## En cours
-- Sécurité, avec le data : analyse de l'échec d'A13 et PR de workflow qui remplace le contrôle `pg_stat_ssl` (faux derrière le proxy Neon) sans affaiblir S9. Si `tests/unit/ci/db-migrate.test.ts` doit changer, la nouvelle version est préparée pour Samuel (garde-fou des agents, comme Q452).
+- data : A14, PR d'approbation du lot 2 (`0005_prototype_coordinates_run`), verdict Sécurité à la revue, puis `owner-approved` de Samuel.
+- #378 (décision 0068) : changements demandés par le Tech Lead (gabarit de note de version, renvois aux spécifications, portée rétroactive) ; correction après la réponse de Samuel à la carte.
 
 ## Bloqué
-- **Premier essai réel** (lancé par Samuel seul) : correction du contrôle de chiffrement de `db-migrate` (PR de workflow, `owner-approved` de Samuel), puis A13 relancé, lot 2 (0005) ; relevés `db-releve` après 0057 définitive ; limites de dépense OpenRouter et Google (Q325) ; accord écrit de Samuel (0055).
-- **Purge `p0-purge`** : premier lancement manuel après les migrations du lot 1 (A15).
+- **Premier essai réel** (lancé par Samuel seul) : lot 2 (A14, `owner-approved`), relevés `db-releve` par la Sécurité (A16 ; 0057 définitive selon la portée de 0068), PR de déverrouillage (A17), limites de dépense OpenRouter et Google (Q325) ; accord écrit de Samuel (0055).
 - **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
 1. Seulement le chemin de l'essai réel.
-2. Revue de la PR du contrôle de chiffrement, puis `owner-approved` de Samuel ; relancer A13, puis A15 et A14.
+2. Lot 2 (A14) puis A16 (`db-releve`) et A17 (déverrouillage) ; correction de #378 selon la carte.
 
 ## Décisions attendues de Samuel
-- **Bientôt** : `owner-approved` sur la PR qui corrige le contrôle de chiffrement de `db-migrate` (lien envoyé quand la revue l'aura approuvée).
+- **Réponse demandée** : carte « Appliquer le délai de 6 heures aussi aux décisions déjà en attente ? » (fil du cycle, 13:46 UTC). Bientôt : `owner-approved` sur le lot 2.
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
