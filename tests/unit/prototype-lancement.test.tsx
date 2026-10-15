@@ -138,6 +138,25 @@ describe("p0: interface de la page de lancement", () => {
     expect(groupe(t.formulaire.brief)).toHaveAttribute("aria-invalid", "true");
     expect(groupe(t.formulaire.variante)).not.toHaveAttribute("aria-invalid");
     expect(groupe(t.formulaire.brief)).toHaveFocus();
+    // Texte distinct : tout est choisi, le brief est refusé (pas « choix incomplet »).
+    expect(screen.getByRole("alert")).toHaveTextContent(t.formulaire.briefRefuse);
+    expect(screen.getByRole("alert")).not.toHaveTextContent(t.statuts.entree_invalide);
+  });
+
+  it("pendant un nouvel envoi, aucun groupe n'est signalé avant la réponse (refus rattaché à l'envoi qui l'a reçu)", async () => {
+    d.action.mockResolvedValueOnce({ statut: "entree_invalide" });
+    render(<LancementP0 modele={modele()} />);
+    await lancer([t.formulaire.variantes.B]);
+    expect(screen.getByRole("alert")).toHaveTextContent(t.statuts.entree_invalide);
+    let repondre: (etat: { statut: string }) => void = () => undefined;
+    d.action.mockReturnValueOnce(new Promise((resolve) => (repondre = resolve)));
+    await lancer(["edimbourg-1.json", t.formulaire.modes.essai]);
+    expect(d.action).toHaveBeenCalledTimes(2);
+    for (const nom of [t.formulaire.brief, t.formulaire.variante, t.formulaire.mode]) expect(groupe(nom)).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("alert")).toHaveTextContent(t.statuts.entree_invalide);
+    await act(async () => repondre({ statut: "lancee" }));
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(t.statuts.lancee);
   });
 
   it("« Actualiser » : bouton qui relit la page côté serveur, sans lien ni rechargement", () => {

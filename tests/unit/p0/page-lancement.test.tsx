@@ -227,6 +227,24 @@ describe("p0: action de lancement", () => {
     expect(d.revalidees).toEqual(["/prototype/executions"]);
   });
 
+  it("FormData forgé : seuls brief, variante et mode partent, tels quels (non fiables, contrôlés par le lancement)", async () => {
+    d.lancer.mockResolvedValue("entree_invalide");
+    const donnees = new FormData();
+    donnees.append("brief", new File(["edimbourg-1.json"], "edimbourg-1.json"));
+    donnees.append("brief", "edimbourg-2.json");
+    donnees.append("variante", "C");
+    donnees.append("mode", "");
+    donnees.append("runId", "11111111-1111-4111-8111-111111111111");
+    donnees.append("$ACTION_ID_x", "y");
+    expect(await lancerExecutionP0Action({ statut: "attente" }, donnees)).toEqual({ statut: "entree_invalide" });
+    const [demande] = d.lancer.mock.calls[0] as [Record<string, unknown>];
+    expect(Object.keys(demande).sort()).toEqual(["brief", "mode", "variante"]);
+    // Premier champ de chaque nom : un fichier reste un fichier (refusé par le lancement : « champ non texte »).
+    expect(demande.brief).toBeInstanceOf(File);
+    expect(demande).toMatchObject({ variante: "C", mode: "" });
+    expect(d.revalidees).toEqual([]);
+  });
+
   it("le fichier d'action n'exporte que le lancement", async () => {
     expect(Object.keys(await import("@/server/actions/p0-lancement")).sort()).toEqual(["lancerExecutionP0Action"]);
   });

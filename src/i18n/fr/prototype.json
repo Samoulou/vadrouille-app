@@ -15,7 +15,7 @@
   "lancement": {
     "titreDocument": "Prototype · Exécutions réelles",
     "titre": "Exécutions réelles",
-    "intro": "Choisis un brief et une variante, puis lance. Une seule exécution par jour de quota Google ; une exécution échouée consomme le jour.",
+    "intro": "Choisis un brief, une variante et une nature, puis lance. Une seule exécution par jour de quota Google ; une exécution échouée consomme le jour.",
     "formulaire": {
       "titre": "Lancer une exécution",
       "brief": "Brief",
@@ -31,7 +31,8 @@
       },
       "lancer": "Lancer",
       "lancement": "Lancement…",
-      "aucunBrief": "Aucun brief disponible."
+      "aucunBrief": "Aucun brief disponible.",
+      "briefRefuse": "Ce brief n'est plus proposé : choisis-en un autre, puis relance."
     },
     "statuts": {
       "lancee": "Exécution lancée. Utilise « Actualiser » pour suivre son avancement.",

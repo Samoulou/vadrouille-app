@@ -178,6 +178,7 @@ describe("p0: lancement d'une exécution (P0r3d)", () => {
     ["chemin", { ...DEMANDE, brief: "../edimbourg-1.json" }],
     ["champ non texte", { ...DEMANDE, brief: new Blob(["edimbourg-1.json"]) }],
     ["champs absents", { mode: null, brief: null, variante: null }],
+    ["champs cachés vides (aucun choix)", { mode: "", brief: "", variante: "" }],
   ])("choix refusé (%s) : entree_invalide, sans connexion", async (_cas, demande) => {
     expect(await lancer(demande as DemandeLancement)).toBe("entree_invalide");
     expect(connexions).toBe(0);

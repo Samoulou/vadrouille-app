@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { SegmentedControl } from "@/components/ligne/SegmentedControl";
@@ -14,7 +14,6 @@ import { lancerExecutionP0Action, type EtatLancementP0 } from "@/server/actions/
 
 const t = messages.prototype.lancement;
 
-const ETAT_INITIAL: EtatLancementP0 = { statut: "attente" };
 
 /** Bouton pendant le lancement : mêmes couleurs que `disabled:` de `Button`, sans retirer le bouton du focus. */
 const BOUTON_EN_COURS = "aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-ink-soft";
@@ -30,6 +29,33 @@ const CHOIX = ["brief", "variante", "mode"] as const;
 type NomChoix = (typeof CHOIX)[number];
 type Choix = { readonly [N in NomChoix]: string | null };
 const AUCUN_CHOIX: Choix = { brief: null, variante: null, mode: null };
+
+/** État du formulaire : statut rendu par l'action et choix envoyés avec lui (un refus se rapporte à eux). */
+type EtatFormulaire = { readonly statut: EtatLancementP0["statut"]; readonly envoye: Choix };
+const ETAT_INITIAL: EtatFormulaire = { statut: "attente", envoye: AUCUN_CHOIX };
+
+/** Choix lus dans les champs cachés envoyés (champ vide : aucun choix). */
+function choixEnvoyes(donnees: FormData): Choix {
+  const lire = (nom: NomChoix) => {
+    const valeur = donnees.get(nom);
+    return typeof valeur === "string" && valeur !== "" ? valeur : null;
+  };
+  return { brief: lire("brief"), variante: lire("variante"), mode: lire("mode") };
+}
+
+/**
+ * Lancement par l'action serveur ; l'état rendu garde les choix envoyés, lus avant l'appel. Le refus et ses groupes
+ * se rapportent ainsi à l'envoi qui l'a reçu : pendant un nouvel envoi, rien ne change avant sa réponse (mineur 2 de la
+ * revue du head `fbeacd6`).
+ */
+async function lancerAvecChoix(precedent: EtatFormulaire, donnees: FormData): Promise<EtatFormulaire> {
+  const envoye = choixEnvoyes(donnees);
+  const { statut } = await lancerExecutionP0Action({ statut: precedent.statut }, donnees);
+  return { statut, envoye };
+}
+
+/** `entree_invalide` avec les trois choix remplis : le serveur a refusé le brief (plus admis ou invalide). */
+const briefRefuse = (etat: EtatFormulaire) => etat.statut === "entree_invalide" && CHOIX.every((nom) => etat.envoye[nom] !== null);
 
 /**
  * Groupes signalés par un refus `entree_invalide` : ceux qui étaient vides à l'envoi ; tous remplis, le brief (refusé
@@ -105,21 +131,22 @@ function Execution({ execution }: { execution: ExecutionSuivie }) {
  * - « Actualiser » relit la page côté serveur (`router.refresh()`) sans perdre l'état du formulaire ni le message.
  */
 export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
-  const [etat, envoyer, enCours] = useActionState(lancerExecutionP0Action, ETAT_INITIAL);
+  const [etat, envoyer, enCours] = useActionState(lancerAvecChoix, ETAT_INITIAL);
   const router = useRouter();
   const envoiEnVol = useRef(false);
   const [choix, setChoix] = useState<Choix>(AUCUN_CHOIX);
-  // Choix tels qu'envoyés : un refus `entree_invalide` se rapporte à eux.
-  const [envoye, setEnvoye] = useState<Choix>(AUCUN_CHOIX);
   const groupeBrief = useRef<HTMLDivElement>(null);
   const groupeVariante = useRef<HTMLDivElement>(null);
   const groupeMode = useRef<HTMLDivElement>(null);
-  const groupes: Record<NomChoix, RefObject<HTMLDivElement | null>> = { brief: groupeBrief, variante: groupeVariante, mode: groupeMode };
+  const groupes = useMemo<Record<NomChoix, RefObject<HTMLDivElement | null>>>(
+    () => ({ brief: groupeBrief, variante: groupeVariante, mode: groupeMode }),
+    [],
+  );
   const etatTraite = useRef(etat);
   // Copie liée au texte copié : un autre rapport efface le message.
   const [copie, setCopie] = useState<{ readonly texte: string; readonly issue: "copie" | "copieImpossible" } | null>(null);
 
-  const invalides = etat.statut === "entree_invalide" ? groupesInvalides(envoye, choix) : new Set<NomChoix>();
+  const invalides = etat.statut === "entree_invalide" ? groupesInvalides(etat.envoye, choix) : new Set<NomChoix>();
   const premierInvalide = CHOIX.find((nom) => invalides.has(nom)) ?? null;
 
   // À chaque réponse de l'action (et seulement alors) : envoi suivant permis, focus au premier groupe en cause.
@@ -127,9 +154,8 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
     if (etatTraite.current === etat) return;
     etatTraite.current = etat;
     envoiEnVol.current = false;
-    const groupe = { brief: groupeBrief, variante: groupeVariante, mode: groupeMode };
-    if (premierInvalide !== null) groupe[premierInvalide].current?.focus();
-  }, [etat, premierInvalide]);
+    if (premierInvalide !== null) groupes[premierInvalide].current?.focus();
+  }, [etat, premierInvalide, groupes]);
 
   const surEnvoi = (evenement: FormEvent<HTMLFormElement>) => {
     if (envoiEnVol.current || enCours) {
@@ -137,7 +163,6 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
       return;
     }
     envoiEnVol.current = true;
-    setEnvoye(choix);
   };
 
   const copier = async (texte: string) => {
@@ -151,7 +176,8 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
 
   const { suivi, rapport } = modele;
   const accepte = etat.statut === "lancee" ? t.statuts.lancee : null;
-  const refus = etat.statut === "attente" || etat.statut === "lancee" ? null : t.statuts[etat.statut];
+  // Brief refusé, choix complet : texte distinct de « choix incomplet » (bloquant 1 du head `fbeacd6`, 0064 point 3).
+  const refus = etat.statut === "attente" || etat.statut === "lancee" ? null : briefRefuse(etat) ? t.formulaire.briefRefuse : t.statuts[etat.statut];
   const options: Record<NomChoix, { value: string; label: string }[]> = {
     brief: modele.briefs.map((brief) => ({ value: brief, label: brief })),
     variante: (["B", "A"] as const).map((variante) => ({ value: variante, label: t.formulaire.variantes[variante] })),
