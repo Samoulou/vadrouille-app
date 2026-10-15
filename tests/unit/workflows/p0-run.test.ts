@@ -187,7 +187,7 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
     const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; config: { totalCandidats: number } };
-    expect(deps.config.totalCandidats).toBe(9);
+    expect(deps.config.totalCandidats).toBe(12);
     for (let i = 0; i < 6; i += 1) await deps.recherche.rechercher({ requete: "x" });
     await expect(deps.recherche.rechercher({ requete: "x" })).rejects.toMatchObject({ code: "cap_reached" });
     expect(recherche.rechercher).toHaveBeenCalledTimes(6);

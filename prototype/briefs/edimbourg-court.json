@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "destination": "Édimbourg",
+  "pays": "Royaume-Uni",
+  "fuseau": "Europe/London",
+  "arrivee": "2026-11-23",
+  "depart": "2026-11-24",
+  "heureArrivee": "12:00",
+  "heureDepart": "16:00",
+  "voyageurs": { "adultes": 2, "enfants": 0 },
+  "rythme": "tranquille",
+  "envies": ["restaurant", "walk", "museum"],
+  "deplacements": ["walk", "transit"],
+  "budgetRepas": 2,
+  "logements": [{ "texte": "Vieille ville d'Édimbourg (Old Town)", "nuits": 1 }],
+  "recit": "Court séjour tranquille : marcher sans courir, un peu d'histoire, un musée et de bonnes tables."
+}

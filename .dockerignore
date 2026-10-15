@@ -21,6 +21,8 @@ prototype
 !prototype/briefs/edimbourg-1.json
 !prototype/briefs/edimbourg-2.json
 !prototype/briefs/edimbourg-3.json
+# Ticket #355 : brief court de l'essai d'intégration, lu par `p0Run` comme les trois autres.
+!prototype/briefs/edimbourg-court.json
 # P0r3c-5 (ticket 352) : formule de classement lue par l'étape finale de `p0Run`.
 !prototype/config/classement.json
 !prototype/config/essai.json
