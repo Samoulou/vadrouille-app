@@ -69,7 +69,7 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
     // Décision 0056 (§ 4.6 point 1 ; ticket 363) : la coupure `db-reverrouillage` retire l'EXECUTE de la fonction à
     // `vadrouille_prototype` par le texte figé de `db/reverrouillage/` et contrôle chaque surcharge trouvée par son nom
     // dans `pg_proc` ; son test recopie le texte figé. Ni appel ni import ; dans le workflow, aucune signature écrite.
-    // Admission proposée à la revue (Sécurité, Tech Lead).
+    // Admission : décision 0066 (bornes : § 2).
     const REVERROUILLAGE = [".github/workflows/db-reverrouillage.yml", "tests/unit/ci/db-reverrouillage.test.ts"];
     expect(hors.filter((f) => !RELEVE.includes(f) && !REVERROUILLAGE.includes(f))).toEqual([MODULE]);
     // Dans le workflow : une seule mention, jamais suivie de `(` (aucun appel, aucune signature écrite).
