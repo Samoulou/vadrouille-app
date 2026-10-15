@@ -218,16 +218,16 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
 describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décision 0063)", () => {
   const essai = () => lire("essai") as Record<string, unknown>;
 
-  it("fichier commité : bornes de P0S2-PO-12 amendé (14, 11, 3, 120), acceptées", () => {
+  it("fichier commité : bornes de P0S2-PO-12 amendé (17, 14, 3, 120 ; 12 candidats ; relevées par le ticket 355), acceptées", () => {
     expect(essai()).toEqual({
       schema: 1,
       uniteQuotaRoutes: "elements",
       coutUsd: 0.3,
       recherchesWeb: 6,
       pagesLues: 15,
-      candidatsTrouves: 9,
-      placesTextSearch: 14,
-      placesDetails: 11,
+      candidatsTrouves: 12,
+      placesTextSearch: 17,
+      placesDetails: 14,
       routesRequetes: 3,
       routesElements: 120,
       dureeMs: 300_000,
@@ -244,9 +244,9 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       ["coutUsd", 0.31],
       ["recherchesWeb", 7],
       ["pagesLues", 16],
-      ["candidatsTrouves", 10],
-      ["placesTextSearch", 15],
-      ["placesDetails", 12],
+      ["candidatsTrouves", 13],
+      ["placesTextSearch", 18],
+      ["placesDetails", 15],
       ["routesRequetes", 4],
       ["routesElements", 121],
       ["dureeMs", 300_001],
@@ -254,7 +254,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
     expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());
     for (const [champ, valeur] of cas) {
       const brutEssai = { ...essai(), [champ]: valeur };
-      expect(validerConfigModeReel(brutEssai).ok, champ).toBe(champ !== "candidatsTrouves" || valeur + 5 <= 14);
+      expect(validerConfigModeReel(brutEssai).ok, champ).toBe(champ !== "candidatsTrouves" || valeur + 5 <= 17);
       const resultat = validerConfigEssai(brutEssai);
       expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
       expect(JSON.stringify(resultat)).not.toContain(String(valeur));
@@ -267,7 +267,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
     expect(validerConfigEssai(sans)).toEqual({ ok: false, code: "config_reel_incomplete" });
   });
 
-  it("recherche-essai.json : 9 candidats, validé par le schéma de recherche", () => {
+  it("recherche-essai.json : 12 candidats, validé par le schéma de recherche", () => {
     const recherche = ConfigRechercheSchema.parse(lire("recherche-essai"));
     expect(recherche.totalCandidats).toBe(BORNES_ESSAI.candidatsTrouves);
     const cibles = Object.values(recherche.ciblesParCreneau).reduce((a, b) => a + b, 0);
