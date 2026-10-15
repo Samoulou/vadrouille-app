@@ -7,6 +7,7 @@ import {
   CAUSES_ENV_P0,
   CODES_ENV_P0,
   decoderJetonSaisi,
+  DIRECTIVES_ENV_P0,
   EXCEPTIONS_ENV_P0,
   lireEnvP0,
   VERDICTS_ENV_P0,
@@ -112,6 +113,8 @@ export const CAUSES_GARDE_FERMEE: readonly string[] = CAUSES_ENV_P0;
 export const EXCEPTIONS_GARDE_FERMEE: readonly string[] = EXCEPTIONS_ENV_P0;
 export const ZONES_GARDE_FERMEE: readonly string[] = ZONES_ENV_P0;
 export const VERDICTS_GARDE_FERMEE: readonly string[] = VERDICTS_ENV_P0;
+/** Jetons des directives que `p0.guard_closed` peut écrire (`openssl_conf_directives`, décision 0065 § 4 point 3). */
+export const DIRECTIVES_GARDE_FERMEE: readonly string[] = DIRECTIVES_ENV_P0;
 
 export type ResultatOuverture = { readonly ok: true; readonly attendu: Buffer } | { readonly ok: false; readonly code: CodeGardeFermee };
 
@@ -129,7 +132,8 @@ export function ouvertureP0(dependances: DependancesAcces = {}, journaliser = tr
 /**
  * Ouverture et diagnostic de la barrière de sortie (décisions 0058 et 0062) : nom de la variable ou de l'option de
  * proxy ou de TLS en cause, marque de l'exception, classe de racine et verdict de l'examen d'`OPENSSL_CONF`
- * (`openssl_conf_zone`, `openssl_conf_verdict`), écrits avec le code dans `p0.guard_closed` ; jamais une valeur.
+ * (`openssl_conf_zone`, `openssl_conf_verdict`) et, avec `section_nodejs`, directives en jetons
+ * (`openssl_conf_directives`, 0065), écrits avec le code dans `p0.guard_closed` ; jamais une valeur.
  */
 function ouvrir(dependances: DependancesAcces): { readonly resultat: ResultatOuverture; readonly diagnostic: DiagnosticSortie } {
   let diagnostic: DiagnosticSortie = {};

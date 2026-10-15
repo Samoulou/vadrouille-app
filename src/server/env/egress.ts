@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  DIRECTIVES_OPENSSL_CONF,
   examinerOpensslConf,
   FS_OPENSSL_REEL,
   nomSectionOpensslAdmis,
@@ -23,10 +24,12 @@ import {
  * 2. `proxy_env_refused` : une variable de proxy posée (majuscules ou minuscules) ou `--use-env-proxy` ;
  * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node ; seule exception,
  *    étroite : `OPENSSL_CONF` dont le fichier n'a aucun effet sur Node, en préversion de Vercel (décision 0062,
- *    ci-dessous ; elle remplace l'exception de `NODE_EXTRA_CA_CERTS` de 0058 § 4, retirée).
+ *    ci-dessous ; elle remplace l'exception de `NODE_EXTRA_CA_CERTS` de 0058 § 4, retirée), ou dont le fichier est
+ *    exactement celui, audité, du runtime Lambda `nodejs24.x` (décision 0065, verdict `contenu_audite`).
  * Diagnostic facultatif (décisions 0058 et 0062) : un rappel reçoit le **nom** de la variable ou de l'option en cause
  * (liste fermée `CAUSES_SORTIE`), la marque de l'exception appliquée et, pour `OPENSSL_CONF`, une classe de racine et un
- * verdict pris dans des listes fermées ; jamais une valeur.
+ * verdict pris dans des listes fermées et, avec le verdict `section_nodejs`, les directives du fichier en jetons d'une
+ * liste fermée (0065 § 4 point 3) ; jamais une valeur.
  *
  * Variable « posée » : présente avec une valeur non vide, sans retrait d'espaces. `NO_PROXY` n'a aucun effet.
  * Lecture paresseuse, à l'appel ; l'environnement est un paramètre (par défaut `process.env`) que les tests injectent.
@@ -153,13 +156,14 @@ const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowe
  * 1.7. la construction de Node lit la section `nodejs_conf` : `configNode` (`process.config` par défaut) passe
  *      `nomSectionOpensslAdmis` (`./openssl-conf.ts`) ; jugée avant le chemin, sans accès au système de fichiers ;
  * 1.3 à 1.6. le chemin et le fichier passent l'examen d'`examinerOpensslConf` (`./openssl-conf.ts`).
- * Le fichier n'est lu que si 1.1, 1.2, 1.7 et 1.3 passent. Rend la classe de racine et le verdict fermé, jamais une valeur.
+ * Le fichier n'est lu que si 1.1, 1.2, 1.7 et 1.3 passent. Rend la classe de racine et le verdict fermé et, avec
+ * `section_nodejs`, les directives en jetons (0065 § 4 point 3) ; jamais une valeur.
  */
 function examenOpensslConf(
   lu: Lecture,
   fs: SystemeFichiersOpenssl,
   configNode: unknown,
-): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf } | undefined {
+): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf; readonly directives?: string } | undefined {
   const valeur = lu.tls.OPENSSL_CONF;
   if (valeur === undefined || !posee(valeur)) return undefined;
   const reel = deploiementReel();
@@ -181,7 +185,10 @@ const causeProxy = (lu: Lecture): string | undefined =>
 const causeTls = (lu: Lecture, exception: boolean): string | undefined =>
   premierePosee(lu.tls, exception ? "OPENSSL_CONF" : undefined) ?? OPTIONS_TLS.find((option) => lu.options.has(option));
 
-/** Marque de l'exception bornée de 0062, quand elle a été appliquée (remplace `vercel_runtime_ca` de 0058). */
+/**
+ * Marque de l'exception bornée de 0062, quand elle a été appliquée (remplace `vercel_runtime_ca` de 0058) : verdict
+ * `admis` (0062) ou `contenu_audite` (0065 § 4 point 2).
+ */
 export const EXCEPTION_OPENSSL_CONF = "vercel_runtime_openssl_conf";
 
 /** Marques d'exception qu'un diagnostic peut rendre (liste fermée ; copie dans `src/server/log.ts`). */
@@ -190,18 +197,26 @@ export const EXCEPTIONS_SORTIE: readonly string[] = [EXCEPTION_OPENSSL_CONF];
 /** Classes de racine et verdicts de l'examen d'`OPENSSL_CONF` (0062 § 5.1 ; copies dans `src/server/log.ts`). */
 export const ZONES_SORTIE: readonly string[] = ZONES_OPENSSL_CONF;
 export const VERDICTS_SORTIE: readonly string[] = VERDICTS_OPENSSL_CONF;
+/** Jetons des directives d'un fichier `section_nodejs` (0065 § 4 point 3 ; copie dans `src/server/log.ts`). */
+export const DIRECTIVES_SORTIE: readonly string[] = DIRECTIVES_OPENSSL_CONF;
+
+/** Verdicts qui ouvrent l'exception : `admis` (0062) et `contenu_audite` (0065 § 4 point 2). */
+const VERDICTS_EXCEPTION: ReadonlySet<VerdictOpensslConf> = new Set(["admis", "contenu_audite"]);
 
 /**
  * Diagnostic de la barrière (décisions 0058 et 0062) : `cause`, nom de la première variable ou option de proxy ou de TLS
  * en cause (liste fermée `CAUSES_SORTIE`) ; `exception`, marque de l'exception appliquée ; `openssl_conf_zone` et
  * `openssl_conf_verdict`, rendus seulement si le contrôle TLS est atteint et qu'`OPENSSL_CONF` est posée dans
- * l'environnement lu (0062 § 5.1). Jamais une valeur, une longueur, un condensat ni un préfixe de valeur.
+ * l'environnement lu (0062 § 5.1) ; `openssl_conf_directives`, rendu seulement avec le verdict `section_nodejs` (0065
+ * § 4 point 3) : jetons d'une liste fermée, sans doublon, triés, séparés par `,`. Jamais une valeur, une longueur, un
+ * condensat ni un préfixe de valeur.
  */
 export type DiagnosticSortie = {
   readonly cause?: string;
   readonly exception?: typeof EXCEPTION_OPENSSL_CONF;
   readonly openssl_conf_zone?: ZoneOpensslConf;
   readonly openssl_conf_verdict?: VerdictOpensslConf;
+  readonly openssl_conf_directives?: string;
 };
 
 /**
@@ -280,12 +295,13 @@ export function verifierSortie(
     return { ok: false, code: "proxy_env_refused" };
   }
   const examen = examenOpensslConf(lu, fs, configNode);
-  const exception = examen?.verdict === "admis";
+  const exception = examen !== undefined && VERDICTS_EXCEPTION.has(examen.verdict);
   const tls = causeTls(lu, exception);
   diagnostic?.({
     ...(tls === undefined ? {} : { cause: tls }),
     ...(exception ? { exception: EXCEPTION_OPENSSL_CONF } : {}),
     ...(examen === undefined ? {} : { openssl_conf_zone: examen.zone, openssl_conf_verdict: examen.verdict }),
+    ...(examen?.verdict === "section_nodejs" && examen.directives !== undefined ? { openssl_conf_directives: examen.directives } : {}),
   });
   if (tls !== undefined) return { ok: false, code: "tls_env_refused" };
   return { ok: true };

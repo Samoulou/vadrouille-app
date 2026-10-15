@@ -20,6 +20,8 @@ On ne connaît pas la valeur de `OPENSSL_CONF` : le diagnostic, volontairement, 
 
 ## 2. Pourquoi le runtime pose `OPENSSL_CONF` : ce qui est établi, ce qui ne l'est pas
 
+> Conclusion corrigée par 0065 § 2 point 2 (`docs/decisions/0065-nodejs-conf-runtime-vercel.md`) : le `bootstrap` de l'image publique du runtime Lambda pose `OPENSSL_CONF`.
+
 Sources lues le 2026-10-14, relues par le Tech Lead le même jour vers 20:25 UTC.
 
 - **Vercel** ([Reserved environment variables](https://vercel.com/docs/environment-variables/reserved-environment-variables), mise à jour du 2025-12-10 ; recherche dans la documentation par le MCP Vercel, `search_vercel_documentation`, sujet « `OPENSSL_CONF` ») : aucune page ne nomme `OPENSSL_CONF`, ni aucune variable OpenSSL ou TLS. Les variables réservées sont celles de Lambda (`AWS_LAMBDA_*`, `LAMBDA_TASK_ROOT`, `LAMBDA_RUNTIME_DIR`, `TZ`).
@@ -58,6 +60,8 @@ Sources lues le 2026-10-14, relues par le Tech Lead le même jour vers 20:25 UTC
    - _Retirer `OPENSSL_CONF` de la liste_ : refusé par S-1 point 4 ; un fichier hors runtime ou définissant `nodejs_conf` doit rester bloquant.
 
 ## 5. Diagnostic (TL ; amende 0058 § 3)
+
+> Verdict `contenu_audite` et champ `openssl_conf_directives` ajoutés par 0065 (`docs/decisions/0065-nodejs-conf-runtime-vercel.md`, section 4 points 2 et 3).
 
 1. `DiagnosticSortie` gagne deux champs facultatifs, valeurs prises dans des listes fermées, **jamais** une valeur, une longueur, un condensat ni un préfixe de la valeur. **Exception assumée** : `openssl_conf_zone` est une **classe de racine** du chemin déclaré, prise dans une liste fermée de 7 valeurs ; c'est la seule information sur le chemin qui sorte, et elle ne nomme qu'une des racines déjà écrites dans cette décision, ou `autre`.
    - `openssl_conf_zone` : `dev_null`, `etc`, `usr`, `var_runtime`, `var_lang`, `opt` ou `autre` ; calculée sur la valeur de l'environnement lu, sans accès au système de fichiers ;

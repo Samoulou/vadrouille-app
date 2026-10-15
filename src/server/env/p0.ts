@@ -3,6 +3,7 @@ import "server-only";
 import {
   CAUSES_SORTIE,
   CODES_REFUS_SORTIE,
+  DIRECTIVES_SORTIE,
   EXCEPTIONS_SORTIE,
   VERDICTS_SORTIE,
   verifierSortie,
@@ -22,7 +23,7 @@ import { resolveServerEnvironment } from "@/server/env/resolve";
  * `lireEnvP0` contrôle, dans cet ordre (le premier refus l'emporte, et rien n'est lu au-delà) :
  * 1. la barrière de sortie de P0r1 (`verifierSortie`, avec D21 : l'environnement injecté ne peut que resserrer), dont
  *    le diagnostic (nom de la cause, marque de l'exception de 0062, classe de racine et verdict de l'examen
- *    d'`OPENSSL_CONF`, jamais une valeur) est passé au rappel facultatif ;
+ *    d'`OPENSSL_CONF`, directives en jetons de 0065, jamais une valeur) est passé au rappel facultatif ;
  * 2. l'environnement du serveur, par le **seul calcul** de B3a (`resolveServerEnvironment`) : `staging` seulement ;
  * 3. `CI` absente ou vide (Vercel la pose au build, jamais à l'exécution d'une fonction) ;
  * 4. `VERCEL_GIT_COMMIT_REF` égale à `p0-reel` (comparaison exacte) ;
@@ -54,6 +55,8 @@ export const CAUSES_ENV_P0: readonly string[] = CAUSES_SORTIE;
 export const EXCEPTIONS_ENV_P0: readonly string[] = EXCEPTIONS_SORTIE;
 export const ZONES_ENV_P0: readonly string[] = ZONES_SORTIE;
 export const VERDICTS_ENV_P0: readonly string[] = VERDICTS_SORTIE;
+/** Jetons des directives d'un fichier `section_nodejs` (décision 0065 § 4 point 3) ; liste fermée. */
+export const DIRECTIVES_ENV_P0: readonly string[] = DIRECTIVES_SORTIE;
 export type { DiagnosticSortie };
 
 export type ResultatEnvP0 = { readonly ok: true; readonly jeton: Buffer } | { readonly ok: false; readonly code: CodeEnvP0 };
