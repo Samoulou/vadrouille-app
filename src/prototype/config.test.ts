@@ -218,7 +218,7 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
 describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décision 0063)", () => {
   const essai = () => lire("essai") as Record<string, unknown>;
 
-  it("fichier commité : bornes de P0S2-PO-12 amendé (14, 11, 3, 120), acceptées", () => {
+  it("fichier commité : bornes de P0S2-PO-12 amendé (14, 14, 3, 120 ; fiches à 14 depuis le ticket 355), acceptées", () => {
     expect(essai()).toEqual({
       schema: 1,
       uniteQuotaRoutes: "elements",
@@ -227,7 +227,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       pagesLues: 15,
       candidatsTrouves: 9,
       placesTextSearch: 14,
-      placesDetails: 11,
+      placesDetails: 14,
       routesRequetes: 3,
       routesElements: 120,
       dureeMs: 300_000,
@@ -246,7 +246,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       ["pagesLues", 16],
       ["candidatsTrouves", 10],
       ["placesTextSearch", 15],
-      ["placesDetails", 12],
+      ["placesDetails", 15],
       ["routesRequetes", 4],
       ["routesElements", 121],
       ["dureeMs", 300_001],

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { briefPourRecherche } from "@/ai/requetes";
 import { planRoutes } from "@/grounding/budget-routes";
 import { BriefSchema, NOM_BRIEF_PATTERN, RYTHMES, type Brief } from "@/prototype/brief";
+import { BORNES_ESSAI, validerConfigEssai } from "@/prototype/config";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { demandeBornee, demandeDuJour, joursDuSejour, TYPES_SERIE } from "@/server/p0/moteur-final";
 import { briefDepuisBrief, engagementsDepuisBrief } from "@/server/p0/vers-moteur";
@@ -88,9 +89,23 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
       }
     }
     expect(serie).toBe(10);
-    // Écart consigné (question de la PR du ticket 355) : le budget de fiches de l'essai, `placesDetails − 2 × logements`, vaut 9 ;
-    // tant qu'il reste sous la série, l'étape finale s'arrête avant toute fiche de lieu (`pipeline_failed`).
-    expect(essai.placesDetails - 2 * brief.logements.length).toBe(9);
+  });
+
+  it("la série tient dans le budget de fiches de l'essai avec 2 de marge (formule de l'étape finale de p0Run)", () => {
+    const { serie } = premiereSerie(brief);
+    // `p0-run.ts` : budgetFiches = placesDetails − 2 × logements ; série plus grande : arrêt avant toute fiche.
+    const budgetFiches = essai.placesDetails - 2 * brief.logements.length;
+    expect(validerConfigEssai(lire("prototype/config/essai.json")).ok).toBe(true);
+    expect(essai.placesDetails).toBe(14);
+    expect(essai.placesDetails).toBeLessThanOrEqual(BORNES_ESSAI.placesDetails);
+    expect(serie).toBeLessThanOrEqual(budgetFiches);
+    expect(budgetFiches - serie).toBe(2);
+  });
+
+  it("réserve des fiches de l'essai sous 0,30 USD au prix plein du SKU Enterprise", () => {
+    const prix = lire("prototype/config/prix-google.json") as { skus: Record<string, { prixPour1000: number }> };
+    const prixFiche = (prix.skus["places_details_enterprise"]?.prixPour1000 ?? Number.POSITIVE_INFINITY) / 1000;
+    expect(essai.placesDetails * prixFiche).toBeLessThanOrEqual(0.3);
   });
 
   it("le modèle de la recherche ne voit pas le logement ; le récit n'en reprend aucun mot ; aucun champ personnel", () => {
