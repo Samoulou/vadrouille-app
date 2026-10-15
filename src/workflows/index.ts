@@ -21,9 +21,10 @@ export { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS,
  *   des messages peuvent être stockés **temporairement dans une région voisine** (relevé 3 de la PR 326 ; Q28).
  * - **Garde exigée** : `p0Run` ne démarre que pour une exécution réservée par une garde ouverte (`GardeOuverte`) ; son
  *   entrée est l'identifiant d'exécution seul.
- * - **`p0Run` non démarrable** : tant que `P0RUN_COMPLET` (`./complet.ts`) est faux, `startWorkflow` refuse de le
- *   démarrer (`real_mode_unavailable`), sans appel au SDK. L'étape finale (P0r3c-5) et l'action de lancement (P0r3d)
- *   sont livrées ; restent les conditions du point 7 de l'amendement P0r3c-5 de 0063 que `./complet.ts` énumère.
+ * - **Interrupteur de `p0Run`** : si `P0RUN_COMPLET` (`./complet.ts`) est faux, `startWorkflow` refuse de le
+ *   démarrer (`real_mode_unavailable`), sans appel au SDK. Il est vrai depuis la PR dédiée (conditions (a), (b) et (d)
+ *   du point 7 de l'amendement P0r3c-5 de 0063 remplies) ; la levée du verrou S8 (c) reste contrôlée à chaque
+ *   lancement par l'action de lancement.
  * - **Démarrage échoué** : une erreur du SDK rend `start_failed`, jamais son message ; l'appelant clôt l'exécution
  *   réservée (`cloreExecutionNonDemarree`).
  */
