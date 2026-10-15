@@ -5,6 +5,7 @@ import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-co
 
 import {
   CAUSES_SORTIE,
+  DIRECTIVES_SORTIE,
   EXCEPTIONS_SORTIE,
   OPTIONS_TLS,
   optionsDeNode,
@@ -14,7 +15,7 @@ import {
   type DiagnosticSortie,
   type EnvSortie,
 } from "./egress";
-import type { SystemeFichiersOpenssl } from "./openssl-conf";
+import { CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24, type SystemeFichiersOpenssl } from "./openssl-conf";
 
 /**
  * `p0: aucun client réel hors préversion ou développement`, `… derrière un proxy d'environnement`, `… avec un TLS
@@ -295,6 +296,7 @@ describe("p0: exception bornée d'OPENSSL_CONF en préversion de Vercel (décisi
       cause: "OPENSSL_CONF",
       openssl_conf_zone: "etc",
       openssl_conf_verdict: "section_nodejs",
+      openssl_conf_directives: "nodejs_conf",
     });
   });
 
@@ -439,6 +441,113 @@ describe("p0: exception bornée d'OPENSSL_CONF en préversion de Vercel (décisi
   });
 });
 
+describe("p0: fichier OPENSSL_CONF audité du runtime Lambda nodejs24.x (décision 0065)", () => {
+  const CHEMIN = "/var/runtime/openssl_conf/openssl.cnf";
+  const ENV: EnvSortie = { ...RUNTIME, OPENSSL_CONF: CHEMIN };
+  const fsAudite = () => fauxFs({ [CHEMIN]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24 });
+  const ADMIS = { exception: "vercel_runtime_openssl_conf", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "contenu_audite" };
+
+  beforeEach(() => {
+    poserRuntime(CHEMIN);
+  });
+
+  it("contenu audité en préversion de Vercel : exception ouverte, verdict contenu_audite, sans directives", () => {
+    expect(verifierSortie(ENV, [], undefined, fsAudite())).toEqual({ ok: true });
+    expect(diagnostiquer(ENV, [], fsAudite())).toEqual(ADMIS);
+  });
+
+  it("hors préversion de Vercel : le contenu audité n'ouvre rien, et le fichier n'est pas lu", () => {
+    for (const env of [
+      { ...ENV, VERCEL: undefined },
+      { ...ENV, VERCEL_ENV: "development" },
+    ]) {
+      const fs = fsAudite();
+      expect(verifierSortie(env, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(env, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "hors_preview" });
+      expect(fs.appels).toEqual([]);
+    }
+    expect(verifierSortie({ ...ENV, VERCEL_ENV: "production" }, [], undefined, fsAudite())).toEqual({ ok: false, code: "production_refused" });
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(verifierSortie(ENV, [], undefined, fsAudite())).toEqual({ ok: false, code: "production_refused" });
+  });
+
+  it("il ne masque ni un proxy, ni une autre variable TLS, ni une option TLS", () => {
+    const fs = fsAudite();
+    expect(verifierSortie({ ...ENV, HTTPS_PROXY: "http://p" }, [], undefined, fs)).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(diagnostiquer({ ...ENV, HTTPS_PROXY: "http://p" }, [], fs)).toEqual({ cause: "HTTPS_PROXY" });
+    expect(fs.appels).toEqual([]);
+    for (const nom of ["NODE_TLS_REJECT_UNAUTHORIZED", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "SSLKEYLOGFILE"]) {
+      const env = { ...ENV, [nom]: "/etc/x" };
+      expect(verifierSortie(env, [], undefined, fsAudite())).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(env, [], fsAudite())).toEqual({ cause: nom, ...ADMIS });
+    }
+    for (const option of ["--openssl-shared-config", "--openssl-config=/etc/x", "--use-openssl-ca"]) {
+      expect(verifierSortie({ ...ENV, NODE_OPTIONS: option }, [], undefined, fsAudite())).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(verifierSortie(ENV, [option], undefined, fsAudite())).toEqual({ ok: false, code: "tls_env_refused" });
+    }
+  });
+
+  it("contenu différent : section_nodejs, barrière fermée, directives rendues", () => {
+    const fs = fauxFs({ [CHEMIN]: `${CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24}MinProtocol = TLSv1\n` });
+    expect(verifierSortie(ENV, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(ENV, [], fauxFs({ [CHEMIN]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24.replaceAll("\n", "\r\n") }))).toEqual({
+      cause: "OPENSSL_CONF",
+      openssl_conf_zone: "var_runtime",
+      openssl_conf_verdict: "section_nodejs",
+      openssl_conf_directives: "groups_admis,nodejs_conf,ssl_conf,system_default",
+    });
+    expect(diagnostiquer(ENV, [], fs)?.openssl_conf_directives).toBe("groups_admis,minprotocol,nodejs_conf,ssl_conf,system_default");
+  });
+
+  it("directives absentes hors section_nodejs", () => {
+    expect(diagnostiquer(ENV, [], fauxFs({ [CHEMIN]: "openssl_conf = x\n" }))).not.toHaveProperty("openssl_conf_directives");
+    expect(diagnostiquer(ENV, [], fauxFs({}))).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "fichier_refuse" });
+    expect(diagnostiquer({ ...ENV, VERCEL: "0" }, [], fsAudite())).not.toHaveProperty("openssl_conf_directives");
+    expect(diagnostiquer(ENV, [], fauxFs({ [CHEMIN]: "nodejs_conf = n\n.include relatif\n" }))).toEqual({
+      cause: "OPENSSL_CONF",
+      openssl_conf_zone: "var_runtime",
+      openssl_conf_verdict: "inclusion_refusee",
+    });
+  });
+
+  it("section_nodejs sans aucune directive (# nodejs_conf, [nodejs_conf]) : champ absent, jamais de chaîne vide", () => {
+    for (const contenu of ["# nodejs_conf\n", "[nodejs_conf]\n"]) {
+      const fs = fauxFs({ [CHEMIN]: contenu });
+      expect(verifierSortie(ENV, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(ENV, [], fauxFs({ [CHEMIN]: contenu }))).toEqual({
+        cause: "OPENSSL_CONF",
+        openssl_conf_zone: "var_runtime",
+        openssl_conf_verdict: "section_nodejs",
+      });
+    }
+  });
+
+  it("contenu audité avec env_differente ou nom_section_refuse : barrière fermée, fichier non lu", () => {
+    vi.stubEnv("OPENSSL_CONF", "/var/runtime/autre.cnf");
+    let fs = fsAudite();
+    expect(verifierSortie(ENV, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(ENV, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "env_differente" });
+    expect(fs.appels).toEqual([]);
+    poserRuntime(CHEMIN);
+    fs = fsAudite();
+    const configNode = { target_defaults: { defines: ["NODE_OPENSSL_CONF_NAME=openssl_conf"] } };
+    expect(verifierSortie(ENV, [], undefined, fs, configNode)).toEqual({ ok: false, code: "tls_env_refused" });
+    const recus: DiagnosticSortie[] = [];
+    verifierSortie(ENV, [], (d) => void recus.push(d), fs, configNode);
+    expect(recus).toEqual([{ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "nom_section_refuse" }]);
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("sentinelle : ni valeur de Groups, ni nom de section, ni chemin dans le diagnostic", () => {
+    const chemin = "/var/runtime/SENTINELLE-CHEMIN.cnf";
+    poserRuntime(chemin);
+    const contenu = "nodejs_conf = SENTINELLE_INIT\n[SENTINELLE_INIT]\nssl_conf = SENTINELLE_SSL\n[SENTINELLE_SSL]\nGroups = SENTINELLE_GROUPE:X25519\n";
+    const diagnostic = diagnostiquer({ ...ENV, OPENSSL_CONF: chemin }, [], fauxFs({ [chemin]: contenu }));
+    expect(diagnostic?.openssl_conf_directives).toBe("groups_autres,nodejs_conf,ssl_conf");
+    expect(JSON.stringify(diagnostic)).not.toContain("SENTINELLE");
+  });
+});
+
 describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et 0062)", () => {
   it("chaque nom de la liste fermée, posé seul, est rendu tel quel et sans sa valeur", () => {
     for (const nom of CAUSES_SORTIE) {
@@ -452,7 +561,9 @@ describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et
   it("listes fermées de l'exception, des classes de racine et des verdicts", () => {
     expect(EXCEPTIONS_SORTIE).toEqual(["vercel_runtime_openssl_conf"]);
     expect(ZONES_SORTIE).toHaveLength(7);
-    expect(VERDICTS_SORTIE).toHaveLength(8);
+    expect(VERDICTS_SORTIE).toHaveLength(9);
+    expect(VERDICTS_SORTIE).toContain("contenu_audite");
+    expect(DIRECTIVES_SORTIE).toHaveLength(32);
   });
   it("une option est nommée par son nom canonique", () => {
     expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--tls_keylog=/SENTINELLE" })).toEqual({ cause: "--tls-keylog" });

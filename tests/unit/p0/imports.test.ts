@@ -1373,6 +1373,31 @@ function importsClientDe(fichier: string, source: string): string[] {
 }
 
 /**
+ * Imports **exécutés** d'un fichier (arbre syntaxique) : `import` et `export … from` sauf ceux qui sont entièrement de
+ * type (effacés à la compilation), et tout `import()` (non littéral : `?import-non-litteral`).
+ */
+function importsExecutesDe(fichier: string, source: string): string[] {
+  const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, true, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const specificateurs: string[] = [];
+  const visiter = (noeud: ts.Node) => {
+    if (ts.isImportDeclaration(noeud) && ts.isStringLiteral(noeud.moduleSpecifier) && !noeud.importClause?.isTypeOnly) {
+      specificateurs.push(noeud.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(noeud) && noeud.moduleSpecifier !== undefined && ts.isStringLiteral(noeud.moduleSpecifier) && !noeud.isTypeOnly) {
+      specificateurs.push(noeud.moduleSpecifier.text);
+    } else if (ts.isCallExpression(noeud) && noeud.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const argument = noeud.arguments[0];
+      specificateurs.push(argument !== undefined && ts.isStringLiteralLike(argument) ? argument.text : "?import-non-litteral");
+    }
+    ts.forEachChild(noeud, visiter);
+  };
+  visiter(sf);
+  return specificateurs;
+}
+
+/** Seuls imports exécutés admis dans le terminal `src/workflows/index.ts`. */
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./complet", "./p0-run"];
+
+/**
  * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
  * nommées, chacune admise **seulement si** sa propriété est vérifiée sur le fichier réel (arbre syntaxique) :
  * - l'action serveur de la saisie du code (`src/server/actions/p0-acces.ts`), si son prologue porte `"use server"` : vue
@@ -1387,10 +1412,20 @@ function importsClientDe(fichier: string, source: string): string[] {
  * Sécurité demandés dans la PR de P0r3b (bloquant 3 du head 6be9299). Décision 0062 (ticket 341) : `openssl-conf.ts`,
  * importé par `egress.ts` (examen d'`OPENSSL_CONF`, aucune clé ni variable d'environnement lue), est admis avec lui ;
  * verdicts Tech Lead et Sécurité demandés dans la PR du ticket 341.
+ *
+ * P0r3d (ticket 354 ; 0055 § 8 ; 0063 point 10) : troisième entrée, l'action de lancement
+ * (`src/server/actions/p0-lancement.ts`, même propriété que la saisie), et un **terminal** : au-delà d'une entrée admise
+ * seulement, l'interface des workflows (`src/workflows/index.ts`), si elle importe `server-only` et ne porte aucune
+ * directive, est admise **sans être parcourue** (le pont `p0Run` et ce qu'il atteint ne sont jamais dans un paquet
+ * client : `server-only` ferait échouer la construction), et si ses imports exécutés sont `server-only`, `workflow/api`,
+ * `./complet` et `./p0-run` seulement (les imports de type sont effacés). Atteinte hors d'une entrée admise, ou sans sa
+ * propriété, elle est parcourue comme un fichier ordinaire, et chaque module de P0 au-delà redevient une violation.
+ * Tech Lead : validé ; Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
  */
 const FRONTIERE_P0R3B = {
   entrees: [
     { fichier: "src/server/actions/p0-acces.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     {
       fichier: "src/server/p0/page-acces.ts",
       admise: (f: string, source: string) => {
@@ -1400,7 +1435,24 @@ const FRONTIERE_P0R3B = {
     },
   ],
   admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts"],
+  terminaux: [
+    {
+      fichier: "src/workflows/index.ts",
+      admis: (f: string, source: string) => {
+        const directives = directivesDuPrologue(f, source);
+        // Non parcouru : ses imports exécutés sont bornés par nom (mineur 16 de la revue du head `193603d`).
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_WORKFLOWS.includes(i));
+        return directives.length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
+  ],
 } as const;
+
+/** Vrai si `fichier` est un terminal de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
+function terminalFrontiereAdmis(fichier: string, lire: (fichier: string) => string): boolean {
+  const terminal = FRONTIERE_P0R3B.terminaux.find((t) => t.fichier === fichier);
+  return terminal !== undefined && terminal.admis(fichier, lire(fichier));
+}
 
 /** Vrai si `fichier` est une entrée de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
 function entreeFrontiereAdmise(fichier: string, lire: (fichier: string) => string): boolean {
@@ -1439,6 +1491,8 @@ function atteintsServeurSeulement(
       const suivant = noeud(cle, viaAction);
       if (precedent.has(suivant)) continue;
       precedent.set(suivant, courant);
+      // Terminal admis au-delà d'une entrée admise : ni violation, ni parcours au-delà.
+      if (viaAction && cible.type === "projet" && terminalFrontiereAdmis(cle, lire)) continue;
       const admis = viaAction && (FRONTIERE_P0R3B.admis as readonly string[]).includes(cle);
       if (!admis && (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral")) {
         violations.push(chemin(suivant));
@@ -1565,8 +1619,75 @@ describe("p0: clé côté serveur seulement", () => {
     expect(directivesDuPrologue("x.ts", '"use strict";\n"use server";\nexport {};\n')).toEqual(["use strict", "use server"]);
   });
 
-  it("frontière de P0r3b sur le dépôt : les deux entrées réelles portent leur propriété", () => {
+  it("frontière de P0r3b sur le dépôt : les trois entrées réelles et le terminal portent leur propriété", () => {
+    expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).toEqual([
+      "src/server/actions/p0-acces.ts",
+      "src/server/actions/p0-lancement.ts",
+      "src/server/p0/page-acces.ts",
+    ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
+    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts"]);
+    for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./complet", "./p0-run", "./p0-run", "server-only", "workflow/api"]);
+    // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
+    const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
+    expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);
+  });
+
+  it("terminal de P0r3d (src/workflows/index.ts) : admis au-delà d'une entrée seulement, et seulement avec server-only sans directive", () => {
+    const resoudreFictif = (depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/")
+        ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` }
+        : specificateur.startsWith("./")
+          ? { type: "projet", chemin: `${path.posix.dirname(depuis)}/${specificateur.slice(2)}.ts` }
+          : { type: "externe", nom: specificateur };
+    const SERVEUR = 'import "server-only";\n';
+    const depot = (index: string, extra: [string, string][] = [], suite = "") =>
+      new Map<string, string>([
+        ["src/features/Lancement.tsx", '"use client";\nimport { a } from "@/server/actions/p0-lancement";\n'],
+        ["src/server/actions/p0-lancement.ts", '"use server";\nimport { b } from "@/server/p0/lancement";\n'],
+        ["src/server/p0/lancement.ts", `${SERVEUR}import { c } from "@/workflows/index";\n`],
+        ["src/workflows/index.ts", `${index}import { start } from "workflow/api";\nimport type { G } from "@/server/p0/garde";\nimport { d } from "./p0-run";\nexport { P } from "./complet";\n${suite}`],
+        ["src/workflows/complet.ts", SERVEUR],
+        ["src/workflows/p0-run.ts", `${SERVEUR}import { e } from "@/ai/client";\nimport { f } from "@/server/composition/p0-reel";\n`],
+        ...extra,
+      ]);
+    const violations = (index: string, depart = "src/features/Lancement.tsx", extra: [string, string][] = [], suite = "") => {
+      const d = depot(index, extra, suite);
+      return atteintsServeurSeulement([depart], (f) => d.get(f) ?? "", resoudreFictif).sort();
+    };
+    const AU_DELA = [
+      "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/index.ts → src/workflows/p0-run.ts → src/ai/client.ts",
+      "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/index.ts → src/workflows/p0-run.ts → src/server/composition/p0-reel.ts",
+    ];
+    // Propriété vérifiée : arrêt au terminal.
+    expect(violations(SERVEUR)).toEqual([]);
+    // Sans server-only, avec une directive, ou server-only après "use client" : parcouru, chaque module de P0 refusé.
+    for (const index of ["", '"use server";\nimport "server-only";\n', '"use client";\nimport "server-only";\n']) {
+      expect(violations(index), JSON.stringify(index)).toEqual(AU_DELA);
+    }
+    // Import exécuté hors de la liste bornée (module, réexportation, import dynamique) : parcouru, chaque module refusé.
+    for (const suite of ['import { g } from "@/ai/client";\n', 'export { h } from "@/ai/client";\n', 'const m = () => import("@/ai/client");\n']) {
+      // Chaque module n'est rapporté qu'une fois, par le premier chemin parcouru (ici, l'import direct).
+      expect(violations(SERVEUR, "src/features/Lancement.tsx", [], suite), suite).toEqual(
+        ["src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/index.ts → src/ai/client.ts", AU_DELA[1]].sort(),
+      );
+    }
+    // Import de type seulement : effacé, admis.
+    expect(violations(SERVEUR, "src/features/Lancement.tsx", [], 'import type { T } from "@/ai/client";\nexport type { U } from "@/ai/client";\n')).toEqual([]);
+    // Atteint hors d'une entrée admise (composant client direct, ou action sans "use server") : parcouru, refusé.
+    expect(violations(SERVEUR, "src/features/Direct.tsx", [["src/features/Direct.tsx", '"use client";\nimport { x } from "@/workflows/index";\n']])).toEqual([
+      "src/features/Direct.tsx → src/workflows/index.ts → src/workflows/p0-run.ts → src/ai/client.ts",
+      "src/features/Direct.tsx → src/workflows/index.ts → src/workflows/p0-run.ts → src/server/composition/p0-reel.ts",
+    ]);
+    expect(violations(SERVEUR, "src/features/Lancement.tsx", [["src/server/actions/p0-lancement.ts", 'import { b } from "@/server/p0/lancement";\n']])).toEqual(AU_DELA);
+    // Le terminal n'admet que lui-même : le pont atteint directement depuis une entrée reste parcouru.
+    expect(
+      violations(SERVEUR, "src/features/Lancement.tsx", [["src/server/p0/lancement.ts", `${SERVEUR}import { c } from "@/workflows/p0-run";\n`]]),
+    ).toEqual([
+      "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/p0-run.ts → src/ai/client.ts",
+      "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/p0-run.ts → src/server/composition/p0-reel.ts",
+    ]);
   });
 
   /**

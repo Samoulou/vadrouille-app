@@ -18,6 +18,7 @@ vi.mock("@/server/env/p0", () => ({
   EXCEPTIONS_ENV_P0: [],
   ZONES_ENV_P0: [],
   VERDICTS_ENV_P0: [],
+  DIRECTIVES_ENV_P0: [],
   lireEnvP0: () => ({ ok: true, jeton }),
   decoderJetonSaisi: () => null,
 }));

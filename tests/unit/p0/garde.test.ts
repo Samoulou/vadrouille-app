@@ -3,10 +3,19 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { formatLogLine, LOG_EXIT_CAUSES, LOG_EXIT_EXCEPTIONS, LOG_GUARD_CODES, LOG_OPENSSL_CONF_VERDICTS, LOG_OPENSSL_CONF_ZONES } from "@/server/log";
+import {
+  formatLogLine,
+  LOG_EXIT_CAUSES,
+  LOG_EXIT_EXCEPTIONS,
+  LOG_GUARD_CODES,
+  LOG_OPENSSL_CONF_DIRECTIVES,
+  LOG_OPENSSL_CONF_VERDICTS,
+  LOG_OPENSSL_CONF_ZONES,
+} from "@/server/log";
 import {
   CAUSES_GARDE_FERMEE,
   CODES_GARDE_FERMEE,
+  DIRECTIVES_GARDE_FERMEE,
   EXCEPTIONS_GARDE_FERMEE,
   valeurCookieAcces,
   VERDICTS_GARDE_FERMEE,
@@ -28,6 +37,31 @@ import { baseEssais } from "../../support/base-essais-p0";
 const cles = vi.hoisted(() => ({ modeles: vi.fn(), google: vi.fn() }));
 vi.mock("@/server/env/ai", () => ({ lireCleOpenRouter: cles.modeles }));
 vi.mock("@/server/env/grounding", () => ({ lireCleGoogle: cles.google }));
+
+/**
+ * Fichier `OPENSSL_CONF` simulé pour la ligne `p0.guard_closed` avec `openssl_conf_directives` (décision 0065) : un seul
+ * chemin sous `/var/runtime/` est servi en mémoire ; tout autre accès passe au vrai `node:fs`.
+ */
+const conf = vi.hoisted(() => ({
+  chemin: "/var/runtime/vadrouille-garde-test/openssl.cnf",
+  texte: "nodejs_conf = SENTINELLE_INIT\n[SENTINELLE_INIT]\nssl_conf = SENTINELLE_SSL\n[SENTINELLE_SSL]\nGroups = SENTINELLE_GROUPE:X25519\n",
+}));
+vi.mock("node:fs", async (importOriginal) => {
+  const reel = await importOriginal<typeof import("node:fs")>();
+  const simule = (chemin: unknown) => chemin === conf.chemin;
+  const octets = () => Buffer.from(conf.texte, "latin1");
+  const remplace = {
+    realpathSync: (chemin: unknown, ...reste: unknown[]) =>
+      simule(chemin) ? chemin : (reel.realpathSync as (...a: unknown[]) => unknown)(chemin, ...reste),
+    lstatSync: (chemin: unknown, ...reste: unknown[]) =>
+      simule(chemin)
+        ? { isFile: () => true, isDirectory: () => false, size: octets().byteLength }
+        : (reel.lstatSync as (...a: unknown[]) => unknown)(chemin, ...reste),
+    readFileSync: (chemin: unknown, ...reste: unknown[]) =>
+      simule(chemin) ? octets() : (reel.readFileSync as (...a: unknown[]) => unknown)(chemin, ...reste),
+  };
+  return { ...reel, ...remplace, default: { ...reel, ...remplace } };
+});
 
 beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "preview");
@@ -187,6 +221,83 @@ describe("p0: mode réel refusé (lancement)", () => {
     expect([...LOG_OPENSSL_CONF_ZONES].sort()).toEqual([...ZONES_GARDE_FERMEE].sort());
     expect([...LOG_OPENSSL_CONF_VERDICTS].sort()).toEqual([...VERDICTS_GARDE_FERMEE].sort());
     expect(LOG_EXIT_EXCEPTIONS).toEqual(["vercel_runtime_openssl_conf"]);
+    expect(LOG_OPENSSL_CONF_VERDICTS).toContain("contenu_audite");
+  });
+
+  it("le journal admet exactement les jetons des directives de la barrière (décision 0065)", () => {
+    expect([...LOG_OPENSSL_CONF_DIRECTIVES].sort()).toEqual([...DIRECTIVES_GARDE_FERMEE].sort());
+    expect(new Set(LOG_OPENSSL_CONF_DIRECTIVES).size).toBe(LOG_OPENSSL_CONF_DIRECTIVES.length);
+  });
+
+  it("le journal admet des directives de la liste fermée et le verdict contenu_audite", () => {
+    const champs = {
+      guard: "tls_env_refused",
+      openssl_conf_verdict: "section_nodejs",
+      openssl_conf_directives: "groups_admis,nodejs_conf,ssl_conf,system_default",
+    };
+    expect(JSON.parse(formatLogLine("p0.guard_closed", champs))).toEqual({ level: "info", event: "p0.guard_closed", ...champs });
+    expect(JSON.parse(formatLogLine("p0.guard_closed", { openssl_conf_directives: "autre" }))).toEqual({
+      level: "info",
+      event: "p0.guard_closed",
+      openssl_conf_directives: "autre",
+    });
+    expect(JSON.parse(formatLogLine("p0.guard_closed", { openssl_conf_verdict: "contenu_audite" }))).toEqual({
+      level: "info",
+      event: "p0.guard_closed",
+      openssl_conf_verdict: "contenu_audite",
+    });
+  });
+
+  it("le journal retire des directives hors liste, en double ou de forme invalide (0065 § 5 point 4)", () => {
+    for (const valeur of [
+      "SENTINELLE",
+      "nodejs_conf,SENTINELLE",
+      "nodejs_conf,sentinelle",
+      "groups_admis,groups_admis",
+      "nodejs_conf,ssl_conf,nodejs_conf",
+      "",
+      ",",
+      "nodejs_conf,",
+      ",nodejs_conf",
+      "nodejs_conf,,ssl_conf",
+      "nodejs_conf, ssl_conf",
+      "NODEJS_CONF",
+      "/var/runtime/SENTINELLE.cnf",
+      "groups_admis:X25519",
+      ["nodejs_conf"],
+      42,
+    ]) {
+      const ligne = formatLogLine("p0.guard_closed", { guard: "tls_env_refused", openssl_conf_directives: valeur });
+      expect(JSON.parse(ligne)).toEqual({ level: "info", event: "p0.guard_closed", guard: "tls_env_refused", dropped: 1 });
+      expect(ligne).not.toContain("SENTINELLE");
+    }
+  });
+
+  it("garde fermée par section_nodejs : p0.guard_closed porte openssl_conf_directives, sans valeur ni nom de section (0065)", async () => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void lignes.push(String(ligne)));
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("OPENSSL_CONF", conf.chemin);
+    await ouvrirGardeLancement({
+      env: preversion({ VERCEL: "1", OPENSSL_CONF: conf.chemin }),
+      execArgv: [],
+      maintenant: () => T0,
+      cookie: undefined,
+      reserver: async () => reservation(),
+    });
+    expect(lignes.join("\n")).not.toContain("SENTINELLE");
+    expect(lignes.join("\n")).not.toContain("vadrouille-garde-test");
+    expect(lignes.map((l) => JSON.parse(l) as unknown)).toEqual([
+      {
+        level: "info",
+        event: "p0.guard_closed",
+        guard: "tls_env_refused",
+        cause: "OPENSSL_CONF",
+        openssl_conf_zone: "var_runtime",
+        openssl_conf_verdict: "section_nodejs",
+        openssl_conf_directives: "groups_autres,nodejs_conf,ssl_conf",
+      },
+    ]);
   });
 
   it("le journal retire une cause, une exception, une zone ou un verdict hors de la liste fermée (valeur, chemin, nom inconnu)", () => {

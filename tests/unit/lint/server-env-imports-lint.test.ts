@@ -39,6 +39,8 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
     ["src/server/p0/garde.ts", "@/server/env/p0"],
     ["src/server/p0/acces.ts", "@/server/env/p0"],
+    // P0r3d (ticket 354) : le lancement, pour le commit du déploiement.
+    ["src/server/p0/lancement.ts", "@/server/env/p0"],
     ["src/server/env/p0.test.ts", "./p0"],
     ["src/server/env/p0.ts", "@/server/env/index"],
   ];
@@ -75,6 +77,11 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/p0/garde.test.ts", "./../env/p0"],
     ["tests/unit/p0/garde.test.ts", "@/server/env/p0"],
     ["src/server/composition/p0-reel.ts", "@/server/env/p0"],
+    // P0r3d : ni l'action de lancement, ni l'état de la page, ni le décompte ou le rapport.
+    ["src/server/actions/p0-lancement.ts", "@/server/env/p0"],
+    ["src/server/p0/page-acces.ts", "@/server/env/p0"],
+    ["src/server/p0/decompte.ts", "@/server/env/p0"],
+    ["src/server/p0/lancement.test.ts", "@/server/env/p0"],
   ];
   it.each(REFUSES)("%s ne peut pas importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(1);

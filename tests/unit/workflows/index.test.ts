@@ -12,6 +12,8 @@ import { getRun, P0RUN_COMPLET, REGION_WORKFLOWS, startWorkflow } from "@/workfl
 const d = vi.hoisted(() => ({ start: vi.fn(), getRun: vi.fn() }));
 vi.mock("workflow/api", () => ({ start: d.start, getRun: d.getRun }));
 vi.mock("@/workflows/p0-run", () => ({ p0Run: vi.fn() }));
+/** Interrupteur simulé à faux : le refus reste prouvé alors que la valeur commitée est vraie (PR dédiée après P0r3d). */
+vi.mock("@/workflows/complet", () => ({ P0RUN_COMPLET: false }));
 
 const GARDE = Object.freeze({ runId: "33333333-3333-4333-8333-333333333333" }) as unknown as GardeOuverte;
 
@@ -20,10 +22,15 @@ beforeEach(() => {
 });
 
 describe("src/workflows/index.ts", () => {
-  it("P0RUN_COMPLET faux (conditions du point 7 de l'amendement P0r3c-5 de 0063) : démarrage refusé, SDK jamais appelé", async () => {
+  it("P0RUN_COMPLET faux (simulé ; conditions du point 7 de l'amendement P0r3c-5 de 0063) : démarrage refusé, SDK jamais appelé", async () => {
     expect(P0RUN_COMPLET).toBe(false);
     expect(await startWorkflow("p0Run", GARDE)).toEqual({ ok: false, code: "real_mode_unavailable" });
     expect(d.start).not.toHaveBeenCalled();
+  });
+
+  it("valeur commitée de P0RUN_COMPLET : vrai (PR dédiée après P0r3d ; amendement P0r3d de 0063, point 2)", async () => {
+    const reel = await vi.importActual<typeof import("@/workflows/complet")>("@/workflows/complet");
+    expect(reel.P0RUN_COMPLET).toBe(true);
   });
 
   it("région fra1, passée à chaque démarrage ; entrée réduite à l'identifiant d'exécution", () => {

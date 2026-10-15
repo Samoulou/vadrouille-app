@@ -28,5 +28,7 @@ prototype
 !prototype/config/essai.json
 !prototype/config/modeles.json
 !prototype/config/mode-reel.json
+# P0r3d (ticket 354) : table de prix Google, lue au lancement pour le forfait réservé (prix plein, Q329).
+!prototype/config/prix-google.json
 !prototype/config/recherche.json
 !prototype/config/recherche-essai.json
