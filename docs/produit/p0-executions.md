@@ -10,7 +10,7 @@ rapport » dans le fil de la tâche ; ia-recherche le recopie ici, tel quel. Le 
 Conditions qui ne sont pas du code (décision 0063, points 7 et 8 ; 0052 § 3 ; 0056) : la page refuse tant qu'une manque
 (`real_mode_unavailable`), sans rien réserver.
 
-1. `P0RUN_COMPLET` à vrai (`src/workflows/complet.ts`), par une PR après la fusion du brief court de l'essai (#355) ;
+1. `P0RUN_COMPLET` à vrai (`src/workflows/complet.ts`), par une PR dédiée (le brief court de l'essai, #355, est fusionné) ;
    la revue Sécurité de P0r3d est rendue (approuvé, PR #357 ; amendement P0r3d de 0063, point 2).
 2. Verrou S8 levé (0056) : la page le lit à chaque lancement (`EXECUTE` de `vadrouille_prototype` sur la fonction des
    positions).

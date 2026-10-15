@@ -201,7 +201,7 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  *
  * - Forfait : plafonds par méthode du mode au prix plein de `prototype/config/prix-google.json` (Q329), SKU des clients
  *   réels (`SKUS_FORFAIT`), plus le plafond de coût des modèles du mode (`coutUsd`) ; 4,30 USD de Google pour le mode
- *   réel (0053), 0,82 USD pour l'essai (spécification P0-suite-2, « Enveloppe Google »).
+ *   réel (0053), 0,88 USD pour l'essai (spécification P0-suite-2, « Enveloppe Google »).
  * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
  *   en cours n'est jamais close comme orpheline par le lancement d'un essai.
  */

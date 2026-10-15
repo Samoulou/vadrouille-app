@@ -59,15 +59,17 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     });
   });
 
-  it("essai : plafonds d'essai.json, 0,82 USD de Google, 0,30 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  // essai.json de #356 (brief court) : 17 Text Search (gratuits), 14 fiches à 20 USD les 1 000 (0,28 USD) et 120 éléments
+  // Routes à 5 USD les 1 000 (0,60 USD), au prix plein.
+  it("essai : plafonds d'essai.json, 0,88 USD de Google, 0,30 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
-        textSearchRequetes: 14,
-        placeDetailsRequetes: 11,
+        textSearchRequetes: 17,
+        placeDetailsRequetes: 14,
         routesRequetes: 3,
         routesElements: 120,
-        coutGoogleMicros: 820_000,
+        coutGoogleMicros: 880_000,
         coutModelesMicros: 300_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
