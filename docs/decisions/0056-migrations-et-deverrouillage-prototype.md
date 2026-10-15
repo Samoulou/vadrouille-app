@@ -2,6 +2,8 @@
 
 **Amendée par 0061** (ticket #337) : réponses du Tech Lead à la revue de #332 (Q419, Q412, liste vide, `SET search_path` non local, `push: main`, test des 600 lignes) ; le cas `SET search_path` non local des « Tests imposés » se lit « cas accepté, sans effet ».
 
+**Amendée par 0067** (PR #376) : au § 2.6.2, la condition « `ssl` vrai dans `pg_catalog.pg_stat_ssl` » est retirée (sur Neon, elle décrit la connexion du proxy, jamais celle du client) et remplacée par une garantie côté client uniquement : une ligne de contrôle avant toute connexion (seules les six variables `PG*` attendues, `PGSSLMODE=verify-full`, `PGSSLROOTCERT=system`). Les contrôles de rôle du § 2.6.2 et S9 sont inchangés ; les « Tests imposés » se lisent avec 0067 § 4.
+
 **Complétée par 0066** (ticket #363) : admission de `db-reverrouillage.yml` et de son test statique dans l'exception S6 (bornes), réponses du Tech Lead aux choix de #365, échec du contrôle final du § 4.6 point 1 (ne pas relancer, escalader).
 
 Statut : décision déléguée, proposée (exigences, risques et verdicts : Sécurité ; architecture, outillage et tests : Tech Lead, « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel **2 jours après sa fusion**. Les passages marqués **(Sécu)** sont les exigences S9 et S11, les risques résiduels et les verdicts. Les passages marqués **(TL)** portent l'architecture, l'outillage et les tests : ils sont **proposés par la Sécurité, non signés tant que le Tech Lead n'a pas approuvé la PR** ; le délai de veto de Samuel ne vaut pas signature du Tech Lead.

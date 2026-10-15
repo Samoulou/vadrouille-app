@@ -1,5 +1,7 @@
 # 0057 — Relevé `db-releve`
 
+**Amendée par 0067** (PR #376) : au § 3, la condition « `ssl` faux dans `pg_catalog.pg_stat_ssl` » est retirée des deux blocs `DO` de `db-releve` (sur Neon, elle décrit la connexion du proxy, jamais celle du client) et remplacée par une garantie côté client uniquement : la ligne de contrôle de 0067 § 2, avant la session. Les autres conditions des blocs `DO` (rôle, caractères de contrôle et `|`) sont inchangées.
+
 Statut : décision déléguée, proposée (exigences, risques et verdicts : Sécurité ; outillage et tests : Tech Lead, « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel **2 jours après sa fusion**. Les passages marqués **(TL)** sont **proposés par la Sécurité, non signés tant que le Tech Lead n'a pas approuvé la PR** ; le délai de veto de Samuel ne vaut pas signature du Tech Lead.
 
 Date : 2026-10-14 · Rédaction : rôle Sécurité, avec le Tech Lead pour l'outillage (découpage décidé par le CEO, Q418) · Ticket #314 · Numéro 0057 réservé par cette PR (mineur 3 de la revue de #300 au head `f8a0f3f`)

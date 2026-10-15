@@ -150,6 +150,7 @@ describe("ci: db-reverrouillage retire l'EXECUTE de vadrouille_prototype (0056 �
     const r = reverrouiller({ base, garderSsl: true });
     expect(r.code).toBe(1);
     expect(r.sortie).toMatch(/Échec : chiffrement : variables PG\* hors liste, ou PGSSLMODE autre que verify-full/);
+    expect(r.sortie).not.toMatch(/connexion ou rôle/);
     expect(await privileges(base)).toEqual(deverrouille);
   });
 });
