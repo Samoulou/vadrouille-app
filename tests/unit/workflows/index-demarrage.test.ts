@@ -6,7 +6,7 @@ import { P0RUN_COMPLET, startWorkflow } from "@/workflows";
 
 /**
  * Chemin de démarrage de `p0Run` une fois l'interrupteur passé à vrai (P0r3d ; 0063 points 5, 7 et 10) : interrupteur
- * simulé à vrai **dans ce test seulement** (`src/workflows/complet.ts` reste à faux, test `index.test.ts`), SDK simulé.
+ * simulé à vrai (la valeur commitée de `src/workflows/complet.ts` est vérifiée par `index.test.ts`), SDK simulé.
  */
 
 const d = vi.hoisted(() => ({ start: vi.fn() }));
