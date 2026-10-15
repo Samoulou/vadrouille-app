@@ -17,7 +17,7 @@ Part estimée de l'abonnement consommée depuis la dernière release : …
 - …
 
 ## Décisions prises par le studio
-Définitives sans veto de Samuel avant le <date + 2 jours>.
+Définitives sans veto de Samuel 6 heures après leur fusion (décision 0068) : <date et heure de fusion + 6 h, UTC>.
 - <décision> — <rôle> — <lien vers docs/decisions/ ou la spécification>
 
 ## Décisions attendues de Samuel
