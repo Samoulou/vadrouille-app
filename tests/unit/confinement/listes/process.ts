@@ -159,11 +159,11 @@ export const LECTURES_ENV = [
   { fichier: "src/server/env/index.ts", noms: ["P0_REAL_RUNS"] },
   { fichier: "src/server/env/p0.ts", noms: ["CI", "VERCEL_GIT_COMMIT_REF", "P0_REAL_RUNS"] },
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (identifiant public posé par Vercel), consigné avec
-  // l'exécution réservée ; lu à l'appel par `commitDuDeploiement`, forme contrôlée. Verdict Sécurité à rendre.
+  // l'exécution réservée ; lu à l'appel par `commitDuDeploiement`, forme contrôlée. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "src/server/env/p0.ts", noms: ["VERCEL_GIT_COMMIT_SHA"] },
   // P0r3d (ticket 354 ; décision 0063 point 8) : relevé humain de la route de flux sur la préversion de `p0-reel`,
   // adresse et jeton de contournement de la protection Vercel posés par la personne qui le lance ; absents, le bloc est
-  // ignoré. Jeton envoyé seulement à l'adresse donnée, jamais écrit. Verdict Sécurité à rendre.
+  // ignoré. Jeton envoyé seulement à l'adresse donnée, jamais écrit. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "tests/e2e/p0-flux.e2e.spec.ts", noms: ["E2E_P0_REEL_URL", "E2E_P0_REEL_BYPASS"] },
 ] as const satisfies readonly LigneLectureEnv[];
 
@@ -222,7 +222,7 @@ export const ENV_ENTIER = [
   // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : module étroit du mode réel, environnement lu à l'appel,
   // passé entier à la barrière de sortie et au seul calcul de l'environnement (B3a). Verdict Sécurité à rendre.
   { fichier: "src/server/env/p0.ts", formes: ["defaut:lireEnvP0", "argument:verifierSortie", "argument:resolveServerEnvironment"] },
-  // P0r3d (ticket 354) : même forme pour le commit du déploiement, lu par propriété littérale. Verdict Sécurité à rendre.
+  // P0r3d (ticket 354) : même forme pour le commit du déploiement, lu par propriété littérale. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "src/server/env/p0.ts", formes: ["defaut:commitDuDeploiement"] },
   // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement » ; 0051 point 6.7.3) : `process.env` entier
   // passé à la validation (`register()`, `serverEnv()`) et à la résolution de l'environnement (garde de connexion).

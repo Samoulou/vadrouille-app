@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { EchecSuivi, lireContenuProgramme, lireSuivi, PHASES_SUIVIES, SQL_CONTENU, SQL_DERNIERE_PURGE, SQL_EXECUTIONS } from "@/adapters/prototype-suivi";
+import { EchecSuivi, EXECUTIONS_MAX, lireContenuProgramme, lireSuivi, PHASES_SUIVIES, SQL_CONTENU, SQL_DERNIERE_PURGE, SQL_EXECUTIONS } from "@/adapters/prototype-suivi";
 import { STATUTS_EXECUTION } from "@/contracts/prototype-suivi";
 import { PHASES } from "@/prototype/arret";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
@@ -96,6 +96,15 @@ describe("p0: lecture du suivi (adaptateur)", () => {
       },
     ]);
     expect(b.requetes.map((r) => r.texte)).toEqual([SQL_EXECUTIONS, SQL_DERNIERE_PURGE]);
+    expect(b.liberations()).toBe(1);
+  });
+
+  it("au plus EXECUTIONS_MAX exécutions : la requête en demande une de plus ; au-delà, échec `base` (jamais tronqué)", async () => {
+    expect(EXECUTIONS_MAX).toBe(1000);
+    expect(SQL_EXECUTIONS).toMatch(/ORDER BY started_at DESC, id LIMIT 1001$/);
+    expect((await lireSuivi(base(Array.from({ length: EXECUTIONS_MAX }, () => LIGNE)).pool)).executions).toHaveLength(EXECUTIONS_MAX);
+    const b = base(Array.from({ length: EXECUTIONS_MAX + 1 }, () => LIGNE));
+    await expect(lireSuivi(b.pool)).rejects.toEqual(new EchecSuivi("base"));
     expect(b.liberations()).toBe(1);
   });
 

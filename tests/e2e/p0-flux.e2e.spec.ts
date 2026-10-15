@@ -25,7 +25,8 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
  * 0.8.0 passe un tel message au gestionnaire du workflow **sans le vérifier auprès du service de files**
  * (`handleCallback` → `consumeMessage` → `processMessage`) ; seule la protection de la plateforme (« Consumer function
  * security ») l'arrête. Critère, fermé : chaque requête est refusée par la plateforme (401 ou 403) ; toute autre réponse
- * fait échouer le relevé, et la Sécurité décide. Sans ces variables, le bloc est ignoré.
+ * fait échouer le relevé, et la Sécurité décide. Sans ces variables, le bloc est ignoré. L'adresse doit être en `https:`
+ * sur `*.vercel.app` : contrôlée avant tout envoi du jeton.
  */
 
 const FLUX = "/.well-known/workflow/v1/flow";
@@ -106,6 +107,37 @@ test.describe("p0-flux: build de la CI (monde local, garde fermée)", () => {
   });
 });
 
+/**
+ * Origine de la préversion, contrôlée **avant** tout envoi du jeton de contournement (mineur 19 de la revue du head
+ * `193603d`) : `https:` et un hôte `*.vercel.app` seulement, sans identifiants ni port ; sinon, erreur sans requête.
+ */
+function originePreversion(adresse: string): string {
+  let url: URL;
+  try {
+    url = new URL(adresse);
+  } catch {
+    throw new Error("E2E_P0_REEL_URL : adresse invalide");
+  }
+  if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app") || url.hostname === ".vercel.app" || url.username || url.password || url.port) {
+    throw new Error("E2E_P0_REEL_URL : https et *.vercel.app seulement");
+  }
+  return url.origin;
+}
+
+test("p0-flux: adresse de préversion contrôlée avant l'envoi du jeton (aucune requête)", () => {
+  expect(originePreversion("https://vadrouille-git-p0-reel-x.vercel.app/prototype")).toBe("https://vadrouille-git-p0-reel-x.vercel.app");
+  for (const adresse of [
+    "http://vadrouille.vercel.app",
+    "https://vadrouille.vercel.app.example.com",
+    "https://example.com",
+    "https://jeton@vadrouille.vercel.app",
+    "https://vadrouille.vercel.app:8443",
+    "pas une adresse",
+  ]) {
+    expect(() => originePreversion(adresse), adresse).toThrow(/E2E_P0_REEL_URL/);
+  }
+});
+
 const PREVERSION = process.env.E2E_P0_REEL_URL;
 const CONTOURNEMENT = process.env.E2E_P0_REEL_BYPASS;
 
@@ -113,7 +145,7 @@ test.describe("p0-flux: préversion de p0-reel (relevé de 0063 point 8)", () =>
   test.skip(!PREVERSION || !CONTOURNEMENT, "E2E_P0_REEL_URL et E2E_P0_REEL_BYPASS absentes : relevé humain sur la préversion");
 
   test("requêtes directes à la route de flux, avec et sans en-têtes de file : refusées par la plateforme", async ({ request }) => {
-    const base = new URL(PREVERSION!).origin;
+    const base = originePreversion(PREVERSION!);
     for (const sonde of SONDES) {
       const reponse = await sonde.envoyer(request, base, { "x-vercel-protection-bypass": CONTOURNEMENT! });
       expect([401, 403], `${sonde.nom} : ${reponse.status()}`).toContain(reponse.status());

@@ -21,13 +21,19 @@ import { placeIdsDuProgramme, ProgrammeReduitSchema, type ProgrammeReduit } from
  *   recomposition complète (positions et durées relues) est celle de la source Neon de P0r4.
  * - A3, A4 et A5 : garantis par construction (validation R1 à R10 en mémoire avant l'écriture) : « oui » si et
  *   seulement si un programme est écrit.
- * - A7 et A8 : « oui » si et seulement si un programme est écrit (S4 : les plafonds de 3 USD et de 15 min arrêtent
- *   l'exécution sans programme).
+ * - A7 et A8 (revue du head `193603d`, bloquant 1 ; amendement P0r3d de 0063) : « oui » si un programme est écrit (les
+ *   plafonds de coût et de durée arrêtent l'exécution sans programme) ; « non » seulement si le code d'arrêt signale un
+ *   plafond (`CODES_PLAFOND`) ; « non relevé » sinon (cause externe ou autre arrêt : rien ne montre un dépassement).
+ *   Sous S4, un plafond atteint en cours d'exécution est écrit `pipeline_failed` (`codePersiste`) : tant que S4
+ *   n'écrit pas ces codes, une exécution arrêtée rend « non relevé ».
  */
 
 const t = messages.prototype.lancement.rapport;
 
 const oui = (vrai: boolean): ValeurCritere => (vrai ? "oui" : "non");
+
+/** Codes d'arrêt qui signalent un plafond de coût ou de durée (A7, A8). */
+export const CODES_PLAFOND: readonly string[] = ["cap_reached", "timeout"];
 
 /** Contenu stocké contrôlé par le schéma de la forme réduite (positions fictives), ou `null` s'il ne le passe pas. */
 function programmeControle(contenu: unknown): ProgrammeReduit | null {
@@ -65,6 +71,7 @@ function propositionsAncrees(programme: ProgrammeReduit): boolean {
 export function criteresDuRapport(execution: ExecutionSuivie, contenu: unknown): CriteresRapport {
   if (execution.statut === "en_cours") throw new Error("rapport : exécution en cours");
   const ecrit = execution.statut === "programme_ecrit";
+  const plafond: ValeurCritere = ecrit ? "oui" : execution.codeArret !== null && CODES_PLAFOND.includes(execution.codeArret) ? "non" : "non_releve";
   let a1: ValeurCritere = "non";
   let a2: ValeurCritere = "non";
   let a6: ValeurCritere = "non";
@@ -83,8 +90,8 @@ export function criteresDuRapport(execution: ExecutionSuivie, contenu: unknown):
     A4: oui(ecrit),
     A5: oui(ecrit),
     A6: a6,
-    A7: oui(ecrit),
-    A8: oui(ecrit),
+    A7: plafond,
+    A8: plafond,
     A9: execution.canaryOk === null ? "non_releve" : oui(execution.canaryOk),
   };
 }

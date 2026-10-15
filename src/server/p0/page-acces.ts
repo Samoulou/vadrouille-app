@@ -18,7 +18,8 @@ import { NOMS_BRIEFS } from "@/workflows";
  * (`src/server/actions/p0-lancement.ts`).
  *
  * Page ouverte seulement (garde ouverte et cookie d'accès valide), le modèle du lancement (P0r3d) est lu : briefs
- * admis, suivi des exécutions, décompte par brief et variante, rapport de la dernière exécution finie. Garde fermée ou
+ * admis, suivi des exécutions, décompte par brief et variante, rapport de la dernière exécution finie (la plus
+ * récente qui n'est pas en cours : une exécution lancée n'efface pas le rapport de la précédente). Garde fermée ou
  * accès à saisir : aucune connexion à la base au-delà de celle de la saisie.
  */
 export async function etatPageExecutionsP0(): Promise<EtatPageAcces> {
@@ -39,7 +40,7 @@ async function suiviOuNul(): Promise<SuiviPrototype | null> {
 }
 
 async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: string | null): Promise<RapportPage | null> {
-  if (execution === undefined || execution.statut === "en_cours") return null;
+  if (execution === undefined) return null;
   let contenu: unknown = null;
   if (execution.statut === "programme_ecrit") {
     try {
@@ -67,7 +68,10 @@ async function modeleLancement(): Promise<ModeleLancementP0> {
             ...decompte(suivi.executions, brief, variante),
           })),
         );
-  const rapport = suivi === null ? null : await rapportDe(suivi.executions[0], suivi.dernierePurge);
+  const rapport = suivi === null ? null : await rapportDe(
+          suivi.executions.find((execution) => execution.statut !== "en_cours"),
+          suivi.dernierePurge,
+        );
   return { briefs: NOMS_BRIEFS, suivi, decompte: lignes, rapport };
 }
 

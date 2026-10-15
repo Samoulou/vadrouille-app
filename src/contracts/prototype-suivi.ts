@@ -56,7 +56,10 @@ export type CodeEchecSuivi = (typeof CODES_ECHEC_SUIVI)[number];
 /** Critères de la grille G0 rapportés en oui ou non (spécification P0-suite-2, « Rapport sans donnée Google »). */
 export const CRITERES = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9"] as const;
 export type Critere = (typeof CRITERES)[number];
-/** `non_releve` : A9 sans canari écrit, ou A1, A2 et A6 d'un programme écrit qui n'est plus lisible. */
+/**
+ * `non_releve` : A9 sans canari écrit ; A1, A2 et A6 d'un programme écrit qui n'est plus lisible ; A7 et A8 d'une
+ * exécution arrêtée sans code de plafond.
+ */
 export type ValeurCritere = "oui" | "non" | "non_releve";
 export type CriteresRapport = { readonly [C in Critere]: ValeurCritere };
 

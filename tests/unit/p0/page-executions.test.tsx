@@ -47,6 +47,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
+  useRouter: () => ({ refresh: () => undefined }),
 }));
 
 const CODE_HEX = etat.jeton.toString("hex");

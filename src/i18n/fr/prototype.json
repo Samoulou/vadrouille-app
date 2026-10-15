@@ -34,7 +34,7 @@
       "aucunBrief": "Aucun brief disponible."
     },
     "statuts": {
-      "lancee": "Exécution lancée. Actualise la page pour suivre son avancement.",
+      "lancee": "Exécution lancée. Utilise « Actualiser » pour suivre son avancement.",
       "fermee": "Lancement impossible : la page n'est plus ouverte. Recharge-la.",
       "acces_refuse": "Accès expiré : recharge la page et saisis de nouveau le code d'accès.",
       "entree_invalide": "Choix incomplet : sélectionne un brief, une variante et une nature.",
@@ -49,6 +49,7 @@
     },
     "suivi": {
       "titre": "Suivi",
+      "titreExecution": "{brief}, variante {variante}, jour du {jour}",
       "aucune": "Aucune exécution pour l'instant.",
       "indisponible": "Le suivi est indisponible : la base du prototype ne répond pas.",
       "actualiser": "Actualiser",
@@ -59,12 +60,36 @@
         "arretee": "Arrêtée"
       },
       "phase": "Phase",
+      "phases": {
+        "recherche": "Recherche des candidats",
+        "ancrage": "Ancrage des lieux",
+        "notation": "Notation",
+        "planification": "Planification",
+        "raisons": "Rédaction des raisons",
+        "validation": "Validation",
+        "ecriture": "Écriture du programme"
+      },
       "cout": "Coût des modèles",
+      "montantUsd": "{montant} USD",
       "duree": "Durée",
-      "codeArret": "Code d'arrêt",
+      "moinsDUneMinute": "moins d'une minute",
+      "codeArret": "Cause de l'arrêt",
+      "codesArret": {
+        "production_refused": "refusée en production",
+        "real_mode_unavailable": "mode réel indisponible",
+        "brief_invalid": "brief invalide",
+        "config_invalid": "configuration invalide",
+        "data_collection_missing": "réglage de non-collecte des données absent",
+        "model_id_invalid": "modèle invalide",
+        "upstream_unavailable": "service externe indisponible",
+        "upstream_redirect": "redirection d'un service externe",
+        "usage_unavailable": "base d'usage indisponible",
+        "pipeline_failed": "échec du traitement"
+      },
       "jourQuota": "Jour de quota",
       "dernierePurge": "Dernière purge réussie",
-      "aucunePurge": "Aucune purge réussie"
+      "aucunePurge": "Aucune purge réussie",
+      "instantUtc": "{date} à {heure} (UTC)"
     },
     "decompte": {
       "titre": "Décompte",
@@ -72,10 +97,12 @@
       "brief": "Brief",
       "variante": "Variante",
       "comptees": "Comptées",
-      "relances": "Relances"
+      "relances": "Relances",
+      "caption": "Exécutions comptées et relances par brief et variante"
     },
     "rapport": {
       "titreSection": "Rapport de la dernière exécution",
+      "texteAria": "Texte du rapport",
       "copier": "Copier le rapport",
       "copie": "Rapport copié.",
       "copieImpossible": "Copie impossible : sélectionne le texte et copie-le à la main.",

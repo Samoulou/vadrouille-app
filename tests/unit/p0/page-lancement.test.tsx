@@ -76,6 +76,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
+  useRouter: () => ({ refresh: () => undefined }),
 }));
 
 const ligne = (champs: Record<string, unknown>) => ({
@@ -129,16 +130,21 @@ describe("p0: page de lancement", () => {
     expect(html.match(/type="radio"[^>]*required/g)).toHaveLength(6);
     expect(html).toContain(t.formulaire.lancer);
     expect(html).toContain(html$(t.suivi.aucune));
-    expect(html.replaceAll("<!-- -->", "")).toContain(`${t.suivi.dernierePurge} : 2026-10-14T03:00:00Z`);
+    expect(html.replaceAll("<!-- -->", "")).toContain(`${t.suivi.dernierePurge} : 14 octobre 2026 à 03:00 (UTC)`);
+    expect(html).not.toContain("2026-10-14T03:00:00Z");
+    expect(html.match(/type="radio"[^>]*class="size-5 shrink-0 accent-line"/g)).toHaveLength(6);
   });
 
   it("exécution en cours : statut, phase, coût et durée ; aucun rapport", async () => {
     d.lignes = [ligne({ status: "en_cours", phase: "ancrage", cost_models_micros: "120000", ecoule_ms: "61000", canary_ok: null })];
     const html = renderToString(await ExecutionsPage());
     expect(html).toContain(t.suivi.statuts.en_cours);
-    expect(html).toContain("ancrage");
+    expect(html).toContain(t.suivi.phases.ancrage);
+    expect(html).not.toMatch(/>ancrage</);
     expect(html).toContain("0,12 USD");
-    expect(html).toContain("1 min 01 s");
+    expect(html).toContain(">1 min<");
+    expect(html).toContain(html$("edimbourg-1.json, variante B, jour du 14 octobre 2026"));
+    expect(html).not.toContain("2026-10-14<");
     expect(html).not.toContain(t.rapport.titreSection);
     expect(d.requetes).not.toContain(SQL_CONTENU);
   });
@@ -161,6 +167,22 @@ describe("p0: page de lancement", () => {
     expect(html).not.toContain(PREFIXE);
     expect(html).not.toContain("[Lieu de test");
     expect(html).not.toContain("USD");
+  });
+
+  it("exécution en cours après une exécution finie : le rapport reste celui de la finie ; cause d'arrêt en clair", async () => {
+    d.lignes = [
+      ligne({ id: "99999999-9999-4999-8999-999999999999", status: "en_cours", phase: "recherche", cost_models_micros: "0", ecoule_ms: "5000", canary_ok: null }),
+      ligne({ status: "arretee", stop_code: "upstream_unavailable", canary_ok: null }),
+    ];
+    const page = await pageExecutionsP0();
+    if (page.etat !== "ouverte") throw new Error("page non ouverte");
+    expect(page.modele.rapport?.execution.id).toBe("77777777-7777-4777-8777-777777777777");
+    expect(page.modele.rapport?.criteres).toMatchObject({ A7: "non_releve", A8: "non_releve" });
+    const html = renderToString(await ExecutionsPage());
+    expect(html).toContain(t.rapport.titreSection);
+    expect(html).toContain(html$(t.suivi.codesArret.upstream_unavailable));
+    expect(html).toContain(html$(t.suivi.moinsDUneMinute));
+    expect(d.requetes).not.toContain(SQL_CONTENU);
   });
 
   it("base injoignable : suivi indisponible, formulaire conservé", async () => {

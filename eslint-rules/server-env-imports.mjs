@@ -38,7 +38,7 @@ export const IMPORTATEURS_ADMIS = new Map([
   // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, depuis la garde et l'accès seulement ; ses
   // tests sont dans `src/server/env/` (`p0.test.ts`).
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (`commitDuDeploiement`), lu par le lancement seulement, garde
-  // déjà ouverte. Verdict Sécurité à rendre.
+  // déjà ouverte. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   ["p0", ["src/server/p0/garde.ts", "src/server/p0/acces.ts", "src/server/p0/lancement.ts"]],
 ]);
 

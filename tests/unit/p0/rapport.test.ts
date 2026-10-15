@@ -6,9 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import { CRITERES } from "@/contracts/prototype-suivi";
 import * as messages from "@/i18n/messages";
+import { CODES_ARRET } from "@/prototype/arret";
 import { decouperProgramme } from "@/prototype/decoupage";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
-import { criteresDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { CODES_PLAFOND, criteresDuRapport, texteDuRapport } from "@/server/p0/rapport";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -68,10 +69,31 @@ describe("p0: critères du rapport", () => {
     expect(criteres).toMatchObject({ A1: "oui", A2: "oui", A6: "non" });
   });
 
-  it("exécution arrêtée : A1 à A8 non, contenu ignoré ; A9 selon le canari", () => {
+  it("exécution arrêtée : A1 à A6 non, contenu ignoré ; A7 et A8 non relevés ; A9 selon le canari", () => {
     const criteres = criteresDuRapport(arretee("pipeline_failed", { canaryOk: null }), contenuValide());
-    for (const c of CRITERES.filter((x) => x !== "A9")) expect(criteres[c], c).toBe("non");
-    expect(criteres.A9).toBe("non_releve");
+    for (const c of ["A1", "A2", "A3", "A4", "A5", "A6"] as const) expect(criteres[c], c).toBe("non");
+    expect(criteres).toMatchObject({ A7: "non_releve", A8: "non_releve", A9: "non_releve" });
+  });
+
+  it.each(["upstream_unavailable", "upstream_redirect", "usage_unavailable", "pipeline_failed", "real_mode_unavailable"])(
+    "A7 et A8 : arrêt %s, aucun plafond signalé : non relevés (jamais un faux « non »)",
+    (code) => {
+      expect(criteresDuRapport(arretee(code), null)).toMatchObject({ A7: "non_releve", A8: "non_releve" });
+    },
+  );
+
+  it.each(CODES_PLAFOND)("A7 et A8 : arrêt %s, plafond signalé : non", (code) => {
+    expect(criteresDuRapport(arretee(code), null)).toMatchObject({ A7: "non", A8: "non" });
+  });
+
+  it("A7 et A8 : oui si et seulement si un programme est écrit, même illisible", () => {
+    expect(criteresDuRapport(executionSuivie(), contenuValide())).toMatchObject({ A7: "oui", A8: "oui" });
+    expect(criteresDuRapport(executionSuivie(), null)).toMatchObject({ A7: "oui", A8: "oui" });
+    expect([...CODES_PLAFOND]).toEqual(["cap_reached", "timeout"]);
+  });
+
+  it("sous S4, aucun code de plafond n'est écrit en base (`pipeline_failed`) : une exécution arrêtée rend A7 et A8 non relevés", () => {
+    for (const code of CODES_PLAFOND) expect(CODES_ARRET as readonly string[], code).not.toContain(code);
   });
 
   it("exécution en cours : aucun rapport (erreur de programmation)", () => {

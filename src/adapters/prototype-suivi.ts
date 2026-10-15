@@ -32,7 +32,12 @@ export const SQL_EXECUTIONS = `SELECT id::text AS id, mode, brief, variant, stat
   CASE WHEN status = 'en_cours'
     THEN pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now() - started_at) * 1000)::bigint END AS ecoule_ms,
   pg_catalog.to_char(quota_day, 'YYYY-MM-DD') AS jour_quota, canary_ok, commit_sha
-FROM prototype.runs ORDER BY started_at DESC, id`;
+FROM prototype.runs ORDER BY started_at DESC, id LIMIT 1001`;
+/**
+ * Exécutions lues au plus (une par jour de quota : près de trois ans). Au-delà, le décompte serait faux : la lecture
+ * échoue (`base`, échec fermé : le lancement rend `usage_unavailable`) au lieu de tronquer.
+ */
+export const EXECUTIONS_MAX = 1000;
 /** Date de la dernière purge réussie (D16 point 6), en UTC ; aucun compte de lignes. */
 export const SQL_DERNIERE_PURGE = `SELECT pg_catalog.to_char(pg_catalog.max(purged_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS derniere
 FROM prototype.purges`;
@@ -115,7 +120,9 @@ function execution(ligne: Record<string, unknown>): ExecutionSuivie {
 /** Exécutions et date de la dernière purge réussie. */
 export async function lireSuivi(pool: PoolSql): Promise<SuiviPrototype> {
   return lecture(pool, async (client) => {
-    const executions = (await client.query(SQL_EXECUTIONS)).rows.map(execution);
+    const lignes = (await client.query(SQL_EXECUTIONS)).rows;
+    if (lignes.length > EXECUTIONS_MAX) throw new EchecSuivi("base");
+    const executions = lignes.map(execution);
     const derniere = (await client.query(SQL_DERNIERE_PURGE)).rows[0]?.derniere ?? null;
     return { executions, dernierePurge: derniere === null ? null : forme(derniere, INSTANT) };
   });
