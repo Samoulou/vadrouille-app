@@ -8,6 +8,8 @@
   },
   "include": [
     "scripts/p0/**/*.ts",
+    "src/server/p0/assemblage.ts",
+    "src/server/p0/vers-moteur.ts",
     "src/prototype/**/*.ts",
     "src/domain/**/*.ts",
     "src/ai/**/*.ts",

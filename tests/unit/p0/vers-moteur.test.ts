@@ -17,7 +17,7 @@ import {
   relecturesDepuisAncrages,
   rythmeVersPace,
   voyageDepuisBrief,
-} from "../../../scripts/p0/vers-moteur";
+} from "@/server/p0/vers-moteur";
 
 /**
  * Adaptateur de P0 vers les entrées du moteur (décision 0045 § 1.3, B5-TL-1) : conversion testée, pas une copie de

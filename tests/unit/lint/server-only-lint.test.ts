@@ -57,4 +57,13 @@ describe("server-only obligatoire", () => {
       expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(1);
     }
   });
+
+  it("P0r3c-5a : assemblage et vers-moteur de src/server/p0 sans import \"server-only\" sont acceptés ; tout autre fichier de src/server/p0 reste signalé", async () => {
+    for (const filePath of ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts"]) {
+      expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(0);
+    }
+    for (const filePath of ["src/server/p0/garde.ts", "src/server/p0/assemblage2.ts", "src/server/p0/sous/assemblage.ts", "src/server/assemblage.ts"]) {
+      expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(1);
+    }
+  });
 });
