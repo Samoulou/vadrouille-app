@@ -65,6 +65,11 @@ const LECTURE = `if IFS= read -r -d '' texte < "$f"; then echec "texte figé : o
 const CHEMIN_TEXTE = 'f="$GITHUB_WORKSPACE/db/reverrouillage/retour-deverrouillage.sql"';
 const COMPARAISON = 'if [[ "$lue" != "$REVERROUILLAGE_SHA256" ]]; then echec "texte figé : empreinte différente de REVERROUILLAGE_SHA256"; fi';
 const PRIVILEGE = "pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')";
+/** Nom de la fonction (exception S6 : décision 0066 ; le workflow le nomme exactement deux fois, § 2 point 1). */
+const NOM = "store_prototype_coordinates";
+/** Textes SQL communs avec `db-migrate.yml`, égaux à la lettre (décision 0066 § 4 point 1). */
+const SQL_COMMUNS = ["SQL_SESSION", "SQL_ROLE", "SQL_DELAIS", "SQL_VERROU", "SQL_REPERE", "SQL_APRES_CHEMIN", "SQL_APRES"];
+const MIGRATE = readFileSync(path.join(DOSSIER, "db-migrate.yml"), "utf8");
 
 /** Constante `REVERROUILLAGE_SHA256` du bloc `run:`, écrite en clair (une seule affectation), ou `null`. */
 function constante(run: string): string | null {
@@ -175,11 +180,13 @@ function ecartsReverrouillage(texte: string): string[] {
   const lignePrivilege = final.split("\n").filter((l) => l.includes(PRIVILEGE));
   if (
     lignePrivilege.length !== 1 ||
-    !lignePrivilege[0]!.includes("FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates' AND") ||
+    !lignePrivilege[0]!.includes(`FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = '${NOM}' AND`) ||
     !/^\s*IF EXISTS \(/.test(lignePrivilege[0]!) ||
     retrait.indexOf('-c "$SQL_CONTROLE"') < retrait.indexOf('-c "COMMIT"')
   )
     e.add("controle-final");
+  // Exactement deux mentions du nom, toutes deux `p.proname = '…'` (décision 0066 § 2).
+  if (texte.split(NOM).length - 1 !== 2 || texte.split(`p.proname = '${NOM}'`).length - 1 !== 2) e.add("mentions");
   if (et.brut.SQL_DELAIS !== `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`) e.add("delais");
   const avantTexte = retrait.slice(0, Math.max(iTexte, 0));
   for (const v of [...avantTexte.matchAll(/"\$([A-Z_]+)"/g)].map((m) => m[1]!)) if (/search_path/i.test(et.env[v] ?? "")) e.add("chemin-avant");
@@ -283,12 +290,14 @@ const MUTATIONS: [string, string, string, string][] = [
   ["contrôle final sans has_function_privilege", PRIVILEGE, "false", "controle-final"],
   [
     "contrôle final par signature écrite",
-    "WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates' AND pg_catalog.has_function_privilege",
-    "WHERE p.oid = 'public.store_prototype_coordinates(uuid, text, double precision, double precision)'::pg_catalog.regprocedure AND pg_catalog.has_function_privilege",
+    `WHERE n.nspname = 'public' AND p.proname = '${NOM}' AND pg_catalog.has_function_privilege`,
+    `WHERE p.oid = 'public.${NOM}(uuid, text, double precision, double precision)'::pg_catalog.regprocedure AND pg_catalog.has_function_privilege`,
     "controle-final",
   ],
   ["contrôle final en -c SELECT", "SQL_CONTROLE: |\n            DO $$", "SQL_CONTROLE: |\n            SELECT 1; DO $$", "controle-do"],
   ["écriture du journal des migrations", '-c "COMMIT" -c "$SQL_SESSION"', `-c "INSERT INTO vadrouille_migrations.applied (tag, sha256) VALUES ('x', 'y')" -c "COMMIT" -c "$SQL_SESSION"`, "journal-ecrit"],
+  ["troisième mention du nom (commentaire)", "# Fichier sous .github/workflows/", `# ${NOM}\n# Fichier sous .github/workflows/`, "mentions"],
+  ["nom dans un message du contrôle final", "'aucune surcharge de la fonction d''écriture des positions'", `'aucune surcharge de ${NOM}'`, "mentions"],
   ["empreinte calculée sur autre chose que le texte lu", `lue=$(printf '%s' "$texte" | sha256sum)`, `lue=$(sha256sum -- "$f")`, "empreinte"],
 ];
 
@@ -302,6 +311,25 @@ describe("ci: workflow des migrations conforme à 0056 — db-reverrouillage.yml
   });
 });
 
+/** Textes SQL communs qui diffèrent entre les deux workflows (décision 0066 § 4 point 1). */
+function ecartsCommuns(reverrouillage: string, migrate: string): string[] {
+  const r = etape(reverrouillage, NOM_ETAPE).env;
+  const m = etape(migrate, "Appliquer les migrations approuvées").env;
+  return SQL_COMMUNS.filter((k) => r[k] === undefined || r[k] !== m[k]);
+}
+
+describe("ci: textes SQL communs de db-reverrouillage.yml égaux à ceux de db-migrate.yml (décision 0066 § 4)", () => {
+  it("SQL_SESSION, SQL_ROLE, SQL_DELAIS, SQL_VERROU, SQL_REPERE, SQL_APRES_CHEMIN et SQL_APRES identiques", () => {
+    expect(ecartsCommuns(WORKFLOW, MIGRATE)).toEqual([]);
+  });
+
+  it("cas négatifs : texte changé dans l'un ou l'autre workflow, ou absent", () => {
+    expect(ecartsCommuns(remplacerUneFois(WORKFLOW, "'rôle changé par la migration'", "'rôle changé'"), MIGRATE)).toEqual(["SQL_APRES"]);
+    expect(ecartsCommuns(WORKFLOW, remplacerUneFois(MIGRATE, `SQL_DELAIS: "SET lock_timeout = '10s'`, `SQL_DELAIS: "SET lock_timeout = '30s'`))).toEqual(["SQL_DELAIS"]);
+    expect(ecartsCommuns(remplacerUneFois(WORKFLOW, "SQL_REPERE:", "SQL_REPERE_AUTRE:"), MIGRATE)).toEqual(["SQL_REPERE"]);
+  });
+});
+
 /**
  * Texte figé attendu (0056 § 4.6 point 1 et § 4.2) : le `REVOKE` encadré par le modèle de `0001_securite.sql`
  * (`RESET ROLE` ; appartenance `vadrouille_fn_coords` accordée à `vadrouille_migrator`, `SET TRUE, INHERIT FALSE` ;
@@ -312,7 +340,7 @@ const ATTENDU = [
   "RESET ROLE;",
   "GRANT vadrouille_fn_coords TO vadrouille_migrator WITH INHERIT FALSE, SET TRUE;",
   "SET LOCAL ROLE vadrouille_fn_coords;",
-  "REVOKE EXECUTE ON FUNCTION public.store_prototype_coordinates(uuid, text, double precision, double precision) FROM vadrouille_prototype;",
+  `REVOKE EXECUTE ON FUNCTION public.${NOM}(uuid, text, double precision, double precision) FROM vadrouille_prototype;`,
   "RESET ROLE;",
   "REVOKE vadrouille_fn_coords FROM vadrouille_migrator GRANTED BY vadrouille_migrator;",
 ];

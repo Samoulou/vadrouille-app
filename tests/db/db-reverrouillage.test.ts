@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -201,6 +202,26 @@ describe("db-reverrouillage : refus sans connexion (0056 § 2.6.1, § 4.6 point 
     symlinkSync(cible, path.join(espace, TEXTE_FIGE));
     await refusSansConnexion({ espace }, /texte figé : lien symbolique/);
   });
+
+  it("texte figé vide, avec octet NUL, de plus de 100 Kio, commençant par une barre oblique inverse ou nommant vadrouille_migrate. (constante égale à son empreinte)", async () => {
+    const yaml = readFileSync(path.join(RACINE, ".github/workflows", WF), "utf8");
+    const valeur = /REVERROUILLAGE_SHA256=([0-9a-f]{64})/.exec(yaml)![1]!;
+    const cas: [string, string | Buffer, RegExp][] = [
+      ["vide", "", /texte figé : fichier vide/],
+      ["NUL", Buffer.from("RESET ROLE;\0RESET ROLE;\n"), /texte figé : octet NUL/],
+      ["plus de 100 Kio", `RESET ROLE;\n${"-".repeat(102_400)}\n`, /texte figé : plus de 100 Kio/],
+      ["barre oblique inverse", "\\! true\nRESET ROLE;\n", /texte figé : commence par une barre oblique inverse/],
+      ["vadrouille_migrate.", "SET LOCAL Vadrouille_Migrate.txid = '1';\n", /texte figé : nomme un paramètre vadrouille_migrate/],
+    ];
+    for (const [libelle, contenu, message] of cas) {
+      const espace = espaceTexteFige();
+      writeFileSync(path.join(espace, TEXTE_FIGE), contenu);
+      const empreinte = createHash("sha256").update(contenu).digest("hex");
+      const workflow = yaml.replace(`REVERROUILLAGE_SHA256=${valeur}`, `REVERROUILLAGE_SHA256=${empreinte}`);
+      expect(workflow === yaml, libelle).toBe(false);
+      await refusSansConnexion({ espace, workflow }, message);
+    }
+  }, 60_000);
 
   it("sha_attendu hors forme, ou différent du commit lancé", async () => {
     await refusSansConnexion({ env: { SHA_ATTENDU: "C0FFEE".padEnd(40, "0") } }, /sha_attendu hors forme/);

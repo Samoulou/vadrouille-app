@@ -1,18 +1,21 @@
 name: db-reverrouillage
 # Coupure d'urgence de l'écriture des positions du prototype (décision 0056 § 4.6, point 1 ; condition 7 du § 4.1).
-# - Retire à vadrouille_prototype l'EXECUTE de store_prototype_coordinates, sans nouvelle PR : le seul texte envoyé est
-#   le texte figé db/reverrouillage/retour-deverrouillage.sql, lu une fois et vérifié contre REVERROUILLAGE_SHA256,
-#   plus bas, écrite en clair. Le fichier de retour arrière de la future migration de déverrouillage (§ 4.2) en est une
-#   copie à l'identique ; changer ce texte passe par une PR de ce workflow (owner-approved, décision 0035).
+# - Retire à vadrouille_prototype l'EXECUTE de la fonction d'écriture des positions, sans nouvelle PR. Le seul texte
+#   envoyé est le texte figé db/reverrouillage/retour-deverrouillage.sql, lu une fois et vérifié contre la constante
+#   REVERROUILLAGE_SHA256, écrite en clair plus bas. Le fichier de retour arrière de la future migration de
+#   déverrouillage (§ 4.2) en est une copie à l'identique ; changer ce texte passe par une PR de ce workflow
+#   (owner-approved, décision 0035).
 # - Aucun fichier du dépôt n'est exécuté ni chargé : bash, sha256sum, stat, realpath et psql -X du runner.
-# - Transaction ouverte comme pour une migration (§ 2.6.4) : délais, verrou consultatif des migrations (un GRANT en
-#   cours d'application est validé avant que le REVOKE ne passe, jamais après), texte, contrôle de rôle, COMMIT ; puis,
-#   dans la même session, un bloc DO qui échoue si vadrouille_prototype garde l'EXECUTE d'une surcharge existante.
-#   Rien n'est écrit dans le journal des migrations. Sans effet s'il n'y a rien à retirer : peut être relancé.
+# - Transaction ouverte comme pour une migration (§ 2.6.4) : délais, verrou consultatif des migrations (une
+#   attribution du droit en cours d'application est validée avant que le retrait ne passe, jamais après), texte,
+#   contrôle de rôle, COMMIT ; puis, dans la même session, un bloc DO qui échoue si vadrouille_prototype garde
+#   l'EXECUTE d'une surcharge existante. Rien n'est écrit dans le journal des migrations. Une fois le lot 2 appliqué,
+#   un lancement sans droit à retirer est sans effet.
 # - Lancé à la main sur main par la Sécurité au plus tard 2 heures après la constatation d'un déclencheur (§ 4.6), ou
 #   à défaut par le rôle désigné pour les migrations, avec sha_attendu = tête de main relevée juste avant. Le lanceur
-#   vérifie la conclusion success de son run (un run en attente du groupe est annulé par un autre lancement) et
-#   relance sinon ; il consigne le run dans le ticket, sans valeur secrète, et alerte le CEO.
+#   vérifie la conclusion success de son run, le consigne dans le ticket, sans valeur secrète, et alerte le CEO.
+#   Relance (décision 0066 § 5) : une fois au plus, et seulement si le contrôle final n'a pas été atteint ; jamais sur
+#   un SQLSTATE P0001 du contrôle final (escalade au CEO) ; deux runs en échec valent « échec répété ».
 # - Environnement db-migrate (branche main seule) et secrets MIGRATOR_PG*, ceux du workflow des migrations ; même
 #   groupe de concurrence : les deux ne tournent jamais en même temps. Aucun agent ne modifie l'environnement.
 # Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
@@ -54,7 +57,8 @@ jobs:
           PGUSER: vadrouille_migrator
           PGSSLMODE: verify-full
           PGSSLROOTCERT: system
-          # Textes SQL de l'exécuteur, envoyés par des -c distincts (0056 § 2.6.2 et 2.6.4, § 4.6 point 1).
+          # Textes SQL de l'exécuteur, envoyés par des -c distincts (0056 § 2.6.2 et 2.6.4, § 4.6 point 1). SQL_SESSION à
+          # SQL_APRES sont identiques à ceux de db-migrate.yml (décision 0066 § 4, vérifié par le test statique).
           SQL_SESSION: "SET search_path = pg_catalog, pg_temp"
           SQL_ROLE: |
             DO $$
@@ -71,9 +75,9 @@ jobs:
           SQL_APRES: |
             DO $$
             BEGIN
-              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle changé par le texte figé'; END IF;
-              IF pg_catalog.current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION 'session_replication_role changé par le texte figé'; END IF;
-              IF pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text THEN RAISE EXCEPTION 'transaction changée par le texte figé'; END IF;
+              IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle changé par la migration'; END IF;
+              IF pg_catalog.current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION 'session_replication_role changé par la migration'; END IF;
+              IF pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text THEN RAISE EXCEPTION 'transaction changée par la migration'; END IF;
             END
             $$
           # Contrôle final (§ 4.6, point 1) : chaque surcharge existante, désignée par son oid trouvé dans pg_proc par nom
@@ -81,8 +85,8 @@ jobs:
           SQL_CONTROLE: |
             DO $$
             BEGIN
-              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates') THEN RAISE EXCEPTION 'aucune surcharge de store_prototype_coordinates'; END IF;
-              IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates' AND pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')) THEN RAISE EXCEPTION 'vadrouille_prototype garde l''EXECUTE d''une surcharge de store_prototype_coordinates'; END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates') THEN RAISE EXCEPTION 'aucune surcharge de la fonction d''écriture des positions'; END IF;
+              IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'store_prototype_coordinates' AND pg_catalog.has_function_privilege('vadrouille_prototype', p.oid, 'EXECUTE')) THEN RAISE EXCEPTION 'vadrouille_prototype garde l''EXECUTE d''une surcharge de la fonction d''écriture des positions'; END IF;
             END
             $$
         run: |
