@@ -22,7 +22,8 @@ const RACINE = process.cwd();
 const NOM = "edimbourg-court";
 const lire = (fichier: string): unknown => JSON.parse(readFileSync(path.join(RACINE, fichier), "utf8"));
 const brief = BriefSchema.parse(lire(`prototype/briefs/${NOM}.json`));
-const essai = lire("prototype/config/essai.json") as { routesElements: number; routesRequetes: number; placesDetails: number };
+const essai = lire("prototype/config/essai.json") as { routesElements: number; routesRequetes: number; placesDetails: number; candidatsTrouves: number };
+const rechercheEssai = lire("prototype/config/recherche-essai.json") as { totalCandidats: number; ciblesParCreneau: Record<"activity" | "meal" | "evening", number> };
 
 /** Plafond d'éléments Routes par essai fixé par Samuel. */
 const PLAFOND_ROUTES_SAMUEL = 500;
@@ -39,10 +40,13 @@ function premiereSerie(b: Brief) {
     configuration: CONFIGURATION_MOTEUR,
   });
   const plan = planRoutes(jours.length, { elements: essai.routesElements, requetes: essai.routesRequetes });
-  const serie = jours
-    .map((jour) => demandeBornee(demandeDuJour(jour), plan.n - b.logements.length))
-    .reduce((somme, demande) => somme + TYPES_SERIE.reduce((s, type) => s + demande[type], 0), 0);
-  return { jours: jours.length, plan, serie };
+  const parType = { activity: 0, meal: 0, evening: 0 };
+  for (const jour of jours) {
+    const demande = demandeBornee(demandeDuJour(jour), plan.n - b.logements.length);
+    for (const type of TYPES_SERIE) parType[type] += demande[type];
+  }
+  const serie = TYPES_SERIE.reduce((somme, type) => somme + parType[type], 0);
+  return { jours: jours.length, plan, serie, parType };
 }
 
 const mots = (texte: string) =>
@@ -100,6 +104,20 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(essai.placesDetails).toBeLessThanOrEqual(BORNES_ESSAI.placesDetails);
     expect(serie).toBeLessThanOrEqual(budgetFiches);
     expect(budgetFiches - serie).toBe(2);
+  });
+
+  it("la série tient dans les candidats de l'essai avec 2 de marge, cibles de recherche comprises", () => {
+    const { serie, parType } = premiereSerie(brief);
+    expect(essai.candidatsTrouves).toBe(12);
+    expect(essai.candidatsTrouves).toBeLessThanOrEqual(BORNES_ESSAI.candidatsTrouves);
+    expect(serie).toBeLessThanOrEqual(essai.candidatsTrouves);
+    expect(essai.candidatsTrouves - serie).toBe(2);
+    expect(rechercheEssai.totalCandidats).toBe(essai.candidatsTrouves);
+    const cibles = rechercheEssai.ciblesParCreneau;
+    expect(cibles.activity + cibles.meal + cibles.evening).toBeLessThanOrEqual(rechercheEssai.totalCandidats);
+    // Activités et soirées prennent des candidats de type activité ; repas, des candidats de type repas.
+    expect(cibles.activity + cibles.evening).toBeGreaterThan(parType.activity + parType.evening);
+    expect(cibles.meal).toBeGreaterThan(parType.meal);
   });
 
   it("réserve des fiches de l'essai sous 0,30 USD au prix plein du SKU Enterprise", () => {

@@ -164,7 +164,7 @@ function briefDe(nom: string): Brief {
 
 /**
  * Modèles et profil de l'agent du mode : `recherche.json` (mode réel, profil léger de 0055 § 6 point 5) ou
- * `recherche-essai.json` (essai d'intégration, 9 candidats au plus) ; le total visé reste sous `candidatsTrouves`.
+ * `recherche-essai.json` (essai d'intégration, 12 candidats au plus) ; le total visé reste sous `candidatsTrouves`.
  */
 function configurationAgent(mode: ExecutionEnCours["mode"], config: ConfigModeReel): { modeles: ConfigModeles; recherche: ConfigRecherche } {
   const modeles = ConfigModelesSchema.safeParse(configModeles);
