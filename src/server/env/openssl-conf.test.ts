@@ -355,9 +355,12 @@ describe("openssl-conf: contenu audité du runtime Lambda nodejs24.x (0065 § 4 
   const RUNTIME = "/var/runtime/openssl_conf/openssl.cnf";
   const AUDITE = CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24;
 
-  // SHA-256 par Web Crypto (`crypto.subtle`) : `node:crypto` n'est pas admis par le régime de confinement dans
-  // `src/server/env/`, et 0065 § 5 point 5 n'ajoute aucune ligne.
-  it("la constante est le fichier audité : 505 octets, SHA-256 d95efaf0…2a88", async () => {
+  // SHA-256 par Web Crypto (`crypto.subtle`, global) : le régime de confinement refuse l'**import** de `node:crypto`
+  // dans `src/server/env/` (pas la capacité de calculer un condensat), et 0065 § 5 point 5 n'ajoute aucune ligne.
+  it("la constante est le fichier audité : 505 caractères ASCII, 505 octets, SHA-256 d95efaf0…2a88", async () => {
+    // `egalAuContenuAudite` compare octet à charCodeAt : la constante doit être en ASCII (mineur 6).
+    expect(AUDITE.length).toBe(505);
+    expect([...AUDITE].every((caractere) => caractere.charCodeAt(0) < 0x80)).toBe(true);
     const octets = new TextEncoder().encode(AUDITE);
     expect(octets.byteLength).toBe(505);
     const condensat = Buffer.from(await crypto.subtle.digest("SHA-256", octets)).toString("hex");
@@ -442,6 +445,10 @@ describe("openssl-conf: diagnostic des directives (0065 § 4 point 3)", () => {
     ["clé inconnue", "inconnue = x\n", "autre"],
     ["ligne sans =", "rien\n", "autre"],
     ["clé vide", "= x\n", "autre"],
+    ["0xA0 après le dernier groupe (lu en latin1)", "Groups = X25519\u00a0\n", "groups_autres"],
+    ["0xA0 avant le premier groupe", "Groups =\u00a0X25519\n", "groups_autres"],
+    ["0xA0 dans la clé", "Gro\u00a0ups = X25519\n", "autre"],
+    ["tabulations et retour chariot autour des groupes", "Groups\t=\tX25519:X448\t\r\n", "groups_admis"],
     ["clé avec blancs et casse", " Min Protocol = TLSv1.3\n", "minprotocol"],
     [".include", ".include /etc/x.cnf\n", "include"],
     [".include=", ".include=/etc/x.cnf\n", "include"],
@@ -484,6 +491,12 @@ describe("openssl-conf: diagnostic des directives (0065 § 4 point 3)", () => {
     expect(examinerOpensslConf("/etc/a.cnf", fauxFs({ "/etc/a.cnf": "a = b\n" }))).toEqual({ zone: "etc", verdict: "admis" });
     const refusee = fauxFs({ "/etc/a.cnf": "nodejs_conf = n\n.include relatif\n" });
     expect(examinerOpensslConf("/etc/a.cnf", refusee)).toEqual({ zone: "etc", verdict: "inclusion_refusee" });
+  });
+
+  it("octet 0xA0 lu du fichier après la valeur de Groups : directives groups_autres (mineur 4)", () => {
+    const octets = Uint8Array.from([...new TextEncoder().encode("nodejs_conf = n\nGroups = X25519"), 0xa0, 0x0a]);
+    const fs = { ...fauxFs({ "/etc/a.cnf": "x" }), lstatSync: () => ({ isFile: () => true, isDirectory: () => false, size: octets.byteLength }), readFileSync: () => octets };
+    expect(examinerOpensslConf("/etc/a.cnf", fs)).toEqual({ zone: "etc", verdict: "section_nodejs", directives: "groups_autres,nodejs_conf" });
   });
 
   it("aucune erreur ne s'échappe, quel que soit le texte ; sans directive, chaîne vide", () => {

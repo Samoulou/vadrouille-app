@@ -301,7 +301,10 @@ export function verifierSortie(
     ...(tls === undefined ? {} : { cause: tls }),
     ...(exception ? { exception: EXCEPTION_OPENSSL_CONF } : {}),
     ...(examen === undefined ? {} : { openssl_conf_zone: examen.zone, openssl_conf_verdict: examen.verdict }),
-    ...(examen?.verdict === "section_nodejs" && examen.directives !== undefined ? { openssl_conf_directives: examen.directives } : {}),
+    // Chaîne vide (fichier sans aucune directive) jamais transmise : bloquant 1 de la revue du head `e7fe172`, 0065 § 7.
+    ...(examen?.verdict === "section_nodejs" && examen.directives !== undefined && examen.directives !== ""
+      ? { openssl_conf_directives: examen.directives }
+      : {}),
   });
   if (tls !== undefined) return { ok: false, code: "tls_env_refused" };
   return { ok: true };

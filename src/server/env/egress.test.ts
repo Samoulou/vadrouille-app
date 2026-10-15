@@ -510,6 +510,34 @@ describe("p0: fichier OPENSSL_CONF audité du runtime Lambda nodejs24.x (décisi
     });
   });
 
+  it("section_nodejs sans aucune directive (# nodejs_conf, [nodejs_conf]) : champ absent, jamais de chaîne vide", () => {
+    for (const contenu of ["# nodejs_conf\n", "[nodejs_conf]\n"]) {
+      const fs = fauxFs({ [CHEMIN]: contenu });
+      expect(verifierSortie(ENV, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+      expect(diagnostiquer(ENV, [], fauxFs({ [CHEMIN]: contenu }))).toEqual({
+        cause: "OPENSSL_CONF",
+        openssl_conf_zone: "var_runtime",
+        openssl_conf_verdict: "section_nodejs",
+      });
+    }
+  });
+
+  it("contenu audité avec env_differente ou nom_section_refuse : barrière fermée, fichier non lu", () => {
+    vi.stubEnv("OPENSSL_CONF", "/var/runtime/autre.cnf");
+    let fs = fsAudite();
+    expect(verifierSortie(ENV, [], undefined, fs)).toEqual({ ok: false, code: "tls_env_refused" });
+    expect(diagnostiquer(ENV, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "env_differente" });
+    expect(fs.appels).toEqual([]);
+    poserRuntime(CHEMIN);
+    fs = fsAudite();
+    const configNode = { target_defaults: { defines: ["NODE_OPENSSL_CONF_NAME=openssl_conf"] } };
+    expect(verifierSortie(ENV, [], undefined, fs, configNode)).toEqual({ ok: false, code: "tls_env_refused" });
+    const recus: DiagnosticSortie[] = [];
+    verifierSortie(ENV, [], (d) => void recus.push(d), fs, configNode);
+    expect(recus).toEqual([{ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "nom_section_refuse" }]);
+    expect(fs.appels).toEqual([]);
+  });
+
   it("sentinelle : ni valeur de Groups, ni nom de section, ni chemin dans le diagnostic", () => {
     const chemin = "/var/runtime/SENTINELLE-CHEMIN.cnf";
     poserRuntime(chemin);

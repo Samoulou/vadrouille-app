@@ -295,7 +295,15 @@ export const DIRECTIVES_OPENSSL_CONF = [...CLES_NOMMEES, "groups_admis", "groups
 export type DirectiveOpensslConf = (typeof DIRECTIVES_OPENSSL_CONF)[number];
 
 const NOMMEES: ReadonlySet<string> = new Set(CLES_NOMMEES);
-const DIRECTIVE_POINTEE = /^\.(include|pragma)(?=[\s=]|$)/i;
+const DIRECTIVE_POINTEE = /^\.(include|pragma)(?=[ \t=]|$)/i;
+/**
+ * Blancs retirés par le diagnostic : espace, tabulation et retour chariot seulement, comme OpenSSL. Pas `\s` ni
+ * `trim()`, qui retireraient aussi 0xA0 (lu en latin1) : `Groups = X25519\xA0` doit sortir `groups_autres` (mineur 4 de
+ * la revue du head `e7fe172`).
+ */
+const BLANCS = /[ \t\r]+/g;
+const BLANCS_AUX_BORDS = /^[ \t\r]+|[ \t\r]+$/g;
+const sansBlancsAuxBords = (texte: string) => texte.replace(BLANCS_AUX_BORDS, "");
 
 /** Jeton d'une ligne logique sans commentaire, ni vide ni en-tête de section. */
 function jetonDeLigne(ligne: string): DirectiveOpensslConf {
@@ -303,9 +311,9 @@ function jetonDeLigne(ligne: string): DirectiveOpensslConf {
   if (pointee === "include" || pointee === "pragma") return pointee;
   const egal = ligne.indexOf("=");
   if (egal < 0) return "autre";
-  const cle = ligne.slice(0, egal).replace(/\s+/g, "").toLowerCase();
+  const cle = ligne.slice(0, egal).replace(BLANCS, "").toLowerCase();
   if (cle === "groups" || cle === "curves") {
-    const groupes = ligne.slice(egal + 1).trim().split(":");
+    const groupes = sansBlancsAuxBords(ligne.slice(egal + 1)).split(":");
     return groupes.every((groupe) => GROUPES_ADMIS.has(groupe)) ? "groups_admis" : "groups_autres";
   }
   return NOMMEES.has(cle) ? (cle as DirectiveOpensslConf) : "autre";
@@ -316,12 +324,16 @@ function jetonDeLigne(ligne: string): DirectiveOpensslConf {
  * retirés (de `#` à la fin de la ligne), lignes vides et en-têtes `[section]` ignorés ; pour chaque autre ligne, le
  * jeton de sa clé (avant `=`, blancs retirés, casse ignorée). Rend les jetons sans doublon, triés, séparés par `,` :
  * **jamais** une valeur, un nom de section, un nom de groupe, une longueur, un condensat ni un extrait. Ne sert qu'au
- * diagnostic : n'admet jamais rien. Un texte sans aucune directive rend la chaîne vide.
+ * diagnostic : n'admet jamais rien. Un texte sans aucune directive rend la chaîne vide (que `egress.ts` ne transmet pas).
+ *
+ * Lecture volontairement simple, qui peut **sous-déclarer** sans effet sur l'admission (mineur 8 de la revue du head
+ * `e7fe172`) : `replace(/#.*$/, "")` ignore les guillemets et l'échappement `\#` (un `#` dans une valeur coupe la
+ * ligne) ; une ligne qui commence par `[` est un en-tête, et le reste de cette ligne n'est pas lu.
  */
 export function directivesOpensslConf(texte: string): string {
   const jetons = new Set<DirectiveOpensslConf>();
   for (const brute of lignesLogiques(texte)) {
-    const ligne = brute.replace(/#.*$/, "").trim();
+    const ligne = sansBlancsAuxBords(brute.replace(/#.*$/, ""));
     if (ligne === "" || ligne.startsWith("[")) continue;
     jetons.add(jetonDeLigne(ligne));
   }
