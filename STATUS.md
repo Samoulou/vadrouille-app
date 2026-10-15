@@ -1,32 +1,29 @@
-# État du studio — 2026-10-15 (74e cycle)
+# État du studio — 2026-10-15 (75e cycle, à la demande de Samuel)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-15 : 06:22 UTC, « oui » à Q452 (correction du test des migrations) → le garde-fou des agents refuse encore de modifier ce test de sécurité ; carte de décision envoyée à Samuel (il fait la modification lui-même, ou on attend). 06:30 UTC : « pas de véto de décision, let's go met à jour la base » → veto de 0056 levé, le lot 1 peut partir dès que sa PR est prête.
+- Fil du cycle, 2026-10-15 : 10:24 UTC, « Je le fais » sur la carte de Q452 → fichier et différence préparés pour lui. 11:06 UTC, « c'est fait » : Samuel a poussé lui-même la correction de `tests/unit/ci/db-migrate.test.ts` sur #374 (d5ed663) → revue lancée. 11:14 et 11:15 UTC, questions sur l'avancement → réponses dans le fil. 11:31 UTC, « lance un cycle » → ce 75e cycle.
 - #studio : aucun nouveau message.
 
 ## Fait
-- Fusionnés depuis le 73e cycle : page de lancement et rapport de l'essai (#357), code de 0065 (#364), correction de `main` (#368 : `DIRECTIVES_ENV_P0` dans les doubles de lancement, `main` rouge après #357 et #364), **`P0RUN_COMPLET` à vrai (#367)**.
-- #365 (`db-reverrouillage`) : correction 1 poussée selon la décision 0066 du Tech Lead (admission S6, Q453) ; mise à jour depuis `main` et revue repassée : `techlead-approved`.
-- Ouverte : #369, mise à jour de `p0-reel` depuis `main` (tête `main`, fusion par Samuel seul ; 0055, D23).
-- Ouvert : ticket #370, suites mineures de la revue de #367 (justifications de confinement, condition 1 de `docs/produit/p0-executions.md`, note dans 0063).
+- Fusionnés depuis le 74e cycle : #365 (`db-reverrouillage`, 0056, avec `owner-approved` de Samuel), #369 (mise à jour de `p0-reel` depuis `main`, par Samuel), #372 (suites mineures de #367, ticket #370), #371 (état du 74e cycle).
+- Ouverte : #374, A12, lot 1 des migrations approuvé dans `db-migrate` (0000 à 0004 ; la 0005 reste pour le lot 2). Revue consolidée sur d5ed663 : Tech Lead approuvé, Sécurité G1 à G6 accordé, aucun bloquant ; `verify` vert ; `techlead-approved`. Mineurs notés pour plus tard (mutations supplémentaires, trou antérieur de `tests/support/workflows.ts:116`, commentaire d'en-tête de 0004).
 
 ## En cours
-- #370 (ia) : suites mineures de #367.
+- Aucun agent : seul #374 est sur le chemin de l'essai réel, et il n'attend plus que Samuel.
 
 ## Bloqué
-- **Premier essai réel** (lancé par Samuel seul) : fusion de #369 par Samuel ; lot 1 des migrations (A12) sur la carte de décision de Q452, puis A13 et lot 2 ; `owner-approved` sur #365 ; relevés `db-releve` après 0057 définitive ; limites de dépense OpenRouter et Google (Q325) ; accord écrit de Samuel (0055).
+- **Premier essai réel** (lancé par Samuel seul) : `owner-approved` de Samuel sur #374 (PR de workflow, 0035), puis A13 (premier passage de `db-migrate` sur la vraie base ; Samuel vérifie l'environnement et les secrets, que le studio ne peut pas lire), lot 2 (0005) ; relevés `db-releve` après 0057 définitive ; limites de dépense OpenRouter et Google (Q325) ; accord écrit de Samuel (0055).
 - **Purge `p0-purge`** : premier lancement manuel après les migrations du lot 1 (A15).
 - **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
 
 ## Prochain cycle
 1. Seulement le chemin de l'essai réel.
-2. Après la réponse de Samuel à la carte de Q452 : A12 (« Je le fais » : fichier et lien prêts pour lui) ou attente.
-3. Après `owner-approved` sur #365 et la fusion de #369 : A13 (premier passage de `db-migrate`), puis lot 2 et `p0-purge`.
+2. Après `owner-approved` et la fusion de #374 : A13 (premier passage de `db-migrate`), puis lot 2 (0005) et premier lancement de `p0-purge`.
 
 ## Décisions attendues de Samuel
-- **Réponse demandée** : carte de décision de Q452 (« Je le fais » ou « On attend »), dans le fil du cycle. `owner-approved` sur #365 et fusion de #369 (liens envoyés le 2026-10-15 à 07:38 et 07:59 UTC).
+- **Réponse demandée** : `owner-approved` sur #374 (lot 1 des migrations, revue approuvée sans bloquant).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q354, Q345, Q332, Q323, Q325, Q317, Q296, Q297, Q288, P0c-Q2.
