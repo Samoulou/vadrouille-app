@@ -81,7 +81,7 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(plan.requetesSansReprise).toBeLessThanOrEqual(essai.routesRequetes);
   });
 
-  it("première série la plus petite qu'admet un brief : deux jours au rythme tranquille, 10 lieux", () => {
+  it("première série la plus petite parmi les séjours de 2 à 4 jours, tous rythmes : deux jours au rythme tranquille, 10 lieux", () => {
     // Un séjour d'un jour est refusé par le schéma (nuits ≥ 1 et nuits = jours).
     expect(BriefSchema.safeParse({ ...brief, depart: brief.arrivee, logements: [{ ...brief.logements[0], nuits: 0 }] }).success).toBe(false);
     const { serie } = premiereSerie(brief);
@@ -114,16 +114,23 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(essai.candidatsTrouves - serie).toBe(2);
     expect(rechercheEssai.totalCandidats).toBe(essai.candidatsTrouves);
     const cibles = rechercheEssai.ciblesParCreneau;
-    expect(cibles.activity + cibles.meal + cibles.evening).toBeLessThanOrEqual(rechercheEssai.totalCandidats);
+    expect(cibles.activity + cibles.meal + cibles.evening).toBe(rechercheEssai.totalCandidats);
     // Activités et soirées prennent des candidats de type activité ; repas, des candidats de type repas.
-    expect(cibles.activity + cibles.evening).toBeGreaterThan(parType.activity + parType.evening);
-    expect(cibles.meal).toBeGreaterThan(parType.meal);
+    // Une cible de réserve par type de candidat, exactement (7 contre 6, 5 contre 4) : vrai sans être serré.
+    expect(parType).toEqual({ activity: 6, meal: 4, evening: 0 });
+    expect(cibles.activity + cibles.evening - (parType.activity + parType.evening)).toBe(1);
+    expect(cibles.meal - parType.meal).toBe(1);
   });
 
-  it("réserve des fiches de l'essai sous 0,30 USD au prix plein du SKU Enterprise", () => {
+  it("réserve Google de l'essai (fiches et Routes, méthode Q329) : 0,88 USD, et l'enveloppe jusqu'à G0 tient sous 40 USD", () => {
     const prix = lire("prototype/config/prix-google.json") as { skus: Record<string, { prixPour1000: number }> };
-    const prixFiche = (prix.skus["places_details_enterprise"]?.prixPour1000 ?? Number.POSITIVE_INFINITY) / 1000;
-    expect(essai.placesDetails * prixFiche).toBeLessThanOrEqual(0.3);
+    const prixDe = (sku: string) => (prix.skus[sku]?.prixPour1000 ?? Number.POSITIVE_INFINITY) / 1000;
+    // Spécification P0-suite-2, P0S2-PO-12 amendé : fiches au SKU Enterprise, éléments Routes au SKU Essentials ;
+    // Text Search au SKU « IDs only », sans coût.
+    const reserve = essai.placesDetails * prixDe("places_details_enterprise") + essai.routesElements * prixDe("routes_matrix_essentials");
+    expect(reserve).toBeCloseTo(0.88, 6);
+    // Enveloppe Google jusqu'à G0 (40 USD) : l'essai et 9 exécutions à leur réserve de 4,30 USD (0053).
+    expect(reserve + 9 * 4.3).toBeLessThanOrEqual(40);
   });
 
   it("le modèle de la recherche ne voit pas le logement ; le récit n'en reprend aucun mot ; aucun champ personnel", () => {
