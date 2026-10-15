@@ -2,7 +2,7 @@
 
 Statut : décidée par Samuel (réservée à Samuel : elle règle sa propre garde, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion.
 
-Date : 2026-10-15 · Décideur : Samuel · Rédacteur : CEO · Source : fil « Routine cycle du studio » du projet Vadrouille (deux messages de Samuel, ci-dessous) · PR #378 · Confirmation écrite de Samuel : commentaire sur #378 (à venir, condition de fusion)
+Date : 2026-10-15 · Décideur : Samuel · Rédacteur : CEO · Source : fil « Routine cycle du studio » du projet Vadrouille (deux messages de Samuel, ci-dessous) · PR #378 · Confirmation écrite de Samuel : [commentaire du 2026-10-15 13:57 UTC sur #378](https://github.com/Samoulou/vadrouille-app/pull/378#issuecomment-6193837503) (« Je confirme 00068 », coquille pour 0068)
 
 ## Contexte
 
@@ -10,9 +10,9 @@ Jusqu'ici, une décision déléguée devenait définitive sans veto de Samuel «
 
 Messages de Samuel, copiés tels quels (projet Vadrouille, fil « Routine cycle du studio ») :
 - 2026-10-15 13:38:44 UTC, message `cmsg_0174CRqum9q8GNfZHmNHcYvR6FPuzEkPKCa42Hb7or92Tu` : « On va changer cette règle, on va laisser le temps de 2 cylcles donc 6h et plus 2 jours pour tes décisions ».
-- Carte de décision `cmsg_0174CRqum9q8GNfZHmNHcYvRXnYSgJA1TRyNSGn4RPkfHT`, posée à 13:45:14 UTC : « Appliquer le délai de 6 heures aussi aux décisions déjà en attente ? ». Son texte rappelait la lecture du CEO (« 6 heures remplacent 2 jours ») et demandait la confirmation de Samuel. Samuel a choisi à 13:47:33 UTC l'option « Oui, partout » : « 6 heures remplacent 2 jours, y compris pour les décisions déjà en attente ». (`STATUS.md` du cycle 77, écrit avant sa réponse, la note « Réponse demandée ».)
+- Carte de décision `cmsg_0174CRqum9q8GNfZHmNHcYvRXnYSgJA1TRyNSGn4RPkfHT`, posée à 13:45:14 UTC : « Appliquer le délai de 6 heures aussi aux décisions déjà en attente ? ». Son contexte disait : « Tu as écrit : « 6h et plus 2 jours pour tes décisions ». Je l'ai lu comme : 6 heures remplacent 2 jours. Le Tech Lead demande ta confirmation écrite, et ton choix pour les décisions déjà écrites (dont celle qui fixe le contrôle de la base par la Sécurité, qui sinon attend demain 19 h). » Samuel a choisi à 13:47:33 UTC l'option « Oui, partout », dont la conséquence affichée était : « 6 heures remplacent 2 jours, y compris pour les décisions déjà en attente : le contrôle de la base peut se faire dès ce soir. »
 
-La carte lève l'ambiguïté du premier message (« et plus 2 jours » se lit « et non plus 2 jours ») et tranche la portée rétroactive. Comme tous les agents écrivent sous le compte de Samuel (décision 0035), Samuel confirme en plus par un commentaire de sa main sur #378 ; la PR n'est pas fusionnée sans lui.
+La carte lève l'ambiguïté du premier message (« et plus 2 jours » se lit « et non plus 2 jours ») et tranche la portée rétroactive. Comme tous les agents écrivent sous le compte de Samuel (décision 0035), Samuel a confirmé en plus par un [commentaire de sa main sur #378](https://github.com/Samoulou/vadrouille-app/pull/378#issuecomment-6193837503), le 2026-10-15 à 13:57 UTC.
 
 ## Décision
 
@@ -26,9 +26,9 @@ La carte lève l'ambiguïté du premier message (« et plus 2 jours » se lit «
 
 ## Conséquences
 
-- **0052** (fusionnée le 2026-10-14 06:30 UTC) : définitive, sauf son § 1.10 tel que complété par 0066 (#365, fusionnée le 2026-10-15 10:24 UTC), définitif à 16:24 UTC.
-- **0056** (fusionnée le 2026-10-14 12:20 UTC, amendée par 0061 le 2026-10-14 19:22 UTC) : définitive, sauf son § 4.6 complété par 0066 (définitif à 16:24 UTC) et son § 2.6.2 amendé par 0067 (#376, fusionnée le 2026-10-15 13:37 UTC ; définitif à 19:37 UTC).
-- **0057** (fusionnée le 2026-10-14 17:14 UTC) : définitive pour la partie Sécurité, sauf son § 4 (R8) complété par 0066 (définitif à 16:24 UTC) et son § 3 amendé par 0067 (définitif à 19:37 UTC). Ses passages (TL) restent régis par son « Statut » : le délai de veto ne vaut pas signature du Tech Lead (inchangé). Sa dépendance à 0052 et 0056 suit les deux points précédents.
+- **0052** (#283, fusionnée le 2026-10-14 06:30 UTC) : définitive, sauf son § 1.10 tel que complété par 0066 (#365, fusionnée le 2026-10-15 10:24 UTC), définitif à 16:24 UTC.
+- **0056** (#300, fusionnée le 2026-10-14 12:20 UTC ; amendée par 0061, #339, fusionnée le 2026-10-14 19:22 UTC) : définitive, sauf son § 4.6 complété par 0066 (#365, définitif à 16:24 UTC), et son § 2.6.2 et sa section « Tests imposés » amendés par 0067 (#376, fusionnée le 2026-10-15 13:37 UTC ; définitifs à 19:37 UTC).
+- **0057** (#315, fusionnée le 2026-10-14 17:14 UTC) : définitive pour la partie Sécurité, sauf son § 4 (R8) complété par 0066 (#365, définitif à 16:24 UTC) et son § 3 amendé par 0067 (#376, définitif à 19:37 UTC). Ses passages (TL) restent régis par son « Statut » : le délai de veto ne vaut pas signature du Tech Lead (inchangé). Sa dépendance à 0052 et 0056 suit les deux points précédents.
 - **Échéances écrites ailleurs** : les rubriques « Décisions (… sous 2 jours) » et les échéances datées des spécifications et handovers (dont `specs/F4-carte.md`, `D1-demo.md`, `F5` à `F13`, `B0`, `B2` à `B8`, `P0-prototype-recherche.md`, `P0-suite-2.md`, `P0c-suite-ia.md`, `P0c-suite-release.md`, `T18-owner-approved-workflows.md`, et `docs/handovers/backend.md` l. 717 et 726) ne sont pas réécrites : **0068 prévaut sur elles**, selon le point 2 de la décision. Une PR qui touche ces fichiers pour une autre raison peut corriger la phrase. `STATUS.md` et `QUESTIONS.md` sont corrigés par la PR « chore: status » suivante.
 - Le rôle Sécurité n'a pas de phrase sur le délai dans `.claude/agents/securite.md` ; il suit `docs/CONTEXT.md`.
 - Les routines de release recopient `docs/templates/release-note.md`, mis à jour.
