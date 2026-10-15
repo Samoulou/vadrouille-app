@@ -117,6 +117,20 @@ arrière se fait **vers l'avant**, par une migration corrective :
    Liste vide : le workflow sort en succès sans aucune connexion. **Un run vert avec une liste vide ne teste ni les
    secrets ni la connexion** ; seul un run qui applique au moins une migration approuvée les éprouve (réponse du
    Tech Lead, revue de la PR 332).
+8. Coupure d'urgence de l'écriture des positions du prototype : `db-reverrouillage.yml` (0056 § 4.6, point 1),
+   lancé à la main sur `main` par la Sécurité dans les 2 heures d'un déclencheur. Il n'envoie que le texte figé
+   `db/reverrouillage/retour-deverrouillage.sql` (`REVOKE EXECUTE … FROM vadrouille_prototype`, vérifié contre
+   `REVERROUILLAGE_SHA256`) et n'écrit pas dans le journal des migrations. Une fois le lot 2 appliqué (surcharge à
+   quatre paramètres présente), un lancement sans droit à retirer est sans effet ; avant, le retrait échoue. Le
+   fichier de retour arrière de la future migration de déverrouillage en sera une copie à l'identique (§ 4.2).
+   Conduite en cas d'échec (décision 0066 § 5) :
+   - on relance une fois au plus, et seulement si le run n'a pas atteint le contrôle final (run annulé en attente,
+     échec avant connexion ou de connexion, délai dépassé) ;
+   - on ne relance jamais sur un SQLSTATE `P0001` du contrôle final (le retrait est déjà validé, le droit reste par un
+     autre chemin) : on escalade aussitôt au CEO avec le numéro du run, puis la Sécurité relève l'origine du droit
+     avec `db-releve` et propose la migration de reverrouillage durable (0056 § 4.6, point 2) ;
+   - deux runs en échec, quelle qu'en soit la cause, valent « échec répété » : le dernier recours de Samuel est
+     proposé, s'il l'a accepté par écrit (question ouverte 8 de 0056).
 
 Test de restauration sur la base de staging (sauvegarde, point dans le temps) : renvoyé à la question 3 de la
 spécification B1 et aux questions Q24, Q27 et Q48 (sauvegardes, durées de conservation).

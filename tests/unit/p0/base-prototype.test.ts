@@ -49,28 +49,88 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
   /** Seul importateur admis hors des tests : l'étape finale de `p0Run` (0052 § 1.10). */
   const IMPORTATEUR = "src/workflows/p0-run.ts";
 
-  it("hors de db/ et de tests/db/, seul src/adapters/prototype-ecriture.ts nomme la fonction", () => {
-    const nom = ["store", "prototype", "coordinates"].join("_");
-    const hors = fichiers().filter(
-      (f) =>
-        TEXTE.test(f) &&
-        !f.endsWith(".md") &&
-        !f.startsWith("db/") &&
-        !f.startsWith("tests/db/") &&
-        !f.startsWith("docs/") &&
-        !f.startsWith("specs/") &&
-        f !== CE_FICHIER &&
-        (lire(f) ?? "").includes(nom),
-    );
-    // Décision 0057 (§ 4, R8 ; « Tests imposés ») : le relevé `db-releve` trouve chaque surcharge de la fonction par son
-    // nom dans `pg_proc` (jamais par une signature écrite), et son test recopie les cas figés du § 5.5. Lecture du
-    // catalogue seulement : ni appel ni import de la fonction. Admission proposée à la revue (Sécurité, Tech Lead).
-    const RELEVE = [".github/workflows/db-releve.yml", "tests/unit/ci/db-releve.test.ts"];
-    expect(hors.filter((f) => !RELEVE.includes(f))).toEqual([MODULE]);
-    // Dans le workflow : une seule mention, jamais suivie de `(` (aucun appel, aucune signature écrite).
-    const yaml = lire(RELEVE[0]!) ?? "";
-    expect(yaml.split(nom).length - 1).toBe(1);
-    expect(yaml).not.toMatch(new RegExp(`${nom}\\s*\\(`));
+  const nom = ["store", "prototype", "coordinates"].join("_");
+  // Décision 0057 (§ 4, R8 ; « Tests imposés ») : le relevé `db-releve` trouve chaque surcharge de la fonction par son
+  // nom dans `pg_proc` (jamais par une signature écrite), et son test recopie les cas figés du § 5.5. Lecture du
+  // catalogue seulement : ni appel ni import de la fonction. Admission : décision 0057, § 4 (R8).
+  const RELEVE = [".github/workflows/db-releve.yml", "tests/unit/ci/db-releve.test.ts"];
+  // Décision 0056 (§ 4.6 point 1 ; ticket 363) : la coupure `db-reverrouillage` contrôle chaque surcharge trouvée par
+  // son nom dans `pg_proc` ; son test recopie le texte figé. Ni appel ni import. Admission : décision 0066 (bornes : § 2).
+  const REVERROUILLAGE = [".github/workflows/db-reverrouillage.yml", "tests/unit/ci/db-reverrouillage.test.ts"];
+  /** Nombre exact de mentions du nom dans le test statique de `db-reverrouillage` (0066 § 2 point 4). */
+  const MENTIONS_TEST_REVERROUILLAGE = 1;
+  const IMPORTS_TEST_REVERROUILLAGE = new Set(["node:crypto", "node:fs", "node:path", "node:url", "vitest", "../../support/workflows"]);
+  const compte = (texte: string, motif: string) => texte.split(motif).length - 1;
+
+  /**
+   * Contrôle S6 en fonction pure (0066 § 2) : `contenus` associe chaque fichier du périmètre (hors de `db/`,
+   * `tests/db/`, `docs/`, `specs/`, du Markdown et de ce fichier) à son texte ; rend la liste des écarts.
+   */
+  function ecartsS6(contenus: ReadonlyMap<string, string>): string[] {
+    const e: string[] = [];
+    const nommant = [...contenus].filter(([, texte]) => texte.includes(nom)).map(([f]) => f);
+    const hors = nommant.filter((f) => f !== MODULE && !RELEVE.includes(f) && !REVERROUILLAGE.includes(f));
+    for (const f of hors) e.push(`fichier hors de la liste admise : ${f}`);
+    if (!nommant.includes(MODULE)) e.push("module appelant absent");
+    const appel = new RegExp(`${nom}\\s*\\(`);
+    // db-releve.yml (0057) : une seule mention, jamais suivie de `(`.
+    const releve = contenus.get(RELEVE[0]!) ?? "";
+    if (compte(releve, nom) !== 1 || appel.test(releve)) e.push("db-releve.yml : mention hors borne");
+    // db-reverrouillage.yml (0066 § 2 points 1 à 3).
+    const yaml = contenus.get(REVERROUILLAGE[0]!) ?? "";
+    if (compte(yaml, nom) !== 2) e.push("db-reverrouillage.yml : nombre de mentions");
+    if (compte(yaml, `p.proname = '${nom}'`) !== 2) e.push("db-reverrouillage.yml : mention hors de p.proname");
+    if (appel.test(yaml) || /regproc/i.test(yaml)) e.push("db-reverrouillage.yml : signature ou appel");
+    if (/\bGRANT\s/i.test(yaml)) e.push("db-reverrouillage.yml : GRANT");
+    // Test statique (0066 § 2 points 4 et 5).
+    const test = contenus.get(REVERROUILLAGE[1]!) ?? "";
+    if (compte(test, nom) !== MENTIONS_TEST_REVERROUILLAGE) e.push("db-reverrouillage.test.ts : nombre de mentions");
+    const imports = [...test.matchAll(/(?:^import\s(?:[^;]*?\sfrom\s)?|\bimport\(|\brequire\()\s*["']([^"']+)["']/gm)].map((m) => m[1]!);
+    if (imports.length === 0 || imports.some((i) => !IMPORTS_TEST_REVERROUILLAGE.has(i))) e.push("db-reverrouillage.test.ts : import hors liste");
+    return e;
+  }
+
+  function perimetre(): Map<string, string> {
+    const contenus = new Map<string, string>();
+    for (const f of fichiers()) {
+      if (!TEXTE.test(f) || f.endsWith(".md") || f === CE_FICHIER) continue;
+      if (["db/", "tests/db/", "docs/", "specs/"].some((d) => f.startsWith(d))) continue;
+      const texte = lire(f);
+      if (texte !== null) contenus.set(f, texte);
+    }
+    return contenus;
+  }
+
+  it("hors de db/ et de tests/db/, seul src/adapters/prototype-ecriture.ts nomme la fonction (exceptions de 0057 et 0066, bornées)", () => {
+    expect(ecartsS6(perimetre())).toEqual([]);
+  });
+
+  it("contrôle S6 : cas négatifs de la décision 0066 § 2", () => {
+    const depot = perimetre();
+    const [wf, test] = REVERROUILLAGE as [string, string];
+    const avec = (fichier: string, avant: string, apres: string) => {
+      const texte = depot.get(fichier) ?? "";
+      expect(compte(texte, avant), avant).toBe(1);
+      return new Map(depot).set(fichier, texte.replace(avant, () => apres));
+    };
+    const message = "'aucune surcharge de la fonction d''écriture des positions'";
+    const cas: [string, Map<string, string>, string][] = [
+      ["troisième mention dans un commentaire", avec(wf, "# Fichier sous .github/workflows/", `# ${nom}\n# Fichier sous .github/workflows/`), "nombre de mentions"],
+      [
+        "mention hors de p.proname à compte égal",
+        new Map(depot).set(wf, (depot.get(wf) ?? "").replace(`p.proname = '${nom}') THEN`, () => "p.proname LIKE 'store_prototype%') THEN").replace(message, () => `'aucune surcharge de ${nom}'`)),
+        "mention hors de p.proname",
+      ],
+      ["regprocedure dans le workflow", avec(wf, "# Fichier sous .github/workflows/", `# SELECT 'public.${nom}(uuid, text, double precision, double precision)'::pg_catalog.regprocedure\n# Fichier sous .github/workflows/`), "signature ou appel"],
+      ["GRANT dans le workflow", avec(wf, "# Fichier sous .github/workflows/", "# GRANT EXECUTE au prototype\n# Fichier sous .github/workflows/"), "GRANT"],
+      ["mention de plus dans le test statique", avec(test, "// @vitest-environment node\n", `// @vitest-environment node\n// ${nom}\n`), "db-reverrouillage.test.ts : nombre de mentions"],
+      ["import de pg dans le test statique", avec(test, 'import { describe, expect, it } from "vitest";\n', 'import { describe, expect, it } from "vitest";\nimport pg from "pg";\n'), "import hors liste"],
+      ["nom dans tests/support/workflows.ts", new Map(depot).set("tests/support/workflows.ts", `${depot.get("tests/support/workflows.ts") ?? ""}\n// ${nom}\n`), "fichier hors de la liste admise : tests/support/workflows.ts"],
+    ];
+    for (const [libelle, contenus, attendu] of cas) {
+      expect(contenus, libelle).not.toEqual(depot);
+      expect(ecartsS6(contenus).join(" | "), libelle).toContain(attendu);
+    }
   });
 
   it("le module n'est importé que par src/workflows/p0-run.ts et les tests ; ni src/adapters/index.ts, ni src/server", () => {
