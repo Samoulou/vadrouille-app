@@ -52,7 +52,8 @@ vi.mock("@/adapters/prototype-travail", () => ({
   cloreExecution: d.cloreExecution,
 }));
 vi.mock("@/server/composition/p0-reel", () => ({ composerP0Reel: d.composerP0Reel }));
-vi.mock("@/research/agent", () => ({ chercherCandidats: d.chercherCandidats }));
+// Ticket 407 : vérification d'échéance remise à l'agent ; l'agent étant simulé, toujours le temps.
+vi.mock("@/research/agent", () => ({ chercherCandidats: d.chercherCandidats, tempsPourAppel: () => () => true }));
 vi.mock("@/grounding/ancrage-zone", () => ({
   ancrerLogementsDuSejour: d.ancrerLogementsDuSejour,
   ancrerCandidatsDansZone: d.ancrerCandidatsDansZone,
@@ -351,6 +352,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
       terminesIgnores: 1,
       finsAnormales: 1,
       candidatsRefuses: { source_not_in_results: 4, duplicate: 0, over_total: 0, invalid: 1 },
+      finsEcheance: 1,
     };
     d.chercherCandidats.mockResolvedValue({ candidats: [], compteurs });
     await refus(etapeRecherche({ runId: RUN_ID }));
@@ -371,6 +373,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         turnUnreadable: 1,
         finishIgnored: 1,
         finishAbnormal: 1,
+        deadlineStop: 1,
       },
     ]);
     info.mockClear();
@@ -387,6 +390,27 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     const evenementsSeuls = String(info.mock.calls.find((appel) => String(appel[0]).includes("p0.research_done"))?.[0]);
     expect(JSON.parse(evenementsSeuls)).toMatchObject({ level: "warn", candidates: 1, places: 0 });
     info.mockRestore();
+  });
+
+  it("ticket 407 : recherche qui lève : ligne p0.research_done écrite quand même (warn, nom de l'erreur, jamais son message)", async () => {
+    const info = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    d.chercherCandidats.mockRejectedValue(Object.assign(new Error(SENTINELLE_ERREUR), { name: "ErreurOpenRouter", code: "cap_reached" }));
+    expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+    const lignes = info.mock.calls.map((appel) => String(appel[0])).filter((ligne) => ligne.includes("p0.research_done"));
+    expect(lignes.map((ligne) => JSON.parse(ligne) as unknown)).toEqual([
+      { level: "warn", event: "p0.research_done", candidates: 0, places: 0, errorName: "ErreurOpenRouter" },
+    ]);
+    expect(lignes.join("\n")).not.toContain(SENTINELLE_ERREUR);
+    expect(d.remplacerCandidats).not.toHaveBeenCalled();
+    expect(d.ecrireCoutModeles).toHaveBeenCalledTimes(1);
+    info.mockRestore();
+  });
+
+  it("ticket 407 : l'agent reçoit la vérification d'échéance de l'étape et un observateur de son état", async () => {
+    await etapeRecherche({ runId: RUN_ID });
+    const dependances = d.chercherCandidats.mock.calls[0]?.[1] as { peutAppeler?: unknown; observer?: unknown };
+    expect(typeof dependances.peutAppeler).toBe("function");
+    expect(typeof dependances.observer).toBe("function");
   });
 
   it("clôture : un code hors de CODES_ARRET devient pipeline_failed", async () => {

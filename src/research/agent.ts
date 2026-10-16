@@ -15,7 +15,8 @@ import { classerSource, dateMentionnee } from "@/research/sources";
  * - un candidat n'est retenu que si sa source figure parmi ces résultats (une URL inventée ou soufflée par une page
  *   ne passe pas) ; son identifiant interne est attribué par le code ;
  * - l'arrêt se fait sur le nombre de candidats **trouvés** (cibles par créneau, total), sur `termine`, sur le
- *   nombre de tours, ou sur un plafond (erreur levée par un décorateur du script) ; `termine` n'est suivi qu'après au
+ *   nombre de tours, sur l'échéance de l'étape (`peutAppeler`, ticket 407 : fin propre, candidats admis gardés), ou sur
+ *   un plafond (erreur levée par un décorateur du script) ; `termine` n'est suivi qu'après au
  *   moins une recherche web (ticket 400 : avant, aucun candidat ne peut avoir de source admise), et une sortie illisible
  *   ne termine pas la boucle (le tour suivant redemande) ;
  * - les doublons sont fusionnés avant l'ancrage.
@@ -35,7 +36,34 @@ export type CompteursAgent = {
   /** Réponses de modèle finies autrement que par `stop` (longueur, filtre, erreur…), quand le client la rend. */
   finsAnormales: number;
   candidatsRefuses: { source_not_in_results: number; duplicate: number; over_total: number; invalid: number };
+  /**
+   * Fins de la recherche sur l'échéance de l'étape (ticket 407) : `peutAppeler` a répondu non avant un appel ; la boucle
+   * s'est terminée avec les candidats déjà admis. 0 ou 1.
+   */
+  finsEcheance: number;
 };
+
+/**
+ * Appel externe que l'agent s'apprête à faire (ticket 407) : appel de modèle (plan ou tour), recherche web (elle aussi
+ * un appel de modèle chez le fournisseur, `src/ai/recherche-web-reelle.ts`), lecture de page.
+ */
+export type AppelAgent = "modele" | "recherche_web" | "page";
+
+/**
+ * Vérification d'échéance à remettre à l'agent (`DependancesAgent.peutAppeler`, ticket 407) : l'appel tient-il avant
+ * l'échéance de l'étape, délai complet compris, plus une marge ? Appel de modèle et recherche web prennent le délai d'un
+ * appel de modèle (`delais.modele`), une lecture de page le sien (`delais.page`). Fonction pure : l'horloge est passée.
+ */
+export function tempsPourAppel(
+  echeance: number,
+  delais: { readonly modele: number; readonly page: number; readonly marge: number },
+  maintenant: () => number = Date.now,
+): (appel: AppelAgent) => boolean {
+  return (appel) => maintenant() + (appel === "page" ? delais.page : delais.modele) + delais.marge <= echeance;
+}
+
+/** État vivant de l'agent, remis à l'appelant au départ : ce qu'il a compté et admis, lisible même si la recherche lève. */
+export type EtatAgent = { readonly compteurs: CompteursAgent; readonly candidats: readonly Candidat[] };
 
 export type DependancesAgent = {
   modeles: ClientModeles;
@@ -44,6 +72,15 @@ export type DependancesAgent = {
   recherche: ClientRechercheWeb;
   lecteur: LecteurPages;
   config: ConfigRecherche;
+  /**
+   * Reste-t-il assez de temps avant l'échéance de l'étape pour cet appel, délai complet compris (ticket 407) ? Demandé
+   * avant chaque appel de modèle, chaque recherche web et chaque lecture de page ; non : la boucle se termine
+   * proprement avec les candidats déjà admis (`finsEcheance`), sans appel ni erreur. Absent : pas d'échéance (mode
+   * simulé, `scripts/p0`).
+   */
+  peutAppeler?: (appel: AppelAgent) => boolean;
+  /** Reçoit l'état vivant de l'agent au départ (ticket 407 : compteurs journalisés même si la recherche lève). */
+  observer?: (etat: EtatAgent) => void;
 };
 
 /** Créneau visé par un candidat trouvé (cibles de `recherche.json`). */
@@ -261,12 +298,22 @@ export async function chercherCandidats(
     terminesIgnores: 0,
     finsAnormales: 0,
     candidatsRefuses: { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
+    finsEcheance: 0,
+  };
+  const candidats: Candidat[] = [];
+  dependances.observer?.({ compteurs, candidats });
+  /** Ticket 407 : l'échéance de l'étape admet-elle cet appel ? Non : la fin sur échéance est comptée. */
+  const aLeTemps = (appel: AppelAgent): boolean => {
+    if (dependances.peutAppeler === undefined || dependances.peutAppeler(appel)) return true;
+    compteurs.finsEcheance += 1;
+    return false;
   };
   const noterFin = (reponse: { fin?: string }) => {
     if (reponse.fin !== undefined && reponse.fin !== "stop") compteurs.finsAnormales += 1;
   };
 
   // Étape 2 : plan de recherche, à partir du brief seul.
+  if (!aLeTemps("modele")) return { candidats, compteurs };
   const reponsePlan = await dependances.modeles.envoyer(requetePlan(brief, dependances.modele, dependances.routage));
   noterFin(reponsePlan);
   const plan = lirePlan(reponsePlan.texte);
@@ -276,7 +323,6 @@ export async function chercherCandidats(
 
   const urlsVues = new Set<string>();
   const pagesTexte = new Map<string, string>();
-  const candidats: Candidat[] = [];
   const cles = new Set<string>();
   const trouves: Record<TypeCreneau, number> = { activity: 0, meal: 0, evening: 0 };
   let resultats: ResultatRecherche[] = [];
@@ -336,7 +382,9 @@ export async function chercherCandidats(
   };
 
   // Étape 3 : tours de l'agent, bornés.
+  let echeanceAtteinte = false;
   for (let tour = 1; tour <= config.toursMax && !ciblesAtteintes(); tour += 1) {
+    if (!aLeTemps("modele")) break;
     compteurs.tours += 1;
     const manquants: Record<TypeCreneau, number> = {
       activity: Math.max(0, config.ciblesParCreneau.activity - trouves.activity),
@@ -380,6 +428,10 @@ export async function chercherCandidats(
           compteurs.sortiesRefusees.recherche += 1;
           continue;
         }
+        if (!aLeTemps("recherche_web")) {
+          echeanceAtteinte = true;
+          break;
+        }
         compteurs.recherches += 1;
         const { resultats: trouvesWeb } = await dependances.recherche.rechercher(requete);
         for (const resultat of trouvesWeb) {
@@ -393,6 +445,10 @@ export async function chercherCandidats(
           });
         }
       } else {
+        if (!aLeTemps("page")) {
+          echeanceAtteinte = true;
+          break;
+        }
         const lue = await dependances.lecteur.lire(action.url, urlsVues);
         if (lue.ok) {
           compteurs.pagesLues += 1;
@@ -405,6 +461,8 @@ export async function chercherCandidats(
         }
       }
     }
+    // Ticket 407 : plus le temps d'un appel dans l'étape ; les candidats admis sont gardés.
+    if (echeanceAtteinte) break;
   }
   return { candidats, compteurs };
 }
