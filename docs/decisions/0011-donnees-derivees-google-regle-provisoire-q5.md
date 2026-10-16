@@ -129,4 +129,4 @@ Une étape IA ne contient jamais de donnée Google. L'étape e est une étape **
 - B8 et B9 peuvent être spécifiés sans attendre la validation juridique formelle de Q5 ; ils restent soumis à leurs autres prérequis (G0, Q3, Q45, P0-Q9) et, pour `verifiedAt`, à S5.
 
 ## Quand revoir cette décision
-À la validation juridique formelle de Q5 (Samuel), ou si la mesure comparée des variantes A et B change le pipeline (0027).
+À la validation juridique formelle de Q5 (Samuel), ou si la mesure comparée des variantes A et B (suspendue par 0076) change le pipeline (0027).
