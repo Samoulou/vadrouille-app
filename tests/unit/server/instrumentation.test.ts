@@ -23,7 +23,7 @@ vi.mock("@/server/log", () => ({
   errorNameOf: (erreur: unknown) => (erreur instanceof Error ? erreur.name : undefined),
 }));
 vi.mock("@/adapters/prototype-instance", () => ({
-  brancherLectureProgrammesReels: (barriere: unknown) => brancher(barriere),
+  brancherLectureProgrammesReels: (barriere: unknown, relecteur: unknown) => brancher(barriere, relecteur),
 }));
 vi.mock("@/server/p0/lecture-programmes", () => ({
   // Accesseur : un échec au chargement de la barrière est simulé à sa lecture, dans le `try` de `register()`.
@@ -59,6 +59,14 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     expect(await barriere()).toBeNull();
     expect(await barriere()).toBeNull();
     expect(poolLectureProgrammes).toHaveBeenCalledTimes(2);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it("DATA_ADAPTER=prototype : relecteur Routes réel branché avec la barrière (P0r4, décision 0076)", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    await register();
+    const relecteur = brancher.mock.calls[0]?.[1] as { relireJournee?: unknown } | undefined;
+    expect(typeof relecteur?.relireJournee).toBe("function");
     expect(logEvent).not.toHaveBeenCalled();
   });
 

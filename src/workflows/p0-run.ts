@@ -57,7 +57,7 @@ import {
   violationsP0,
 } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
-import { forfaitExecution, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type SkusForfait } from "@/server/usage/forfait";
+import { forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type PlafondsRelecture, type SkusForfait } from "@/server/usage/forfait";
 import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
@@ -249,6 +249,34 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
       Math.round(config.coutUsd * 1_000_000),
     );
     return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs } };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Plafonds d'**une** relecture Routes, c'est-à-dire d'une Journée affichée (P0r4, décision 0076 ; « Non tranché » de
+ * 0053) : 40 requêtes de matrice et 40 éléments. Le relecteur fait une requête par lieu de départ et un élément par
+ * trajet distinct de la journée : 40 couvre toute journée du prototype (une vingtaine de trajets au plus). Forfait au
+ * prix plein : 40 × 0,005 = **0,20 USD** réservés, alors que le coût réel est d'un élément par trajet (tranche gratuite
+ * de 10 000 éléments par mois non déduite, Q329). Constante, comme l'exige S4 : le forfait ne dépend que de la nature.
+ */
+export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ routesRequetes: 40, routesElements: 40 });
+
+/**
+ * Forfait et règles de la réservation d'une relecture Routes (P0r4, décision 0076), lus dans ce pont comme ceux du
+ * lancement (l'application n'importe pas `src/prototype`, 0048 § 1) ; `null` si la configuration du mode réel ou la table
+ * de prix est refusée (la relecture échoue alors fermée). Durée des orphelines : celle du mode réel, comme au lancement.
+ */
+export function relectureDuMode(): LancementDuMode | null {
+  const reel = validerConfigModeReel(configModeReel);
+  const table = TablePrixGoogleSchema.safeParse(prixGoogle);
+  if (!reel.ok || !table.success) return null;
+  try {
+    return {
+      forfait: forfaitRelecture(table.data, SKUS_FORFAIT, PLAFONDS_RELECTURE),
+      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: reel.config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs },
+    };
   } catch {
     return null;
   }

@@ -10,7 +10,7 @@ import { blockGoogle } from "./carte-helpers";
 import { PROTOTYPE_TRIP, PROTOTYPE_URL } from "./prototype-helpers";
 
 /**
- * Décision 0074 sur le build de production : troisième serveur de `playwright.config.ts`, adaptateur `prototype` sans
+ * Décisions 0074 et 0076 (P0r4) sur le build de production : troisième serveur de `playwright.config.ts`, adaptateur `prototype` sans
  * dossier de programmes. `instrumentation.ts` y branche la barrière de lecture des programmes réels (chargement de
  * `next/headers`, `server-only` et de la garde dans la couche d'instrumentation) ; la garde du mode réel est fermée
  * (`CI=true`, aucune base) : « Mes voyages » est vide, un voyage est introuvable, aucune connexion n'est tentée (sans
@@ -22,7 +22,7 @@ const PORT = Number(new URL(PROTOTYPE_URL).port) + PROTOTYPE_PORT_OFFSET;
 
 test.use({ baseURL: `http://127.0.0.1:${PORT}` });
 
-test("lecture réelle, garde fermée : « Mes voyages » vide, voyage introuvable, branchement sans échec", async ({ page }) => {
+test("p0: lecture sans barrière : refus et aucun appel Routes — « Mes voyages » vide, voyage et Journée introuvables, branchement sans échec", async ({ page }) => {
   const google = await blockGoogle(page);
   const reponse = await page.goto("/voyages");
   expect(reponse?.status()).toBe(200);
@@ -34,6 +34,9 @@ test("lecture réelle, garde fermée : « Mes voyages » vide, voyage introuvabl
 
   const introuvable = await page.goto(`/voyages/${PROTOTYPE_TRIP}`);
   expect(introuvable?.status()).toBe(404);
+  // Journée (relecture Routes, P0r4) : sans barrière, aucune lecture, donc aucune relecture ni position servie.
+  const journee = await page.goto(`/voyages/${PROTOTYPE_TRIP}/jour/1`);
+  expect(journee?.status()).toBe(404);
   expect(google).toEqual([]);
 
   const journal = readFileSync(serverLogPath({ port: PORT, tmpDir: tmpdir() }), "utf8");
