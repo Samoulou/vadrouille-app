@@ -26,7 +26,8 @@ export const LOG_EVENTS = [
   // `openssl_conf_directives` (listes fermées, jamais une valeur).
   "p0.guard_closed",
   // Ticket 400 : fin de l'étape de recherche de `p0Run`, compteurs de l'agent seulement (des nombres : ni texte du
-  // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu.
+  // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu. Depuis le ticket 407,
+  // écrite aussi quand la recherche lève (`errorName`, `warn`), avec `deadlineStop` (fin sur l'échéance de l'étape).
   "p0.research_done",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
@@ -76,6 +77,8 @@ export type LogFields = {
   readonly turnUnreadable?: number;
   readonly finishIgnored?: number;
   readonly finishAbnormal?: number;
+  /** Fins de la recherche sur l'échéance de l'étape, candidats admis gardés (ticket 407) : 0 ou 1. */
+  readonly deadlineStop?: number;
 };
 
 /**
@@ -280,6 +283,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["turnUnreadable", entierPositif],
   ["finishIgnored", entierPositif],
   ["finishAbnormal", entierPositif],
+  ["deadlineStop", entierPositif],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

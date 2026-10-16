@@ -27,7 +27,7 @@ import {
 } from "@/prototype/config";
 import { decouperProgramme } from "@/prototype/decoupage";
 import { reduireProgramme } from "@/prototype/reduction";
-import { chercherCandidats, type CompteursAgent } from "@/research/agent";
+import { chercherCandidats, tempsPourAppel, type CompteursAgent, type EtatAgent } from "@/research/agent";
 import { DELAI_MAX_MS, type LecteurPages } from "@/research/fetch-page";
 import { bornerLecteur, bornerRecherche, PlafondAgentAtteint } from "@/research/plafonds-agent";
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
@@ -61,7 +61,7 @@ import { forfaitExecution, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, 
 import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
-import { logEvent } from "@/server/log";
+import { errorNameOf, logEvent } from "@/server/log";
 
 import edimbourg1 from "../../prototype/briefs/edimbourg-1.json";
 import edimbourg2 from "../../prototype/briefs/edimbourg-2.json";
@@ -101,8 +101,10 @@ import configRechercheEssai from "../../prototype/config/recherche-essai.json";
  * 5. **plafonds** : un registre en mémoire par étape, borné par la part du forfait de l'exécution qui revient à
  *    l'étape (`forfaitDeLEtape`) ; le coût des modèles déjà compté est relu en base (`runs.cost_models_micros`) et
  *    réécrit avant la fin de l'étape, si bien qu'aucune étape ne dispose de plus que le reste du plafond ;
- * 6. **échéance** (marge de durée, réponse 1 du Tech Lead, PR 348) : un appel externe ne part que si son délai entier
- *    (`DELAI_REQUETE_MS`, `DELAI_MAX_MS` d'une page) tient avant l'échéance de l'étape, sinon `cap_reached` sans appel ;
+ * 6. **échéance** (marge de durée, réponse 1 du Tech Lead, PR 348 ; décision 0075) : un appel externe ne part que si son
+ *    délai entier (`DELAI_REQUETE_MS`, `DELAI_MAX_MS` d'une page) tient avant l'échéance de l'étape, sinon `cap_reached`
+ *    sans appel ; l'agent de recherche le demande avant chaque appel et se termine proprement s'il n'a plus le temps
+ *    (ticket 407) ;
  * 7. **aucune relance** (`maxRetries = 0`) : une étape rejouée repaierait ses appels.
  *
  * **Barrière hors de Vercel** (réponse 4 de la Sécurité, PR 326) : la route `/.well-known/workflow/v1/flow` est exposée
@@ -126,12 +128,33 @@ const BRIEFS: ReadonlyMap<string, unknown> = new Map([
 export const NOMS_BRIEFS: readonly string[] = [...BRIEFS.keys()];
 
 /**
- * Durée maximale d'une fonction Vercel la plus basse des formules (documentation Vercel « Configuring Maximum Duration »,
- * relevée le 2026-10-15 : Hobby 300 s au plus ; Pro et Enterprise 300 s par défaut, 800 s au plus). Le SDK pose
- * `maxDuration: "max"` sur la route des étapes (`@workflow/next` 5.0.2) ; la formule du compte n'étant pas relevée,
- * chaque étape tient sous la plus basse.
+ * Durée maximale d'une fonction Vercel du compte (décision 0075) : formule Pro depuis le 2026-10-13, 800 s au plus
+ * (documentation Vercel « Configuring Maximum Duration », relevée le 2026-10-15 : Hobby 300 s, Pro et Enterprise 800 s
+ * au plus, avec Fluid Compute). Le SDK pose `maxDuration: "max"` sur la route des étapes (`@workflow/next` 5.0.2,
+ * `.well-known/workflow/v1/config.json`), que la plateforme résout selon la formule au déploiement : 800 s en Pro.
+ * Avant 0075 : 300 s, la plus basse des formules.
  */
-export const LIMITE_FONCTION_MS = 300_000;
+export const LIMITE_FONCTION_MS = 800_000;
+
+/**
+ * Durée gardée pour les étapes suivantes (décision 0075) : avec 800 s par étape, une étape pourrait consommer presque
+ * toute la durée de l'exécution (`dureeMs`, 900 s) et priver les suivantes. L'échéance d'une étape laisse donc, sur la
+ * durée restante, 150 s à l'ancrage (Text Search en série) et 300 s à l'étape finale (son ancienne fenêtre entière) :
+ * la recherche a au plus 900 − 450 − 30 = 420 s (fenêtre des appels de modèle : 296 s, contre 146 s avant), l'ancrage
+ * au plus ce qui reste moins 300 s, l'étape finale tout ce qui reste.
+ */
+export const RESERVE_ETAPES_SUIVANTES_MS: Readonly<Record<"recherche" | "ancrage" | "notation", number>> = {
+  recherche: 450_000,
+  ancrage: 300_000,
+  notation: 0,
+};
+
+/**
+ * Marge de la vérification de l'agent (ticket 407) : l'agent demande s'il a le temps un peu avant que le registre
+ * réserve l'appel ; 1 s de plus évite qu'un appel admis par l'agent soit refusé par le registre quelques
+ * millisecondes plus tard (ce refus-là reste une erreur, `pipeline_failed`).
+ */
+export const MARGE_VERIFICATION_AGENT_MS = 1_000;
 
 /** Marge laissée après le dernier appel externe d'une étape : écritures en base (phase, coût, programme) et sortie. */
 export const MARGE_FIN_ETAPE_MS = 30_000;
@@ -350,7 +373,7 @@ type ContexteEtape = {
  * Entrée commune d'une étape : garde (durée du mode réel, la plus longue), exécution relue, configuration et brief ;
  * pour un essai, garde revérifiée avec sa durée propre (`essai.json` : 15 min depuis la décision 0073, 5 min avant). Puis
  * phase écrite (garde d'idempotence) et échéance : la plus proche de la limite de fonction et de la fin de la durée du
- * mode, moins la marge de fin d'étape.
+ * mode diminuée de la part gardée aux étapes suivantes (0075), moins la marge de fin d'étape.
  */
 async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<ContexteEtape> {
   const dureeReel = validerConfigModeReel(configModeReel);
@@ -365,13 +388,14 @@ async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<Contexte
   }
   const brief = briefDe(execution.brief);
   await ecrirePhase(poolPrototype(), ouverte.garde.runId, phase);
-  const echeance = debut + Math.min(LIMITE_FONCTION_MS, config.dureeMs - execution.ecouleMs) - MARGE_FIN_ETAPE_MS;
+  const reserve = phase === "recherche" || phase === "ancrage" || phase === "notation" ? RESERVE_ETAPES_SUIVANTES_MS[phase] : 0;
+  const echeance = debut + Math.min(LIMITE_FONCTION_MS, config.dureeMs - execution.ecouleMs - reserve) - MARGE_FIN_ETAPE_MS;
   return { garde: ouverte.garde, execution, config, brief, echeance };
 }
 
 /** Délai complet d'un appel réservé : requête du client et opérations du port qui l'entourent (D13 point 5). */
-function delaiDeLAppel(demande: DemandeReservation): number {
-  const requete = demande.methode === "chat" ? DELAI_REQUETE_MS.openrouter : demande.methode === "routes_matrix" ? DELAI_REQUETE_MS.routes : DELAI_REQUETE_MS.places;
+function delaiDeLAppel(methode: DemandeReservation["methode"]): number {
+  const requete = methode === "chat" ? DELAI_REQUETE_MS.openrouter : methode === "routes_matrix" ? DELAI_REQUETE_MS.routes : DELAI_REQUETE_MS.places;
   return requete + 2 * DELAI_PORT_MS;
 }
 
@@ -384,7 +408,7 @@ function registreDeLEtape(forfait: Forfait, contexte: ContexteEtape): RegistreFo
   return {
     ...registre,
     async reserve(demande) {
-      if (Date.now() + delaiDeLAppel(demande) > contexte.echeance) return { ok: false, code: "cap_reached" };
+      if (Date.now() + delaiDeLAppel(demande.methode) > contexte.echeance) return { ok: false, code: "cap_reached" };
       return registre.reserve(demande);
     },
   };
@@ -484,18 +508,22 @@ export const CODE_RECHERCHE_VIDE = "research_empty";
 
 /**
  * Ligne de journal fermée de fin de recherche (ticket 400) : compteurs de l'agent seulement, des nombres (ni texte du
- * modèle, ni requête, ni URL, ni donnée Google) ; `warn` si aucun lieu n'est retenu.
+ * modèle, ni requête, ni URL, ni donnée Google) ; `warn` si aucun lieu n'est retenu. Écrite aussi quand la recherche
+ * lève (ticket 407) : compteurs et candidats admis jusque-là, nom de l'erreur (`errorName`, jamais son message), `warn`.
  */
-function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: number, lieux: number): void {
+function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: readonly Candidat[], echec?: { readonly erreur: unknown }): void {
   const refuses = compteurs?.candidatsRefuses;
+  const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
+  const nomErreur = echec === undefined ? undefined : errorNameOf(echec.erreur);
   logEvent(
     "p0.research_done",
     {
       // `candidates` compte tout, événements compris ; `places`, les lieux seuls, qui décident du niveau et de l'arrêt
       // (mineur 2 du head `cd614d4` : une exécution vide peut avoir `candidates > 0` quand elle n'a trouvé que des
       // événements).
-      candidates: candidats,
+      candidates: candidats.length,
       places: lieux,
+      ...(nomErreur === undefined ? {} : { errorName: nomErreur }),
       ...(compteurs === undefined
         ? {}
         : {
@@ -509,9 +537,10 @@ function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: 
             turnUnreadable: compteurs.sortiesIllisibles.recherche,
             finishIgnored: compteurs.terminesIgnores,
             finishAbnormal: compteurs.finsAnormales,
+            deadlineStop: compteurs.finsEcheance,
           }),
     },
-    lieux === 0 ? "warn" : "info",
+    lieux === 0 || echec !== undefined ? "warn" : "info",
   );
 }
 
@@ -528,16 +557,31 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
     const agent = composition.agent();
     marquerAppels();
     await memoireDuCout(contexte, registre).terminer(async () => {
-      const { candidats, compteurs } = await chercherCandidats(contexte.brief, {
-        modeles: agent.modeles,
-        modele: choisis.recherche,
-        routage,
-        recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
-        lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
-        config: recherche,
-      });
+      // Ticket 407 : état vivant de l'agent, pour journaliser ses compteurs même si la recherche lève.
+      let etat: EtatAgent | undefined;
+      let trouve: Awaited<ReturnType<typeof chercherCandidats>>;
+      try {
+        trouve = await chercherCandidats(contexte.brief, {
+          modeles: agent.modeles,
+          modele: choisis.recherche,
+          routage,
+          recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
+          lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
+          config: recherche,
+          // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même
+          // délai complet que `registreDeLEtape` (modèle et recherche web : méthode `chat`) et `lecteurSousEcheance`.
+          peutAppeler: tempsPourAppel(contexte.echeance, { modele: delaiDeLAppel("chat"), page: DELAI_MAX_MS, marge: MARGE_VERIFICATION_AGENT_MS }),
+          observer: (vivant) => {
+            etat = vivant;
+          },
+        });
+      } catch (erreur) {
+        journaliserRecherche(etat?.compteurs, etat?.candidats ?? [], { erreur });
+        throw erreur;
+      }
+      const { candidats, compteurs } = trouve;
       const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
-      journaliserRecherche(compteurs, candidats.length, lieux);
+      journaliserRecherche(compteurs, candidats);
       if (candidats.length > contexte.config.candidatsTrouves) throw new ArretEtape(codePersiste("cap_reached", true));
       // Ticket 400 : aucun lieu trouvé (les événements seuls ne font pas de programme) : arrêt ici, avant l'ancrage et
       // l'étape finale, qui paieraient leurs appels pour rien. Code interne `research_empty`, persisté `pipeline_failed`
