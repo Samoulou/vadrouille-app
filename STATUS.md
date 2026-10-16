@@ -1,29 +1,29 @@
-# État du studio — 2026-10-16 (84e cycle)
+# État du studio — 2026-10-16 (85e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-16 : 06:58 UTC « prêt à tout faire aujourd'hui » ; 07:09–07:12 UTC relevé S7 dans la console Neon (captures, fenêtre de restauration 6 h) → Q456 close ; 07:25 UTC « test fait » (commit `2eb88f7` sur #381, posé par sa session Claude) → Q457 close ; 08:45 UTC limites de dépense posées → Q325 close ; 08:49 UTC `owner-approved` sur #381 ; 08:58 UTC accord écrit « j'autorise le premier essaie réel » (0055:146) ; 09:02 UTC rapport du premier essai réel (Q460).
+- Fil du cycle, 2026-10-16 : 09:20 à 20:57 UTC, rapports des essais réels 2 à 6 et choix associés (fusibles alignés, durée Vercel portée à 800 s, notation B par DeepSeek, carte et trajets) ; 21:02 UTC « On reprend » (reprise des cycles, priorité : brancher la vraie génération sur le parcours de l'app) et demande d'une feuille de route de 20 cycles ; 21:05 UTC Resend pour les e-mails (Q25), réglages Vercel posés par lui (Q401), question sur le coût par génération (Q39).
 
 ## Fait
-- Condition 3 de 0056 § 4.1 remplie (Sécurité, #374 c6210191396).
-- #381 (A17, migration 0006) : CI verte, revue Tech Lead et Sécurité approuvée sans bloquant, signalement dans #studio, `owner-approved`, **fusionnée** (08:50 UTC).
-- A18 : `db-migrate` run 38876502011 (08:51 UTC), 0006 appliquée, empreinte conforme ; `p0-purge` non relancé (dernier succès 04:32 UTC, moins de 12 h).
-- A19 : `db-releve` run 38876787144 (08:54 UTC), verdict favorable (#374 c6211870156) : `EXECUTE` à `vadrouille_prototype` seul.
-- A20 : liste « tout est vert » envoyée ; accord écrit de Samuel reçu (08:58 UTC).
-- **Premier essai réel lancé par Samuel** (~09:00 UTC, `p0-reel` `d61e9fa`) : arrêté, `pipeline_failed`, A1 à A6 non, modèle appelé, aucun appel Google (Q460).
+- Cycles en pause de 11:17 à 21:02 UTC à la demande de Samuel, qui a piloté lui-même ses essais.
+- Essais réels : essai 3 (edimbourg-court, B) puis **essai 6 (edimbourg-1, A) réussis** : programme de 6 jours écrit, A1 à A8 oui, lisible dans « Mes voyages » (#406, décision 0074).
+- Correctifs fusionnés et publiés sur `p0-reel` : #392, #394, #401, #404 (0073), #409 (0075, fin propre de la recherche, 800 s), #412 (0076, notation B par DeepSeek) ; release vers `p0-reel` #410 et #413 (`37e735e`, déployé).
+- Routine du cycle réactivée (21:04 UTC) ; feuille de route des 20 cycles : `/mnt/project-files/plans/roadmap-20-cycles.md`.
 
 ## En cours
-- ia-recherche : diagnostic en lecture seule de l'arrêt du premier essai (`/mnt/project-files/essai-reel/diagnostic-essai-1.md`) ; aucun nouvel essai avant correctif.
+- backend : P0r4 (#414), carte Google et temps de trajet des voyages réels (choix de Samuel « Oui, les deux »).
+- tech-lead : décision 0077 (#415), préalables de B7a, B8c et B3b.
+- CEO : décision 0078 (#416), découpage de B4 (Q351).
 
 ## Bloqué
-- **Deuxième essai réel** : cause de `pipeline_failed` (Q460), correctif, puis mise à jour de `p0-reel` si le code change.
-- **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
+- **B7a, B8c, B3b** : décision 0077. **B4a** : 0078, Q352, Q364, B3b. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : B3b (Q401 : Samuel posera les variables).
+- **B9 réel** : Q39 et Q45 (plafonds, Samuel), Q135.
 
 ## Prochain cycle
-1. Seulement le chemin de l'essai réel : correctif de la cause de `pipeline_failed`, puis relance par Samuel seul.
-2. Purge : la surveiller (seuil de 18 h entre deux succès, sinon reverrouillage § 4.6).
-3. Ticket P0r4 à ouvrir avant P0a2 ; mineurs 12 et 13 de #384, mineurs de #383 et #381 (ligne « Brouillon » de la description, test D15 point 6) dans un chore.
+1. Fusionner 0077 et 0078, puis ouvrir B7a (et B8c, B3b selon 0077), au plus 3 fils.
+2. Suivre P0r4 jusqu'à sa PR et sa mise à jour de `p0-reel`.
+3. Écrire à Samuel les cartes Q354 (plafond d'e-mails) et Q39 (3 USD par génération, recommandé), une à la fois.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : aucune pour l'instant (Q325, Q456 et Q457 closes).
@@ -45,7 +45,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q460.
+- Q462, Q463.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
