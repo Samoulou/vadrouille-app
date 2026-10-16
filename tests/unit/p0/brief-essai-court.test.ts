@@ -76,7 +76,8 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     const { plan } = premiereSerie(brief);
     expect(essai.routesElements).toBeLessThanOrEqual(PLAFOND_ROUTES_SAMUEL);
     expect(plan.tient).toBe(true);
-    expect(plan.n).toBe(6);
+    // Plafonds de l'essai alignés sur le mode réel (décision 0073) : 500 éléments et 30 requêtes, matrice de 14 lieux.
+    expect(plan.n).toBe(14);
     expect(plan.elementsSansReprise).toBeLessThanOrEqual(essai.routesElements);
     expect(plan.requetesSansReprise).toBeLessThanOrEqual(essai.routesRequetes);
   });
@@ -95,24 +96,26 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(serie).toBe(10);
   });
 
-  it("la série tient dans le budget de fiches de l'essai avec 2 de marge (formule de l'étape finale de p0Run)", () => {
+  it("la série tient dans le budget de fiches de l'essai (formule de l'étape finale de p0Run ; plafonds de 0073)", () => {
     const { serie } = premiereSerie(brief);
     // `p0-run.ts` : budgetFiches = placesDetails − 2 × logements ; série plus grande : arrêt avant toute fiche.
     const budgetFiches = essai.placesDetails - 2 * brief.logements.length;
     expect(validerConfigEssai(lire("prototype/config/essai.json")).ok).toBe(true);
-    expect(essai.placesDetails).toBe(14);
+    expect(essai.placesDetails).toBe(90);
     expect(essai.placesDetails).toBeLessThanOrEqual(BORNES_ESSAI.placesDetails);
     expect(serie).toBeLessThanOrEqual(budgetFiches);
-    expect(budgetFiches - serie).toBe(2);
+    expect(budgetFiches - serie).toBe(78);
   });
 
-  it("la série tient dans les candidats de l'essai avec 2 de marge, cibles de recherche comprises", () => {
+  it("la série tient dans les candidats visés par la recherche de l'essai avec 2 de marge, sous le plafond de 0073", () => {
     const { serie, parType } = premiereSerie(brief);
-    expect(essai.candidatsTrouves).toBe(12);
+    expect(essai.candidatsTrouves).toBe(85);
     expect(essai.candidatsTrouves).toBeLessThanOrEqual(BORNES_ESSAI.candidatsTrouves);
-    expect(serie).toBeLessThanOrEqual(essai.candidatsTrouves);
-    expect(essai.candidatsTrouves - serie).toBe(2);
-    expect(rechercheEssai.totalCandidats).toBe(essai.candidatsTrouves);
+    // Profil de recherche de l'essai inchangé par 0073 : 12 candidats visés, sous le plafond (fusible) de 85.
+    expect(rechercheEssai.totalCandidats).toBe(12);
+    expect(rechercheEssai.totalCandidats).toBeLessThanOrEqual(essai.candidatsTrouves);
+    expect(serie).toBeLessThanOrEqual(rechercheEssai.totalCandidats);
+    expect(rechercheEssai.totalCandidats - serie).toBe(2);
     const cibles = rechercheEssai.ciblesParCreneau;
     expect(cibles.activity + cibles.meal + cibles.evening).toBe(rechercheEssai.totalCandidats);
     // Activités et soirées prennent des candidats de type activité ; repas, des candidats de type repas.
@@ -122,15 +125,14 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(cibles.meal - parType.meal).toBe(1);
   });
 
-  it("réserve Google de l'essai (fiches et Routes, méthode Q329) : 0,88 USD, et l'enveloppe jusqu'à G0 tient sous 40 USD", () => {
+  it("réserve Google de l'essai (fiches et Routes, méthode Q329) : 4,30 USD, celle du mode réel (0073)", () => {
     const prix = lire("prototype/config/prix-google.json") as { skus: Record<string, { prixPour1000: number }> };
     const prixDe = (sku: string) => (prix.skus[sku]?.prixPour1000 ?? Number.POSITIVE_INFINITY) / 1000;
     // Spécification P0-suite-2, P0S2-PO-12 amendé : fiches au SKU Enterprise, éléments Routes au SKU Essentials ;
     // Text Search au SKU « IDs only », sans coût.
     const reserve = essai.placesDetails * prixDe("places_details_enterprise") + essai.routesElements * prixDe("routes_matrix_essentials");
-    expect(reserve).toBeCloseTo(0.88, 6);
-    // Enveloppe Google jusqu'à G0 (40 USD) : l'essai et 9 exécutions à leur réserve de 4,30 USD (0053).
-    expect(reserve + 9 * 4.3).toBeLessThanOrEqual(40);
+    // 90 × 0,020 + 500 × 0,005 = 1,80 + 2,50 (0053). Aucune enveloppe ne borne plus le nombre d'essais (0071).
+    expect(reserve).toBeCloseTo(4.3, 6);
   });
 
   it("le modèle de la recherche ne voit pas le logement ; le récit n'en reprend aucun mot ; aucun champ personnel", () => {

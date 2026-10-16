@@ -215,47 +215,49 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
   });
 });
 
-describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décision 0063)", () => {
+describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décisions 0063 et 0073)", () => {
   const essai = () => lire("essai") as Record<string, unknown>;
 
-  it("fichier commité : bornes de P0S2-PO-12 amendé (17, 14, 3, 120 ; 12 candidats ; relevées par le ticket 355), acceptées", () => {
+  it("fichier commité : mêmes plafonds par exécution que mode-reel.json (décision 0073), acceptés", () => {
     expect(essai()).toEqual({
       schema: 1,
       uniteQuotaRoutes: "elements",
-      coutUsd: 0.3,
-      recherchesWeb: 6,
-      pagesLues: 15,
-      candidatsTrouves: 12,
-      placesTextSearch: 17,
-      placesDetails: 14,
-      routesRequetes: 3,
-      routesElements: 120,
-      dureeMs: 300_000,
+      coutUsd: 3,
+      recherchesWeb: 40,
+      pagesLues: 100,
+      candidatsTrouves: 85,
+      placesTextSearch: 90,
+      placesDetails: 90,
+      routesRequetes: 30,
+      routesElements: 500,
+      dureeMs: 900_000,
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
     expect(validerConfigEssai(essai())).toEqual({ ok: true, config: essai() });
     // Chaque valeur commitée est exactement la borne : le fichier ne peut que descendre.
     for (const [champ, borne] of Object.entries(BORNES_ESSAI)) expect(essai()[champ], champ).toBe(borne);
+    // Décision 0073 : fichier de l'essai identique à celui du mode réel, bornes égales aux plafonds commités du mode réel.
+    const reel = lire("mode-reel") as Record<string, unknown>;
+    expect(essai()).toEqual(reel);
+    for (const [champ, borne] of Object.entries(BORNES_ESSAI)) expect(reel[champ], champ).toBe(borne);
   });
 
-  it("au-delà d'une borne de l'essai (mais sous celles du mode réel), refusée sans recopier la valeur", () => {
+  it("au-delà d'une borne de l'essai, refusée sans recopier la valeur", () => {
     const cas: [string, number][] = [
-      ["coutUsd", 0.31],
-      ["recherchesWeb", 7],
-      ["pagesLues", 16],
-      ["candidatsTrouves", 13],
-      ["placesTextSearch", 18],
-      ["placesDetails", 15],
-      ["routesRequetes", 4],
-      ["routesElements", 121],
-      ["dureeMs", 300_001],
+      ["coutUsd", 3.01],
+      ["recherchesWeb", 41],
+      ["pagesLues", 101],
+      ["candidatsTrouves", 86],
+      ["placesTextSearch", 91],
+      ["placesDetails", 91],
+      ["routesRequetes", 31],
+      ["routesElements", 501],
+      ["dureeMs", 900_001],
     ];
     expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());
     for (const [champ, valeur] of cas) {
-      const brutEssai = { ...essai(), [champ]: valeur };
-      expect(validerConfigModeReel(brutEssai).ok, champ).toBe(champ !== "candidatsTrouves" || valeur + 5 <= 17);
-      const resultat = validerConfigEssai(brutEssai);
+      const resultat = validerConfigEssai({ ...essai(), [champ]: valeur });
       expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
       expect(JSON.stringify(resultat)).not.toContain(String(valeur));
     }
@@ -267,9 +269,11 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
     expect(validerConfigEssai(sans)).toEqual({ ok: false, code: "config_reel_incomplete" });
   });
 
-  it("recherche-essai.json : 12 candidats, validé par le schéma de recherche", () => {
+  it("recherche-essai.json : profil de l'essai (12 candidats visés), fusible toursMax aligné sur le mode réel (0073)", () => {
     const recherche = ConfigRechercheSchema.parse(lire("recherche-essai"));
-    expect(recherche.totalCandidats).toBe(BORNES_ESSAI.candidatsTrouves);
+    expect(recherche.totalCandidats).toBe(12);
+    expect(recherche.totalCandidats).toBeLessThanOrEqual(BORNES_ESSAI.candidatsTrouves);
+    expect(recherche.toursMax).toBe(ConfigRechercheSchema.parse(lire("recherche")).toursMax);
     const cibles = Object.values(recherche.ciblesParCreneau).reduce((a, b) => a + b, 0);
     expect(cibles).toBeLessThanOrEqual(recherche.totalCandidats);
   });
