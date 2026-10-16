@@ -43,15 +43,16 @@ describe("db-releve : relevé de la base migrée (0057 § 3 à § 5)", () => {
     const lignes = r.sortie.split("\n").filter((l) => /^R[1-8]\|/.test(l));
     expect(lignes).toHaveLength(Number(affichees));
     for (const etiquette of ["R1", "R3", "R4", "R5", "R6", "R8"]) expect(lignes.some((l) => l.startsWith(`${etiquette}|`)), etiquette).toBe(true);
-    expect(lignes).toContain("R8|public.store_prototype_coordinates(uuid,text,double precision,double precision)|f");
+    expect(lignes).toContain("R8|public.store_prototype_coordinates(uuid,text,double precision,double precision)|t");
     expect(lignes).toContain("R1|plpgsql|1.0|pg_catalog");
   });
 
-  it("contrôle ssl gardé : échec sans chiffrement, aucune ligne R affichée", async () => {
+  it("contrôle de chiffrement gardé : refusé sans connexion, aucune ligne R affichée (0067)", async () => {
     const base = await creerBase("rl_ssl");
     const r = executer(WF, ETAPE_RELEVE, { base, login: "p0_purge", garderSsl: true });
     expect(r.code).toBe(1);
-    expect(r.sortie).toContain("Échec : psql");
+    expect(r.sortie).toContain("Échec : chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full");
+    expect(r.sortie).not.toContain("Échec : psql");
     expect(r.sortie).not.toMatch(/^R[1-8]\|/m);
   });
 

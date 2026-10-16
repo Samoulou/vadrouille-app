@@ -2,7 +2,15 @@
 import { describe, expect, it } from "vitest";
 
 import { CODES_EXTERNES } from "@/prototype/arret";
-import { CODES_EXTERNES_SUIVI, COMPTEES_MAX, decompte, lancementDansLeDecompte, RELANCES_MAX } from "@/server/p0/decompte";
+import {
+  CODES_EXTERNES_SUIVI,
+  COMPTEES_MAX,
+  decompte,
+  estExclue,
+  EXECUTIONS_EXCLUES,
+  lancementDansLeDecompte,
+  RELANCES_MAX,
+} from "@/server/p0/decompte";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -62,5 +70,51 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     const pleines = [executionSuivie(), executionSuivie(), executionSuivie({ variante: "A" })];
     expect(lancementDansLeDecompte(pleines, "essai", "edimbourg-1.json", "B")).toBe(true);
     expect(lancementDansLeDecompte(pleines, "essai", "edimbourg-1.json", "A")).toBe(true);
+  });
+});
+
+/** Décision 0070 : l'exécution réelle du 2026-10-16 (`wrun_41M51Z1RQ450GN2FF85TK80W6Z`) est exclue du décompte G0. */
+describe("p0: exécutions exclues du décompte (décision 0070)", () => {
+  const exclue0070 = arretee("pipeline_failed", {
+    jourQuota: "2026-10-16",
+    commitSha: "d61e9faefacf568ad39833e8ac611ba717e0fbdd",
+  });
+
+  it("liste fermée : une seule entrée, celle de la décision 0070", () => {
+    expect(EXECUTIONS_EXCLUES).toEqual([
+      {
+        decision: "0070",
+        brief: "edimbourg-1.json",
+        variante: "B",
+        jourQuota: "2026-10-16",
+        codeArret: "pipeline_failed",
+        commitSha: "d61e9faefacf568ad39833e8ac611ba717e0fbdd",
+      },
+    ]);
+  });
+
+  it("l'exécution de 0070 n'est ni comptée ni relance : edimbourg-1/B garde ses deux places", () => {
+    expect(estExclue(exclue0070)).toBe(true);
+    expect(decompte([exclue0070], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
+    expect(lancementDansLeDecompte([exclue0070, executionSuivie()], "reel", "edimbourg-1.json", "B")).toBe(true);
+    expect(lancementDansLeDecompte([exclue0070, executionSuivie(), executionSuivie()], "reel", "edimbourg-1.json", "B")).toBe(false);
+  });
+
+  it.each([
+    ["autre jour", { jourQuota: "2026-10-17" }],
+    ["autre commit", { commitSha: "b".repeat(40) }],
+    ["autre code", { codeArret: "cap_reached" }],
+    ["autre brief", { brief: "edimbourg-2.json" }],
+    ["autre variante", { variante: "A" as const }],
+    ["programme écrit", { statut: "programme_ecrit" as const, codeArret: null }],
+    ["en cours", { statut: "en_cours" as const, codeArret: null }],
+  ])("un seul champ différent (%s) : l'exécution compte", (_cas, champs) => {
+    const execution = { ...exclue0070, ...champs };
+    expect(estExclue(execution)).toBe(false);
+    expect(decompte([execution], execution.brief, execution.variante).comptees).toBe(1);
+  });
+
+  it("un essai du même jour n'est pas visé (il ne compte déjà pas)", () => {
+    expect(estExclue({ ...exclue0070, mode: "essai" })).toBe(false);
   });
 });

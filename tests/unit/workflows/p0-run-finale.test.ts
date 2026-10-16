@@ -65,6 +65,8 @@ const d = vi.hoisted(() => ({
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
+  /** Fiches Place Details sans statut d'établissement (quartier, parc, site naturel ; Q460). */
+  sansStatut: false,
   /** Contenu servi pour `essai.json`, `mode-reel.json` et `classement.json` (les fichiers commités, sauf cas modifié par un test). */
   essai: {} as Record<string, unknown>,
   modeReel: {} as Record<string, unknown>,
@@ -257,7 +259,9 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
       facture(google("places_details"), async () => {
         capture.details.push(placeId);
         capture.ordre.push("details");
-        return placesSimule.details(placeId);
+        const fiche = await placesSimule.details(placeId);
+        if (d.sansStatut) delete fiche.statut;
+        return fiche;
       }),
   };
   const routesSimule = creerRoutesSimule(fixtures.routes);
@@ -317,6 +321,7 @@ function reinitialiser(): void {
   d.requetesSql.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
+  d.sansStatut = false;
   d.composerP0Reel.mockImplementation(compositionSimulee);
   derniere = undefined;
 }
@@ -394,6 +399,23 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     const transaction = d.requetesSql.map((r) => r.texte.split(/\s+/)[0]);
     expect(transaction[0]).toBe("BEGIN");
     expect(transaction.at(-1)).toBe("COMMIT");
+  });
+
+  it("Q460 (diagnostic de l'essai 1) : fiches sans statut d'établissement (logement « quartier », lieux) ; p0Run va jusqu'au programme", async () => {
+    d.sansStatut = true;
+    capture = {
+      requetes: [],
+      textSearch: [],
+      details: [],
+      matrices: [],
+      ordre: [],
+    };
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.etat.clos).toBeUndefined();
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.ecrituresPhase).toEqual([...PHASES]);
+    expect(capture.details.length).toBeGreaterThan(1);
+    expect(placeIdsDuProgramme(programmeEcrit().contenu as never).size).toBeGreaterThan(0);
   });
 
   it("ordre : notation (modèle) avant tout appel Google ; logements (Text Search puis fiche) ; fiches ; Routes ; raisons en dernier", async () => {

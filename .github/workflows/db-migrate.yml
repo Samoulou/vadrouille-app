@@ -60,7 +60,6 @@ jobs:
             BEGIN
               IF session_user <> 'vadrouille_migrator' OR current_user <> 'vadrouille_migrator' THEN RAISE EXCEPTION 'rôle de session inattendu'; END IF;
               IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'vadrouille_migrator' AND (r.rolsuper OR r.rolbypassrls)) THEN RAISE EXCEPTION 'rôle privilégié'; END IF;
-              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;
             END
             $$
           SQL_JOURNAL: "CREATE TABLE IF NOT EXISTS vadrouille_migrations.applied (tag text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())"
@@ -94,6 +93,13 @@ jobs:
           # Liste d'approbation (§ 2.4) : une ligne « <tag> <sha256> » par migration, dans l'ordre du journal, en ajout
           # seulement. Chaque ajout est une PR de workflow qui attend owner-approved, avec le verdict Sécurité G1 à G6.
           MIGRATIONS_APPROUVEES=(
+            "0000_socle ec0a86eff5924456d3bcef6ebfa9512ced902c8612fd34392fac562b61983158"
+            "0001_securite acd8f95df0c27d1e8bfb3f722bd4d02b4943a3ebf1e0c8bb9aa08a972c4b2f6a"
+            "0002_place_coordinates 5d88c571a20c220bceada1aeddfe6818b8a075db06f6e6989685b1257aa62006"
+            "0003_prototype e75ab97b8cd8dfbac73e909cbe79153c051cc92ecfa97936b6297e715ecde843"
+            "0004_rate_limit_expires_at f637564fe843325e9afe70c6f017680616c0bff098a8304d9502e8c8c8f2352d"
+            "0005_prototype_coordinates_run fe1a524fca2816ad76a09b75baff36770234f653c9c2d9ce9cd7af5a0bfb4145"
+            "0006_deverrouillage_positions_prototype 5db869668d67397556d2f1c2393923c920f6afb0f1f5cef83618de32ca2f57ca"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
@@ -104,6 +110,10 @@ jobs:
           if [[ ! $PGHOST =~ ^[a-z0-9.-]{1,253}$ ]]; then echec "PGHOST hors forme"; fi
           if [[ $PGHOST == *-pooler* ]]; then echec "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi
           if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then echec "PGDATABASE hors forme"; fi
+          # Chiffrement (0056 § 2.6.2, amendé par 0067) : derrière le proxy de Neon, pg_stat_ssl du compute ne voit pas le
+          # TLS du client ; la garantie est celle de libpq, qui refuse sous verify-full toute connexion sans TLS ou dont le
+          # certificat ne nomme pas PGHOST. Seules les six variables PG* de l'étape (aucun PGSERVICE ni autre réglage hérité).
+          if [[ "${!PG*}" != "PGDATABASE PGHOST PGPASSWORD PGSSLMODE PGSSLROOTCERT PGUSER" || $PGSSLMODE != verify-full || $PGSSLROOTCERT != system ]]; then echec "chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full"; fi
 
           motif_liste='^([0-9]{4}_[a-z0-9_]{1,60}) ([0-9a-f]{64})$'
           tags=()

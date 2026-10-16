@@ -27,7 +27,8 @@ import {
  * - Clé par `@/server/env/grounding`, lue à la création, après la barrière de sortie ; refus : le client ne se
  *   construit pas (erreur fermée du même code).
  * - Masques de champs minimaux : Text Search « IDs only » (`places.id`) ; Place Details : identifiant, statut,
- *   position et horaires réguliers (SKU Enterprise de la table de prix).
+ *   position et horaires réguliers (SKU Enterprise de la table de prix). Statut et horaires sont facultatifs : un lieu
+ *   qui n'est pas un établissement (quartier, parc, site naturel) n'en a pas (Q460).
  * - Text Search : biais (cercle) ou, pour `p0Run`, restriction à la zone du séjour (rectangle, 0055 § 6 point 3) ;
  *   jamais les deux, et un rectangle invalide est refusé avant toute réservation (`invalid_request`).
  * - Chaque requête réserve une unité auprès du port de consommation avant l'appel (D13) ; délai de 10 s par requête.
@@ -59,10 +60,22 @@ export type OptionsPlaces = {
 
 const TextSearchSchema = z.object({ places: z.array(z.object({ id: z.string().regex(PLACE_ID) })).max(20).optional() });
 
-const PointSchema = z.object({ day: z.number().int().min(0).max(6), hour: z.number().int().min(0).max(24), minute: z.number().int().min(0).max(59) });
+/**
+ * Point d'une période d'ouverture. Places API (New) suit le format JSON de proto3, qui omet un entier à sa valeur par
+ * défaut : `day` (dimanche), `hour` (minuit) et `minute` (heure pile) absents valent 0 (Q460). Une valeur présente
+ * reste bornée ; `date` et `truncated` ne sont pas lus.
+ */
+const PointSchema = z.object({
+  day: z.number().int().min(0).max(6).default(0),
+  hour: z.number().int().min(0).max(24).default(0),
+  minute: z.number().int().min(0).max(59).default(0),
+});
 const DetailsSchema = z.object({
   id: z.string().regex(PLACE_ID),
-  businessStatus: z.enum(["OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"]),
+  // Facultatif (Q460) : Places API (New) ne le renvoie que pour un établissement ; un quartier, un parc ou un site
+  // naturel n'en a pas. `BUSINESS_STATUS_UNSPECIFIED` (valeur par défaut de l'énumération) vaut absence. Toute autre
+  // valeur reste refusée (`invalid_response`).
+  businessStatus: z.enum(["OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY", "BUSINESS_STATUS_UNSPECIFIED"]).optional(),
   location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
   regularOpeningHours: z.object({ periods: z.array(z.object({ open: PointSchema, close: PointSchema.optional() })).max(50) }).optional(),
 });
@@ -147,9 +160,11 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
       );
       const lu = DetailsSchema.safeParse(brut);
       if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
+      const statut = lu.data.businessStatus;
       return {
         placeId: lu.data.id,
-        statut: lu.data.businessStatus,
+        // Statut absent ou non précisé : la clé est omise (aucun état d'établissement déclaré, Q460).
+        ...(statut === undefined || statut === "BUSINESS_STATUS_UNSPECIFIED" ? {} : { statut }),
         position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude },
         horaires: horairesDe(lu.data.regularOpeningHours),
       };

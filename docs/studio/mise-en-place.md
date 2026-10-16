@@ -88,7 +88,7 @@ Mêmes rôles que la version 1, sous forme de sous-agents dans `.claude/agents/`
 | Déclencheurs GitHub | Ils exigent l'application GitHub Claude sur le dépôt, et sont plafonnés par heure | Installer l'application ; déclencher R2 sur le libellé, pas sur chaque mise à jour de PR |
 | Arrêt | Interrupteur marche/arrêt sur chaque routine | En plus : si le fichier `docs/STUDIO_PAUSED` existe, toutes les routines s'arrêtent dès leur première étape |
 
-**Qui décide quoi** : voir `docs/CONTEXT.md`, section « Qui décide quoi » (réservé à Samuel, délégations, veto sous 2 jours). Le CEO pose les décisions réservées à Samuel dans `#studio` et `QUESTIONS.md`, puis continue sur autre chose.
+**Qui décide quoi** : voir `docs/CONTEXT.md`, section « Qui décide quoi » (réservé à Samuel, délégations, veto sous 6 heures, décision 0068). Le CEO pose les décisions réservées à Samuel dans `#studio` et `QUESTIONS.md`, puis continue sur autre chose.
 
 ---
 

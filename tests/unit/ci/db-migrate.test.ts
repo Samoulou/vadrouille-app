@@ -13,6 +13,7 @@ import { commandes, etape, lignesUtiles, remplacerUneFois } from "../../support/
  * Tests imposés par la décision 0056 pour `.github/workflows/db-migrate.yml` (sans base ; l'exécuteur est joué sur la
  * base de service de la CI par `tests/db/db-migrate.test.ts`) :
  * - `ci: workflow des migrations conforme à 0056` : contrôle statique, un cas négatif par exigence (mutation) ;
+ * - `ci: contrôle de chiffrement côté client` (décision 0067) : la ligne jouée sous bash, refus de chaque écart ;
  * - `ci: l'environnement db-migrate et les secrets MIGRATOR_PG* ne sont nommés que par db-migrate.yml et
  *   db-reverrouillage.yml` ;
  * - `ci: liste approuvée = préfixe du journal`, `ci: liste approuvée en ajout seulement` (contre le commit de base de
@@ -63,6 +64,13 @@ const CONTROLES_VALEUR = [
   `if [[ $PGHOST == *-pooler* ]]; then echec "PGHOST désigne l'hôte poolé (hôte direct exigé)"; fi`,
   'if [[ ! $PGDATABASE =~ ^[a-z0-9_]{1,63}$ ]]; then echec "PGDATABASE hors forme"; fi',
 ];
+/**
+ * Contrôle de chiffrement côté client (décision 0067, amendement de 0056 § 2.6.2) : il remplace le contrôle
+ * `pg_stat_ssl`, aveugle derrière le proxy de Neon. Une ligne, avant toute connexion ; aucun texte SQL ne lit `pg_stat_ssl`.
+ */
+/** Les six variables PG* de l'étape, dans l'ordre où bash les rend (`${!PG*}` : ordre alphabétique). */
+const LISTE_PG = [...ENV_PG].sort().join(" ");
+const CHIFFREMENT = `if [[ "\${!PG*}" != "${LISTE_PG}" || $PGSSLMODE != verify-full || $PGSSLROOTCERT != system ]]; then echec "chiffrement : variables PG* hors liste, ou PGSSLMODE autre que verify-full"; fi`;
 const LECTURE = `if IFS= read -r -d '' texte < "$f"; then echec "migration $tag : octet NUL"; fi`;
 
 /** Écarts de `db-migrate.yml` aux exigences de 0056 (codes stables, un par exigence). */
@@ -128,7 +136,7 @@ function ecartsMigrate(texte: string): string[] {
     .filter((l) => !l.trim().startsWith("#"))
     .join("\n");
   if (/\$\{\{/.test(run)) e.add("expression-run");
-  for (const mot of commandes(run)) if (!COMMANDES_ADMISES.has(mot)) e.add("commande-interdite");
+  for (const mot of commandes(sansLignesDeListe(run))) if (!COMMANDES_ADMISES.has(mot)) e.add("commande-interdite");
   if (/\b(eval|exec|trap|export|declare|let|source|pnpm|npm|npx|node|corepack|tsx|make|cat|bash)\b|\(\(|\$\(\(|\$\(<|set -x|printenv|\benv\b/.test(run)) e.add("commande-interdite");
   if (/(^|[;&|]|then|do)\s*\.\s/m.test(run)) e.add("commande-interdite");
   if (/_journal\.json|meta\//.test(texte)) e.add("journal-lu");
@@ -143,7 +151,12 @@ function ecartsMigrate(texte: string): string[] {
   if (!/^\s*textes\+=\("\$texte"\)$/m.test(run) || (run.match(/\btextes\b/g) ?? []).length !== 3) e.add("relecture");
   if (!run.includes(`lue=$(printf '%s' "$texte" | sha256sum)`)) e.add("empreinte");
   for (const k of ["SQL_ROLE", "SQL_NON_APPLIQUEE", "SQL_APRES"]) if (!/^DO \$\$\nBEGIN\n/.test(et.env[k] ?? "")) e.add("controle-do");
-  if (!(et.env.SQL_ROLE ?? "").includes("pg_catalog.pg_stat_ssl") || !(et.env.SQL_ROLE ?? "").includes("rolbypassrls")) e.add("controle-do");
+  if (!(et.env.SQL_ROLE ?? "").includes("r.rolsuper OR r.rolbypassrls")) e.add("controle-do");
+  // Chiffrement (0067) : contrôle côté client unique, avant la première connexion ; plus aucun contrôle pg_stat_ssl.
+  const iChiffrement = run.indexOf(CHIFFREMENT);
+  const iPremiereConnexion = run.indexOf("psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -q");
+  if (run.split("\n").filter((l) => l.trim() === CHIFFREMENT).length !== 1 || run.split(CHIFFREMENT).length !== 2 || iChiffrement < 0 || iPremiereConnexion < 0 || iChiffrement > iPremiereConnexion) e.add("chiffrement");
+  if (Object.entries(et.env).some(([k, v]) => k.startsWith("SQL_") && v.includes("pg_stat_ssl"))) e.add("ssl-serveur");
   if (!(et.env.SQL_APRES ?? "").includes("pg_catalog.current_setting('vadrouille_migrate.txid', true) IS DISTINCT FROM pg_catalog.txid_current()::text")) e.add("controle-do");
   if (!(et.env.SQL_APRES ?? "").includes("current_setting('session_replication_role') <> 'origin'")) e.add("controle-do");
   if (et.brut.SQL_DELAIS !== `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`) e.add("delais");
@@ -168,6 +181,27 @@ function ecartsMigrate(texte: string): string[] {
   const iConnexion = run.indexOf("psql -X -v ON_ERROR_STOP=1");
   if (iControles < 0 || iConnexion < 0 || iControles > iConnexion || iLecture > iConnexion) e.add("ordre");
   return [...e];
+}
+
+/**
+ * Retire, pour la lecture des commandes seulement, les éléments de `MIGRATIONS_APPROUVEES` : les lignes de forme exacte
+ * `"<tag> <sha256>"` situées entre `MIGRATIONS_APPROUVEES=(` et la première `)`. Toute autre ligne, dans le bloc ou
+ * hors du bloc, reste lue comme une commande (Q452).
+ */
+function sansLignesDeListe(run: string): string {
+  let dedans = false;
+  return run
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim();
+      if (t === "MIGRATIONS_APPROUVEES=(") {
+        dedans = true;
+        return true;
+      }
+      if (dedans && t === ")") dedans = false;
+      return !(dedans && /^"[0-9]{4}_[a-z0-9_]{1,60} [0-9a-f]{64}"$/.test(t));
+    })
+    .join("\n");
 }
 
 const MUTATIONS: [string, string, string, string][] = [
@@ -195,6 +229,8 @@ const MUTATIONS: [string, string, string, string][] = [
   ["bash fichier", '          echo "Terminé."\n', '          echo "Terminé."\n          bash script.sh\n', "commande-interdite"],
   ["eval", '          echo "Terminé."\n', '          echo "Terminé."\n          eval "$x"\n', "commande-interdite"],
   ["export", "          set -u\n", "          set -u\n          export PGPORT=5432\n", "commande-interdite"],
+  ["ligne de liste hors du bloc", '          echo "Terminé."\n', `          echo "Terminé."\n          "0000_socle ${"0".repeat(64)}"\n`, "commande-interdite"],
+  ["commande entre guillemets dans la liste", "MIGRATIONS_APPROUVEES=(\n", 'MIGRATIONS_APPROUVEES=(\n            "touch" x\n', "commande-interdite"],
   ["arithmétique", '          echo "Terminé."\n', '          echo "Terminé."\n          n=$((1 + 1))\n', "commande-interdite"],
   ["psql -f", '-c "COMMIT" > "$sortie"', '-f "$f" > "$sortie"', "psql-entree"],
   ["entrée redirigée vers psql", '-c "COMMIT" > "$sortie" 2>&1', '-c "COMMIT" < "$f" > "$sortie" 2>&1', "psql-entree"],
@@ -213,7 +249,13 @@ const MUTATIONS: [string, string, string, string][] = [
   ["contrôle NUL absent", LECTURE, `IFS= read -r -d '' texte < "$f" || true`, "controle-nul"],
   ["contrôle NUL écrit autrement", LECTURE, `if read -d '' -r texte < "$f"; then echec "migration $tag : octet NUL"; fi`, "controle-nul"],
   ["contrôle en -c SELECT", "SQL_NON_APPLIQUEE: |\n            DO $$", "SQL_NON_APPLIQUEE: |\n            SELECT 1; DO $$", "controle-do"],
-  ["contrôle de rôle sans ssl", "pg_catalog.pg_stat_ssl s", "pg_catalog.pg_stat_activity s", "controle-do"],
+  ["contrôle de rôle sans rolbypassrls", "r.rolsuper OR r.rolbypassrls", "r.rolsuper", "controle-do"],
+  ["contrôle de chiffrement absent", `          ${CHIFFREMENT}\n`, "", "chiffrement"],
+  ["contrôle de chiffrement doublé", `          ${CHIFFREMENT}\n`, `          ${CHIFFREMENT}\n          ${CHIFFREMENT}\n`, "chiffrement"],
+  ["chiffrement : PGSSLMODE require admis", "$PGSSLMODE != verify-full", "$PGSSLMODE == disable", "chiffrement"],
+  ["chiffrement : PGSSLROOTCERT non contrôlé", " || $PGSSLROOTCERT != system ]]", " ]]", "chiffrement"],
+  ["chiffrement : PGSERVICE admis", `"${LISTE_PG}"`, `"${LISTE_PG} PGSERVICE"`, "chiffrement"],
+  ["contrôle pg_stat_ssl réintroduit", "RAISE EXCEPTION 'rôle privilégié'; END IF;", "RAISE EXCEPTION 'rôle privilégié'; END IF;\n              IF NOT COALESCE((SELECT s.ssl FROM pg_catalog.pg_stat_ssl s WHERE s.pid = pg_catalog.pg_backend_pid()), false) THEN RAISE EXCEPTION 'connexion sans chiffrement'; END IF;", "ssl-serveur"],
   ["repère de transaction non contrôlé", "IS DISTINCT FROM pg_catalog.txid_current()::text", "IS NULL", "controle-do"],
   ["lock_timeout absent", `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`, `"SET statement_timeout = '5min'"`, "delais"],
   ["statement_timeout absent", `"SET lock_timeout = '10s'; SET statement_timeout = '5min'"`, `"SET lock_timeout = '10s'"`, "delais"],
@@ -237,6 +279,49 @@ describe("ci: workflow des migrations conforme à 0056", () => {
 
   it.each(MUTATIONS)("cas négatif : %s", (_cas, avant, apres, attendu) => {
     expect(ecartsMigrate(remplacerUneFois(WORKFLOW, avant, apres))).toContain(attendu);
+  });
+
+  it("cas négatif : contrôle de chiffrement déplacé après la première connexion", () => {
+    const sans = remplacerUneFois(WORKFLOW, `          ${CHIFFREMENT}\n`, "");
+    expect(ecartsMigrate(remplacerUneFois(sans, '          echo "Terminé."\n', `          echo "Terminé."\n          ${CHIFFREMENT}\n`))).toContain("chiffrement");
+  });
+});
+
+describe("ci: contrôle de chiffrement côté client (décision 0067)", () => {
+  const VALEURS: Record<string, string> = { PGSSLMODE: "verify-full", PGSSLROOTCERT: "system", PGUSER: "vadrouille_migrator" };
+  const SIX: Record<string, string> = Object.fromEntries(ENV_PG.map((k) => [k, VALEURS[k] ?? "x"]));
+  const sauf = (cle: string) => Object.fromEntries(Object.entries(SIX).filter(([k]) => k !== cle));
+  /** Joue la seule ligne du contrôle sous bash, avec `PATH` et les variables du cas, rien d'autre. */
+  function jouer(env: Record<string, string>): number {
+    const script = `set -u\nechec() { printf 'Échec : %s\\n' "$1"; exit 1; }\n${CHIFFREMENT}\necho ok\n`;
+    try {
+      execFileSync("bash", ["--noprofile", "--norc", "-c", script], { env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...env } as Record<string, string> as NodeJS.ProcessEnv, encoding: "utf8", stdio: "pipe" });
+      return 0;
+    } catch (erreur) {
+      return (erreur as { status: number }).status;
+    }
+  }
+
+  it("la ligne est celle du workflow, avant la première connexion", () => {
+    expect(etape(WORKFLOW, NOM_ETAPE).run).toContain(CHIFFREMENT);
+  });
+
+  it("passe avec les six variables de l'étape, verify-full et system", () => {
+    expect(jouer(SIX)).toBe(0);
+  });
+
+  it.each([
+    ["PGSSLMODE require", { ...SIX, PGSSLMODE: "require" }],
+    ["PGSSLMODE disable", { ...SIX, PGSSLMODE: "disable" }],
+    ["PGSSLROOTCERT autre", { ...SIX, PGSSLROOTCERT: "/tmp/ca.pem" }],
+    ["PGSERVICE hérité (fichier de service qui fixerait sslmode)", { ...SIX, PGSERVICE: "s" }],
+    ["PGSERVICEFILE hérité", { ...SIX, PGSERVICEFILE: "/tmp/s.conf" }],
+    ["PGSSLNEGOTIATION hérité", { ...SIX, PGSSLNEGOTIATION: "direct" }],
+    ["PGPORT hérité", { ...SIX, PGPORT: "5432" }],
+    ["PGSSLMODE absente", sauf("PGSSLMODE")],
+    ["PGSSLROOTCERT absente", sauf("PGSSLROOTCERT")],
+  ] as [string, Record<string, string>][])("refuse sans connexion : %s", (_cas, env) => {
+    expect(jouer(env)).toBe(1);
   });
 });
 
@@ -328,7 +413,7 @@ describe("ci: liste approuvée = préfixe du journal", () => {
 
   it("lecture de la liste : une ligne hors forme est refusée", () => {
     const avec = (lignes: string) => remplacerUneFois(WORKFLOW, "MIGRATIONS_APPROUVEES=(\n", `MIGRATIONS_APPROUVEES=(\n${lignes}`);
-    expect(liste(avec(`            "${complete[0]}"\n`))).toEqual([complete[0]]);
+    expect(liste(avec(`            "${complete[0]}"\n`))).toEqual([complete[0], ...liste(WORKFLOW)]);
     expect(() => liste(avec(`            ${complete[0]}\n`))).toThrow(/hors forme/);
     expect(() => liste(avec(`            "${complete[0]!.toUpperCase()}"\n`))).toThrow(/hors forme/);
   });

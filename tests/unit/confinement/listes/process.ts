@@ -112,6 +112,13 @@ export const LECTURES_ENV = [
   { fichier: "tests/db/workflows-harnais.ts", noms: ["PATH"] },
   { fichier: "tests/unit/ci/db-releve.test.ts", noms: ["PATH"] },
   { fichier: "tests/unit/ci/db-migrate.test.ts", noms: ["GITHUB_EVENT_NAME"] },
+  // Contrôle de chiffrement côté client (décision 0067, PR 376) : la ligne du workflow est jouée sous bash avec le seul `PATH`
+  // hérité et des valeurs littérales (aucune autre variable). Verdict Sécurité : approuvé (lecture d'un nom non secret,
+  // passé à un sous-processus local sans réseau ; tests posés par Samuel, commit 426b08f).
+  { fichier: "tests/unit/ci/db-migrate.test.ts", noms: ["PATH"] },
+  // Workflow db-reverrouillage (ticket 363 ; décision 0056 § 4.6) ; verdict Sécurité à rendre : `PATH` du `psql` espion placé
+  // en tête du chemin pour prouver un refus sans connexion (environnement du script construit par le harnais).
+  { fichier: "tests/db/db-reverrouillage.test.ts", noms: ["PATH"] },
   // 0040 D2, A8 : environnement de `git` construit (P0c-suite-release, #222).
   { fichier: "scripts/ci/techlead-gate.mjs", noms: ["PATH", "HOME"] },
   // P0r1 (ticket 267 ; décision 0031 § 6 ; spécification P0c, section 9) : variables de déploiement, de proxy et de TLS de

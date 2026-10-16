@@ -197,6 +197,52 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     expect((await client.details(PLACE_ID)).horaires).toHaveLength(7);
   });
 
+  it("fiche sans businessStatus (quartier, parc, site naturel ; Q460) : acceptée, sans statut ni horaires", async () => {
+    const quartier: Record<string, unknown> = { ...DETAILS };
+    delete quartier.businessStatus;
+    delete quartier.regularOpeningHours;
+    const { client, port } = monter([async () => json(quartier), async () => json({ ...quartier, businessStatus: "BUSINESS_STATUS_UNSPECIFIED" })]);
+    for (let i = 0; i < 2; i += 1) {
+      const details = await client.details(PLACE_ID);
+      expect(details).toStrictEqual({ placeId: PLACE_ID, position: { lat: 48.8566123, lng: 2.3522456 }, horaires: null });
+      expect("statut" in details).toBe(false);
+    }
+    expect(port.lignes.map((l) => l.etat)).toEqual(["confirmee", "confirmee"]);
+  });
+
+  it("JSON proto3 (Q460) : day, hour et minute absents valent 0 (période sans minute, ouverture dimanche minuit)", async () => {
+    const periodes = [
+      // Lundi 9 h – 18 h, heures pile : aucune minute écrite.
+      { open: { day: 1, hour: 9 }, close: { day: 1, hour: 18 } },
+      // Dimanche minuit (ni day, ni hour, ni minute) – dimanche 12 h.
+      { open: {}, close: { hour: 12 } },
+    ];
+    const { client } = monter([
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: periodes } }),
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: {} }] } }),
+    ]);
+    expect((await client.details(PLACE_ID)).horaires).toEqual([
+      { jour: 1, debut: 540, fin: 1080 },
+      { jour: 0, debut: 0, fin: 720 },
+    ]);
+    // Ouvert en permanence, ouverture sans aucun champ : sept plages pleines.
+    expect((await client.details(PLACE_ID)).horaires).toHaveLength(7);
+  });
+
+  it("point d'horaire hors bornes ou non entier : toujours invalid_response", async () => {
+    const { client } = monter([
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { day: 7 } }] } }),
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { minute: 1.5 } }] } }),
+    ]);
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+  });
+
+  it("businessStatus inconnu de l'énumération : toujours invalid_response", async () => {
+    const { client } = monter([async () => json({ ...DETAILS, businessStatus: "STATUT_INCONNU" })]);
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+  });
+
   it("identifiant de lieu mal formé : invalid_request, ni réservation ni requête (aucun chemin construit)", async () => {
     const { client, transport, port } = monter([]);
     for (const id of ["../x", "a/b", "a?key=1", "", "x".repeat(257), "a#b"]) {
