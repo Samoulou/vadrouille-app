@@ -133,7 +133,7 @@ describe("p0Run : garde à l'entrée de chaque étape (0055 § 1 point 2, répon
     expect(d.cloreExecution).not.toHaveBeenCalled();
   });
 
-  it("garde vérifiée avant la composition, avec la durée du mode réel ; pour un essai, revérifiée avec sa durée (5 min)", async () => {
+  it("garde vérifiée avant la composition, avec la durée du mode réel ; pour un essai, revérifiée avec la durée d'essai.json (15 min depuis 0073)", async () => {
     await etapeRecherche({ runId: RUN_ID });
     expect(d.verifierGardeEtape).toHaveBeenCalledTimes(1);
     expect(d.verifierGardeEtape.mock.calls[0]?.[1]).toMatchObject({ dureeMaxMs: 900_000 });
@@ -142,10 +142,10 @@ describe("p0Run : garde à l'entrée de chaque étape (0055 § 1 point 2, répon
     vi.clearAllMocks();
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
-    expect(d.verifierGardeEtape.mock.calls.map((appel) => (appel[1] as { dureeMaxMs: number }).dureeMaxMs)).toEqual([900_000, 300_000]);
+    expect(d.verifierGardeEtape.mock.calls.map((appel) => (appel[1] as { dureeMaxMs: number }).dureeMaxMs)).toEqual([900_000, 900_000]);
   });
 
-  it("garde de l'essai fermée (durée de 5 min dépassée) : arrêt sans composition", async () => {
+  it("garde de l'essai fermée (durée d'essai.json dépassée) : arrêt sans composition", async () => {
     d.lireExecution.mockResolvedValue(execution("essai"));
     d.verifierGardeEtape.mockResolvedValueOnce({ ok: true, garde: { runId: RUN_ID } }).mockResolvedValueOnce({ ok: false, code: "run_refused" });
     expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("real_mode_unavailable");
@@ -183,16 +183,17 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
     expect(d.ancrage).toHaveBeenCalledTimes(1);
   });
 
-  it("recherche de l'essai : plafonds de l'agent (6 recherches web, 15 pages), la 7e recherche lève cap_reached sans appel", async () => {
+  it("recherche de l'essai : profil de l'essai (12 candidats visés), plafonds de l'agent alignés sur le mode réel (0073 : 40 recherches web), la 41e lève cap_reached sans appel", async () => {
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
-    const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; config: { totalCandidats: number } };
+    const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; config: { totalCandidats: number; toursMax: number } };
     expect(deps.config.totalCandidats).toBe(12);
-    for (let i = 0; i < 6; i += 1) await deps.recherche.rechercher({ requete: "x" });
+    expect(deps.config.toursMax).toBe(6);
+    for (let i = 0; i < 40; i += 1) await deps.recherche.rechercher({ requete: "x" });
     await expect(deps.recherche.rechercher({ requete: "x" })).rejects.toMatchObject({ code: "cap_reached" });
-    expect(recherche.rechercher).toHaveBeenCalledTimes(6);
+    expect(recherche.rechercher).toHaveBeenCalledTimes(40);
     const plafonds = (d.composerP0Reel.mock.calls[0]?.[1] as { plafonds: { fournisseur: string; maxCoutMicros?: number }[] }).plafonds;
-    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(300_000);
+    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(3_000_000);
   });
 
   it("coût des modèles déjà compté : l'étape ne dispose que du reste du plafond", async () => {
