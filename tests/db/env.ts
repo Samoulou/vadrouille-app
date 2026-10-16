@@ -57,46 +57,29 @@ export function readUrl(login: Login): string | undefined {
   }
 }
 
-/**
- * Seconde base jetable des tests sous verrou (décision 0052 § 1, « Harnais des tests sous verrou » ; 0055, section 8,
- * ligne P0r3c) : `<base>_dv`, copie de la base migrée créée par le préalable (`tests/db/global-setup.ts`), où
- * `vadrouille_prototype` a `EXECUTE` sur `store_prototype_coordinates`. Seulement sur `127.0.0.1` ou `localhost`
- * (CI et poste local) : jamais la base réelle. Nom de 63 caractères au plus (limite des identifiants de PostgreSQL),
- * refusé au-delà plutôt que tronqué.
- */
-export const SUFFIXE_BASE_DEVERROUILLEE = "_dv";
 const HOTES_LOCAUX = new Set(["127.0.0.1", "localhost"]);
 const NOM_BASE = /^[a-z0-9_]{1,63}$/;
 
-export type BaseDeverrouillee = { readonly modele: string; readonly nom: string };
-
-/** Noms de la base migrée et de sa copie, lus dans une adresse de connexion ; refus hors hôte local ou nom hors forme. */
-export function baseDeverrouillee(url: string): BaseDeverrouillee {
+/**
+ * Nom de la base migrée, lu dans une adresse de connexion : seulement sur `127.0.0.1` ou `localhost` (CI et poste
+ * local), jamais la base réelle ; nom de 63 caractères au plus (limite des identifiants de PostgreSQL).
+ */
+function baseLocale(url: string): string {
   const adresse = new URL(url);
-  if (!HOTES_LOCAUX.has(adresse.hostname)) throw new Error("seconde base jetable : hôte autre que 127.0.0.1 ou localhost refusé (0052 § 1)");
+  if (!HOTES_LOCAUX.has(adresse.hostname)) throw new Error("base jetable : hôte autre que 127.0.0.1 ou localhost refusé");
   const modele = decodeURIComponent(adresse.pathname.replace(/^\//, ""));
-  const nom = `${modele}${SUFFIXE_BASE_DEVERROUILLEE}`;
-  if (!NOM_BASE.test(modele) || !NOM_BASE.test(nom)) throw new Error("seconde base jetable : nom de base hors forme ou de plus de 63 caractères (0052 § 1)");
-  return { modele, nom };
-}
-
-/** Adresse de la seconde base jetable pour un login : même adresse, base `<base>_dv`. */
-export function urlDeverrouillee(login: Login): string | undefined {
-  const url = readUrl(login);
-  if (url === undefined) return undefined;
-  const adresse = new URL(url);
-  adresse.pathname = `/${baseDeverrouillee(url).nom}`;
-  return adresse.toString();
+  if (!NOM_BASE.test(modele)) throw new Error("base jetable : nom de base hors forme ou de plus de 63 caractères");
+  return modele;
 }
 
 /**
  * Bases jetables des tests des workflows de la base (décisions 0056 et 0057, « Tests imposés » ; harnais confié à la
- * PR du workflow par Q412) : `<base>_<suffixe>`, créées vides par le test sur le même serveur, puis supprimées. Mêmes
- * gardes que la seconde base de 0052 : `127.0.0.1` ou `localhost` seulement, nom de 63 caractères au plus.
+ * PR du workflow par Q412) : `<base>_<suffixe>`, créées vides par le test sur le même serveur, puis supprimées.
+ * `127.0.0.1` ou `localhost` seulement, nom de 63 caractères au plus.
  */
 export function nomBaseJetable(url: string, suffixe: string): string {
   if (!/^[a-z0-9_]{1,20}$/.test(suffixe)) throw new Error("base jetable : suffixe hors forme");
-  const { modele } = baseDeverrouillee(url);
+  const modele = baseLocale(url);
   const nom = `${modele}_${suffixe}`;
   if (!NOM_BASE.test(nom)) throw new Error("base jetable : nom de plus de 63 caractères");
   return nom;
@@ -106,7 +89,7 @@ export function nomBaseJetable(url: string, suffixe: string): string {
 export function urlBaseJetable(login: Login, nom: string): string {
   const url = readUrl(login);
   if (url === undefined) throw new Error(`variable ${DB_ENV[login]} absente (voir tests/db/global-setup.ts)`);
-  baseDeverrouillee(url);
+  baseLocale(url);
   if (!NOM_BASE.test(nom)) throw new Error("base jetable : nom hors forme");
   const adresse = new URL(url);
   adresse.pathname = `/${nom}`;

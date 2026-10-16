@@ -43,7 +43,7 @@ describe("db-releve : relevé de la base migrée (0057 § 3 à § 5)", () => {
     const lignes = r.sortie.split("\n").filter((l) => /^R[1-8]\|/.test(l));
     expect(lignes).toHaveLength(Number(affichees));
     for (const etiquette of ["R1", "R3", "R4", "R5", "R6", "R8"]) expect(lignes.some((l) => l.startsWith(`${etiquette}|`)), etiquette).toBe(true);
-    expect(lignes).toContain("R8|public.store_prototype_coordinates(uuid,text,double precision,double precision)|f");
+    expect(lignes).toContain("R8|public.store_prototype_coordinates(uuid,text,double precision,double precision)|t");
     expect(lignes).toContain("R1|plpgsql|1.0|pg_catalog");
   });
 

@@ -15,8 +15,9 @@ import { creerBase, dossierTemporaire, executer, lancer, type Options, requeteAd
  * serveur de la CI (`postgres:17.11`), dans des bases jetables créées vides et migrées jusqu'au lot 2 (migration de
  * remplacement `0005_prototype_coordinates_run`, `store_prototype_coordinates` à quatre paramètres) par
  * `db/migrate.ts`. Le bloc `run:` de `.github/workflows/db-reverrouillage.yml` est joué tel quel par le harnais
- * (`tests/db/workflows-harnais.ts`) ; aucune base réelle, aucun secret réel. La migration de déverrouillage n'existe
- * pas encore : le `GRANT EXECUTE` est posé par le test.
+ * (`tests/db/workflows-harnais.ts`) ; aucune base réelle, aucun secret réel. Juste après les migrations, migration
+ * de déverrouillage `0006_deverrouillage_positions_prototype` comprise (0056 § 4.5), l'état est « déverrouillé » : le
+ * test ne pose plus de `GRANT EXECUTE` à `vadrouille_prototype`.
  *
  * Dernier recours du § 4.6 (point 3) : les appartenances de l'identifiant propriétaire de Neon ne sont pas relevées
  * (future décision 0057) ; la commande est jouée sous un rôle `CREATEROLE` non superutilisateur, avec l'option ADMIN sur
@@ -40,7 +41,7 @@ function reverrouiller(options: Options) {
   return executer(WF, ETAPE, options);
 }
 
-/** Base jetable amorcée puis migrée par `db/migrate.ts` jusqu'à la dernière migration du journal (lot 2 compris). */
+/** Base jetable amorcée puis migrée par `db/migrate.ts` jusqu'à la dernière migration du journal (0006 comprise). */
 async function baseMigree(suffixe: string): Promise<string> {
   const base = await creerBase(suffixe);
   await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: urlBaseJetable("migrator", base) });
@@ -63,7 +64,7 @@ const SURCHARGE = "store_prototype_coordinates(uuid,text,double precision,double
 const deverrouille = { [SURCHARGE]: true };
 const verrouille = { [SURCHARGE]: false };
 
-async function accorder(base: string, beneficiaire = "vadrouille_prototype"): Promise<void> {
+async function accorder(base: string, beneficiaire: string): Promise<void> {
   await requeteAdmin(base, `GRANT EXECUTE ON FUNCTION ${SIGNATURE} TO ${beneficiaire}`);
 }
 
@@ -107,12 +108,10 @@ function psqlEspion(): { readonly env: Record<string, string>; readonly sentinel
 }
 
 describe("ci: db-reverrouillage retire l'EXECUTE de vadrouille_prototype (0056 § 4.6)", () => {
-  it("après un GRANT EXECUTE posé par le test : droit retiré, contrôle final passé ; second lancement sans effet ; journal et appartenances inchangés", async () => {
+  it("juste après les migrations (0006 comprise) : droit retiré, contrôle final passé ; second lancement sans effet ; journal et appartenances inchangés", async () => {
     const base = await baseMigree("dr_retrait");
     const tags = await journal(base);
-    expect(tags).toContain("0005_prototype_coordinates_run");
-    expect(await privileges(base)).toEqual(verrouille);
-    await accorder(base);
+    expect(tags).toContain("0006_deverrouillage_positions_prototype");
     expect(await privileges(base)).toEqual(deverrouille);
 
     const r = reverrouiller({ base });
@@ -132,7 +131,6 @@ describe("ci: db-reverrouillage retire l'EXECUTE de vadrouille_prototype (0056 �
 
   it("EXECUTE restant par PUBLIC : le REVOKE passe, mais le contrôle final échoue (SQLSTATE P0001)", async () => {
     const base = await baseMigree("dr_public");
-    await accorder(base);
     await accorder(base, "PUBLIC");
     const r = reverrouiller({ base });
     expect(r.code).toBe(1);
@@ -146,7 +144,6 @@ describe("ci: db-reverrouillage retire l'EXECUTE de vadrouille_prototype (0056 �
 
   it("contrôle de chiffrement gardé : refusé sans connexion (PGSSLMODE=disable, PGPORT), droit inchangé (0067)", async () => {
     const base = await baseMigree("dr_ssl");
-    await accorder(base);
     const r = reverrouiller({ base, garderSsl: true });
     expect(r.code).toBe(1);
     expect(r.sortie).toMatch(/Échec : chiffrement : variables PG\* hors liste, ou PGSSLMODE autre que verify-full/);
@@ -160,7 +157,6 @@ describe("db-reverrouillage : refus sans connexion (0056 § 2.6.1, § 4.6 point 
 
   async function refusSansConnexion(options: Omit<Options, "base">, message: RegExp): Promise<string> {
     const base = await baseMigree("dr_refus");
-    await accorder(base);
     const espion = psqlEspion();
     const r = reverrouiller({ base, ...options, env: { ...espion.env, ...options.env } });
     expect(r.code, r.sortie).toBe(1);
