@@ -8,12 +8,13 @@ import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import { createPlacesClient } from "@/grounding/places-client";
+import { creerCadence, type Cadence } from "@/grounding/budget-routes";
 import { createRoutesClient } from "@/grounding/routes-client";
 import { moteurRechercheWebAttendu, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
 import { creerLecteurPages, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/research/recherche-web";
 import { createUndiciTransport } from "@/research/undici-transport";
-import type { GardeOuverte } from "@/server/p0/garde";
+import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
 import { periodesDe } from "@/server/usage/periodes";
 import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
 
@@ -104,6 +105,8 @@ export type CompositionP0Reel = {
  * modèle l'offre, sinon `exa`), même règle que la configuration (défense en profondeur).
  */
 export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition): CompositionP0Reel {
+  // Non-confusion (P0r4, décision 0079) : une preuve de relecture n'ouvre jamais une exécution.
+  if (typeof garde.runId !== "string" || "relecture" in garde) throw new RangeError("composition : garde d'exécution attendue");
   if (options.modeles.rechercheWeb.moteur !== moteurRechercheWebAttendu(options.modeles.rechercheWeb.modele)) {
     throw new RangeError("composition : moteur de recherche web incohérent avec le modèle de l'étape recherche");
   }
@@ -148,4 +151,36 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
       };
     },
   };
+}
+
+export type OptionsRelecture = {
+  /** Registre en mémoire du forfait de relecture réservé (P0r2) : il borne les appels de cette relecture. */
+  readonly usage: PortConsommation;
+  readonly plafonds: readonly Plafond[];
+  readonly horloge?: Horloge;
+};
+
+/**
+ * Relecture Routes d'une Journée (P0r4, décision 0079) : le seul client Routes, rien d'autre (ni Places, ni modèle).
+ * Exige une `GardeRelecture` (barrière, purge et forfait de relecture réservé, `src/server/p0/garde.ts`). Le contexte de
+ * chaque appel porte la nature `relecture`, sans exécution, et les périodes Google calculées à l'appel (D20).
+ */
+export function composerRelecture(garde: GardeRelecture, options: OptionsRelecture): { readonly routes: ClientRoutes } {
+  // Non-confusion : une preuve d'exécution (`runId`) n'ouvre jamais une relecture.
+  if (garde.relecture !== true || "runId" in garde) throw new RangeError("composition : garde de relecture attendue");
+  const horloge = options.horloge ?? horlogeSysteme;
+  const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
+  return { routes: createRoutesClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge }) };
+}
+
+/**
+ * Cadence des relectures Routes (P0r4 ; bloquant 2 de la revue du head `e79fbed`) : fenêtre glissante d'une minute de
+ * `creerCadence`, `maxParMinute` éléments au plus, minuterie réelle. **Câble seulement** : l'instance unique par
+ * processus (3 000 éléments par minute, Q330) est gardée par `src/server/p0/relecture.ts` (`cadenceRelecture`).
+ */
+export function creerCadenceRelecture(maxParMinute: number): Cadence {
+  return creerCadence(maxParMinute, {
+    maintenant: () => Date.now(),
+    attendre: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  });
 }

@@ -118,3 +118,44 @@ export async function verifierGardeEtape(runId: string, dependances: Dependances
   }
   return trouvee ? { ok: true, garde: preuve(runId) } : { ok: false, code: "run_refused" };
 }
+
+/**
+ * Preuve que la garde est ouverte pour **une relecture Routes** (P0r4, décision 0079) : conditions (1) à (7),
+ * déploiement autre que la production, cookie d'accès valide, dernière purge réussie de moins de 24 h (0046 D16
+ * point 8), forfait de relecture réservé. Même marque que `GardeOuverte`, sans exécution : une `GardeRelecture` n'est
+ * jamais une `GardeOuverte` (pas de `runId`), et réciproquement.
+ */
+export type GardeRelecture = { readonly relecture: true; readonly [MARQUE]: true };
+
+/** Refus propre à la relecture : dernière purge réussie absente ou de plus de 24 h (0046 D16 point 8). */
+export type CodeRefusRelecture = "purge_stale";
+
+export type ResultatGardeRelecture =
+  | { readonly ok: true; readonly garde: GardeRelecture }
+  | { readonly ok: false; readonly code: CodeGardeFermee | "access_refused" | CodeRefusUsage | CodeRefusRelecture };
+
+export type DependancesRelecture = DependancesAcces & {
+  /** Valeur du cookie `__Host-p0_acces` reçu avec la requête d'affichage. */
+  readonly cookie: string | undefined;
+  /** Contrôle de la purge puis réservation du forfait de relecture (`reserverRelecture`, P0r2). */
+  readonly reserver: () => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: CodeRefusUsage | CodeRefusRelecture }>;
+};
+
+/**
+ * Relecture : même barrière que le lancement (exigence 4 : garde et cookie, vérifiés à chaque relecture), puis contrôle
+ * de la purge et réservation du forfait. Garde fermée ou cookie absent : aucune connexion à la base, aucun appel.
+ */
+export async function ouvrirGardeRelecture(dependances: DependancesRelecture): Promise<ResultatGardeRelecture> {
+  const ouverture = ouvertureP0(dependances, false);
+  if (!ouverture.ok) return ouverture;
+  const maintenant = (dependances.maintenant ?? Date.now)();
+  if (!cookieAccesValide(dependances.cookie, ouverture.attendu, maintenant)) return { ok: false, code: "access_refused" };
+  let reservation: Awaited<ReturnType<DependancesRelecture["reserver"]>>;
+  try {
+    reservation = await dependances.reserver();
+  } catch {
+    return { ok: false, code: "usage_unavailable" };
+  }
+  if (!reservation.ok) return reservation;
+  return { ok: true, garde: Object.freeze({ relecture: true }) as GardeRelecture };
+}

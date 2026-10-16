@@ -92,3 +92,44 @@ describe("GardeOuverte fabriquée par src/server/p0/garde.ts seul (tests de test
     }
   });
 });
+
+/**
+ * P0r4 (ticket 414, décision 0079 ; bloquant 3 de la revue du head `e79fbed`) : la preuve `GardeRelecture` (client Routes
+ * payant de la relecture) a la même protection que `GardeOuverte` : mêmes formes refusées, mêmes exemptions.
+ */
+async function messagesRelecture(code: string, filePath: string) {
+  const [result] = await eslint.lintText(code, { filePath });
+  return result?.messages.filter((m) => m.ruleId === RULE && m.message.includes("GardeRelecture")) ?? [];
+}
+
+const TYPE_RELECTURE = 'import type { GardeRelecture } from "@/server/p0/garde";\n\n';
+const CAS_RELECTURE: [string, string][] = [
+  ["as GardeRelecture", `${TYPE_RELECTURE}export const g = { relecture: true } as GardeRelecture;\n`],
+  ["as unknown as GardeRelecture", `${TYPE_RELECTURE}export const g = "x" as unknown as GardeRelecture;\n`],
+  ["<GardeRelecture>x", `${TYPE_RELECTURE}const x: unknown = {};\nexport const g = <GardeRelecture>x;\n`],
+  ["x is GardeRelecture", `${TYPE_RELECTURE}export function estGarde(x: unknown): x is GardeRelecture {\n  return x !== null;\n}\n`],
+];
+
+describe("GardeRelecture fabriquée par src/server/p0/garde.ts seul (tests de tests/ exceptés)", () => {
+  const REFUSES = [
+    "src/server/p0/relecture.ts",
+    "src/server/composition/p0-reel.ts",
+    "src/adapters/prototype-instance.ts",
+    "src/instrumentation.ts",
+    "src/server/p0/garde.test.ts",
+    "src/server/email.ts",
+    "src/domain/exemple.ts",
+    "src/adapters/mock-auth.ts",
+  ];
+  for (const [nom, code] of CAS_RELECTURE) {
+    it.each(REFUSES)(`${nom} refusé dans %s`, async (fichier) => {
+      expect(await messagesRelecture(code, fichier)).toHaveLength(1);
+    });
+  }
+
+  it("accepté dans src/server/p0/garde.ts et dans un test de tests/", async () => {
+    for (const fichier of ["src/server/p0/garde.ts", "tests/unit/p0/relecture.test.ts", "tests/support/exemple.ts"]) {
+      for (const [nom, code] of CAS_RELECTURE) expect(await messagesRelecture(code, fichier), `${nom} ${fichier}`).toHaveLength(0);
+    }
+  });
+});

@@ -324,7 +324,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["moteurRechercheWebAttendu", "type:MoteurRechercheWeb", "type:Routage"],
     motif: `${PROTOTYPE_PUR} ; ${COMPOSITION_P0R3C} ; moteur du greffon web contrôlé à la construction (bloquant 1c de la PR 326)`,
   },
-  { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/p0/garde", noms: ["type:GardeOuverte"], motif: COMPOSITION_P0R3C },
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "@/server/p0/garde",
+    noms: ["type:GardeOuverte", "type:GardeRelecture"],
+    motif: `${COMPOSITION_P0R3C} ; \`GardeRelecture\` : preuve exigée par \`composerRelecture\` (P0r4, ticket 414, décision 0079 ; preuve protégée comme \`GardeOuverte\` depuis la correction 1 de la PR 419 ; verdict Sécurité demandé sur le head de cette correction)`,
+  },
   { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_P0R3C },
   {
     fichier: "src/server/composition/p0-reel.ts",
