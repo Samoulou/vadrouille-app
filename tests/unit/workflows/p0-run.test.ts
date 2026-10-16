@@ -359,6 +359,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         level: "warn",
         event: "p0.research_done",
         candidates: 0,
+        places: 0,
         turns: 3,
         searches: 0,
         pagesRead: 0,
@@ -375,9 +376,15 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     d.chercherCandidats.mockResolvedValue({ candidats: [candidat(1)], compteurs: { ...compteurs, recherches: 2 } });
     await etapeRecherche({ runId: RUN_ID });
     const ligne = String(info.mock.calls.find((appel) => String(appel[0]).includes("p0.research_done"))?.[0]);
-    expect(JSON.parse(ligne)).toMatchObject({ level: "info", candidates: 1, searches: 2 });
+    expect(JSON.parse(ligne)).toMatchObject({ level: "info", candidates: 1, places: 1, searches: 2 });
     expect(ligne).not.toContain("Lieu maison");
     expect(ligne).not.toContain("guide.example");
+    // Mineur 2 du head `cd614d4` : événements seuls, `candidates > 0` mais `places` à 0, d'où le niveau `warn`.
+    info.mockClear();
+    d.chercherCandidats.mockResolvedValue({ candidats: [candidat(1, "event")], compteurs });
+    await refus(etapeRecherche({ runId: RUN_ID }));
+    const evenementsSeuls = String(info.mock.calls.find((appel) => String(appel[0]).includes("p0.research_done"))?.[0]);
+    expect(JSON.parse(evenementsSeuls)).toMatchObject({ level: "warn", candidates: 1, places: 0 });
     info.mockRestore();
   });
 

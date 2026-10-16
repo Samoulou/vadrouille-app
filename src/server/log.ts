@@ -63,7 +63,10 @@ export type LogFields = {
   readonly turns?: number;
   readonly searches?: number;
   readonly pagesRead?: number;
+  /** Tous les candidats retenus, événements compris. */
   readonly candidates?: number;
+  /** Candidats retenus hors événements (lieux) : 0 donne le niveau `warn` et l'arrêt `research_empty` (mineur 2). */
+  readonly places?: number;
   readonly candidatesRefused?: number;
   readonly planRefused?: number;
   readonly planUnreadable?: number;
@@ -267,6 +270,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["searches", entierPositif],
   ["pagesRead", entierPositif],
   ["candidates", entierPositif],
+  ["places", entierPositif],
   ["candidatesRefused", entierPositif],
   ["planRefused", entierPositif],
   ["planUnreadable", entierPositif],

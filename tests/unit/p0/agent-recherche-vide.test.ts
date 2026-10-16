@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { ReponseModele } from "@/ai/client";
-import { lirePlan, lireTour } from "@/ai/sorties";
+import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
+import { BLOCS_ESSAYES_MAX, LONGUEUR_REPONSE_MAX, lirePlan, lireTour } from "@/ai/sorties";
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
 import { chercherCandidats } from "@/research/agent";
@@ -41,10 +42,12 @@ const enBloc = (texte: string) => "Voici ma réponse :\n```json\n" + texte + "\n
 async function rejouer(reponses: (string | ReponseModele)[]) {
   let appels = 0;
   const requetesWeb: string[] = [];
+  const prompts: { etape: string; id: string; version: number }[] = [];
   const resultat = await chercherCandidats(brief, {
     modeles: {
-      envoyer: async () => {
+      envoyer: async (requete) => {
         appels += 1;
+        prompts.push({ etape: requete.etape, ...requete.prompt });
         const reponse = reponses.shift() ?? tour({ termine: true });
         return typeof reponse === "string" ? { texte: reponse, coutUsd: 0 } : reponse;
       },
@@ -60,7 +63,7 @@ async function rejouer(reponses: (string | ReponseModele)[]) {
     lecteur: { lire: async () => ({ ok: false, raison: "not_in_search_results" }) },
     config,
   });
-  return { appels, requetesWeb, ...resultat };
+  return { appels, requetesWeb, prompts, ...resultat };
 }
 
 describe("ia: sorties de modèle habillées (ticket 400)", () => {
@@ -81,6 +84,46 @@ describe("ia: sorties de modèle habillées (ticket 400)", () => {
   });
 });
 
+describe("ia: habillage des sorties, cas limites (mineurs 8 et bloquant 1 du head cd614d4)", () => {
+  const plan = (requete: string) => JSON.stringify({ requetes: [{ requete, creneau: "activity" }] });
+
+  it("plusieurs blocs de code : le dernier bloc lisible gagne", () => {
+    const texte = `Brouillon :\n\`\`\`json\n${plan("premier")}\n\`\`\`\nVersion finale :\n\`\`\`json\n${plan("dernier")}\n\`\`\`\n`;
+    expect(lirePlan(texte).valeur.map((r) => r.requete)).toEqual(["dernier"]);
+    // Dernier bloc illisible : l'avant-dernier est essayé.
+    expect(lirePlan(`${texte}\`\`\`\npas du json\n\`\`\``).valeur.map((r) => r.requete)).toEqual(["dernier"]);
+    // Seuls les BLOCS_ESSAYES_MAX derniers blocs sont essayés (accolades dans les blocs vides : l'empan du premier
+    // « { » au dernier « } » n'est pas non plus un objet JSON).
+    const vides = Array.from({ length: BLOCS_ESSAYES_MAX }, () => "```\n{rien}\n```").join("\n");
+    expect(lirePlan(`\`\`\`json\n${plan("trop tôt")}\n\`\`\`\n${vides}`).illisible).toBe(true);
+  });
+
+  it("accolades dans la prose : lu si l'objet est dans un bloc ; prose nue autour d'accolades : illisible (limite)", () => {
+    expect(lirePlan(`Je cherche {des musées} puis :\n\`\`\`json\n${plan("musées")}\n\`\`\`\nEt {voilà}.`).valeur).toHaveLength(1);
+    // Sans bloc, l'empan du premier « { » au dernier « } » englobe la prose : refusé en entier.
+    expect(lirePlan(`Je cherche {des musées} : ${plan("musées")} et {voilà}.`)).toEqual({ valeur: [], refuses: 1, illisible: true });
+    expect(lirePlan(`Plan {${plan("musées")}}`).illisible).toBe(true);
+  });
+
+  it("bloc ouvert jamais fermé suivi de 100 k espaces : lu en temps linéaire, illisible", () => {
+    const pathologique = "```json\n" + " ".repeat(100_000);
+    const debut = performance.now();
+    for (let fois = 0; fois < 5; fois += 1) {
+      expect(lireTour(pathologique).illisible).toBe(true);
+      expect(lirePlan(`\`\`\`${pathologique}`).illisible).toBe(true);
+    }
+    // Borne généreuse : l'ancienne expression régulière prenait environ 1,2 s par lecture à cette taille.
+    expect(performance.now() - debut).toBeLessThan(1000);
+  });
+
+  it("réponse plus longue que LONGUEUR_REPONSE_MAX : refusée en entier sans examen", () => {
+    const long = JSON.stringify({ requetes: [], marge: " ".repeat(LONGUEUR_REPONSE_MAX) });
+    expect(lirePlan(long)).toEqual({ valeur: [], refuses: 1, illisible: true });
+    const justeSousLePlafond = PLAN + " ".repeat(LONGUEUR_REPONSE_MAX - PLAN.length);
+    expect(lirePlan(justeSousLePlafond).valeur).toHaveLength(1);
+  });
+});
+
 describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)", () => {
   it("bloc de code au plan et aux tours : lus, la recherche web part et le candidat est retenu", async () => {
     const { appels, requetesWeb, candidats, compteurs } = await rejouer([
@@ -92,6 +135,17 @@ describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)"
     expect(candidats.map((c) => c.nom)).toEqual(["Musée maison"]);
     expect(appels).toBe(3);
     expect(compteurs.sortiesIllisibles).toEqual({ plan: 0, recherche: 0 });
+  });
+
+  it("mineur 11 du head cd614d4 : les tours partent avec le prompt recherche v2 (forme JSON nue, termine après recherche)", async () => {
+    const { prompts } = await rejouer([PLAN, tour({ actions: [RECHERCHER] }), tour({ termine: true })]);
+    expect(PROMPT_RECHERCHE).toMatchObject({ id: "recherche", version: 2 });
+    expect(prompts.filter((p) => p.etape === "recherche")).toEqual([
+      { etape: "recherche", id: "recherche", version: 2 },
+      { etape: "recherche", id: "recherche", version: 2 },
+    ]);
+    expect(PROMPT_RECHERCHE.texte).toContain("sans bloc de code ni texte autour");
+    expect(PROMPT_RECHERCHE.texte).toContain("Au premier tour, aucun résultat n'existe encore");
   });
 
   it("« termine » au premier tour, avant toute recherche : ignoré et compté ; la boucle continue jusqu'à une recherche", async () => {
@@ -113,6 +167,17 @@ describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)"
     expect(requetesWeb).toEqual([]);
     expect(candidats).toEqual([]);
     expect(compteurs).toMatchObject({ tours: config.toursMax, sortiesIllisibles: { plan: 1, recherche: config.toursMax }, sortiesRefusees: { plan: 1, recherche: config.toursMax } });
+  });
+
+  it("N sorties illisibles consécutives, plus que toursMax : la boucle s'arrête à toursMax, les réponses en trop ne sont pas demandées", async () => {
+    const reponses = [PLAN, ...Array.from({ length: config.toursMax + 5 }, () => "```json\n{ tronqué")];
+    const { appels, requetesWeb, candidats, compteurs } = await rejouer(reponses);
+    // Un appel de plan, puis un appel par tour : le nombre d'appels payants est borné par toursMax quel que soit le modèle.
+    expect(appels).toBe(1 + config.toursMax);
+    expect(reponses).toHaveLength(5);
+    expect(requetesWeb).toEqual([]);
+    expect(candidats).toEqual([]);
+    expect(compteurs.sortiesIllisibles.recherche).toBe(config.toursMax);
   });
 
   it("« termine » toujours avant recherche : ignoré à chaque tour, au plus toursMax tours", async () => {

@@ -168,6 +168,7 @@ Le mode réel s'ouvre seulement si **toutes** ces conditions sont vraies, chacun
 - Routes HTTP du SDK : le Tech Lead relève leur authentification sur la version installée et la consigne ; une route qui accepterait un appel non authentifié bloque P0r3. Sur « Production », `p0Run` n'est pas démarrable et toute étape refuse (test e2e sur le build de production : appel direct aux routes du SDK, aucun appel aux clients simulés).
 - Région de l'état du monde Vercel relevée et notée dans la PR (Q28, 0009 § 5) ; si elle est hors UE, la question remonte à Samuel, et la règle « identifiants seulement » reste la condition du lancement.
 - Formule Vercel : la PR de P0r3 relève la formule du projet (API Vercel) et les limites du Workflow SDK qui s'y appliquent, et dit si elle permet `p0Run` ; sinon, question à Samuel (argent) avant tout changement, et P0r3 ne fusionne pas.
+- **Recherche sans candidat** (ticket 400, décision 0072) : sorties de modèle lues avec tolérance (bloc de code, raisonnement), à coût borné ; `termine` ignoré avant toute recherche web ; recherche sans aucun lieu arrêtée avant l'ancrage (`research_empty`, persisté `pipeline_failed`) ; brief hors des plafonds du mode refusé au lancement (`brief_hors_plafonds`, avant la réservation) ; ligne de journal `p0.research_done` (compteurs seulement) ; prompt recherche v2.
 
 ### Plafonds (Q270 et rappels)
 Appliqués **avant chaque appel** par la réservation du port de consommation ; un plafond atteint arrête l'exécution sans programme partiel (`cap_reached`).

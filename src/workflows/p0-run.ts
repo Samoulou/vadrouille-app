@@ -270,6 +270,11 @@ export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string
     if (mode !== "reel" && mode !== "essai") return false;
     const brief = briefDe(nom);
     const config = configurationDuMode(mode);
+    // Repères distincts par logement (aucun identifiant de lieu n'existe avant l'ancrage). Limite connue (mineur 9 du
+    // head `cd614d4`) : si deux logements du brief s'ancraient au même lieu, l'étape finale verrait un seul logement les
+    // jours de changement, donc une place de plus pour les lieux du jour (`capacites`), et sa première série pourrait
+    // dépasser celle calculée ici d'au plus un lieu par jour de changement. Le plan Routes (nombre de jours) et le budget
+    // de fiches (nombre de logements du brief) n'en dépendent pas. Cas d'un même logement saisi deux fois : non traité.
     const reperes = brief.logements.map((_, rang) => `logement-${rang + 1}`);
     const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperes);
     return plan.tient && premiereSerie <= budgetFiches;
@@ -479,12 +484,16 @@ export const CODE_RECHERCHE_VIDE = "research_empty";
  * Ligne de journal fermée de fin de recherche (ticket 400) : compteurs de l'agent seulement, des nombres (ni texte du
  * modèle, ni requête, ni URL, ni donnée Google) ; `warn` si aucun lieu n'est retenu.
  */
-function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: number, vide: boolean): void {
+function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: number, lieux: number): void {
   const refuses = compteurs?.candidatsRefuses;
   logEvent(
     "p0.research_done",
     {
+      // `candidates` compte tout, événements compris ; `places`, les lieux seuls, qui décident du niveau et de l'arrêt
+      // (mineur 2 du head `cd614d4` : une exécution vide peut avoir `candidates > 0` quand elle n'a trouvé que des
+      // événements).
       candidates: candidats,
+      places: lieux,
       ...(compteurs === undefined
         ? {}
         : {
@@ -500,7 +509,7 @@ function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: 
             finishAbnormal: compteurs.finsAnormales,
           }),
     },
-    vide ? "warn" : "info",
+    lieux === 0 ? "warn" : "info",
   );
 }
 
@@ -526,7 +535,7 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
         config: recherche,
       });
       const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
-      journaliserRecherche(compteurs, candidats.length, lieux === 0);
+      journaliserRecherche(compteurs, candidats.length, lieux);
       if (candidats.length > contexte.config.candidatsTrouves) throw new ArretEtape(codePersiste("cap_reached", true));
       // Ticket 400 : aucun lieu trouvé (les événements seuls ne font pas de programme) : arrêt ici, avant l'ancrage et
       // l'étape finale, qui paieraient leurs appels pour rien. Code interne `research_empty`, persisté `pipeline_failed`

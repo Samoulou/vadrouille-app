@@ -11,7 +11,8 @@ import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } 
  *
  * Habillage toléré (ticket 400) : un modèle rend souvent son objet JSON dans un bloc de code Markdown (```json … ```),
  * précédé d'une phrase ou d'un raisonnement (`<think>…</think>`). L'objet est alors cherché dans cet habillage
- * (`formesAEssayer`) ; le schéma qui le valide reste aussi strict.
+ * (`formesAEssayer`) ; le schéma qui le valide reste aussi strict. Une réponse de plus de `LONGUEUR_REPONSE_MAX`
+ * caractères est refusée en entier, et la recherche de l'habillage reste linéaire (bloquant 1 du head `cd614d4`).
  */
 
 export type Lecture<T> = {
@@ -22,16 +23,59 @@ export type Lecture<T> = {
 };
 
 const FIN_RAISONNEMENT = "</think>";
-const BLOC_DE_CODE = /```[A-Za-z]*[^\S\n]*\n?([\s\S]*?)```/g;
+const CLOTURE = "```";
+
+/**
+ * Longueur maximale (en caractères) d'une réponse de modèle lue ; au-delà, la réponse est refusée en entier
+ * (`illisible`) sans être examinée (bloquant 1 du head `cd614d4`). 256 Ki : plus de trois fois le plus long tour valide
+ * (30 candidats et 10 actions aux longueurs maximales du schéma, environ 80 Ki), avec la marge d'un raisonnement.
+ */
+export const LONGUEUR_REPONSE_MAX = 256 * 1024;
+
+/** Nombre de blocs de code Markdown essayés, les derniers de la réponse (bloquant 1 du head `cd614d4`). */
+export const BLOCS_ESSAYES_MAX = 8;
+
+/**
+ * Contenu des blocs de code Markdown (```lang … ```) d'un texte, du dernier au premier, `BLOCS_ESSAYES_MAX` au plus.
+ * Balayage linéaire par `indexOf` (bloquant 1 du head `cd614d4`) : l'ancienne expression régulière paresseuse coûtait un
+ * temps quadratique sur un bloc ouvert jamais fermé. Chaque position du texte est examinée une fois ; un bloc ouvert sans
+ * clôture arrête le balayage (aucune clôture plus loin ne peut exister).
+ */
+function blocsDeCode(texte: string): string[] {
+  const blocs: string[] = [];
+  let position = texte.indexOf(CLOTURE);
+  while (position !== -1) {
+    let debut = position + CLOTURE.length;
+    // Langage (lettres ASCII), espaces horizontales, puis au plus un saut de ligne, comme ```json⏎.
+    while (debut < texte.length && /[A-Za-z]/.test(texte.charAt(debut))) debut += 1;
+    while (debut < texte.length && texte.charAt(debut) !== "\n" && /\s/.test(texte.charAt(debut))) debut += 1;
+    if (texte.charAt(debut) === "\n") debut += 1;
+    const fin = texte.indexOf(CLOTURE, debut);
+    if (fin === -1) break;
+    blocs.push(texte.slice(debut, fin));
+    if (blocs.length > BLOCS_ESSAYES_MAX) blocs.shift();
+    position = texte.indexOf(CLOTURE, fin + CLOTURE.length);
+  }
+  return blocs.reverse();
+}
 
 /**
  * Textes où chercher l'objet JSON, dans l'ordre : la réponse telle quelle ; ce qui suit le dernier `</think>` ; le
- * contenu de chaque bloc de code Markdown, du dernier au premier ; du premier `{` au dernier `}`.
+ * contenu des derniers blocs de code Markdown, du dernier au premier ; du premier `{` au dernier `}`. Réponse plus longue
+ * que `LONGUEUR_REPONSE_MAX` : aucune forme (refusée en entier). Coût : linéaire en la longueur, `BLOCS_ESSAYES_MAX + 3`
+ * analyses JSON au plus.
+ *
+ * Limite assumée (mineur 3 du head `cd614d4`) : le dernier `</think>`, le dernier bloc et l'empan du premier `{` au
+ * dernier `}` laissent un objet placé après le vrai (par exemple soufflé par une page lue et recopié par le modèle)
+ * masquer celui-ci. La réponse entière, essayée d'abord, n'est pas concernée. L'effet est borné : l'objet retenu passe
+ * le même schéma strict (clés de racine fermées, éléments validés un à un), et un candidat n'est gardé que si sa source
+ * figure dans les résultats de recherche de l'exécution (`src/research/agent.ts`).
  */
 function formesAEssayer(texte: string): string[] {
+  if (texte.length > LONGUEUR_REPONSE_MAX) return [];
   const fin = texte.lastIndexOf(FIN_RAISONNEMENT);
   const reponse = fin === -1 ? texte : texte.slice(fin + FIN_RAISONNEMENT.length);
-  const blocs = [...reponse.matchAll(BLOC_DE_CODE)].map((bloc) => bloc[1] ?? "").reverse();
+  const blocs = blocsDeCode(reponse);
   const debut = reponse.indexOf("{");
   const finObjet = reponse.lastIndexOf("}");
   return [texte, reponse, ...blocs, ...(debut !== -1 && finObjet > debut ? [reponse.slice(debut, finObjet + 1)] : [])];
