@@ -1,12 +1,13 @@
-# État du studio — 2026-10-16 (82e cycle)
+# État du studio — 2026-10-16 (83e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 81e cycle (fil du cycle, GitHub et #studio). Relevé S7 (Q456) et tests de `tests/db/` (Q457) attendus dans la journée.
+- Aucun nouveau message depuis le 82e cycle (fil du cycle, GitHub et #studio). Relevé S7 (Q456) et tests de `tests/db/` (Q457) attendus dans la journée.
 
 ## Fait
-- Fusionné depuis le 81e cycle : #388 (état du 81e cycle). Rien d'autre : le chemin de l'essai attend les deux gestes de Samuel.
+- Fusionné depuis le 82e cycle : #389 (état du 82e cycle).
+- `p0-purge` planifié réussi à 04:32 UTC (condition 5 tenue jusqu'à 16:32 UTC le 2026-10-16).
 
 ## En cours
 - Aucun agent. data : A17, #381 en brouillon, attend les tests de `tests/db/` posés par Samuel (Q457).
