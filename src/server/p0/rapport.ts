@@ -2,7 +2,7 @@ import "server-only";
 
 import { CRITERES, type CriteresRapport, type ExecutionSuivie, type ValeurCritere } from "@/contracts/prototype-suivi";
 import * as messages from "@/i18n/messages";
-import { placeIdsDuProgramme, ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
+import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme-reduit";
 
 /**
  * Rapport d'une exécution finie, sans donnée Google (spécification `specs/P0-suite-2.md`, « Page de lancement » ;
@@ -35,22 +35,14 @@ const oui = (vrai: boolean): ValeurCritere => (vrai ? "oui" : "non");
 /** Codes d'arrêt qui signalent un plafond de coût ou de durée (A7, A8). */
 export const CODES_PLAFOND: readonly string[] = ["cap_reached", "timeout"];
 
-/** Contenu stocké contrôlé par le schéma de la forme réduite (positions fictives), ou `null` s'il ne le passe pas. */
-function programmeControle(contenu: unknown): ProgrammeReduit | null {
-  if (typeof contenu !== "object" || contenu === null || Array.isArray(contenu) || Object.hasOwn(contenu, "positions")) return null;
-  let lieux: Set<string>;
-  try {
-    lieux = placeIdsDuProgramme(contenu as Omit<ProgrammeReduit, "positions">);
-  } catch {
-    return null;
-  }
-  const positions = Object.fromEntries([...lieux].map((placeId) => [placeId, { lat: 0, lng: 0 }]));
-  const lu = ProgrammeReduitSchema.safeParse({ ...contenu, positions });
+/** Contenu stocké contrôlé par le schéma unique du programme écrit (sans positions), ou `null` s'il ne le passe pas. */
+function programmeControle(contenu: unknown): ProgrammeEcrit | null {
+  const lu = ProgrammeEcritSchema.safeParse(contenu);
   return lu.success ? lu.data : null;
 }
 
 /** A2 (R1) : chaque étape de lieu, et l'idée « Surprends-moi », a un `placeId` et une source ; un événement a sa source. */
-function etapesDeLieuSourcees(programme: ProgrammeReduit): boolean {
+function etapesDeLieuSourcees(programme: ProgrammeEcrit): boolean {
   return programme.trip.days.every(
     (jour) =>
       jour.items.every((ligne) => ligne.type !== "stop" || (ligne.stop.placeId !== undefined && ligne.stop.source !== undefined)) &&
@@ -60,7 +52,7 @@ function etapesDeLieuSourcees(programme: ProgrammeReduit): boolean {
 }
 
 /** A6 : au plus 8 propositions (schéma), chacune ancrée ; les manquantes sont des cases « aucune option compatible ». */
-function propositionsAncrees(programme: ProgrammeReduit): boolean {
+function propositionsAncrees(programme: ProgrammeEcrit): boolean {
   return programme.proposals.every((proposition) => proposition.stop.placeId !== undefined);
 }
 

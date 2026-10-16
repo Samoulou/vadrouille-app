@@ -34,10 +34,10 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
 export { authAdapterChoice, mockAuthAllowed } from "./auth-guard";
 export { getRequestContext } from "./context";
-export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
+export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
-export { prototypeRelectures } from "./prototype-instance";
+export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
 /**
  * Vrai quand l'adaptateur de données est `mock` (`DATA_ADAPTER` absent, vide ou `mock`), faux pour
@@ -46,14 +46,6 @@ export { prototypeRelectures } from "./prototype-instance";
  */
 export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
   return adapterChoice(value) === "mock";
-}
-
-/**
- * Vrai quand l'adaptateur de données est `prototype` (spécification P0, P0b1), sans lever d'erreur ni consulter
- * la liste blanche : `getTripAdapter()` et `getRequestContext()` la consultent, et lèvent hors liste blanche.
- */
-export function isPrototypeAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
-  return adapterChoice(value) === "prototype";
 }
 
 /**

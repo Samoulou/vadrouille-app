@@ -28,6 +28,8 @@ export const LOG_EVENTS = [
   // Ticket 400 : fin de l'étape de recherche de `p0Run`, compteurs de l'agent seulement (des nombres : ni texte du
   // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu.
   "p0.research_done",
+  // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
+  "p0.read_unavailable",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];

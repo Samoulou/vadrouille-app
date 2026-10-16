@@ -348,6 +348,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: `marqueur \`server-only\` (sans capacité) d'un nouveau module serveur du lancement, exigé par \`ligne/require-server-only\` ; ${P0R3D}`,
   })),
+  // Ticket 403 (décision 0074) : source des programmes réels de l'adaptateur `prototype`, lecture seule, sans capacité
+  // propre (pool et barrière injectés). Verdict Sécurité : demandé sur le head de la correction 1 de la PR 406.
+  {
+    fichier: "src/adapters/prototype-lecture.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) de la source des programmes réels (lecture seule de `prototype.programmes`, " +
+      "pool et barrière injectés) ; ticket 403, décision 0074 ; verdict Sécurité : demandé sur le head de la correction 1 de la PR 406",
+  },
   {
     fichier: "tests/unit/server/env.test.ts",
     specificateur: "node:util",
