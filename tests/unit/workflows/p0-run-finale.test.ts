@@ -612,8 +612,17 @@ describe("p0Run, étape finale : arrêts sans programme", () => {
     expect(d.requetesSql).toEqual([]);
   });
 
-  it("essai d'intégration sur un brief de six jours : plan Routes hors plafond (3 requêtes), arrêt en planification sans fiche de lieu ni Routes", async () => {
+  it("essai d'intégration sur un brief de six jours (plafonds de 0073, ceux du mode réel) : p0Run va jusqu'au programme", async () => {
     d.etat.mode = "essai";
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.etat.clos).toBeUndefined();
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.ecrituresPhase).toEqual([...PHASES]);
+  });
+
+  it("plan Routes hors plafond (essai aux anciens plafonds de 0063, 3 requêtes et 120 éléments) : arrêt en planification sans fiche de lieu ni Routes", async () => {
+    d.etat.mode = "essai";
+    d.essai = { ...ESSAI, routesRequetes: 3, routesElements: 120 };
     await jusquAEtapeFinale();
     expect((await refus(etapeFinale({ runId: RUN_ID }))).message).toBe("pipeline_failed");
     expect(d.ecrituresPhase.slice(-2)).toEqual(["notation", "planification"]);
