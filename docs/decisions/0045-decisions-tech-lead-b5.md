@@ -2,6 +2,8 @@
 
 Statut : décision déléguée (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-13 · Rédaction : CEO (commit `[ceo]`), comme 0038, 0040 et 0042 · Décideur : Tech Lead · Ticket #255 · Spécification `specs/B5-moteur-sans-ia.md` (#229, fusionnée) · Questions Q333, Q337, Q338 · **Amende la décision 0032** (A2, A3.1 et A3.2, ligne `src/domain/**`, et règle « types partagés »), sans la réécrire
 
+**§ 1.3 amendé par 0077** (§ 1 point 8, ticket #415) : `src/ai` ne lit plus les types de `src/prototype`, qui restent pour P0 seulement.
+
 **§ 1.5 précisé par 0063** (amendement P0r3c-5a, ticket #349) : `assemblage.ts` et `vers-moteur.ts` vivent désormais dans `src/server/p0/` ; `scripts/p0` les importe.
 
 Numérotation (vérifiée le 2026-10-13) : `main` va de 0001 à 0044 ; aucune PR ouverte (#238, #243, #245, #248) n'ajoute de fichier sous `docs/decisions/`. Cette PR ajoute `0045`.
