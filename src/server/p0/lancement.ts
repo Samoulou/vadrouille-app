@@ -1,9 +1,7 @@
 import "server-only";
 
-import { lireSuivi } from "@/adapters/prototype-suivi";
 import { commitDuDeploiement } from "@/server/env/p0";
 import type { DependancesAcces } from "@/server/p0/acces";
-import { lancementDansLeDecompte } from "@/server/p0/decompte";
 import { ouvrirGardeLancement, type CodeGarde, type CodeRefusAvantReservation } from "@/server/p0/garde";
 import { reserverExecution, type PoolSql } from "@/server/usage/neon";
 import { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, P0RUN_COMPLET, startWorkflow, verrouS8Leve } from "@/workflows";
@@ -22,9 +20,10 @@ import { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS,
  *    c. configuration du mode et forfait (`lancementDuMode`), commit du déploiement — sinon `real_mode_unavailable` ;
  *    d. **verrou S8 levé** (`verrouS8Leve`, 0052 § 3, 0056 § 4) — sinon `real_mode_unavailable` : fermé, aucun
  *       programme ne pourrait être écrit, et aucune exécution ne doit dépenser sans pouvoir écrire (0063 point 10) ;
- *    e. décompte (P0S2-PO-13) — sinon `run_quota_reached` (D24) ;
- *    f. réservation du jour et du forfait (`reserverExecution`, P0r2) : une exécution par jour de quota, plafonds du jour,
- *       du mois et de l'enveloppe. Une concurrence entre (e) et (f) est bornée par (f) : une seule exécution par jour ;
+ *    e. réservation du forfait (`reserverExecution`, P0r2) : ligne `runs` et forfait écrits ensemble. Depuis la
+ *       décision 0071, ni le décompte par brief et variante (P0S2-PO-13, affiché sur la page pour information), ni le
+ *       nombre d'exécutions par jour de quota, ni les plafonds du jour, du mois et de l'enveloppe ne refusent un
+ *       lancement ; seuls restent le contrôle propre au forfait et les plafonds par exécution ;
  * 3. démarrage par le SDK ; échoué, l'exécution réservée est close `upstream_unavailable` (cause externe, relance
  *    ouverte) : aucun appel payant n'est parti.
  * Toute erreur de la base dans la réservation rend `usage_unavailable` (échec fermé, par la garde).
@@ -37,7 +36,6 @@ export const STATUTS_LANCEMENT = [
   "acces_refuse",
   "entree_invalide",
   "real_mode_unavailable",
-  "run_quota_reached",
   "daily_quota_insufficient",
   "envelope_reached",
   "cap_reached",
@@ -75,7 +73,6 @@ const STATUT_DU_REFUS: ReadonlyMap<CodeGarde, StatutLancement> = new Map<CodeGar
   ["access_refused", "acces_refuse"],
   ["entree_invalide", "entree_invalide"],
   ["real_mode_unavailable", "real_mode_unavailable"],
-  ["run_quota_reached", "run_quota_reached"],
   ["daily_quota_insufficient", "daily_quota_insufficient"],
   ["envelope_reached", "envelope_reached"],
   ["cap_reached", "cap_reached"],
@@ -99,8 +96,6 @@ export async function lancerExecutionP0(demande: DemandeLancement, dependances: 
       if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
       const pool = dependances.pool();
       if (!(await verrouS8Leve(pool))) return refus("real_mode_unavailable");
-      const { executions } = await lireSuivi(pool);
-      if (!lancementDansLeDecompte(executions, choix.mode, choix.brief, choix.variante)) return refus("run_quota_reached");
       return reserverExecution(pool, { mode: choix.mode, brief: choix.brief, variant: choix.variante, commitSha, forfait: lancement.forfait }, lancement.regles);
     },
   });

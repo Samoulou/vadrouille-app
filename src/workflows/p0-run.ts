@@ -690,7 +690,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       await ecrirePhase(poolPrototype(), garde.runId, "validation");
       const positions = new Map<string, Position>([...ancragesParPlace].map(([placeId, ancrage]) => [placeId, ancrage.position]));
       const complet = assembler({
-        tripId: identifiantDuVoyage(brief.destination, execution.jourQuota),
+        tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
         brief,
         nuits,
         configuration: CONFIGURATION_MOTEUR,

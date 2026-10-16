@@ -217,8 +217,8 @@ describe("p0: action de lancement", () => {
   });
 
   it("refus : statut seul, page non relue ; exception : erreur, sans message", async () => {
-    d.lancer.mockResolvedValue("run_quota_reached");
-    expect(await lancerExecutionP0Action({ statut: "attente" }, formulaire({}))).toEqual({ statut: "run_quota_reached" });
+    d.lancer.mockResolvedValue("daily_quota_insufficient");
+    expect(await lancerExecutionP0Action({ statut: "attente" }, formulaire({}))).toEqual({ statut: "daily_quota_insufficient" });
     d.lancer.mockRejectedValue(new Error("SENTINELLE"));
     const etat = await lancerExecutionP0Action({ statut: "attente" }, formulaire({}));
     expect(etat).toEqual({ statut: "erreur" });

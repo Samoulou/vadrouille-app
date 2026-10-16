@@ -75,7 +75,7 @@ const textSearch = vi.fn();
 const detailsLogement = vi.fn();
 
 function execution(mode: "reel" | "essai" = "reel", brief = "edimbourg-1.json") {
-  return { mode, brief, variante: "A" as const, coutModelesMicros: 0, jourQuota: "2026-10-15", ecouleMs: 0 };
+  return { mode, brief, variante: "A" as const, coutModelesMicros: 0, jourQuota: "2026-10-15", numeroDuJour: 1, ecouleMs: 0 };
 }
 
 beforeEach(() => {

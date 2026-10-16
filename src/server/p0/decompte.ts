@@ -3,8 +3,10 @@ import "server-only";
 import type { ExecutionSuivie } from "@/contracts/prototype-suivi";
 
 /**
- * Décompte des exécutions réelles par brief et variante (P0S2-PO-13 ; spécification `specs/P0-suite-2.md`, « P0a2 » ;
- * décision 0046, D24, `run_quota_reached`). Module pur : aucune base, aucune horloge.
+ * Décompte des exécutions réelles par brief et variante (P0S2-PO-13 ; spécification `specs/P0-suite-2.md`, « P0a2 »).
+ * Module pur : aucune base, aucune horloge. **Information seulement** depuis la décision 0071 : le décompte est affiché
+ * sur la page des exécutions (tableau par brief et variante) et ne refuse plus aucun lancement (`run_quota_reached`
+ * de D24 n'est plus rendu).
  *
  * - **Exécutions comptées** : 2 pour la variante B, 1 pour la variante A, par brief (P0a2 : « 2 de la variante B et
  *   1 de la variante A »).
@@ -13,10 +15,9 @@ import type { ExecutionSuivie } from "@/contracts/prototype-suivi";
  *   y compris une exécution en cours (elle finira comptée ou relancée) et un plafond atteint ; une seconde fin externe
  *   compte aussi.
  * - Les essais d'intégration (`mode = essai`) ne comptent pas pour G0 (spécification, « Essai d'intégration ») : ils
- *   ne sont ni décomptés ni bornés ici (une exécution par jour de quota reste la règle de la réservation).
+ *   ne sont pas décomptés.
  * - **Exécutions exclues** (`EXECUTIONS_EXCLUES`) : liste fermée d'exécutions réelles que Samuel a retirées du décompte
- *   par une décision écrite ; elles ne sont ni comptées ni relances. Le jour de quota qu'elles ont pris reste consommé
- *   (la réservation n'est pas touchée).
+ *   par une décision écrite ; elles ne sont ni comptées ni relances.
  */
 
 /** Exécutions comptées au plus, par brief, selon la variante (P0a2). */
@@ -31,8 +32,11 @@ export const RELANCES_MAX = 1;
 export const CODES_EXTERNES_SUIVI: readonly string[] = ["upstream_unavailable", "upstream_redirect", "usage_unavailable"];
 
 /**
- * Exécution réelle exclue du décompte, désignée par ses champs de `prototype.runs` : l'index unique
- * `runs_one_per_quota_day_idx` (une exécution `reel` ou `essai` par jour de quota) fait de ce tuple une seule ligne.
+ * Exécution réelle exclue du décompte, désignée par ses champs de `prototype.runs`. Depuis la décision 0071, plusieurs
+ * exécutions peuvent partager un jour de quota (index `runs_one_per_quota_day_idx` supprimé par la migration
+ * 0007_essais_sans_limite) : le tuple ne désigne plus une seule ligne par construction. Il la désigne encore pour
+ * l'entrée de 0070 : le déploiement `d61e9fa` refusait lui-même une seconde exécution du jour, et aucun autre
+ * déploiement ne porte ce commit. Une nouvelle entrée doit vérifier que son tuple ne désigne qu'une ligne.
  */
 export type ExecutionExclue = {
   readonly decision: string;
@@ -91,10 +95,4 @@ export function decompte(executions: readonly ExecutionSuivie[], brief: string, 
     else comptees += 1;
   }
   return { comptees, relances };
-}
-
-/** Vrai si un lancement de ce mode, brief et variante reste dans le décompte ; faux : `run_quota_reached`. */
-export function lancementDansLeDecompte(executions: readonly ExecutionSuivie[], mode: "reel" | "essai", brief: string, variante: "A" | "B"): boolean {
-  if (mode === "essai") return true;
-  return decompte(executions, brief, variante).comptees < COMPTEES_MAX[variante];
 }

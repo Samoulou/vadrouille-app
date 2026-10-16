@@ -170,8 +170,12 @@ describe("p0: passage au moteur de l'étape finale (moteur-final.ts)", () => {
     expect(planifie.idee).toBeUndefined();
   });
 
-  it("identifiantDuVoyage : proto_<destination>_<jour de quota>_1 ; jour mal formé refusé", () => {
-    expect(identifiantDuVoyage("Édimbourg", "2026-10-15")).toBe("proto_edimbourg_20261015_1");
-    expect(() => identifiantDuVoyage("Édimbourg", "15/10/2026")).toThrow(RangeError);
+  it("identifiantDuVoyage : proto_<destination>_<jour de quota>_<rang dans le jour> ; jour ou rang mal formé refusé", () => {
+    expect(identifiantDuVoyage("Édimbourg", "2026-10-15", 1)).toBe("proto_edimbourg_20261015_1");
+    // 0071 : plusieurs exécutions le même jour de quota, identifiants distincts.
+    expect(identifiantDuVoyage("Édimbourg", "2026-10-15", 2)).toBe("proto_edimbourg_20261015_2");
+    expect(() => identifiantDuVoyage("Édimbourg", "15/10/2026", 1)).toThrow(RangeError);
+    expect(() => identifiantDuVoyage("Édimbourg", "2026-10-15", 0)).toThrow(RangeError);
+    expect(() => identifiantDuVoyage("Édimbourg", "2026-10-15", 1000)).toThrow(RangeError);
   });
 });

@@ -55,17 +55,21 @@ export type UniteQuotaRoutes = "requetes" | "elements";
 export const QUOTA_ROUTES_ELEMENTS_PAR_MINUTE = 3_000;
 
 /**
- * Limites appliquées au lancement (0046 D13 point 3 ; spécification `specs/P0-suite-2.md`, tableau des plafonds) :
- * 95 par jour et par méthode dans l'unité du quota (Text Search et Place Details ; Routes seulement en unité
- * `"requetes"`, Q330) ; Google 20 USD par mois (Pacifique) et 40 USD jusqu'à G0 ;
- * modèles 40 USD par mois (UTC) et 80 USD jusqu'à G0.
+ * Limites appliquées au lancement : **aucune** depuis la décision 0071 (Samuel, 2026-10-16 : « enlève les restrictions
+ * je fais mes tests, avec mes dashboards et je gère les couts »). Ni quota du jour par méthode, ni plafond du mois, ni
+ * enveloppe jusqu'à G0 ne refusent plus un lancement : Samuel fixe lui-même ses limites chez les fournisseurs (limite
+ * de dépense OpenRouter, quotas par jour et par API de Google Cloud). Les valeurs levées étaient 95 par jour et par
+ * méthode, Google 20 USD par mois et 40 USD jusqu'à G0, modèles 40 USD par mois et 80 USD jusqu'à G0 (0046 D13 point 3) ;
+ * les rétablir est un changement de ces seules valeurs, par une nouvelle décision. Restent : le contrôle propre au
+ * forfait (Routes en unité `"elements"`, quota d'une minute, `refusDuForfait`) et les plafonds **par exécution**
+ * (`prototype/config/plafonds.json`, registre en mémoire), qui arrêtent une exécution qui s'emballe.
  */
 export const LIMITES_PROTOTYPE = {
-  quotaJourParMethode: 95,
-  moisGoogleMicros: 20_000_000,
-  enveloppeGoogleMicros: 40_000_000,
-  moisModelesMicros: 40_000_000,
-  enveloppeModelesMicros: 80_000_000,
+  quotaJourParMethode: Number.POSITIVE_INFINITY,
+  moisGoogleMicros: Number.POSITIVE_INFINITY,
+  enveloppeGoogleMicros: Number.POSITIVE_INFINITY,
+  moisModelesMicros: Number.POSITIVE_INFINITY,
+  enveloppeModelesMicros: Number.POSITIVE_INFINITY,
 } as const;
 export type LimitesForfait = { readonly [K in keyof typeof LIMITES_PROTOTYPE]: number };
 
