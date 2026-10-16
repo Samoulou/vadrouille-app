@@ -41,7 +41,7 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const { modeles } = validerConfiguration(brut());
     expect(modelesDeLaVariante(modeles, "b")).toEqual({
       recherche: "deepseek/deepseek-v4.1-flash",
-      notation: "perplexity/pplx-decider-v1.1-27b",
+      notation: "deepseek/deepseek-v4.1-flash",
       raisons: "deepseek/deepseek-v4.1-flash",
     });
   });
@@ -53,6 +53,8 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     expect(a.recherche).toBe(b.recherche);
     expect(a.raisons).toBe(b.raisons);
     expect(a.notation).toBe("deepseek/deepseek-v4.1-flash");
+    // Décision 0076 : A et B ne diffèrent plus par la notation ; la surcharge `variantes.a` reste, identique.
+    expect(a.notation).toBe(b.notation);
     // La forme ne permet pas à la variante A de toucher une autre étape.
     const autre = structuredClone(brut().modeles) as { variantes: { a: Record<string, string> } };
     autre.variantes.a.recherche = "autre/modele";
