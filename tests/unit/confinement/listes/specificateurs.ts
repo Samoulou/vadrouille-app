@@ -328,7 +328,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     fichier: "src/server/composition/p0-reel.ts",
     specificateur: "@/server/p0/garde",
     noms: ["type:GardeOuverte", "type:GardeRelecture"],
-    motif: `${COMPOSITION_P0R3C} ; \`GardeRelecture\` : preuve exigée par \`composerRelecture\` (P0r4, ticket 414, décision 0076 ; verdict Sécurité demandé dans la PR)`,
+    motif: `${COMPOSITION_P0R3C} ; \`GardeRelecture\` : preuve exigée par \`composerRelecture\` (P0r4, ticket 414, décision 0079 ; verdict Sécurité demandé dans la PR)`,
   },
   { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_P0R3C },
   {

@@ -158,7 +158,7 @@ export type OptionsRelecture = {
 };
 
 /**
- * Relecture Routes d'une Journée (P0r4, décision 0076) : le seul client Routes, rien d'autre (ni Places, ni modèle).
+ * Relecture Routes d'une Journée (P0r4, décision 0079) : le seul client Routes, rien d'autre (ni Places, ni modèle).
  * Exige une `GardeRelecture` (barrière, purge et forfait de relecture réservé, `src/server/p0/garde.ts`). Le contexte de
  * chaque appel porte la nature `relecture`, sans exécution, et les périodes Google calculées à l'appel (D20).
  */

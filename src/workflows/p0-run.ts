@@ -255,7 +255,7 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
 }
 
 /**
- * Plafonds d'**une** relecture Routes, c'est-à-dire d'une Journée affichée (P0r4, décision 0076 ; « Non tranché » de
+ * Plafonds d'**une** relecture Routes, c'est-à-dire d'une Journée affichée (P0r4, décision 0079 ; « Non tranché » de
  * 0053) : 40 requêtes de matrice et 40 éléments. Le relecteur fait une requête par lieu de départ et un élément par
  * trajet distinct de la journée : 40 couvre toute journée du prototype (une vingtaine de trajets au plus). Forfait au
  * prix plein : 40 × 0,005 = **0,20 USD** réservés, alors que le coût réel est d'un élément par trajet (tranche gratuite
@@ -264,7 +264,7 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
 export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ routesRequetes: 40, routesElements: 40 });
 
 /**
- * Forfait et règles de la réservation d'une relecture Routes (P0r4, décision 0076), lus dans ce pont comme ceux du
+ * Forfait et règles de la réservation d'une relecture Routes (P0r4, décision 0079), lus dans ce pont comme ceux du
  * lancement (l'application n'importe pas `src/prototype`, 0048 § 1) ; `null` si la configuration du mode réel ou la table
  * de prix est refusée (la relecture échoue alors fermée). Durée des orphelines : celle du mode réel, comme au lancement.
  */

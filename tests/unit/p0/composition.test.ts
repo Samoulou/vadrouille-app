@@ -44,7 +44,7 @@ const COMPOSITION = "src/server/composition/p0-reel.ts";
 /** Seul importateur admis de la composition hors des tests (0055 § 3 point 3), livré avec le workflow `p0Run`. */
 const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
 /**
- * Second importateur admis (P0r4, ticket 414, décision 0076 point 5) : le relecteur Routes réel, qui n'en lit que
+ * Second importateur admis (P0r4, ticket 414, décision 0079 point 5) : le relecteur Routes réel, qui n'en lit que
  * `composerRelecture` (client Routes seul, garde de relecture exigée) ; lui-même importé par `src/instrumentation.ts` seul.
  */
 const RELECTEUR_REEL = "src/server/p0/relecture.ts";

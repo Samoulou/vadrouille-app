@@ -62,7 +62,7 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     expect(logEvent).not.toHaveBeenCalled();
   });
 
-  it("DATA_ADAPTER=prototype : relecteur Routes réel branché avec la barrière (P0r4, décision 0076)", async () => {
+  it("DATA_ADAPTER=prototype : relecteur Routes réel branché avec la barrière (P0r4, décision 0079)", async () => {
     vi.stubEnv("DATA_ADAPTER", "prototype");
     await register();
     const relecteur = brancher.mock.calls[0]?.[1] as { relireJournee?: unknown } | undefined;

@@ -33,7 +33,7 @@ import type { AdapterContext, TripAdapter } from "./types";
  * en échec (quota atteint, service indisponible, réponse invalide) lève une erreur : la page affiche l'état
  * d'erreur existant (« Réessayer »), jamais une durée inventée. Programmes et relecteur sont **injectés** ; dans
  * P0b1, seul un relecteur simulé existe (`src/mocks/prototype-relecteur.ts`). Programmes réels lus en base, recomposés
- * avec leurs positions, et relecteur Routes réel (P0r4, décisions 0074 et 0076) : `createPrototypeAdapterReel`.
+ * avec leurs positions, et relecteur Routes réel (P0r4, décisions 0074 et 0079) : `createPrototypeAdapterReel`.
  */
 
 /** Mode de déplacement d'un segment. */
@@ -75,7 +75,7 @@ export interface PrototypeAdapterOptions {
 
 /**
  * Source des programmes **réels** : contenus lus en base et recomposés avec leurs positions (`ProgrammeReduitSchema`,
- * `src/adapters/prototype-lecture.ts`, décisions 0074 et 0076) ou double de test. « Mes voyages » lit tous les
+ * `src/adapters/prototype-lecture.ts`, décisions 0074 et 0079) ou double de test. « Mes voyages » lit tous les
  * programmes en une seule lecture (`lister`).
  */
 export interface SourceProgrammesReels {
@@ -293,7 +293,7 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
 }
 
 /**
- * Adaptateur des programmes **réels** (P0r4, décisions 0074 et 0076) : programmes lus en base et recomposés avec leurs
+ * Adaptateur des programmes **réels** (P0r4, décisions 0074 et 0079) : programmes lus en base et recomposés avec leurs
  * positions (carte Google), durées relues à chaque affichage par le relecteur injecté (Routes réel, payant, réservé et
  * plafonné : `src/server/p0/relecture.ts`). « Mes voyages » lit tous les programmes en une seule lecture (`lister`).
  */

@@ -21,7 +21,7 @@ import {
 } from "./prototype-lecture";
 
 /**
- * Source des programmes réels (décision 0074, complétée par 0076 : P0r4) : client `pg` simulé. Lecture seule bornée,
+ * Source des programmes réels (décision 0074, complétée par 0079 : P0r4) : client `pg` simulé. Lecture seule bornée,
  * barrière avant toute connexion, schéma unique, positions recomposées depuis `place_coordinates` (une position
  * manquante ou expirée : programme non servi), durées relues par le relecteur injecté.
  */
@@ -85,7 +85,7 @@ function relecteurFixe(minutes = 11): RelecteurTrajets & { paires: PaireRelectur
   };
 }
 
-describe("p0: lecture des programmes réels (décisions 0074 et 0076)", () => {
+describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
   it("barrière fermée : aucune connexion, liste vide et voyage introuvable", async () => {
     const ouvrir = vi.fn(async () => null);
     const source = createSourceProgrammesReels({ pool: ouvrir });

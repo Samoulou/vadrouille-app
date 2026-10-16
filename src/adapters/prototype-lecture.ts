@@ -7,7 +7,7 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
 import type { SourceProgrammesReels } from "./prototype";
 
 /**
- * Source des programmes **réels** de l'adaptateur `prototype` (décision 0074, complétée par 0076 ; spécification
+ * Source des programmes **réels** de l'adaptateur `prototype` (décision 0074, complétée par 0079 ; spécification
  * P0-suite-2, « P0r4 — Lecture des programmes réels ») : les programmes écrits par `p0Run` dans `prototype.programmes`,
  * **recomposés avec leurs positions** lues dans `public.place_coordinates`, pour « Mes voyages » et les pages du voyage
  * de la préversion de `p0-reel`.

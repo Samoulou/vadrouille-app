@@ -10,7 +10,7 @@ import { blockGoogle } from "./carte-helpers";
 import { PROTOTYPE_TRIP, PROTOTYPE_URL } from "./prototype-helpers";
 
 /**
- * Décisions 0074 et 0076 (P0r4) sur le build de production : troisième serveur de `playwright.config.ts`, adaptateur `prototype` sans
+ * Décisions 0074 et 0079 (P0r4) sur le build de production : troisième serveur de `playwright.config.ts`, adaptateur `prototype` sans
  * dossier de programmes. `instrumentation.ts` y branche la barrière de lecture des programmes réels (chargement de
  * `next/headers`, `server-only` et de la garde dans la couche d'instrumentation) ; la garde du mode réel est fermée
  * (`CI=true`, aucune base) : « Mes voyages » est vide, un voyage est introuvable, aucune connexion n'est tentée (sans

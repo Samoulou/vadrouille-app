@@ -14,7 +14,7 @@ import { creerRegistreForfait } from "@/server/usage/registre";
 
 /**
  * Relecteur **réel** des durées de trajet des programmes réels (P0r4 de `specs/P0-suite-2.md`, « Relecture Routes » ;
- * décision 0076, qui complète 0074). Branché au démarrage par `src/instrumentation.ts` sur l'adaptateur `prototype`
+ * décision 0079, qui complète 0074). Branché au démarrage par `src/instrumentation.ts` sur l'adaptateur `prototype`
  * (`brancherLectureProgrammesReels`), appelé une fois par Journée relue.
  *
  * À **chaque** relecture, dans cet ordre, le premier refus l'emportant (refus : `{ ok: false }`, aucun appel Routes ;

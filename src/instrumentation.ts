@@ -9,7 +9,7 @@
  * valeur) puis le processus s'arrête par `process.exit(1)`. L'erreur n'est jamais relancée : Next.js écrirait son
  * message, sa pile et sa `cause` hors du journal (0051 point 6.1.2).
  *
- * Décisions 0074 et 0076 : environnement valide et adaptateur `prototype`, la barrière de la lecture des programmes
+ * Décisions 0074 et 0079 : environnement valide et adaptateur `prototype`, la barrière de la lecture des programmes
  * réels (`src/server/p0/lecture-programmes.ts`) et le relecteur Routes réel (`src/server/p0/relecture.ts`, même
  * barrière, vérifiée à chaque relecture) sont branchés sur l'adaptateur. Elle ne lit rien ici : chaque lecture la
  * vérifie (garde du mode réel et cookie d'accès), et elle reste fermée hors de la préversion de `p0-reel`. Un échec du
@@ -35,7 +35,7 @@ export async function register(): Promise<void> {
   process.exit(1);
 }
 
-/** Branche la barrière de lecture et le relecteur réel sur l'adaptateur `prototype` (décisions 0074 et 0076). */
+/** Branche la barrière de lecture et le relecteur réel sur l'adaptateur `prototype` (décisions 0074 et 0079). */
 async function brancherLecturePrototype(
   logEvent: typeof import("@/server/log").logEvent,
   errorNameOf: typeof import("@/server/log").errorNameOf,

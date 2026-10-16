@@ -120,7 +120,7 @@ export async function verifierGardeEtape(runId: string, dependances: Dependances
 }
 
 /**
- * Preuve que la garde est ouverte pour **une relecture Routes** (P0r4, décision 0076) : conditions (1) à (7),
+ * Preuve que la garde est ouverte pour **une relecture Routes** (P0r4, décision 0079) : conditions (1) à (7),
  * déploiement autre que la production, cookie d'accès valide, dernière purge réussie de moins de 24 h (0046 D16
  * point 8), forfait de relecture réservé. Même marque que `GardeOuverte`, sans exécution : une `GardeRelecture` n'est
  * jamais une `GardeOuverte` (pas de `runId`), et réciproquement.

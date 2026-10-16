@@ -8,7 +8,7 @@ import { createProgrammeLoader } from "./prototype-loader";
 import type { TripAdapter } from "./types";
 
 /**
- * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6 ; décisions 0074 et 0076) :
+ * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6 ; décisions 0074 et 0079) :
  * - `VADROUILLE_PROTOTYPE_DIR` posée (lue une fois, à la création) : programmes lus dans ce dossier, relecteur
  *   **simulé** (P0b1 : aucun relecteur réel, aucune clé lue, aucun appel à Google ; `pnpm dev`, CI, e2e) ;
  * - sinon : programmes **réels** lus dans `prototype.programmes`, en lecture seule, **recomposés avec leurs positions**

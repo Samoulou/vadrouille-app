@@ -13,7 +13,7 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 
 /**
- * Relecteur Routes réel des programmes réels (P0r4, décision 0076) : même barrière que le lancement, purge de moins de
+ * Relecteur Routes réel des programmes réels (P0r4, décision 0079) : même barrière que le lancement, purge de moins de
  * 24 h, forfait de relecture réservé (plafond du mois, enveloppe), appels bornés par le registre ; aucun appel Routes ni
  * aucune connexion avant la barrière ; jamais une durée inventée.
  */
