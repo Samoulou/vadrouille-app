@@ -10,8 +10,8 @@ import { closeAll, connect, type DbClient } from "./helpers";
 /**
  * Port de consommation du prototype, implémentation Neon (décision 0046, D13 point 3, exigence Sécurité S4), sous
  * `vadrouille_prototype`. La plupart des cas tournent dans une transaction **annulée** (le port y ouvre un point de
- * sauvegarde à la place de sa transaction) : l'index « une exécution par jour » ne garde ainsi aucune exécution du
- * jour réel. La concurrence et l'échec fermé utilisent de vraies transactions, sur des forfaits de relecture.
+ * sauvegarde à la place de sa transaction) : aucune exécution du jour réel n'est ainsi gardée (plus de limite d'une
+ * exécution par jour, décision 0071). La concurrence et l'échec fermé utilisent de vraies transactions, sur des forfaits de relecture.
  */
 
 const SHA = "b".repeat(40);
@@ -87,8 +87,8 @@ async function annulee<T>(fn: (pool: PoolSql) => Promise<T>): Promise<T> {
 const lancer = (pool: PoolSql, regles: ReglesForfait = REGLES) =>
   reserverExecution(pool, { mode: "reel", brief: "brief-test.json", variant: "A", commitSha: SHA, forfait: FORFAIT_EXECUTION }, regles);
 
-describe("p0: forfait réservé en base, une exécution par jour", () => {
-  it("le lancement écrit une ligne runs en cours et son forfait, valeurs posées par la base ; un second lancement du jour est refusé", async () => {
+describe("p0: forfait réservé en base, plusieurs exécutions par jour (0071)", () => {
+  it("le lancement écrit une ligne runs en cours et son forfait, valeurs posées par la base ; un second lancement du jour réussit avec un autre runId", async () => {
     await annulee(async (pool) => {
       const premier = await lancer(pool);
       expect(premier.ok).toBe(true);
@@ -116,8 +116,11 @@ describe("p0: forfait réservé en base, une exécution par jour", () => {
           meme_instant: true,
         },
       ]);
-      expect(await lancer(pool)).toEqual({ ok: false, code: "cap_reached" });
-      expect(Number((await proto.query("SELECT count(*) AS n FROM prototype.forfaits WHERE nature = 'execution' AND created_at = now()")).rows[0].n)).toBe(1);
+      const second = await lancer(pool);
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(second.runId).not.toBe(premier.runId);
+      expect(Number((await proto.query("SELECT count(*) AS n FROM prototype.forfaits WHERE nature = 'execution' AND created_at = now()")).rows[0].n)).toBe(2);
     });
   });
 
