@@ -58,8 +58,23 @@ export function travelBannerMessage(day: Day): string | null {
   return `${first} ${format(t.bandeauPlusLong, { segment: segmentLabel(longest.segment), name: longest.stop.name })}`;
 }
 
-/** Ligne sous le titre du jour : « 1 h 25 de trajet · environ 95 CHF par personne » (budget s'il est défini). */
-export function dayTravelLine(day: Pick<Day, "travelMinutes" | "budgetPerPerson">): string {
+/**
+ * Journée sans aucune durée de trajet connue : aucune ligne de trajet et un total nul. C'est le cas des programmes
+ * réels servis sans relecture des durées (adaptateur `prototype`, décision 0074) : l'interface n'affiche alors aucune
+ * durée, plutôt qu'un « 0 min de trajet » qui serait inventé.
+ */
+export function withoutTravel(day: Pick<Day, "items" | "travelMinutes">): boolean {
+  return day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment");
+}
+
+/**
+ * Ligne sous le titre du jour : « 1 h 25 de trajet · environ 95 CHF par personne » (budget s'il est défini). Sans
+ * durée connue (`withoutTravel`) : le budget seul, ou `null` (la ligne n'est pas rendue).
+ */
+export function dayTravelLine(day: Pick<Day, "items" | "travelMinutes" | "budgetPerPerson">): string | null {
+  if (withoutTravel(day)) {
+    return day.budgetPerPerson === undefined ? null : format(t.budgetSeul, { montant: formatMontant(day.budgetPerPerson) });
+  }
   const duree = formatDuree(day.travelMinutes);
   return day.budgetPerPerson === undefined
     ? format(t.trajet, { duree })
@@ -117,8 +132,12 @@ export function tripBudgetLine(days: readonly Pick<Day, "index" | "budgetPerPers
   return [format(ts.budget, { montant: formatMontant(total) }), ...missing].join(" ");
 }
 
-/** Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet ». */
+/**
+ * Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet » ; le nombre
+ * d'étapes seul sans durée connue (`withoutTravel`, décision 0074).
+ */
 export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
+  if (withoutTravel(day)) return dayStopCount(day);
   return format(ts.jourParJour.resume, { etapes: dayStopCount(day), duree: formatDuree(day.travelMinutes) });
 }
 

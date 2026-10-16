@@ -37,7 +37,7 @@ export { getRequestContext } from "./context";
 export { paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
-export { prototypeRelectures } from "./prototype-instance";
+export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
 /**
  * Vrai quand l'adaptateur de données est `mock` (`DATA_ADAPTER` absent, vide ou `mock`), faux pour

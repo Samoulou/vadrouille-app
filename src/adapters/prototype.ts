@@ -32,7 +32,8 @@ import type { AdapterContext, TripAdapter } from "./types";
  * Aucune durée relue n'est gardée : ni fichier, ni cache de module, ni cache partagé entre requêtes. Une relecture
  * en échec (quota atteint, service indisponible, réponse invalide) lève une erreur : la page affiche l'état
  * d'erreur existant (« Réessayer »), jamais une durée inventée. Programmes et relecteur sont **injectés** ; dans
- * P0b1, seul un relecteur simulé existe (`src/mocks/prototype-relecteur.ts`).
+ * P0b1, seul un relecteur simulé existe (`src/mocks/prototype-relecteur.ts`). Sans relecteur (programmes réels lus en
+ * base, décision 0074), aucune durée n'est servie : voir `PrototypeAdapterOptions`.
  */
 
 /** Mode de déplacement d'un segment. */
@@ -69,7 +70,13 @@ export interface SourceProgrammes {
 
 export interface PrototypeAdapterOptions {
   programmes: SourceProgrammes;
-  relecteurs: { trajets: RelecteurTrajets };
+  /**
+   * `trajets: null` : **aucune relecture** (programmes réels lus en base sur la préversion de `p0-reel`, décision 0074).
+   * Aucune durée n'est alors servie, ni inventée : les lignes de trajet sont retirées de la journée, `travelMinutes`
+   * vaut 0 (l'interface n'affiche aucune durée pour une journée sans ligne de trajet), et les propositions n'ont ni
+   * `travelFromPrevious` ni `detour`.
+   */
+  relecteurs: { trajets: RelecteurTrajets | null };
 }
 
 /** Erreur fermée d'une relecture : son message ne contient que le code, jamais un identifiant de lieu. */
@@ -137,8 +144,17 @@ async function relire(relecteur: RelecteurTrajets, paires: PaireRelecture[]): Pr
   return minutes;
 }
 
+/** Journée sans relecture (décision 0074) : lignes de trajet retirées, aucune durée, `travelMinutes` à 0. */
+function jourSansTrajets(jour: JourReduit): Day {
+  const items = jour.items.filter((ligne): ligne is Exclude<Ligne, { type: "segment" }> => ligne.type !== "segment");
+  const reste: Partial<typeof jour> = { ...jour };
+  delete reste.weekday;
+  return DaySchema.parse({ ...reste, items, travelMinutes: 0 });
+}
+
 /** Recompose une journée : durées relues (`estimated: false`), `travelMinutes` = somme des segments relus. */
-async function recomposerJour(programme: ProgrammeReduit, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
+async function recomposerJour(programme: ProgrammeReduit, jour: JourReduit, relecteur: RelecteurTrajets | null): Promise<Day> {
+  if (relecteur === null) return jourSansTrajets(jour);
   const terminus = terminusDu(programme, jour.index);
   const paires: PaireRelecture[] = [];
   jour.items.forEach((ligne, index) => {
@@ -174,20 +190,23 @@ function origineProposition(programme: ProgrammeReduit, proposition: Proposition
 }
 
 /** Recompose les propositions : une requête de relecture par journée concernée, `detour` gardé au-delà du seuil. */
-async function recomposerPropositions(programme: ProgrammeReduit, relecteur: RelecteurTrajets): Promise<Proposal[]> {
+async function recomposerPropositions(programme: ProgrammeReduit, relecteur: RelecteurTrajets | null): Promise<Proposal[]> {
   const relues = new Map<number, number>();
-  const jours = [...new Set(programme.proposals.filter((p) => p.travelFromPrevious).map((p) => p.day))];
-  for (const jour of jours) {
-    const concernees = programme.proposals
-      .map((proposition, index) => ({ proposition, index }))
-      .filter(({ proposition }) => proposition.day === jour && proposition.travelFromPrevious);
-    const minutes = await relire(
-      relecteur,
-      concernees.map(({ proposition }) =>
-        paire(origineProposition(programme, proposition), proposition.stop.placeId, proposition.travelFromPrevious!.mode),
-      ),
-    );
-    concernees.forEach(({ index }, rang) => relues.set(index, minutes[rang]!));
+  // Sans relecteur (décision 0074) : aucune durée relue, donc ni `travelFromPrevious` ni `detour` (seuil inconnu).
+  if (relecteur !== null) {
+    const jours = [...new Set(programme.proposals.filter((p) => p.travelFromPrevious).map((p) => p.day))];
+    for (const jour of jours) {
+      const concernees = programme.proposals
+        .map((proposition, index) => ({ proposition, index }))
+        .filter(({ proposition }) => proposition.day === jour && proposition.travelFromPrevious);
+      const minutes = await relire(
+        relecteur,
+        concernees.map(({ proposition }) =>
+          paire(origineProposition(programme, proposition), proposition.stop.placeId, proposition.travelFromPrevious!.mode),
+        ),
+      );
+      concernees.forEach(({ index }, rang) => relues.set(index, minutes[rang]!));
+    }
   }
   return programme.proposals.map((proposition, index) => {
     const { travelFromPrevious, detour, ...reste } = proposition;
