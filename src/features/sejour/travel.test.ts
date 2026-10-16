@@ -145,7 +145,16 @@ describe("travel: ligne trajet et budget", () => {
   });
 
   it("sans budget : la durée seule", () => {
-    expect(dayTravelLine({ travelMinutes: 40, budgetPerPerson: undefined })).toBe("40 min de trajet");
+    expect(dayTravelLine({ items: [], travelMinutes: 40, budgetPerPerson: undefined })).toBe("40 min de trajet");
+  });
+
+  it("sans durée connue (aucun segment, total nul ; décision 0074) : budget seul, ou aucune ligne", () => {
+    const sansTrajets = day(2).items.filter((item) => item.type !== "segment");
+    expect(dayTravelLine({ items: sansTrajets, travelMinutes: 0, budgetPerPerson: 95 })).toBe("Environ 95 CHF par personne");
+    expect(dayTravelLine({ items: sansTrajets, travelMinutes: 0, budgetPerPerson: undefined })).toBeNull();
+    // Un segment présent garde la durée affichée, même nulle.
+    const avecSegment: DayLineItem[] = [{ type: "segment", segment: { mode: "walk", minutes: 0, estimated: false } }];
+    expect(dayTravelLine({ items: avecSegment, travelMinutes: 0, budgetPerPerson: undefined })).toBe("0 min de trajet");
   });
 
   it("formate les montants en fr-CH, sans dépendre de l'ICU (F-ICU, ticket 171)", () => {
@@ -202,6 +211,12 @@ describe("travel: résumé du jour (« Jour par jour »)", () => {
       { type: "openMeal", time: "19:00", meal: "dinner" },
     ];
     expect(daySummary({ items, travelMinutes: 10 })).toBe("1 étape · 10 min de trajet");
+  });
+
+  it("sans durée connue (décision 0074) : le nombre d'étapes seul, jamais « 0 min de trajet »", () => {
+    const items = day(2).items.filter((item) => item.type !== "segment");
+    const stops = items.filter((item) => item.type === "stop").length;
+    expect(daySummary({ items, travelMinutes: 0 })).toBe(`${stops} étapes`);
   });
 });
 

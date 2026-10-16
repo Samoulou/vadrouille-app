@@ -16,7 +16,7 @@ import {
   type Trip,
   type TripSummary,
 } from "@/contracts";
-import type { JourReduit, ProgrammeReduit, PropositionReduite } from "@/prototype/programme-reduit";
+import type { JourReduit, ProgrammeEcrit, ProgrammeReduit, PropositionReduite } from "@/prototype/programme-reduit";
 
 import type { AdapterContext, TripAdapter } from "./types";
 
@@ -32,7 +32,8 @@ import type { AdapterContext, TripAdapter } from "./types";
  * Aucune durée relue n'est gardée : ni fichier, ni cache de module, ni cache partagé entre requêtes. Une relecture
  * en échec (quota atteint, service indisponible, réponse invalide) lève une erreur : la page affiche l'état
  * d'erreur existant (« Réessayer »), jamais une durée inventée. Programmes et relecteur sont **injectés** ; dans
- * P0b1, seul un relecteur simulé existe (`src/mocks/prototype-relecteur.ts`).
+ * P0b1, seul un relecteur simulé existe (`src/mocks/prototype-relecteur.ts`). Sans relecteur ni positions (programmes réels lus en
+ * base, décision 0074) : chemin explicite `createPrototypeAdapterSansCarte`.
  */
 
 /** Mode de déplacement d'un segment. */
@@ -72,6 +73,26 @@ export interface PrototypeAdapterOptions {
   relecteurs: { trajets: RelecteurTrajets };
 }
 
+/**
+ * Source des programmes **écrits** (forme réduite sans `positions`, `ProgrammeEcritSchema`) : programmes réels lus en
+ * base (`src/adapters/prototype-lecture.ts`, décision 0074) ou double de test.
+ */
+export interface SourceProgrammesEcrits {
+  /** Tous les programmes servables, en une lecture, triés par identifiant de voyage. */
+  lister(): Promise<ProgrammeEcrit[]>;
+  /** Programme validé, ou `null` (identifiant inconnu, refusé ou en double). */
+  lire(tripId: string): Promise<ProgrammeEcrit | null>;
+}
+
+/**
+ * Programme tel que l'adaptateur le sert : avec sa table de positions (chargeur de dossier, carte), ou **sans carte**
+ * (`positions: null`, chemin de la décision 0074 : aucune position lue, donc aucun point sur aucune carte).
+ */
+interface ProgrammeServi {
+  readonly programme: ProgrammeEcrit;
+  readonly positions: ProgrammeReduit["positions"] | null;
+}
+
 /** Erreur fermée d'une relecture : son message ne contient que le code, jamais un identifiant de lieu. */
 export class RelectureError extends Error {
   readonly code: RaisonRelecture | "invalid_response" | "missing_place";
@@ -85,14 +106,14 @@ export class RelectureError extends Error {
 type Ligne = JourReduit["items"][number];
 
 /** Identifiant de lieu d'une ligne qui a une position (terminus, étape), `null` pour les autres lignes. */
-function lieuDe(ligne: Ligne, terminus: ProgrammeReduit["terminus"][number]): string | undefined | null {
+function lieuDe(ligne: Ligne, terminus: ProgrammeEcrit["terminus"][number]): string | undefined | null {
   if (ligne.type === "terminus") return ligne.role === "start" ? terminus.depart : terminus.arrivee;
   if (ligne.type === "stop") return ligne.stop.placeId;
   return null;
 }
 
 /** Lieu qui précède la ligne `index` (terminus ou étape), en remontant la journée ; `null` s'il n'y en a pas. */
-function lieuAvant(jour: JourReduit, terminus: ProgrammeReduit["terminus"][number], index: number): string | undefined | null {
+function lieuAvant(jour: JourReduit, terminus: ProgrammeEcrit["terminus"][number], index: number): string | undefined | null {
   for (let i = index - 1; i >= 0; i -= 1) {
     const lieu = lieuDe(jour.items[i]!, terminus);
     if (lieu !== null) return lieu;
@@ -100,7 +121,7 @@ function lieuAvant(jour: JourReduit, terminus: ProgrammeReduit["terminus"][numbe
   return null;
 }
 
-function lieuApres(jour: JourReduit, terminus: ProgrammeReduit["terminus"][number], index: number): string | undefined | null {
+function lieuApres(jour: JourReduit, terminus: ProgrammeEcrit["terminus"][number], index: number): string | undefined | null {
   for (let i = index + 1; i < jour.items.length; i += 1) {
     const lieu = lieuDe(jour.items[i]!, terminus);
     if (lieu !== null) return lieu;
@@ -113,7 +134,7 @@ function paire(origine: string | undefined | null, destination: string | undefin
   return { origine, destination, mode };
 }
 
-function terminusDu(programme: ProgrammeReduit, jour: number): ProgrammeReduit["terminus"][number] {
+function terminusDu(programme: ProgrammeEcrit, jour: number): ProgrammeEcrit["terminus"][number] {
   const terminus = programme.terminus.find((candidat) => candidat.jour === jour);
   // Le schéma de la forme réduite impose un terminus par jour (cas inatteignable avec un programme valide) : son
   // absence est un lieu manquant, traité comme toute relecture impossible (état d'erreur et « Réessayer »).
@@ -137,8 +158,17 @@ async function relire(relecteur: RelecteurTrajets, paires: PaireRelecture[]): Pr
   return minutes;
 }
 
+/** Journée sans relecture (décision 0074) : lignes de trajet retirées, aucune durée, `travelMinutes` à 0. */
+function jourSansTrajets(jour: JourReduit): Day {
+  const items = jour.items.filter((ligne): ligne is Exclude<Ligne, { type: "segment" }> => ligne.type !== "segment");
+  const reste: Partial<typeof jour> = { ...jour };
+  delete reste.weekday;
+  return DaySchema.parse({ ...reste, items, travelMinutes: 0 });
+}
+
 /** Recompose une journée : durées relues (`estimated: false`), `travelMinutes` = somme des segments relus. */
-async function recomposerJour(programme: ProgrammeReduit, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
+async function recomposerJour(programme: ProgrammeEcrit, jour: JourReduit, relecteur: RelecteurTrajets | null): Promise<Day> {
+  if (relecteur === null) return jourSansTrajets(jour);
   const terminus = terminusDu(programme, jour.index);
   const paires: PaireRelecture[] = [];
   jour.items.forEach((ligne, index) => {
@@ -165,7 +195,7 @@ async function recomposerJour(programme: ProgrammeReduit, jour: JourReduit, rele
  * Lieu de départ du trajet d'une proposition : le lieu qui précède son étape dans la journée, ou le logement de
  * départ du jour si l'étape n'est pas dans la ligne du jour (« depuis l'étape précédente (ou l'hôtel) »).
  */
-function origineProposition(programme: ProgrammeReduit, proposition: PropositionReduite): string | undefined | null {
+function origineProposition(programme: ProgrammeEcrit, proposition: PropositionReduite): string | undefined | null {
   const terminus = terminusDu(programme, proposition.day);
   const jour = programme.trip.days.find((candidat) => candidat.index === proposition.day);
   const index = jour?.items.findIndex((ligne) => ligne.type === "stop" && ligne.stop.id === proposition.stop.id) ?? -1;
@@ -174,20 +204,23 @@ function origineProposition(programme: ProgrammeReduit, proposition: Proposition
 }
 
 /** Recompose les propositions : une requête de relecture par journée concernée, `detour` gardé au-delà du seuil. */
-async function recomposerPropositions(programme: ProgrammeReduit, relecteur: RelecteurTrajets): Promise<Proposal[]> {
+async function recomposerPropositions(programme: ProgrammeEcrit, relecteur: RelecteurTrajets | null): Promise<Proposal[]> {
   const relues = new Map<number, number>();
-  const jours = [...new Set(programme.proposals.filter((p) => p.travelFromPrevious).map((p) => p.day))];
-  for (const jour of jours) {
-    const concernees = programme.proposals
-      .map((proposition, index) => ({ proposition, index }))
-      .filter(({ proposition }) => proposition.day === jour && proposition.travelFromPrevious);
-    const minutes = await relire(
-      relecteur,
-      concernees.map(({ proposition }) =>
-        paire(origineProposition(programme, proposition), proposition.stop.placeId, proposition.travelFromPrevious!.mode),
-      ),
-    );
-    concernees.forEach(({ index }, rang) => relues.set(index, minutes[rang]!));
+  // Sans relecteur (décision 0074) : aucune durée relue, donc ni `travelFromPrevious` ni `detour` (seuil inconnu).
+  if (relecteur !== null) {
+    const jours = [...new Set(programme.proposals.filter((p) => p.travelFromPrevious).map((p) => p.day))];
+    for (const jour of jours) {
+      const concernees = programme.proposals
+        .map((proposition, index) => ({ proposition, index }))
+        .filter(({ proposition }) => proposition.day === jour && proposition.travelFromPrevious);
+      const minutes = await relire(
+        relecteur,
+        concernees.map(({ proposition }) =>
+          paire(origineProposition(programme, proposition), proposition.stop.placeId, proposition.travelFromPrevious!.mode),
+        ),
+      );
+      concernees.forEach(({ index }, rang) => relues.set(index, minutes[rang]!));
+    }
   }
   return programme.proposals.map((proposition, index) => {
     const { travelFromPrevious, detour, ...reste } = proposition;
@@ -207,11 +240,15 @@ async function recomposerPropositions(programme: ProgrammeReduit, relecteur: Rel
   });
 }
 
-/** Positions d'un jour, lues dans la table `positions` du programme ; `null` sans aucune position. */
-function carteDuJour(programme: ProgrammeReduit, jour: JourReduit): DayMap | null {
+/**
+ * Positions d'un jour, lues dans la table `positions` du programme ; `null` sans aucune position. Programme servi
+ * **sans carte** (`positions: null`, décision 0074) : toujours `null`, avant toute lecture de position.
+ */
+function carteDuJour({ programme, positions: table }: ProgrammeServi, jour: JourReduit): DayMap | null {
+  if (table === null) return null;
   const terminus = terminusDu(programme, jour.index);
   const position = (placeId: string | undefined) =>
-    placeId !== undefined && Object.hasOwn(programme.positions, placeId) ? programme.positions[placeId] : undefined;
+    placeId !== undefined && Object.hasOwn(table, placeId) ? table[placeId] : undefined;
   const points: MapPoint[] = [];
   const vus = new Set<string>();
   for (const ligne of jour.items) {
@@ -236,7 +273,7 @@ function carteDuJour(programme: ProgrammeReduit, jour: JourReduit): DayMap | nul
 }
 
 /** Résumé d'un voyage du prototype, sans relecture (aucune durée dans `TripSummary`). */
-function resume(programme: ProgrammeReduit): TripSummary {
+function resume(programme: ProgrammeEcrit): TripSummary {
   const { trip } = programme;
   return TripSummarySchema.parse({
     id: trip.id,
@@ -253,17 +290,58 @@ function resume(programme: ProgrammeReduit): TripSummary {
 }
 
 export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdapterOptions): TripAdapter {
-  const relecteur = relecteurs.trajets;
+  return creerAdapter({
+    async lister() {
+      const servis: ProgrammeServi[] = [];
+      for (const id of await programmes.ids()) {
+        const programme = await programmes.lire(id);
+        if (programme) servis.push({ programme, positions: programme.positions });
+      }
+      return servis;
+    },
+    async lire(tripId) {
+      const programme = await programmes.lire(tripId);
+      return programme ? { programme, positions: programme.positions } : null;
+    },
+    relecteur: relecteurs.trajets,
+  });
+}
 
+/**
+ * Adaptateur des programmes réels **sans carte ni durée** (décision 0074) : chemin explicite, distinct de celui du
+ * chargeur. Aucune position n'est lue ni servie (`getDayMap` et `getTripMap` vides), aucune relecture n'est faite :
+ * les lignes de trajet sont retirées de la journée, `travelMinutes` vaut 0 (l'interface n'affiche alors aucune durée,
+ * `withoutTravel`), et les propositions n'ont ni `travelFromPrevious` ni `detour`. « Mes voyages » lit tous les
+ * programmes en une seule lecture (`lister`).
+ */
+export function createPrototypeAdapterSansCarte({ programmes }: { programmes: SourceProgrammesEcrits }): TripAdapter {
+  return creerAdapter({
+    lister: async () => (await programmes.lister()).map((programme) => ({ programme, positions: null })),
+    async lire(tripId) {
+      const programme = await programmes.lire(tripId);
+      return programme ? { programme, positions: null } : null;
+    },
+    relecteur: null,
+  });
+}
+
+interface SourceServie {
+  lister(): Promise<ProgrammeServi[]>;
+  lire(tripId: string): Promise<ProgrammeServi | null>;
+  /** `null` : chemin sans durée (décision 0074). */
+  relecteur: RelecteurTrajets | null;
+}
+
+function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
   /** Programme de l'organisation du contexte ; `null` pour un identifiant mal formé, inconnu ou d'une autre organisation. */
-  const trouver = async (ctx: AdapterContext, tripId: string): Promise<ProgrammeReduit | null> => {
+  const trouver = async (ctx: AdapterContext, tripId: string): Promise<ProgrammeServi | null> => {
     if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId)) return null;
-    const programme = await programmes.lire(tripId);
-    if (!programme || programme.trip.organizationId !== ctx.organizationId) return null;
-    return programme;
+    const servi = await lire(tripId);
+    if (!servi || servi.programme.trip.organizationId !== ctx.organizationId) return null;
+    return servi;
   };
 
-  const voyage = async (programme: ProgrammeReduit): Promise<Trip> => {
+  const voyage = async (programme: ProgrammeEcrit): Promise<Trip> => {
     const days: Day[] = [];
     // Une requête par journée, dans l'ordre : aucune durée n'est gardée d'un appel à l'autre.
     for (const jour of programme.trip.days) days.push(await recomposerJour(programme, jour, relecteur));
@@ -272,25 +350,22 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
 
   return {
     async listTrips(ctx) {
-      const resumes: TripSummary[] = [];
-      for (const id of await programmes.ids()) {
-        const programme = await trouver(ctx, id);
-        if (programme) resumes.push(resume(programme));
-      }
-      return resumes;
+      return (await lister())
+        .filter(({ programme }) => programme.trip.organizationId === ctx.organizationId)
+        .map(({ programme }) => resume(programme));
     },
     async getTrip(ctx, tripId) {
-      const programme = await trouver(ctx, tripId);
-      return programme ? voyage(programme) : null;
+      const servi = await trouver(ctx, tripId);
+      return servi ? voyage(servi.programme) : null;
     },
     async getDay(ctx, tripId, index) {
-      const programme = await trouver(ctx, tripId);
-      const jour = programme?.trip.days.find((candidat) => candidat.index === index);
-      return programme && jour ? recomposerJour(programme, jour, relecteur) : null;
+      const servi = await trouver(ctx, tripId);
+      const jour = servi?.programme.trip.days.find((candidat) => candidat.index === index);
+      return servi && jour ? recomposerJour(servi.programme, jour, relecteur) : null;
     },
     async listProposals(ctx, tripId) {
-      const programme = await trouver(ctx, tripId);
-      return programme ? recomposerPropositions(programme, relecteur) : [];
+      const servi = await trouver(ctx, tripId);
+      return servi ? recomposerPropositions(servi.programme, relecteur) : [];
     },
     /**
      * Les voyages du prototype sont toujours débloqués (`unlocked: true`, forme réduite) : la présentation lit
@@ -300,15 +375,15 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
       return [];
     },
     async getDayMap(ctx, tripId, index) {
-      const programme = await trouver(ctx, tripId);
-      const jour = programme?.trip.days.find((candidat) => candidat.index === index);
-      return programme && jour ? carteDuJour(programme, jour) : null;
+      const servi = await trouver(ctx, tripId);
+      const jour = servi?.programme.trip.days.find((candidat) => candidat.index === index);
+      return servi && jour ? carteDuJour(servi, jour) : null;
     },
     async getTripMap(ctx, tripId) {
-      const programme = await trouver(ctx, tripId);
-      if (!programme) return [];
-      return programme.trip.days.flatMap((jour) => {
-        const carte = carteDuJour(programme, jour);
+      const servi = await trouver(ctx, tripId);
+      if (!servi) return [];
+      return servi.programme.trip.days.flatMap((jour) => {
+        const carte = carteDuJour(servi, jour);
         return carte ? [carte] : [];
       });
     },
