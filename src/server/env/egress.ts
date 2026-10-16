@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { CodeRefusSortie } from "@/ai/erreurs";
+
 import {
   DIRECTIVES_OPENSSL_CONF,
   examinerOpensslConf,
@@ -43,15 +45,12 @@ import {
  * `process.config` (condition 1.7, cinquième paramètre de `verifierSortie`, injectable) dans le même cas.
  */
 
-export const CODES_REFUS_SORTIE = ["production_refused", "proxy_env_refused", "tls_env_refused"] as const;
-export type CodeRefusSortie = (typeof CODES_REFUS_SORTIE)[number];
-
 /**
- * Code fermé « clé absente ou vide » des modules étroits `ai.ts` et `grounding.ts` et des clients réels. Écrit une
- * seule fois ici : son texte finit comme un nom secret (régime de confinement, section 5), d'où une seule ligne.
+ * Codes fermés de la barrière (`CODES_REFUS_SORTIE`) et « clé absente » (`CODE_CLE_ABSENTE`, modules étroits `ai.ts` et
+ * `grounding.ts`, clients réels) : définis une seule fois dans `src/ai/erreurs.ts` (décision 0077 § 3 point 1, module
+ * sans import) et exportés ici sous le même nom, pour que leurs importateurs ne changent pas.
  */
-export const CODE_CLE_ABSENTE = "missing_key";
-export type CodeCleAbsente = typeof CODE_CLE_ABSENTE;
+export { CODE_CLE_ABSENTE, CODES_REFUS_SORTIE, type CodeCleAbsente, type CodeRefusSortie } from "@/ai/erreurs";
 
 export type ResultatSortie = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusSortie };
 

@@ -12,8 +12,10 @@ import { CODE_CLE_ABSENTE } from "@/server/env/egress";
  * - impose `redirect: "manual"` et `cache: "no-store"` ;
  * - ne suit jamais une réponse 300 à 399 ou `opaqueredirect` : corps abandonné, `upstream_redirect`.
  * Aucun message, corps de réponse ni pile du fournisseur ne sort : seulement un code fermé. De `src/server`, ce
- * module n'importe que le code `missing_key` de `@/server/env/egress` (admis dans tout `src/grounding`) : le port de
- * consommation et le module de la clé ne sont importés que par les deux clients (exceptions nominatives de 0031 § 5).
+ * module n'importe que le code `missing_key` de `@/server/env/egress` (admis dans tout `src/grounding`), qui le
+ * réexporte sous le même nom depuis `src/ai/erreurs.ts`, sa définition unique (décision 0077 § 3 point 1, module sans
+ * import) : le port de consommation et le module de la clé ne sont importés que par les deux clients (exceptions
+ * nominatives de 0031 § 5).
  */
 
 /** Signature du transport : celle du `fetch` global, toujours appelée à travers l'enveloppe. */

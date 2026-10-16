@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { briefPourRecherche } from "@/ai/requetes";
+import { complementDepuisBrief, entreeModelesDepuisBrief } from "@/server/p0/vers-couche-ia";
 import { planRoutes } from "@/grounding/budget-routes";
 import { BriefSchema, NOM_BRIEF_PATTERN, RYTHMES, type Brief } from "@/prototype/brief";
 import { BORNES_ESSAI, validerConfigEssai } from "@/prototype/config";
@@ -136,7 +137,7 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
   });
 
   it("le modèle de la recherche ne voit pas le logement ; le récit n'en reprend aucun mot ; aucun champ personnel", () => {
-    const vue = JSON.stringify(briefPourRecherche(brief));
+    const vue = JSON.stringify(briefPourRecherche(entreeModelesDepuisBrief(brief), complementDepuisBrief(brief)));
     expect(vue).not.toContain(brief.logements[0]?.texte);
     const lieu = new Set(mots(`${brief.destination} ${brief.pays}`));
     const motsLogement = mots(brief.logements[0]?.texte ?? "").filter((mot) => !lieu.has(mot));

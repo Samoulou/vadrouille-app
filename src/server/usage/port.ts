@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { CodeRefusUsage } from "@/ai/erreurs";
+
 /**
  * Port de consommation `@/server/usage` (spécification `specs/P0-suite-executions-reelles.md`, « Port de
  * consommation » ; forme fixée par la décision 0046, D13). Les clients réels (`src/ai`, `src/grounding`) reçoivent
@@ -10,7 +12,8 @@ import "server-only";
  * calculées par l'appelant (D20) ; le port ne calcule aucun fuseau. Une réservation couvre **une seule** requête au
  * transport.
  *
- * Ce module ne contient que le contrat et l'enveloppe commune aux clients (délais, échec fermé). Il n'importe rien.
+ * Ce module ne contient que le contrat et l'enveloppe commune aux clients (délais, échec fermé). Il n'importe que ses
+ * codes de refus, de `src/ai/erreurs.ts` (module sans import, décision 0077 § 3 point 1).
  */
 
 export const NATURES = ["execution", "relecture"] as const;
@@ -88,8 +91,11 @@ export function demandeDe(contexte: ContexteAppel, appel: AppelFacture, plafonds
   };
 }
 
-export const CODES_REFUS_USAGE = ["cap_reached", "envelope_reached", "daily_quota_insufficient", "usage_unavailable"] as const;
-export type CodeRefusUsage = (typeof CODES_REFUS_USAGE)[number];
+/**
+ * Refus du port (D13) : définis une seule fois dans `src/ai/erreurs.ts` (décision 0077 § 3 point 1, module sans import)
+ * et exportés ici sous le même nom, pour que leurs importateurs ne changent pas.
+ */
+export { CODES_REFUS_USAGE, type CodeRefusUsage } from "@/ai/erreurs";
 
 export type ResultatReservation =
   | { readonly ok: true; readonly reservationId: string }

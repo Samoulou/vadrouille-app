@@ -1,11 +1,13 @@
+import type { TypeCreneau } from "@/ai/candidat";
 import type { ClientModeles } from "@/ai/client";
-import { requetePlan, requeteRecherche, type PageLue, type ResultatRecherche } from "@/ai/requetes";
+import type { EntreeModeles } from "@/ai/entrees";
+import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/ai/recherche-web";
+import type { Routage } from "@/ai/reglages";
+import { requetePlan, requeteRecherche, type PageLue } from "@/ai/requetes";
 import { lirePlan, lireTour, type CandidatExtrait, type RequetePlan } from "@/ai/sorties";
-import type { Brief } from "@/prototype/brief";
-import { CandidatSchema, type Candidat, type TypeCreneau } from "@/prototype/candidat";
-import type { ConfigRecherche, Routage } from "@/prototype/config";
+import type { BornesRecherche } from "@/research/bornes";
+import { CandidatRechercheSchema, type CandidatRecherche } from "@/research/candidat";
 import { urlNormalisee, type LecteurPages, type RaisonRefusPage } from "@/research/fetch-page";
-import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb } from "@/research/recherche-web";
 import { classerSource, dateMentionnee } from "@/research/sources";
 
 /**
@@ -63,7 +65,7 @@ export function tempsPourAppel(
 }
 
 /** État vivant de l'agent, remis à l'appelant au départ : ce qu'il a compté et admis, lisible même si la recherche lève. */
-export type EtatAgent = { readonly compteurs: CompteursAgent; readonly candidats: readonly Candidat[] };
+export type EtatAgent = { readonly compteurs: CompteursAgent; readonly candidats: readonly CandidatRecherche[] };
 
 export type DependancesAgent = {
   modeles: ClientModeles;
@@ -71,7 +73,18 @@ export type DependancesAgent = {
   routage: Routage;
   recherche: ClientRechercheWeb;
   lecteur: LecteurPages;
-  config: ConfigRecherche;
+  /** Bornes de la recherche (B7a, `src/research/bornes.ts`) ; `delaiMs` n'est pas lu ici (échéance : `peutAppeler`). */
+  bornes: BornesRecherche;
+  /**
+   * Récit et logements de P0 (`ComplementP0`, décision 0077 § 1 point 5), passés seulement par `pnpm p0` et `p0Run` ;
+   * son type est celui du dernier paramètre de `requetePlan` (`src/research` n'importe pas `@/ai/complement-p0`).
+   */
+  complement?: Parameters<typeof requetePlan>[3];
+  /**
+   * Textes que les requêtes web ne doivent jamais reprendre (`requeteSansDonneeDuBrief`). Absent : la destination et le
+   * pays de l'entrée seulement (aucun récit ni logement n'atteint l'agent sans `complement`).
+   */
+  protegees?: DonneesProtegees;
   /**
    * Reste-t-il assez de temps avant l'échéance de l'étape pour cet appel, délai complet compris (ticket 407) ? Demandé
    * avant chaque appel de modèle, chaque recherche web et chaque lecture de page ; non : la boucle se termine
@@ -84,7 +97,7 @@ export type DependancesAgent = {
 };
 
 /** Créneau visé par un candidat trouvé (cibles de `recherche.json`). */
-export function creneauDe(typeEtape: Candidat["typeEtape"]): TypeCreneau {
+export function creneauDe(typeEtape: CandidatRecherche["typeEtape"]): TypeCreneau {
   if (typeEtape === "meal") return "meal";
   if (typeEtape === "event") return "evening";
   return "activity";
@@ -216,6 +229,19 @@ function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): Fragme
 }
 
 /**
+ * Textes protégés d'une recherche (PR 326) : destination et pays (mots de lieu, admis dans une requête), logements,
+ * libellés d'engagements et récit (refusés). Forme structurelle : le `Brief` de P0 la satisfait ; l'adaptateur de P0
+ * (`src/server/p0/vers-couche-ia.ts`) la construit sans que `src/research` importe `src/prototype` (0077 § 1 point 7).
+ */
+export type DonneesProtegees = {
+  readonly destination: string;
+  readonly pays?: string;
+  readonly logements?: readonly { readonly texte: string }[];
+  readonly engagements?: readonly { readonly libelle: string }[];
+  readonly recit?: string;
+};
+
+/**
  * Requête de recherche web admise au regard du brief (PR 326, bloquant 1d et corrections 1 à 3 : la requête part
  * chez le moteur de recherche du fournisseur, Exa, hors du réglage `data_collection: "deny"`). Filet de sécurité :
  * depuis la correction 2, le modèle de l'étape de recherche ne voit ni les logements ni les engagements
@@ -241,13 +267,13 @@ function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): Fragme
  * (particules ou suffixes collés : « 롯데호텔에서 », turc, finnois, composés allemands). Seul appelant du moteur de
  * recherche web : cet agent (la composition `p0-reel` n'a pas le brief ; voir `src/ai/recherche-web-reelle.ts`).
  */
-export function requeteSansDonneeDuBrief(requete: string, brief: Brief): boolean {
+export function requeteSansDonneeDuBrief(requete: string, brief: DonneesProtegees): boolean {
   const texte = cleRequete(requete);
   const texteSansEspace = compactSansEspace(texte);
   // Mots de la requête en écriture à espaces, séparés de toute suite sans espace collée (« 新宿hotel »).
   const texteMots = texte.replace(SUITES_SANS_ESPACE, " ").replace(/ +/g, " ").trim();
-  const motsLieu = new Set(`${cleRequete(brief.destination)} ${cleRequete(brief.pays)}`.split(" ").filter((mot) => mot !== ""));
-  const proteges = [...brief.logements.map((l) => l.texte), ...(brief.engagements ?? []).map((e) => e.libelle)];
+  const motsLieu = new Set(`${cleRequete(brief.destination)} ${cleRequete(brief.pays ?? "")}`.split(" ").filter((mot) => mot !== ""));
+  const proteges = [...(brief.logements ?? []).map((l) => l.texte), ...(brief.engagements ?? []).map((e) => e.libelle)];
   for (const protege of proteges) {
     const fragments = fragmentsProteges(protege, motsLieu);
     if (fragments === undefined) return false;
@@ -284,10 +310,14 @@ function borner(texte: string, max: number): string {
 }
 
 export async function chercherCandidats(
-  brief: Brief,
+  entree: EntreeModeles,
   dependances: DependancesAgent,
-): Promise<{ candidats: Candidat[]; compteurs: CompteursAgent }> {
-  const { config } = dependances;
+): Promise<{ candidats: CandidatRecherche[]; compteurs: CompteursAgent }> {
+  const { bornes: config, complement } = dependances;
+  const protegees: DonneesProtegees = dependances.protegees ?? {
+    destination: entree.destination,
+    ...(entree.pays === undefined ? {} : { pays: entree.pays }),
+  };
   const compteurs: CompteursAgent = {
     tours: 0,
     recherches: 0,
@@ -300,7 +330,7 @@ export async function chercherCandidats(
     candidatsRefuses: { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
     finsEcheance: 0,
   };
-  const candidats: Candidat[] = [];
+  const candidats: CandidatRecherche[] = [];
   dependances.observer?.({ compteurs, candidats });
   /** Ticket 407 : l'échéance de l'étape admet-elle cet appel ? Non : la fin sur échéance est comptée. */
   const aLeTemps = (appel: AppelAgent): boolean => {
@@ -314,7 +344,7 @@ export async function chercherCandidats(
 
   // Étape 2 : plan de recherche, à partir du brief seul.
   if (!aLeTemps("modele")) return { candidats, compteurs };
-  const reponsePlan = await dependances.modeles.envoyer(requetePlan(brief, dependances.modele, dependances.routage));
+  const reponsePlan = await dependances.modeles.envoyer(requetePlan(entree, dependances.modele, dependances.routage, complement));
   noterFin(reponsePlan);
   const plan = lirePlan(reponsePlan.texte);
   compteurs.sortiesRefusees.plan += plan.refuses;
@@ -325,7 +355,7 @@ export async function chercherCandidats(
   const pagesTexte = new Map<string, string>();
   const cles = new Set<string>();
   const trouves: Record<TypeCreneau, number> = { activity: 0, meal: 0, evening: 0 };
-  let resultats: ResultatRecherche[] = [];
+  let resultats: ResultatWeb[] = [];
   let pages: PageLue[] = [];
 
   const ciblesAtteintes = () =>
@@ -350,7 +380,7 @@ export async function chercherCandidats(
       return;
     }
     const texte = pagesTexte.get(source);
-    const resultat = CandidatSchema.safeParse({
+    const resultat = CandidatRechercheSchema.safeParse({
       id: `c_${String(candidats.length + 1).padStart(3, "0")}`,
       nom: extrait.nom,
       resume: extrait.resume,
@@ -394,7 +424,7 @@ export async function chercherCandidats(
     const reponse = await dependances.modeles.envoyer(
       requeteRecherche(
         {
-          brief,
+          entree,
           tour,
           plan: requetesPlan,
           resultats,
@@ -404,6 +434,7 @@ export async function chercherCandidats(
         },
         dependances.modele,
         dependances.routage,
+        complement,
       ),
     );
     noterFin(reponse);
@@ -424,7 +455,7 @@ export async function chercherCandidats(
         // Mineur 4 du head `3254723` : nettoyée d'abord, la requête est jugée telle qu'elle part (longueur déjà bornée
         // à `LONGUEURS_TEXTE.requete` par le schéma des sorties, la même borne que le client réel).
         const requete = nettoyerRequeteWeb(action.requete);
-        if (!requeteSansDonneeDuBrief(requete, brief)) {
+        if (!requeteSansDonneeDuBrief(requete, protegees)) {
           compteurs.sortiesRefusees.recherche += 1;
           continue;
         }

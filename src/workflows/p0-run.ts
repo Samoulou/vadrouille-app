@@ -33,6 +33,14 @@ import { bornerLecteur, bornerRecherche, PlafondAgentAtteint } from "@/research/
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assembler, type Raison } from "@/server/p0/assemblage";
+import {
+  bornesDepuisConfig,
+  candidatPourModele,
+  complementDepuisBrief,
+  donneesProtegeesDepuisBrief,
+  entreeModelesDepuisBrief,
+  lieuRetenuDepuisCandidat,
+} from "@/server/p0/vers-couche-ia";
 import { poolPrototype } from "@/server/p0/base";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import {
@@ -589,13 +597,17 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
       let etat: EtatAgent | undefined;
       let trouve: Awaited<ReturnType<typeof chercherCandidats>>;
       try {
-        trouve = await chercherCandidats(contexte.brief, {
+        // Types de production de la couche IA (`vers-couche-ia.ts`, décision 0077 § 1 point 5) ; récit et logements de
+        // P0 par `ComplementP0`, pour P0 seulement (B7-PO-1).
+        trouve = await chercherCandidats(entreeModelesDepuisBrief(contexte.brief), {
           modeles: agent.modeles,
           modele: choisis.recherche,
           routage,
           recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
           lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
-          config: recherche,
+          bornes: bornesDepuisConfig(recherche),
+          complement: complementDepuisBrief(contexte.brief),
+          protegees: donneesProtegeesDepuisBrief(contexte.brief),
           // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même
           // délai complet que `registreDeLEtape` (modèle et recherche web : méthode `chat`) et `lecteurSousEcheance`.
           peutAppeler: tempsPourAppel(contexte.echeance, { modele: delaiDeLAppel("chat"), page: DELAI_MAX_MS, marge: MARGE_VERIFICATION_AGENT_MS }),
@@ -712,6 +724,9 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
     marquerAppels();
     const cout = memoireDuCout(contexte, registre);
     await cout.terminer(async () => {
+      // Types de production de la couche IA (`vers-couche-ia.ts`, 0077 § 1 point 5) ; `ComplementP0` pour P0 seulement.
+      const entreeIa = entreeModelesDepuisBrief(brief);
+      const complement = complementDepuisBrief(brief);
       // 1. Notation, avant les fiches.
       const lieux = relus.filter((relu) => relu.candidat.typeEtape !== "event" && relu.placeId !== null);
       const lotsNotation = enLots(
@@ -719,7 +734,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         recherche.tailleLotNotation,
       );
       const notes = new Map<string, CandidatNote["notes"]>();
-      (await parLots(lotsNotation, (lot) => finale.noterCandidats({ brief, lot }))).forEach((reponse, rang) => {
+      (await parLots(lotsNotation, (lot) => finale.noterCandidats({ entree: entreeIa, lot: lot.map(candidatPourModele), complement }))).forEach((reponse, rang) => {
         const ids = new Set((lotsNotation[rang] ?? []).map((candidat) => candidat.id));
         for (const [id, note] of lireNotes(reponse.texte, ids).valeur) notes.set(id, note);
       });
@@ -832,7 +847,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         recherche.tailleLotNotation,
       );
       const raisons = new Map<string, Raison>();
-      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ brief, retenus: lot }))).forEach((reponse, rang) => {
+      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ entree: entreeIa, retenus: lot.map(lieuRetenuDepuisCandidat), complement }))).forEach((reponse, rang) => {
         const ids = new Set((lotsRaisons[rang] ?? []).map((candidat) => candidat.id));
         for (const [id, raison] of lireRaisons(reponse.texte, ids).valeur) raisons.set(id, raison);
       });

@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats, type AppelAgent, type EtatAgent } from "@/research/agent";
+import type { AppelAgent, EtatAgent } from "@/research/agent";
+
+import { chercherCandidatsP0 } from "./agent-p0";
 
 /**
  * Ticket 407 (diagnostic de l'essai 4) : la fenêtre des appels de modèle de l'étape de recherche s'est fermée pendant
@@ -44,7 +46,7 @@ async function rejouer(reponses: string[], admis: (appel: AppelAgent, rang: numb
   const journal: string[] = [];
   const rangs = new Map<AppelAgent, number>();
   let etat: EtatAgent | undefined;
-  const resultat = await chercherCandidats(brief, {
+  const resultat = await chercherCandidatsP0(brief, {
     modeles: {
       envoyer: async () => {
         journal.push("modele");
@@ -135,7 +137,7 @@ describe("ia: agent de recherche, fin propre à l'échéance de l'étape (ticket
 
   it("sans vérification (mode simulé, scripts/p0) : aucune fin sur échéance", async () => {
     const reponses = [PLAN, tour({ actions: [RECHERCHER] }), tour({ candidats: [candidat("Musée maison")], termine: true })];
-    const { compteurs, candidats } = await chercherCandidats(brief, {
+    const { compteurs, candidats } = await chercherCandidatsP0(brief, {
       modeles: { envoyer: async () => ({ texte: reponses.shift() ?? tour({ termine: true }), coutUsd: 0 }) },
       modele: "fournisseur/recherche-test",
       routage: { data_collection: "deny" },

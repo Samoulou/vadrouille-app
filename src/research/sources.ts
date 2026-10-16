@@ -1,4 +1,4 @@
-import type { ClasseSource } from "@/prototype/candidat";
+import type { ClasseSource } from "@/research/candidat";
 
 /**
  * Politique de sources (cadrage § 6.5) : classement maison des domaines. Privilégier médias et guides locaux,
