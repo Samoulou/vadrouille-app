@@ -1,16 +1,12 @@
-# État du studio — 2026-10-16 (81e cycle)
+# État du studio — 2026-10-16 (82e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
 
 ## Messages de Samuel traités (projet)
-- GitHub, 2026-10-15 : 21:27 UTC, commentaire sur #374 « Je lève le délais 6h 0066-0067 » (Q455) ; 21:28 UTC, commentaire sur #383 « Je confirme l'amendement du verrou p0r4 » (Q459).
-- Fil du cycle : 21:30 UTC, « J'ai fait mes tâches » → vérifié : les deux phrases sont là ; ni relevé Neon ni tests sur #381 encore. 22:04 UTC, « je fais demain, j'avais pas d'ordi » → relevé S7 (Q456) et tests de `tests/db/` (Q457) attendus le 2026-10-16.
-- #studio : aucun nouveau message.
+- Aucun nouveau message depuis le 81e cycle (fil du cycle, GitHub et #studio). Relevé S7 (Q456) et tests de `tests/db/` (Q457) attendus dans la journée.
 
 ## Fait
-- **Conditions 1 et 4 de 0056 § 4.1 déclarées remplies** par la Sécurité sur #374 (commentaire 6202733687, 21:32 UTC), sur la base du commentaire de Samuel et du relevé A16. Liste de contrôle de l'essai mise à jour : l'essai d'intégration n'attend plus P0r4 (Q459) ; P0r4 reste exigée avant P0a2.
-- `p0-purge` réussi à 21:23 UTC (condition 5 tenue jusqu'à 09:23 UTC le 2026-10-16).
-- Fusionnés depuis le 80e cycle : #386 (état du 80e cycle), #387 (note de version v2026.10.15-21).
+- Fusionné depuis le 81e cycle : #388 (état du 81e cycle). Rien d'autre : le chemin de l'essai attend les deux gestes de Samuel.
 
 ## En cours
 - Aucun agent. data : A17, #381 en brouillon, attend les tests de `tests/db/` posés par Samuel (Q457).
