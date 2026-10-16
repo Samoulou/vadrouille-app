@@ -210,6 +210,34 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     expect(port.lignes.map((l) => l.etat)).toEqual(["confirmee", "confirmee"]);
   });
 
+  it("JSON proto3 (Q460) : day, hour et minute absents valent 0 (période sans minute, ouverture dimanche minuit)", async () => {
+    const periodes = [
+      // Lundi 9 h – 18 h, heures pile : aucune minute écrite.
+      { open: { day: 1, hour: 9 }, close: { day: 1, hour: 18 } },
+      // Dimanche minuit (ni day, ni hour, ni minute) – dimanche 12 h.
+      { open: {}, close: { hour: 12 } },
+    ];
+    const { client } = monter([
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: periodes } }),
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: {} }] } }),
+    ]);
+    expect((await client.details(PLACE_ID)).horaires).toEqual([
+      { jour: 1, debut: 540, fin: 1080 },
+      { jour: 0, debut: 0, fin: 720 },
+    ]);
+    // Ouvert en permanence, ouverture sans aucun champ : sept plages pleines.
+    expect((await client.details(PLACE_ID)).horaires).toHaveLength(7);
+  });
+
+  it("point d'horaire hors bornes ou non entier : toujours invalid_response", async () => {
+    const { client } = monter([
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { day: 7 } }] } }),
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { minute: 1.5 } }] } }),
+    ]);
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+  });
+
   it("businessStatus inconnu de l'énumération : toujours invalid_response", async () => {
     const { client } = monter([async () => json({ ...DETAILS, businessStatus: "STATUT_INCONNU" })]);
     expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
