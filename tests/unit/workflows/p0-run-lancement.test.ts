@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as ecriture from "@/adapters/prototype-ecriture";
 import type { GardeOuverte } from "@/server/p0/garde";
 import { LIMITES_PROTOTYPE } from "@/server/usage/forfait";
-import { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
+import { briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
 
 /**
  * Pièces du lancement lues dans le pont `p0Run` (P0r3d) : forfait et règles de la réservation (0046 D13 point 3 ; 0053 ;
@@ -30,6 +30,16 @@ beforeEach(() => {
 });
 
 describe("p0Run : pièces du lancement (P0r3d)", () => {
+  it("ticket 400 : brief dans les plafonds du mode ; l'essai (essai.json) n'admet que le brief court, le mode réel tous", () => {
+    const table = Object.fromEntries((["essai", "reel"] as const).map((mode) => [mode, Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, briefTientDansLeMode(mode, nom)]))]));
+    expect(table).toEqual({
+      essai: { "edimbourg-1.json": false, "edimbourg-2.json": false, "edimbourg-3.json": false, "edimbourg-court.json": true },
+      reel: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true },
+    });
+    expect(briefTientDansLeMode("essai", "absent.json")).toBe(false);
+    expect(briefTientDansLeMode("demo" as "reel", "edimbourg-court.json")).toBe(false);
+  });
+
   it("SKU du forfait : égaux à ceux des clients réels (lus dans leur source : seuls leurs tests les importent)", () => {
     const sku = (fichier: string, nom: string) => {
       const trouve = new RegExp(`^export const ${nom} = "([a-z_]+)";$`, "m").exec(readFileSync(path.join(process.cwd(), fichier), "utf8"));

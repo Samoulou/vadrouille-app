@@ -9,7 +9,7 @@ import { p0Run } from "./p0-run";
 
 export { P0RUN_COMPLET };
 /** Pièces du lancement (P0r3d), lues dans le pont `p0-run.ts` : l'application n'importe pas `src/prototype` (0048 § 1). */
-export { briefLancable, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, verrouS8Leve, type LancementDuMode } from "./p0-run";
+export { briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, verrouS8Leve, type LancementDuMode } from "./p0-run";
 
 /**
  * Interface stable des workflows (décision 0009 point 2) : le reste du code ne connaît que ce module, jamais le paquet

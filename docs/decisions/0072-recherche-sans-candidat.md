@@ -1,0 +1,28 @@
+# 0072 — Recherche réelle sans candidat : lecture tolérante, arrêt clair et contrôle au lancement
+
+Statut : rédigée par ia-recherche **pour le Tech Lead**, qui la décide (choix techniques de l'agent de recherche et du workflow `p0Run`, « Qui décide quoi » de `docs/CONTEXT.md`) en approuvant la PR #401 ; délai de veto de Samuel selon la décision 0068. Les verdicts de la Sécurité cités ci-dessous viennent de la revue consolidée du head `cd614d4` de la PR #401.
+
+Date : 2026-10-16 · Décideur : Tech Lead · Rédacteur : ia-recherche · Ticket : #400 · PR : #401
+
+## Contexte
+
+Le deuxième essai réel s'est arrêté après deux appels de modèle (le plan, puis un tour sans aucune recherche web) et a rendu 0 candidat sans erreur. Rejoué en mode simulé (`tests/unit/p0/agent-recherche-vide.test.ts`), le compte s'explique par deux sorties de modèle : un objet JSON rendu dans un bloc de code Markdown, refusé en entier puis lu comme `termine`, et `termine: true` dès le premier tour, avant toute recherche. L'exécution a ensuite payé l'ancrage et l'étape finale pour rien.
+
+## Décision
+
+1. **Lecture tolérante des sorties** (`src/ai/sorties.ts`, `formesAEssayer`). L'objet JSON est cherché, dans l'ordre, dans : la réponse telle quelle ; ce qui suit le dernier `</think>` ; le contenu des 8 derniers blocs de code Markdown (`BLOCS_ESSAYES_MAX`), du dernier au premier ; l'empan du premier `{` au dernier `}`. Le schéma strict qui valide l'objet ne change pas (clés de racine fermées, éléments validés un à un, refus comptés sans contenu).
+   - **Coût borné** (bloquant 1 de la Sécurité, head `cd614d4`) : une réponse de plus de `LONGUEUR_REPONSE_MAX` caractères (256 Ki, plus de trois fois le plus long tour valide) est refusée en entier (`illisible`) sans examen ; les blocs sont trouvés par un balayage linéaire (`indexOf`), sans expression régulière ; au plus `BLOCS_ESSAYES_MAX + 3` analyses JSON par réponse. Test de non-régression : bloc ouvert jamais fermé suivi de 100 k espaces.
+   - **Limite assumée** (mineur 3) : un objet placé après le vrai (dernier `</think>`, dernier bloc, empan des accolades) peut le masquer. Effet borné par le schéma strict et par la règle « un candidat n'est gardé que si sa source figure dans les résultats de recherche de l'exécution ».
+   - Une réponse sans objet lisible est `illisible` : comptée (`sortiesIllisibles`), elle ne termine pas la boucle de l'agent ; le tour suivant redemande, jusqu'à `toursMax`.
+2. **`termine` ignoré avant toute recherche web** (`src/research/agent.ts`) : avant la première recherche, aucun candidat ne peut avoir de source admise ; un `termine: true` est alors ignoré et compté (`terminesIgnores`). Le nombre d'appels de modèle reste borné par `1 + toursMax` (plan, puis un appel par tour), quelles que soient les réponses du modèle (test « N sorties illisibles consécutives ») ; la dépense reste bornée par le plafond de coût de l'exécution, réservé avant chaque appel.
+3. **Arrêt `research_empty`** (`src/workflows/p0-run.ts`, `etapeRecherche`) : si la recherche ne rend aucun lieu (les événements seuls ne font pas de programme), l'exécution s'arrête là, avant l'ancrage et l'étape finale. Code interne `research_empty`, **persisté `pipeline_failed`** (S4 : aucune migration, aucune valeur nouvelle en base). Un code d'arrêt persisté distinct reste une question ouverte.
+4. **Refus `brief_hors_plafonds` au lancement** (`src/server/p0/lancement.ts`, étape « c bis ») : `briefTientDansLeMode` vérifie, avant toute réservation et sans connexion à la base, que le plan Routes du séjour tient et que la première série ne dépasse pas le budget de fiches du mode. Ordre complet des refus : (a) `p0Run` démarrable, (b) choix reçu valide, (c) configuration du mode et forfait, (c bis) brief dans les plafonds du mode, (d) verrou S8 levé, (e) réservation du forfait. Limite : les logements sont comptés par repères distincts (`logement-N`) ; si deux logements s'ancraient au même lieu, l'étape finale pourrait voir une première série plus grande d'au plus un lieu par jour de changement (commentaire dans `briefTientDansLeMode`).
+5. **Événement de journal `p0.research_done`** (`src/server/log.ts`, liste fermée) : compteurs entiers seulement, jamais de texte de modèle, de requête, d'URL ni de donnée Google : `candidates` (tous les candidats, événements compris), `places` (lieux seuls, qui décident du niveau et de l'arrêt), `turns`, `searches`, `pagesRead`, `candidatesRefused`, `planRefused`, `planUnreadable`, `turnRefused`, `turnUnreadable`, `finishIgnored`, `finishAbnormal`. Niveau `warn` quand `places` vaut 0. Verdict de la Sécurité : acquis (revue du head `cd614d4`).
+6. **Prompt recherche v2** (`src/ai/prompts/recherche.ts`, version 2) : la source d'un lieu doit être une URL des résultats de recherche ; premier tour consacré aux recherches ; objet JSON nu, sans bloc de code ni texte autour ; forme des actions et des candidats décrite ; `termine` vrai seulement quand plus aucune action n'est demandée. Aucune donnée Google dans le prompt (règle de `CLAUDE.md`). La version est vérifiée par le test « mineur 11 » de `tests/unit/p0/agent-recherche-vide.test.ts`.
+
+## Conséquences
+
+- Les tours illisibles ou terminés trop tôt coûtent au plus `toursMax` appels de modèle ; `finishIgnored` et `turnUnreadable` les rendent visibles dans le journal.
+- Une recherche vide ne paie plus l'ancrage ni l'étape finale.
+- Reportés (PR #401, mineurs 6, 7 et 10) : noms de champs du journal mêlant camelCase et snake_case ; compteur `finishAbnormal` par raison ; résultats du dernier tour jamais renvoyés au modèle (ticket séparé).
+- `specs/P0-suite-2.md` renvoie à cette décision (section « Workflow `p0Run` »).

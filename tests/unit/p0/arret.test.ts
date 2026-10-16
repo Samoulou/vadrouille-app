@@ -68,6 +68,8 @@ describe("p0: stop_code et phase selon S4", () => {
       "routes_unavailable",
       "reduction_refused",
       "programme_invalid",
+      // Ticket 400 : recherche sans aucun lieu (code interne de l'étape de recherche).
+      "research_empty",
       "cap_reached",
       "cost_cap_reached",
       "quota_reached",

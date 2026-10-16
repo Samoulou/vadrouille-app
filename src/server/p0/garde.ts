@@ -33,10 +33,11 @@ export type GardeOuverte = { readonly runId: string; readonly [MARQUE]: true };
 /**
  * Refus du lancement rendus par `reserver` **avant** la réservation, garde déjà ouverte (P0r3d) : choix refusé
  * (`entree_invalide`) et mode réel indisponible (`real_mode_unavailable` : `p0Run` non démarrable, configuration refusée
- * ou verrou S8 fermé). Rien n'est écrit. Le décompte atteint (`run_quota_reached`, D24) ne refuse plus depuis la
- * décision 0071.
+ * ou verrou S8 fermé) et brief hors des plafonds du mode (`brief_hors_plafonds`, ticket 400 : plan Routes ou fiches
+ * de la première série au-delà des plafonds). Rien n'est écrit. Le décompte atteint (`run_quota_reached`, D24) ne
+ * refuse plus depuis la décision 0071.
  */
-export type CodeRefusAvantReservation = "entree_invalide" | "real_mode_unavailable";
+export type CodeRefusAvantReservation = "entree_invalide" | "real_mode_unavailable" | "brief_hors_plafonds";
 
 /** Codes de la garde fermée : environnement et déploiement, accès, réservation, exécution. */
 export type CodeGarde = CodeGardeFermee | "access_refused" | "run_refused" | CodeRefusUsage | CodeRefusAvantReservation;

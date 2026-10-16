@@ -321,6 +321,73 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     expect(d.ancrage).not.toHaveBeenCalled();
   });
 
+  it("ticket 400 : recherche sans aucun lieu (aucun candidat, ou des événements seuls) : arrêt pipeline_failed, rien écrit, ancrage jamais lancé", async () => {
+    const journal = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    for (const candidats of [[], [candidat(1, "event")]]) {
+      vi.clearAllMocks();
+      d.chercherCandidats.mockResolvedValue({ candidats });
+      expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+      expect(d.remplacerCandidats).not.toHaveBeenCalled();
+      expect(d.ecrireCoutModeles).toHaveBeenCalledTimes(1);
+    }
+    d.chercherCandidats.mockResolvedValue({ candidats: [] });
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "pipeline_failed");
+    expect(d.ancrage).not.toHaveBeenCalled();
+    expect(d.etapeFinale).not.toHaveBeenCalled();
+    journal.mockRestore();
+  });
+
+  it("ticket 400 : ligne de journal fermée de fin de recherche, compteurs de l'agent seulement (warn si aucun lieu)", async () => {
+    const info = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const compteurs = {
+      tours: 3,
+      recherches: 0,
+      pagesLues: 0,
+      pagesRefusees: {},
+      sortiesRefusees: { plan: 1, recherche: 2 },
+      sortiesIllisibles: { plan: 1, recherche: 1 },
+      terminesIgnores: 1,
+      finsAnormales: 1,
+      candidatsRefuses: { source_not_in_results: 4, duplicate: 0, over_total: 0, invalid: 1 },
+    };
+    d.chercherCandidats.mockResolvedValue({ candidats: [], compteurs });
+    await refus(etapeRecherche({ runId: RUN_ID }));
+    const lignes = info.mock.calls.map((appel) => JSON.parse(String(appel[0])) as Record<string, unknown>).filter((l) => l.event === "p0.research_done");
+    expect(lignes).toEqual([
+      {
+        level: "warn",
+        event: "p0.research_done",
+        candidates: 0,
+        places: 0,
+        turns: 3,
+        searches: 0,
+        pagesRead: 0,
+        candidatesRefused: 5,
+        planRefused: 1,
+        planUnreadable: 1,
+        turnRefused: 2,
+        turnUnreadable: 1,
+        finishIgnored: 1,
+        finishAbnormal: 1,
+      },
+    ]);
+    info.mockClear();
+    d.chercherCandidats.mockResolvedValue({ candidats: [candidat(1)], compteurs: { ...compteurs, recherches: 2 } });
+    await etapeRecherche({ runId: RUN_ID });
+    const ligne = String(info.mock.calls.find((appel) => String(appel[0]).includes("p0.research_done"))?.[0]);
+    expect(JSON.parse(ligne)).toMatchObject({ level: "info", candidates: 1, places: 1, searches: 2 });
+    expect(ligne).not.toContain("Lieu maison");
+    expect(ligne).not.toContain("guide.example");
+    // Mineur 2 du head `cd614d4` : événements seuls, `candidates > 0` mais `places` à 0, d'où le niveau `warn`.
+    info.mockClear();
+    d.chercherCandidats.mockResolvedValue({ candidats: [candidat(1, "event")], compteurs });
+    await refus(etapeRecherche({ runId: RUN_ID }));
+    const evenementsSeuls = String(info.mock.calls.find((appel) => String(appel[0]).includes("p0.research_done"))?.[0]);
+    expect(JSON.parse(evenementsSeuls)).toMatchObject({ level: "warn", candidates: 1, places: 0 });
+    info.mockRestore();
+  });
+
   it("clôture : un code hors de CODES_ARRET devient pipeline_failed", async () => {
     await etapeClore({ runId: RUN_ID, code: SENTINELLE_ERREUR as never });
     expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "pipeline_failed");
