@@ -22,7 +22,9 @@ const STATUTS: ReadonlyMap<string, AncrageResolu["statut"]> = new Map([
 ]);
 
 /**
- * Ancrage d'une fiche Place Details : statut traduit par `STATUTS` (un statut inattendu vaut fermé définitivement),
+ * Ancrage d'une fiche Place Details : statut traduit par `STATUTS` (un statut absent vaut ouvert, puisque Google ne
+ * déclare aucun état d'établissement pour un quartier, un parc ou un site naturel, Q460 ; un statut présent mais
+ * inattendu vaut fermé définitivement),
  * position et horaires recopiés champ par champ. Nom, adresse, note et prix ne sont pas recopiés. Partagée avec les
  * fonctions de `p0Run` (`ancrage-zone.ts`, 0055 § 6 point 3 : réutilisée, jamais recopiée).
  */
@@ -30,7 +32,7 @@ export function ancrageDeFiche(placeId: string, details: DetailsLieu): AncrageRe
   return {
     resolu: true,
     placeId,
-    statut: STATUTS.get(details.statut) ?? "ferme_definitivement",
+    statut: details.statut === undefined ? "ouvert" : (STATUTS.get(details.statut) ?? "ferme_definitivement"),
     position: { lat: details.position.lat, lng: details.position.lng },
     horaires: details.horaires === null ? null : details.horaires.map(({ jour, debut, fin }) => ({ jour, debut, fin })),
   };

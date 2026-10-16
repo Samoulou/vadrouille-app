@@ -223,6 +223,54 @@ describe("p0: lieu fermé définitivement écarté à l'étape finale et remplac
   });
 });
 
+/** Double de Places dont les fiches n'ont aucun statut (quartier, parc, site naturel : Places API (New) n'en renvoie pas). */
+function espionSansStatut() {
+  const base = espion();
+  const places: ClientPlaces = {
+    textSearch: base.places.textSearch,
+    details: async (placeId) => {
+      const fiche: DetailsLieu = { ...(await base.places.details(placeId)) };
+      delete fiche.statut;
+      return fiche;
+    },
+  };
+  return { ...base, places };
+}
+
+describe("p0: lieu sans statut d'établissement (Q460, diagnostic de l'essai 1)", () => {
+  it("logement de type quartier sans statut : ancré et ouvert, puis la zone et les candidats suivent", async () => {
+    const { places, fiches } = espionSansStatut();
+    const capacites = capacitesAncrage(places);
+    const { logements, zone } = await ancrerLogementsDuSejour(BRIEF, capacites);
+    expect(logements).toEqual([expect.objectContaining({ resolu: true, placeId: "SENT_LOGEMENT_1", statut: "ouvert" })]);
+    expect(fiches).toEqual(["SENT_LOGEMENT_1"]);
+    const ancrages = await ancrerCandidatsDansZone([{ id: "c_001", nom: "Musée" }], BRIEF.destination, capacites, zone);
+    expect([...ancrages]).toEqual([["c_001", { resolu: true, placeId: "SENT_MUSEE" }]]);
+  });
+
+  it("étape finale : un lieu sans statut est retenu (ouvert) ; un logement sans statut est relu sans erreur", async () => {
+    const zone = zoneDuSejour([{ lat: 55.95, lng: -3.19 }], 30_000);
+    const { places } = espionSansStatut();
+    const issue = await fichesEtapeFinale([{ id: "c_001", placeId: "SENT_BAR" }], places, zone, { premiereSerie: 1, marge: 0 });
+    expect(issue).toMatchObject({ complete: true });
+    expect(issue.retenus.map((r) => [r.id, r.ancrage.statut])).toEqual([["c_001", "ouvert"]]);
+    const relus = await fichesLogementsEtapeFinale(["SENT_LOGEMENT_1"], places);
+    expect(relus.map((l) => l.statut)).toEqual(["ouvert"]);
+  });
+
+  it("statut présent mais inattendu : reste fermé définitivement (logement refusé, lieu écarté)", async () => {
+    const base = espion();
+    const places: ClientPlaces = {
+      textSearch: base.places.textSearch,
+      details: async (placeId) => ({ ...(await base.places.details(placeId)), statut: "STATUT_INCONNU" as unknown as DetailsLieu["statut"] }),
+    };
+    await expect(ancrerLogementsDuSejour(BRIEF, capacitesAncrage(places))).rejects.toEqual(new ErreurAncrage("lodging_unresolved"));
+    const zone = zoneDuSejour([{ lat: 55.95, lng: -3.19 }], 30_000);
+    const issue = await fichesEtapeFinale([{ id: "c_001", placeId: "SENT_BAR" }], places, zone, { premiereSerie: 1, marge: 0 });
+    expect(issue).toMatchObject({ retenus: [], complete: false });
+  });
+});
+
 describe("p0: logements relus à l'étape finale ; pré-tri par le cache", () => {
   it("une fiche par logement ; fermé ou introuvable : lodging_unresolved", async () => {
     const { places, fiches } = espion();
