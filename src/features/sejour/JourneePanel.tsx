@@ -30,6 +30,7 @@ export interface JourneePanelProps {
  */
 export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE, highlightedStopIds }: JourneePanelProps) {
   const banner = day.generating ? null : travelBannerMessage(day);
+  const travelLine = day.generating ? null : dayTravelLine(day);
 
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
@@ -42,9 +43,9 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
         >
           {formatTitreJour(day.date)}
         </h1>
-        {day.generating ? null : (
+        {travelLine === null ? null : (
           <p data-part="trajet-budget" className="text-corps-s text-ink-soft tabular-nums">
-            {dayTravelLine(day)}
+            {travelLine}
           </p>
         )}
       </header>

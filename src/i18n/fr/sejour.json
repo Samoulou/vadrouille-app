@@ -9,6 +9,7 @@
   "journee": {
     "trajet": "{duree} de trajet",
     "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
+    "budgetSeul": "Environ {montant} CHF par personne",
     "enPreparation": "Jour {n} en préparation",
     "etapes": "Étapes du jour {n}",
     "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
@@ -57,6 +58,7 @@
       "titre": "Jour par jour",
       "resume": "{etapes} · {duree} de trajet",
       "etapes": {
+        "aucune": "Aucune étape",
         "un": "1 étape",
         "plusieurs": "{n} étapes"
       },

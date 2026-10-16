@@ -1,14 +1,22 @@
 import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-relecteur";
+import type { PoolSql } from "@/server/usage/neon";
 
-import { createPrototypeAdapter, type SourceProgrammes } from "./prototype";
+import { createPrototypeAdapter, createPrototypeAdapterSansCarte } from "./prototype";
+import { createSourceProgrammesReels } from "./prototype-lecture";
 import { createProgrammeLoader } from "./prototype-loader";
 import type { TripAdapter } from "./types";
 
 /**
- * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6) : programmes lus dans le dossier
- * `VADROUILLE_PROTOTYPE_DIR` (lu une fois, à la création), relecteur **simulé** dans tous les cas (P0b1 : aucun
- * relecteur réel, aucune clé lue, aucun appel à Google, sous `pnpm dev` comme en préversion ou en CI).
+ * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6 ; décision 0074) :
+ * - `VADROUILLE_PROTOTYPE_DIR` posée (lue une fois, à la création) : programmes lus dans ce dossier, relecteur
+ *   **simulé** (P0b1 : aucun relecteur réel, aucune clé lue, aucun appel à Google ; `pnpm dev`, CI, e2e) ;
+ * - sinon : programmes **réels** lus dans `prototype.programmes`, en lecture seule, derrière la barrière du mode réel
+ *   (garde ouverte et cookie d'accès, vérifiée à chaque lecture ; fermée : aucun programme, comme avant), **sans
+ *   relecteur** (aucune durée de trajet, aucun appel Routes) et sans position (aucune carte). La barrière
+ *   (`src/server/p0/lecture-programmes.ts`) est **branchée au démarrage** par `src/instrumentation.ts`
+ *   (`brancherLectureProgrammesReels`) : ce module n'importe ni la base ni la garde (régime de confinement, doubles de
+ *   `@/adapters`). Non branchée (tests, `next build`, autre runtime) : aucun programme.
  *
  * L'instance (index du chargeur, compteur du relecteur simulé) n'existe que si la liste blanche
  * `prototypeAdapterAllowed` est vraie ; elle ne garde aucune durée relue. Elle vit sur `globalThis`, comme la
@@ -16,15 +24,33 @@ import type { TripAdapter } from "./types";
  * compteur (`/dev/api/prototype/relectures`) doit lire le relecteur des pages.
  */
 
-const AUCUN_PROGRAMME: SourceProgrammes = { ids: async () => [], lire: async () => null };
+/** Barrière de la lecture réelle : pool si elle est ouverte pour la requête courante, sinon `null`. */
+export type BarriereLectureProgrammes = () => Promise<PoolSql | null>;
 
 interface Instance {
   adapter: TripAdapter;
   relecteur: RelecteurSimule;
 }
 
+/** État du module sur `globalThis` : l'instance (créée à la demande) et la barrière branchée au démarrage. */
+interface Etat {
+  instance?: Instance;
+  barriere?: BarriereLectureProgrammes;
+}
+
 const INSTANCE_KEY = Symbol.for("vadrouille.prototype");
-const holder = globalThis as typeof globalThis & { [INSTANCE_KEY]?: Instance };
+const holder = globalThis as typeof globalThis & { [INSTANCE_KEY]?: Etat };
+
+/**
+ * Branche la barrière de la lecture réelle (appelé une fois, au démarrage, par `src/instrumentation.ts` ; décision
+ * 0074). Sur `globalThis`, comme l'instance : Next.js charge une copie de ce module par route.
+ */
+export function brancherLectureProgrammesReels(barriere: BarriereLectureProgrammes): void {
+  holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], barriere };
+}
+
+/** Barrière lue à chaque lecture ; non branchée : `null` (aucune connexion, aucun programme). */
+const poolLectureProgrammes: BarriereLectureProgrammes = async () => (await holder[INSTANCE_KEY]?.barriere?.()) ?? null;
 
 /** Lève une erreur explicite hors liste blanche : jamais de repli silencieux vers `mock`. */
 export function assertPrototypeAllowed(env: NodeJS.ProcessEnv): void {
@@ -35,13 +61,17 @@ export function assertPrototypeAllowed(env: NodeJS.ProcessEnv): void {
 
 export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env): TripAdapter {
   assertPrototypeAllowed(env);
-  if (!holder[INSTANCE_KEY]) {
+  const etat = holder[INSTANCE_KEY] ?? {};
+  if (!etat.instance) {
     const dossier = env.VADROUILLE_PROTOTYPE_DIR?.trim();
-    const programmes = dossier ? createProgrammeLoader({ dossier }) : AUCUN_PROGRAMME;
     const relecteur = createRelecteurSimule();
-    holder[INSTANCE_KEY] = { adapter: createPrototypeAdapter({ programmes, relecteurs: { trajets: relecteur } }), relecteur };
+    const adapter = dossier
+      ? createPrototypeAdapter({ programmes: createProgrammeLoader({ dossier }), relecteurs: { trajets: relecteur } })
+      : createPrototypeAdapterSansCarte({ programmes: createSourceProgrammesReels({ pool: poolLectureProgrammes }) });
+    etat.instance = { adapter, relecteur };
+    holder[INSTANCE_KEY] = etat;
   }
-  return holder[INSTANCE_KEY].adapter;
+  return etat.instance.adapter;
 }
 
 /**
@@ -50,5 +80,5 @@ export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env): Trip
  */
 export function prototypeRelectures(env: NodeJS.ProcessEnv = process.env): number | null {
   if (!prototypeAdapterAllowed(env)) return null;
-  return holder[INSTANCE_KEY]?.relecteur.appels() ?? 0;
+  return holder[INSTANCE_KEY]?.instance?.relecteur.appels() ?? 0;
 }

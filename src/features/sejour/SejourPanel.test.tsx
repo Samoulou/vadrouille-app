@@ -180,6 +180,20 @@ describe("SejourPanel : « Pendant ton séjour » et « Jour par jour »", () =>
     expect(days[5]).not.toHaveTextContent("de trajet");
   });
 
+  it("décision 0074 : jours sans durée connue, résumé « N étapes » sans « de trajet » ; jour sans étape : « Aucune étape »", () => {
+    const days = edimbourg.days.map((day) => ({
+      ...day,
+      items: day.index === 3 ? [] : day.items.filter((item) => item.type !== "segment"),
+      travelMinutes: 0,
+    }));
+    renderSejour({ ...edimbourg, days });
+    const liens = within(section("Jour par jour")).getAllByRole("link");
+    const etapesJ2 = days[1]!.items.filter((item) => item.type === "stop").length;
+    expect(liens[1]).toHaveTextContent(`${etapesJ2} étapes`);
+    for (const lien of liens) expect(lien).not.toHaveTextContent("de trajet");
+    expect(liens[2]).toHaveTextContent("Aucune étape");
+  });
+
   it("axe sans violation", async () => {
     const { container } = renderSejour();
     expect(await axeViolations(container)).toEqual([]);

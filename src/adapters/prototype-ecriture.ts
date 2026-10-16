@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { CodeEchecEcriture, EcritureProgrammePrototype, ProgrammeEcrit } from "@/contracts/prototype-ecriture";
-import { PLACE_ID_PATTERN, PROTOTYPE_ORG_ID, placeIdsDuProgramme } from "@/prototype/programme-reduit";
+import { CLES_PROGRAMME_ECRIT, PLACE_ID_PATTERN, PROTOTYPE_ORG_ID, placeIdsDuProgramme } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
@@ -30,10 +30,10 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
  * Clés de premier niveau du contenu, égales à `CLES_CONTENU` (`src/prototype/decoupage.ts`) et au `CHECK` de
- * `prototype.programmes` (test) ; recopiées parce que l'application n'atteint pas `src/prototype` hors de
- * `programme-reduit` (0048 § 1, test `p0: graphes d'import`).
+ * `prototype.programmes` (test) : `CLES_PROGRAMME_ECRIT` de `programme-reduit`, seul module de `src/prototype` que
+ * l'application atteint (0048 § 1).
  */
-export const CLES_CONTENU_ECRIT = ["schema", "trip", "proposals", "terminus"] as const;
+export const CLES_CONTENU_ECRIT = CLES_PROGRAMME_ECRIT;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SQLSTATE = /^[0-9A-Z]{5}$/;

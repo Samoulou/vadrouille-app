@@ -29,6 +29,8 @@ export const LOG_EVENTS = [
   // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu. Depuis le ticket 407,
   // écrite aussi quand la recherche lève (`errorName`, `warn`), avec `deadlineStop` (fin sur l'échéance de l'étape).
   "p0.research_done",
+  // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
+  "p0.read_unavailable",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];

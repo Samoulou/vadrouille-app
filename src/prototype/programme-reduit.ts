@@ -214,15 +214,52 @@ export function placeIdsDuProgramme(programme: {
   return ids;
 }
 
+/**
+ * Clés de premier niveau du programme **écrit** en base (`prototype.programmes.contenu`) : la forme réduite sans
+ * `positions` (Q324, 0046 D15 point 1). Égales au `CHECK` de `prototype.programmes` (test).
+ */
+export const CLES_PROGRAMME_ECRIT = ["schema", "trip", "proposals", "terminus"] as const;
+
+const ChampsProgrammeEcrit = {
+  schema: z.literal(PROGRAMME_REDUIT_SCHEMA),
+  trip: VoyageReduitSchema,
+  /** Les 8 propositions de la présentation (cadrage § 4), au plus. */
+  proposals: z.array(PropositionReduiteSchema).max(8),
+  terminus: z.array(TerminusReduitSchema),
+};
+
+/** Contrôles de structure communs au programme écrit et à la forme réduite complète (jours, terminus, propositions). */
+function controlerStructure(
+  programme: { trip: VoyageReduit; proposals: PropositionReduite[]; terminus: z.infer<typeof TerminusReduitSchema>[] },
+  ctx: z.RefinementCtx,
+): void {
+  const jours = programme.trip.days.map((jour) => jour.index);
+  if (new Set(jours).size !== jours.length) {
+    ctx.addIssue({ code: "custom", message: "indices de jour en double", path: ["trip", "days"] });
+  }
+  const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
+  if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus.at(index) !== jour)) {
+    ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
+  }
+  const joursConnus = new Set(jours);
+  programme.proposals.forEach((proposition, index) => {
+    if (!joursConnus.has(proposition.day)) {
+      ctx.addIssue({ code: "custom", message: "proposition d'un jour absent", path: ["proposals", index, "day"] });
+    }
+  });
+}
+
+/**
+ * Programme **écrit** : la forme réduite sans `positions`, telle que `p0Run` l'écrit dans `prototype.programmes`.
+ * Schéma unique de ce contenu, partagé par le rapport (`src/server/p0/rapport.ts`), la lecture des programmes réels
+ * (`src/adapters/prototype-lecture.ts`, décision 0074) et la recomposition (`src/prototype/decoupage.ts`). Une clé
+ * `positions` est refusée (objet strict).
+ */
+export const ProgrammeEcritSchema = z.strictObject(ChampsProgrammeEcrit).superRefine(controlerStructure);
+export type ProgrammeEcrit = z.infer<typeof ProgrammeEcritSchema>;
+
 export const ProgrammeReduitSchema = z
-  .strictObject({
-    schema: z.literal(PROGRAMME_REDUIT_SCHEMA),
-    trip: VoyageReduitSchema,
-    /** Les 8 propositions de la présentation (cadrage § 4), au plus. */
-    proposals: z.array(PropositionReduiteSchema).max(8),
-    positions: PositionsSchema,
-    terminus: z.array(TerminusReduitSchema),
-  })
+  .strictObject({ ...ChampsProgrammeEcrit, positions: PositionsSchema })
   .superRefine((programme, ctx) => {
     const attendus = placeIdsDuProgramme(programme);
     const presents = Object.keys(programme.positions);
@@ -238,19 +275,6 @@ export const ProgrammeReduitSchema = z
         break;
       }
     }
-    const jours = programme.trip.days.map((jour) => jour.index);
-    if (new Set(jours).size !== jours.length) {
-      ctx.addIssue({ code: "custom", message: "indices de jour en double", path: ["trip", "days"] });
-    }
-    const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
-    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus.at(index) !== jour)) {
-      ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
-    }
-    const joursConnus = new Set(jours);
-    programme.proposals.forEach((proposition, index) => {
-      if (!joursConnus.has(proposition.day)) {
-        ctx.addIssue({ code: "custom", message: "proposition d'un jour absent", path: ["proposals", index, "day"] });
-      }
-    });
+    controlerStructure(programme, ctx);
   });
 export type ProgrammeReduit = z.infer<typeof ProgrammeReduitSchema>;

@@ -348,6 +348,8 @@ describe("module de journal", () => {
       "p0.guard_closed",
       // Ticket 400 : fin de la recherche de p0Run, compteurs de l'agent seulement (des nombres).
       "p0.research_done",
+      // Décision 0074 : branchement de la lecture des programmes réels impossible, nom d'erreur seulement.
+      "p0.read_unavailable",
       "log.unknown_event",
     ]);
   });
