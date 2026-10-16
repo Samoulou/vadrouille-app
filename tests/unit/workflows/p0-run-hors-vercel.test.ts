@@ -23,7 +23,8 @@ const d = vi.hoisted(() => ({
 
 vi.mock("@/server/p0/base", () => ({ poolPrototype: () => ({ connect: d.connect }) }));
 vi.mock("@/server/composition/p0-reel", () => ({ composerP0Reel: d.composerP0Reel }));
-vi.mock("@/research/agent", () => ({ chercherCandidats: d.chercherCandidats }));
+// Ticket 407 : vérification d'échéance remise à l'agent ; l'agent étant simulé, toujours le temps.
+vi.mock("@/research/agent", () => ({ chercherCandidats: d.chercherCandidats, tempsPourAppel: () => () => true }));
 vi.mock("@/adapters/prototype-travail", () => ({
   lireExecution: d.lireExecution,
   ecrirePhase: vi.fn(),

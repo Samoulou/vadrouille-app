@@ -16,11 +16,21 @@ import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { PHASES } from "@/prototype/arret";
 import { placeIdsDuProgramme } from "@/prototype/programme-reduit";
-import { creerLecteurPages } from "@/research/fetch-page";
+import { tempsPourAppel } from "@/research/agent";
+import { creerLecteurPages, DELAI_MAX_MS } from "@/research/fetch-page";
 import { creerHttpSimule, creerResolveurSimule } from "@/research/pages.simule";
 import { creerRechercheSimulee } from "@/research/recherche-web.simule";
 import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, type PortConsommation } from "@/server/usage/port";
-import { etapeAncrage, etapeFinale, etapeRecherche, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, p0Run } from "@/workflows/p0-run";
+import {
+  etapeAncrage,
+  etapeFinale,
+  etapeRecherche,
+  LIMITE_FONCTION_MS,
+  MARGE_FIN_ETAPE_MS,
+  MARGE_VERIFICATION_AGENT_MS,
+  p0Run,
+  RESERVE_ETAPES_SUIVANTES_MS,
+} from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
 import { clesDe, CLES_INTERDITES, sentinelles } from "../p0/harnais";
@@ -180,6 +190,26 @@ vi.mock("@/server/composition/p0-reel", () => ({
 }));
 
 let capture: Capture;
+
+/**
+ * Latences simulées (ticket 407, ms) : l'horloge (`Date`, simulée) avance de la latence de chaque appel, à partir de son
+ * départ ; des appels partis ensemble (lots de l'étape finale) finissent donc ensemble. Absentes : l'horloge ne bouge pas.
+ */
+type Latences = { readonly modele: number; readonly rechercheWeb: number; readonly page: number; readonly places: number; readonly routes: number };
+let latences: Latences | undefined;
+
+async function avecLatence<T>(duree: number | undefined, envoi: () => Promise<T>): Promise<T> {
+  const depart = Date.now();
+  const reponse = await envoi();
+  if (duree !== undefined) vi.setSystemTime(Math.max(Date.now(), depart + duree));
+  return reponse;
+}
+
+function latenceDe(methode: AppelFacture["methode"]): number | undefined {
+  if (latences === undefined) return undefined;
+  if (methode === "chat") return latences.modele;
+  return methode === "routes_matrix" ? latences.routes : latences.places;
+}
 /** Port de consommation (registre de l'étape) et plafonds reçus par la dernière composition. */
 let derniere: { usage: PortConsommation; plafonds: readonly Plafond[] } | undefined;
 
@@ -212,7 +242,7 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
         code: reservation.code,
       });
     try {
-      const reponse = await envoi();
+      const reponse = await avecLatence(latenceDe(appel.methode), envoi);
       await options.usage.confirm(reservation.reservationId, {
         coutMicros: coutReel(reponse),
       });
@@ -281,8 +311,11 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
   return {
     agent: () => ({
       modeles,
-      rechercheWeb: creerRechercheSimulee(fixtures.recherche),
-      pages: lecteur,
+      rechercheWeb: (() => {
+        const simulee = creerRechercheSimulee(fixtures.recherche);
+        return { rechercher: (requete: string) => avecLatence(latences?.rechercheWeb, () => simulee.rechercher(requete)) };
+      })(),
+      pages: { lire: (url: string, autorisees: ReadonlySet<string>) => avecLatence(latences?.page, () => lecteur.lire(url, autorisees)) },
     }),
     ancrage: () => capacitesAncrage(places),
     etapeFinale: () => ({
@@ -325,6 +358,7 @@ function reinitialiser(): void {
   d.sansStatut = false;
   d.composerP0Reel.mockImplementation(compositionSimulee);
   derniere = undefined;
+  latences = undefined;
 }
 
 beforeEach(() => {
@@ -694,16 +728,18 @@ describe("p0Run, marge de durée (réponse 1 du Tech Lead, PR 348 ; dureeMs 900 
     return usage;
   }
 
-  it("échéance : limite de fonction (300 s) moins la marge (30 s) ; un appel dont le délai complet ne tient pas est refusé cap_reached", async () => {
-    expect(LIMITE_FONCTION_MS).toBe(300_000);
+  it("échéance (0075) : durée restante moins la part des étapes suivantes, au plus la limite de fonction (800 s), moins la marge (30 s) ; un appel dont le délai complet ne tient pas est refusé cap_reached", async () => {
+    expect(LIMITE_FONCTION_MS).toBe(800_000);
     expect(MARGE_FIN_ETAPE_MS).toBe(30_000);
+    expect(RESERVE_ETAPES_SUIVANTES_MS).toEqual({ recherche: 450_000, ancrage: 300_000, notation: 0 });
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
       const usage = await registreOuvertA(0);
-      // Places : 10 s de requête + 2 × 2 s de port ; échéance à T0 + 270 s.
-      vi.setSystemTime(T0 + 256_000);
+      // Ancrage ouvert à 0 s écoulée : min(800 s, 900 − 0 − 300) − 30 = échéance à T0 + 570 s.
+      // Places : 10 s de requête + 2 × 2 s de port.
+      vi.setSystemTime(T0 + 556_000);
       expect((await usage.reserve(demande("places_details"))).ok).toBe(true);
-      vi.setSystemTime(T0 + 256_001);
+      vi.setSystemTime(T0 + 556_001);
       expect(await usage.reserve(demande("places_details"))).toEqual({
         ok: false,
         code: "cap_reached",
@@ -713,7 +749,7 @@ describe("p0Run, marge de durée (réponse 1 du Tech Lead, PR 348 ; dureeMs 900 
         code: "cap_reached",
       });
       // Modèle : 120 s + 2 × 2 s ; Routes : 10 s + 2 × 2 s.
-      vi.setSystemTime(T0 + 146_001);
+      vi.setSystemTime(T0 + 446_001);
       expect(await usage.reserve(demande("chat"))).toEqual({
         ok: false,
         code: "cap_reached",
@@ -727,8 +763,8 @@ describe("p0Run, marge de durée (réponse 1 du Tech Lead, PR 348 ; dureeMs 900 
   it("durée du mode (900 s) presque écoulée, mesurée par la base : l'échéance la suit, avant la limite de fonction", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
-      // 840 s écoulées : il reste 60 s, échéance à T0 + 30 s.
-      const usage = await registreOuvertA(840_000);
+      // 540 s écoulées : il reste 360 s, dont 300 gardées pour l'étape finale ; échéance à T0 + 30 s.
+      const usage = await registreOuvertA(540_000);
       vi.setSystemTime(T0 + 16_000);
       expect((await usage.reserve(demande("places_details"))).ok).toBe(true);
       vi.setSystemTime(T0 + 16_001);
@@ -750,8 +786,135 @@ describe("p0Run, marge de durée (réponse 1 du Tech Lead, PR 348 ; dureeMs 900 
       matrices: [],
       ordre: [],
     };
+    const journal = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const erreur = await refus(etapeRecherche({ runId: RUN_ID }));
     expect(erreur.message).toBe("pipeline_failed");
     expect(capture.ordre).toEqual([]);
+    // Ticket 407 : l'agent n'a même pas demandé son plan ; fin sur échéance journalisée, aucun lieu (`research_empty`).
+    const ligne = journal.mock.calls.map((appel) => String(appel[0])).find((texte) => texte.includes("p0.research_done"));
+    expect(JSON.parse(String(ligne))).toMatchObject({ level: "warn", candidates: 0, places: 0, turns: 0, deadlineStop: 1 });
+    journal.mockRestore();
+  });
+
+  it("ticket 407 : vérification de l'agent, même délai complet que le registre (modèle et recherche web 124 s, page 10 s) plus 1 s", () => {
+    expect(MARGE_VERIFICATION_AGENT_MS).toBe(1_000);
+    // Valeurs passées par `etapeRecherche` : délai complet d'un appel `chat` (120 s + 2 × 2 s), d'une page (10 s).
+    expect(DELAI_MAX_MS).toBe(10_000);
+    let maintenant = T0;
+    const peut = tempsPourAppel(T0 + 200_000, { modele: 124_000, page: DELAI_MAX_MS, marge: MARGE_VERIFICATION_AGENT_MS }, () => maintenant);
+    maintenant = T0 + 75_000;
+    expect([peut("modele"), peut("recherche_web"), peut("page")]).toEqual([true, true, true]);
+    maintenant = T0 + 75_001;
+    expect([peut("modele"), peut("recherche_web"), peut("page")]).toEqual([false, false, true]);
+    maintenant = T0 + 189_000;
+    expect(peut("page")).toBe(true);
+    maintenant = T0 + 189_001;
+    expect(peut("page")).toBe(false);
+  });
+
+  it("ticket 407 (essai 4) : la fenêtre des appels de modèle se ferme pendant la recherche ; fin propre avec les candidats admis, puis ancrage", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const journal = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      vi.setSystemTime(T0);
+      capture = { requetes: [], textSearch: [], details: [], matrices: [], ordre: [] };
+      // Chaque appel de modèle de la recherche dure 90 s : échéance de la recherche à T0 + min(800, 900 − 450) − 30 =
+      // T0 + 420 s ; un appel de modèle ne part plus après T0 + 295 s (124 s de délai complet, 1 s de marge).
+      d.composerP0Reel.mockImplementation((garde: unknown, options: OptionsSimulees) => {
+        const composition = compositionSimulee(garde, options);
+        return {
+          ...composition,
+          agent: () => {
+            const agent = composition.agent();
+            return {
+              ...agent,
+              modeles: {
+                envoyer: async (requete: RequeteModele) => {
+                  const reponse = await agent.modeles.envoyer(requete);
+                  vi.setSystemTime(Date.now() + 90_000);
+                  return reponse;
+                },
+              },
+            };
+          },
+        };
+      });
+      await etapeRecherche({ runId: RUN_ID });
+      const appelsModele = capture.ordre.filter((appel) => appel.startsWith("modele:"));
+      // Appels à T0, T0 + 90 s, + 180 s, + 270 s ; le suivant (T0 + 360 s) n'est pas demandé.
+      expect(appelsModele).toHaveLength(4);
+      const ligne = JSON.parse(String(journal.mock.calls.map((appel) => String(appel[0])).find((texte) => texte.includes("p0.research_done")))) as Record<string, unknown>;
+      expect(ligne).toMatchObject({ level: "info", deadlineStop: 1, turns: 3 });
+      expect(ligne.places).toBeGreaterThan(0);
+      expect(d.etat.lignes.length).toBe(ligne.candidates);
+      expect(d.etat.phase).toBe("recherche");
+      expect(d.etat.statut).toBe("en_cours");
+      // L'ancrage part ensuite sur les candidats admis.
+      d.composerP0Reel.mockImplementation(compositionSimulee);
+      await etapeAncrage({ runId: RUN_ID });
+      expect(d.etat.phase).toBe("ancrage");
+      expect(capture.textSearch.length).toBeGreaterThan(0);
+    } finally {
+      journal.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * Ticket 407 : `edimbourg-1.json` (6 jours) de bout en bout sous les échéances de 0075, avec des latences simulées.
+ * L'horloge simulée avance de la latence de chaque appel ; la durée écoulée de l'exécution est relue « en base » à
+ * chaque étape (`now − started_at`), comme en vrai. Les lots de l'étape finale partent ensemble. Non modélisé : le délai
+ * de la file entre deux étapes (quelques secondes). Aucun appel réel.
+ */
+describe("p0Run, edimbourg-1.json sous les échéances (ticket 407, 0075)", () => {
+  const T0 = Date.parse("2026-10-16T16:05:30Z");
+
+  /** Exécute `p0Run` ; rend l'instant (s depuis T0) de chaque phase écrite et la ligne de fin de recherche. */
+  async function executer(choisies: Latences) {
+    latences = choisies;
+    Object.defineProperty(d.etat, "ecouleMs", { get: () => Date.now() - T0, set: () => undefined, configurable: true, enumerable: true });
+    const phases = new Map<string, number>();
+    // Phases écrites horodatées : le double de `ecrirePhase` n'appelle que `push` sur `d.ecrituresPhase`.
+    const origine = d.ecrituresPhase;
+    d.ecrituresPhase = {
+      push: (...ajouts: string[]) => {
+        for (const phase of ajouts) phases.set(phase, (Date.now() - T0) / 1000);
+        return origine.push(...ajouts);
+      },
+    } as unknown as string[];
+    const journal = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+    capture = { requetes: [], textSearch: [], details: [], matrices: [], ordre: [] };
+    try {
+      expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+      const ligne = journal.mock.calls.map((appel) => String(appel[0])).find((texte) => texte.includes("p0.research_done"));
+      return { phases, fin: (Date.now() - T0) / 1000, recherche: JSON.parse(String(ligne)) as Record<string, unknown> };
+    } finally {
+      vi.useRealTimers();
+      journal.mockRestore();
+      d.ecrituresPhase = origine;
+      Object.defineProperty(d.etat, "ecouleMs", { value: 0, writable: true, configurable: true, enumerable: true });
+    }
+  }
+
+  // Appels de modèle de 20 s à 100 s (l'essai 4 : 14 appels, recherches web comprises, en 2 min environ).
+  it.each([
+    { cas: "typique", latences: { modele: 20_000, rechercheWeb: 8_000, page: 2_000, places: 500, routes: 1_500 }, finEcheance: 0 },
+    { cas: "lent", latences: { modele: 45_000, rechercheWeb: 15_000, page: 5_000, places: 1_000, routes: 3_000 }, finEcheance: 1 },
+    { cas: "très lent", latences: { modele: 100_000, rechercheWeb: 30_000, page: 9_000, places: 3_000, routes: 8_000 }, finEcheance: 1 },
+  ])("latences $cas : programme écrit, chaque étape sous son échéance, l'exécution sous 900 s", async ({ latences: choisies, finEcheance }) => {
+    const { phases, fin, recherche } = await executer(choisies);
+    expect(d.etat.clos).toBeUndefined();
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.ecrituresPhase).toEqual([...PHASES]);
+    expect(recherche).toMatchObject({ level: "info", deadlineStop: finEcheance });
+    expect(recherche.places).toBeGreaterThanOrEqual(20);
+    // Recherche finie avant son échéance (420 s), ancrage avant la sienne (900 − 300 − 30 = 570 s au plus), fin sous 870 s.
+    expect(phases.get("ancrage")).toBeLessThanOrEqual(420);
+    expect(phases.get("notation")).toBeLessThanOrEqual(570);
+    expect(fin).toBeLessThanOrEqual(870);
+    expect(placeIdsDuProgramme(programmeEcrit().contenu as never).size).toBeGreaterThan(0);
   });
 });

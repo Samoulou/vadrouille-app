@@ -315,6 +315,14 @@ describe("module de journal", () => {
     });
   });
 
+  it("ticket 407 : deadlineStop, entier positif ou nul, admis sur p0.research_done ; toute autre valeur retirée", () => {
+    const ligne = (champs: object) => JSON.parse(formatLogLine("p0.research_done", champs, "warn")) as Record<string, unknown>;
+    expect(ligne({ deadlineStop: 1, errorName: "ErreurOpenRouter" })).toEqual({ level: "warn", event: "p0.research_done", deadlineStop: 1, errorName: "ErreurOpenRouter" });
+    expect(ligne({ deadlineStop: 0 })).toEqual({ level: "warn", event: "p0.research_done", deadlineStop: 0 });
+    expect(ligne({ deadlineStop: -1 })).toEqual({ level: "warn", event: "p0.research_done", dropped: 1 });
+    expect(ligne({ deadlineStop: "1" })).toEqual({ level: "warn", event: "p0.research_done", dropped: 1 });
+  });
+
   it("errorNameOf ne lit que error.name, jamais message, code ni cause", () => {
     expect(errorNameOf(new TypeError(SENTINELLE))).toBe("TypeError");
     expect(errorNameOf({ name: `a@exemple.test`, message: SENTINELLE })).toBeUndefined();
