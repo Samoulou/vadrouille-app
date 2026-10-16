@@ -87,7 +87,7 @@ export const CandidatSchema = z.strictObject({
 });
 export type Candidat = z.infer<typeof CandidatSchema>;
 
-/** Les quatre notes de l'étape « Notation » (variante B, décision 0027). */
+/** Les quatre notes de l'étape « Notation » (décisions 0027 et 0076). */
 export const NotesSchema = z.strictObject({
   matchesWishes: z.boolean(),
   notForMeRisk: z.number().int().min(1).max(10),

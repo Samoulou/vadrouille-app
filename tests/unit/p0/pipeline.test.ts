@@ -10,7 +10,7 @@ import { ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/program
 import { charger, executerCapture } from "./harnais";
 
 /**
- * Tests de l'orchestrateur sur les fixtures commitées (mode simulé) : entrée limitée du Decider et des raisons,
+ * Tests de l'orchestrateur sur les fixtures commitées (mode simulé) : entrée limitée de la notation et des raisons,
  * variante A, aucun identifiant de modèle en dur, garde data_collection, plafonds, aucune relance de la recherche,
  * candidats non résolus ou fermés, validation complète avant réduction, page à instructions, redaction.
  */
@@ -48,7 +48,7 @@ function avecPlafonds(modifs: Partial<Configuration["plafonds"]>): Configuration
   return { ...configBase, plafonds: { ...configBase.plafonds, ...modifs } };
 }
 
-describe("p0: le Decider ne note que des candidats ancrés et ne reçoit que des identifiants internes, des noms et résumés maison et le brief", () => {
+describe("p0: la notation ne note que des candidats ancrés et ne reçoit que des identifiants internes, des noms et résumés maison et le brief", () => {
   it("requête capturée : champs permis seulement, candidats ancrés et ouverts seulement", async () => {
     const { capture } = await executerCapture();
     const notation = capture.requetes.filter((requete) => requete.etape === "notation");
@@ -91,21 +91,27 @@ describe("p0: les raisons ne sont demandées que pour les lieux retenus", () => 
 
 describe("p0: la variante A ne change que le modèle de notation", () => {
   it("requêtes capturées identiques hors identifiant de modèle de l'étape de notation", async () => {
-    const b = await executerCapture({ variante: "b" });
-    const a = await executerCapture({ variante: "a" });
+    // Configuration de TEST où `variantes.a.notation` diffère (la configuration commitée a le même modèle en A et B, 0076).
+    const configuration: Configuration = {
+      ...configBase,
+      modeles: { ...configBase.modeles, variantes: { a: { notation: "test/notation-a" } } },
+    };
+    const b = await executerCapture({ variante: "b", configuration });
+    const a = await executerCapture({ variante: "a", configuration });
     expect(a.capture.requetes.length).toBe(b.capture.requetes.length);
     a.capture.requetes.forEach((requeteA, index) => {
       const requeteB = b.capture.requetes[index];
       expect(requeteB?.etape).toBe(requeteA.etape);
       if (requeteA.etape === "notation") {
-        expect(requeteA.modele).toBe(configBase.modeles.variantes.a.notation);
+        expect(requeteA.modele).toBe("test/notation-a");
         expect(requeteB?.modele).toBe(configBase.modeles.etapes.notation);
         expect({ ...requeteA, modele: "" }).toEqual({ ...requeteB, modele: "" });
       } else {
         expect(requeteA).toEqual(requeteB);
       }
     });
-    expect(a.resultat.rapport.modeles.notation).toBe(configBase.modeles.variantes.a.notation);
+    expect(a.resultat.rapport.modeles.notation).toBe("test/notation-a");
+    expect(b.resultat.rapport.modeles.notation).toBe(configBase.modeles.etapes.notation);
   });
 });
 

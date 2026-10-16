@@ -2,7 +2,7 @@
   "schema": 1,
   "etapes": {
     "recherche": "deepseek/deepseek-v4.1-flash",
-    "notation": "perplexity/pplx-decider-v1.1-27b",
+    "notation": "deepseek/deepseek-v4.1-flash",
     "raisons": "deepseek/deepseek-v4.1-flash"
   },
   "variantes": {

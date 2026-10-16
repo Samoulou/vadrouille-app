@@ -37,7 +37,7 @@ export type Nuit = { etiquette: string; placeId?: string };
 /** Source web d'un candidat : URL `https:` déjà validée, date de la page, classe de domaine. */
 export type SourceMoteur = { url: string; date: string; classe: ClasseSource };
 
-/** Notes du Decider (étape de notation), sur nos descriptions seulement. */
+/** Notes du modèle de notation (étape de notation), sur nos descriptions seulement. */
 export type NotesMoteur = {
   matchesWishes: boolean;
   /** 1 à 10. */
