@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PaireRelecture } from "@/adapters/prototype";
 import { valeurCookieAcces } from "@/server/p0/acces";
-import { creerRelecteurReel, SQL_PURGE_RECENTE, type ClientMatrice, type DependancesRelecteur } from "@/server/p0/relecture";
-import { forfaitRelecture, LIMITES_PROTOTYPE, type Forfait, type LimitesForfait } from "@/server/usage/forfait";
+import { creerCadence, ErreurBudgetRoutes } from "@/grounding/budget-routes";
+import { cadenceRelecture, creerRelecteurReel, SQL_PURGE_RECENTE, type ClientMatrice, type DependancesRelecteur } from "@/server/p0/relecture";
+import { forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type LimitesForfait } from "@/server/usage/forfait";
 import type { ClientSql, PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { PLAFONDS_RELECTURE, relectureDuMode, SKUS_FORFAIT } from "@/workflows/p0-run";
 import prixGoogle from "../../../prototype/config/prix-google.json";
@@ -108,6 +109,9 @@ function routesSimulees(secondes: (origine: string, destination: string) => numb
   return { client, requetes };
 }
 
+/** Cadence propre au test, sans attente (le test de la cadence partagée injecte la sienne). */
+const cadenceLibre = () => creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, { maintenant: () => 0, attendre: async () => undefined });
+
 const PAIRES: PaireRelecture[] = [
   { origine: "lieu_hotel", destination: "lieu_musee", mode: "walk" },
   { origine: "lieu_musee", destination: "lieu_cafe", mode: "walk" },
@@ -124,6 +128,7 @@ function relecteur(extra: Partial<DependancesRelecteur> & { pool?: () => PoolSql
     cookie: async () => COOKIE,
     relecture: async () => ({ forfait: FORFAIT, regles: regles() }),
     routes: fabrique,
+    cadence: async () => cadenceLibre(),
     ...extra,
   });
   return { relecteur: r, fabrique, routes };
@@ -238,6 +243,7 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
       cookie: async () => COOKIE,
       pool: () => poolSimule().pool,
       relecture: async () => ({ forfait: petit, regles: regles() }),
+      cadence: async () => cadenceLibre(),
       routes: async (_garde, port) => {
         usage = port;
         return routesSimulees().client;
@@ -282,5 +288,87 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
     });
     expect(lu!.regles).toEqual({ limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 });
     expect(relectureDuMode()).toEqual(lu);
+  });
+});
+
+describe("p0: cadence Routes unique par processus pour la relecture (3 000 éléments par minute)", () => {
+  it("plusieurs relectures simultanées partagent la cadence : au-delà du maximum de la minute, les requêtes attendent", async () => {
+    // Horloge injectée : l'attente avance le temps virtuel ; cadence réduite à 4 éléments par minute pour le test.
+    let maintenant = 0;
+    const attentes: number[] = [];
+    const cadence = creerCadence(4, {
+      maintenant: () => maintenant,
+      attendre: async (ms) => {
+        attentes.push(ms);
+        // Le temps avance après les tâches en cours (macrotâche) : les requêtes déjà admises partent à leur instant.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        maintenant += ms;
+      },
+    });
+    const departs: { instant: number; elements: number }[] = [];
+    const client: ClientMatrice = {
+      async matrice(requete) {
+        departs.push({ instant: maintenant, elements: requete.origines.length * requete.destinations.length });
+        return { secondes: requete.origines.map(() => requete.destinations.map(() => 120)) };
+      },
+    };
+    const lecteurs = Array.from({ length: 3 }, () =>
+      creerRelecteurReel({
+        env: preversion(),
+        execArgv: [],
+        maintenant: () => T0,
+        cookie: async () => COOKIE,
+        pool: () => poolSimule().pool,
+        relecture: async () => ({ forfait: FORFAIT, regles: regles() }),
+        routes: async () => client,
+        cadence: async () => cadence,
+      }),
+    );
+    // Trois relectures de deux éléments chacune (deux origines distinctes) : 6 éléments pour un maximum de 4.
+    const deux: PaireRelecture[] = [
+      { origine: "lieu_a", destination: "lieu_b", mode: "walk" },
+      { origine: "lieu_b", destination: "lieu_c", mode: "walk" },
+    ];
+    const resultats = await Promise.all(lecteurs.map((l) => l.relireJournee(deux)));
+    expect(resultats.every((r) => r.ok)).toBe(true);
+    expect(departs.reduce((t, d) => t + d.elements, 0)).toBe(6);
+    // Jamais plus de 4 éléments dans une minute glissante ; au moins une requête a attendu la minute suivante.
+    for (const depart of departs) {
+      const fenetre = departs.filter((d) => d.instant > depart.instant - 60_000 && d.instant <= depart.instant);
+      expect(fenetre.reduce((t, d) => t + d.elements, 0)).toBeLessThanOrEqual(4);
+    }
+    expect(attentes.length).toBeGreaterThan(0);
+    expect(Math.max(...departs.map((d) => d.instant))).toBeGreaterThanOrEqual(60_000);
+  });
+
+  it("cadence par défaut : une seule instance par processus, au quota de 3 000 éléments par minute", async () => {
+    const cadence = await cadenceRelecture();
+    expect(await cadenceRelecture()).toBe(cadence);
+    expect(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE).toBe(3_000);
+    await expect(cadence.reserver(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1)).rejects.toBeInstanceOf(ErreurBudgetRoutes);
+  });
+});
+
+describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed)", () => {
+  it("daily_quota_insufficient (forfait au-delà du quota d'une minute) n'est pas un plafond atteint : unavailable", async () => {
+    const enorme: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { routesRequetes: 1, routesElements: QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1 });
+    const base = poolSimule();
+    const { relecteur: r, fabrique } = relecteur({ pool: () => base.pool, relecture: async () => ({ forfait: enorme, regles: regles() }) });
+    expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
+    expect(fabrique).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "ReservationImpossible" }, "warn");
+  });
+
+  it("cookie illisible hors portée de requête : refus fermé, aucune connexion, aucune erreur levée", async () => {
+    const base = poolSimule();
+    const { relecteur: r, fabrique } = relecteur({
+      pool: () => base.pool,
+      cookie: async () => {
+        throw new Error("cookies() hors de la portée d'une requête");
+      },
+    });
+    expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
+    expect(base.connect).not.toHaveBeenCalled();
+    expect(fabrique).not.toHaveBeenCalled();
   });
 });

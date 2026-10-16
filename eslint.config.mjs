@@ -161,9 +161,22 @@ const GARDE_OUVERTE_SYNTAX = [
   { selector: "TSTypeAssertion > TSTypeReference.typeAnnotation[typeName.name='GardeOuverte']", message: GARDE_OUVERTE_MESSAGE },
   { selector: "TSTypePredicate TSTypeReference[typeName.name='GardeOuverte']", message: GARDE_OUVERTE_MESSAGE },
 ];
+/**
+ * P0r4 (ticket 414, décision 0079 ; bloquant 3 de la revue du head `e79fbed`) : la preuve `GardeRelecture` (relecture
+ * Routes payante) a la même protection que `GardeOuverte`, mêmes exemptions.
+ */
+const GARDE_RELECTURE_MESSAGE =
+  "GardeRelecture n'est fabriquée que par src/server/p0/garde.ts (décision 0079) : ni conversion, ni assertion, ni prédicat de type hors des tests de tests/.";
+const GARDE_RELECTURE_SYNTAX = [
+  { selector: "TSAsExpression > TSTypeReference.typeAnnotation[typeName.name='GardeRelecture']", message: GARDE_RELECTURE_MESSAGE },
+  { selector: "TSTypeAssertion > TSTypeReference.typeAnnotation[typeName.name='GardeRelecture']", message: GARDE_RELECTURE_MESSAGE },
+  { selector: "TSTypePredicate TSTypeReference[typeName.name='GardeRelecture']", message: GARDE_RELECTURE_MESSAGE },
+];
+/** Preuves de la garde du mode réel (`GardeOuverte`, `GardeRelecture`), fabriquées par `src/server/p0/garde.ts` seul. */
+const GARDES_SYNTAX = [...GARDE_OUVERTE_SYNTAX, ...GARDE_RELECTURE_SYNTAX];
 /** Types de marque fabriqués par un seul module : liste reprise par chaque bloc qui règle `no-restricted-syntax`. */
-const MARQUES_SYNTAX = [...CANONICAL_EMAIL_SYNTAX, ...GARDE_OUVERTE_SYNTAX];
-/** Fichiers exemptés de l'interdiction de `GardeOuverte` (et d'elle seule). */
+const MARQUES_SYNTAX = [...CANONICAL_EMAIL_SYNTAX, ...GARDES_SYNTAX];
+/** Fichiers exemptés de l'interdiction de `GardeOuverte` et `GardeRelecture` (et d'elles seules). */
 const GARDE_OUVERTE_EXEMPTES = ["src/server/p0/garde.ts", "tests/**"];
 
 /**
@@ -233,7 +246,7 @@ export default defineConfig([
   },
   {
     files: ["src/server/email.ts"],
-    rules: { "no-restricted-syntax": ["error", ...GARDE_OUVERTE_SYNTAX] },
+    rules: { "no-restricted-syntax": ["error", ...GARDES_SYNTAX] },
   },
   {
     files: GARDE_OUVERTE_EXEMPTES,

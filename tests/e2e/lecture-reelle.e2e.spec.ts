@@ -37,6 +37,9 @@ test("p0: lecture sans barrière : refus et aucun appel Routes — « Mes voyage
   // Journée (relecture Routes, P0r4) : sans barrière, aucune lecture, donc aucune relecture ni position servie.
   const journee = await page.goto(`/voyages/${PROTOTYPE_TRIP}/jour/1`);
   expect(journee?.status()).toBe(404);
+  // Pages qui portent durées et positions Google une fois la barrière ouverte : jamais gardées par un cache (Next.js,
+  // pages dynamiques ; mineur 3 de la revue du head `e79fbed`).
+  for (const reponse of [introuvable, journee]) expect(reponse?.headers()["cache-control"]).toContain("no-store");
   expect(google).toEqual([]);
 
   const journal = readFileSync(serverLogPath({ port: PORT, tmpDir: tmpdir() }), "utf8");

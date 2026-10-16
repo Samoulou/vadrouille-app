@@ -7,9 +7,10 @@ import { NOM_COOKIE_ACCES, type DependancesAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { ouvrirGardeRelecture, type GardeRelecture } from "@/server/p0/garde";
 import { errorNameOf, logEvent } from "@/server/log";
-import type { Forfait } from "@/server/usage/forfait";
+import { QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait } from "@/server/usage/forfait";
 import { reserverRelecture, type PoolSql, type ReglesForfait } from "@/server/usage/neon";
 import { horlogeSysteme, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
+import type { composerRelecture, creerCadenceRelecture } from "@/server/composition/p0-reel";
 import { creerRegistreForfait } from "@/server/usage/registre";
 
 /**
@@ -27,22 +28,44 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  *    Google du mois ou enveloppe atteints (`cap_reached`, `envelope_reached` ; levés par la décision 0071 tant qu'elle
  *    tient) : refus `quota_reached`. Aucun seuil Routes par jour (Q330) ;
  * 4. **appels** : le client Routes de la composition (`composerRelecture`), borné par le registre en mémoire du forfait
- *    (aucune ligne par appel en base). Une requête de matrice par lieu de départ et par mode, un élément par trajet
- *    distinct (jamais le produit de toutes les origines et destinations). Durées arrondies à la minute supérieure.
+ *    (aucune ligne par appel en base) et par la **cadence unique du processus** (3 000 éléments par minute, toutes
+ *    relectures confondues, `cadenceRelecture`). Une requête de matrice par lieu de départ et par mode, un élément par
+ *    trajet distinct (jamais le produit de toutes les origines et destinations). Durées arrondies à la minute supérieure.
  *
  * Les durées sont des **données Google** : rendues à l'adaptateur seulement, jamais stockées, journalisées ni mises en
- * cache (pages `force-dynamic`, `Cache-Control: private, no-store`). Un refus après la garde écrit `p0.read_unavailable`
+ * cache (pages `force-dynamic` : Next.js répond `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
+ * vérifié par `tests/e2e/lecture-reelle.e2e.spec.ts`). Un refus après la garde écrit `p0.read_unavailable`
  * avec un nom fermé seulement (`PurgeAncienne`, `PlafondAtteint`, `ReservationImpossible`, ou le nom de l'erreur du
  * client : `ErreurClientGoogle`), jamais une durée, un identifiant de lieu ni un message.
  */
 
-/** Une requête de matrice : origines, destinations et mode, comme `RequeteMatrice` de `src/grounding`. */
-type RequeteMatrice = { origines: string[]; destinations: string[]; mode: PaireRelecture["mode"] };
-/** Client Routes tel que la composition le rend (durées en secondes, `null` sans itinéraire). */
-export type ClientMatrice = { matrice(requete: RequeteMatrice): Promise<{ secondes: (number | null)[][] }> };
+/** Client Routes tel que la composition le rend (`ClientRoutes` : durées en secondes, `null` sans itinéraire). */
+export type ClientMatrice = ReturnType<typeof composerRelecture>["routes"];
+/** Cadence par minute des éléments Routes (`creerCadence`), unique par processus par défaut (`cadenceRelecture`). */
+export type CadenceRelecture = ReturnType<typeof creerCadenceRelecture>;
 
-/** Codes de refus de la réservation qui signifient « plafond atteint » (jamais un seuil Routes par jour, Q330). */
-const PLAFONDS_ATTEINTS: ReadonlySet<string> = new Set(["cap_reached", "envelope_reached", "daily_quota_insufficient"]);
+/** Instance unique de la cadence (module chargé par `src/instrumentation.ts` seul, une fois par processus). */
+let cadenceDuProcessus: Promise<CadenceRelecture> | undefined;
+
+/**
+ * Cadence **unique par processus** des relectures Routes (bloquant 2 de la revue du head `e79fbed`) : 3 000 éléments
+ * par minute au plus (Q330, `QUOTA_ROUTES_ELEMENTS_PAR_MINUTE`), partagée par toutes les relectures du processus,
+ * simultanées comprises. Ce module n'est chargé que par `src/instrumentation.ts` (test d'importateurs de
+ * `composition.test.ts`), une fois par processus : le relecteur qu'il crée est gardé par l'état de
+ * `prototype-instance.ts`, et toutes les pages appellent ce même relecteur, donc cette même cadence. Créée à la première
+ * relecture (composition chargée à la demande).
+ */
+export function cadenceRelecture(): Promise<CadenceRelecture> {
+  cadenceDuProcessus ??= import("@/server/composition/p0-reel").then(({ creerCadenceRelecture }) => creerCadenceRelecture(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE));
+  return cadenceDuProcessus;
+}
+
+/**
+ * Codes de refus qui signifient « plafond atteint » : plafond du mois et enveloppe seulement. `daily_quota_insufficient`
+ * n'en fait pas partie : aucun seuil Routes par jour (Q330) ; ce code ne peut venir que d'un forfait au-delà du quota
+ * d'une minute (erreur de configuration), traité comme une indisponibilité.
+ */
+const PLAFONDS_ATTEINTS: ReadonlySet<string> = new Set(["cap_reached", "envelope_reached"]);
 
 /** Dernière purge réussie de moins de 24 h, calculé par la base (0046 D16 point 8) ; aucune purge : faux. */
 export const SQL_PURGE_RECENTE = `SELECT COALESCE(pg_catalog.max(purged_at) > pg_catalog.now() - interval '24 hours', false) AS recente
@@ -57,6 +80,8 @@ export type DependancesRelecteur = DependancesAcces & {
   readonly relecture?: () => Promise<{ readonly forfait: Forfait; readonly regles: ReglesForfait } | null>;
   /** Client Routes d'une relecture (par défaut : `composerRelecture` de la composition du mode réel). */
   readonly routes?: (garde: GardeRelecture, usage: PortConsommation, plafonds: readonly Plafond[]) => Promise<ClientMatrice>;
+  /** Cadence des éléments Routes (par défaut : `cadenceRelecture()`, unique par processus, 3 000 éléments par minute). */
+  readonly cadence?: () => Promise<CadenceRelecture>;
   readonly horloge?: Horloge;
 };
 
@@ -82,8 +107,11 @@ const plafondsDu = (forfait: Forfait): Plafond[] => [
   { portee: "execution", fournisseur: "google", methode: "routes_matrix", maxRequetes: forfait.routesRequetes, maxElements: forfait.routesElements },
 ];
 
-/** Durées des paires : une requête par (mode, origine), un élément par destination distincte. */
-async function relirePaires(routes: ClientMatrice, paires: readonly PaireRelecture[]): Promise<number[]> {
+/**
+ * Durées des paires : une requête par (mode, origine), un élément par destination distincte. Chaque requête attend sa
+ * place dans la cadence du processus avant de partir (3 000 éléments par minute, toutes relectures confondues).
+ */
+async function relirePaires(routes: ClientMatrice, cadence: CadenceRelecture, paires: readonly PaireRelecture[]): Promise<number[]> {
   const groupes = new Map<string, { mode: PaireRelecture["mode"]; origine: string; destinations: string[] }>();
   for (const { origine, destination, mode } of paires) {
     const cle = `${mode}\u0000${origine}`;
@@ -94,6 +122,7 @@ async function relirePaires(routes: ClientMatrice, paires: readonly PaireRelectu
   const secondes = new Map<string, number | null>();
   await Promise.all(
     [...groupes.values()].map(async ({ mode, origine, destinations }) => {
+      await cadence.reserver(destinations.length);
       const reponse = await routes.matrice({ origines: [origine], destinations, mode });
       destinations.forEach((destination, rang) => {
         const valeur = reponse.secondes[0]?.[rang];
@@ -125,16 +154,24 @@ export function creerRelecteurReel(dependances: DependancesRelecteur = {}): Rele
       const { composerRelecture } = await import("@/server/composition/p0-reel");
       return composerRelecture(garde, { usage, plafonds, horloge }).routes;
     });
+  const cadence = dependances.cadence ?? cadenceRelecture;
 
   return {
     async relireJournee(paires) {
       if (paires.length === 0) return { ok: true, minutes: [] };
       let reglage: Awaited<ReturnType<NonNullable<DependancesRelecteur["relecture"]>>> = null;
+      let cookie: string | undefined;
+      try {
+        cookie = await lireCookie();
+      } catch {
+        // Hors portée de requête (`cookies()` lève) : refus fermé, sans connexion ni journal.
+        return refus("unavailable");
+      }
       const garde = await ouvrirGardeRelecture({
         env: dependances.env,
         execArgv: dependances.execArgv,
         maintenant: dependances.maintenant,
-        cookie: await lireCookie(),
+        cookie,
         async reserver() {
           reglage = await relecture();
           if (reglage === null) return { ok: false, code: "usage_unavailable" };
@@ -147,14 +184,16 @@ export function creerRelecteurReel(dependances: DependancesRelecteur = {}): Rele
         // Garde fermée ou cookie absent : rien n'est journalisé (comme la lecture) ; refus après la garde : un nom fermé.
         if (garde.code === "purge_stale") logEvent("p0.read_unavailable", { errorName: "PurgeAncienne" }, "warn");
         else if (PLAFONDS_ATTEINTS.has(garde.code)) logEvent("p0.read_unavailable", { errorName: "PlafondAtteint" }, "warn");
-        else if (garde.code === "usage_unavailable") logEvent("p0.read_unavailable", { errorName: "ReservationImpossible" }, "warn");
+        else if (garde.code === "usage_unavailable" || garde.code === "daily_quota_insufficient") {
+          logEvent("p0.read_unavailable", { errorName: "ReservationImpossible" }, "warn");
+        }
         return refus(PLAFONDS_ATTEINTS.has(garde.code) ? "quota_reached" : "unavailable");
       }
       const { forfait } = reglage!;
       try {
         const registre = creerRegistreForfait(forfait, null, horloge);
         const client = await routes(garde.garde, registre, plafondsDu(forfait));
-        return { ok: true, minutes: await relirePaires(client, paires) };
+        return { ok: true, minutes: await relirePaires(client, await cadence(), paires) };
       } catch (erreur) {
         const code = codeDe(erreur);
         if (code !== undefined && PLAFONDS_ATTEINTS.has(code)) return refus("quota_reached");
