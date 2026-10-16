@@ -44,7 +44,7 @@
       "envelope_reached": "Lancement refusé : une enveloppe de dépense est atteinte. Rien n'a été réservé.",
       "cap_reached": "Lancement refusé : un plafond de dépense est atteint. Rien n'a été réservé.",
       "usage_unavailable": "Lancement refusé : la base du prototype ne répond pas. Rien n'a été réservé.",
-      "demarrage_impossible": "L'exécution réservée n'a pas pu démarrer : elle est close avec une cause externe et pourra être relancée un autre jour.",
+      "demarrage_impossible": "L'exécution réservée n'a pas pu démarrer : elle est close avec une cause externe et pourra être relancée.",
       "erreur": "Le lancement n'a pas pu aboutir. Réessaie plus tard."
     },
     "suivi": {
