@@ -100,10 +100,10 @@ describe("p0: interface de la page de lancement", () => {
   });
 
   it("refus : annoncé par `alert`, jamais par `status` ; le focus reste sur le bouton", async () => {
-    d.action.mockResolvedValue({ statut: "run_quota_reached" });
+    d.action.mockResolvedValue({ statut: "daily_quota_insufficient" });
     render(<LancementP0 modele={modele()} />);
     await lancer();
-    expect(screen.getByRole("alert")).toHaveTextContent(t.statuts.run_quota_reached);
+    expect(screen.getByRole("alert")).toHaveTextContent(t.statuts.daily_quota_insufficient);
     for (const region of screen.getAllByRole("status")) expect(region).toBeEmptyDOMElement();
     for (const nom of [t.formulaire.brief, t.formulaire.variante, t.formulaire.mode]) expect(groupe(nom)).not.toHaveAttribute("aria-invalid");
     expect(screen.getByRole("button", { name: t.formulaire.lancer })).toHaveFocus();

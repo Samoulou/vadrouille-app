@@ -20,11 +20,14 @@ export type ExecutionEnCours = {
   readonly variante: "A" | "B";
   /** Coût des modèles déjà compté par les étapes précédentes, en micro-USD (arrondi au cent supérieur, D24). */
   readonly coutModelesMicros: number;
-  /**
-   * Jour de quota de l'exécution (`prototype.runs.quota_day`, posé par la base, S1), `AAAA-MM-JJ` : une seule exécution
-   * par jour de quota (index unique), d'où un identifiant de voyage unique (P0r3c-5, étape finale).
-   */
+  /** Jour de quota de l'exécution (`prototype.runs.quota_day`, posé par la base, S1), `AAAA-MM-JJ`. */
   readonly jourQuota: string;
+  /**
+   * Rang de l'exécution dans son jour de quota, à partir de 1 (exécutions `reel` et `essai` du même jour, ordonnées par
+   * début puis identifiant ; lu en base). Plusieurs exécutions par jour depuis la décision 0071 : le couple (jour, rang)
+   * rend l'identifiant de voyage unique (P0r3c-5, étape finale).
+   */
+  readonly numeroDuJour: number;
   /**
    * Temps écoulé depuis le début de l'exécution, en millisecondes, mesuré par la base (`now() - started_at`) : borne
    * l'échéance de l'étape sous la durée maximale du mode (P0r3c-5, marge de durée). Lu en mémoire, jamais écrit.

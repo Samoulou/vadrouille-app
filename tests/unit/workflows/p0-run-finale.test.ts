@@ -139,6 +139,7 @@ vi.mock("@/adapters/prototype-travail", () => {
         variante: "B",
         coutModelesMicros: d.etat.cout,
         jourQuota: "2026-10-12",
+        numeroDuJour: 2,
         ecouleMs: d.etat.ecouleMs,
       };
     },

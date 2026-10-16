@@ -32,10 +32,11 @@ export type GardeOuverte = { readonly runId: string; readonly [MARQUE]: true };
 
 /**
  * Refus du lancement rendus par `reserver` **avant** la réservation, garde déjà ouverte (P0r3d) : choix refusé
- * (`entree_invalide`), mode réel indisponible (`real_mode_unavailable` : `p0Run` non démarrable, configuration refusée
- * ou verrou S8 fermé) et décompte atteint (`run_quota_reached`, D24). Rien n'est écrit.
+ * (`entree_invalide`) et mode réel indisponible (`real_mode_unavailable` : `p0Run` non démarrable, configuration refusée
+ * ou verrou S8 fermé). Rien n'est écrit. Le décompte atteint (`run_quota_reached`, D24) ne refuse plus depuis la
+ * décision 0071.
  */
-export type CodeRefusAvantReservation = "entree_invalide" | "real_mode_unavailable" | "run_quota_reached";
+export type CodeRefusAvantReservation = "entree_invalide" | "real_mode_unavailable";
 
 /** Codes de la garde fermée : environnement et déploiement, accès, réservation, exécution. */
 export type CodeGarde = CodeGardeFermee | "access_refused" | "run_refused" | CodeRefusUsage | CodeRefusAvantReservation;
@@ -51,7 +52,7 @@ export type DependancesLancement = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête de lancement. */
   readonly cookie: string | undefined;
   /**
-   * Réservation du jour et des plafonds par le port de consommation de P0r2 (`reserverExecution`), précédée des
+   * Réservation du forfait par le port de consommation de P0r2 (`reserverExecution`), précédée des
    * contrôles du lancement qui peuvent la refuser sans rien écrire (`CodeRefusAvantReservation`).
    */
   readonly reserver: () => Promise<ResultatLancement | { readonly ok: false; readonly code: CodeRefusAvantReservation }>;
@@ -59,7 +60,7 @@ export type DependancesLancement = DependancesAcces & {
 
 /**
  * Lancement : conditions (1) à (7), déploiement autre que la production, cookie d'accès valide, puis réservation du
- * jour réussie et plafonds non atteints. Le code saisi n'entre pas ici : il ouvre l'accès par la page de saisie
+ * forfait réussie (sans limite du jour, du mois ni d'enveloppe depuis la décision 0071). Le code saisi n'entre pas ici : il ouvre l'accès par la page de saisie
  * (`saisirCodeAcces`), qui pose le cookie ; seul le cookie prouve l'accès au lancement.
  */
 export async function ouvrirGardeLancement(dependances: DependancesLancement): Promise<ResultatGarde> {
