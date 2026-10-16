@@ -14,9 +14,12 @@ import type { CodeRefusUsage } from "@/server/usage/port";
  * 3. clôt les exécutions orphelines (`en_cours` au-delà de `dureeMs` + 5 min : `arretee`, `pipeline_failed`, phase et
  *    coût des modèles nuls) ;
  * 4. somme les forfaits du jour de quota et du mois Google **de la base** (`prototype.quota_day_at(now())`, S1), du
- *    mois UTC des modèles et de l'enveloppe, et les compare aux limites, forfait à lancer compris ;
- * 5. insère la ligne `runs` (exécution) et la ligne `forfaits`. Le jour, l'heure, l'organisation et l'identifiant sont
- *    posés par la base (S1).
+ *    mois UTC des modèles et de l'enveloppe, et les compare aux limites reçues, forfait à lancer compris. Pour le
+ *    prototype, ces limites sont levées depuis la décision 0071 (`LIMITES_PROTOTYPE`) : seul le contrôle propre au
+ *    forfait (Routes, quota d'une minute) peut encore refuser ;
+ * 5. insère la ligne `runs` (exécution) et la ligne `forfaits`, gardée pour information. Le jour, l'heure,
+ *    l'organisation et l'identifiant sont posés par la base (S1). Plusieurs exécutions par jour de quota sont admises
+ *    (décision 0071 ; migration 0007_essais_sans_limite).
  * Toute erreur annule la transaction et rend `usage_unavailable` (échec fermé). Les appels eux-mêmes passent ensuite
  * par le registre en mémoire borné par le forfait (`registre.ts`) : **aucune ligne par appel en base**, et le
  * prototype n'écrit jamais dans `usage_ledger` (D13 point 7 ; aucun droit).
@@ -86,9 +89,6 @@ SELECT
   COALESCE(SUM(f.models_cost_micros), 0) AS enveloppe_modeles
 FROM bornes AS b LEFT JOIN prototype.forfaits AS f ON TRUE
 GROUP BY b.jour, b.mois_google, b.mois_utc`;
-
-const SQL_EXECUTION_DU_JOUR = `SELECT 1 FROM prototype.runs AS r
-WHERE r.quota_day = prototype.quota_day_at(pg_catalog.now()) AND r.mode IN ('reel', 'essai') LIMIT 1`;
 
 const SQL_INSERER_RUN = `INSERT INTO prototype.runs (mode, brief, variant, commit_sha) VALUES ($1, $2, $3, $4) RETURNING id`;
 
@@ -170,8 +170,8 @@ const valeursForfait = (forfait: Forfait, runId: string | null) => [
 ];
 
 /**
- * Lancement d'une exécution : une seule par jour de quota Google (index unique ; une seconde est refusée
- * `cap_reached` avant toute écriture), forfait réservé avec la ligne `runs` dans la même transaction.
+ * Lancement d'une exécution : forfait réservé avec la ligne `runs` dans la même transaction. Aucune limite du nombre
+ * d'exécutions par jour de quota (décision 0071, qui lève la règle de 0046 D13 point 3).
  */
 export async function reserverExecution(pool: PoolSql, demande: DemandeExecution, regles: ReglesForfait): Promise<ResultatLancement> {
   if (demande.forfait.nature !== "execution") return { ok: false, code: "usage_unavailable" };
@@ -179,7 +179,7 @@ export async function reserverExecution(pool: PoolSql, demande: DemandeExecution
     pool,
     demande.forfait,
     regles,
-    async (client) => ((await client.query(SQL_EXECUTION_DU_JOUR)).rows.length > 0 ? "cap_reached" : null),
+    async () => null,
     async (client) => {
       const { rows } = await client.query(SQL_INSERER_RUN, [demande.mode, demande.brief, demande.variant, demande.commitSha]);
       const runId = rows[0]?.id;

@@ -8,13 +8,17 @@ import {
   decompte,
   estExclue,
   EXECUTIONS_EXCLUES,
-  lancementDansLeDecompte,
   RELANCES_MAX,
 } from "@/server/p0/decompte";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
-/** Décompte des exécutions réelles (P0S2-PO-13 ; P0a2 : 2 B et 1 A par brief ; D24, `run_quota_reached`). */
+/**
+ * Décompte des exécutions réelles (P0S2-PO-13 ; P0a2 : 2 B et 1 A par brief). Information seulement depuis la décision
+ * 0071 : il ne refuse plus aucun lancement (`tests/unit/p0/lancement.test.ts`) ; `placeLibre` lit le tableau de la page.
+ */
+const placeLibre = (executions: Parameters<typeof decompte>[0], brief: string, variante: "A" | "B") =>
+  decompte(executions, brief, variante).comptees < COMPTEES_MAX[variante];
 
 describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
   it("codes externes égaux à CODES_EXTERNES de src/prototype/arret.ts ; maxima de P0a2", () => {
@@ -23,9 +27,9 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     expect(RELANCES_MAX).toBe(1);
   });
 
-  it("aucune exécution : rien de compté, lancement admis pour chaque variante", () => {
+  it("aucune exécution : rien de compté, place libre pour chaque variante", () => {
     expect(decompte([], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
-    expect(lancementDansLeDecompte([], "reel", "edimbourg-1.json", "A")).toBe(true);
+    expect(placeLibre([], "edimbourg-1.json", "A")).toBe(true);
   });
 
   it("toute fin compte (programme écrit, pipeline_failed, codes avant appel), et une exécution en cours compte", () => {
@@ -54,22 +58,23 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     expect(decompte(executions, "edimbourg-1.json", "A")).toEqual({ comptees: 1, relances: 0 });
   });
 
-  it("B : deux comptées puis refus ; A : une comptée puis refus ; une relance ne consomme pas de place comptée", () => {
+  it("B : deux comptées puis plus de place ; A : une comptée puis plus de place ; une relance ne consomme pas de place comptée", () => {
     const b = [executionSuivie(), arretee("upstream_unavailable")];
-    expect(lancementDansLeDecompte(b, "reel", "edimbourg-1.json", "B")).toBe(true);
-    expect(lancementDansLeDecompte([...b, executionSuivie()], "reel", "edimbourg-1.json", "B")).toBe(false);
+    expect(placeLibre(b, "edimbourg-1.json", "B")).toBe(true);
+    expect(placeLibre([...b, executionSuivie()], "edimbourg-1.json", "B")).toBe(false);
     const a = [executionSuivie({ variante: "A" })];
-    expect(lancementDansLeDecompte(a, "reel", "edimbourg-1.json", "A")).toBe(false);
-    expect(lancementDansLeDecompte([arretee("usage_unavailable", { variante: "A" })], "reel", "edimbourg-1.json", "A")).toBe(true);
-    expect(lancementDansLeDecompte([arretee("usage_unavailable", { variante: "A" }), arretee("upstream_redirect", { variante: "A" })], "reel", "edimbourg-1.json", "A")).toBe(
+    expect(placeLibre(a, "edimbourg-1.json", "A")).toBe(false);
+    expect(placeLibre([arretee("usage_unavailable", { variante: "A" })], "edimbourg-1.json", "A")).toBe(true);
+    expect(placeLibre([arretee("usage_unavailable", { variante: "A" }), arretee("upstream_redirect", { variante: "A" })], "edimbourg-1.json", "A")).toBe(
       false,
     );
   });
 
-  it("un essai d'intégration n'est jamais refusé par le décompte", () => {
+  it("un essai d'intégration n'entre jamais dans le décompte, même places pleines", () => {
     const pleines = [executionSuivie(), executionSuivie(), executionSuivie({ variante: "A" })];
-    expect(lancementDansLeDecompte(pleines, "essai", "edimbourg-1.json", "B")).toBe(true);
-    expect(lancementDansLeDecompte(pleines, "essai", "edimbourg-1.json", "A")).toBe(true);
+    const essais = [executionSuivie({ mode: "essai" }), executionSuivie({ mode: "essai", variante: "A" })];
+    expect(decompte([...pleines, ...essais], "edimbourg-1.json", "B")).toEqual(decompte(pleines, "edimbourg-1.json", "B"));
+    expect(decompte([...pleines, ...essais], "edimbourg-1.json", "A")).toEqual(decompte(pleines, "edimbourg-1.json", "A"));
   });
 });
 
@@ -96,8 +101,8 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
   it("l'exécution de 0070 n'est ni comptée ni relance : edimbourg-1/B garde ses deux places", () => {
     expect(estExclue(exclue0070)).toBe(true);
     expect(decompte([exclue0070], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
-    expect(lancementDansLeDecompte([exclue0070, executionSuivie()], "reel", "edimbourg-1.json", "B")).toBe(true);
-    expect(lancementDansLeDecompte([exclue0070, executionSuivie(), executionSuivie()], "reel", "edimbourg-1.json", "B")).toBe(false);
+    expect(placeLibre([exclue0070, executionSuivie()], "edimbourg-1.json", "B")).toBe(true);
+    expect(placeLibre([exclue0070, executionSuivie(), executionSuivie()], "edimbourg-1.json", "B")).toBe(false);
   });
 
   it.each([

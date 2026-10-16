@@ -34,8 +34,9 @@ export const SQL_EXECUTIONS = `SELECT id::text AS id, mode, brief, variant, stat
   pg_catalog.to_char(quota_day, 'YYYY-MM-DD') AS jour_quota, canary_ok, commit_sha
 FROM prototype.runs ORDER BY started_at DESC, id LIMIT 1001`;
 /**
- * Exécutions lues au plus (une par jour de quota : près de trois ans). Au-delà, le décompte serait faux : la lecture
- * échoue (`base`, échec fermé : le lancement rend `usage_unavailable`) au lieu de tronquer.
+ * Exécutions lues au plus. Au-delà, le décompte affiché serait faux : la lecture échoue (`base`, échec fermé : la page
+ * affiche le suivi indisponible) au lieu de tronquer. Depuis la décision 0071, le nombre d'exécutions par jour n'est plus
+ * borné et le lancement ne lit plus le suivi : atteindre cette borne n'empêche aucun lancement.
  */
 export const EXECUTIONS_MAX = 1000;
 /** Date de la dernière purge réussie (D16 point 6), en UTC ; aucun compte de lignes. */

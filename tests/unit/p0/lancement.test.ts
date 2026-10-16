@@ -136,9 +136,9 @@ beforeEach(() => {
 });
 
 describe("p0: lancement d'une exécution (P0r3d)", () => {
-  it("chemin nominal, dans l'ordre : garde, interrupteur, mode, commit, verrou S8, décompte, réservation, démarrage", async () => {
+  it("chemin nominal, dans l'ordre : garde, interrupteur, mode, commit, verrou S8, réservation, démarrage (0071 : sans décompte)", async () => {
     expect(await lancer()).toBe("lancee");
-    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "s8", "suivi", "reserver", "start"]);
+    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "s8", "reserver", "start"]);
     expect(d.reserver).toHaveBeenCalledWith(
       pool,
       { mode: "reel", brief: "edimbourg-1.json", variant: "B", commitSha: "d".repeat(40), forfait: { nature: "execution" } },
@@ -206,14 +206,17 @@ describe("p0: lancement d'une exécution (P0r3d)", () => {
     expect(d.start).not.toHaveBeenCalled();
   });
 
-  it("décompte atteint : run_quota_reached sans réservation ; un essai passe ; suivi illisible : usage_unavailable", async () => {
-    lignes = [ligne({}), ligne({})];
-    expect(await lancer()).toBe("run_quota_reached");
-    expect(d.reserver).not.toHaveBeenCalled();
+  it("0071 : décompte atteint ou suivi illisible, le lancement réel ou d'essai passe quand même, sans lire le suivi", async () => {
+    lignes = [ligne({}), ligne({}), ligne({}), ligne({ jour_quota: "2026-10-15" })];
+    expect(await lancer()).toBe("lancee");
     expect(await lancer({ ...DEMANDE, mode: "essai" })).toBe("lancee");
     expect(d.journal).toContain("mode:essai");
     lignes = [ligne({ status: "inconnu" })];
-    expect(await lancer()).toBe("usage_unavailable");
+    expect(await lancer()).toBe("lancee");
+    expect(d.journal).not.toContain("suivi");
+    expect(connexions).toBe(0);
+    expect(d.reserver).toHaveBeenCalledTimes(3);
+    expect(STATUTS_LANCEMENT).not.toContain("run_quota_reached");
   });
 
   it.each(["daily_quota_insufficient", "envelope_reached", "cap_reached", "usage_unavailable"] as const)(

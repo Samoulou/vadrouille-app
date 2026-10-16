@@ -111,7 +111,11 @@ export function planifierLeJour(entree: EntreeJour): JourPlanifie {
   return jour;
 }
 
-/** Identifiant du voyage : `proto_<destination>_<jour de quota>_1` (une seule exécution par jour de quota). */
-export function identifiantDuVoyage(destination: string, jourQuota: string): string {
-  return identifiantVoyage(destination, jourQuota, 1);
+/**
+ * Identifiant du voyage : `proto_<destination>_<jour de quota>_<rang de l'exécution dans le jour>`. Plusieurs exécutions
+ * par jour de quota depuis la décision 0071 : le rang (`numeroDuJour`, lu en base) rend l'identifiant unique. Au-delà
+ * de 999 exécutions le même jour, `identifiantVoyage` refuse (l'exécution s'arrête `pipeline_failed`, sans programme).
+ */
+export function identifiantDuVoyage(destination: string, jourQuota: string, numeroDuJour: number): string {
+  return identifiantVoyage(destination, jourQuota, numeroDuJour);
 }

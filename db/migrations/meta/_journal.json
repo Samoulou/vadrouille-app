@@ -50,6 +50,13 @@
       "when": 1792076079474,
       "tag": "0006_deverrouillage_positions_prototype",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792149798743,
+      "tag": "0007_essais_sans_limite",
+      "breakpoints": true
     }
   ]
 }

@@ -540,7 +540,7 @@ describe("invariants et contenus (0046 D24, S4)", () => {
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'place_not_found', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBe("23514");
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'cap_reached', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBe("23514");
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'pipeline_failed', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBeUndefined();
-      // Colonnes non modifiables, valeurs hors liste à l'insertion, seconde exécution du même jour.
+      // Colonnes non modifiables, valeurs hors liste à l'insertion ; seconde exécution du même jour admise (0071).
       await expectRefused(proto, "UPDATE prototype.runs SET started_at = now() - interval '1 day' WHERE id = $1", [id]);
       await expectRefused(proto, "UPDATE prototype.runs SET brief = 'autre.json' WHERE id = $1", [id]);
       for (const [colonnes, valeurs] of [
@@ -551,7 +551,7 @@ describe("invariants et contenus (0046 D24, S4)", () => {
       ]) {
         expect((await attempt(proto, `INSERT INTO prototype.runs (${colonnes}) VALUES (${valeurs})`)).code, valeurs).toBe("23514");
       }
-      expect((await attempt(proto, "INSERT INTO prototype.runs (mode, brief, variant, commit_sha) VALUES ('essai', 'brief-test.json', 'B', $1)", [SHA])).code).toBe("23505");
+      expect((await attempt(proto, "INSERT INTO prototype.runs (mode, brief, variant, commit_sha) VALUES ('essai', 'brief-test.json', 'B', $1)", [SHA])).code).toBeUndefined();
     } finally {
       await proto.query("ROLLBACK");
     }

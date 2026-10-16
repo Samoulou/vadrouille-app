@@ -61,23 +61,44 @@ describe("p0: forfait au prix catalogue plein", () => {
   });
 });
 
+/**
+ * Limites levées par la décision 0071 (valeurs de 0046 D13 point 3) : elles éprouvent le mécanisme de `refusDuForfait`,
+ * qui reste, sans être appliqué au lancement du prototype (`LIMITES_PROTOTYPE`).
+ */
+const LIMITES_EPROUVEES = {
+  quotaJourParMethode: 95,
+  moisGoogleMicros: 20_000_000,
+  enveloppeGoogleMicros: 40_000_000,
+  moisModelesMicros: 40_000_000,
+  enveloppeModelesMicros: 80_000_000,
+};
+
 describe("p0: plafonds du lancement comparés aux forfaits", () => {
   const forfait = forfaitExecution(TABLE, SKUS, { ...PLAFONDS, routesElements: 400 }, 3_000_000);
 
-  it("limites de la spécification : 95 par jour, 20 et 40 USD Google, 40 et 80 USD modèles", () => {
+  it("0071 : aucune limite du jour, du mois ni d'enveloppe au lancement du prototype", () => {
     expect(LIMITES_PROTOTYPE).toEqual({
-      quotaJourParMethode: 95,
-      moisGoogleMicros: 20_000_000,
-      enveloppeGoogleMicros: 40_000_000,
-      moisModelesMicros: 40_000_000,
-      enveloppeModelesMicros: 80_000_000,
+      quotaJourParMethode: Number.POSITIVE_INFINITY,
+      moisGoogleMicros: Number.POSITIVE_INFINITY,
+      enveloppeGoogleMicros: Number.POSITIVE_INFINITY,
+      moisModelesMicros: Number.POSITIVE_INFINITY,
+      enveloppeModelesMicros: Number.POSITIVE_INFINITY,
     });
     expect(refusDuForfait(VIDE, forfait, LIMITES_PROTOTYPE, "requetes")).toBeNull();
+    const charge: SommesForfaits = {
+      jour: { textSearchRequetes: 1_000_000, placeDetailsRequetes: 1_000_000, routesRequetes: 1_000_000, routesElements: 1_000_000 },
+      moisGoogleMicros: 1e12,
+      enveloppeGoogleMicros: 1e12,
+      moisModelesMicros: 1e12,
+      enveloppeModelesMicros: 1e12,
+    };
+    expect(refusDuForfait(charge, forfait, LIMITES_PROTOTYPE, "requetes")).toBeNull();
+    expect(refusDuForfait(charge, forfait, LIMITES_PROTOTYPE, "elements")).toBeNull();
   });
 
   it("jour entamé : daily_quota_insufficient, dans l'unité du quota Routes", () => {
-    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 6 } }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("daily_quota_insufficient");
-    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 5 } }, forfait, LIMITES_PROTOTYPE, "requetes")).toBeNull();
+    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 6 } }, forfait, LIMITES_EPROUVEES, "requetes")).toBe("daily_quota_insufficient");
+    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, placeDetailsRequetes: 5 } }, forfait, LIMITES_EPROUVEES, "requetes")).toBeNull();
   });
 
   it("p0: Q330, quota Routes en éléments sans seuil du jour, 3 000 par minute", () => {
@@ -86,10 +107,11 @@ describe("p0: plafonds du lancement comparés aux forfaits", () => {
     expectTypeOf<(typeof UNITES_QUOTA_ROUTES)[number]>().toEqualTypeOf<UniteQuotaRoutes>();
     // 400 éléments, jour déjà chargé en éléments et en requêtes Routes : aucun seuil du jour en unité « éléments ».
     const jourCharge = { ...VIDE, jour: { ...VIDE.jour, routesElements: 10_000, routesRequetes: 1_000 } };
-    expect(refusDuForfait(jourCharge, forfait, LIMITES_PROTOTYPE, "elements")).toBeNull();
+    expect(refusDuForfait(jourCharge, forfait, LIMITES_EPROUVEES, "elements")).toBeNull();
     // Le même jour en unité « requêtes » (hypothèse écartée) : refusé au seuil de 95.
-    expect(refusDuForfait(jourCharge, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("daily_quota_insufficient");
+    expect(refusDuForfait(jourCharge, forfait, LIMITES_EPROUVEES, "requetes")).toBe("daily_quota_insufficient");
     // 500 éléments (0053) : accepté ; 3 000 : accepté ; 3 001 : refusé, il ne tiendrait pas dans la cadence d'une minute.
+    // Ce contrôle propre au forfait reste appliqué au lancement du prototype (0071) : il vaut aussi pour `LIMITES_PROTOTYPE`.
     for (const [elements, attendu] of [
       [500, null],
       [3_000, null],
@@ -97,23 +119,24 @@ describe("p0: plafonds du lancement comparés aux forfaits", () => {
     ] as const) {
       const f = forfaitExecution(TABLE, SKUS, { ...PLAFONDS, routesElements: elements }, 3_000_000);
       // Montants Google hors de cause ici (3 000 éléments dépassent les 20 USD du mois) : seule l'unité Routes est éprouvée.
-      const limites = { ...LIMITES_PROTOTYPE, moisGoogleMicros: Number.MAX_SAFE_INTEGER, enveloppeGoogleMicros: Number.MAX_SAFE_INTEGER };
+      const limites = { ...LIMITES_EPROUVEES, moisGoogleMicros: Number.MAX_SAFE_INTEGER, enveloppeGoogleMicros: Number.MAX_SAFE_INTEGER };
       expect(refusDuForfait(VIDE, f, limites, "elements"), String(elements)).toBe(attendu);
+      expect(refusDuForfait(VIDE, f, LIMITES_PROTOTYPE, "elements"), `0071 ${elements}`).toBe(attendu);
     }
     // Text Search et Place Details gardent le seuil du jour de 95 en unité « éléments ».
-    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, textSearchRequetes: 6 } }, forfait, LIMITES_PROTOTYPE, "elements")).toBe("daily_quota_insufficient");
+    expect(refusDuForfait({ ...VIDE, jour: { ...VIDE.jour, textSearchRequetes: 6 } }, forfait, LIMITES_EPROUVEES, "elements")).toBe("daily_quota_insufficient");
   });
 
   it("enveloppe jusqu'à G0 puis plafond du mois", () => {
-    expect(refusDuForfait({ ...VIDE, enveloppeGoogleMicros: 37_000_001 }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("envelope_reached");
-    expect(refusDuForfait({ ...VIDE, enveloppeModelesMicros: 77_000_001 }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("envelope_reached");
-    expect(refusDuForfait({ ...VIDE, moisGoogleMicros: 17_000_001 }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("cap_reached");
-    expect(refusDuForfait({ ...VIDE, moisModelesMicros: 37_000_001 }, forfait, LIMITES_PROTOTYPE, "requetes")).toBe("cap_reached");
-    expect(refusDuForfait({ ...VIDE, moisModelesMicros: 37_000_000 }, forfait, LIMITES_PROTOTYPE, "requetes")).toBeNull();
+    expect(refusDuForfait({ ...VIDE, enveloppeGoogleMicros: 37_000_001 }, forfait, LIMITES_EPROUVEES, "requetes")).toBe("envelope_reached");
+    expect(refusDuForfait({ ...VIDE, enveloppeModelesMicros: 77_000_001 }, forfait, LIMITES_EPROUVEES, "requetes")).toBe("envelope_reached");
+    expect(refusDuForfait({ ...VIDE, moisGoogleMicros: 17_000_001 }, forfait, LIMITES_EPROUVEES, "requetes")).toBe("cap_reached");
+    expect(refusDuForfait({ ...VIDE, moisModelesMicros: 37_000_001 }, forfait, LIMITES_EPROUVEES, "requetes")).toBe("cap_reached");
+    expect(refusDuForfait({ ...VIDE, moisModelesMicros: 37_000_000 }, forfait, LIMITES_EPROUVEES, "requetes")).toBeNull();
   });
 
-  it("au forfait, 13 exécutions réelles par mois au plus pour les modèles (0046, « Conséquence sur l'argent »)", () => {
-    const parMois = Math.floor(LIMITES_PROTOTYPE.moisModelesMicros / 3_000_000);
-    expect(parMois).toBe(13);
+  it("0071 : aucun nombre maximal d'exécutions réelles par mois (13 au forfait avant la décision, 0046)", () => {
+    expect(Math.floor(LIMITES_EPROUVEES.moisModelesMicros / 3_000_000)).toBe(13);
+    expect(Math.floor(LIMITES_PROTOTYPE.moisModelesMicros / 3_000_000)).toBe(Number.POSITIVE_INFINITY);
   });
 });
