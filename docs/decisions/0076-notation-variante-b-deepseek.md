@@ -2,6 +2,8 @@
 
 Statut : décision de Samuel, mise en œuvre par ia-recherche.
 
+Confirmation écrite de Samuel (0068/0035) : « Je confirme » sur #412, [commentaire 6222866312](https://github.com/Samoulou/vadrouille-app/pull/412#issuecomment-6222866312) (auteur Samoulou, 2026-10-16 19:13 UTC), en réponse à la demande de confirmation que la notation de B passe à DeepSeek.
+
 Date : 2026-10-16 · Décideur : Samuel (fil « Routine cycle du studio », 2026-10-16 18:35 UTC, carte de décision, message `cmsg_0174CRqum9q8GNfZHmNHcYvR8MVqFNPwccWud62816rUuH`) · Rédacteur : ia-recherche · Ticket : #411 · Renvois : 0027 (amende le point 1.3), essai réel 5
 
 ## Contexte

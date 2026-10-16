@@ -21,7 +21,7 @@ Règles :
 - fournisseurs OpenRouter restreints (aucun entraînement sur les données, 0026) ;
 - modèles choisis **par configuration**.
 
-Mesure de référence : la **variante A** (DeepSeek seul) est mesurée une fois : taux de « Pas pour moi », R1 à R10, coût et temps par voyage. Si B n'apporte rien de mesurable, le Tech Lead peut revenir à A par une décision écrite.
+Mesure de référence *(suspendue par 0076)* : la **variante A** (DeepSeek seul) est mesurée une fois : taux de « Pas pour moi », R1 à R10, coût et temps par voyage. Si B n'apporte rien de mesurable, le Tech Lead peut revenir à A par une décision écrite.
 
 ### 2. Plafonds (Q234, P0-Q2)
 - Pas de clé Anthropic : les modèles passent par OpenRouter (0026).
@@ -54,4 +54,5 @@ Lecture stricte du cadrage : **aucune donnée Google dans les prompts, seul l'id
 - Suite : voir 0028 (réponses de Samuel du 2026-10-12 à 10:35 et 10:49).
 
 ## Quand revoir cette décision
+*(La mesure comparée des variantes A et B est suspendue par 0076, A et B étant identiques.)*
 Après la mesure comparée des variantes A et B (Tech Lead), à la validation juridique de Q5, ou avant l'ouverture au public (Q214).

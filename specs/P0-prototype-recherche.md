@@ -353,7 +353,7 @@ Aucun test de CI n'utilise une clé réelle ni le réseau ; les exécutions rée
 
 ## Critères d'acceptation
 P0a1
-- [ ] `pnpm p0` en mode simulé, sans aucune variable de clé dans l'environnement, produit un programme réduit et un rapport pour chacun des trois briefs d'Édimbourg, en variante B et en variante A ; le programme complet passe `TripSchema` et `ProposalSchema`, la forme réduite passe son schéma strict.
+- [ ] `pnpm p0` en mode simulé, sans aucune variable de clé dans l'environnement, produit un programme réduit et un rapport pour chacun des trois briefs d'Édimbourg, en variante B et en variante A (identiques depuis 0076) ; le programme complet passe `TripSchema` et `ProposalSchema`, la forme réduite passe son schéma strict.
 - [ ] `--reel` sort toujours en erreur fermée constante, sans lire de clé ni ouvrir de connexion (test) ; aucun client réel dans le code.
 - [ ] Le test canari, la garde `data_collection` et tous les tests P0a1 listés ci-dessus sont verts dans `pnpm verify`.
 - [ ] Chaque plafond du tableau est vérifié avant l'appel concerné ; un dépassement arrête sans programme partiel (test par plafond).
@@ -397,7 +397,7 @@ P0a2, P0b2, P0a3 et P0c : critères dans la spécification suivante.
 - **P0-PO-8 — Programmes réels hors du dépôt** (application de Q241). Aucun programme réel n'est commité ni produit dans le périmètre de cette spécification ; leur régime est fixé par la spécification suivante.
 - **P0-PO-9 — Durées relues à l'affichage, jamais écrites ni mises en cache ; positions lues dans le programme** (application de la réponse de Samuel à P0-Q8) ; quota atteint ou relecture en échec : état d'erreur ; `toConfirm` et `verifiedAt` ne s'affichent pas en mode prototype.
 - **P0-PO-11 — Section « Prototype » de l'accueil**, sur le modèle de D1, visible seulement en mode prototype ; aucun nouvel écran.
-- **P0-PO-12 — Mesure de la variante A.** La variante A est la configuration de la variante B où l'étape de notation est confiée à DeepSeek (même prompt, même schéma) ; P0a1 en livre la configuration et son test ; les exécutions et le jugement à l'aveugle relèvent de la spécification suivante. La décision de revenir à A reste au Tech Lead (0027).
+- **P0-PO-12 — Mesure de la variante A.** La variante A est la configuration de la variante B où l'étape de notation est confiée à DeepSeek (même prompt, même schéma) ; P0a1 en livre la configuration et son test ; les exécutions et le jugement à l'aveugle relèvent de la spécification suivante. Depuis la décision 0076, A et B ont le même modèle de notation : la mesure de A est **suspendue** (aucune exécution réelle de A, ni jugement à l'aveugle A/B) jusqu'à un nouveau choix de Samuel d'un autre modèle de notation en B ; le mécanisme reste testé avec une configuration de test.
 - **P0-PO-13 — Briefs de référence.** Récits de Samuel mot pour mot ; dates et logement par défaut (P0-Q7) ; champs structurés déduits du récit à la main et listés dans la PR de P0a1 pour correction par Samuel ; liste des incontournables jamais donnée au prototype.
 
 ### Propositions d'architecture (décision du Tech Lead : A2 à A4, A6, A7 ; A1 avec la spécification suivante)
@@ -405,7 +405,7 @@ Client de modèles et version, configuration (dont la formule de classement), em
 
 ## Renvoyé à la spécification suivante (décision 0030 du Tech Lead, 2026-10-12)
 `specs/P0-suite-executions-reelles.md` (nom proposé), ticket et PR à ouvrir par le CEO après les réponses de Samuel à P0-Q13 et P0-Q14. Elle reprend la grille G0, les critères des exécutions réelles et les exigences ci-dessous (décision 0030) ; ce qui en a été retiré reste lisible dans l'historique de #149.
-- **Contenu** : P0a2 (exécutions réelles d'Édimbourg, deux de la variante B et une de la variante A par brief), P0b2 (programmes réels affichés, séance de jugement à l'aveugle), P0a3 (Zakynthos), P0c (facultatif, si Samuel le demande) ; A5 (emplacement des programmes réels, transfert, purge, garde de CI) ; plafonds définitifs par exécution, une exécution réelle par jour, registre du jour, calendrier ; grille G0 et P0-Q6.
+- **Contenu** : P0a2 (exécutions réelles d'Édimbourg, deux de la variante B par brief ; aucune exécution réelle de la variante A tant que les modèles sont identiques, 0076), P0b2 (programmes réels affichés, séance de jugement à l'aveugle), P0a3 (Zakynthos), P0c (facultatif, si Samuel le demande) ; A5 (emplacement des programmes réels, transfert, purge, garde de CI) ; plafonds définitifs par exécution, une exécution réelle par jour, registre du jour, calendrier ; grille G0 et P0-Q6.
 - **Exigences d'entrée** (bloquants de la revue du head 0dd05f7) :
   - **quotas** : la somme des requêtes d'une exécution, par API, reste sous 100 par jour, marge et ancrage des logements compris (selon la réponse à P0-Q14) ; métrique de Routes vérifiée dans la console (éléments ou requêtes) ;
   - **rétention** : purge à chaque construction de l'index par le chargeur et au lancement de `pnpm p0`, échéance (J+30, fuseau) écrite dans l'index et dans le nom de fichier, test « fichier expiré supprimé » ; pour tout emplacement hors du poste, un responsable et un contrôle à chaque cycle ;
