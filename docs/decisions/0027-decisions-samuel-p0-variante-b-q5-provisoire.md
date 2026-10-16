@@ -12,7 +12,7 @@ La spécification P0 (#149, ticket #147) et l'état du 37e cycle posaient à Sam
 ### 1. Orientation de P0 : variante B
 1. **DeepSeek** (`deepseek/deepseek-v4.1-flash`) cherche les candidats sur le web à partir du brief.
 2. Le code les **ancre dans Google** (existence, horaires, position).
-3. Le **Decider** (`perplexity/pplx-decider-v1.1-27b`) note chaque candidat ancré : correspond aux envies (oui ou non), risque de « Pas pour moi » (1 à 10), incontournable (oui ou non), adapté au créneau (activité, repas, soirée).
+3. *(Amendée par 0076 : la notation utilise `deepseek/deepseek-v4.1-flash`, le Decider n'étant pas un modèle de conversation.)* Le **Decider** (`perplexity/pplx-decider-v1.1-27b`) note chaque candidat ancré : correspond aux envies (oui ou non), risque de « Pas pour moi » (1 à 10), incontournable (oui ou non), adapté au créneau (activité, repas, soirée).
 4. Le code **classe** avec ces notes et le coût de trajet du cadrage § 3.7.
 5. DeepSeek **rédige les raisons** des seuls lieux retenus.
 

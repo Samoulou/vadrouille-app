@@ -61,6 +61,13 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     expect(ConfigModelesSchema.safeParse(autre).success).toBe(false);
   });
 
+  it("p0: modelesDeLaVariante applique variantes.a avec une configuration de test où la notation de A diffère (P0-PO-12)", () => {
+    const { modeles } = validerConfiguration(brut());
+    const test = { ...modeles, variantes: { a: { notation: "test/notation-a" } } };
+    expect(modelesDeLaVariante(test, "a")).toEqual({ ...modeles.etapes, notation: "test/notation-a" });
+    expect(modelesDeLaVariante(test, "b")).toEqual(modeles.etapes);
+  });
+
   it("moteur de recherche web fixé (bloquant 1c de la PR 326) : exa pour le modèle de recherche choisi, cohérent avec le modèle, jamais absent", () => {
     const { modeles } = validerConfiguration(brut());
     expect(modeles.rechercheWeb).toEqual({ moteur: "exa" });

@@ -1,5 +1,5 @@
 /**
- * Prompt de l'étape « Notation » (spécification P0, étape 6 ; Decider en variante B, DeepSeek en variante A, même
+ * Prompt de l'étape « Notation » (spécification P0, étape 6 ; modèle de notation de la variante B et de la variante A, même
  * prompt et même schéma, P0-PO-12). Entrée : le brief et, pour chaque candidat, son identifiant interne, son nom
  * maison, son résumé maison, sa catégorie et son type d'étape. Jamais de donnée Google, de coût de trajet ni de
  * liste d'incontournables fournie par l'équipe (contrainte 7).
