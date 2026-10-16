@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { expect } from "vitest";
 
-import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl, urlBaseJetable, urlDeverrouillee } from "./env";
+import { BOOTSTRAP_ROLE, DB_ENV, type Login, readUrl, urlBaseJetable } from "./env";
 
 /**
  * Outils des tests de base (`pnpm test:db`, spécification B1). Chaque test se connecte avec le rôle qu'il éprouve ;
@@ -26,19 +26,6 @@ const open: pg.Client[] = [];
 
 export async function connect(login: Login): Promise<pg.Client> {
   const client = new pg.Client({ connectionString: urlFor(login) });
-  await client.connect();
-  open.push(client);
-  return client;
-}
-
-/**
- * Connexion à la seconde base jetable (`<base>_dv`, décision 0052 § 1, « Harnais des tests sous verrou ») : seuls les
- * tests du § 1 qui appellent `store_prototype_coordinates` sous `vadrouille_prototype` s'y connectent.
- */
-export async function connectDeverrouillee(login: "p0" | "admin"): Promise<pg.Client> {
-  const url = urlDeverrouillee(login);
-  if (!url) throw new Error(`variable ${DB_ENV[login]} absente (voir tests/db/global-setup.ts)`);
-  const client = new pg.Client({ connectionString: url });
   await client.connect();
   open.push(client);
   return client;

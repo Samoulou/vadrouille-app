@@ -351,14 +351,14 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
 describe("fonctions: SECURITY DEFINER durcies", () => {
   // Amendé par 0046 (D16, « Tests imposés », et S8) : purge_expired() à vadrouille_prototype_purge seul ;
   // purge_expired_coordinates à vadrouille_app et vadrouille_fn_prototype_purge ; store_place_coordinates à
-  // vadrouille_app seul ; store_prototype_coordinates à aucun rôle hors son propriétaire, PUBLIC compris (verrou S8 ;
-  // forme à quatre paramètres de 0052 § 1.7 ; ce qui change au déverrouillage relève de 0056 § 4.3).
+  // vadrouille_app seul ; store_prototype_coordinates à vadrouille_prototype seul, PUBLIC exclu (forme à quatre
+  // paramètres de 0052 § 1.7 ; déverrouillage par la migration 0006, décision 0056 § 4.5).
   const EXPECTED = {
     resolve_share_link: { owner: "vadrouille_fn_share", execute: ["vadrouille_app"] },
     checkout_organization: { owner: "vadrouille_fn_checkout", execute: ["vadrouille_webhook"] },
     purge_organization_data: { owner: "vadrouille_fn_purge", execute: ["vadrouille_account_admin"] },
     store_place_coordinates: { owner: "vadrouille_fn_coords", execute: ["vadrouille_app"] },
-    store_prototype_coordinates: { owner: "vadrouille_fn_coords", execute: [] },
+    store_prototype_coordinates: { owner: "vadrouille_fn_coords", execute: ["vadrouille_prototype"] },
     purge_expired_coordinates: { owner: "vadrouille_fn_coords", execute: ["vadrouille_app", "vadrouille_fn_prototype_purge"] },
     purge_expired: { owner: "vadrouille_fn_prototype_purge", execute: ["vadrouille_prototype_purge"] },
   } as const;

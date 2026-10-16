@@ -5,23 +5,22 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { EchecEcritureProgramme, ecrireProgramme } from "@/adapters/prototype-ecriture";
+import { EchecEcritureProgramme, ecrireProgramme, verrouS8Leve } from "@/adapters/prototype-ecriture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { decouperProgramme, type PositionLieu } from "@/prototype/decoupage";
 import { PROTOTYPE_ORG_ID, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
-import { attempt, closeAll, connect, connectDeverrouillee, createOrg, type DbClient, type Org, poserExecution, unique } from "./helpers";
+import { attempt, closeAll, connect, createOrg, type DbClient, type Org, poserExecution, unique } from "./helpers";
 
 /**
  * Écriture des positions du prototype (décision 0052 § 1 : S10, fonction du § 1.7, droits du § 1.9, module du
  * § 1.10, « Tests imposés » et « Harnais des tests sous verrou » ; 0055, section 8, ligne P0r3c ; migration
- * `0005_prototype_coordinates_run`).
+ * `0005_prototype_coordinates_run` ; déverrouillage par `0006_deverrouillage_positions_prototype`, 0056 § 4.5).
  *
- * - Base migrée (verrou S8 en place) : la fonction est appelée par l'administration, qui a `EXECUTE` de droit ; les
- *   exécutions sont posées dans des transactions annulées.
- * - Seconde base jetable `<base>_dv` (créée par le préalable, `GRANT EXECUTE` à `vadrouille_prototype`) : le module
- *   `src/adapters/prototype-ecriture.ts` y écrit sous `vadrouille_prototype`, avec de vrais `COMMIT` et `ROLLBACK`.
+ * - Fonction appelée par l'administration, qui a `EXECUTE` de droit ; exécutions posées dans des transactions annulées.
+ * - Module `src/adapters/prototype-ecriture.ts` : il écrit sur la base migrée sous `vadrouille_prototype` (`EXECUTE`
+ *   accordé par la migration 0006), avec de vrais `COMMIT` et `ROLLBACK`.
  */
 
 const RACINE = fileURLToPath(new URL("../../", import.meta.url));
@@ -30,16 +29,14 @@ const APPEL = "SELECT public.store_prototype_coordinates($1, $2, $3, $4)";
 
 let admin: DbClient;
 let a: Org;
-let dvAdmin: DbClient;
-let dvProto: DbClient;
+let app: DbClient;
 let proto: DbClient;
 
 beforeAll(async () => {
   admin = await connect("admin");
   a = await createOrg(await connect("auth"));
+  app = await connect("app");
   proto = await connect("p0");
-  dvAdmin = await connectDeverrouillee("admin");
-  dvProto = await connectDeverrouillee("p0");
 });
 
 afterAll(closeAll);
@@ -225,41 +222,41 @@ describe("droits de vadrouille_fn_coords sur prototype.runs (0052 § 1.9)", () =
   });
 });
 
-describe("p0: positions et programme écrits ensemble ou pas du tout (module, seconde base jetable)", () => {
+describe("p0: positions et programme écrits ensemble ou pas du tout (module, base migrée)", () => {
   it("réussite : positions des seuls placeId du programme, depuis l'entrée ; programme sans positions ; exécution programme_ecrit", async () => {
-    const runId = await executionValidee(dvAdmin);
+    const runId = await executionValidee(admin);
     const e = entree(runId, 21.5);
-    const { programmeId } = await ecrireProgramme(e, pool(dvProto));
-    const ecrites = await lignes(dvAdmin, e.placeIds);
+    const { programmeId } = await ecrireProgramme(e, pool(proto));
+    const ecrites = await lignes(admin, e.placeIds);
     expect(ecrites.map((l) => l.place_id)).toEqual(e.placeIds);
     for (const ligne of ecrites) {
       expect(ligne).toMatchObject({ org: PROTOTYPE_ORG_ID, lat: 21.5, lng: e.positions.get(ligne.place_id)?.lng });
     }
-    const heures = await dvAdmin.query(
+    const heures = await admin.query(
       `SELECT bool_and(c.fetched_at = r.started_at AND c.expires_at = r.started_at + interval '29 days') AS ok
        FROM public.place_coordinates c, prototype.runs r WHERE c.place_id = ANY($1::text[]) AND r.id = $2`,
       [e.placeIds, runId],
     );
     expect(heures.rows[0].ok).toBe(true);
-    const programme = await dvAdmin.query("SELECT id, contenu ? 'positions' AS avec_positions, expires_at FROM prototype.programmes WHERE run_id = $1", [runId]);
+    const programme = await admin.query("SELECT id, contenu ? 'positions' AS avec_positions, expires_at FROM prototype.programmes WHERE run_id = $1", [runId]);
     expect(programme.rows).toHaveLength(1);
     expect(programme.rows[0]).toMatchObject({ id: programmeId, avec_positions: false });
     expect(JSON.stringify(programme.rows[0])).not.toContain("21.5");
-    expect((await etat(dvAdmin, runId)).statut).toBe("programme_ecrit");
+    expect((await etat(admin, runId)).statut).toBe("programme_ecrit");
     // Écrire une seconde fois pour la même exécution (désormais close) : refusé, rien de plus.
-    await expect(ecrireProgramme(entree(runId), pool(dvProto))).rejects.toMatchObject({ code: "base", sqlstate: "42501" });
+    await expect(ecrireProgramme(entree(runId), pool(proto))).rejects.toMatchObject({ code: "base", sqlstate: "42501" });
   });
 
   it.each([
     ["(a) après les appels à la fonction, avant l'insertion du programme", "INSERT INTO prototype.programmes"],
     ["(b) après l'insertion du programme, avant le passage à programme_ecrit", "UPDATE prototype.runs"],
   ])("échec forcé %s : aucune position, aucun programme, exécution toujours en cours", async (_cas, debutRequete) => {
-    const runId = await executionValidee(dvAdmin);
+    const runId = await executionValidee(admin);
     const e = entree(runId);
     let appelsFonction = 0;
     const echec = ecrireProgramme(
       e,
-      pool(dvProto, (texte) => {
+      pool(proto, (texte) => {
         if (texte.includes("store_prototype_coordinates")) appelsFonction += 1;
         if (texte.startsWith(debutRequete)) throw Object.assign(new Error("panne simulée"), { code: "08006" });
       }),
@@ -267,36 +264,20 @@ describe("p0: positions et programme écrits ensemble ou pas du tout (module, se
     await expect(echec).rejects.toBeInstanceOf(EchecEcritureProgramme);
     await expect(echec).rejects.toMatchObject({ code: "base", sqlstate: "08006" });
     expect(appelsFonction).toBe(e.placeIds.length);
-    expect(await lignes(dvAdmin, e.placeIds)).toEqual([]);
-    expect(await etat(dvAdmin, runId)).toEqual({ statut: "en_cours", programmes: 0 });
+    expect(await lignes(admin, e.placeIds)).toEqual([]);
+    expect(await etat(admin, runId)).toEqual({ statut: "en_cours", programmes: 0 });
   });
 
   it("exécution arrêtée entre-temps : refus de la fonction, rien n'est écrit", async () => {
-    const runId = await executionValidee(dvAdmin, "arretee");
+    const runId = await executionValidee(admin, "arretee");
     const e = entree(runId);
-    await expect(ecrireProgramme(e, pool(dvProto))).rejects.toMatchObject({ code: "base", sqlstate: "42501" });
-    expect(await lignes(dvAdmin, e.placeIds)).toEqual([]);
-    expect(await etat(dvAdmin, runId)).toEqual({ statut: "arretee", programmes: 0 });
+    await expect(ecrireProgramme(e, pool(proto))).rejects.toMatchObject({ code: "base", sqlstate: "42501" });
+    expect(await lignes(admin, e.placeIds)).toEqual([]);
+    expect(await etat(admin, runId)).toEqual({ statut: "arretee", programmes: 0 });
   });
 
-  it("base migrée (verrou S8) : le module n'écrit rien, refus 42501 dès la première position", async () => {
-    await admin.query("BEGIN");
-    let runId: string;
-    try {
-      runId = await poserExecution(admin, { organisation: PROTOTYPE_ORG_ID });
-      await admin.query("COMMIT");
-    } catch (error) {
-      await admin.query("ROLLBACK");
-      throw error;
-    }
-    try {
-      const e = entree(runId);
-      await expect(ecrireProgramme(e, pool(proto))).rejects.toMatchObject({ code: "base", sqlstate: "42501" });
-      expect(await lignes(admin, e.placeIds)).toEqual([]);
-      expect(await etat(admin, runId)).toEqual({ statut: "en_cours", programmes: 0 });
-    } finally {
-      // L'exécution posée est close : elle ne reste pas en cours dans la base migrée (index « une par jour » hors jeu).
-      await admin.query("UPDATE prototype.runs SET status = 'arretee', stop_code = 'pipeline_failed', phase = NULL, cost_models_micros = NULL WHERE id = $1", [runId]);
-    }
+  it("base migrée (droit accordé par 0006) : verrouS8Leve vrai pour vadrouille_prototype, faux pour un rôle sans droit (0056 § 4.5)", async () => {
+    expect(await verrouS8Leve(pool(proto))).toBe(true);
+    expect(await verrouS8Leve(pool(app))).toBe(false);
   });
 });

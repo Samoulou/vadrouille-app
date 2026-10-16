@@ -43,6 +43,13 @@
       "when": 1792000000000,
       "tag": "0005_prototype_coordinates_run",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792076079474,
+      "tag": "0006_deverrouillage_positions_prototype",
+      "breakpoints": true
     }
   ]
 }
