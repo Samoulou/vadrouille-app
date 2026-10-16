@@ -6,19 +6,47 @@ import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } 
 /**
  * Schémas stricts des sorties de modèles (spécification P0, « Sorties des modèles : schémas stricts »).
  * Chaque élément est validé à part : un élément refusé est écarté et compté (`model_output_invalid` par étape),
- * sans son contenu. Une réponse qui n'est pas un objet JSON est refusée en entier (comptée une fois).
+ * sans son contenu. Une réponse qui n'est pas un objet JSON est refusée en entier (comptée une fois, `illisible`).
  * Les identifiants acceptés sont seulement ceux de la requête.
+ *
+ * Habillage toléré (ticket 400) : un modèle rend souvent son objet JSON dans un bloc de code Markdown (```json … ```),
+ * précédé d'une phrase ou d'un raisonnement (`<think>…</think>`). L'objet est alors cherché dans cet habillage
+ * (`formesAEssayer`) ; le schéma qui le valide reste aussi strict.
  */
 
-export type Lecture<T> = { valeur: T; refuses: number };
+export type Lecture<T> = {
+  valeur: T;
+  refuses: number;
+  /** Vrai si la réponse entière a été refusée (aucun objet JSON de la forme attendue). */
+  illisible?: boolean;
+};
+
+const FIN_RAISONNEMENT = "</think>";
+const BLOC_DE_CODE = /```[A-Za-z]*[^\S\n]*\n?([\s\S]*?)```/g;
+
+/**
+ * Textes où chercher l'objet JSON, dans l'ordre : la réponse telle quelle ; ce qui suit le dernier `</think>` ; le
+ * contenu de chaque bloc de code Markdown, du dernier au premier ; du premier `{` au dernier `}`.
+ */
+function formesAEssayer(texte: string): string[] {
+  const fin = texte.lastIndexOf(FIN_RAISONNEMENT);
+  const reponse = fin === -1 ? texte : texte.slice(fin + FIN_RAISONNEMENT.length);
+  const blocs = [...reponse.matchAll(BLOC_DE_CODE)].map((bloc) => bloc[1] ?? "").reverse();
+  const debut = reponse.indexOf("{");
+  const finObjet = reponse.lastIndexOf("}");
+  return [texte, reponse, ...blocs, ...(debut !== -1 && finObjet > debut ? [reponse.slice(debut, finObjet + 1)] : [])];
+}
 
 function objetJson(texte: string): Record<string, unknown> | undefined {
-  try {
-    const valeur: unknown = JSON.parse(texte);
-    return typeof valeur === "object" && valeur !== null && !Array.isArray(valeur) ? (valeur as Record<string, unknown>) : undefined;
-  } catch {
-    return undefined;
+  for (const forme of formesAEssayer(texte)) {
+    try {
+      const valeur: unknown = JSON.parse(forme);
+      if (typeof valeur === "object" && valeur !== null && !Array.isArray(valeur)) return valeur as Record<string, unknown>;
+    } catch {
+      // Forme suivante.
+    }
   }
+  return undefined;
 }
 
 /** Valide chaque élément d'un tableau, borne sa longueur, compte les refus. */
@@ -50,7 +78,7 @@ export type RequetePlan = z.infer<typeof RequetePlanSchema>;
 
 export function lirePlan(texte: string): Lecture<RequetePlan[]> {
   const objet = racine(texte, ["requetes"]);
-  if (objet === undefined) return { valeur: [], refuses: 1 };
+  if (objet === undefined) return { valeur: [], refuses: 1, illisible: true };
   return elements(objet.requetes, RequetePlanSchema, 30);
 }
 
@@ -79,10 +107,14 @@ export type CandidatExtrait = z.infer<typeof CandidatExtraitSchema>;
 
 export type TourRecherche = { actions: Action[]; candidats: CandidatExtrait[]; termine: boolean };
 
+/**
+ * Tour de l'agent. Réponse illisible (ticket 400) : `termine` faux, pour que l'agent redemande au tour suivant (borné par
+ * `toursMax`) au lieu de finir sur une sortie qu'il n'a pas pu lire.
+ */
 export function lireTour(texte: string): Lecture<TourRecherche> {
   const objet = racine(texte, ["actions", "candidats", "termine"]);
   if (objet === undefined || typeof objet.termine !== "boolean") {
-    return { valeur: { actions: [], candidats: [], termine: true }, refuses: 1 };
+    return { valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true };
   }
   const actions = objet.actions === undefined ? { valeur: [], refuses: 0 } : elements(objet.actions, ActionSchema, 10);
   const candidats = objet.candidats === undefined ? { valeur: [], refuses: 0 } : elements(objet.candidats, CandidatExtraitSchema, 30);

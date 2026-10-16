@@ -24,11 +24,20 @@ export type RequeteModele = {
   messages: Message[];
 };
 
+/**
+ * Raisons de fin d'une génération (liste fermée de l'AI SDK, `FinishReason`). Un compteur de diagnostic seulement
+ * (ticket 400) : jamais le texte du modèle.
+ */
+export const FINS_MODELE = ["stop", "length", "content-filter", "tool-calls", "error", "other"] as const;
+export type FinModele = (typeof FINS_MODELE)[number];
+
 export type ReponseModele = {
   /** Texte brut renvoyé par le modèle : du JSON attendu, validé par un schéma strict avant usage. */
   texte: string;
   /** Coût renvoyé par le fournisseur, en USD. */
   coutUsd: number;
+  /** Raison de fin rendue par le client réel (absente du double sur fixtures). */
+  fin?: FinModele;
 };
 
 export interface ClientModeles {

@@ -25,6 +25,9 @@ export const LOG_EVENTS = [
   // 0058 `cause` et `exception`, depuis 0062 `openssl_conf_zone` et `openssl_conf_verdict`, depuis 0065
   // `openssl_conf_directives` (listes fermées, jamais une valeur).
   "p0.guard_closed",
+  // Ticket 400 : fin de l'étape de recherche de `p0Run`, compteurs de l'agent seulement (des nombres : ni texte du
+  // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu.
+  "p0.research_done",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -56,6 +59,18 @@ export type LogFields = {
    * sans doublon, séparés par `,` ; jamais une valeur, un nom de section ni un nom de groupe.
    */
   readonly openssl_conf_directives?: string;
+  /** Compteurs de l'agent de recherche (`p0.research_done`, ticket 400) : entiers positifs ou nuls, jamais un texte. */
+  readonly turns?: number;
+  readonly searches?: number;
+  readonly pagesRead?: number;
+  readonly candidates?: number;
+  readonly candidatesRefused?: number;
+  readonly planRefused?: number;
+  readonly planUnreadable?: number;
+  readonly turnRefused?: number;
+  readonly turnUnreadable?: number;
+  readonly finishIgnored?: number;
+  readonly finishAbnormal?: number;
 };
 
 /**
@@ -248,6 +263,17 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["openssl_conf_zone", (v) => chaine(v) && ZONES_OPENSSL.has(v)],
   ["openssl_conf_verdict", (v) => chaine(v) && VERDICTS_OPENSSL.has(v)],
   ["openssl_conf_directives", directivesAdmises],
+  ["turns", entierPositif],
+  ["searches", entierPositif],
+  ["pagesRead", entierPositif],
+  ["candidates", entierPositif],
+  ["candidatesRefused", entierPositif],
+  ["planRefused", entierPositif],
+  ["planUnreadable", entierPositif],
+  ["turnRefused", entierPositif],
+  ["turnUnreadable", entierPositif],
+  ["finishIgnored", entierPositif],
+  ["finishAbnormal", entierPositif],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

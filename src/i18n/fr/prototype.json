@@ -39,6 +39,7 @@
       "fermee": "Lancement impossible : la page n'est plus ouverte. Recharge-la.",
       "acces_refuse": "Accès expiré : recharge la page et saisis de nouveau le code d'accès.",
       "entree_invalide": "Choix incomplet : sélectionne un brief, une variante et une nature.",
+      "brief_hors_plafonds": "Lancement refusé : ce brief est trop long pour cette nature, ses plafonds de trajets ou de fiches de lieux ne suffisent pas. Choisis un brief plus court ou l'exécution comptée. Rien n'a été réservé.",
       "real_mode_unavailable": "Lancement indisponible : le mode réel n'est pas encore ouvert (programme impossible à écrire).",
       "daily_quota_insufficient": "Lancement refusé : les plafonds de cette exécution dépassent le quota Google d'une minute. Rien n'a été réservé.",
       "envelope_reached": "Lancement refusé : une enveloppe de dépense est atteinte. Rien n'a été réservé.",

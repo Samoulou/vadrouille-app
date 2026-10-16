@@ -389,7 +389,7 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const { composition, appels, port } = monter([async () => reponseModele({ content: '{"ok":true}' })]);
     const agent = composition.agent();
     expect(Object.keys(agent).sort()).toEqual(["modeles", "pages", "rechercheWeb"]);
-    expect(await agent.modeles.envoyer(requete)).toEqual({ texte: '{"ok":true}', coutUsd: 0.003 });
+    expect(await agent.modeles.envoyer(requete)).toEqual({ texte: '{"ok":true}', coutUsd: 0.003, fin: "stop" });
     expect(appels).toHaveLength(1);
     const { url, init } = appels[0] as Appel;
     expect(new URL(url).protocol).toBe("https:");

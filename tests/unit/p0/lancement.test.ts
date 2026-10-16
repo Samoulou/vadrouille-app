@@ -19,6 +19,7 @@ const d = vi.hoisted(() => ({
   complet: true,
   journal: [] as string[],
   verrouLeve: true as boolean | Error,
+  tient: true,
   lancement: { forfait: { nature: "execution" }, regles: { dureeMaxMs: 900_000 } } as unknown,
   reservation: { ok: true, runId: "44444444-4444-4444-8444-444444444444" } as unknown,
   demarrage: { ok: true, workflowRunId: "wrun_1" } as unknown,
@@ -51,6 +52,10 @@ vi.mock("@/workflows", () => ({
   },
   NOMS_BRIEFS: ["edimbourg-1.json", "edimbourg-2.json", "casse.json"],
   briefLancable: (nom: string) => nom !== "casse.json",
+  briefTientDansLeMode: (mode: string, brief: string) => {
+    d.journal.push(`plafonds:${mode}:${brief}`);
+    return d.tient;
+  },
   lancementDuMode: (mode: string) => {
     d.journal.push(`mode:${mode}`);
     return d.lancement;
@@ -127,6 +132,7 @@ beforeEach(() => {
   d.complet = true;
   d.journal = [];
   d.verrouLeve = true;
+  d.tient = true;
   d.lancement = { forfait: { nature: "execution" }, regles: { dureeMaxMs: 900_000 } };
   d.reservation = { ok: true, runId: "44444444-4444-4444-8444-444444444444" };
   d.demarrage = { ok: true, workflowRunId: "wrun_1" };
@@ -138,7 +144,7 @@ beforeEach(() => {
 describe("p0: lancement d'une exécution (P0r3d)", () => {
   it("chemin nominal, dans l'ordre : garde, interrupteur, mode, commit, verrou S8, réservation, démarrage (0071 : sans décompte)", async () => {
     expect(await lancer()).toBe("lancee");
-    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "s8", "reserver", "start"]);
+    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "plafonds:reel:edimbourg-1.json", "s8", "reserver", "start"]);
     expect(d.reserver).toHaveBeenCalledWith(
       pool,
       { mode: "reel", brief: "edimbourg-1.json", variant: "B", commitSha: "d".repeat(40), forfait: { nature: "execution" } },
@@ -196,10 +202,19 @@ describe("p0: lancement d'une exécution (P0r3d)", () => {
     expect(d.reserver).not.toHaveBeenCalled();
   });
 
+  it("ticket 400 : brief hors des plafonds du mode (essai + brief long) : brief_hors_plafonds, sans connexion ni réservation", async () => {
+    d.tient = false;
+    expect(await lancer({ ...DEMANDE, mode: "essai" })).toBe("brief_hors_plafonds");
+    expect(d.journal).toEqual(["garde", "complet", "mode:essai", "commit", "plafonds:essai:edimbourg-1.json"]);
+    expect(connexions).toBe(0);
+    expect(d.reserver).not.toHaveBeenCalled();
+    expect(d.start).not.toHaveBeenCalled();
+  });
+
   it("verrou S8 fermé : real_mode_unavailable avant tout décompte et toute réservation ; erreur de lecture : usage_unavailable", async () => {
     d.verrouLeve = false;
     expect(await lancer()).toBe("real_mode_unavailable");
-    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "s8"]);
+    expect(d.journal).toEqual(["garde", "complet", "mode:reel", "commit", "plafonds:reel:edimbourg-1.json", "s8"]);
     d.verrouLeve = new Error("panne");
     expect(await lancer()).toBe("usage_unavailable");
     expect(d.reserver).not.toHaveBeenCalled();
