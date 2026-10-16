@@ -6,19 +6,91 @@ import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } 
 /**
  * Schémas stricts des sorties de modèles (spécification P0, « Sorties des modèles : schémas stricts »).
  * Chaque élément est validé à part : un élément refusé est écarté et compté (`model_output_invalid` par étape),
- * sans son contenu. Une réponse qui n'est pas un objet JSON est refusée en entier (comptée une fois).
+ * sans son contenu. Une réponse qui n'est pas un objet JSON est refusée en entier (comptée une fois, `illisible`).
  * Les identifiants acceptés sont seulement ceux de la requête.
+ *
+ * Habillage toléré (ticket 400) : un modèle rend souvent son objet JSON dans un bloc de code Markdown (```json … ```),
+ * précédé d'une phrase ou d'un raisonnement (`<think>…</think>`). L'objet est alors cherché dans cet habillage
+ * (`formesAEssayer`) ; le schéma qui le valide reste aussi strict. Une réponse de plus de `LONGUEUR_REPONSE_MAX`
+ * caractères est refusée en entier, et la recherche de l'habillage reste linéaire (bloquant 1 du head `cd614d4`).
  */
 
-export type Lecture<T> = { valeur: T; refuses: number };
+export type Lecture<T> = {
+  valeur: T;
+  refuses: number;
+  /** Vrai si la réponse entière a été refusée (aucun objet JSON de la forme attendue). */
+  illisible?: boolean;
+};
+
+const FIN_RAISONNEMENT = "</think>";
+const CLOTURE = "```";
+
+/**
+ * Longueur maximale (en caractères) d'une réponse de modèle lue ; au-delà, la réponse est refusée en entier
+ * (`illisible`) sans être examinée (bloquant 1 du head `cd614d4`). 256 Ki : plus de trois fois le plus long tour valide
+ * (30 candidats et 10 actions aux longueurs maximales du schéma, environ 80 Ki), avec la marge d'un raisonnement.
+ */
+export const LONGUEUR_REPONSE_MAX = 256 * 1024;
+
+/** Nombre de blocs de code Markdown essayés, les derniers de la réponse (bloquant 1 du head `cd614d4`). */
+export const BLOCS_ESSAYES_MAX = 8;
+
+/**
+ * Contenu des blocs de code Markdown (```lang … ```) d'un texte, du dernier au premier, `BLOCS_ESSAYES_MAX` au plus.
+ * Balayage linéaire par `indexOf` (bloquant 1 du head `cd614d4`) : l'ancienne expression régulière paresseuse coûtait un
+ * temps quadratique sur un bloc ouvert jamais fermé. Chaque position du texte est examinée une fois ; un bloc ouvert sans
+ * clôture arrête le balayage (aucune clôture plus loin ne peut exister).
+ */
+function blocsDeCode(texte: string): string[] {
+  const blocs: string[] = [];
+  let position = texte.indexOf(CLOTURE);
+  while (position !== -1) {
+    let debut = position + CLOTURE.length;
+    // Langage (lettres ASCII), espaces horizontales, puis au plus un saut de ligne, comme ```json⏎.
+    while (debut < texte.length && /[A-Za-z]/.test(texte.charAt(debut))) debut += 1;
+    while (debut < texte.length && texte.charAt(debut) !== "\n" && /\s/.test(texte.charAt(debut))) debut += 1;
+    if (texte.charAt(debut) === "\n") debut += 1;
+    const fin = texte.indexOf(CLOTURE, debut);
+    if (fin === -1) break;
+    blocs.push(texte.slice(debut, fin));
+    if (blocs.length > BLOCS_ESSAYES_MAX) blocs.shift();
+    position = texte.indexOf(CLOTURE, fin + CLOTURE.length);
+  }
+  return blocs.reverse();
+}
+
+/**
+ * Textes où chercher l'objet JSON, dans l'ordre : la réponse telle quelle ; ce qui suit le dernier `</think>` ; le
+ * contenu des derniers blocs de code Markdown, du dernier au premier ; du premier `{` au dernier `}`. Réponse plus longue
+ * que `LONGUEUR_REPONSE_MAX` : aucune forme (refusée en entier). Coût : linéaire en la longueur, `BLOCS_ESSAYES_MAX + 3`
+ * analyses JSON au plus.
+ *
+ * Limite assumée (mineur 3 du head `cd614d4`) : le dernier `</think>`, le dernier bloc et l'empan du premier `{` au
+ * dernier `}` laissent un objet placé après le vrai (par exemple soufflé par une page lue et recopié par le modèle)
+ * masquer celui-ci. La réponse entière, essayée d'abord, n'est pas concernée. L'effet est borné : l'objet retenu passe
+ * le même schéma strict (clés de racine fermées, éléments validés un à un), et un candidat n'est gardé que si sa source
+ * figure dans les résultats de recherche de l'exécution (`src/research/agent.ts`).
+ */
+function formesAEssayer(texte: string): string[] {
+  if (texte.length > LONGUEUR_REPONSE_MAX) return [];
+  const fin = texte.lastIndexOf(FIN_RAISONNEMENT);
+  const reponse = fin === -1 ? texte : texte.slice(fin + FIN_RAISONNEMENT.length);
+  const blocs = blocsDeCode(reponse);
+  const debut = reponse.indexOf("{");
+  const finObjet = reponse.lastIndexOf("}");
+  return [texte, reponse, ...blocs, ...(debut !== -1 && finObjet > debut ? [reponse.slice(debut, finObjet + 1)] : [])];
+}
 
 function objetJson(texte: string): Record<string, unknown> | undefined {
-  try {
-    const valeur: unknown = JSON.parse(texte);
-    return typeof valeur === "object" && valeur !== null && !Array.isArray(valeur) ? (valeur as Record<string, unknown>) : undefined;
-  } catch {
-    return undefined;
+  for (const forme of formesAEssayer(texte)) {
+    try {
+      const valeur: unknown = JSON.parse(forme);
+      if (typeof valeur === "object" && valeur !== null && !Array.isArray(valeur)) return valeur as Record<string, unknown>;
+    } catch {
+      // Forme suivante.
+    }
   }
+  return undefined;
 }
 
 /** Valide chaque élément d'un tableau, borne sa longueur, compte les refus. */
@@ -50,7 +122,7 @@ export type RequetePlan = z.infer<typeof RequetePlanSchema>;
 
 export function lirePlan(texte: string): Lecture<RequetePlan[]> {
   const objet = racine(texte, ["requetes"]);
-  if (objet === undefined) return { valeur: [], refuses: 1 };
+  if (objet === undefined) return { valeur: [], refuses: 1, illisible: true };
   return elements(objet.requetes, RequetePlanSchema, 30);
 }
 
@@ -79,10 +151,14 @@ export type CandidatExtrait = z.infer<typeof CandidatExtraitSchema>;
 
 export type TourRecherche = { actions: Action[]; candidats: CandidatExtrait[]; termine: boolean };
 
+/**
+ * Tour de l'agent. Réponse illisible (ticket 400) : `termine` faux, pour que l'agent redemande au tour suivant (borné par
+ * `toursMax`) au lieu de finir sur une sortie qu'il n'a pas pu lire.
+ */
 export function lireTour(texte: string): Lecture<TourRecherche> {
   const objet = racine(texte, ["actions", "candidats", "termine"]);
   if (objet === undefined || typeof objet.termine !== "boolean") {
-    return { valeur: { actions: [], candidats: [], termine: true }, refuses: 1 };
+    return { valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true };
   }
   const actions = objet.actions === undefined ? { valeur: [], refuses: 0 } : elements(objet.actions, ActionSchema, 10);
   const candidats = objet.candidats === undefined ? { valeur: [], refuses: 0 } : elements(objet.candidats, CandidatExtraitSchema, 30);

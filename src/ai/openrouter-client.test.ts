@@ -145,7 +145,7 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
   it("une requête : origine figée, redirect manual, data_collection deny, clé en en-tête seulement, coût réel confirmé", async () => {
     const { client, appels, port } = monter([async () => reponseOk(0.0042)]);
     const reponse = await client.envoyer(requete());
-    expect(reponse).toEqual({ texte: '{"ok":true}', coutUsd: 0.0042 });
+    expect(reponse).toEqual({ texte: '{"ok":true}', coutUsd: 0.0042, fin: "stop" });
     expect(appels).toHaveLength(1);
     const { url, init } = premier(appels);
     expect(new URL(url).origin).toBe(ORIGINE_MODELES);
@@ -176,7 +176,7 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
           { status: 200 },
         ),
     ]);
-    expect(await client.envoyer(requete())).toEqual({ texte: "x", coutUsd: 0.01 });
+    expect(await client.envoyer(requete())).toEqual({ texte: "x", coutUsd: 0.01, fin: "stop" });
     expect(port.lignes[0]?.etat).toBe("confirmee");
     expect(port.lignes[0]?.coutReelMicros).toBeNull();
   });

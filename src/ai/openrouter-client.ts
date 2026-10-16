@@ -6,9 +6,11 @@ import { z } from "zod";
 
 import { MODELE_ID_PATTERN } from "@/prototype/config";
 import {
+  FINS_MODELE,
   MAX_RESULTATS_WEB,
   MOTEURS_GREFFON_WEB,
   type ClientModeles,
+  type FinModele,
   type Message,
   type MoteurGreffonWeb,
   type PointEntreeRechercheWeb,
@@ -135,8 +137,13 @@ type AppelModele = {
   readonly greffonWeb: GreffonWeb | null;
 };
 
-/** Résultat brut d'un appel : texte, sources (citations d'adresses) et coût. */
-type ResultatAppel = { readonly texte: string; readonly sources: readonly SourceWebFournisseur[]; readonly coutUsd: number };
+/** Résultat brut d'un appel : texte, sources (citations d'adresses), coût et raison de fin (liste fermée). */
+type ResultatAppel = { readonly texte: string; readonly sources: readonly SourceWebFournisseur[]; readonly coutUsd: number; readonly fin: FinModele };
+
+/** Raison de fin de l'AI SDK, réduite à la liste fermée (`other` sinon) : jamais la raison brute du fournisseur. */
+function finDe(raison: unknown): FinModele {
+  return typeof raison === "string" && (FINS_MODELE as readonly string[]).includes(raison) ? (raison as FinModele) : "other";
+}
 
 const SourceSchema = z.object({
   type: z.literal("source"),
@@ -265,7 +272,10 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
               if (source.success) sources.push({ url: source.data.url, titre: source.data.title ?? "", extrait: source.data.providerMetadata?.openrouter?.content ?? "" });
             }
           }
-          return { valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? coutEstimeMicros) / 1_000_000 }, coutReelMicros };
+          return {
+            valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? coutEstimeMicros) / 1_000_000, fin: finDe(resultat.finishReason) },
+            coutReelMicros,
+          };
         } finally {
           etats.delete(signal);
         }
@@ -281,8 +291,8 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
 
   return {
     async envoyer(requete: RequeteModele): Promise<ReponseModele> {
-      const { texte, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
-      return { texte, coutUsd };
+      const { texte, coutUsd, fin } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
+      return { texte, coutUsd, fin };
     },
     async rechercherWeb(requete) {
       const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats } });

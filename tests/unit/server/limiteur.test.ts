@@ -338,6 +338,8 @@ describe("module de journal", () => {
       "rate_limit.failed",
       // P0r3b (décision 0055, section 1 points 2 et 3) : garde du mode réel fermée, code fermé seulement.
       "p0.guard_closed",
+      // Ticket 400 : fin de la recherche de p0Run, compteurs de l'agent seulement (des nombres).
+      "p0.research_done",
       "log.unknown_event",
     ]);
   });

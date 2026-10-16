@@ -15,7 +15,9 @@ import { classerSource, dateMentionnee } from "@/research/sources";
  * - un candidat n'est retenu que si sa source figure parmi ces résultats (une URL inventée ou soufflée par une page
  *   ne passe pas) ; son identifiant interne est attribué par le code ;
  * - l'arrêt se fait sur le nombre de candidats **trouvés** (cibles par créneau, total), sur `termine`, sur le
- *   nombre de tours, ou sur un plafond (erreur levée par un décorateur du script) ;
+ *   nombre de tours, ou sur un plafond (erreur levée par un décorateur du script) ; `termine` n'est suivi qu'après au
+ *   moins une recherche web (ticket 400 : avant, aucun candidat ne peut avoir de source admise), et une sortie illisible
+ *   ne termine pas la boucle (le tour suivant redemande) ;
  * - les doublons sont fusionnés avant l'ancrage.
  * L'agent ne reçoit **aucun** résultat d'ancrage : il tourne une seule fois, avant l'ancrage (contrainte 7).
  */
@@ -26,6 +28,12 @@ export type CompteursAgent = {
   pagesLues: number;
   pagesRefusees: Partial<Record<RaisonRefusPage, number>>;
   sortiesRefusees: { plan: number; recherche: number };
+  /** Réponses refusées en entier (aucun objet JSON de la forme attendue), parmi `sortiesRefusees` (ticket 400). */
+  sortiesIllisibles: { plan: number; recherche: number };
+  /** Tours où le modèle a rendu `termine` avant toute recherche web : ignoré, la boucle continue (ticket 400). */
+  terminesIgnores: number;
+  /** Réponses de modèle finies autrement que par `stop` (longueur, filtre, erreur…), quand le client la rend. */
+  finsAnormales: number;
   candidatsRefuses: { source_not_in_results: number; duplicate: number; over_total: number; invalid: number };
 };
 
@@ -249,13 +257,21 @@ export async function chercherCandidats(
     pagesLues: 0,
     pagesRefusees: {},
     sortiesRefusees: { plan: 0, recherche: 0 },
+    sortiesIllisibles: { plan: 0, recherche: 0 },
+    terminesIgnores: 0,
+    finsAnormales: 0,
     candidatsRefuses: { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
+  };
+  const noterFin = (reponse: { fin?: string }) => {
+    if (reponse.fin !== undefined && reponse.fin !== "stop") compteurs.finsAnormales += 1;
   };
 
   // Étape 2 : plan de recherche, à partir du brief seul.
   const reponsePlan = await dependances.modeles.envoyer(requetePlan(brief, dependances.modele, dependances.routage));
+  noterFin(reponsePlan);
   const plan = lirePlan(reponsePlan.texte);
   compteurs.sortiesRefusees.plan += plan.refuses;
+  if (plan.illisible === true) compteurs.sortiesIllisibles.plan += 1;
   const requetesPlan: RequetePlan[] = plan.valeur;
 
   const urlsVues = new Set<string>();
@@ -342,10 +358,15 @@ export async function chercherCandidats(
         dependances.routage,
       ),
     );
+    noterFin(reponse);
     const lecture = lireTour(reponse.texte);
     compteurs.sortiesRefusees.recherche += lecture.refuses;
+    if (lecture.illisible === true) compteurs.sortiesIllisibles.recherche += 1;
     for (const extrait of lecture.valeur.candidats) accueillir(extrait);
-    if (lecture.valeur.termine || ciblesAtteintes()) break;
+    // Ticket 400 : `termine` avant toute recherche web est ignoré (aucune source ne peut encore être admise).
+    const termine = lecture.valeur.termine && compteurs.recherches > 0;
+    if (lecture.valeur.termine && !termine) compteurs.terminesIgnores += 1;
+    if (termine || ciblesAtteintes()) break;
 
     resultats = [];
     pages = [];

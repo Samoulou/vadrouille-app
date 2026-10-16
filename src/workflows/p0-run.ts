@@ -27,7 +27,7 @@ import {
 } from "@/prototype/config";
 import { decouperProgramme } from "@/prototype/decoupage";
 import { reduireProgramme } from "@/prototype/reduction";
-import { chercherCandidats } from "@/research/agent";
+import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { DELAI_MAX_MS, type LecteurPages } from "@/research/fetch-page";
 import { bornerLecteur, bornerRecherche, PlafondAgentAtteint } from "@/research/plafonds-agent";
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
@@ -61,6 +61,7 @@ import { forfaitExecution, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, 
 import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
+import { logEvent } from "@/server/log";
 
 import edimbourg1 from "../../prototype/briefs/edimbourg-1.json";
 import edimbourg2 from "../../prototype/briefs/edimbourg-2.json";
@@ -227,6 +228,58 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
     return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs } };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Dimensions du séjour qui bornent l'étape finale (ticket 400 : calculées de même au lancement et dans l'étape) : jours
+ * du squelette, plan Routes sous les plafonds du mode, et première série (lieux demandés, un par créneau et l'idée)
+ * face au budget de fiches (`placesDetails − 2 × logements`). `placeIdsLogements` : identifiants des logements relus
+ * (étape finale) ou, au lancement, des repères distincts par logement (aucune donnée Google).
+ */
+function dimensionsDuSejour(brief: Brief, config: ConfigModeReel, placeIdsLogements: readonly string[]) {
+  const nuits = nuitsDepuisBrief(brief, placeIdsLogements);
+  const briefMoteur = briefDepuisBrief(brief);
+  const voyage = { start: brief.arrivee, end: brief.depart };
+  const jours = joursDuSejour({
+    voyage,
+    pace: briefMoteur.pace,
+    nombreDeNuits: nuits.length,
+    engagements: engagementsDepuisBrief(brief),
+    configuration: CONFIGURATION_MOTEUR,
+  });
+  const plan = planRoutes(jours.length, { elements: config.routesElements, requetes: config.routesRequetes });
+  const logementDe = (nuit: number) => (nuits.at(nuit) ?? nuits.at(0))?.placeId;
+  const logementsDuJour = jours.map((jour) => [...new Set([logementDe(jour.logementDepart), logementDe(jour.logementArrivee)].flatMap((p) => (p === undefined ? [] : [p])))]);
+  const capacites = logementsDuJour.map((ids) => Math.max(0, plan.n - ids.length));
+  const demandes = jours.map((jour, rang) => demandeBornee(demandeDuJour(jour), capacites[rang] ?? 0));
+  const serie: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
+  for (const demande of demandes) for (const type of TYPES_SERIE) serie[type] += demande[type];
+  const premiereSerie = TYPES_SERIE.reduce((somme, type) => somme + serie[type], 0);
+  const budgetFiches = config.placesDetails - 2 * brief.logements.length;
+  return { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches };
+}
+
+/**
+ * Le brief tient-il dans les plafonds du mode (ticket 400) ? Contrôlé au lancement, avant toute réservation : le plan
+ * Routes du séjour doit tenir et la première série ne pas dépasser le budget de fiches, sinon l'étape finale
+ * s'arrêterait après des appels payants. Brief ou configuration refusés, ou calcul en erreur : `false`.
+ */
+export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string): boolean {
+  try {
+    if (mode !== "reel" && mode !== "essai") return false;
+    const brief = briefDe(nom);
+    const config = configurationDuMode(mode);
+    // Repères distincts par logement (aucun identifiant de lieu n'existe avant l'ancrage). Limite connue (mineur 9 du
+    // head `cd614d4`) : si deux logements du brief s'ancraient au même lieu, l'étape finale verrait un seul logement les
+    // jours de changement, donc une place de plus pour les lieux du jour (`capacites`), et sa première série pourrait
+    // dépasser celle calculée ici d'au plus un lieu par jour de changement. Le plan Routes (nombre de jours) et le budget
+    // de fiches (nombre de logements du brief) n'en dépendent pas. Cas d'un même logement saisi deux fois : non traité.
+    const reperes = brief.logements.map((_, rang) => `logement-${rang + 1}`);
+    const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperes);
+    return plan.tient && premiereSerie <= budgetFiches;
+  } catch {
+    return false;
   }
 }
 
@@ -424,6 +477,42 @@ function candidatsRelus(lignes: readonly LigneCandidat[]): { readonly candidat: 
   });
 }
 
+/** Code interne d'une recherche sans aucun lieu (ticket 400) ; persisté `pipeline_failed` par `codePersiste` (S4). */
+export const CODE_RECHERCHE_VIDE = "research_empty";
+
+/**
+ * Ligne de journal fermée de fin de recherche (ticket 400) : compteurs de l'agent seulement, des nombres (ni texte du
+ * modèle, ni requête, ni URL, ni donnée Google) ; `warn` si aucun lieu n'est retenu.
+ */
+function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: number, lieux: number): void {
+  const refuses = compteurs?.candidatsRefuses;
+  logEvent(
+    "p0.research_done",
+    {
+      // `candidates` compte tout, événements compris ; `places`, les lieux seuls, qui décident du niveau et de l'arrêt
+      // (mineur 2 du head `cd614d4` : une exécution vide peut avoir `candidates > 0` quand elle n'a trouvé que des
+      // événements).
+      candidates: candidats,
+      places: lieux,
+      ...(compteurs === undefined
+        ? {}
+        : {
+            turns: compteurs.tours,
+            searches: compteurs.recherches,
+            pagesRead: compteurs.pagesLues,
+            candidatesRefused: (refuses?.source_not_in_results ?? 0) + (refuses?.duplicate ?? 0) + (refuses?.over_total ?? 0) + (refuses?.invalid ?? 0),
+            planRefused: compteurs.sortiesRefusees.plan,
+            planUnreadable: compteurs.sortiesIllisibles.plan,
+            turnRefused: compteurs.sortiesRefusees.recherche,
+            turnUnreadable: compteurs.sortiesIllisibles.recherche,
+            finishIgnored: compteurs.terminesIgnores,
+            finishAbnormal: compteurs.finsAnormales,
+          }),
+    },
+    lieux === 0 ? "warn" : "info",
+  );
+}
+
 /** Étape de recherche (plan, recherche web, lecture des pages) : candidats écrits dans la table de travail. */
 export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
   "use step";
@@ -437,7 +526,7 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
     const agent = composition.agent();
     marquerAppels();
     await memoireDuCout(contexte, registre).terminer(async () => {
-      const { candidats } = await chercherCandidats(contexte.brief, {
+      const { candidats, compteurs } = await chercherCandidats(contexte.brief, {
         modeles: agent.modeles,
         modele: choisis.recherche,
         routage,
@@ -445,7 +534,13 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
         lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
         config: recherche,
       });
+      const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
+      journaliserRecherche(compteurs, candidats.length, lieux);
       if (candidats.length > contexte.config.candidatsTrouves) throw new ArretEtape(codePersiste("cap_reached", true));
+      // Ticket 400 : aucun lieu trouvé (les événements seuls ne font pas de programme) : arrêt ici, avant l'ancrage et
+      // l'étape finale, qui paieraient leurs appels pour rien. Code interne `research_empty`, persisté `pipeline_failed`
+      // (S4) ; la ligne `p0.research_done` du journal en donne les compteurs.
+      if (lieux === 0) throw new ArretEtape(codePersiste(CODE_RECHERCHE_VIDE, true));
       await remplacerCandidats(poolPrototype(), contexte.garde.runId, candidats.map((candidat) => ({ cle: candidat.id, candidat, placeId: null })));
     });
   });
@@ -570,31 +665,14 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       await ecrirePhase(poolPrototype(), garde.runId, "planification");
       // Même fonction qu'à l'ancrage (une fiche par logement, zone du séjour), sur la capacité de l'étape finale.
       const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: finale.detailsLogement });
-      const nuits = nuitsDepuisBrief(
+      const { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches } = dimensionsDuSejour(
         brief,
+        config,
         logements.map((logement) => logement.placeId),
       );
-      const briefMoteur = briefDepuisBrief(brief);
-      const voyage = { start: brief.arrivee, end: brief.depart };
-      const jours = joursDuSejour({
-        voyage,
-        pace: briefMoteur.pace,
-        nombreDeNuits: nuits.length,
-        engagements: engagementsDepuisBrief(brief),
-        configuration: CONFIGURATION_MOTEUR,
-      });
-      const plan = planRoutes(jours.length, { elements: config.routesElements, requetes: config.routesRequetes });
       if (!plan.tient) throw new ErreurBudgetRoutes();
-      const logementDe = (nuit: number) => (nuits.at(nuit) ?? nuits.at(0))?.placeId;
-      const logementsDuJour = jours.map((jour) => [...new Set([logementDe(jour.logementDepart), logementDe(jour.logementArrivee)].flatMap((p) => (p === undefined ? [] : [p])))]);
-      const capacites = logementsDuJour.map((ids) => Math.max(0, plan.n - ids.length));
-      const demandes = jours.map((jour, rang) => demandeBornee(demandeDuJour(jour), capacites[rang] ?? 0));
 
       // 3. Première série et fiches, type par type, dans l'ordre du classement.
-      const serie: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
-      for (const demande of demandes) for (const type of TYPES_SERIE) serie[type] += demande[type];
-      const premiereSerie = TYPES_SERIE.reduce((somme, type) => somme + serie[type], 0);
-      const budgetFiches = config.placesDetails - 2 * nombreLogements;
       // Série plus grande que le plafond des fiches : arrêt sans programme (plafond, persisté `pipeline_failed`).
       if (premiereSerie > budgetFiches) throw new ArretEtape("pipeline_failed");
       const marge = margeRemplacement(premiereSerie, { minimum: config.fiches.margeMinimum, part: config.fiches.margePart });

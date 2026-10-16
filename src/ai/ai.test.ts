@@ -137,7 +137,8 @@ describe("p0: sorties des modèles validées par schéma strict", () => {
     expect(valeur.actions).toHaveLength(1);
     expect(valeur.candidats).toHaveLength(1);
     expect(refuses).toBe(4);
-    expect(lireTour("{}")).toEqual({ valeur: { actions: [], candidats: [], termine: true }, refuses: 1 });
+    // Ticket 400 : une réponse illisible ne termine pas la boucle de l'agent.
+    expect(lireTour("{}")).toEqual({ valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true });
   });
 
   it("plan : requête avec balise refusée", () => {
