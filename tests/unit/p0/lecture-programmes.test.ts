@@ -12,8 +12,13 @@ import { poolLectureProgrammes } from "@/server/p0/lecture-programmes";
  */
 
 const pool = { connect: vi.fn() };
-const poolPrototype = vi.fn(() => pool);
+const poolPrototype = vi.fn((): unknown => pool);
 vi.mock("@/server/p0/base", () => ({ poolPrototype: () => poolPrototype() }));
+const logEvent = vi.fn();
+vi.mock("@/server/log", () => ({
+  logEvent: (...args: unknown[]) => logEvent(...args),
+  errorNameOf: (erreur: unknown) => (erreur instanceof Error ? erreur.name : undefined),
+}));
 
 beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "preview");
@@ -23,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   poolPrototype.mockClear();
+  logEvent.mockClear();
 });
 
 const [NOM_CODE = "", NOM_BASE = ""] = Object.keys({ P0_RUN_TOKEN: 0, P0_DATABASE_URL: 0 });
@@ -56,6 +62,15 @@ describe("p0: lecture des programmes réels derrière la barrière du lancement 
     expect(await lire(preversion(code), cookie, T0 + 12 * 3_600_000)).toBeNull();
     expect(await lire(preversion(code), valeurCookieAcces(randomBytes(32), T0))).toBeNull();
     expect(poolPrototype).not.toHaveBeenCalled();
+  });
+
+  it("pool impossible à créer : null, p0.read_unavailable avec le seul nom d'erreur", async () => {
+    poolPrototype.mockImplementationOnce(() => {
+      throw new RangeError("secret de configuration");
+    });
+    expect(await lire(preversion(code), cookie)).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "RangeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 
   it.each<[string, Record<string, string | undefined>]>([

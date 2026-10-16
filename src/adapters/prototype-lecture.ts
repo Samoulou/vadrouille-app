@@ -1,69 +1,46 @@
 import "server-only";
 
-import { z } from "zod";
-
 import { TRIP_ID_PATTERN } from "@/contracts/values";
-import {
-  PROGRAMME_REDUIT_SCHEMA,
-  PropositionReduiteSchema,
-  TerminusReduitSchema,
-  VoyageReduitSchema,
-  type ProgrammeReduit,
-} from "@/prototype/programme-reduit";
+import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
-import type { SourceProgrammes } from "./prototype";
+import type { SourceProgrammesEcrits } from "./prototype";
 
 /**
- * Source des programmes **réels** de l'adaptateur `prototype` (décision 0074 ; spécification P0-suite-2, « P0r4 », partie
- * lecture) : les programmes écrits par `p0Run` dans `prototype.programmes`, lus pour « Mes voyages » et les pages du
- * voyage de la préversion de `p0-reel`.
+ * Source des programmes **réels** de l'adaptateur `prototype` sans carte (décision 0074 ; spécification P0-suite-2,
+ * « P0r4 », partie lecture) : les programmes écrits par `p0Run` dans `prototype.programmes`, lus pour « Mes voyages » et
+ * les pages du voyage de la préversion de `p0-reel`.
  *
- * - **Lecture seule** : une transaction `BEGIN READ ONLY` par lecture (la base refuse toute écriture), deux requêtes
- *   `SELECT` fixes, valeurs en paramètres liés. Rôle : `vadrouille_prototype` (pool de la garde de connexion), dont la
- *   politique de lecture ne rend que les lignes d'`org_prototype` non expirées ; `expires_at > now()` est aussi écrit ici.
+ * - **Lecture seule** : une transaction `BEGIN READ ONLY` par lecture, `SET LOCAL statement_timeout`, un seul `SELECT`
+ *   fixe, valeurs en paramètres liés. Rôle : `vadrouille_prototype` (pool de la garde de connexion), dont la politique
+ *   de lecture ne rend que les lignes d'`org_prototype` non expirées ; `expires_at > now()` est aussi écrit ici.
  * - **Même barrière que le lancement** (exigence 4) : `pool()` est injecté et rend `null` tant que la garde du mode réel
- *   est fermée ou que le cookie d'accès manque (`src/server/p0/page-acces.ts`) ; alors **aucune connexion** n'est
- *   ouverte, la liste est vide et un voyage est introuvable (404).
- * - **Aucune position** : `place_coordinates` n'est jamais lue (0052, S6) ; le programme est servi avec une table
- *   `positions` vide, donc sans carte (aucun point, ni sur une carte Google ni ailleurs).
- * - **Schéma strict** : le contenu est validé par la forme réduite **sans** `positions` (`ProgrammeEcritSchema`), et
- *   `trip.id` doit être l'identifiant demandé. Un contenu refusé n'est jamais servi ni journalisé.
+ *   est fermée ou que le cookie d'accès manque (`src/server/p0/lecture-programmes.ts`) ; alors **aucune connexion**
+ *   n'est ouverte, la liste est vide et un voyage est introuvable (404).
+ * - **Aucune position** : `place_coordinates` n'est jamais lue (0052, S6) ; l'adaptateur sert ces programmes par son
+ *   chemin sans carte (`createPrototypeAdapterSansCarte`).
+ * - **Schéma unique** : `ProgrammeEcritSchema` (`src/prototype/programme-reduit.ts`, partagé avec le rapport), puis
+ *   `trip.id` égal à l'identifiant demandé. Un contenu refusé n'est jamais servi ni journalisé.
+ * - **Identifiant en double** : deux programmes portant le même `trip.id` (impossible par construction, 0071) ne sont
+ *   servis ni par la liste ni par la page du voyage : le voyage est absent des deux, de façon cohérente.
  *
- * Erreur de base (connexion, requête) : `EchecLectureProgrammes`, sans message de la base ni valeur ; la page affiche
- * l'état d'erreur existant.
+ * Erreur de base (connexion, requête, délai) : `EchecLectureProgrammes`, sans message de la base ni valeur ; la page
+ * affiche l'état d'erreur existant.
  */
 
-/** Programme tel qu'écrit par `ecrireProgramme` : forme réduite sans `positions` (Q324, 0046 D15). */
-export const ProgrammeEcritSchema = z
-  .strictObject({
-    schema: z.literal(PROGRAMME_REDUIT_SCHEMA),
-    trip: VoyageReduitSchema,
-    proposals: z.array(PropositionReduiteSchema).max(8),
-    terminus: z.array(TerminusReduitSchema),
-  })
-  .superRefine((programme, ctx) => {
-    const jours = programme.trip.days.map((jour) => jour.index);
-    if (new Set(jours).size !== jours.length) ctx.addIssue({ code: "custom", message: "indices de jour en double", path: ["trip", "days"] });
-    const joursTerminus = programme.terminus.map((terminus) => terminus.jour);
-    if (jours.length !== joursTerminus.length || jours.some((jour, index) => joursTerminus.at(index) !== jour)) {
-      ctx.addIssue({ code: "custom", message: "un terminus par jour, dans l'ordre des jours", path: ["terminus"] });
-    }
-    const connus = new Set(jours);
-    if (programme.proposals.some((proposition) => !connus.has(proposition.day))) {
-      ctx.addIssue({ code: "custom", message: "proposition d'un jour absent", path: ["proposals"] });
-    }
-  });
-
-/** Identifiants des voyages des programmes non expirés, triés ; plafonnés (`PROGRAMMES_MAX`). */
-export const SQL_IDS = `SELECT DISTINCT contenu #>> '{trip,id}' AS id FROM prototype.programmes
-WHERE expires_at > pg_catalog.now() ORDER BY 1 LIMIT 201`;
-/** Contenu du programme d'un voyage, s'il n'est pas expiré. */
-export const SQL_PROGRAMME = `SELECT contenu FROM prototype.programmes
-WHERE contenu #>> '{trip,id}' = $1::text AND expires_at > pg_catalog.now() LIMIT 2`;
+/** Délai maximal d'une requête de lecture (millisecondes), posé dans la transaction. */
+export const DELAI_LECTURE_MS = 5000;
+export const SQL_DELAI = `SET LOCAL statement_timeout = ${DELAI_LECTURE_MS}`;
 
 /** Programmes listés au plus ; au-delà, la lecture échoue fermée (jamais une liste tronquée en silence). */
 export const PROGRAMMES_MAX = 200;
+
+/** Contenus des programmes non expirés, pour « Mes voyages » : une seule requête (`PROGRAMMES_MAX` + 1 lignes au plus). */
+export const SQL_LISTE = `SELECT contenu FROM prototype.programmes
+WHERE expires_at > pg_catalog.now() ORDER BY contenu #>> '{trip,id}' LIMIT ${PROGRAMMES_MAX + 1}`;
+/** Contenu du programme d'un voyage, s'il n'est pas expiré (deux lignes au plus, pour détecter un doublon). */
+export const SQL_PROGRAMME = `SELECT contenu FROM prototype.programmes
+WHERE contenu #>> '{trip,id}' = $1::text AND expires_at > pg_catalog.now() LIMIT 2`;
 
 export class EchecLectureProgrammes extends Error {
   constructor() {
@@ -77,52 +54,72 @@ export interface SourceProgrammesReelsOptions {
   pool: () => Promise<PoolSql | null>;
 }
 
-/** Une connexion, une transaction en lecture seule ; toute erreur devient `EchecLectureProgrammes`. */
-async function lectureSeule<T>(pool: PoolSql, lire: (client: ClientSql) => Promise<T>): Promise<T> {
+/**
+ * Une connexion, une transaction en lecture seule bornée dans le temps ; toute erreur devient `EchecLectureProgrammes`
+ * et le client est rendu au pool **comme cassé** (`release(true)` : il est détruit, jamais réutilisé).
+ */
+async function lectureSeule(pool: PoolSql, sql: string, valeurs?: readonly unknown[]): Promise<readonly Record<string, unknown>[]> {
   let client: ClientSql;
   try {
     client = await pool.connect();
   } catch {
     throw new EchecLectureProgrammes();
   }
+  let casse = false;
   try {
     await client.query("BEGIN READ ONLY");
-    const resultat = await lire(client);
+    await client.query(SQL_DELAI);
+    const { rows } = await client.query(sql, valeurs);
     await client.query("COMMIT");
-    return resultat;
+    return rows;
   } catch {
+    casse = true;
     await client.query("ROLLBACK").catch(() => undefined);
     throw new EchecLectureProgrammes();
   } finally {
-    client.release();
+    client.release(casse);
   }
 }
 
-/** Contenu validé, rendu sous la forme réduite avec une table `positions` vide (aucune carte). */
-function programmeServi(contenu: unknown, tripId: string): ProgrammeReduit | null {
+const idDe = (contenu: unknown): string | undefined => {
+  const trip = (contenu as { trip?: { id?: unknown } } | null)?.trip;
+  return typeof trip?.id === "string" ? trip.id : undefined;
+};
+
+/** Contenu validé par le schéma unique, avec l'identifiant attendu ; `null` sinon. */
+function programmeValide(contenu: unknown, tripId: string): ProgrammeEcrit | null {
   const resultat = ProgrammeEcritSchema.safeParse(contenu);
-  if (!resultat.success || resultat.data.trip.id !== tripId) return null;
-  return { ...resultat.data, positions: {} };
+  return resultat.success && resultat.data.trip.id === tripId ? resultat.data : null;
 }
 
-export function createSourceProgrammesReels({ pool }: SourceProgrammesReelsOptions): SourceProgrammes {
+export function createSourceProgrammesReels({ pool }: SourceProgrammesReelsOptions): SourceProgrammesEcrits {
   return {
-    async ids() {
+    async lister() {
       const ouvert = await pool();
       if (ouvert === null) return [];
-      const lignes = await lectureSeule(ouvert, async (client) => (await client.query(SQL_IDS)).rows);
+      const lignes = await lectureSeule(ouvert, SQL_LISTE);
       if (lignes.length > PROGRAMMES_MAX) throw new EchecLectureProgrammes();
-      return lignes.map((ligne) => ligne.id).filter((id): id is string => typeof id === "string" && TRIP_ID_PATTERN.test(id));
+      const parId = new Map<string, unknown[]>();
+      for (const { contenu } of lignes) {
+        const id = idDe(contenu);
+        if (id !== undefined && TRIP_ID_PATTERN.test(id)) parId.set(id, [...(parId.get(id) ?? []), contenu]);
+      }
+      const programmes: ProgrammeEcrit[] = [];
+      for (const [id, contenus] of parId) {
+        // Doublon : aucun des deux n'est servi, comme par `lire`.
+        const programme = contenus.length === 1 ? programmeValide(contenus[0], id) : null;
+        if (programme) programmes.push(programme);
+      }
+      return programmes;
     },
     async lire(tripId) {
       // Motif vérifié avant toute connexion.
       if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId)) return null;
       const ouvert = await pool();
       if (ouvert === null) return null;
-      const lignes = await lectureSeule(ouvert, async (client) => (await client.query(SQL_PROGRAMME, [tripId])).rows);
-      // Deux programmes pour un même voyage : aucun n'est servi (l'identifiant est unique par construction, 0071).
+      const lignes = await lectureSeule(ouvert, SQL_PROGRAMME, [tripId]);
       if (lignes.length !== 1) return null;
-      return programmeServi(lignes[0]?.contenu, tripId);
+      return programmeValide(lignes[0]?.contenu, tripId);
     },
   };
 }

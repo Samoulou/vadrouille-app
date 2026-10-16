@@ -40,8 +40,9 @@ async function brancherLecturePrototype(
   errorNameOf: typeof import("@/server/log").errorNameOf,
 ): Promise<void> {
   try {
-    const { brancherLectureProgrammesReels, isPrototypeAdapter } = await import("@/adapters");
+    const { isPrototypeAdapter } = await import("@/adapters/payment-guard");
     if (!isPrototypeAdapter()) return;
+    const { brancherLectureProgrammesReels } = await import("@/adapters/prototype-instance");
     const { poolLectureProgrammes } = await import("@/server/p0/lecture-programmes");
     brancherLectureProgrammesReels(() => poolLectureProgrammes());
   } catch (error) {

@@ -33,6 +33,11 @@ const PROTOTYPE_PORT = PORT + PROTOTYPE_PORT_OFFSET;
 const prototypeURL = `http://127.0.0.1:${PROTOTYPE_PORT}`;
 const PROTOTYPE_DIR = realpathSync(join(__dirname, "prototype", "programmes-test"));
 
+// Troisième serveur sur le même build (décision 0074) : adaptateur `prototype` **sans** dossier de programmes, donc
+// source des programmes réels branchée par `instrumentation.ts`, garde du mode réel fermée (`CI=true`, aucune base) :
+// « Mes voyages » vide, aucune connexion, aucun échec de branchement au journal. Port décalé de 2 000.
+const LECTURE_REELLE_PORT = PORT + 2 * PROTOTYPE_PORT_OFFSET;
+
 // B3a (spécification B3, B3a point 3 ; décisions 0050, P2, et 0051, points 2.3 et 6.4) : les serveurs des e2e
 // tournent en `VADROUILLE_ENV=ci`. Le secret du limiteur est tiré au hasard à chaque exécution et posé dans le seul
 // `env` du serveur principal : ni écrit sur disque, ni journalisé, ni posé dans `process.env` de Playwright (aucun
@@ -136,6 +141,24 @@ export default defineConfig({
         VADROUILLE_DEV_PAGES: "1",
         PORT: String(PROTOTYPE_PORT),
         HOSTNAME: "127.0.0.1",
+      },
+    },
+    {
+      // Même build, servi sans dossier de programmes (décision 0074, `tests/e2e/lecture-reelle.e2e.spec.ts`).
+      command: serve,
+      url: `http://127.0.0.1:${LECTURE_REELLE_PORT}`,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        DATA_ADAPTER: "prototype",
+        VADROUILLE_PROTOTYPE: "1",
+        CI: "true",
+        VADROUILLE_ENV: "ci",
+        PORT: String(LECTURE_REELLE_PORT),
+        HOSTNAME: "127.0.0.1",
+        [SERVER_LOG_ENV]: serverLogPath({ port: LECTURE_REELLE_PORT, tmpDir: tmpdir() }),
       },
     },
   ],

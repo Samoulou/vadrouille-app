@@ -2,7 +2,7 @@ import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-relecteur";
 import type { PoolSql } from "@/server/usage/neon";
 
-import { createPrototypeAdapter } from "./prototype";
+import { createPrototypeAdapter, createPrototypeAdapterSansCarte } from "./prototype";
 import { createSourceProgrammesReels } from "./prototype-lecture";
 import { createProgrammeLoader } from "./prototype-loader";
 import type { TripAdapter } from "./types";
@@ -67,7 +67,7 @@ export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env): Trip
     const relecteur = createRelecteurSimule();
     const adapter = dossier
       ? createPrototypeAdapter({ programmes: createProgrammeLoader({ dossier }), relecteurs: { trajets: relecteur } })
-      : createPrototypeAdapter({ programmes: createSourceProgrammesReels({ pool: poolLectureProgrammes }), relecteurs: { trajets: null } });
+      : createPrototypeAdapterSansCarte({ programmes: createSourceProgrammesReels({ pool: poolLectureProgrammes }) });
     etat.instance = { adapter, relecteur };
     holder[INSTANCE_KEY] = etat;
   }

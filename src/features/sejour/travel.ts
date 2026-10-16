@@ -60,8 +60,13 @@ export function travelBannerMessage(day: Day): string | null {
 
 /**
  * Journée sans aucune durée de trajet connue : aucune ligne de trajet et un total nul. C'est le cas des programmes
- * réels servis sans relecture des durées (adaptateur `prototype`, décision 0074) : l'interface n'affiche alors aucune
- * durée, plutôt qu'un « 0 min de trajet » qui serait inventé.
+ * réels servis sans relecture des durées (adaptateur `prototype` sans carte, décision 0074) : l'interface n'affiche
+ * alors aucune durée, plutôt qu'un « 0 min de trajet » qui serait inventé.
+ *
+ * **Déduction assumée** (décision 0074, point 4) : le contrat `Day` ne distingue pas « inconnu » de « zéro », et
+ * l'étendre toucherait tous les adaptateurs pour un cas de la préversion. Une journée sans aucun trajet (une seule
+ * étape, ou aucune, avec l'adaptateur simulé) n'affiche donc pas non plus « 0 min de trajet » : il n'y a aucun
+ * trajet à décrire, et rien d'utile n'est perdu. Testé dans `JourneePanel.test.tsx` et `SejourPanel.test.tsx`.
  */
 export function withoutTravel(day: Pick<Day, "items" | "travelMinutes">): boolean {
   return day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment");
@@ -142,11 +147,12 @@ export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
 }
 
 /**
- * Nombre d'étapes d'un jour : « 1 étape », « 6 étapes ». Seul résumé de « Jour par jour » dans la vue partagée,
- * qui ne reçoit aucune durée de trajet totale (F10c).
+ * Nombre d'étapes d'un jour : « Aucune étape », « 1 étape », « 6 étapes ». Seul résumé de « Jour par jour » dans la
+ * vue partagée, qui ne reçoit aucune durée de trajet totale (F10c).
  */
 export function dayStopCount(day: { items: readonly { type: string }[] }): string {
   const count = day.items.filter((item) => item.type === "stop").length;
+  if (count === 0) return ts.jourParJour.etapes.aucune;
   return count === 1 ? ts.jourParJour.etapes.un : format(ts.jourParJour.etapes.plusieurs, { n: count });
 }
 

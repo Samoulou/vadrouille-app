@@ -1,4 +1,4 @@
-import { placeIdsDuProgramme, type ProgrammeReduit, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import { CLES_PROGRAMME_ECRIT, placeIdsDuProgramme, type ProgrammeEcrit, type ProgrammeReduit, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
 
 /**
  * Découpage du programme réduit pour la base du prototype (décision 0046, D15 point 1 ; Q324, option a) : le contenu
@@ -10,11 +10,11 @@ import { placeIdsDuProgramme, type ProgrammeReduit, ProgrammeReduitSchema } from
  * journalisées ni écrites dans un fichier (S6).
  */
 
-export type ContenuProgramme = Omit<ProgrammeReduit, "positions">;
+export type ContenuProgramme = ProgrammeEcrit;
 export type PositionLieu = { readonly lat: number; readonly lng: number };
 
 /** Clés de premier niveau du contenu écrit en base, égales au `CHECK` de `prototype.programmes`. */
-export const CLES_CONTENU = ["schema", "trip", "proposals", "terminus"] as const;
+export const CLES_CONTENU = CLES_PROGRAMME_ECRIT;
 
 /** Sépare le contenu (sans positions) des positions, par `placeId`. */
 export function decouperProgramme(programme: ProgrammeReduit): { readonly contenu: ContenuProgramme; readonly positions: ReadonlyMap<string, PositionLieu> } {

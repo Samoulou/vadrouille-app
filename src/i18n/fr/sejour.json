@@ -58,6 +58,7 @@
       "titre": "Jour par jour",
       "resume": "{etapes} · {duree} de trajet",
       "etapes": {
+        "aucune": "Aucune étape",
         "un": "1 étape",
         "plusieurs": "{n} étapes"
       },

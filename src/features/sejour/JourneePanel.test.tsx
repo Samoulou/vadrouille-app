@@ -15,6 +15,35 @@ import { tripRoutes } from "./routes";
 const routes = tripRoutes("/voyages", edimbourg.id);
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
 
+/** Journée sans durée connue (programme réel sans relecture, décision 0074) : aucun segment, `travelMinutes` à 0. */
+const sansTrajets = (jour: Day, budgetPerPerson: number | undefined): Day => ({
+  ...jour,
+  items: jour.items.filter((item) => item.type !== "segment"),
+  travelMinutes: 0,
+  budgetPerPerson,
+});
+
+describe("JourneePanel : journée sans durée connue (décision 0074)", () => {
+  it("budget seul : « Environ 95 CHF par personne », aucune durée ni bandeau de trajet", () => {
+    const { container } = render(<JourneePanel day={sansTrajets(day(2), 95)} routes={routes} />);
+    expect(container.querySelector("[data-part='trajet-budget']")).toHaveTextContent(/^Environ 95 CHF par personne$/);
+    expect(container).not.toHaveTextContent("de trajet");
+    expect(container.querySelector("[data-type='segment']")).toBeNull();
+    expect(container.querySelector("[data-kind='travel']")).toBeNull();
+  });
+
+  it("sans budget : aucune ligne sous le titre ; les étapes restent affichées", () => {
+    const { container } = render(<JourneePanel day={sansTrajets(day(2), undefined)} routes={routes} />);
+    expect(container.querySelector("[data-part='trajet-budget']")).toBeNull();
+    expect(within(container.querySelector("#liste-etapes") as HTMLElement).getByRole("link", { name: /\[Dean Village\]/ })).toBeInTheDocument();
+  });
+
+  it("déduction assumée : un jour simulé sans aucun trajet n'affiche pas « 0 min de trajet »", () => {
+    const { container } = render(<JourneePanel day={sansTrajets(day(2), undefined)} routes={routes} />);
+    expect(container).not.toHaveTextContent("0 min de trajet");
+  });
+});
+
 describe("JourneePanel (écran 12, F5-PO-5)", () => {
   it("J2 : titre de niveau 1, ligne trajet et budget, ligne du jour, événements, « Surprends-moi », dans cet ordre", () => {
     const { container } = render(<JourneePanel day={day(2)} routes={routes} />);

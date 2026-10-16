@@ -13,6 +13,14 @@ export function adapterChoice(value: string | undefined): string {
 }
 
 /**
+ * Vrai quand l'adaptateur de données est `prototype` (spécification P0, P0b1), sans lever d'erreur ni consulter
+ * la liste blanche : `getTripAdapter()` et `getRequestContext()` la consultent, et lèvent hors liste blanche.
+ */
+export function isPrototypeAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  return adapterChoice(value) === "prototype";
+}
+
+/**
  * Faux sur tout déploiement de production (`VADROUILLE_ENV` ou `VERCEL_ENV` à `production`), quels que
  * soient `NODE_ENV` et le drapeau ; sinon vrai seulement en `development` ou `test`, ou avec
  * `VADROUILLE_DEMO_PAYMENT` à exactement `1` (posé par `playwright.config.ts` seulement).
