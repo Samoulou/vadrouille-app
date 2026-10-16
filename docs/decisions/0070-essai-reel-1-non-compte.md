@@ -2,7 +2,7 @@
 
 Statut : décidée par Samuel (le décompte de P0a2 relève des phases G0, réservées à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion. Le mécanisme (§ « Mise en œuvre ») est un choix d'outillage soumis au Tech Lead.
 
-Date : 2026-10-16 · Décideur : Samuel · Rédacteur : Product Owner (pour le CEO) · Source : fil du studio, projet Vadrouille (message de Samuel ci-dessous) · PR #<à compléter> · Diagnostic : note de l'IA-recherche « Diagnostic du premier essai réel » (fichier du projet `essai-reel/diagnostic-essai-1.md`, hors dépôt) · Correctif : Q460, branche `claude/460-ancrage-sans-statut`
+Date : 2026-10-16 · Décideur : Samuel · Rédacteur : Product Owner (pour le CEO) · Source : fil du studio, projet Vadrouille (message de Samuel ci-dessous) · PR #393 · Diagnostic : note de l'IA-recherche « Diagnostic du premier essai réel » (fichier du projet `essai-reel/diagnostic-essai-1.md`, hors dépôt) · Correctif : Q460, branche `claude/460-ancrage-sans-statut`
 
 ## Contexte
 
