@@ -60,7 +60,16 @@ export type OptionsPlaces = {
 
 const TextSearchSchema = z.object({ places: z.array(z.object({ id: z.string().regex(PLACE_ID) })).max(20).optional() });
 
-const PointSchema = z.object({ day: z.number().int().min(0).max(6), hour: z.number().int().min(0).max(24), minute: z.number().int().min(0).max(59) });
+/**
+ * Point d'une période d'ouverture. Places API (New) suit le format JSON de proto3, qui omet un entier à sa valeur par
+ * défaut : `day` (dimanche), `hour` (minuit) et `minute` (heure pile) absents valent 0 (Q460). Une valeur présente
+ * reste bornée ; `date` et `truncated` ne sont pas lus.
+ */
+const PointSchema = z.object({
+  day: z.number().int().min(0).max(6).default(0),
+  hour: z.number().int().min(0).max(24).default(0),
+  minute: z.number().int().min(0).max(59).default(0),
+});
 const DetailsSchema = z.object({
   id: z.string().regex(PLACE_ID),
   // Facultatif (Q460) : Places API (New) ne le renvoie que pour un établissement ; un quartier, un parc ou un site
