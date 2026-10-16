@@ -30,14 +30,31 @@ beforeEach(() => {
 });
 
 describe("p0Run : pièces du lancement (P0r3d)", () => {
-  it("ticket 400 : brief dans les plafonds du mode ; l'essai (essai.json) n'admet que le brief court, le mode réel tous", () => {
+  it("ticket 400 et décision 0073 : brief dans les plafonds du mode ; essai et mode réel admettent les quatre briefs", () => {
     const table = Object.fromEntries((["essai", "reel"] as const).map((mode) => [mode, Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, briefTientDansLeMode(mode, nom)]))]));
     expect(table).toEqual({
-      essai: { "edimbourg-1.json": false, "edimbourg-2.json": false, "edimbourg-3.json": false, "edimbourg-court.json": true },
+      essai: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true },
       reel: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true },
     });
     expect(briefTientDansLeMode("essai", "absent.json")).toBe(false);
     expect(briefTientDansLeMode("demo" as "reel", "edimbourg-court.json")).toBe(false);
+  });
+
+  it("ticket 400 : le contrôle reste actif ; essai aux anciens plafonds de 0063 (3 requêtes, 120 éléments, 14 fiches) : seul le brief court passe", async () => {
+    vi.resetModules();
+    const commite = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/config/essai.json"), "utf8")) as Record<string, unknown>;
+    vi.doMock("../../../prototype/config/essai.json", () => ({
+      default: { ...commite, coutUsd: 0.3, recherchesWeb: 6, pagesLues: 15, candidatsTrouves: 12, placesTextSearch: 17, placesDetails: 14, routesRequetes: 3, routesElements: 120, dureeMs: 300_000 },
+    }));
+    const { briefTientDansLeMode: tientAncien, NOMS_BRIEFS: noms } = await import("@/workflows/p0-run");
+    expect(Object.fromEntries(noms.map((nom) => [nom, tientAncien("essai", nom)]))).toEqual({
+      "edimbourg-1.json": false,
+      "edimbourg-2.json": false,
+      "edimbourg-3.json": false,
+      "edimbourg-court.json": true,
+    });
+    vi.doUnmock("../../../prototype/config/essai.json");
+    vi.resetModules();
   });
 
   it("SKU du forfait : égaux à ceux des clients réels (lus dans leur source : seuls leurs tests les importent)", () => {
@@ -69,18 +86,18 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     });
   });
 
-  // essai.json de #356 (brief court) : 17 Text Search (gratuits), 14 fiches à 20 USD les 1 000 (0,28 USD) et 120 éléments
-  // Routes à 5 USD les 1 000 (0,60 USD), au prix plein.
-  it("essai : plafonds d'essai.json, 0,88 USD de Google, 0,30 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  // essai.json aligné sur mode-reel.json (0073) : 90 Text Search (gratuits), 90 fiches à 20 USD les 1 000 (1,80 USD) et
+  // 500 éléments Routes à 5 USD les 1 000 (2,50 USD), au prix plein.
+  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 4,30 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
-        textSearchRequetes: 17,
-        placeDetailsRequetes: 14,
-        routesRequetes: 3,
-        routesElements: 120,
-        coutGoogleMicros: 880_000,
-        coutModelesMicros: 300_000,
+        textSearchRequetes: 90,
+        placeDetailsRequetes: 90,
+        routesRequetes: 30,
+        routesElements: 500,
+        coutGoogleMicros: 4_300_000,
+        coutModelesMicros: 3_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
     });

@@ -235,24 +235,23 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
 }
 
 /**
- * Plafonds de l'**essai d'intégration** (P0S2-PO-12, amendé le 2026-10-14 par le Product Owner, spécification
- * P0 suite 2, « Essai d'intégration » ; proposés par #318 selon la règle de 0055 § 6 point 7) : 0,30 USD de
- * modèles, 6 recherches web, 15 pages, 12 candidats (série de 10 lieux du brief court et 2 de marge), 17 Text
- * Search (12 candidats et 5 logements au plus), 14 Place Details (10 lieux, 2 de marge et 2 × 1 logement),
- * 3 requêtes de matrice et 120 éléments (`n² + 2n`, `n` = 10), 5 min. Candidats, Text Search et fiches relevés
- * par le ticket 355 (0063, amendement P0r3c-5, points 8 et 9). Ce sont des maxima : `essai.json` ne peut pas
- * les dépasser.
+ * Plafonds de l'**essai d'intégration** : depuis la décision 0073 (Samuel, 2026-10-16), **les mêmes que ceux de
+ * `mode-reel.json`** (3 USD de modèles, 40 recherches web, 100 pages, 85 candidats, 90 Text Search, 90 Place Details,
+ * 30 requêtes de matrice et 500 éléments, 15 min), pour que tout brief passe en essai ; seul un voyage qui les
+ * dépasserait est arrêté. Valeurs antérieures (P0S2-PO-12 amendé, ticket 355 : 0,30 USD, 6, 15, 12, 17, 14, 3, 120,
+ * 5 min) : décision 0063, points 8 et 9. Ce sont des maxima : `essai.json` ne peut pas les dépasser ; un test vérifie
+ * qu'ils restent égaux aux plafonds commités du mode réel.
  */
 export const BORNES_ESSAI = {
-  coutUsd: 0.3,
-  recherchesWeb: 6,
-  pagesLues: 15,
-  candidatsTrouves: 12,
-  placesTextSearch: 17,
-  placesDetails: 14,
-  routesRequetes: 3,
-  routesElements: 120,
-  dureeMs: 300_000,
+  coutUsd: 3,
+  recherchesWeb: 40,
+  pagesLues: 100,
+  candidatsTrouves: 85,
+  placesTextSearch: 90,
+  placesDetails: 90,
+  routesRequetes: 30,
+  routesElements: 500,
+  dureeMs: 900_000,
 } as const;
 
 /**

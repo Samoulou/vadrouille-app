@@ -204,8 +204,8 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  *   réels (`SKUS_FORFAIT`), plus le plafond de coût des modèles du mode (`coutUsd`). Google, Text Search (identifiants
  *   seulement) à 0 USD, fiches à 20 USD les 1 000, éléments Routes à 5 USD les 1 000 :
  *   - mode réel (`mode-reel.json`, 0053) : 90 × 0 + 90 × 0,020 + 500 × 0,005 = 0 + 1,80 + 2,50 = **4,30 USD** ;
- *   - essai (`essai.json`, spécification P0-suite-2, « Enveloppe Google ») : 17 × 0 + 14 × 0,020 + 120 × 0,005
- *     = 0 + 0,28 + 0,60 = **0,88 USD**.
+ *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **4,30 USD**
+ *     (0,88 USD avec les plafonds d'essai de 0063, points 8 et 9).
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
  * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
  *   en cours n'est jamais close comme orpheline par le lancement d'un essai.
@@ -296,7 +296,8 @@ export async function cloreExecutionNonDemarree(pool: PoolSql, garde: GardeOuver
 
 /**
  * Modèles et profil de l'agent du mode : `recherche.json` (mode réel, profil léger de 0055 § 6 point 5) ou
- * `recherche-essai.json` (essai d'intégration, 12 candidats au plus) ; le total visé reste sous `candidatsTrouves`.
+ * `recherche-essai.json` (essai d'intégration : 12 candidats visés ; `toursMax` aligné sur le mode réel par 0073) ; le
+ * total visé reste sous `candidatsTrouves`.
  */
 function configurationAgent(mode: ExecutionEnCours["mode"], config: ConfigModeReel): { modeles: ConfigModeles; recherche: ConfigRecherche } {
   const modeles = ConfigModelesSchema.safeParse(configModeles);
@@ -347,8 +348,9 @@ type ContexteEtape = {
 
 /**
  * Entrée commune d'une étape : garde (durée du mode réel, la plus longue), exécution relue, configuration et brief ;
- * pour un essai, garde revérifiée avec sa durée propre (5 min). Puis phase écrite (garde d'idempotence) et échéance :
- * la plus proche de la limite de fonction et de la fin de la durée du mode, moins la marge de fin d'étape.
+ * pour un essai, garde revérifiée avec sa durée propre (`essai.json` : 15 min depuis la décision 0073, 5 min avant). Puis
+ * phase écrite (garde d'idempotence) et échéance : la plus proche de la limite de fonction et de la fin de la durée du
+ * mode, moins la marge de fin d'étape.
  */
 async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<ContexteEtape> {
   const dureeReel = validerConfigModeReel(configModeReel);
