@@ -37,7 +37,11 @@ export const STATUTS_GOOGLE = ["OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERM
 /** Place Details : ce que le moteur lit, plus des champs que l'ancrage ignore (nom, adresse, note, prix). */
 export type DetailsLieu = {
   placeId: string;
-  statut: (typeof STATUTS_GOOGLE)[number];
+  /**
+   * État d'établissement déclaré par Google ; absent pour un lieu qui n'est pas un établissement (quartier, parc, site
+   * naturel), ce qui ne signifie pas une fermeture (Q460).
+   */
+  statut?: (typeof STATUTS_GOOGLE)[number];
   position: Coordonnees;
   /** Plages d'ouverture (0 = dimanche, minutes depuis minuit) ; `null` si inconnues. */
   horaires: { jour: number; debut: number; fin: number }[] | null;

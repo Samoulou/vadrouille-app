@@ -197,6 +197,24 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     expect((await client.details(PLACE_ID)).horaires).toHaveLength(7);
   });
 
+  it("fiche sans businessStatus (quartier, parc, site naturel ; Q460) : acceptée, sans statut ni horaires", async () => {
+    const quartier: Record<string, unknown> = { ...DETAILS };
+    delete quartier.businessStatus;
+    delete quartier.regularOpeningHours;
+    const { client, port } = monter([async () => json(quartier), async () => json({ ...quartier, businessStatus: "BUSINESS_STATUS_UNSPECIFIED" })]);
+    for (let i = 0; i < 2; i += 1) {
+      const details = await client.details(PLACE_ID);
+      expect(details).toStrictEqual({ placeId: PLACE_ID, position: { lat: 48.8566123, lng: 2.3522456 }, horaires: null });
+      expect("statut" in details).toBe(false);
+    }
+    expect(port.lignes.map((l) => l.etat)).toEqual(["confirmee", "confirmee"]);
+  });
+
+  it("businessStatus inconnu de l'énumération : toujours invalid_response", async () => {
+    const { client } = monter([async () => json({ ...DETAILS, businessStatus: "STATUT_INCONNU" })]);
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+  });
+
   it("identifiant de lieu mal formé : invalid_request, ni réservation ni requête (aucun chemin construit)", async () => {
     const { client, transport, port } = monter([]);
     for (const id of ["../x", "a/b", "a?key=1", "", "x".repeat(257), "a#b"]) {
