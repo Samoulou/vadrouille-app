@@ -17,6 +17,7 @@ import {
   pendingLodgingCities,
   type DraftAction,
   type DraftState,
+  type LodgingChoice,
 } from "./draft";
 import { toTripDraft } from "./validation";
 
@@ -29,6 +30,10 @@ const EDIMBOURG: InferredBrief = {
   mobility: ["walk", "transit"],
   inferredFields: ["travellers", "pace", "wishes", "mobility"],
 };
+
+/** Suggestions retenues avec leurs valeurs maison (0081 § B9-TL-5). */
+const ZONE: LodgingChoice = { kind: "suggestedArea", areaId: "zone", name: "[Zone]", center: { lat: 55.95, lng: -3.19 }, radiusM: 700 };
+const LOGEMENT: LodgingChoice = { kind: "suggestedLodging", lodgingId: "logement-1", placeId: "lieu-1", name: "[Logement]" };
 
 const run = (actions: DraftAction[], state: DraftState = initialDraft()) => actions.reduce(draftReducer, state);
 
@@ -193,25 +198,25 @@ describe("brouillon : écran 3 (F8b, F8-PO-8)", () => {
 
   it("choix gardé par clé de ville ; la ville courante avance, puis reste la dernière (retour de l'écran 4)", () => {
     let state = run([{ type: "lodgingCity", city: 0 }], threeCities());
-    state = draftReducer(state, { type: "lodgingChoice", city: 0, choice: { kind: "suggestedArea", areaId: "zone" }, next: 2 });
+    state = draftReducer(state, { type: "lodgingChoice", city: 0, choice: ZONE, next: 2 });
     expect(state.lodgingCity).toBe(2);
     state = draftReducer(state, { type: "lodgingChoice", city: 2, choice: { kind: "none" }, next: null });
     expect(state.lodgingCity).toBe(2);
-    expect(state.lodgingChoices).toEqual({ destination: { kind: "suggestedArea", areaId: "zone" }, [cityKey(state.trip, 2)!]: { kind: "none" } });
-    // Le brouillon transmis porte le choix (identifiants seulement) et garde le logement connu de Glasgow.
+    expect(state.lodgingChoices).toEqual({ destination: ZONE, [cityKey(state.trip, 2)!]: { kind: "none" } });
+    // Le brouillon transmis porte le choix (valeurs maison, 0081 § B9-TL-5) et garde le logement connu de Glasgow.
     const draft = toTripDraft(state.trip, state.lodgingChoices);
-    expect(draft.lodging).toEqual({ kind: "suggestedArea", areaId: "zone" });
+    expect(draft.lodging).toEqual(ZONE);
     expect(draft.otherCities.map((city) => city.lodging)).toEqual([{ kind: "known", label: "[Hôtel]" }, { kind: "none" }]);
   });
 
-  it("un choix de logement ne garde que ses identifiants", () => {
+  it("un choix de logement garde ses identifiants et son nom maison", () => {
     const state = draftReducer(threeCities(), {
       type: "lodgingChoice",
       city: 0,
-      choice: { kind: "suggestedLodging", lodgingId: "logement-1", placeId: "lieu-1" },
+      choice: LOGEMENT,
       next: 2,
     });
-    expect(toTripDraft(state.trip, state.lodgingChoices).lodging).toEqual({ kind: "suggestedLodging", lodgingId: "logement-1", placeId: "lieu-1" });
+    expect(toTripDraft(state.trip, state.lodgingChoices).lodging).toEqual(LOGEMENT);
   });
 
   it("brouillon perdu : choix et ville courante effacés", () => {
