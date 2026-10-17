@@ -1,11 +1,12 @@
 import "server-only";
 
 import type { TablePrixGoogle } from "@/server/usage/cout-google";
-import type { CodeRefusUsage, Methode, Nature } from "@/server/usage/port";
+import type { CodeRefusUsage, Fournisseur, Methode, Nature } from "@/server/usage/port";
 
 /**
- * Forfait d'une exécution ou d'une relecture du prototype (décision 0046, D13 point 3, exigence Sécurité S4). Module
- * pur : aucune base, aucune horloge, aucune lecture d'environnement.
+ * Forfait d'une exécution ou d'une relecture du prototype (décision 0046, D13 point 3, exigence Sécurité S4), repris
+ * par le MVP (B7c, B7-TL-9 : génération, relecture et action sans compte ; lignes de `usage_ledger` en fin de module).
+ * Module pur : aucune base, aucune horloge, aucune lecture d'environnement.
  *
  * Le forfait d'une exécution est **la somme de ses plafonds par méthode** de la configuration du mode, valorisée au
  * **prix catalogue plein** (sans tranche gratuite : le forfait surestime, jamais il ne sous-estime ; Q329), plus le
@@ -167,4 +168,81 @@ export function refusDuForfait(sommes: SommesForfaits, forfait: Forfait, limites
     return "cap_reached";
   }
   return null;
+}
+
+// --- MVP (B7c) : forfait d'une action sans compte, plafond par organisation et par jour, lignes de `usage_ledger` ---
+
+/**
+ * Plafonds d'une action sans compte (décision 0081, B9-TL-4 point 3 ; B7-TL-10) : coût de modèles et, pour
+ * `suggestLodging`, requêtes Text Search de l'ancrage des logements suggérés (B8-PO-4). Aucune fiche, aucun Routes.
+ */
+export type PlafondsAction = { readonly coutModelesMicros: number; readonly placesTextSearch: number };
+
+/**
+ * Forfait d'une action sans compte : de nature `execution` (aucune nouvelle nature, `NATURES` du port reste fermé ;
+ * 0081 B9-TL-4 point 3), construit par `forfaitExecution` avec des plafonds nuls hors Text Search : même calcul, même
+ * prix plein.
+ */
+export function forfaitAction(table: TablePrixGoogle, skus: SkusForfait, plafonds: PlafondsAction): Forfait {
+  return forfaitExecution(table, skus, { placesTextSearch: plafonds.placesTextSearch, placesDetails: 0, routesRequetes: 0, routesElements: 0 }, plafonds.coutModelesMicros);
+}
+
+/** Coût total d'un forfait (Google au prix plein, plus le plafond de coût des modèles), en micro-USD. */
+export function coutTotalMicros(forfait: Forfait): number {
+  return forfait.coutGoogleMicros + (forfait.coutModelesMicros ?? 0);
+}
+
+/**
+ * Plafond **par organisation et par jour** (B7c point 3, spécification « Consommation et plafonds » point 2) :
+ * comparaison ajoutée à côté de `refusDuForfait`, sans changer le port. `cap_reached` si la somme des forfaits de
+ * l'organisation sur le jour, forfait à réserver compris, dépasse le plafond. Pour l'organisation des actions sans
+ * compte, c'est le plafond global quotidien des actions sans compte (0081 B9-TL-4 point 3).
+ */
+export function refusParOrganisation(sommeJourMicros: number, forfait: Forfait, plafondJourMicros: number): CodeRefusUsage | null {
+  return sommeJourMicros + coutTotalMicros(forfait) > plafondJourMicros ? "cap_reached" : null;
+}
+
+/** Valeur de `step` de **toute** ligne de `usage_ledger` du MVP (B7-TL-9 : seule correspondance, aucune ligne par appel). */
+export const STEP_FORFAIT = "forfait";
+
+/**
+ * Ligne de `usage_ledger` d'un forfait (B7-TL-9) : une par méthode du forfait. Chaque valeur est une fonction du seul
+ * forfait, donc du profil et de la configuration : deux générations du même profil écrivent les mêmes lignes, quel que
+ * soit le nombre d'appels réels (0046 D13 point 7).
+ */
+export type LigneForfait = {
+  readonly step: typeof STEP_FORFAIT;
+  readonly provider: Fournisseur;
+  readonly sku: string;
+  /** Plafond de la méthode dans l'unité de son SKU (requêtes, ou éléments pour Routes) ; 0 pour les modèles. */
+  readonly units: number;
+  /** Prix plein du plafond de la méthode ; pour les modèles, le plafond de coût. */
+  readonly costEstimateMicros: number;
+};
+
+/**
+ * Lignes d'un forfait, dans un ordre fixe : modèles (si le forfait en porte un plafond, même nul), puis Text Search,
+ * fiches et Routes, chacune seulement si son plafond est non nul. La somme des coûts Google des lignes est égale à
+ * `coutGoogleMicros` (sinon le forfait a été calculé avec d'autres SKU : erreur).
+ */
+export function lignesDuForfait(table: TablePrixGoogle, skus: SkusForfait, skuModeles: string, forfait: Forfait): LigneForfait[] {
+  if (table.skus[skuModeles] !== undefined) throw new ErreurForfait("forfait: SKU de modèles pris dans la table de prix Google");
+  const lignes: LigneForfait[] = [];
+  if (forfait.coutModelesMicros !== null) {
+    lignes.push({ step: STEP_FORFAIT, provider: "modeles", sku: skuModeles, units: 0, costEstimateMicros: entier(forfait.coutModelesMicros, "coutModelesMicros") });
+  }
+  const google: readonly [string, Methode, "requete" | "element", number][] = [
+    [skus.textSearch, "places_text_search", "requete", forfait.textSearchRequetes],
+    [skus.details, "places_details", "requete", forfait.placeDetailsRequetes],
+    [skus.matrice, "routes_matrix", "element", forfait.routesElements],
+  ];
+  let totalGoogle = 0;
+  for (const [sku, methode, unite, quantite] of google) {
+    if (entier(quantite, methode) === 0) continue;
+    const cout = prixPlein(table, sku, methode, unite, quantite);
+    totalGoogle += cout;
+    lignes.push({ step: STEP_FORFAIT, provider: "google", sku, units: quantite, costEstimateMicros: cout });
+  }
+  if (totalGoogle !== forfait.coutGoogleMicros) throw new ErreurForfait("forfait: lignes Google différentes du forfait");
+  return lignes;
 }

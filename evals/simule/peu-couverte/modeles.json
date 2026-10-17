@@ -1,0 +1,42 @@
+{
+  "coutParRequeteUsd": 0.002,
+  "plan": {
+    "requetes": [
+      {
+        "requete": "balades au bord de l'eau",
+        "creneau": "activity"
+      },
+      {
+        "requete": "poisson frais du port",
+        "creneau": "meal"
+      }
+    ]
+  },
+  "recherche": [
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "balades au bord de l'eau"
+        },
+        {
+          "type": "rechercher",
+          "requete": "poisson frais du port"
+        }
+      ],
+      "candidats": [],
+      "termine": false
+    },
+    {
+      "actions": [],
+      "candidats": [],
+      "termine": true
+    }
+  ],
+  "notes": {},
+  "notesParDefaut": {
+    "matchesWishes": true,
+    "notForMeRisk": 3,
+    "mustSee": false
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "id": "edimbourg-1",
+  "type": "reference",
+  "cas": "Brief de référence 1 de Samuel (0027 § 6, `prototype/briefs/edimbourg-1.json`)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "On aime bien manger, goûter les boissons du coin, se balader en ville et un peu d'histoire. Pas trop de musées. Une distillerie accessible en train serait top.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "restaurant",
+      "tasting",
+      "walk",
+      "museum"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "restaurant",
+      "tasting",
+      "walk",
+      "museum"
+    ],
+    "incontournables": [
+      "château d'Édimbourg",
+      "Royal Mile",
+      "Arthur's Seat et Holyrood Park",
+      "Calton Hill",
+      "Dean Village",
+      "Victoria Street et Grassmarket",
+      "National Museum of Scotland",
+      "Princes Street Gardens et Scott Monument",
+      "Royal Botanic Garden",
+      "Leith et The Shore"
+    ]
+  }
+}

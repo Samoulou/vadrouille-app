@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "id": "budget-mixte",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : budget mixte (simple le midi, une belle table le soir)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "Le midi on mange sur le pouce pour pas cher, mais le soir on aime se faire plaisir dans une bonne table.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "restaurant",
+      "walk"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "restaurant"
+    ],
+    "incontournables": []
+  }
+}

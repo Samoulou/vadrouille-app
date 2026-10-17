@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "id": "destination-peu-couverte",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : destination peu couverte (peu de résultats web : aucun candidat inventé)",
+  "simulation": "peu-couverte",
+  "demande": {
+    "story": "Un petit port de pêche très calme : on veut juste marcher au bord de l'eau et manger du poisson frais.",
+    "trip": {
+      "destination": "Port-Calme",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Port-Calme",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "relaxed",
+    "envies": [
+      "walk",
+      "restaurant"
+    ],
+    "deplacements": [
+      "walk"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "walk",
+      "restaurant"
+    ],
+    "incontournables": []
+  }
+}
