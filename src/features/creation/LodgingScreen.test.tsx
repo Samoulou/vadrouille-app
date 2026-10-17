@@ -22,6 +22,9 @@ vi.mock("@/server/actions/creation", () => ({ suggestLodging: vi.fn() }));
 
 const t = messages.creation.ecran3;
 const LODGINGS = MOCK_LODGING_SUGGESTION.lodgings;
+const { areaId, name, center, radiusM } = MOCK_LODGING_SUGGESTION.area;
+/** Valeurs maison de la zone retenue (0081 § B9-TL-5) : jamais la raison affichée. */
+const SUGGESTED_AREA = { kind: "suggestedArea" as const, areaId, name, center, radiusM };
 
 let latest: DraftState | null = null;
 function Probe() {
@@ -98,7 +101,9 @@ describe("LodgingScreen : suggestion", () => {
   it("« Choisir ce logement » sur la dernière ville : identifiants gardés, écran 4 avec la suite du lancement", async () => {
     renderScreen();
     fireEvent.click(await screen.findByRole("button", { name: `Choisir ce logement : ${LODGINGS[1]!.name}` }));
-    expect(latest?.lodgingChoices).toEqual({ destination: { kind: "suggestedLodging", lodgingId: LODGINGS[1]!.lodgingId } });
+    expect(latest?.lodgingChoices).toEqual({
+      destination: { kind: "suggestedLodging", lodgingId: LODGINGS[1]!.lodgingId, name: LODGINGS[1]!.name },
+    });
     expect(router.push).toHaveBeenCalledWith("/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer");
   });
 
@@ -114,7 +119,7 @@ describe("LodgingScreen : suggestion", () => {
     expect(latest?.lodgingCity).toBe(1);
     // La demande de Glasgow porte le choix déjà fait pour Édimbourg.
     expect(suggestLodging).toHaveBeenLastCalledWith({
-      draft: { ...TWO_CITIES, lodging: { kind: "suggestedArea", areaId: MOCK_LODGING_SUGGESTION.area.areaId } },
+      draft: { ...TWO_CITIES, lodging: SUGGESTED_AREA },
       city: 1,
     });
     // Ville inconnue du jeu simulé.

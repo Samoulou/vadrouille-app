@@ -329,7 +329,12 @@ describe("prompts: l'entrée du quartier ne vient que du contrat", () => {
     destination: "Édimbourg",
     start: "2026-11-20",
     end: "2026-11-30",
-    lodging: { kind: "suggestedLodging", lodgingId: "SENTINELLE-LODGING-ID", placeId: "SENTINELLE-PLACE-ID-LOGEMENT" },
+    lodging: {
+      kind: "suggestedLodging",
+      lodgingId: "SENTINELLE-LODGING-ID",
+      placeId: "SENTINELLE-PLACE-ID-LOGEMENT",
+      name: "SENTINELLE-NOM-LOGEMENT-SUGGERE",
+    },
     otherCities: [
       { name: "Glasgow", arrival: "2026-11-24", lodging: { kind: "known", label: "SENTINELLE-LOGEMENT-GLASGOW" } },
       { name: "Inverness", arrival: "2026-11-27", lodging: { kind: "area", label: "SENTINELLE-QUARTIER-INVERNESS" } },
