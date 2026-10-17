@@ -130,7 +130,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
                   {t.reessayer}
                 </Button>
               ) : (
-                <Button variant="text" asChild className="px-0">
+                <Button variant="text" size="sm" asChild className="px-0">
                   <Link href={mesVoyagesRoute()}>{t.voirMesVoyages}</Link>
                 </Button>
               )

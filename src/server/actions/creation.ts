@@ -114,6 +114,9 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
     return fail("provider_error");
   }
   if (!result.ok && result.error.code === "active_preview_exists") {
+    // Le conflit est reconstruit avec `code` et `activeTripId` seulement : `retryable` et `field` éventuels de
+    // l'adaptateur sont écartés (rien à rejouer ni à corriger dans le brouillon), comme les autres erreurs ramenées à
+    // leur code ci-dessous.
     const conflict = ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: result.error.activeTripId });
     return conflict.success ? { ok: false, error: conflict.data } : fail("provider_error");
   }

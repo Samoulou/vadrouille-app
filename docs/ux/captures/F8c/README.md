@@ -1,8 +1,8 @@
 # Captures F8c (390 × 844)
 
-Écran 5 et bandeaux de `R-lancer`, non maquettés (Q12). Les PNG de ce répertoire sont des copies locales pour la PR ;
-les références de la CI sont dans `tests/visual/__screenshots__` (décision 0004), publiées par `visual-update`
-(commit 580fe72, `--update-snapshots=all`).
+Écran 5 et bandeaux de `R-lancer`, non maquettés (Q12). Les PNG de ce répertoire sont des copies, pour la PR, des
+références de la CI de `tests/visual/__screenshots__` (décision 0004), publiées par `visual-update` (580fe72, puis 58ac983,
+`--update-snapshots=all`).
 
 ## Références nouvelles (6)
 
@@ -36,4 +36,5 @@ le code. La capture attend désormais un état stable : « Continuer sans logeme
 - `lancement-conflit.png` (« Voir ces propositions » en `size="sm"`, mineur UX 6) et `lancement-erreur.png` : écarts
   sous la tolérance, réécrits par `--update-snapshots=all`.
 
-`preparation-en-cours.png` est inchangée. Les PNG de ce répertoire montrent l'état d'avant ces corrections.
+`preparation-en-cours.png` est inchangée. Les PNG de ce répertoire sont des copies des références de la CI
+(`tests/visual/__screenshots__`, 58ac983), sans régénération (revue de 6a9f2a3, mineur TL 3).

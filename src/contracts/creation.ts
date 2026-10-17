@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { TripIdSchema } from "./billing";
 import { CategorySchema } from "./category";
 import { IsoDateSchema, TimeSchema } from "./trip";
 import {
@@ -21,7 +22,6 @@ import {
   MOBILITY_MODES,
   PACES,
   STORY_LENGTH,
-  TRIP_ID_PATTERN,
   type BriefField,
 } from "./values";
 
@@ -249,8 +249,6 @@ export type LodgingSuggestion = z.infer<typeof LodgingSuggestionSchema>;
 /*
  * Lancement et écran 5 « Propositions prêtes » (0017 § 2.4, F8c).
  */
-
-const TripIdSchema = z.string().regex(TRIP_ID_PATTERN);
 
 /**
  * Demande de `createTrip` (0017 § 2.4) : `requestId` créé une fois par brouillon (idempotence par organisation et
