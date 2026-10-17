@@ -16,6 +16,7 @@ import {
   type RequeteModele,
   type ReponseModele,
   type SourceWebFournisseur,
+  usdEnMicros,
 } from "@/ai/client";
 import { REESSAYABLES, type CodeErreurOpenRouter } from "@/ai/erreurs";
 import { MODELE_ID_PATTERN } from "@/ai/reglages";
@@ -249,7 +250,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
             experimental_telemetry: { isEnabled: false },
           });
           const cout = CoutSchema.safeParse(resultat.providerMetadata);
-          const coutReelMicros = cout.success ? Math.round(cout.data.openrouter.usage.cost * 1_000_000) : null;
+          const coutReelMicros = cout.success ? usdEnMicros(cout.data.openrouter.usage.cost) : null;
           const sources: SourceWebFournisseur[] = [];
           if (greffonWeb !== null) {
             for (const brute of resultat.sources) {

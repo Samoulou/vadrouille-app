@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "id": "arrivee-tardive",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : arrivée tardive (le premier jour ne commence qu'en soirée)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "Notre vol arrive tard le premier soir, vers 22 h : ce jour-là, juste un repas simple près de l'hôtel si possible.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "restaurant",
+      "walk",
+      "heritage"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "restaurant",
+      "walk"
+    ],
+    "incontournables": []
+  }
+}

@@ -447,6 +447,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
   // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.
   ["src/research/plafonds-agent.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
+  // B7c (ticket 449 ; spécification B7, B7c point 4) : harnais du jeu d'évaluation `evals/`, non chargé par `pnpm p0` ;
+  // marqueur `server-only` seul, imports de projet par les règles de base (`src/contracts`, `src/ai`, `src/research`).
+  ["src/research/evaluation.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
   [
     "src/research/undici-transport.ts",
     {

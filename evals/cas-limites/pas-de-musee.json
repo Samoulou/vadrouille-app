@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "id": "pas-de-musee",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : « pas de musée » comparé à un avis négatif sur un seul musée (limite générale, aucune généralisation silencieuse)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "Pas de musée pour nous, vraiment aucun. On préfère marcher, les marchés et bien manger.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "walk",
+      "market",
+      "restaurant"
+    ],
+    "limites": [
+      "museum"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "walk",
+      "restaurant"
+    ],
+    "incontournables": []
+  }
+}

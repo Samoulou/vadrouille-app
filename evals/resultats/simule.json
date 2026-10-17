@@ -1,0 +1,558 @@
+{
+  "schema": 1,
+  "mode": "simule",
+  "mesures": [
+    {
+      "cas": "edimbourg-1",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": 0,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "edimbourg-2",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": 0,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "edimbourg-3",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": 0,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "arrivee-tardive",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "budget-mixte",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "destination-peu-couverte",
+      "prompts": {
+        "plan": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 2,
+          "tauxValides": 1,
+          "coutMicros": 18000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 0,
+          "tauxValides": null,
+          "coutMicros": 0,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 0,
+          "tauxValides": null,
+          "coutMicros": 0,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 0,
+        "meal": 0,
+        "evening": 0
+      },
+      "partSources": null,
+      "couvertureCategories": 0,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "evenement-horaire-fixe",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 0.5,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 0
+    },
+    {
+      "cas": "pas-de-musee",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 10
+    },
+    {
+      "cas": "sans-voiture",
+      "prompts": {
+        "notation": 1,
+        "plan": 1,
+        "raisons": 1,
+        "recherche": 2,
+        "structuration": 1
+      },
+      "modeles": {
+        "structuration": "deepseek/deepseek-v4.1-flash",
+        "plan": "deepseek/deepseek-v4.1-flash",
+        "recherche": "deepseek/deepseek-v4.1-flash",
+        "notation": "deepseek/deepseek-v4.1-flash",
+        "raisons": "deepseek/deepseek-v4.1-flash"
+      },
+      "etapes": {
+        "structuration": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "plan": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        },
+        "recherche": {
+          "appels": 5,
+          "tauxValides": 1,
+          "coutMicros": 52000,
+          "dureeMs": 0
+        },
+        "notation": {
+          "appels": 4,
+          "tauxValides": 1,
+          "coutMicros": 8000,
+          "dureeMs": 0
+        },
+        "raisons": {
+          "appels": 1,
+          "tauxValides": 1,
+          "coutMicros": 2000,
+          "dureeMs": 0
+        }
+      },
+      "candidatsParCreneau": {
+        "activity": 23,
+        "meal": 12,
+        "evening": 3
+      },
+      "partSources": {
+        "officielle": 0.21052631578947367,
+        "independante": 0.6842105263157895,
+        "generique": 0.10526315789473684
+      },
+      "couvertureCategories": 1,
+      "couvertureIncontournables": null,
+      "candidatsDansUneLimite": 0
+    }
+  ]
+}

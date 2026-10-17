@@ -629,6 +629,28 @@
         }
       ],
       "ecart": "texte de test qui ressemble à un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446)"
+    },
+    {
+      "fichier": "tests/unit/evals/evals.test.ts",
+      "portee": "test",
+      "usage": "garde « aucune donnée Google dans les jeux d'évaluation » (B7c) : motif des hôtes Google refusés dans `evals/` et valeur sentinelle de son cas négatif ; texte seulement, aucun réseau (`fetch` remplacé par une fonction qui échoue), aucune lecture de clé",
+      "capacites": [
+        {
+          "capacite": "hote:googleapis.com",
+          "formes": [
+            "googleapis\\.com|maps\\.google\\.|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps|maps\\.app\\.goo\\.gl"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:maps.googleapis.com",
+          "formes": [
+            "Voir https://maps.googleapis.com/maps/api/place/details/json"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B7c (ticket 449 ; spécification B7, critère « evals: aucune donnée Google dans les jeux d'évaluation » ; CLAUDE.md, « Jamais ») : motif et sentinelle d'un contrôle négatif, sur le modèle de `tests/e2e/carte.e2e.spec.ts` et `tests/unit/p0/pipeline.test.ts` : ligne ordinaire B, 0040 D4 ; verdict Sécurité demandé (PR 454)"
     }
   ]
 }

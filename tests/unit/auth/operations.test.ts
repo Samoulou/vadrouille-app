@@ -59,7 +59,8 @@ describe("exports", () => {
     expect(Object.isFrozen(operations)).toBe(true);
     expect(Object.keys(moduleAuth).sort()).toEqual(["AuthNotConfiguredError", "authOperations", "createAuthOperations"]);
     // Revue consolidée du head `ed79edb` (PR 446), mineur 4 ; B3c (ticket 447) : clés exportées des modules voisins.
-    expect(Object.keys(moduleWithOrg).sort()).toEqual(["WithOrgContextError", "creerWithOrg", "withOrg"]);
+    // `executeurSql` : export ajouté par B7c (ticket 449, PR 454), conservé à la fusion de main.
+    expect(Object.keys(moduleWithOrg).sort()).toEqual(["WithOrgContextError", "creerWithOrg", "executeurSql", "withOrg"]);
     expect(Object.keys(moduleSession).sort()).toEqual(["creerContexteServeur", "getServerRequestContext"]);
     expect(Object.keys(moduleErreurs).sort()).toEqual(["ERREURS_BIBLIOTHEQUE", "codeEchec"]);
     expect(Object.keys(moduleConfig).sort()).toEqual(["BETTER_AUTH_CONFIG"]);

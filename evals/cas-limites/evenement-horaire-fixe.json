@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "id": "evenement-horaire-fixe",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : événement unique à horaire fixe (un concert un soir donné)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "On aimerait voir un concert de musique traditionnelle un des soirs, à une heure fixe, et le reste du temps flâner.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "nightlife",
+      "walk",
+      "restaurant"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "nightlife",
+      "walk"
+    ],
+    "incontournables": []
+  }
+}

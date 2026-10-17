@@ -25,7 +25,6 @@ import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, in
 const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 const MIGRATION_PROTOTYPE = readFileSync(path.join(RACINE, "db/migrations/0003_prototype.sql"), "utf8");
 const MIGRATION_COORDONNEES = readFileSync(path.join(RACINE, "db/migrations/0002_place_coordinates.sql"), "utf8");
-const PRIX_GOOGLE = JSON.parse(readFileSync(path.join(RACINE, "prototype/config/prix-google.json"), "utf8")) as { skus: Record<string, unknown> };
 
 const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges"] as const;
 const SHA = "a".repeat(40);
@@ -641,29 +640,9 @@ describe("invariants et contenus (0046 D24, S4)", () => {
   });
 });
 
-describe("usage_ledger : gardes jusqu'au verdict de B7 (0046 D13 point 7)", () => {
-  const inserer = (org: string, provider: string, step: string, sku: string) =>
-    inTx(app, { org }, (c) =>
-      attempt(c, "INSERT INTO public.usage_ledger (organization_id, step, provider, sku, units, cost_estimate_micros) VALUES ($1, $2, $3, $4, 1, 1)", [org, step, provider, sku]),
-    );
-
-  it("usage: aucune écriture Google par appel dans usage_ledger avant le verdict de B7", async () => {
-    const skus = Object.keys(PRIX_GOOGLE.skus);
-    expect(skus.length).toBeGreaterThanOrEqual(8);
-    for (const sku of skus) expect((await inserer(a.org, "google", "b", sku)).code, sku).toBe("23514");
-    // Liste de la contrainte égale aux SKU de la table de prix.
-    const def = (
-      await app.query("SELECT pg_catalog.pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint WHERE conname = 'usage_ledger_no_google_call_check'")
-    ).rows[0].def as string;
-    expect([...def.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]).sort()).toEqual(skus.sort());
-    expect((await inserer(a.org, "modeles", "b", "modele-x")).code).toBeUndefined();
-  });
-
-  it("usage: aucune écriture par lot de notation dans usage_ledger avant le verdict de B7", async () => {
-    for (const step of ["d", "notation"]) expect((await inserer(a.org, "modeles", step, "modele-x")).code, step).toBe("23514");
-    expect((await inserer(a.org, "modeles", "c", "modele-x")).code).toBeUndefined();
-  });
-});
+// Gardes de usage_ledger jusqu'au verdict de B7 (0046 D13 point 7) : levées par la migration 0010_usage_forfait (B7c,
+// avec le verdict de la Sécurité) et remplacées par `usage: une ligne par forfait, jamais par appel`
+// (tests/db/usage.test.ts).
 
 describe("purge du prototype (0046 D16)", () => {
   it("base: vadrouille_prototype_purge ne fait que purger (fonction sans paramètre, aucun droit sur une table)", async () => {

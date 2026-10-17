@@ -16,6 +16,9 @@ import { MODELE_ID_PATTERN, MOTEURS_RECHERCHE_WEB, type MoteurRechercheWeb, type
 export const ETAPES_REQUETE = ["plan", "recherche", "notation", "raisons", "structuration", "quartier"] as const;
 export type EtapeRequete = (typeof ETAPES_REQUETE)[number];
 
+/** Montant en dollars converti en micro-USD entiers (coût réel d'OpenRouter, mesures de `evals/`). */
+export const usdEnMicros = (usd: number): number => Math.round(usd * 1_000_000);
+
 export type Message = { role: "system" | "user"; contenu: string };
 
 export type RequeteModele = {
