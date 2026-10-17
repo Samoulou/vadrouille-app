@@ -6,9 +6,9 @@ import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
 
 /**
  * Environnement serveur fermé par défaut (spécification B3, B3a points 1 et 2 ; amendement de 0017 § 11.0 écrit
- * dans 0006 ; décisions 0050, B3-TL-1 et B3-TL-5, et 0051, points 2, 3 et 6.5). Importé sous le nom `@/server/env`,
- * seulement par `src/instrumentation.ts`, le limiteur (`src/server/rate-limit.ts`) et ses tests
- * (`ligne/server-env-imports`).
+ * dans 0006 ; décisions 0050, B3-TL-1 et B3-TL-5, et 0051, points 2, 3 et 6.5 ; B3b : 0077 § 5.1). Importé sous le
+ * nom `@/server/env`, seulement par `src/instrumentation.ts`, le limiteur (`src/server/rate-limit.ts`), les opérations
+ * de connexion (`src/server/auth/index.ts`) et ses tests (`ligne/server-env-imports`).
  *
  * - `parseServerEnv(env)` : fonction pure, valide l'objet reçu et rend un objet figé, sans aucune chaîne secrète (les
  *   secrets n'y sont que leurs octets décodés) ni clé de fournisseur.
@@ -36,6 +36,22 @@ const VARIABLES = {
   TRUSTED_IP_HEADER: 0,
   RATE_LIMIT_HMAC_SECRET: 0,
   BETTER_AUTH_SECRET: 0,
+  // B3b (spécification B3, B3a point 1 ; décision 0077 § 5.1) : requises avec `AUTH_ADAPTER=better-auth` ;
+  // `EMAIL_TRANSPORT` et `SMTP_URL` : présence refusée partout jusqu'à B3b-envoi (lecture de présence seulement).
+  BETTER_AUTH_URL: 0,
+  APP_URL: 0,
+  VADROUILLE_DATABASE_URL_AUTH: 0,
+  EMAIL_TRANSPORT: 0,
+  SMTP_URL: 0,
+  // B3b (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7 lit d'elle-même
+  // (origines de confiance, télémétrie, secrets de repli) ; présence refusée partout, quel que soit `AUTH_ADAPTER`.
+  BETTER_AUTH_TRUSTED_ORIGINS: 0,
+  BETTER_AUTH_TELEMETRY: 0,
+  BETTER_AUTH_TELEMETRY_ENDPOINT: 0,
+  BETTER_AUTH_TELEMETRY_ID: 0,
+  BETTER_AUTH_TELEMETRY_DEBUG: 0,
+  BETTER_AUTH_SECRETS: 0,
+  AUTH_SECRET: 0,
   SIMULATED_WEBHOOK_SECRET: 0,
   SIMULATED_WEBHOOK_ENABLED: 0,
   VADROUILLE_DATABASE_URL_MIGRATOR: 0,
@@ -88,10 +104,23 @@ type Env = Readonly<Record<string, string | undefined>>;
 export const TRUSTED_IP_HEADERS = ["x-vercel-forwarded-for"] as const;
 export type TrustedIpHeader = (typeof TRUSTED_IP_HEADERS)[number];
 
-/** Configuration validée. Aucune chaîne secrète : le secret du limiteur n'y est que ses octets décodés. */
+/**
+ * Réglages de la connexion réelle (B3b), présents seulement avec `AUTH_ADAPTER=better-auth`, admis en `local` et `ci`
+ * seulement (B3-TL-2) : octets décodés de `BETTER_AUTH_SECRET` (jamais la chaîne), `BETTER_AUTH_URL` et `APP_URL`.
+ */
+export type BetterAuthSettings = {
+  readonly environment: "local" | "ci";
+  readonly secret: Buffer;
+  readonly baseUrl: string;
+  readonly appUrl: string;
+};
+
+/** Configuration validée. Aucune chaîne secrète : les secrets n'y sont que leurs octets décodés. */
 export type ServerEnv = {
   readonly environment: ServerEnvironment;
-  readonly authAdapter: "mock";
+  readonly authAdapter: "mock" | "better-auth";
+  /** `null` avec `AUTH_ADAPTER=mock`. */
+  readonly betterAuth: BetterAuthSettings | null;
   /** En-tête d'adresse IP de confiance, normalisé ; `null` : compartiment commun (absent). */
   readonly trustedIpHeader: TrustedIpHeader | null;
   /** Octets décodés de `RATE_LIMIT_HMAC_SECRET` ; `null` si absente (le limiteur échoue alors fermé, à l'usage). */
@@ -188,11 +217,22 @@ const ServerEnvSchema = z.object({
   VERCEL: z.string().optional(),
   RATE_LIMIT_HMAC_SECRET: z.string().optional(),
   BETTER_AUTH_SECRET: z.string().optional(),
+  BETTER_AUTH_URL: z.string().optional(),
+  APP_URL: z.string().optional(),
   SIMULATED_WEBHOOK_SECRET: z.string().optional(),
   SIMULATED_WEBHOOK_ENABLED: z.string().optional(),
   P0_REAL_RUNS: z.string().optional(),
   P0_RUN_TOKEN: z.string().optional(),
 });
+
+/** URL absolue `http:` ou `https:`, sans identifiants ni fragment ; rendue normalisée (`URL#origin`), ou `null`. */
+function origineHttp(valeur: string): string | null {
+  if (!URL.canParse(valeur)) return null;
+  const url = new URL(valeur);
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username !== "" || url.password !== "" || url.hash !== "") return null;
+  if (url.pathname !== "/" || url.search !== "") return null;
+  return url.origin;
+}
 
 /** Préfixes de production des clés Stripe, comparés après `trim()` et sans tenir compte de la casse (handover § 2). */
 const PREFIXES_STRIPE_PRODUCTION = ["sk_live_", "pk_live_", "rk_live_"] as const;
@@ -230,6 +270,8 @@ export function parseServerEnv(env: Env): ServerEnv {
     VERCEL: env.VERCEL,
     RATE_LIMIT_HMAC_SECRET: env.RATE_LIMIT_HMAC_SECRET,
     BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: env.BETTER_AUTH_URL,
+    APP_URL: env.APP_URL,
     SIMULATED_WEBHOOK_SECRET: env.SIMULATED_WEBHOOK_SECRET,
     SIMULATED_WEBHOOK_ENABLED: env.SIMULATED_WEBHOOK_ENABLED,
     P0_REAL_RUNS: env.P0_REAL_RUNS,
@@ -242,12 +284,31 @@ export function parseServerEnv(env: Env): ServerEnv {
   }
   const brut = lu.data;
 
-  // AUTH_ADAPTER : `assertAuthAdapter` (src/adapters/auth-guard.ts, F8b) fait foi jusqu'à B3c ; refus anticipé de
-  // toute valeur dont le choix normalisé (même normalisation que `adapterChoice` : `trim()`, vide = `mock`) n'est
-  // pas `mock` (0050, B3-TL-1 point 2). `better-auth` est refusé en B3a, toute autre valeur est inconnue.
+  // EMAIL_TRANSPORT et SMTP_URL (décision 0077 § 5.1 ; découpage Q361) : aucun envoi avant B3b-envoi ; la présence
+  // de l'une ou de l'autre refuse le démarrage dans les quatre environnements. Lecture de **présence** seulement
+  // (`!== undefined`) : la valeur n'est ni copiée, ni rendue, ni journalisée, ni jointe à l'erreur.
+  if (env.EMAIL_TRANSPORT !== undefined) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
+  if (env.SMTP_URL !== undefined) throw new ServerEnvError(V.SMTP_URL, "forbidden");
+
+  // Variables lues par Better Auth 1.7.7 sans passer par nos options (revue consolidée du head `f0b8c5a`, bloquant 1 ;
+  // décision 0082) : `BETTER_AUTH_TRUSTED_ORIGINS` ajoute des origines de confiance à `trustedOrigins` ;
+  // `BETTER_AUTH_TELEMETRY*` peut réactiver la télémétrie malgré `telemetry.enabled: false` et l'envoyer vers une adresse
+  // externe ; `BETTER_AUTH_SECRETS` et `AUTH_SECRET` sont des secrets de repli que la configuration rend inutiles (7.13).
+  // Présence refusée dans les quatre environnements, `AUTH_ADAPTER=mock` compris ; présence seulement, valeur jamais lue.
+  if (env.BETTER_AUTH_TRUSTED_ORIGINS !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TRUSTED_ORIGINS, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_ENDPOINT !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_ENDPOINT, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_ID !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_ID, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_DEBUG !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_DEBUG, "forbidden");
+  if (env.BETTER_AUTH_SECRETS !== undefined) throw new ServerEnvError(V.BETTER_AUTH_SECRETS, "forbidden");
+  if (env.AUTH_SECRET !== undefined) throw new ServerEnvError(V.AUTH_SECRET, "forbidden");
+
+  // AUTH_ADAPTER (même normalisation que `adapterChoice` : `trim()`, vide = `mock`) : `better-auth` admis en `local`
+  // et `ci` seulement, `forbidden` en `staging` et `production` (B3-TL-2, 0077 § 5.1) ; toute autre valeur est
+  // inconnue. `assertAuthAdapter` (src/adapters/auth-guard.ts) est amendée par B3c.
   const choix = brut.AUTH_ADAPTER?.trim() || "mock";
-  if (choix === "better-auth") throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
-  if (choix !== "mock") throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
+  if (choix !== "mock" && choix !== "better-auth") throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
+  if (choix === "better-auth" && environment !== "local" && environment !== "ci") throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
 
   // TRUSTED_IP_HEADER (B3a point 5 ; 0051 point 2).
   let trustedIpHeader: TrustedIpHeader | null = null;
@@ -293,19 +354,37 @@ export function parseServerEnv(env: Env): ServerEnv {
   ];
   const decodes: Buffer[] = [];
   let rateLimitHmacSecret: Buffer | null = null;
+  let betterAuthSecret: Buffer | null = null;
   for (const [nom, valeur] of secrets) {
     if (!presente(valeur)) continue;
     const octets = decodeSecret(nom, valeur);
     if (decodes.some((autre) => autre.equals(octets))) throw new ServerEnvError(nom, "secret_duplicate");
     decodes.push(octets);
     if (nom === V.RATE_LIMIT_HMAC_SECRET) rateLimitHmacSecret = octets;
+    if (nom === V.BETTER_AUTH_SECRET) betterAuthSecret = octets;
+  }
+
+  // Connexion réelle (B3b) : secret, URL de la bibliothèque, URL de l'application et URL de connexion du rôle
+  // `vadrouille_auth` requis au démarrage ; cette dernière n'est lue que pour sa présence (sa valeur n'est lue que par
+  // `db/connection.ts`). Avec `mock`, ces variables sont ignorées, sauf le secret, validé s'il est présent (0051 § 3.6).
+  let betterAuth: BetterAuthSettings | null = null;
+  if (choix === "better-auth" && (environment === "local" || environment === "ci")) {
+    if (betterAuthSecret === null) throw new ServerEnvError(V.BETTER_AUTH_SECRET, "missing");
+    if (!presente(brut.BETTER_AUTH_URL)) throw new ServerEnvError(V.BETTER_AUTH_URL, "missing");
+    const baseUrl = origineHttp(brut.BETTER_AUTH_URL.trim());
+    if (baseUrl === null) throw new ServerEnvError(V.BETTER_AUTH_URL, "invalid_value");
+    if (!presente(brut.APP_URL)) throw new ServerEnvError(V.APP_URL, "missing");
+    const appUrl = origineHttp(brut.APP_URL.trim());
+    if (appUrl === null) throw new ServerEnvError(V.APP_URL, "invalid_value");
+    if (!presente(env.VADROUILLE_DATABASE_URL_AUTH)) throw new ServerEnvError(V.VADROUILLE_DATABASE_URL_AUTH, "missing");
+    betterAuth = Object.freeze({ environment, secret: betterAuthSecret, baseUrl, appUrl });
   }
 
   if (environment === "production" && brut.SIMULATED_WEBHOOK_ENABLED?.trim().toLowerCase() === "true") {
     throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "forbidden");
   }
 
-  return Object.freeze({ environment, authAdapter: "mock", trustedIpHeader, rateLimitHmacSecret });
+  return Object.freeze({ environment, authAdapter: choix, betterAuth, trustedIpHeader, rateLimitHmacSecret });
 }
 
 /**

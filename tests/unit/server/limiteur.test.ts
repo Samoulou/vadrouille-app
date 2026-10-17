@@ -350,6 +350,12 @@ describe("module de journal", () => {
       "p0.research_done",
       // Décision 0074 : branchement de la lecture des programmes réels impossible, nom d'erreur seulement.
       "p0.read_unavailable",
+      // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
+      "email.address_refused",
+      "email.transport_disabled",
+      "auth.library_log",
+      "auth.operation_failed",
+      "auth.purge_failed",
       "log.unknown_event",
     ]);
   });

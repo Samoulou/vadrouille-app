@@ -579,6 +579,41 @@
         }
       ],
       "ecart": "PR du workflow des migrations (décisions 0056 et 0057, « Tests imposés » : secrets exacts affectés à leur variable) : noms des secrets, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "tests/unit/lint/better-auth-lint.test.ts",
+      "portee": "test",
+      "usage": "cas négatifs de la règle `ligne/no-raw-auth-secret` : textes de code soumis à ESLint (`lintText`), jamais exécutés ; aucune lecture de l'environnement",
+      "capacites": [
+        {
+          "capacite": "secret:BETTER_AUTH_SECRET",
+          "formes": [
+            "export const s = process.env.BETTER_AUTH_SECRET;",
+            "const { BETTER_AUTH_SECRET } = process.env; export const s = BETTER_AUTH_SECRET;"
+          ]
+        },
+        {
+          "capacite": "secret:AUTH_SECRET",
+          "formes": [
+            "export const s = process.env[\"AUTH_SECRET\"];"
+          ]
+        }
+      ],
+      "ecart": "textes de test qui nomment un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446)"
+    },
+    {
+      "fichier": "tests/db/auth-outils.ts",
+      "portee": "test",
+      "usage": "nom du cookie de session de Better Auth (`<préfixe>.session_token`) reconnu dans les cookies du banc de test ; aucun secret, aucune lecture de l'environnement",
+      "capacites": [
+        {
+          "capacite": "secret:SESSION_TOKEN",
+          "formes": [
+            "session_token"
+          ]
+        }
+      ],
+      "ecart": "texte de test qui ressemble à un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446)"
     }
   ]
 }

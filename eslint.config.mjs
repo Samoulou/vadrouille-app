@@ -657,6 +657,14 @@ export default defineConfig([
     rules: { "ligne/server-env-imports": "error" },
   },
   {
+    // B3b (spécification B3, B3b point 4 ; décisions 0008 et 0051 § 5.4) : `better-auth` depuis `src/server/auth` et
+    // `src/tenancy` seulement, `@/tenancy/auth` depuis `src/server/auth` seulement, `auth.api` réduit aux appels nommés
+    // de la liste blanche ; secret de Better Auth lu dans `process.env` par le seul module d'environnement. Règles
+    // propres au plugin, posées par ce seul bloc (tests/unit/lint/better-auth-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/better-auth-confinement": "error", "ligne/no-raw-auth-secret": "error" },
+  },
+  {
     // B7a (ticket 423 ; spécification B7a point 5, handover § 3 ; décisions 0077 § 1 point 5 et 0080 §§ 4 et 5) :
     // `src/ai` et `src/research` en liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support`
     // en plus ; toute source non littérale refusée), et `@/ai/complement-p0` confiné aux appels directs de P0. Règles propres au plugin, posées par ce seul bloc sur tout
@@ -720,6 +728,14 @@ export default defineConfig([
       "src/server/ip.ts",
       "src/server/rate-limit.ts",
       "src/server/config/limites.ts",
+      // B3b (spécification B3, « Critères communs » ; 0050, B3-TL-1 point 5) : fichiers de B3b sous `src/server` et
+      // `src/tenancy`.
+      "src/server/auth/**/*.ts",
+      "src/server/mail/port.ts",
+      "src/server/mail/disabled.ts",
+      "src/server/session.ts",
+      "src/server/with-org.ts",
+      "src/tenancy/**/*.ts",
     ],
     rules: { "no-console": "error" },
   },

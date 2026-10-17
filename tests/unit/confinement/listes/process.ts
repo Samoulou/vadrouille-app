@@ -72,6 +72,11 @@ export const PROPRIETES_PROCESS = [
   // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : arrêt du groupe de
   // processus de l'exécuteur joué par le test « job arrêté » (0056, « Tests imposés »), comme le runner le ferait.
   { fichier: "tests/db/workflows-harnais.ts", propriete: "kill" },
+  // B3b (ticket 444 ; spécification B3, critère B13 ; décision 0008) : sortie standard et sortie d'erreur espionnées
+  // (`vi.spyOn(…, "write")`) pendant le parcours de connexion, pour prouver qu'aucune adresse ni aucun code n'y est écrit ;
+  // rien n'y est écrit par le test. Verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446).
+  { fichier: "tests/db/auth.test.ts", propriete: "stdout" },
+  { fichier: "tests/db/auth.test.ts", propriete: "stderr" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
@@ -167,6 +172,24 @@ export const LECTURES_ENV = [
   // seulement, comparaison exacte), puis conditions (3) à (5) du module étroit `p0.ts` (`CI`, branche, réglage), lues
   // par propriété littérale, à l'appel, valeur jamais rendue. Verdict Sécurité à rendre.
   { fichier: "src/server/env/index.ts", noms: ["P0_REAL_RUNS"] },
+  // B3b (ticket 444 ; spécification B3, B3b ; décision 0077 § 5.1) : adresses de la connexion réelle (contrôlées par
+  // `origineHttp`, origine seule rendue) ; `EMAIL_TRANSPORT` et `SMTP_URL` : présence seulement, refusée au démarrage
+  // tant que le transport SMTP n'est pas livré (B3b-envoi). Lues par propriété littérale. Verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446).
+  { fichier: "src/server/env/index.ts", noms: ["BETTER_AUTH_URL", "APP_URL", "EMAIL_TRANSPORT", "SMTP_URL"] },
+  // B3b, correction 1 (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7
+  // lit d'elle-même, refusées au démarrage par leur seule présence (`!== undefined`), valeur jamais lue ; le secret de
+  // repli `AUTH_*` est dans `donnees/lectures-env-secretes.json`. Verdict Sécurité à rendre.
+  {
+    fichier: "src/server/env/index.ts",
+    noms: [
+      "BETTER_AUTH_TRUSTED_ORIGINS",
+      "BETTER_AUTH_TELEMETRY",
+      "BETTER_AUTH_TELEMETRY_ENDPOINT",
+      "BETTER_AUTH_TELEMETRY_ID",
+      "BETTER_AUTH_TELEMETRY_DEBUG",
+      "BETTER_AUTH_SECRETS",
+    ],
+  },
   { fichier: "src/server/env/p0.ts", noms: ["CI", "VERCEL_GIT_COMMIT_REF", "P0_REAL_RUNS"] },
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (identifiant public posé par Vercel), consigné avec
   // l'exécution réservée ; lu à l'appel par `commitDuDeploiement`, forme contrôlée. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).

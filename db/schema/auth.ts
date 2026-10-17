@@ -69,7 +69,10 @@ export const accounts = pgTable(
   (t) => [index("accounts_user_id_idx").on(t.userId)],
 );
 
-/** Exception à `organization_id` : avant toute session. `value` est le code haché. */
+/**
+ * Exception à `organization_id` : avant toute session. `value` est le code haché (HMAC-SHA-256 à clé lié à l'adresse,
+ * suivi de `:<essais>`) ; `identifier` vaut `sign-in-otp-<adresse canonique>`, en clair jusqu'à la purge (B3b).
+ */
 export const verifications = pgTable(
   "verifications",
   {
@@ -78,6 +81,8 @@ export const verifications = pgTable(
     value: text("value").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: createdAt(),
+    // B3b (migration 0009) : Better Auth 1.7.7 écrit `updatedAt` à chaque création de vérification.
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("verifications_identifier_idx").on(t.identifier), index("verifications_expires_at_idx").on(t.expiresAt)],
 );

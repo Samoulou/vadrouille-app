@@ -2,7 +2,7 @@
 import { randomBytes } from "node:crypto";
 import { inspect } from "node:util";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { authAdapterChoice } from "@/adapters/auth-guard";
 import { isProductionDeployment } from "@/dev/flags";
@@ -35,6 +35,19 @@ const hex = (octets: Buffer) => octets.toString("hex");
 
 /** Environnement `ci` minimal, plus les variables du cas. */
 const ci = (extra: Env = {}): Env => ({ VADROUILLE_ENV: "ci", ...extra });
+/**
+ * Variables de la connexion réelle (B3b), plus `extra` : secret tiré au hasard, URL de la bibliothèque et de
+ * l'application, URL de connexion de `vadrouille_auth` (présence seulement ; valeur factice sans mot de passe).
+ */
+const connexionReelle = (extra: Env = {}): Env => ({
+  AUTH_ADAPTER: "better-auth",
+  [NOM.BETTER_AUTH_SECRET]: base64url(aleatoire()),
+  [NOM.BETTER_AUTH_URL]: "http://127.0.0.1:3000",
+  [NOM.APP_URL]: "http://127.0.0.1:3000",
+  [NOM.VADROUILLE_DATABASE_URL_AUTH]: "postgresql://vadrouille_auth@127.0.0.1:5432/vadrouille",
+  ...extra,
+});
+
 /** Environnement d'un déploiement Vercel (`VERCEL_ENV` déclarée et `VERCEL=1`). */
 const vercel = (vercelEnv: string, extra: Env = {}): Env => ({ VERCEL_ENV: vercelEnv, VERCEL: "1", ...extra });
 
@@ -325,24 +338,118 @@ describe("env: gardes de configuration", () => {
   });
 
   describe("AUTH_ADAPTER", () => {
-    it("inconnu → refus ; better-auth → refus en B3a ; mock, absent ou vide → accepté", () => {
+    it("inconnu → refus ; better-auth → refus en staging et production (B3-TL-2, B3b) ; mock, absent ou vide → accepté", () => {
       refusParse(ci({ AUTH_ADAPTER: `x${SENTINELLE}` }), NOM.AUTH_ADAPTER, "invalid_value");
-      refusParse(ci({ AUTH_ADAPTER: "better-auth" }), NOM.AUTH_ADAPTER, "forbidden");
+      refusParse({ VADROUILLE_ENV: "staging", ...connexionReelle() }, NOM.AUTH_ADAPTER, "forbidden");
+      refusParse({ VADROUILLE_ENV: "production", ...connexionReelle() }, NOM.AUTH_ADAPTER, "forbidden");
+      expect(parseServerEnv(ci(connexionReelle())).authAdapter).toBe("better-auth");
       for (const valeur of [undefined, "", "  ", "mock", " mock "]) expect(parseServerEnv(ci({ AUTH_ADAPTER: valeur })).authAdapter).toBe("mock");
     });
 
-    it("même choix normalisé que authAdapterChoice (src/adapters/auth-guard.ts) : accepté si et seulement si mock", () => {
-      for (const valeur of [undefined, "", " ", "mock", " mock ", "Mock", "MOCK", "better-auth", "Better-Auth", "api", "mock2"]) {
+    it("même choix normalisé que authAdapterChoice (src/adapters/auth-guard.ts) : accepté en ci si et seulement si mock ou better-auth", () => {
+      for (const valeur of [undefined, "", " ", "mock", " mock ", "Mock", "MOCK", "better-auth", " better-auth ", "Better-Auth", "api", "mock2"]) {
         const accepte = (() => {
           try {
-            parseServerEnv(ci({ AUTH_ADAPTER: valeur }));
+            parseServerEnv(ci({ ...connexionReelle(), AUTH_ADAPTER: valeur }));
             return true;
           } catch {
             return false;
           }
         })();
-        expect(accepte, String(valeur)).toBe(authAdapterChoice({ NODE_ENV: "test", AUTH_ADAPTER: valeur }) === "mock");
+        const choix = authAdapterChoice({ NODE_ENV: "test", AUTH_ADAPTER: valeur });
+        expect(accepte, String(valeur)).toBe(choix === "mock" || choix === "better-auth");
       }
+    });
+  });
+
+  describe("B3b : connexion réelle et envoi (critère B16 ; décision 0077 § 5.1)", () => {
+    it("AUTH_ADAPTER=better-auth en staging ou production → refus (forbidden), Vercel compris", () => {
+      refusParse(vercel("preview", connexionReelle()), NOM.AUTH_ADAPTER, "forbidden");
+      refusParse(vercel("production", connexionReelle()), NOM.AUTH_ADAPTER, "forbidden");
+      refusParse({ VADROUILLE_ENV: "staging", ...connexionReelle({ [NOM.BETTER_AUTH_SECRET]: undefined }) }, NOM.AUTH_ADAPTER, "forbidden");
+    });
+
+    it("better-auth en local ou ci : secret de Better Auth absent → refus au démarrage ; variables requises absentes ou invalides → refus", () => {
+      for (const environnement of ["local", "ci"]) {
+        const env = (extra: Env = {}): Env => ({ VADROUILLE_ENV: environnement, ...connexionReelle(extra) });
+        refusParse(env({ [NOM.BETTER_AUTH_SECRET]: undefined }), NOM.BETTER_AUTH_SECRET, "missing");
+        refusParse(env({ [NOM.BETTER_AUTH_SECRET]: "  " }), NOM.BETTER_AUTH_SECRET, "missing");
+        refusParse(env({ [NOM.BETTER_AUTH_URL]: undefined }), NOM.BETTER_AUTH_URL, "missing");
+        refusParse(env({ [NOM.APP_URL]: "" }), NOM.APP_URL, "missing");
+        refusParse(env({ [NOM.VADROUILLE_DATABASE_URL_AUTH]: undefined }), NOM.VADROUILLE_DATABASE_URL_AUTH, "missing");
+        for (const invalide of [`ftp://${SENTINELLE}.test`, `${SENTINELLE}`, `http://u:${SENTINELLE}@127.0.0.1:3000`, "http://127.0.0.1:3000/chemin", "javascript:alert(1)"]) {
+          refusParse(env({ [NOM.BETTER_AUTH_URL]: invalide }), NOM.BETTER_AUTH_URL, "invalid_value");
+          refusParse(env({ [NOM.APP_URL]: invalide }), NOM.APP_URL, "invalid_value");
+        }
+        const secret = aleatoire();
+        const config = parseServerEnv(env({ [NOM.BETTER_AUTH_SECRET]: hex(secret), [NOM.BETTER_AUTH_URL]: " http://127.0.0.1:3100/ " }));
+        expect(config.authAdapter).toBe("better-auth");
+        expect(config.betterAuth?.environment).toBe(environnement);
+        expect(config.betterAuth?.secret.equals(secret)).toBe(true);
+        expect(config.betterAuth?.baseUrl).toBe("http://127.0.0.1:3100");
+        expect(config.betterAuth?.appUrl).toBe("http://127.0.0.1:3000");
+        expect(Object.isFrozen(config.betterAuth)).toBe(true);
+        expect(JSON.stringify(config)).not.toContain(hex(secret));
+        expect(inspect(config, { depth: 5 })).not.toContain(hex(secret));
+      }
+    });
+
+    it("EMAIL_TRANSPORT ou SMTP_URL présente → refus dans les quatre environnements, valeur jamais rendue ni journalisée", () => {
+      const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
+      try {
+        for (const env of [ci(), { VADROUILLE_ENV: "local" }, vercel("preview"), vercel("production")]) {
+          for (const transport of ["smtp", "ses", SENTINELLE, ""]) {
+            refusParse({ ...env, [NOM.EMAIL_TRANSPORT]: transport }, NOM.EMAIL_TRANSPORT, "forbidden");
+          }
+          for (const smtp of ["smtp://127.0.0.1:1025", `smtp://u:${SENTINELLE}@127.0.0.1:1025`, ""]) {
+            attendreRefus(() => parseServerEnv({ ...env, [NOM.SMTP_URL]: smtp }), NOM.SMTP_URL, "forbidden", [smtp, SENTINELLE]);
+          }
+          refusParse({ ...env, ...connexionReelle(), [NOM.SMTP_URL]: "smtp://127.0.0.1:1025" }, NOM.SMTP_URL, "forbidden");
+        }
+        const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+        expect(ecrit).not.toContain(SENTINELLE);
+      } finally {
+        for (const espion of espions) espion.mockRestore();
+      }
+    });
+
+    it("variables lues par Better Auth (origines, télémétrie, secrets de repli) présentes → refus dans les quatre environnements, mock compris (décision 0082)", () => {
+      const noms = [
+        NOM.BETTER_AUTH_TRUSTED_ORIGINS,
+        NOM.BETTER_AUTH_TELEMETRY,
+        NOM.BETTER_AUTH_TELEMETRY_ENDPOINT,
+        NOM.BETTER_AUTH_TELEMETRY_ID,
+        NOM.BETTER_AUTH_TELEMETRY_DEBUG,
+        NOM.BETTER_AUTH_SECRETS,
+        NOM.AUTH_SECRET,
+      ];
+      const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
+      try {
+        for (const env of [ci(), { VADROUILLE_ENV: "local" }, vercel("preview"), vercel("production")]) {
+          for (const nom of noms) {
+            for (const valeur of [SENTINELLE, ""]) {
+              attendreRefus(() => parseServerEnv({ ...env, [nom]: valeur }), nom, "forbidden", [SENTINELLE]);
+            }
+            refusParse({ ...env, [NOM.AUTH_ADAPTER]: "mock", [nom]: "1" }, nom, "forbidden");
+          }
+        }
+        for (const nom of noms) refusParse({ ...ci(), ...connexionReelle(), [nom]: "1" }, nom, "forbidden");
+        const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+        expect(ecrit).not.toContain(SENTINELLE);
+      } finally {
+        for (const espion of espions) espion.mockRestore();
+      }
+    });
+
+    it("secret de Better Auth égal au secret du limiteur → refus (secret_duplicate)", () => {
+      const octets = aleatoire();
+      refusParse(ci(connexionReelle({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.BETTER_AUTH_SECRET]: hex(octets) })), NOM.BETTER_AUTH_SECRET, "secret_duplicate");
+    });
+
+    it("AUTH_ADAPTER=mock et secret de Better Auth trivial → refus (un secret présent est toujours validé, 0051 § 3.6)", () => {
+      refusParse(ci({ AUTH_ADAPTER: "mock", [NOM.BETTER_AUTH_SECRET]: "changeme".repeat(6) }), NOM.BETTER_AUTH_SECRET, "secret_trivial");
+      const config = parseServerEnv(ci({ AUTH_ADAPTER: "mock", [NOM.BETTER_AUTH_SECRET]: base64url(aleatoire()), [NOM.BETTER_AUTH_URL]: "pas une adresse" }));
+      expect(config.betterAuth).toBeNull();
     });
   });
 
@@ -387,7 +494,7 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
     const octets = aleatoire();
     refusParse(ci({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.P0_RUN_TOKEN]: hex(octets) }), NOM.P0_RUN_TOKEN, "secret_duplicate");
     const config = parseServerEnv(ci(code()));
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
   });
 });
 
@@ -401,7 +508,7 @@ describe("env: modules d'environnement", () => {
     const config = parseServerEnv(env);
     expect(JSON.stringify(config)).not.toContain(SENTINELLE);
     expect(inspect(config, { depth: 5 })).not.toContain(SENTINELLE);
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
   });
 
   it("la liste des variables du journal est celle de src/server/env/index.ts", () => {
