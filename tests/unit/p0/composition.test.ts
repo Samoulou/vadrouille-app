@@ -15,14 +15,16 @@ import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
 import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
+import { FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
-import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/research/recherche-web";
-import { composerP0Reel, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
-import type { GardeOuverte } from "@/server/p0/garde";
+import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/ai/recherche-web";
+import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
+import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
+import { entreeModelesDepuisBrief } from "@/server/p0/vers-couche-ia";
 
 import { creerHorlogeManuelle } from "../../support/horloge-manuelle";
 import { creerPortMemoire } from "../../support/port-consommation-memoire";
+import { chercherCandidatsP0 } from "./agent-p0";
 import { RACINE, rel, resoudre, type Cible } from "./resolution";
 
 /**
@@ -43,6 +45,12 @@ const MODULES_CAPACITE = (JSON.parse(readFileSync(path.join(RACINE, "tests/unit/
 const COMPOSITION = "src/server/composition/p0-reel.ts";
 /** Seul importateur admis de la composition hors des tests (0055 § 3 point 3), livré avec le workflow `p0Run`. */
 const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
+/**
+ * Second importateur admis (P0r4, ticket 414, décision 0079 point 5) : le relecteur Routes réel, qui n'en lit que
+ * `composerRelecture` (client Routes seul, garde de relecture exigée) ; lui-même importé par `src/instrumentation.ts` seul.
+ */
+const RELECTEUR_REEL = "src/server/p0/relecture.ts";
+const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RELECTEUR_REEL];
 
 /**
  * Fichiers exemptés : les fichiers de test (`*.test.*`, `*.spec.*`) et les supports de test (`tests/support/`) seulement
@@ -189,9 +197,12 @@ describe("p0: modules de capacité importés par la seule composition", () => {
     for (const capacite of MODULES_CAPACITE) expect(directs).toContainEqual({ type: "projet", chemin: capacite });
   });
 
-  it(`seul ${IMPORTATEUR_COMPOSITION} (absent tant que le workflow n'est pas livré) peut importer la composition`, () => {
+  it(`seuls ${IMPORTATEURS_COMPOSITION.join(" et ")} peuvent importer la composition ; le relecteur, par l'instrumentation seule`, () => {
     const trouves = importateurs(DEPOT, COMPOSITION);
-    expect(trouves.filter((f) => f !== IMPORTATEUR_COMPOSITION)).toEqual([]);
+    expect(trouves.filter((f) => !IMPORTATEURS_COMPOSITION.includes(f))).toEqual([]);
+    expect(importateurs(DEPOT, RELECTEUR_REEL)).toEqual(["src/instrumentation.ts"]);
+    // Le relecteur n'utilise de la composition que la relecture (jamais `composerP0Reel`).
+    expect(lireDepot(RELECTEUR_REEL)).not.toContain("composerP0Reel");
     for (const interdit of ["src/app/", "src/features/", "src/server/actions/", "src/adapters/index.ts"]) {
       expect(trouves.some((f) => f.startsWith(interdit))).toBe(false);
     }
@@ -278,7 +289,10 @@ describe("p0: séparation des capacités de la composition (types)", () => {
   });
 
   it("notation des candidats : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
-    expectTypeOf<keyof EntreeNotation>().toEqualTypeOf<"brief" | "lot">();
+    // B7a (décision 0077 § 1 point 6) : types de production (`EntreeModeles`, `CandidatPourModele`) et `ComplementP0`
+    // en champ distinct, passé par `p0Run` seulement.
+    expectTypeOf<keyof EntreeNotation>().toEqualTypeOf<"entree" | "lot" | "complement">();
+    expectTypeOf<keyof EntreeNotation["lot"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape">();
     type Lieu = EntreeNotation["lot"][number];
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");
     expectTypeOf<Lieu>().not.toHaveProperty("position");
@@ -287,7 +301,8 @@ describe("p0: séparation des capacités de la composition (types)", () => {
   });
 
   it("rédaction des raisons : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
-    expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"brief" | "retenus">();
+    expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"entree" | "retenus" | "complement">();
+    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine">();
     type Lieu = EntreeRaisons["retenus"][number];
     // Aucun champ d'ancrage, de fiche ni de trajet dans ce qu'un prompt peut recevoir.
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");
@@ -295,7 +310,9 @@ describe("p0: séparation des capacités de la composition (types)", () => {
     expectTypeOf<Lieu>().not.toHaveProperty("statut");
     expectTypeOf<Lieu>().not.toHaveProperty("horaires");
     expectTypeOf<Lieu>().not.toHaveProperty("trajets");
-    expectTypeOf<EntreeRaisons["brief"]>().not.toHaveProperty("placeId");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("placeId");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("recit");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("logements");
   });
 
   it("la composition exige une GardeOuverte : un littéral est refusé par le type", () => {
@@ -480,13 +497,14 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     expect(Object.keys(finale.places)).toEqual(["details"]);
     expect(Object.keys(finale.routes)).toEqual(["matrice"]);
     // La rédaction des raisons passe par le client de modèles réel, sans greffon, avec le modèle des raisons.
-    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as EntreeRaisons["brief"];
-    await finale.redigerRaisons({ brief, retenus: [] });
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    const entree = entreeModelesDepuisBrief(brief);
+    await finale.redigerRaisons({ entree, retenus: [] });
     const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
     expect(corps.model).toBe("fournisseur/raisons-test");
     expect(corps.plugins).toBeUndefined();
     // La notation aussi : client de modèles réel, sans greffon, avec le modèle de la notation (amendement A3 de 0055).
-    await finale.noterCandidats({ brief, lot: [] });
+    await finale.noterCandidats({ entree, lot: [] });
     const notation = JSON.parse(String(appels[1]?.init.body)) as Record<string, unknown>;
     expect(notation.model).toBe("fournisseur/notation-test");
     expect(notation.plugins).toBeUndefined();
@@ -531,7 +549,7 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
       },
     };
     const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
-    const { compteurs } = await chercherCandidats(brief, {
+    const { compteurs } = await chercherCandidatsP0(brief, {
       modeles,
       modele: "fournisseur/recherche-test",
       routage: { data_collection: "deny" },
@@ -760,7 +778,7 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
       JSON.stringify({ actions: [], candidats: [], termine: true }),
     ];
     const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
-    await chercherCandidats(avec({}), {
+    await chercherCandidatsP0(avec({}), {
       modeles: { envoyer: async () => ({ texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 }) },
       modele: "fournisseur/recherche-test",
       routage: { data_collection: "deny" },
@@ -805,5 +823,32 @@ describe("p0: lecture de pages de la composition, adresses locales refusées (mi
     const { composition, fetchDouble } = monter([]);
     expect(await composition.agent().pages.lire(url, new Set([url]))).toEqual({ ok: false, raison });
     expect(fetchDouble).not.toHaveBeenCalled();
+  });
+});
+
+describe("p0: non-confusion des preuves de la garde (P0r4, décision 0079)", () => {
+  const RELECTURE = Object.freeze({ relecture: true }) as unknown as GardeRelecture;
+  const OUVERTE = Object.freeze({ runId: "00000000-0000-4000-8000-000000000000" }) as unknown as GardeOuverte;
+  const options = {
+    usage: creerPortMemoire(creerHorlogeManuelle()),
+    plafonds: [],
+    coutEstimeModelesMicros: 1,
+    coutEstimeRechercheWebMicros: 1,
+    modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "openai/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" } },
+  };
+
+  it("une preuve de relecture n'ouvre pas une exécution (à l'exécution, sans aucun client construit)", () => {
+    expect(() => composerP0Reel(RELECTURE as unknown as GardeOuverte, options)).toThrow("garde d'exécution attendue");
+    const mixte = Object.freeze({ runId: "00000000-0000-4000-8000-000000000000", relecture: true }) as unknown as GardeOuverte;
+    expect(() => composerP0Reel(mixte, options)).toThrow("garde d'exécution attendue");
+  });
+
+  it("une preuve d'exécution n'ouvre pas une relecture (à l'exécution, avant le client Routes et sa clé)", () => {
+    const relecture = { usage: options.usage, plafonds: [] };
+    expect(() => composerRelecture(OUVERTE as unknown as GardeRelecture, relecture)).toThrow("garde de relecture attendue");
+    const mixte = Object.freeze({ runId: "x", relecture: true }) as unknown as GardeRelecture;
+    expect(() => composerRelecture(mixte, relecture)).toThrow("garde de relecture attendue");
+    // Preuve de relecture valide : seule l'absence de clé Google (environnement des tests) arrête la construction.
+    expect(() => composerRelecture(RELECTURE, relecture)).not.toThrow("garde de relecture attendue");
   });
 });

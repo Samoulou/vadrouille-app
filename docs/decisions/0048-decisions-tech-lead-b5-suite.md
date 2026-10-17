@@ -2,6 +2,8 @@
 
 Statut : décision déléguée (architecture, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-13 · Rédaction : CEO (commit `[ceo]`), comme 0045 · Décideur : Tech Lead · Ticket #271 · Spécification `specs/B5-moteur-sans-ia.md` · Questions : question 1 de #268 (B5a, fusionnée) ; écarts 1 et 3, questions 1 à 3 de #270 (B5b, fusionnée le 2026-10-13, `337c937`) · **Amende la décision 0045** (§ 1 « Amendement de 0032 », dernier point ; § 2.2 ; § 4.1 et « Ce que B5a doit tester » du § 4 ; § 6.2 ; « Conséquences », dernier point), sans la réécrire · **Amende indirectement 0032** (A3.2, règle complémentaire « graphe de l'application », vérifiée par `imports.test.ts`, déjà amendée par 0045) : voir « Amendements »
 
+**§ 1 amendé par 0077** (§ 3 point 1, ticket #415) : `src/ai/erreurs.ts`, et lui seul, est exempté de `interditPartout` et de `violationsPont` (module sans aucun import, codes fermés seulement). Précisé par 0080 (ticket #425) : la mention de `violationsPont` est retirée (`src/ai` y est déjà une ouverture), et `erreurs.ts` est aussi admis quand `egress.ts` ou `port.ts` l'importe.
+
 Numérotation (vérifiée le 2026-10-14 sur `main`, `9b76af5`) : `main` contient 0001 à 0045, 0047 et 0049 ; #269 (fusionnée le 2026-10-13) a ajouté `0047`, #266 (ouverte) prend `0046`, #275 (fusionnée) a ajouté `0049` ; #270 (fusionnée) n'ajoute aucun fichier sous `docs/decisions/`. Cette PR ajoute `0048`.
 
 ## Contexte

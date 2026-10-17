@@ -110,29 +110,6 @@ const P0R3D =
 const NOMS_PORT = ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"];
 
 const SPECIFICATEURS_NOMINATIFS_TS = [
-  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/ai.test.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
-  {
-    fichier: "src/ai/client.ts",
-    specificateur: "@/prototype/config",
-    noms: ["MODELE_ID_PATTERN", "MOTEURS_RECHERCHE_WEB", "type:MoteurRechercheWeb", "type:Routage"],
-    motif: `${PROTOTYPE_PUR} ; moteurs du greffon web ajoutés par la correction 1 de la PR 326 (bloquant 1c), verdict Sécurité : approuvé sur le head \`59878f0\` (PR 326)`,
-  },
-  { fichier: "src/ai/modeles.simule.ts", specificateur: "@/prototype/candidat", noms: ["TYPES_CRENEAU"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  {
-    fichier: "src/ai/requetes.ts",
-    specificateur: "@/prototype/candidat",
-    noms: ["type:Candidat", "type:TypeCreneau", "vuePourModele"],
-    motif: PROTOTYPE_PUR,
-  },
-  { fichier: "src/ai/requetes.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
-  {
-    fichier: "src/ai/sorties.ts",
-    specificateur: "@/prototype/candidat",
-    noms: ["LONGUEURS_TEXTE", "NotesSchema", "TYPES_CRENEAU", "texteMaison", "type:Notes"],
-    motif: PROTOTYPE_PUR,
-  },
   {
     fichier: "src/grounding/ancrage.ts",
     specificateur: "@/prototype/ancrage",
@@ -167,19 +144,6 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)",
   })),
-  {
-    fichier: "src/ai/recherche-web-reelle.ts",
-    specificateur: "@/prototype/candidat",
-    noms: ["LONGUEURS_TEXTE"],
-    motif: `${PROTOTYPE_PUR} ; longueur des requêtes du plan, importée au lieu d'être recopiée (mineur 6 de la PR 326)`,
-  },
-  {
-    fichier: "src/ai/recherche-web-reelle.test.ts",
-    specificateur: "@/prototype/candidat",
-    noms: ["LONGUEURS_TEXTE"],
-    motif: `${PROTOTYPE_PUR} ; égalité de la longueur des requêtes web et du plan, sans recopier la valeur (mineur 10 de la PR 326)`,
-  },
-  { fichier: "src/ai/recherche-web-reelle.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
   // P0r3c-5 (ticket 352) : capacité de notation de l'étape finale (réponse 1 du Tech Lead à la revue de la PR 348 ;
   // amendement A3 de 0055 § 3 point 5). Verdict Sécurité demandé dans la PR du ticket 352.
   {
@@ -190,21 +154,17 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-5 (ticket 352), amendement A3 de 0055 § 3 point 5 ; verdict Sécurité demandé (PR du ticket 352)",
   },
-  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/noter-candidats.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
-  { fichier: "src/ai/rediger-raisons.ts", specificateur: "@/prototype/config", noms: ["type:Routage"], motif: PROTOTYPE_PUR },
-  { fichier: "src/research/agent.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  {
-    fichier: "src/research/agent.ts",
-    specificateur: "@/prototype/candidat",
-    noms: ["CandidatSchema", "type:Candidat", "type:TypeCreneau"],
-    motif: PROTOTYPE_PUR,
-  },
-  { fichier: "src/research/agent.ts", specificateur: "@/prototype/config", noms: ["type:ConfigRecherche", "type:Routage"], motif: PROTOTYPE_PUR },
-  { fichier: "src/research/sources.ts", specificateur: "@/prototype/candidat", noms: ["type:ClasseSource"], motif: PROTOTYPE_PUR },
+  // B7a (ticket 423, décision 0077 § 1 et § 2) : `src/ai` et `src/research` n'importent plus rien de `src/prototype`
+  // (lignes `PROTOTYPE_PUR` de ces dossiers retirées, 0077 § 1 point 7) ; nouveaux modules de la couche IA non chargés
+  // par `pnpm p0`, marqueur `server-only` seul. Verdict Sécurité demandé dans la PR de B7a.
+  ...["src/ai/complement-p0.ts", "src/ai/couche.ts", "src/ai/entrees.ts", "src/ai/natures.ts", "src/research/bornes.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7a (ticket 423), décision 0077 § 1 et § 2 ; verdict Sécurité demandé (PR de B7a)",
+  })),
   {
     fichier: "src/research/extract-text.ts",
     specificateur: "parse5",
@@ -324,7 +284,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["moteurRechercheWebAttendu", "type:MoteurRechercheWeb", "type:Routage"],
     motif: `${PROTOTYPE_PUR} ; ${COMPOSITION_P0R3C} ; moteur du greffon web contrôlé à la construction (bloquant 1c de la PR 326)`,
   },
-  { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/p0/garde", noms: ["type:GardeOuverte"], motif: COMPOSITION_P0R3C },
+  {
+    fichier: "src/server/composition/p0-reel.ts",
+    specificateur: "@/server/p0/garde",
+    noms: ["type:GardeOuverte", "type:GardeRelecture"],
+    motif: `${COMPOSITION_P0R3C} ; \`GardeRelecture\` : preuve exigée par \`composerRelecture\` (P0r4, ticket 414, décision 0079 ; preuve protégée comme \`GardeOuverte\` depuis la correction 1 de la PR 419 ; verdict Sécurité demandé sur le head de cette correction)`,
+  },
   { fichier: "src/server/composition/p0-reel.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_P0R3C },
   {
     fichier: "src/server/composition/p0-reel.ts",

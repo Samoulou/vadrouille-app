@@ -2,6 +2,8 @@
 
 Statut : proposé · Date : 2026-10-08, reprise le 2026-10-11 dans B0a (découpage de #27, Q43) avec la correction du point 5 de la seconde revue Sécurité, complétée le 2026-10-11 (correction 2 de #114 : limiteur dans nos actions, regroupement IPv6, purges techniques, ordre de `verifyCode` pour une organisation en suppression) · Décideur : Tech Lead (architecture, délégation « Qui décide quoi » ; le choix de Better Auth est une décision de Samuel, Q4) · Définitif sans veto de Samuel avant le 2026-10-13 ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio »
 
+**Amendée par 0077** (§ 5.3, ticket #415) : « B3 garde sa signature » (contexte de session) se lit « B3 garde ce qu'elle renvoie » ; `getRequestContext()` devient asynchrone en B3c (B3-TL-4).
+
 ## Contexte
 Q4 tranchée par Samuel : Better Auth. Cadrage D8 et écran 4 : email et code à 6 chiffres, sans mot de passe ; organisations et rôles natifs ; rôles `propriétaire` et `conseiller` (§ 6.8). PO-3 : organisation personnelle créée à la première connexion, invisible au MVP. Décision 0017 § 3 : l'écran 4 appelle les actions serveur `requestCode` et `verifyCode` (`src/server/actions/compte.ts`) par `AuthAdapter`.
 

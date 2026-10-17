@@ -1,7 +1,12 @@
 /**
- * Interface de la recherche web (spécification P0, étape 3). Le moteur réel (greffon `web` d'OpenRouter ou moteur
- * tiers) arrive avec la spécification suivante ; P0a1 ne livre que le double sur fixtures
- * (`recherche-web.simule.ts`).
+ * Interface de la recherche web (spécification P0, étape 3), déplacée de `src/research` par B7a (décision 0077 § 1
+ * point 4 : `src/ai` n'importe jamais `@/research`, et `src/research` importe déjà `@/ai`) ; interface inchangée, sans
+ * réexport. Client réel : `src/ai/recherche-web-reelle.ts` (P0r3, repris par B7b) ; double sur fixtures :
+ * `src/research/recherche-web.simule.ts`. Une seule forme de résultat : `ResultatWeb` (aucun second type de même forme).
+ *
+ * Ce module ne porte **aucune capacité réseau** (types, longueurs et une fonction pure, sans import) : la sortie réseau
+ * de la recherche web reste dans `openrouter-client.ts`, seul module de capacité (0055 § 7 point 2). Chargé par
+ * `pnpm p0` sous Node nu (par `src/research/agent.ts`) : exception nominative de `ligne/require-server-only`.
  */
 
 export type ResultatWeb = { url: string; titre: string; extrait: string };

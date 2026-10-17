@@ -4,7 +4,6 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
 import { z } from "zod";
 
-import { MODELE_ID_PATTERN } from "@/prototype/config";
 import {
   FINS_MODELE,
   MAX_RESULTATS_WEB,
@@ -18,8 +17,9 @@ import {
   type ReponseModele,
   type SourceWebFournisseur,
 } from "@/ai/client";
+import { REESSAYABLES, type CodeErreurOpenRouter } from "@/ai/erreurs";
+import { MODELE_ID_PATTERN } from "@/ai/reglages";
 import { lireCleOpenRouter } from "@/server/env/ai";
-import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 import {
   avecReservation,
   DELAI_REQUETE_MS,
@@ -68,26 +68,11 @@ const BASE_URL = "https://openrouter.ai/api/v1";
 /** Transport : la signature du `fetch` global, toujours appelée à travers l'enveloppe. */
 export type Transport = (url: string, init: RequestInit) => Promise<Response>;
 
-export const CODES_ERREUR_OPENROUTER = [
-  "production_refused",
-  "proxy_env_refused",
-  "tls_env_refused",
-  CODE_CLE_ABSENTE,
-  "cap_reached",
-  "envelope_reached",
-  "daily_quota_insufficient",
-  "usage_unavailable",
-  "data_collection_missing",
-  "model_id_invalid",
-  "invalid_request",
-  "upstream_redirect",
-  "upstream_unavailable",
-  "upstream_timeout",
-  "upstream_error",
-] as const;
-export type CodeErreurOpenRouter = (typeof CODES_ERREUR_OPENROUTER)[number];
-
-const REESSAYABLES: ReadonlySet<CodeErreurOpenRouter> = new Set(["upstream_unavailable", "upstream_timeout"]);
+/**
+ * Codes fermés de ce client (`CODES_ERREUR_OPENROUTER`) et codes réessayables (`REESSAYABLES`) : définis une seule fois
+ * dans `@/ai/erreurs` (décision 0077 § 3 point 1), composés des refus de la barrière, de la clé absente et du port.
+ */
+const reessayable = (code: CodeErreurOpenRouter) => (REESSAYABLES as readonly string[]).includes(code);
 
 export class ErreurOpenRouter extends Error {
   readonly code: CodeErreurOpenRouter;
@@ -95,7 +80,7 @@ export class ErreurOpenRouter extends Error {
   constructor(code: CodeErreurOpenRouter) {
     super(code);
     this.code = code;
-    this.retryable = REESSAYABLES.has(code);
+    this.retryable = reessayable(code);
     this.name = "ErreurOpenRouter";
   }
 }

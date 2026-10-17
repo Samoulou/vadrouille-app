@@ -1,10 +1,14 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as erreursIa from "@/ai/erreurs";
+
 import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-commune";
 
 import {
   CAUSES_SORTIE,
+  CODE_CLE_ABSENTE,
+  CODES_REFUS_SORTIE,
   DIRECTIVES_SORTIE,
   EXCEPTIONS_SORTIE,
   OPTIONS_TLS,
@@ -575,5 +579,12 @@ describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et
   });
   it("le proxy l'emporte sur le TLS, comme le code", () => {
     expect(diagnostiquer({ ...PREVIEW, https_proxy: "http://p", SSL_CERT_FILE: "/x" })).toEqual({ cause: "https_proxy" });
+  });
+});
+
+describe("B7a : egress.ts réexporte les codes de src/ai/erreurs.ts (décision 0077 § 3 point 1)", () => {
+  it("mêmes listes, sous le même nom (définition unique)", () => {
+    expect(CODES_REFUS_SORTIE).toBe(erreursIa.CODES_REFUS_SORTIE);
+    expect(CODE_CLE_ABSENTE).toBe(erreursIa.CODE_CLE_ABSENTE);
   });
 });

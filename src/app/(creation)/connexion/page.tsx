@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { getAuthAdapter } from "@/adapters";
 import { SignInForm } from "@/features/compte/SignInForm";
 import { normaliserSuite } from "@/features/compte/suite";
+import { creationRoutes } from "@/features/creation/routes";
 import * as messages from "@/i18n/messages";
+import { hasSession } from "@/server/actions/compte";
 
 // L'adaptateur `auth` et sa garde (décision 0017 § 11.2) sont lus à chaque requête, jamais au build.
 export const dynamic = "force-dynamic";
@@ -20,10 +23,15 @@ type SearchParams = Record<string, string | string[] | undefined>;
  * fois) et normalisée par `normaliserSuite` : seule la valeur reconstruite atteint l'écran. Le mode de la connexion
  * (`authMode`) et la durée de validité du code viennent de l'adaptateur `auth`, côté serveur. Garde fermée (0017
  * § 11.2) : `getAuthAdapter()` lève une erreur, et la page affiche l'erreur générique.
+ *
+ * F8c : appelée par la création (`suite` = `R-lancer`) alors qu'une session existe dans la portée de la requête,
+ * l'adresse est remplacée par `R-lancer` (une personne déjà connectée saute l'écran 4, F8-PO-2 ; `redirect` d'un
+ * composant serveur remplace l'entrée d'historique). Le brouillon, dans le layout du groupe `(creation)`, est conservé.
  */
 export default async function ConnexionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const raw = (await searchParams).suite;
   const suite = normaliserSuite(Array.isArray(raw) ? raw[0] : raw);
   const adapter = getAuthAdapter();
+  if (suite === creationRoutes.lancer() && (await hasSession())) redirect(suite);
   return <SignInForm suite={suite} codeTtlMs={adapter.config.codeTtlMs} authMode={adapter.mode} />;
 }

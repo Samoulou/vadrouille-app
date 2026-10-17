@@ -10,7 +10,8 @@ import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
 import { BLOCS_ESSAYES_MAX, LONGUEUR_REPONSE_MAX, lirePlan, lireTour } from "@/ai/sorties";
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats } from "@/research/agent";
+
+import { chercherCandidatsP0 } from "./agent-p0";
 
 /**
  * Ticket 400 : la recherche réelle de l'essai 2 s'est arrêtée après deux appels de modèle (plan, puis un tour sans
@@ -43,7 +44,7 @@ async function rejouer(reponses: (string | ReponseModele)[]) {
   let appels = 0;
   const requetesWeb: string[] = [];
   const prompts: { etape: string; id: string; version: number }[] = [];
-  const resultat = await chercherCandidats(brief, {
+  const resultat = await chercherCandidatsP0(brief, {
     modeles: {
       envoyer: async (requete) => {
         appels += 1;

@@ -33,6 +33,14 @@ import { bornerLecteur, bornerRecherche, PlafondAgentAtteint } from "@/research/
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assembler, type Raison } from "@/server/p0/assemblage";
+import {
+  bornesDepuisConfig,
+  candidatPourModele,
+  complementDepuisBrief,
+  donneesProtegeesDepuisBrief,
+  entreeModelesDepuisBrief,
+  lieuRetenuDepuisCandidat,
+} from "@/server/p0/vers-couche-ia";
 import { poolPrototype } from "@/server/p0/base";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import {
@@ -57,7 +65,7 @@ import {
   violationsP0,
 } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
-import { forfaitExecution, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type SkusForfait } from "@/server/usage/forfait";
+import { forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type PlafondsRelecture, type SkusForfait } from "@/server/usage/forfait";
 import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
@@ -249,6 +257,34 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
       Math.round(config.coutUsd * 1_000_000),
     );
     return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs } };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Plafonds d'**une** relecture Routes, c'est-à-dire d'une Journée affichée (P0r4, décision 0079 ; « Non tranché » de
+ * 0053) : 40 requêtes de matrice et 40 éléments. Le relecteur fait une requête par lieu de départ et un élément par
+ * trajet distinct de la journée : 40 couvre toute journée du prototype (une vingtaine de trajets au plus). Forfait au
+ * prix plein : 40 × 0,005 = **0,20 USD** réservés, alors que le coût réel est d'un élément par trajet (tranche gratuite
+ * de 10 000 éléments par mois non déduite, Q329). Constante, comme l'exige S4 : le forfait ne dépend que de la nature.
+ */
+export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ routesRequetes: 40, routesElements: 40 });
+
+/**
+ * Forfait et règles de la réservation d'une relecture Routes (P0r4, décision 0079), lus dans ce pont comme ceux du
+ * lancement (l'application n'importe pas `src/prototype`, 0048 § 1) ; `null` si la configuration du mode réel ou la table
+ * de prix est refusée (la relecture échoue alors fermée). Durée des orphelines : celle du mode réel, comme au lancement.
+ */
+export function relectureDuMode(): LancementDuMode | null {
+  const reel = validerConfigModeReel(configModeReel);
+  const table = TablePrixGoogleSchema.safeParse(prixGoogle);
+  if (!reel.ok || !table.success) return null;
+  try {
+    return {
+      forfait: forfaitRelecture(table.data, SKUS_FORFAIT, PLAFONDS_RELECTURE),
+      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: reel.config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs },
+    };
   } catch {
     return null;
   }
@@ -561,13 +597,17 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
       let etat: EtatAgent | undefined;
       let trouve: Awaited<ReturnType<typeof chercherCandidats>>;
       try {
-        trouve = await chercherCandidats(contexte.brief, {
+        // Types de production de la couche IA (`vers-couche-ia.ts`, décision 0077 § 1 point 5) ; récit et logements de
+        // P0 par `ComplementP0`, pour P0 seulement (B7-PO-1).
+        trouve = await chercherCandidats(entreeModelesDepuisBrief(contexte.brief), {
           modeles: agent.modeles,
           modele: choisis.recherche,
           routage,
           recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
           lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
-          config: recherche,
+          bornes: bornesDepuisConfig(recherche),
+          complement: complementDepuisBrief(contexte.brief),
+          protegees: donneesProtegeesDepuisBrief(contexte.brief),
           // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même
           // délai complet que `registreDeLEtape` (modèle et recherche web : méthode `chat`) et `lecteurSousEcheance`.
           peutAppeler: tempsPourAppel(contexte.echeance, { modele: delaiDeLAppel("chat"), page: DELAI_MAX_MS, marge: MARGE_VERIFICATION_AGENT_MS }),
@@ -684,6 +724,9 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
     marquerAppels();
     const cout = memoireDuCout(contexte, registre);
     await cout.terminer(async () => {
+      // Types de production de la couche IA (`vers-couche-ia.ts`, 0077 § 1 point 5) ; `ComplementP0` pour P0 seulement.
+      const entreeIa = entreeModelesDepuisBrief(brief);
+      const complement = complementDepuisBrief(brief);
       // 1. Notation, avant les fiches.
       const lieux = relus.filter((relu) => relu.candidat.typeEtape !== "event" && relu.placeId !== null);
       const lotsNotation = enLots(
@@ -691,7 +734,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         recherche.tailleLotNotation,
       );
       const notes = new Map<string, CandidatNote["notes"]>();
-      (await parLots(lotsNotation, (lot) => finale.noterCandidats({ brief, lot }))).forEach((reponse, rang) => {
+      (await parLots(lotsNotation, (lot) => finale.noterCandidats({ entree: entreeIa, lot: lot.map(candidatPourModele), complement }))).forEach((reponse, rang) => {
         const ids = new Set((lotsNotation[rang] ?? []).map((candidat) => candidat.id));
         for (const [id, note] of lireNotes(reponse.texte, ids).valeur) notes.set(id, note);
       });
@@ -804,7 +847,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         recherche.tailleLotNotation,
       );
       const raisons = new Map<string, Raison>();
-      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ brief, retenus: lot }))).forEach((reponse, rang) => {
+      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ entree: entreeIa, retenus: lot.map(lieuRetenuDepuisCandidat), complement }))).forEach((reponse, rang) => {
         const ids = new Set((lotsRaisons[rang] ?? []).map((candidat) => candidat.id));
         for (const [id, raison] of lireRaisons(reponse.texte, ids).valeur) raisons.set(id, raison);
       });

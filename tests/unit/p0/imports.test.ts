@@ -376,7 +376,7 @@ const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossi
  * liste d'autorisation de A3.2 (contrôlés avec les fichiers de P0) et n'importent de `src/prototype` que le programme
  * réduit (admis partout) et, **en `import type` seulement**, les trois feuilles ci-dessous (contrats et `zod` seulement).
  */
-const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts"];
+const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts", "src/server/p0/vers-couche-ia.ts"];
 const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", "candidat");
 
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
@@ -400,7 +400,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
         ["ai", 'import { generateText } from "ai";'],
         ["@openrouter/ai-sdk-provider", 'import { createOpenRouter } from "@openrouter/ai-sdk-provider";'],
       ]),
-      projet: ["src/server/env/ai.ts", "src/server/env/egress.ts", "src/server/usage/port.ts"],
+      // B7a (décision 0077 § 3 point 1) : `CODE_CLE_ABSENTE` vient de `src/ai/erreurs.ts` (règle de base de `src/ai`) ;
+      // l'import de `src/server/env/egress.ts` disparaît, et ce module sort de la liste.
+      projet: ["src/server/env/ai.ts", "src/server/usage/port.ts"],
     },
   ],
   [
@@ -418,11 +420,16 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
     (nom) => [`src/grounding/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
   ),
   // P0r3c-3 (ticket 316, décision 0055, sections 3 et 7) : prompt et client réel de recherche web, rédaction des raisons ;
-  // marqueur `server-only`. Le client réel de recherche web importe le seul type `ClientRechercheWeb` et les longueurs
-  // de `src/research/recherche-web.ts` (interface inchangée ; 0055 § 7 point 1 : « src/ai importe ce type »), qui
-  // n'importe rien.
-  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
-  ["src/ai/recherche-web-reelle.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: ["src/research/recherche-web.ts"] }],
+  // marqueur `server-only`. B7a (décision 0077 § 1 point 4) : l'interface de recherche web est déplacée dans
+  // `src/ai/recherche-web.ts` ; l'exception de `src/research/recherche-web.ts` du client réel est retirée.
+  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons", "recherche-web-reelle"].map(
+    (nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
+  ),
+  // B7a (ticket 423, décision 0077 § 1 et § 2) : nouveaux modules de la couche IA non chargés par `pnpm p0`, marqueur
+  // `server-only` seul ; imports de projet par les règles de base (`src/contracts`, `src/ai`, et `src/ai` pour
+  // `src/research`).
+  ...["complement-p0", "couche", "entrees", "natures"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
+  ["src/research/bornes.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
   // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
   // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.
   ["src/research/plafonds-agent.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
@@ -472,8 +479,10 @@ function regleDeBase(fichier: string): Regle | undefined {
   if (fichier.startsWith("src/domain/")) {
     return { projet: (c) => contrats(c) || sous("src/domain")(c), externes: ["zod"] };
   }
+  // B7a (décision 0077 § 1 points 7 et 8, amendement de 0032 A3.2) : `src/ai` et `src/research` n'importent plus rien
+  // de `src/prototype`, fichiers de test compris.
   if (fichier.startsWith("src/ai/")) {
-    return { projet: (c) => contrats(c) || sous("src/ai")(c) || proto("brief", "config", "candidat").includes(c), externes: ["zod"] };
+    return { projet: (c) => contrats(c) || sous("src/ai")(c), externes: ["zod"] };
   }
   if (fichier.startsWith("src/research/")) {
     const externes = ["zod"];
@@ -483,8 +492,7 @@ function regleDeBase(fichier: string): Regle | undefined {
       projet: (c) =>
         contrats(c) ||
         sous("src/ai")(c) ||
-        (sous("src/research")(c) && (c !== "src/research/ip-guard.ts" || fichier === "src/research/fetch-page.ts")) ||
-        proto("brief", "config", "candidat").includes(c),
+        (sous("src/research")(c) && (c !== "src/research/ip-guard.ts" || fichier === "src/research/fetch-page.ts")),
       externes,
     };
   }
@@ -692,10 +700,27 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
 const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/workflows/p0-run.ts"];
 const estPont = (chemin: string) => PONTS_P0.includes(chemin);
 
-/** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1). */
+/**
+ * B7a (décision 0077 § 3 point 1, amende 0048 § 1 et 0055 § 3 sur ce seul point) : `src/ai/erreurs.ts`, **et lui seul**
+ * (égalité de chaîne, jamais un préfixe ni un motif), est exempté de `interditPartout`, et admis comme terminal de la
+ * frontière de P0r3b (atteint par une entrée admise, ou par l'un des `REEXPORTATEURS_ERREURS_IA`). Aucune clause dans
+ * `violationsPont` : `src/ai/` y est déjà une ouverture du pont (`OUVERTURES_PONT`), une exemption serait sans effet
+ * (revue du head `5a955f8`, bloquant 3 ; décision 0080 §§ 1 et 2, amendement de 0077). Il n'importe rien (test
+ * « p0: src/ai/erreurs.ts n'importe rien ») et ne contient que des listes de codes : `egress.ts` et `port.ts` en
+ * réexportent les leurs. Si le test « zéro import » échoue, l'exemption tombe.
+ */
+const FICHIER_ERREURS_IA = "src/ai/erreurs.ts";
+/**
+ * Seuls modules qui réexportent les codes de `src/ai/erreurs.ts` sous leur nom d'origine (0077 § 3 point 1). Liste
+ * fermée de la décision 0080 § 1 : un ajout demande une décision du Tech Lead et l'avis de la Sécurité.
+ */
+const REEXPORTATEURS_ERREURS_IA: readonly string[] = ["src/server/env/egress.ts", "src/server/usage/port.ts"];
+
+/** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1), hors `FICHIER_ERREURS_IA`. */
 const interditPartout = (chemin: string) =>
-  ["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
-  (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts");
+  chemin !== FICHIER_ERREURS_IA &&
+  (["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
+    (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts"));
 
 /**
  * Seules arêtes de l'application vers `src/prototype` (hors programme réduit) admises : d'un module serveur de P0 vers
@@ -1032,6 +1057,9 @@ describe("p0: aucun client réel ni accès réseau dans le code de P0a1", () => 
       ["scripts/p0/cli.ts", 'import { readFile } from "node:fs/promises";'],
       ["scripts/p0/pipeline.ts", 'import fs = require("node:fs");'],
       ["scripts/p0/main.ts", 'import { readFileSync } from "fs";'],
+      // B7a (décision 0077 § 1 point 7) : `src/ai` et `src/research` n'importent plus rien de `src/prototype`, pas même un type.
+      ["src/ai/x.ts", 'import type { Brief } from "@/prototype/brief";'],
+      ["src/research/x.ts", 'import type { Brief } from "@/prototype/brief";'],
     ];
     for (const [fichier, source] of cas) {
       it(`${fichier} : ${source.split("\n").at(-1)}`, () => {
@@ -1434,7 +1462,9 @@ const FRONTIERE_P0R3B = {
       },
     },
   ],
-  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts"],
+  // B7a (décision 0077 § 3 point 1) : `src/ai/erreurs.ts` (codes réexportés par `egress.ts`), admis comme **terminal** :
+  // jamais parcouru au-delà (il n'importe rien).
+  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts", FICHIER_ERREURS_IA],
   terminaux: [
     {
       fichier: "src/workflows/index.ts",
@@ -1494,6 +1524,10 @@ function atteintsServeurSeulement(
       // Terminal admis au-delà d'une entrée admise : ni violation, ni parcours au-delà.
       if (viaAction && cible.type === "projet" && terminalFrontiereAdmis(cle, lire)) continue;
       const admis = viaAction && (FRONTIERE_P0R3B.admis as readonly string[]).includes(cle);
+      // Terminal de B7a : admis, jamais parcouru au-delà (0077 § 3 point 1), au-delà d'une entrée de la frontière, ou
+      // atteint par l'un de ses deux réexportateurs (`egress.ts`, `port.ts` : chaîne `src/features` → `src/adapters` →
+      // `src/server/usage/neon.ts` → `port.ts`, non prévue par 0077 ; écart soumis au Tech Lead et à la Sécurité).
+      if (cle === FICHIER_ERREURS_IA && (admis || REEXPORTATEURS_ERREURS_IA.includes(fichierCourant))) continue;
       if (!admis && (ZONES_SERVEUR_SEULEMENT.some((zone) => cle.startsWith(zone)) || PAQUETS_SERVEUR_SEULEMENT.includes(cle) || cle === "externe:?import-non-litteral")) {
         violations.push(chemin(suivant));
         continue;
@@ -1812,5 +1846,104 @@ describe("p0: fournisseur de modèles explicite (arbre syntaxique)", () => {
     expect(verifier(`${base}generateText({ model: modele, maxRetries: 2, experimental_telemetry: { isEnabled: false } });`).length).toBeGreaterThan(0);
     expect(verifier(`${base}streamObject({ model: modele, maxRetries: 0, experimental_telemetry: { isEnabled: true } });`).length).toBeGreaterThan(0);
     expect(verifier(`${base}generateText(options);`).length).toBeGreaterThan(0);
+  });
+});
+
+// --- B7a : exemption exacte de `src/ai/erreurs.ts` (décision 0077 § 3 point 1) ------------------------------------------
+
+describe("p0: exemption exacte de src/ai/erreurs.ts (décision 0077 § 3 point 1)", () => {
+  /** Même contrôle que pour un module sans import : aucun `import`, `export … from`, `import()` ni `require`. */
+  const sansImport = (fichier: string, source: string) => {
+    const { imports, constructions } = analyser(fichier, source);
+    return imports.length === 0 && constructions.length === 0;
+  };
+
+  it("p0: src/ai/erreurs.ts n'importe rien", () => {
+    expect(sansImport(FICHIER_ERREURS_IA, readFileSync(path.join(RACINE, FICHIER_ERREURS_IA), "utf8"))).toBe(true);
+    // Le contrôle échoue sur chaque forme d'import (si le fichier en prend un, l'exemption tombe).
+    for (const source of [
+      'import "server-only";\n',
+      'import type { Pace } from "@/contracts";\n',
+      'export { a } from "./x";\n',
+      'export * from "@/ai/requetes";\n',
+      'const m = () => import("@/ai/requetes");\n',
+      'const m = require("@/ai/requetes");\n',
+      'import x = require("@/ai/requetes");\n',
+    ]) {
+      expect(sansImport(FICHIER_ERREURS_IA, source), source).toBe(false);
+    }
+  });
+
+  it("égalité de chaîne seulement : ni préfixe, ni motif, ni autre fichier de src/ai", () => {
+    expect(interditPartout(FICHIER_ERREURS_IA)).toBe(false);
+    for (const chemin of ["src/ai/erreurs.ts.bak", "src/ai/erreurs/x.ts", "src/ai/erreurs.test.ts", "src/ai/requetes.ts", "src/ai/natures.ts", "src/research/erreurs.ts"]) {
+      expect(interditPartout(chemin), chemin).toBe(true);
+    }
+  });
+
+  const graphe = (aretes: Record<string, string[]>): Voisins => (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+
+  it.each([
+    ["admis : egress.ts → src/ai/erreurs.ts", "src/server/env/egress.ts", ["src/ai/erreurs.ts"], []],
+    ["admis : port.ts → src/ai/erreurs.ts", "src/server/usage/port.ts", ["src/ai/erreurs.ts"], []],
+    ["refusé : egress.ts → src/ai/requetes.ts", "src/server/env/egress.ts", ["src/ai/requetes.ts"], ["src/ai/requetes.ts"]],
+    ["refusé : port.ts → src/ai/requetes.ts", "src/server/usage/port.ts", ["src/ai/requetes.ts"], ["src/ai/requetes.ts"]],
+    ["refusé : egress.ts → src/ai/erreurs.ts.bak", "src/server/env/egress.ts", ["src/ai/erreurs.ts.bak"], ["src/ai/erreurs.ts.bak"]],
+    ["refusé : port.ts → src/ai/erreurs/x.ts", "src/server/usage/port.ts", ["src/ai/erreurs/x.ts"], ["src/ai/erreurs/x.ts"]],
+  ] satisfies [string, string, string[], string[]][])("graphe de l'application (interditPartout) : %s", (_nom, depart, cibles, attendu) => {
+    expect(violationsApplication(depart, graphe({ [depart]: cibles }))).toEqual(attendu);
+    // Même résultat atteint depuis une page de l'application par le port (chaîne de `src/adapters`, 0077 § 3 point 1).
+    const page = graphe({ "src/app/x/page.tsx": ["src/adapters/y.ts"], "src/adapters/y.ts": [depart], [depart]: cibles });
+    expect(violationsApplication("src/app/x/page.tsx", page)).toEqual(attendu);
+  });
+
+  it("pont p0Run : src/ai/erreurs.ts admis comme toute ouverture du pont (src/ai/), sans exemption propre ; src/domain et scripts/ toujours refusés", () => {
+    expect(violationsPont("src/workflows/p0-run.ts", graphe({ "src/workflows/p0-run.ts": ["src/ai/erreurs.ts", "src/domain/temps.ts"] }))).toEqual(["src/domain/temps.ts"]);
+    expect(violationsPont("src/workflows/p0-run.ts", graphe({ "src/workflows/p0-run.ts": ["src/lib/x.ts"], "src/lib/x.ts": ["scripts/p0/pipeline.ts"] }))).toEqual([
+      "scripts/p0/pipeline.ts",
+    ]);
+  });
+
+  it("frontière de P0r3b : erreurs.ts admis au-delà d'une entrée, comme terminal ; tout autre fichier de src/ai reste une violation", () => {
+    const resoudreFictif = (_depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const violations = (egress: string, extra: [string, string][] = [], depart = "src/app/prototype/page.tsx") => {
+      const depot = new Map<string, string>([
+        ["src/app/prototype/page.tsx", 'import { a } from "@/server/actions/p0-acces";\n'],
+        ["src/server/actions/p0-acces.ts", '"use server";\nimport { b } from "@/server/env/p0";\n'],
+        ["src/server/env/p0.ts", 'import { c } from "@/server/env/egress";\n'],
+        ["src/server/env/egress.ts", egress],
+        ...extra,
+      ]);
+      return atteintsServeurSeulement([depart], (f) => depot.get(f) ?? "", resoudreFictif).sort();
+    };
+    const CHAINE = "src/app/prototype/page.tsx → src/server/actions/p0-acces.ts → src/server/env/p0.ts → src/server/env/egress.ts";
+    expect(violations('export { CODE_CLE_ABSENTE } from "@/ai/erreurs";\n')).toEqual([]);
+    // Terminal : jamais parcouru au-delà (si erreurs.ts importait un autre module, le test « zéro import » échouerait).
+    expect(violations('export { X } from "@/ai/erreurs";\n', [["src/ai/erreurs.ts", 'import { d } from "@/ai/requetes";\n']])).toEqual([]);
+    expect(violations('import { e } from "@/ai/requetes";\n')).toEqual([`${CHAINE} → src/ai/requetes.ts`]);
+    expect(violations('import { e } from "@/ai/natures";\n')).toEqual([`${CHAINE} → src/ai/natures.ts`]);
+    expect(violations('import { e } from "@/ai/erreurs.ts.bak";\n')).toEqual([`${CHAINE} → src/ai/erreurs.ts.bak.ts`]);
+    expect(violations('import { e } from "@/ai/erreurs/x";\n')).toEqual([`${CHAINE} → src/ai/erreurs/x.ts`]);
+    // Hors d'une entrée admise : erreurs.ts n'est admis qu'atteint par l'un de ses deux réexportateurs (`egress.ts`,
+    // `port.ts`) ; atteint directement ou par un autre module, il reste une violation.
+    expect(violations("", [["src/features/Direct.tsx", '"use client";\nimport { f } from "@/ai/erreurs";\n']], "src/features/Direct.tsx")).toEqual([
+      "src/features/Direct.tsx → src/ai/erreurs.ts",
+    ]);
+    const parPort: [string, string][] = [
+      ["src/features/Port.tsx", '"use client";\nimport { g } from "@/adapters/y";\n'],
+      ["src/adapters/y.ts", 'import { h } from "@/server/usage/port";\n'],
+      ["src/server/usage/port.ts", 'export { CODES_REFUS_USAGE } from "@/ai/erreurs";\n'],
+    ];
+    expect(violations("", parPort, "src/features/Port.tsx")).toEqual([]);
+    const parAutre: [string, string][] = [
+      ["src/features/Autre.tsx", '"use client";\nimport { g } from "@/server/usage/autre";\n'],
+      ["src/server/usage/autre.ts", 'export { CODES_REFUS_USAGE } from "@/ai/erreurs";\n'],
+    ];
+    expect(violations("", parAutre, "src/features/Autre.tsx")).toEqual(["src/features/Autre.tsx → src/server/usage/autre.ts → src/ai/erreurs.ts"]);
+    const portVersRequetes: [string, string][] = [...parPort.slice(0, 2), ["src/server/usage/port.ts", 'export { x } from "@/ai/requetes";\n']];
+    expect(violations("", portVersRequetes, "src/features/Port.tsx")).toEqual([
+      "src/features/Port.tsx → src/adapters/y.ts → src/server/usage/port.ts → src/ai/requetes.ts",
+    ]);
   });
 });

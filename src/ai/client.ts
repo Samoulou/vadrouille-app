@@ -1,4 +1,5 @@
-import { MODELE_ID_PATTERN, MOTEURS_RECHERCHE_WEB, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
+import type { CodeErreurModele } from "@/ai/erreurs";
+import { MODELE_ID_PATTERN, MOTEURS_RECHERCHE_WEB, type MoteurRechercheWeb, type Routage } from "@/ai/reglages";
 
 /**
  * Interface du client de modèles (spécification P0, A1 : « P0a1 définit sa propre interface de client de modèles
@@ -8,8 +9,11 @@ import { MODELE_ID_PATTERN, MOTEURS_RECHERCHE_WEB, type MoteurRechercheWeb, type
  * interface. Le client réel (AI SDK et fournisseur OpenRouter, A1) arrive avec la spécification suivante.
  */
 
-/** Étapes qui appellent un modèle, dans l'ordre du déroulement. */
-export const ETAPES_REQUETE = ["plan", "recherche", "notation", "raisons"] as const;
+/**
+ * Étapes qui appellent un modèle, dans l'ordre du déroulement de P0, puis les deux étapes ajoutées par B7a
+ * (`structuration` du brief et `quartier` conseillé, B7-PO-4).
+ */
+export const ETAPES_REQUETE = ["plan", "recherche", "notation", "raisons", "structuration", "quartier"] as const;
 export type EtapeRequete = (typeof ETAPES_REQUETE)[number];
 
 export type Message = { role: "system" | "user"; contenu: string };
@@ -51,7 +55,7 @@ export interface ClientModeles {
 /** Nombre maximal de résultats demandés par requête de recherche web. */
 export const MAX_RESULTATS_WEB = 10;
 
-/** Moteurs admis du greffon `web` (valeurs de `@/prototype/config`, fixées par la configuration, bloquant 1c). */
+/** Moteurs admis du greffon `web` (copie de `@/prototype/config` dans `@/ai/reglages`, bloquant 1c de la PR 326). */
 export const MOTEURS_GREFFON_WEB = MOTEURS_RECHERCHE_WEB;
 export type MoteurGreffonWeb = MoteurRechercheWeb;
 
@@ -67,8 +71,8 @@ export type RequeteRechercheWebFournisseur = {
 
 /**
  * Source rendue par le fournisseur (citation d'adresse), avant tout contrôle. Même forme que `ResultatWeb`
- * (`src/research/recherche-web.ts`), que `src/ai/client.ts` ne peut pas importer (règle d'import de `src/ai`,
- * `tests/unit/p0/imports.test.ts`) : l'égalité des deux types est vérifiée par `recherche-web-reelle.test.ts`.
+ * (`src/ai/recherche-web.ts`), mais type distinct : une source brute n'est pas un résultat admis (adresse, longueurs) ;
+ * l'égalité des deux formes est vérifiée par `recherche-web-reelle.test.ts`.
  */
 export type SourceWebFournisseur = { readonly url: string; readonly titre: string; readonly extrait: string };
 
@@ -78,10 +82,7 @@ export type ReponseRechercheWebFournisseur = { readonly sources: readonly Source
 /** Point d'entrée de recherche web du fournisseur, construit par la composition (`rechercherWeb` du client de modèles). */
 export type PointEntreeRechercheWeb = (requete: RequeteRechercheWebFournisseur) => Promise<ReponseRechercheWebFournisseur>;
 
-/** Codes d'erreur fermés du client de modèles (jamais un message de fournisseur). */
-export const CODES_ERREUR_MODELE = ["data_collection_missing", "model_id_invalid", "model_unavailable", "model_error"] as const;
-export type CodeErreurModele = (typeof CODES_ERREUR_MODELE)[number];
-
+/** Erreur du client de modèles : un code fermé de `CODES_ERREUR_MODELE` (`@/ai/erreurs`), jamais un message de fournisseur. */
 export class ErreurModele extends Error {
   readonly code: CodeErreurModele;
   constructor(code: CodeErreurModele) {

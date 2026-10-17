@@ -2,14 +2,14 @@ import "server-only";
 
 import { MAX_RESULTATS_WEB, MOTEURS_GREFFON_WEB, type MoteurGreffonWeb, type PointEntreeRechercheWeb } from "@/ai/client";
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
+import { LONGUEURS_TEXTE } from "@/ai/candidat";
 import { DEBUT_DONNEES, FIN_DONNEES } from "@/ai/requetes";
-import { LONGUEURS_TEXTE } from "@/prototype/candidat";
-import type { Routage } from "@/prototype/config";
-import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/research/recherche-web";
+import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/ai/recherche-web";
+import type { Routage } from "@/ai/reglages";
 
 /**
  * Client réel de recherche web (décision 0055, section 7 ; Q396 : dans `src/ai`, écrit par P0r3, repris par B7b sans
- * changement d'interface). Implémente `ClientRechercheWeb` (`src/research/recherche-web.ts`, inchangée).
+ * changement d'interface). Implémente `ClientRechercheWeb` (`src/ai/recherche-web.ts`, déplacée par B7a, inchangée).
  *
  * **Capacité injectée, jamais importée** (section 7 point 2) : ce module n'importe ni `openrouter-client.ts` ni aucun
  * module réseau. Il reçoit de sa fabrique le **point d'entrée** de recherche web que la composition

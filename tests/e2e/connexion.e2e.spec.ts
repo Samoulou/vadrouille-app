@@ -20,12 +20,13 @@ import {
 } from "./connexion-helpers";
 import { EDIMBOURG, R1, R2, R3, R4_LANCER, R_LANCER, continueButton, field, fillTrip, installClock, reachAfterBrief, reachReview } from "./creation-helpers";
 import { expectPath, pathOf, useScope, type Scope } from "./debloquer-helpers";
+import { R5 } from "./preparation-helpers";
 
 /**
  * Écran 4 « Compte » (spécification F8, critères [b] ; décisions 0017 § 3.5 et § 10, 0018 § 18), build de
  * production, 390 × 844, domaines Google bloqués, horloge du navigateur au 2026-08-01T08:00. Chaque test a sa portée
  * de simulation (en-tête vers l'origine de l'application seulement) ; l'horloge du serveur n'avance que par `R-sim`.
- * `R-lancer` (F8c) n'existe pas encore : seule l'adresse atteinte est vérifiée (0017 § 1).
+ * Depuis F8c, `R-lancer` crée le voyage et remplace l'adresse par l'écran 5 (`preparation.e2e.spec.ts`).
  */
 
 let googleRequests: string[] = [];
@@ -90,10 +91,10 @@ test("connexion: code à 6 chiffres", async ({ page }) => {
   expect(await codeGroup(page).getAttribute("aria-labelledby")).toBe(await label.getAttribute("id"));
   await expect(codeCells(page)).toHaveCount(6);
 
-  // Collage du code valable : vérification sans bouton, puis la suite du lancement remplace l'adresse.
+  // Collage du code valable : vérification sans bouton, puis le lancement (F8c) remplace l'adresse par l'écran 5.
   await expect(page.getByRole("button", { name: /Valider/ })).toHaveCount(0);
   await pasteCode(page, MOCK_CODE);
-  await expectPath(page, R_LANCER);
+  await expectPath(page, R5);
   // Le retour du navigateur ne ramène pas au formulaire de code.
   await page.goBack();
   await expect.poll(() => pathOf(page)).not.toBe(R4_LANCER);

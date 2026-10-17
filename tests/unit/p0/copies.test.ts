@@ -1,11 +1,17 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
+import * as copieIa from "@/ai/candidat";
+import type { CandidatPourModele } from "@/ai/entrees";
+import * as reglagesIa from "@/ai/reglages";
 import { urlSourceValide as urlSourceValideR1 } from "@/domain/validation";
 import { MODES_ROUTES } from "@/grounding/interfaces";
 import { PositionSchema as PositionAncrage } from "@/prototype/ancrage";
 import { MODES_DEPLACEMENT } from "@/prototype/brief";
+import * as originalCandidat from "@/prototype/candidat";
+import * as originalConfig from "@/prototype/config";
 import { PositionSchema as PositionReduite, urlSourceValide as urlSourceValideReduite } from "@/prototype/programme-reduit";
+import * as copieRecherche from "@/research/candidat";
 import { analyserUrl } from "@/research/fetch-page";
 
 /**
@@ -94,5 +100,137 @@ describe("p0: PositionSchema — ancrage.ts et programme-reduit.ts d'accord (tab
 describe("p0: modes de déplacement — brief.ts et grounding/interfaces.ts d'accord", () => {
   it("MODES_DEPLACEMENT et MODES_ROUTES sont identiques, dans le même ordre", () => {
     expect([...MODES_ROUTES]).toEqual([...MODES_DEPLACEMENT]);
+  });
+});
+
+/**
+ * B7a (décision 0077 § 1 point 3, B7-TL-1 : liste fermée ; 0032 point 10) : copies de `src/prototype` tenues égales dans
+ * `src/ai` (`candidat.ts`, `reglages.ts`) et `src/research` (`candidat.ts`). Une table par copie ; une copie modifiée
+ * d'un seul côté fait échouer le test. Toute autre copie demande un amendement de 0077.
+ */
+describe("p0: copies de src/prototype tenues égales", () => {
+  it("TYPES_CRENEAU et TypeCreneau (src/ai/candidat.ts)", () => {
+    expect([...copieIa.TYPES_CRENEAU]).toEqual([...originalCandidat.TYPES_CRENEAU]);
+    expectTypeOf<copieIa.TypeCreneau>().toEqualTypeOf<originalCandidat.TypeCreneau>();
+  });
+
+  it("LONGUEURS_TEXTE (src/ai/candidat.ts)", () => {
+    expect(copieIa.LONGUEURS_TEXTE).toEqual(originalCandidat.LONGUEURS_TEXTE);
+    expectTypeOf<typeof copieIa.LONGUEURS_TEXTE>().toEqualTypeOf<typeof originalCandidat.LONGUEURS_TEXTE>();
+  });
+
+  it("CANDIDAT_ID_PATTERN (src/ai/candidat.ts) et MODELE_ID_PATTERN (src/ai/reglages.ts) : mêmes motifs", () => {
+    for (const [copie, original] of [
+      [copieIa.CANDIDAT_ID_PATTERN, originalCandidat.CANDIDAT_ID_PATTERN],
+      [reglagesIa.MODELE_ID_PATTERN, originalConfig.MODELE_ID_PATTERN],
+    ] as const) {
+      expect(copie.source).toBe(original.source);
+      expect(copie.flags).toBe(original.flags);
+    }
+  });
+
+  it("MOTEURS_RECHERCHE_WEB et MoteurRechercheWeb, Routage (src/ai/reglages.ts)", () => {
+    expect([...reglagesIa.MOTEURS_RECHERCHE_WEB]).toEqual([...originalConfig.MOTEURS_RECHERCHE_WEB]);
+    expectTypeOf<reglagesIa.MoteurRechercheWeb>().toEqualTypeOf<originalConfig.MoteurRechercheWeb>();
+    expectTypeOf<reglagesIa.Routage>().toEqualTypeOf<originalConfig.Routage>();
+  });
+
+  it("CLASSES_SOURCE et ClasseSource (src/research/candidat.ts)", () => {
+    expect([...copieRecherche.CLASSES_SOURCE]).toEqual([...originalCandidat.CLASSES_SOURCE]);
+    expectTypeOf<copieRecherche.ClasseSource>().toEqualTypeOf<originalCandidat.ClasseSource>();
+  });
+
+  describe("contientUrl et texteMaison (src/ai/candidat.ts) : même verdict (table)", () => {
+    const table: [string, number][] = [
+      ["Musée maison", 80],
+      ["", 80],
+      ["   ", 80],
+      ["x".repeat(80), 80],
+      ["x".repeat(81), 80],
+      ["ligne\u0007son", 80],
+      ["un <b>lieu</b>", 80],
+      ["voir https://exemple.org", 300],
+      ["voir www.exemple", 300],
+      ["voir exemple.com", 300],
+      ["mailto:a", 300],
+      ["javascript:alert(1)", 300],
+      ["texte\u200bcaché", 300],
+      ["droite\u202egauche", 300],
+      ["Café du Lac, 12 €", 300],
+      ["東京の美術館", 300],
+    ];
+    for (const [texte, max] of table) {
+      it(JSON.stringify(texte), () => {
+        expect(copieIa.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
+        expect(copieIa.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
+      });
+    }
+  });
+
+  describe("NotesSchema et Notes (src/ai/candidat.ts) : même verdict (table)", () => {
+    const valide = { matchesWishes: true, notForMeRisk: 3, mustSee: false, slotFit: ["activity"] };
+    const table: unknown[] = [
+      valide,
+      { ...valide, slotFit: ["activity", "meal", "evening"] },
+      { ...valide, slotFit: [] },
+      { ...valide, slotFit: ["activity", "activity"] },
+      { ...valide, slotFit: ["event"] },
+      { ...valide, notForMeRisk: 0 },
+      { ...valide, notForMeRisk: 11 },
+      { ...valide, notForMeRisk: 2.5 },
+      { ...valide, placeId: "x" },
+      { ...valide, mustSee: "oui" },
+      null,
+    ];
+    for (const valeur of table) {
+      it(JSON.stringify(valeur), () => {
+        expect(copieIa.NotesSchema.safeParse(valeur).success).toBe(originalCandidat.NotesSchema.safeParse(valeur).success);
+      });
+    }
+    it("types égaux", () => {
+      expectTypeOf<copieIa.Notes>().toEqualTypeOf<originalCandidat.Notes>();
+    });
+  });
+
+  describe("CandidatRechercheSchema (src/research/candidat.ts) et CandidatSchema : même verdict (table)", () => {
+    const valide = {
+      id: "c_001",
+      nom: "Musée maison",
+      resume: "Résumé maison.",
+      categorie: "museum",
+      typeEtape: "activity",
+      source: { url: "https://guide.example/page", date: "2026-09-01", classe: "independante" },
+      aReserver: false,
+    };
+    const table: unknown[] = [
+      valide,
+      { ...valide, evenement: { date: "2026-11-24", heure: "20:00", dateConfirmee: true } },
+      { ...valide, evenement: { date: "2026-11-24", dateConfirmee: false } },
+      { ...valide, evenement: { date: "2026-11-24" } },
+      { ...valide, prixParPersonne: 0, dureeMinutes: 15 },
+      { ...valide, prixParPersonne: 1001 },
+      { ...valide, dureeMinutes: 14 },
+      { ...valide, id: "c_1" },
+      { ...valide, nom: "voir https://exemple.org" },
+      { ...valide, categorie: "plage" },
+      { ...valide, typeEtape: "hotel" },
+      { ...valide, source: { ...valide.source, classe: "autre" } },
+      { ...valide, source: { ...valide.source, date: "01/09/2026" } },
+      { ...valide, source: { ...valide.source, placeId: "x" } },
+      { ...valide, placeId: "x" },
+      { ...valide, aReserver: undefined },
+    ];
+    for (const valeur of table) {
+      it(JSON.stringify(valeur), () => {
+        expect(copieRecherche.CandidatRechercheSchema.safeParse(valeur).success).toBe(originalCandidat.CandidatSchema.safeParse(valeur).success);
+      });
+    }
+    it("types égaux (Candidat)", () => {
+      expectTypeOf<copieRecherche.CandidatRecherche>().toEqualTypeOf<originalCandidat.Candidat>();
+    });
+  });
+
+  it("CandidatPourModele (src/ai/entrees.ts) est exactement la projection de vuePourModele (0077 § 1 point 5)", () => {
+    expectTypeOf<CandidatPourModele>().toEqualTypeOf<ReturnType<typeof originalCandidat.vuePourModele>>();
   });
 });

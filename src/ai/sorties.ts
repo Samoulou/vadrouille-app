@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { CategorySchema, IsoDateSchema, STOP_KINDS, TimeSchema } from "@/contracts";
-import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } from "@/prototype/candidat";
+import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } from "@/ai/candidat";
+import { CategorySchema, InferredBriefSchema, IsoDateSchema, MAX_SUGGESTED_LODGINGS, STOP_KINDS, TimeSchema, type InferredBrief } from "@/contracts";
 
 /**
  * Schémas stricts des sorties de modèles (spécification P0, « Sorties des modèles : schémas stricts »).
@@ -112,6 +112,15 @@ function racine(texte: string, cles: readonly string[]): Record<string, unknown>
   return Object.keys(objet).every((cle) => cles.includes(cle)) ? objet : undefined;
 }
 
+/**
+ * Vrai si la réponse contient un objet JSON dont les clés de racine sont parmi `cles` (B7a, couche IA : une réponse
+ * illisible de la notation ou des raisons donne `model_output_invalid`, 0077 § 2 point 4). `lireNotes` et `lireRaisons`
+ * gardent leur forme de P0 (aucun drapeau `illisible`) ; la couche IA demande la lisibilité ici.
+ */
+export function racineLisible(texte: string, cles: readonly string[]): boolean {
+  return racine(texte, cles) !== undefined;
+}
+
 // --- Plan de recherche -------------------------------------------------------
 
 export const RequetePlanSchema = z.strictObject({
@@ -208,4 +217,59 @@ export function lireRaisons(
     else raisons.set(id, { raison, detour });
   }
   return { valeur: raisons, refuses: ecartes };
+}
+
+// --- Structuration du brief (B7-PO-2) -----------------------------------------
+
+/**
+ * Brief déduit : la réponse entière est un `InferredBrief` du contrat, validé par `InferredBriefSchema` (clés fermées,
+ * `inferredFields` égal aux champs présents). Une sortie non conforme est refusée **en entier** (`illisible`, puis
+ * `model_output_invalid`) : aucun brief partiel (F8-PO-17).
+ */
+export function lireBriefDeduit(texte: string): Lecture<InferredBrief | null> {
+  const objet = objetJson(texte);
+  const brief = objet === undefined ? undefined : InferredBriefSchema.safeParse(objet);
+  if (brief === undefined || !brief.success) return { valeur: null, refuses: 1, illisible: true };
+  return { valeur: brief.data, refuses: 0 };
+}
+
+// --- Quartier conseillé (B7-PO-3) ---------------------------------------------
+
+/** Zone proposée par le modèle : textes et valeurs maison (centre et rayon), jamais un identifiant ni une géométrie Google. */
+const ZoneSchema = z.strictObject({
+  nom: texteMaison(LONGUEURS_TEXTE.nom),
+  raison: texteMaison(160),
+  centre: z.strictObject({ lat: z.number().finite().min(-90).max(90), lng: z.number().finite().min(-180).max(180) }),
+  rayonM: z.number().int().min(50).max(20_000),
+});
+export type ZoneProposee = z.infer<typeof ZoneSchema>;
+
+/** Logement proposé : nom et ligne `meta` maison, URL `https:` de la source choisie ; aucun identifiant. */
+const LogementSchema = z.strictObject({
+  nom: texteMaison(LONGUEURS_TEXTE.nom),
+  meta: texteMaison(160),
+  sourceUrl: z
+    .string()
+    .min(1)
+    .max(2048)
+    .refine((valeur) => URL.canParse(valeur) && new URL(valeur).protocol === "https:", "source https: exigée"),
+});
+export type LogementPropose = z.infer<typeof LogementSchema>;
+
+/**
+ * Quartier : `zone` valide exigée, ou « aucune zone » explicite (`"zone": null`, puis aucun logement lu) ; sinon la
+ * réponse entière est refusée (`illisible`). Chaque logement est validé à part : sans source `https:`, ou avec une clé en
+ * trop (un identifiant proposé par le modèle, `lodgingId`, `placeId`…), il est écarté et compté ; au-delà de
+ * `MAX_SUGGESTED_LODGINGS`, les logements sont tronqués et comptés. Le contrôle « URL présente dans les résultats de
+ * l'exécution » et les identifiants sont faits par `src/research` (B7b, `suggererQuartier`).
+ */
+export function lireQuartier(texte: string): Lecture<{ zone: ZoneProposee | null; logements: LogementPropose[] }> {
+  const objet = racine(texte, ["zone", "logements"]);
+  if (objet === undefined || !("zone" in objet)) return { valeur: { zone: null, logements: [] }, refuses: 1, illisible: true };
+  // Aucune zone : aucun logement n'est lu ; ceux qui seraient rendus quand même sont écartés et comptés.
+  if (objet.zone === null) return { valeur: { zone: null, logements: [] }, refuses: Array.isArray(objet.logements) ? objet.logements.length : 0 };
+  const zone = ZoneSchema.safeParse(objet.zone);
+  if (!zone.success) return { valeur: { zone: null, logements: [] }, refuses: 1, illisible: true };
+  const logements = objet.logements === undefined ? { valeur: [], refuses: 0 } : elements(objet.logements, LogementSchema, MAX_SUGGESTED_LODGINGS);
+  return { valeur: { zone: zone.data, logements: logements.valeur }, refuses: logements.refuses };
 }

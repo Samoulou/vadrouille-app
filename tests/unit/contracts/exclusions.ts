@@ -30,6 +30,11 @@ export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "CodeRequest", task: "F8b", reason: "demande de code de connexion (0017 § 2.4), jamais stockée ; reprise par B3" },
   { contract: "CodeVerification", task: "F8b", reason: "vérification du code (0017 § 2.4), jamais stockée ; reprise par B3" },
   { contract: "Session", task: "B3", reason: "session lue par l'interface (0017 § 2.4), complétée par B3" },
+  // F8c (décision 0017 § 2.4) : lancement et écran 5, repris par B9 ; « Contrats à créer » du handover back-end les
+  // attribue à F8c sans ligne au § 5, que le Tech Lead écrit dans une PR de documentation avant de retirer ces entrées.
+  // `CreatedTrip` et `GenerationStatusRequest` (`{ tripId }`) ne sont pas réexportés par l'index (précédent : share.ts).
+  { contract: "TripRequest", task: "B9", reason: "demande de création du voyage (0017 § 2.4), jamais stockée en phase 0 ; reprise par B9" },
+  { contract: "GenerationStatus", task: "B9", reason: "avancement de la génération (0017 § 2.4), simulé en phase 0, complété par B9" },
   // F7a (décision 0016 § 4 et § 6) : contrats de phase 0 de la révision, jamais stockés ; B11 les reprend derrière
   // les Server Actions (`previewReplacement`, `applyPatch`) et en écrit les lignes.
   { contract: "ReplacementRequest", task: "B11", reason: "demande de remplacement (0016 § 4.1), action serveur de B11" },

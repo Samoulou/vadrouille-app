@@ -187,9 +187,9 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
   it("recherche de l'essai : profil de l'essai (12 candidats visés), plafonds de l'agent alignés sur le mode réel (0073 : 40 recherches web), la 41e lève cap_reached sans appel", async () => {
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
-    const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; config: { totalCandidats: number; toursMax: number } };
-    expect(deps.config.totalCandidats).toBe(12);
-    expect(deps.config.toursMax).toBe(6);
+    const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; bornes: { totalCandidats: number; toursMax: number } };
+    expect(deps.bornes.totalCandidats).toBe(12);
+    expect(deps.bornes.toursMax).toBe(6);
     for (let i = 0; i < 40; i += 1) await deps.recherche.rechercher({ requete: "x" });
     await expect(deps.recherche.rechercher({ requete: "x" })).rejects.toMatchObject({ code: "cap_reached" });
     expect(recherche.rechercher).toHaveBeenCalledTimes(40);

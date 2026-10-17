@@ -13,8 +13,10 @@ export const creationRoutes = {
   brief: () => "/voyages/nouveau/brief",
   /** `R3`, écran 3 « Où loger » (décision 0017 § 1, F8-TL-1) : la ville courante est l'état du brouillon, jamais l'adresse. */
   logement: () => "/voyages/nouveau/logement",
-  /** `R-lancer`, étape sans écran qui crée le voyage après la connexion (page livrée par F8c, 404 d'ici là). */
+  /** `R-lancer`, étape sans écran qui crée le voyage après la connexion (F8c). */
   lancer: () => "/voyages/nouveau/lancer",
+  /** `R5`, écran 5 « Propositions prêtes » du voyage créé (F8c), hors du groupe `(creation)` ; identifiant encodé. */
+  preparation: (tripId: string) => `/voyages/${encodeURIComponent(tripId)}/preparation`,
   /** Niveau supérieur de l'écran 1 : « Mes voyages » (F11a, 404 d'ici là). */
   mesVoyages: () => "/voyages",
 } as const;

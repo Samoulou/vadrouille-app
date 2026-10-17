@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "../e2e/carte-helpers";
-import { AUTH_CONFIG, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor } from "../e2e/connexion-helpers";
+import { AUTH_CONFIG, MOCK_CODE, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor, uniqueEmail } from "../e2e/connexion-helpers";
 import { EDIMBOURG, R1, R3_DEV, STORY, continueButton, fillTrip, installClock, reachAfterBrief, reachBrief, reachReview } from "../e2e/creation-helpers";
 import { useScope } from "../e2e/debloquer-helpers";
+import { R5, STEP_MS, advance, alertRegion, counter, launchFromCreation, leaveLodging } from "../e2e/preparation-helpers";
 
 /**
  * Captures des écrans 1 et 2 de la création en 390 × 844 (références de la CI, décision 0004), mêmes états que
@@ -111,6 +112,9 @@ test("logement: carte simulée (R3-dev)", async ({ page }) => {
 test("logement: aucun quartier", async ({ page }) => {
   await reachAfterBrief(page, { ...EDIMBOURG, destination: "Glasgow" });
   await expect(page.getByText("Aucun quartier à te proposer pour l'instant.")).toBeVisible();
+  // État stable avant la capture : sortie visible, squelette du chargement retiré (revue de F8c).
+  await expect(page.getByRole("button", { name: "Continuer sans logement", exact: true })).toBeVisible();
+  await expect(page.locator("[data-part='squelette']")).toHaveCount(0);
   await capture(page, "logement-aucun-quartier.png");
 });
 
@@ -155,4 +159,58 @@ test("connexion: trop d'essais", async ({ page, context, baseURL }) => {
   }
   await expect(codeAlert(page)).toHaveText(/^Trop d'essais/);
   await capture(page, "connexion-trop-d-essais.png");
+});
+
+// F8c : écran 5 (en préparation, prêt, incomplet, erreur) et bandeaux de `R-lancer` (non maquettés, F8-Q1, 0018 § 18 et § 19).
+
+test("preparation: en préparation", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await launchFromCreation(page);
+  await advance(page, scope, 5 * STEP_MS, async (p) => expect(counter(p)).toHaveText("5 propositions prêtes sur 8", { timeout: 1000 }));
+  await capture(page, "preparation-en-cours.png");
+});
+
+test("preparation: prêt", async ({ page }) => {
+  await page.goto(R5);
+  await expect(page.getByRole("link", { name: "Voir mes propositions" })).toBeVisible();
+  await capture(page, "preparation-pret.png");
+});
+
+test("preparation: aperçu incomplet", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await scope.control({ action: "configureGeneration", outcome: "incomplete" });
+  await launchFromCreation(page);
+  const banner = (p: Page) => p.getByText("2 propositions n'ont pas trouvé de lieu compatible.");
+  await advance(page, scope, 8 * STEP_MS, async (p) => expect(banner(p)).toBeVisible({ timeout: 1000 }));
+  await capture(page, "preparation-incomplet.png");
+});
+
+test("preparation: erreur", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await scope.control({ action: "configureGeneration", outcome: "failed" });
+  await launchFromCreation(page);
+  const retry = (p: Page) => alertRegion(p).getByRole("button", { name: "Réessayer" });
+  await advance(page, scope, 3 * STEP_MS, async (p) => expect(retry(p)).toBeVisible({ timeout: 1000 }));
+  await capture(page, "preparation-erreur.png");
+});
+
+test("lancement: aperçu déjà en préparation", async ({ page, context, baseURL }) => {
+  await useScope(context, baseURL!);
+  await launchFromCreation(page);
+  await reachAfterBrief(page);
+  await leaveLodging(page);
+  await expect(page.getByRole("link", { name: "Voir ces propositions" })).toBeVisible();
+  await capture(page, "lancement-conflit.png");
+});
+
+test("lancement: erreur", async ({ page, context, baseURL }) => {
+  // Horloge de la portée au-delà de l'arrivée (29 août) : `createTrip` refuse le brouillon, bandeau « error ».
+  const scope = await useScope(context, baseURL!);
+  for (let week = 0; week < 5; week += 1) await scope.control({ action: "advanceClock", ms: 7 * 86_400_000 });
+  await reachAfterBrief(page);
+  await leaveLodging(page);
+  await requestCodeFor(page, uniqueEmail());
+  await pasteCode(page, MOCK_CODE);
+  await expect(page.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  await capture(page, "lancement-erreur.png");
 });

@@ -2,14 +2,16 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { blockGoogle } from "./carte-helpers";
-import { AUTH_CONFIG, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor, uniqueEmail } from "./connexion-helpers";
+import { AUTH_CONFIG, MOCK_CODE, MOCK_WRONG_CODE, codeAlert, connexionRoute, emailField, pasteCode, requestCodeFor, uniqueEmail } from "./connexion-helpers";
 import { EDIMBOURG, R1, R3, R3_DEV, continueButton, fillTrip, installClock, reachAfterBrief, reachBrief, reachReview } from "./creation-helpers";
-import { expectPath } from "./debloquer-helpers";
+import { expectPath, useScope } from "./debloquer-helpers";
+import { R5, STEP_MS, advance, alertRegion, counter, launchFromCreation, leaveLodging } from "./preparation-helpers";
 
 /**
  * Axe (WCAG 2.2 AA), cibles de 44 × 44 px, contour de focus et titre de niveau 1 unique sur chaque état des
  * écrans 1 et 2 (spécification F8, « Tests » ; critères transverses) : écran 1 vide, avec erreurs, avec une ville
- * et un engagement ; écran 2 récit, vérification avec champs déduits, sections repliées.
+ * et un engagement ; écran 2 récit, vérification avec champs déduits, sections repliées ; F8c : écran 5 en
+ * préparation, prêt, incomplet et en erreur, bandeaux « conflict » et « error » de `R-lancer`.
  */
 
 async function expectAccessible(page: Page) {
@@ -182,5 +184,57 @@ test("connexion: aucune violation axe, trop d'essais", async ({ page }) => {
     await expect(codeAlert(page)).not.toHaveText("");
   }
   await expect(codeAlert(page)).toHaveText(/^Trop d'essais/);
+  await expectAccessible(page);
+});
+
+test("preparation: aucune violation axe, en préparation", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await launchFromCreation(page);
+  await advance(page, scope, 5 * STEP_MS, async (p) => expect(counter(p)).toHaveText("5 propositions prêtes sur 8", { timeout: 1000 }));
+  await expectAccessible(page);
+});
+
+test("preparation: aucune violation axe, prêt", async ({ page }) => {
+  await page.goto(R5);
+  await expect(page.getByRole("link", { name: "Voir mes propositions" })).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("preparation: aucune violation axe, aperçu incomplet", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await scope.control({ action: "configureGeneration", outcome: "incomplete" });
+  await launchFromCreation(page);
+  const banner = (p: Page) => p.getByText("2 propositions n'ont pas trouvé de lieu compatible.");
+  await advance(page, scope, 8 * STEP_MS, async (p) => expect(banner(p)).toBeVisible({ timeout: 1000 }));
+  await expectAccessible(page);
+});
+
+test("preparation: aucune violation axe, erreur", async ({ page, context, baseURL }) => {
+  const scope = await useScope(context, baseURL!);
+  await scope.control({ action: "configureGeneration", outcome: "failed" });
+  await launchFromCreation(page);
+  const retry = (p: Page) => alertRegion(p).getByRole("button", { name: "Réessayer" });
+  await advance(page, scope, 3 * STEP_MS, async (p) => expect(retry(p)).toBeVisible({ timeout: 1000 }));
+  await expectAccessible(page);
+});
+
+test("lancement: aucune violation axe, aperçu déjà en préparation", async ({ page, context, baseURL }) => {
+  await useScope(context, baseURL!);
+  await launchFromCreation(page);
+  await reachAfterBrief(page);
+  await leaveLodging(page);
+  await expect(page.getByRole("link", { name: "Voir ces propositions" })).toBeVisible();
+  await expectAccessible(page);
+});
+
+test("lancement: aucune violation axe, erreur", async ({ page, context, baseURL }) => {
+  // Horloge de la portée au-delà de l'arrivée (29 août) : `createTrip` refuse le brouillon, bandeau « error ».
+  const scope = await useScope(context, baseURL!);
+  for (let week = 0; week < 5; week += 1) await scope.control({ action: "advanceClock", ms: 7 * 86_400_000 });
+  await reachAfterBrief(page);
+  await leaveLodging(page);
+  await requestCodeFor(page, uniqueEmail());
+  await pasteCode(page, MOCK_CODE);
+  await expect(page.getByRole("button", { name: "Réessayer" })).toBeVisible();
   await expectAccessible(page);
 });

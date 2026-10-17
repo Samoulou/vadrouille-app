@@ -1,3 +1,4 @@
+import { complementP0, listeBlanche } from "./ia-recherche-imports.mjs";
 import noHardcodedColors from "./no-hardcoded-colors.mjs";
 import noP0ServerModules from "./no-p0-server-modules.mjs";
 import requireServerOnly from "./require-server-only.mjs";
@@ -18,6 +19,8 @@ const plugin = {
     "no-service-worker-register": noServiceWorkerRegister,
     "no-cache-storage-open": noCacheStorageOpen,
     "workflow-directives": workflowDirectives,
+    "ia-recherche-liste-blanche": listeBlanche,
+    "complement-p0-imports": complementP0,
   },
 };
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
 /**
  * Double de la recherche web sur fixtures fabriquées à la main (`prototype/fixtures/recherche/`) : chaque requête

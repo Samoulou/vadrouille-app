@@ -1,29 +1,28 @@
-# État du studio — 2026-10-16 (84e cycle)
+# État du studio — 2026-10-17 (88e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle.
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 4 sur 20).
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle, 2026-10-16 : 06:58 UTC « prêt à tout faire aujourd'hui » ; 07:09–07:12 UTC relevé S7 dans la console Neon (captures, fenêtre de restauration 6 h) → Q456 close ; 07:25 UTC « test fait » (commit `2eb88f7` sur #381, posé par sa session Claude) → Q457 close ; 08:45 UTC limites de dépense posées → Q325 close ; 08:49 UTC `owner-approved` sur #381 ; 08:58 UTC accord écrit « j'autorise le premier essaie réel » (0055:146) ; 09:02 UTC rapport du premier essai réel (Q460).
+- Aucun nouveau message depuis le 87e cycle (fil du cycle ni #studio).
 
 ## Fait
-- Condition 3 de 0056 § 4.1 remplie (Sécurité, #374 c6210191396).
-- #381 (A17, migration 0006) : CI verte, revue Tech Lead et Sécurité approuvée sans bloquant, signalement dans #studio, `owner-approved`, **fusionnée** (08:50 UTC).
-- A18 : `db-migrate` run 38876502011 (08:51 UTC), 0006 appliquée, empreinte conforme ; `p0-purge` non relancé (dernier succès 04:32 UTC, moins de 12 h).
-- A19 : `db-releve` run 38876787144 (08:54 UTC), verdict favorable (#374 c6211870156) : `EXECUTE` à `vadrouille_prototype` seul.
-- A20 : liste « tout est vert » envoyée ; accord écrit de Samuel reçu (08:58 UTC).
-- **Premier essai réel lancé par Samuel** (~09:00 UTC, `p0-reel` `d61e9fa`) : arrêté, `pipeline_failed`, A1 à A6 non, modèle appelé, aucun appel Google (Q460).
+- Fusionnées : statut du 87e cycle (#431), **spécification B9** (#429, après un bloquant tardif non compté), **B7a** (#424, couche IA de production, fusionnée à 06:23 UTC après la fin du veto de 0080).
+- **F8c** (#432) : corrections 1 et 2 faites (`activeTripId` dans `ApiError`, références visuelles, textes provisoires consignés dans la spec F8) ; il restait un bloquant de rédaction : troisième tentative bornée (Q470), documentation seulement, poussée.
 
 ## En cours
-- ia-recherche : diagnostic en lecture seule de l'arrêt du premier essai (`/mnt/project-files/essai-reel/diagnostic-essai-1.md`) ; aucun nouvel essai avant correctif.
+- tech-lead : **décision 0081** (#434, ticket #433, B9-TL-1 à B9-TL-14) ; correction 1 (comptée) poussée, en revue.
+- backend : **B3b** (ticket #435), envoi du code de connexion par e-mail vers Mailpit seulement.
+- frontend : F8c (#432), revue de la troisième tentative bornée après CI verte.
+- En attente de Samuel : release `main` → `p0-reel` (#422, carte et temps de trajet) après son accord écrit sur #419.
 
 ## Bloqué
-- **Deuxième essai réel** : cause de `pipeline_failed` (Q460), correctif, puis mise à jour de `p0-reel` si le code change.
-- **B8c** : Q445. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : Q401. **Code de B4** : Q351, Q352, Q364.
+- **B8c** : pas dans le même cycle que B3b. **B7c** : B9-TL-4 (#434) puis 6 h de veto. **B8a** : B7c. **B4a** : B3b, Q352, Sécurité sur B4-TL-3 et B4-TL-6. **B6a** : B3b. **B3c** : B3b.
+- **B9** : B9b après 0081 (et sa PR de contrat) ; PR de moteur de B9-TL-13 avant B9c ; B9e : Q465 (plafonds), Q467 ; B9c réel : Q468.
 
 ## Prochain cycle
-1. Seulement le chemin de l'essai réel : correctif de la cause de `pipeline_failed`, puis relance par Samuel seul.
-2. Purge : la surveiller (seuil de 18 h entre deux succès, sinon reverrouillage § 4.6).
-3. Ticket P0r4 à ouvrir avant P0a2 ; mineurs 12 et 13 de #384, mineurs de #383 et #381 (ligne « Brouillon » de la description, test D15 point 6) dans un chore.
+1. Suivre F8c, 0081 et B3b jusqu'à la fusion ; après 0081 : ticket B7c, ticket de la PR de moteur (B9-TL-13), puis B9b.
+2. B8c au cycle suivant celui de B3b.
+3. Tickets : page de jugement de P0r4 et son e2e ; refus de lancement si la purge a plus de 24 h ; nombre d'appels Google dans le rapport d'essai ; adaptateur Resend. Cartes à Samuel : Q354, puis Q39/Q465.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : aucune pour l'instant (Q325, Q456 et Q457 closes).
@@ -45,7 +44,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q460.
+- Q470, Q471.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).

@@ -126,6 +126,11 @@ export interface DraftState {
   noticeVisible: boolean;
   /** Compteur des clés de villes et d'engagements. */
   serial: number;
+  /**
+   * Clé d'idempotence du lancement (`R-lancer`, décision 0017 § 5) : créée au premier lancement, réutilisée par tout
+   * lancement suivant du même brouillon (double appui, « Réessayer », retour du navigateur) ; `null` avant.
+   */
+  requestId: string | null;
 }
 
 const emptyLodging = (): LodgingForm => ({ answer: null, label: "" });
@@ -157,6 +162,7 @@ export function initialDraft(): DraftState {
     lostNotice: false,
     noticeVisible: false,
     serial: 0,
+    requestId: null,
   };
 }
 
@@ -285,7 +291,8 @@ export type DraftAction =
   | { type: "mealBudget"; value: string }
   | { type: "briefReady" }
   | { type: "lodgingCity"; city: number | null }
-  | { type: "lodgingChoice"; city: number; choice: LodgingChoice; next: number | null };
+  | { type: "lodgingChoice"; city: number; choice: LodgingChoice; next: number | null }
+  | { type: "requestId"; requestId: string };
 
 function touch(brief: BriefForm, field: BriefField): BriefForm {
   return {
@@ -381,6 +388,9 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
       return { ...state, briefReady: true };
     case "lodgingCity":
       return { ...state, lodgingCity: action.city };
+    case "requestId":
+      // Une seule clé par brouillon : la première est gardée.
+      return state.requestId === null ? { ...state, requestId: action.requestId } : state;
     case "lodgingChoice": {
       const key = cityKey(state.trip, action.city);
       if (key === undefined) return state;
@@ -392,6 +402,18 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
       };
     }
   }
+}
+
+/**
+ * Brouillon complet pour le lancement (garde de `R-lancer`, F8-PO-2) : écrans 1 et 2 validés, et un choix de l'écran 3
+ * pour chaque ville « Pas encore ». Un rechargement perd le brouillon : ce n'est alors jamais le cas.
+ */
+export function draftComplete(state: DraftState): boolean {
+  if (!state.tripReady || !state.briefReady) return false;
+  return pendingLodgingCities(state.trip).every((city) => {
+    const key = cityKey(state.trip, city);
+    return key !== undefined && state.lodgingChoices[key] !== undefined;
+  });
 }
 
 function lodgingForm(lodging: Lodging): LodgingForm {
