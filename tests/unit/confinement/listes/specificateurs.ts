@@ -86,7 +86,9 @@ export const SPECIFICATEURS = [
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
   // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
-  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts"] },
+  // B8c (ticket 438) : `tests/unit/lint/positions-imports.test.ts` applique les règles d'import de 0060 § 1.4 sur l'arbre
+  // syntaxique, comme `imports.test.ts`. Verdict Sécurité à rendre.
+  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts", "tests/unit/lint/positions-imports.test.ts"] },
 ] as const satisfies readonly LigneSpecificateur[];
 
 const CHARGEUR =
@@ -136,6 +138,15 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/grounding` de `p0Run`, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-2 (ticket 316), décision 0055, section 6 ; verdict Sécurité : approuvé sur le head `bc0ff4c` (PR 323)",
   })),
+  // B8c (ticket 438) : port du cache de positions (décision 0060 § 1.1), déclarations de type seules. Verdict Sécurité à rendre.
+  {
+    fichier: "src/grounding/port-positions.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du port `PortPositions` de `src/grounding` (types seuls), exigé par `ligne/require-server-only` ; " +
+      "B8c (ticket 438), décision 0060 § 1.1 ; verdict Sécurité à rendre",
+  },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },

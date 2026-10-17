@@ -57,6 +57,13 @@
       "when": 1792149798743,
       "tag": "0007_essais_sans_limite",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792228510870,
+      "tag": "0008_positions_mvp_29_jours",
+      "breakpoints": true
     }
   ]
 }

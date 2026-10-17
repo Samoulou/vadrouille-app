@@ -32,6 +32,8 @@ function run(extra: Record<string, string | undefined>) {
     // P0r2 (décision 0046) : connexions des rôles du prototype, posées par `scripts/ci/db-setup.sh`.
     VADROUILLE_DB_PROTOTYPE_URL: UNREACHABLE,
     VADROUILLE_DB_PROTOTYPE_PURGE_URL: UNREACHABLE,
+    // B8c (décision 0060 § 4) : connexion du rôle de purge du MVP.
+    VADROUILLE_DB_COORDS_PURGE_URL: UNREACHABLE,
     ...extra,
   });
   const result = spawnSync("node", ["scripts/test-db.mjs"], { env: env as NodeJS.ProcessEnv, encoding: "utf8", timeout: 90_000 });
