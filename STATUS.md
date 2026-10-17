@@ -1,28 +1,31 @@
-# État du studio — 2026-10-17 (90e cycle)
+# État du studio — 2026-10-17 (91e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 6 sur 20).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 7 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié au 90e cycle, de nouveau à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Fil du cycle : `owner-approved` posé par Samuel sur #442 (B8c), 11:33 UTC.
-- #studio : aucun nouveau message depuis le 89e cycle.
+- Fil du cycle, 14:46 UTC : « État ? Plus de dashboard après les cycles ? » ; le tableau de bord, arrêté au 84e cycle, est republié (cycle 90) et sera remis à jour à la fin de chaque cycle.
+- #studio : aucun nouveau message depuis le 90e cycle.
 
 ## Fait
-- Fusionnées : statut du 89e cycle (#443), **B8c** (#442 : port du cache de positions, migration 0008 à 29 jours, rôle et workflow `coords-purge.yml`, approuvée par le Tech Lead et la Sécurité ; purge pas encore activée, Q438), **amendement 1 de la spec B9** (#441 : reprise d'un voyage complet échoué, au plus 3 reprises ; refus des voyages à plusieurs fuseaux ; deux corrections).
-- Q476 13 (c) tranchée par le CEO : la tâche frontend de l'amendement 1 part après la PR de contrat qui fixe la source d'état des bandeaux.
+- Fusionnées : statut du 90e cycle (#445), **B3b de B3** (#446 : Better Auth 1.7.7, organisations, `withOrg`, contexte de requête ; décision 0082 du Tech Lead). Ticket #444 fermé.
+- Veto de 0081 terminé (15:48 UTC) : les sous-tâches de B9 peuvent l'appliquer.
 
 ## En cours
-- backend : **B3b de B3** (ticket #444 : Better Auth 1.7.7, organisations, `withOrg`, contexte de requête), branche `claude/444-b3b-better-auth`.
+- backend : **B3c de B3** (ticket #447 : adaptateur `better-auth` et branchement), branche `claude/447-b3c-branchement`.
+- backend : **PR de moteur B9-TL-13** (ticket #448 : entrée `jours` de `generer`), branche `claude/448-moteur-jours`.
+- ia-recherche (avec data) : **B7c** (ticket #449 : `usage_ledger`, plafonds en valeurs de test, organisation « actions sans compte », `evals/` simulé ; migration 0010, seule migration du cycle selon 0059 § 4), branche `claude/449-b7c-registre`.
 
 ## Bloqué
-- **B3c**, **B6a**, **B4a** : B3b (#444). **B3b-envoi, suite** (#435) : B3b et P5 de la Sécurité pour `SMTP_URL`.
-- **B7c** et **PR de moteur (B9-TL-13)** : fin du veto de 0081 (15:48 UTC) ; B7c ajoute une migration : jamais dans le même cycle qu'une autre PR qui en ajoute (0059 § 4), donc après B3b ou avec une numérotation fixée par le CEO. **B8a** : B7c. **B8b** : B8a.
-- **B9** : B9b après sa PR de contrat (Q476 14 (a), (d)) ; B9e : Q465, Q467 ; B9c réel : Q468.
+- **B6a**, **B4a** : B3c (#447). **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
+- **B8a** : B7c (#449). **B8b** : B8a.
+- **B9** : B9b après sa PR de contrat (B9-TL-14) et B6a ; B9c après la PR de moteur (#448) ; B9e : Q465, Q467 ; B9c réel : Q468.
 - **Activation de la purge du MVP** (`coords-purge`) : Q438 (Samuel).
+- **Migrations 0008 et 0009 sur la vraie base** : `MIGRATIONS_APPROUVEES` de `db-migrate.yml` ne les liste pas ; une PR de workflow avec `owner-approved` de Samuel sera nécessaire.
 
 ## Prochain cycle
-1. Suivre B3b (#444) : revue, puis `owner-approved` de Samuel si la PR touche `.github/`.
-2. Après 15:48 UTC : ticket PR de moteur (B9-TL-13, `jours` dans `generer`) ; B7c dès que la règle des migrations le permet ; puis B9b et sa PR de contrat.
-3. Tickets à placer : page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré » dans « Mes voyages », mineurs de B8c et erratum de 0060 (Q477). Carte à Samuel : Q39/Q465.
+1. Suivre B3c (#447), la PR de moteur (#448) et B7c (#449) : CI, revue, `owner-approved` si `.github/` est touché.
+2. PR de contrat de B9b (B9-TL-14) au premier fil libre ; puis B6a après B3c.
+3. Tickets à placer : page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré » dans « Mes voyages », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier` avant de lever B3-TL-2, note de version listant 0082. Carte à Samuel : Q39/Q465.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : aucune pour l'instant (Q325, Q456 et Q457 closes).
