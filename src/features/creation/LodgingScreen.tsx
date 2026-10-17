@@ -224,6 +224,7 @@ function Suggestion({ suggestion, onChoose }: { suggestion: LodgingSuggestion; o
                       kind: "suggestedLodging",
                       lodgingId: lodging.lodgingId,
                       ...(lodging.placeId ? { placeId: lodging.placeId } : {}),
+                      name: lodging.name,
                     })
                   }
                 >
@@ -234,7 +235,12 @@ function Suggestion({ suggestion, onChoose }: { suggestion: LodgingSuggestion; o
           </ul>
         </section>
       ) : null}
-      <Button className="mt-8 w-full" onClick={() => onChoose({ kind: "suggestedArea", areaId: area.areaId })}>
+      <Button
+        className="mt-8 w-full"
+        onClick={() =>
+          onChoose({ kind: "suggestedArea", areaId: area.areaId, name: area.name, center: area.center, radiusM: area.radiusM })
+        }
+      >
         {t.partirDuQuartier}
       </Button>
     </>
