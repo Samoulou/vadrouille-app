@@ -31,6 +31,13 @@ export type LigneSpecificateurNominative = {
 
 const NEUTRES_SAUF = ["@src-non-test", "@sensible"] as const;
 
+/**
+ * B3b (ticket 444 ; spécification B3, B3b ; décisions 0007 et 0008) : requêtes paramétrées (`sql`) de la création de
+ * compte, de l'organisation personnelle, du verrou et de la purge bornée, de `withOrg` ; `drizzle-orm/node-postgres`
+ * (`drizzle.mock`, sans connexion) dans le test des exports. Verdict Sécurité à rendre dans la PR de B3b.
+ */
+const ZONES_DRIZZLE_B3B = ["src/tenancy/**", "src/server/auth/**", "src/server/with-org.ts", "tests/db/with-org.test.ts", "tests/unit/auth/operations.test.ts"];
+
 export const SPECIFICATEURS = [
   { specificateur: "react", zones: ["src/**", "tests/unit/**"] },
   { specificateur: "react-dom", zones: ["src/**", "tests/unit/**"] },
@@ -66,11 +73,21 @@ export const SPECIFICATEURS = [
   { specificateur: "node:util", zones: ["scripts/p0/**"] },
   // B1 (PR 188, décisions 0006 et 0036 ; spécification P0c, section 9) : paquets sans capacité du socle base de
   // données. `pg` est un module à capacité : lignes nominatives de `listes/capacites.ts`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
-  { specificateur: "server-only", zones: ["db/**", "src/server/**"] },
-  { specificateur: "drizzle-orm", zones: ["db/**"] },
+  { specificateur: "server-only", zones: ["db/**", "src/server/**", "src/tenancy/**"] },
+  { specificateur: "drizzle-orm", zones: ["db/**", ...ZONES_DRIZZLE_B3B] },
   // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : analyseur de chaînes de
   // connexion de `pg` (même version), pour le refus de tout hôte non local de `db/migrate.ts` (0056 § 2.8). Sans capacité.
   { specificateur: "pg-connection-string", zones: ["db/migrate.ts"] },
+  // B3b (ticket 444 ; spécification B3, B3b point 4 ; décision 0008) : `better-auth` 1.7.7, sous-chemins exacts, dans
+  // `src/tenancy/` seulement (`src/server/auth/` n'importe que `@/tenancy/auth` ; même confinement tenu par
+  // `ligne/better-auth-confinement`). `node:async_hooks` : contexte d'appel (`AsyncLocalStorage`) de l'adresse du code
+  // et de l'état d'envoi, sans capacité. Verdict Sécurité à rendre dans la PR de B3b.
+  { specificateur: "better-auth", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  { specificateur: "better-auth/adapters/drizzle", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  { specificateur: "better-auth/next-js", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins/organization/access", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  { specificateur: "node:async_hooks", zones: ["src/tenancy/code-otp.ts", "src/server/auth/index.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
   // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.

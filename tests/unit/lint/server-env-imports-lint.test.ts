@@ -30,6 +30,8 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     // B3a (décision 0050, B3-TL-1 point 1) : index, resolve, payment.
     ["src/instrumentation.ts", "@/server/env"],
     ["src/server/rate-limit.ts", "@/server/env"],
+    // B3b (décision 0077 § 5.1) : opérations de connexion.
+    ["src/server/auth/index.ts", "@/server/env"],
     ["tests/unit/server/env.test.ts", "@/server/env"],
     ["tests/unit/server/env.test.ts", "@/server/env/resolve"],
     ["db/connection.ts", "../src/server/env/resolve.ts"],

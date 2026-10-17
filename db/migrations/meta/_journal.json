@@ -64,6 +64,13 @@
       "when": 1792228510870,
       "tag": "0008_positions_mvp_29_jours",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792240760476,
+      "tag": "0009_verifications_updated_at",
+      "breakpoints": true
     }
   ]
 }

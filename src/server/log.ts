@@ -31,6 +31,15 @@ export const LOG_EVENTS = [
   "p0.research_done",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
+  // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
+  // l'implémentation désactivée du port, journal de Better Auth (niveau seulement, jamais le message ni ses
+  // arguments), échec d'une opération de la liste blanche et de la purge technique (`action` et `errorName`
+  // seulement). Aucune valeur : ni adresse, ni code, ni jeton, ni adresse IP.
+  "email.address_refused",
+  "email.transport_disabled",
+  "auth.library_log",
+  "auth.operation_failed",
+  "auth.purge_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -97,6 +106,11 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     TRUSTED_IP_HEADER: 0,
     RATE_LIMIT_HMAC_SECRET: 0,
     BETTER_AUTH_SECRET: 0,
+    BETTER_AUTH_URL: 0,
+    APP_URL: 0,
+    VADROUILLE_DATABASE_URL_AUTH: 0,
+    EMAIL_TRANSPORT: 0,
+    SMTP_URL: 0,
     SIMULATED_WEBHOOK_SECRET: 0,
     SIMULATED_WEBHOOK_ENABLED: 0,
     VADROUILLE_DATABASE_URL_MIGRATOR: 0,

@@ -79,6 +79,15 @@ const PAQUETS_TS = [
       "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, aucun script d'installation, hors de `onlyBuiltDependencies`) ; " +
       "spécificateurs réduits à deux sous-chemins exacts (bloquant 1 de cette revue)",
   },
+  {
+    paquet: "better-auth",
+    usage:
+      "connexion par code et organisations (B3b, décision 0008) : `src/tenancy/` seulement, sous-chemins exacts ; aucune route HTTP, " +
+      "opérations de la liste blanche appelées depuis `src/server/auth/` (`ligne/better-auth-confinement`)",
+    verdict:
+      "B3b (ticket 444) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 1.7.7, aucun paquet ajouté à " +
+      "`onlyBuiltDependencies`, scripts d'installation ignorés inchangés",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];
