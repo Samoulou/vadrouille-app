@@ -105,7 +105,8 @@ export function creneauDe(typeEtape: CandidatRecherche["typeEtape"]): TypeCrenea
   return "activity";
 }
 
-function cle(nom: string): string {
+/** Clé de comparaison d'un nom (doublons de l'agent, mesures de `evals/`) : minuscules, sans accents ni ponctuation. */
+export function cleDeNom(nom: string): string {
   return nom
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -392,7 +393,7 @@ export async function chercherCandidats(
       compteurs.candidatsRefuses.source_not_in_results += 1;
       return;
     }
-    const k = cle(extrait.nom);
+    const k = cleDeNom(extrait.nom);
     if (cles.has(k)) {
       compteurs.candidatsRefuses.duplicate += 1;
       return;

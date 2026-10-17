@@ -17,15 +17,20 @@ import {
   ORGANISATION_ACTIONS_SANS_COMPTE,
   reserverAction,
   reserverForfait,
+  type ExecuteurUsage,
   type ReglesUsage,
+  type TransactionOrganisation,
 } from "@/server/usage/reservation";
+import { creerWithOrg, executeurSql } from "@/server/with-org";
 
+import { createDatabase } from "../../db/index";
 import { PLAFONDS_USAGE_TEST } from "../support/plafonds-usage";
 import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, inTx, type Org } from "./helpers";
 
 /**
- * Consommation du MVP au forfait (spécification B7, B7c ; B7-TL-9 ; décision 0081, B9-TL-4 ; migration
- * 0010_usage_forfait). Remplace les deux gardes de P0r2 (0046 D13 point 7), levées par la migration avec le verdict de
+ * Consommation du MVP au forfait (spécification B7, B7c ; décision 0083 ; décision 0081, B9-TL-4 ; migration
+ * 0010_usage_forfait). Les générations et relectures passent par le vrai `withOrg` (`creerWithOrg`, 0083 § 2) ; les
+ * actions sans compte par le pool brut du rôle `vadrouille_app`. Remplace les deux gardes de P0r2 (0046 D13 point 7), levées par la migration avec le verdict de
  * la Sécurité. Les plafonds sont des **valeurs de test** ; les limites globales sont posées par rapport aux sommes déjà
  * présentes dans la base de test (partagée entre fichiers).
  */
@@ -33,25 +38,44 @@ import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, in
 const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 const TABLE = TablePrixGoogleSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/prix-google.json"), "utf8")));
 
+const base = createDatabase("vadrouille_app");
+const withOrgTest = creerWithOrg(base);
 let app: DbClient;
-let app2: DbClient;
 let auth: DbClient;
 let admin: DbClient;
 let a: Org;
-let b: Org;
 
 beforeAll(async () => {
   app = await connect("app");
-  app2 = await connect("app");
   auth = await connect("auth");
   admin = await connect("admin");
   a = await createOrg(auth);
-  b = await createOrg(auth);
 });
 
-afterAll(closeAll);
+afterAll(async () => {
+  await base.$client.end();
+  await closeAll();
+});
 
-/** Pool du port sur une connexion `vadrouille_app` déjà ouverte (le module n'importe pas `pg`). */
+/**
+ * Transaction d'une génération, comme la composera B9 : `withOrg` avec l'organisation et l'utilisateur de la
+ * génération, exécuteur `executeurSql` (0083 § 2) ; `compteur` compte les requêtes du module.
+ */
+function transactionDe(organisation: Pick<Org, "org" | "owner">, compteur?: { requetes: number }): TransactionOrganisation {
+  return (fn) =>
+    withOrgTest({ organizationId: organisation.org, userId: organisation.owner }, (tx) => {
+      const executeur = executeurSql(tx);
+      const compte: ExecuteurUsage = {
+        query: (texte, valeurs) => {
+          if (compteur) compteur.requetes += 1;
+          return executeur.query(texte, valeurs);
+        },
+      };
+      return fn(compte);
+    });
+}
+
+/** Pool brut des actions sans compte sur une connexion `vadrouille_app` déjà ouverte (le module n'importe pas `pg`). */
 function poolDe(client: DbClient, compteur?: { requetes: number }): PoolSql {
   return {
     async connect() {
@@ -98,11 +122,11 @@ const nombreDeLignes = async () => Number((await admin.query("SELECT count(*) AS
 
 describe("usage: une ligne par forfait, jamais par appel (B7-TL-9 ; 0046 D13 point 7)", () => {
   /** Génération simulée : N fiches, M matrices Routes, K lots de notation, par le registre de P0r2. */
-  async function generation(org: string, appels: { details: number; routes: number; lots: number }) {
+  async function generation(organisation: Org, appels: { details: number; routes: number; lots: number }) {
     const trip = randomUUID();
     const run = randomUUID();
     const compteur = { requetes: 0 };
-    const reservation = await reserverForfait(poolDe(app, compteur), { organisationId: org, tripId: trip, generationRunId: run, profil: "apercu" }, regles());
+    const reservation = await reserverForfait(transactionDe(organisation, compteur), { organisationId: organisation.org, tripId: trip, generationRunId: run, profil: "apercu" }, regles());
     if (!reservation.ok) throw new Error(reservation.code);
     const requetesReservation = compteur.requetes;
     const registre = creerRegistreForfait(reservation.forfait, reservation.executionId, horlogeSysteme);
@@ -131,8 +155,8 @@ describe("usage: une ligne par forfait, jamais par appel (B7-TL-9 ; 0046 D13 poi
   }
 
   it("usage: une ligne par forfait, jamais par appel", async () => {
-    const premiere = await generation(a.org, { details: 3, routes: 2, lots: 4 });
-    const seconde = await generation(a.org, { details: 9, routes: 1, lots: 0 });
+    const premiere = await generation(a, { details: 3, routes: 2, lots: 4 });
+    const seconde = await generation(a, { details: 9, routes: 1, lots: 0 });
     const l1 = await lignesDe(a.org, premiere.run);
     const l2 = await lignesDe(a.org, seconde.run);
     const attendues = lignesDuForfait(TABLE, PLAFONDS_USAGE_TEST.skus, PLAFONDS_USAGE_TEST.skus.modeles, premiere.forfait);
@@ -176,7 +200,8 @@ describe("usage: une ligne par forfait, jamais par appel (B7-TL-9 ; 0046 D13 poi
 
 describe("usage: plafonds appliqués à la réservation, avant tout appel", () => {
   it("usage: plafond atteint, aucun appel (par organisation et par jour, par mois et par fournisseur, enveloppe, quota du jour)", async () => {
-    const org = (await createOrg(auth)).org;
+    const organisation = await createOrg(auth);
+    const org = organisation.org;
     const t = await totaux(org);
     const forfait = forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "apercu");
     const modeles = forfait.coutModelesMicros ?? 0;
@@ -190,22 +215,24 @@ describe("usage: plafonds appliqués à la réservation, avant tout appel", () =
     ];
     const avant = await nombreDeLignes();
     for (const [nom, plafonds, code] of cas) {
-      const resultat = await reserverForfait(poolDe(app), { organisationId: org, tripId: null, generationRunId: randomUUID(), profil: "apercu" }, regles(plafonds));
+      const resultat = await reserverForfait(transactionDe(organisation), { organisationId: org, tripId: null, generationRunId: randomUUID(), profil: "apercu" }, regles(plafonds));
       // Refus avant l'appel : aucun forfait rendu, donc aucun registre ni transport ; rien n'est écrit.
       expect(resultat, nom).toEqual({ ok: false, code });
     }
     expect(await nombreDeLignes()).toBe(avant);
     // Avec les plafonds de test, la même réservation passe.
-    expect((await reserverForfait(poolDe(app), { organisationId: org, tripId: null, generationRunId: randomUUID(), profil: "apercu" }, regles())).ok).toBe(true);
+    expect((await reserverForfait(transactionDe(organisation), { organisationId: org, tripId: null, generationRunId: randomUUID(), profil: "apercu" }, regles())).ok).toBe(true);
   });
 
   it("usage: réservation atomique", async () => {
-    const org = (await createOrg(auth)).org;
+    const organisation = await createOrg(auth);
+    const org = organisation.org;
     const forfait = forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "apercu");
     // Le plafond du jour de l'organisation tient un forfait, pas deux.
     const plafonds = { ...PLAFONDS_USAGE_TEST, parOrganisationJourMicros: Math.floor(coutTotalMicros(forfait) * 1.5) };
     const demande = () => ({ organisationId: org, tripId: null, generationRunId: randomUUID(), profil: "apercu" as const });
-    const resultats = await Promise.all([reserverForfait(poolDe(app), demande(), regles(plafonds)), reserverForfait(poolDe(app2), demande(), regles(plafonds))]);
+    // Deux transactions withOrg simultanées, sur deux connexions du pool.
+    const resultats = await Promise.all([reserverForfait(transactionDe(organisation), demande(), regles(plafonds)), reserverForfait(transactionDe(organisation), demande(), regles(plafonds))]);
     expect(resultats.filter((r) => r.ok)).toHaveLength(1);
     expect(resultats.filter((r) => !r.ok)).toEqual([{ ok: false, code: "cap_reached" }]);
     expect((await totaux(org)).org_jour_micros).toBe(coutTotalMicros(forfait));
@@ -214,15 +241,25 @@ describe("usage: plafonds appliqués à la réservation, avant tout appel", () =
 
 describe("usage: écritures isolées par organisation", () => {
   it("usage: écritures isolées par organisation", async () => {
+    // Organisations propres à ce test : les sommes ne dépendent d'aucun autre test.
+    const x = await createOrg(auth);
+    const y = await createOrg(auth);
     const run = randomUUID();
-    const reservation = await reserverForfait(poolDe(app), { organisationId: b.org, tripId: null, generationRunId: run, profil: "mini" }, regles());
+    const reservation = await reserverForfait(transactionDe(y), { organisationId: y.org, tripId: null, generationRunId: run, profil: "mini" }, regles());
     expect(reservation.ok).toBe(true);
-    // Le contexte vient de la génération : les lignes sont celles de B, invisibles depuis A.
-    expect((await lignesDe(b.org, run)).every((l) => l.organization_id === b.org)).toBe(true);
-    expect(await lignesDe(a.org, run)).toEqual([]);
-    await inTx(app, { org: a.org }, async (c) => {
-      // A n'écrit pas pour B (RLS, WITH CHECK).
-      await expectRefused(c, "INSERT INTO public.usage_ledger (organization_id, step, provider, sku, units, cost_estimate_micros) VALUES ($1, 'forfait', 'modeles', 'modeles_forfait', 0, 1)", [b.org]);
+    // Le contexte vient de la génération : les lignes sont celles de Y, invisibles depuis X.
+    expect((await lignesDe(y.org, run)).every((l) => l.organization_id === y.org)).toBe(true);
+    expect(await lignesDe(x.org, run)).toEqual([]);
+    // Contexte withOrg de X pour une génération de Y : refusé avant toute somme, rien d'écrit.
+    const avant = await nombreDeLignes();
+    expect(await reserverForfait(transactionDe(x), { organisationId: y.org, tripId: null, generationRunId: randomUUID(), profil: "mini" }, regles())).toEqual({
+      ok: false,
+      code: "usage_unavailable",
+    });
+    expect(await nombreDeLignes()).toBe(avant);
+    await inTx(app, { org: x.org }, async (c) => {
+      // X n'écrit pas pour Y (RLS, WITH CHECK).
+      await expectRefused(c, "INSERT INTO public.usage_ledger (organization_id, step, provider, sku, units, cost_estimate_micros) VALUES ($1, 'forfait', 'modeles', 'modeles_forfait', 0, 1)", [y.org]);
       // vadrouille_app ne lit pas les sommes sans passer par la fonction ; la fonction ne rend que des sommes.
       const colonnes = Object.keys((await c.query("SELECT * FROM public.usage_forfait_totals()")).rows[0]).sort();
       expect(colonnes).toEqual(
@@ -230,16 +267,17 @@ describe("usage: écritures isolées par organisation", () => {
       );
     });
     // Somme du jour de l'organisation du contexte seulement.
-    expect((await totaux(b.org)).org_jour_micros).toBe(coutTotalMicros(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "mini")));
-    // A : ses deux forfaits d'aperçu et la ligne de 1 micro-USD écrite par le test des gardes, rien de B.
-    expect((await totaux(a.org)).org_jour_micros).toBe(2 * coutTotalMicros(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "apercu")) + 1);
+    expect((await totaux(y.org)).org_jour_micros).toBe(coutTotalMicros(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "mini")));
+    expect((await totaux(x.org)).org_jour_micros).toBe(0);
+    expect((await reserverForfait(transactionDe(x), { organisationId: x.org, tripId: null, generationRunId: randomUUID(), profil: "apercu" }, regles())).ok).toBe(true);
+    expect((await totaux(x.org)).org_jour_micros).toBe(coutTotalMicros(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "apercu")));
     // Sans organisation dans le contexte : refusée.
     await inTx(app, {}, (c) => expectRefused(c, "SELECT * FROM public.usage_forfait_totals()"));
   });
 
   it("usage: demande mal formée ou organisation technique refusée sans requête", async () => {
     const compteur = { requetes: 0 };
-    const pool = poolDe(app, compteur);
+    const transaction = transactionDe(a, compteur);
     for (const demande of [
       { organisationId: "pas-un-uuid", tripId: null, generationRunId: randomUUID(), profil: "apercu" as const },
       { organisationId: ORGANISATION_ACTIONS_SANS_COMPTE, tripId: null, generationRunId: randomUUID(), profil: "apercu" as const },
@@ -247,9 +285,39 @@ describe("usage: écritures isolées par organisation", () => {
       { organisationId: a.org, tripId: null, generationRunId: null, profil: "apercu" as const },
       { organisationId: a.org, tripId: null, generationRunId: randomUUID(), profil: "relecture" as const },
     ]) {
-      expect(await reserverForfait(pool, demande, regles())).toEqual({ ok: false, code: "usage_unavailable" });
+      expect(await reserverForfait(transaction, demande, regles())).toEqual({ ok: false, code: "usage_unavailable" });
     }
     expect(compteur.requetes).toBe(0);
+  });
+});
+
+describe("usage: reprise et relectures (décision 0083 § 3 et § 4)", () => {
+  it("usage: une même génération réservée deux fois (reprise d'étape) rend le même forfait sans nouvelle ligne", async () => {
+    const organisation = await createOrg(auth);
+    const demande = { organisationId: organisation.org, tripId: null, generationRunId: randomUUID(), profil: "apercu" as const };
+    const premiere = await reserverForfait(transactionDe(organisation), demande, regles());
+    expect(premiere.ok).toBe(true);
+    const lignes = await lignesDe(organisation.org, demande.generationRunId);
+    const jour = (await totaux(organisation.org)).org_jour_micros;
+    // Reprise : même résultat, aucune ligne de plus, même avec un plafond du jour désormais atteint.
+    const plein = { ...PLAFONDS_USAGE_TEST, parOrganisationJourMicros: jour };
+    expect(await reserverForfait(transactionDe(organisation), demande, regles(plein))).toEqual(premiere);
+    expect(await lignesDe(organisation.org, demande.generationRunId)).toEqual(lignes);
+    expect((await totaux(organisation.org)).org_jour_micros).toBe(jour);
+    // Même identifiant, autre profil : forfait différent, échec fermé, rien d'écrit.
+    expect(await reserverForfait(transactionDe(organisation), { ...demande, profil: "mini" }, regles())).toEqual({ ok: false, code: "usage_unavailable" });
+    expect(await lignesDe(organisation.org, demande.generationRunId)).toEqual(lignes);
+  });
+
+  it("usage: deux relectures successives sont comptées chacune (index unique partiel)", async () => {
+    const organisation = await createOrg(auth);
+    const relecture = coutTotalMicros(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relecture"));
+    for (let i = 0; i < 2; i++) {
+      expect((await reserverForfait(transactionDe(organisation), { organisationId: organisation.org, tripId: null, generationRunId: null, profil: "relecture" }, regles())).ok).toBe(true);
+    }
+    const lignes = await inTx(app, { org: organisation.org }, async (c) => (await c.query("SELECT sku FROM public.usage_ledger WHERE generation_run_id IS NULL")).rows);
+    expect(lignes).toEqual([{ sku: "routes_matrix_essentials" }, { sku: "routes_matrix_essentials" }]);
+    expect((await totaux(organisation.org)).org_jour_micros).toBe(2 * relecture);
   });
 });
 

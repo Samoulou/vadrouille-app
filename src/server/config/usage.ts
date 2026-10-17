@@ -29,6 +29,14 @@ const requetes = z.number().int().min(0).max(100_000);
 const elements = z.number().int().min(0).max(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE);
 const sku = z.string().regex(/^[a-z0-9_]{1,80}$/);
 
+/**
+ * Préfixes des SKU sommés pour le quota du jour Google par `public.usage_forfait_totals()` (migration 0010, filtre
+ * `starts_with`). Un SKU configuré hors de son préfixe ferait tomber la somme du jour à 0 sans erreur (échec ouvert) :
+ * il est refusé au chargement (revue de la PR #454, mineur 2 ; test sur `prototype/config/prix-google.json`).
+ */
+export const PREFIXES_SKU_QUOTA = { textSearch: "places_text_search_", details: "places_details_", matrice: "routes_matrix_" } as const;
+const skuDe = (prefixe: string) => sku.refine((valeur) => valeur.startsWith(prefixe), { message: `SKU hors du préfixe ${prefixe}` });
+
 /** Plafonds d'une génération : par méthode (portée `execution`) et coût des modèles. */
 const ProfilGenerationSchema = z.strictObject({
   coutModelesMicros: microsPositifs,
@@ -68,7 +76,12 @@ export const PlafondsUsageSchema = z.strictObject({
     enveloppeModelesMicros: microsPositifs,
   }),
   /** SKU écrits dans `usage_ledger` : ceux des clients réels (table de prix) et le SKU de forfait des modèles. */
-  skus: z.strictObject({ textSearch: sku, details: sku, matrice: sku, modeles: sku }),
+  skus: z.strictObject({
+    textSearch: skuDe(PREFIXES_SKU_QUOTA.textSearch),
+    details: skuDe(PREFIXES_SKU_QUOTA.details),
+    matrice: skuDe(PREFIXES_SKU_QUOTA.matrice),
+    modeles: sku,
+  }),
 });
 export type PlafondsUsage = z.infer<typeof PlafondsUsageSchema>;
 

@@ -13,26 +13,39 @@ import {
   type SkusForfait,
   type SommesForfaits,
 } from "@/server/usage/forfait";
-import type { ClientSql, PoolSql } from "@/server/usage/neon";
+import type { PoolSql, ResultatRequeteSql } from "@/server/usage/neon";
 import { DELAI_PORT_MS, type CodeRefusUsage, type Horloge, type Plafond } from "@/server/usage/port";
 
 /**
  * Réservation du **forfait** d'une génération, d'une relecture ou d'une action sans compte dans `usage_ledger`
- * (spécification B7, B7c points 1 et 3, « Consommation et plafonds » ; propositions B7-TL-6, B7-TL-9, B7-TL-10 ;
- * décision 0081, B9-TL-4). Seul module qui écrit `usage_ledger` ; aucune implémentation du port n'y écrit (B7-TL-6).
+ * (spécification B7, B7c points 1 et 3, « Consommation et plafonds » ; décision 0083, qui tranche B7-TL-6 et B7-TL-9 ;
+ * décision 0081, B9-TL-4, pour B7-TL-10). Seul module qui écrit `usage_ledger` ; aucune implémentation du port n'y
+ * écrit (0083 § 1).
+ *
+ * Deux chemins, une même séquence (0083 § 2) :
+ * - **génération ou relecture** (`reserverForfait`) : dans la transaction ouverte par **`withOrg`** (B3b) avec le
+ *   contexte de la génération (organisation et utilisateur de la génération, jamais ceux du navigateur), que la
+ *   composition passe sous la forme d'une `TransactionOrganisation` ; le module vérifie que l'organisation du contexte
+ *   est celle de la demande ;
+ * - **action sans compte** (`reserverAction`) : l'organisation technique n'a aucun membre, donc aucun utilisateur pour
+ *   `withOrg` (0081 B9-TL-4 point 2) ; la transaction est ouverte sur le pool `vadrouille_app` et le contexte posé par
+ *   paramètre lié (`set_config('app.organization_id', …, true)`), comme `src/server/usage/neon.ts` pour
+ *   `org_prototype`.
  *
  * Séquence, dans **une** transaction du rôle `vadrouille_app` :
- * 1. contexte d'organisation posé par paramètre lié (`set_config('app.organization_id', …, true)`), celui de la
- *    génération (jamais celui de l'appelant ni du navigateur) ; délai de requête de la base borné à `DELAI_PORT_MS` ;
+ * 1. délai de requête de la base borné à `DELAI_PORT_MS` ; organisation du contexte égale à celle de la demande ;
  * 2. verrou consultatif **global** (`CLE_VERROU_USAGE`) : les sommes comparées sont globales (une clé de fournisseur
  *    pour toutes les organisations), deux réservations simultanées sont sérialisées ;
- * 3. sommes des lignes de forfait par `public.usage_forfait_totals()` (migration 0010, fonction en lecture seule
- *    `SECURITY DEFINER` : sommes globales et somme du jour de la seule organisation du contexte ; aucune ligne
- *    rendue) ;
- * 4. comparaison par `refusDuForfait` (quota du jour Google, enveloppe, mois ; `forfait.ts` de P0r2, réutilisé) puis
+ * 3. **reprise** (0083 § 4) : si des lignes existent déjà pour cette `generationRunId` (reprise d'étape du Workflow
+ *    SDK), elles doivent être exactement celles du forfait : la réservation est alors rendue telle quelle, sans
+ *    nouvelle écriture ni nouvelle comparaison ; différentes, `usage_unavailable` ;
+ * 4. sommes des lignes de forfait par `public.usage_forfait_totals()` (migration 0010, fonction en lecture seule
+ *    `SECURITY DEFINER`, 0083 § 3 : sommes globales et somme du jour de la seule organisation du contexte ; aucune
+ *    ligne rendue) ;
+ * 5. comparaison par `refusDuForfait` (quota du jour Google, enveloppe, mois ; `forfait.ts` de P0r2, réutilisé) puis
  *    par `refusParOrganisation` (plafond par organisation et par jour, ou global quotidien des actions sans compte) ;
  *    un refus annule la transaction **avant tout appel** ;
- * 5. écriture d'**une** ligne par méthode du forfait (`lignesDuForfait`, B7-TL-9 : `step` = `forfait`), en ajout
+ * 6. écriture d'**une** ligne par méthode du forfait (`lignesDuForfait`, B7-TL-9 : `step` = `forfait`), en ajout
  *    seulement.
  * Toute erreur, ou une base muette au-delà de `DELAI_PORT_MS` (horloge injectée), rend `usage_unavailable` (échec
  * fermé) : aucun registre n'est rendu, donc aucun appel. Une transaction qui aboutirait après ce délai compterait un
@@ -40,10 +53,8 @@ import { DELAI_PORT_MS, type CodeRefusUsage, type Horloge, type Plafond } from "
  *
  * Les appels passent ensuite par le registre **en mémoire** de P0r2 (`creerRegistreForfait(forfait, executionId,
  * horloge)`, `registre.ts`, repris tel quel, B7-TL-9), borné par ce forfait, avec les plafonds de `plafonds` ; rien
- * n'est écrit par appel. Comme `neon.ts`, le module n'importe pas `pg` : il reçoit le pool du rôle `vadrouille_app`
- * par la composition (B9, B8). `withOrg` (B3b) n'est pas utilisé : il exige un utilisateur, et l'organisation des
- * actions sans compte n'en a aucun (0081 B9-TL-4 point 2 : « comme `src/server/usage/neon.ts` le fait pour
- * `org_prototype` ») ; la transaction pose le même contexte, de la même façon.
+ * n'est écrit par appel. Le module n'importe ni `pg` ni `withOrg` : il reçoit la transaction de `withOrg` ou le pool
+ * du rôle `vadrouille_app` par la composition (B9, B8).
  */
 
 /** Organisation technique des actions sans compte (0081 B9-TL-4 point 1), créée par la migration 0010. */
@@ -81,6 +92,16 @@ export type DemandeForfait = {
  */
 export type ForfaitReserve = { readonly ok: true; readonly forfait: Forfait; readonly executionId: string | null; readonly plafonds: readonly Plafond[] };
 export type ResultatForfait = ForfaitReserve | { readonly ok: false; readonly code: CodeRefusUsage };
+
+/** Client d'une transaction déjà ouverte (forme de `ClientSql` sans `release`, comme `ExecuteurPositions`). */
+export type ExecuteurUsage = { query(texte: string, valeurs?: readonly unknown[]): Promise<ResultatRequeteSql> };
+
+/**
+ * Transaction d'une génération, ouverte par la composition avec **`withOrg`** (contexte de la génération) :
+ * `(fn) => withOrg({ organizationId, userId }, (tx) => fn(executeurSql(tx)))` (`src/server/with-org.ts`). Une erreur
+ * levée par `fn` annule la transaction.
+ */
+export type TransactionOrganisation = <T>(fn: (executeur: ExecuteurUsage) => Promise<T>) => Promise<T>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const estUuid = (valeur: unknown): valeur is string => typeof valeur === "string" && UUID.test(valeur);
@@ -158,57 +179,103 @@ type Ecriture = {
   readonly plafondJourMicros: number;
 };
 
-/** Transaction de réservation (séquence de l'en-tête) ; `null` si le forfait est écrit, sinon le code du refus. */
-async function transaction(client: ClientSql, ecriture: Ecriture, regles: ReglesUsage): Promise<CodeRefusUsage | null> {
+/** Refus d'un plafond : annule la transaction (lancé dans `fn`), rendu comme code fermé. */
+class RefusUsage extends Error {
+  override name = "RefusUsage";
+
+  constructor(readonly code: CodeRefusUsage) {
+    super("usage: refus");
+  }
+}
+
+const SQL_EXISTANTES = `SELECT provider, sku, units, cost_estimate_micros FROM public.usage_ledger WHERE generation_run_id = $1::uuid`;
+
+const empreinte = (provider: unknown, sku: unknown, units: unknown, cout: unknown) => `${String(provider)}|${String(sku)}|${String(units)}|${String(cout)}`;
+
+/**
+ * Séquence de l'en-tête (points 1 à 6), dans une transaction déjà ouverte, contexte d'organisation posé. Rend sans
+ * erreur si le forfait est écrit ou déjà écrit à l'identique (reprise) ; lève `RefusUsage` sur un plafond, une autre
+ * erreur sinon.
+ */
+async function sequence(executeur: ExecuteurUsage, ecriture: Ecriture, regles: ReglesUsage): Promise<void> {
   const { plafonds, table } = regles;
   const lignes = lignesDuForfait(table, skusDe(plafonds), plafonds.skus.modeles, ecriture.forfait);
-  await client.query("BEGIN");
-  try {
-    await client.query("SELECT pg_catalog.set_config('app.organization_id', $1, true), pg_catalog.set_config('statement_timeout', $2, true)", [
-      ecriture.organisationId,
-      String(DELAI_PORT_MS),
-    ]);
-    await client.query("SELECT pg_catalog.pg_advisory_xact_lock($1)", [CLE_VERROU_USAGE]);
-    const { sommes, orgJourMicros } = lireSommes((await client.query(SQL_SOMMES)).rows[0]);
-    const refus =
-      refusDuForfait(sommes, ecriture.forfait, plafonds.limites, "elements") ?? refusParOrganisation(orgJourMicros, ecriture.forfait, ecriture.plafondJourMicros);
-    if (refus !== null) {
-      await client.query("ROLLBACK");
-      return refus;
+  const contexte = await executeur.query("SELECT pg_catalog.set_config('statement_timeout', $1, true), public.app_current_org()::text AS org", [String(DELAI_PORT_MS)]);
+  const org = contexte.rows[0]?.org;
+  if (typeof org !== "string" || org.toLowerCase() !== ecriture.organisationId.toLowerCase()) throw new Error("usage: contexte d'organisation inattendu");
+  await executeur.query("SELECT pg_catalog.pg_advisory_xact_lock($1)", [CLE_VERROU_USAGE]);
+  if (ecriture.generationRunId !== null) {
+    const existantes = (await executeur.query(SQL_EXISTANTES, [ecriture.generationRunId])).rows;
+    if (existantes.length > 0) {
+      const lues = existantes.map((l) => empreinte(l.provider, l.sku, l.units, l.cost_estimate_micros)).sort();
+      const attendues = lignes.map((l) => empreinte(l.provider, l.sku, l.units, l.costEstimateMicros)).sort();
+      if (lues.length === attendues.length && lues.every((v, i) => v === attendues[i])) return;
+      throw new Error("usage: forfait déjà réservé, différent");
     }
-    await client.query(SQL_INSERER, [
-      ecriture.organisationId,
-      ecriture.tripId,
-      ecriture.generationRunId,
-      lignes.map((l) => l.step),
-      lignes.map((l) => l.provider),
-      lignes.map((l) => l.sku),
-      lignes.map((l) => l.units),
-      lignes.map((l) => l.costEstimateMicros),
-    ]);
-    await client.query("COMMIT");
-    return null;
-  } catch (erreur) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw erreur;
   }
+  const { sommes, orgJourMicros } = lireSommes((await executeur.query(SQL_SOMMES)).rows[0]);
+  const refus =
+    refusDuForfait(sommes, ecriture.forfait, plafonds.limites, "elements") ?? refusParOrganisation(orgJourMicros, ecriture.forfait, ecriture.plafondJourMicros);
+  if (refus !== null) throw new RefusUsage(refus);
+  await executeur.query(SQL_INSERER, [
+    ecriture.organisationId,
+    ecriture.tripId,
+    ecriture.generationRunId,
+    lignes.map((l) => l.step),
+    lignes.map((l) => l.provider),
+    lignes.map((l) => l.sku),
+    lignes.map((l) => l.units),
+    lignes.map((l) => l.costEstimateMicros),
+  ]);
+}
+
+/**
+ * Transaction sur le pool brut (actions sans compte seulement, 0083 § 2) : contexte posé par paramètre lié. Une
+ * connexion en erreur est rendue au pool avec l'erreur (`release(erreur)`), qui la détruit (revue de la PR #454,
+ * mineur 6) ; un refus de plafond la rend saine.
+ */
+function transactionBrute(pool: PoolSql, organisationId: string): TransactionOrganisation {
+  return async (fn) => {
+    const client = await pool.connect();
+    let casse: Error | undefined;
+    try {
+      await client.query("BEGIN");
+      try {
+        await client.query("SELECT pg_catalog.set_config('app.organization_id', $1, true)", [organisationId]);
+        const resultat = await fn(client);
+        await client.query("COMMIT");
+        return resultat;
+      } catch (erreur) {
+        await client.query("ROLLBACK").catch((annulation: unknown) => {
+          casse = annulation instanceof Error ? annulation : new Error("usage: annulation");
+        });
+        throw erreur;
+      }
+    } catch (erreur) {
+      if (!(erreur instanceof RefusUsage)) casse ??= erreur instanceof Error ? erreur : new Error("usage: erreur");
+      throw erreur;
+    } finally {
+      client.release(casse);
+    }
+  };
 }
 
 /** Valeur sentinelle « la base n'a pas répondu à temps ». */
 const MUET: { readonly muet: true } = Object.freeze({ muet: true });
 
 /** Réservation bornée par `DELAI_PORT_MS` (horloge injectée) ; toute erreur ou un silence rend `usage_unavailable`. */
-async function reserver(pool: PoolSql, ecriture: Ecriture, regles: ReglesUsage): Promise<CodeRefusUsage | null> {
+async function reserver(transaction: TransactionOrganisation, ecriture: Ecriture, regles: ReglesUsage): Promise<CodeRefusUsage | null> {
   let annuler = () => {};
   const delai = new Promise<typeof MUET>((resolve) => {
     annuler = regles.horloge.minuterie(DELAI_PORT_MS, () => resolve(MUET));
   });
-  const travail = (async () => {
-    const client = await pool.connect();
+  const travail = (async (): Promise<CodeRefusUsage | null> => {
     try {
-      return await transaction(client, ecriture, regles);
-    } finally {
-      client.release();
+      await transaction((executeur) => sequence(executeur, ecriture, regles));
+      return null;
+    } catch (erreur) {
+      if (erreur instanceof RefusUsage) return erreur.code;
+      throw erreur;
     }
   })();
   // Une erreur tardive (après le délai) ne doit pas rester sans gestionnaire.
@@ -224,12 +291,13 @@ async function reserver(pool: PoolSql, ecriture: Ecriture, regles: ReglesUsage):
 }
 
 /**
- * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`) ou d'une relecture, dans l'organisation de la
- * génération, contre le plafond par organisation et par jour et les limites globales. Une demande mal formée
- * (identifiant qui n'est pas un uuid, relecture avec génération, génération sans identifiant, organisation technique)
- * est une erreur de composition : `usage_unavailable`, sans requête.
+ * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`) ou d'une relecture, dans la transaction de
+ * `withOrg` de la génération (0083 § 2), contre le plafond par organisation et par jour et les limites globales. Une
+ * demande mal formée (identifiant qui n'est pas un uuid, relecture avec génération, génération sans identifiant,
+ * organisation technique) est une erreur de composition : `usage_unavailable`, sans requête. Une même
+ * `generationRunId` réservée deux fois (reprise) rend le même forfait sans nouvelle ligne (0083 § 4).
  */
-export async function reserverForfait(pool: PoolSql, demande: DemandeForfait, regles: ReglesUsage): Promise<ResultatForfait> {
+export async function reserverForfait(transaction: TransactionOrganisation, demande: DemandeForfait, regles: ReglesUsage): Promise<ResultatForfait> {
   const relecture = demande.profil === "relecture";
   if (
     !(PROFILS_FORFAIT as readonly string[]).includes(demande.profil) ||
@@ -248,7 +316,7 @@ export async function reserverForfait(pool: PoolSql, demande: DemandeForfait, re
     return { ok: false, code: "usage_unavailable" };
   }
   const refus = await reserver(
-    pool,
+    transaction,
     { organisationId: demande.organisationId, tripId: demande.tripId, generationRunId: demande.generationRunId, forfait, plafondJourMicros: regles.plafonds.parOrganisationJourMicros },
     regles,
   );
@@ -258,7 +326,8 @@ export async function reserverForfait(pool: PoolSql, demande: DemandeForfait, re
 
 /**
  * Réserve le forfait d'une action sans compte (`structureBrief`, `suggestLodging`) dans l'organisation technique des
- * actions sans compte, contre son plafond global quotidien (0081 B9-TL-4 point 3). L'identifiant d'exécution est
+ * actions sans compte, sur le pool `vadrouille_app` (0083 § 2 : aucun utilisateur pour `withOrg`), contre son plafond
+ * global quotidien (0081 B9-TL-4 point 3). L'identifiant d'exécution est
  * opaque, tiré à chaque appel, jamais réutilisé ni renvoyé au navigateur ; c'est aussi le `generation_run_id` des
  * lignes écrites (aucun voyage, aucune personne, aucune adresse IP).
  */
@@ -278,7 +347,7 @@ export async function reserverAction(
   const executionId = tirerId();
   if (!estUuid(executionId)) return { ok: false, code: "usage_unavailable" };
   const refus = await reserver(
-    pool,
+    transactionBrute(pool, ORGANISATION_ACTIONS_SANS_COMPTE),
     { organisationId: ORGANISATION_ACTIONS_SANS_COMPTE, tripId: null, generationRunId: executionId, forfait, plafondJourMicros: regles.plafonds.actionsSansCompteJourMicros },
     regles,
   );

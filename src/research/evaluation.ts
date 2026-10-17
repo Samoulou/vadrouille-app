@@ -3,12 +3,12 @@ import "server-only";
 import { z } from "zod";
 
 import { LONGUEURS_TEXTE, TYPES_CRENEAU, texteMaison, type TypeCreneau } from "@/ai/candidat";
-import { ETAPES_REQUETE, type ClientModeles, type EtapeRequete } from "@/ai/client";
+import { ETAPES_REQUETE, usdEnMicros, type ClientModeles, type EtapeRequete } from "@/ai/client";
 import { creerCoucheIa, type ReglageEtape, type ReglagesIa } from "@/ai/couche";
 import { EntreeModelesSchema, type CandidatPourModele, type LieuRetenu } from "@/ai/entrees";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { BriefRequestSchema, CategorySchema, type Category } from "@/contracts";
-import { chercherCandidats, creneauDe } from "@/research/agent";
+import { chercherCandidats, cleDeNom, creneauDe } from "@/research/agent";
 import type { BornesRecherche } from "@/research/bornes";
 import { CLASSES_SOURCE, type CandidatRecherche, type ClasseSource } from "@/research/candidat";
 import type { LecteurPages } from "@/research/fetch-page";
@@ -91,16 +91,6 @@ export type DependancesEvaluation = {
   readonly maintenant: () => number;
 };
 
-/** Nom comparé : minuscules, sans accents ni ponctuation. */
-const normaliser = (nom: string) =>
-  nom
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-
-const micros = (usd: number) => Math.round(usd * 1_000_000);
 
 type Compte = { appels: number; coutMicros: number; dureeMs: number };
 
@@ -115,7 +105,7 @@ function instrumenter(modeles: ClientModeles, maintenant: () => number) {
       const compte = comptes.get(requete.etape);
       if (compte !== undefined) {
         compte.appels += 1;
-        compte.coutMicros += micros(reponse.coutUsd);
+        compte.coutMicros += usdEnMicros(reponse.coutUsd);
         compte.dureeMs += Math.max(0, maintenant() - debut);
       }
       prompts.set(requete.prompt.id, requete.prompt.version);
@@ -135,9 +125,9 @@ function partSources(candidats: readonly CandidatRecherche[]): MesuresCas["partS
 
 function couvertureIncontournables(candidats: readonly CandidatRecherche[], attendus: readonly string[]): number | null {
   if (attendus.length === 0) return null;
-  const noms = candidats.map((candidat) => normaliser(candidat.nom));
+  const noms = candidats.map((candidat) => cleDeNom(candidat.nom));
   const trouves = attendus.filter((attendu) => {
-    const cle = normaliser(attendu);
+    const cle = cleDeNom(attendu);
     return noms.some((nom) => nom.includes(cle) || cle.includes(nom));
   });
   return trouves.length / attendus.length;
@@ -179,7 +169,7 @@ export async function evaluerCas(cas: CasEvaluation, dependances: DependancesEva
   const rechercheWeb: ClientRechercheWeb = {
     async rechercher(requete) {
       const reponse = await dependances.recherche.rechercher(requete);
-      coutRechercheWebMicros += micros(reponse.coutUsd);
+      coutRechercheWebMicros += usdEnMicros(reponse.coutUsd);
       return reponse;
     },
   };
@@ -192,6 +182,8 @@ export async function evaluerCas(cas: CasEvaluation, dependances: DependancesEva
     bornes: dependances.bornes,
   });
   const dureeRecherche = Math.max(0, dependances.maintenant() - debutRecherche);
+  // Taux indicatifs (evals/README.md) : `plan` compté même sans appel du plan ; `recherche` par tour, échecs supposés
+  // en tête (le bilan de l'agent n'en donne que le nombre).
   noter("plan", compteurs.sortiesIllisibles.plan === 0);
   for (let tour = 0; tour < compteurs.tours; tour += 1) noter("recherche", tour >= compteurs.sortiesIllisibles.recherche);
 

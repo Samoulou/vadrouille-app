@@ -1,6 +1,6 @@
 -- 0010_usage_forfait — usage_ledger au forfait, organisation des actions sans compte, sommes globales en lecture
--- seule (spécification `specs/B7-couche-ia-recherche.md`, B7c points 1 à 3 ; propositions B7-TL-6, B7-TL-9, B7-TL-10 ;
--- décision 0081, B9-TL-4 ; réserve Sécurité de 0046 D13 point 7). Écrite à la main (`drizzle-kit generate --custom`).
+-- seule (spécification `specs/B7-couche-ia-recherche.md`, B7c points 1 à 3 ; décision 0083, qui tranche B7-TL-6 et
+-- B7-TL-9 ; décision 0081, B9-TL-4, pour B7-TL-10 ; réserve Sécurité de 0046 D13 point 7). Écrite à la main (`drizzle-kit generate --custom`).
 -- Exécutée par `vadrouille_migrator` dans une transaction, après 0009_verifications_updated_at. Exige le rôle
 -- `vadrouille_fn_usage`, créé par `db/bootstrap/roles.sql` : l'amorçage est réexécuté sur chaque base avant cette
 -- migration (CI : job `db` ; base réelle : avant le lot qui la contient, 0056 § 3), sans quoi elle échoue.
@@ -20,7 +20,8 @@
 --   2. protection S3 étendue à cette organisation (ni suppression, ni modification) et adhésion refusée pour elle ;
 --   3. gardes de P0r2 remplacées : toute ligne est une ligne de forfait (`step` = 'forfait', fournisseur `modeles` ou
 --      `google`, unités et coût positifs ou nuls, unités nulles pour les modèles) ; au plus une ligne par méthode et
---      par génération (index unique partiel) ;
+--      par génération **identifiée** (index unique partiel, 0083 § 3) ; les relectures (`generation_run_id` nul) n'y
+--      sont pas soumises : chacune écrit ses lignes ;
 --   4. lecture des sommes par `vadrouille_fn_usage` : colonnes nécessaires seulement, politique en lecture seule ;
 --   5. fonction `public.usage_forfait_totals()` (SECURITY DEFINER, propriétaire `vadrouille_fn_usage`, EXECUTE à
 --      `vadrouille_app` seul) : sommes globales et somme du jour de la seule organisation du contexte ;
@@ -87,8 +88,11 @@ CREATE TRIGGER memberships_refuse_actions_sans_compte BEFORE INSERT ON public.me
 
 -- 3. Gardes de P0r2 remplacées (0046 D13 point 7 ; B7-TL-9, B7c point 2) : la seule correspondance avec usage_ledger
 -- est le forfait. Toute ligne a `step` = 'forfait' ; un fournisseur `modeles` (identité, 0049) n'a jamais d'unités
--- (son plafond est un coût). Une génération n'a qu'une ligne par méthode (fournisseur et SKU) : une écriture par appel
--- ou par lot de notation pour une génération échoue sur l'index unique.
+-- (son plafond est un coût). Une génération identifiée n'a qu'une ligne par méthode (fournisseur et SKU) : une écriture
+-- par appel ou par lot de notation pour une génération échoue sur l'index unique (0083 § 3). L'index est **partiel**
+-- (`generation_run_id IS NOT NULL`) : une relecture (identifiant nul, B8-TL-4) n'y est pas soumise, et deux relectures
+-- successives écrivent chacune leurs lignes, toutes comptées. Une reprise de la même génération ne réécrit rien :
+-- `reserverForfait` lit d'abord les lignes existantes (0083 § 4) ; l'index reste la garde de dernier recours.
 ALTER TABLE public.usage_ledger DROP CONSTRAINT usage_ledger_no_google_call_check;
 --> statement-breakpoint
 ALTER TABLE public.usage_ledger DROP CONSTRAINT usage_ledger_no_scoring_batch_check;
@@ -124,7 +128,10 @@ SET LOCAL ROLE vadrouille_fn_usage;
 -- (plafond par organisation et par jour) ; requêtes Text Search et fiches du jour de quota Google (minuit heure du
 -- Pacifique, 0046 D20, comme prototype.quota_day_at) ; coût Google du mois du Pacifique et des modèles du mois UTC ;
 -- enveloppes, sans période (Q329). Aucune ligne, aucun identifiant ni aucune somme d'une autre organisation n'est rendu.
--- Refusée sans organisation dans le contexte.
+-- Refusée sans organisation dans le contexte. Toute autre organisation non nulle est acceptée, `org_prototype` et
+-- l'organisation des actions sans compte comprises : le refus de réserver pour `org_prototype`, et pour l'organisation
+-- technique hors de `reserverAction`, est **applicatif** (`reserverForfait`, `src/server/usage/reservation.ts`) ; la
+-- fonction ne rend que des sommes, sans risque d'écriture (0083 § 3).
 CREATE FUNCTION public.usage_forfait_totals()
   RETURNS TABLE (org_jour_micros bigint, jour_text_search bigint, jour_place_details bigint, mois_google_micros bigint,
     enveloppe_google_micros bigint, mois_modeles_micros bigint, enveloppe_modeles_micros bigint)
