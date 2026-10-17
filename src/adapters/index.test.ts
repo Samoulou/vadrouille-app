@@ -11,6 +11,7 @@ import {
   isPrototypeAdapter,
   mockAuthAllowed,
 } from "./index";
+import { brancherConnexionReelle } from "./better-auth";
 import { mockTripAdapter } from "./mock";
 import { explicitScope } from "./simulation";
 
@@ -122,9 +123,33 @@ describe("getAuthAdapter (décision 0017 § 11.2)", () => {
     expect(getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, AUTH_ADAPTER: "mock" }) }).config.codeTtlMs).toBe(600_000);
   });
 
-  it("lève pour AUTH_ADAPTER inconnu ou better-auth (avant B3), même en test", () => {
-    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "better-auth" }) })).toThrow(/better-auth non implémenté/);
+  it("lève pour AUTH_ADAPTER inconnu, et pour better-auth hors local et ci (B3c ; B3-TL-2), même en test", () => {
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "better-auth" }) })).toThrow(/better-auth refusée/);
+    expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "better-auth", VADROUILLE_ENV: "staging" }) })).toThrow(
+      /better-auth refusée/,
+    );
     expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "magique" }) })).toThrow(/AUTH_ADAPTER inconnu/);
+  });
+
+  it("C10 (B3c ; 0034, B3-TL-2) : better-auth refusé en production et en staging avant toute opération, limiteur ou base", () => {
+    const operations = vi.fn();
+    const limiter = vi.fn();
+    const contexte = vi.fn();
+    brancherConnexionReelle({ operations, limiter, contexte });
+    for (const deployment of [{ VERCEL_ENV: "production" }, { VADROUILLE_ENV: "production" }, { VADROUILLE_ENV: "staging" }, { VERCEL_ENV: "preview" }]) {
+      for (const nodeEnv of ["test", "production"]) {
+        expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, AUTH_ADAPTER: "better-auth", ...deployment }) })).toThrow(/refusée/);
+      }
+    }
+    expect(operations).not.toHaveBeenCalled();
+    expect(limiter).not.toHaveBeenCalled();
+    expect(contexte).not.toHaveBeenCalled();
+  });
+
+  it.each(["local", "ci"])("rend l'adaptateur better-auth en %s (B3c), mode réel, limites par adresse e-mail (B3-PO-6)", (environnement) => {
+    const adapter = getAuthAdapter({ scope, env: env({ NODE_ENV: "production", AUTH_ADAPTER: "better-auth", VADROUILLE_ENV: environnement }) });
+    expect(adapter.mode).toBe("real");
+    expect(adapter.config).toEqual({ codeTtlMs: 600_000, maxAttempts: 3, maxCodeRequests: 5, codeRequestWindowMs: 3_600_000 });
   });
 
   it("mockAuthAllowed et authAdapterChoice sont exportés pour l'écran 4 et les tests", () => {

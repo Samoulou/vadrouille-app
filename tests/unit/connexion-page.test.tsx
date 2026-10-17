@@ -56,6 +56,14 @@ describe("/connexion", () => {
     expect(screen.queryByText(t.simulee)).toBeNull();
   });
 
+  it("C11 (B3c) : avec AUTH_ADAPTER=better-auth, adaptateur réel de getAuthAdapter, aucun avertissement du mode simulé", async () => {
+    vi.stubEnv("AUTH_ADAPTER", "better-auth");
+    vi.stubEnv("VADROUILLE_ENV", "ci");
+    const element = await renderPage("/voyages/nouveau/lancer");
+    expect(element.props).toMatchObject({ codeTtlMs: 600_000, authMode: "real" });
+    expect(screen.queryByText(t.simulee)).toBeNull();
+  });
+
   it.each([
     [undefined, "/voyages"],
     ["https://exemple.org", "/voyages"],

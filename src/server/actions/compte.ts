@@ -2,26 +2,44 @@
 
 import { getAuthAdapter } from "@/adapters";
 import { getSimulationScope } from "@/adapters/simulation";
-import { CodeRequestSchema, CodeVerificationSchema, fail, ok, type Result } from "@/contracts";
+import { CodeRequestSchema, CodeVerificationSchema, fail, ok, type ApiError, type Result } from "@/contracts";
 import type { ApiErrorCode } from "@/contracts/values";
 
 import { parseInput } from "../parse-input";
 
 /**
- * Actions serveur de la connexion par code (écran 4 ; décision 0017 § 3.3 et § 3.4, F8-PO-9, F8-PO-17). Actions
- * anonymes : 1. `parseInput` de l'entrée reçue en `unknown` (`validation_failed`, sans appel à l'adaptateur : aucun
- * essai consommé, aucune demande comptée) ; 2. appel de l'adaptateur `auth` de la portée de simulation de la
- * requête. **Aucun journal** : ni adresse, ni code (règle `no-console` et test « aucune donnée journalisée »).
+ * Actions serveur de la connexion par code (écran 4 ; décision 0017 § 3.3 et § 3.4, F8-PO-9, F8-PO-17 ; spécification
+ * B3, B3c point 2). Actions anonymes : 1. `parseInput` de l'entrée reçue en `unknown` (`validation_failed`, sans appel à
+ * l'adaptateur : aucun essai consommé, aucune demande comptée) ; 2. adaptateur `auth` de `getAuthAdapter()` : simulé
+ * (`mock`, portée de simulation de la requête) ou réel (`better-auth`, qui suit l'ordre `parseEmailAddress` → limiteur
+ * (adresse IP, puis e-mail) → opération, `src/adapters/better-auth.ts`). Aucune organisation n'est reçue du client.
+ * **Aucun journal** : ni adresse, ni code (règle `no-console` et test « aucune donnée journalisée »).
  *
- * Les réponses sont les mêmes pour une adresse connue ou inconnue : la réussite ne renvoie aucune donnée de session
- * au navigateur (en phase 0, la session vit dans la portée de simulation, sans cookie : 0017 § 3.5).
+ * Les réponses sont les mêmes pour une adresse connue ou inconnue : la réussite ne renvoie aucune donnée de session au
+ * navigateur (en phase 0, la session vit dans la portée de simulation, sans cookie : 0017 § 3.5 ; avec `better-auth`,
+ * dans le cookie posé par la bibliothèque). Une erreur de l'adaptateur de la liste de l'action est rendue telle quelle
+ * (`retryable` compris) ; toute autre erreur, garde fermée comprise, devient `provider_error`, sans détail.
  */
 
-const REQUEST_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["rate_limited"]);
-const VERIFY_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["invalid_code", "code_expired", "too_many_attempts"]);
+const REQUEST_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["validation_failed", "rate_limited", "provider_error"]);
+const VERIFY_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
+  "validation_failed",
+  "rate_limited",
+  "code_expired",
+  "too_many_attempts",
+  "invalid_code",
+  "unauthenticated",
+  "provider_error",
+]);
 
 export type CodeSent = { sent: true };
 export type SignedIn = { signedIn: true };
+export type SignedOut = { signedOut: true };
+
+/** Erreur de l'adaptateur rendue telle quelle si son code est dans `admis`, sinon `provider_error`. */
+function erreurAdmise<T>(error: ApiError, admis: ReadonlySet<ApiErrorCode>): Result<T> {
+  return admis.has(error.code) ? { ok: false, error } : fail("provider_error");
+}
 
 export async function requestCode(input: unknown): Promise<Result<CodeSent>> {
   const parsed = parseInput(CodeRequestSchema, input);
@@ -30,7 +48,7 @@ export async function requestCode(input: unknown): Promise<Result<CodeSent>> {
   try {
     const adapter = getAuthAdapter({ scope });
     const result = await adapter.requestCode(parsed.value);
-    if (!result.ok) return fail(REQUEST_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
+    if (!result.ok) return erreurAdmise(result.error, REQUEST_ERRORS);
     return ok({ sent: true });
   } catch {
     // Garde fermée (0017 § 11.2) ou erreur de l'adaptateur : erreur générique, sans détail.
@@ -45,8 +63,23 @@ export async function verifyCode(input: unknown): Promise<Result<SignedIn>> {
   try {
     const adapter = getAuthAdapter({ scope });
     const result = await adapter.verifyCode(parsed.value);
-    if (!result.ok) return fail(VERIFY_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
+    if (!result.ok) return erreurAdmise(result.error, VERIFY_ERRORS);
     return ok({ signedIn: true });
+  } catch {
+    return fail("provider_error");
+  }
+}
+
+/**
+ * Déconnexion (B3-PO-7) : ferme la session de la requête et efface son cookie ; idempotente (sans session, réussit sans
+ * rien faire) ; ne touche pas les autres sessions de la personne. Aucune entrée. Où l'interface la propose : question 5
+ * de la spécification B3 (UX/UI) ; B3 livre l'action sans écran.
+ */
+export async function signOut(): Promise<Result<SignedOut>> {
+  const scope = await getSimulationScope();
+  try {
+    await getAuthAdapter({ scope }).signOut();
+    return ok({ signedOut: true });
   } catch {
     return fail("provider_error");
   }

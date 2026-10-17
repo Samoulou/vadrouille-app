@@ -3,12 +3,12 @@ import Link from "next/link";
 import {
   MOCK_DEMO_TRIP,
   MOCK_DEMO_UNLOCKED_TRIP,
-  getRequestContext,
   getTripAdapter,
   isMockAdapter,
   isPrototypeAdapter,
   paymentAvailable,
 } from "@/adapters";
+import { contexteFacultatif } from "@/features/compte/session";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import type { TripSummary } from "@/contracts";
@@ -48,7 +48,7 @@ function demoLinks(): DemoLink[] {
  * `/voyages/nouveau` ; demande de Samuel transmise par le CEO, ticket #259), quel que soit l'adaptateur. Avec
  * l'adaptateur `mock` seulement, section « Démonstration » vers les parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
  * Avec l'adaptateur `prototype` seulement, section « Prototype » (spécification P0, P0-PO-11) : un voyage par
- * programme du dossier, absente sans programme ; hors liste blanche, `getRequestContext()` lève (erreur 500).
+ * programme du dossier, absente sans programme ; hors liste blanche, `contexteFacultatif()` lève (erreur 500).
  */
 export default async function HomePage() {
   let demo: { destination?: string } | null = null;
@@ -58,8 +58,9 @@ export default async function HomePage() {
   }
   let prototype: TripSummary[] = [];
   if (isPrototypeAdapter()) {
-    const ctx = getRequestContext();
-    prototype = await getTripAdapter().listTrips(ctx);
+    // Sans session (`better-auth`, B3c) : aucune section « Prototype ».
+    const ctx = await contexteFacultatif();
+    prototype = ctx === null ? [] : await getTripAdapter().listTrips(ctx);
   }
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">

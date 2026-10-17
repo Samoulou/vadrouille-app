@@ -155,6 +155,26 @@ jobs:
           PGDATABASE: vadrouille
           VADROUILLE_DB_BOOTSTRAP_ROLE: postgres
         run: VADROUILLE_DB_ADMIN_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}" pnpm test:db
+      # B3c (spécification B3, B3c point 7 ; B3-TL-8 ; décision 0077 § 5.4) : projet Playwright `auth`, serveur construit
+      # avec `AUTH_ADAPTER=better-auth` sur cette base migrée. `E2E_AUTH_SERVER=1` (variable d'outillage) démarre ce
+      # serveur ; ses deux secrets sont tirés par playwright.config.ts, jamais ici. Ni adresse d'administration ni PG*.
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.diff.outputs.code == 'true'
+        run: pnpm build
+      - if: steps.diff.outputs.code == 'true'
+        name: Projet Playwright auth (redirection sans session)
+        run: E2E_SKIP_BUILD=1 E2E_AUTH_SERVER=1 pnpm exec playwright test --project=auth
+      - if: failure() && steps.diff.outputs.code == 'true'
+        name: Envoyer les résultats du projet auth en artefact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results-auth
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
   docker:
     runs-on: ubuntu-latest
     steps:

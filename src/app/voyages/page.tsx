@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
-import { getRequestContext, getTripReader } from "@/adapters";
+import { getTripReader } from "@/adapters";
+import { exigerSession } from "@/features/compte/session";
 import { PRODUCT_NAME } from "@/config/site";
 import { TripsScreen } from "@/features/compte/TripsScreen";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
+import { mesVoyagesRoute } from "@/features/sejour/routes";
 
 // Données lues à chaque requête, dans le contexte d'organisation de la requête.
 export const dynamic = "force-dynamic";
@@ -22,8 +24,10 @@ export const metadata: Metadata = {
  *
  * « Créer un voyage » n'est pas encore proposé : l'écran 1 (`/voyages/nouveau`) existe depuis F8a, et le lien sera
  * ajouté par la première PR qui touche `R17` (F11-PO-4).
+ *
+ * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
 export default async function MesVoyagesPage() {
-  const trips = await getTripReader().listTrips(getRequestContext());
+  const trips = await getTripReader().listTrips(await exigerSession(mesVoyagesRoute()));
   return <TripsScreen trips={trips} />;
 }

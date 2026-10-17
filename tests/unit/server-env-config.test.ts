@@ -221,7 +221,8 @@ describe("configuration versionnée : environnement du serveur (décision 0050, 
   it("chaque webServer pose VADROUILLE_ENV=ci ; celui qui pose TRUSTED_IP_HEADER lance le serveur autonome sur 127.0.0.1", () => {
     const config = lire(PLAYWRIGHT);
     expect(webServers(config).length).toBeGreaterThanOrEqual(2);
-    expect(webServers(config).filter((serveur) => serveur.includes("TRUSTED_IP_HEADER"))).toHaveLength(1);
+    // Serveur principal, et serveur `auth` de B3c (connexion réelle, B3c point 7 : en-tête de confiance exigé).
+    expect(webServers(config).filter((serveur) => serveur.includes("TRUSTED_IP_HEADER"))).toHaveLength(2);
     expect(webServerOffenders(config)).toEqual([]);
   });
 

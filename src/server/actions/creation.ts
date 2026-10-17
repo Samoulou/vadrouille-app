@@ -1,6 +1,7 @@
 "use server";
 
-import { getAuthAdapter, getCreationAdapter, getRequestContext, type AdapterContext } from "@/adapters";
+import { getAuthAdapter, getCreationAdapter, type AdapterContext } from "@/adapters";
+import { contexteFacultatif } from "@/features/compte/session";
 import { getSimulationScope } from "@/adapters/simulation";
 import {
   BriefRequestSchema,
@@ -127,18 +128,25 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
 
 /**
  * Écran 5 (F8c) : avancement de la génération, lu par la page (état initial) puis interrogé par le navigateur toutes
- * les secondes (0017 § 9). En phase 0, le contexte vient de `getRequestContext()`, comme la page (0017 § 3.1) : l'action
- * ne doit jamais être branchée sur un adaptateur réel avant B3, qui la remplace par la session et le contrôle
- * d'appartenance (0017 § 3.6). `not_found` pour un voyage inconnu ou d'une autre organisation ; une sortie non conforme
- * ou d'un autre voyage devient `provider_error`.
+ * les secondes (0017 § 9). Le contexte vient de `contexteFacultatif()`, comme la page (0017 § 3.1) : celui de la
+ * session avec `better-auth` (B3c ; sans session, `unauthenticated` avant toute lecture de l'entrée), celui de la phase
+ * 0 sinon. Le contrôle d'appartenance de l'adaptateur réel reste à B9 (0017 § 3.6). `not_found` pour un voyage inconnu
+ * ou d'une autre organisation ; une sortie non conforme ou d'un autre voyage devient `provider_error`.
  */
 export async function getGenerationStatus(input: unknown): Promise<Result<GenerationStatus>> {
+  let ctx: AdapterContext | null;
+  try {
+    ctx = await contexteFacultatif();
+  } catch {
+    return fail("provider_error");
+  }
+  if (ctx === null) return fail("unauthenticated");
   const parsed = parseInput(GenerationStatusRequestSchema, input);
   if (!parsed.ok) return parsed;
   const scope = await getSimulationScope();
   let result: Result<unknown>;
   try {
-    result = await getCreationAdapter(undefined, { scope }).getGenerationStatus(getRequestContext(), parsed.value.tripId);
+    result = await getCreationAdapter(undefined, { scope }).getGenerationStatus(ctx, parsed.value.tripId);
   } catch {
     return fail("provider_error");
   }
