@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type RequeteGoogle, type Transport } from "@/grounding/enveloppe-google";
-import type { ClientPlaces, Coordonnees, DetailsLieu, RectangleZone, RequeteTextSearch } from "@/grounding/interfaces";
+import { ErreurAncrage, type ClientPlacesMvp, type Coordonnees, type DetailsLieu, type RectangleZone, type RequeteTextSearch } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
@@ -31,6 +31,11 @@ import {
  *   qui n'est pas un établissement (quartier, parc, site naturel) n'en a pas (Q460).
  * - Text Search : biais (cercle) ou, pour `p0Run`, restriction à la zone du séjour (rectangle, 0055 § 6 point 3) ;
  *   jamais les deux, et un rectangle invalide est refusé avant toute réservation (`invalid_request`).
+ * - B8a (décision 0085 § 2, soumis au verdict de la Sécurité) : un masque fermé par méthode de Place Details —
+ *   `details` (`MASQUE_DETAILS`, Enterprise), `position` (`id,location`, Essentials), `identifiant` (`id`, « IDs only »,
+ *   seule méthode qui accepte un `id` différent de celui demandé : rafraîchissement documenté par Google). Une réponse
+ *   404 de ces trois méthodes (identifiant obsolète, `NOT_FOUND`) lève `ErreurAncrage("place_not_found")`, la même
+ *   erreur que le double, après la réservation (requête partie : comptée).
  * - Chaque requête réserve une unité auprès du port de consommation avant l'appel (D13) ; délai de 10 s par requête.
  * Tout ce qui sort est une donnée Google : il reste en mémoire et n'atteint jamais un prompt.
  */
@@ -39,12 +44,20 @@ export const ORIGINE_PLACES = "https://places.googleapis.com";
 
 export const MASQUE_TEXT_SEARCH = "places.id";
 export const MASQUE_DETAILS = "id,businessStatus,location,regularOpeningHours";
+/** Masque de `position` (B8a, 0085 § 2) : identifiant et position, rien d'autre. */
+export const MASQUE_POSITION = "id,location";
+/** Masque de `identifiant` (B8a, 0085 § 2 ; B8-PO-12) : l'identifiant seul. */
+export const MASQUE_IDENTIFIANT = "id";
 
 export const SKU_TEXT_SEARCH = "places_text_search_essentials_ids_only";
 export const SKU_DETAILS = "places_details_enterprise";
+/** SKU le moins cher qui contient `location` : « Place Details Essentials » (page de tarifs relevée le 2026-10-17). */
+export const SKU_POSITION = "places_details_essentials";
+/** SKU de `id` seul : « Place Details Essentials (IDs Only) », sans plafond gratuit (relevé le 2026-10-17). */
+export const SKU_IDENTIFIANT = "places_details_essentials_ids_only";
 
 /** Coûts estimés par requête, en micro-USD, au prix plein (Q329) : table `prototype/config/prix-google.json`. */
-export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000 } as const;
+export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0 } as const;
 
 /** Identifiant de lieu Google : jamais interpolé dans un chemin sans ce contrôle. */
 const PLACE_ID = PLACE_ID_GOOGLE;
@@ -94,10 +107,13 @@ function rectangleValide(zone: RectangleZone): boolean {
 
 type Periodes = z.infer<typeof DetailsSchema>["regularOpeningHours"];
 
-/** Plages d'ouverture par jour, en minutes depuis minuit ; une plage qui passe minuit s'arrête à 1 440. */
+/**
+ * Plages d'ouverture par jour, en minutes depuis minuit ; une plage qui passe minuit s'arrête à 1 440 (P0) et porte
+ * `finLendemain` quand sa fermeture tombe le jour suivant (0085 § 2 point d).
+ */
 function horairesDe(periodes: Periodes): DetailsLieu["horaires"] {
   if (periodes === undefined) return null;
-  const plages: { jour: number; debut: number; fin: number }[] = [];
+  const plages: NonNullable<DetailsLieu["horaires"]> = [];
   for (const { open, close } of periodes.periods) {
     const debut = open.hour * 60 + open.minute;
     if (close === undefined) {
@@ -105,13 +121,31 @@ function horairesDe(periodes: Periodes): DetailsLieu["horaires"] {
       for (let jour = 0; jour < 7; jour += 1) plages.push({ jour, debut: 0, fin: 1440 });
       continue;
     }
-    const fin = close.day === open.day ? close.hour * 60 + close.minute : 1440;
-    plages.push({ jour: open.day, debut, fin: Math.max(debut, fin) });
+    const fermeture = close.hour * 60 + close.minute;
+    const fin = close.day === open.day ? fermeture : 1440;
+    const lendemain = close.day === (open.day + 1) % 7 && fermeture > 0;
+    plages.push({ jour: open.day, debut, fin: Math.max(debut, fin), ...(lendemain ? { finLendemain: fermeture } : {}) });
   }
   return plages;
 }
 
-export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlaces {
+const PositionSchema = z.object({
+  id: z.string().regex(PLACE_ID),
+  location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
+});
+const IdentifiantSchema = z.object({ id: z.string().regex(PLACE_ID) });
+
+/** Fiche introuvable (0085 § 2 point c) : le seul `upstream_not_found` devient `place_not_found`, comme le double. */
+async function sansIntrouvable<T>(appel: () => Promise<T>): Promise<T> {
+  try {
+    return await appel();
+  } catch (erreur) {
+    if (erreur instanceof ErreurClientGoogle && erreur.code === "upstream_not_found") throw new ErreurAncrage("place_not_found");
+    throw erreur;
+  }
+}
+
+export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp {
   const cle = lireCleGoogle(options.environnement, options.execArgv);
   if (!cle.ok) throw new ErreurClientGoogle(cle.code);
   const parametres = { origine: ORIGINE_PLACES, cle: cle.cle, transport };
@@ -154,9 +188,11 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
     },
     async details(placeId: string) {
       if (!PLACE_ID.test(placeId)) throw new ErreurClientGoogle("invalid_request");
-      const brut = await appeler(
-        { chemin: `/v1/places/${placeId}`, methode: "GET", masque: MASQUE_DETAILS },
-        demande("places_details", SKU_DETAILS, COUT_ESTIME_MICROS.details),
+      const brut = await sansIntrouvable(() =>
+        appeler(
+          { chemin: `/v1/places/${placeId}`, methode: "GET", masque: MASQUE_DETAILS, introuvableSur404: true },
+          demande("places_details", SKU_DETAILS, COUT_ESTIME_MICROS.details),
+        ),
       );
       const lu = DetailsSchema.safeParse(brut);
       if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
@@ -168,6 +204,31 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
         position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude },
         horaires: horairesDe(lu.data.regularOpeningHours),
       };
+    },
+    async position(placeId: string) {
+      if (!PLACE_ID.test(placeId)) throw new ErreurClientGoogle("invalid_request");
+      const brut = await sansIntrouvable(() =>
+        appeler(
+          { chemin: `/v1/places/${placeId}`, methode: "GET", masque: MASQUE_POSITION, introuvableSur404: true },
+          demande("places_details", SKU_POSITION, COUT_ESTIME_MICROS.position),
+        ),
+      );
+      const lu = PositionSchema.safeParse(brut);
+      if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
+      return { placeId: lu.data.id, position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude } };
+    },
+    async identifiant(placeId: string) {
+      if (!PLACE_ID.test(placeId)) throw new ErreurClientGoogle("invalid_request");
+      const brut = await sansIntrouvable(() =>
+        appeler(
+          { chemin: `/v1/places/${placeId}`, methode: "GET", masque: MASQUE_IDENTIFIANT, introuvableSur404: true },
+          demande("places_details", SKU_IDENTIFIANT, COUT_ESTIME_MICROS.identifiant),
+        ),
+      );
+      // 0085 § 2 point b : un autre `id` valide est le rafraîchissement documenté par Google ; contrôlé par PLACE_ID.
+      const lu = IdentifiantSchema.safeParse(brut);
+      if (!lu.success) throw new ErreurClientGoogle("invalid_response");
+      return { placeId: lu.data.id };
     },
   };
 }

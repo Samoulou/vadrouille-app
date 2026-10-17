@@ -674,6 +674,15 @@ export default defineConfig([
     rules: { "ligne/ia-recherche-liste-blanche": "error", "ligne/complement-p0-imports": "error" },
   },
   {
+    // B8a (ticket 462 ; spécification B8a point 6, handover § 3 ; décision 0085 § 1.8 à § 1.10) : `src/grounding` en
+    // liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support` en plus ; exception
+    // nominative de `@/prototype/*` pour `ancrage.ts` et les modules de P0r3c, jusqu'à B8-TL-10), et
+    // `@/server/relecture/*` importable par la seule composition de génération. Règles propres au plugin, posées par ce
+    // seul bloc sur tout fichier (eslint-rules/grounding-imports.mjs ; tests/unit/lint/grounding-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/grounding-liste-blanche": "error", "ligne/relecture-imports": "error" },
+  },
+  {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
     // Workflow SDK dans `src/workflows/` seulement (`workflow/next` admis dans `next.config.ts`) ; `createWebhook`,
     // `createHook`, `defineHook`, `resumeHook`, `resumeWebhook` et `getHookByToken` interdits partout. Règle propre au

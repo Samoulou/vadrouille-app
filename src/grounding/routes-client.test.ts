@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { COUT_ELEMENT_MICROS, createRoutesClient, MASQUE_MATRICE, ORIGINE_ROUTES, SKU_MATRICE, type OptionsRoutes } from "@/grounding/routes-client";
+import { chargerTrajets } from "@/grounding/trajets";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
 import { creerPortMemoire } from "../../tests/support/port-consommation-memoire";
@@ -255,5 +256,27 @@ describe("p0: réservation avant chaque requête (Routes)", () => {
 describe("p0: coût estimé de la matrice égal à la table de prix (décision 0049 E2)", () => {
   it("élément de matrice : constante du client = prix du SKU de la table", () => {
     expect(COUT_ELEMENT_MICROS).toBe(prixUnitaireMicros(SKU_MATRICE));
+  });
+});
+
+// B8a (décision 0085 § 2 point c) : l'option `introuvableSur404` est réservée aux méthodes Place Details.
+describe("fiches: introuvable du client réel (Routes inchangé)", () => {
+  it("Routes 404 : upstream_error, jamais upstream_not_found", async () => {
+    const { client } = monter([async () => json({ error: { message: "SENTINELLE-FOURNISSEUR" } }, 404)]);
+    expect((await erreurDe(client.matrice({ origines: ["A"], destinations: ["B"], mode: "walk" }))).code).toBe("upstream_error");
+  });
+});
+
+// B8a : `ancrage: erreur de Google réduite à son code` pour `chargerTrajets` sur le client Routes réel.
+describe("ancrage: erreur de Google réduite à son code (client Routes réel)", () => {
+  it("chargerTrajets : réponse 403 à corps sentinelle → upstream_error, sans sentinelle ni durée", async () => {
+    const { client } = monter([async () => json({ error: { message: `SENTINELLE-FOURNISSEUR ${CLE}` } }, 403)]);
+    const points = [
+      { placeId: "SENTINELLE_A", position: { lat: 48.85, lng: 2.35 } },
+      { placeId: "SENTINELLE_B", position: { lat: 48.86, lng: 2.35 } },
+    ];
+    const resultat = await chargerTrajets(points, ["walk"], client);
+    expect(resultat).toEqual({ ok: false, code: "upstream_error", retryable: false });
+    expect(JSON.stringify(resultat)).not.toContain("SENTINELLE-FOURNISSEUR");
   });
 });
