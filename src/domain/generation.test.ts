@@ -7,9 +7,11 @@ import type { ConfigClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatEvenement, CandidatIdee, CandidatMoteur, EntreeMoteur, EtatChoix, Nuit } from "@/domain/entrees";
 import { generer, replanifierJour, type ResultatGeneration } from "@/domain/generation";
+import { estJourNonPlanifie, pointsDesJours } from "@/domain/jours-planifies";
 import { INCONNU, memePoint, type ModeTrajet, type Plage, type Point, type Relectures } from "@/domain/relectures";
 import { squeletteAvecEngagements } from "@/domain/squelette";
 import { versMinutes } from "@/domain/temps";
+import { estBloquante } from "@/domain/validation";
 import { etapesVerrouilleesModifiees } from "@/domain/verrous";
 
 /**
@@ -345,6 +347,7 @@ describe("moteur: réparation par l'option suivante, sans modèle", () => {
       dateReference: true,
       version: true,
       budgetTrajetReduit: true,
+      jours: true,
     } satisfies Record<keyof EntreeMoteur, true>;
     expect(Object.keys(cles).filter((cle) => /mod[eè]le|client|prompt|ia$/i.test(cle))).toEqual([]);
     expect(Object.keys(relectures()).sort()).toEqual(["duree", "plages", "validite"]);
@@ -555,5 +558,172 @@ describe("moteur: une étape verrouillée est conservée", () => {
     // Aucun lieu d'un autre jour n'est repris.
     const ailleurs = new Set(v3.days.filter((d) => d.index !== 2).flatMap((d) => etapes(d).map((s) => s.placeId)));
     for (const stop of etapes(resultat.jour)) if (!gardeesIds.has(stop.id)) expect(ailleurs.has(stop.placeId)).toBe(false);
+  });
+});
+
+describe("moteur: jours à planifier (B9-TL-13)", () => {
+  // Voyage de 4 jours, 3 nuits d'étiquettes distinctes : J3 et J4 sont seuls à lire la nuit 2.
+  const NUITS_4: Nuit[] = [
+    { etiquette: "Logement A", placeId: place("nuit-a") },
+    { etiquette: "Logement B", placeId: place("nuit-b") },
+    { etiquette: "Logement C", placeId: place("nuit-c") },
+  ];
+  const ENGAGEMENTS_4: TripCommitment[] = [
+    { kind: "flight", label: "Arrivée", date: "2026-11-23", start: "08:10", end: "11:40" },
+    { kind: "ticket", label: "Billet du J4", date: "2026-11-26", start: "10:00", end: "11:00" },
+    { kind: "flight", label: "Départ", date: "2026-11-26", start: "17:00" },
+  ];
+  const EVENEMENT_J3: CandidatEvenement = {
+    id: "ev-j3",
+    nom: "Événement maison J3",
+    resume: "Résumé maison.",
+    categorie: "museum",
+    faits: {},
+    sources: [{ url: "https://guide.example/ev-j3", date: "2026-10-01", classe: "independante" }],
+    placeId: place("ev-j3"),
+    aReserver: false,
+    evenement: { date: "2026-11-25", heure: "21:00", dateRelue: true },
+  };
+  const IDEE: CandidatIdee = {
+    ...candidat("idee-1", "activity"),
+    raison: "Raison maison idee-1.",
+  };
+  const PLUS = ["b1", "b2", "b3", "b4", "b5", "b6"].map((id) => candidat(id, "activity"));
+
+  function entree4(modif: Partial<EntreeMoteur> = {}): EntreeMoteur {
+    return entree({
+      voyage: { destination: "Édimbourg", start: "2026-11-23", end: "2026-11-26", timeZone: "Europe/London", travellers: { adults: 2, children: 0 } },
+      nuits: NUITS_4,
+      engagements: ENGAGEMENTS_4,
+      candidats: [...ACTIVITES, ...PLUS, ...REPAS, ...SOIREES],
+      evenements: [EVENEMENT_J3],
+      idees: [IDEE],
+      ...modif,
+    });
+  }
+
+  /** Relectures qui notent chaque lieu, nuit et date lus. */
+  function espion(): { relectures: Relectures; lieux: Set<string>; nuits: Set<number>; dates: Set<string> } {
+    const base = relectures();
+    const lieux = new Set<string>();
+    const nuits = new Set<number>();
+    const dates = new Set<string>();
+    const noter = (point: Point) => ("lieu" in point ? lieux.add(point.lieu) : nuits.add(point.logement));
+    return {
+      lieux,
+      nuits,
+      dates,
+      relectures: {
+        validite(placeId) {
+          lieux.add(placeId);
+          return base.validite(placeId);
+        },
+        plages(placeId, date) {
+          lieux.add(placeId);
+          dates.add(date);
+          return base.plages(placeId, date);
+        },
+        duree(depuis, vers, mode) {
+          noter(depuis);
+          noter(vers);
+          return base.duree(depuis, vers, mode);
+        },
+      },
+    };
+  }
+
+  it("sans jours, ou avec tous les jours : la même sortie que B5", () => {
+    expect(generer(entree4({ jours: [1, 2, 3, 4] }))).toEqual(generer(entree4()));
+    expect(generer(entree({ jours: [3, 1, 2, 2] }))).toEqual(generer(entree()));
+  });
+
+  it("jours hors de jours : termini de logement seuls, sans étape, événement ni idée (B9-PO-6)", () => {
+    const partiel = reussi(generer(entree4({ jours: [1, 2] })));
+    const complet = reussi(generer(entree4()));
+    expect(partiel.days.map((d) => d.index)).toEqual([1, 2, 3, 4]);
+    expect(jourN(partiel, 1)).toEqual(jourN(complet, 1));
+    expect(jourN(partiel, 2)).toEqual(jourN(complet, 2));
+    expect(jourN(partiel, 3)).toEqual({
+      index: 3,
+      date: "2026-11-25",
+      items: [
+        { type: "terminus", role: "start", time: "09:00", label: "Logement B" },
+        { type: "terminus", role: "end", time: "23:00", label: "Logement C" },
+      ],
+      events: [],
+      travelBudgetMinutes: jourN(complet, 3).travelBudgetMinutes,
+    });
+    // L'engagement du J4 n'est pas posé ; le vol de départ borne toujours la fin.
+    expect(jourN(partiel, 4).items).toEqual([
+      { type: "terminus", role: "start", time: "09:00", label: "Logement C" },
+      { type: "terminus", role: "end", time: "17:00", label: "Logement C" },
+    ]);
+    expect(jourN(complet, 3).events.map((e) => e.name)).toEqual(["Événement maison J3"]);
+    expect(TripSnapshotSchema.safeParse(partiel).success).toBe(true);
+  });
+
+  it("aucune relecture pour un point qui n'appartient qu'aux jours non planifiés", () => {
+    const { relectures: espionnes, lieux, nuits, dates } = espion();
+    reussi(generer(entree4({ jours: [1, 2], relectures: espionnes })));
+    expect(nuits.has(2)).toBe(false);
+    expect(lieux.has(place("ev-j3"))).toBe(false);
+    expect([...dates].sort()).toEqual(["2026-11-23", "2026-11-24"]);
+  });
+
+  it("pointsDesJours rend les nuits, engagements et événements des seuls jours demandés", () => {
+    const e = entree4();
+    expect(pointsDesJours(e, [1, 2])).toEqual([
+      { index: 1, date: "2026-11-23", nuits: [0], engagements: [ENGAGEMENTS_4[0]], evenements: [] },
+      { index: 2, date: "2026-11-24", nuits: [0, 1], engagements: [], evenements: [] },
+    ]);
+    expect(pointsDesJours(e, [3, 4])).toEqual([
+      { index: 3, date: "2026-11-25", nuits: [1, 2], engagements: [], evenements: [EVENEMENT_J3] },
+      { index: 4, date: "2026-11-26", nuits: [2], engagements: [ENGAGEMENTS_4[1], ENGAGEMENTS_4[2]], evenements: [] },
+    ]);
+    expect(pointsDesJours(e).map((p) => p.index)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("un jour hors du séjour est refusé (RangeError)", () => {
+    expect(() => generer(entree4({ jours: [5] }))).toThrow(RangeError);
+    expect(() => generer(entree4({ jours: [0] }))).toThrow(RangeError);
+    expect(() => pointsDesJours(entree4(), [1.5])).toThrow(RangeError);
+  });
+
+  it("replanifierJour planifie un jour de base non planifié, sans toucher aux autres jours (B9-PO-7)", () => {
+    const apercu = reussi(generer(entree4({ jours: [1, 2], version: 1 })));
+    expect(estJourNonPlanifie(jourN(apercu, 3))).toBe(true);
+    expect(estJourNonPlanifie(jourN(apercu, 2))).toBe(false);
+    const { relectures: espionnes, nuits, dates } = espion();
+    const resultat = replanifierJour(entree4({ version: 2, relectures: espionnes }), apercu, 3);
+    if (!resultat.ok) throw new Error(resultat.code);
+    const jour = resultat.jour;
+    expect(jour.index).toBe(3);
+    expect(etapes(jour).length).toBeGreaterThan(0);
+    expect(jour.events.map((e) => [e.id, e.name])).toEqual([["v2-j3-e1", "Événement maison J3"]]);
+    for (const stop of etapes(jour)) expect(stop.id).toMatch(/^v2-j3-\d+$/);
+    expect(jour.items.at(0)).toMatchObject({ type: "terminus", role: "start", label: "Logement B" });
+    expect(jour.items.at(-1)).toMatchObject({ type: "terminus", role: "end", label: "Logement C" });
+    // Aucun lieu des jours de l'aperçu n'est repris, ni leur idée.
+    const apercuLieux = new Set(
+      apercu.days.flatMap((d) => [...etapes(d).map((s) => s.placeId), ...(d.surprise === undefined ? [] : [d.surprise.placeId])]),
+    );
+    for (const stop of etapes(jour)) expect(apercuLieux.has(stop.placeId)).toBe(false);
+    if (jour.surprise !== undefined) expect(apercuLieux.has(jour.surprise.placeId)).toBe(false);
+    expect(resultat.rapport.filter((r) => estBloquante(r, [jour]))).toEqual([]);
+    expect([...dates]).toEqual(["2026-11-25"]);
+    expect(nuits.has(0)).toBe(false);
+    expect(TripSnapshotSchema.safeParse({ days: [jour] }).success).toBe(true);
+  });
+
+  it("replanifierJour pose l'engagement d'un jour de base non planifié, verrouillé (B5-PO-12)", () => {
+    const apercu = reussi(generer(entree4({ jours: [1, 2], version: 1 })));
+    const resultat = replanifierJour(entree4({ version: 2 }), apercu, 4);
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(etapes(resultat.jour).find((s) => s.commitment === "ticket")).toMatchObject({
+      name: "Billet du J4",
+      start: "10:00",
+      end: "11:00",
+      locked: true,
+    });
   });
 });

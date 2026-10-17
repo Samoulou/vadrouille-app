@@ -13,7 +13,8 @@ import { classer, type ParametresClassement } from "@/domain/classement";
 import type { CandidatEvenement, CandidatIdee, CandidatMoteur, EntreeMoteur, EtatChoix, Nuit } from "@/domain/entrees";
 import { identifiantEtape } from "@/domain/identifiant";
 import { planifierJour, type ResultatJour, type Trajet } from "@/domain/planification";
-import { finDuJour, tempsLibreAvant } from "@/domain/journee";
+import { DERNIERE_HEURE, finDuJour, tempsLibreAvant } from "@/domain/journee";
+import { estJourNonPlanifie, joursAPlanifier } from "@/domain/jours-planifies";
 import { INCONNU, trajetLePlusRapide, type ModeTrajet, type Point, type Relectures } from "@/domain/relectures";
 import {
   finOccupee,
@@ -294,6 +295,25 @@ function construireJour(squeletteDuJour: JourSquelette, plan: ResultatJour, cont
   };
 }
 
+/**
+ * Jour non planifié (B9-PO-6 ; 0081 § B9-TL-13) : terminus `start` au logement de départ à l'heure de début du
+ * squelette, terminus `end` au logement d'arrivée à sa fin, sans étape, sans trajet, sans événement ni idée.
+ * Aucune relecture n'est lue pour ce jour.
+ */
+function jourNonPlanifie(squeletteDuJour: JourSquelette, nuits: readonly Nuit[]): DaySnapshot {
+  const fin = Math.min(DERNIERE_HEURE, Math.max(squeletteDuJour.debut, squeletteDuJour.fin));
+  return {
+    index: squeletteDuJour.index,
+    date: squeletteDuJour.date,
+    items: [
+      { type: "terminus", role: "start", time: versHeure(squeletteDuJour.debut), label: etiquette(nuits, squeletteDuJour.logementDepart) },
+      { type: "terminus", role: "end", time: versHeure(fin), label: etiquette(nuits, squeletteDuJour.logementArrivee) },
+    ],
+    events: [],
+    travelBudgetMinutes: squeletteDuJour.budgetTrajet,
+  };
+}
+
 function etapeEvenement(evenement: CandidatEvenement, id: string): StopSnapshot {
   const source = sourceDe(evenement);
   return {
@@ -431,9 +451,14 @@ function planifierAvecReparation(
 /**
  * Génère le programme d'un voyage (version `entree.version`) : instantané validé par `TripSnapshotSchema` et rapport
  * en mémoire, ou refus `no_option` si une entrée bloquante du rapport subsiste après réparation.
+ *
+ * Moteur partiel (0081 § B9-TL-13) : avec `entree.jours`, seuls ces jours sont planifiés ; les autres sont rendus
+ * non planifiés (B9-PO-6), sans aucune lecture des relectures pour eux. R1 à R10 s'appliquent aux jours planifiés.
+ * `jours` absent : tout le voyage, comme B5.
  */
 export function generer(entree: EntreeMoteur): ResultatGeneration {
   const contexte = contexteDe(entree);
+  const planifies = joursAPlanifier(entree.voyage, entree.jours);
   const jours = squeletteAvecEngagements({
     voyage: { start: entree.voyage.start, end: entree.voyage.end },
     pace: entree.brief.pace,
@@ -442,11 +467,12 @@ export function generer(entree: EntreeMoteur): ResultatGeneration {
     configuration: entree.configuration,
     budgetTrajetReduit: entree.budgetTrajetReduit,
   });
+  const aPlanifier = jours.filter((jour) => planifies.has(jour.index));
 
   // Programme (`items`), jour par jour : un candidat n'est retenu qu'une fois dans le voyage.
   const utilises = new Set<string>();
   const construits: JourConstruit[] = [];
-  for (const jour of jours) {
+  for (const jour of aPlanifier) {
     const construit = planifierAvecReparation(jour, contexte, utilises);
     if (construit === undefined) return REFUS_AUCUNE_OPTION;
     construits.push(construit);
@@ -458,8 +484,8 @@ export function generer(entree: EntreeMoteur): ResultatGeneration {
     for (const item of construit.jour.items) if (item.type === "stop" && item.stop.placeId !== undefined) lieuxUtilises.add(item.stop.placeId);
   }
   const idsUtilises = new Set(utilises);
-  const days: DaySnapshot[] = construits.map((construit, rang) => {
-    const squeletteDuJour = jours.at(rang);
+  const planifiesEcrits: DaySnapshot[] = construits.map((construit, rang) => {
+    const squeletteDuJour = aPlanifier.at(rang);
     if (squeletteDuJour === undefined) throw new Error("moteur : jour sans squelette");
     const index = construit.jour.index;
     const events = evenementsDuJour(construit.jour.date, entree.evenements, entree.voyage, entree.relectures, contexte.portee).map(
@@ -485,8 +511,10 @@ export function generer(entree: EntreeMoteur): ResultatGeneration {
     return jour;
   });
 
-  const rapport = validerProgramme(days, contexteValidation(contexte, construits));
-  if (rapport.some((entreeRapport) => estBloquante(entreeRapport, days))) return REFUS_AUCUNE_OPTION;
+  const rapport = validerProgramme(planifiesEcrits, contexteValidation(contexte, construits));
+  if (rapport.some((entreeRapport) => estBloquante(entreeRapport, planifiesEcrits))) return REFUS_AUCUNE_OPTION;
+  const ecrits = new Map(planifiesEcrits.map((jour) => [jour.index, jour]));
+  const days = jours.map((jour) => ecrits.get(jour.index) ?? jourNonPlanifie(jour, entree.nuits));
   return { ok: true, instantane: TripSnapshotSchema.parse({ days }), rapport };
 }
 
@@ -495,29 +523,40 @@ export function generer(entree: EntreeMoteur): ResultatGeneration {
  * sont des blocs fixes, gardés à l'identique avec leur identifiant, jamais remplacés par un candidat, même meilleur ;
  * les autres créneaux sont replanifiés depuis la réserve, sans reprendre un lieu déjà présent ailleurs dans le
  * voyage. Événements et idée du jour sont repris tels quels. R3 est contrôlée contre l'instantané de base.
+ *
+ * Jour de base non planifié (B9-PO-6 ; 0081 § B9-TL-13, voyage complet de B9d) : il est planifié comme par
+ * `generer` — engagements de sa date posés et verrouillés (B5-PO-12), puis événements et idée du jour (B5-PO-16),
+ * sans reprendre un lieu ni une idée déjà présents dans le voyage.
  */
 export function replanifierJour(entree: EntreeMoteur, base: TripSnapshot, index: number): ResultatReplanification {
   const contexte = contexteDe(entree);
   const jourBase = base.days.find((jour) => jour.index === index);
-  const squeletteDuJour = squelette({
+  const nonPlanifie = jourBase !== undefined && estJourNonPlanifie(jourBase);
+  const entreeSquelette = {
     voyage: { start: entree.voyage.start, end: entree.voyage.end },
     pace: entree.brief.pace,
     nombreDeNuits: entree.nuits.length,
     engagements: entree.engagements,
     configuration: entree.configuration,
     budgetTrajetReduit: entree.budgetTrajetReduit,
-  }).find((jour) => jour.index === index);
+  };
+  const squeletteDuJour = (nonPlanifie ? squeletteAvecEngagements(entreeSquelette) : squelette(entreeSquelette)).find(
+    (jour) => jour.index === index,
+  );
   if (jourBase === undefined || squeletteDuJour === undefined) throw new RangeError("moteur : jour hors du séjour");
 
-  const blocs: BlocFixe[] = jourBase.items
-    .flatMap((item) => (item.type === "stop" && (item.stop.locked || item.stop.commitment !== undefined) ? [item.stop] : []))
-    .map((stop) => ({ id: stop.id, stop: sansIdentifiant(stop), debut: versMinutes(stop.start), fin: finOccupee(stop, entree.configuration) }))
-    .sort((a, b) => a.debut - b.debut);
-  const jour: JourSquelette = {
-    ...squeletteDuJour,
-    creneaux: retirerCreneaux(squeletteDuJour.creneaux, blocs, entree.configuration),
-    fixes: blocs,
-  };
+  let jour: JourSquelette = squeletteDuJour;
+  if (!nonPlanifie) {
+    const blocs: BlocFixe[] = jourBase.items
+      .flatMap((item) => (item.type === "stop" && (item.stop.locked || item.stop.commitment !== undefined) ? [item.stop] : []))
+      .map((stop) => ({ id: stop.id, stop: sansIdentifiant(stop), debut: versMinutes(stop.start), fin: finOccupee(stop, entree.configuration) }))
+      .sort((a, b) => a.debut - b.debut);
+    jour = {
+      ...squeletteDuJour,
+      creneaux: retirerCreneaux(squeletteDuJour.creneaux, blocs, entree.configuration),
+      fixes: blocs,
+    };
+  }
 
   // Lieux déjà présents ailleurs dans le voyage, ou gardés dans ce jour : leurs candidats ne sont pas repris.
   const lieux = new Set<string>();
@@ -533,11 +572,25 @@ export function replanifierJour(entree: EntreeMoteur, base: TripSnapshot, index:
 
   const construit = planifierAvecReparation(jour, contexte, utilises, base.days);
   if (construit === undefined) return REFUS_AUCUNE_OPTION;
-  const resultat: DaySnapshot = {
-    ...construit.jour,
+  let ajouts: Pick<DaySnapshot, "events" | "surprise"> = {
     events: jourBase.events,
     ...(jourBase.surprise === undefined ? {} : { surprise: jourBase.surprise }),
   };
+  if (nonPlanifie) {
+    for (const item of construit.jour.items) if (item.type === "stop" && item.stop.placeId !== undefined) lieux.add(item.stop.placeId);
+    const events = evenementsDuJour(construit.jour.date, entree.evenements, entree.voyage, entree.relectures, contexte.portee).map(
+      (evenement, position) => etapeEvenement(evenement, identifiantEtape(entree.version, index, "evenement", position + 1)),
+    );
+    const idee = ideeDuJour(entree.idees, {
+      logement: squeletteDuJour.logementArrivee,
+      relectures: entree.relectures,
+      trajet: contexte.trajet,
+      parametres: contexte.parametres,
+      exclus: { ids: utilises, lieux },
+    });
+    ajouts = { events, ...(idee === undefined ? {} : { surprise: ideeEcrite(idee, identifiantEtape(entree.version, index, "idee")) }) };
+  }
+  const resultat: DaySnapshot = { ...construit.jour, ...ajouts };
   const rapport = validerProgramme([resultat], contexteValidation(contexte, [{ ...construit, jour: resultat }], base.days));
   return { ok: true, jour: TripSnapshotSchema.parse({ days: [resultat] }).days.at(0) ?? resultat, rapport };
 }
