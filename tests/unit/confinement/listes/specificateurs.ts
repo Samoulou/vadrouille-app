@@ -75,11 +75,14 @@ export const SPECIFICATEURS = [
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
   // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.
   { specificateur: "workflow", zones: ["src/workflows/**", "next.config.ts", "tests/unit/workflows/**"] },
-  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1 et 4 ; liste de 0008) : `nodemailer` 10.0.16, confiné à
-  // `src/server/mail/` (compilation de l'enveloppe par `MailComposer`) et au critère E3 (`addressparser`). Verdict
-  // Sécurité demandé dans la PR, qui cite le lockfile ; classement en module à capacité (transport SMTP) : question à
-  // la Sécurité, avant `src/server/mail/smtp.ts`.
-  { specificateur: "nodemailer", zones: ["src/server/mail/**", "tests/unit/server/email-ip.test.ts"] },
+  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1 et 4 ; liste de 0008) : deux sous-chemins **exacts** de
+  // `nodemailer` 10.0.16, sans capacité réseau : `MailComposer` (compilation de l'enveloppe) dans `src/server/mail/`,
+  // `addressparser` dans le seul test du critère E3. Ni `nodemailer`, ni `createTransport`, ni `smtp-connection`, ni
+  // `fetch` : le transport SMTP et le classement en module à capacité suivent dans la PR de `src/server/mail/smtp.ts`.
+  // Sécurité : dépendance conforme (lockfile, intégrité, aucun script), lignes exactes demandées par le bloquant 1 de
+  // la revue consolidée du head `1b3a97d` (PR 437).
+  { specificateur: "nodemailer/lib/mail-composer", zones: ["src/server/mail/**"], sousChemins: "exacts" },
+  { specificateur: "nodemailer/lib/addressparser", zones: ["tests/unit/server/email-ip.test.ts"], sousChemins: "exacts" },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
   // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).

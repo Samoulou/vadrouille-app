@@ -112,18 +112,22 @@ describe("auth: forme canonique de l'adresse e-mail", () => {
       "0@1.exemple.test",
       "a@x-y.exemple.test",
       `${"a".repeat(64)}@exemple.test`,
-      `${"a".repeat(60)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(61)}.test`,
+      `${"a".repeat(60)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(60)}.test`,
       // Chaque caractère de la liste blanche, à chaque position admise de la partie locale.
-      ..."abcxyzABCXYZ0189._+-".split("").flatMap((c) => [`x${c}y@exemple.test`, `${c}y@exemple.test`, `x${c}@exemple.test`]),
+      // (`.` et `+` refusés en tête, `.` refusé en fin : ces positions sont omises).
+      ..."abcxyzABCXYZ0189._+-".split("").flatMap((c) => [
+        `x${c}y@exemple.test`,
+        ...(c === "." || c === "+" ? [] : [`${c}y@exemple.test`]),
+        ...(c === "." ? [] : [`x${c}@exemple.test`]),
+      ]),
     ];
-    let vues = 0;
+    expect(admises.length).toBeGreaterThan(60);
     for (const entree of admises) {
       const lu = parseEmailAddress(entree);
+      expect(lu.ok, entree).toBe(true);
       if (!lu.ok) continue;
-      vues += 1;
       expect(addressparser(lu.email), entree).toEqual([{ address: lu.email, name: "" }]);
     }
-    expect(vues).toBeGreaterThan(50);
   });
 });
 

@@ -72,11 +72,12 @@ const PAQUETS_TS = [
   {
     paquet: "nodemailer",
     usage:
-      "e-mail du code de connexion vers Mailpit (B3b-envoi, décision 0008) : compilation de l'enveloppe par `MailComposer` (`src/server/mail/enveloppe.ts`), " +
-      "`addressparser` du critère E3 ; aucune dépendance, aucun script d'installation",
+      "e-mail du code de connexion vers Mailpit (B3b-envoi, décision 0008) : compilation de l'enveloppe par `nodemailer/lib/mail-composer` (`src/server/mail/enveloppe.ts`), " +
+      "`nodemailer/lib/addressparser` du critère E3 ; sous-chemins exacts, aucun transport ; aucune dépendance, aucun script d'installation",
     verdict:
-      "B3b-envoi (ticket 435) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 10.0.16, intégrité " +
-      "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, hors de `onlyBuiltDependencies`",
+      "B3b-envoi (ticket 435, PR 437) ; Sécurité : dépendance conforme sur le head `1b3a97d` (revue consolidée : lockfile, version exacte 10.0.16, intégrité " +
+      "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, aucun script d'installation, hors de `onlyBuiltDependencies`) ; " +
+      "spécificateurs réduits à deux sous-chemins exacts (bloquant 1 de cette revue)",
   },
 ] as const satisfies readonly LignePaquet[];
 
