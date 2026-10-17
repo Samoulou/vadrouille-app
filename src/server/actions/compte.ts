@@ -51,3 +51,18 @@ export async function verifyCode(input: unknown): Promise<Result<SignedIn>> {
     return fail("provider_error");
   }
 }
+
+/**
+ * Une session existe-t-elle dans la portée de simulation de la requête (F8c) ? Lu par les pages `R4` et `R-lancer`
+ * (composants serveur) : une personne déjà connectée saute l'écran 4 (F8-PO-2), et `R-lancer` n'appelle `createTrip`
+ * qu'avec une session (garde du lancement, simple confort : `createTrip` vérifie lui-même la session). Aucune donnée de
+ * session n'est renvoyée ; garde fermée de l'adaptateur `auth` ou erreur : `false`.
+ */
+export async function hasSession(): Promise<boolean> {
+  const scope = await getSimulationScope();
+  try {
+    return (await getAuthAdapter({ scope }).getSession()) !== null;
+  } catch {
+    return false;
+  }
+}

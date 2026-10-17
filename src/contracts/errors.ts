@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { API_ERROR_CODES } from "./values";
+import { API_ERROR_CODES, TRIP_ID_PATTERN } from "./values";
 
 /**
  * Format d'erreur commun des actions serveur (décision 0017 § 4, reprise par 0020 § 1.3) : codes en
@@ -19,6 +19,12 @@ export const ApiErrorSchema = z
      * `version_conflict` ; l'interface propose alors de rejouer la révision (`retryable: true`). B5 la remplit.
      */
     currentVersion: z.number().int().positive().optional(),
+    /**
+     * Voyage dont la génération est en cours (F8c, cadrage § 4 : un aperçu actif à la fois par compte), présent si
+     * et seulement si `code` vaut `active_preview_exists` ; l'écran renvoie à ce voyage (« Voir ces propositions »,
+     * 0018 § 18). Calculé par le serveur.
+     */
+    activeTripId: z.string().regex(TRIP_ID_PATTERN).optional(),
   })
   .superRefine((error, ctx) => {
     const conflict = error.code === "version_conflict";
@@ -31,6 +37,13 @@ export const ApiErrorSchema = z
     }
     if (conflict && error.retryable !== true) {
       ctx.addIssue({ code: "custom", message: "version_conflict : retryable vaut true", path: ["retryable"] });
+    }
+    if ((error.code === "active_preview_exists") !== (error.activeTripId !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "activeTripId présent si et seulement si code vaut active_preview_exists",
+        path: ["activeTripId"],
+      });
     }
   });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

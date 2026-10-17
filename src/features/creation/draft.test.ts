@@ -9,6 +9,7 @@ import { MOCK_DEMO_TRIP_DRAFT } from "@/mocks/creation-edimbourg";
 import {
   adjacentLodgingCity,
   cityKey,
+  draftComplete,
   draftForLodging,
   draftReducer,
   initialDraft,
@@ -226,5 +227,32 @@ describe("brouillon : écran 3 (F8b, F8-PO-8)", () => {
     expect(state.briefReady).toBe(true);
     expect(state.lodgingCity).toBe(0);
     expect(toTripDraft(state.trip)).toEqual(MOCK_DEMO_TRIP_DRAFT);
+  });
+});
+
+describe("brouillon : lancement (F8c)", () => {
+  const NONE = { kind: "none" } as const;
+
+  it("requestId : créé une fois par brouillon, le premier est gardé", () => {
+    const state = run([
+      { type: "requestId", requestId: "5b0f3f39-4a5e-4d0c-9a59-1c2f0a7c5e11" },
+      { type: "requestId", requestId: "0c6a1b0e-3d7f-4b8e-8f2a-6b9d5e4c3a21" },
+    ]);
+    expect(state.requestId).toBe("5b0f3f39-4a5e-4d0c-9a59-1c2f0a7c5e11");
+    expect(initialDraft().requestId).toBeNull();
+  });
+
+  it("brouillon complet : écrans 1 et 2 validés et un choix de l'écran 3 pour chaque ville « Pas encore »", () => {
+    expect(draftComplete(initialDraft())).toBe(false);
+    const lodging = draftForLodging({ ...MOCK_DEMO_TRIP_DRAFT, otherCities: [{ name: "Glasgow", arrival: "2026-09-01", lodging: NONE }] });
+    expect(draftComplete(lodging)).toBe(false);
+    const one = run([{ type: "lodgingChoice", city: 0, choice: NONE, next: 1 }], lodging);
+    expect(draftComplete(one)).toBe(false);
+    const both = run([{ type: "lodgingChoice", city: 1, choice: NONE, next: null }], one);
+    expect(draftComplete(both)).toBe(true);
+    expect(draftComplete({ ...both, briefReady: false })).toBe(false);
+    // Logement connu : aucun écran 3.
+    const known = draftForLodging({ ...MOCK_DEMO_TRIP_DRAFT, lodging: { kind: "known", label: "[Hôtel]" } });
+    expect(draftComplete(known)).toBe(true);
   });
 });

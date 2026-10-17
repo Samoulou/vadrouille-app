@@ -215,7 +215,7 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `CodeVerification` | Adresse et code à 6 chiffres (0017 § 2.4) | F8b |
 | `Session` | Session lue par l'interface : `sessionId`, `userId`, `organizationId` (0017 § 2.4) | F8b ; complété par B3 |
 | `AuthAdapter` | Adaptateur `auth` : demander un code, le vérifier, lire la session, se déconnecter | F8b ; adaptateur Better Auth par B3 |
-| `TripRequest` | `requestId`, brouillon, brief (0017 § 2.4) | F8c |
+| `TripRequest` | `requestId`, brouillon, brief (0017 § 2.4) | F8c ; repris par B9 |
 | `GenerationStatus` | Phases, jours prêts, compteurs `expected` et `ready`, raison d'échec (0017 § 2.4) | F8c ; complété par B9 |
 | `ReplacementRequest` | Étape, raison (`PreferenceReason`), souhait, version de base (0016 § 4.1) | F7a ; complété par B11 |
 | `RevisionPreview` | Aperçu d'une révision : jours touchés, `Change`, étape visée (0016 § 4.2) | F7a ; complété par B11 |
@@ -256,7 +256,7 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 **Correspondance `PreferenceSignal` → `RetainedPreference`** (B10, fonction pure de `src/domain`) : seuls les signaux de statut `confirmed` ou `inferred` (jamais `cancelled`) produisent une préférence retenue ; `origin` reprend le statut ; un signal de catégorie (refus confirmé par `answerYes`, ou trois « j'aime » déduits) donne `subject = { kind: "category", category, direction }` (`less` pour un refus, `more` pour une envie) ; un signal `travelReduction` donne `subject = { kind: "distance" }` ; `id = preferenceKey(subject)`, si bien que plusieurs signaux d'un même sujet donnent une seule préférence, et « Retirer » annule tous les signaux de ce sujet (`status = cancelled`). Test `préférences: un signal annulé ne produit aucune préférence retenue` (B10).
 
 ### Format d'erreur commun et états de l'interface
-`ApiError` existe (`src/contracts/errors.ts`, décision 0017 § 4) : `code` (énumération `API_ERROR_CODES` de `src/contracts/values.ts`, étendue sans renommer par chaque tâche), `field` (chemin construit à partir des clés connues du schéma, jamais la valeur reçue), `retryable`, et `currentVersion` (conflit, évolution E10, fait par B2). L'interface choisit le texte (`src/i18n/fr.json`) et l'état à afficher :
+`ApiError` existe (`src/contracts/errors.ts`, décision 0017 § 4) : `code` (énumération `API_ERROR_CODES` de `src/contracts/values.ts`, étendue sans renommer par chaque tâche), `field` (chemin construit à partir des clés connues du schéma, jamais la valeur reçue), `retryable`, `currentVersion` (conflit, évolution E10, fait par B2) et `activeTripId` (aperçu déjà en préparation, évolution E12, fait par F8c). L'interface choisit le texte (`src/i18n/fr.json`) et l'état à afficher :
 | Codes | État du handover front (StatusBanner, écran « États ») |
 |---|---|
 | (pas de réponse réseau, détecté par l'interface) | `offline` |
@@ -288,6 +288,7 @@ Appliquées par **B2** (une seule PR, avec `src/mocks/edimbourg.ts`, les composa
 | E9 | `ChecklistItem.stopId` (décision 0016 § 11), par la tâche qui applique F7-PO-19, ou par B2 si le schéma de base vient avant — **fait (B2)** | lignes du Tattoo reliées à leur étape | ChecklistRow, rappels de l'écran 15 (Q187) |
 | E10 | `ApiError.currentVersion` (B5) — **fait (B2)** | — | bandeau `conflict` |
 | E11 | `Trip.timeZone` (identifiant IANA obligatoire, F10-TL-1 ; décision 0021 § 3) et `TripSummary.timeZone` (repris de `TripSchema` par `pick`, 0021 § 1.2), créés par F10a (ou par F11a si F10a n'est pas fusionnée, 0021 § 3) ; côté serveur, colonne `trips.time_zone` (§ 6) et ligne `Trip.timeZone` du § 5 | `Europe/London` (Édimbourg), `Europe/Lisbon` | écran 15, « Mes voyages » (date locale de la destination) |
+| E12 | `ApiError.activeTripId` (F8c) — **fait** : identifiant du voyage en préparation, présent si et seulement si `code` vaut `active_preview_exists` (`superRefine`, comme `currentVersion`) ; `createTrip` renvoie `Result<CreatedTrip>` | — | `R-lancer` : bandeau `conflict` et « Voir ces propositions » |
 
 ---
 
@@ -495,6 +496,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `ApiError.field` | calculé | Serveur, chemin construit depuis les clés du schéma (décision 0017 § 4) |
 | `ApiError.retryable` | calculé | Serveur |
 | `ApiError.currentVersion` | calculé | Serveur, depuis `trips.current_version`, seulement avec le code `version_conflict` (évolution E10) |
+| `ApiError.activeTripId` | calculé | Serveur, voyage de l'organisation dont la génération n'est pas finie, seulement avec le code `active_preview_exists` (évolution E12, F8c) |
 
 **Où vit l'aperçu et la suite du tri (fait, B2).** `Proposal` et `PreviewSlot` ne sont pas dans l'instantané d'une version : ils vivent dans la table `proposals` (§ 6), une ligne par case, écrite par le workflow 1 (aperçu) ou par la suite du tri, jamais modifiée ensuite (les décisions vont dans `preference_signals`). Une case `noOption` n'y a que `day`, `time` et `kind`. Une case `proposal` porte `content`, validé par `ProposalRecordSchema` (`src/contracts/snapshot.ts`), dérivé de `ProposalBaseSchema` par omission des champs calculés (`neighbours`, `option`) et chargés à la demande (`photoUrl`), avec `stop` en `StopSnapshot` (sans `verifiedAt`, `exceptions` sans `toConfirm`) et `travelFromPrevious` en `SegmentSnapshot` (sans `minutes`) ; `detour` y est obligatoire (« Partie Q5 ») et `stop.commitment` refusé. `TripAdapter.listPreviewSlots` et `listProposals` recomposent la `Proposal` complète et la valident par `ProposalSchema` (`neighbours` calculé à la lecture, 0037).
 
