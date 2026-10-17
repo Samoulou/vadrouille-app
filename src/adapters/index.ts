@@ -12,7 +12,7 @@ import { prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
-import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, type SimulationScope } from "./simulation";
+import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
 export type {
@@ -70,14 +70,22 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
 
 /**
  * Création du voyage (décision 0017 § 3.1), selon la variable serveur `DATA_ADAPTER` (`mock` par défaut, même
- * normalisation que `getTripAdapter`, erreur pour une valeur inconnue). Sans portée de simulation (§ 10) :
- * `structureBrief` et `suggestLodging` ne gardent rien ; F8c ajoutera la portée pour y ranger son état.
+ * normalisation que `getTripAdapter`, erreur pour une valeur inconnue). L'état simulé (lancements, issue de la
+ * génération, horloge) vit dans la portée `options.scope` (portée par défaut sinon, § 10) ; `structureBrief` et
+ * `suggestLodging` ne gardent rien. Les voyages sont lus par `getTripAdapter()` (voyage jamais lancé dans la portée).
  */
-export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER): CreationAdapter {
+export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): CreationAdapter {
   const choice = adapterChoice(value);
   switch (choice) {
-    case "mock":
-      return createMockCreationAdapter();
+    case "mock": {
+      const scope = options.scope ?? defaultScope();
+      return createMockCreationAdapter({
+        now: () => scope.clock.now(),
+        store: scope.creation,
+        trips: getTripAdapter(value),
+        maxLaunches: MAX_LAUNCHES_PER_SCOPE,
+      });
+    }
     case "api":
       throw new Error("adaptateur api de création non implémenté (B9)");
     case "prototype":

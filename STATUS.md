@@ -1,27 +1,27 @@
-# État du studio — 2026-10-17 (87e cycle)
+# État du studio — 2026-10-17 (88e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 3 sur 20).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 4 sur 20).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 86e cycle (fil du cycle ni #studio).
+- Aucun nouveau message depuis le 87e cycle (fil du cycle ni #studio).
 
 ## Fait
-- Fusionnées : statut du 86e cycle (#427), **décision 0080** (#428, amendement de 0077 pour B7a ; définitive à 06:21 UTC).
-- **B7a (#424)** : correction 1 approuvée (Tech Lead et Sécurité, `techlead-approved`, head `dab3259`). Fusion automatique suspendue par le CEO jusqu'à la fin du veto de 0080 (2026-10-17 06:21 UTC), puis réactivée.
-- Spécification B9 (#429) écrite : découpage B9a à B9e ; CEO : ordre accepté, F8c ouverte (Q469).
+- Fusionnées : statut du 87e cycle (#431), **spécification B9** (#429, après un bloquant tardif non compté), **B7a** (#424, couche IA de production, fusionnée à 06:23 UTC après la fin du veto de 0080).
+- **F8c** (#432) : corrections 1 et 2 faites (`activeTripId` dans `ApiError`, références visuelles, textes provisoires consignés dans la spec F8) ; il restait un bloquant de rédaction : troisième tentative bornée (Q470), documentation seulement, poussée.
 
 ## En cours
-- product-owner : spécification B9 (#429), correction 1 (comptée) : 6 bloquants du Tech Lead.
-- frontend : **F8c** (#430), lancement de la génération et écran 5, sur l'adaptateur simulé.
+- tech-lead : **décision 0081** (#434, ticket #433, B9-TL-1 à B9-TL-14) ; correction 1 (comptée) poussée, en revue.
+- backend : **B3b** (ticket #435), envoi du code de connexion par e-mail vers Mailpit seulement.
+- frontend : F8c (#432), revue de la troisième tentative bornée après CI verte.
 - En attente de Samuel : release `main` → `p0-reel` (#422, carte et temps de trajet) après son accord écrit sur #419.
 
 ## Bloqué
-- **B3b, B8c, B7c** : après la fusion de B7a (fichiers communs ; B3b et B8c jamais dans le même cycle). **B4a** : B3b, Q352, Sécurité sur B4-TL-3 et B4-TL-6. **B6a** : B3b. **B8a** : B7a, B7c. **B3c** : B3b.
-- **B9** : spec en correction ; B9e : Q465 (plafonds), Q467 ; B9c réel : Q468.
+- **B8c** : pas dans le même cycle que B3b. **B7c** : B9-TL-4 (#434) puis 6 h de veto. **B8a** : B7c. **B4a** : B3b, Q352, Sécurité sur B4-TL-3 et B4-TL-6. **B6a** : B3b. **B3c** : B3b.
+- **B9** : B9b après 0081 (et sa PR de contrat) ; PR de moteur de B9-TL-13 avant B9c ; B9e : Q465 (plafonds), Q467 ; B9c réel : Q468.
 
 ## Prochain cycle
-1. Réactiver la fusion automatique de B7a après 06:21 UTC ; puis ouvrir B7c et B3b (ou B8c), un seul des deux derniers par cycle.
-2. Suivre la correction de B9 et F8c.
+1. Suivre F8c, 0081 et B3b jusqu'à la fusion ; après 0081 : ticket B7c, ticket de la PR de moteur (B9-TL-13), puis B9b.
+2. B8c au cycle suivant celui de B3b.
 3. Tickets : page de jugement de P0r4 et son e2e ; refus de lancement si la purge a plus de 24 h ; nombre d'appels Google dans le rapport d'essai ; adaptateur Resend. Cartes à Samuel : Q354, puis Q39/Q465.
 
 ## Décisions attendues de Samuel
@@ -44,7 +44,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q465 à Q469.
+- Q470, Q471.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).

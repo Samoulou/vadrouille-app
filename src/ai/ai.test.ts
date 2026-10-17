@@ -4,39 +4,32 @@ import { describe, expect, it, vi } from "vitest";
 import { avecGardeDataCollection, ErreurModele, type ClientModeles, type RequeteModele } from "@/ai/client";
 import { DEBUT_DONNEES, donneesDe, encadrer, requeteNotation } from "@/ai/requetes";
 import { lireNotes, lirePlan, lireRaisons, lireTour } from "@/ai/sorties";
-import type { Brief } from "@/prototype/brief";
-import type { Candidat } from "@/prototype/candidat";
+import type { CandidatPourModele, EntreeModeles } from "@/ai/entrees";
 
 const ROUTAGE = { data_collection: "deny" as const };
 
-const BRIEF: Brief = {
-  schema: 1,
+// Types de production (B7a, décision 0077 § 1 point 7) : `src/ai` n'importe plus rien de `src/prototype`, tests compris.
+const ENTREE: EntreeModeles = {
   destination: "Édimbourg",
   pays: "Royaume-Uni",
-  fuseau: "Europe/London",
   arrivee: "2026-11-23",
   depart: "2026-11-25",
-  heureArrivee: "12:00",
-  heureDepart: "16:00",
   voyageurs: { adultes: 2, enfants: 0 },
-  rythme: "equilibre",
+  rythme: "balanced",
   envies: ["walk"],
   deplacements: ["walk"],
-  logements: [{ texte: "Logement de test", nuits: 2 }],
 };
 
-const CANDIDAT: Candidat = {
+const CANDIDAT: CandidatPourModele = {
   id: "c_001",
   nom: "Lieu maison",
   resume: "Résumé maison.",
   categorie: "walk",
   typeEtape: "activity",
-  source: { url: "https://guide.example/page", date: "2026-09-01", classe: "independante" },
-  aReserver: false,
 };
 
 function requete(modifs: Partial<RequeteModele> = {}): RequeteModele {
-  return { ...requeteNotation(BRIEF, [CANDIDAT], "test/modele-a", ROUTAGE), ...modifs };
+  return { ...requeteNotation(ENTREE, [CANDIDAT], "test/modele-a", ROUTAGE), ...modifs };
 }
 
 describe("p0: le client de modèles refuse de partir sans data_collection deny", () => {

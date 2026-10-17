@@ -66,4 +66,11 @@ describe("server-only obligatoire", () => {
       expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(1);
     }
   });
+
+  it("B7a : vers-couche-ia de src/server/p0 sans import \"server-only\" est accepté (décision 0077 § 1 point 5) ; ses voisins de nom restent signalés", async () => {
+    expect(await messagesFor(WITHOUT, "src/server/p0/vers-couche-ia.ts")).toHaveLength(0);
+    for (const filePath of ["src/server/p0/vers-couche-ia2.ts", "src/server/p0/sous/vers-couche-ia.ts", "src/server/vers-couche-ia.ts"]) {
+      expect(await messagesFor(WITHOUT, filePath), filePath).toHaveLength(1);
+    }
+  });
 });

@@ -1,10 +1,20 @@
 import { z } from "zod";
 
-import { advanceClock, configurePayment, isScopeName, resetScope, simulationEnabled, SIMULATION_HEADER } from "@/adapters/simulation";
+import {
+  advanceClock,
+  configureGeneration,
+  configurePayment,
+  GENERATION_OUTCOMES,
+  isScopeName,
+  resetScope,
+  simulationEnabled,
+  SIMULATION_HEADER,
+} from "@/adapters/simulation";
 
 /**
  * `R-sim` : contrôle des simulations, tests seulement (décision 0017 § 10.5, créée par F9a avec
- * `configurePayment` selon 0020 § 6). 404 sans pages de développement ou sur un déploiement de production ;
+ * `configurePayment` selon 0020 § 6 ; F8c ajoute `configureGeneration`, issue de la génération simulée de la
+ * portée). 404 sans pages de développement ou sur un déploiement de production ;
  * 415 sans JSON ; 413 au-delà de 1 024 octets (annoncés par `content-length`, avant toute lecture, ou lus) ; 400 hors schéma ou sans portée explicite valide (la portée
  * par défaut n'est jamais modifiée).
  */
@@ -24,6 +34,7 @@ const BodySchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("reset"), now: IsoInstantSchema }),
   z.strictObject({ action: z.literal("advanceClock"), ms: z.number().int().min(0).max(604_800_000) }),
   z.strictObject({ action: z.literal("configurePayment"), confirmationDelayMs: z.number().int().min(0).max(600_000) }),
+  z.strictObject({ action: z.literal("configureGeneration"), outcome: z.enum(GENERATION_OUTCOMES) }),
 ]);
 
 const empty = (status: number) => new Response(null, { status });
@@ -54,6 +65,9 @@ export async function POST(request: Request): Promise<Response> {
       break;
     case "configurePayment":
       configurePayment(scope, body.confirmationDelayMs);
+      break;
+    case "configureGeneration":
+      configureGeneration(scope, body.outcome);
       break;
   }
   return empty(204);

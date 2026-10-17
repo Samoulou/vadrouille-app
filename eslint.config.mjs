@@ -596,8 +596,20 @@ export default defineConfig([
       "src/research/ip-guard.ts",
       "src/research/pages.simule.ts",
       "src/research/recherche-web.simule.ts",
-      "src/research/recherche-web.ts",
       "src/research/sources.ts",
+      // B7a (ticket 423, décision 0077 § 1 points 3 et 4, § 3 point 1 ; spécification B7a, point 6) : modules de
+      // `src/ai` et `src/research` que `pnpm p0` charge sous Node nu, ajoutés par leur nom avec la même justification :
+      // `recherche-web.ts` déplacé de `src/research` (sa ligne passe de l'un à l'autre) ; copies tenues égales de
+      // `src/prototype` (`candidat.ts`, `reglages.ts`, `src/research/candidat.ts`) ; prompts `structuration` et
+      // `quartier` (chargés par `requetes.ts`) ; `erreurs.ts`, liste de codes sans aucun import (justification de
+      // `src/server/env/resolve.ts` : ne lit ni ne rend aucun secret). Condition de sortie : celle des modules de phase 0.
+      "src/ai/candidat.ts",
+      "src/ai/erreurs.ts",
+      "src/ai/prompts/quartier.ts",
+      "src/ai/prompts/structuration.ts",
+      "src/ai/recherche-web.ts",
+      "src/ai/reglages.ts",
+      "src/research/candidat.ts",
       // P0r1 : garde « aucune clé dans l'environnement des tests », chargée par la configuration de Playwright hors de
       // Next.js, où `import "server-only"` lèverait une erreur ; ne rend aucune valeur (src/server/env/garde-cles.ts).
       "src/server/env/garde-cles.ts",
@@ -611,6 +623,8 @@ export default defineConfig([
       // Condition de sortie : celle des modules de phase 0 ci-dessus.
       "src/server/p0/assemblage.ts",
       "src/server/p0/vers-moteur.ts",
+      // B7a (ticket 423, décision 0077 § 1 point 5) : adaptateur de P0 vers la couche IA, même régime que `vers-moteur.ts`.
+      "src/server/p0/vers-couche-ia.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
@@ -641,6 +655,15 @@ export default defineConfig([
     // fichier du dépôt, tests compris (tests/unit/lint/server-env-imports-lint.test.ts).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "ligne/server-env-imports": "error" },
+  },
+  {
+    // B7a (ticket 423 ; spécification B7a point 5, handover § 3 ; décisions 0077 § 1 point 5 et 0080 §§ 4 et 5) :
+    // `src/ai` et `src/research` en liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support`
+    // en plus ; toute source non littérale refusée), et `@/ai/complement-p0` confiné aux appels directs de P0. Règles propres au plugin, posées par ce seul bloc sur tout
+    // fichier (eslint-rules/ia-recherche-imports.mjs ; tests/unit/lint/ia-recherche-lint.test.ts). Le test d'imports
+    // de P0 (tests/unit/p0/imports.test.ts) reste en place à côté jusqu'à la fin de P0 (0077 § 2 point 6).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/ia-recherche-liste-blanche": "error", "ligne/complement-p0-imports": "error" },
   },
   {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et

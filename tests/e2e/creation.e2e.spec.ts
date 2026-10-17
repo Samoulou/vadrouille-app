@@ -21,8 +21,9 @@ import {
   reachReview,
   storyField,
 } from "./creation-helpers";
-import { MOCK_WRONG_CODE, emailField, pasteCode } from "./connexion-helpers";
-import { expectPath, pathOf } from "./debloquer-helpers";
+import { MOCK_CODE, MOCK_WRONG_CODE, emailField, pasteCode } from "./connexion-helpers";
+import { expectPath, pathOf, useScope } from "./debloquer-helpers";
+import { R5 } from "./preparation-helpers";
 import { collectEvents } from "./presentation-helpers";
 
 /**
@@ -345,6 +346,8 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
   page.on("request", (request) => visited.push(request.url()));
   page.on("console", (message) => consoleLines.push(message.text()));
   const events = collectEvents(page);
+  // F8c : portée explicite, la session obtenue à l'écran 4 ne touche pas la portée par défaut (en-tête, aucun cookie).
+  await useScope(context, baseURL!);
 
   await reachBrief(page);
   await storyField(page).fill("Court.");
@@ -360,6 +363,10 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
   await expect(page.getByRole("textbox", { name: "Chiffre 1 sur 6" })).toBeFocused();
   await pasteCode(page, MOCK_WRONG_CODE);
   await expect(page.getByRole("alert").filter({ hasText: "Ce code ne correspond pas." })).toBeVisible();
+  // F8c : code valable, lancement et écran 5 (`preview_ready` compris dans les mesures relues).
+  await pasteCode(page, MOCK_CODE);
+  await expectPath(page, R5);
+  await expect(heading(page)).toHaveText("On prépare tes premières propositions");
 
   const storage = await page.evaluate(async () => ({
     local: window.localStorage.length,
@@ -388,5 +395,5 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
     expect(JSON.stringify(events)).not.toContain(secret);
     expect(output).not.toContain(secret);
   }
-  expect(pathOf(page)).toBe(R4_LANCER);
+  expect(pathOf(page)).toBe(R5);
 });

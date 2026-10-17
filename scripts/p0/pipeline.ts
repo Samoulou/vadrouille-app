@@ -18,9 +18,17 @@ import type { ProgrammeReduit } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
 import { assembler, type Raison } from "@/server/p0/assemblage";
+import {
+  bornesDepuisConfig,
+  candidatPourModele,
+  complementDepuisBrief,
+  donneesProtegeesDepuisBrief,
+  entreeModelesDepuisBrief,
+  lieuRetenuDepuisCandidat,
+} from "@/server/p0/vers-couche-ia";
 import type { Configuration } from "./fichiers";
 import { codeErreur, type Journal } from "./journal";
 import {
@@ -130,9 +138,22 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
 
   journal.ecrire("run_started");
   try {
+    // Types de production de la couche IA (adaptateur `vers-couche-ia.ts`, décision 0077 § 1 point 5) : le récit et
+    // les logements de P0 partent par `ComplementP0`, pour P0 seulement (B7-PO-1), prompts et octets inchangés.
+    const entreeIa = entreeModelesDepuisBrief(brief);
+    const complement = complementDepuisBrief(brief);
     // Étapes 2 et 3 : plan et recherche bornée. L'agent ne voit aucun résultat d'ancrage et ne sera pas relancé.
     const resultatAgent = await chrono("recherche", () =>
-      chercherCandidats(brief, { modeles, modele: choisis.recherche, routage, recherche, lecteur, config: configuration.recherche }),
+      chercherCandidats(entreeIa, {
+        modeles,
+        modele: choisis.recherche,
+        routage,
+        recherche,
+        lecteur,
+        bornes: bornesDepuisConfig(configuration.recherche),
+        complement,
+        protegees: donneesProtegeesDepuisBrief(brief),
+      }),
     );
     agent = resultatAgent.compteurs;
     candidats = resultatAgent.candidats;
@@ -167,7 +188,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     notes = await chrono("notation", async () => {
       const resultat = new Map<string, CandidatNote["notes"]>();
       for (const lot of enLots(ancresLieux, configuration.recherche.tailleLotNotation)) {
-        const reponse = await modeles.envoyer(requeteNotation(brief, lot, choisis.notation, routage));
+        const reponse = await modeles.envoyer(requeteNotation(entreeIa, lot.map(candidatPourModele), choisis.notation, routage, complement));
         const lecture = lireNotes(reponse.texte, new Set(lot.map((candidat) => candidat.id)));
         sortiesRefusees.notation += lecture.refuses;
         for (const [id, note] of lecture.valeur) resultat.set(id, note);
@@ -234,7 +255,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     const raisons = await chrono("raisons", async () => {
       const resultat = new Map<string, Raison>();
       for (const lot of enLots(lieuxRetenus, configuration.recherche.tailleLotNotation)) {
-        const reponse = await modeles.envoyer(requeteRaisons(brief, lot, choisis.raisons, routage));
+        const reponse = await modeles.envoyer(requeteRaisons(entreeIa, lot.map(lieuRetenuDepuisCandidat), choisis.raisons, routage, complement));
         const lecture = lireRaisons(reponse.texte, new Set(lot.map((candidat) => candidat.id)));
         sortiesRefusees.raisons += lecture.refuses;
         for (const [id, valeur] of lecture.valeur) resultat.set(id, valeur);

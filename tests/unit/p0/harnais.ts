@@ -7,7 +7,7 @@ import type { Brief } from "@/prototype/brief";
 import type { Variante } from "@/prototype/config";
 import { creerLecteurPages, type LecteurPages, type RequeteHttp } from "@/research/fetch-page";
 import { creerHttpSimule, creerResolveurSimule } from "@/research/pages.simule";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { creerRechercheSimulee } from "@/research/recherche-web.simule";
 
 import { lireBrief, lireConfiguration, lireFixtures, type Configuration, type Fixtures } from "../../../scripts/p0/fichiers";
