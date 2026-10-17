@@ -599,7 +599,7 @@
           ]
         }
       ],
-      "ecart": "textes de test qui nomment un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité à rendre"
+      "ecart": "textes de test qui nomment un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446)"
     },
     {
       "fichier": "tests/db/auth-outils.ts",
@@ -613,7 +613,7 @@
           ]
         }
       ],
-      "ecart": "texte de test qui ressemble à un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité à rendre"
+      "ecart": "texte de test qui ressemble à un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446)"
     }
   ]
 }

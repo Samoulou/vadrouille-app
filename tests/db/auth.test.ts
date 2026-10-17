@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { envoyerCodeRecu } from "@/server/auth/envoi";
 import { disabledCodeMailer } from "@/server/mail/disabled";
-import { getServerRequestContext } from "@/server/session";
+import { creerContexteServeur } from "@/server/session";
 import { fabriqueAdaptateur, MODELES } from "@/tenancy/adaptateur";
 import { RechercheJetonRefuseeError } from "@/tenancy/jetons-haches";
 
@@ -105,6 +105,26 @@ describe("B3b : code de connexion", () => {
     if (nouveau !== ancien) expect(await verifier(email, ancien)).toEqual({ ok: false, code: "invalid_code" });
     expect((await verifier(email, nouveau)).ok).toBe(true);
     expect(await compter("verifications", "identifier", identifiant(email))).toBe(0);
+  });
+
+  it("un code mal formé est refusé sans compter d'essai (revue du head f0b8c5a, mineur 3)", async () => {
+    const email = adresse();
+    const code = await demanderCode(banc, email);
+    for (const forme of ["12345", "1234567", "12a456", " 123456", "１２３４５６", ""]) {
+      expect(await verifier(email, forme)).toEqual({ ok: false, code: "invalid_code" });
+    }
+    for (let i = 0; i < 2; i += 1) expect(await verifier(email, codeFaux(code))).toEqual({ ok: false, code: "invalid_code" });
+    expect((await verifier(email, code)).ok).toBe(true);
+  });
+
+  it("deux demandes simultanées pour la même adresse ne laissent qu'une vérification (revue du head f0b8c5a, mineur 2)", async () => {
+    const email = adresse();
+    const resultats = await Promise.all([banc.operations.requestCode(email), banc.operations.requestCode(email), banc.operations.requestCode(email)]);
+    expect(resultats.every((r) => r.ok)).toBe(true);
+    expect(await compter("verifications", "identifier", identifiant(email))).toBe(1);
+    const dernier = banc.mailer.dernierCode(email);
+    expect(dernier).toBeDefined();
+    expect((await verifier(email, dernier ?? "")).ok).toBe(true);
   });
 });
 
@@ -347,7 +367,7 @@ describe("B3b : sessions", () => {
     const { rows } = await auth.query("SELECT id FROM sessions WHERE user_id = $1", [ouverte.userId]);
     expect(rows).toEqual([{ id: ouverte.sessionId }]);
     // Session existante de cette organisation : refusée.
-    expect(await getServerRequestContext({ headers: cookiesSession, operations: banc.operations })).toBeNull();
+    expect(await creerContexteServeur(banc.operations)(cookiesSession)).toBeNull();
   });
 
   it("auth: le contexte vient de la session, jamais du client", async () => {
@@ -362,22 +382,22 @@ describe("B3b : sessions", () => {
       "x-role": "owner",
       referer: `http://127.0.0.1:3999/voyages?organizationId=${b.organizationId}&userId=${b.userId}`,
     });
-    const contexte = await getServerRequestContext({ headers: forges, operations: banc.operations });
+    const contexte = await creerContexteServeur(banc.operations)(forges);
     expect(contexte).toEqual({ organizationId: a.organizationId, userId: a.userId, role: "owner" });
 
     // Sans cookie : null.
-    expect(await getServerRequestContext({ headers: new Headers({ "x-organization-id": a.organizationId }), operations: banc.operations })).toBeNull();
+    expect(await creerContexteServeur(banc.operations)(new Headers({ "x-organization-id": a.organizationId }))).toBeNull();
 
     // Adhésion disparue : null (adhésion `member` à l'organisation de B, rendue active, puis retirée).
     await admin.query("INSERT INTO memberships (organization_id, user_id, role) VALUES ($1, $2, 'member')", [b.organizationId, a.userId]);
     await admin.query("UPDATE sessions SET active_organization_id = $1 WHERE id = $2", [b.organizationId, a.sessionId]);
-    expect(await getServerRequestContext({ headers: enTetesA, operations: banc.operations })).toEqual({
+    expect(await creerContexteServeur(banc.operations)(enTetesA)).toEqual({
       organizationId: b.organizationId,
       userId: a.userId,
       role: "member",
     });
     await admin.query("DELETE FROM memberships WHERE organization_id = $1 AND user_id = $2", [b.organizationId, a.userId]);
-    expect(await getServerRequestContext({ headers: enTetesA, operations: banc.operations })).toBeNull();
+    expect(await creerContexteServeur(banc.operations)(enTetesA)).toBeNull();
   });
 
   it("prolongation : expires_at repoussé une fois par jour, created_at inchangé (B3-PO-8)", async () => {

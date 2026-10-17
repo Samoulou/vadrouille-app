@@ -115,10 +115,9 @@ export function creerAuth(config: ConfigurationAuth) {
       useSecureCookies: cookiesSecurises(config.environment),
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
       ipAddress: { ipAddressHeaders: entetesIp(config.trustedIpHeader), disableIpTracking: false },
-      // Contrôle de schéma de la bibliothèque désactivé : il exigerait des colonnes et tables que la collecte minimale
-      // exclut (`users.name`, `users.image`, jetons de `accounts`, `invitations`, `organizations.logo` et `metadata`)
-      // et qu'aucune opération de la liste blanche n'écrit ; le schéma fait foi par `db/schema/auth.ts` et les tests
-      // de base (écart noté dans l'amendement de 0008).
+      // `validateSchema: false` (décision 0082) : n'arrête que la comparaison du schéma que 1.7.7 lance à l'initialisation
+      // (`auth/base.mjs`), qui ne refuse rien et ne fait que journaliser un écart ; le schéma fait foi par
+      // `db/schema/auth.ts`, les migrations et les tests de base.
       database: { generateId: "uuid", validateSchema: false },
     },
     databaseHooks: {

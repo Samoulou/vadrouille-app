@@ -43,6 +43,15 @@ const VARIABLES = {
   VADROUILLE_DATABASE_URL_AUTH: 0,
   EMAIL_TRANSPORT: 0,
   SMTP_URL: 0,
+  // B3b (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7 lit d'elle-même
+  // (origines de confiance, télémétrie, secrets de repli) ; présence refusée partout, quel que soit `AUTH_ADAPTER`.
+  BETTER_AUTH_TRUSTED_ORIGINS: 0,
+  BETTER_AUTH_TELEMETRY: 0,
+  BETTER_AUTH_TELEMETRY_ENDPOINT: 0,
+  BETTER_AUTH_TELEMETRY_ID: 0,
+  BETTER_AUTH_TELEMETRY_DEBUG: 0,
+  BETTER_AUTH_SECRETS: 0,
+  AUTH_SECRET: 0,
   SIMULATED_WEBHOOK_SECRET: 0,
   SIMULATED_WEBHOOK_ENABLED: 0,
   VADROUILLE_DATABASE_URL_MIGRATOR: 0,
@@ -280,6 +289,19 @@ export function parseServerEnv(env: Env): ServerEnv {
   // (`!== undefined`) : la valeur n'est ni copiée, ni rendue, ni journalisée, ni jointe à l'erreur.
   if (env.EMAIL_TRANSPORT !== undefined) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
   if (env.SMTP_URL !== undefined) throw new ServerEnvError(V.SMTP_URL, "forbidden");
+
+  // Variables lues par Better Auth 1.7.7 sans passer par nos options (revue consolidée du head `f0b8c5a`, bloquant 1 ;
+  // décision 0082) : `BETTER_AUTH_TRUSTED_ORIGINS` ajoute des origines de confiance à `trustedOrigins` ;
+  // `BETTER_AUTH_TELEMETRY*` peut réactiver la télémétrie malgré `telemetry.enabled: false` et l'envoyer vers une adresse
+  // externe ; `BETTER_AUTH_SECRETS` et `AUTH_SECRET` sont des secrets de repli que la configuration rend inutiles (7.13).
+  // Présence refusée dans les quatre environnements, `AUTH_ADAPTER=mock` compris ; présence seulement, valeur jamais lue.
+  if (env.BETTER_AUTH_TRUSTED_ORIGINS !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TRUSTED_ORIGINS, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_ENDPOINT !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_ENDPOINT, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_ID !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_ID, "forbidden");
+  if (env.BETTER_AUTH_TELEMETRY_DEBUG !== undefined) throw new ServerEnvError(V.BETTER_AUTH_TELEMETRY_DEBUG, "forbidden");
+  if (env.BETTER_AUTH_SECRETS !== undefined) throw new ServerEnvError(V.BETTER_AUTH_SECRETS, "forbidden");
+  if (env.AUTH_SECRET !== undefined) throw new ServerEnvError(V.AUTH_SECRET, "forbidden");
 
   // AUTH_ADAPTER (même normalisation que `adapterChoice` : `trim()`, vide = `mock`) : `better-auth` admis en `local`
   // et `ci` seulement, `forbidden` en `staging` et `production` (B3-TL-2, 0077 § 5.1) ; toute autre valeur est

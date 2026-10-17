@@ -87,6 +87,34 @@ export type AuthOperationsConfig = {
 const LOT_PURGE = 100;
 /** Attente maximale du verrou de vérification d'une adresse. */
 const ATTENTE_VERROU = "5s";
+/**
+ * Bornes des pools de B3b (revue consolidée du head `f0b8c5a`, mineur 1) : connexions plafonnées, attente d'une
+ * connexion et durée d'une requête bornées. Le garde-fou contre un afflux reste le limiteur par adresse (B3c).
+ */
+const POOL_OPERATIONS = { max: 10, connectionTimeoutMillis: 5_000, query_timeout: 10_000 } as const;
+const POOL_VERROUS = { max: 5, connectionTimeoutMillis: 5_000, query_timeout: 10_000 } as const;
+/** Durée maximale d'une opération tenue sous le verrou d'une adresse (envoi ou vérification). */
+const DUREE_SOUS_VERROU_MS = 20_000;
+/** Forme d'un code de connexion : 6 chiffres ASCII (B3-PO-4). */
+const FORME_CODE = /^[0-9]{6}$/;
+
+/** Le délai d'une opération tenue sous verrou est dépassé ; ne porte aucune valeur. */
+class DelaiDepasseError extends Error {
+  override name = "DelaiDepasseError";
+
+  constructor() {
+    super("Délai dépassé.");
+  }
+}
+
+/** Rejette après `ms` si `promesse` n'est pas réglée ; la transaction englobante est alors annulée. */
+function avecDelai<T>(promesse: Promise<T>, ms: number): Promise<T> {
+  let minuterie: ReturnType<typeof setTimeout> | undefined;
+  const delai = new Promise<never>((_, rejeter) => {
+    minuterie = setTimeout(() => rejeter(new DelaiDepasseError()), ms);
+  });
+  return Promise.race([promesse, delai]).finally(() => clearTimeout(minuterie));
+}
 
 const echec = (code: AuthFailureCode): AuthFailure => Object.freeze({ ok: false, code });
 const identifiantCode = (email: CanonicalEmail) => `sign-in-otp-${email}`;
@@ -144,6 +172,12 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     for (const valeur of headers.getSetCookie()) config.onSetCookie(valeur);
   };
 
+  /** Verrou de transaction de l'adresse (`identifiant`), attente bornée par `lock_timeout`. */
+  async function verrouiller(tx: Parameters<Parameters<Database["transaction"]>[0]>[0], identifiant: string): Promise<void> {
+    await tx.execute(sql`SELECT set_config('lock_timeout', ${ATTENTE_VERROU}, true)`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${identifiant}, 0))`);
+  }
+
   /**
    * Purge technique, par lot borné : vérifications et sessions expirées (vérification 7.5). `garder` : identifiant de
    * vérification de l'appel en cours, épargné pour que `verifyCode` puisse répondre `code_expired`. Ne lève jamais.
@@ -174,11 +208,19 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     const identifiant = identifiantCode(email);
     try {
       await purger();
-      // Un nouveau code remplace l'ancien et remet les essais à zéro (B3-PO-5, vérification 7.7).
-      await database.execute(sql`DELETE FROM verifications WHERE identifier = ${identifiant}`);
-      const etat: EtatEnvoi = { envoye: false, erreur: undefined };
-      await envoiCourant.run(etat, () => avecAdresse(email, () => a.api.sendVerificationOTP({ body: { email, type: "sign-in" } })));
-      if (!etat.envoye) throw etat.erreur ?? new EnvoiNonFaitError();
+      // Sous le verrou de l'adresse (revue du head `f0b8c5a`, mineur 2) : la suppression préalable et l'envoi ne se
+      // croisent ni avec un autre `requestCode` ni avec un `verifyCode` de la même adresse ; il ne reste qu'une ligne.
+      await config.verrous.transaction(async (tx) => {
+        await verrouiller(tx, identifiant);
+        // Un nouveau code remplace l'ancien et remet les essais à zéro (B3-PO-5, vérification 7.7).
+        await database.execute(sql`DELETE FROM verifications WHERE identifier = ${identifiant}`);
+        const etat: EtatEnvoi = { envoye: false, erreur: undefined };
+        await avecDelai(
+          envoiCourant.run(etat, () => avecAdresse(email, () => a.api.sendVerificationOTP({ body: { email, type: "sign-in" } }))),
+          DUREE_SOUS_VERROU_MS,
+        );
+        if (!etat.envoye) throw etat.erreur ?? new EnvoiNonFaitError();
+      });
       return Object.freeze({ ok: true });
     } catch (erreur) {
       // Envoi refusé ou en panne : aucun code utilisable ne reste en base.
@@ -201,15 +243,17 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     if (a === null) return journaliserEchec("verify-code", undefined);
     const { email, code } = demande;
     if (!adresseAdmise(email)) return echec("provider_error");
+    // Forme contrôlée avant toute connexion et tout verrou (revue du head `f0b8c5a`, mineur 3) : aucun essai compté.
+    if (!FORME_CODE.test(code)) return echec("invalid_code");
     const identifiant = identifiantCode(email);
     try {
       await purger(identifiant);
-      // Verrou par adresse (vérifications 7.11 et 7.12) : les essais d'une même adresse passent un par un, et le
-      // compteur d'essais est relu avant tout appel à la bibliothèque. Au-delà de 3 essais, la ligne reste et chaque
-      // essai rend `too_many_attempts`, code juste compris, jusqu'à un nouveau code ou l'expiration.
+      // Verrou par adresse (vérifications 7.11 et 7.12, décision 0082) : la ligne de vérification est relue sous le
+      // verrou avant tout appel à la bibliothèque. Ce n'est pas une barrière anti-contournement (la consommation de
+      // 1.7.7 est déjà atomique) : le verrou rend déterministe la réponse exigée par B1. Au-delà de 3 essais, la ligne
+      // reste et chaque essai rend `too_many_attempts`, code juste compris, jusqu'à un nouveau code ou l'expiration.
       return await config.verrous.transaction(async (tx) => {
-        await tx.execute(sql`SELECT set_config('lock_timeout', ${ATTENTE_VERROU}, true)`);
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${identifiant}, 0))`);
+        await verrouiller(tx, identifiant);
         const lu = await tx.execute<{ value: string; expiree: boolean }>(
           sql`SELECT value, expires_at <= now() AS expiree FROM verifications WHERE identifier = ${identifiant} ORDER BY created_at DESC LIMIT 1`,
         );
@@ -218,7 +262,7 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
         if (ligne.expiree) return echec("code_expired");
         const essais = Number.parseInt(ligne.value.slice(ligne.value.lastIndexOf(":") + 1), 10);
         if (!Number.isSafeInteger(essais) || essais >= CODE_CONNEXION.essais) return echec("too_many_attempts");
-        return connecter(a, email, code, demande.headers ?? new Headers());
+        return avecDelai(connecter(a, email, code, demande.headers ?? new Headers()), DUREE_SOUS_VERROU_MS);
       });
     } catch (erreur) {
       return journaliserEchec("verify-code", erreur);
@@ -310,8 +354,8 @@ export function authOperations(): AuthOperations {
     baseUrl: env.betterAuth.baseUrl,
     appUrl: env.betterAuth.appUrl,
     trustedIpHeader: env.trustedIpHeader,
-    database: createDatabase("vadrouille_auth"),
-    verrous: createDatabase("vadrouille_auth"),
+    database: createDatabase("vadrouille_auth", undefined, POOL_OPERATIONS),
+    verrous: createDatabase("vadrouille_auth", undefined, POOL_VERROUS),
     mailer: disabledCodeMailer,
   });
   return parDefaut;

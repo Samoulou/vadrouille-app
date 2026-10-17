@@ -34,9 +34,19 @@ const NEUTRES_SAUF = ["@src-non-test", "@sensible"] as const;
 /**
  * B3b (ticket 444 ; spécification B3, B3b ; décisions 0007 et 0008) : requêtes paramétrées (`sql`) de la création de
  * compte, de l'organisation personnelle, du verrou et de la purge bornée, de `withOrg` ; `drizzle-orm/node-postgres`
- * (`drizzle.mock`, sans connexion) dans le test des exports. Verdict Sécurité à rendre dans la PR de B3b.
+ * (`drizzle.mock`, sans connexion) dans le test des exports. Fichiers nommés, sans motif de dossier (revue du head
+ * `f0b8c5a`, mineur 6). Verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446), sous réserve de ce mineur.
  */
-const ZONES_DRIZZLE_B3B = ["src/tenancy/**", "src/server/auth/**", "src/server/with-org.ts", "tests/db/with-org.test.ts", "tests/unit/auth/operations.test.ts"];
+const ZONES_DRIZZLE_B3B = [
+  "src/tenancy/creation-compte.ts",
+  "src/tenancy/organisations.ts",
+  "src/server/auth/index.ts",
+  "src/server/with-org.ts",
+  "tests/db/with-org.test.ts",
+  "tests/unit/auth/operations.test.ts",
+];
+/** B3b : fichiers nommés qui importent `better-auth` (revue du head `f0b8c5a`, mineur 6 : pas de motif de dossier). */
+const ZONES_BETTER_AUTH_B3B = ["src/tenancy/auth.ts", "src/tenancy/adaptateur.ts", "src/tenancy/creation-compte.ts", "src/tenancy/jetons-haches.ts"];
 
 export const SPECIFICATEURS = [
   { specificateur: "react", zones: ["src/**", "tests/unit/**"] },
@@ -81,12 +91,12 @@ export const SPECIFICATEURS = [
   // B3b (ticket 444 ; spécification B3, B3b point 4 ; décision 0008) : `better-auth` 1.7.7, sous-chemins exacts, dans
   // `src/tenancy/` seulement (`src/server/auth/` n'importe que `@/tenancy/auth` ; même confinement tenu par
   // `ligne/better-auth-confinement`). `node:async_hooks` : contexte d'appel (`AsyncLocalStorage`) de l'adresse du code
-  // et de l'état d'envoi, sans capacité. Verdict Sécurité à rendre dans la PR de B3b.
-  { specificateur: "better-auth", zones: ["src/tenancy/**"], sousChemins: "exacts" },
-  { specificateur: "better-auth/adapters/drizzle", zones: ["src/tenancy/**"], sousChemins: "exacts" },
-  { specificateur: "better-auth/next-js", zones: ["src/tenancy/**"], sousChemins: "exacts" },
-  { specificateur: "better-auth/plugins", zones: ["src/tenancy/**"], sousChemins: "exacts" },
-  { specificateur: "better-auth/plugins/organization/access", zones: ["src/tenancy/**"], sousChemins: "exacts" },
+  // et de l'état d'envoi, sans capacité. Verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446).
+  { specificateur: "better-auth", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/adapters/drizzle", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/next-js", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins/organization/access", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
   { specificateur: "node:async_hooks", zones: ["src/tenancy/code-otp.ts", "src/server/auth/index.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à

@@ -413,6 +413,34 @@ describe("env: gardes de configuration", () => {
       }
     });
 
+    it("variables lues par Better Auth (origines, télémétrie, secrets de repli) présentes → refus dans les quatre environnements, mock compris (décision 0082)", () => {
+      const noms = [
+        NOM.BETTER_AUTH_TRUSTED_ORIGINS,
+        NOM.BETTER_AUTH_TELEMETRY,
+        NOM.BETTER_AUTH_TELEMETRY_ENDPOINT,
+        NOM.BETTER_AUTH_TELEMETRY_ID,
+        NOM.BETTER_AUTH_TELEMETRY_DEBUG,
+        NOM.BETTER_AUTH_SECRETS,
+        NOM.AUTH_SECRET,
+      ];
+      const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
+      try {
+        for (const env of [ci(), { VADROUILLE_ENV: "local" }, vercel("preview"), vercel("production")]) {
+          for (const nom of noms) {
+            for (const valeur of [SENTINELLE, ""]) {
+              attendreRefus(() => parseServerEnv({ ...env, [nom]: valeur }), nom, "forbidden", [SENTINELLE]);
+            }
+            refusParse({ ...env, [NOM.AUTH_ADAPTER]: "mock", [nom]: "1" }, nom, "forbidden");
+          }
+        }
+        for (const nom of noms) refusParse({ ...ci(), ...connexionReelle(), [nom]: "1" }, nom, "forbidden");
+        const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+        expect(ecrit).not.toContain(SENTINELLE);
+      } finally {
+        for (const espion of espions) espion.mockRestore();
+      }
+    });
+
     it("secret de Better Auth égal au secret du limiteur → refus (secret_duplicate)", () => {
       const octets = aleatoire();
       refusParse(ci(connexionReelle({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.BETTER_AUTH_SECRET]: hex(octets) })), NOM.BETTER_AUTH_SECRET, "secret_duplicate");

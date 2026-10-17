@@ -4,5 +4,5 @@
 -- de 10 minutes), sans donnée d'une personne ni d'une organisation. Les lignes restent : ni `DELETE`, ni `TRUNCATE`,
 -- ni changement des autres colonnes. Après cette descente, Better Auth 1.7.7 ne peut plus créer de vérification :
 -- l'adaptateur `better-auth` doit être retiré (`AUTH_ADAPTER=mock`) avant de la jouer. L'exception ne vaut que pour
--- cette colonne.
+-- cette colonne. Acceptée par le Tech Lead le 2026-10-17 (amendement B3b de la décision 0007).
 ALTER TABLE "verifications" DROP COLUMN "updated_at";

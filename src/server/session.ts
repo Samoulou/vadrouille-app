@@ -14,13 +14,6 @@ import { type AuthOperations, authOperations } from "@/server/auth";
  * `{ organizationId, userId, role }` ou `null`. B3c y branche `getRequestContext()` (`src/adapters/context.ts`).
  */
 
-export type ServerRequestContextOptions = {
-  /** En-têtes de la requête ; par défaut, ceux de Next.js (`next/headers`). */
-  readonly headers?: Headers;
-  /** Opérations injectées (tests) ; par défaut, `authOperations()`. */
-  readonly operations?: AuthOperations;
-};
-
 /** Seul le cookie est transmis : aucun autre en-tête ne peut porter un identifiant. */
 function cookieSeulement(source: Headers): Headers {
   const filtres = new Headers();
@@ -29,10 +22,20 @@ function cookieSeulement(source: Headers): Headers {
   return filtres;
 }
 
-export async function getServerRequestContext(options: ServerRequestContextOptions = {}): Promise<AdapterContext | null> {
-  const source = options.headers ?? new Headers(await (await import("next/headers")).headers());
-  const operations = options.operations ?? authOperations();
-  const session = await operations.readSession(cookieSeulement(source));
-  if (session === null) return null;
-  return { organizationId: session.organizationId, userId: session.userId, role: session.role };
+/**
+ * Fabrique liée à des opérations données (tests, revue du head `f0b8c5a`, mineur 9) : l'API de production,
+ * `getServerRequestContext()`, ne prend aucun paramètre.
+ */
+export function creerContexteServeur(operations: AuthOperations): (headers: Headers) => Promise<AdapterContext | null> {
+  return async (headers) => {
+    const session = await operations.readSession(cookieSeulement(headers));
+    if (session === null) return null;
+    return { organizationId: session.organizationId, userId: session.userId, role: session.role };
+  };
+}
+
+/** En-têtes de la requête Next.js (`next/headers`) et opérations du serveur (`authOperations()`). */
+export async function getServerRequestContext(): Promise<AdapterContext | null> {
+  const headers = new Headers(await (await import("next/headers")).headers());
+  return creerContexteServeur(authOperations())(headers);
 }

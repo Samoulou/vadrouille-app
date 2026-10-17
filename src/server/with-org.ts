@@ -26,19 +26,27 @@ export class WithOrgContextError extends Error {
 
 export type OrgTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-let parDefaut: Database | undefined;
+type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>) => Promise<T>;
 
-/** `database` : client du rôle `vadrouille_app` (injecté par les tests) ; par défaut, celui de `db/index.ts`. */
-export async function withOrg<T>(
-  ctx: Pick<AdapterContext, "organizationId" | "userId">,
-  fn: (tx: OrgTransaction) => Promise<T>,
-  database?: Database,
-): Promise<T> {
-  if (typeof ctx.organizationId !== "string" || !UUID.test(ctx.organizationId)) throw new WithOrgContextError();
-  if (typeof ctx.userId !== "string" || !UUID.test(ctx.userId)) throw new WithOrgContextError();
-  const db = database ?? (parDefaut ??= createDatabase("vadrouille_app"));
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT set_config('app.organization_id', ${ctx.organizationId}, true), set_config('app.user_id', ${ctx.userId}, true)`);
-    return fn(tx);
-  });
+/**
+ * Fabrique liée à un client donné (tests, revue du head `f0b8c5a`, mineur 9) : l'API de production, `withOrg`, ne
+ * prend aucun client en paramètre.
+ */
+export function creerWithOrg(database: Database): FonctionWithOrg {
+  return async (ctx, fn) => {
+    if (typeof ctx.organizationId !== "string" || !UUID.test(ctx.organizationId)) throw new WithOrgContextError();
+    if (typeof ctx.userId !== "string" || !UUID.test(ctx.userId)) throw new WithOrgContextError();
+    return database.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.organization_id', ${ctx.organizationId}, true), set_config('app.user_id', ${ctx.userId}, true)`);
+      return fn(tx);
+    });
+  };
+}
+
+let parDefaut: FonctionWithOrg | undefined;
+
+/** Sur le client du rôle `vadrouille_app` de `db/index.ts`. */
+export async function withOrg<T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>): Promise<T> {
+  parDefaut ??= creerWithOrg(createDatabase("vadrouille_app"));
+  return parDefaut(ctx, fn);
 }

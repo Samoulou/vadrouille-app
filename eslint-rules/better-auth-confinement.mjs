@@ -6,11 +6,16 @@ import path from "node:path";
  * `ligne/better-auth-confinement`, posée sur tout fichier du dépôt, tests compris :
  * - `better-auth` (et ses sous-chemins, et les paquets `@better-auth/*`) : importable depuis `src/server/auth/` et
  *   `src/tenancy/` seulement ;
- * - `@/tenancy/auth` : importable depuis `src/server/auth/` seulement ;
+ * - `@/tenancy/auth` : importable depuis `src/server/auth/` seulement ; les autres modules de `src/tenancy/` : depuis
+ *   `src/server/`, `src/tenancy/` et les tests seulement (revue du head `f0b8c5a`, mineur 5) ;
  * - dans ces deux dossiers, `.api` ne s'emploie que dans un appel nommé de la liste blanche
  *   (`<objet>.api.sendVerificationOTP(…)`, `signInEmailOTP`, `getSession`, `signOut`) ; tout autre emploi est refusé :
  *   opération hors liste, accès calculé (`auth["api"]`, `auth.api[nom]`), déstructuration (`const { api } = auth`),
  *   valeur passée ou rendue (`f(auth.api)`, `return auth.api`). `handler` et `$context` y sont refusés de même.
+ *   **Limite connue** (revue du head `f0b8c5a`, mineur 5) : un accès calculé non littéral sur l'instance
+ *   (`auth[variable]`), `Reflect.get(auth, …)` ou `Object.values(auth)` ne sont pas reconnus, la règle ne suivant pas
+ *   les valeurs ; ils restent refusés par la revue, et le régime de confinement refuse `Reflect` (section 2.4). Le
+ *   périmètre est réduit à deux dossiers, et seul `src/tenancy/auth.ts` construit l'instance.
  *
  * `ligne/no-raw-auth-secret`, posée sur `src/` : lecture de `BETTER_AUTH_SECRET`, `AUTH_SECRET` ou
  * `BETTER_AUTH_SECRETS` dans `process.env` (propriété, accès calculé littéral ou déstructuration) refusée hors du module
@@ -21,6 +26,8 @@ import path from "node:path";
 export const OPERATIONS_PERMISES = ["sendVerificationOTP", "signInEmailOTP", "getSession", "signOut"];
 const DOSSIERS_BIBLIOTHEQUE = ["src/server/auth/", "src/tenancy/"];
 const DOSSIER_OPERATIONS = "src/server/auth/";
+/** Importateurs admis des autres modules de `src/tenancy/`. */
+const IMPORTATEURS_TENANCY = ["src/server/", "src/tenancy/", "tests/"];
 const PROPRIETES_INTERDITES = new Set(["handler", "$context"]);
 
 const relatif = (context) => path.relative(context.cwd, context.filename).split(path.sep).join("/");
@@ -46,6 +53,15 @@ export function estConfiguration(source, importateur) {
   return /^src\/tenancy\/auth(\.(ts|tsx|mts|js|mjs))?$/.test(cible) || cible === "src/tenancy/auth/index" || cible === "src/tenancy/auth/index.ts";
 }
 
+/** Vrai si `source`, importée depuis `importateur`, désigne un module de `src/tenancy/`. */
+export function estTenancy(source, importateur) {
+  let cible;
+  if (source.startsWith("@/")) cible = path.posix.normalize(`src/${source.slice(2)}`);
+  else if (source.startsWith("./") || source.startsWith("../")) cible = path.posix.normalize(path.posix.join(path.posix.dirname(importateur), source));
+  else return false;
+  return cible === "src/tenancy" || cible.startsWith("src/tenancy/");
+}
+
 /** Nom d'une propriété non calculée, ou d'une propriété calculée littérale. */
 function nomPropriete(membre) {
   if (!membre.computed && membre.property.type === "Identifier") return membre.property.name;
@@ -61,6 +77,7 @@ export const betterAuthConfinement = {
     messages: {
       bibliotheque: "better-auth ne s'importe que depuis src/server/auth et src/tenancy (spécification B3, B3b point 4) ({{source}}).",
       configuration: "@/tenancy/auth ne s'importe que depuis src/server/auth (spécification B3, B3b point 4) ({{source}}).",
+      tenancy: "src/tenancy ne s'importe que depuis src/server, src/tenancy et les tests (B3b) ({{source}}).",
       operation:
         "auth.api : seul un appel nommé de la liste blanche est permis (sendVerificationOTP, signInEmailOTP, getSession, signOut) ; accès calculé, déstructuration et valeur refusés (décision 0008).",
       propriete: "{{nom}} de Better Auth refusé (aucune route ni contexte interne exposé ; décision 0008).",
@@ -74,7 +91,11 @@ export const betterAuthConfinement = {
       const source = sourceText(sourceNode);
       if (source === null) return;
       if (estBibliotheque(source) && !dansBibliotheque) context.report({ node, messageId: "bibliotheque", data: { source } });
-      if (estConfiguration(source, importateur) && !dansOperations) context.report({ node, messageId: "configuration", data: { source } });
+      if (estConfiguration(source, importateur)) {
+        if (!dansOperations) context.report({ node, messageId: "configuration", data: { source } });
+      } else if (estTenancy(source, importateur) && !IMPORTATEURS_TENANCY.some((dossier) => importateur.startsWith(dossier))) {
+        context.report({ node, messageId: "tenancy", data: { source } });
+      }
     }
     const visiteurs = {
       ImportDeclaration: (node) => controlerImport(node, node.source),

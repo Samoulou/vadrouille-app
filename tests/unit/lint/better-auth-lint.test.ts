@@ -25,6 +25,9 @@ describe("auth: seules les opérations de la liste blanche sont appelées (lint)
     ["src/server/auth/index.ts", "better-auth"],
     ["src/server/auth/index.ts", "@/tenancy/auth"],
     ["src/server/auth/sous/exemple.ts", "../../../tenancy/auth"],
+    ["src/server/session.ts", "@/tenancy/options"],
+    ["tests/db/exemple.test.ts", "@/tenancy/adaptateur"],
+    ["src/tenancy/auth.ts", "./options"],
   ];
   it.each(BIBLIOTHEQUE_ADMISE)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier, CONFINEMENT)).toHaveLength(0);
@@ -39,6 +42,9 @@ describe("auth: seules les opérations de la liste blanche sont appelées (lint)
     ["src/server/with-org.ts", "@/tenancy/auth"],
     ["src/tenancy/autre.ts", "./auth"],
     ["tests/db/exemple.test.ts", "@/tenancy/auth"],
+    ["src/features/exemple.ts", "@/tenancy/options"],
+    ["src/app/page.tsx", "@/tenancy/cles"],
+    ["src/adapters/exemple.ts", "../tenancy/organisations"],
   ];
   it.each(BIBLIOTHEQUE_REFUSEE)("%s ne peut pas importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier, CONFINEMENT)).not.toHaveLength(0);

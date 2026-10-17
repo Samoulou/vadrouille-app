@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { withOrg, WithOrgContextError } from "@/server/with-org";
+import { creerWithOrg, WithOrgContextError } from "@/server/with-org";
 
 import { createDatabase, type Database } from "../../db/index";
 import { closeAll, connect, createOrg, type DbClient } from "./helpers";
@@ -28,7 +28,7 @@ afterAll(async () => {
 describe("withOrg", () => {
   it("rls: withOrg pose le contexte de la transaction", async () => {
     const { org, owner } = await createOrg(auth);
-    const dedans = await withOrg(
+    const dedans = await creerWithOrg(app)(
       { organizationId: org, userId: owner },
       async (tx) => {
         await tx.execute(
@@ -39,7 +39,6 @@ describe("withOrg", () => {
         const voyages = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM trips`);
         return { contexte: contexte.rows[0], voyages: voyages.rows[0]?.n };
       },
-      app,
     );
     expect(dedans.contexte).toEqual({ org, utilisateur: owner });
     expect(dedans.voyages).toBe(1);
@@ -65,7 +64,7 @@ describe("withOrg", () => {
       { organizationId: "", userId: valide },
       { organizationId: 42 as unknown as string, userId: valide },
     ]) {
-      await expect(withOrg(ctx, async () => "jamais", espion)).rejects.toBeInstanceOf(WithOrgContextError);
+      await expect(creerWithOrg(espion)(ctx, async () => "jamais")).rejects.toBeInstanceOf(WithOrgContextError);
     }
     expect(appels).toEqual([]);
   });

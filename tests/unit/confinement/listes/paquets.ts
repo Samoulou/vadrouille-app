@@ -85,7 +85,7 @@ const PAQUETS_TS = [
       "connexion par code et organisations (B3b, décision 0008) : `src/tenancy/` seulement, sous-chemins exacts ; aucune route HTTP, " +
       "opérations de la liste blanche appelées depuis `src/server/auth/` (`ligne/better-auth-confinement`)",
     verdict:
-      "B3b (ticket 444) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 1.7.7, aucun paquet ajouté à " +
+      "B3b (ticket 444) ; verdict Sécurité : approuvé sur le head `f0b8c5a` (revue consolidée, PR 446), lockfile cité : version exacte 1.7.7, aucun paquet ajouté à " +
       "`onlyBuiltDependencies`, scripts d'installation ignorés inchangés",
   },
 ] as const satisfies readonly LignePaquet[];
