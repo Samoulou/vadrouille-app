@@ -12,29 +12,29 @@ afterEach(() => {
 });
 
 describe("getRequestContext (décision 0013, § 3.6)", () => {
-  it("renvoie l'organisation simulée avec l'adaptateur mock (défaut)", () => {
+  it("renvoie l'organisation simulée avec l'adaptateur mock (défaut)", async () => {
     vi.stubEnv("DATA_ADAPTER", undefined);
-    expect(getRequestContext()).toEqual({ organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" });
+    expect(await getRequestContext()).toEqual({ organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" });
     vi.stubEnv("DATA_ADAPTER", "mock");
-    expect(getRequestContext()).toEqual({ organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" });
+    expect(await getRequestContext()).toEqual({ organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" });
   });
 
-  it("lève une erreur avec tout autre adaptateur", () => {
+  it("lève une erreur avec tout autre adaptateur", async () => {
     vi.stubEnv("DATA_ADAPTER", "api");
-    expect(() => getRequestContext()).toThrow(/B3/);
+    await expect(getRequestContext()).rejects.toThrow(/B3/);
   });
 
-  it("adaptateurs: contexte de requête org_prototype en mode prototype, refusé en production", () => {
+  it("adaptateurs: contexte de requête org_prototype en mode prototype, refusé en production", async () => {
     vi.stubEnv("DATA_ADAPTER", "prototype");
     vi.stubEnv("NODE_ENV", "test");
-    expect(getRequestContext()).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
-    expect(getRequestContext("prototype", { NODE_ENV: "development" })).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
+    expect(await getRequestContext()).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
+    expect(await getRequestContext("prototype", { NODE_ENV: "development" })).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
     vi.stubEnv("VERCEL_ENV", "production");
-    expect(() => getRequestContext()).toThrow(/adaptateur prototype refusé/);
-    expect(() => getRequestContext("prototype", { NODE_ENV: "test", VADROUILLE_ENV: "production" })).toThrow(
+    await expect(getRequestContext()).rejects.toThrow(/adaptateur prototype refusé/);
+    await expect(getRequestContext("prototype", { NODE_ENV: "test", VADROUILLE_ENV: "production" })).rejects.toThrow(
       /adaptateur prototype refusé/,
     );
-    expect(() => getRequestContext("prototype", { NODE_ENV: "production" })).toThrow(/adaptateur prototype refusé/);
+    await expect(getRequestContext("prototype", { NODE_ENV: "production" })).rejects.toThrow(/adaptateur prototype refusé/);
   });
 
   it("adaptateurs: org_prototype et son utilisateur technique ont des uuid fixes distincts (0046 D15 point 4)", () => {
@@ -44,10 +44,10 @@ describe("getRequestContext (décision 0013, § 3.6)", () => {
     expect(PROTOTYPE_USER_ID).not.toBe(PROTOTYPE_ORG_ID);
   });
 
-  it("renvoie une copie : la modifier ne change pas le contexte suivant", () => {
-    const ctx = getRequestContext("mock");
+  it("renvoie une copie : la modifier ne change pas le contexte suivant", async () => {
+    const ctx = await getRequestContext("mock");
     ctx.organizationId = "autre";
-    expect(getRequestContext("mock").organizationId).toBe(MOCK_ORGANIZATION_ID);
+    expect((await getRequestContext("mock")).organizationId).toBe(MOCK_ORGANIZATION_ID);
   });
 });
 
@@ -69,9 +69,9 @@ describe("adaptateur mock : voyage débloqué (écran 6b)", () => {
 });
 
 describe("contexte de requête (E6)", () => {
-  it("adaptateurs: le contexte porte userId et role", () => {
+  it("adaptateurs: le contexte porte userId et role", async () => {
     vi.stubEnv("DATA_ADAPTER", "mock");
-    const ctx = getRequestContext();
+    const ctx = await getRequestContext();
     expect(Object.keys(ctx).sort()).toEqual(["organizationId", "role", "userId"]);
     expect(ctx).toEqual({ organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" });
   });

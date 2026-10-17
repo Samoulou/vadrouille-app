@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getPaymentAdapter, getRequestContext, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
+import { getPaymentAdapter, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
+import { contexteFacultatif, exigerSession } from "@/features/compte/session";
 import { OfferScreen } from "@/features/presentation/OfferScreen";
+import { unlockRoutes } from "@/features/presentation/routes";
 import { loadUnlockPage } from "@/features/presentation/unlock-load";
 import { tripRoutes } from "@/features/sejour/routes";
 import { plateMeta } from "@/features/voyage/plate";
@@ -21,7 +23,8 @@ const ROBOTS = { index: false, follow: false } as const;
 async function load(id: string, paiement: string | string[] | undefined) {
   // Garde en premier, avant toute lecture (décision 0020 § 2.3) : 404, jamais 500.
   if (!paymentAvailable()) return null;
-  const ctx = getRequestContext();
+  // Sans session (`better-auth`, B3c) : redirection vers l'écran 4.
+  const ctx = await exigerSession(unlockRoutes(id).debloquer());
   const scope = await getSimulationScope();
   return loadUnlockPage(getTripReader({ scope }), getPaymentAdapter({ scope }), ctx, id, paiement);
 }
@@ -29,7 +32,9 @@ async function load(id: string, paiement: string | string[] | undefined) {
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   if (!paymentAvailable()) return { robots: ROBOTS };
   const { id } = await params;
-  const trip = await getTripReader().getTrip(getRequestContext(), id);
+  // Sans session (`better-auth`) : titre par défaut ; seule la page redirige (`exigerSession`).
+  const ctx = await contexteFacultatif();
+  const trip = ctx === null ? null : await getTripReader().getTrip(ctx, id);
   return trip ? { title: format(messages.debloquer.titreDocument.debloquer, { destination: trip.destination }), robots: ROBOTS } : { robots: ROBOTS };
 }
 

@@ -14,6 +14,12 @@
  * barrière, vérifiée à chaque relecture) sont branchés sur l'adaptateur. Elle ne lit rien ici : chaque lecture la
  * vérifie (garde du mode réel et cookie d'accès), et elle reste fermée hors de la préversion de `p0-reel`. Un échec du
  * branchement est journalisé sans arrêter le serveur : la liste reste vide, comme sans barrière.
+ *
+ * B3c (spécification B3, B3c point 1) : environnement valide et `AUTH_ADAPTER=better-auth` (admis en `local` et `ci`
+ * seulement, B3-TL-2), les opérations de la liste blanche (`authOperations()`), le limiteur (`checkRateLimit`) et le
+ * contexte de session (`getServerRequestContext()`) sont branchés sur l'adaptateur `better-auth`
+ * (`brancherConnexionReelle`) ; rien n'est lu ni connecté ici (pools créés au premier appel). Un échec du branchement
+ * est journalisé sans arrêter le serveur : la connexion reste fermée (`provider_error`, page d'erreur).
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -24,6 +30,7 @@ export async function register(): Promise<void> {
       parseServerEnv(process.env);
       assertServerProcessEnv(process.env);
       await brancherLecturePrototype(logEvent, errorNameOf);
+      await brancherConnexion(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -49,5 +56,23 @@ async function brancherLecturePrototype(
     brancherLectureProgrammesReels(() => poolLectureProgrammes(), creerRelecteurReel());
   } catch (error) {
     logEvent("p0.read_unavailable", { errorName: errorNameOf(error) }, "error");
+  }
+}
+
+/** Branche la connexion réelle sur l'adaptateur `better-auth` (spécification B3, B3c point 1). */
+async function brancherConnexion(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { authAdapterChoice } = await import("@/adapters/auth-guard");
+    if (authAdapterChoice() !== "better-auth") return;
+    const { brancherConnexionReelle } = await import("@/adapters/better-auth");
+    const { authOperations } = await import("@/server/auth");
+    const { checkRateLimit } = await import("@/server/rate-limit");
+    const { getServerRequestContext } = await import("@/server/session");
+    brancherConnexionReelle({ operations: authOperations, limiter: checkRateLimit, contexte: getServerRequestContext });
+  } catch (error) {
+    logEvent("auth.operation_failed", { action: "branchement", errorName: errorNameOf(error) }, "error");
   }
 }

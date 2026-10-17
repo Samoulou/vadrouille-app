@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getPaymentAdapter, getRequestContext, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
+import { getPaymentAdapter, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
+import { contexteFacultatif, exigerSession } from "@/features/compte/session";
 import { PaymentReturn } from "@/features/presentation/PaymentReturn";
-import { presentationRoute } from "@/features/presentation/routes";
+import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { loadCheckout } from "@/features/presentation/unlock-load";
 import { tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
@@ -20,7 +21,9 @@ const ROBOTS = { index: false, follow: false } as const;
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   if (!paymentAvailable()) return { robots: ROBOTS };
   const { id } = await params;
-  const trip = await getTripReader().getTrip(getRequestContext(), id);
+  // Sans session (`better-auth`) : titre par défaut ; seule la page redirige (`exigerSession`).
+  const ctx = await contexteFacultatif();
+  const trip = ctx === null ? null : await getTripReader().getTrip(ctx, id);
   return trip
     ? { title: format(messages.debloquer.titreDocument.confirmation, { destination: trip.destination }), robots: ROBOTS }
     : { robots: ROBOTS };
@@ -35,7 +38,9 @@ export default async function ConfirmationPage({ params, searchParams }: { param
   if (!paymentAvailable()) notFound();
   const { id } = await params;
   const { paiement } = await searchParams;
-  const ctx = getRequestContext();
+  // Sans session (`better-auth`, B3c) : redirection vers l'écran 4, suite « Débloquer » (une page de paiement simulé
+  // n'est jamais une suite, B3-PO-11).
+  const ctx = await exigerSession(unlockRoutes(id).debloquer());
   const scope = await getSimulationScope();
   const trip = await getTripReader({ scope }).getTrip(ctx, id);
   if (!trip) notFound();

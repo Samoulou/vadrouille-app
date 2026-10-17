@@ -6,7 +6,7 @@ import { MOCK_AUTH_CONFIG } from "@/adapters/mock-auth";
 import { advanceClock, explicitScope } from "@/adapters/simulation";
 import { MOCK_AUTH_CODE, MOCK_KNOWN_EMAIL, MOCK_WRONG_AUTH_CODE } from "@/mocks/auth-simule";
 
-import { requestCode, verifyCode } from "./compte";
+import { hasSession, requestCode, signOut, verifyCode } from "./compte";
 
 const scopeName = vi.hoisted(() => ({ value: "compte-1" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-vadrouille-simulation": scopeName.value }) }));
@@ -151,5 +151,27 @@ describe("requestCode et verifyCode : erreurs", () => {
     } finally {
       for (const spy of spies) spy.mockRestore();
     }
+  });
+});
+
+describe("signOut : connexion simulée (B3-PO-7 ; revue consolidée du head `2b80bd7` de la PR 452, mineur 12)", () => {
+  it("ferme la session de la portée, idempotente, sans entrée", async () => {
+    expect((await requestCode({ email: MOCK_KNOWN_EMAIL })).ok).toBe(true);
+    expect(await verifyCode({ email: MOCK_KNOWN_EMAIL, code: MOCK_AUTH_CODE })).toEqual({ ok: true, value: { signedIn: true } });
+    expect(await hasSession()).toBe(true);
+    expect(await signOut()).toEqual({ ok: true, value: { signedOut: true } });
+    expect(await hasSession()).toBe(false);
+    expect(await signOut()).toEqual({ ok: true, value: { signedOut: true } });
+  });
+
+  it("une erreur de l'adaptateur ou la garde fermée devient provider_error, sans détail", async () => {
+    vi.mocked(adapters.getAuthAdapter).mockReturnValueOnce({
+      signOut: async () => {
+        throw new Error(MOCK_KNOWN_EMAIL);
+      },
+    } as never);
+    expect(await signOut()).toEqual({ ok: false, error: { code: "provider_error" } });
+    vi.stubEnv("VADROUILLE_ENV", "production");
+    expect(await signOut()).toEqual({ ok: false, error: { code: "provider_error" } });
   });
 });

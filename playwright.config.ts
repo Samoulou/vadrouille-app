@@ -38,6 +38,15 @@ const PROTOTYPE_DIR = realpathSync(join(__dirname, "prototype", "programmes-test
 // « Mes voyages » vide, aucune connexion, aucun échec de branchement au journal. Port décalé de 2 000.
 const LECTURE_REELLE_PORT = PORT + 2 * PROTOTYPE_PORT_OFFSET;
 
+// B3c (spécification B3, B3c point 7 ; B3-TL-8 ; décision 0077 § 5.4) : quatrième serveur sur le même build, connexion
+// réelle (`AUTH_ADAPTER=better-auth`) sur la base du job `db`. Démarré, avec le projet `auth`, seulement quand le job
+// `db` pose la variable d'outillage `E2E_AUTH_SERVER=1` (après les migrations) : sans base, `register()` le refuserait.
+// Port décalé de 3 000. Les URL de connexion de la base (`vadrouille_app`, `vadrouille_auth`) viennent de
+// l'environnement du job (`scripts/ci/db-setup.sh`) ; les deux secrets sont tirés ici, comme pour le serveur principal.
+const AUTH_SERVER = process.env.E2E_AUTH_SERVER === "1";
+const AUTH_PORT = PORT + 3 * PROTOTYPE_PORT_OFFSET;
+const authURL = `http://127.0.0.1:${AUTH_PORT}`;
+
 // B3a (spécification B3, B3a point 3 ; décisions 0050, P2, et 0051, points 2.3 et 6.4) : les serveurs des e2e
 // tournent en `VADROUILLE_ENV=ci`. Le secret du limiteur est tiré au hasard à chaque exécution et posé dans le seul
 // `env` du serveur principal : ni écrit sur disque, ni journalisé, ni posé dans `process.env` de Playwright (aucun
@@ -95,6 +104,9 @@ export default defineConfig({
     // Mesure Lighthouse (décision 0022 § 1 et § 2) : `pnpm test:perf`, hors de `pnpm verify`, un seul worker,
     // sans nouvelle tentative (elle cacherait un score instable).
     { name: "perf", testDir: "tests/perf", testMatch: /.*\.perf\.spec\.ts$/, retries: 0 },
+    // B3c (critère C7, partie « pages ») : serveur à connexion réelle ; aucune trace (cookies de session), en-tête de
+    // confiance posé par fixture dans chaque test (`tests/e2e/sans-session.auth.spec.ts`).
+    ...(AUTH_SERVER ? [{ name: "auth", testDir: "tests/e2e", testMatch: /.*\.auth\.spec\.ts$/, use: { baseURL: authURL, trace: "off" as const } }] : []),
   ],
   webServer: [
     {
@@ -161,5 +173,30 @@ export default defineConfig({
         [SERVER_LOG_ENV]: serverLogPath({ port: LECTURE_REELLE_PORT, tmpDir: tmpdir() }),
       },
     },
+    ...(AUTH_SERVER
+      ? [
+          {
+            // Même build, connexion réelle (B3c point 7) ; ni `EMAIL_TRANSPORT` ni `SMTP_URL` : port d'envoi désactivé.
+            command: serve,
+            url: authURL,
+            reuseExistingServer: false,
+            timeout: 180_000,
+            stdout: "pipe" as const,
+            stderr: "pipe" as const,
+            env: {
+              AUTH_ADAPTER: "better-auth",
+              VADROUILLE_ENV: "ci",
+              TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
+              BETTER_AUTH_URL: authURL,
+              APP_URL: authURL,
+              BETTER_AUTH_SECRET: secretJetable(),
+              RATE_LIMIT_HMAC_SECRET: secretJetable(),
+              PORT: String(AUTH_PORT),
+              HOSTNAME: "127.0.0.1",
+              [SERVER_LOG_ENV]: serverLogPath({ port: AUTH_PORT, tmpDir: tmpdir() }),
+            },
+          },
+        ]
+      : []),
   ],
 });

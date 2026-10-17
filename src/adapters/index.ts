@@ -3,6 +3,7 @@ import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { assertAuthAdapter } from "./auth-guard";
+import { betterAuthServerAdapter } from "./better-auth";
 import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock";
 import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
@@ -32,8 +33,8 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
  * comme `MOCK_DEMO_TRIP`. Jamais lu par une route produit.
  */
 export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
-export { authAdapterChoice, mockAuthAllowed } from "./auth-guard";
-export { getRequestContext } from "./context";
+export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
+export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
@@ -97,13 +98,14 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
 
 /**
  * Connexion (décision 0017 § 3.1 et § 11.2), selon la variable serveur `AUTH_ADAPTER` (`mock` par défaut). **Garde
- * fermée par défaut** : lève une erreur à l'appel pour l'adaptateur `mock` sur un déploiement de production ou
- * hors `development`/`test` sans `VADROUILLE_DEMO_AUTH=1`, et pour un adaptateur inconnu ou pas encore livré
- * (`better-auth`, B3). Aucun repli permissif. L'état simulé vit dans la portée `options.scope` (portée par défaut
- * sinon) ; `env` sert aux tests.
+ * fermée par défaut** (`assertAuthAdapter`) : lève une erreur à l'appel, avant toute connexion à la base, pour
+ * l'adaptateur `mock` sur un déploiement de production ou hors `development`/`test` sans `VADROUILLE_DEMO_AUTH=1`, pour
+ * `better-auth` hors `local` et `ci` (B3c ; B3-TL-2, décision 0077 § 5.1), et pour un adaptateur inconnu. Aucun repli
+ * permissif. `better-auth` : adaptateur réel de `./better-auth.ts` (B3c), qui charge ses modules à l'appel. `mock` :
+ * l'état simulé vit dans la portée `options.scope` (portée par défaut sinon) ; `env` sert aux tests.
  */
 export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.ProcessEnv } = {}): AuthAdapter {
-  assertAuthAdapter(options.env);
+  if (assertAuthAdapter(options.env) === "better-auth") return betterAuthServerAdapter();
   const scope = options.scope ?? defaultScope();
   return createMockAuthAdapter({
     now: () => scope.clock.now(),
