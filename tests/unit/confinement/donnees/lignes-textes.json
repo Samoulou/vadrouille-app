@@ -101,7 +101,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (B3c, ticket 447 ; spécification B3, B3c point 1), modèle accepté par 0040 D4, décision 0077 § 5.6. Verdict Sécurité à rendre"
+      "ecart": "ligne ordinaire de portée application (B3c, ticket 447 ; spécification B3, B3c point 1), modèle accepté par 0040 D4, décision 0077 § 5.6 ; garde-fou du second branchement ajouté par la revue consolidée du head `2b80bd7` (PR 452, bloquant 2) ; verdict Sécurité : approuvé sur le head `da34495`"
     },
     {
       "fichier": "src/adapters/prototype.test.ts",
