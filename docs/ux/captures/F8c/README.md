@@ -17,25 +17,23 @@ les références de la CI sont dans `tests/visual/__screenshots__` (décision 00
 
 ## Références existantes
 
-La revue de 293493b (Tech Lead, mineur 9) l'a demandé : les 5 références réécrites sans lien avec le diff de F8c
-sont restaurées depuis `main`. Ce sont `connexion-code`, `connexion-code-faux`, `connexion-trop-d-essais`,
+Sur demande de la revue de 293493b (Tech Lead, mineur 9), les 5 références réécrites sans lien avec le diff de F8c
+sont restaurées depuis `main` : `connexion-code`, `connexion-code-faux`, `connexion-trop-d-essais`,
 `revision-deplacer-jours` et `revision-deplacer-points`. Leurs écarts (lissage du texte, 1 à 2 niveaux sur 255)
-restaient sous la tolérance de 1 %, et `--update-snapshots=all` les avait réécrites quand même (Q232).
+restent sous la tolérance de 1 %. `visual-update` (`--update-snapshots=all`, Q232) les réécrit pourtant à chaque
+passage (580fe72, puis 58ac983) ; elles sont donc restaurées de nouveau après chaque publication.
 
 Seule `logement-aucun-quartier.png` est gardée dans sa version publiée par 580fe72 (14 px gris,
 `text-corps-s text-ink-soft`, ce que demande `LodgingScreen`). L'ancienne image (texte foncé plus grand) contredisait
 le code. La capture attend désormais un état stable : « Continuer sans logement » visible et squelette retiré
 (mineur 10).
 
-## À régénérer après la correction de la revue
+## Republiées après la correction de la revue (58ac983)
 
-Ces captures F8c changent au-delà de la tolérance de 1 % avec les corrections de la revue (`test:visual` local sur
-4671b38). Leurs références sont à republier (`update-snapshots`) :
+`visual-update` a republié les références F8c touchées par les corrections de la revue :
 - `preparation-erreur.png` : titre « Préparation interrompue » et jours non prêts « Interrompu » (mineur UX 2) ;
-- `preparation-pret.png`, `preparation-incomplet.png` : la colonne d'état garde la largeur de « En préparation », et
-  les mini-lignes ne sautent plus quand un jour devient prêt (mineur UX 5).
+- `preparation-pret.png`, `preparation-incomplet.png` : colonne d'état à largeur réservée (mineur UX 5) ;
+- `lancement-conflit.png` (« Voir ces propositions » en `size="sm"`, mineur UX 6) et `lancement-erreur.png` : écarts
+  sous la tolérance, réécrits par `--update-snapshots=all`.
 
-Ces deux captures changent aussi, mais sous la tolérance : `preparation-en-cours.png` (même colonne, déjà à cette
-largeur) et `lancement-conflit.png` (« Voir ces propositions » en `size="sm"`, mineur UX 6).
-
-Les PNG de ce répertoire montrent l'état d'avant ces corrections.
+`preparation-en-cours.png` est inchangée. Les PNG de ce répertoire montrent l'état d'avant ces corrections.
