@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { getPaymentAdapter, getRequestContext, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
+import { getPaymentAdapter, getSimulationScope, getTripReader, paymentAvailable } from "@/adapters";
+import { exigerSession } from "@/features/compte/session";
 import { PaymentSimulation } from "@/features/presentation/PaymentSimulation";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { loadCheckout } from "@/features/presentation/unlock-load";
@@ -24,7 +25,9 @@ export const metadata: Metadata = {
 export default async function PaiementSimulePage({ params }: { params: Params }) {
   if (!paymentAvailable()) notFound();
   const { id, paiementId } = await params;
-  const ctx = getRequestContext();
+  // Sans session (`better-auth`, B3c) : redirection vers l'écran 4, suite « Débloquer » (une page de paiement simulé
+  // n'est jamais une suite, B3-PO-11).
+  const ctx = await exigerSession(unlockRoutes(id).debloquer());
   const scope = await getSimulationScope();
   const trip = await getTripReader({ scope }).getTrip(ctx, id);
   if (!trip) notFound();

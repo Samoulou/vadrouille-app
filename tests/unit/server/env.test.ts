@@ -4,7 +4,7 @@ import { inspect } from "node:util";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { authAdapterChoice } from "@/adapters/auth-guard";
+import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
 import { isProductionDeployment } from "@/dev/flags";
 import * as moduleEnv from "@/server/env";
 import { assertServerProcessEnv, parseServerEnv, rateLimitSettings, SERVER_ENV_VARIABLES, ServerEnvError, type ServerEnvRule, type ServerEnvVariable } from "@/server/env";
@@ -537,5 +537,29 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
         if (isProductionDeployment({ NODE_ENV: "test", ...env })) expect(resolveServerEnvironment(env), JSON.stringify(env)).toBe("production");
       }
     }
+  });
+
+  it("betterAuthAllowed suit resolveServerEnvironment : vrai seulement pour local et ci (B3c ; B3-TL-2)", () => {
+    const valeurs = [undefined, "", " ", "local", "development", " CI ", "ci", "staging", "preview", "production", " Production", "inconnu", "constructor"];
+    for (const vadrouille of valeurs) {
+      for (const vercelEnv of valeurs) {
+        const env = { VADROUILLE_ENV: vadrouille, VERCEL_ENV: vercelEnv };
+        let attendu: boolean;
+        try {
+          attendu = ["local", "ci"].includes(resolveServerEnvironment(env));
+        } catch {
+          attendu = false;
+        }
+        expect(betterAuthAllowed({ NODE_ENV: "test", ...env }), JSON.stringify(env)).toBe(attendu);
+      }
+    }
+  });
+
+  it("valeur blanche déclarée : non déclarée pour resolveServerEnvironment comme pour betterAuthAllowed (revue du head `2b80bd7` de la PR 452, mineur 8)", () => {
+    const env = { VADROUILLE_ENV: "  ", VERCEL_ENV: "local" };
+    expect(resolveServerEnvironment(env)).toBe("local");
+    expect(betterAuthAllowed({ NODE_ENV: "test", ...env })).toBe(true);
+    expect(() => resolveServerEnvironment({ VADROUILLE_ENV: "  " })).toThrow(ServerEnvironmentUndeclaredError);
+    expect(betterAuthAllowed({ NODE_ENV: "test", VADROUILLE_ENV: "  " })).toBe(false);
   });
 });

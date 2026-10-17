@@ -1,6 +1,6 @@
 "use server";
 
-import { getAuthAdapter, getCreationAdapter, getRequestContext, type AdapterContext } from "@/adapters";
+import { authAdapterChoice, getAuthAdapter, getCreationAdapter, type AdapterContext } from "@/adapters";
 import { getSimulationScope } from "@/adapters/simulation";
 import {
   BriefRequestSchema,
@@ -21,6 +21,7 @@ import {
 } from "@/contracts";
 import { CreatedTripSchema, GenerationStatusRequestSchema } from "@/contracts/creation";
 import type { ApiErrorCode } from "@/contracts/values";
+import { contexteFacultatif } from "@/features/compte/session";
 
 import { parseInput } from "../parse-input";
 
@@ -105,8 +106,20 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
   const earliest = new Date(scope.clock.now() - DAY_MS).toISOString().slice(0, 10);
   if (parsed.value.draft.start < earliest) return fail("validation_failed", "draft.start");
 
-  // Phase 0 : la session simulée ne porte pas de rôle ; la personne connectée est propriétaire de son organisation (B3).
-  const ctx: AdapterContext = { organizationId: session.organizationId, userId: session.userId, role: "owner" };
+  // Contexte : avec `better-auth`, celui de la session (organisation active, personne et rôle lus par
+  // `getServerRequestContext()`, comme `getGenerationStatus`) ; en phase 0, la session simulée ne porte pas de rôle et
+  // la personne connectée est propriétaire de son organisation simulée.
+  let ctx: AdapterContext | null;
+  if (authAdapterChoice() === "better-auth") {
+    try {
+      ctx = await contexteFacultatif();
+    } catch {
+      return fail("provider_error");
+    }
+    if (ctx === null) return fail("unauthenticated");
+  } else {
+    ctx = { organizationId: session.organizationId, userId: session.userId, role: "owner" };
+  }
   let result: Result<CreatedTrip>;
   try {
     result = await getCreationAdapter(undefined, { scope }).createTrip(ctx, parsed.value);
@@ -127,18 +140,25 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
 
 /**
  * Écran 5 (F8c) : avancement de la génération, lu par la page (état initial) puis interrogé par le navigateur toutes
- * les secondes (0017 § 9). En phase 0, le contexte vient de `getRequestContext()`, comme la page (0017 § 3.1) : l'action
- * ne doit jamais être branchée sur un adaptateur réel avant B3, qui la remplace par la session et le contrôle
- * d'appartenance (0017 § 3.6). `not_found` pour un voyage inconnu ou d'une autre organisation ; une sortie non conforme
- * ou d'un autre voyage devient `provider_error`.
+ * les secondes (0017 § 9). Le contexte vient de `contexteFacultatif()`, comme la page (0017 § 3.1) : celui de la
+ * session avec `better-auth` (B3c ; sans session, `unauthenticated` avant toute lecture de l'entrée), celui de la phase
+ * 0 sinon. Le contrôle d'appartenance de l'adaptateur réel reste à B9 (0017 § 3.6). `not_found` pour un voyage inconnu
+ * ou d'une autre organisation ; une sortie non conforme ou d'un autre voyage devient `provider_error`.
  */
 export async function getGenerationStatus(input: unknown): Promise<Result<GenerationStatus>> {
+  let ctx: AdapterContext | null;
+  try {
+    ctx = await contexteFacultatif();
+  } catch {
+    return fail("provider_error");
+  }
+  if (ctx === null) return fail("unauthenticated");
   const parsed = parseInput(GenerationStatusRequestSchema, input);
   if (!parsed.ok) return parsed;
   const scope = await getSimulationScope();
   let result: Result<unknown>;
   try {
-    result = await getCreationAdapter(undefined, { scope }).getGenerationStatus(getRequestContext(), parsed.value.tripId);
+    result = await getCreationAdapter(undefined, { scope }).getGenerationStatus(ctx, parsed.value.tripId);
   } catch {
     return fail("provider_error");
   }
