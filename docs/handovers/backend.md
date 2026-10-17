@@ -141,6 +141,8 @@ evals/            voyages de référence, scripts d'évaluation (aucune donnée 
 | `src/grounding` | `@/contracts`, `@/grounding/*`, `zod`, `server-only`, `@/server/env/grounding` (clé serveur Google), `@/server/env/egress`, `@/server/usage/port` (le port seulement, jamais une implémentation) ; `fetch` global seulement comme transport par défaut des modules de capacité `places-client.ts` et `routes-client.ts` (P0r1, décision 0031 § 5 et § 6) |
 | `src/research` | `@/contracts`, `@/ai`, `@/research/*`, `zod`, `server-only`, `node:net` (`BlockList` et `isIP`, dans `ip-guard.ts` seulement) ; `node:dns/promises`, client HTTP du lecteur de pages (`undici`, `Agent` seulement) et `@/server/env/egress` confinés au seul module de capacité `src/research/undici-transport.ts` (P0r1, décision 0031 § 5 et § 6) |
 
+Admis nommément, hors du tableau (décision 0080, B7a) : `parse5` dans le seul `src/research/extract-text.ts` ; `node:fs` dans le seul test `src/ai/openrouter-client.test.ts` ; `node:fs`, `node:path` et `node:zlib` dans le seul test `src/research/fetch-page.test.ts`. Pour `src/ai` et `src/research`, la liste blanche est vérifiée par les règles du plugin `ligne/ia-recherche-liste-blanche` et `ligne/complement-p0-imports` (et non par `no-restricted-imports`), qui signalent aussi toute source non littérale d'`import()` ou de `require`.
+
 **Liste noire** pour les autres dossiers :
 | Dossier | Interdit |
 |---|---|
