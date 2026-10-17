@@ -43,8 +43,12 @@ export type DetailsLieu = {
    */
   statut?: (typeof STATUTS_GOOGLE)[number];
   position: Coordonnees;
-  /** Plages d'ouverture (0 = dimanche, minutes depuis minuit) ; `null` si inconnues. */
-  horaires: { jour: number; debut: number; fin: number }[] | null;
+  /**
+   * Plages d'ouverture (0 = dimanche, minutes depuis minuit) ; `null` si inconnues. Une plage qui passe minuit garde
+   * `fin` = 1 440 (comportement de P0) et porte `finLendemain`, l'heure de fermeture du lendemain en minutes depuis
+   * minuit (décision 0085 § 2 point d) : seul `versRelectures` le lit.
+   */
+  horaires: { jour: number; debut: number; fin: number; finLendemain?: number }[] | null;
   nom?: string;
   adresse?: string;
   note?: number;
@@ -54,6 +58,21 @@ export type DetailsLieu = {
 export interface ClientPlaces {
   textSearch(requete: RequeteTextSearch): Promise<ReponseTextSearch>;
   details(placeId: string): Promise<DetailsLieu>;
+}
+
+/** Place Details au masque `id,location` (décision 0085 § 2) : la seule position du lieu. */
+export type PositionLieu = { placeId: string; position: Coordonnees };
+
+/**
+ * Client Places du MVP (B8a, décision 0085 § 2, soumis au verdict de la Sécurité) : un masque fermé **par méthode**,
+ * jamais passé en paramètre. `position` (`id,location`, SKU Essentials) : centre d'une ville, carte (B8b) ;
+ * `identifiant` (`id`, SKU « IDs only ») : rafraîchissement d'un `placeId` de plus de 12 mois, qui peut rendre un autre
+ * identifiant (seule méthode qui l'accepte). Une fiche introuvable lève `ErreurAncrage("place_not_found")` sur les
+ * trois méthodes Place Details. `ClientPlaces` (P0) reste inchangé : la composition de P0 n'a pas ces méthodes.
+ */
+export interface ClientPlacesMvp extends ClientPlaces {
+  position(placeId: string): Promise<PositionLieu>;
+  identifiant(placeId: string): Promise<{ placeId: string }>;
 }
 
 export const MODES_ROUTES = ["walk", "transit", "car"] as const;

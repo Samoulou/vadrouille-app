@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { ClientRoutes } from "@/grounding/interfaces";
+import { MODES_ROUTES, type ClientRoutes } from "@/grounding/interfaces";
 
 /**
  * Double de Routes à **valeurs sentinelles** (contrainte 8). Durées déterministes, en secondes, calculées à partir
@@ -14,6 +14,11 @@ export const FixturesRoutesSchema = z.strictObject({
   modulo: z.number().int().min(1).max(100),
   loin: z.strictObject({ placeIds: z.array(z.string()), secondesEnPlus: z.number().int().min(0).max(7200) }),
   sentinelle: z.strictObject({ de: z.string(), vers: z.string(), secondes: z.number().int() }),
+  /**
+   * B8a (B8-PO-8) : paires sans itinéraire pour les modes nommés (Routes répond sans durée : `null`). Absent : toute
+   * paire a une durée. Les fixtures de P0 n'en ont pas (comportement de `pnpm p0` inchangé).
+   */
+  sansItineraire: z.array(z.strictObject({ de: z.string(), vers: z.string(), modes: z.array(z.enum(MODES_ROUTES)) })).optional(),
 });
 export type FixturesRoutes = z.infer<typeof FixturesRoutesSchema>;
 
@@ -35,8 +40,10 @@ export function dureeSimulee(fixtures: FixturesRoutes, de: string, vers: string)
 export function creerRoutesSimule(fixtures: FixturesRoutes): ClientRoutes {
   return {
     async matrice(requete) {
+      const sansItineraire = (de: string, vers: string) =>
+        (fixtures.sansItineraire ?? []).some((paire) => paire.de === de && paire.vers === vers && paire.modes.includes(requete.mode));
       return {
-        secondes: requete.origines.map((de) => requete.destinations.map((vers) => dureeSimulee(fixtures, de, vers))),
+        secondes: requete.origines.map((de) => requete.destinations.map((vers) => (sansItineraire(de, vers) ? null : dureeSimulee(fixtures, de, vers)))),
       };
     },
   };

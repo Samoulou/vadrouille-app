@@ -6,7 +6,27 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { z } from "zod";
 
 import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
-import { COUT_ESTIME_MICROS, createPlacesClient, MASQUE_DETAILS, MASQUE_TEXT_SEARCH, ORIGINE_PLACES, SKU_DETAILS, SKU_TEXT_SEARCH, type OptionsPlaces } from "@/grounding/places-client";
+import { ancrerLogement as ancrerLogementP0, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
+import { ancrerCandidats, ancrerLogement, ancrerLogementsSuggeres } from "@/grounding/ancrage-production";
+import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
+import { fichesEtapeFinale, fichesLogementsEtapeFinale } from "@/grounding/fiches-finales";
+import { ErreurAncrage } from "@/grounding/interfaces";
+import { CODES_ANCRAGE } from "@/grounding/resultat";
+import { zoneDuSejour } from "@/grounding/zone";
+import {
+  COUT_ESTIME_MICROS,
+  createPlacesClient,
+  MASQUE_DETAILS,
+  MASQUE_IDENTIFIANT,
+  MASQUE_POSITION,
+  MASQUE_TEXT_SEARCH,
+  ORIGINE_PLACES,
+  SKU_DETAILS,
+  SKU_IDENTIFIANT,
+  SKU_POSITION,
+  SKU_TEXT_SEARCH,
+  type OptionsPlaces,
+} from "@/grounding/places-client";
 import { CODE_CLE_ABSENTE } from "@/server/env/egress";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
@@ -178,7 +198,8 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
       position: { lat: 48.8566123, lng: 2.3522456 },
       horaires: [
         { jour: 1, debut: 570, fin: 1080 },
-        { jour: 5, debut: 1200, fin: 1440 },
+        // B8a (0085 § 2 point d) : `fin` reste 1 440 (P0) ; la fermeture du lendemain est portée à part.
+        { jour: 5, debut: 1200, fin: 1440, finLendemain: 120 },
       ],
     });
     expect(JSON.stringify(details)).not.toContain("SENTINELLE-NOM");
@@ -385,5 +406,141 @@ describe("p0: coûts estimés de Places égaux à la table de prix (décision 00
   it("Text Search et Details : constante du client = prix du SKU de la table", () => {
     expect(COUT_ESTIME_MICROS.textSearch).toBe(prixUnitaireMicros(SKU_TEXT_SEARCH));
     expect(COUT_ESTIME_MICROS.details).toBe(prixUnitaireMicros(SKU_DETAILS));
+  });
+
+  it("B8a : position et identifiant, constante du client = prix du SKU de la table", () => {
+    expect(COUT_ESTIME_MICROS.position).toBe(prixUnitaireMicros(SKU_POSITION));
+    expect(COUT_ESTIME_MICROS.identifiant).toBe(prixUnitaireMicros(SKU_IDENTIFIANT));
+  });
+});
+
+/** Appel d'une méthode Place Details nommée (sans accès calculé). */
+function appelerMethode(client: ReturnType<typeof createPlacesClient>, methode: "details" | "position" | "identifiant", placeId: string): Promise<unknown> {
+  if (methode === "details") return client.details(placeId);
+  if (methode === "position") return client.position(placeId);
+  return client.identifiant(placeId);
+}
+
+/** Erreur levée par une promesse (toute classe). */
+async function leve(promesse: Promise<unknown>): Promise<unknown> {
+  try {
+    await promesse;
+  } catch (erreur) {
+    return erreur;
+  }
+  throw new Error("aucune erreur");
+}
+
+// B8a (décision 0085 § 2 points a et b, soumis au verdict de la Sécurité).
+describe("places: un masque par méthode", () => {
+  const POSITION = { id: PLACE_ID, location: { latitude: 48.8566123, longitude: 2.3522456 }, displayName: { text: "SENTINELLE-NOM" } };
+
+  it.each([
+    ["details", MASQUE_DETAILS, SKU_DETAILS, DETAILS],
+    ["position", MASQUE_POSITION, SKU_POSITION, POSITION],
+    ["identifiant", MASQUE_IDENTIFIANT, SKU_IDENTIFIANT, { id: PLACE_ID }],
+  ] as const)("%s : GET /v1/places/{id}, exactement son masque, réservation places_details à son SKU", async (methode, masque, sku, reponse) => {
+    const { client, appels, port } = monter([async () => json(reponse)]);
+    await appelerMethode(client, methode, PLACE_ID);
+    const { url, init } = premier(appels);
+    expect(new URL(url).pathname).toBe(`/v1/places/${PLACE_ID}`);
+    expect(init.method).toBe("GET");
+    expect(new Headers(init.headers).get("x-goog-fieldmask")).toBe(masque);
+    expect(port.lignes.map((l) => [l.demande.methode, l.demande.sku, l.etat])).toEqual([["places_details", sku, "confirmee"]]);
+  });
+
+  it("position : identifiant et position seulement ; un autre id est refusé (invalid_response)", async () => {
+    const { client } = monter([async () => json(POSITION), async () => json({ ...POSITION, id: "SENTINELLE_AUTRE_ID" })]);
+    const lu = await client.position(PLACE_ID);
+    expect(lu).toEqual({ placeId: PLACE_ID, position: { lat: 48.8566123, lng: 2.3522456 } });
+    expect(JSON.stringify(lu)).not.toContain("SENTINELLE-NOM");
+    expect((await erreurDe(client.position(PLACE_ID))).code).toBe("invalid_response");
+  });
+
+  it("identifiant : un autre id valide est rendu (rafraîchissement) ; un id mal formé est refusé", async () => {
+    const { client } = monter([async () => json({ id: "SENTINELLE_NOUVEL_ID" }), async () => json({ id: "pas valide !" })]);
+    expect(await client.identifiant(PLACE_ID)).toEqual({ placeId: "SENTINELLE_NOUVEL_ID" });
+    expect((await erreurDe(client.identifiant(PLACE_ID))).code).toBe("invalid_response");
+  });
+
+  it("details : un autre id reste refusé (invalid_response)", async () => {
+    const { client } = monter([async () => json({ ...DETAILS, id: "SENTINELLE_AUTRE_ID" })]);
+    expect((await erreurDe(client.details(PLACE_ID))).code).toBe("invalid_response");
+  });
+});
+
+// B8a (décision 0085 § 2 point c, soumis au verdict de la Sécurité).
+describe("fiches: introuvable du client réel", () => {
+  const corps404 = () => {
+    const annule = vi.fn();
+    const reponse = new Response(new ReadableStream({ cancel: annule }), { status: 404 });
+    return { reponse, annule };
+  };
+
+  it.each(["details", "position", "identifiant"] as const)("%s : 404 → ErreurAncrage(place_not_found), corps abandonné, réservation comptée", async (methode) => {
+    const { reponse, annule } = corps404();
+    const { client, port } = monter([async () => reponse]);
+    const erreur = await leve(appelerMethode(client, methode, PLACE_ID));
+    expect(erreur).toBeInstanceOf(ErreurAncrage);
+    expect((erreur as ErreurAncrage).code).toBe("place_not_found");
+    expect(annule).toHaveBeenCalled();
+    // Requête partie : la réservation est abandonnée, donc comptée (jamais libérée).
+    expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+  });
+
+  it("Text Search 404 inchangé : upstream_error ; upstream_not_found ne sort jamais du client", async () => {
+    const { client } = monter([async () => json({ error: { message: "SENTINELLE-FOURNISSEUR" } }, 404)]);
+    const erreur = await erreurDe(client.textSearch({ texte: "x", biais: null }));
+    expect(erreur.code).toBe("upstream_error");
+    for (const methode of ["details", "position", "identifiant"] as const) {
+      const { client: autre } = monter([async () => json({}, 404)]);
+      const levee = await leve(appelerMethode(autre, methode, PLACE_ID));
+      expect((levee as { code?: string }).code).not.toBe("upstream_not_found");
+    }
+  });
+});
+
+// B8a : `ancrage: erreur de Google réduite à son code` sur le client réel (corps de réponse sentinelle).
+describe("ancrage: erreur de Google réduite à son code (client Places réel)", () => {
+  const ZONE = zoneDuSejour([{ lat: 48.8566123, lng: 2.3522456 }], RAYON_BIAIS_METRES);
+  const corps = () => json({ error: { message: `SENTINELLE-FOURNISSEUR ${CLE} ${PLACE_ID}` } }, 403);
+  it.each([
+    ["ancrerCandidats", (c: ReturnType<typeof createPlacesClient>) => ancrerCandidats([{ id: "c", nom: "Lieu maison" }], "Ville", ZONE, c)],
+    ["ancrerLogement", (c: ReturnType<typeof createPlacesClient>) => ancrerLogement({ kind: "known", label: "Hôtel maison" }, "Ville", c)],
+    ["ancrerLogementsSuggeres", (c: ReturnType<typeof createPlacesClient>) => ancrerLogementsSuggeres({ zone: null, logements: [{ nom: "Hôtel" }] }, "Ville", c)],
+    ["rafraichirPlaceId", (c: ReturnType<typeof createPlacesClient>) => rafraichirPlaceId({ placeId: PLACE_ID, reference: 0 }, Date.UTC(2026, 9, 17), c)],
+    ["chargerFiches", (c: ReturnType<typeof createPlacesClient>) => chargerFiches([PLACE_ID], c)],
+    ["ficherSerie", (c: ReturnType<typeof createPlacesClient>) => ficherSerie([{ id: "c", placeId: PLACE_ID }], { premiereSerie: 1, marge: 0 }, ZONE, c)],
+  ] as const)("%s : réponse 403 à corps sentinelle → upstream_error, sans sentinelle", async (_nom, appeler) => {
+    const { client, transport } = monter([async () => corps()]);
+    const resultat = await appeler(client);
+    expect(resultat).toEqual({ ok: false, code: "upstream_error", retryable: false });
+    expect(CODES_ANCRAGE).toContain("upstream_error");
+    for (const sentinelle of ["SENTINELLE-FOURNISSEUR", CLE, PLACE_ID]) expect(JSON.stringify(resultat)).not.toContain(sentinelle);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+});
+
+// B8a (décision 0085 § 2 point c, « Conséquences testables ») : effet sur `p0Run` en mode réel, soumis au verdict.
+describe("p0: fiche introuvable écartée en mode réel", () => {
+  const ZONE = zoneDuSejour([{ lat: 48.8566123, lng: 2.3522456 }], RAYON_BIAIS_METRES);
+  const fiche = (id: string) => async () => json({ ...DETAILS, id });
+
+  it("404 sur la fiche d'un lieu de la série : écarté, remplacé par le suivant du classement, l'exécution continue", async () => {
+    const { client } = monter([fiche("SENTINELLE_P1"), async () => json({}, 404), fiche("SENTINELLE_P3")]);
+    const classement = ["SENTINELLE_P1", "SENTINELLE_P2", "SENTINELLE_P3", "SENTINELLE_P4"].map((placeId, i) => ({ id: `c${i + 1}`, placeId }));
+    const issue = await fichesEtapeFinale(classement, client, ZONE, { premiereSerie: 2, marge: 1 });
+    expect(issue.retenus.map((r) => r.id)).toEqual(["c1", "c3"]);
+    expect(issue.fiches).toBe(3);
+    expect(issue.complete).toBe(true);
+  });
+
+  it("404 sur la fiche d'un logement : lodging_unresolved, comme avec le double", async () => {
+    const { client } = monter([async () => json({}, 404)]);
+    const erreur = await leve(fichesLogementsEtapeFinale([PLACE_ID], client));
+    expect((erreur as ErreurAncrage).code).toBe("lodging_unresolved");
+    const { client: ancrage } = monter([async () => json({ places: [{ id: PLACE_ID }] }), async () => json({}, 404)]);
+    const viaP0 = await leve(ancrerLogementP0({ texte: "Hôtel maison", nuits: 1 }, "Ville", ancrage));
+    expect((viaP0 as ErreurAncrage).code).toBe("lodging_unresolved");
   });
 });

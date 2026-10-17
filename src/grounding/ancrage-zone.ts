@@ -5,7 +5,6 @@ import { ErreurAncrage, type ClientPlaces, type RectangleZone, type ReponseTextS
 import { zoneDuSejour } from "@/grounding/zone";
 import type { AncrageResolu } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
-import type { Candidat } from "@/prototype/candidat";
 
 /**
  * Étape d'ancrage de `p0Run` (décision 0055, section 6 point 3, qui amende 0011 § 2 pour `p0Run` seulement ; section 3
@@ -63,11 +62,18 @@ export async function ancrerLogementsDuSejour(brief: Brief, capacites: Pick<Capa
 /** Candidat résolu dans la zone, sans fiche : seulement son `placeId` (statut, position et horaires inconnus ici). */
 export type AncrageSansFiche = { readonly resolu: false } | { readonly resolu: true; readonly placeId: string };
 
-/** Candidats résolus dans la zone par Text Search « IDs only », sans aucune fiche (0055 § 6 point 3). */
+/** Candidat à ancrer : identifiant interne et nom maison (types de `src/grounding`, 0085 § 1.9). */
+export type CandidatAAncrer = { readonly id: string; readonly nom: string };
+
+/**
+ * Candidats résolus dans la zone par Text Search « IDs only », sans aucune fiche (0055 § 6 point 3). Algorithme unique
+ * de résolution d'un candidat (0085 § 1.9) : `p0Run` et `ancrerCandidats` (B8a) l'appellent ; entrée et capacité
+ * retypées sur `src/grounding` (structurellement identiques pour `p0Run`).
+ */
 export async function ancrerCandidatsDansZone(
-  candidats: readonly Pick<Candidat, "id" | "nom">[],
+  candidats: readonly CandidatAAncrer[],
   destination: string,
-  capacites: Pick<CapacitesAncrage, "textSearch">,
+  capacites: { readonly textSearch: (requete: RequeteTextSearch) => Promise<ReponseTextSearch> },
   zone: RectangleZone,
 ): Promise<Map<string, AncrageSansFiche>> {
   const ancrages = new Map<string, AncrageSansFiche>();

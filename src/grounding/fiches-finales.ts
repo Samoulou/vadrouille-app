@@ -54,6 +54,52 @@ export type IssueFiches = {
   readonly complete: boolean;
 };
 
+/** Bornes d'une série : taille de la première série et marge de remplacement (entiers positifs ou nuls). */
+export type BornesSerie = { readonly premiereSerie: number; readonly marge: number };
+
+/** Sortie du cœur de sélection : retenus dans l'ordre du classement, fiches lues, lieux écartés, série remplie. */
+export type SelectionSerie<G> = {
+  readonly retenus: readonly { readonly id: string; readonly fiche: G }[];
+  readonly fiches: number;
+  readonly ecartes: number;
+  readonly complete: boolean;
+};
+
+/**
+ * Cœur générique de la sélection d'une série (décision 0085 § 1.9, extrait de `fichesEtapeFinale`) : dans l'ordre du
+ * classement, une fiche par `placeId` distinct (deux candidats du même `placeId` la partagent), **au plus
+ * `premiereSerie + marge` fiches**, arrêt dès que la série est remplie ; un lieu dont la fiche n'est pas `gardee` est
+ * écarté (compté) et remplacé par le suivant. Toute erreur de `lire` est propagée telle quelle (aucune série partielle).
+ * Appelé par `fichesEtapeFinale` (P0, `ficheOuNull`) et par `ficherSerie` (B8a, `chargerFiches`).
+ */
+export async function selectionnerSerie<F, G extends F>(
+  classement: readonly LieuClasse[],
+  lire: (placeId: string) => Promise<F>,
+  gardee: (fiche: F) => fiche is G,
+  bornes: BornesSerie,
+): Promise<SelectionSerie<G>> {
+  const { premiereSerie, marge } = bornes;
+  if (!Number.isSafeInteger(premiereSerie) || premiereSerie < 0 || !Number.isSafeInteger(marge) || marge < 0) throw new RangeError("fiches: bornes invalides");
+  const plafond = premiereSerie + marge;
+  const lues = new Map<string, F>();
+  const retenus: { id: string; fiche: G }[] = [];
+  let ecartes = 0;
+  for (const lieu of classement) {
+    if (retenus.length >= premiereSerie) break;
+    if (!lues.has(lieu.placeId)) {
+      if (lues.size >= plafond) break;
+      lues.set(lieu.placeId, await lire(lieu.placeId));
+    }
+    const fiche = lues.get(lieu.placeId) as F;
+    if (!gardee(fiche)) {
+      ecartes += 1;
+      continue;
+    }
+    retenus.push({ id: lieu.id, fiche });
+  }
+  return { retenus, fiches: lues.size, ecartes, complete: retenus.length >= premiereSerie };
+}
+
 /**
  * Fiches de la première série et de sa marge, dans l'ordre du classement. Deux candidats du même `placeId` partagent
  * une seule fiche. Toute erreur du client autre que `place_not_found` est propagée (l'exécution s'arrête).
@@ -62,24 +108,16 @@ export async function fichesEtapeFinale(
   classement: readonly LieuClasse[],
   places: Pick<ClientPlaces, "details">,
   zone: RectangleZone,
-  bornes: { readonly premiereSerie: number; readonly marge: number },
+  bornes: BornesSerie,
 ): Promise<IssueFiches> {
-  const { premiereSerie, marge } = bornes;
-  if (!Number.isSafeInteger(premiereSerie) || premiereSerie < 0 || !Number.isSafeInteger(marge) || marge < 0) throw new RangeError("fiches: bornes invalides");
-  const plafond = premiereSerie + marge;
-  const lues = new Map<string, AncrageResolu | null>();
-  const retenus: { id: string; ancrage: AncrageResolu }[] = [];
-  for (const lieu of classement) {
-    if (retenus.length >= premiereSerie) break;
-    if (!lues.has(lieu.placeId)) {
-      if (lues.size >= plafond) break;
-      lues.set(lieu.placeId, await ficheOuNull(lieu.placeId, places));
-    }
-    const fiche = lues.get(lieu.placeId) ?? null;
-    if (fiche === null || fiche.statut === "ferme_definitivement" || !dansZone(fiche.position, zone)) continue;
-    retenus.push({ id: lieu.id, ancrage: fiche });
-  }
-  return { retenus, fiches: lues.size, complete: retenus.length >= premiereSerie };
+  const garde = (fiche: AncrageResolu | null): fiche is AncrageResolu =>
+    fiche !== null && fiche.statut !== "ferme_definitivement" && dansZone(fiche.position, zone);
+  const selection = await selectionnerSerie(classement, (placeId) => ficheOuNull(placeId, places), garde, bornes);
+  return {
+    retenus: selection.retenus.map(({ id, fiche }) => ({ id, ancrage: fiche })),
+    fiches: selection.fiches,
+    complete: selection.complete,
+  };
 }
 
 /** Fiches des logements à l'étape finale : une chacun ; introuvable ou fermé définitivement : `lodging_unresolved`. */

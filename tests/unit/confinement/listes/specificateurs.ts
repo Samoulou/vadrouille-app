@@ -175,9 +175,18 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) du port `PortPositions` de `src/grounding` (types seuls), exigé par `ligne/require-server-only` ; " +
       "B8c (ticket 438), décision 0060 § 1.1 ; verdict Sécurité à rendre",
   },
+  // B8a (ticket 462) : modules de production de `src/grounding` (décision 0085 § 1), non chargés par `pnpm p0`.
+  // Verdict Sécurité à rendre (PR de B8a).
+  ...["ancrage-production", "fiches", "resultat", "trajets"].map((nom) => ({
+    fichier: `src/grounding/${nom}.ts`,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un module de production de `src/grounding` (B8a), exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B8a (ticket 462), décision 0085 § 1 ; verdict Sécurité à rendre",
+  })),
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
