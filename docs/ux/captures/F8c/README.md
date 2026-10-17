@@ -29,11 +29,13 @@ le code. La capture attend désormais un état stable : « Continuer sans logeme
 
 ## À régénérer après la correction de la revue
 
-Ces captures F8c changent avec les corrections de la revue, et leurs références sont à republier
-(`update-snapshots`) :
+Ces captures F8c changent au-delà de la tolérance de 1 % avec les corrections de la revue (`test:visual` local sur
+4671b38). Leurs références sont à republier (`update-snapshots`) :
 - `preparation-erreur.png` : titre « Préparation interrompue » et jours non prêts « Interrompu » (mineur UX 2) ;
-- `preparation-en-cours.png`, `preparation-pret.png`, `preparation-incomplet.png` : colonne d'état à largeur
-  réservée, les mini-lignes ne sautent plus (mineur UX 5) ;
-- `lancement-conflit.png` : « Voir ces propositions » en `size="sm"` (mineur UX 6).
+- `preparation-pret.png`, `preparation-incomplet.png` : la colonne d'état garde la largeur de « En préparation », et
+  les mini-lignes ne sautent plus quand un jour devient prêt (mineur UX 5).
+
+Ces deux captures changent aussi, mais sous la tolérance : `preparation-en-cours.png` (même colonne, déjà à cette
+largeur) et `lancement-conflit.png` (« Voir ces propositions » en `size="sm"`, mineur UX 6).
 
 Les PNG de ce répertoire montrent l'état d'avant ces corrections.
