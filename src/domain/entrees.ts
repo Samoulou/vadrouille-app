@@ -111,4 +111,9 @@ export type EntreeMoteur = {
   version: number;
   /** Budget de trajet déjà réduit pour ce voyage (B5-PO-3), lu dans l'instantané de base. */
   budgetTrajetReduit: boolean;
+  /**
+   * Jours à planifier par `generer` (indices, 1 = J1 ; décision 0081 § B9-TL-13). Absent : tout le voyage. Les
+   * autres jours sont rendus non planifiés (B9-PO-6 : termini de logement seuls). Ignoré par `replanifierJour`.
+   */
+  jours?: readonly number[];
 };
