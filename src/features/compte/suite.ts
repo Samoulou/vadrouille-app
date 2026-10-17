@@ -46,9 +46,7 @@ export function normaliserSuite(valeur: string | undefined): string {
   if (voyages !== "voyages" || id === undefined || !TRIP_ID_PATTERN.test(id) || reste.length > 0) return repli;
   const voyage = tripRoutes("/voyages", id);
   if (sous === undefined) return voyage.sejour();
-  // Avant F8c, `/voyages/{id}/preparation` se reconstruit à partir du Séjour (0017 § 1) ; F8c remplace cette
-  // ligne par `creationRoutes.preparation(id)`.
-  if (sous === "preparation") return `${voyage.sejour()}/preparation`;
+  if (sous === "preparation") return creationRoutes.preparation(id);
   if (sous === "presentation") return presentationRoute(id);
   return repli;
 }

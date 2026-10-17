@@ -5,7 +5,9 @@
   "titreDocument": {
     "nouveau": "Nouveau voyage · Destination et dates",
     "brief": "Nouveau voyage · Ton brief",
-    "logement": "Nouveau voyage · Où loger"
+    "logement": "Nouveau voyage · Où loger",
+    "lancement": "Nouveau voyage · Création",
+    "preparation": "{destination} · Préparation"
   },
   "ecran1": {
     "titre": "Ton voyage",
@@ -164,5 +166,35 @@
     "echec": "Impossible de chercher un quartier pour le moment.",
     "reessayer": "Réessayer",
     "continuerSansLogement": "Continuer sans logement"
+  },
+  "lancement": {
+    "titre": "On crée ton voyage",
+    "attente": "Création de ton voyage…",
+    "conflit": "Tu as déjà des propositions en préparation.",
+    "voirConflit": "Voir ces propositions",
+    "echec": "Impossible de créer ton voyage pour le moment. Ton brouillon est conservé.",
+    "reessayer": "Réessayer"
+  },
+  "ecran5": {
+    "titre": "On prépare tes premières propositions",
+    "titrePret": "Tes premières propositions sont prêtes",
+    "compteur": {
+      "singulier": "{ready} proposition prête sur {expected}",
+      "pluriel": "{ready} propositions prêtes sur {expected}"
+    },
+    "jours": "Jours de tes premières propositions",
+    "enPreparation": "En préparation",
+    "jourPret": "Jour {n} prêt",
+    "incomplet": {
+      "singulier": "1 proposition n'a pas trouvé de lieu compatible.",
+      "pluriel": "{n} propositions n'ont pas trouvé de lieu compatible."
+    },
+    "interrompue": "La préparation s'est interrompue.",
+    "titreInterrompu": "Préparation interrompue",
+    "jourInterrompu": "Interrompu",
+    "reessayer": "Réessayer",
+    "voirMesVoyages": "Voir mes voyages",
+    "voirPropositions": "Voir mes propositions",
+    "passer": "Passer, voir le programme"
   }
 }

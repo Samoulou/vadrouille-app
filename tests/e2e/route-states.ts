@@ -1,8 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 
-import { R1, R2, R3, continueButton, fillTrip, reachReview, upcomingTrip } from "./creation-helpers";
-import { emailField, uniqueEmail } from "./connexion-helpers";
+import { R1, R2, R3, R4_LANCER, R_LANCER, continueButton, fillTrip, reachReview, upcomingTrip } from "./creation-helpers";
+import { MOCK_CODE, emailField, pasteCode, requestCodeFor, uniqueEmail } from "./connexion-helpers";
 import { expectPath, openOffer, pathOf, R9_RETOUR, simulate, startPayment, useScope as createScope } from "./debloquer-helpers";
+import { R5 } from "./preparation-helpers";
 import { card, press, toast } from "./presentation-helpers";
 import { RP, RPJ, SHARE_TOKEN_VALIDE, createShareScope } from "./partage-helpers";
 import type { RouteJourneyName, RoutePreparationName, RouteStateName } from "./routes";
@@ -104,6 +105,22 @@ export const ROUTE_PREPARATIONS = {
     const scope = await createShareScope(page.context(), baseURL);
     return { path: RPJ(SHARE_TOKEN_VALIDE, 2), scope: scope.name };
   },
+  /**
+   * `R-lancer` (F8c) : création complète, connexion et lancement dans une portée explicite ; l'horloge de la portée
+   * n'avance que par `R-sim`, la génération reste donc en cours (un aperçu actif). La mesure part ensuite d'un
+   * nouveau brouillon (parcours `brouillon-lancement`).
+   */
+  "lancement-actif": async (page, baseURL) => {
+    const scope = await createScope(page.context(), baseURL);
+    await page.goto(R1);
+    await draftFromR1(page);
+    await page.getByRole("button", { name: "Partir du quartier, choisir plus tard", exact: true }).click();
+    await expectPath(page, R4_LANCER);
+    await requestCodeFor(page, uniqueEmail());
+    await pasteCode(page, MOCK_CODE);
+    await expectPath(page, R5);
+    return { path: R_LANCER, scope: scope.name };
+  },
 } satisfies Record<RoutePreparationName, RoutePreparation>;
 
 export interface RouteJourney {
@@ -127,14 +144,31 @@ export const ROUTE_JOURNEYS = {
   /** `R3` : écran 1 « Pas encore », écran 2 validé avec le brief simulé ; l'écran 3 s'affiche (F8b). */
   "brouillon-logement": {
     start: R1,
+    run: draftFromR1,
+  },
+  /**
+   * `R-lancer` (F8c), dans la portée de `lancement-actif` : brouillon jusqu'à l'écran 3, « Partir du quartier,
+   * choisir plus tard » ; la session saute l'écran 4 et `createTrip` répond `active_preview_exists` : le bandeau
+   * « conflict » s'affiche et l'adresse reste celle de `R-lancer`.
+   */
+  "brouillon-lancement": {
+    start: R1,
     run: async (page) => {
-      await fillTrip(page, upcomingTrip());
-      await continueButton(page).click();
-      await expect.poll(() => new URL(page.url()).pathname).toBe(R2);
-      await reachReview(page);
-      await continueButton(page).click();
-      await expect.poll(() => new URL(page.url()).pathname).toBe(R3);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await draftFromR1(page);
+      await page.getByRole("button", { name: "Partir du quartier, choisir plus tard", exact: true }).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(R_LANCER);
+      await expect(page.getByRole("alert").filter({ hasText: "Tu as déjà des propositions en préparation." })).toBeVisible();
     },
   },
 } satisfies Record<RouteJourneyName, RouteJourney>;
+
+/** Écran 1 « Pas encore » (dates à venir), écran 2 validé avec le brief simulé ; l'écran 3 s'affiche. */
+async function draftFromR1(page: Page) {
+  await fillTrip(page, upcomingTrip());
+  await continueButton(page).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe(R2);
+  await reachReview(page);
+  await continueButton(page).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe(R3);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+}

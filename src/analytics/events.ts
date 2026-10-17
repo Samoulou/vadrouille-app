@@ -138,6 +138,18 @@ export const BriefCompletedEventSchema = z.strictObject({
 });
 
 /**
+ * Première fois que l'écran 5 voit l'état « prêt » ou « aperçu incomplet » d'un voyage dans l'onglet (handover § 12,
+ * spécification F8, F8-PO-15) : `duration_ms` de l'appel à `createTrip` à cet état, mesuré dans le navigateur, **absent**
+ * si la page a été rechargée entre-temps. Ni identifiant de voyage, ni destination.
+ */
+export const PreviewReadyEventSchema = z.strictObject({
+  name: z.literal("preview_ready"),
+  properties: z.strictObject({
+    duration_ms: z.optional(z.int().check(z.nonnegative())),
+  }),
+});
+
+/**
  * Remplacement d'une étape (handover § 12, spécification F7, F7-PO-18 ; décision 0016 § 10) : code de raison,
  * proposition tirée de la réserve, attente de la proposition appliquée en millisecondes. Ni nom, ni `placeId`,
  * ni identifiant d'étape, ni souhait : l'objet strict les refuse.
@@ -182,6 +194,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   ChecklistItemDoneEventSchema,
   TodayOpenedEventSchema,
   BriefCompletedEventSchema,
+  PreviewReadyEventSchema,
   ReplaceAppliedEventSchema,
   ReplaceUndoneEventSchema,
   StopMovedEventSchema,

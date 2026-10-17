@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import type { Session } from "@/contracts";
 import type { CheckoutOutcome, CheckoutStatusCode, Currency, PaymentMethod, PriceVariant } from "@/contracts/values";
 import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
+import { MOCK_GENERATION_OUTCOMES, type MockGenerationOutcome } from "@/mocks/creation-edimbourg";
 import { FIXED_SHARE_LINKS } from "@/mocks/edimbourg-partage";
 
 import { hashShareToken } from "./share-token";
@@ -32,6 +33,12 @@ export const MAX_ENTITLEMENTS_PER_SCOPE = 20;
 export const MAX_SHARE_LINKS_PER_SCOPE = 20;
 /** Adresses (clés HMAC) gardées par portée pour la connexion simulée (0017 § 10.4) ; au-delà, la plus ancienne est retirée. */
 export const MAX_AUTH_ADDRESSES_PER_SCOPE = 50;
+/** Voyages créés gardés par portée (0017 § 10.4) ; au-delà, le lancement le plus ancien est retiré. */
+export const MAX_LAUNCHES_PER_SCOPE = 20;
+
+/** Issues de la génération simulée, choisies par `R-sim` (`configureGeneration`) dans une portée explicite. */
+export const GENERATION_OUTCOMES = MOCK_GENERATION_OUTCOMES;
+export type GenerationOutcome = MockGenerationOutcome;
 
 export interface Clock {
   now(): number;
@@ -112,6 +119,24 @@ export interface AuthStore {
   session: Session | null;
 }
 
+/**
+ * Lancement simulé (`createTrip`, 0017 § 3.5 et § 3.7) : organisation, `requestId`, voyage et instant du lancement.
+ * Ni récit, ni brouillon, ni brief.
+ */
+export interface LaunchRecord {
+  organizationId: string;
+  requestId: string;
+  tripId: string;
+  launchedAt: number;
+}
+
+export interface CreationStore {
+  /** Clé : `${organizationId}\u0000${requestId}` (idempotence) ; ordre d'insertion = ordre des lancements. */
+  launches: Map<string, LaunchRecord>;
+  /** Issue de la génération simulée, réglée par `R-sim` dans une portée explicite (`ready` par défaut). */
+  outcome: GenerationOutcome;
+}
+
 export interface SimulationScope {
   name: string;
   explicit: boolean;
@@ -119,6 +144,7 @@ export interface SimulationScope {
   payment: PaymentStore;
   share: ShareStore;
   auth: AuthStore;
+  creation: CreationStore;
 }
 
 interface ManualClock extends Clock {
@@ -137,6 +163,10 @@ function manualClock(start: number): ManualClock {
       current += ms;
     },
   };
+}
+
+function emptyCreationStore(): CreationStore {
+  return { launches: new Map(), outcome: "ready" };
 }
 
 function emptyAuthStore(): AuthStore {
@@ -187,6 +217,7 @@ function registry(): Registry {
       payment: emptyPaymentStore(),
       share: initialShareStore(),
       auth: emptyAuthStore(),
+      creation: emptyCreationStore(),
     },
     explicit: new Map(),
     authKey: randomBytes(32),
@@ -219,6 +250,7 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
       payment: emptyPaymentStore(),
       share: initialShareStore(),
       auth: emptyAuthStore(),
+      creation: emptyCreationStore(),
     };
   }
   scopes.set(name, scope);
@@ -232,14 +264,15 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
 
 /**
  * Vide paiements et droits de la portée, remet le délai de confirmation à 0, efface les liens de partage créés et
- * rétablit les liens fixes (F10-PO-18), vide les codes, compteurs et session de la connexion simulée (F8b), et fixe
- * l'horloge.
+ * rétablit les liens fixes (F10-PO-18), vide les codes, compteurs et session de la connexion simulée (F8b), vide les
+ * lancements et remet l'issue de la génération à `ready` (F8c), et fixe l'horloge.
  */
 export function resetScope(name: string, now: number): void {
   const scope = explicitScope(name);
   scope.payment = emptyPaymentStore();
   scope.share = initialShareStore();
   scope.auth = emptyAuthStore();
+  scope.creation = emptyCreationStore();
   scope.clock.set(now);
 }
 
@@ -254,6 +287,11 @@ export function advanceClock(name: string, ms: number): void {
 
 export function configurePayment(name: string, confirmationDelayMs: number): void {
   explicitScope(name).payment.confirmationDelayMs = confirmationDelayMs;
+}
+
+/** Issue de la génération simulée des prochains états de la portée (F8c, tests seulement). */
+export function configureGeneration(name: string, outcome: GenerationOutcome): void {
+  explicitScope(name).creation.outcome = outcome;
 }
 
 /** Portée explicite lue par l'en-tête seulement si les pages de développement sont actives, hors production. */

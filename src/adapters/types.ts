@@ -5,9 +5,11 @@ import type {
   CodeVerification,
   CheckoutStart,
   CheckoutStatus,
+  CreatedTrip,
   CreatedShareLink,
   Day,
   DayMap,
+  GenerationStatus,
   InferredBrief,
   LodgingRequest,
   LodgingSuggestion,
@@ -20,6 +22,7 @@ import type {
   SharedDayView,
   SharedTripView,
   Trip,
+  TripRequest,
   TripSummary,
 } from "@/contracts";
 import type { AuthMode, CheckoutOutcome } from "@/contracts/values";
@@ -100,6 +103,17 @@ export interface CreationAdapter {
    * Anonyme. Calculé par le moteur avec B9 (0017 § 3.6) ; noms et raisons maison. Sortie revalidée par l'action.
    */
   suggestLodging(request: LodgingRequest): Promise<Result<LodgingSuggestion>>;
+  /**
+   * Lancement (F8c) : crée le voyage de l'organisation `ctx` (celle de la session, jamais une valeur du navigateur),
+   * idempotent par (organisation, `requestId`) ; `active_preview_exists` (avec le voyage en préparation) si une
+   * génération de l'organisation n'est pas finie. Sortie revalidée par l'action.
+   */
+  createTrip(ctx: AdapterContext, request: TripRequest): Promise<Result<CreatedTrip>>;
+  /**
+   * Écran 5 (F8c) : avancement de la génération du voyage, sans nom de lieu ; `not_found` pour un voyage inconnu ou
+   * d'une autre organisation (contrôle d'appartenance repris par B3 et B9, 0017 § 3.6).
+   */
+  getGenerationStatus(ctx: AdapterContext, tripId: string): Promise<Result<GenerationStatus>>;
 }
 
 /**

@@ -146,6 +146,7 @@ export {
   BriefFieldSchema,
   BriefRequestSchema,
   BriefSchema,
+  GenerationStatusSchema,
   InferredBriefSchema,
   LodgingRequestSchema,
   LodgingSchema,
@@ -156,10 +157,14 @@ export {
   TravellersSchema,
   TripCommitmentSchema,
   TripDraftSchema,
+  TripRequestSchema,
 } from "./creation";
 export type {
   Brief,
   BriefRequest,
+  CreatedTrip,
+  GenerationStatus,
+  GenerationStatusRequest,
   InferredBrief,
   Lodging,
   LodgingRequest,
@@ -167,6 +172,7 @@ export type {
   OtherCity,
   TripCommitment,
   TripDraft,
+  TripRequest,
 } from "./creation";
 export { CodeRequestSchema, CodeVerificationSchema, SessionSchema } from "./auth";
 export type { CodeRequest, CodeVerification, Session } from "./auth";

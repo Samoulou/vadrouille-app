@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { explicitScope } from "@/adapters/simulation";
 import { POST } from "@/app/dev/api/simulation/route";
 
-/** `R-sim` (décision 0017 § 10.5, avec `configurePayment` de 0020 § 6). */
+/** `R-sim` (décision 0017 § 10.5, avec `configurePayment` de 0020 § 6 et `configureGeneration` de F8c). */
 
 const URL_SIM = "http://127.0.0.1/dev/api/simulation";
 
@@ -28,6 +28,14 @@ describe("R-sim", () => {
     expect(explicitScope("rsim-1").payment.confirmationDelayMs).toBe(5000);
     expect((await post({ action: "reset", now: "2026-08-01T12:00:00+02:00" })).status).toBe(204);
     expect(explicitScope("rsim-1").payment.confirmationDelayMs).toBe(0);
+  });
+
+  it("configureGeneration (F8c) : issue de la génération simulée de la portée, remise à « ready » par reset", async () => {
+    expect((await post({ action: "configureGeneration", outcome: "incomplete" })).status).toBe(204);
+    expect(explicitScope("rsim-1").creation.outcome).toBe("incomplete");
+    expect((await post({ action: "reset", now: "2026-08-01T12:00:00+02:00" })).status).toBe(204);
+    expect(explicitScope("rsim-1").creation.outcome).toBe("ready");
+    expect(explicitScope("rsim-1").creation.launches.size).toBe(0);
   });
 
   it("404 sans pages de développement, ou sur un déploiement de production", async () => {
@@ -62,6 +70,8 @@ describe("R-sim", () => {
     [{ action: "reset", now: "2019-12-31T23:00:00Z" }],
     [{ action: "advanceClock", ms: 1, autre: true }],
     [{ action: "inconnue" }],
+    [{ action: "configureGeneration", outcome: "timeout" }],
+    [{ action: "configureGeneration" }],
   ])("400 hors schéma : %j", async (body) => {
     expect((await post(body)).status).toBe(400);
   });
