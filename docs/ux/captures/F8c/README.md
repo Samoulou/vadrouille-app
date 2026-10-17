@@ -36,5 +36,18 @@ le code. La capture attend désormais un état stable : « Continuer sans logeme
 - `lancement-conflit.png` (« Voir ces propositions » en `size="sm"`, mineur UX 6) et `lancement-erreur.png` : écarts
   sous la tolérance, réécrits par `--update-snapshots=all`.
 
-`preparation-en-cours.png` est inchangée. Les PNG de ce répertoire sont des copies des références de la CI
-(`tests/visual/__screenshots__`, 58ac983), sans régénération (revue de 6a9f2a3, mineur TL 3).
+`preparation-en-cours.png` est inchangée.
+
+## Provenance et contrôle
+
+Les PNG de ce répertoire sont des copies, sans régénération, des références de la CI publiées par `visual-update`
+dans `tests/visual/__screenshots__` (commit 58ac983). La copie a été faite au commit 1d0ac3c, à la demande de la revue
+du Tech Lead. L'identité a été vérifiée avec `cmp` : chaque PNG est identique octet pour octet à sa référence.
+
+## Capture non produite
+
+L'erreur définitive de l'écran 5 (`retryable: false`, bandeau sans « Réessayer », lien « Voir mes voyages » en
+`size="sm"`) n'a pas de capture. Ce qu'elle doit dire (ce qui reste possible, sort des propositions déjà prêtes)
+dépend de B9 : `retryGeneration` et conservation côté serveur. Elle sera capturée quand B9 en fixera le contenu. Elle
+est couverte en attendant par le test unitaire `erreur définitive` (`PreparationView.test.tsx`, axe compris) et par
+l'e2e `preparation: erreur définitive, sans « Réessayer »`.
