@@ -1,4 +1,5 @@
 // @vitest-environment node
+import addressparser from "nodemailer/lib/addressparser";
 import { describe, expect, it } from "vitest";
 
 import { type CanonicalEmail, isCanonicalEmail, parseEmailAddress, rateLimitEmailKey } from "@/server/email";
@@ -97,6 +98,32 @@ describe("auth: forme canonique de l'adresse e-mail", () => {
   it("clé e-mail du limiteur : partie locale coupée au premier +", () => {
     expect(rateLimitEmailKey(canonique("a+b+c@exemple.test"))).toBe("a@exemple.test");
     expect(rateLimitEmailKey(canonique("a@exemple.test"))).toBe("a@exemple.test");
+  });
+
+  it("addressparser de nodemailer : une seule adresse, égale à la forme canonique (B3b-envoi, critère E3)", () => {
+    const admises = [
+      " A@Exemple.TEST ",
+      "a.b_c+d-e@exemple.test",
+      "-a@exemple.test",
+      "a-@exemple.test",
+      "_@exemple.test",
+      "a+@exemple.test",
+      "a.b.c@sous.domaine.exemple.test",
+      "0@1.exemple.test",
+      "a@x-y.exemple.test",
+      `${"a".repeat(64)}@exemple.test`,
+      `${"a".repeat(60)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(61)}.test`,
+      // Chaque caractère de la liste blanche, à chaque position admise de la partie locale.
+      ..."abcxyzABCXYZ0189._+-".split("").flatMap((c) => [`x${c}y@exemple.test`, `${c}y@exemple.test`, `x${c}@exemple.test`]),
+    ];
+    let vues = 0;
+    for (const entree of admises) {
+      const lu = parseEmailAddress(entree);
+      if (!lu.ok) continue;
+      vues += 1;
+      expect(addressparser(lu.email), entree).toEqual([{ address: lu.email, name: "" }]);
+    }
+    expect(vues).toBeGreaterThan(50);
   });
 });
 

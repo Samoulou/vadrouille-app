@@ -69,6 +69,15 @@ const PAQUETS_TS = [
       "P0r3c-4 (ticket 316, décision 0063 points 1 et 2) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 5.1.0, " +
       "`@swc/core`, `esbuild` et `cbor-extract` hors de `onlyBuiltDependencies` (build prouvé sans leurs scripts)",
   },
+  {
+    paquet: "nodemailer",
+    usage:
+      "e-mail du code de connexion vers Mailpit (B3b-envoi, décision 0008) : compilation de l'enveloppe par `MailComposer` (`src/server/mail/enveloppe.ts`), " +
+      "`addressparser` du critère E3 ; aucune dépendance, aucun script d'installation",
+    verdict:
+      "B3b-envoi (ticket 435) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 10.0.16, intégrité " +
+      "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, hors de `onlyBuiltDependencies`",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];
