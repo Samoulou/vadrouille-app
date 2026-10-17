@@ -71,6 +71,13 @@
       "when": 1792240760476,
       "tag": "0009_verifications_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792327160476,
+      "tag": "0010_usage_forfait",
+      "breakpoints": true
     }
   ]
 }

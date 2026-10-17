@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "id": "sans-voiture",
+  "type": "cas-limite",
+  "cas": "Cadrage § 8 : voyage sans voiture (à pied et en transports seulement)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "Nous n'avons pas de voiture et n'en louerons pas : tout à pied ou en bus et en train, avec de belles balades.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "walk",
+      "nature",
+      "heritage"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "walk",
+      "nature"
+    ],
+    "incontournables": []
+  }
+}

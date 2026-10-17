@@ -1,6 +1,6 @@
 -- Amorçage des rôles de la décision 0007 (spécification B1, « Amorçage des rôles »), amendée par la décision 0046
--- (D17 point 2) : 17 rôles, dont les trois du prototype de recherche (P0r2) et le rôle de purge du MVP (décision 0060
--- § 3.2, B8c).
+-- (D17 point 2) : 18 rôles, dont les trois du prototype de recherche (P0r2), le rôle de purge du MVP (décision 0060
+-- § 3.2, B8c) et le propriétaire de la fonction des sommes de consommation (B7c, migration 0010_usage_forfait).
 --
 -- À exécuter UNE FOIS PAR BASE, avant les migrations, par un utilisateur qui peut créer des rôles :
 --   - en CI : le superutilisateur du conteneur postgres:17.11 (job `db`) ;
@@ -37,7 +37,10 @@ DECLARE
     ['vadrouille_prototype_purge', 'true', '-1'],
     ['vadrouille_fn_prototype_purge', 'false', '-1'],
     -- Purge du MVP (décision 0060 § 3.2) : connexion du job coords-purge, deux connexions au plus, aucune appartenance.
-    ['vadrouille_coords_purge', 'true', '2']
+    ['vadrouille_coords_purge', 'true', '2'],
+    -- Consommation du MVP (B7c, migration 0010_usage_forfait) : propriétaire de public.usage_forfait_totals(), seul
+    -- lecteur des sommes globales de usage_ledger ; aucune connexion, aucune appartenance hors ADMIN de vadrouille_migrator.
+    ['vadrouille_fn_usage', 'false', '-1']
   ];
   i int;
   v_name text;
@@ -74,7 +77,7 @@ GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille
 -- Transfert de propriété (décision 0007) : vadrouille_migrator doit pouvoir accorder, le temps d'une migration,
 -- l'appartenance aux rôles vadrouille_fn_* (option ADMIN seule, sans SET ni INHERIT : décision 0036, B1-TL-2).
 GRANT vadrouille_fn_share, vadrouille_fn_share_views, vadrouille_fn_checkout, vadrouille_fn_coords, vadrouille_fn_purge,
-  vadrouille_fn_prototype_purge
+  vadrouille_fn_prototype_purge, vadrouille_fn_usage
   TO vadrouille_migrator WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
 -- Schéma public : vadrouille_owner y crée les tables ; l'option de transmission sert à accorder CREATE, le temps

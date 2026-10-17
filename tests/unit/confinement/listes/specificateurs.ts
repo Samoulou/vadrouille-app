@@ -211,6 +211,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7a (ticket 423), décision 0077 § 1 et § 2 ; verdict Sécurité demandé (PR de B7a)",
   })),
+  // B7c (ticket 449 ; spécification B7, B7c point 4) : harnais du jeu d'évaluation `evals/`, non chargé par `pnpm p0`
+  // ni par l'application, marqueur `server-only` seul. Verdict Sécurité demandé dans la PR de B7c (PR 454).
+  {
+    fichier: "src/research/evaluation.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/research` (harnais d'`evals/`), exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7c (ticket 449), spécification B7, B7c point 4, décision 0077 § 2 (liste blanche de `src/research`) ; verdict Sécurité demandé (PR 454)",
+  },
   {
     fichier: "src/research/extract-text.ts",
     specificateur: "parse5",

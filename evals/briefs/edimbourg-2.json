@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "edimbourg-2",
+  "type": "reference",
+  "cas": "Brief de référence 2 de Samuel (0027 § 6, `prototype/briefs/edimbourg-2.json`)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "On voyage tranquille : culture, histoire, beaux intérieurs, pas plus de deux visites par jour, et de bonnes tables le soir.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "relaxed",
+    "envies": [
+      "museum",
+      "restaurant",
+      "walk"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 3
+  },
+  "attentes": {
+    "categories": [
+      "museum",
+      "restaurant",
+      "walk"
+    ],
+    "incontournables": [
+      "château d'Édimbourg",
+      "Royal Mile",
+      "Arthur's Seat et Holyrood Park",
+      "Calton Hill",
+      "Dean Village",
+      "Victoria Street et Grassmarket",
+      "National Museum of Scotland",
+      "Princes Street Gardens et Scott Monument",
+      "Royal Botanic Garden",
+      "Leith et The Shore"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sql } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 
 import { createDatabase, type Database } from "../../db/index.ts";
 import type { AdapterContext } from "@/adapters/types";
@@ -40,6 +40,28 @@ export function creerWithOrg(database: Database): FonctionWithOrg {
       await tx.execute(sql`SELECT set_config('app.organization_id', ${ctx.organizationId}, true), set_config('app.user_id', ${ctx.userId}, true)`);
       return fn(tx);
     });
+  };
+}
+
+/**
+ * Exécuteur structurel `{ query(texte, valeurs) }` sur la transaction de `withOrg` (décision 0083 § 2 : réservation du
+ * forfait d'une génération, `src/server/usage/reservation.ts` ; même forme qu'`ExecuteurPositions`). Les marques
+ * `$1`, `$2`… du texte deviennent des **paramètres liés** (`sql.param`, un tableau reste un seul paramètre) ; une
+ * marque sans valeur est refusée avant toute requête. Le texte est une constante du module appelant, jamais une
+ * entrée.
+ */
+export function executeurSql(tx: OrgTransaction): { query(texte: string, valeurs?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }> } {
+  return {
+    async query(texte, valeurs = []) {
+      const parties: SQL[] = texte.split(/\$(\d+)/).map((morceau, i) => {
+        if (i % 2 === 0) return sql.raw(morceau);
+        const rang = Number(morceau);
+        if (!Number.isSafeInteger(rang) || rang < 1 || rang > valeurs.length) throw new Error("executeurSql: paramètre absent");
+        return sql`${sql.param(valeurs[rang - 1])}`;
+      });
+      const resultat = await tx.execute<Record<string, unknown>>(sql.join(parties));
+      return { rows: resultat.rows };
+    },
   };
 }
 
