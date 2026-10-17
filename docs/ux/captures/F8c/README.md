@@ -15,26 +15,25 @@ les références de la CI sont dans `tests/visual/__screenshots__` (décision 00
 | `lancement-conflit.png` | `R-lancer`, aperçu déjà en préparation |
 | `lancement-erreur.png` | `R-lancer`, création refusée avec « Réessayer » |
 
-## Références existantes réécrites (6)
+## Références existantes
 
-Aucune n'est expliquée par le diff de F8c. Les specs de ces captures et leurs aides sont inchangées. Les écrans
-concernés (`LodgingScreen`, formulaire de connexion, révision) et les tokens (`globals.css`) ne sont pas modifiés :
-`provisoire.css` et `creation.json` ne reçoivent que des ajouts. Le saut de l'écran 4 dans `connexion/page.tsx`
-ne s'applique qu'avec une session et `suite=R-lancer`, ce qui n'est le cas d'aucune de ces captures. Un rendu local
-des captures `logement: aucun quartier` et `connexion: étape code`, sur la base de `main` (beb2e48) puis sur F8c,
-donne des images identiques au pixel près.
+La revue de 293493b (Tech Lead, mineur 9) l'a demandé : les 5 références réécrites sans lien avec le diff de F8c
+sont restaurées depuis `main`. Ce sont `connexion-code`, `connexion-code-faux`, `connexion-trop-d-essais`,
+`revision-deplacer-jours` et `revision-deplacer-points`. Leurs écarts (lissage du texte, 1 à 2 niveaux sur 255)
+restaient sous la tolérance de 1 %, et `--update-snapshots=all` les avait réécrites quand même (Q232).
 
-| Référence | Pixels différents | Écart max. (sur 255) | Lecture |
-|---|---|---|---|
-| `connexion-code.png` | 2 236 (0,68 %) | 238 | lissage du texte des liens et des cases du code, sans déplacement : bruit de rendu |
-| `connexion-code-faux.png` | 2 192 (0,67 %) | 238 | lissage du texte des liens « Renvoyer le code » et « Changer d'adresse » : bruit de rendu |
-| `connexion-trop-d-essais.png` | 2 192 (0,67 %) | 238 | idem : bruit de rendu |
-| `revision-deplacer-jours.png` | 189 | 2 | bruit de rendu |
-| `revision-deplacer-points.png` | 13 | 1 | bruit de rendu |
-| `logement-aucun-quartier.png` | 5 986 (1,82 %) | 241 | le message « Aucun quartier à te proposer pour l'instant. » passe d'un texte foncé plus grand à 14 px gris (`text-corps-s text-ink-soft`, ce que demande `LodgingScreen`) ; le bouton remonte de 2 px |
+Seule `logement-aucun-quartier.png` est gardée dans sa version publiée par 580fe72 (14 px gris,
+`text-corps-s text-ink-soft`, ce que demande `LodgingScreen`). L'ancienne image (texte foncé plus grand) contredisait
+le code. La capture attend désormais un état stable : « Continuer sans logement » visible et squelette retiré
+(mineur 10).
 
-Les cinq premières restent sous la tolérance de 1 % (`maxDiffPixelRatio`). `--update-snapshots=all` les réécrit
-quand même (Q232). `logement-aucun-quartier` la dépasse, alors que la CI de `main` (beb2e48) passait avec
-l'ancienne référence. La nouvelle image correspond au code, et le rendu local aussi (base et F8c). L'ancienne
-semble donc avoir été prise dans un état transitoire. Il faut surveiller une capture instable : question au
-Tech Lead et à QA dans la PR #432.
+## À régénérer après la correction de la revue
+
+Ces captures F8c changent avec les corrections de la revue, et leurs références sont à republier
+(`update-snapshots`) :
+- `preparation-erreur.png` : titre « Préparation interrompue » et jours non prêts « Interrompu » (mineur UX 2) ;
+- `preparation-en-cours.png`, `preparation-pret.png`, `preparation-incomplet.png` : colonne d'état à largeur
+  réservée, les mini-lignes ne sautent plus (mineur UX 5) ;
+- `lancement-conflit.png` : « Voir ces propositions » en `size="sm"` (mineur UX 6).
+
+Les PNG de ce répertoire montrent l'état d'avant ces corrections.

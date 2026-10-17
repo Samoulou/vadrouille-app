@@ -5,7 +5,7 @@ import type {
   CodeVerification,
   CheckoutStart,
   CheckoutStatus,
-  CreateTripResult,
+  CreatedTrip,
   CreatedShareLink,
   Day,
   DayMap,
@@ -108,7 +108,7 @@ export interface CreationAdapter {
    * idempotent par (organisation, `requestId`) ; `active_preview_exists` (avec le voyage en préparation) si une
    * génération de l'organisation n'est pas finie. Sortie revalidée par l'action.
    */
-  createTrip(ctx: AdapterContext, request: TripRequest): Promise<CreateTripResult>;
+  createTrip(ctx: AdapterContext, request: TripRequest): Promise<Result<CreatedTrip>>;
   /**
    * Écran 5 (F8c) : avancement de la génération du voyage, sans nom de lieu ; `not_found` pour un voyage inconnu ou
    * d'une autre organisation (contrôle d'appartenance repris par B3 et B9, 0017 § 3.6).

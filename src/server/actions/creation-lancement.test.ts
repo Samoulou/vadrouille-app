@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as adapters from "@/adapters";
 import { advanceClock, configureGeneration, explicitScope, resetScope } from "@/adapters/simulation";
-import { fail, type Brief, type TripRequest } from "@/contracts";
+import { fail, type ApiError, type Brief, type TripRequest } from "@/contracts";
+import type { ApiErrorCode } from "@/contracts/values";
 import { MOCK_AUTH_CODE, MOCK_KNOWN_EMAIL } from "@/mocks/auth-simule";
 import { MOCK_DEMO_TRIP_DRAFT, MOCK_GENERATION_STEP_MS, MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
 
@@ -34,6 +35,8 @@ const REQUEST: TripRequest = {
   brief: BRIEF,
 };
 const OTHER_ID = "0c6a1b0e-3d7f-4b8e-8f2a-6b9d5e4c3a21";
+/** Refus `active_preview_exists` : le voyage en préparation est porté par l'erreur commune (0017 § 4). */
+const conflict = (activeTripId: string): { ok: false; error: ApiError } => ({ ok: false, error: { code: "active_preview_exists", activeTripId } });
 
 let serial = 0;
 const actual = vi.mocked(adapters.getCreationAdapter).getMockImplementation()!;
@@ -58,19 +61,13 @@ afterEach(() => {
 describe("createTrip : session et validation", () => {
   it("sans session : unauthenticated, aucun voyage créé, même avec un brouillon complet et valide", async () => {
     expect(await hasSession()).toBe(false);
-    expect(await createTrip(REQUEST)).toEqual({
-      ok: false,
-      error: { code: "unauthenticated" },
-    });
+    expect(await createTrip(REQUEST)).toEqual(fail("unauthenticated"));
     expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
     expect(explicitScope(scopeName.value).creation.launches.size).toBe(0);
   });
 
   it("sans session, une entrée invalide donne aussi unauthenticated (le schéma n'est pas un oracle)", async () => {
-    expect(await createTrip({ inconnu: true })).toEqual({
-      ok: false,
-      error: { code: "unauthenticated" },
-    });
+    expect(await createTrip({ inconnu: true })).toEqual(fail("unauthenticated"));
   });
 
   it.each([
@@ -96,20 +93,14 @@ describe("createTrip : session et validation", () => {
   ])("%s : validation_failed sans appeler l'adaptateur", async (_label, input, field) => {
     await signIn();
     const result = await createTrip(input);
-    expect(result).toEqual({
-      ok: false,
-      error: field ? { code: "validation_failed", field } : { code: "validation_failed" },
-    });
+    expect(result).toEqual(fail("validation_failed", field));
     expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
   });
 
   it("arrivée passée sur l'horloge de la portée (au-delà d'un jour) : validation_failed sur draft.start", async () => {
     await signIn();
     advanceClock(scopeName.value, 30 * 86_400_000);
-    expect(await createTrip(REQUEST)).toEqual({
-      ok: false,
-      error: { code: "validation_failed", field: "draft.start" },
-    });
+    expect(await createTrip(REQUEST)).toEqual(fail("validation_failed", "draft.start"));
     expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
   });
 });
@@ -132,11 +123,7 @@ describe("createTrip : lancement", () => {
   it("nouveau requestId pendant la génération : active_preview_exists avec le voyage en préparation", async () => {
     await signIn();
     await createTrip(REQUEST);
-    expect(await createTrip({ ...REQUEST, requestId: OTHER_ID })).toEqual({
-      ok: false,
-      error: { code: "active_preview_exists" },
-      activeTripId: "mock_trip_edimbourg",
-    });
+    expect(await createTrip({ ...REQUEST, requestId: OTHER_ID })).toEqual(conflict("mock_trip_edimbourg"));
     // Génération finie : un nouveau requestId relance la suite d'états.
     advanceClock(scopeName.value, 8 * MOCK_GENERATION_STEP_MS);
     expect(await createTrip({ ...REQUEST, requestId: OTHER_ID })).toEqual({
@@ -146,19 +133,15 @@ describe("createTrip : lancement", () => {
     expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toMatchObject({ ok: true, value: { phase: "preparing", ready: 0 } });
   });
 
-  it("un conflit dont l'identifiant n'est pas un identifiant de voyage devient provider_error", async () => {
+  it.each([
+    ["identifiant qui n'est pas un identifiant de voyage", conflict("../admin")],
+    ["conflit sans identifiant", fail("active_preview_exists")],
+  ])("conflit non conforme (%s) : provider_error", async (_label, output) => {
     await signIn();
     vi.mocked(adapters.getCreationAdapter).mockReturnValue({
-      createTrip: async () => ({
-        ok: false,
-        error: { code: "active_preview_exists" },
-        activeTripId: "../admin",
-      }),
+      createTrip: async () => output,
     } as never);
-    expect(await createTrip(REQUEST)).toEqual({
-      ok: false,
-      error: { code: "provider_error" },
-    });
+    expect(await createTrip(REQUEST)).toEqual(fail("provider_error"));
   });
 
   it.each([
@@ -166,12 +149,12 @@ describe("createTrip : lancement", () => {
     ["provider_error", fail("provider_error"), "provider_error"],
     ["autre code", fail("not_found"), "provider_error"],
     ["sortie non conforme", { ok: true, value: { tripId: "Édimbourg !" } }, "provider_error"],
-  ] as const)("%s : %s", async (_label, output, code) => {
+  ] satisfies [string, unknown, ApiErrorCode][])("%s : %s", async (_label, output, code) => {
     await signIn();
     vi.mocked(adapters.getCreationAdapter).mockReturnValue({
       createTrip: async () => output,
     } as never);
-    expect(await createTrip(REQUEST)).toEqual({ ok: false, error: { code } });
+    expect(await createTrip(REQUEST)).toEqual(fail(code));
   });
 
   it("adaptateur qui lève : provider_error", async () => {
@@ -181,10 +164,7 @@ describe("createTrip : lancement", () => {
         throw new Error("panne");
       },
     } as never);
-    expect(await createTrip(REQUEST)).toEqual({
-      ok: false,
-      error: { code: "provider_error" },
-    });
+    expect(await createTrip(REQUEST)).toEqual(fail("provider_error"));
   });
 });
 
@@ -222,10 +202,7 @@ describe("getGenerationStatus", () => {
 
   it("voyage jamais lancé dans la portée : déjà complet ; voyage inconnu : not_found", async () => {
     expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toMatchObject({ ok: true, value: { phase: "ready", ready: 8 } });
-    expect(await getGenerationStatus({ tripId: "mock_trip_inconnu" })).toEqual({
-      ok: false,
-      error: { code: "not_found" },
-    });
+    expect(await getGenerationStatus({ tripId: "mock_trip_inconnu" })).toEqual(fail("not_found"));
   });
 
   it.each([
@@ -249,7 +226,7 @@ describe("getGenerationStatus", () => {
         },
       }),
     } as never);
-    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toEqual({ ok: false, error: { code: "provider_error" } });
+    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toEqual(fail("provider_error"));
     vi.mocked(adapters.getCreationAdapter).mockReturnValue({
       getGenerationStatus: async () => ({
         ok: true,
@@ -262,7 +239,7 @@ describe("getGenerationStatus", () => {
         },
       }),
     } as never);
-    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toEqual({ ok: false, error: { code: "provider_error" } });
+    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toEqual(fail("provider_error"));
   });
 });
 

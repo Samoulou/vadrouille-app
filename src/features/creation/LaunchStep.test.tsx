@@ -110,10 +110,11 @@ describe("LaunchStep : lancement", () => {
     });
   });
 
-  it("attente : « Création de ton voyage… » dans la région status ; régions présentes dès l'affichage", async () => {
+  it("attente : « Création de ton voyage… » dans la région status ; régions présentes dès l'affichage ; « Retour » inactif", async () => {
     vi.mocked(createTrip).mockReturnValue(new Promise(() => {}));
     const { container } = renderStep();
     expect(screen.getByRole("status")).toHaveTextContent(t.attente);
+    expect(screen.getByRole("button", { name: messages.creation.retour })).toBeDisabled();
     expect(screen.getByRole("alert")).toBeEmptyDOMElement();
     expect(await axeViolations(container)).toEqual([]);
   });
@@ -133,8 +134,7 @@ describe("LaunchStep : lancement", () => {
   it("active_preview_exists : bandeau « conflict » et lien vers le voyage existant, sans redirection", async () => {
     vi.mocked(createTrip).mockResolvedValue({
       ok: false,
-      error: { code: "active_preview_exists" },
-      activeTripId: "mock_trip_edimbourg",
+      error: { code: "active_preview_exists", activeTripId: "mock_trip_edimbourg" },
     });
     const { container } = renderStep();
     const alert = await screen.findByRole("alert");
@@ -152,7 +152,10 @@ describe("LaunchStep : lancement", () => {
       .mockResolvedValueOnce(ok({ tripId: "mock_trip_edimbourg" }));
     renderStep();
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(t.echec));
+    expect(screen.getByRole("button", { name: messages.creation.retour })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: t.reessayer }));
+    // Le bandeau disparaît pendant l'essai : le focus est sur le titre.
+    expect(screen.getByRole("heading", { level: 1, name: t.titre })).toHaveFocus();
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(t.echec));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: t.reessayer }));
@@ -170,16 +173,19 @@ describe("LaunchStep : lancement", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith(R4_LANCER));
   });
 
-  it("« Retour » : dernier écran 3 affiché, sinon écran 2", async () => {
-    vi.mocked(createTrip).mockReturnValue(new Promise(() => {}));
+  it("« Retour » (après l'appel) : dernier écran 3 affiché, sinon écran 2", async () => {
+    vi.mocked(createTrip).mockResolvedValue(fail("provider_error"));
+    const retour = () => screen.getByRole("button", { name: messages.creation.retour });
     const { unmount } = renderStep({
       initial: { ...COMPLETE, lodgingCity: 0 },
     });
-    fireEvent.click(screen.getByRole("button", { name: messages.creation.retour }));
+    await waitFor(() => expect(retour()).toBeEnabled());
+    fireEvent.click(retour());
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/logement");
     unmount();
     renderStep({ initial: { ...COMPLETE, lodgingCity: null } });
-    fireEvent.click(screen.getByRole("button", { name: messages.creation.retour }));
+    await waitFor(() => expect(retour()).toBeEnabled());
+    fireEvent.click(retour());
     expect(router.push).toHaveBeenLastCalledWith("/voyages/nouveau/brief");
   });
 });

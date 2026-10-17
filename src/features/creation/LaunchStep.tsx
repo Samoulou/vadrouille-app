@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
-import type { CreateTripResult } from "@/contracts";
+import type { CreatedTrip, Result } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
 import * as messages from "@/i18n/messages";
 import { createTrip } from "@/server/actions/creation";
@@ -37,8 +37,9 @@ export interface LaunchStepProps {
  *   brouillon (idempotence : double appui, « Réessayer », retour du navigateur) ; l'instant de l'appel est retenu
  *   pour `preview_ready` (`launch-timing.ts`) ; à la réussite, l'adresse est **remplacée** par l'écran 5 (aucune
  *   entrée d'historique : le retour du navigateur ne rencontre jamais `R-lancer`).
- * - `active_preview_exists` : `StatusBanner` `conflict` et « Voir ces propositions » (0018 § 18) ; autre erreur :
- *   `StatusBanner` `error` et « Réessayer », brouillon conservé. Régions `role="status"` et `role="alert"` présentes dès
+ * - `active_preview_exists` (voyage en préparation dans `error.activeTripId`) : `StatusBanner` `conflict` et « Voir
+ *   ces propositions » (0018 § 18) ; autre erreur : `StatusBanner` `error` et « Réessayer » (focus sur le titre),
+ *   brouillon conservé. « Retour » est inactif pendant l'appel, déjà parti. Régions `role="status"` et `role="alert"` présentes dès
  *   l'affichage.
  */
 export function LaunchStep({ signedIn }: LaunchStepProps) {
@@ -51,13 +52,14 @@ export function LaunchStep({ signedIn }: LaunchStepProps) {
   const attempt = useRef(0);
   const started = useRef(false);
   const requestId = useRef<string | null>(null);
+  const title = useRef<HTMLHeadingElement>(null);
 
   async function run() {
     const current = ++attempt.current;
     setLaunch({ kind: "pending" });
     requestId.current ??= state.requestId ?? crypto.randomUUID();
     if (state.requestId === null) dispatch({ type: "requestId", requestId: requestId.current });
-    let result: CreateTripResult | null = null;
+    let result: Result<CreatedTrip> | null = null;
     const at = launchNow();
     try {
       result = await createTrip({
@@ -74,8 +76,8 @@ export function LaunchStep({ signedIn }: LaunchStepProps) {
       router.replace(creationRoutes.preparation(result.value.tripId));
       return;
     }
-    if (result && "activeTripId" in result) {
-      setLaunch({ kind: "conflict", tripId: result.activeTripId });
+    if (result?.error.code === "active_preview_exists" && result.error.activeTripId) {
+      setLaunch({ kind: "conflict", tripId: result.error.activeTripId });
       return;
     }
     if (result?.error.code === "unauthenticated") {
@@ -109,14 +111,22 @@ export function LaunchStep({ signedIn }: LaunchStepProps) {
 
   if (!allowed) return null;
 
+  function retry() {
+    // Le bandeau (et le bouton) disparaît pendant l'essai : le focus va au titre (WCAG 2.4.3).
+    title.current?.focus();
+    void run();
+  }
+
   function back() {
     // Niveau supérieur de la création : dernier écran 3 affiché, sinon écran 2 (« Vérification »), comme l'écran 4.
     router.push(state.lodgingCity !== null ? creationRoutes.logement() : creationRoutes.brief());
   }
 
   return (
-    <CreationShell onBack={back}>
-      <h1 className={TITLE_CLASS}>{t.titre}</h1>
+    <CreationShell onBack={back} backDisabled={launch.kind === "pending"}>
+      <h1 ref={title} tabIndex={-1} className={TITLE_CLASS}>
+        {t.titre}
+      </h1>
       <p role="status" className={launch.kind === "pending" ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
         {launch.kind === "pending" ? t.attente : null}
       </p>
@@ -127,7 +137,7 @@ export function LaunchStep({ signedIn }: LaunchStepProps) {
             announce={false}
             message={t.conflit}
             action={
-              <Button variant="text" asChild className="px-0">
+              <Button variant="text" size="sm" asChild className="px-0">
                 <Link href={creationRoutes.preparation(launch.tripId)}>{t.voirConflit}</Link>
               </Button>
             }
@@ -139,7 +149,7 @@ export function LaunchStep({ signedIn }: LaunchStepProps) {
             announce={false}
             message={t.echec}
             action={
-              <Button variant="secondary" size="sm" onClick={() => void run()}>
+              <Button variant="secondary" size="sm" onClick={retry}>
                 {t.reessayer}
               </Button>
             }

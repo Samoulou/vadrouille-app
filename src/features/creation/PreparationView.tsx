@@ -44,7 +44,8 @@ export interface PreparationViewProps {
  *   final, une fois chacun, sans déplacer le focus ;
  * - prêt ou aperçu incomplet : « Voir mes propositions » et « Passer, voir le programme », sans redirection ;
  *   incomplet : `StatusBanner` `noOption` ; échec : `StatusBanner` `error`, avec « Réessayer » si `retryable` (ou
- *   si l'interrogation a échoué), sinon « Voir mes voyages » ;
+ *   si l'interrogation a échoué, focus sur le titre après l'appui), sinon « Voir mes voyages » ; le titre et les
+ *   jours non prêts disent alors l'interruption (« Préparation interrompue », « Interrompu ») ;
  * - `preview_ready` à la première vue de l'état prêt ou incomplet dans l'onglet (`launch-timing.ts`) ; la
  *   validation de la mesure est chargée à ce moment (`createLazyTrack`), hors du JavaScript initial.
  * Aucun nom de lieu : les arrêts sont des anneaux sans numéro (F8-PO-12).
@@ -54,6 +55,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
   const [announcements, setAnnouncements] = useState<string[]>([]);
   const previous = useRef(initial);
+  const title = useRef<HTMLHeadingElement>(null);
   const ready = isPreviewReady(status);
 
   // Annonces : passages de jour puis état final, observés dans cet onglet (un état déjà final au chargement est dit par le titre).
@@ -80,10 +82,18 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
   const canRetry = interrupted || (failed?.retryable ?? false);
   const routes = tripRoutes("/voyages", tripId);
 
+  function retryWithFocus() {
+    // Le bandeau (et le bouton) disparaît pendant la reprise : le focus va au titre (WCAG 2.4.3).
+    title.current?.focus();
+    retry();
+  }
+
   return (
     <CreationShell backHref={mesVoyagesRoute()}>
       <div className="flex flex-col gap-2">
-        <h1 className={TITLE_CLASS}>{ready ? t.titrePret : t.titre}</h1>
+        <h1 ref={title} tabIndex={-1} className={TITLE_CLASS}>
+          {ready ? t.titrePret : showError ? t.titreInterrompu : t.titre}
+        </h1>
         <p className="text-corps text-ink-2 tabular-nums" data-compteur="">
           {readyCounter(status.ready, status.expected)}
         </p>
@@ -93,9 +103,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
           <li key={day.index} className="col-span-3 grid grid-cols-subgrid items-center" data-day-state={day.state}>
             <DayBadge day={day.index} size="sm" />
             <MiniLine ready={day.state === "ready"} readyStops={day.readyStops} />
-            <span className={cn("text-corps-s", day.state === "ready" ? "font-bold text-ink" : "text-ink-soft")}>
-              {day.state === "ready" ? format(t.jourPret, { n: day.index }) : t.enPreparation}
-            </span>
+            <DayStateLabel index={day.index} ready={day.state === "ready"} interrupted={showError} />
           </li>
         ))}
       </ul>
@@ -118,7 +126,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
             message={t.interrompue}
             action={
               canRetry ? (
-                <Button variant="secondary" size="sm" onClick={retry}>
+                <Button variant="secondary" size="sm" onClick={retryWithFocus}>
                   {t.reessayer}
                 </Button>
               ) : (
@@ -174,6 +182,26 @@ function MiniLine({ ready, readyStops }: { ready: boolean; readyStops: number })
         </span>
       </span>
       <Terminus />
+    </span>
+  );
+}
+
+/**
+ * État d'un jour. La colonne garde la largeur du plus long libellé possible (« Jour {n} prêt » en gras, « En
+ * préparation ») : les mini-lignes ne bougent pas quand un jour devient prêt. La réserve passe par des pseudo-éléments
+ * invisibles, hors du texte et de l'arbre d'accessibilité.
+ */
+function DayStateLabel({ index, ready, interrupted }: { index: number; ready: boolean; interrupted: boolean }) {
+  const readyLabel = format(t.jourPret, { n: index });
+  return (
+    <span
+      data-largeur-pret={readyLabel}
+      data-largeur-attente={t.enPreparation}
+      className="grid text-corps-s whitespace-nowrap before:invisible before:font-bold before:content-[attr(data-largeur-pret)] before:[grid-area:1/1] after:invisible after:content-[attr(data-largeur-attente)] after:[grid-area:1/1]"
+    >
+      <span className={cn("[grid-area:1/1]", ready ? "font-bold text-ink" : "text-ink-soft")}>
+        {ready ? readyLabel : interrupted ? t.jourInterrompu : t.enPreparation}
+      </span>
     </span>
   );
 }

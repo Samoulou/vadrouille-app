@@ -8,11 +8,11 @@ import {
   InferredBriefSchema,
   LodgingRequestSchema,
   LodgingSuggestionSchema,
+  ApiErrorSchema,
   TripRequestSchema,
   fail,
-  isActivePreviewConflict,
   ok,
-  type CreateTripResult,
+  type CreatedTrip,
   type GenerationStatus,
   type InferredBrief,
   type LodgingSuggestion,
@@ -20,7 +20,7 @@ import {
   type Session,
 } from "@/contracts";
 import { CreatedTripSchema, GenerationStatusRequestSchema } from "@/contracts/creation";
-import { TRIP_ID_PATTERN, type ApiErrorCode } from "@/contracts/values";
+import type { ApiErrorCode } from "@/contracts/values";
 
 import { parseInput } from "../parse-input";
 
@@ -86,10 +86,11 @@ const DAY_MS = 86_400_000;
  * requête (`unauthenticated` sans session : aucun voyage créé, et `validation_failed` ne sert pas d'oracle du schéma) ;
  * 2. `parseInput` par `TripRequestSchema`, puis « arrivée au plus tôt aujourd'hui » sur l'horloge de la portée, à un
  * jour près pour les fuseaux (0017 § 2.2) ; 3. appel de l'adaptateur avec l'organisation **de la session**, jamais une
- * valeur du navigateur (F8-PO-17) ; 4. validation de la sortie. `active_preview_exists` porte le voyage en préparation.
+ * valeur du navigateur (F8-PO-17) ; 4. validation de la sortie. `active_preview_exists` porte le voyage en préparation
+ * dans `error.activeTripId` (`ApiErrorSchema`, revalidé ici).
  * Aucun journal : ni brouillon, ni brief.
  */
-export async function createTrip(input: unknown): Promise<CreateTripResult> {
+export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
   const scope = await getSimulationScope();
   let session: Session | null;
   try {
@@ -106,16 +107,15 @@ export async function createTrip(input: unknown): Promise<CreateTripResult> {
 
   // Phase 0 : la session simulée ne porte pas de rôle ; la personne connectée est propriétaire de son organisation (B3).
   const ctx: AdapterContext = { organizationId: session.organizationId, userId: session.userId, role: "owner" };
-  let result: CreateTripResult;
+  let result: Result<CreatedTrip>;
   try {
     result = await getCreationAdapter(undefined, { scope }).createTrip(ctx, parsed.value);
   } catch {
     return fail("provider_error");
   }
-  if (isActivePreviewConflict(result)) {
-    return TRIP_ID_PATTERN.test(result.activeTripId)
-      ? { ok: false, error: { code: "active_preview_exists" }, activeTripId: result.activeTripId }
-      : fail("provider_error");
+  if (!result.ok && result.error.code === "active_preview_exists") {
+    const conflict = ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: result.error.activeTripId });
+    return conflict.success ? { ok: false, error: conflict.data } : fail("provider_error");
   }
   if (!result.ok) return fail(CREATE_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
   const output = CreatedTripSchema.safeParse(result.value);

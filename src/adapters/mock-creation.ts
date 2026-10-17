@@ -6,7 +6,7 @@ import {
   LodgingSuggestionSchema,
   fail,
   ok,
-  type CreateTripResult,
+  type CreatedTrip,
   type GenerationStatus,
   type InferredBrief,
   type LodgingRequest,
@@ -112,7 +112,7 @@ export function createMockCreationAdapter({
       const parsed = LodgingSuggestionSchema.safeParse(lodgingSuggestion);
       return parsed.success ? ok(parsed.data) : fail("provider_error");
     },
-    async createTrip(ctx: AdapterContext, request: TripRequest): Promise<CreateTripResult> {
+    async createTrip(ctx: AdapterContext, request: TripRequest): Promise<Result<CreatedTrip>> {
       const { clock, creation } = scoped();
       const at = clock();
       const existing = creation.launches.get(launchKey(ctx.organizationId, request.requestId));
@@ -126,7 +126,7 @@ export function createMockCreationAdapter({
       for (const tripId of tripIds) {
         const latest = latestLaunch(creation.launches, ctx.organizationId, tripId);
         if (latest && !isFinalGenerationPhase(statusOf(latest, at, creation.outcome).phase)) {
-          return { ok: false, error: { code: "active_preview_exists" }, activeTripId: tripId };
+          return { ok: false, error: { code: "active_preview_exists", activeTripId: tripId } };
         }
       }
 

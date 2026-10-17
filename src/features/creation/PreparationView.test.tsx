@@ -188,6 +188,10 @@ describe("PreparationView : bandeaux", () => {
     await poll(at(3, "failed"));
     const alert = container.querySelector("main [role='alert']")!;
     expect(alert).toHaveTextContent(t.interrompue);
+    // Titre et jours non prêts disent l'interruption, comme le bandeau.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(t.titreInterrompu);
+    expect(rows()[0]).toHaveTextContent(t.jourInterrompu);
+    expect(rows()[0]).not.toHaveTextContent(t.enPreparation);
     expect(fetchStatus).toHaveBeenCalledTimes(1);
     await poll(at(5, "failed"));
     expect(fetchStatus).toHaveBeenCalledTimes(1);
@@ -197,6 +201,9 @@ describe("PreparationView : bandeaux", () => {
     });
     expect(fetchStatus).toHaveBeenCalledTimes(2);
     expect(alert).toBeEmptyDOMElement();
+    // Le bouton a disparu avec le bandeau : le focus est sur le titre (WCAG 2.4.3).
+    expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(t.titre);
     await poll(at(6, "failed"));
     expect(counter()).toHaveTextContent(readyCounter(4, 8));
   });
@@ -207,6 +214,7 @@ describe("PreparationView : bandeaux", () => {
     const alert = container.querySelector("main [role='alert']") as HTMLElement;
     expect(alert).toHaveTextContent(t.interrompue);
     expect(within(alert).queryByRole("button", { name: t.reessayer })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(t.titreInterrompu);
     expect(within(alert).getByRole("link", { name: t.voirMesVoyages })).toHaveAttribute("href", "/voyages");
     expect(screen.queryByRole("link", { name: t.voirPropositions })).toBeNull();
     expect(await axeWithRealTimers(container)).toEqual([]);

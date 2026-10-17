@@ -112,6 +112,9 @@ test("logement: carte simulée (R3-dev)", async ({ page }) => {
 test("logement: aucun quartier", async ({ page }) => {
   await reachAfterBrief(page, { ...EDIMBOURG, destination: "Glasgow" });
   await expect(page.getByText("Aucun quartier à te proposer pour l'instant.")).toBeVisible();
+  // État stable avant la capture : sortie visible, squelette du chargement retiré (revue de F8c).
+  await expect(page.getByRole("button", { name: "Continuer sans logement", exact: true })).toBeVisible();
+  await expect(page.locator("[data-part='squelette']")).toHaveCount(0);
   await capture(page, "logement-aucun-quartier.png");
 });
 

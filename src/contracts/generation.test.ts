@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MOCK_DEMO_TRIP_DRAFT, MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
 
 import { CreatedTripSchema, GenerationStatusRequestSchema } from "./creation";
-import { GenerationStatusSchema, TripRequestSchema, isActivePreviewConflict } from "./index";
+import { ApiErrorSchema, GenerationStatusSchema, TripRequestSchema } from "./index";
 import { API_ERROR_CODES, isFinalGenerationPhase } from "./values";
 
 /** Contrats du lancement et de l'écran 5 (F8c ; décision 0017 § 2.4 ; 0077 § 3 point 5). */
@@ -116,20 +116,13 @@ describe("codes du lancement", () => {
     expect(API_ERROR_CODES).not.toContain("quota_reached");
   });
 
-  it("isActivePreviewConflict ne reconnaît que le conflit qui porte un voyage", () => {
-    expect(
-      isActivePreviewConflict({
-        ok: false,
-        error: { code: "active_preview_exists" },
-        activeTripId: "mock_trip_edimbourg",
-      }),
-    ).toBe(true);
-    expect(isActivePreviewConflict({ ok: false, error: { code: "provider_error" } })).toBe(false);
-    expect(
-      isActivePreviewConflict({
-        ok: true,
-        value: { tripId: "mock_trip_edimbourg" },
-      }),
-    ).toBe(false);
+  it("ApiError.activeTripId : présent si et seulement si code vaut active_preview_exists, identifiant de voyage", () => {
+    expect(ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: "mock_trip_edimbourg" }).success).toBe(true);
+    // Code sans identifiant.
+    expect(ApiErrorSchema.safeParse({ code: "active_preview_exists" }).success).toBe(false);
+    // Identifiant sans le code.
+    expect(ApiErrorSchema.safeParse({ code: "provider_error", activeTripId: "mock_trip_edimbourg" }).success).toBe(false);
+    expect(ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: "../admin" }).success).toBe(false);
+    expect(ApiErrorSchema.safeParse({ code: "provider_error" }).success).toBe(true);
   });
 });

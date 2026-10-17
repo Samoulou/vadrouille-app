@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { CategorySchema } from "./category";
-import type { ApiError, Result } from "./errors";
 import { IsoDateSchema, TimeSchema } from "./trip";
 import {
   ADULTS,
@@ -325,21 +324,3 @@ export const GenerationStatusSchema = z
     }
   });
 export type GenerationStatus = z.infer<typeof GenerationStatusSchema>;
-
-/**
- * Refus `active_preview_exists` de `createTrip` (un aperçu actif à la fois par compte, cadrage § 4) : l'écran
- * renvoie au voyage en préparation (« Voir ces propositions », 0018 § 18). Son identifiant est porté à côté de
- * l'erreur commune, sans changer `ApiError` (question au Tech Lead, PR de F8c).
- */
-export interface ActivePreviewConflict {
-  ok: false;
-  error: ApiError & { code: "active_preview_exists" };
-  activeTripId: string;
-}
-
-/** Réponse de `createTrip`, côté adaptateur comme côté action. */
-export type CreateTripResult = Result<CreatedTrip> | ActivePreviewConflict;
-
-export function isActivePreviewConflict(result: CreateTripResult): result is ActivePreviewConflict {
-  return !result.ok && "activeTripId" in result;
-}

@@ -174,6 +174,8 @@ test("preparation: erreur réparable, « Réessayer » relance le suivi", async 
     exact: true,
   });
   await expect(retry).toBeVisible();
+  await expect(heading(page)).toHaveText("Préparation interrompue");
+  await expect(dayRows(page).nth(0)).toContainText("Interrompu");
   // Le suivi est arrêté : avancer la portée ne change rien sans « Réessayer ».
   await scope.control({ action: "advanceClock", ms: 3 * STEP_MS });
   await page.clock.runFor(3000);
@@ -181,6 +183,7 @@ test("preparation: erreur réparable, « Réessayer » relance le suivi", async 
   await expect(retry).toBeVisible();
   await retry.click();
   await expect(alertRegion(page)).toHaveText("");
+  await expect(heading(page)).toBeFocused();
   await advance(page, scope, 0, counterIs("4 propositions prêtes sur 8"));
 });
 

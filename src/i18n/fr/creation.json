@@ -190,6 +190,8 @@
       "pluriel": "{n} propositions n'ont pas trouvé de lieu compatible."
     },
     "interrompue": "La préparation s'est interrompue.",
+    "titreInterrompu": "Préparation interrompue",
+    "jourInterrompu": "Interrompu",
     "reessayer": "Réessayer",
     "voirMesVoyages": "Voir mes voyages",
     "voirPropositions": "Voir mes propositions",

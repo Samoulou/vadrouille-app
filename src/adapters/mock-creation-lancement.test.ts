@@ -89,8 +89,7 @@ describe("createTrip simulé", () => {
     await adapter.createTrip(MOCK_REQUEST_CONTEXT, REQUEST);
     expect(await adapter.createTrip(MOCK_REQUEST_CONTEXT, OTHER_REQUEST)).toEqual({
       ok: false,
-      error: { code: "active_preview_exists" },
-      activeTripId: "mock_trip_edimbourg",
+      error: { code: "active_preview_exists", activeTripId: "mock_trip_edimbourg" },
     });
     // Une autre organisation n'est pas concernée.
     expect((await adapter.createTrip(OTHER_ORG, OTHER_REQUEST)).ok).toBe(true);
