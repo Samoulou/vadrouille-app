@@ -9,6 +9,13 @@ import type { Stop } from "@/contracts";
 
 export type TripRoutesBase = "/voyages" | "/dev/voyages";
 
+/**
+ * Numéro de jour d'une adresse `/jour/{n}` : entier écrit sans zéro initial, trois chiffres au plus. Seule forme admise
+ * par les pages (`dayFromParam`, redirection vers l'écran 4) et par `normaliserSuite` (revue consolidée du head
+ * `2b80bd7` de la PR 452, mineurs 7 et 14).
+ */
+export const DAY_PARAM_PATTERN = /^[1-9][0-9]{0,2}$/;
+
 export interface TripRoutes {
   /** Écran 11 « Séjour ». */
   sejour(): string;

@@ -61,11 +61,11 @@ describe("adaptateurs: prototype refusé en production et hors liste blanche (d�
     ["0006 : VADROUILLE_ENV=ci et VERCEL_ENV=production", { VADROUILLE_ENV: "ci", VERCEL_ENV: "production" }],
     ["0006 : VADROUILLE_ENV=staging et VERCEL_ENV=preview", { VADROUILLE_ENV: "staging", VERCEL_ENV: "preview" }],
     ["0006 : valeur hors liste", { VERCEL_ENV: "prod", NODE_ENV: "development" }],
-  ])("refus : %s", (_cas, valeurs) => {
+  ])("refus : %s", async (_cas, valeurs) => {
     const env = asEnv(valeurs);
     expect(prototypeAdapterAllowed(env)).toBe(false);
     expect(() => getTripAdapter("prototype", env)).toThrow(/adaptateur prototype refusé/);
-    expect(() => getRequestContext("prototype", env)).toThrow(/adaptateur prototype refusé/);
+    await expect(getRequestContext("prototype", env)).rejects.toThrow(/adaptateur prototype refusé/);
   });
 
   it.each<[string, Env]>([
@@ -78,10 +78,10 @@ describe("adaptateurs: prototype refusé en production et hors liste blanche (d�
     ["0006 : VADROUILLE_ENV=local et VERCEL_ENV=preview", { VADROUILLE_ENV: "local", VERCEL_ENV: "preview" }],
     ["drapeau de CI", { NODE_ENV: "production", VADROUILLE_PROTOTYPE: "1", CI: "true" }],
     ["drapeau de CI avec VADROUILLE_ENV=ci", { NODE_ENV: "production", VADROUILLE_PROTOTYPE: "1", CI: "true", VADROUILLE_ENV: "ci" }],
-  ])("ouvert : %s", (_cas, valeurs) => {
+  ])("ouvert : %s", async (_cas, valeurs) => {
     const env = asEnv(valeurs);
     expect(prototypeAdapterAllowed(env)).toBe(true);
-    expect(getRequestContext("prototype", env)).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
+    expect(await getRequestContext("prototype", env)).toEqual({ organizationId: PROTOTYPE_ORG_ID, userId: PROTOTYPE_USER_ID, role: "owner" });
     expect(() => getTripAdapter("prototype", env)).not.toThrow();
   });
 });
@@ -93,11 +93,11 @@ describe("adaptateurs: VADROUILLE_PROTOTYPE=1 n'ouvre jamais en production", () 
     ["VERCEL_ENV=production, NODE_ENV=production", { ...drapeau, VERCEL_ENV: "production", NODE_ENV: "production" }],
     ["VADROUILLE_ENV=production", { ...drapeau, VADROUILLE_ENV: "production" }],
     ["VADROUILLE_ENV=production, NODE_ENV=production", { ...drapeau, VADROUILLE_ENV: "production", NODE_ENV: "production" }],
-  ])("%s : refus pour l'adaptateur et le contexte", (_cas, valeurs) => {
+  ])("%s : refus pour l'adaptateur et le contexte", async (_cas, valeurs) => {
     const env = asEnv(valeurs);
     expect(prototypeAdapterAllowed(env)).toBe(false);
     expect(() => getTripAdapter("prototype", env)).toThrow(/adaptateur prototype refusé/);
-    expect(() => getRequestContext("prototype", env)).toThrow(/adaptateur prototype refusé/);
+    await expect(getRequestContext("prototype", env)).rejects.toThrow(/adaptateur prototype refusé/);
   });
 });
 

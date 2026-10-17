@@ -185,6 +185,8 @@ export const CHILDREN = { min: 0, max: 9 } as const;
 /** Budget par repas et par personne, entier en CHF. */
 export const MEAL_BUDGET_CHF = { min: 5, max: 500 } as const;
 export const EMAIL_MAX_LENGTH = 254;
+/** Borne de l'entrée brute d'une adresse, avant retrait des espaces aux extrémités (décision 0084 ; 0051 point 3). */
+export const EMAIL_INPUT_MAX_LENGTH = 320;
 export const OTP_LENGTH = 6;
 /** Code de connexion : exactement `OTP_LENGTH` chiffres ASCII (0017 § 2.4). */
 export const OTP_PATTERN = /^[0-9]{6}$/;
@@ -241,9 +243,24 @@ export const LODGING_KINDS = ["known", "area", "none", "suggestedLodging", "sugg
 export type LodgingKind = (typeof LODGING_KINDS)[number];
 
 /**
+ * Retire les espaces U+0020 aux extrémités, et eux seuls (ni tabulation, ni retour à la ligne, ni autre espace
+ * Unicode) : parcours caractère par caractère, sans expression régulière (décision 0084 ; 0051 point 4.3). Seule
+ * implémentation du dépôt, appelée par `EmailSchema` (`./auth.ts`) et par `parseEmailAddress` (`src/server/email.ts`).
+ */
+export function stripEdgeSpaces(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === " ") start += 1;
+  while (end > start && value[end - 1] === " ") end -= 1;
+  return value.slice(start, end);
+}
+
+/**
  * Forme d'une adresse email (0017 § 2.1, écran 4) : un seul `@`, partie locale non vide, domaine qui contient
- * un point ni au début ni à la fin, aucun espace, 254 caractères au plus. L'interface et le serveur (par
- * `.refine`) acceptent exactement les mêmes adresses ; seule la réception du code prouve qu'elle existe.
+ * un point ni au début ni à la fin, aucun espace, 254 caractères au plus. Décision 0084 : le contrat tolère les espaces
+ * U+0020 aux extrémités (`EmailSchema` applique `isEmailShape(stripEdgeSpaces(v))`) ; l'interface et le serveur
+ * acceptent exactement les mêmes adresses une fois ces espaces retirés ; seule la réception du code prouve qu'elle
+ * existe.
  */
 export function isEmailShape(value: string): boolean {
   if (value.length === 0 || value.length > EMAIL_MAX_LENGTH || /\s/.test(value)) return false;

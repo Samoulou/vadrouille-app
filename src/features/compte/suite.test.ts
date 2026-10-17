@@ -99,3 +99,35 @@ describe("normaliserSuite : valeur reconstruite", () => {
     }
   });
 });
+
+describe("normaliserSuite : sous-chemins du voyage (spécification B3, B3-PO-11, critère C8)", () => {
+  it.each([
+    `/voyages/${TRIP}/jour/1`,
+    `/voyages/${TRIP}/jour/12`,
+    `/voyages/${TRIP}/aujourdhui`,
+    `/voyages/${TRIP}/debloquer`,
+    `/voyages/${TRIP}/preparation`,
+    `/voyages/${TRIP}/presentation`,
+  ])("accepte et renvoie à l'identique %s", (valeur) => {
+    expect(normaliserSuite(valeur)).toBe(valeur);
+  });
+
+  it.each([
+    ["jour 0", `/voyages/${TRIP}/jour/0`],
+    ["jour à zéro initial", `/voyages/${TRIP}/jour/01`],
+    ["jour sans numéro", `/voyages/${TRIP}/jour`],
+    ["jour non numérique", `/voyages/${TRIP}/jour/a`],
+    ["jour négatif", `/voyages/${TRIP}/jour/-1`],
+    ["jour de 4 chiffres", `/voyages/${TRIP}/jour/1000`],
+    ["Remplacer une étape", `/voyages/${TRIP}/jour/1/remplacer/etape_1`],
+    ["sous-chemin après le jour", `/voyages/${TRIP}/jour/1/x`],
+    ["paiement simulé", `/voyages/${TRIP}/debloquer/paiement-simule/pay_1`],
+    ["confirmation du paiement", `/voyages/${TRIP}/debloquer/confirmation`],
+    ["sous-chemin après aujourdhui", `/voyages/${TRIP}/aujourdhui/x`],
+    ["identifiant hors TRIP_ID_PATTERN avec jour", "/voyages/é/jour/1"],
+    ["identifiant hors TRIP_ID_PATTERN avec debloquer", `/voyages/${"a".repeat(65)}/debloquer`],
+    ["identifiant hors TRIP_ID_PATTERN avec aujourdhui", "/voyages/a.b/aujourdhui"],
+  ])("%s : /voyages", (_label, valeur) => {
+    expect(normaliserSuite(valeur)).toBe("/voyages");
+  });
+});

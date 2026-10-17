@@ -18,6 +18,7 @@ import { CODE_CONNEXION, type EnteteIpDeConfiance, type EnvironnementAuth } from
 import { adhesion, organisationPersonnelle } from "@/tenancy/organisations";
 
 import { envoyerCodeRecu } from "./envoi";
+import { type AuthFailureCode, codeEchec } from "./erreurs";
 import { reprendreSuppression } from "./reprise";
 
 /**
@@ -36,8 +37,8 @@ import { reprendreSuppression } from "./reprise";
  * l'action et `error.name` (`auth.operation_failed`).
  */
 
-/** Codes d'échec des opérations (sous-ensemble de `API_ERROR_CODES`, `@/contracts/values`). */
-export type AuthFailureCode = "invalid_code" | "code_expired" | "too_many_attempts" | "unauthenticated" | "provider_error";
+/** Codes d'échec des opérations (sous-ensemble de `API_ERROR_CODES`, `./erreurs.ts`). */
+export type { AuthFailureCode } from "./erreurs";
 export type AuthFailure = { readonly ok: false; readonly code: AuthFailureCode };
 
 /** Session ouverte ou lue : identifiants seulement, jamais le jeton. */
@@ -107,7 +108,12 @@ class DelaiDepasseError extends Error {
   }
 }
 
-/** Rejette après `ms` si `promesse` n'est pas réglée ; la transaction englobante est alors annulée. */
+/**
+ * Rejette après `ms` si `promesse` n'est pas réglée ; la transaction englobante (et son verrou) est alors annulée. Better
+ * Auth 1.7.7 n'accepte aucun signal d'annulation sur `auth.api` : l'opération en cours n'est pas interrompue et peut
+ * finir hors du verrou (revue consolidée du head `ed79edb` de la PR 446, mineur 3 ; noté dans 0008, vérification 7.11).
+ * Risque borné par `query_timeout` (10 s) et par le limiteur des actions (B3c).
+ */
 function avecDelai<T>(promesse: Promise<T>, ms: number): Promise<T> {
   let minuterie: ReturnType<typeof setTimeout> | undefined;
   const delai = new Promise<never>((_, rejeter) => {
@@ -284,16 +290,9 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
         await reprendreSuppression(erreur.userId);
         return echec("unauthenticated");
       }
-      switch (codeBibliotheque(erreur)) {
-        case "INVALID_OTP":
-          return echec("invalid_code");
-        case "OTP_EXPIRED":
-          return echec("code_expired");
-        case "TOO_MANY_ATTEMPTS":
-          return echec("too_many_attempts");
-        default:
-          return journaliserEchec("verify-code", erreur);
-      }
+      // Seul tableau de correspondance (B3c point 3, `./erreurs.ts`) ; tout autre cas : `provider_error`.
+      const code = codeEchec(codeBibliotheque(erreur));
+      return code === undefined ? journaliserEchec("verify-code", erreur) : echec(code);
     }
     transmettreCookies(reponse.headers);
     const userId = reponse.response.user.id;

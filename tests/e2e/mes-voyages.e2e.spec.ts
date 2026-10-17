@@ -208,6 +208,8 @@ test("mes-voyages: aucune donnée persistée côté client", async ({ page }) =>
   await sheet(page).getByRole("link", { name: "Jour 3, lun." }).click();
   await expect(page).toHaveURL(`/voyages/${ED_OK}/jour/3`);
   await page.getByRole("link", { name: "Retour" }).click();
+  // Navigation attendue avant le second clic : sinon il peut viser le lien « Retour » de la page quittée (B3c).
+  await expect(page).toHaveURL(`/voyages/${ED_OK}`);
   await page.getByRole("link", { name: "Retour" }).click();
   await expect(page).toHaveURL(R17);
   await openTrips(page);
