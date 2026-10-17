@@ -12,7 +12,7 @@ import { creerCadence, type Cadence } from "@/grounding/budget-routes";
 import { createRoutesClient } from "@/grounding/routes-client";
 import { moteurRechercheWebAttendu, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
 import { creerLecteurPages, type LecteurPages } from "@/research/fetch-page";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { createUndiciTransport } from "@/research/undici-transport";
 import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
 import { periodesDe } from "@/server/usage/periodes";

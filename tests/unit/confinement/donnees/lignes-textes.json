@@ -400,9 +400,9 @@
       "ecart": "module de capacité de P0r1 (décisions 0031 § 5 et 0049 C1 ; spécification P0c, section 9) : verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)"
     },
     {
-      "fichier": "src/server/env/egress.ts",
+      "fichier": "src/ai/erreurs.ts",
       "portee": "application",
-      "usage": "code fermé « clé absente » des modules étroits et des clients réels (P0r1), écrit une seule fois ; ce n'est pas un nom de variable",
+      "usage": "code fermé « clé absente » des modules étroits et des clients réels (P0r1), écrit une seule fois ; ce n'est pas un nom de variable ; déplacé de `src/server/env/egress.ts`, qui le réexporte sous le même nom (B7a, ticket 423, décision 0077 § 3 point 1)",
       "capacites": [
         {
           "capacite": "secret:MISSING_KEY",
@@ -412,7 +412,24 @@
           "nombre": 1
         }
       ],
-      "ecart": "texte à suffixe `_KEY` (section 5) : code d'erreur `missing_key` imposé par la spécification de P0r1 (décisions 0031 § 6 et 0049 C1, point 3), aucune lecture ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267)"
+      "ecart": "texte à suffixe `_KEY` (section 5) : code d'erreur `missing_key` imposé par la spécification de P0r1 (décisions 0031 § 6 et 0049 C1, point 3), aucune lecture ; verdict Sécurité : approuvé sur le head `353bb20` (PR 272, ticket 267) ; déplacement dans `src/ai/erreurs.ts` (B7a, 0077 § 3 point 1) : verdict Sécurité demandé (PR de B7a)"
+    },
+    {
+      "fichier": "eslint-rules/ia-recherche-imports.mjs",
+      "portee": "outil",
+      "usage": "règle ESLint de B7a (`ligne/ia-recherche-liste-blanche`, ticket 423, handover § 3) : nomme le module de capacité du client de modèles, son test et le SDK qu'il seul importe ; aucune capacité réseau, aucune lecture",
+      "capacites": [
+        {
+          "capacite": "fragment:openrouter",
+          "formes": [
+            "src/ai/openrouter-client.ts",
+            "@openrouter/ai-sdk-provider",
+            "src/ai/openrouter-client.test.ts"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "fragment dans une règle de lint, hors des tableaux des sections 3 et 9 : liste blanche de `src/ai` du handover § 3 (spécification B7a point 5 ; décision 0077 § 2 point 6) ; aucune capacité réseau ; verdict Sécurité demandé (PR de B7a, ticket 423)"
     },
     {
       "fichier": "tests/unit/p0/clients-reels.test.ts",

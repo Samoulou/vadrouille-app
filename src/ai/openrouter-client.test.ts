@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { RequeteModele } from "@/ai/client";
 import { createOpenRouterClient, ErreurOpenRouter, ORIGINE_MODELES, type OptionsOpenRouter } from "@/ai/openrouter-client";
-import { CODE_CLE_ABSENTE } from "@/server/env/egress";
+import { CODE_CLE_ABSENTE, CODES_ERREUR_OPENROUTER } from "@/ai/erreurs";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
 import { creerPortMemoire } from "../../tests/support/port-consommation-memoire";
@@ -445,5 +445,11 @@ describe("p0: recherche web du fournisseur (0055 § 7 point 2)", () => {
     expect(`${(erreur as Error).message} ${JSON.stringify(erreur)}`).not.toContain("SENTINELLE-FOURNISSEUR");
     expect(appels).toHaveLength(1);
     expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+  });
+});
+
+describe("B7a : retryable des erreurs du client réel (décision 0077 § 3 point 3)", () => {
+  it("vrai seulement pour upstream_unavailable et upstream_timeout (REESSAYABLES de src/ai/erreurs.ts)", () => {
+    for (const code of CODES_ERREUR_OPENROUTER) expect(new ErreurOpenRouter(code).retryable, code).toBe(code === "upstream_unavailable" || code === "upstream_timeout");
   });
 });

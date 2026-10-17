@@ -5,8 +5,8 @@ import type { PointEntreeRechercheWeb, RequeteRechercheWebFournisseur, SourceWeb
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
 import { creerRechercheWebReelle, LONGUEUR_MAX_REQUETE_WEB, messageRequete } from "@/ai/recherche-web-reelle";
 import { DEBUT_DONNEES, FIN_DONNEES } from "@/ai/requetes";
-import { LONGUEURS_TEXTE } from "@/prototype/candidat";
-import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/research/recherche-web";
+import { LONGUEURS_TEXTE } from "@/ai/candidat";
+import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/ai/recherche-web";
 
 /**
  * Client réel de recherche web (P0r3c-3, décision 0055, section 7) : capacité **injectée** (point d'entrée du
@@ -96,7 +96,7 @@ describe("p0: recherche web réelle, capacité injectée", () => {
     expect(LONGUEUR_MAX_REQUETE_WEB).toBe(LONGUEURS_TEXTE.requete);
   });
 
-  it("source du fournisseur : même forme que ResultatWeb (mineur 7 ; le contrat vit dans @/ai/client, qui ne peut importer src/research)", () => {
+  it("source du fournisseur : même forme que ResultatWeb (mineur 7 ; le contrat du fournisseur vit dans @/ai/client, le résultat admis dans @/ai/recherche-web)", () => {
     expectTypeOf<Readonly<ResultatWeb>>().toEqualTypeOf<SourceWebFournisseur>();
   });
 

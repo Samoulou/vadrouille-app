@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  *    fichier hors des dossiers serveur, `db/`, `scripts/` et des tests, sous toutes les formes de chargement
  *    (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`) ; seul un bloc de la
  *    configuration la règle, aucun bloc plus bas ne la remplace ;
- * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés ; un 21e fichier sans
+ * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés (26 depuis B7a, ticket 423) ; un 21e fichier sans
  *    `import "server-only"` est refusé.
  * Configuration réelle du projet.
  */
@@ -186,14 +186,25 @@ describe("src/ai, src/research et src/grounding restent hors du code client (000
   });
 });
 
-/** Les 20 modules de phase 0 exemptés (fusion de main dans B1, #188). Toute modification de la liste passe en revue. */
+/**
+ * Les modules de phase 0 exemptés de `src/ai`, `src/research` et `src/grounding` : les 20 de la fusion de main dans B1
+ * (#188), puis B7a (ticket 423, décision 0077 § 1 points 3 et 4, § 3 point 1) : `src/research/recherche-web.ts` devient
+ * `src/ai/recherche-web.ts`, et six modules chargés par `pnpm p0` s'ajoutent (copies tenues égales, prompts
+ * `structuration` et `quartier`, `erreurs.ts`). Toute modification de la liste passe en revue.
+ */
 const EXEMPTED = [
+  "src/ai/candidat.ts",
   "src/ai/client.ts",
+  "src/ai/erreurs.ts",
   "src/ai/modeles.simule.ts",
   "src/ai/prompts/notation.ts",
   "src/ai/prompts/plan.ts",
+  "src/ai/prompts/quartier.ts",
   "src/ai/prompts/raisons.ts",
   "src/ai/prompts/recherche.ts",
+  "src/ai/prompts/structuration.ts",
+  "src/ai/recherche-web.ts",
+  "src/ai/reglages.ts",
   "src/ai/requetes.ts",
   "src/ai/sorties.ts",
   "src/grounding/ancrage.ts",
@@ -201,14 +212,17 @@ const EXEMPTED = [
   "src/grounding/places.simule.ts",
   "src/grounding/routes.simule.ts",
   "src/research/agent.ts",
+  "src/research/candidat.ts",
   "src/research/extract-text.ts",
   "src/research/fetch-page.ts",
   "src/research/ip-guard.ts",
   "src/research/pages.simule.ts",
   "src/research/recherche-web.simule.ts",
-  "src/research/recherche-web.ts",
   "src/research/sources.ts",
 ];
+
+/** Adaptateurs de P0 de `src/server/p0` exemptés (P0r3c-5a, puis B7a : `vers-couche-ia.ts`, décision 0077 § 1 point 5). */
+const EXEMPTED_SERVEUR_P0 = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts", "src/server/p0/vers-couche-ia.ts"];
 
 function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -218,12 +232,12 @@ function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   });
 }
 
-describe("exception de server-only : liste fermée de 20 fichiers", () => {
+describe("exception de server-only : liste fermée de 26 fichiers (20 de B1, puis B7a)", () => {
   const WITHOUT = "export const x = 1;\n";
 
-  it("la liste compte exactement 20 fichiers, tous présents dans le dépôt", () => {
-    expect(EXEMPTED).toHaveLength(20);
-    expect(new Set(EXEMPTED).size).toBe(20);
+  it("la liste compte exactement 26 fichiers, tous présents dans le dépôt", () => {
+    expect(EXEMPTED).toHaveLength(26);
+    expect(new Set(EXEMPTED).size).toBe(26);
     const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of EXEMPTED) expect(present, filePath).toContain(filePath);
   });
@@ -241,6 +255,15 @@ describe("exception de server-only : liste fermée de 20 fichiers", () => {
     expect(await serverOnlyMessages(WITHOUT, filePath)).toHaveLength(0);
   });
 
+  it("src/server/p0 : seuls assemblage, vers-moteur et vers-couche-ia (B7a) sont exemptés, et tous sont présents", async () => {
+    const present = sourceFiles("src/server/p0");
+    for (const filePath of EXEMPTED_SERVEUR_P0) expect(present, filePath).toContain(filePath);
+    for (const filePath of present) {
+      const rules = rulesOf(await eslint.calculateConfigForFile(filePath));
+      expect(rules.get(SERVER_ONLY) === undefined, filePath).toBe(EXEMPTED_SERVEUR_P0.includes(filePath));
+    }
+  });
+
   it.each([
     "src/ai/client2.ts",
     "src/ai/prompts/nouveau.ts",
@@ -248,7 +271,7 @@ describe("exception de server-only : liste fermée de 20 fichiers", () => {
     "src/research/nouveau.ts",
     "src/grounding/places.ts",
     "src/grounding/routes.ts",
-  ])("un 21e fichier (%s) sans import \"server-only\" est refusé", async (filePath) => {
+  ])("un fichier hors de la liste (%s) sans import \"server-only\" est refusé", async (filePath) => {
     const messages = await serverOnlyMessages(WITHOUT, filePath);
     expect(messages).toHaveLength(1);
     expect(messages[0]?.severity).toBe(2);

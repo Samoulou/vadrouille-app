@@ -2,7 +2,7 @@ import type { ClientModeles } from "@/ai/client";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { CompteurPlafonne, ConfigPlafonds } from "@/prototype/config";
 import type { LecteurPages } from "@/research/fetch-page";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { lire } from "@/domain/tables";
 
 /**

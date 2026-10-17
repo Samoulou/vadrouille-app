@@ -15,14 +15,16 @@ import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
 import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { chercherCandidats, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
+import { FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
-import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/research/recherche-web";
+import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/ai/recherche-web";
 import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
 import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
+import { entreeModelesDepuisBrief } from "@/server/p0/vers-couche-ia";
 
 import { creerHorlogeManuelle } from "../../support/horloge-manuelle";
 import { creerPortMemoire } from "../../support/port-consommation-memoire";
+import { chercherCandidatsP0 } from "./agent-p0";
 import { RACINE, rel, resoudre, type Cible } from "./resolution";
 
 /**
@@ -287,7 +289,10 @@ describe("p0: séparation des capacités de la composition (types)", () => {
   });
 
   it("notation des candidats : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
-    expectTypeOf<keyof EntreeNotation>().toEqualTypeOf<"brief" | "lot">();
+    // B7a (décision 0077 § 1 point 6) : types de production (`EntreeModeles`, `CandidatPourModele`) et `ComplementP0`
+    // en champ distinct, passé par `p0Run` seulement.
+    expectTypeOf<keyof EntreeNotation>().toEqualTypeOf<"entree" | "lot" | "complement">();
+    expectTypeOf<keyof EntreeNotation["lot"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape">();
     type Lieu = EntreeNotation["lot"][number];
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");
     expectTypeOf<Lieu>().not.toHaveProperty("position");
@@ -296,7 +301,8 @@ describe("p0: séparation des capacités de la composition (types)", () => {
   });
 
   it("rédaction des raisons : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
-    expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"brief" | "retenus">();
+    expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"entree" | "retenus" | "complement">();
+    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine">();
     type Lieu = EntreeRaisons["retenus"][number];
     // Aucun champ d'ancrage, de fiche ni de trajet dans ce qu'un prompt peut recevoir.
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");
@@ -304,7 +310,9 @@ describe("p0: séparation des capacités de la composition (types)", () => {
     expectTypeOf<Lieu>().not.toHaveProperty("statut");
     expectTypeOf<Lieu>().not.toHaveProperty("horaires");
     expectTypeOf<Lieu>().not.toHaveProperty("trajets");
-    expectTypeOf<EntreeRaisons["brief"]>().not.toHaveProperty("placeId");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("placeId");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("recit");
+    expectTypeOf<EntreeRaisons["entree"]>().not.toHaveProperty("logements");
   });
 
   it("la composition exige une GardeOuverte : un littéral est refusé par le type", () => {
@@ -489,13 +497,14 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     expect(Object.keys(finale.places)).toEqual(["details"]);
     expect(Object.keys(finale.routes)).toEqual(["matrice"]);
     // La rédaction des raisons passe par le client de modèles réel, sans greffon, avec le modèle des raisons.
-    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as EntreeRaisons["brief"];
-    await finale.redigerRaisons({ brief, retenus: [] });
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    const entree = entreeModelesDepuisBrief(brief);
+    await finale.redigerRaisons({ entree, retenus: [] });
     const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
     expect(corps.model).toBe("fournisseur/raisons-test");
     expect(corps.plugins).toBeUndefined();
     // La notation aussi : client de modèles réel, sans greffon, avec le modèle de la notation (amendement A3 de 0055).
-    await finale.noterCandidats({ brief, lot: [] });
+    await finale.noterCandidats({ entree, lot: [] });
     const notation = JSON.parse(String(appels[1]?.init.body)) as Record<string, unknown>;
     expect(notation.model).toBe("fournisseur/notation-test");
     expect(notation.plugins).toBeUndefined();
@@ -540,7 +549,7 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
       },
     };
     const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
-    const { compteurs } = await chercherCandidats(brief, {
+    const { compteurs } = await chercherCandidatsP0(brief, {
       modeles,
       modele: "fournisseur/recherche-test",
       routage: { data_collection: "deny" },
@@ -769,7 +778,7 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
       JSON.stringify({ actions: [], candidats: [], termine: true }),
     ];
     const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
-    await chercherCandidats(avec({}), {
+    await chercherCandidatsP0(avec({}), {
       modeles: { envoyer: async () => ({ texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 }) },
       modele: "fournisseur/recherche-test",
       routage: { data_collection: "deny" },

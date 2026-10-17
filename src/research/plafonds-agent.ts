@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { LecteurPages } from "@/research/fetch-page";
-import type { ClientRechercheWeb } from "@/research/recherche-web";
+import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
 /**
  * Plafonds de l'agent du mode réel (`p0Run`, décision 0055, section 6 point 5 ; tableau « Plafonds » de la
