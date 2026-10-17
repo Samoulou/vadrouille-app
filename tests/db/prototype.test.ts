@@ -428,9 +428,9 @@ describe("S2 et S8 : coordonnées du prototype (0046)", () => {
       await c.query("SELECT public.store_place_coordinates($1, 1, 1)", [placeId]);
     });
     expect(await lus(a.org)).toEqual([{ organization_id: a.org, lat: 46.2, lng: 6.15 }]);
-    // Expiration à 30 jours pour une organisation du MVP (0011 § 6).
+    // Expiration à 29 jours pour une organisation du MVP (0011 § 6, amendée par 0060 § 2 : migration 0008).
     expect(
-      await compter("SELECT count(*) AS n FROM public.place_coordinates WHERE place_id = $1 AND organization_id = $2 AND expires_at - fetched_at = interval '30 days'", [placeId, a.org]),
+      await compter("SELECT count(*) AS n FROM public.place_coordinates WHERE place_id = $1 AND organization_id = $2 AND expires_at - fetched_at = interval '29 days'", [placeId, a.org]),
     ).toBe(1);
   });
 
