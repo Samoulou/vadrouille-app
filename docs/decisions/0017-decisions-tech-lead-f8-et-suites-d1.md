@@ -2,6 +2,8 @@
 
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-13, délai compté depuis la correction 3) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09, corrigée le 2026-10-11 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #62 · Corrections 1, 2 et 3 après les revues de #65 (3e tentative accordée par le CEO sur délégation de Samuel, Q119)
 
+**§ 2.2 amendé par 0081** (B9-TL-5, ticket #433) : une suggestion retenue porte aussi ses valeurs maison (`name` du logement ; `name`, `center`, `radiusM` de la zone), jamais une donnée Google.
+
 ## Contexte
 Six questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` :
 - **Q80** (F8-Q7) : propositions F8-TL-1 à F8-TL-8 de `specs/F8-creation-compte.md` (fusionnée par #49), à trancher avant le code de F8 ;
