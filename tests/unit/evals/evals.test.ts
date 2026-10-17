@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ import { creerRechercheSimulee, FixturesRechercheSchema } from "@/research/reche
  * Jeu d'évaluation `evals/` (spécification B7, B7c point 4 et B7-PO-9 ; critères `evals: …` de B7c) : jeu valide,
  * aucune donnée Google, harnais en mode simulé sans réseau ni clé, mesures sans nom de lieu ni compteur d'ancrage,
  * comparées au fichier commité `evals/resultats/simule.json` (pour mettre ce fichier à jour après un changement
- * voulu de prompt, de modèle ou de fixture : `EVALS_ECRIRE=1 pnpm vitest run tests/unit/evals`).
+ * voulu de prompt, de modèle ou de fixture : `pnpm vitest run tests/unit/evals -u`, jamais en CI).
  */
 
 const RACINE = process.cwd();
@@ -188,7 +188,8 @@ describe("evals: harnais en mode simulé", () => {
   });
 
   it("evals: le harnais tourne en simulé sans clé", async () => {
-    for (const cle of ["OPENROUTER_API_KEY", "GOOGLE_MAPS_SERVER_KEY"]) expect(process.env[cle], cle).toBeUndefined();
+    // Aucune clé de service : `tests/unit/setup.ts` refuse de lancer Vitest si l'une est posée (garde-cles, décision
+    // 0031 § 6), et ce fichier ne peut pas importer ce module étroit. Aucun réseau : `fetch` échoue (beforeEach).
     const jeu = chargerJeu();
     const mesures = await evaluerJeuSimule(jeu);
     expect(mesures.map((m) => m.cas)).toEqual(jeu.map((cas) => cas.id));
@@ -227,7 +228,7 @@ describe("evals: harnais en mode simulé", () => {
 
     // Résultats commités pour comparer les versions (cadrage § 8).
     const attendu = `${JSON.stringify({ schema: 1, mode: "simule", mesures }, null, 2)}\n`;
-    if (process.env.EVALS_ECRIRE === "1") writeFileSync(RESULTATS_SIMULES, attendu);
-    expect(readFileSync(RESULTATS_SIMULES, "utf8")).toBe(attendu);
+    // Mise à jour voulue : `pnpm vitest run tests/unit/evals -u` (Vitest n'écrit jamais ce fichier en CI).
+    await expect(attendu).toMatchFileSnapshot(RESULTATS_SIMULES);
   });
 });

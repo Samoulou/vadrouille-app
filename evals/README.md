@@ -17,7 +17,7 @@ Chaque cas a la forme de `CasEvaluationSchema` (`src/research/evaluation.ts`) : 
 
 `evaluerCas` (`src/research/evaluation.ts`) fait tourner la structuration, le plan, la recherche, la notation et les raisons, et rend par cas : taux de sorties valides par étape, candidats trouvés par type de créneau, part des sources officielles, indépendantes et génériques, couverture des catégories et des incontournables attendus, candidats dans une limite du brief, coût et durée par étape, versions des prompts et des modèles.
 
-- **Mode simulé par défaut** : doubles sur fixtures, sans réseau ni clé (`tests/unit/evals/evals.test.ts`). Après un changement voulu de prompt, de modèle ou de fixture : `EVALS_ECRIRE=1 pnpm vitest run tests/unit/evals`, puis relire le différentiel de `resultats/simule.json`.
+- **Mode simulé par défaut** : doubles sur fixtures, sans réseau ni clé (`tests/unit/evals/evals.test.ts`). Après un changement voulu de prompt, de modèle ou de fixture : `pnpm vitest run tests/unit/evals -u`, puis relire le différentiel de `resultats/simule.json`.
 - **Mode réel** : pas encore. Il attend la réponse de Samuel sur le budget et le plafond par exécution (question 6 de la spécification) ; il se lancera à la main, sur préversion, et n'appellera jamais Google.
 
 ## Règles

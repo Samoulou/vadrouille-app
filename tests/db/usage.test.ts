@@ -164,7 +164,7 @@ describe("usage: une ligne par forfait, jamais par appel (B7-TL-9 ; 0046 D13 poi
       for (const sku of Object.keys(TABLE.skus)) expect((await inserer("b", "google", sku, 1)).code, sku).toBe("23514");
       for (const step of ["d", "notation", "c"]) expect((await inserer(step, "modeles", "modele-x", 0)).code, step).toBe("23514");
       // Fournisseur hors identité (0049), unités de modèles (un nombre de lots), valeurs négatives.
-      expect((await inserer("forfait", "openrouter", "modele-x", 0)).code).toBe("23514");
+      expect((await inserer("forfait", "fournisseur_x", "modele-x", 0)).code).toBe("23514");
       expect((await inserer("forfait", "modeles", "modeles_forfait", 3)).code).toBe("23514");
       expect((await inserer("forfait", "google", "places_details_enterprise", -1)).code).toBe("23514");
       // Une seule ligne par méthode et par génération : une seconde ligne (écriture par appel) échoue.
