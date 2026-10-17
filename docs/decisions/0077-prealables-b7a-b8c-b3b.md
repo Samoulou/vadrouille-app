@@ -2,6 +2,8 @@
 
 Statut : décision déléguée (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel 6 heures après sa fusion (décision 0068).
 
+**§ 3 point 1 et § 1 point 9 amendés par 0080** (ticket #425, B7a) : `src/ai/erreurs.ts` est aussi admis comme terminal quand `egress.ts` ou `port.ts` l'importe (`REEXPORTATEURS_ERREURS_IA`) ; la mention de `violationsPont` et les spécificateurs `@/ai/erreurs` de `specificateurs.ts` sont retirés ; la fin des copies retire aussi `pays`, `budgetRepas` d'`EntreeModeles` et la conversion du rythme de `vers-couche-ia.ts`.
+
 Date : 2026-10-16 · Décideur : Tech Lead · Ticket : #415 · Spécifications : `specs/B7-couche-ia-recherche.md` (#288, fusionnée), `specs/B8-ancrage.md` (#301, fusionnée), `specs/B3-compte-connexion.md` (#243, fusionnée) · Découpages : 0054 § 2 (B7), 0059 § 3 et § 4 (B8), 0050 P1 point 2 (B3)
 
 Numérotation (relue le 2026-10-16 sur `main` `df48fab`) : `main` porte 0001 à 0076 et 0078 (`0078-decoupage-b4.md`, #418) ; la PR ouverte #419 ajoutait un second `0076`, numéro déjà pris par `0076-notation-variante-b-deepseek.md` : elle passe en 0079 (CEO). 0077 est réservée à ce ticket. Les numéros de ligne de code et de décision cités ici sont ceux de `fb06dd8` (inchangés à `df48fab`, qui n'ajoute que `STATUS.md`, `QUESTIONS.md`, 0078 et une note de version), **avant** les renvois que cette PR ajoute en tête de 0008, 0032, 0045, 0048 et 0055 (deux lignes de plus dans chacun de ces fichiers).
