@@ -29,7 +29,9 @@ import {
  * Contrats de phase 0 de la création du voyage (décision 0017 § 2, F8-TL-2) : objets stricts, noms du handover
  * back-end, aucun texte d'interface. Les bornes viennent de `values.ts` (aucune seconde copie). F8a livre
  * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b `LodgingRequest` et `LodgingSuggestion` ; F8c
- * `TripRequest`, `CreatedTrip`, `GenerationStatusRequest` et `GenerationStatus`.
+ * `TripRequest`, `CreatedTrip`, `GenerationStatusRequest` et `GenerationStatus`. La PR de contrat de B9b (0081
+ * § B9-TL-14) ajoute les valeurs maison des suggestions retenues (B9-TL-5), `GenerationDay` (exporté pour le tableau
+ * des champs du handover § 5) et `RetryGenerationRequest` (B9-TL-11).
  */
 
 const text = (bounds: { min: number; max: number }) => z.string().trim().min(bounds.min).max(bounds.max);
@@ -37,13 +39,26 @@ const text = (bounds: { min: number; max: number }) => z.string().trim().min(bou
 /** Comparaison de deux `IsoDate` (« AAAA-MM-JJ ») ou de deux `Time` (« HH:MM ») : l'ordre du texte est celui du temps. */
 const before = (a: string, b: string) => a < b;
 
-/** Logement d'une ville (0017 § 2.2) : une suggestion retenue ne porte que des identifiants, jamais le nom affiché. */
+/** Textes maison des suggestions : jamais un nom Google (spécification F8, « Source des noms »). */
+const houseText = z.string().trim().min(1).max(160);
+const identifier = z.string().min(1).max(64);
+/** Centre et rayon d'une zone maison (sortie du modèle, B7) : jamais une géométrie ni des coordonnées Google (0011, 0027). */
+const center = z.strictObject({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
+const radiusM = z.number().int().min(50).max(20_000);
+
+/**
+ * Logement d'une ville (0017 § 2.2, amendé par 0081 § B9-TL-5). Une suggestion retenue porte ses **valeurs maison**
+ * (nom, et pour une zone son centre et son rayon), avec les mêmes schémas et bornes que `LodgingSuggestionSchema`,
+ * parce que `suggestLodging` ne stocke rien et que `createTrip` en a besoin (B9-PO-2). Saisie non fiable : revalidée
+ * par ce schéma à l'entrée de `createTrip`, jamais envoyée à un modèle ; le `placeId` est revérifié par une fiche au
+ * début du workflow 1, jamais cru.
+ */
 export const LodgingSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("known"), label: text(KNOWN_LODGING_LENGTH) }),
   z.strictObject({ kind: z.literal("area"), label: text(AREA_LENGTH) }),
   z.strictObject({ kind: z.literal("none") }),
-  z.strictObject({ kind: z.literal("suggestedLodging"), lodgingId: z.string().min(1), placeId: z.string().min(1).optional() }),
-  z.strictObject({ kind: z.literal("suggestedArea"), areaId: z.string().min(1) }),
+  z.strictObject({ kind: z.literal("suggestedLodging"), lodgingId: identifier, placeId: identifier.optional(), name: houseText }),
+  z.strictObject({ kind: z.literal("suggestedArea"), areaId: identifier, name: houseText, center, radiusM }),
 ]);
 export type Lodging = z.infer<typeof LodgingSchema>;
 
@@ -200,10 +215,6 @@ export type InferredBrief = z.infer<typeof InferredBriefSchema>;
  * Écran 3 « Où loger » (0017 § 2.4, F8b).
  */
 
-/** Textes maison des suggestions : jamais un nom Google (spécification F8, « Source des noms »). */
-const houseText = z.string().trim().min(1).max(160);
-const identifier = z.string().min(1).max(64);
-
 /**
  * Demande de `suggestLodging` (0017 § 2.4) : le brouillon validé et la ville, `0` pour la destination, `i` pour
  * `otherCities[i − 1]`. Ni `requestId` ni brief : c'est le « `TripRequest` sans logement » du handover.
@@ -230,8 +241,8 @@ export const LodgingSuggestionSchema = z.strictObject({
     areaId: identifier,
     name: houseText,
     reason: houseText,
-    center: z.strictObject({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
-    radiusM: z.number().int().min(50).max(20_000),
+    center,
+    radiusM,
   }),
   lodgings: z
     .array(
@@ -262,9 +273,9 @@ export const TripRequestSchema = z.strictObject({
 });
 export type TripRequest = z.infer<typeof TripRequestSchema>;
 
-// `CreatedTripSchema` et `GenerationStatusRequestSchema` ne sont pas réexportés par `index.ts` (seulement leurs types) :
-// enveloppes `{ tripId }` d'une action, absentes de « Contrats à créer » et du tableau des champs du handover § 5
-// (même règle que `share.ts`). Les actions et l'adaptateur simulé les importent depuis `@/contracts/creation`.
+// `CreatedTripSchema`, `GenerationStatusRequestSchema` et `RetryGenerationRequestSchema` (B9b) ne sont pas réexportés
+// par `index.ts` (seulement leurs types) : enveloppes d'une action (`{ tripId }`, `{ tripId, requestId }`), absentes
+// de « Contrats à créer » et du tableau des champs du handover § 5 (même règle que `share.ts`). Les actions et l'adaptateur simulé les importent depuis `@/contracts/creation`.
 
 /** Réponse de `createTrip` (0017 § 2.4) : l'identifiant du voyage, que l'écran 5 relit par `TripAdapter`. */
 export const CreatedTripSchema = z.strictObject({ tripId: TripIdSchema });
@@ -277,11 +288,12 @@ export type GenerationStatusRequest = z.infer<typeof GenerationStatusRequestSche
 const count = z.number().int().min(0);
 
 /** Un jour couvert par les premières propositions : rang (1 = J1), état, propositions prêtes ce jour-là (U2-Q2). */
-const GenerationDaySchema = z.strictObject({
+export const GenerationDaySchema = z.strictObject({
   index: z.number().int().positive(),
   state: z.enum(GENERATION_DAY_STATES),
   readyStops: count,
 });
+export type GenerationDay = z.infer<typeof GenerationDaySchema>;
 
 const generationFields = {
   tripId: TripIdSchema,
@@ -322,3 +334,13 @@ export const GenerationStatusSchema = z
     }
   });
 export type GenerationStatus = z.infer<typeof GenerationStatusSchema>;
+
+/**
+ * Entrée de `retryGeneration` (0081 § B9-TL-11, B9-PO-9) : seul chemin d'un nouvel essai par la personne. `requestId`
+ * est créé une fois par essai (idempotence par `generation_runs.request_id`, B9-TL-6 (h)). Réponse : `CreatedTrip`
+ * (`{ tripId }`), l'écran relisant ensuite `getGenerationStatus`. Refus sans écriture : `validation_failed` si rien
+ * n'est à relancer, `active_preview_exists` si une autre génération de l'organisation est en cours, `not_found` pour
+ * un voyage d'une autre organisation.
+ */
+export const RetryGenerationRequestSchema = z.strictObject({ tripId: TripIdSchema, requestId: z.uuid() });
+export type RetryGenerationRequest = z.infer<typeof RetryGenerationRequestSchema>;

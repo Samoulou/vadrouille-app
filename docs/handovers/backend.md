@@ -174,7 +174,7 @@ Admis nommément, hors du tableau (décision 0080, B7a) : `parse5` dans le seul 
 | 2 Brief raconté | `structureBrief` | action | `BriefRequest` | `InferredBrief` | anonyme, limité par adresse IP (limiteur maison, § 7) puis plafond global | sans état (rien n'est stocké) | `validation_failed`, `rate_limited`, `cost_cap_reached`, `provider_error` |
 | 3 Où loger | `suggestLodging` | action | `LodgingRequest` | `LodgingSuggestion` | anonyme, limité par adresse IP (limiteur maison, § 7) puis plafond global | sans état | `validation_failed`, `rate_limited`, `cost_cap_reached`, `no_option`, `provider_error` |
 | 4 Compte | `requestCode` ; `verifyCode` ; `signOut`, par `AuthAdapter` (aucune route `/api/auth/*`, décision 0008) | action | `CodeRequest` ; `CodeVerification` | `Session` (cookie) | anonyme | limité par notre limiteur dans les actions (décision 0008, § 7) | `invalid_code`, `code_expired`, `too_many_attempts`, `rate_limited` |
-| 5 Propositions prêtes | `createTrip` puis `getGenerationStatus` (interrogation, décision 0017 § 9) ; flux `/api/v1/trips/[id]/generation` plus tard | action ; route GET | `TripRequest` | identifiant du voyage (`{ tripId }`, 0017) ; `GenerationStatus` | propriétaire ou conseiller | `requestId` unique par organisation | `active_preview_exists`, `validation_failed`, `cost_cap_reached`, `quota_reached`, `provider_error` |
+| 5 Propositions prêtes | `createTrip` puis `getGenerationStatus` (interrogation, décision 0017 § 9) ; « Réessayer » : `retryGeneration` (0081 § B9-TL-11) ; flux `/api/v1/trips/[id]/generation` plus tard | action ; route GET | `TripRequest` ; `GenerationStatusRequest` ; `RetryGenerationRequest` (`{ tripId, requestId }`) | identifiant du voyage (`CreatedTrip`, `{ tripId }`, 0017) ; `GenerationStatus` ; `CreatedTrip` | propriétaire ou conseiller | `createTrip` : `requestId` unique par organisation ; `retryGeneration` : `requestId` unique par essai (`generation_runs.request_id`) | `createTrip` : `validation_failed`, `unauthenticated`, `active_preview_exists` (aucun appel de fournisseur : plafond, quota et erreur de fournisseur ne sont jamais une erreur de `createTrip`, mais une raison d'échec de `GenerationStatus` : `provider_error`, `cost_cap_reached`, `quota_reached`, 0077 § 3 point 5) ; `getGenerationStatus` : `unauthenticated`, `not_found` ; `retryGeneration` : `validation_failed` (rien à relancer), `unauthenticated`, `active_preview_exists`, `not_found` |
 | 6 Présentation | `TripAdapter.listPreviewSlots` ; `decideCard` ; `undoDecision` | lecture ; action | `DeckDecision` | `PreviewSlot` (liste) ; `DeckDecisionResult` | propriétaire ou conseiller | `requestId` unique par voyage ; annulation idempotente | `not_found`, `validation_failed`, `generation_in_progress` |
 | 6b Suite du tri | `TripAdapter.listProposals` ; `getGenerationStatus` | lecture | — | `Proposal` (liste) ; `GenerationStatus` | propriétaire ou conseiller | lecture | `not_found` |
 | 7 Confirmer une préférence | `answerPreferencePrompt` | action | `PreferenceAnswer` (étendu par B10 : `requestId`, question) | `PreferenceSignal` | propriétaire ou conseiller | `requestId` unique par voyage | `not_found`, `validation_failed` |
@@ -205,7 +205,7 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `BriefRequest` | Récit et voyage minimal envoyés à la structuration (0017 § 2.3) | F8a ; côté serveur par B9 |
 | `Brief` | Brief structuré complet (0017 § 2.3) | F8a ; complété par B9 |
 | `InferredBrief` | Brief déduit, champs facultatifs (0017 § 2.3) | F8a ; côté serveur par B9 |
-| `Lodging` | Logement d'une ville (0017 § 2.2) : saisi, quartier, aucun, ou suggestion retenue par identifiants seulement ; sous-contrat de `TripDraft` et `Brief` | F8a ; complété par B9 |
+| `Lodging` | Logement d'une ville (0017 § 2.2, amendé par 0081 § B9-TL-5) : saisi, quartier, aucun, ou suggestion retenue avec ses valeurs maison (identifiants, nom, et pour une zone centre et rayon) ; sous-contrat de `TripDraft` et `Brief` | F8a ; complété par B9 |
 | `OtherCity` | Autre ville du séjour (0017 § 2.2), sous-contrat de `TripDraft` et `Brief` | F8a ; complété par B9 |
 | `TripCommitment` | Engagement saisi à l'écran 1 (décision 0015 § 9), sous-contrat de `TripDraft` et `Brief` | F8a ; complété par B9 |
 | `Travellers` | Adultes et enfants du brouillon et du brief (0017 § 2.2) | F8a ; complété par B9 |
@@ -299,7 +299,7 @@ Décision 0010. Catégories :
 - **chargé à la demande** : contenu Google obtenu côté serveur à l'affichage, jamais persisté, affiché sur la carte Google ou avec la mention « Données de lieux : Google » ;
 - **calculé** : à la lecture, par le moteur (`src/domain`, appelé par le serveur), par le serveur (configuration, identifiants) ou par l'interface (formatage) ; jamais persisté.
 
-Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exporté par `src/contracts` au 2026-10-11 (144 clés, notation du critère § 5 de la spécification B0), **sauf les 7 clés qui dépendent de Q5**, classées dans « Partie Q5 » (décision 0011, point 5) : 137 lignes ici, 7 là-bas, sans recouvrement ; les 144 clés ont donc une catégorie. **Après B2** (2026-10-13) : 6 lignes retirées (`Day.weekday`, `Day.title`, `Proposal.weekday`, `Proposal.context`, `Stop.meta`, `SurpriseIdea.meta`) et 56 ajoutées (`Trip.timeZone` comprise) : 187 lignes ici, 194 clés avec les 7 de 0011 ; les contrats de création (`TripDraft`, `Brief`, `BriefRequest`, `InferredBrief`, `Lodging`, `OtherCity`, `TripCommitment`, `Travellers`, tâche B9) et `TripSummary` (B6) n'ont pas encore de lignes, et les schémas de stockage dérivés (`TripSnapshot`, `DaySnapshot`, `DayLineItemSnapshot`, `StopSnapshot`, `EventSnapshot`, `SegmentSnapshot`, `SurpriseIdeaSnapshot`, `ProposalRecord`) n'en ont pas (exclusions du test `contrats: chaque champ a une seule catégorie`, `tests/unit/contracts/categories.test.ts`, décision 0037). Un champ dont le type est un autre schéma exporté a une ligne ; ses sous-champs sont dans les lignes du schéma référencé.
+Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exporté par `src/contracts` au 2026-10-11 (144 clés, notation du critère § 5 de la spécification B0), **sauf les 7 clés qui dépendent de Q5**, classées dans « Partie Q5 » (décision 0011, point 5) : 137 lignes ici, 7 là-bas, sans recouvrement ; les 144 clés ont donc une catégorie. **Après B2** (2026-10-13) : 6 lignes retirées (`Day.weekday`, `Day.title`, `Proposal.weekday`, `Proposal.context`, `Stop.meta`, `SurpriseIdea.meta`) et 56 ajoutées (`Trip.timeZone` comprise) : 187 lignes ici, 194 clés avec les 7 de 0011 ; les contrats de création (`TripDraft`, `Brief`, `BriefRequest`, `InferredBrief`, `Lodging`, `OtherCity`, `TripCommitment`, `Travellers`, tâche B9) et `TripSummary` (B6) n'ont pas encore de lignes, et les schémas de stockage dérivés (`TripSnapshot`, `DaySnapshot`, `DayLineItemSnapshot`, `StopSnapshot`, `EventSnapshot`, `SegmentSnapshot`, `SurpriseIdeaSnapshot`, `ProposalRecord`) n'en ont pas (exclusions du test `contrats: chaque champ a une seule catégorie`, `tests/unit/contracts/categories.test.ts`, décision 0037). **Après la PR de contrat de B9b** (2026-10-17, décision 0081 § B9-TL-14) : 66 lignes ajoutées pour les contrats de création de l'écran 1 et du lancement (`TripRequest`, `TripDraft`, `OtherCity`, `TripCommitment`, `Lodging`, `Brief`, `Travellers`, `GenerationStatus` et `GenerationDay`, exporté pour l'occasion), retirés des exclusions ; `BriefRequest`, `InferredBrief`, `LodgingRequest` et `LodgingSuggestion` (actions sans compte, B9a) restent exclus. Un champ dont le type est un autre schéma exporté a une ligne ; ses sous-champs sont dans les lignes du schéma référencé.
 
 | Champ | Catégorie | Règle |
 |---|---|---|
@@ -497,6 +497,72 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `ApiError.retryable` | calculé | Serveur |
 | `ApiError.currentVersion` | calculé | Serveur, depuis `trips.current_version`, seulement avec le code `version_conflict` (évolution E10) |
 | `ApiError.activeTripId` | calculé | Serveur, voyage de l'organisation dont la génération n'est pas finie, seulement avec le code `active_preview_exists` (évolution E12, F8c) |
+| `TripRequest.requestId` | stocké | `trips.request_id` (idempotence de `createTrip` par organisation, B9b point 3) |
+| `TripRequest.draft` | stocké | Voir `TripDraft.*` ; écrit par `createTrip` dans une seule transaction (B9b point 2) |
+| `TripRequest.brief` | stocké | Voir `Brief.*` ; `briefs`, version 1 (B9-PO-1) |
+| `TripDraft.destination` | stocké | `trips.destination`, saisie par la personne |
+| `TripDraft.start` | stocké | `trips.start_date` ; « arrivée au plus tôt aujourd'hui » revérifiée par `createTrip` dans le fuseau du voyage |
+| `TripDraft.end` | stocké | `trips.end_date` |
+| `TripDraft.lodging` | stocké | Voir `Lodging.*` ; `stays` de la destination (B9-PO-1) |
+| `TripDraft.otherCities` | stocké | Voir `OtherCity.*` ; une ligne `stays` par ville (B9-PO-1) |
+| `TripDraft.commitments` | stocké | Voir `TripCommitment.*` ; engagements de l'écran 1 (décision 0015 § 9, B9-TL-6) |
+| `OtherCity.name` | stocké | Ville saisie par la personne (B9-TL-6, ville de chaque logement) |
+| `OtherCity.arrival` | stocké | `stays.from_date` de la ville ; la fin se déduit de l'arrivée suivante ou du départ (borne exclusive, B9-PO-1) |
+| `OtherCity.lodging` | stocké | Voir `Lodging.*` |
+| `TripCommitment.kind` | stocké | Type d'engagement saisi par la personne |
+| `TripCommitment.label` | stocké | Libellé saisi par la personne ; jamais envoyé à un modèle |
+| `TripCommitment.date` | stocké | Date saisie par la personne |
+| `TripCommitment.start` | stocké | Heure saisie par la personne |
+| `TripCommitment.end` | stocké | Heure saisie par la personne, facultative |
+| `Lodging[known].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
+| `Lodging[known].label` | stocké | `stays.label`, saisi par la personne, ancré au début du workflow 1 (B9-PO-2) |
+| `Lodging[area].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
+| `Lodging[area].label` | stocké | `stays.label`, quartier saisi par la personne, sans `placeId` |
+| `Lodging[none].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) ; `stays.kind` `none`, libellé = la ville |
+| `Lodging[suggestedLodging].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
+| `Lodging[suggestedLodging].lodgingId` | stocké | Identifiant maison de la suggestion retenue (0081 § B9-TL-5) |
+| `Lodging[suggestedLodging].placeId` | stocké | `stays.place_id`, identifiant de lieu Google, seul élément Google conservable ; revérifié par une fiche au début du workflow 1, jamais cru (B9-PO-2) |
+| `Lodging[suggestedLodging].name` | stocké | `stays.label`, nom **maison** de la suggestion (sortie du modèle, B7), jamais un nom Google (0081 § B9-TL-5) |
+| `Lodging[suggestedArea].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
+| `Lodging[suggestedArea].areaId` | stocké | Identifiant maison de la zone retenue (0081 § B9-TL-5) |
+| `Lodging[suggestedArea].name` | stocké | `stays.label`, nom **maison** de la zone, jamais un nom Google (0081 § B9-TL-5) |
+| `Lodging[suggestedArea].center.lat` | stocké | Centre de la zone **maison** (sortie du modèle, B7), jamais une coordonnée Google (0011, 0027, 0081 § B9-TL-5) |
+| `Lodging[suggestedArea].center.lng` | stocké | Comme `Lodging[suggestedArea].center.lat` |
+| `Lodging[suggestedArea].radiusM` | stocké | Rayon de la zone maison, 50 à 20 000 m (0081 § B9-TL-5) |
+| `Brief.travellers` | stocké | Voir `Travellers.*` |
+| `Brief.pace` | stocké | `briefs.pace` |
+| `Brief.wishes` | stocké | `briefs.wishes` (codes `Category`) |
+| `Brief.limits` | stocké | `briefs.limits` (codes `Category`) |
+| `Brief.mobility` | stocké | `briefs.mobility` (format fixé par B9-TL-6) |
+| `Brief.mealBudgetPerPerson` | stocké | `briefs.meal_budget`, CHF par personne, facultatif |
+| `Brief.inferredFields` | stocké | `briefs.inferred_fields` : champs déduits du récit par la structuration (B7-PO-1) |
+| `Travellers.adults` | stocké | `trips.travellers_adults` |
+| `Travellers.children` | stocké | `trips.travellers_children` |
+| `GenerationStatus[preparing].phase` | calculé | Serveur, depuis `generation_runs.phase` de la dernière exécution du voyage (`queued` et `preparing` → `preparing`, B9b point 5) |
+| `GenerationStatus[preparing].tripId` | calculé | Serveur, identifiant du voyage demandé |
+| `GenerationStatus[preparing].days` | calculé | Voir `GenerationDay.*` |
+| `GenerationStatus[preparing].expected` | calculé | Serveur, nombre de cases attendues de l'aperçu (B9-PO-5) |
+| `GenerationStatus[preparing].ready` | calculé | Serveur, somme des `readyStops`, depuis `proposals` |
+| `GenerationStatus[ready].phase` | calculé | Serveur, depuis `generation_runs.phase` de la dernière exécution du voyage (`queued` et `preparing` → `preparing`, B9b point 5) |
+| `GenerationStatus[ready].tripId` | calculé | Serveur, identifiant du voyage demandé |
+| `GenerationStatus[ready].days` | calculé | Voir `GenerationDay.*` |
+| `GenerationStatus[ready].expected` | calculé | Serveur, nombre de cases attendues de l'aperçu (B9-PO-5) |
+| `GenerationStatus[ready].ready` | calculé | Serveur, somme des `readyStops`, depuis `proposals` |
+| `GenerationStatus[incomplete].phase` | calculé | Serveur, depuis `generation_runs.phase` de la dernière exécution du voyage (`queued` et `preparing` → `preparing`, B9b point 5) |
+| `GenerationStatus[incomplete].tripId` | calculé | Serveur, identifiant du voyage demandé |
+| `GenerationStatus[incomplete].days` | calculé | Voir `GenerationDay.*` |
+| `GenerationStatus[incomplete].expected` | calculé | Serveur, nombre de cases attendues de l'aperçu (B9-PO-5) |
+| `GenerationStatus[incomplete].ready` | calculé | Serveur, somme des `readyStops`, depuis `proposals` |
+| `GenerationStatus[failed].phase` | calculé | Serveur, depuis `generation_runs.phase` de la dernière exécution du voyage (`queued` et `preparing` → `preparing`, B9b point 5) |
+| `GenerationStatus[failed].tripId` | calculé | Serveur, identifiant du voyage demandé |
+| `GenerationStatus[failed].days` | calculé | Voir `GenerationDay.*` |
+| `GenerationStatus[failed].expected` | calculé | Serveur, nombre de cases attendues de l'aperçu (B9-PO-5) |
+| `GenerationStatus[failed].ready` | calculé | Serveur, somme des `readyStops`, depuis `proposals` |
+| `GenerationStatus[failed].reason` | calculé | Serveur, conversion unique de `generation_runs.stop_reason` (B9-TL-6 (h), B9-PO-9) ; `no_option` n'est jamais une raison d'échec |
+| `GenerationStatus[failed].retryable` | calculé | Serveur, vrai seulement pour `upstream_unavailable`, `upstream_timeout` et `step_expired` (B9-PO-9, B9-TL-3 point 5) |
+| `GenerationDay.index` | calculé | Serveur, rang du jour (1 = J1) |
+| `GenerationDay.state` | calculé | Serveur, jour publié dans la version ou non (B9-PO-12) |
+| `GenerationDay.readyStops` | calculé | Serveur, cases prêtes de ce jour, depuis `proposals` ; aucun nom de lieu ni identifiant d'étape |
 
 **Où vit l'aperçu et la suite du tri (fait, B2).** `Proposal` et `PreviewSlot` ne sont pas dans l'instantané d'une version : ils vivent dans la table `proposals` (§ 6), une ligne par case, écrite par le workflow 1 (aperçu) ou par la suite du tri, jamais modifiée ensuite (les décisions vont dans `preference_signals`). Une case `noOption` n'y a que `day`, `time` et `kind`. Une case `proposal` porte `content`, validé par `ProposalRecordSchema` (`src/contracts/snapshot.ts`), dérivé de `ProposalBaseSchema` par omission des champs calculés (`neighbours`, `option`) et chargés à la demande (`photoUrl`), avec `stop` en `StopSnapshot` (sans `verifiedAt`, `exceptions` sans `toConfirm`) et `travelFromPrevious` en `SegmentSnapshot` (sans `minutes`) ; `detour` y est obligatoire (« Partie Q5 ») et `stop.commitment` refusé. `TripAdapter.listPreviewSlots` et `listProposals` recomposent la `Proposal` complète et la valident par `ProposalSchema` (`neighbours` calculé à la lecture, 0037).
 

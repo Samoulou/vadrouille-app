@@ -15,14 +15,11 @@ export interface ExcludedContract {
  */
 export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "TripSummary", task: "B6", reason: "résumé de « Mes voyages », complété par B6" },
-  { contract: "TripDraft", task: "B9", reason: "brouillon de l'écran 1, complété par B9" },
-  { contract: "Brief", task: "B9", reason: "brief structuré, complété par B9" },
+  // Contrats de création : ceux de l'écran 1 et du lancement (`TripDraft`, `Brief`, `Lodging`, `OtherCity`,
+  // `TripCommitment`, `Travellers`, `TripRequest`, `GenerationStatus`, `GenerationDay`) ont leurs lignes au § 5 depuis
+  // la PR de contrat de B9b (0081 § B9-TL-14 ; spécification B9, B9b point 7). Restent ceux des actions sans compte (B9a).
   { contract: "BriefRequest", task: "B9", reason: "structuration côté serveur par B9 (structureBrief)" },
   { contract: "InferredBrief", task: "B9", reason: "structuration côté serveur par B9 (structureBrief)" },
-  { contract: "Lodging", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
-  { contract: "OtherCity", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
-  { contract: "TripCommitment", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
-  { contract: "Travellers", task: "B9", reason: "sous-contrat de TripDraft et Brief, complété par B9" },
   // F8b (décision 0017 § 2.4) : contrats de phase 0 jamais stockés ; « Contrats à créer » du handover back-end les
   // attribue à F8b sans ligne au § 5, que le Tech Lead écrit (question de la PR F8b) avant de retirer ces entrées.
   { contract: "LodgingRequest", task: "F8b", reason: "demande de suggestion de logement (0017 § 2.4), jamais stockée ; reprise par B9" },
@@ -30,11 +27,6 @@ export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
   { contract: "CodeRequest", task: "F8b", reason: "demande de code de connexion (0017 § 2.4), jamais stockée ; reprise par B3" },
   { contract: "CodeVerification", task: "F8b", reason: "vérification du code (0017 § 2.4), jamais stockée ; reprise par B3" },
   { contract: "Session", task: "B3", reason: "session lue par l'interface (0017 § 2.4), complétée par B3" },
-  // F8c (décision 0017 § 2.4) : lancement et écran 5, repris par B9 ; « Contrats à créer » du handover back-end les
-  // attribue à F8c sans ligne au § 5, que le Tech Lead écrit dans une PR de documentation avant de retirer ces entrées.
-  // `CreatedTrip` et `GenerationStatusRequest` (`{ tripId }`) ne sont pas réexportés par l'index (précédent : share.ts).
-  { contract: "TripRequest", task: "B9", reason: "demande de création du voyage (0017 § 2.4), jamais stockée en phase 0 ; reprise par B9" },
-  { contract: "GenerationStatus", task: "B9", reason: "avancement de la génération (0017 § 2.4), simulé en phase 0, complété par B9" },
   // F7a (décision 0016 § 4 et § 6) : contrats de phase 0 de la révision, jamais stockés ; B11 les reprend derrière
   // les Server Actions (`previewReplacement`, `applyPatch`) et en écrit les lignes.
   { contract: "ReplacementRequest", task: "B11", reason: "demande de remplacement (0016 § 4.1), action serveur de B11" },
