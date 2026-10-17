@@ -13,13 +13,21 @@ import { RACINE, rel } from "../p0/resolution";
  * leur propre module, commentaires compris : le serveur passe par `authOperations()`, `withOrg` et
  * `getServerRequestContext()`, qui lisent leur configuration de l'environnement validé.
  *
+ * Revue consolidée du head `2b80bd7` de la PR 452, bloquant 2 : `brancherConnexionReelle` (opérations, limiteur et
+ * contexte de session de l'adaptateur `better-auth`, sur `globalThis`) n'est nommée hors de `tests/` que par son module
+ * et par `src/instrumentation.ts`, seul appelant du serveur ; `debrancherConnexionReellePourTests` (remise à zéro)
+ * n'est nommée hors de `tests/` que par son module. Les tests colocalisés de `src/` n'y font pas exception.
+ *
  * Dossiers lus : `src/` (tests colocalisés compris), `db/`, `scripts/` et `eslint-rules/`.
  */
 
-const POINTS: Readonly<Record<string, string>> = {
-  createAuthOperations: "src/server/auth/index.ts",
-  creerWithOrg: "src/server/with-org.ts",
-  creerContexteServeur: "src/server/session.ts",
+/** Nom du point d'injection → fichiers admis hors de `tests/` (le premier est son module). */
+const POINTS: Readonly<Record<string, readonly string[]>> = {
+  createAuthOperations: ["src/server/auth/index.ts"],
+  creerWithOrg: ["src/server/with-org.ts"],
+  creerContexteServeur: ["src/server/session.ts"],
+  brancherConnexionReelle: ["src/adapters/better-auth.ts", "src/instrumentation.ts"],
+  debrancherConnexionReellePourTests: ["src/adapters/better-auth.ts"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];
@@ -40,14 +48,14 @@ function fichiers(dossier: string): string[] {
 }
 
 describe("points d'injection de la connexion réelle", () => {
-  it("auth: createAuthOperations, creerWithOrg et creerContexteServeur réservés à tests/ et à leur module", () => {
+  it("auth: createAuthOperations, creerWithOrg, creerContexteServeur et le branchement de la connexion réservés à tests/ et aux fichiers admis", () => {
     const lus = DOSSIERS.flatMap(fichiers);
-    expect(lus).toEqual(expect.arrayContaining(Object.values(POINTS)));
+    expect(lus).toEqual(expect.arrayContaining(Object.values(POINTS).flat()));
     const ecarts: string[] = [];
     for (const fichier of lus) {
       const texte = readFileSync(path.join(RACINE, fichier), "utf8");
-      for (const [nom, proprietaire] of Object.entries(POINTS)) {
-        if (fichier !== proprietaire && new RegExp(`\\b${nom}\\b`).test(texte)) ecarts.push(`${fichier} : ${nom}`);
+      for (const [nom, admis] of Object.entries(POINTS)) {
+        if (!admis.includes(fichier) && new RegExp(`\\b${nom}\\b`).test(texte)) ecarts.push(`${fichier} : ${nom}`);
       }
     }
     expect(ecarts).toEqual([]);

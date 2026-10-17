@@ -1,7 +1,7 @@
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
-import { tripRoutes } from "@/features/sejour/routes";
+import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 
 /**
  * Paramètre `suite` de l'écran 4 (`/connexion?suite=…`, F8-PO-10, décision 0017 § 1) : le module qui écrit
@@ -9,9 +9,6 @@ import { tripRoutes } from "@/features/sejour/routes";
  */
 
 const CONNEXION = "/connexion";
-/** Numéro de jour d'une adresse `/jour/{n}` : entier écrit sans zéro initial (même forme que `dayFromParam`). */
-const JOUR_PATTERN = /^[1-9][0-9]{0,2}$/;
-
 /** Longueur au-delà de laquelle la valeur est refusée. */
 const MAX_SUITE_LENGTH = 200;
 
@@ -36,7 +33,7 @@ const FORBIDDEN = /[\u0000-\u001F\u007F-\u009F\s\\%?#]/u;
  * 3. hors des formes `/voyages`, `R-lancer`, `/voyages/{id}`, `/voyages/{id}/preparation`,
  *    `/voyages/{id}/presentation`, et depuis B3c (B3-PO-11) `/voyages/{id}/jour/{n}`, `/voyages/{id}/aujourdhui` et
  *    `/voyages/{id}/debloquer`, avec `{id}` conforme à `TRIP_ID_PATTERN` et `{n}` entier écrit sans zéro initial
- *    (`JOUR_PATTERN`). Jamais `/jour/{n}/remplacer/…`, ni les pages de paiement simulé (`/debloquer/…`).
+ *    (`DAY_PARAM_PATTERN`, partagé avec les pages). Jamais `/jour/{n}/remplacer/…`, ni les pages de paiement simulé (`/debloquer/…`).
  * L'appartenance du voyage à l'organisation n'est pas vérifiée ici : la page cible renvoie 404 sinon.
  */
 export function normaliserSuite(valeur: string | undefined): string {
@@ -54,7 +51,7 @@ export function normaliserSuite(valeur: string | undefined): string {
   // B3-PO-11 : `/jour/{n}`, seul sous-chemin à deux segments ; rien après lui (« Remplacer » n'est jamais une suite).
   if (sous === "jour") {
     const [n, ...apres] = reste;
-    return n !== undefined && apres.length === 0 && JOUR_PATTERN.test(n) ? voyage.jour(Number(n)) : repli;
+    return n !== undefined && apres.length === 0 && DAY_PARAM_PATTERN.test(n) ? voyage.jour(Number(n)) : repli;
   }
   if (reste.length > 0) return repli;
   if (sous === undefined) return voyage.sejour();

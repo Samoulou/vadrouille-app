@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
-import { tripRoutes } from "@/features/sejour/routes";
+import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 import { JourneeScreen } from "@/features/sejour/screen-journee";
 import { journeeMetadata } from "@/features/sejour/screens";
 
@@ -23,6 +23,6 @@ export async function generateMetadata({ params, searchParams }: { params: Param
 export default async function JourneePage({ params }: { params: Params }) {
   const { id, n } = await params;
   const routes = tripRoutes("/voyages", id);
-  await exigerSession(/^[1-9]\d*$/.test(n) ? routes.jour(Number(n)) : routes.sejour());
+  await exigerSession(DAY_PARAM_PATTERN.test(n) ? routes.jour(Number(n)) : routes.sejour());
   return <JourneeScreen tripId={id} n={n} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

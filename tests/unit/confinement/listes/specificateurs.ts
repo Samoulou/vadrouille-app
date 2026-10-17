@@ -35,7 +35,8 @@ const NEUTRES_SAUF = ["@src-non-test", "@sensible"] as const;
  * B3b (ticket 444 ; spécification B3, B3b ; décisions 0007 et 0008) : requêtes paramétrées (`sql`) de la création de
  * compte, de l'organisation personnelle, du verrou et de la purge bornée, de `withOrg` ; `drizzle-orm/node-postgres`
  * (`drizzle.mock`, sans connexion) dans le test des exports. Fichiers nommés, sans motif de dossier (revue du head
- * `f0b8c5a`, mineur 6). Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+ * `f0b8c5a`, mineur 6). Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446), qui lève la
+ * réserve « sous réserve de ce mineur » du head `f0b8c5a` (même revue, mineur 2).
  */
 const ZONES_DRIZZLE_B3B = [
   "src/tenancy/creation-compte.ts",

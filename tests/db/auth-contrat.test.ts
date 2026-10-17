@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type 
 import {
   brancherConnexionReelle,
   createBetterAuthAdapter,
+  debrancherConnexionReellePourTests,
   type DemandeLimiteur,
   type Limiteur,
   type OperationsConnexion,
@@ -117,6 +118,7 @@ describe("actions", () => {
     const operations = vi.fn((): OperationsConnexion => b.operations);
     espions = { operations, envois: () => b.mailer.envois.length };
     courante = { banc: b, ip: ipDocumentation(), autres: {} };
+    debrancherConnexionReellePourTests();
     brancherConnexionReelle({ operations, limiter: limiteur.check, contexte: async () => null });
   }
 
@@ -200,11 +202,8 @@ describe("actions", () => {
 
     // Variantes d'une même adresse depuis des adresses IP différentes : le 6e envoi dans l'heure est refusé.
     const p = `b3c${unique().replace(/[^a-z0-9]/gi, "").toLowerCase()}`;
-    // ` a@exemple.test ` (espaces autour) : refusée par le contrat `CodeRequestSchema` (`isEmailShape`, 0017 § 2.1)
-    // avant le limiteur ; écart signalé dans la PR de B3c. Sa forme canonique est éprouvée sur l'adaptateur (C5).
-    courante.ip = ipDocumentation();
-    expect(await requestCode({ email: ` ${p}a@exemple.test ` })).toEqual({ ok: false, error: { code: "validation_failed", field: "email" } });
-    const variantes = [`${p}a@exemple.test`, `${p}A@Exemple.test`, ...[1, 2, 3, 4, 5].map((n) => `${p}a+${n}@exemple.test`)];
+    // ` a@exemple.test ` (espaces autour) : accepté par l'action et compté (décision 0084).
+    const variantes = [`${p}a@exemple.test`, `${p}A@Exemple.test`, ` ${p}a@exemple.test `, ...[1, 2, 3, 4, 5].map((n) => `${p}a+${n}@exemple.test`)];
     const resultats: unknown[] = [];
     for (const email of variantes) {
       courante.ip = ipDocumentation();
@@ -220,7 +219,7 @@ describe("actions", () => {
       }
     }
     expect(resultats.slice(0, 5)).toEqual(Array(5).fill({ ok: true, value: { sent: true } }));
-    expect(resultats.slice(5)).toEqual(Array(2).fill({ ok: false, error: { code: "rate_limited", retryable: true } }));
+    expect(resultats.slice(5)).toEqual(Array(3).fill({ ok: false, error: { code: "rate_limited", retryable: true } }));
   });
 
   it("auth: sans en-tête de confiance, la limite reste appliquée", async () => {
@@ -264,19 +263,12 @@ describe("actions", () => {
     expect(espions.operations).not.toHaveBeenCalled();
     expect(espions.envois()).toBe(0);
 
-    // Adresse valide : la forme canonique circule seule (limiteur, bibliothèque, base, port d'envoi). Par l'action,
-    // `A@Exemple.test` (le contrat refuse les espaces autour, voir « limitation des envois ») ; par l'adaptateur,
-    // ` A@Exemple.test `.
-    expect(await requestCode({ email: "A@Exemple.test" })).toEqual({ ok: true, value: { sent: true } });
-    const adapter = createBetterAuthAdapter({
-      operations: espions.operations,
-      headers: () => b.enTetes({ [ENTETE]: ipDocumentation() }),
-      limiter: limiteur.check,
-    });
-    expect(await adapter.requestCode({ email: " A@Exemple.test " })).toEqual({ ok: true, value: { sent: true } });
-    expect(limiteur.appels.map((appel) => appel.email)).toEqual(["a@exemple.test", "a@exemple.test"]);
-    expect(espions.operations).toHaveBeenCalledTimes(2);
-    expect(b.mailer.envois.map((envoi) => envoi.to)).toEqual(["a@exemple.test", "a@exemple.test"]);
+    // Adresse valide (` A@Exemple.test `, par l'action ; décision 0084) : la forme canonique circule seule (limiteur,
+    // bibliothèque, base, port d'envoi).
+    expect(await requestCode({ email: " A@Exemple.test " })).toEqual({ ok: true, value: { sent: true } });
+    expect(limiteur.appels.map((appel) => appel.email)).toEqual(["a@exemple.test"]);
+    expect(espions.operations).toHaveBeenCalledTimes(1);
+    expect(b.mailer.envois.map((envoi) => envoi.to)).toEqual(["a@exemple.test"]);
     const { rows } = await auth.query("SELECT count(*)::int AS n FROM verifications WHERE identifier = $1", [identifiant("a@exemple.test" as never)]);
     expect(rows[0].n).toBe(1);
   });

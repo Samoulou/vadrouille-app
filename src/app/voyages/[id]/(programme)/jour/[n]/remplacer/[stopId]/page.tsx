@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
-import { tripRoutes } from "@/features/sejour/routes";
+import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 import { ReplaceScreen } from "@/features/sejour/screen-remplacer";
 import { remplacerMetadata } from "@/features/sejour/screens";
 
@@ -23,6 +23,6 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function RemplacerPage({ params }: { params: Params }) {
   const { id, n, stopId } = await params;
   const routes = tripRoutes("/voyages", id);
-  await exigerSession(/^[1-9]\d*$/.test(n) ? routes.jour(Number(n)) : routes.sejour());
+  await exigerSession(DAY_PARAM_PATTERN.test(n) ? routes.jour(Number(n)) : routes.sejour());
   return <ReplaceScreen tripId={id} n={n} stopId={stopId} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

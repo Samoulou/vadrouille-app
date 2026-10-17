@@ -35,9 +35,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 /**
  * `R5`, écran 5 « Propositions prêtes » (spécification F8, F8-PO-12 ; décision 0017 § 9). Composant serveur : le
- * voyage est lu dans le contexte de la requête (`exigerSession` : sans session, redirection vers l'écran 4, B3c) (inconnu ou d'une autre organisation : 404), puis
- * l'avancement par l'action `getGenerationStatus` (état initial du rendu serveur ; le navigateur l'interroge ensuite
- * toutes les secondes). Une erreur de lecture de l'avancement affiche la page d'erreur commune. Fermer l'onglet ou
+ * voyage est lu dans le contexte de la requête : sans session (`better-auth`, B3c), `exigerSession` redirige vers
+ * l'écran 4 ; voyage inconnu ou d'une autre organisation : 404. Puis l'avancement est lu par l'action
+ * `getGenerationStatus` (état initial du rendu serveur ; le navigateur l'interroge ensuite toutes les secondes). Une erreur de lecture de l'avancement affiche la page d'erreur commune. Fermer l'onglet ou
  * recharger ne perd rien : l'état vient de l'adaptateur.
  */
 export default async function PreparationPage({ params }: { params: Params }) {

@@ -1,8 +1,10 @@
 import { cache } from "react";
 
 import { getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
-import { contexteFacultatif } from "@/features/compte/session";
 import type { Day, DayMap, Stop, Trip } from "@/contracts";
+import { contexteFacultatif } from "@/features/compte/session";
+
+import { DAY_PARAM_PATTERN } from "./routes";
 
 export interface TripData {
   trip: Trip;
@@ -33,9 +35,9 @@ export const loadTrip = cache(async (tripId: string): Promise<TripData | null> =
   return ctx === null ? null : readTrip(getTripReader(), ctx, tripId);
 });
 
-/** `n` de l'adresse : entier écrit sans zéro initial, dans les jours du voyage ; sinon `null` (404). */
+/** `n` de l'adresse : entier écrit sans zéro initial (`DAY_PARAM_PATTERN`), dans les jours du voyage ; sinon `null` (404). */
 export function dayFromParam(trip: Trip, n: string): Day | null {
-  if (!/^[1-9]\d*$/.test(n)) return null;
+  if (!DAY_PARAM_PATTERN.test(n)) return null;
   const index = Number(n);
   return trip.days.find((day) => day.index === index) ?? null;
 }

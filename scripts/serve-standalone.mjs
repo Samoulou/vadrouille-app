@@ -24,11 +24,16 @@ if (existsSync(join(root, "public"))) {
 }
 
 // Environnement du serveur : copie de celui de ce processus, sans `VADROUILLE_DATABASE_URL_MIGRATOR` (écrite dans
-// `$GITHUB_ENV` par `scripts/ci/db-setup.sh`) ni `VADROUILLE_DB_ADMIN_URL` (posée pour l'étape `pnpm verify`).
+// `$GITHUB_ENV` par `scripts/ci/db-setup.sh`) ni `VADROUILLE_DB_ADMIN_URL` (posée pour l'étape `pnpm verify`), ni les
+// adresses des rôles techniques des tests de base (prototype, purges), qu'aucun serveur ne lit (revue consolidée du
+// head `2b80bd7` de la PR 452, mineur 3 : Playwright fusionne `process.env` dans l'`env` de chaque serveur, dont `auth`).
 // Test : `tests/unit/server-env-config.test.ts`.
 const serverEnv = { ...process.env };
 delete serverEnv.VADROUILLE_DATABASE_URL_MIGRATOR;
 delete serverEnv.VADROUILLE_DB_ADMIN_URL;
+delete serverEnv.VADROUILLE_DB_PROTOTYPE_URL;
+delete serverEnv.VADROUILLE_DB_PROTOTYPE_PURGE_URL;
+delete serverEnv.VADROUILLE_DB_COORDS_PURGE_URL;
 
 const logPath = process.env[SERVER_LOG_ENV];
 const log = logPath ? openSync(logPath, "w") : null;

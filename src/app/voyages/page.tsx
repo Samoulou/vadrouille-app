@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
 import { getTripReader } from "@/adapters";
-import { exigerSession } from "@/features/compte/session";
 import { PRODUCT_NAME } from "@/config/site";
+import { exigerSession } from "@/features/compte/session";
 import { TripsScreen } from "@/features/compte/TripsScreen";
+import { mesVoyagesRoute } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { mesVoyagesRoute } from "@/features/sejour/routes";
 
 // Données lues à chaque requête, dans le contexte d'organisation de la requête.
 export const dynamic = "force-dynamic";

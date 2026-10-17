@@ -554,4 +554,12 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
       }
     }
   });
+
+  it("valeur blanche déclarée : non déclarée pour resolveServerEnvironment comme pour betterAuthAllowed (revue du head `2b80bd7` de la PR 452, mineur 8)", () => {
+    const env = { VADROUILLE_ENV: "  ", VERCEL_ENV: "local" };
+    expect(resolveServerEnvironment(env)).toBe("local");
+    expect(betterAuthAllowed({ NODE_ENV: "test", ...env })).toBe(true);
+    expect(() => resolveServerEnvironment({ VADROUILLE_ENV: "  " })).toThrow(ServerEnvironmentUndeclaredError);
+    expect(betterAuthAllowed({ NODE_ENV: "test", VADROUILLE_ENV: "  " })).toBe(false);
+  });
 });

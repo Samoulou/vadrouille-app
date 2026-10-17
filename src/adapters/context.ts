@@ -27,7 +27,16 @@ export class SessionRequiseError extends Error {
 /**
  * Contexte de la session (B3b, `getServerRequestContext`, branché au démarrage par `src/instrumentation.ts` : voir
  * `./better-auth.ts`), lu une fois par rendu de page (`cache` de React : la mise en page, la page et ses métadonnées
- * partagent la lecture ; sans effet dans une action). Non branché : erreur (page d'erreur), jamais une absence de session.
+ * partagent la lecture). Non branché : erreur (page d'erreur), jamais une absence de session.
+ *
+ * Garantie (revue consolidée du head `2b80bd7` de la PR 452, mineur 9) : la mémoire de `cache` n'existe que pendant un
+ * rendu de composants serveur, et React la vide à chaque requête ; appelée hors d'un rendu, la fonction est exécutée
+ * sans lire ni remplir la mémoire (documentation de React, https://react.dev/reference/react/cache, « Caveats » et
+ * « Calling a memoized function outside of a component will not use the cache »). Une action (`verifyCode`, `signOut`)
+ * s'exécute hors rendu : elle relit la session à chaque appel, et le rendu qui suit est une nouvelle requête de
+ * composants serveur, avec une mémoire vide, qui voit la session ouverte ou fermée. Aucune action ne relit d'ailleurs ce
+ * contexte après `verifyCode` ou `signOut` (`src/server/actions/compte.ts`). Test hors rendu :
+ * `tests/unit/adapters/better-auth-branchement.test.ts`.
  */
 const contexteDeSession = cache((): Promise<AdapterContext | null> => contexteDeSessionBranche());
 

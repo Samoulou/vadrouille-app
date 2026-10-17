@@ -28,7 +28,7 @@ export { BETTER_AUTH_CONFIG };
 
 /** Échec d'une opération de la liste blanche (forme de `AuthFailure`, `src/server/auth`). */
 export type EchecConnexion = { readonly ok: false; readonly code: "invalid_code" | "code_expired" | "too_many_attempts" | "unauthenticated" | "provider_error" };
-type SessionOuverte = { readonly sessionId: string; readonly userId: string; readonly organizationId: string; readonly role: MemberRole };
+export type SessionOuverte = { readonly sessionId: string; readonly userId: string; readonly organizationId: string; readonly role: MemberRole };
 
 /** Opérations de la liste blanche (forme de `AuthOperations`, `src/server/auth`) : seules celles que l'adaptateur appelle. */
 export interface OperationsConnexion {
@@ -55,6 +55,25 @@ export interface BetterAuthAdapterOptions {
   limiter: Limiteur;
   /** Noms d'action du limiteur ; un nom propre à chaque test isole ses compteurs (critère C4). */
   actions?: BetterAuthLimitActions;
+}
+
+/**
+ * En-têtes transmis aux opérations (revue consolidée du head `2b80bd7` de la PR 452, mineur 4 ; aligné sur
+ * `cookieSeulement` de `src/server/session.ts`) : le cookie de session seul pour `readSession` et `signOut` ; pour
+ * `verifyCode`, le cookie et `x-vercel-forwarded-for`, seul en-tête d'adresse IP que la bibliothèque peut lire
+ * (`TRUSTED_IP_HEADERS` de `src/server/env`, `advanced.ipAddress.ipAddressHeaders`, décision 0008). Le limiteur reçoit
+ * les en-têtes de la requête : il ne lit que l'en-tête de confiance configuré (`src/server/ip.ts`).
+ */
+const ENTETES_SESSION = ["cookie"] as const;
+const ENTETES_VERIFICATION = ["cookie", "x-vercel-forwarded-for"] as const;
+
+function enTetesRetenus(source: Headers, noms: readonly string[]): Headers {
+  const retenus = new Headers();
+  for (const nom of noms) {
+    const valeur = source.get(nom);
+    if (valeur !== null) retenus.set(nom, valeur);
+  }
+  return retenus;
 }
 
 /** `provider_error` porte toujours `retryable: true` (B3-PO-4). */
@@ -97,20 +116,24 @@ export function createBetterAuthAdapter(options: BetterAuthAdapterOptions): Auth
         const headers = await options.headers();
         const limite = await options.limiter({ action: actions.verifyCode, headers, email: lu.email });
         if (!limite.ok) return limite;
-        const resultat = await (await options.operations()).verifyCode({ email: lu.email, code, headers });
+        const resultat = await (await options.operations()).verifyCode({ email: lu.email, code, headers: enTetesRetenus(headers, ENTETES_VERIFICATION) });
         return resultat.ok ? ok(versSession(resultat)) : echec(resultat);
       } catch {
         return REFUS_FOURNISSEUR;
       }
     },
 
+    // `getSession` et `signOut` sans `try/catch` (revue consolidée du head `2b80bd7` de la PR 452, mineur 11) : le
+    // contrat `AuthAdapter` les type sans `Result` (`Session | null`, `void`) ; une panne doit rester distincte d'une
+    // absence de session, donc lever. Chaque appelant ferme : `hasSession` rend `false`, `signOut` (action) et
+    // `createTrip` rendent `provider_error`, le contexte de page passe par `contexteDeSessionBranche` (page d'erreur).
     async getSession(): Promise<Session | null> {
-      const session = await (await options.operations()).readSession(await options.headers());
+      const session = await (await options.operations()).readSession(enTetesRetenus(await options.headers(), ENTETES_SESSION));
       return session === null ? null : versSession(session);
     },
 
     async signOut(): Promise<void> {
-      const resultat = await (await options.operations()).signOut(await options.headers());
+      const resultat = await (await options.operations()).signOut(enTetesRetenus(await options.headers(), ENTETES_SESSION));
       if (!resultat.ok) throw new ConnexionIndisponibleError();
     },
   };
@@ -138,12 +161,35 @@ export interface ConnexionReelle {
 const CONNEXION_KEY = Symbol.for("vadrouille.connexion-reelle");
 const holder = globalThis as typeof globalThis & { [CONNEXION_KEY]?: ConnexionReelle };
 
+/** Second branchement refusé : la connexion branchée au démarrage n'est jamais remplacée ; ne porte aucune valeur. */
+export class ConnexionDejaBrancheeError extends Error {
+  override name = "ConnexionDejaBrancheeError";
+
+  constructor() {
+    super("Connexion réelle déjà branchée.");
+  }
+}
+
 /**
  * Branche la connexion réelle (appelé une fois, au démarrage, par `src/instrumentation.ts`). Sur `globalThis` : Next.js
  * charge une copie de ce module par route.
+ *
+ * Point d'injection verrouillé (revue consolidée du head `2b80bd7` de la PR 452, bloquant 2) : hors de `tests/`, seuls
+ * ce module et `src/instrumentation.ts` le nomment (`tests/unit/auth/points-injection.test.ts`). Un second branchement
+ * lève `ConnexionDejaBrancheeError` sans rien remplacer : un module chargé après le démarrage ne peut pas substituer
+ * ses opérations, son limiteur ou son contexte de session (organisation) à ceux du serveur.
  */
 export function brancherConnexionReelle(connexion: ConnexionReelle): void {
+  if (holder[CONNEXION_KEY] !== undefined) throw new ConnexionDejaBrancheeError();
   holder[CONNEXION_KEY] = connexion;
+}
+
+/**
+ * Remise à zéro du branchement, **réservée aux tests** : hors de `tests/`, seul ce module la nomme
+ * (`tests/unit/auth/points-injection.test.ts`). Le serveur ne l'appelle jamais.
+ */
+export function debrancherConnexionReellePourTests(): void {
+  delete holder[CONNEXION_KEY];
 }
 
 function branchee(): ConnexionReelle {

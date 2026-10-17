@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOCK_DEMO_TRIP } from "@/adapters";
-import { brancherConnexionReelle } from "@/adapters/better-auth";
+import { brancherConnexionReelle, debrancherConnexionReellePourTests } from "@/adapters/better-auth";
 import MesVoyagesPage from "@/app/voyages/page";
 import SejourPage from "@/app/voyages/[id]/(programme)/page";
 import PresentationPage from "@/app/voyages/[id]/presentation/page";
@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.stubEnv("VADROUILLE_ENV", "ci");
   vi.stubEnv("VADROUILLE_DEMO_PAYMENT", "1");
   vi.stubEnv("VADROUILLE_DEMO_SHARE", "1");
+  debrancherConnexionReellePourTests();
   brancherConnexionReelle({ operations, limiter, contexte });
 });
 

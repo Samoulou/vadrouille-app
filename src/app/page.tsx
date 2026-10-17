@@ -8,11 +8,11 @@ import {
   isPrototypeAdapter,
   paymentAvailable,
 } from "@/adapters";
-import { contexteFacultatif } from "@/features/compte/session";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
 import type { TripSummary } from "@/contracts";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
+import { contexteFacultatif } from "@/features/compte/session";
 import { PrototypeSection } from "@/features/accueil/PrototypeSection";
 import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
@@ -48,7 +48,9 @@ function demoLinks(): DemoLink[] {
  * `/voyages/nouveau` ; demande de Samuel transmise par le CEO, ticket #259), quel que soit l'adaptateur. Avec
  * l'adaptateur `mock` seulement, section « Démonstration » vers les parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
  * Avec l'adaptateur `prototype` seulement, section « Prototype » (spécification P0, P0-PO-11) : un voyage par
- * programme du dossier, absente sans programme ; hors liste blanche, `contexteFacultatif()` lève (erreur 500).
+ * programme du dossier, absente sans programme ; hors liste blanche de l'adaptateur `prototype`, `contexteFacultatif()`
+ * relance l'erreur de `getRequestContext()` (erreur 500) ; avec `AUTH_ADAPTER=better-auth` et sans session, il rend
+ * `null` et la section est absente (aucune redirection depuis l'accueil).
  */
 export default async function HomePage() {
   let demo: { destination?: string } | null = null;

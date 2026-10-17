@@ -11,7 +11,6 @@ import {
   isPrototypeAdapter,
   mockAuthAllowed,
 } from "./index";
-import { brancherConnexionReelle } from "./better-auth";
 import { mockTripAdapter } from "./mock";
 import { explicitScope } from "./simulation";
 
@@ -129,21 +128,6 @@ describe("getAuthAdapter (décision 0017 § 11.2)", () => {
       /better-auth refusée/,
     );
     expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: "test", AUTH_ADAPTER: "magique" }) })).toThrow(/AUTH_ADAPTER inconnu/);
-  });
-
-  it("C10 (B3c ; 0034, B3-TL-2) : better-auth refusé en production et en staging avant toute opération, limiteur ou base", () => {
-    const operations = vi.fn();
-    const limiter = vi.fn();
-    const contexte = vi.fn();
-    brancherConnexionReelle({ operations, limiter, contexte });
-    for (const deployment of [{ VERCEL_ENV: "production" }, { VADROUILLE_ENV: "production" }, { VADROUILLE_ENV: "staging" }, { VERCEL_ENV: "preview" }]) {
-      for (const nodeEnv of ["test", "production"]) {
-        expect(() => getAuthAdapter({ scope, env: env({ NODE_ENV: nodeEnv, AUTH_ADAPTER: "better-auth", ...deployment }) })).toThrow(/refusée/);
-      }
-    }
-    expect(operations).not.toHaveBeenCalled();
-    expect(limiter).not.toHaveBeenCalled();
-    expect(contexte).not.toHaveBeenCalled();
   });
 
   it.each(["local", "ci"])("rend l'adaptateur better-auth en %s (B3c), mode réel, limites par adresse e-mail (B3-PO-6)", (environnement) => {

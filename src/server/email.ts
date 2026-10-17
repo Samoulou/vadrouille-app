@@ -1,5 +1,7 @@
 import "server-only";
 
+import { EMAIL_INPUT_MAX_LENGTH, stripEdgeSpaces } from "@/contracts/values";
+
 /**
  * Adresse e-mail (spécification B3, B3a point 8 ; décision 0050, B3-TL-6 point 6 ; 0051 point 4). **Une seule**
  * fonction, `parseEmailAddress`, rend la forme canonique ou un refus ; c'est la seule forme utilisée ensuite par le
@@ -18,7 +20,6 @@ export type CanonicalEmail = string & { readonly __brand: "CanonicalEmail" };
 
 export type ParsedEmail = { readonly ok: true; readonly email: CanonicalEmail } | { readonly ok: false };
 
-const LONGUEUR_ENTREE_MAX = 320;
 const LONGUEUR_MAX = 254;
 const PARTIE_LOCALE_MAX = 64;
 const LABEL_MAX = 63;
@@ -47,18 +48,9 @@ function domaineAdmis(domaine: string): boolean {
   return ![...dernier].every(estChiffre);
 }
 
-/** Retire les espaces U+0020 aux extrémités seulement (ni tabulation, ni autre espace Unicode). */
-function sansEspacesAuxBords(entree: string): string {
-  let debut = 0;
-  let fin = entree.length;
-  while (debut < fin && entree[debut] === " ") debut += 1;
-  while (fin > debut && entree[fin - 1] === " ") fin -= 1;
-  return entree.slice(debut, fin);
-}
-
 export function parseEmailAddress(entree: unknown): ParsedEmail {
-  if (typeof entree !== "string" || entree.length > LONGUEUR_ENTREE_MAX) return { ok: false };
-  const adresse = sansEspacesAuxBords(entree);
+  if (typeof entree !== "string" || entree.length > EMAIL_INPUT_MAX_LENGTH) return { ok: false };
+  const adresse = stripEdgeSpaces(entree); // Décision 0084 : seule implémentation, `src/contracts/values.ts`.
   if (adresse.length === 0 || adresse.length > LONGUEUR_MAX) return { ok: false };
   const arobase = adresse.indexOf("@");
   if (arobase < 0 || adresse.indexOf("@", arobase + 1) >= 0) return { ok: false };

@@ -240,6 +240,17 @@ describe("configuration versionnée : environnement du serveur (décision 0050, 
     expect(script).toMatch(/spawn\(process\.execPath, \["server\.js"\], \{[^}]*env: serverEnv,/);
   });
 
+  it("scripts/serve-standalone.mjs retire toute adresse de rôle technique exportée par db-setup.sh, hors app et auth (PR 452, mineur 3)", () => {
+    const script = lire("scripts/serve-standalone.mjs");
+    const exportees = [...lire("scripts/ci/db-setup.sh").matchAll(/export (VADROUILLE_[A-Z_]+)\b/g)].map((m) => m[1] ?? "");
+    const conservees = new Set(Object.keys({ VADROUILLE_DATABASE_URL: 0, VADROUILLE_DATABASE_URL_AUTH: 0 }));
+    const retirees = [...new Set(exportees)].filter((nom) => !conservees.has(nom));
+    expect(retirees.length).toBeGreaterThanOrEqual(5);
+    for (const nom of retirees) expect(script).toContain(`delete serverEnv.${nom};`);
+    // Le serveur `auth` de Playwright est servi par ce script (`command: serve`).
+    expect(lire(PLAYWRIGHT)).toMatch(/AUTH_SERVER\s*\?\s*\[\s*\{[^]*?command: serve,[^]*?AUTH_ADAPTER: "better-auth"/);
+  });
+
   it("le script dev pose VADROUILLE_ENV=local, et aucun autre script de package.json ne pose VADROUILLE_ENV", () => {
     const scripts = (JSON.parse(lire("package.json")) as { scripts: Record<string, string> }).scripts;
     expect(scripts.dev).toBe("VADROUILLE_ENV=local next dev");

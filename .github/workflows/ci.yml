@@ -159,8 +159,10 @@ jobs:
       # avec `AUTH_ADAPTER=better-auth` sur cette base migrée. `E2E_AUTH_SERVER=1` (variable d'outillage) démarre ce
       # serveur ; ses deux secrets sont tirés par playwright.config.ts, jamais ici. Ni adresse d'administration ni PG*.
       - if: steps.diff.outputs.code == 'true'
+        name: Installer Chromium pour le projet auth
         run: pnpm exec playwright install --with-deps chromium
       - if: steps.diff.outputs.code == 'true'
+        name: Construire le serveur du projet auth
         run: pnpm build
       - if: steps.diff.outputs.code == 'true'
         name: Projet Playwright auth (redirection sans session)
