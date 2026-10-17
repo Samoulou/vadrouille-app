@@ -18,7 +18,7 @@ export type RouteStateName = "fiche-ouverte" | "annulation-proposee" | "proposit
  * identifiant). L'action, dans `route-states.ts` (`ROUTE_PREPARATIONS`), crée l'état dans une portée de
  * simulation explicite (0017 § 10.3) et renvoie l'adresse réelle à mesurer.
  */
-export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente" | "partage-sejour" | "partage-jour";
+export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-attente" | "partage-sejour" | "partage-jour" | "lancement-actif";
 
 /**
  * Parcours côté client (F8a, spécification F8, « Inventaire des routes ») : certaines pages n'ont de contenu
@@ -26,7 +26,7 @@ export type RoutePreparationName = "paiement-en-attente" | "confirmation-en-atte
  * adresse par `R1`. L'action, dans `route-states.ts` (`ROUTE_JOURNEYS`), part de son adresse de départ, remplit
  * le brouillon et atteint l'adresse de l'entrée par navigation côté client, dans le même onglet.
  */
-export type RouteJourneyName = "brouillon-ecran-1" | "brouillon-logement";
+export type RouteJourneyName = "brouillon-ecran-1" | "brouillon-logement" | "brouillon-lancement";
 
 /** `seuil` : budget bloquant ; `journal` : mesuré et journalisé sans seuil. */
 export type BudgetMode = "seuil" | "journal";
@@ -176,6 +176,27 @@ export const ROUTES: readonly RouteEntry[] = [
     path: "/connexion?suite=%2Fvoyages",
     page: "(creation)/connexion/page.tsx",
     states: ["etape-code"],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F8c : étape sans écran du lancement. Préparation : session et génération en cours dans une portée explicite ;
+    // parcours : nouveau brouillon complet, écran 4 sauté (session), `createTrip` refusé (`active_preview_exists`) :
+    // la page reste sur son adresse, bandeau « conflict » affiché. `journal` (F8-Q15).
+    id: "R-lancer",
+    path: "/voyages/nouveau/lancer",
+    page: "(creation)/voyages/nouveau/lancer/page.tsx",
+    prepare: "lancement-actif",
+    journey: "brouillon-lancement",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // F8c : écran 5 du voyage simulé, ouvert directement : état final (voyage déjà complet dans la portée par
+    // défaut, 0017 § 3.7) ; `journal` (F8-Q15).
+    id: "R5",
+    path: `${TRIP}/preparation`,
+    page: "voyages/[id]/preparation/page.tsx",
+    states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {

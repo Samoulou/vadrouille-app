@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema } from "./category";
+import type { ApiError, Result } from "./errors";
 import { IsoDateSchema, TimeSchema } from "./trip";
 import {
   ADULTS,
@@ -11,6 +12,8 @@ import {
   COMMITMENT_KINDS,
   COMMITMENT_LABEL_LENGTH,
   DESTINATION_LENGTH,
+  GENERATION_DAY_STATES,
+  GENERATION_FAILURE_REASONS,
   KNOWN_LODGING_LENGTH,
   MAX_CITIES,
   MAX_COMMITMENTS,
@@ -19,14 +22,15 @@ import {
   MOBILITY_MODES,
   PACES,
   STORY_LENGTH,
+  TRIP_ID_PATTERN,
   type BriefField,
 } from "./values";
 
 /**
  * Contrats de phase 0 de la création du voyage (décision 0017 § 2, F8-TL-2) : objets stricts, noms du handover
  * back-end, aucun texte d'interface. Les bornes viennent de `values.ts` (aucune seconde copie). F8a livre
- * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b `LodgingRequest` et `LodgingSuggestion` ; F8c complète
- * ce module.
+ * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b `LodgingRequest` et `LodgingSuggestion` ; F8c
+ * `TripRequest`, `CreatedTrip`, `GenerationStatusRequest` et `GenerationStatus`.
  */
 
 const text = (bounds: { min: number; max: number }) => z.string().trim().min(bounds.min).max(bounds.max);
@@ -242,3 +246,100 @@ export const LodgingSuggestionSchema = z.strictObject({
     .max(MAX_SUGGESTED_LODGINGS),
 });
 export type LodgingSuggestion = z.infer<typeof LodgingSuggestionSchema>;
+
+/*
+ * Lancement et écran 5 « Propositions prêtes » (0017 § 2.4, F8c).
+ */
+
+const TripIdSchema = z.string().regex(TRIP_ID_PATTERN);
+
+/**
+ * Demande de `createTrip` (0017 § 2.4) : `requestId` créé une fois par brouillon (idempotence par organisation et
+ * `requestId`), brouillon validé (choix de logement compris, identifiants seulement) et brief complet. L'organisation
+ * **n'y figure pas** : elle vient de la session (F8-PO-17).
+ */
+export const TripRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  draft: TripDraftSchema,
+  brief: BriefSchema,
+});
+export type TripRequest = z.infer<typeof TripRequestSchema>;
+
+// `CreatedTripSchema` et `GenerationStatusRequestSchema` ne sont pas réexportés par `index.ts` (seulement leurs types) :
+// enveloppes `{ tripId }` d'une action, absentes de « Contrats à créer » et du tableau des champs du handover § 5
+// (même règle que `share.ts`). Les actions et l'adaptateur simulé les importent depuis `@/contracts/creation`.
+
+/** Réponse de `createTrip` (0017 § 2.4) : l'identifiant du voyage, que l'écran 5 relit par `TripAdapter`. */
+export const CreatedTripSchema = z.strictObject({ tripId: TripIdSchema });
+export type CreatedTrip = z.infer<typeof CreatedTripSchema>;
+
+/** Entrée de l'action `getGenerationStatus` : l'identifiant du voyage seulement. */
+export const GenerationStatusRequestSchema = z.strictObject({ tripId: TripIdSchema });
+export type GenerationStatusRequest = z.infer<typeof GenerationStatusRequestSchema>;
+
+const count = z.number().int().min(0);
+
+/** Un jour couvert par les premières propositions : rang (1 = J1), état, propositions prêtes ce jour-là (U2-Q2). */
+const GenerationDaySchema = z.strictObject({
+  index: z.number().int().positive(),
+  state: z.enum(GENERATION_DAY_STATES),
+  readyStops: count,
+});
+
+const generationFields = {
+  tripId: TripIdSchema,
+  days: z.array(GenerationDaySchema).min(1),
+  expected: count,
+  ready: count,
+};
+
+/**
+ * Avancement de la génération (0017 § 2.4), union discriminée sur `phase`. **Aucun nom de lieu ni identifiant
+ * d'étape** : l'écran 5 ne montre que des anneaux (F8-PO-12). Raffinements : jours dans l'ordre sans doublon,
+ * `ready` = somme des `readyStops` et au plus `expected` ; `ready` = `expected` pour `ready`, `ready` < `expected`
+ * pour `incomplete` ; tous les jours prêts pour `ready` et `incomplete`.
+ */
+export const GenerationStatusSchema = z
+  .discriminatedUnion("phase", [
+    z.strictObject({ phase: z.literal("preparing"), ...generationFields }),
+    z.strictObject({ phase: z.literal("ready"), ...generationFields }),
+    z.strictObject({ phase: z.literal("incomplete"), ...generationFields }),
+    z.strictObject({
+      phase: z.literal("failed"),
+      ...generationFields,
+      reason: z.enum(GENERATION_FAILURE_REASONS),
+      retryable: z.boolean(),
+    }),
+  ])
+  .superRefine((status, ctx) => {
+    const issue = (path: (string | number)[], message: string) => ctx.addIssue({ code: "custom", path, message });
+    status.days.forEach((day, position) => {
+      if (day.index !== position + 1) issue(["days", position, "index"], "jours dans l'ordre");
+    });
+    if (status.days.reduce((total, day) => total + day.readyStops, 0) !== status.ready) issue(["ready"], "somme des readyStops");
+    if (status.ready > status.expected) issue(["ready"], "au plus expected");
+    if (status.phase === "ready" && status.ready !== status.expected) issue(["ready"], "ready = expected");
+    if (status.phase === "incomplete" && status.ready >= status.expected) issue(["ready"], "ready < expected");
+    if ((status.phase === "ready" || status.phase === "incomplete") && status.days.some((day) => day.state !== "ready")) {
+      issue(["days"], "tous les jours prêts");
+    }
+  });
+export type GenerationStatus = z.infer<typeof GenerationStatusSchema>;
+
+/**
+ * Refus `active_preview_exists` de `createTrip` (un aperçu actif à la fois par compte, cadrage § 4) : l'écran
+ * renvoie au voyage en préparation (« Voir ces propositions », 0018 § 18). Son identifiant est porté à côté de
+ * l'erreur commune, sans changer `ApiError` (question au Tech Lead, PR de F8c).
+ */
+export interface ActivePreviewConflict {
+  ok: false;
+  error: ApiError & { code: "active_preview_exists" };
+  activeTripId: string;
+}
+
+/** Réponse de `createTrip`, côté adaptateur comme côté action. */
+export type CreateTripResult = Result<CreatedTrip> | ActivePreviewConflict;
+
+export function isActivePreviewConflict(result: CreateTripResult): result is ActivePreviewConflict {
+  return !result.ok && "activeTripId" in result;
+}

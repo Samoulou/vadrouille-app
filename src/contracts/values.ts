@@ -147,6 +147,10 @@ export const API_ERROR_CODES = [
   "invalid_code",
   "code_expired",
   "too_many_attempts",
+  // F8c (décision 0017 § 4) : création du voyage sans session, aperçu déjà en préparation pour l'organisation.
+  // `quota_reached` n'est pas un code d'`ApiError` (0077 § 3 point 5) : seulement une raison d'arrêt d'une génération.
+  "unauthenticated",
+  "active_preview_exists",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
@@ -194,6 +198,24 @@ export type AuthMode = (typeof AUTH_MODES)[number];
 
 /** Écran 3 : logements suggérés dans un quartier, au plus (cadrage § 3.1, écran 3). */
 export const MAX_SUGGESTED_LODGINGS = 3;
+
+/**
+ * Génération des premières propositions (décision 0017 § 2.4, F8c) : phases de `GenerationStatus`. `preparing` est
+ * la seule phase non finale ; `incomplete` = terminée avec moins de propositions que prévu (B0 PO-6).
+ */
+export const GENERATION_PHASES = ["preparing", "ready", "incomplete", "failed"] as const;
+export type GenerationPhase = (typeof GENERATION_PHASES)[number];
+/** État d'un jour de la génération. */
+export const GENERATION_DAY_STATES = ["preparing", "ready"] as const;
+export type GenerationDayState = (typeof GENERATION_DAY_STATES)[number];
+/** Raison d'arrêt d'une génération (`failed`, 0017 § 2.4 ; handover back-end § 8, « Arrêt sur plafond ou quota »). */
+export const GENERATION_FAILURE_REASONS = ["provider_error", "cost_cap_reached", "quota_reached"] as const;
+export type GenerationFailureReason = (typeof GENERATION_FAILURE_REASONS)[number];
+
+/** Phases finales (`ready`, `incomplete`, `failed`) : l'interrogation de l'écran 5 s'y arrête (0017 § 9). */
+export function isFinalGenerationPhase(phase: GenerationPhase): boolean {
+  return phase !== "preparing";
+}
 
 /** Rythme du brief (cadrage § 3.7), dans l'ordre d'affichage. */
 export const PACES = ["relaxed", "balanced", "intense"] as const;
