@@ -23,16 +23,21 @@ import path from "node:path";
  * `src/workflows/p0-run.ts`, `src/server/composition/p0-reel.ts` et les tests (décision 0077 § 1 point 5).
  *
  * Toutes les formes de chargement sont lues (import statique ou de type, réexport, `import()`, `require()`, `import
- * x = require()`, `import("…")` de type), comme `ligne/server-env-imports`. La source est résolue (alias `@/`, chemin
+ * x = require()`, `import("…")` de type, `vi.importActual`, `vi.importMock`, `vi.mock` sans fabrique) ; sous
+ * `src/ai` et `src/research`, une source non littérale est refusée. La source est résolue (alias `@/`, chemin
  * relatif, segments `.` et `..` normalisés, extension retirée) avant la comparaison.
  */
 
-/** Modules de `tests/support` importables par les tests de `src/ai` et `src/research` (nommés un par un). */
-export const MODULES_SUPPORT = ["tests/support/horloge-manuelle", "tests/support/journal-prompts", "tests/support/port-consommation-memoire", "tests/support/sentinelles-google"];
+/**
+ * Modules de `tests/support` importables par les tests de `src/ai` et `src/research` (nommés un par un ; ceux qu'ils
+ * utilisent aujourd'hui seulement : revue du head `5a955f8`, mineur 2 — `sentinelles-google` importe un type de
+ * `@/grounding` et reste réservé aux tests de `tests/`).
+ */
+export const MODULES_SUPPORT = ["tests/support/horloge-manuelle", "tests/support/port-consommation-memoire"];
 
 /** Paquets admis dans un seul fichier (module de capacité). */
 const CAPACITES = new Map([
-  ["src/ai/openrouter-client.ts", ["ai", "@openrouter/ai-sdk-provider", "src/server/env/egress"]],
+  ["src/ai/openrouter-client.ts", ["ai", "@openrouter/ai-sdk-provider"]],
   ["src/research/ip-guard.ts", ["node:net"]],
   ["src/research/undici-transport.ts", ["node:dns/promises", "undici", "src/server/env/egress"]],
   ["src/research/extract-text.ts", ["parse5"]],
@@ -97,26 +102,36 @@ export function importComplementAdmis(source, importateur) {
   return IMPORTATEURS_COMPLEMENT.some((entree) => (entree.endsWith("/") ? importateur.startsWith(entree) : importateur === entree));
 }
 
+/** Texte d'une source littérale (chaîne, ou gabarit **sans** expression) ; `null` pour toute autre source. */
 function sourceText(node) {
   if (!node) return null;
   if (node.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node.type === "TemplateLiteral") return node.quasis[0]?.value.cooked ?? null;
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0]?.value.cooked ?? null;
   return null;
 }
 
-/** Visiteurs communs : `verifier(node, source)` pour chaque forme de chargement. */
+/**
+ * Visiteurs communs : `verifier(node, source)` pour chaque forme de chargement ; `source` vaut `null` quand elle n'est
+ * pas littérale (`import(v)`, `require(v)`, ``import(`${v}`)``, `require()` sans argument) : la liste blanche la refuse
+ * (revue du head `5a955f8`, bloquant 2), la règle de `complement-p0` ne peut pas la juger.
+ */
 function visiteurs(verifier) {
-  const check = (node, sourceNode) => {
-    const source = sourceText(sourceNode);
-    if (source !== null) verifier(node, source);
-  };
+  const check = (node, sourceNode) => verifier(node, sourceText(sourceNode));
   return {
     ImportDeclaration: (node) => check(node, node.source),
-    ExportNamedDeclaration: (node) => check(node, node.source),
+    // Une déclaration exportée sans `from` (`export const x = …`) ne charge rien.
+    ExportNamedDeclaration: (node) => node.source && check(node, node.source),
     ExportAllDeclaration: (node) => check(node, node.source),
     ImportExpression: (node) => check(node, node.source),
     CallExpression(node) {
       if (node.callee.type === "Identifier" && node.callee.name === "require") check(node, node.arguments[0]);
+      // Chargements de Vitest : `vi.importActual`, `vi.importMock`, et `vi.mock` / `vi.doMock` sans fabrique (simulation
+      // automatique, qui charge le module réel). Une fabrique remplace le module sans le charger : non lue.
+      const appel = node.callee;
+      if (appel.type === "MemberExpression" && appel.object.type === "Identifier" && appel.object.name === "vi" && appel.property.type === "Identifier") {
+        const nom = appel.property.name;
+        if (nom === "importActual" || nom === "importMock" || ((nom === "mock" || nom === "doMock") && node.arguments.length < 2)) check(node, node.arguments[0]);
+      }
     },
     TSExternalModuleReference: (node) => check(node, node.expression),
     TSImportType(node) {
@@ -135,6 +150,7 @@ export const listeBlanche = {
     schema: [],
     messages: {
       forbidden: "src/{{dossier}} en liste blanche (handover § 3, spécification B7a) : import refusé ({{source}}).",
+      nonLitteral: "src/{{dossier}} en liste blanche (handover § 3, spécification B7a) : source de chargement non littérale refusée.",
     },
   },
   create(context) {
@@ -142,7 +158,8 @@ export const listeBlanche = {
     const dossier = importateur.startsWith("src/ai/") ? "ai" : importateur.startsWith("src/research/") ? "research" : null;
     if (dossier === null) return {};
     return visiteurs((node, source) => {
-      if (!importListeBlanche(source, importateur)) context.report({ node, messageId: "forbidden", data: { dossier, source } });
+      if (source === null) context.report({ node, messageId: "nonLitteral", data: { dossier } });
+      else if (!importListeBlanche(source, importateur)) context.report({ node, messageId: "forbidden", data: { dossier, source } });
     });
   },
 };
@@ -160,7 +177,7 @@ export const complementP0 = {
   create(context) {
     const importateur = importateurDe(context);
     return visiteurs((node, source) => {
-      if (!importComplementAdmis(source, importateur)) context.report({ node, messageId: "forbidden", data: { source } });
+      if (source !== null && !importComplementAdmis(source, importateur)) context.report({ node, messageId: "forbidden", data: { source } });
     });
   },
 };

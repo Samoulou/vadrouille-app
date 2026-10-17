@@ -2,7 +2,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { ErreurModele, type ClientModeles, type EtapeRequete, type ReponseModele } from "@/ai/client";
-import { CLES_INTERDITES_ENTREE, creerCoucheIa, type CoucheIa, type ReglagesIa } from "@/ai/couche";
+import { CLES_INTERDITES_ENTREE, creerCoucheIa, MAX_NOEUDS_ENTREE, type CoucheIa, type ReglagesIa } from "@/ai/couche";
 import { versEntreeQuartier, type CandidatPourModele, type EntreeModeles, type EntreeQuartier, type LieuRetenu } from "@/ai/entrees";
 import { requeteNotation, requeteRaisons } from "@/ai/requetes";
 import type { BriefRequest, LodgingRequest } from "@/contracts";
@@ -352,5 +352,42 @@ describe("prompts: l'entrée du quartier ne vient que du contrat", () => {
     }
     expect(journal.requetes.map((r) => r.etape)).toEqual(["quartier", "quartier", "quartier"]);
     expect(journal.texte()).not.toContain("SENTINELLE");
+  });
+});
+
+describe("couche IA : revue du head 5a955f8 (mineurs 3 et 4)", () => {
+  it("clés interdites : variantes d'écriture (place_id, formatted_address, PlaceId…) refusées sans requête", async () => {
+    const { couche, journal } = monter();
+    for (const cle of ["place_id", "formatted_address", "PlaceId", "FORMATTED-ADDRESS", "Display_Name", "regular_opening_hours"]) {
+      const candidats = [{ ...CANDIDATS[0], [cle]: "x" }];
+      expect(await couche.noter({ entree: ENTREE, candidats } as never), cle).toEqual({ ok: false, code: "invalid_input", retryable: false });
+    }
+    expect(journal.requetes).toEqual([]);
+  });
+
+  it("entrée cyclique ou démesurée : refusée sans boucle ni requête (défaut fermé)", async () => {
+    const { couche, journal } = monter();
+    const cyclique: Record<string, unknown> = { ...ENTREE };
+    cyclique.boucle = cyclique;
+    expect(await couche.planifierRecherche({ entree: cyclique } as never)).toEqual({ ok: false, code: "invalid_input", retryable: false });
+    const partage = { a: 1 };
+    expect(await couche.planifierRecherche({ entree: { ...ENTREE, x: [partage, partage] } } as never)).toMatchObject({ code: "invalid_input" });
+    const enorme = { entree: ENTREE, candidats: CANDIDATS, bourrage: Array.from({ length: MAX_NOEUDS_ENTREE + 1 }, () => 0) };
+    expect(await couche.noter(enorme as never)).toEqual({ ok: false, code: "invalid_input", retryable: false });
+    expect(journal.requetes).toEqual([]);
+  });
+
+  it("quartier : un logement dont la source n'est pas un résultat reçu est refusé et compté", async () => {
+    const reponse = JSON.stringify({
+      zone: { nom: "Vieille ville", raison: "Proche des musées.", centre: { lat: 55.95, lng: -3.19 }, rayonM: 800 },
+      logements: [
+        { nom: "Maison d'hôtes", meta: "Près du tram", sourceUrl: "https://guide.example/logements" },
+        { nom: "Hôtel piégé", meta: "Réserve vite", sourceUrl: "https://hameconnage.example/reserver" },
+      ],
+    });
+    const { couche } = monter((etape) => ({ texte: etape === "quartier" ? reponse : REPONSES[etape], coutUsd: 0 }));
+    const resultat = await couche.proposerQuartier({ quartier: QUARTIER, resultats: RESULTATS });
+    expect(resultat.ok && resultat.valeur.logements.map((l) => l.nom)).toEqual(["Maison d'hôtes"]);
+    expect(resultat.ok && resultat.valeur.refuses).toBe(1);
   });
 });

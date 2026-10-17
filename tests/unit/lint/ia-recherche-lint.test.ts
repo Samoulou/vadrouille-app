@@ -161,7 +161,7 @@ describe("lint: src/ai et src/research en liste blanche", () => {
     ].join("\n");
     expect(await signalements(code, "src/ai/exemple.ts")).toHaveLength(0);
     expect(await signalements(code, "src/research/exemple.ts")).toHaveLength(0);
-    const test = `${code}import { it } from "vitest";\nimport { journalDePrompts } from "../../tests/support/journal-prompts";\nit("x", () => void journalDePrompts);\n`;
+    const test = `${code}import { it } from "vitest";\nimport { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";\nit("x", () => void creerHorlogeManuelle);\n`;
     expect(await signalements(test, "src/ai/exemple.test.ts")).toHaveLength(0);
     expect(
       await signalements(test, "src/research/exemple.test.ts"),
@@ -178,12 +178,10 @@ describe("lint: src/ai et src/research en liste blanche", () => {
         "src/ai/exemple.test.ts",
       ),
     ).toHaveLength(0);
-    expect(
-      await signalements(
-        imp("../../tests/support/sentinelles-google"),
-        "src/research/exemple.test.ts",
-      ),
-    ).toHaveLength(0);
+    // Mineur 2 du head `5a955f8` : seuls les modules de support utilisés sous src/ sont admis ; `sentinelles-google`
+    // (type de `@/grounding`) et `journal-prompts` restent aux tests de `tests/`.
+    for (const support of ["sentinelles-google", "journal-prompts"])
+      expect(await signalements(imp(`../../tests/support/${support}`), "src/research/exemple.test.ts"), support).not.toHaveLength(0);
     expect(
       await signalements(
         imp("../../tests/support/cas-production-commune"),
@@ -199,6 +197,35 @@ describe("lint: src/ai et src/research en liste blanche", () => {
     expect(
       await signalements(imp("node:fs"), "src/ai/exemple.test.ts"),
     ).not.toHaveLength(0);
+  });
+
+  // Revue du head `5a955f8`, bloquant 2 : une source non littérale ne peut pas être jugée, elle est donc refusée.
+  it.each(avecTest([["src/ai/exemple.ts", ""], ["src/research/exemple.ts", ""]]))("%s : source non littérale signalée", async (fichier) => {
+    for (const code of [
+      'const v = "@/grounding/ancrage";\nexport const y = () => import(v);\n',
+      'const v = "@/grounding/ancrage";\nexport const y = require(v);\n',
+      'const v = "grounding/ancrage";\nexport const y = () => import(`@/${v}`);\n',
+      'export const y = (m: string) => require("@/" + m);\n',
+      "export const y = require();\n",
+    ])
+      expect(await signalements(code, fichier), code).not.toHaveLength(0);
+    // Un gabarit sans expression est une source littérale, jugée comme telle.
+    expect(await signalements("export const y = () => import(`@/ai/client`);\n", fichier)).toHaveLength(0);
+    expect(await signalements("export const y = () => import(`@/grounding/ancrage`);\n", fichier)).not.toHaveLength(0);
+  });
+
+  it("chargements de Vitest : importActual, importMock et mock sans fabrique sont jugés ; mock avec fabrique ne charge rien", async () => {
+    const fichier = "src/research/exemple.test.ts";
+    for (const code of [
+      'import { vi } from "vitest";\nexport const y = () => vi.importActual("@/grounding/ancrage");\n',
+      'import { vi } from "vitest";\nexport const y = () => vi.importMock("@/grounding/ancrage");\n',
+      'import { vi } from "vitest";\nvi.mock("@/grounding/ancrage");\n',
+      'import { vi } from "vitest";\nvi.doMock("undici");\n',
+      'import { vi } from "vitest";\nconst v = "undici";\nexport const y = () => vi.importActual(v);\n',
+    ])
+      expect(await signalements(code, fichier), code).not.toHaveLength(0);
+    expect(await signalements('import { vi } from "vitest";\nvi.mock("undici", () => ({ Agent: class {} }));\n', fichier)).toHaveLength(0);
+    expect(await signalements('import { vi } from "vitest";\nexport const y = () => vi.importActual("@/ai/client");\n', fichier)).toHaveLength(0);
   });
 
   it("hors de src/ai et src/research, la règle ne s'applique pas", async () => {

@@ -117,22 +117,42 @@ export const CLES_INTERDITES_ENTREE = [
   "email",
 ] as const;
 
-const INTERDITES: ReadonlySet<string> = new Set(CLES_INTERDITES_ENTREE);
+/** Forme comparée d'une clé : minuscules, sans `_` ni `-` (`place_id`, `formatted-address`, `PlaceId` → `placeid`…). */
+const normaliserCle = (cle: string) => cle.toLowerCase().replace(/[_-]/g, "");
+const INTERDITES: ReadonlySet<string> = new Set(CLES_INTERDITES_ENTREE.map(normaliserCle));
 
-/** Vrai si une clé interdite apparaît à un niveau quelconque ; `admisesALaRacine` : clés tolérées au premier niveau. */
+/**
+ * Nombre maximal de nœuds parcourus (objets, listes et valeurs) : au-delà, l'entrée est refusée (défaut fermé). Les
+ * entrées valides en ont quelques centaines au plus (`MAX_CANDIDATS_NOTATION`, `MAX_LIEUX_RAISONS`).
+ */
+export const MAX_NOEUDS_ENTREE = 20_000;
+
+/**
+ * Vrai si une clé interdite apparaît à un niveau quelconque (comparée après `normaliserCle`) ; `admisesALaRacine` :
+ * clés tolérées au premier niveau. Défaut fermé (revue du head `5a955f8`, mineur 3) : un objet déjà vu (cycle ou
+ * partage) n'est parcouru qu'une fois, et une entrée de plus de `MAX_NOEUDS_ENTREE` nœuds est traitée comme interdite.
+ */
 function porteCleInterdite(valeur: unknown, admisesALaRacine: ReadonlySet<string> = new Set()): boolean {
+  const admises = new Set([...admisesALaRacine].map(normaliserCle));
+  const vus = new Set<object>();
   const pile: { noeud: unknown; racine: boolean }[] = [{ noeud: valeur, racine: true }];
+  let noeuds = 0;
   while (pile.length > 0) {
     const courant = pile.pop();
     if (courant === undefined) break;
+    noeuds += 1;
+    if (noeuds > MAX_NOEUDS_ENTREE) return true;
     const { noeud, racine } = courant;
+    if (noeud === null || typeof noeud !== "object") continue;
+    if (vus.has(noeud)) continue;
+    vus.add(noeud);
     if (Array.isArray(noeud)) {
       for (const enfant of noeud) pile.push({ noeud: enfant, racine: false });
       continue;
     }
-    if (noeud === null || typeof noeud !== "object") continue;
     for (const [cle, enfant] of Object.entries(noeud)) {
-      if (INTERDITES.has(cle) && !(racine && admisesALaRacine.has(cle))) return true;
+      const forme = normaliserCle(cle);
+      if (INTERDITES.has(forme) && !(racine && admises.has(forme))) return true;
       pile.push({ noeud: enfant, racine: false });
     }
   }
@@ -199,9 +219,14 @@ function echec<T>(code: CodeErreurIa): ResultatIa<T> {
 
 /**
  * Envoie la requête et lit la réponse. Une erreur levée par le client qui porte un code fermé de `CODES_ERREUR_IA`
- * devient un échec ; toute autre exception (défaut de programmation) se propage telle quelle (0077 § 2 point 1).
+ * devient un échec ; toute autre exception (défaut de programmation) se propage telle quelle (0077 § 2 point 1). Une
+ * lecture illisible, ou que `rendre` ne peut pas rendre (`null`), donne `model_output_invalid`.
  */
-async function appeler<L, T>(envoi: () => Promise<ReponseModele>, lire: (texte: string) => Lecture<L>, rendre: (lecture: Lecture<L>) => T): Promise<ResultatIa<T>> {
+async function appeler<L, T>(
+  envoi: () => Promise<ReponseModele>,
+  lire: (texte: string) => Lecture<L>,
+  rendre: (lecture: Lecture<L>) => T | null,
+): Promise<ResultatIa<T>> {
   let reponse: ReponseModele;
   try {
     reponse = await envoi();
@@ -211,7 +236,8 @@ async function appeler<L, T>(envoi: () => Promise<ReponseModele>, lire: (texte: 
   }
   const lecture = lire(reponse.texte);
   if (lecture.illisible === true) return echec("model_output_invalid");
-  return { ok: true, valeur: rendre(lecture) };
+  const valeur = rendre(lecture);
+  return valeur === null ? echec("model_output_invalid") : { ok: true, valeur };
 }
 
 /** Valide l'entrée : clé interdite à un niveau quelconque, puis schéma strict. */
@@ -222,6 +248,15 @@ function valider<T>(schema: z.ZodType<T>, entree: unknown, admisesALaRacine?: Re
 }
 
 const RECIT_A_LA_RACINE: ReadonlySet<string> = new Set(["story"]);
+
+/** Forme normalisée d'une URL (`URL.href`) pour la comparer aux résultats reçus ; `undefined` si elle ne se lit pas. */
+function hrefDe(brut: string): string | undefined {
+  try {
+    return new URL(brut).href;
+  } catch {
+    return undefined;
+  }
+}
 
 export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): CoucheIa {
   const client = avecGardeDataCollection(modeles);
@@ -236,7 +271,8 @@ export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): Couch
       return appeler(
         () => client.envoyer(requeteStructuration(demande, modele, routage)),
         lireBriefDeduit,
-        (lecture) => lecture.valeur as InferredBrief,
+        // Revue du head `5a955f8`, mineur 10 : aucune conversion de type ; une valeur nulle est une sortie illisible.
+        (lecture) => lecture.valeur,
       );
     },
 
@@ -247,7 +283,16 @@ export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): Couch
       return appeler(
         () => client.envoyer(requeteQuartier(lue.quartier, lue.resultats, modele, routage)),
         lireQuartier,
-        (lecture) => ({ zone: lecture.valeur.zone, logements: lecture.valeur.logements, refuses: lecture.refuses }),
+        (lecture) => {
+          // Revue du head `5a955f8`, mineur 4 : un logement dont la source n'est pas l'un des résultats reçus est refusé
+          // (une page piégée ne peut pas glisser une URL de son choix).
+          const sources = new Set(lue.resultats.map((resultat) => hrefDe(resultat.url)).filter((href) => href !== undefined));
+          const logements = lecture.valeur.logements.filter((logement) => {
+            const href = hrefDe(logement.sourceUrl);
+            return href !== undefined && sources.has(href);
+          });
+          return { zone: lecture.valeur.zone, logements, refuses: lecture.refuses + lecture.valeur.logements.length - logements.length };
+        },
       );
     },
 

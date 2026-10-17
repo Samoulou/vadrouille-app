@@ -6,15 +6,17 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ComplementP0 } from "@/ai/complement-p0";
 import { CandidatPourModeleSchema, EntreeModelesSchema, LieuRetenuSchema, type CandidatPourModele, type EntreeModeles, type LieuRetenu } from "@/ai/entrees";
+import type { EntreeNotation } from "@/ai/noter-candidats";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
+import type { EntreeRaisons } from "@/ai/rediger-raisons";
 import { encadrer, requeteNotation, requetePlan, requeteRaisons, requeteRecherche, rythmePourModele } from "@/ai/requetes";
 import { BriefSchema, RYTHMES, type Brief } from "@/prototype/brief";
 import { vuePourModele, type Candidat } from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import type { DonneesProtegees } from "@/research/agent";
+import type { DependancesAgent, DonneesProtegees } from "@/research/agent";
 import { BornesRechercheSchema, type BornesRecherche } from "@/research/bornes";
 import {
   bornesDepuisConfig,
@@ -124,6 +126,12 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
     expectTypeOf<DonneesProtegeesP0>().toEqualTypeOf<DonneesProtegees>();
   });
 
+  it("garde-fou du complément : les types dérivés par Parameters<…> restent exactement ComplementP0 (revue du head 5a955f8, mineur 7)", () => {
+    expectTypeOf<EntreeNotation["complement"]>().toEqualTypeOf<ComplementP0 | undefined>();
+    expectTypeOf<EntreeRaisons["complement"]>().toEqualTypeOf<ComplementP0 | undefined>();
+    expectTypeOf<DependancesAgent["complement"]>().toEqualTypeOf<ComplementP0 | undefined>();
+  });
+
   it("rythme : la conversion puis la vue des modèles rendent le libellé de P0 (inverse de rythmeVersPace)", () => {
     for (const rythme of RYTHMES) {
       expect(rythmePourModele(rythmeVersPace(rythme))).toBe(rythme);
@@ -174,9 +182,26 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
           lieux: CANDIDATS.map((candidat) => ({ ...vuePourModele(candidat), sourceDomaine: new URL(candidat.source.url).hostname })),
         }),
       );
-      // Octets du message de données identiques (même ordre des clés).
-      const octets = (requete: { messages: { contenu: string }[] }) => requete.messages.map((m) => m.contenu).join("\n");
-      expect(octets(requetePlan(entree, modele, ROUTAGE, complement))).toBe(octets(requeteAvant("plan", PROMPT_PLAN, modele, { brief: avant.briefPourRecherche(brief) })));
+      // Revue du head `5a955f8`, mineur 8 : `toEqual` ignore l'ordre des clés ; les messages (système et données) sont
+      // donc aussi comparés en texte, pour les quatre étapes : octets identiques, ordre des clés compris.
+      const octets = (requete: { messages: readonly { contenu: string }[] }) => requete.messages.map((m) => m.contenu);
+      expect(octets(requetePlan(entree, modele, ROUTAGE, complement))).toStrictEqual(
+        octets(requeteAvant("plan", PROMPT_PLAN, modele, { brief: avant.briefPourRecherche(brief) })),
+      );
+      expect(octets(requeteRecherche({ entree, ...donneesRecherche }, modele, ROUTAGE, complement))).toStrictEqual(
+        octets(requeteAvant("recherche", PROMPT_RECHERCHE, modele, { brief: avant.briefPourRecherche(brief), ...donneesRecherche })),
+      );
+      expect(octets(requeteNotation(entree, CANDIDATS.map(candidatPourModele), modele, ROUTAGE, complement))).toStrictEqual(
+        octets(requeteAvant("notation", PROMPT_NOTATION, modele, { brief: avant.briefPourModele(brief), candidats: CANDIDATS.map(vuePourModele) })),
+      );
+      expect(octets(requeteRaisons(entree, CANDIDATS.map(lieuRetenuDepuisCandidat), modele, ROUTAGE, complement))).toStrictEqual(
+        octets(
+          requeteAvant("raisons", PROMPT_RAISONS, modele, {
+            brief: avant.briefPourModele(brief),
+            lieux: CANDIDATS.map((candidat) => ({ ...vuePourModele(candidat), sourceDomaine: new URL(candidat.source.url).hostname })),
+          }),
+        ),
+      );
     });
 
     it("données protégées du filtre des requêtes web : destination, pays, logements, libellés d'engagements, récit", () => {

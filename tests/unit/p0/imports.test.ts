@@ -702,13 +702,18 @@ const estPont = (chemin: string) => PONTS_P0.includes(chemin);
 
 /**
  * B7a (décision 0077 § 3 point 1, amende 0048 § 1 et 0055 § 3 sur ce seul point) : `src/ai/erreurs.ts`, **et lui seul**
- * (égalité de chaîne, jamais un préfixe ni un motif), est exempté de `interditPartout` et de `violationsPont`, et admis
- * comme terminal de la frontière de P0r3b. Il n'importe rien (test « p0: src/ai/erreurs.ts n'importe rien ») et ne
- * contient que des listes de codes : `egress.ts` et `port.ts` en réexportent les leurs. Si le test « zéro import »
- * échoue, l'exemption tombe.
+ * (égalité de chaîne, jamais un préfixe ni un motif), est exempté de `interditPartout`, et admis comme terminal de la
+ * frontière de P0r3b (atteint par une entrée admise, ou par l'un des `REEXPORTATEURS_ERREURS_IA`). Aucune clause dans
+ * `violationsPont` : `src/ai/` y est déjà une ouverture du pont (`OUVERTURES_PONT`), une exemption serait sans effet
+ * (revue du head `5a955f8`, bloquant 3 ; décision 0080 §§ 1 et 2, amendement de 0077). Il n'importe rien (test
+ * « p0: src/ai/erreurs.ts n'importe rien ») et ne contient que des listes de codes : `egress.ts` et `port.ts` en
+ * réexportent les leurs. Si le test « zéro import » échoue, l'exemption tombe.
  */
 const FICHIER_ERREURS_IA = "src/ai/erreurs.ts";
-/** Seuls modules qui réexportent les codes de `src/ai/erreurs.ts` sous leur nom d'origine (0077 § 3 point 1). */
+/**
+ * Seuls modules qui réexportent les codes de `src/ai/erreurs.ts` sous leur nom d'origine (0077 § 3 point 1). Liste
+ * fermée de la décision 0080 § 1 : un ajout demande une décision du Tech Lead et l'avis de la Sécurité.
+ */
 const REEXPORTATEURS_ERREURS_IA: readonly string[] = ["src/server/env/egress.ts", "src/server/usage/port.ts"];
 
 /** Refusés sur tout le graphe de l'application, src/server compris (0032 A3.2, 0048 § 1.1), hors `FICHIER_ERREURS_IA`. */
@@ -746,9 +751,7 @@ const OUVERTURES_PONT = ["src/research/", "src/grounding/", "src/ai/", "src/prot
  */
 function violationsPont(fichier: string, voisins: Voisins): string[] {
   return [...atteints(fichier, voisins, (chemin) => chemin.startsWith("src/server/"))].filter(
-    (chemin) =>
-      chemin !== FICHIER_ERREURS_IA &&
-      (chemin.startsWith("src/domain/") || chemin.startsWith("scripts/") || (interditPartout(chemin) && !OUVERTURES_PONT.some((d) => chemin.startsWith(d)))),
+    (chemin) => chemin.startsWith("src/domain/") || chemin.startsWith("scripts/") || (interditPartout(chemin) && !OUVERTURES_PONT.some((d) => chemin.startsWith(d))),
   );
 }
 
@@ -1894,7 +1897,7 @@ describe("p0: exemption exacte de src/ai/erreurs.ts (décision 0077 § 3 point 1
     expect(violationsApplication("src/app/x/page.tsx", page)).toEqual(attendu);
   });
 
-  it("pont p0Run : src/ai/erreurs.ts admis, comme les autres ouvertures du pont ; src/domain et scripts/ toujours refusés", () => {
+  it("pont p0Run : src/ai/erreurs.ts admis comme toute ouverture du pont (src/ai/), sans exemption propre ; src/domain et scripts/ toujours refusés", () => {
     expect(violationsPont("src/workflows/p0-run.ts", graphe({ "src/workflows/p0-run.ts": ["src/ai/erreurs.ts", "src/domain/temps.ts"] }))).toEqual(["src/domain/temps.ts"]);
     expect(violationsPont("src/workflows/p0-run.ts", graphe({ "src/workflows/p0-run.ts": ["src/lib/x.ts"], "src/lib/x.ts": ["scripts/p0/pipeline.ts"] }))).toEqual([
       "scripts/p0/pipeline.ts",

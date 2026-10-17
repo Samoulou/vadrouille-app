@@ -22,7 +22,12 @@ import { charger, executerCapture } from "../p0/harnais";
  * - `plan`, `recherche`, `notation`, `raisons` : l'orchestrateur de P0 de bout en bout (les clients Google y sont
  *   appelés, et leurs réponses sentinelles circulent dans le moteur avant l'étape `raisons`) ;
  * - `structuration`, `quartier` (et les cinq méthodes de la couche) : `creerCoucheIa` sur des entrées construites
- *   après les mêmes appels Google.
+ *   après les mêmes appels Google. **Test de fumée** (revue du head `5a955f8`, mineur 9) : aucune sentinelle n'entre
+ *   dans ces entrées, il passerait donc même en cas de fuite ; le canari est le premier test (orchestrateur de P0), que
+ *   B9 étendra à ses étapes.
+ *
+ * Distances et polylignes ne sont pas des champs des interfaces `ClientPlaces` et `ClientRoutes` (le client réel ne
+ * les rend jamais) : elles restent couvertes par le test de P0r1 sur le client réel (réponse Q13 de la revue).
  */
 
 const ROUTAGE = { data_collection: "deny" as const };

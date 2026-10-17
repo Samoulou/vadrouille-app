@@ -81,8 +81,10 @@ export type DependancesAgent = {
    */
   complement?: Parameters<typeof requetePlan>[3];
   /**
-   * Textes que les requêtes web ne doivent jamais reprendre (`requeteSansDonneeDuBrief`). Absent : la destination et le
-   * pays de l'entrée seulement (aucun récit ni logement n'atteint l'agent sans `complement`).
+   * Textes que les requêtes web ne doivent jamais reprendre (`requeteSansDonneeDuBrief`), en plus de ceux que l'agent
+   * déduit toujours lui-même (`ensemblesProteges` : destination, pays, et récit et logements de `complement`). Défaut
+   * fermé (revue du head `5a955f8`, bloquant 1) : `complement` sans `protegees` protège quand même son récit et ses
+   * logements ; `protegees` n'ajoute que ce que le complément ne porte pas (libellés d'engagements de P0).
    */
   protegees?: DonneesProtegees;
   /**
@@ -305,6 +307,29 @@ export function requeteSansDonneeDuBrief(requete: string, brief: DonneesProtegee
   return true;
 }
 
+/**
+ * Ensembles de textes protégés de l'agent, jugés chacun par `requeteSansDonneeDuBrief` (une requête doit les passer
+ * tous). Défaut fermé : le récit et les logements de `complement` sont **toujours** protégés, que l'appelant passe
+ * `protegees` ou non ; destination et pays (mots de lieu admis) viennent de `protegees`, sinon de l'entrée.
+ */
+export function ensemblesProteges(
+  entree: Pick<EntreeModeles, "destination" | "pays">,
+  complement: DependancesAgent["complement"],
+  protegees: DonneesProtegees | undefined,
+): DonneesProtegees[] {
+  const pays = protegees?.pays ?? entree.pays;
+  const lieu: DonneesProtegees = { destination: protegees?.destination ?? entree.destination, ...(pays === undefined ? {} : { pays }) };
+  const ensembles: DonneesProtegees[] = [protegees ?? lieu];
+  if (complement !== undefined) {
+    ensembles.push({
+      ...lieu,
+      logements: complement.logements.map((texte) => ({ texte })),
+      ...(complement.recit === undefined ? {} : { recit: complement.recit }),
+    });
+  }
+  return ensembles;
+}
+
 function borner(texte: string, max: number): string {
   return texte.replace(/[\p{Cc}\p{Cf}]/gu, " ").slice(0, max);
 }
@@ -314,10 +339,7 @@ export async function chercherCandidats(
   dependances: DependancesAgent,
 ): Promise<{ candidats: CandidatRecherche[]; compteurs: CompteursAgent }> {
   const { bornes: config, complement } = dependances;
-  const protegees: DonneesProtegees = dependances.protegees ?? {
-    destination: entree.destination,
-    ...(entree.pays === undefined ? {} : { pays: entree.pays }),
-  };
+  const proteges = ensemblesProteges(entree, complement, dependances.protegees);
   const compteurs: CompteursAgent = {
     tours: 0,
     recherches: 0,
@@ -455,7 +477,7 @@ export async function chercherCandidats(
         // Mineur 4 du head `3254723` : nettoyée d'abord, la requête est jugée telle qu'elle part (longueur déjà bornée
         // à `LONGUEURS_TEXTE.requete` par le schéma des sorties, la même borne que le client réel).
         const requete = nettoyerRequeteWeb(action.requete);
-        if (!requeteSansDonneeDuBrief(requete, protegees)) {
+        if (!proteges.every((ensemble) => requeteSansDonneeDuBrief(requete, ensemble))) {
           compteurs.sortiesRefusees.recherche += 1;
           continue;
         }

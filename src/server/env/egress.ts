@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CodeRefusSortie } from "@/ai/erreurs";
+import { CODE_CLE_ABSENTE, CODES_REFUS_SORTIE, type CodeCleAbsente, type CodeRefusSortie } from "@/ai/erreurs";
 
 import {
   DIRECTIVES_OPENSSL_CONF,
@@ -50,7 +50,7 @@ import {
  * `grounding.ts`, clients réels) : définis une seule fois dans `src/ai/erreurs.ts` (décision 0077 § 3 point 1, module
  * sans import) et exportés ici sous le même nom, pour que leurs importateurs ne changent pas.
  */
-export { CODE_CLE_ABSENTE, CODES_REFUS_SORTIE, type CodeCleAbsente, type CodeRefusSortie } from "@/ai/erreurs";
+export { CODE_CLE_ABSENTE, CODES_REFUS_SORTIE, type CodeCleAbsente, type CodeRefusSortie };
 
 export type ResultatSortie = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusSortie };
 

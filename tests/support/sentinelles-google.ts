@@ -21,7 +21,11 @@ export const NOTE_SENTINELLE = 2.718281;
 /** Fraction de seconde ajoutée à chaque durée de trajet : `…​.4271828` n'apparaît que si une durée a fuité. */
 export const FRACTION_DUREE_SENTINELLE = 0.4271828;
 
-/** Valeurs de `GroundingVerdict` (décision 0011 § 2) : type serveur de `src/grounding`, jamais dans un prompt. */
+/**
+ * Valeurs de `GroundingVerdict` (décision 0011 § 2) : type serveur de `src/grounding`, jamais dans un prompt. Le type
+ * n'existe pas encore dans `src/contracts` ; quand B8 le crée, cette liste en est dérivée ou comparée par
+ * `expectTypeOf` (réponse Q12 de la revue du head `5a955f8`).
+ */
 export const VERDICTS_ANCRAGE = ["compatible", "discarded", "closedPermanently"] as const;
 
 /** Codes de règles du rapport du moteur (`R1` à `R10`), cherchés comme mots entiers. */

@@ -657,9 +657,9 @@ export default defineConfig([
     rules: { "ligne/server-env-imports": "error" },
   },
   {
-    // B7a (ticket 423 ; spécification B7a point 5, handover § 3 ; décision 0077 § 1 point 5) : `src/ai` et `src/research`
-    // en liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support` en plus), et
-    // `@/ai/complement-p0` confiné aux appels directs de P0. Règles propres au plugin, posées par ce seul bloc sur tout
+    // B7a (ticket 423 ; spécification B7a point 5, handover § 3 ; décisions 0077 § 1 point 5 et 0080 §§ 4 et 5) :
+    // `src/ai` et `src/research` en liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support`
+    // en plus ; toute source non littérale refusée), et `@/ai/complement-p0` confiné aux appels directs de P0. Règles propres au plugin, posées par ce seul bloc sur tout
     // fichier (eslint-rules/ia-recherche-imports.mjs ; tests/unit/lint/ia-recherche-lint.test.ts). Le test d'imports
     // de P0 (tests/unit/p0/imports.test.ts) reste en place à côté jusqu'à la fin de P0 (0077 § 2 point 6).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],

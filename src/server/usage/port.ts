@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CodeRefusUsage } from "@/ai/erreurs";
+import { CODES_REFUS_USAGE, type CodeRefusUsage } from "@/ai/erreurs";
 
 /**
  * Port de consommation `@/server/usage` (spécification `specs/P0-suite-executions-reelles.md`, « Port de
@@ -95,7 +95,7 @@ export function demandeDe(contexte: ContexteAppel, appel: AppelFacture, plafonds
  * Refus du port (D13) : définis une seule fois dans `src/ai/erreurs.ts` (décision 0077 § 3 point 1, module sans import)
  * et exportés ici sous le même nom, pour que leurs importateurs ne changent pas.
  */
-export { CODES_REFUS_USAGE, type CodeRefusUsage } from "@/ai/erreurs";
+export { CODES_REFUS_USAGE, type CodeRefusUsage };
 
 export type ResultatReservation =
   | { readonly ok: true; readonly reservationId: string }
