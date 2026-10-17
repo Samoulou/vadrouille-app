@@ -99,6 +99,9 @@ export const LECTURES_ENV = [
   // P0r2 (ticket 284 ; décision 0046) : connexions de test de `vadrouille_prototype` et `vadrouille_prototype_purge`,
   // mots de passe jetables de la CI (`scripts/ci/db-setup.sh`). Verdict Sécurité à rendre.
   { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_PROTOTYPE_URL", "VADROUILLE_DB_PROTOTYPE_PURGE_URL"] },
+  // B8c (ticket 438 ; décision 0060 § 4) : connexion de test de `vadrouille_coords_purge`, mot de passe jetable de la CI
+  // (`scripts/ci/db-setup.sh`). Verdict Sécurité à rendre (question 2 de 0060).
+  { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_COORDS_PURGE_URL"] },
   { fichier: "tests/unit/db/test-db-sans-base.test.ts", noms: ["PATH", "HOME"] },
   { fichier: "src/components/carte/config.tsx", noms: ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID"] },
   // Relevé de la base de P0c1 (P0a1, PR 180) : environnement minimal du sous-processus `pnpm p0`, six lectures par

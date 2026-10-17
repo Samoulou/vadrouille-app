@@ -16,6 +16,9 @@ export const DB_ENV = {
   // (D21), ce qui est le cas de la CI ; `vadrouille_prototype_purge` n'a aucun module applicatif (job p0-purge).
   p0: "VADROUILLE_DB_PROTOTYPE_URL",
   p0_purge: "VADROUILLE_DB_PROTOTYPE_PURGE_URL",
+  // B8c (décision 0060 § 4) : rôle de purge du MVP, `vadrouille_coords_purge`, mot de passe jetable posé par
+  // `scripts/ci/db-setup.sh` ; aucun module applicatif (job coords-purge).
+  coords_purge: "VADROUILLE_DB_COORDS_PURGE_URL",
 } as const;
 
 export type Login = keyof typeof DB_ENV;
@@ -49,6 +52,8 @@ export function readUrl(login: Login): string | undefined {
         return process.env.VADROUILLE_DB_PROTOTYPE_URL || undefined;
       case "p0_purge":
         return process.env.VADROUILLE_DB_PROTOTYPE_PURGE_URL || undefined;
+      case "coords_purge":
+        return process.env.VADROUILLE_DB_COORDS_PURGE_URL || undefined;
     }
   } catch (error) {
     // Variable absente (ou garde de production) : le préalable le signale sans valeur (tests/db/global-setup.ts).

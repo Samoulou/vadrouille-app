@@ -256,6 +256,15 @@ function fetchAdmis(fichier: string, noeud: ts.Identifier): boolean {
   );
 }
 
+/**
+ * B8c (ticket 438, décision 0060 § 1.1) : type du port du cache de positions, déclarations de type seules. Sa marque
+ * nominale est une propriété de type littéral nommée par un `unique symbol` ambiant (`declare const marqueFiche`), forme
+ * fixée par 0060 : admise dans ce seul fichier, pour ce seul nom, sur une signature de propriété (effacée à la
+ * compilation). Hors de `src/grounding`, il ne s'importe qu'en `import type` (`tests/unit/lint/positions-imports.test.ts`) :
+ * l'arête de l'application vers lui est admise (`areteAdmise`), et le parcours ne descend pas au-delà.
+ */
+const PORT_POSITIONS = "src/grounding/port-positions.ts";
+
 function analyser(fichier: string, source: string): { imports: Import[]; constructions: string[] } {
   const sf = ts.createSourceFile(fichier, source, ts.ScriptTarget.Latest, true, fichier.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const imports: Import[] = [];
@@ -307,7 +316,9 @@ function analyser(fichier: string, source: string): { imports: Import[]; constru
         !cibleDeDestructuration(membre.parent);
       const symbole =
         (ts.isMethodDeclaration(membre) || ts.isMethodSignature(membre) || ts.isPropertySignature(membre)) && cleLitterale(noeud.expression);
-      if (!creation && !symbole) constructions.push("nom de propriété calculé");
+      const marquePort =
+        fichier === PORT_POSITIONS && ts.isPropertySignature(membre) && ts.isIdentifier(noeud.expression) && noeud.expression.text === "marqueFiche";
+      if (!creation && !symbole && !marquePort) constructions.push("nom de propriété calculé");
     }
     if (ts.isObjectLiteralExpression(noeud) && cibleDeDestructuration(noeud)) {
       for (const propriete of noeud.properties) {
@@ -430,6 +441,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // `src/research`).
   ...["complement-p0", "couche", "entrees", "natures"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   ["src/research/bornes.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
+  // B8c (ticket 438, décision 0060 § 1.1) : type du port du cache de positions, non chargé par `pnpm p0` ; marqueur
+  // `server-only` seul, `@/grounding/interfaces` par les règles de base.
+  [PORT_POSITIONS, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
   // P0r3c-4 (ticket 316, décision 0055, section 6 point 5 ; 0063) : plafonds de l'agent du mode réel (recherches web,
   // pages lues), marqueur `server-only` seul ; types de `src/research` par les règles de base.
   ["src/research/plafonds-agent.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
@@ -727,7 +741,10 @@ const interditPartout = (chemin: string) =>
  * une feuille de types (P0r3c-5a). Ces imports sont des `import type` (test ci-dessous) : rien de `src/prototype`
  * n'est chargé à l'exécution, et les feuilles n'importent que les contrats et `zod`.
  */
-const areteAdmise = (de: string, vers: string) => MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers);
+const areteAdmise = (de: string, vers: string) =>
+  (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
+  // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding.
+  (vers === PORT_POSITIONS && !de.startsWith("src/grounding/"));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {

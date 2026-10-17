@@ -1,0 +1,50 @@
+name: coords-purge
+# Purge du cache de positions du MVP (décision 0060 § 3, B8-TL-3 ; 0011 § 6) : appelle
+# public.purge_expired_coordinates() toutes les 6 heures sous le rôle vadrouille_coords_purge, qui n'a que EXECUTE sur
+# cette fonction (aucun droit sur une table). La fonction ne prend aucun paramètre et ne supprime que des lignes
+# expirées, de toutes les organisations. Créneaux décalés de 3 heures sur ceux de la purge du prototype.
+# - Aucune action tierce, ni checkout, ni installation de paquets : psql du runner (client PostgreSQL 16 de l'image
+#   ubuntu-24.04, requis pour PGSSLROOTCERT=system ; s'il manque, l'étape échoue, sans repli sur sslmode=require).
+# - Connexion par les seules variables libpq de l'étape, tirées des secrets de l'environnement coords-purge (branche
+#   de déploiement : main seulement ; sans relecteur obligatoire, 0060 § 3.3). Hôte direct de Neon, jamais l'hôte
+#   poolé. Secrets exposés à cette seule étape ; sortie de psql redirigée : seul le code de sortie est affiché.
+# - Avant la pose du rôle, de l'environnement et des secrets par Samuel (0060 § 3.3, question 1), le job échoue à
+#   chaque passage : ces échecs sont attendus. Surveillance et repli manuel : 0060 § 3.5 et db/README.md.
+# Fichier sous .github/workflows/ : owner-approved posé par Samuel (décision 0035).
+on:
+  schedule:
+    - cron: "17 3-21/6 * * *"
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: coords-purge
+  cancel-in-progress: false
+jobs:
+  purge:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: coords-purge
+    timeout-minutes: 5
+    steps:
+      - name: Purger les positions expirées du MVP
+        env:
+          PGHOST: ${{ secrets.COORDS_PURGE_PGHOST }}
+          PGDATABASE: ${{ secrets.COORDS_PURGE_PGDATABASE }}
+          PGUSER: ${{ secrets.COORDS_PURGE_PGUSER }}
+          PGPASSWORD: ${{ secrets.COORDS_PURGE_PGPASSWORD }}
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+        run: |
+          status=0
+          psql -X -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' || status=$?
+          DO $$
+          BEGIN
+            IF session_user <> 'vadrouille_coords_purge' THEN
+              RAISE EXCEPTION 'rôle de session inattendu';
+            END IF;
+          END
+          $$;
+          SELECT public.purge_expired_coordinates();
+          SQL
+          echo "psql : code de sortie ${status}"
+          exit "${status}"
