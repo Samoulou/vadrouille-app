@@ -7,6 +7,7 @@ import requireServerOnly from "./require-server-only.mjs";
 import serverEnvImports from "./server-env-imports.mjs";
 import { noCacheStorageOpen, noServiceWorkerRegister } from "./service-worker.mjs";
 import useServerOnlyInActions from "./use-server-only-in-actions.mjs";
+import { voyagesImports } from "./voyages-imports.mjs";
 import workflowDirectives from "./workflow-directives.mjs";
 
 /** Plugin ESLint local du projet. */
@@ -25,6 +26,7 @@ const plugin = {
     "complement-p0-imports": complementP0,
     "grounding-liste-blanche": listeBlancheGrounding,
     "relecture-imports": relectureImports,
+    "voyages-imports": voyagesImports,
     "better-auth-confinement": betterAuthConfinement,
     "no-raw-auth-secret": noRawAuthSecret,
   },

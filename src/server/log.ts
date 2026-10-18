@@ -40,6 +40,12 @@ export const LOG_EVENTS = [
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
+  // B6a (spécification B6, B6a point 10 ; décision 0086 § 4 point 2, verdict Sécurité attendu) : lecture d'un voyage
+  // en échec (donnée incohérente ou sortie invalide), refus du port de relectures (une fois par lecture, par le cas
+  // d'usage seul). Champs : `reason` (liste fermée), `tripId`, `version`, `dayIndex` ; aucun nom, instantané,
+  // `placeId`, coordonnée, durée ni message de base.
+  "voyages.read_failed",
+  "voyages.relecture_refused",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -88,6 +94,14 @@ export type LogFields = {
   readonly finishAbnormal?: number;
   /** Fins de la recherche sur l'échéance de l'étape, candidats admis gardés (ticket 407) : 0 ou 1. */
   readonly deadlineStop?: number;
+  /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
+  readonly reason?: string;
+  /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
+  readonly tripId?: string;
+  /** Numéro de version d'un voyage (entier ≥ 1). */
+  readonly version?: number;
+  /** Numéro de jour (1 = J1). */
+  readonly dayIndex?: number;
 };
 
 /**
@@ -254,6 +268,25 @@ export const LOG_OPENSSL_CONF_DIRECTIVES: readonly string[] = [
   "pragma",
   "autre",
 ];
+/**
+ * Raisons admises dans le champ `reason` (B6a point 10 ; 0086 § 4 point 2 (a)) : copie de `RAISONS_LECTURE`
+ * (`src/server/voyages/erreurs.ts`) ; l'égalité des deux listes est vérifiée par le test de la lecture des voyages.
+ */
+export const LOG_READ_REASONS: readonly string[] = [
+  "time_zone_missing",
+  "snapshot_invalid",
+  "checklist_orphan",
+  "proposal_invalid",
+  "proposal_day_missing",
+  "stay_missing",
+  "mobility_invalid",
+  "travel_unknown",
+  "output_invalid",
+  "quota_reached",
+  "unavailable",
+];
+const RAISONS_LECTURE: ReadonlySet<string> = new Set(LOG_READ_REASONS);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXCEPTIONS: ReadonlySet<string> = new Set(LOG_EXIT_EXCEPTIONS);
 const ZONES_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_ZONES);
 const VERDICTS_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_VERDICTS);
@@ -264,6 +297,7 @@ const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
 const NOM_ERREUR = /^[A-Za-z]{1,40}$/;
 
 const entierPositif = (valeur: unknown): valeur is number => typeof valeur === "number" && Number.isSafeInteger(valeur) && valeur >= 0;
+const entierStrict = (valeur: unknown): valeur is number => entierPositif(valeur) && valeur >= 1;
 const chaine = (valeur: unknown): valeur is string => typeof valeur === "string";
 
 /**
@@ -305,6 +339,10 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["finishIgnored", entierPositif],
   ["finishAbnormal", entierPositif],
   ["deadlineStop", entierPositif],
+  ["reason", (v) => chaine(v) && RAISONS_LECTURE.has(v)],
+  ["tripId", (v) => chaine(v) && UUID.test(v)],
+  ["version", entierStrict],
+  ["dayIndex", entierStrict],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
