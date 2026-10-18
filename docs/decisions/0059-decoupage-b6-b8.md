@@ -6,6 +6,8 @@ Numérotation (vérifiée le 2026-10-14) : `main` va de 0001 à 0058 ; aucune PR
 
 **§ 4 précisé par 0060** (ticket #333, fichier commun `eslint.config.mjs`) : B8c n'est dans le même cycle ni que B8a, ni que B3c, ni que B6a, ni qu'une PR qui modifie `eslint.config.mjs` ou ses tests de confinement ; la phrase « [B8a] peut être dans le même cycle que B8c » ne vaut plus.
 
+**§ 1 précisé par 0086** (§ 1.5, ticket #466), colonne « Fichiers » de B6a : la suite de contrat commune vit sous `tests/support/` (sur le modèle de `tests/support/auth-contrat.ts`) et non dans `src/adapters/contract.suite.ts` ; ses deux fichiers d'exécution sont sous `tests/unit/adapters/` et `tests/db/`.
+
 ## Contexte
 Les deux spécifications proposent un découpage qui déroge à la règle « une tâche = une spécification = une branche = une PR » (`CLAUDE.md`) et renvoient son écriture à une décision du CEO avant le premier ticket de code (B6 : section « Découpage » et question 1 au CEO ; B8 : section « Découpage proposé » et question 1). Le CEO a accepté les deux découpages sur le principe (Q415, Q416) ; restait à les écrire et à fixer l'ordre de B8c par rapport à B7a et B7c, que la décision 0054 § 3 place avant tout B8.
 
