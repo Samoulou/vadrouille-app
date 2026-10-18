@@ -515,13 +515,13 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `TripCommitment.start` | stocké | Heure saisie par la personne |
 | `TripCommitment.end` | stocké | Heure saisie par la personne, facultative |
 | `Lodging[known].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
-| `Lodging[known].label` | stocké | `stays.label`, saisi par la personne, ancré au début du workflow 1 (B9-PO-2) |
+| `Lodging[known].label` | stocké | `stays.label`, saisi par la personne, ancré à l'étape `l` du workflow 1, avant la recherche web (B9-PO-2, 0087 § 2) |
 | `Lodging[area].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
 | `Lodging[area].label` | stocké | `stays.label`, quartier saisi par la personne, sans `placeId` |
 | `Lodging[none].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) ; `stays.kind` `none`, libellé = la ville |
 | `Lodging[suggestedLodging].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
 | `Lodging[suggestedLodging].lodgingId` | stocké | Identifiant maison de la suggestion retenue (0081 § B9-TL-5) |
-| `Lodging[suggestedLodging].placeId` | stocké | `stays.place_id`, identifiant de lieu Google, seul élément Google conservable ; revérifié par une fiche au début du workflow 1, jamais cru (B9-PO-2) |
+| `Lodging[suggestedLodging].placeId` | stocké | `stays.place_id`, identifiant de lieu Google, seul élément Google conservable ; revérifié par une fiche à l'étape `l` du workflow 1, avant la recherche web, jamais cru (B9-PO-2, 0087 § 2) |
 | `Lodging[suggestedLodging].name` | stocké | `stays.label`, nom **maison** de la suggestion (sortie du modèle, B7), jamais un nom Google (0081 § B9-TL-5) |
 | `Lodging[suggestedArea].kind` | stocké | Type de logement d'origine (B9-TL-6 (c)) |
 | `Lodging[suggestedArea].areaId` | stocké | Identifiant maison de la zone retenue (0081 § B9-TL-5) |
@@ -902,12 +902,15 @@ Pipeline de la **variante B** (0027, point 1) ; données admises par étape : **
 | Étape | Type | Entrée → sortie | Google | Plafond | Relances | Idempotence | État publié |
 |---|---|---|---|---|---|---|---|
 | a Brief | déterministe | voyage, version du brief → identifiant du brief validé | non | — | 2 | `(runId, a)` | `preparing` |
+| l Logement (0087) | appel externe (Places : Text Search si le `placeId` manque, puis Place Details au masque `details`) | identifiant de l'exécution → identifiant de l'exécution ; contrôle de validité des logements `known` et `suggestedLodging` ; écrit `stays.place_id` ; non résolu : `failed`, `lodging_unresolved` | oui (en mémoire ; seul le `placeId` en sort) | oui | 0 | garde `step_seq` (rang 2) | `preparing` |
 | b Recherche web | IA (DeepSeek) et recherche bornée | brief → identifiant de la recherche ; écrit `candidates` (contenu maison, sans `placeId`) et `research_runs` | non | oui | 2 | unicité `(research_run_id, nom normalisé)` | `preparing` |
 | c Ancrage | appel externe (Places « IDs only », puis Place Details, champ de statut) | identifiant de la recherche → identifiant de la recherche ; écrit `candidates.place_id` des seuls `compatible` | oui | oui | 3 | écriture idempotente de `place_id` | `preparing` |
 | d Notation | IA (Decider) | identifiant de la recherche → identifiant de la recherche ; lit les candidats qui ont un `placeId`, envoie nos descriptions et des identifiants internes ; écrit les notes | non | oui | 2 | `(runId, d, candidat)` | `preparing` |
 | e Planification et publication | moteur `src/domain` avec relectures Places et Routes, puis un appel IA (DeepSeek) pour les raisons | identifiant de voyage → identifiant de version ; en mémoire : classement, planification, validation R1 à R10, réparation déterministe (option suivante, sinon `noOption`), puis raisons sur nos descriptions des seuls lieux retenus (0027 point 1.5) ; à la fin, **une seule transaction** : la version validée par `TripSnapshotSchema` (raisons comprises), qui devient `current_version`, et les 8 cases `proposals` (PO-6) | oui (en mémoire ; jamais dans le prompt des raisons) | oui (avant les relectures et avant l'appel des raisons) | 2 (l'étape est rejouée en entier) | unique `(trip_id, request_id)` | `preparing`, puis `ready` ou `incomplete` (`readyStops` à jour) |
 
 **Relances amendées par 0081** (B9-TL-3) : étape a : 2 ; étapes b, c, d et e : 0 (une étape rejouée repaierait ses appels) ; un nouvel essai passe par `retryGeneration`.
+
+**Étape `l` ajoutée par 0087** (§ 2) : le contrôle de validité du logement (B8-PO-16 point 1) précède toute dépense d'IA de b sans entrer dans une étape IA ; a et b restent « Google : non ». Rangs : a = 1, l = 2, b = 3, c = 4, d = 5, e = 6 ; voyage complet : a = 1, l = 2, puis b à e de chaque jour planifié par l'exécution. Les étapes c et e ne prennent que des fiches `position` pour les logements (B8-PO-16 point 2).
 
 **Workflow 2 — ancrage (`groundCandidates`)** : l'étape c ci-dessus, appelée comme sous-étape par les workflows 1, 4 et 5. Les trois verdicts (`compatible`, `discarded`, `closedPermanently`, décision 0011 point 2) ne vivent qu'en mémoire ; un candidat réutilisé est **ré-ancré** (le `placeId` présent ne vaut pas verdict).
 

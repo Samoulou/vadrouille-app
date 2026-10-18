@@ -14,6 +14,8 @@ Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08
 
 **§ 2 amendé par 0085** (ticket #457), pour le MVP : même répartition que 0055 pour `p0Run` (ancrage par Text Search « IDs only » restreint à la zone de la ville, sans fiche pour un candidat ; statut, position et horaires vérifiés par la fiche de l'étape qui planifie ou présente ; aucun lieu planifié, présenté ni écrit sans cette fiche) ; un candidat réutilisé est ré-ancré par Text Search, puis fiché seulement s'il entre dans une série. **§ 5 précisé par 0085** : la durée estimée d'un trajet sans itinéraire est calculée par B8 et passée au moteur par `duree` (0048 § 3.2), pas par le moteur. **§ 1, § 3, § 4, § 6 et § 7 ne sont pas amendés.**
 
+**§ 7 complété par 0087** (ticket #474) : une étape `l` (contrôle du logement : Text Search éventuel et fiche `details`, Google en mémoire, seul le `placeId` en sort, écrit dans `stays.place_id`) entre a et b ; les étapes a et b restent sans donnée Google.
+
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.
 
 ## Contexte
