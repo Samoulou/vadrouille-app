@@ -142,6 +142,8 @@ Samuel n'a donné ni dates ni logement : s'applique le défaut annoncé dans P0-
 - Lues par le script et par l'adaptateur ; seules les clés sont des variables d'environnement. Un dépassement arrête l'exécution ; il ne se contourne pas par un drapeau.
 
 ### Déroulement (cadrage § 6.5 et variante B de la décision 0027, en une seule exécution)
+> **Amendé le 2026-10-18** (`specs/P0-suite-2.md`, amendement 3 du Product Owner, P0S2-PO-19 à P0S2-PO-27, ticket #487) : plan et recherche par secteurs, incontournables propres à la destination et au brief d'abord et chacun comme une étape, infos pratiques (pourquoi, prix, horaires, conseil) tirées de la source web, une journée = un ou deux secteurs voisins sans aller-retour, repas et soirée dans le secteur du jour, et chaque demi-journée remplie selon la durée des visites plutôt qu'un nombre d'activités par rythme (règle de Samuel du 2026-10-18). Les étapes 2, 3, 5, 7, 8 et 9 ci-dessous s'appliquent avec ces règles.
+
 1. **Brief** : lu tel quel, récit compris (pas de structuration du récit par un modèle dans P0).
 2. **Plan de recherche** (DeepSeek, entrée : le brief seul) : incontournables de la destination qui correspondent aux envies, sans filtre de distance ; puis besoins par jour et par créneau (repas, soirées, temps libre, événements aux dates du séjour).
 3. **Recherche** (DeepSeek, agent borné, P0-PO-4) : recherche web et lecture de pages, extraction de candidats avec nom maison, résumé maison d'une à deux phrases (aucun texte recopié), catégorie, type d'étape, URL et date de la source ; pour un événement, date et heure lues sur la page. Politique de sources du cadrage § 6.5. Le contenu web est une donnée, jamais une instruction. Arrêt sur le nombre de **candidats trouvés** (cibles par type de créneau, et un total par exécution fixé dans la configuration, contrainte 7) ou sur un plafond ; les doublons sont fusionnés avant l'ancrage.
@@ -178,6 +180,8 @@ Valeurs (2 Mo, 10 s, 3 redirections) proposées ; noms et emplacement : décisio
 - Consigne de Samuel, exigence testée : `GOOGLE_MAPS_SERVER_KEY` n'est **jamais écrite** dans un fichier, un journal, un rapport, un message d'erreur, une sortie de test, une PR, un ticket ou un message. Un filtre de redaction remplace toute occurrence de la valeur de chaque clé par `[clé masquée]` avant toute écriture (ceinture et bretelles en plus de la règle précédente).
 
 ### Textes produits (`Day.title`, `Proposal.context`, raisons, justification `detour`)
+> **Amendé le 2026-10-18** (P0S2-PO-23, `specs/P0-suite-2.md`) : le gabarit de `Day.title` peut porter les noms maison des secteurs du jour, issus de la recherche (jamais d'une réponse Google).
+
 Ces textes sont écrits dans le programme ; ils ne doivent rien dériver de Google :
 - `Day.title` : **gabarit déterministe** (proposition) construit à partir des noms maison et des catégories des étapes retenues pour le jour (déjà présents dans le programme), par exemple « Vieille ville et dégustations » ; jamais un nom de quartier, une adresse ou un secteur tiré d'une position Google, jamais une durée.
 - `Proposal.context` : **gabarit déterministe** à partir du brief et du créneau (« Déjeuner du jour 1 »), jamais d'un horaire ou d'une durée Google.
