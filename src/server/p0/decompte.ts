@@ -36,7 +36,10 @@ export const CODES_EXTERNES_SUIVI: readonly string[] = ["upstream_unavailable", 
  * exécutions peuvent partager un jour de quota (index `runs_one_per_quota_day_idx` supprimé par la migration
  * 0007_essais_sans_limite) : le tuple ne désigne plus une seule ligne par construction. Il la désigne encore pour
  * l'entrée de 0070 : le déploiement `d61e9fa` refusait lui-même une seconde exécution du jour, et aucun autre
- * déploiement ne porte ce commit. Une nouvelle entrée doit vérifier que son tuple ne désigne qu'une ligne.
+ * déploiement ne porte ce commit. Pour les entrées de 0089, une autre exécution réelle de rome-1/B arrêtée en
+ * `pipeline_failed` le même jour sur le même commit répondrait au même tuple : c'est pourquoi `decompte()` n'exclut
+ * **qu'une exécution au plus par entrée** (décision 0089, § « Mise en œuvre ») ; une seconde exécution qui répond au
+ * même tuple compte.
  */
 export type ExecutionExclue = {
   readonly decision: string;
@@ -61,22 +64,43 @@ export const EXECUTIONS_EXCLUES: readonly ExecutionExclue[] = [
     codeArret: "pipeline_failed",
     commitSha: "d61e9faefacf568ad39833e8ac611ba717e0fbdd",
   },
+  // Décision 0089 : `wrun_41M57JCM3G50T1SSVCX1XG7HRT` (lancée vers 13:14 UTC), arrêtée par un défaut du studio
+  // (lecture des trajets Routes de l'étape finale).
+  {
+    decision: "0089",
+    brief: "rome-1.json",
+    variante: "B",
+    jourQuota: "2026-10-18",
+    codeArret: "pipeline_failed",
+    commitSha: "cfca0b58ccf67e4d10196adea296045ec98fdb61",
+  },
+  // Décision 0089 : `wrun_41M57JWPHV50HNB1M3TH4D2140` (lancée vers 13:23 UTC), même défaut.
+  {
+    decision: "0089",
+    brief: "rome-1.json",
+    variante: "B",
+    jourQuota: "2026-10-18",
+    codeArret: "pipeline_failed",
+    commitSha: "efc0994f3e4e8eb5eb081c84b754797b980cf166",
+  },
 ];
 
-/** Vrai si l'exécution est une exécution réelle, arrêtée, qui répond exactement à une entrée de la liste. */
-export function estExclue(execution: ExecutionSuivie, exclues: readonly ExecutionExclue[] = EXECUTIONS_EXCLUES): boolean {
+/** Vrai si l'exécution est une exécution réelle, arrêtée, qui répond exactement à l'entrée donnée. */
+function repondA(execution: ExecutionSuivie, exclue: ExecutionExclue): boolean {
   return (
     execution.mode === "reel" &&
     execution.statut === "arretee" &&
-    exclues.some(
-      (exclue) =>
-        exclue.brief === execution.brief &&
-        exclue.variante === execution.variante &&
-        exclue.jourQuota === execution.jourQuota &&
-        exclue.codeArret === execution.codeArret &&
-        exclue.commitSha === execution.commitSha,
-    )
+    exclue.brief === execution.brief &&
+    exclue.variante === execution.variante &&
+    exclue.jourQuota === execution.jourQuota &&
+    exclue.codeArret === execution.codeArret &&
+    exclue.commitSha === execution.commitSha
   );
+}
+
+/** Vrai si l'exécution est une exécution réelle, arrêtée, qui répond exactement à une entrée de la liste. */
+export function estExclue(execution: ExecutionSuivie, exclues: readonly ExecutionExclue[] = EXECUTIONS_EXCLUES): boolean {
+  return exclues.some((exclue) => repondA(execution, exclue));
 }
 
 export type Decompte = { readonly comptees: number; readonly relances: number };
@@ -84,13 +108,28 @@ export type Decompte = { readonly comptees: number; readonly relances: number };
 const estRelancable = (execution: ExecutionSuivie) =>
   execution.statut === "arretee" && execution.codeArret !== null && CODES_EXTERNES_SUIVI.includes(execution.codeArret);
 
-/** Décompte d'un brief et d'une variante, à partir des exécutions réelles (`mode = reel`) non exclues seulement. */
-export function decompte(executions: readonly ExecutionSuivie[], brief: string, variante: "A" | "B"): Decompte {
+/**
+ * Décompte d'un brief et d'une variante, à partir des exécutions réelles (`mode = reel`) non exclues seulement. Chaque
+ * entrée de `exclues` retire **une exécution au plus** (décision 0089) : une seconde exécution qui répond au même tuple
+ * compte. Les exécutions qui répondent à un même tuple ont les mêmes champs décomptés : le total ne dépend pas de celle
+ * qui est retirée.
+ */
+export function decompte(
+  executions: readonly ExecutionSuivie[],
+  brief: string,
+  variante: "A" | "B",
+  exclues: readonly ExecutionExclue[] = EXECUTIONS_EXCLUES,
+): Decompte {
   let comptees = 0;
   let relances = 0;
+  const entreesUtilisees = new Set<number>();
   for (const execution of executions) {
     if (execution.mode !== "reel" || execution.brief !== brief || execution.variante !== variante) continue;
-    if (estExclue(execution)) continue;
+    const entree = exclues.findIndex((exclue, index) => !entreesUtilisees.has(index) && repondA(execution, exclue));
+    if (entree !== -1) {
+      entreesUtilisees.add(entree);
+      continue;
+    }
     if (estRelancable(execution) && relances < RELANCES_MAX) relances += 1;
     else comptees += 1;
   }
