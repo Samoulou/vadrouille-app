@@ -10,8 +10,8 @@ import { planRoutes } from "@/grounding/budget-routes";
 import { BriefSchema, NOM_BRIEF_PATTERN, RYTHMES, type Brief } from "@/prototype/brief";
 import { BORNES_ESSAI, validerConfigEssai } from "@/prototype/config";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
-import { demandeBornee, demandeDuJour, joursDuSejour, TYPES_SERIE } from "@/server/p0/moteur-final";
-import { briefDepuisBrief, engagementsDepuisBrief } from "@/server/p0/vers-moteur";
+import { joursDuSejour } from "@/server/p0/moteur-final";
+import { briefDepuisBrief, demandeBornee, demandeDuJour, engagementsDepuisBrief, TYPES_SERIE } from "@/server/p0/vers-moteur";
 
 /**
  * Brief court de l'essai d'intégration (ticket #355 ; question du Product Owner de 0063, amendement P0r3c-5 point 7 d) :

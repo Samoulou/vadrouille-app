@@ -1,10 +1,11 @@
 import type { Brief as BriefContrat, Day, MobilityMode, Pace, TripCommitment } from "@/contracts";
 import type { ConfigurationMoteur } from "@/domain/configuration";
-import type { CandidatEvenement, CandidatMoteur, EtatChoix, Nuit, VoyageMoteur } from "@/domain/entrees";
+import type { CandidatEvenement, CandidatMoteur, EtatChoix, Nuit, TypeCreneau, VoyageMoteur } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
 import { INCONNU, type Duree, type Plage, type Point, type Relectures, type Validite } from "@/domain/relectures";
-import { element } from "@/domain/tables";
+import { element, lire } from "@/domain/tables";
 import { compterParRegle, validerProgramme } from "@/domain/validation";
+import type { JourSquelette } from "@/domain/squelette";
 import { jourSemaine } from "@/domain/temps";
 import type { AncrageResolu, Trajets } from "@/prototype/ancrage";
 import type { Brief, Rythme } from "@/prototype/brief";
@@ -86,6 +87,92 @@ export function nuitsDepuisBrief(brief: Brief, placeIds: readonly string[]): Nui
     const nuit: Nuit = { etiquette: logement.texte, ...(placeId === undefined ? {} : { placeId }) };
     return Array.from({ length: logement.nuits }, () => nuit);
   });
+}
+
+/** Types de créneaux de la première série : activités (dont l'idée du jour), repas, soirée. */
+export type TypeSerie = TypeCreneau;
+export const TYPES_SERIE: readonly TypeSerie[] = ["activity", "meal", "evening"];
+
+/** `n` lieux de plus pour `type` (sans accès calculé : règle d'import des modules de P0 chargés par `pnpm p0`). */
+function ajouter(demande: Readonly<Record<TypeSerie, number>>, type: TypeSerie, n: number): Record<TypeSerie, number> {
+  return {
+    activity: demande.activity + (type === "activity" ? n : 0),
+    meal: demande.meal + (type === "meal" ? n : 0),
+    evening: demande.evening + (type === "evening" ? n : 0),
+  };
+}
+
+/**
+ * Lieux que demande un jour, par type : un par créneau du squelette **qui tient dans la fenêtre réelle du jour**, plus
+ * l'idée « Surprends-moi » (une activité). C'est la part du jour dans la **première série** (0055 § 6 point 3 : « étapes
+ * du programme et 8 propositions » ; les propositions de P0 sont prises parmi les étapes planifiées, `assemblage.ts`,
+ * et ne demandent aucun lieu de plus).
+ *
+ * Fenêtre réelle (ticket 483) : les créneaux sont parcourus dans l'ordre depuis `jour.debut` (heure d'arrivée le premier
+ * jour), avec les durées par défaut de la configuration et sans trajet, selon les règles de `planifierJour` : une
+ * activité finit avant la fin au plus tard du repas qui la suit (sinon avant la fin du jour), un repas commence dans sa
+ * fenêtre et finit avant la fin du jour (heure de départ le dernier jour), la soirée finit avant la fin du jour. Un
+ * créneau qui ne tient pas n'est pas demandé. Sans trajet, c'est une borne haute : le planificateur, qui ajoute les
+ * trajets, n'en remplit jamais plus. Le nombre de créneaux reste celui du squelette (rythme) ; un nombre qui suivrait les
+ * durées de visite est l'objet de la spécification PO-27 (ticket 489).
+ */
+export function demandeDuJour(jour: JourSquelette, configuration: ConfigurationMoteur): Record<TypeSerie, number> {
+  const durees = configuration.dureesParDefaut;
+  let demande: Record<TypeSerie, number> = { activity: 1, meal: 0, evening: 0 };
+  let instant = jour.debut;
+  jour.creneaux.forEach((creneau, rang) => {
+    if (creneau.type === "activity") {
+      const suivant = jour.creneaux.at(rang + 1);
+      const limite = suivant?.type === "meal" ? suivant.auPlusTard : jour.fin;
+      const fin = instant + durees.activity;
+      if (fin > limite || fin > jour.fin) return;
+      demande = ajouter(demande, "activity", 1);
+      instant = fin;
+      return;
+    }
+    const debut = Math.max(instant, creneau.auPlusTot);
+    const fin = debut + (creneau.type === "meal" ? lire(durees, creneau.repas) : durees.evening);
+    if ((creneau.type === "meal" && debut > creneau.auPlusTard) || fin > jour.fin) return;
+    demande = ajouter(demande, creneau.type, 1);
+    instant = fin;
+  });
+  return demande;
+}
+
+/**
+ * Demande du jour ramenée à la capacité de sa matrice Routes (lieux admis en plus des logements, 0055 § 6 point 1) :
+ * types pris dans l'ordre de `TYPES_SERIE`, aucun lieu au-delà de la capacité.
+ */
+export function demandeBornee(demande: Readonly<Record<TypeSerie, number>>, capacite: number): Record<TypeSerie, number> {
+  let reste = Math.max(0, capacite);
+  let bornee: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
+  for (const type of TYPES_SERIE) {
+    const pris = Math.min(lire(demande, type), reste);
+    bornee = ajouter(bornee, type, pris);
+    reste -= pris;
+  }
+  return bornee;
+}
+
+/**
+ * Demande de la première série, jour par jour et sommée sur le séjour (ticket 483 ; correction 1 de la PR #490 : **seul
+ * chemin de calcul** des cibles de recherche, pour `p0Run` comme pour `pnpm p0`). Chaque jour : `demandeDuJour`, bornée
+ * par sa capacité (`demandeBornee`) si `capacites` est donné (étape finale de `p0Run`, matrice Routes du jour) ; sans
+ * capacités (`pnpm p0`, une seule matrice), la demande n'est pas bornée.
+ */
+export function demandesDuSejour(
+  jours: readonly JourSquelette[],
+  configuration: ConfigurationMoteur,
+  capacites?: readonly number[],
+): { demandes: Record<TypeSerie, number>[]; serie: Record<TypeSerie, number>; premiereSerie: number } {
+  const demandes = jours.map((jour, rang) => {
+    const demande = demandeDuJour(jour, configuration);
+    return capacites === undefined ? demande : demandeBornee(demande, element(capacites, rang) ?? 0);
+  });
+  let serie: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
+  for (const demande of demandes) for (const type of TYPES_SERIE) serie = ajouter(serie, type, lire(demande, type));
+  const premiereSerie = serie.activity + serie.meal + serie.evening;
+  return { demandes, serie, premiereSerie };
 }
 
 /** Mode de trajet de P0 : un seul mode, celui du calcul de la matrice. */
@@ -170,6 +257,23 @@ export function relecturesDepuisAncrages(
       return minutes === undefined ? INCONNU : { minutes, estimee: false };
     },
   };
+}
+
+/**
+ * Rangs des jours dont le lieu est **fermé pendant toute la fenêtre** (correction 1 de la PR #490, regroupement par
+ * jour) : ses plages d'ouverture de la date sont connues et aucune ne recouvre `[debut, fin]` du jour. Horaires
+ * inconnus : aucun jour (aucune contrainte, B5-PO-5).
+ */
+export function joursDeFermeture(
+  relectures: Pick<Relectures, "plages">,
+  placeId: string,
+  jours: readonly { readonly date: string; readonly debut: number; readonly fin: number }[],
+): number[] {
+  return jours.flatMap((jour, rang) => {
+    const plages = relectures.plages(placeId, jour.date);
+    if (plages === INCONNU) return [];
+    return plages.some((plage) => plage.debut < jour.fin && jour.debut < plage.fin) ? [] : [rang];
+  });
 }
 
 /** Six compteurs du rapport de P0 (`scripts/p0/rapport.ts`) ; R3, R7 et R10 y sont « sans objet ». */

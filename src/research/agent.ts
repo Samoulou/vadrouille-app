@@ -125,6 +125,26 @@ export function creneauCompte(
   return soir && (soireeManquante || !jour) ? "evening" : "activity";
 }
 
+/**
+ * Fin de la boucle de l'agent (mineur 11 de la revue de la PR #490) : le total visé est atteint (tout candidat admis y
+ * compte, événements compris : c'est la borne de coût), ou chaque cible de créneau l'est, les candidats étant **comptés
+ * par `creneauCompte`**, comme la planification remplit ses créneaux. Voulu : un événement ne compte dans aucun créneau
+ * (la soirée du programme ne prend jamais un événement), donc une recherche qui ne trouve que des événements continue
+ * jusqu'à `toursMax` ou `totalCandidats`, ses deux fusibles de coût, sans jamais se croire servie en soirée.
+ */
+export function ciblesAtteintes(
+  trouves: Readonly<Record<TypeCreneau, number>>,
+  nombreCandidats: number,
+  bornes: Pick<BornesRecherche, "ciblesParCreneau" | "totalCandidats">,
+): boolean {
+  return (
+    nombreCandidats >= bornes.totalCandidats ||
+    (trouves.activity >= bornes.ciblesParCreneau.activity &&
+      trouves.meal >= bornes.ciblesParCreneau.meal &&
+      trouves.evening >= bornes.ciblesParCreneau.evening)
+  );
+}
+
 /** Clé de comparaison d'un nom (doublons de l'agent, mesures de `evals/`) : minuscules, sans accents ni ponctuation. */
 export function cleDeNom(nom: string): string {
   return nom
@@ -401,11 +421,7 @@ export async function chercherCandidats(
   let resultats: ResultatWeb[] = [];
   let pages: PageLue[] = [];
 
-  const ciblesAtteintes = () =>
-    candidats.length >= config.totalCandidats ||
-    (trouves.activity >= config.ciblesParCreneau.activity &&
-      trouves.meal >= config.ciblesParCreneau.meal &&
-      trouves.evening >= config.ciblesParCreneau.evening);
+  const servi = () => ciblesAtteintes(trouves, candidats.length, config);
 
   const accueillir = (extrait: CandidatExtrait) => {
     const source = urlNormalisee(extrait.sourceUrl);
@@ -459,7 +475,7 @@ export async function chercherCandidats(
 
   // Étape 3 : tours de l'agent, bornés.
   let echeanceAtteinte = false;
-  for (let tour = 1; tour <= config.toursMax && !ciblesAtteintes(); tour += 1) {
+  for (let tour = 1; tour <= config.toursMax && !servi(); tour += 1) {
     if (!aLeTemps("modele")) break;
     compteurs.tours += 1;
     const manquants: Record<TypeCreneau, number> = {
@@ -491,7 +507,7 @@ export async function chercherCandidats(
     // Ticket 400 : `termine` avant toute recherche web est ignoré (aucune source ne peut encore être admise).
     const termine = lecture.valeur.termine && compteurs.recherches > 0;
     if (lecture.valeur.termine && !termine) compteurs.terminesIgnores += 1;
-    if (termine || ciblesAtteintes()) break;
+    if (termine || servi()) break;
 
     resultats = [];
     pages = [];

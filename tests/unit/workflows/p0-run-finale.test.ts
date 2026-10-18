@@ -546,12 +546,9 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     expect(positions.has(ferme.placeId)).toBe(false);
     expect(JSON.stringify(programmeEcrit().contenu)).not.toContain(ferme.placeId);
     expect(capture.matrices.some((m) => m.origines.includes(ferme.placeId))).toBe(false);
-    // Remplacé : une fiche de plus (la marge).
+    // Remplacé : une fiche de plus (la marge), autant de lieux au programme.
     expect(capture.details.length).toBe(reference.fiches + 1);
-    // Ticket 483 : le regroupement est géographique ; le remplaçant change le groupe de son jour, et un lieu de ce groupe
-    // peut ne plus tenir dans son créneau (horaires, trajets) : une étape de moins au plus, jamais une de plus.
-    expect(positions.size).toBeLessThanOrEqual(reference.lieux);
-    expect(positions.size).toBeGreaterThanOrEqual(reference.lieux - 1);
+    expect(positions.size).toBe(reference.lieux);
   });
 
   it("une matrice Routes par jour, chacune avec le logement du jour ; aucun lieu dans deux jours", async () => {
@@ -676,6 +673,36 @@ describe("p0Run, étape finale : arrêts sans programme", () => {
     expect(derniere?.plafonds.find((p) => p.methode === "places_details")?.maxRequetes).toBe(11);
     expect(capture.ordre.filter((appel) => !appel.startsWith("modele:"))).toEqual(["textSearch", "details"]);
     expect(d.requetesSql).toEqual([]);
+  });
+
+  // Mineur 10 de la revue de la PR #490 (Sécurité) : `placesTextSearch − 2 × logements` ≤ 0, aucun candidat ancrable.
+  // Les contrôles de configuration (totalCandidats ≤ candidatsTrouves, candidatsTrouves + 5 ≤ placesTextSearch) ne
+  // l'excluent que si totalCandidats > 5 : recherche.json à 1 candidat, 1 candidat trouvé, 6 Text Search et un brief à
+  // trois logements donnent min(1, 6 − 2 × 3) = 0. `briefTientDansLeMode` refuse ce brief ; l'étape s'arrête quand même.
+  it("plafond de recherche nul (placesTextSearch − 2 × logements ≤ 0) : arrêt pipeline_failed avant tout appel, jamais une recherche à un candidat", async () => {
+    d.modeReel = { ...MODE_REEL, candidatsTrouves: 1, placesTextSearch: 6 };
+    const brut = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/briefs/edimbourg-1.json"), "utf8")) as Record<string, unknown>;
+    const logements = [1, 2, 2].map((nuits, rang) => ({ texte: `Logement ${rang + 1}`, nuits }));
+    vi.resetModules();
+    vi.doMock("../../../prototype/briefs/edimbourg-1.json", () => ({ default: { ...brut, logements } }));
+    const recherche = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/config/recherche.json"), "utf8")) as Record<string, unknown>;
+    vi.doMock("../../../prototype/config/recherche.json", () => ({
+      default: { ...recherche, ciblesParCreneau: { activity: 1, meal: 1, evening: 1 }, totalCandidats: 1 },
+    }));
+    try {
+      const p0 = await import("@/workflows/p0-run");
+      expect(p0.briefTientDansLeMode("reel", "edimbourg-1.json")).toBe(false);
+      capture = { requetes: [], textSearch: [], details: [], matrices: [], ordre: [] };
+      const compositions = d.composerP0Reel.mock.calls.length;
+      expect((await refus(p0.etapeRecherche({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+      expect(d.composerP0Reel.mock.calls.length).toBe(compositions);
+      expect(capture.ordre).toEqual([]);
+      expect(d.etat.lignes).toEqual([]);
+    } finally {
+      vi.doUnmock("../../../prototype/briefs/edimbourg-1.json");
+      vi.doUnmock("../../../prototype/config/recherche.json");
+      vi.resetModules();
+    }
   });
 
   it("formule de classement invalide : config_invalid avant toute composition de l'étape finale", async () => {

@@ -11,21 +11,21 @@ import type { CandidatNote, Notes } from "@/prototype/candidat";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import {
   classementParType,
-  demandeBornee,
-  demandeDuJour,
   identifiantDuVoyage,
   joursDuSejour,
   lireClassement,
   planifierLeJour,
-  TYPES_SERIE,
 } from "@/server/p0/moteur-final";
 import {
   briefDepuisBrief,
   candidatVersMoteur,
+  demandeBornee,
+  demandeDuJour,
   engagementsDepuisBrief,
   modeDeTrajet,
   nuitsDepuisBrief,
   relecturesDepuisAncrages,
+  TYPES_SERIE,
 } from "@/server/p0/vers-moteur";
 
 /**

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CandidatExtraitSchema } from "@/ai/sorties";
-import { creneauCompte, creneauDe } from "@/research/agent";
+import { ciblesAtteintes, creneauCompte, creneauDe } from "@/research/agent";
 
 /**
  * Ticket 483 (essai rome-1 du 2026-10-18) : les cibles de l'agent se comptent comme la planification remplit ses
@@ -22,6 +22,27 @@ describe("p0: créneau compté par l'agent de recherche (ticket 483)", () => {
     expect(creneauCompte({ typeEtape: "activity", slotFit: ["activity", "evening"] }, false)).toBe("activity");
     expect(creneauCompte({ typeEtape: "activity", slotFit: ["evening"] }, false)).toBe("evening");
     expect(creneauCompte({ typeEtape: "activity", slotFit: ["activity"] }, true)).toBe("activity");
+  });
+
+  // Mineur 11 de la revue de la PR #490 (Sécurité) : fin de la boucle cohérente avec `creneauCompte`.
+  it("fin de la boucle : cibles comptées comme creneauCompte ; des événements seuls ne servent jamais la soirée, seul le total les arrête", () => {
+    const bornes = { ciblesParCreneau: { activity: 2, meal: 1, evening: 1 }, totalCandidats: 6 };
+    // Comptage d'une suite de candidats admis, comme l'agent : la soirée manque tant que sa cible n'est pas atteinte.
+    const compter = (suite: readonly { typeEtape: "activity" | "meal" | "event"; slotFit?: ("activity" | "meal" | "evening")[] }[]) => {
+      const trouves = { activity: 0, meal: 0, evening: 0 };
+      for (const candidat of suite) {
+        const creneau = creneauCompte(candidat, trouves.evening < bornes.ciblesParCreneau.evening);
+        if (creneau !== undefined) trouves[creneau] += 1;
+      }
+      return { trouves, servi: ciblesAtteintes(trouves, suite.length, bornes) };
+    };
+    const evenement = { typeEtape: "event" as const, slotFit: ["evening" as const] };
+    expect(compter([evenement, evenement, evenement, evenement, evenement])).toEqual({ trouves: { activity: 0, meal: 0, evening: 0 }, servi: false });
+    expect(compter(Array.from({ length: 6 }, () => evenement)).servi).toBe(true);
+    // Une activité du soir sert la soirée ; la suivante, qui convient aussi le jour, compte en activité.
+    const soir = { typeEtape: "activity" as const, slotFit: ["activity" as const, "evening" as const] };
+    expect(compter([soir, soir, { typeEtape: "activity" }, { typeEtape: "meal" }])).toEqual({ trouves: { activity: 2, meal: 1, evening: 1 }, servi: true });
+    expect(compter([{ typeEtape: "activity" }, { typeEtape: "activity" }, { typeEtape: "meal" }, evenement]).servi).toBe(false);
   });
 
   it("mesures de evals/ inchangées : creneauDe classe encore par type d'étape", () => {

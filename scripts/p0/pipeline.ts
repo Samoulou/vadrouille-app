@@ -22,7 +22,7 @@ import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
 import { assembler, type Raison } from "@/server/p0/assemblage";
 import {
-  bornesDepuisConfig,
+  bornesDepuisDemande,
   candidatPourModele,
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
@@ -45,6 +45,7 @@ import { RapportSchema, type Rapport } from "./rapport";
 import {
   briefDepuisBrief,
   candidatVersMoteur,
+  demandesDuSejour,
   engagementsDepuisBrief,
   evenementVersMoteur,
   modeDeTrajet,
@@ -142,6 +143,27 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     // les logements de P0 partent par `ComplementP0`, pour P0 seulement (B7-PO-1), prompts et octets inchangés.
     const entreeIa = entreeModelesDepuisBrief(brief);
     const complement = complementDepuisBrief(brief);
+    // Squelette du séjour : il ne dépend que du brief (nombre de nuits), pas des lieux ancrés.
+    const briefMoteur = briefDepuisBrief(brief);
+    const joursSquelette = squelette({
+      voyage: { start: brief.arrivee, end: brief.depart },
+      pace: briefMoteur.pace,
+      nombreDeNuits: nuitsDepuisBrief(brief, []).length,
+      engagements: engagementsDepuisBrief(brief),
+      configuration: configuration.moteur,
+      budgetTrajetReduit: false,
+    });
+    // Mineur 3 de la revue de la PR #490 : mêmes cibles que `p0Run` (exécution comptée), par le même chemin
+    // (`demandesDuSejour` puis `bornesDepuisDemande`). Une seule matrice ici : la demande n'est pas bornée par jour.
+    // Plafond : Text Search moins une requête par logement (une par candidat à l'ancrage) ; plafond nul : arrêt avant
+    // tout appel, comme un plafond atteint. `candidatsTrouves` n'y entre pas : ici il reste un fusible qui arrête
+    // l'exécution (`cost_cap_reached`, tests/unit/p0/pipeline.test.ts), au lieu de devenir une cible.
+    const bornes = bornesDepuisDemande(
+      configuration.recherche,
+      demandesDuSejour(joursSquelette, configuration.moteur).serie,
+      configuration.plafonds.placesTextSearch - brief.logements.length,
+    );
+    if (bornes === null) throw new PlafondAtteint("placesTextSearch");
     // Étapes 2 et 3 : plan et recherche bornée. L'agent ne voit aucun résultat d'ancrage et ne sera pas relancé.
     const resultatAgent = await chrono("recherche", () =>
       chercherCandidats(entreeIa, {
@@ -150,7 +172,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
         routage,
         recherche,
         lecteur,
-        bornes: bornesDepuisConfig(configuration.recherche),
+        bornes,
         complement,
         protegees: donneesProtegeesDepuisBrief(brief),
       }),
@@ -215,15 +237,6 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     const ancragesParPlace = new Map<string, AncrageResolu>();
     for (const ancrage of [...logements, ...ancrages.values()]) ancragesParPlace.set(ancrage.placeId, ancrage);
     const relectures = relecturesDepuisAncrages(ancragesParPlace, nuits, trajetsMemoire);
-    const briefMoteur = briefDepuisBrief(brief);
-    const joursSquelette = squelette({
-      voyage: { start: brief.arrivee, end: brief.depart },
-      pace: briefMoteur.pace,
-      nombreDeNuits: nuits.length,
-      engagements: engagementsDepuisBrief(brief),
-      configuration: configuration.moteur,
-      budgetTrajetReduit: false,
-    });
     const planifies = await chrono("planification", () =>
       planifier({
         jours: joursSquelette,

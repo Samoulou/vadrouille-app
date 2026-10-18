@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as ecriture from "@/adapters/prototype-ecriture";
 import type { GardeOuverte } from "@/server/p0/garde";
 import { LIMITES_PROTOTYPE } from "@/server/usage/forfait";
-import { bornesRechercheDuBrief, briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
+import { bornesRechercheDuBriefPourTests, briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
 
 /**
  * Pièces du lancement lues dans le pont `p0Run` (P0r3d) : forfait et règles de la réservation (0046 D13 point 3 ; 0053 ;
@@ -37,8 +37,8 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     const rechercheEssai = lireJson("prototype/config/recherche-essai.json") as { ciblesParCreneau: Record<string, number>; totalCandidats: number };
     // Rome : 19 activités, 9 repas, 4 soirées demandés → 25, 14 (plancher de recherche.json), 6 ; 45 au total (23 trouvés
     // lors de l'essai du 2026-10-18 sous l'ancien total de 40).
-    expect(bornesRechercheDuBrief("reel", "rome-1.json")?.ciblesParCreneau).toEqual({ activity: 25, meal: 14, evening: 6 });
-    expect(Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, bornesRechercheDuBrief("reel", nom)?.totalCandidats]))).toEqual({
+    expect(bornesRechercheDuBriefPourTests("reel", "rome-1.json")?.ciblesParCreneau).toEqual({ activity: 25, meal: 14, evening: 6 });
+    expect(Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, bornesRechercheDuBriefPourTests("reel", nom)?.totalCandidats]))).toEqual({
       "edimbourg-1.json": 52,
       "edimbourg-2.json": 43,
       "edimbourg-3.json": 52,
@@ -46,7 +46,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
       "rome-1.json": 45,
     });
     for (const nom of NOMS_BRIEFS) {
-      const bornes = bornesRechercheDuBrief("reel", nom);
+      const bornes = bornesRechercheDuBriefPourTests("reel", nom);
       expect(bornes, nom).not.toBeNull();
       const somme = (bornes?.ciblesParCreneau.activity ?? 0) + (bornes?.ciblesParCreneau.meal ?? 0) + (bornes?.ciblesParCreneau.evening ?? 0);
       expect(somme, nom).toBeLessThanOrEqual(bornes?.totalCandidats ?? 0);
@@ -56,10 +56,10 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
       expect(bornes?.toursMax, nom).toBe(recherche.toursMax);
       expect((bornes?.toursMax ?? 0) * 30, nom).toBeGreaterThanOrEqual(bornes?.totalCandidats ?? Infinity);
       // Essai : profil fixe de recherche-essai.json (décision 0073 point 4, réservée à Samuel).
-      expect(bornesRechercheDuBrief("essai", nom)?.ciblesParCreneau, nom).toEqual(rechercheEssai.ciblesParCreneau);
-      expect(bornesRechercheDuBrief("essai", nom)?.totalCandidats, nom).toBe(rechercheEssai.totalCandidats);
+      expect(bornesRechercheDuBriefPourTests("essai", nom)?.ciblesParCreneau, nom).toEqual(rechercheEssai.ciblesParCreneau);
+      expect(bornesRechercheDuBriefPourTests("essai", nom)?.totalCandidats, nom).toBe(rechercheEssai.totalCandidats);
     }
-    expect(bornesRechercheDuBrief("reel", "absent.json")).toBeNull();
+    expect(bornesRechercheDuBriefPourTests("reel", "absent.json")).toBeNull();
   });
 
   it("ticket 400 et décision 0073 : brief dans les plafonds du mode ; essai et mode réel admettent les cinq briefs (rome-1 compris, ticket 478)", () => {

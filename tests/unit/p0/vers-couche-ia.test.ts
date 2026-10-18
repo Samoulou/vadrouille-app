@@ -256,20 +256,32 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
       ageSourceMaxJours: config.ageSourceMaxJours,
     });
     // 10 × 1,3 = 13 tout juste (aucune erreur d'arrondi flottant) ; 20 × 1,3 = 26.
-    expect(bornesDepuisDemande(config, { activity: 10, meal: 10, evening: 0 }, 85).ciblesParCreneau.meal).toBe(14);
-    expect(bornesDepuisDemande(config, { activity: 10, meal: 20, evening: 0 }, 85).ciblesParCreneau.meal).toBe(26);
-    expect(bornesDepuisDemande(config, { activity: 0, meal: 10, evening: 0 }, 85).ciblesParCreneau.meal).toBe(14);
-    expect(bornesDepuisDemande({ ...config, ciblesParCreneau: { activity: 1, meal: 1, evening: 1 } }, { activity: 0, meal: 10, evening: 0 }, 85).ciblesParCreneau.meal).toBe(13);
+    const cibles = (demande: { activity: number; meal: number; evening: number }, plafond = 85, c = config) =>
+      bornesDepuisDemande(c, demande, plafond)?.ciblesParCreneau;
+    expect(cibles({ activity: 10, meal: 10, evening: 0 })?.meal).toBe(14);
+    expect(cibles({ activity: 10, meal: 20, evening: 0 })?.meal).toBe(26);
+    expect(cibles({ activity: 0, meal: 10, evening: 0 })?.meal).toBe(14);
+    expect(cibles({ activity: 0, meal: 10, evening: 0 }, 85, { ...config, ciblesParCreneau: { activity: 1, meal: 1, evening: 1 } })?.meal).toBe(13);
     // Petite demande : les cibles de recherche.json restent un plancher.
     expect(bornesDepuisDemande(config, { activity: 1, meal: 1, evening: 0 }, 85)).toEqual(bornesDepuisConfig(config));
     // Au-delà du plafond : cibles réduites en proportion, total au plafond, bornes toujours valides.
     const borne = bornesDepuisDemande(config, { activity: 80, meal: 40, evening: 10 }, 85);
+    if (borne === null) throw new Error("borne attendue");
     const somme = borne.ciblesParCreneau.activity + borne.ciblesParCreneau.meal + borne.ciblesParCreneau.evening;
     expect(somme).toBeLessThanOrEqual(85);
     expect(borne.totalCandidats).toBe(somme);
     expect(borne.ciblesParCreneau.activity).toBeGreaterThan(borne.ciblesParCreneau.meal);
-    for (const bornes of [rome, borne, bornesDepuisDemande(config, { activity: 5, meal: 5, evening: 5 }, 2)]) {
+    for (const bornes of [rome, borne, bornesDepuisDemande(config, { activity: 5, meal: 5, evening: 5 }, 2), bornesDepuisDemande(config, { activity: 5, meal: 5, evening: 5 }, 1)]) {
+      expect(bornes).not.toBeNull();
       expect(BornesRechercheSchema.safeParse(bornes).success).toBe(true);
     }
+  });
+
+  // Mineur 10 de la revue de la PR #490 (Sécurité) : plafond nul ou négatif (`placesTextSearch − 2 × logements` ≤ 0),
+  // aucune recherche au lieu d'une recherche ramenée à un candidat.
+  it("bornes depuis la demande : plafond inférieur à 1 (nul, négatif, NaN) : null, l'appelant s'arrête", () => {
+    const config = ConfigRechercheSchema.parse(lire("prototype/config/recherche.json"));
+    for (const plafond of [0, 0.5, -1, -40, Number.NaN]) expect(bornesDepuisDemande(config, { activity: 19, meal: 9, evening: 4 }, plafond), String(plafond)).toBeNull();
+    expect(bornesDepuisDemande(config, { activity: 19, meal: 9, evening: 4 }, 1)?.totalCandidats).toBe(1);
   });
 });

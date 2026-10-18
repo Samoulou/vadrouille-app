@@ -140,19 +140,23 @@ export const MARGE_CIBLES_POURCENT = 30;
  * `MARGE_CIBLES_POURCENT` (arrondi au-dessus). Total visé : le plus grand du total de `recherche.json` et de la somme des
  * cibles. Le tout borné par `plafond` (candidats que l'exécution peut trouver et ancrer) : au-delà, chaque cible est
  * réduite en proportion (arrondi au-dessous). `toursMax` et `ageSourceMaxJours` restent ceux de la configuration.
+ * Plafond inférieur à 1 (aucun candidat ancrable, par exemple `placesTextSearch − 2 × logements` ≤ 0) : `null`, l'appelant
+ * s'arrête au lieu de chercher (mineur 10 de la revue de la PR #490). Seul chemin de calcul des cibles, pour `p0Run`
+ * comme pour `pnpm p0` (mineur 3) ; la demande vient de `demandesDuSejour` (`vers-moteur.ts`).
  */
 export function bornesDepuisDemande(
   config: Parameters<typeof bornesDepuisConfig>[0],
   demande: { readonly activity: number; readonly meal: number; readonly evening: number },
   plafond: number,
-): BornesRechercheP0 {
+): BornesRechercheP0 | null {
+  if (!(Math.floor(plafond) >= 1)) return null;
   const base = bornesDepuisConfig(config);
   // Entiers seulement : 10 × 130 / 100 = 13 exactement, sans erreur d'arrondi flottant.
   const avecMarge = (valeur: number) => Math.ceil((Math.max(0, valeur) * (100 + MARGE_CIBLES_POURCENT)) / 100);
   let activity = Math.max(base.ciblesParCreneau.activity, avecMarge(demande.activity));
   let meal = Math.max(base.ciblesParCreneau.meal, avecMarge(demande.meal));
   let evening = Math.max(base.ciblesParCreneau.evening, avecMarge(demande.evening));
-  const maximum = Math.max(1, Math.floor(plafond));
+  const maximum = Math.floor(plafond);
   const somme = activity + meal + evening;
   if (somme > maximum) {
     const reduire = (valeur: number) => Math.floor((valeur * maximum) / somme);

@@ -291,6 +291,97 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
     expect(trois.filter((groupe) => zones(groupe) > 1).length).toBeLessThanOrEqual(1);
   });
 
+  // Mineur 6 de la revue de la PR #490 : la distance range, elle n'écarte aucun lieu mieux classé.
+  it("plus de lieux que les parts : les mieux classés de chaque type sont retenus, jamais un plus proche moins bien classé", () => {
+    // Ordre d'entrée = classement : a1 (loin, bien classé) avant les trois activités proches du repas.
+    const lieux = [
+      lieu("loin", "activity", 55.95, -3.0),
+      lieu("repas", "meal", 55.95, -3.19),
+      lieu("proche1", "activity", 55.95, -3.191),
+      lieu("proche2", "activity", 55.95, -3.192),
+      lieu("proche3", "activity", 55.95, -3.193),
+    ];
+    const groupes = regrouperParJour(lieux, [jour(2, 1, 0, 10)]);
+    expect(groupes).toEqual([["loin", "repas", "proche1"]]);
+    // Deux jours : les trois premières activités du classement, réparties par proximité ; proche3 n'entre pas.
+    const deux = regrouperParJour(lieux, [jour(2, 1, 0, 10), jour(1, 0, 0, 10)]);
+    expect(deux.flat().sort()).toEqual(["loin", "proche1", "proche2", "repas"]);
+  });
+
+  // Mineur 7 de la revue de la PR #490 : capacité d'un jour inférieure à sa demande.
+  it("capacité inférieure à la demande : les types prioritaires (repas) sont servis d'abord ; sans priorité, ordre des clés", () => {
+    const lieux = [
+      lieu("a1", "activity", 55.95, -3.19),
+      lieu("a2", "activity", 55.95, -3.191),
+      lieu("a3", "activity", 55.95, -3.192),
+      lieu("m1", "meal", 55.95, -3.193),
+      lieu("m2", "meal", 55.95, -3.194),
+    ];
+    const serre = [jour(3, 2, 0, 3)];
+    expect(regrouperParJour(lieux, serre, { typesPrioritaires: ["meal", "evening"] })).toEqual([["a1", "m1", "m2"]]);
+    expect(regrouperParJour(lieux, serre)).toEqual([["a1", "a2", "a3"]]);
+  });
+
+  // Mineur 9 de la revue de la PR #490 : non-régression, la capacité de la matrice Routes du jour n'est jamais dépassée.
+  it("capacités serrées : aucun jour au-delà de sa capacité ni de sa demande par type, aucun lieu deux fois", () => {
+    const types: Type[] = ["activity", "meal", "evening"];
+    const typeDe = (k: number): Type => (k % 3 === 0 ? "activity" : k % 3 === 1 ? "meal" : "evening");
+    const lieux = Array.from({ length: 40 }, (_, k) => lieu(`l${k}`, typeDe(k), 55.9 + ((k * 7) % 11) * 0.004, -3.25 + ((k * 5) % 13) * 0.006));
+    const demandes = [jour(4, 2, 1, 0), jour(4, 2, 1, 1), jour(4, 2, 1, 2), jour(3, 2, 1, 3), jour(4, 2, 1, 5), jour(4, 2, 1, 7), jour(4, 1, 0, 20)];
+    for (let decalage = 0; decalage < demandes.length; decalage += 1) {
+      const jours = [...demandes.slice(decalage), ...demandes.slice(0, decalage)];
+      for (const options of [{}, { typesPrioritaires: ["meal", "evening"] as Type[] }]) {
+        for (const n of [5, 12, 25, 40]) {
+          const groupes = regrouperParJour(lieux.slice(0, n), jours, options);
+          expect(new Set(groupes.flat()).size).toBe(groupes.flat().length);
+          groupes.forEach((groupe, rang) => {
+            const attendu = jours.at(rang);
+            expect(groupe.length).toBeLessThanOrEqual(attendu?.capacite ?? 0);
+            for (const type of types) {
+              const nombre = groupe.filter((id) => lieux.find((l) => l.id === id)?.type === type).length;
+              const demande = new Map(Object.entries(attendu?.demande ?? {}));
+              expect(nombre).toBeLessThanOrEqual(demande.get(type) ?? 0);
+            }
+          });
+        }
+      }
+    }
+  });
+
+  // Bloquant 2 de la revue de la PR #490 (p0-run-finale, « lieu fermé définitivement ») : un lieu fermé toute la fenêtre
+  // d'un jour (horaires de sa fiche) n'y est mis qu'en dernier recours.
+  it("jours de fermeture : un lieu fermé un jour va dans un autre jour s'il le peut ; sinon en dernier recours", () => {
+    // Quartier A (a1 à a3), quartier B (b1 à b3) ; a2 est fermé le jour 0, qui est centré sur A.
+    const lieux = [
+      lieu("a1", "activity", 55.95, -3.19),
+      lieu("b1", "activity", 55.95, -3.11),
+      { ...lieu("a2", "activity", 55.951, -3.191), fermeLes: [0] },
+      lieu("b2", "activity", 55.951, -3.111),
+      lieu("a3", "activity", 55.952, -3.189),
+      lieu("b3", "activity", 55.952, -3.109),
+    ];
+    const jours = [jour(3, 0, 0, 10), jour(3, 0, 0, 10)];
+    const sansFermeture = regrouperParJour(
+      lieux.map(({ id, type, position }) => ({ id, type, position })),
+      jours,
+    );
+    expect(sansFermeture).toEqual([
+      ["a1", "a2", "a3"],
+      ["b1", "b2", "b3"],
+    ]);
+    const groupes = regrouperParJour(lieux, jours);
+    expect(groupes[0]).not.toContain("a2");
+    expect(groupes[1]).toContain("a2");
+    expect(groupes.flat().sort()).toEqual(["a1", "a2", "a3", "b1", "b2", "b3"]);
+    // Fermé tous les jours : toujours regroupé (la planification décidera), jamais écarté par le regroupement.
+    const partout = regrouperParJour([{ ...lieu("x", "activity", 0, 0), fermeLes: [0, 1] }, lieu("y", "activity", 0, 0.001)], [jour(1, 0, 0, 5), jour(1, 0, 0, 5)]);
+    expect(partout.flat().sort()).toEqual(["x", "y"]);
+    // Le classement prime : seul retenu (part de 1), le premier du classement est mis même fermé, jamais remplacé par un
+    // lieu ouvert moins bien classé.
+    const centre = regrouperParJour([{ ...lieu("f", "activity", 0, 0), fermeLes: [0] }, lieu("o", "activity", 0, 0.001)], [jour(1, 0, 0, 5)]);
+    expect(centre).toEqual([["f"]]);
+  });
+
   it("déterministe : mêmes entrées, mêmes groupes", () => {
     const jours = [jour(2, 1, 1, 4), jour(2, 1, 1, 4)];
     expect(regrouperParJour(LIEUX, jours)).toEqual(regrouperParJour(LIEUX, jours));
