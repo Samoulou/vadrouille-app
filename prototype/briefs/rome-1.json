@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "destination": "Rome",
+  "pays": "Italie",
+  "fuseau": "Europe/Rome",
+  "arrivee": "2027-05-04",
+  "depart": "2027-05-08",
+  "heureArrivee": "12:00",
+  "heureDepart": "16:00",
+  "voyageurs": { "adultes": 2, "enfants": 0 },
+  "rythme": "equilibre",
+  "envies": ["heritage", "museum", "walk", "restaurant", "tasting"],
+  "deplacements": ["walk", "transit"],
+  "budgetRepas": 2,
+  "logements": [{ "texte": "Rione Monti (près du Colisée), Rome", "nuits": 4 }],
+  "recit": "Avec ma femme, on va à Rome du 04.05.2027 au 08.05.2027. On aime visiter, on n'aura pas de voiture donc à pied et transport en commun, on adore bien manger, mais le soir, on veut découvrir les carbonara romaines, boire l'apéro en fin d'après-midi avant d'aller au resto, à midi on peut facilement manger un truc rapide genre panini à l'emporter. On veut surtout visiter la ville, les monuments et s'immerger dans la Rome antique."
+}

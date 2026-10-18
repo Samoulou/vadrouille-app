@@ -30,11 +30,11 @@ beforeEach(() => {
 });
 
 describe("p0Run : pièces du lancement (P0r3d)", () => {
-  it("ticket 400 et décision 0073 : brief dans les plafonds du mode ; essai et mode réel admettent les quatre briefs", () => {
+  it("ticket 400 et décision 0073 : brief dans les plafonds du mode ; essai et mode réel admettent les cinq briefs (rome-1 compris, ticket 478)", () => {
     const table = Object.fromEntries((["essai", "reel"] as const).map((mode) => [mode, Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, briefTientDansLeMode(mode, nom)]))]));
     expect(table).toEqual({
-      essai: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true },
-      reel: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true },
+      essai: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true, "rome-1.json": true },
+      reel: { "edimbourg-1.json": true, "edimbourg-2.json": true, "edimbourg-3.json": true, "edimbourg-court.json": true, "rome-1.json": true },
     });
     expect(briefTientDansLeMode("essai", "absent.json")).toBe(false);
     expect(briefTientDansLeMode("demo" as "reel", "edimbourg-court.json")).toBe(false);
@@ -52,6 +52,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
       "edimbourg-2.json": false,
       "edimbourg-3.json": false,
       "edimbourg-court.json": true,
+      "rome-1.json": false,
     });
     vi.doUnmock("../../../prototype/config/essai.json");
     vi.resetModules();
