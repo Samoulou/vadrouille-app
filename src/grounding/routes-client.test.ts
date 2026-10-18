@@ -180,33 +180,90 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     expect(port.lignes).toEqual([]);
   });
 
+  // Ticket 493 : une réponse lisible ne lève plus ; toute incertitude donne une durée inconnue (null), jamais une durée
+  // attribuée à une autre paire. Requête : origine A ; destinations B (index 0) et C (index 1).
   it.each([
-    ["matrice incomplète (une paire manquante)", [{ originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" }]],
+    ["matrice incomplète (une paire manquante)", [{ originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" }], [[null, 60]]],
     [
-      "paire répétée",
+      "paire répétée (même durée ou non) : inconnue",
       [
+        { originIndex: 0, destinationIndex: 0, duration: "30s", condition: "ROUTE_EXISTS" },
         { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
         { originIndex: 0, destinationIndex: 1, duration: "90s", condition: "ROUTE_EXISTS" },
       ],
+      [[30, null]],
     ],
     [
-      "index absent qui répète une paire (lu 0, déjà présente)",
+      "index absent qui répète une paire (lu 0, déjà présente) : cette paire inconnue",
       [
         { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" },
         { originIndex: 0, duration: "90s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: "120s", condition: "ROUTE_EXISTS" },
       ],
+      [[null, 120]],
     ],
     [
-      "élément en trop",
-      [
-        { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" },
-        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
-        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" },
-      ],
+      "élément en erreur sans index (forme possible d'un élément en échec) : il ne prend jamais la place de 0:0",
+      [{}, { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" }, { destinationIndex: 1, duration: "45s", condition: "ROUTE_EXISTS" }],
+      [[null, 45]],
     ],
-  ])("%s : invalid_response (jamais une durée attribuée à une autre paire)", async (_nom, elements) => {
+    [
+      "statut d'erreur par élément (google.rpc.Status) : inconnue, même avec une durée",
+      [
+        { originIndex: 0, destinationIndex: 0, status: { code: 5, message: "SENTINELLE" }, duration: "60s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, status: {}, duration: "75s", condition: "ROUTE_EXISTS" },
+      ],
+      [[null, 75]],
+    ],
+    [
+      "sans route (ROUTE_NOT_FOUND) ou condition omise (UNSPECIFIED) : inconnue",
+      [
+        { originIndex: 0, destinationIndex: 0, condition: "ROUTE_NOT_FOUND" },
+        { originIndex: 0, destinationIndex: 1, duration: "75s" },
+      ],
+      [[null, null]],
+    ],
+    [
+      "durée fractionnaire documentée (« 3.5s »)",
+      [
+        { originIndex: 0, destinationIndex: 0, duration: "3.5s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: "1754.000000001s", condition: "ROUTE_EXISTS" },
+      ],
+      [[3.5, 1754.000000001]],
+    ],
+    [
+      "durée mal formée (négative, sans unité, nombre) : inconnue",
+      [
+        { originIndex: 0, destinationIndex: 0, duration: "-3s", condition: "ROUTE_EXISTS" },
+        { originIndex: 0, destinationIndex: 1, duration: 60, condition: "ROUTE_EXISTS" },
+      ],
+      [[null, null]],
+    ],
+    [
+      "champs en plus (localizedValues, fallbackInfo, travelAdvisory, condition inconnue)",
+      [
+        {
+          originIndex: 0,
+          destinationIndex: 0,
+          duration: "600s",
+          condition: "ROUTE_EXISTS",
+          localizedValues: { duration: { text: "10 min" }, transitFare: { text: "1,50 €" } },
+          fallbackInfo: { routingMode: "FALLBACK_TRAFFIC_UNAWARE" },
+          travelAdvisory: { transitFare: { currencyCode: "EUR", units: "1" } },
+        },
+        { originIndex: 0, destinationIndex: 1, duration: "60s", condition: "ROUTE_CONDITION_FUTURE" },
+      ],
+      [[600, null]],
+    ],
+    [
+      "élément illisible (pas un objet, index non entier) : ignoré",
+      [null, "x", { originIndex: "0", destinationIndex: 1, duration: "60s", condition: "ROUTE_EXISTS" }, { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" }],
+      [[60, null]],
+    ],
+    ["réponse vide", [], [[null, null]]],
+  ] as const)("%s", async (_nom, elements, attendu) => {
     const { client } = monter([async () => json(elements)]);
-    expect((await erreurDe(client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "walk" }))).code).toBe("invalid_response");
+    expect(await client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "transit" })).toEqual({ secondes: attendu });
   });
 
   it("index absent (valeur par défaut omise par le JSON de proto3) : lu 0, dans une matrice complète", async () => {
@@ -220,9 +277,64 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
     expect(await client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "walk" })).toEqual({ secondes: [[60, 90]] });
   });
 
-  it("index hors de la matrice : invalid_response", async () => {
-    const { client } = monter([async () => json([{ originIndex: 3, destinationIndex: 0, duration: "1s", condition: "ROUTE_EXISTS" }])]);
+  it("éléments dans le désordre (exemple documenté en transports en commun) : chacun à sa paire", async () => {
+    const { client } = monter([
+      async () =>
+        json([
+          { originIndex: 1, destinationIndex: 1, status: {}, duration: "2754s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 0, status: {}, duration: "394s", condition: "ROUTE_EXISTS" },
+          { originIndex: 1, destinationIndex: 0, status: {}, duration: "740s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, status: {}, duration: "3049s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    expect(await client.matrice({ origines: ["A1", "A2"], destinations: ["B1", "B2"], mode: "transit" })).toEqual({
+      secondes: [
+        [394, 3049],
+        [740, 2754],
+      ],
+    });
+  });
+
+  it("index hors de la matrice : la réponse ne correspond pas à la requête, toute la matrice inconnue (aucune erreur)", async () => {
+    const { client } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" },
+          { originIndex: 3, destinationIndex: 0, duration: "1s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    expect(await client.matrice({ origines: ["A"], destinations: ["B"], mode: "walk" })).toEqual({ secondes: [[null]] });
+  });
+
+  it.each([
+    ["objet au lieu d'un tableau", { originIndex: 0 }],
+    ["texte", "SENTINELLE"],
+    ["plus de 625 éléments", Array.from({ length: 626 }, () => ({}))],
+  ])("%s : invalid_response", async (_nom, corps) => {
+    const { client } = monter([async () => json(corps)]);
     expect((await erreurDe(client.matrice({ origines: ["A"], destinations: ["B"], mode: "walk" }))).code).toBe("invalid_response");
+  });
+
+  it("matrice TRANSIT de 10 × 10 avec des paires sans route et en erreur : jamais d'erreur, chaque durée à sa paire", async () => {
+    const ids = (prefixe: string) => Array.from({ length: 10 }, (_, i) => `${prefixe}${i}`);
+    const elements: unknown[] = [];
+    for (let de = 0; de < 10; de += 1) {
+      for (let vers = 0; vers < 10; vers += 1) {
+        const element: Record<string, unknown> = { ...(de === 0 ? {} : { originIndex: de }), ...(vers === 0 ? {} : { destinationIndex: vers }) };
+        if ((de + vers) % 7 === 3) element.condition = "ROUTE_NOT_FOUND";
+        else if ((de * vers) % 11 === 5) element.status = { code: 3 };
+        else Object.assign(element, { condition: "ROUTE_EXISTS", duration: `${100 * de + vers}s` });
+        elements.push(element);
+      }
+    }
+    const { client } = monter([async () => json(elements.reverse())]);
+    const { secondes } = await client.matrice({ origines: ids("O"), destinations: ids("D"), mode: "transit" });
+    for (let de = 0; de < 10; de += 1) {
+      for (let vers = 0; vers < 10; vers += 1) {
+        const attendu = (de + vers) % 7 === 3 || (de * vers) % 11 === 5 ? null : 100 * de + vers;
+        expect(secondes.at(de)?.at(vers)).toBe(attendu);
+      }
+    }
   });
 });
 

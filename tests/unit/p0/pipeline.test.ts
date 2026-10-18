@@ -7,6 +7,10 @@ import type { Brief } from "@/prototype/brief";
 import type { Configuration } from "../../../scripts/p0/fichiers";
 import { ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
+import type { ClientRoutes } from "@/grounding/interfaces";
+import { creerPlacesSimule } from "@/grounding/places.simule";
+import { creerRoutesSimule } from "@/grounding/routes.simule";
+
 import { charger, executerCapture } from "./harnais";
 
 /**
@@ -270,6 +274,29 @@ describe("p0: un séjour de 7 jours passe les plafonds Routes", () => {
     expect(resultat.rapport.statut).toBe("complete");
     expect(resultat.programme?.trip.days).toHaveLength(7);
     expect(resultat.rapport.google.routesElements).toBeLessThanOrEqual(configBase.plafonds.routesElements);
+  });
+});
+
+describe("p0: durées Routes inconnues (ticket 493, réponse en transports en commun lue en null)", () => {
+  /** Routes simulé dont une partie des paires (hors diagonale) n'a pas de durée, comme une réponse lue par paire. */
+  const routesTrouees = (garder: (de: number, vers: number) => boolean): ClientRoutes => {
+    const base = creerRoutesSimule(fixturesBase.routes);
+    return {
+      async matrice(requete) {
+        const { secondes } = await base.matrice(requete);
+        return { secondes: secondes.map((ligne, de) => ligne.map((valeur, vers) => (requete.origines[de] === requete.destinations[vers] || garder(de, vers) ? valeur : null))) };
+      },
+    };
+  };
+
+  it.each([
+    ["un tiers des paires sans durée", (de: number, vers: number) => (de + 2 * vers) % 3 !== 0],
+    ["aucune durée hors diagonale", () => false],
+  ])("%s : aucune erreur, aucune violation, forme réduite valide", async (_nom, garder) => {
+    const { resultat } = await executerCapture({ google: { places: creerPlacesSimule(fixturesBase.places), routes: routesTrouees(garder) } });
+    expect(resultat.rapport.statut).toBe("complete");
+    expect(resultat.rapport.violations).toEqual({ R1: 0, R2: 0, R4: 0, R5: 0, R6: 0, R8: 0 });
+    expect(ProgrammeReduitSchema.safeParse(resultat.programme).success).toBe(true);
   });
 });
 

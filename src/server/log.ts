@@ -1,5 +1,6 @@
 import "server-only";
 
+import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
 import { API_ERROR_CODES } from "@/contracts/values";
 
 /**
@@ -46,6 +47,11 @@ export const LOG_EVENTS = [
   // `placeId`, coordonnée, durée ni message de base.
   "voyages.read_failed",
   "voyages.relecture_refused",
+  // Ticket 493 (verdict Sécurité S4 attendu) : arrêt d'une étape de `p0Run`, cause fermée seulement. Champs : `phase`
+  // (`LOG_STEP_PHASES`), `errorName` (classe de l'erreur, liste fermée de `src/server/p0/journal-etape.ts`) et
+  // `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message, aucune donnée Google, aucun identifiant de
+  // lieu ni d'exécution.
+  "p0.step_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -102,6 +108,10 @@ export type LogFields = {
   readonly version?: number;
   /** Numéro de jour (1 = J1). */
   readonly dayIndex?: number;
+  /** Phase d'une étape de `p0Run` arrêtée (`p0.step_failed`, ticket 493) : `LOG_STEP_PHASES`. */
+  readonly phase?: string;
+  /** Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) : `LOG_STEP_FAILURE_CODES`, jamais un message. */
+  readonly failureCode?: string;
 };
 
 /**
@@ -286,6 +296,79 @@ export const LOG_READ_REASONS: readonly string[] = [
   "unavailable",
 ];
 const RAISONS_LECTURE: ReadonlySet<string> = new Set(LOG_READ_REASONS);
+/**
+ * Phases admises dans `phase` (`p0.step_failed`, ticket 493) : celles de `prototype.runs.phase` (`PHASES`,
+ * `src/prototype/arret.ts`), plus trois repères de l'étape finale sans écriture en base : `fiches` (Place Details de
+ * la première série), `routes` (regroupement par jour et matrices du séjour) et `moteur` (planification des jours). Égalité vérifiée par le test
+ * du journal des étapes.
+ */
+export const LOG_STEP_PHASES: readonly string[] = [
+  "recherche",
+  "ancrage",
+  "notation",
+  "planification",
+  "fiches",
+  "routes",
+  "moteur",
+  "raisons",
+  "validation",
+  "ecriture",
+];
+/**
+ * Codes admis dans `failureCode` (`p0.step_failed`, ticket 493) : union des listes fermées des erreurs qu'une étape
+ * peut recevoir (`CODES_ERREUR_GOOGLE`, `CODES_ERREUR_ANCRAGE`, `CODES_ERREUR_IA`, `CODES_ARRET`,
+ * `CODES_ECHEC_TRAVAIL`, `CODES_ECHEC_ECRITURE`, `reduction_refused`), et `autre` pour toute erreur sans code fermé.
+ * Copie écrite ici (le code de clé absente est importé de sa définition unique, `@/ai/erreurs`) ; l'égalité avec l'union est vérifiée par le test du journal
+ * des étapes (`tests/unit/p0/journal-etape.test.ts`).
+ */
+export const LOG_STEP_FAILURE_CODES: readonly string[] = [
+  // Clients Google (`CODES_ERREUR_GOOGLE`).
+  "production_refused",
+  "proxy_env_refused",
+  "tls_env_refused",
+  CODE_CLE_ABSENTE,
+  "cap_reached",
+  "envelope_reached",
+  "daily_quota_insufficient",
+  "usage_unavailable",
+  "invalid_request",
+  "upstream_redirect",
+  "upstream_unavailable",
+  "upstream_timeout",
+  "upstream_rate_limited",
+  "upstream_error",
+  "invalid_response",
+  "upstream_not_found",
+  // Ancrage (`CODES_ERREUR_ANCRAGE`).
+  "place_not_found",
+  "routes_unavailable",
+  "lodging_unresolved",
+  // Couche IA (`CODES_ERREUR_IA`, hors doublons).
+  "data_collection_missing",
+  "model_id_invalid",
+  "model_unavailable",
+  "model_error",
+  "invalid_input",
+  "model_output_invalid",
+  "no_option",
+  // Codes d'arrêt persistés (`CODES_ARRET`, hors doublons).
+  "real_mode_unavailable",
+  "brief_invalid",
+  "config_invalid",
+  "pipeline_failed",
+  // Table de travail et écriture du programme (`CODES_ECHEC_TRAVAIL`, `CODES_ECHEC_ECRITURE`, hors doublons).
+  "execution_absente",
+  "entree_refusee",
+  "base",
+  "phase_deja_passee",
+  "execution_close",
+  // Réduction du programme refusée.
+  "reduction_refused",
+  // Toute autre erreur (erreur de programmation, code inconnu).
+  "autre",
+];
+const PHASES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_PHASES);
+const CODES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_FAILURE_CODES);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXCEPTIONS: ReadonlySet<string> = new Set(LOG_EXIT_EXCEPTIONS);
 const ZONES_OPENSSL: ReadonlySet<string> = new Set(LOG_OPENSSL_CONF_ZONES);
@@ -343,6 +426,8 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],
+  ["phase", (v) => chaine(v) && PHASES_ETAPE.has(v)],
+  ["failureCode", (v) => chaine(v) && CODES_ETAPE.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
