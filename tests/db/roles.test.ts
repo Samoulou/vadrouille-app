@@ -438,7 +438,7 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
  * chacun des 18 rôles. Tout droit absent est refusé.
  */
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
-  // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0012_trajets_prototype).
+  // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
   const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "runs", "trajets"];
   const EXPECTED_PROTOTYPE: Record<string, Record<string, string[]>> = {
     vadrouille_prototype: {

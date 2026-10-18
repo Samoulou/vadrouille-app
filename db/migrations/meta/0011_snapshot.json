@@ -1,6 +1,6 @@
 {
   "id": "af70a49c-0af7-4a16-94b8-ecf0bb9f800c",
-  "prevId": "486f57dd-dfa0-488e-80eb-f3e55d65dfdd",
+  "prevId": "ec957f23-0678-480f-b1fb-8900a689304c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -47,24 +47,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "accounts_user_id_users_id_fk": {
           "name": "accounts_user_id_users_id_fk",
           "tableFrom": "accounts",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -115,9 +115,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "action_rate_limits_expires_at_idx": {
           "name": "action_rate_limits_expires_at_idx",
@@ -130,9 +130,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -196,10 +196,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"memberships\".\"role\" = 'owner'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "memberships_user_id_idx": {
           "name": "memberships_user_id_idx",
@@ -212,48 +212,48 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "memberships_organization_id_organizations_id_fk": {
           "name": "memberships_organization_id_organizations_id_fk",
           "tableFrom": "memberships",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "memberships_user_id_users_id_fk": {
           "name": "memberships_user_id_users_id_fk",
           "tableFrom": "memberships",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "memberships_organization_id_user_id_key": {
           "name": "memberships_organization_id_user_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "user_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -314,10 +314,10 @@
       "uniqueConstraints": {
         "organizations_slug_key": {
           "name": "organizations_slug_key",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -391,9 +391,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "sessions_expires_at_idx": {
           "name": "sessions_expires_at_idx",
@@ -406,47 +406,47 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "sessions_active_organization_id_organizations_id_fk": {
           "name": "sessions_active_organization_id_organizations_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "organizations",
           "columnsFrom": [
             "active_organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "sessions_token_key": {
           "name": "sessions_token_key",
+          "nullsNotDistinct": false,
           "columns": [
             "token"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -498,10 +498,10 @@
       "uniqueConstraints": {
         "users_email_key": {
           "name": "users_email_key",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -564,9 +564,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "verifications_expires_at_idx": {
           "name": "verifications_expires_at_idx",
@@ -579,9 +579,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -669,33 +669,33 @@
         "billing_organization_id_organizations_id_fk": {
           "name": "billing_organization_id_organizations_id_fk",
           "tableFrom": "billing",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "billing_stripe_event_id_key": {
           "name": "billing_stripe_event_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "stripe_event_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "billing_organization_id_id_key": {
           "name": "billing_organization_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -793,42 +793,42 @@
         "briefs_organization_id_organizations_id_fk": {
           "name": "briefs_organization_id_organizations_id_fk",
           "tableFrom": "briefs",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "briefs_trip_fk": {
           "name": "briefs_trip_fk",
           "tableFrom": "briefs",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "briefs_organization_id_trip_id_version_key": {
           "name": "briefs_organization_id_trip_id_version_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "version"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -970,65 +970,65 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "candidates_organization_id_organizations_id_fk": {
           "name": "candidates_organization_id_organizations_id_fk",
           "tableFrom": "candidates",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "candidates_trip_fk": {
           "name": "candidates_trip_fk",
           "tableFrom": "candidates",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "candidates_research_run_fk": {
           "name": "candidates_research_run_fk",
           "tableFrom": "candidates",
+          "tableTo": "research_runs",
           "columnsFrom": [
             "organization_id",
             "research_run_id"
           ],
-          "tableTo": "research_runs",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "candidates_organization_id_id_key": {
           "name": "candidates_organization_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1152,39 +1152,39 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "checklist_items_organization_id_organizations_id_fk": {
           "name": "checklist_items_organization_id_organizations_id_fk",
           "tableFrom": "checklist_items",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "checklist_items_trip_fk": {
           "name": "checklist_items_trip_fk",
           "tableFrom": "checklist_items",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1298,61 +1298,61 @@
         "checkouts_organization_id_organizations_id_fk": {
           "name": "checkouts_organization_id_organizations_id_fk",
           "tableFrom": "checkouts",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "checkouts_created_by_users_id_fk": {
           "name": "checkouts_created_by_users_id_fk",
           "tableFrom": "checkouts",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "checkouts_trip_fk": {
           "name": "checkouts_trip_fk",
           "tableFrom": "checkouts",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "checkouts_stripe_checkout_session_id_key": {
           "name": "checkouts_stripe_checkout_session_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "stripe_checkout_session_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "checkouts_organization_id_request_id_key": {
           "name": "checkouts_organization_id_request_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "request_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1424,57 +1424,57 @@
         "entitlements_organization_id_organizations_id_fk": {
           "name": "entitlements_organization_id_organizations_id_fk",
           "tableFrom": "entitlements",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "entitlements_trip_fk": {
           "name": "entitlements_trip_fk",
           "tableFrom": "entitlements",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "entitlements_billing_fk": {
           "name": "entitlements_billing_fk",
           "tableFrom": "entitlements",
+          "tableTo": "billing",
           "columnsFrom": [
             "organization_id",
             "billing_id"
           ],
-          "tableTo": "billing",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "entitlements_organization_id_trip_id_kind_key": {
           "name": "entitlements_organization_id_trip_id_kind_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "kind"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1594,54 +1594,54 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "event_occurrences_organization_id_organizations_id_fk": {
           "name": "event_occurrences_organization_id_organizations_id_fk",
           "tableFrom": "event_occurrences",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "event_occurrences_trip_fk": {
           "name": "event_occurrences_trip_fk",
           "tableFrom": "event_occurrences",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "event_occurrences_candidate_fk": {
           "name": "event_occurrences_candidate_fk",
           "tableFrom": "event_occurrences",
+          "tableTo": "candidates",
           "columnsFrom": [
             "organization_id",
             "candidate_id"
           ],
-          "tableTo": "candidates",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1744,52 +1744,52 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "feedback_organization_id_organizations_id_fk": {
           "name": "feedback_organization_id_organizations_id_fk",
           "tableFrom": "feedback",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "feedback_created_by_users_id_fk": {
           "name": "feedback_created_by_users_id_fk",
           "tableFrom": "feedback",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "feedback_trip_fk": {
           "name": "feedback_trip_fk",
           "tableFrom": "feedback",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1901,50 +1901,50 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "generation_runs_organization_id_organizations_id_fk": {
           "name": "generation_runs_organization_id_organizations_id_fk",
           "tableFrom": "generation_runs",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "generation_runs_trip_fk": {
           "name": "generation_runs_trip_fk",
           "tableFrom": "generation_runs",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "generation_runs_organization_id_id_key": {
           "name": "generation_runs_organization_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2060,66 +2060,66 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "preference_signals_organization_id_organizations_id_fk": {
           "name": "preference_signals_organization_id_organizations_id_fk",
           "tableFrom": "preference_signals",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "preference_signals_trip_fk": {
           "name": "preference_signals_trip_fk",
           "tableFrom": "preference_signals",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "preference_signals_candidate_fk": {
           "name": "preference_signals_candidate_fk",
           "tableFrom": "preference_signals",
+          "tableTo": "candidates",
           "columnsFrom": [
             "organization_id",
             "candidate_id"
           ],
-          "tableTo": "candidates",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "preference_signals_organization_id_trip_id_request_id_key": {
           "name": "preference_signals_organization_id_trip_id_request_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "request_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2206,37 +2206,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "preferences_organization_id_organizations_id_fk": {
           "name": "preferences_organization_id_organizations_id_fk",
           "tableFrom": "preferences",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "preferences_user_id_users_id_fk": {
           "name": "preferences_user_id_users_id_fk",
           "tableFrom": "preferences",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2354,83 +2354,83 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "proposals_organization_id_organizations_id_fk": {
           "name": "proposals_organization_id_organizations_id_fk",
           "tableFrom": "proposals",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "proposals_trip_fk": {
           "name": "proposals_trip_fk",
           "tableFrom": "proposals",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "proposals_generation_run_fk": {
           "name": "proposals_generation_run_fk",
           "tableFrom": "proposals",
+          "tableTo": "generation_runs",
           "columnsFrom": [
             "organization_id",
             "generation_run_id"
           ],
-          "tableTo": "generation_runs",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "proposals_candidate_fk": {
           "name": "proposals_candidate_fk",
           "tableFrom": "proposals",
+          "tableTo": "candidates",
           "columnsFrom": [
             "organization_id",
             "candidate_id"
           ],
-          "tableTo": "candidates",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "proposals_organization_id_trip_id_generation_run_id_phase_position_key": {
           "name": "proposals_organization_id_trip_id_generation_run_id_phase_position_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "generation_run_id",
             "phase",
             "position"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2564,65 +2564,65 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "research_runs_organization_id_organizations_id_fk": {
           "name": "research_runs_organization_id_organizations_id_fk",
           "tableFrom": "research_runs",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "research_runs_trip_fk": {
           "name": "research_runs_trip_fk",
           "tableFrom": "research_runs",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "research_runs_generation_run_fk": {
           "name": "research_runs_generation_run_fk",
           "tableFrom": "research_runs",
+          "tableTo": "generation_runs",
           "columnsFrom": [
             "organization_id",
             "generation_run_id"
           ],
-          "tableTo": "generation_runs",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "research_runs_organization_id_id_key": {
           "name": "research_runs_organization_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2702,63 +2702,63 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"share_links\".\"revoked_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "share_links_organization_id_organizations_id_fk": {
           "name": "share_links_organization_id_organizations_id_fk",
           "tableFrom": "share_links",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "share_links_created_by_users_id_fk": {
           "name": "share_links_created_by_users_id_fk",
           "tableFrom": "share_links",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "share_links_trip_fk": {
           "name": "share_links_trip_fk",
           "tableFrom": "share_links",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "share_links_token_hash_key": {
           "name": "share_links_token_hash_key",
+          "nullsNotDistinct": false,
           "columns": [
             "token_hash"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2866,39 +2866,39 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "stays_organization_id_organizations_id_fk": {
           "name": "stays_organization_id_organizations_id_fk",
           "tableFrom": "stays",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "stays_trip_fk": {
           "name": "stays_trip_fk",
           "tableFrom": "stays",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3002,64 +3002,64 @@
         "trip_versions_organization_id_organizations_id_fk": {
           "name": "trip_versions_organization_id_organizations_id_fk",
           "tableFrom": "trip_versions",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "trip_versions_author_user_id_users_id_fk": {
           "name": "trip_versions_author_user_id_users_id_fk",
           "tableFrom": "trip_versions",
+          "tableTo": "users",
           "columnsFrom": [
             "author_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "trip_versions_trip_fk": {
           "name": "trip_versions_trip_fk",
           "tableFrom": "trip_versions",
+          "tableTo": "trips",
           "columnsFrom": [
             "organization_id",
             "trip_id"
           ],
-          "tableTo": "trips",
           "columnsTo": [
             "organization_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "trip_versions_organization_id_trip_id_version_key": {
           "name": "trip_versions_organization_id_trip_id_version_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "version"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "trip_versions_organization_id_trip_id_request_id_key": {
           "name": "trip_versions_organization_id_trip_id_request_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "trip_id",
             "request_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -3184,56 +3184,56 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "trips_organization_id_organizations_id_fk": {
           "name": "trips_organization_id_organizations_id_fk",
           "tableFrom": "trips",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "trips_created_by_users_id_fk": {
           "name": "trips_created_by_users_id_fk",
           "tableFrom": "trips",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "trips_organization_id_id_key": {
           "name": "trips_organization_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "trips_organization_id_request_id_key": {
           "name": "trips_organization_id_request_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "organization_id",
             "request_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -3338,9 +3338,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "usage_ledger_organization_id_trip_id_idx": {
           "name": "usage_ledger_organization_id_trip_id_idx",
@@ -3359,24 +3359,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "usage_ledger_organization_id_organizations_id_fk": {
           "name": "usage_ledger_organization_id_organizations_id_fk",
           "tableFrom": "usage_ledger",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3388,10 +3388,10 @@
   },
   "enums": {},
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

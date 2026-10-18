@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { DaySchema, ProposalSchema, TripSchema } from "@/contracts";
-import { cleTrajet, PROTOTYPE_ORG_ID, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver, type ProgrammeReduit } from "@/prototype/programme-reduit";
+import { cleTrajet, PROTOTYPE_ORG_ID, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
 import { createPrototypeAdapterReel, type PaireRelecture, type RelecteurTrajets, type SourceProgrammesReels, type TrajetsConserves } from "./prototype";
 
@@ -30,9 +30,9 @@ function source(trajets: TrajetsConserves): SourceProgrammesReels {
   return { lister: async () => [lu()], lire: async (id) => (id === TRIP_ID ? lu() : null) };
 }
 
-/** Temps de toutes les paires du programme, sauf celles que `garder` écarte. */
+/** Temps conservés de toutes les paires du programme (tous modes), sauf celles que `garder` écarte. */
 function conserves(garder: (paire: PaireRelecture) => boolean = () => true): Map<string, number> {
-  return trajetsAConserver(programme(), (paire) => (garder(paire) ? CONSERVE : undefined));
+  return new Map(pairesDistinctes(pairesDuProgramme(programme())).filter(garder).map((paire) => [cleTrajet(paire), CONSERVE]));
 }
 
 /** Relecteur double : appels notés ; réponse fixe, refus ou exception. */

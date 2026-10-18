@@ -8,13 +8,13 @@ import { ecrireProgramme } from "@/adapters/prototype-ecriture";
 import { createSourceProgrammesReels } from "@/adapters/prototype-lecture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { pairesDistinctes, pairesDuProgramme, PROTOTYPE_ORG_ID, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
+import { pairesAConserver, PROTOTYPE_ORG_ID, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, inTx, type Org, poserExecution, unique } from "./helpers";
 
 /**
- * Temps de trajet conservés des programmes du prototype (décision 0092 § 3 à § 5 ; migration `0012_trajets_prototype`).
+ * Temps de trajet conservés des programmes du prototype (décision 0092 § 3 à § 5 ; migration `0011_trajets_prototype`).
  * Chaque test se connecte avec le rôle qu'il éprouve ; l'administration ne sert qu'à poser des lignes datées (déclencheurs
  * désactivés pour sa seule transaction) et à constater un résultat.
  */
@@ -244,20 +244,20 @@ async function executionValidee(): Promise<string> {
   }
 }
 
-/** Programme de test aux `placeId` et à l'identifiant de voyage propres à l'appel, temps de toutes ses paires. */
+/** Programme de test aux `placeId` et à l'identifiant de voyage propres à l'appel, temps de toutes ses paires du mode `walk`. */
 function entree(runId: string, minutes: number): EcritureProgrammePrototype & { tripId: string } {
   const prefixe = `T${unique()}_`;
   const tripId = `proto_tr${unique()}_1`;
   const programme = ProgrammeReduitSchema.parse(JSON.parse(SOURCE_PROGRAMME.replaceAll("SENTINELLE_PLACE_ID_", prefixe).replaceAll("proto_test_20261012_1", tripId)));
   const { contenu, positions } = decouperProgramme(programme);
-  return { runId, programme: contenu, positions, trajets: trajetsAConserver(contenu, () => minutes), tripId };
+  return { runId, programme: contenu, positions, mode: "walk", trajets: trajetsAConserver(contenu, "walk", () => minutes), tripId };
 }
 
 describe("p0: programme et temps écrits ensemble ou pas du tout, puis lus avec le programme (module, base migrée)", () => {
-  it("réussite : un temps par paire de pairesDuProgramme, expiration du programme ; relus par la source des programmes réels", async () => {
+  it("réussite : un temps par paire de pairesDuProgramme du mode de l'exécution, expiration du programme ; relus par la source des programmes réels", async () => {
     const runId = await executionValidee();
     const e = entree(runId, 9);
-    const paires = pairesDistinctes(pairesDuProgramme(e.programme));
+    const paires = pairesAConserver(e.programme, e.mode);
     expect(paires.length).toBeGreaterThan(0);
     const { programmeId } = await ecrireProgramme(e, pool(proto));
     const lignes = await admin.query(

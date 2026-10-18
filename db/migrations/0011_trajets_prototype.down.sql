@@ -1,4 +1,4 @@
--- Migration inverse de 0012_trajets_prototype (décision 0092 § 3) : rétablit `prototype.purge_expired()` de
+-- Migration inverse de 0011_trajets_prototype (décision 0092 § 3) : rétablit `prototype.purge_expired()` de
 -- 0003_prototype (section 6) à l'identique, sous son propriétaire, puis supprime `prototype.trajets` et son
 -- déclencheur. Exception nommée à la règle « aucune suppression de données » (voir `db/README.md`) : la table ne porte
 -- que des temps de trajet Routes, donnée Google conservée par exception (0092 § 1) et qui doit être supprimée avec son

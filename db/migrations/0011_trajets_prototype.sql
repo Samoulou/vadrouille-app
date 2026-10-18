@@ -1,7 +1,7 @@
--- 0012_trajets_prototype — temps de trajet des programmes du prototype conservés (décision 0092 § 3, décision de Samuel
+-- 0011_trajets_prototype — temps de trajet des programmes du prototype conservés (décision 0092 § 3, décision de Samuel
 -- du 2026-10-18 : exception à 0011 § 1 et à 0027 point 4, pour le prototype seulement). Écrite à la main
 -- (`drizzle-kit generate --custom`). Exécutée par `vadrouille_migrator` dans une transaction, après
--- 0011_arret_limite_google, seulement par le workflow `db-migrate` après l'`owner-approved` de Samuel sur la ligne de
+-- 0010_usage_forfait, seulement par le workflow `db-migrate` après l'`owner-approved` de Samuel sur la ligne de
 -- MIGRATIONS_APPROUVEES (0035, 0056 § 3).
 --
 -- Plan :
@@ -20,7 +20,7 @@
 --
 -- Compatibilité avec la version précédente du code : elle ne nomme pas la table ; la purge reste la même fonction. La
 -- nouvelle version du code avant cette migration ne lit ni n'écrit aucun temps (`to_regclass`, 0092 § 5 point 6).
--- Aucune ligne existante n'est lue, modifiée ni supprimée. Retour arrière : `0012_trajets_prototype.down.sql`.
+-- Aucune ligne existante n'est lue, modifiée ni supprimée. Retour arrière : `0011_trajets_prototype.down.sql`.
 SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
 

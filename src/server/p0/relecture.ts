@@ -19,7 +19,7 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  * (`brancherLectureProgrammesReels`), appelé une fois par Journée relue.
  *
  * Décision 0092 § 4 : l'adaptateur ne l'appelle que pour les paires **sans temps conservé** (programme écrit avant la
- * migration `0012_trajets_prototype`, ou paire absente) ; toutes conservées, il n'est pas appelé. Il n'écrit jamais
+ * migration `0011_trajets_prototype`, ou paire absente) ; toutes conservées, il n'est pas appelé. Il n'écrit jamais
  * les durées qu'il obtient (seule l'étape finale de `p0Run` écrit les temps).
  *
  * À **chaque** relecture, dans cet ordre, le premier refus l'emportant (refus : `{ ok: false }`, aucun appel Routes ;

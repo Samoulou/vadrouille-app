@@ -7,8 +7,7 @@ import {
   PROTOTYPE_ORG_ID,
   cleTrajet,
   minutesTrajetValides,
-  pairesDistinctes,
-  pairesDuProgramme,
+  pairesAConserver,
   placeIdsDuProgramme,
 } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
@@ -29,7 +28,7 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * ses temps**. Valeurs toujours en paramètres liés (§ 1.8) : le texte des requêtes ne contient ni identifiant de lieu,
  * ni coordonnée, ni durée.
  *
- * Compatibilité (0092 § 5 point 6) : tant que la migration `0012_trajets_prototype` n'est pas appliquée, la table
+ * Compatibilité (0092 § 5 point 6) : tant que la migration `0011_trajets_prototype` n'est pas appliquée, la table
  * n'existe pas (`to_regclass`, lu dans la même transaction) et l'étape (ii bis) n'est pas tentée ; le programme est
  * écrit comme avant. Avec `prototype-lecture.ts`, seul module hors de `db/` et `tests/db/` qui nomme
  * `prototype.trajets` (test de confinement).
@@ -57,7 +56,7 @@ const SQLSTATE = /^[0-9A-Z]{5}$/;
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
 const SQL_POSITION = "SELECT public.store_prototype_coordinates($1::uuid, $2::text, $3::double precision, $4::double precision)";
 const SQL_PROGRAMME = "INSERT INTO prototype.programmes (run_id, contenu) VALUES ($1::uuid, $2::jsonb) RETURNING id";
-/** Présence de la table des temps conservés (migration `0012_trajets_prototype`, décision 0092 § 5 point 6). */
+/** Présence de la table des temps conservés (migration `0011_trajets_prototype`, décision 0092 § 5 point 6). */
 export const SQL_TRAJETS_PRESENTS = "SELECT pg_catalog.to_regclass('prototype.trajets') IS NOT NULL AS presente";
 /** Un temps conservé ; `id`, `organization_id` et `expires_at` sont posés par le déclencheur de la base (0092 § 3). */
 export const SQL_TRAJET =
@@ -90,9 +89,11 @@ type LigneTrajet = [mode: string, origine: string, destination: string, minutes:
 
 /**
  * Contrôles avant toute requête (§ 1.10) : identifiant d'exécution, contenu sans `positions` ni clé inconnue, clés de
- * `positions` **égales** à `placeIdsDuProgramme(programme)`, formes et bornes ; clés de `trajets` **incluses** dans les
- * paires de `pairesDuProgramme(programme)` (0092 § 1 point 5), minutes entières entre 0 et 1 440. Rend les positions
- * et les temps dans un ordre fixe.
+ * `positions` **égales** à `placeIdsDuProgramme(programme)`, formes et bornes. Les temps (0092 § 4, « Écriture ») ne
+ * sont pas contrôlés mais **filtrés** : seules les paires de `pairesAConserver(programme, mode)` dont les minutes sont
+ * un entier entre 0 et 1 440 sont retenues ; une paire sans durée, d'un autre mode, hors bornes ou étrangère au
+ * programme est écartée sans refus (jamais un programme payé perdu pour un temps). Rend les positions et les temps
+ * dans un ordre fixe.
  */
 function controler(entree: EcritureProgrammePrototype): { positions: [string, number, number][]; trajets: LigneTrajet[] } {
   if (!UUID.test(entree.runId)) throw new EchecEcritureProgramme("entree_refusee");
@@ -113,19 +114,16 @@ function controler(entree: EcritureProgrammePrototype): { positions: [string, nu
     }
     lignes.push([placeId, position.lat, position.lng]);
   }
-  let paires: ReturnType<typeof pairesDistinctes>;
+  let paires: ReturnType<typeof pairesAConserver>;
   try {
-    paires = pairesDistinctes(pairesDuProgramme(entree.programme));
+    paires = pairesAConserver(entree.programme, entree.mode);
   } catch {
     throw new EchecEcritureProgramme("entree_refusee");
   }
-  const parCle = new Map(paires.map((paire) => [cleTrajet(paire), paire]));
   const trajets: LigneTrajet[] = [];
-  for (const cle of [...entree.trajets.keys()].sort()) {
-    const paire = parCle.get(cle);
-    const minutes = entree.trajets.get(cle);
-    if (paire === undefined || !minutesTrajetValides(minutes)) throw new EchecEcritureProgramme("entree_refusee");
-    trajets.push([paire.mode, paire.origine, paire.destination, minutes]);
+  for (const paire of [...paires].sort((a, b) => (cleTrajet(a) < cleTrajet(b) ? -1 : 1))) {
+    const minutes = entree.trajets.get(cleTrajet(paire));
+    if (minutesTrajetValides(minutes)) trajets.push([paire.mode, paire.origine, paire.destination, minutes]);
   }
   return { positions: lignes, trajets };
 }

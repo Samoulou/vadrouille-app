@@ -393,13 +393,26 @@ export const minutesTrajetValides = (valeur: unknown): valeur is number =>
   typeof valeur === "number" && Number.isInteger(valeur) && valeur >= 0 && valeur <= MINUTES_TRAJET_MAX;
 
 /**
- * Temps à conserver d'un programme (décision 0092 § 4, écriture) : pour chaque paire de `pairesDuProgramme`, la durée
+ * Paires à conserver d'un programme (décision 0092 § 1 point 5 et § 4, écriture) : les paires distinctes de
+ * `pairesDuProgramme` dans le mode unique de l'exécution ; une paire d'un autre mode n'est jamais retenue (elle sera
+ * relue). Seule règle de sélection, partagée par l'étape finale et par `ecrireProgramme`.
+ */
+export function pairesAConserver(programme: ProgrammeDesPaires, mode: ModeTrajet): PaireTrajet[] {
+  return pairesDistinctes(pairesDuProgramme(programme)).filter((paire) => paire.mode === mode);
+}
+
+/**
+ * Temps à conserver d'un programme (décision 0092 § 4, écriture) : pour chaque paire de `pairesAConserver`, la durée
  * sur laquelle le moteur a planifié (`duree`, celle de l'étape finale) ; une paire sans durée connue ou hors bornes
  * n'est pas retenue. Aucune autre paire.
  */
-export function trajetsAConserver(programme: ProgrammeDesPaires, duree: (paire: PaireTrajet) => number | undefined): Map<string, number> {
+export function trajetsAConserver(
+  programme: ProgrammeDesPaires,
+  mode: ModeTrajet,
+  duree: (paire: PaireTrajet) => number | undefined,
+): Map<string, number> {
   const trajets = new Map<string, number>();
-  for (const paire of pairesDistinctes(pairesDuProgramme(programme))) {
+  for (const paire of pairesAConserver(programme, mode)) {
     const minutes = duree(paire);
     if (minutesTrajetValides(minutes)) trajets.set(cleTrajet(paire), minutes);
   }

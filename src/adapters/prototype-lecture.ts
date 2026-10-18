@@ -44,7 +44,7 @@ import type { ProgrammeReelLu, SourceProgrammesReels, TrajetsConserves } from ".
  *   transaction, une requête pour tous les programmes lus (comme les positions), dans `prototype.trajets` (lignes non
  *   expirées, `expires_at > now()` aussi écrit ici) ; rendus à l'adaptateur seulement (`ProgrammeReelLu.trajets`),
  *   jamais journalisés. Une ligne hors forme (mode, identifiant de lieu, minutes entre 0 et 1 440) est ignorée : la
- *   paire est relue. **Compatibilité** (0092 § 5 point 6) : tant que la migration `0012_trajets_prototype` n'est pas
+ *   paire est relue. **Compatibilité** (0092 § 5 point 6) : tant que la migration `0011_trajets_prototype` n'est pas
  *   appliquée, la table n'existe pas (`to_regclass`, lu dans la même transaction, avant toute requête qui la nomme) :
  *   aucun temps n'est lu, tout est relu comme avant. Avec `prototype-ecriture.ts`, seul module hors de `db/` et
  *   `tests/db/` qui nomme `prototype.trajets`.
@@ -73,7 +73,7 @@ WHERE contenu #>> '{trip,id}' = $1::text AND expires_at > pg_catalog.now() LIMIT
 export const SQL_POSITIONS = `SELECT place_id, lat, lng FROM public.place_coordinates
 WHERE place_id = ANY($1::text[]) AND expires_at > pg_catalog.now()`;
 
-/** Présence de la table des temps conservés (migration `0012_trajets_prototype`, décision 0092 § 5 point 6). */
+/** Présence de la table des temps conservés (migration `0011_trajets_prototype`, décision 0092 § 5 point 6). */
 export const SQL_TRAJETS_PRESENTS = "SELECT pg_catalog.to_regclass('prototype.trajets') IS NOT NULL AS presente";
 /**
  * Temps conservés non expirés des programmes lus (décision 0092 § 4) : la politique de `vadrouille_prototype` ne rend

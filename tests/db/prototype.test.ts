@@ -26,7 +26,7 @@ const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 const MIGRATION_PROTOTYPE = readFileSync(path.join(RACINE, "db/migrations/0003_prototype.sql"), "utf8");
 const MIGRATION_COORDONNEES = readFileSync(path.join(RACINE, "db/migrations/0002_place_coordinates.sql"), "utf8");
 
-// `trajets` : décision 0092 (migration 0012_trajets_prototype), éprouvée en détail par `trajets-prototype.test.ts`.
+// `trajets` : décision 0092 (migration 0011_trajets_prototype), éprouvée en détail par `trajets-prototype.test.ts`.
 const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets"] as const;
 const SHA = "a".repeat(40);
 const SIGNATURE_POSITIONS = "store_prototype_coordinates(uuid,text,double precision,double precision)";

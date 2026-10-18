@@ -1,5 +1,7 @@
 import type { ProgrammeReduit } from "@/prototype/programme-reduit";
 
+import type { Segment } from "./trip";
+
 /**
  * Écriture d'un programme du prototype (décision 0052 § 1.10 ; 0055, section 8, ligne P0r3c) : contrat de l'étape
  * finale de `p0Run`, implémenté par le seul module `src/adapters/prototype-ecriture.ts` (aucune autre implémentation,
@@ -11,11 +13,15 @@ import type { ProgrammeReduit } from "@/prototype/programme-reduit";
  *   champ `position` de la fiche Place Details obtenue **dans l'étape finale de cette exécution**, celle sur laquelle le
  *   plan validé a été calculé (§ 1.3) ; jamais une position du cache, de l'ancrage ou de Text Search.
  *
+ * - `mode` (décision 0092 § 1 point 5) : le mode unique de l'exécution, `modeDeTrajet(brief)`, celui de toutes les
+ *   matrices du moteur ;
  * - `trajets` (décision 0092 § 4, exception à 0011 pour le prototype seulement) : temps de trajet en minutes entières,
- *   par clé `cleTrajet` (mode, origine, destination ; `src/prototype/programme-reduit.ts`), pour des paires de
- *   `pairesDuProgramme(programme)` seulement, ceux sur lesquels le moteur a planifié **dans l'étape finale de cette
- *   exécution** (`trajetsAConserver`) ; une paire sans durée connue est absente. Jamais dans un prompt, un journal,
- *   une trace ni un état de workflow.
+ *   par clé `cleTrajet` (mode, origine, destination ; `src/prototype/programme-reduit.ts`), ceux sur lesquels le moteur
+ *   a planifié **dans l'étape finale de cette exécution** (`trajetsAConserver`). `ecrireProgramme` n'écrit, parmi eux,
+ *   que les paires de `pairesAConserver(programme, mode)` dont les minutes sont un entier entre 0 et 1 440 ; toute
+ *   autre entrée est **écartée avant la transaction**, sans refus (`entree_refusee` ne s'y applique pas) : une paire
+ *   écartée est relue à l'affichage et ne fait jamais perdre le programme. Jamais dans un prompt, un journal, une trace
+ *   ni un état de workflow.
  *
  * Aucune autre donnée d'une réponse Place Details ou Routes n'a de place dans ce contrat (§ 1.4) : ni distance, ni
  * condition, ni autre champ de Routes.
@@ -30,6 +36,7 @@ export type EcritureProgrammePrototype = {
   readonly runId: string;
   readonly programme: ContenuProgrammePrototype;
   readonly positions: ReadonlyMap<string, PositionProgrammePrototype>;
+  readonly mode: Segment["mode"];
   readonly trajets: ReadonlyMap<string, number>;
 };
 

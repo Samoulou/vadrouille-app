@@ -950,9 +950,9 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       // 7. Écriture : positions des fiches de cette étape, programme et temps du moteur (0092), ensemble ou pas du tout.
       await passerA("ecriture");
       const decoupe = decouperProgramme(programme);
-      // Temps de la matrice de cette étape (`trajets`, celle du moteur), dans le mode du séjour ; aucune autre requête.
-      const conserves = trajetsAConserver(decoupe.contenu, (paire) => (paire.mode === mode ? trajets(paire.origine, paire.destination) : undefined));
-      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, trajets: conserves }, poolPrototype());
+      // Temps de la matrice de cette étape (`trajets`, celle du moteur), dans le mode unique de l'exécution ; aucune autre requête.
+      const conserves = trajetsAConserver(decoupe.contenu, mode, (paire) => trajets(paire.origine, paire.destination));
+      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, mode, trajets: conserves }, poolPrototype());
     });
   });
 }

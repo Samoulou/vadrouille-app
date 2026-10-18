@@ -76,7 +76,7 @@ const d = vi.hoisted(() => ({
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
-  /** Table des temps conservés présente (migration 0012 appliquée, décision 0092 § 5 point 6). */
+  /** Table des temps conservés présente (migration 0011 appliquée, décision 0092 § 5 point 6). */
   tablePresente: true,
   /** Ticket 493 (0090 § 3 point 8) : le moteur lève à la planification des jours. */
   echecMoteur: false,
@@ -630,6 +630,47 @@ describe("p0Run, étape finale : temps de trajet conservés (décision 0092 § 4
     const premier = textes.indexOf(SQL_TRAJET);
     expect(premier).toBeGreaterThan(programme);
     expect(textes.lastIndexOf(SQL_TRAJET)).toBeLessThan(statut);
+  });
+
+  /**
+   * Paires de `pairesDuProgramme` qu'aucune matrice de l'exécution ne couvre (0092 § 5, « couverture des paires par
+   * `p0Run` »). Liste fermée, vide : sur les doubles, toute paire du programme (lignes des journées, trajets depuis et
+   * vers les logements, trajet des propositions depuis l'étape précédente ou le logement) a une durée dans les
+   * matrices du moteur, dans le mode de l'exécution. Une entrée ajoutée ici est justifiée dans sa PR et relue à
+   * l'affichage.
+   */
+  const PAIRES_NON_COUVERTES: readonly string[] = [];
+
+  it("couverture : toute paire du programme a une durée dans les matrices de l'exécution, logements et propositions compris ; seules les paires non couvertes énumérées manquent", async () => {
+    await jusquAEtapeFinale();
+    await etapeFinale({ runId: RUN_ID });
+    const { contenu } = programmeEcrit();
+    const paires = pairesDuProgramme(contenu as never);
+    const distinctes = pairesDistinctes(paires);
+    // Le programme porte des trajets de journée et de propositions, et des trajets depuis ou vers un logement.
+    expect([...paires.jours.values()].flat().filter((p) => p !== null).length).toBeGreaterThan(0);
+    expect([...paires.propositions.values()].filter((p) => p !== null).length).toBeGreaterThan(0);
+    const logements = new Set((contenu as { terminus: { depart: string; arrivee: string }[] }).terminus.flatMap((t) => [t.depart, t.arrivee]));
+    expect(distinctes.some((p) => logements.has(p.origine) || logements.has(p.destination))).toBe(true);
+    // Mode unique de l'exécution : toutes les matrices le portent, et toutes les paires du programme aussi.
+    const modes = new Set(capture.matrices.map((m) => m.mode));
+    expect(modes.size).toBe(1);
+    const routes = creerRoutesSimule(fixtures.routes);
+    const couverte = async (paire: (typeof distinctes)[number]) => {
+      for (const matrice of capture.matrices) {
+        const a = matrice.origines.indexOf(paire.origine);
+        const b = matrice.destinations.indexOf(paire.destination);
+        if (matrice.mode !== paire.mode || a < 0 || b < 0) continue;
+        const valeur = (await routes.matrice(matrice)).secondes.at(a)?.at(b);
+        if (typeof valeur === "number" && Number.isFinite(valeur)) return true;
+      }
+      return false;
+    };
+    const nonCouvertes: string[] = [];
+    for (const paire of distinctes) if (!(await couverte(paire))) nonCouvertes.push(cleTrajet(paire));
+    expect(nonCouvertes.sort()).toEqual([...PAIRES_NON_COUVERTES].sort());
+    // Les temps écrits sont exactement les paires couvertes : aucune ouverture n'appelle Routes pour elles.
+    expect(tempsEcrits().map((e) => e.cle).sort()).toEqual(distinctes.map(cleTrajet).filter((cle) => !nonCouvertes.includes(cle)).sort());
   });
 
   it("table absente (migration non appliquée) : programme écrit comme avant, aucun temps", async () => {

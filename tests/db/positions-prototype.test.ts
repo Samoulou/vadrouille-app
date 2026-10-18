@@ -70,7 +70,7 @@ function entree(runId: string, lat = 12.5): EcritureProgrammePrototype & { place
   const programme = ProgrammeReduitSchema.parse(JSON.parse(SOURCE_PROGRAMME.replaceAll("SENTINELLE_PLACE_ID_", prefixe)));
   const { contenu, positions } = decouperProgramme(programme);
   const sentinelles = new Map<string, PositionLieu>([...positions.keys()].map((placeId, i) => [placeId, { lat, lng: 40 + i }]));
-  return { runId, programme: contenu, positions: sentinelles, trajets: new Map(), placeIds: [...positions.keys()].sort() };
+  return { runId, programme: contenu, positions: sentinelles, mode: "walk", trajets: new Map(), placeIds: [...positions.keys()].sort() };
 }
 
 /** Pool minimal du module sur une connexion de test ; `intercepter` peut faire échouer une requête avant son envoi. */

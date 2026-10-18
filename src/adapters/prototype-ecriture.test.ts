@@ -16,7 +16,7 @@ import {
 } from "@/adapters/prototype-ecriture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
-import { cleTrajet, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesAConserver, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
@@ -40,6 +40,7 @@ function entree(): EcritureProgrammePrototype {
     runId: RUN_ID,
     programme: contenu,
     positions: new Map([...positions.keys()].map((placeId, i) => [placeId, { lat: LAT, lng: LNG + i / 1000 }])),
+    mode: "walk",
     trajets: new Map(),
   };
 }
@@ -47,10 +48,13 @@ function entree(): EcritureProgrammePrototype {
 /** Minutes sentinelles d'un temps conservé : jamais dans le texte d'une requête ni dans une erreur (0092 § 5). */
 const MINUTES_SENTINELLE = 1237;
 
-/** Entrée avec les temps de toutes les paires du programme (`trajetsAConserver`, comme l'étape finale). */
+/**
+ * Entrée avec un temps pour **toutes** les paires du programme, quel que soit leur mode : le programme de test mêle
+ * `walk` (mode de l'exécution ici) et `transit` ; seules les paires `walk` doivent être écrites (0092 § 1 point 5).
+ */
 function entreeAvecTrajets(): EcritureProgrammePrototype {
   const e = entree();
-  return { ...e, trajets: trajetsAConserver(e.programme, () => MINUTES_SENTINELLE) };
+  return { ...e, trajets: new Map(pairesDistinctes(pairesDuProgramme(e.programme)).map((p) => [cleTrajet(p), MINUTES_SENTINELLE])) };
 }
 
 type Requete = { texte: string; valeurs: readonly unknown[] | undefined };
@@ -180,10 +184,12 @@ describe("p0: échec de la base, transaction annulée, erreur sans valeur (0052 
 });
 
 describe("p0: temps de trajet écrits avec le programme (décision 0092 § 4)", () => {
-  it("programme et temps dans la même transaction : après le programme, avant le statut ; paires de pairesDuProgramme seules", async () => {
+  it("programme et temps dans la même transaction : après le programme, avant le statut ; paires de pairesDuProgramme du mode de l'exécution seules", async () => {
     const e = entreeAvecTrajets();
-    const paires = pairesDistinctes(pairesDuProgramme(e.programme));
+    const paires = pairesAConserver(e.programme, e.mode);
     expect(paires.length).toBeGreaterThan(0);
+    // Le programme de test porte aussi des paires d'un autre mode : présentes dans l'entrée, jamais écrites.
+    expect(pairesDistinctes(pairesDuProgramme(e.programme)).some((p) => p.mode !== e.mode)).toBe(true);
     const { pool, requetes } = poolSimule();
     await ecrireProgramme(e, pool);
     const textes = requetes.map((r) => r.texte);
@@ -208,8 +214,8 @@ describe("p0: temps de trajet écrits avec le programme (décision 0092 § 4)", 
 
   it("une paire sans durée connue n'est pas écrite ; aucun temps : aucune requête sur la table", async () => {
     const e = entree();
-    const [premiere] = pairesDistinctes(pairesDuProgramme(e.programme));
-    const une = { ...e, trajets: trajetsAConserver(e.programme, (p) => (cleTrajet(p) === cleTrajet(premiere!) ? 4 : undefined)) };
+    const [premiere] = pairesAConserver(e.programme, e.mode);
+    const une = { ...e, trajets: trajetsAConserver(e.programme, e.mode, (p) => (cleTrajet(p) === cleTrajet(premiere!) ? 4 : undefined)) };
     const avec = poolSimule();
     await ecrireProgramme(une, avec.pool);
     expect(avec.requetes.filter((r) => r.texte === SQL_TRAJET).map((r) => r.valeurs)).toEqual([["programme-1", premiere!.mode, premiere!.origine, premiere!.destination, 4]]);
@@ -234,15 +240,27 @@ describe("p0: temps de trajet écrits avec le programme (décision 0092 § 4)", 
     expect(requetes.some((r) => r.texte === "COMMIT" || r.texte.startsWith("UPDATE prototype.runs"))).toBe(false);
   });
 
-  it.each<[string, (e: EcritureProgrammePrototype) => EcritureProgrammePrototype]>([
-    ["paire hors du programme", (e) => ({ ...e, trajets: new Map([...e.trajets, ["walk:AUTRE_LIEU:SENTINELLE_PLACE_ID_1", 3]]) })],
-    ["minutes non entières", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? 1.5 : 3])) })],
-    ["minutes négatives", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? -1 : 3])) })],
-    ["minutes au-delà de 1 440", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? 1441 : 3])) })],
-  ])("%s : entree_refusee, aucune connexion", async (_nom, modifier) => {
-    const { pool, compte } = poolSimule();
-    await expect(ecrireProgramme(modifier(entreeAvecTrajets()), pool)).rejects.toMatchObject({ code: "entree_refusee" });
-    expect(compte().connexions).toBe(0);
+  /** Première paire du mode de l'exécution : celle que chaque cas rend invalide. */
+  const cible = (e: EcritureProgrammePrototype) => cleTrajet(pairesAConserver(e.programme, e.mode)[0]!);
+  const avecMinutes = (e: EcritureProgrammePrototype, minutes: number) => ({ ...e, trajets: new Map([...e.trajets, [cible(e), minutes]]) });
+
+  it.each<[string, (e: EcritureProgrammePrototype) => EcritureProgrammePrototype, boolean]>([
+    ["paire hors du programme", (e) => ({ ...e, trajets: new Map([...e.trajets, ["walk:AUTRE_LIEU:SENTINELLE_PLACE_ID_1", 3]]) }), false],
+    ["minutes non entières", (e) => avecMinutes(e, 1.5), true],
+    ["minutes négatives", (e) => avecMinutes(e, -1), true],
+    ["minutes au-delà de 1 440", (e) => avecMinutes(e, 1441), true],
+    ["minutes non finies", (e) => avecMinutes(e, Number.NaN), true],
+    ["exécution d'un autre mode", (e) => ({ ...e, mode: "car" }), false],
+  ])("%s : temps écarté avant la transaction, jamais un refus ; programme et autres temps écrits", async (_nom, modifier, cibleEcartee) => {
+    const base = entreeAvecTrajets();
+    const e = modifier(base);
+    const attendus = pairesAConserver(e.programme, e.mode).filter((p) => !cibleEcartee || cleTrajet(p) !== cible(base));
+    const { pool, requetes } = poolSimule();
+    expect(await ecrireProgramme(e, pool)).toEqual({ programmeId: "programme-1" });
+    const ecrits = requetes.filter((r) => r.texte === SQL_TRAJET).map((r) => r.valeurs);
+    expect(ecrits.sort()).toEqual(attendus.map((p) => ["programme-1", p.mode, p.origine, p.destination, MINUTES_SENTINELLE]).sort());
+    expect(ecrits.some((v) => v?.[2] === "AUTRE_LIEU" || v?.[4] !== MINUTES_SENTINELLE)).toBe(false);
+    expect(requetes.at(-1)?.texte).toBe("COMMIT");
   });
 });
 
