@@ -1,5 +1,3 @@
-import { PgDialect } from "drizzle-orm/pg-core";
-import type { SQL } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiTripAdapter } from "@/adapters/api";
@@ -39,9 +37,21 @@ const jour: DaySnapshot = {
 };
 const snapshot = TripSnapshotSchema.parse({ days: [jour] });
 
+/**
+ * Texte d'une requête de `executeurSql` sans importer drizzle (confinement des spécificateurs, CI de la PR 473) :
+ * l'objet SQL est parcouru par sa forme (`queryChunks` imbriqués, morceaux de texte `value: string[]`, paramètres
+ * reconnus à leur `encoder` et rendus `$?`). Une forme inconnue lève, pour qu'un changement interne échoue bruyamment au lieu de passer à vide.
+ */
+function texteSql(requete: unknown): string {
+  if (typeof requete !== "object" || requete === null) throw new Error("texteSql: forme inconnue");
+  if ("queryChunks" in requete && Array.isArray(requete.queryChunks)) return requete.queryChunks.map(texteSql).join("");
+  if ("encoder" in requete) return "$?";
+  if ("value" in requete && Array.isArray(requete.value) && requete.value.every((v) => typeof v === "string")) return requete.value.join("");
+  throw new Error("texteSql: forme inconnue");
+}
+
 /** Lignes rendues par table interrogée ; `leve` : la requête de cette table échoue avec un message de base. */
 function transaction(leve?: string) {
-  const dialecte = new PgDialect();
   const lignes = (texte: string): Record<string, unknown>[] => {
     if (texte.startsWith("SET TRANSACTION")) return [];
     if (texte.includes("FROM public.trips")) {
@@ -54,8 +64,8 @@ function transaction(leve?: string) {
     return [];
   };
   const tx = {
-    async execute(requete: SQL) {
-      const texte = dialecte.sqlToQuery(requete).sql;
+    async execute(requete: unknown) {
+      const texte = texteSql(requete);
       if (leve !== undefined && texte.includes(leve)) throw new Error(SECRET_SQL);
       return { rows: lignes(texte) };
     },
