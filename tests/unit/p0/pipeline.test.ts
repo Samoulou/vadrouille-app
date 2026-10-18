@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { donneesDe } from "@/ai/requetes";
@@ -357,5 +360,29 @@ describe("p0: aucune clé dans le journal ni dans un message d'erreur", () => {
       expect(sortie).not.toContain(interdit);
     }
     expect(capture.journal.at(-1)).toBe(JSON.stringify({ code: "internal_error" }));
+  });
+});
+
+describe("qualite: compteurs de l'agent au rapport de pnpm p0 (P0S2-PO-25, correction 1 de la PR 505)", () => {
+  it("Édimbourg : bloc qualite égal aux compteurs de l'agent ; le rapport ne contient aucun nom de secteur, d'incontournable ni de candidat", async () => {
+    const { resultat } = await executerCapture();
+    expect(resultat.rapport.qualite).toEqual({
+      secteursPlan: 3,
+      incontournablesPlan: 3,
+      incontournableSansCandidat: 0,
+      candidatRegroupe: 0,
+      secteurInconnu: 0,
+    });
+    const fixture = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/fixtures/modeles/edimbourg.json"), "utf8")) as {
+      plan: { secteurs: { nom: string; incontournables: string[] }[] };
+      recherche: { candidats?: { nom: string }[] }[];
+    };
+    const noms = [
+      ...fixture.plan.secteurs.flatMap((secteur) => [secteur.nom, ...secteur.incontournables]),
+      ...fixture.recherche.flatMap((tour) => (tour.candidats ?? []).map((candidat) => candidat.nom)),
+    ];
+    expect(noms.length).toBeGreaterThan(20);
+    const texte = JSON.stringify(resultat.rapport);
+    for (const nom of noms) expect(texte.includes(nom), nom).toBe(false);
   });
 });

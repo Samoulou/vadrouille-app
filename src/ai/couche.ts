@@ -305,6 +305,8 @@ export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): Couch
       const { modele, routage } = reglages.plan;
       return appeler(
         () => client.envoyer(requetePlan(lue.entree, modele, routage)),
+        // La couche du MVP ne connaît pas la cible d'activités d'une exécution : seule la borne `2 × jours` des
+        // incontournables s'applique ici (P0S2-PO-19 ; `chercherCandidats` ajoute la cible et `incontournablesMax`).
         (texte) => lirePlan(texte, { jours: joursDuSejour(lue.entree.arrivee, lue.entree.depart) }),
         (lecture) => ({ secteurs: lecture.valeur.secteurs, requetes: lecture.valeur.requetes, refuses: lecture.refuses }),
       );

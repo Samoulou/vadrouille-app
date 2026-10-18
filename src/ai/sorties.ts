@@ -125,15 +125,17 @@ export function racineLisible(texte: string, cles: readonly string[]): boolean {
 
 /**
  * Clé de comparaison d'un nom maison (doublons de l'agent, secteurs et incontournables du plan, mesures de `evals/`) :
- * minuscules, sans accents ni ponctuation. Réexportée par `src/research/agent.ts` (`cleDeNom`), où la spécification la
+ * minuscules, sans accents ni ponctuation, lettres de toute écriture gardées. Réexportée par `src/research/agent.ts` (`cleDeNom`), où la spécification la
  * cite (amendement 3 de la suite 2 de P0, vocabulaire).
  */
 export function cleDeNom(nom: string): string {
+  // Correction 1 de la PR 505 (réserve Sécurité 15) : lettres et chiffres de toute écriture gardés, pour qu'un nom en
+  // écriture non latine (東京, Αθήνα) ne donne pas une clé vide ; pour un nom latin, la clé est celle d'avant.
   return nom
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -146,11 +148,18 @@ export const SECTEURS_MAX = 9;
 export const REQUETES_PLAN_MAX = 30;
 export const REQUETES_EVENEMENT_MAX = 2;
 
+/**
+ * Borne de forme du schéma par secteur (garde de taille seulement) : 2 incontournables par jour sur 31 jours, au-delà de
+ * tout séjour admis (15 jours au plus pour un brief de P0). La vraie borne, `min(2 × jours, cible d'activités)` sur tout
+ * le plan, est appliquée par `reglePlanManquee`.
+ */
+export const INCONTOURNABLES_SCHEMA_MAX = 2 * 31;
+
 export const SecteurPlanSchema = z.strictObject({
   nom: texteMaison(LONGUEURS_PLAN.secteur),
   raison: texteMaison(LONGUEURS_PLAN.raisonSecteur),
   voisins: z.array(texteMaison(LONGUEURS_PLAN.secteur)).max(SECTEURS_MAX - 1),
-  incontournables: z.array(texteMaison(LONGUEURS_PLAN.incontournable)).max(2 * 31),
+  incontournables: z.array(texteMaison(LONGUEURS_PLAN.incontournable)).max(INCONTOURNABLES_SCHEMA_MAX),
 });
 export type SecteurPlan = z.infer<typeof SecteurPlanSchema>;
 

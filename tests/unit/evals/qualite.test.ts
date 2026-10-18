@@ -308,7 +308,7 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
     expect(compteurs.pagesLues).toBe(lectures);
   });
 
-  it("Rome : la page sans horaires donne un candidat sans horaires ; prixParPersonne absent en euros, 0 pour « gratuit »", async () => {
+  it("Rome : la page sans horaires donne un candidat sans horaires ; prixParPersonne seulement en CHF (texte de prix exigé), 0 pour « gratuit »", async () => {
     const { candidats, infos } = await lancer("rome-1");
     const par = (nom: string) => candidats.find((candidat) => candidat.nom === nom);
     expect(infos.get(par("Place Navone")?.id ?? "")?.horaires).toBeUndefined();
@@ -321,7 +321,17 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
     expect(prixParPersonneAdmis({ prix: "CHF 8.50", prixParPersonne: 8.5 })).toBe(8.5);
     expect(prixParPersonneAdmis({ prix: "15 €", prixParPersonne: 15 })).toBeUndefined();
     expect(prixParPersonneAdmis({ prix: "gratuit", prixParPersonne: 0 })).toBe(0);
-    expect(prixParPersonneAdmis({ prixParPersonne: 20 })).toBe(20);
+    // Correction 1 (bloquant 1) : un montant sans texte de prix en CHF est retiré ; un 0 contredit par le texte aussi.
+    expect(prixParPersonneAdmis({ prixParPersonne: 20 })).toBeUndefined();
+    expect(prixParPersonneAdmis({ prix: "18 € (≈ 17 CHF)", prixParPersonne: 17 })).toBeUndefined();
+    expect(prixParPersonneAdmis({ prix: "5000 francs CFA", prixParPersonne: 8 })).toBeUndefined();
+    expect(prixParPersonneAdmis({ prix: "12 fr. par personne", prixParPersonne: 12 })).toBe(12);
+    expect(prixParPersonneAdmis({ prix: "fr. 9.50", prixParPersonne: 9.5 })).toBe(9.5);
+    expect(prixParPersonneAdmis({ prix: "20 francs suisses", prixParPersonne: 20 })).toBe(20);
+    expect(prixParPersonneAdmis({ prixParPersonne: 0 })).toBe(0);
+    expect(prixParPersonneAdmis({ prix: "free entry", prixParPersonne: 0 })).toBe(0);
+    expect(prixParPersonneAdmis({ prix: "15 €", prixParPersonne: 0 })).toBeUndefined();
+    expect(prixParPersonneAdmis({ prixParPersonne: undefined })).toBeUndefined();
   });
 
   it("un texte d'info pratique trop long ou avec une URL fait écarter le candidat (compté), jamais tronquer", async () => {
@@ -375,6 +385,23 @@ describe("qualite: totaux de la PR 490 répartis par secteur", () => {
       if (cibles.evening >= plan.secteurs.length) for (const r of reparties) expect(r.cibles.evening).toBeGreaterThanOrEqual(1);
     }
     expect(ciblesParSecteur(PLAN_VIDE, f.bornes.ciblesParCreneau)).toEqual([]);
+  });
+
+  it("incontournables plus nombreux que la cible d'activités : un par incontournable dans l'ordre du plan, jusqu'à la cible", () => {
+    const plan = planDe(fixtures("qualite-rome"));
+    const reparties = ciblesParSecteur(plan, { activity: 4, meal: 12, evening: 6 });
+    // Ordre du plan : Monti (aucun), La Rome antique (3), Centre historique (2) : 3 puis 1.
+    expect(reparties.map((r) => r.cibles.activity)).toEqual([0, 3, 1, 0, 0, 0]);
+    expect(reparties.map((r) => r.cibles.meal)).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(reparties.map((r) => r.cibles.evening)).toEqual([1, 1, 1, 1, 1, 1]);
+  });
+
+  it("noms en écriture non latine : clés non vides, plan lu (réserve Sécurité 15)", () => {
+    expect(cleDeNom("東京駅")).not.toBe("");
+    const secteurs = ["浅草", "銀座", "新宿"].map((nom, i, tous) => ({ nom, raison: "Un secteur.", voisins: [tous[(i + 1) % 3] as string], incontournables: [`${nom}寺`] }));
+    const requetes = secteurs.map((s) => ({ requete: `${s.nom} 観光`, creneau: "activity", secteur: s.nom }));
+    expect(lirePlan(JSON.stringify({ secteurs, requetes }), { jours: 5 }).refuses).toBe(0);
+    expect(cleDeNom("Château d'Ô")).toBe("chateau d o");
   });
 
   it("chaque tour reçoit ce qui manque par secteur, incontournables sans candidat compris (noms du plan seulement)", async () => {

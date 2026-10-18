@@ -207,7 +207,8 @@
           "prixParPersonne": 25,
           "dureeMinutes": 120,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "25 CHF par personne"
         },
         {
           "nom": "Salle de dégustation de whiskies rares",
@@ -220,7 +221,8 @@
           "prixParPersonne": 30,
           "dureeMinutes": 90,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "30 CHF par personne"
         },
         {
           "nom": "Brasserie artisanale du canal",
@@ -233,7 +235,8 @@
           "prixParPersonne": 12,
           "dureeMinutes": 75,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "12 CHF par personne"
         },
         {
           "nom": "Palais au bout de la grande rue",
@@ -271,7 +274,8 @@
           "prixParPersonne": 10,
           "dureeMinutes": 60,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "10 CHF par personne"
         },
         {
           "nom": "Cimetière des poètes",
@@ -362,7 +366,8 @@
           "prixParPersonne": 20,
           "dureeMinutes": 75,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "20 CHF par personne"
         },
         {
           "nom": "Parc des collines au sud",
@@ -400,7 +405,8 @@
           "prixParPersonne": 22,
           "dureeMinutes": 75,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "22 CHF par personne"
         }
       ],
       "termine": false
@@ -439,7 +445,8 @@
           "aReserver": false,
           "prixParPersonne": 14,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "14 CHF par personne"
         },
         {
           "nom": "Café des fermiers",
@@ -451,7 +458,8 @@
           "aReserver": false,
           "prixParPersonne": 16,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "16 CHF par personne"
         },
         {
           "nom": "Table du marché couvert",
@@ -463,7 +471,8 @@
           "aReserver": true,
           "prixParPersonne": 55,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "55 CHF par personne"
         },
         {
           "nom": "Bistrot du port",
@@ -475,7 +484,8 @@
           "aReserver": true,
           "prixParPersonne": 40,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "40 CHF par personne"
         },
         {
           "nom": "Taverne aux tourtes",
@@ -487,7 +497,8 @@
           "aReserver": false,
           "prixParPersonne": 22,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "22 CHF par personne"
         },
         {
           "nom": "Salon de thé des écrivains",
@@ -499,7 +510,8 @@
           "aReserver": false,
           "prixParPersonne": 15,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "15 CHF par personne"
         },
         {
           "nom": "Restaurant gastronomique de la ville neuve",
@@ -511,7 +523,8 @@
           "aReserver": true,
           "prixParPersonne": 95,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "95 CHF par personne"
         },
         {
           "nom": "Fish and chips de la grande rue",
@@ -523,7 +536,8 @@
           "aReserver": false,
           "prixParPersonne": 12,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "12 CHF par personne"
         },
         {
           "nom": "Épicerie fine et comptoir à fromages",
@@ -535,7 +549,8 @@
           "aReserver": false,
           "prixParPersonne": 20,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "20 CHF par personne"
         },
         {
           "nom": "Brasserie de la gare",
@@ -547,7 +562,8 @@
           "aReserver": false,
           "prixParPersonne": 25,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "25 CHF par personne"
         },
         {
           "nom": "Cuisine de rue du marché du samedi",
@@ -559,7 +575,8 @@
           "aReserver": false,
           "prixParPersonne": 10,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "10 CHF par personne"
         },
         {
           "nom": "Pub aux musiciens",
@@ -571,7 +588,8 @@
           "aReserver": false,
           "prixParPersonne": 18,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "18 CHF par personne"
         },
         {
           "nom": "Colline aux trois belvédères",
@@ -623,7 +641,8 @@
             "heure": "19:30"
           },
           "secteur": null,
-          "incontournable": null
+          "incontournable": null,
+          "prix": "18 CHF par personne"
         },
         {
           "nom": "Conte nocturne au musée",

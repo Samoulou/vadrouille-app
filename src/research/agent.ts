@@ -504,14 +504,18 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
   const candidats: CandidatRecherche[] = [];
   const infos = new Map<string, InfosCandidat>();
   let plan: PlanRecherche = PLAN_VIDE;
-  /** Fin de l'agent : `incontournable_sans_candidat` sur la seule sortie de l'agent, avant tout ancrage (P0S2-PO-20). */
-  const resultat = (): ResultatAgent => {
+  /**
+   * `incontournable_sans_candidat` sur la seule sortie de l'agent, avant tout ancrage (P0S2-PO-20) : tenu à jour après la
+   * lecture du plan et à chaque admission, pour que l'état vivant (`observer`, journal sur erreur ou échéance, ticket 407)
+   * porte la bonne valeur même si la recherche lève.
+   */
+  const majSansCandidat = () => {
     const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [cleDeNom(info.incontournable)])));
     compteurs.qualite.incontournableSansCandidat = plan.secteurs
       .flatMap((secteur) => secteur.incontournables)
       .filter((incontournable) => !designes.has(cleDeNom(incontournable))).length;
-    return { candidats, compteurs, plan, infos };
   };
+  const resultat = (): ResultatAgent => ({ candidats, compteurs, plan, infos });
   dependances.observer?.({ compteurs, candidats });
   /** Ticket 407 : l'échéance de l'étape admet-elle cet appel ? Non : la fin sur échéance est comptée. */
   const aLeTemps = (appel: AppelAgent): boolean => {
@@ -537,6 +541,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
   plan = lecturePlan.valeur;
   compteurs.qualite.secteursPlan = plan.secteurs.length;
   compteurs.qualite.incontournablesPlan = plan.secteurs.reduce((total, secteur) => total + secteur.incontournables.length, 0);
+  majSansCandidat();
   const cibles = ciblesParSecteur(plan, config.ciblesParCreneau);
   const trouvesParSecteur = new Map<string, Record<TypeCreneau, number>>(plan.secteurs.map((secteur) => [secteur.nom, { activity: 0, meal: 0, evening: 0 }]));
 
@@ -585,6 +590,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
       return;
     }
     const texte = pagesTexte.get(source);
+    const prixParPersonne = prixParPersonneAdmis(extrait);
     const lu = CandidatRechercheSchema.safeParse({
       id: `c_${String(candidats.length + 1).padStart(3, "0")}`,
       nom: extrait.nom,
@@ -601,7 +607,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
             },
           }),
       aReserver: extrait.aReserver,
-      ...(prixParPersonneAdmis(extrait) === undefined ? {} : { prixParPersonne: prixParPersonneAdmis(extrait) }),
+      ...(prixParPersonne === undefined ? {} : { prixParPersonne }),
       ...(extrait.dureeMinutes === undefined ? {} : { dureeMinutes: extrait.dureeMinutes }),
     });
     if (!lu.success) {
@@ -617,6 +623,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
       ...(extrait.horaires === undefined ? {} : { horaires: extrait.horaires }),
       ...(extrait.conseil === undefined ? {} : { conseil: extrait.conseil }),
     });
+    if (incontournable !== undefined) majSansCandidat();
     const creneau = creneauCompte(
       { typeEtape: lu.data.typeEtape, ...(extrait.slotFit === undefined ? {} : { slotFit: extrait.slotFit }) },
       trouves.evening < config.ciblesParCreneau.evening,
@@ -732,16 +739,25 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
   return resultat();
 }
 
-/** Mention d'un prix en francs suisses dans le texte `prix` d'une source (« 12 CHF », « CHF 12 », « 12 fr. »). */
-const PRIX_EN_CHF = /\bchf\b|\bfr\.|\bfrancs?\b/i;
+/**
+ * Prix en francs suisses dans le texte `prix` d'une source : « 12 CHF », « CHF 12 », « 12 fr. », « fr. 12 », « francs
+ * suisses » ; jamais si une autre devise y figure (« 18 € (≈ 17 CHF) » : la source ne donne pas le prix en CHF).
+ */
+const PRIX_EN_CHF = /\bchf\b|\d\s?fr\.|\bfr\.\s?\d|\bfrancs?\s+suisses?\b/i;
+const AUTRE_DEVISE = /[€£$¥]|\b(?:eur|euros?|usd|gbp|dollars?|livres?)\b/i;
+/** Entrée gratuite dite par le texte `prix` de la source. */
+const PRIX_GRATUIT = /\bgratuite?s?\b|\bfree\b/i;
 
 /**
- * `prixParPersonne` admis (P0S2-PO-21 : le prototype ne convertit aucune devise) : 0 (entrée gratuite) toujours ; un
- * montant positif seulement si le texte `prix` de la source, quand il est donné, est en francs suisses. Sans texte `prix`,
- * la règle de la v3 s'applique (montant gardé tel que le modèle le rend, consigne du prompt v4 : CHF seulement).
+ * `prixParPersonne` admis (P0S2-PO-21 : le prototype ne convertit aucune devise ; « seulement si la source donne le prix
+ * en CHF, ou si l'entrée est gratuite ; sinon absent ») :
+ * - un montant positif seulement si le texte `prix` est présent et en francs suisses, sans autre devise ;
+ * - 0 si le texte `prix` est absent ou dit l'entrée gratuite ; un 0 contredit par un texte `prix` (« 15 € ») est retiré.
+ * Fonction pure.
  */
 export function prixParPersonneAdmis(extrait: Pick<CandidatExtrait, "prix" | "prixParPersonne">): number | undefined {
-  if (extrait.prixParPersonne === undefined || extrait.prixParPersonne === 0) return extrait.prixParPersonne;
-  if (extrait.prix !== undefined && !PRIX_EN_CHF.test(extrait.prix)) return undefined;
-  return extrait.prixParPersonne;
+  const { prix, prixParPersonne } = extrait;
+  if (prixParPersonne === undefined) return undefined;
+  if (prixParPersonne === 0) return prix === undefined || PRIX_GRATUIT.test(prix) ? 0 : undefined;
+  return prix !== undefined && PRIX_EN_CHF.test(prix) && !AUTRE_DEVISE.test(prix) ? prixParPersonne : undefined;
 }
