@@ -1,35 +1,38 @@
-# État du studio — 2026-10-18 (99e cycle)
+# État du studio — 2026-10-18 (100e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 15 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 16 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 09:47 à 09:58 UTC (essai Rome) : un quartier par jour, incontournables de la destination d'abord (monuments à Rome, autre chose ailleurs) avec explication, fiche pratique par étape (prix, horaires, astuce), nombre d'activités selon la durée des visites (matin 8-12 h : 2 × 2 h ou 3-4 × 1 h, puis repas ; idem après-midi et soir) ; PDF d'exemple (`/mnt/project-files/essai-reel/exemples/rome-samuel.pdf`) ; ticket #487 (amendement 3, PR #489) et correction #483 (PR #490).
-- 11:42 UTC : carte de décision, **« Monter à 840 »** éléments Routes par voyage (Q494) ; appliqué dans 0088 (#490). Réserve Google d'une exécution : 4,30 → 6,00 USD (environ 3 exécutions par mois dans le plafond de 20 USD), dit à Samuel.
+- 13:13 UTC : report `main` → `p0-reel` (#492) **fusionné par Samuel** (remplissage du séjour, Routes 840).
+- 13:21 et 13:30 UTC : deux exécutions comptées rome-1/B arrêtées en `pipeline_failed` dans l'étape finale (la première partie sur l'ancien déploiement avant la fin du report, la seconde sur `efc0994`) ; diagnostic `/mnt/project-files/essai-reel/diagnostic-rome-2.md` (lecture de la matrice Routes trop stricte, cause probable) ; ticket #493.
+- 13:50 UTC : carte de décision, **« Ne pas compter »** ces deux exécutions (Q495) : décision 0089 (#494) **fusionnée**.
+- 14:18 UTC : « Pourquoi Google ne donne pas de trajet » : répondu (paires sans trajet en transports en commun, réponse rejetée en entier par notre lecture).
 - #studio : aucun message nouveau.
 
 ## Fait
-- Fusionnées : statut du 98e cycle (#485), **B6a** (#473, lecture serveur et adaptateur `api`), note de version v2026.10.18-09 (#488).
-- #490 (remplissage du séjour) : décision 0088 du Tech Lead (cibles depuis la demande, regroupement par quartier sur tous les jours, Routes à 840), puis correction 1 bis 73c8e02 (retrait de `typesPrioritaires`, test de borne `demandeDuJour`, `routesElements` 840 dans `essai.json`, `mode-reel.json` et les bornes du schéma) ; `pnpm verify` vert hors 74 écarts visuels connus ; revue relancée.
+- Fusionnées : **remplissage du séjour** (#490, décision 0088 ; Routes 840), statut du 99e cycle (#491), **décision 0089** (#494), report `main` → `p0-reel` (#492, par Samuel).
+- #489 (amendement 3, qualité du programme) : correction 2 et correction de fait nouveau (#490 fusionnée) poussées ; revue : un seul bloquant tardif (500 → 840, l. 196).
 
 ## En cours
-- Revue : **#490** (correction 2, la dernière : la revue de `acbc0b9` est comptée).
-- product-owner : **#489** (amendement 3, qualité du programme), correction 2, la dernière (repas du soir et secteur du jour ; 7 activités au plus par jour plein, 715 éléments, 840 retenu par Samuel).
-- #481 (PR #486) et #482 (PR #484) : `needs-review` après 15:23 UTC (fin du délai de 0087).
+- tech-lead : **décision 0090** (lecture de la matrice Routes paire par paire, bloquant 2 de la revue de #495) ; puis ia-recherche : description de #495 réécrite (écrasée par erreur par celle de #494) et mineurs. Verdict Sécurité S4 sur `p0.step_failed` : favorable.
+- product-owner : #489, bloquant tardif (non compté).
+- #484 et #486 : `needs-review` après 15:23 UTC (fin du délai de 0087).
 
 ## Bloqué
-- **B9b** : B6a fusionnée ; attend la fusion de la PR de contrat de B9d (#484, mêmes fichiers d'adaptateur de création) ; noms de colonnes posés par le rôle data dans sa migration (0087 § 1.2, Q492).
-- **B4a** et **B8b** : après B6a, jamais dans le même cycle que B9b (0078) ; à placer.
+- **Relance de Rome par Samuel** : après la fusion de #495, report `main` → `p0-reel`, annonce « p0-reel prêt, commit … » ; relance en « Essai d'intégration » (ne compte pas).
+- **B9b** : après #484 (mêmes fichiers d'adaptateur de création) ; noms de colonnes posés par le rôle data dans sa migration (0087 § 1.2, Q492).
+- **B4a** et **B8b** : jamais dans le même cycle que B9b (0078) ; à placer.
 - **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
 - **B9c** après #481 ; B9d : verdict Sécurité (Q492) ; B9c réel : Q468 ; B9e : Q467.
 - **Purge du MVP** : activation Q438 (Samuel).
-- **Compteurs de fin d'essai** (`p0.final_counts`, Q493) : B6a fusionnée, ticket à ouvrir.
+- **`coords-purge`** : en échec à ses trois premiers runs (note de version v2026.10.18-09) ; cause à analyser avant que des positions atteignent 30 jours (0027) : ticket à ouvrir.
 
 ## Prochain cycle
-1. Après la fusion de #490 : report `main` → `p0-reel` ; Samuel relance Rome en « Exécution comptée » (les nouvelles cibles ; « Essai d'intégration » garde le profil fixe, 0073 point 4).
-2. Après 15:23 UTC : `needs-review` sur #484 et #486.
-3. Après #484 : B9b (backend avec data pour la migration) ; B4a dans un autre cycle ; ticket Q493.
-4. Code de l'amendement 3 (#489) après sa fusion et celle de #490.
-5. Tickets à placer : police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
+1. Après #495 : report `main` → `p0-reel` ; Samuel relance rome-1 en « Essai d'intégration » seulement après l'annonce du commit prêt.
+2. `needs-review` sur #484 et #486.
+3. Après #484 : B9b (backend avec data) ; B4a dans un autre cycle ; ticket Q493 (compteurs de fin d'essai).
+4. Code de l'amendement 3 (#489) après sa fusion.
+5. Tickets à placer : `coords-purge` en échec, relecture des trajets en rafales (429 Google, voir le diagnostic Rome 2), commit affiché sur la page d'essai, police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : aucune pour l'instant (Q39, Q45, Q465 et Q491 répondues le 2026-10-18).
