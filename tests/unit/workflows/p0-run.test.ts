@@ -353,6 +353,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
       finsAnormales: 1,
       candidatsRefuses: { source_not_in_results: 4, duplicate: 0, over_total: 0, invalid: 1 },
       finsEcheance: 1,
+      qualite: { secteursPlan: 6, incontournablesPlan: 10, incontournableSansCandidat: 2, candidatRegroupe: 1, secteurInconnu: 3 },
     };
     d.chercherCandidats.mockResolvedValue({ candidats: [], compteurs });
     await refus(etapeRecherche({ runId: RUN_ID }));
@@ -374,6 +375,11 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         finishIgnored: 1,
         finishAbnormal: 1,
         deadlineStop: 1,
+        sectors: 6,
+        mustSees: 10,
+        mustSeesWithoutCandidate: 2,
+        candidatesGrouped: 1,
+        sectorUnknown: 3,
       },
     ]);
     info.mockClear();

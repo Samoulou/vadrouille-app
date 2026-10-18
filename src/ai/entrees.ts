@@ -83,10 +83,17 @@ export type CandidatPourModele = z.infer<typeof CandidatPourModeleSchema>;
 /** Nom d'hôte d'une source (`exemple.org`) : lettres, chiffres, tirets et points seulement. */
 const DOMAINE_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/;
 
-/** Lieu retenu passé à l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source (P0, étape 9). */
+/**
+ * Lieu retenu passé à l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source (P0, étape 9) ; depuis
+ * la version 2 du prompt (P0S2-PO-21), et quand l'appelant les connaît, le **secteur maison** du plan (60 caractères au
+ * plus, limite de `StopFacts.area`) et `incontournable` (le lieu est un incontournable du plan). Jamais un prix, un
+ * horaire, un conseil ni une donnée Google.
+ */
 export const LieuRetenuSchema = z.strictObject({
   ...CandidatPourModeleSchema.shape,
   sourceDomaine: z.string().min(1).max(253).regex(DOMAINE_PATTERN),
+  secteur: texteMaison(60).optional(),
+  incontournable: z.literal(true).optional(),
 });
 export type LieuRetenu = z.infer<typeof LieuRetenuSchema>;
 

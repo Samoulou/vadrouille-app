@@ -1,14 +1,43 @@
 {
   "coutParRequeteUsd": 0.002,
   "plan": {
+    "secteurs": [
+      {
+        "nom": "Quais",
+        "raison": "Le bord de l'eau, à parcourir à pied.",
+        "voisins": [
+          "Vieux port"
+        ],
+        "incontournables": []
+      },
+      {
+        "nom": "Vieux port",
+        "raison": "Les bateaux de pêche et les petites tables.",
+        "voisins": [
+          "Quais",
+          "Falaises"
+        ],
+        "incontournables": []
+      },
+      {
+        "nom": "Falaises",
+        "raison": "Le sentier au-dessus de la mer.",
+        "voisins": [
+          "Vieux port"
+        ],
+        "incontournables": []
+      }
+    ],
     "requetes": [
       {
         "requete": "balades au bord de l'eau",
-        "creneau": "activity"
+        "creneau": "activity",
+        "secteur": "Quais"
       },
       {
         "requete": "poisson frais du port",
-        "creneau": "meal"
+        "creneau": "meal",
+        "secteur": "Vieux port"
       }
     ]
   },

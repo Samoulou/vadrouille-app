@@ -624,6 +624,11 @@ function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: 
             finishIgnored: compteurs.terminesIgnores,
             finishAbnormal: compteurs.finsAnormales,
             deadlineStop: compteurs.finsEcheance,
+            sectors: compteurs.qualite.secteursPlan,
+            mustSees: compteurs.qualite.incontournablesPlan,
+            mustSeesWithoutCandidate: compteurs.qualite.incontournableSansCandidat,
+            candidatesGrouped: compteurs.qualite.candidatRegroupe,
+            sectorUnknown: compteurs.qualite.secteurInconnu,
           }),
     },
     lieux === 0 || echec !== undefined ? "warn" : "info",
@@ -913,7 +918,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         recherche.tailleLotNotation,
       );
       const raisons = new Map<string, Raison>();
-      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ entree: entreeIa, retenus: lot.map(lieuRetenuDepuisCandidat), complement }))).forEach((reponse, rang) => {
+      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ entree: entreeIa, retenus: lot.map((candidat) => lieuRetenuDepuisCandidat(candidat)), complement }))).forEach((reponse, rang) => {
         const ids = new Set((lotsRaisons[rang] ?? []).map((candidat) => candidat.id));
         for (const [id, raison] of lireRaisons(reponse.texte, ids).valeur) raisons.set(id, raison);
       });

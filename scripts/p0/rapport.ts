@@ -65,6 +65,12 @@ export const RapportSchema = z.strictObject({
     propositions: n,
     jours: n,
   }),
+  /**
+   * Amendement 3 de la suite 2 de P0 (P0S2-PO-25), sortie de l'agent avant tout ancrage : secteurs et incontournables
+   * du plan, incontournables sans candidat, candidats regroupés, secteurs inconnus. Aucun nom, aucun compteur d'ancrage.
+   * Les compteurs de jours (labels du programme écrit) et `secteur_sans_jour` viennent avec la règle du jour (P0S2-PO-22).
+   */
+  qualite: z.strictObject({ secteursPlan: n, incontournablesPlan: n, incontournableSansCandidat: n, candidatRegroupe: n, secteurInconnu: n }),
   /** Part des candidats trouvés dont la source est officielle ou indépendante (classement maison des domaines). */
   partSourcesLocalesOuIndependantes: z.number().min(0).max(1),
   violations: z.strictObject({ R1: n, R2: n, R4: n, R5: n, R6: n, R8: n }),

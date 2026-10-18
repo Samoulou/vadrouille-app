@@ -119,8 +119,21 @@ function requete(etape: EtapeRequete, prompt: Prompt, modele: string, routage: R
   return { etape, modele, routage: { ...routage }, prompt: { id: prompt.id, version: prompt.version }, messages };
 }
 
-export function requetePlan(entree: EntreeModeles, modele: string, routage: Routage, complement?: ComplementP0): RequeteModele {
-  return requete("plan", PROMPT_PLAN, modele, routage, { brief: briefPourRecherche(entree, complement) });
+/**
+ * Plan de recherche (prompt `plan` v2) : le brief vu par la recherche et, quand l'appelant la connaît, la borne du nombre
+ * d'incontournables (`min(2 × jours, cible d'activités)`, P0S2-PO-19), que le plan doit respecter sous peine d'être refusé.
+ */
+export function requetePlan(
+  entree: EntreeModeles,
+  modele: string,
+  routage: Routage,
+  complement?: ComplementP0,
+  incontournablesMax?: number,
+): RequeteModele {
+  return requete("plan", PROMPT_PLAN, modele, routage, {
+    brief: briefPourRecherche(entree, complement),
+    ...(incontournablesMax === undefined ? {} : { incontournablesMax }),
+  });
 }
 
 export type PageLue = { url: string; texte: string };
@@ -129,7 +142,16 @@ export function requeteRecherche(
   donnees: {
     entree: EntreeModeles;
     tour: number;
-    plan: readonly { requete: string; creneau: string }[];
+    plan: {
+      readonly secteurs: readonly { readonly nom: string; readonly voisins: readonly string[]; readonly incontournables: readonly string[] }[];
+      readonly requetes: readonly { readonly requete: string; readonly creneau: string; readonly secteur: string | null }[];
+    };
+    /** Ce qui manque encore, par secteur du plan (P0S2-PO-20) : créneaux et incontournables sans candidat. */
+    secteurs: readonly {
+      readonly nom: string;
+      readonly manquants: Record<TypeCreneau, number>;
+      readonly incontournablesSansCandidat: readonly string[];
+    }[];
     resultats: readonly ResultatWeb[];
     pages: readonly PageLue[];
     dejaTrouves: readonly string[];
@@ -142,11 +164,23 @@ export function requeteRecherche(
   return requete("recherche", PROMPT_RECHERCHE, modele, routage, {
     brief: briefPourRecherche(donnees.entree, complement),
     tour: donnees.tour,
-    plan: donnees.plan.map((ligne) => ({ requete: ligne.requete, creneau: ligne.creneau })),
+    plan: {
+      secteurs: donnees.plan.secteurs.map((secteur) => ({
+        nom: secteur.nom,
+        voisins: [...secteur.voisins],
+        incontournables: [...secteur.incontournables],
+      })),
+      requetes: donnees.plan.requetes.map((ligne) => ({ requete: ligne.requete, creneau: ligne.creneau, secteur: ligne.secteur })),
+    },
     resultats: donnees.resultats.map((resultat) => ({ url: resultat.url, titre: resultat.titre, extrait: resultat.extrait })),
     pages: donnees.pages.map((page) => ({ url: page.url, texte: page.texte })),
     dejaTrouves: [...donnees.dejaTrouves],
     manquants: { activity: donnees.manquants.activity, meal: donnees.manquants.meal, evening: donnees.manquants.evening },
+    secteurs: donnees.secteurs.map((secteur) => ({
+      nom: secteur.nom,
+      manquants: { activity: secteur.manquants.activity, meal: secteur.manquants.meal, evening: secteur.manquants.evening },
+      incontournablesSansCandidat: [...secteur.incontournablesSansCandidat],
+    })),
   });
 }
 
@@ -172,7 +206,12 @@ export function requeteRaisons(
 ): RequeteModele {
   return requete("raisons", PROMPT_RAISONS, modele, routage, {
     brief: briefPourModele(entree, complement),
-    lieux: lieux.map((lieu) => ({ ...vueCandidat(lieu), sourceDomaine: lieu.sourceDomaine })),
+    lieux: lieux.map((lieu) => ({
+      ...vueCandidat(lieu),
+      sourceDomaine: lieu.sourceDomaine,
+      ...(lieu.secteur === undefined ? {} : { secteur: lieu.secteur }),
+      ...(lieu.incontournable === true ? { incontournable: true } : {}),
+    })),
   });
 }
 
