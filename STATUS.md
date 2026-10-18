@@ -1,41 +1,44 @@
-# État du studio — 2026-10-18 (100e cycle)
+# État du studio — 2026-10-18 (101e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 16 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 17 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 13:13 UTC : report `main` → `p0-reel` (#492) **fusionné par Samuel** (remplissage du séjour, Routes 840).
-- 13:21 et 13:30 UTC : deux exécutions comptées rome-1/B arrêtées en `pipeline_failed` dans l'étape finale (la première partie sur l'ancien déploiement avant la fin du report, la seconde sur `efc0994`) ; diagnostic `/mnt/project-files/essai-reel/diagnostic-rome-2.md` (lecture de la matrice Routes trop stricte, cause probable) ; ticket #493.
-- 13:50 UTC : carte de décision, **« Ne pas compter »** ces deux exécutions (Q495) : décision 0089 (#494) **fusionnée**.
-- 14:18 UTC : « Pourquoi Google ne donne pas de trajet » : répondu (paires sans trajet en transports en commun, réponse rejetée en entier par notre lecture).
+- 15:15 UTC : carte « Lever le délai » de 6 h sur la décision 0090 (Q498) : délai levé.
+- 16:17 UTC : report `main` → `p0-reel` (#497) **fusionné par Samuel** (`0d0bbaa`, déployé).
+- 16:51 UTC : rapport, exécution comptée rome-1/B (`0d0bbaa`) arrêtée en `pipeline_failed` ; journal : `p0.step_failed` phase `routes`, `ErreurClientGoogle`, `upstream_rate_limited` (limite quotidienne de 1000 éléments Routes de la console de Samuel atteinte). La lecture paire par paire (#495) fonctionne.
+- 16:54 UTC : carte « Ne pas compter » cette exécution (Q499) : décision 0091 (#498).
+- 17:36 UTC : « on peut pas forcer un test ? » : répondu (relever la limite dans sa console Google ; le studio n'y touche pas).
+- 17:54 UTC : la page du voyage `proto_rome_20261018_6` ne s'ouvre plus : l'exécution de ~17:42 UTC a **réussi**, mais chaque ouverture relit les trajets chez Google (`p0.read_unavailable`, `ErreurClientGoogle`, limite atteinte).
+- 17:57 et 17:59 UTC : « on sauvegarde les temps et tant pis » puis carte **« Garder les temps »** (Q501), après avertissement sur le contrat Google : décision 0092 en cours.
 - #studio : aucun message nouveau.
 
 ## Fait
-- Fusionnées : **remplissage du séjour** (#490, décision 0088 ; Routes 840), statut du 99e cycle (#491), **décision 0089** (#494), report `main` → `p0-reel` (#492, par Samuel).
-- #489 (amendement 3, qualité du programme) : correction 2 et correction de fait nouveau (#490 fusionnée) poussées ; revue : un seul bloquant tardif (500 → 840, l. 196).
+- Fusionnées : lecture Routes paire par paire et `p0.step_failed` (#495, décision 0090), amendement 3 qualité du programme (#489), ancrage B8-PO-13/15 (#486), contrat de B9d (#484), décision 0089 (#494), statut du 100e cycle (#496), report `main` → `p0-reel` (#497, par Samuel).
+- Premier voyage Rome complet de la journée écrit (`proto_rome_20261018_6`).
 
 ## En cours
-- tech-lead : **décision 0090** (lecture de la matrice Routes paire par paire, bloquant 2 de la revue de #495) ; puis ia-recherche : description de #495 réécrite (écrasée par erreur par celle de #494) et mineurs. Verdict Sécurité S4 sur `p0.step_failed` : favorable.
-- product-owner : #489, bloquant tardif (non compté).
-- #484 et #486 : `needs-review` après 15:23 UTC (fin du délai de 0087).
+- tech-lead : **décision 0092** (temps de trajet Routes conservés dans le schéma `prototype`, purge 30 jours, relecture sans appel Google si tout est conservé ; amende 0011, 0027 et la ligne « Jamais » de CLAUDE.md : `owner-approved` de Samuel probable).
+- ia-recherche : arrêt clair « limite Google du jour atteinte » (sans changer le décompte, Q500).
+- ia-recherche : code de l'amendement 3 (PO-19 à PO-28).
+- #498 (0091) : `techlead-approved` ; job `docker` relancé une fois (police Google non téléchargée pendant la construction, sans rapport avec la PR ; vert sur `main`).
 
 ## Bloqué
-- **Relance de Rome par Samuel** : après la fusion de #495, report `main` → `p0-reel`, annonce « p0-reel prêt, commit … » ; relance en « Essai d'intégration » (ne compte pas).
-- **B9b** : après #484 (mêmes fichiers d'adaptateur de création) ; noms de colonnes posés par le rôle data dans sa migration (0087 § 1.2, Q492).
-- **B4a** et **B8b** : jamais dans le même cycle que B9b (0078) ; à placer.
+- **Affichage des voyages sur `p0-reel`** : chaque ouverture redemande des centaines d'éléments Routes ; code après la fusion de 0092 (rôle de code, verdict Sécurité sur `db/`), puis report `main` → `p0-reel`.
+- **B9b** : désormais possible (#484 fusionnée) ; place libre au prochain cycle.
+- **B4a** et **B8b** : jamais dans le même cycle que B9b (0078).
 - **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
-- **B9c** après #481 ; B9d : verdict Sécurité (Q492) ; B9c réel : Q468 ; B9e : Q467.
+- **B9c réel** : Q468 ; B9d : verdict Sécurité (Q492) ; B9e : Q467.
 - **Purge du MVP** : activation Q438 (Samuel).
-- **`coords-purge`** : en échec à ses trois premiers runs (note de version v2026.10.18-09) ; cause à analyser avant que des positions atteignent 30 jours (0027) : ticket à ouvrir.
+- **`coords-purge`** en échec (3 runs) : ticket à ouvrir.
 
 ## Prochain cycle
-1. Après #495 : report `main` → `p0-reel` ; Samuel relance rome-1 en « Essai d'intégration » seulement après l'annonce du commit prêt.
-2. `needs-review` sur #484 et #486.
-3. Après #484 : B9b (backend avec data) ; B4a dans un autre cycle ; ticket Q493 (compteurs de fin d'essai).
-4. Code de l'amendement 3 (#489) après sa fusion.
-5. Tickets à placer : `coords-purge` en échec, relecture des trajets en rafales (429 Google, voir le diagnostic Rome 2), commit affiché sur la page d'essai, police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
+1. Après 0092 : tâche de code (data + ia-recherche) pour conserver les temps et afficher sans erreur ; puis report `main` → `p0-reel`.
+2. B9b (backend avec data).
+3. Samuel ouvre son voyage Rome une seule fois après ~07:00 UTC le 2026-10-19.
+4. Tickets à placer : `coords-purge`, commit affiché sur la page d'essai, police servie localement (Q484, aussi cause du job `docker` rouge), compteurs de fin d'essai (Q493), et la liste du 100e cycle.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : aucune pour l'instant (Q39, Q45, Q465 et Q491 répondues le 2026-10-18).
+- **Réponses demandées** : Q500 (un arrêt par la limite Google compte-t-il ?), Q502 (exécution de 16:57 UTC), Q497 (exécution du matin) ; extension au MVP de Q501.
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060) ; B8c est fusionnée, la purge attend cette réponse pour être activée.
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -54,7 +57,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q493.
+- Q498 à Q502.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
