@@ -2,6 +2,8 @@
 
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #57
 
+**§ 12 précisé par 0086** (§ 3, question 4, ticket #466) : au point 1, la lecture de « la réserve et [des] lieux déjà trouvés et ancrés par l'agent » pour `searchPlaces` est rattachée à B11 (action de l'écran « Ajouter »), non à B6.
+
 ## Contexte
 Sept questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` :
 - **Q92** (F7-Q6) : propositions F7-TL-1 à F7-TL-9 de `specs/F7-remplacer-ajouter-deplacer.md` (fusionnée par #53), à trancher avant le code de F7 ;

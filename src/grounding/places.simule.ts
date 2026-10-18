@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ErreurAncrage, STATUTS_GOOGLE, type ClientPlaces } from "@/grounding/interfaces";
+import { ErreurAncrage, STATUTS_GOOGLE, type ClientPlacesMvp } from "@/grounding/interfaces";
 
 /**
  * Double de Places à **valeurs sentinelles** (contrainte 8 : aucune réponse réelle de Google enregistrée). Les
@@ -12,7 +12,9 @@ const LieuSchema = z.strictObject({
   placeId: z.string().min(1).max(256),
   statut: z.enum(STATUTS_GOOGLE),
   position: z.strictObject({ lat: z.number(), lng: z.number() }),
-  horaires: z.array(z.strictObject({ jour: z.number().int(), debut: z.number().int(), fin: z.number().int() })).nullable(),
+  horaires: z
+    .array(z.strictObject({ jour: z.number().int(), debut: z.number().int(), fin: z.number().int(), finLendemain: z.number().int().optional() }))
+    .nullable(),
   nom: z.string(),
   adresse: z.string(),
   note: z.number(),
@@ -22,6 +24,11 @@ const LieuSchema = z.strictObject({
 export const FixturesPlacesSchema = z.strictObject({
   /** Lieu par nom maison (ou texte du logement). Un nom absent n'est pas résolu. */
   lieux: z.record(z.string(), LieuSchema),
+  /**
+   * B8a : nouvel identifiant rendu par `identifiant` pour un `placeId` rafraîchi (B8-PO-12). Absent : chaque lieu connu
+   * garde son identifiant. Les fixtures de P0 n'en ont pas (comportement de `pnpm p0` inchangé).
+   */
+  renommes: z.record(z.string(), z.string().min(1).max(256)).optional(),
 });
 export type FixturesPlaces = z.infer<typeof FixturesPlacesSchema>;
 
@@ -31,9 +38,10 @@ function nomDe(texte: string): string {
   return separateur === -1 ? texte : texte.slice(0, separateur);
 }
 
-export function creerPlacesSimule(fixtures: FixturesPlaces): ClientPlaces {
+export function creerPlacesSimule(fixtures: FixturesPlaces): ClientPlacesMvp {
   const parPlaceId = new Map(Object.values(fixtures.lieux).map((lieu) => [lieu.placeId, lieu]));
   const parNom = new Map(Object.entries(fixtures.lieux));
+  const renommes = new Map(Object.entries(fixtures.renommes ?? {}));
   return {
     async textSearch(requete) {
       const lieu = parNom.get(nomDe(requete.texte));
@@ -43,6 +51,19 @@ export function creerPlacesSimule(fixtures: FixturesPlaces): ClientPlaces {
       const lieu = parPlaceId.get(placeId);
       if (lieu === undefined) throw new ErreurAncrage("place_not_found");
       return { ...lieu, horaires: lieu.horaires === null ? null : lieu.horaires.map((plage) => ({ ...plage })) };
+    },
+    // B8a (0085 § 2) : masque `id,location` ; introuvable comme `details`.
+    async position(placeId) {
+      const lieu = parPlaceId.get(placeId);
+      if (lieu === undefined) throw new ErreurAncrage("place_not_found");
+      return { placeId, position: { ...lieu.position } };
+    },
+    // B8a (0085 § 2, B8-PO-12) : masque `id` ; un identifiant renommé rend le nouveau, un inconnu est introuvable.
+    async identifiant(placeId) {
+      const nouveau = renommes.get(placeId);
+      if (nouveau !== undefined) return { placeId: nouveau };
+      if (!parPlaceId.has(placeId)) throw new ErreurAncrage("place_not_found");
+      return { placeId };
     },
   };
 }

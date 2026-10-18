@@ -221,7 +221,8 @@ describe("configuration versionnée : environnement du serveur (décision 0050, 
   it("chaque webServer pose VADROUILLE_ENV=ci ; celui qui pose TRUSTED_IP_HEADER lance le serveur autonome sur 127.0.0.1", () => {
     const config = lire(PLAYWRIGHT);
     expect(webServers(config).length).toBeGreaterThanOrEqual(2);
-    expect(webServers(config).filter((serveur) => serveur.includes("TRUSTED_IP_HEADER"))).toHaveLength(1);
+    // Serveur principal, et serveur `auth` de B3c (connexion réelle, B3c point 7 : en-tête de confiance exigé).
+    expect(webServers(config).filter((serveur) => serveur.includes("TRUSTED_IP_HEADER"))).toHaveLength(2);
     expect(webServerOffenders(config)).toEqual([]);
   });
 
@@ -237,6 +238,17 @@ describe("configuration versionnée : environnement du serveur (décision 0050, 
     expect(script).toContain(`delete serverEnv.${MIGRATEUR};`);
     expect(script).toContain(`delete serverEnv.${ADMIN};`);
     expect(script).toMatch(/spawn\(process\.execPath, \["server\.js"\], \{[^}]*env: serverEnv,/);
+  });
+
+  it("scripts/serve-standalone.mjs retire toute adresse de rôle technique exportée par db-setup.sh, hors app et auth (PR 452, mineur 3)", () => {
+    const script = lire("scripts/serve-standalone.mjs");
+    const exportees = [...lire("scripts/ci/db-setup.sh").matchAll(/export (VADROUILLE_[A-Z_]+)\b/g)].map((m) => m[1] ?? "");
+    const conservees = new Set(Object.keys({ VADROUILLE_DATABASE_URL: 0, VADROUILLE_DATABASE_URL_AUTH: 0 }));
+    const retirees = [...new Set(exportees)].filter((nom) => !conservees.has(nom));
+    expect(retirees.length).toBeGreaterThanOrEqual(5);
+    for (const nom of retirees) expect(script).toContain(`delete serverEnv.${nom};`);
+    // Le serveur `auth` de Playwright est servi par ce script (`command: serve`).
+    expect(lire(PLAYWRIGHT)).toMatch(/AUTH_SERVER\s*\?\s*\[\s*\{[^]*?command: serve,[^]*?AUTH_ADAPTER: "better-auth"/);
   });
 
   it("le script dev pose VADROUILLE_ENV=local, et aucun autre script de package.json ne pose VADROUILLE_ENV", () => {

@@ -2,6 +2,8 @@
 
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #46
 
+**§ 3 précisé par 0086** (§ 3, question 3, ticket #466) : l'idée « Surprends-moi » est choisie par la génération (`ideeDuJour`, B5b et B9) et stockée dans l'instantané ; B6 la lit telle que stockée. « Sélection de B6 dans la réserve » ne vaut plus.
+
 ## Contexte
 Deux questions déléguées au Tech Lead sont ouvertes dans `QUESTIONS.md` pour la spécification `specs/F5-sejour-journee-fiche.md` (fusionnée par #40) :
 - **Q65** (F5-Q4) : propositions F5-TL-1 à F5-TL-8, à trancher avant le code de F5 ;

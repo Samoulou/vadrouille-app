@@ -1,3 +1,5 @@
+import { betterAuthConfinement, noRawAuthSecret } from "./better-auth-confinement.mjs";
+import { listeBlancheGrounding, relectureImports } from "./grounding-imports.mjs";
 import { complementP0, listeBlanche } from "./ia-recherche-imports.mjs";
 import noHardcodedColors from "./no-hardcoded-colors.mjs";
 import noP0ServerModules from "./no-p0-server-modules.mjs";
@@ -21,6 +23,10 @@ const plugin = {
     "workflow-directives": workflowDirectives,
     "ia-recherche-liste-blanche": listeBlanche,
     "complement-p0-imports": complementP0,
+    "grounding-liste-blanche": listeBlancheGrounding,
+    "relecture-imports": relectureImports,
+    "better-auth-confinement": betterAuthConfinement,
+    "no-raw-auth-secret": noRawAuthSecret,
   },
 };
 

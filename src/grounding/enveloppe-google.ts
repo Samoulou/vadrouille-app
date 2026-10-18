@@ -43,6 +43,9 @@ export const CODES_ERREUR_GOOGLE = [
   "upstream_rate_limited",
   "upstream_error",
   "invalid_response",
+  // B8a (décision 0085 § 2 point c, soumis au verdict de la Sécurité) : 404 d'une méthode Place Details posée avec
+  // `introuvableSur404`. Ne sort jamais du client Places, qui le traduit en `ErreurAncrage("place_not_found")`.
+  "upstream_not_found",
 ] as const;
 export type CodeErreurGoogle = (typeof CODES_ERREUR_GOOGLE)[number];
 
@@ -74,6 +77,12 @@ export type RequeteGoogle = {
   readonly methode: "GET" | "POST";
   readonly masque: string;
   readonly corps?: string;
+  /**
+   * Option fermée des seules méthodes Place Details du client Places (décision 0085 § 2 point c) : une réponse 404
+   * (`NOT_FOUND`, identifiant obsolète ou inconnu) lève `upstream_not_found` au lieu d'`upstream_error`. Corps
+   * abandonné comme pour toute autre réponse ; sans elle (Text Search, Routes), rien ne change.
+   */
+  readonly introuvableSur404?: true;
 };
 
 export type ParametresEnveloppe = {
@@ -130,6 +139,7 @@ export async function envoyerGoogle(
     await abandonnerCorps(reponse);
     if (reponse.status === 429) throw new ErreurClientGoogle("upstream_rate_limited");
     if (reponse.status >= 500) throw new ErreurClientGoogle("upstream_unavailable");
+    if (reponse.status === 404 && requete.introuvableSur404 === true) throw new ErreurClientGoogle("upstream_not_found");
     throw new ErreurClientGoogle("upstream_error");
   }
   try {

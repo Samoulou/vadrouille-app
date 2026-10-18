@@ -69,6 +69,25 @@ const PAQUETS_TS = [
       "P0r3c-4 (ticket 316, décision 0063 points 1 et 2) ; verdict Sécurité à rendre dans la PR, qui cite le lockfile : version exacte 5.1.0, " +
       "`@swc/core`, `esbuild` et `cbor-extract` hors de `onlyBuiltDependencies` (build prouvé sans leurs scripts)",
   },
+  {
+    paquet: "nodemailer",
+    usage:
+      "e-mail du code de connexion vers Mailpit (B3b-envoi, décision 0008) : compilation de l'enveloppe par `nodemailer/lib/mail-composer` (`src/server/mail/enveloppe.ts`), " +
+      "`nodemailer/lib/addressparser` du critère E3 ; sous-chemins exacts, aucun transport ; aucune dépendance, aucun script d'installation",
+    verdict:
+      "B3b-envoi (ticket 435, PR 437) ; Sécurité : dépendance conforme sur le head `1b3a97d` (revue consolidée : lockfile, version exacte 10.0.16, intégrité " +
+      "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, aucun script d'installation, hors de `onlyBuiltDependencies`) ; " +
+      "spécificateurs réduits à deux sous-chemins exacts (bloquant 1 de cette revue)",
+  },
+  {
+    paquet: "better-auth",
+    usage:
+      "connexion par code et organisations (B3b, décision 0008) : `src/tenancy/` seulement, sous-chemins exacts ; aucune route HTTP, " +
+      "opérations de la liste blanche appelées depuis `src/server/auth/` (`ligne/better-auth-confinement`)",
+    verdict:
+      "B3b (ticket 444) ; verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446), lockfile cité : version exacte 1.7.7, aucun paquet ajouté à " +
+      "`onlyBuiltDependencies`, scripts d'installation ignorés inchangés",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];

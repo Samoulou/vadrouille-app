@@ -72,10 +72,18 @@ export const PROPRIETES_PROCESS = [
   // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : arrêt du groupe de
   // processus de l'exécuteur joué par le test « job arrêté » (0056, « Tests imposés »), comme le runner le ferait.
   { fichier: "tests/db/workflows-harnais.ts", propriete: "kill" },
+  // B3b (ticket 444 ; spécification B3, critère B13 ; décision 0008) : sortie standard et sortie d'erreur espionnées
+  // (`vi.spyOn(…, "write")`) pendant le parcours de connexion, pour prouver qu'aucune adresse ni aucun code n'y est écrit ;
+  // rien n'y est écrit par le test. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+  { fichier: "tests/db/auth.test.ts", propriete: "stdout" },
+  { fichier: "tests/db/auth.test.ts", propriete: "stderr" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
   { fichier: "playwright.config.ts", noms: ["CI", "E2E_SKIP_BUILD"] },
+  // B3c (ticket 447 ; spécification B3, B3c point 7 ; décision 0077 § 5.4) : variable d'outillage posée par le seul job
+  // `db`, comparée à « 1 », jamais rendue ; démarre le serveur et le projet `auth`. Verdict Sécurité à rendre.
+  { fichier: "playwright.config.ts", noms: ["E2E_AUTH_SERVER"] },
   { fichier: "scripts/e2e-port.mjs", noms: ["E2E_PORT", "CI"] },
   { fichier: "scripts/serve-standalone.mjs", noms: ["E2E_SERVER_LOG"], constante: true },
   { fichier: "src/adapters/context.ts", noms: ["DATA_ADAPTER"] },
@@ -85,6 +93,10 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
   // F8b (décision 0017 § 11.2, F8-TL-10) : garde de la connexion simulée, même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
   { fichier: "src/adapters/auth-guard.ts", noms: ["AUTH_ADAPTER", "VADROUILLE_DEMO_AUTH"] },
+  // B3c (ticket 447 ; décision 0077 § 5.1, B3-TL-2) : environnement déclaré, comparé à une liste fermée (`local`,
+  // `development`, `ci`) par `betterAuthAllowed`, valeur jamais rendue ; mêmes règles que `resolveServerEnvironment`
+  // (test d'équivalence dans `tests/unit/server/env.test.ts`). Verdict Sécurité à rendre.
+  { fichier: "src/adapters/auth-guard.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV"] },
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
   { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
@@ -99,6 +111,9 @@ export const LECTURES_ENV = [
   // P0r2 (ticket 284 ; décision 0046) : connexions de test de `vadrouille_prototype` et `vadrouille_prototype_purge`,
   // mots de passe jetables de la CI (`scripts/ci/db-setup.sh`). Verdict Sécurité à rendre.
   { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_PROTOTYPE_URL", "VADROUILLE_DB_PROTOTYPE_PURGE_URL"] },
+  // B8c (ticket 438 ; décision 0060 § 4) : connexion de test de `vadrouille_coords_purge`, mot de passe jetable de la CI
+  // (`scripts/ci/db-setup.sh`). Verdict Sécurité à rendre (question 2 de 0060).
+  { fichier: "tests/db/env.ts", noms: ["VADROUILLE_DB_COORDS_PURGE_URL"] },
   { fichier: "tests/unit/db/test-db-sans-base.test.ts", noms: ["PATH", "HOME"] },
   { fichier: "src/components/carte/config.tsx", noms: ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID"] },
   // Relevé de la base de P0c1 (P0a1, PR 180) : environnement minimal du sous-processus `pnpm p0`, six lectures par
@@ -164,6 +179,24 @@ export const LECTURES_ENV = [
   // seulement, comparaison exacte), puis conditions (3) à (5) du module étroit `p0.ts` (`CI`, branche, réglage), lues
   // par propriété littérale, à l'appel, valeur jamais rendue. Verdict Sécurité à rendre.
   { fichier: "src/server/env/index.ts", noms: ["P0_REAL_RUNS"] },
+  // B3b (ticket 444 ; spécification B3, B3b ; décision 0077 § 5.1) : adresses de la connexion réelle (contrôlées par
+  // `origineHttp`, origine seule rendue) ; `EMAIL_TRANSPORT` et `SMTP_URL` : présence seulement, refusée au démarrage
+  // tant que le transport SMTP n'est pas livré (B3b-envoi). Lues par propriété littérale. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+  { fichier: "src/server/env/index.ts", noms: ["BETTER_AUTH_URL", "APP_URL", "EMAIL_TRANSPORT", "SMTP_URL"] },
+  // B3b, correction 1 (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7
+  // lit d'elle-même, refusées au démarrage par leur seule présence (`!== undefined`), valeur jamais lue ; le secret de
+  // repli `AUTH_*` est dans `donnees/lectures-env-secretes.json`. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+  {
+    fichier: "src/server/env/index.ts",
+    noms: [
+      "BETTER_AUTH_TRUSTED_ORIGINS",
+      "BETTER_AUTH_TELEMETRY",
+      "BETTER_AUTH_TELEMETRY_ENDPOINT",
+      "BETTER_AUTH_TELEMETRY_ID",
+      "BETTER_AUTH_TELEMETRY_DEBUG",
+      "BETTER_AUTH_SECRETS",
+    ],
+  },
   { fichier: "src/server/env/p0.ts", noms: ["CI", "VERCEL_GIT_COMMIT_REF", "P0_REAL_RUNS"] },
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (identifiant public posé par Vercel), consigné avec
   // l'exécution réservée ; lu à l'appel par `commitDuDeploiement`, forme contrôlée. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
@@ -197,11 +230,25 @@ export const ENV_ENTIER = [
       "argument:mockAuthAllowed",
     ],
   },
+  // B3c (ticket 447 ; spécification B3, B3c point 4 ; décision 0077 § 5.1, B3-TL-2) : `betterAuthAllowed` (local et ci
+  // seulement) ; même forme que les gardes ci-dessus, environnement entier en valeur par défaut, jamais rendu. Verdict
+  // Sécurité à rendre.
+  {
+    fichier: "src/adapters/auth-guard.ts",
+    formes: ["defaut:betterAuthAllowed", "argument:betterAuthAllowed"],
+  },
   { fichier: "src/adapters/simulation.ts", formes: ["defaut:simulationEnabled", "argument:devPagesEnabled", "argument:isProductionDeployment"] },
   { fichier: "src/dev/flags.ts", formes: ["defaut:devPagesEnabled", "defaut:isProductionDeployment", "defaut:prototypeAdapterAllowed", "argument:isProductionDeployment"] },
   { fichier: "tests/unit/ci/visual-update.test.ts", formes: ["etalement"] },
   // Relevé de la base de P0c1 (P0b1, après `40b6738`).
   { fichier: "src/adapters/context.ts", formes: ["defaut:getRequestContext", "argument:assertPrototypeAllowed"] },
+  // B3c (ticket 447 ; B3-TL-4, décision 0077 § 5.3) : contexte asynchrone ; `getOptionalRequestContext` reçoit
+  // l'environnement entier en valeur par défaut et le passe aux gardes `authAdapterChoice` et `assertAuthAdapter`, jamais
+  // rendu. Verdict Sécurité à rendre.
+  {
+    fichier: "src/adapters/context.ts",
+    formes: ["defaut:getOptionalRequestContext", "argument:authAdapterChoice", "argument:assertAuthAdapter", "argument:getOptionalRequestContext"],
+  },
   { fichier: "src/adapters/index.ts", formes: ["defaut:getTripAdapter", "argument:prototypeTripAdapter"] },
   {
     fichier: "src/adapters/prototype-instance.ts",

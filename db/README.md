@@ -2,8 +2,8 @@
 
 Spécification B1 (`specs/B1-socle-base-de-donnees.md`), décisions 0006 (outils), 0007 (rôles, RLS, fonctions),
 0011 (données Google), 0029 (identifiants d'administration), 0034 (aucune connexion en production avant la passe
-de sécurité de la mise en public) et 0046 (base du prototype, P0r2 : `place_coordinates`, schéma `prototype`, trois
-rôles, purge).
+de sécurité de la mise en public), 0046 (base du prototype, P0r2 : `place_coordinates`, schéma `prototype`, trois
+rôles, purge) et 0060 (cache de positions du MVP, B8c : expiration à 29 jours, rôle et workflow de purge, repli manuel).
 
 Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une PR ou dans un journal de CI.
 
@@ -11,10 +11,11 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 
 | Chemin | Rôle |
 | --- | --- |
-| `db/bootstrap/roles.sql` | Amorçage idempotent des 16 rôles des décisions 0007 et 0046, une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/bootstrap/roles.sql` | Amorçage idempotent des 18 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`) et de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/maintenance/coords-purge-repli.sql` | Repli manuel de la purge du MVP (0060 § 3.5), exécuté par Samuel seul dans la console Neon quand `coords-purge.yml` ne peut pas réussir ; jamais par le studio (section 4). |
 | `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
-| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17) ; `0005_prototype_coordinates_run` (écrite à la main) remplace `store_prototype_coordinates` par sa forme à quatre paramètres liée à une exécution en cours (0052 § 1.7 et § 1.9), sans aucun `EXECUTE` hors de son propriétaire (verrou S8). |
+| `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17) ; `0005_prototype_coordinates_run` (écrite à la main) remplace `store_prototype_coordinates` par sa forme à quatre paramètres liée à une exécution en cours (0052 § 1.7 et § 1.9), sans aucun `EXECUTE` hors de son propriétaire (verrou S8) ; `0008_positions_mvp_29_jours` (écrite à la main) passe l'expiration des positions du MVP à 29 jours et donne au rôle de purge du MVP son seul `EXECUTE` (0060 § 2 et § 3.2) ; `0009_verifications_updated_at` (générée, commentée à la main) ajoute la colonne `updated_at` que Better Auth 1.7.7 écrit dans `verifications` (B3b). |
 | `db/migrate.ts` | Applique les migrations sous `vadrouille_migrator`, une transaction par migration, journal dans `vadrouille_migrations.applied` (empreinte SHA-256 : une migration déjà appliquée et modifiée est refusée). |
 | `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034, sur l'environnement injecté **et** le vrai `process.env`, 0046 D21), liste d'autorisation de `vadrouille_prototype` (préversion ou développement seulement, D21) et garde de rôle (B1-PO-6). |
 | `db/index.ts` | `createDatabase("vadrouille_app" \| "vadrouille_auth" \| "vadrouille_prototype")` : client Drizzle sur un pool gardé. |
@@ -31,10 +32,14 @@ l'identifiant propriétaire) :
 | `P0_DATABASE_URL` | `vadrouille_prototype` | seule préversion de `p0-reel` (0046 S5), posée selon la décision 0056 (workflow des migrations et déverrouillage) ; refusée sans `VERCEL_ENV` `preview` ou `development` |
 | `VADROUILLE_DB_ADMIN_URL` | administrateur de la base de test | tests de base seulement (CI, poste local) |
 | `VADROUILLE_DB_PROTOTYPE_URL`, `VADROUILLE_DB_PROTOTYPE_PURGE_URL` | `vadrouille_prototype`, `vadrouille_prototype_purge` | tests de base seulement (mots de passe jetables de `scripts/ci/db-setup.sh`) ; jamais une variable `P0_*` |
+| `VADROUILLE_DB_COORDS_PURGE_URL` | `vadrouille_coords_purge` | tests de base seulement (mot de passe jetable de `scripts/ci/db-setup.sh`, 0060 § 4) ; jamais un secret `COORDS_PURGE_*` |
 
 Le job `.github/workflows/p0-purge.yml` (0046 D16 point 7) ne lit aucune de ces variables : il se connecte sous
 `vadrouille_prototype_purge` par les variables libpq de son étape, tirées des secrets `P0_PURGE_PGHOST`,
-`P0_PURGE_PGDATABASE`, `P0_PURGE_PGUSER` et `P0_PURGE_PGPASSWORD` de l'environnement GitHub `p0-purge`.
+`P0_PURGE_PGDATABASE`, `P0_PURGE_PGUSER` et `P0_PURGE_PGPASSWORD` de l'environnement GitHub `p0-purge`. De même,
+`.github/workflows/coords-purge.yml` (0060 § 3.1) se connecte sous `vadrouille_coords_purge` par les secrets
+`COORDS_PURGE_PGHOST` (hôte direct de Neon, jamais l'hôte poolé), `COORDS_PURGE_PGDATABASE`, `COORDS_PURGE_PGUSER` et
+`COORDS_PURGE_PGPASSWORD` de l'environnement GitHub `coords-purge`, posés par Samuel (section 4).
 
 Commandes :
 
@@ -94,6 +99,9 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | `0005_prototype_coordinates_run` | irréversible | Elle remplace la forme à trois paramètres de `store_prototype_coordinates`, qui écrivait une position sans exécution en cours, contraire à 0052 § 1.7 : la recréer rouvrirait ce chemin. Aucune donnée n'est supprimée ; une correction se fait vers l'avant. |
 | `0006_deverrouillage_positions_prototype` | `0006_deverrouillage_positions_prototype.down.sql` | Levée du verrou S8 (décision 0056 § 4.2) : la migration inverse est le texte figé `db/reverrouillage/retour-deverrouillage.sql` copié octet pour octet (`REVOKE EXECUTE … FROM vadrouille_prototype`, même cadre), joué en urgence par `db-reverrouillage` ; le reverrouillage durable est une nouvelle migration (0056 § 4.6 point 2). Aucune donnée supprimée. |
 | `0007_essais_sans_limite` | `0007_essais_sans_limite.down.sql` | Levée de la règle « une exécution `reel` ou `essai` par jour de quota » (décision 0071) : la migration inverse recrée l'index unique `runs_one_per_quota_day_idx` à l'identique ; elle échoue sans rien supprimer si un jour compte déjà plusieurs exécutions (rétablir la règle exige alors une décision de Samuel). Aucune donnée supprimée. |
+| `0008_positions_mvp_29_jours` | irréversible | Elle passe l'expiration de `store_place_coordinates` de 30 à 29 jours (0060 § 2) et donne `EXECUTE` de `purge_expired_coordinates()` à `vadrouille_coords_purge` : revenir à 30 jours rendrait intenable l'obligation « supprimées au plus tard 30 jours après leur obtention » (0011 § 6), et retirer le droit couperait la purge planifiée du MVP. Aucune ligne n'est modifiée ni supprimée ; une correction se fait vers l'avant. Elle exige l'amorçage de `vadrouille_coords_purge` (`db/bootstrap/roles.sql`) avant son lot. |
+| `0009_verifications_updated_at` | `0009_verifications_updated_at.down.sql` | Exception nommée (spécification B3, B3b point 6 ; acceptée par le Tech Lead le 2026-10-17, inscrite dans l'amendement B3b de la décision 0007, `docs/decisions/0007-rls.md`), sur le modèle de 0004 : la migration inverse supprime la colonne `updated_at` de `verifications`, instant technique d'écriture d'un code de connexion (10 minutes de vie), sans donnée d'une personne ni d'une organisation ; les lignes restent. Better Auth 1.7.7 ne peut plus créer de vérification après elle : `AUTH_ADAPTER=mock` d'abord. L'exception ne vaut que pour cette colonne. |
+| `0010_usage_forfait` | irréversible | Elle remplace les deux gardes de P0r2 sur `usage_ledger` par la contrainte « toute ligne est une ligne de forfait » (verdict Sécurité de B7c), crée l'organisation des actions sans compte (0081, B9-TL-4) et la fonction des sommes `usage_forfait_totals()` : son inverse supprimerait une organisation à laquelle des lignes de `usage_ledger` (ajout seulement) peuvent se rattacher, et rouvrirait l'écriture de lignes par appel. Aucune ligne n'est modifiée ni supprimée ; une correction se fait vers l'avant. Elle exige l'amorçage de `vadrouille_fn_usage` (`db/bootstrap/roles.sql`) avant son lot. |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :
@@ -171,8 +179,9 @@ spécification B1).
 Console Neon, projet de staging, branche principale, **SQL Editor**, base de l'application : coller le contenu de
 `db/bootstrap/roles.sql` et l'exécuter. Il peut être rejoué sans effet.
 
-Contrôle (16 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
-`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype` et `vadrouille_prototype_purge`) :
+Contrôle (17 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
+`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge` et
+`vadrouille_coords_purge`) :
 
 ```sql
 SELECT rolname, rolsuper AS super, rolbypassrls AS bypassrls, rolcanlogin AS login
@@ -249,3 +258,62 @@ Vercel, ne reçoit aucun mot de passe et n'applique de migration que par le work
 l'amorçage des trois rôles du prototype, la connexion d'administration qu'il exige, la pose de leurs mots de passe, de
 `P0_DATABASE_URL` et des secrets de `p0-purge`, par le studio selon 0046 S5, après la décision 0056 ; la lecture de
 contrôle reste à Samuel.
+
+## 4. Purge planifiée du MVP (décision 0060 § 3)
+
+`.github/workflows/coords-purge.yml` appelle `public.purge_expired_coordinates()` toutes les 6 heures (03:17, 09:17,
+15:17 et 21:17 UTC) sous `vadrouille_coords_purge`, rôle de connexion qui n'a que `EXECUTE` sur cette fonction et
+`USAGE` sur le schéma `public` (migration `0008_positions_mvp_29_jours`), `CONNECTION LIMIT 2`, aucune appartenance
+hors la ligne `ADMIN` seule que Postgres 16 et suivants donnent au rôle d'amorçage quand il n'est pas
+superutilisateur. Avec l'expiration à 29 jours, une position est supprimée au plus tard 30 jours après la réponse de
+Google tant que deux purges réussies ne sont pas séparées de 22 heures ou plus (calcul de 0060 § 2).
+
+**Fusion sans activation.** La PR de B8c fusionne sans le rôle sur la base réelle, ni l'environnement, ni les
+secrets : d'ici leur pose, chaque passage du job échoue, ce qui est attendu. Aucune écriture du MVP sur la base réelle
+avant le premier succès de `coords-purge.yml` (0060 § 3.4).
+
+**Activation** (Samuel, ou le studio s'il étend sa réponse à Q321 à cette purge : question 1 de 0060), dans l'ordre :
+
+1. réexécution de `db/bootstrap/roles.sql` sur la base réelle (ajout de `vadrouille_coords_purge`), **avant**
+   l'application du lot qui contient `0008_positions_mvp_29_jours` (sans le rôle, la migration échoue) ;
+2. mot de passe du rôle selon la procédure S5 de 0046 (vérificateur SCRAM, jamais en clair) ;
+3. environnement GitHub `coords-purge`, sans relecteur obligatoire, branches de déploiement « Selected branches »
+   réduites à `main` (`deployment_branch_policy: {protected_branches: false, custom_branch_policies: true}` puis une
+   politique `name=main`, `type=branch`), et ses quatre secrets `COORDS_PURGE_PGHOST` (hôte direct, sans `-pooler`),
+   `COORDS_PURGE_PGDATABASE`, `COORDS_PURGE_PGUSER`, `COORDS_PURGE_PGPASSWORD` ;
+4. approbation du lot qui contient la migration (0056 § 3) et application par `db-migrate` ;
+5. `workflow_dispatch` de `coords-purge.yml` et premier succès relevé ;
+6. **exercice du repli manuel**, une fois, par Samuel (ci-dessous). Sans cet exercice réussi, l'activation n'est pas
+   acquise.
+
+**Repli manuel** (0060 § 3.5, point 1 ; Samuel seul, le studio ne se connecte jamais à la base réelle) : quand le
+workflow ne peut pas réussir (un `workflow_dispatch` sans succès relevé 30 minutes plus tard, ou impossible à lancer),
+coller et exécuter le contenu de `db/maintenance/coords-purge-repli.sql` dans l'éditeur SQL de la console Neon
+(projet et branche de la base, base de l'application), sous l'utilisateur propriétaire de l'intégration. Noter l'heure
+UTC juste avant le lancement et à la réponse `DO`, et les donner au CEO. Le bloc ne dépend ni de GitHub, ni de
+l'environnement, ni des secrets, ni du mot de passe du rôle ; il réussit en entier ou ne change rien. L'appel direct
+`SELECT public.purge_expired_coordinates();` sous le propriétaire échoue (`42501`) : `EXECUTE` est nominatif. Il
+accompagne la suspension des écritures (`POSITIONS_ECRITURE_SUSPENDUE=1` sur Vercel, 0060 § 3.5 point 2), il ne la
+remplace pas.
+
+**Contrôle après l'exercice**, dans le même éditeur. Cette requête est filtrée sur le rôle (celle de la section 3,
+étape 1, filtre sur le membre et ne montrerait ni la ligne `ADMIN` du propriétaire ni une appartenance résiduelle) :
+
+```sql
+SELECT m.rolname AS membre, r.rolname AS role, am.admin_option AS admin,
+       am.inherit_option AS inherit, am.set_option AS set
+FROM pg_catalog.pg_auth_members am
+JOIN pg_catalog.pg_roles r ON r.oid = am.roleid
+JOIN pg_catalog.pg_roles m ON m.oid = am.member
+WHERE r.rolname = 'vadrouille_coords_purge' OR m.rolname = 'vadrouille_coords_purge'
+ORDER BY 1, 2;
+```
+
+**Résultat attendu, exactement une ligne** : `membre` = l'utilisateur propriétaire de l'intégration sous lequel le
+bloc a été lancé, `role` = `vadrouille_coords_purge`, `admin` vrai, `inherit` faux, `set` faux. Toute autre ligne
+(deuxième ligne pour ce membre, `inherit` ou `set` vrai, autre membre, ou `vadrouille_coords_purge` membre d'un rôle)
+ou l'absence de ligne : exercice échoué, signalé au Tech Lead et à la Sécurité.
+
+**Coexistence** : `p0-purge.yml` reste en place jusqu'à la fin de la phase 0 et purge aussi ces lignes quand il
+réussit ; seuls les succès de `coords-purge.yml` et les purges manuelles comptent pour le calcul de 0060 § 2.
+Surveillance : CEO, à chaque cycle (0060 § 3.5).

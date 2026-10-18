@@ -39,8 +39,12 @@ describe("ancrage: masques de champs exacts", () => {
     const constante = (nom: string) => new RegExp(`^export const ${nom} = "([^"]*)";$`, "m").exec(source)?.[1];
     expect(constante("MASQUE_TEXT_SEARCH")).toBe("places.id");
     expect(constante("MASQUE_DETAILS")).toBe("id,businessStatus,location,regularOpeningHours");
+    // B8a (décision 0085 § 2, soumis au verdict de la Sécurité) : un masque fermé par méthode, `position` (`id,location`)
+    // et `identifiant` (`id`) en plus ; la composition de P0 ne les appelle pas (`tests/unit/p0/b8a-isolement.test.ts`).
+    expect(constante("MASQUE_POSITION")).toBe("id,location");
+    expect(constante("MASQUE_IDENTIFIANT")).toBe("id");
     // Le client Places n'envoie aucun autre masque.
-    expect([...source.matchAll(/masque: ([A-Za-z_]+)/g)].map((m) => m[1])).toEqual(["MASQUE_TEXT_SEARCH", "MASQUE_DETAILS"]);
+    expect([...source.matchAll(/masque: ([A-Za-z_]+)/g)].map((m) => m[1])).toEqual(["MASQUE_TEXT_SEARCH", "MASQUE_DETAILS", "MASQUE_POSITION", "MASQUE_IDENTIFIANT"]);
   });
 });
 

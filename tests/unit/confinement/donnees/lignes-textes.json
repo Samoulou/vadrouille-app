@@ -89,6 +89,21 @@
       "ecart": "ligne ordinaire de portée application (P0b1, PR 208), acceptée par 0040 D4 ; permanente"
     },
     {
+      "fichier": "src/adapters/better-auth.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `prototype-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `CONNEXION_KEY` (`Symbol.for(\"vadrouille.connexion-reelle\")`) ; garde la connexion réelle (opérations de la liste blanche, limiteur, contexte de session) branchée une fois au démarrage par `src/instrumentation.ts` entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`) ; non branchée, chaque opération rend `provider_error` et le contexte lève (échec fermé). Garde-fou (revue consolidée du head `2b80bd7` de la PR 452, bloquant 2) : la clé `Symbol.for` est devinable et le contexte branché fournit l'organisation de chaque requête ; donc `brancherConnexionReelle` lève `ConnexionDejaBrancheeError` si la clé est déjà définie (aucun module chargé après le démarrage ne peut substituer ses opérations, son limiteur ou un contexte rendant une organisation arbitraire), hors de `tests/` seuls ce module et `src/instrumentation.ts` la nomment, et la remise à zéro `debrancherConnexionReellePourTests` (`delete holder[CONNEXION_KEY]`) n'est nommée hors de `tests/` que par ce module (`tests/unit/auth/points-injection.test.ts`) ; toute autre écriture de `globalThis` reste refusée par ce régime",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[CONNEXION_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (B3c, ticket 447 ; spécification B3, B3c point 1), modèle accepté par 0040 D4, décision 0077 § 5.6 ; garde-fou du second branchement ajouté par la revue consolidée du head `2b80bd7` (PR 452, bloquant 2) ; verdict Sécurité : approuvé sur le head `da34495`"
+    },
+    {
       "fichier": "src/adapters/prototype.test.ts",
       "portee": "test",
       "usage": "vérifie que P0b1 n'appelle jamais Google",
@@ -468,6 +483,27 @@
       "ecart": "P0r2 (ticket 284 ; décision 0046, D16 point 7) : noms des secrets de l'environnement p0-purge, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
     },
     {
+      "fichier": "tests/unit/ci/coords-purge.test.ts",
+      "portee": "test",
+      "usage": "test statique du workflow coords-purge : noms des secrets de l'environnement attendus en variables libpq",
+      "capacites": [
+        {
+          "capacite": "secret:COORDS_PURGE_PGPASSWORD",
+          "formes": [
+            "COORDS_PURGE_PGPASSWORD",
+            "PGPASSWORD: ${{ secrets.COORDS_PURGE_PGPASSWORD }}"
+          ]
+        },
+        {
+          "capacite": "secret:PGPASSWORD",
+          "formes": [
+            "PGPASSWORD: ${{ secrets.COORDS_PURGE_PGPASSWORD }}"
+          ]
+        }
+      ],
+      "ecart": "B8c (ticket 438 ; décision 0060 § 3.1) : noms des secrets de l'environnement coords-purge, jamais leurs valeurs : ligne ordinaire B, 0040 D4, sur le modèle de p0-purge ; verdict Sécurité à rendre"
+    },
+    {
       "fichier": "src/features/prototype/SaisieCodeAcces.tsx",
       "portee": "application",
       "usage": "type du champ de saisie du code d'accès du mode réel (`type=\"password\"`, décision 0055, section 2 point 5) ; ce n'est pas un nom de variable, aucune valeur",
@@ -558,6 +594,63 @@
         }
       ],
       "ecart": "PR du workflow des migrations (décisions 0056 et 0057, « Tests imposés » : secrets exacts affectés à leur variable) : noms des secrets, jamais leurs valeurs : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre"
+    },
+    {
+      "fichier": "tests/unit/lint/better-auth-lint.test.ts",
+      "portee": "test",
+      "usage": "cas négatifs de la règle `ligne/no-raw-auth-secret` : textes de code soumis à ESLint (`lintText`), jamais exécutés ; aucune lecture de l'environnement",
+      "capacites": [
+        {
+          "capacite": "secret:BETTER_AUTH_SECRET",
+          "formes": [
+            "export const s = process.env.BETTER_AUTH_SECRET;",
+            "const { BETTER_AUTH_SECRET } = process.env; export const s = BETTER_AUTH_SECRET;"
+          ]
+        },
+        {
+          "capacite": "secret:AUTH_SECRET",
+          "formes": [
+            "export const s = process.env[\"AUTH_SECRET\"];"
+          ]
+        }
+      ],
+      "ecart": "textes de test qui nomment un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446)"
+    },
+    {
+      "fichier": "tests/db/auth-outils.ts",
+      "portee": "test",
+      "usage": "nom du cookie de session de Better Auth (`<préfixe>.session_token`) reconnu dans les cookies du banc de test ; aucun secret, aucune lecture de l'environnement",
+      "capacites": [
+        {
+          "capacite": "secret:SESSION_TOKEN",
+          "formes": [
+            "session_token"
+          ]
+        }
+      ],
+      "ecart": "texte de test qui ressemble à un nom secret : B3b (ticket 444, spécification B3, point 4 et critère B3 ; décision 0008), lignes ordinaires B, 0040 D4 ; verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446)"
+    },
+    {
+      "fichier": "tests/unit/evals/evals.test.ts",
+      "portee": "test",
+      "usage": "garde « aucune donnée Google dans les jeux d'évaluation » (B7c) : motif des hôtes Google refusés dans `evals/` et valeur sentinelle de son cas négatif ; texte seulement, aucun réseau (`fetch` remplacé par une fonction qui échoue), aucune lecture de clé",
+      "capacites": [
+        {
+          "capacite": "hote:googleapis.com",
+          "formes": [
+            "googleapis\\.com|maps\\.google\\.|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps|maps\\.app\\.goo\\.gl"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:maps.googleapis.com",
+          "formes": [
+            "Voir https://maps.googleapis.com/maps/api/place/details/json"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B7c (ticket 449 ; spécification B7, critère « evals: aucune donnée Google dans les jeux d'évaluation » ; CLAUDE.md, « Jamais ») : motif et sentinelle d'un contrôle négatif, sur le modèle de `tests/e2e/carte.e2e.spec.ts` et `tests/unit/p0/pipeline.test.ts` : ligne ordinaire B, 0040 D4 ; verdict Sécurité demandé (PR 454)"
     }
   ]
 }

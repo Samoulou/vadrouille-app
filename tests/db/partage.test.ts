@@ -268,6 +268,7 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
 
   // Amendée par 0046 D16 point 6 : politiques de prototype.purges (lecture de la date par vadrouille_prototype,
   // insertion par la fonction de purge) ; le test couvre USING (true) et WITH CHECK (true), dans tous les schémas.
+  // Amendée par B7c (0010_usage_forfait) : usage_ledger pour vadrouille_fn_usage.
   it("liste fermée des politiques USING (true) et WITH CHECK (true)", async () => {
     const { rows } = await app.query(
       `SELECT CASE WHEN schemaname = 'public' THEN '' ELSE schemaname || '.' END || tablename || ':' || array_to_string(roles::text[], ',') AS policy
@@ -286,6 +287,9 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
         "verifications:vadrouille_auth",
         "prototype.purges:vadrouille_fn_prototype_purge",
         "prototype.purges:vadrouille_prototype",
+        // B7c (migration 0010_usage_forfait) : lecture des sommes par la seule fonction usage_forfait_totals(),
+        // colonnes nécessaires seulement (tests/db/roles.test.ts, tests/db/usage.test.ts).
+        "usage_ledger:vadrouille_fn_usage",
       ].sort(),
     );
   });

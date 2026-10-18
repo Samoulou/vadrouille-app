@@ -1,6 +1,7 @@
 import { cache } from "react";
 
-import { getRequestContext, getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
+import { getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
+import { contexteFacultatif } from "@/features/compte/session";
 
 import { projectTodayTrip, type TodayTrip } from "./today";
 
@@ -16,8 +17,10 @@ export async function readToday(adapter: TripAdapter, ctx: AdapterContext, tripI
 
 /**
  * Une seule lecture par requête pour la page et ses métadonnées. Lecture par `getTripReader()` (décision 0020
- * § 3) : l'écran 15 suit l'accès du Séjour (F10-PO-4).
+ * § 3) : l'écran 15 suit l'accès du Séjour (F10-PO-4). Sans session (`better-auth`, B3c) : `null` ; la page redirige
+ * avant d'appeler ce chargeur (`exigerSession`), les métadonnées ne redirigent jamais.
  */
-export const loadToday = cache(async (tripId: string): Promise<TodayTrip | null> =>
-  readToday(getTripReader(), getRequestContext(), tripId),
-);
+export const loadToday = cache(async (tripId: string): Promise<TodayTrip | null> => {
+  const ctx = await contexteFacultatif();
+  return ctx === null ? null : readToday(getTripReader(), ctx, tripId);
+});

@@ -15,3 +15,21 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+  # Capteur d'e-mails local (spécification B3b-envoi, point 1 ; décision 0008) : aucun envoi hors de la machine, aucun
+  # compte. Image épinglée par digest (index multi-architecture de v1.31.4, relevé au registre le 2026-10-17). SMTP et
+  # API liés à la boucle locale seulement. `docker compose up -d mailpit` ; boîte : http://127.0.0.1:8025.
+  mailpit:
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    environment:
+      # Aucune requête vers GitHub pour chercher une mise à jour (`MP_DISABLE_VERSION_CHECK`, `cmd/root.go` de
+      # v1.31.4) ; Mailpit 1.31.4 n'a pas d'option de télémétrie. Aucun volume : base temporaire, supprimée à l'arrêt.
+      MP_DISABLE_VERSION_CHECK: "1"
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      # Sous-commande `readyz` de l'image (même commande que le HEALTHCHECK de son Dockerfile).
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

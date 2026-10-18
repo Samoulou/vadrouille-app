@@ -31,8 +31,15 @@ const TEST: TablePrixGoogle = {
 
 describe("p0: table de prix Google", () => {
   it("la table commitée est valide, datée, et couvre les SKU des clients réels", () => {
-    expect(TABLE_REELLE.releve).toBe("2026-10-13");
-    for (const sku of ["places_text_search_essentials_ids_only", "places_details_enterprise", "routes_matrix_essentials"]) {
+    // B8a (0085 § 2) : relevé du 2026-10-17, qui ajoute la ligne « IDs only » de Place Details.
+    expect(TABLE_REELLE.releve).toBe("2026-10-17");
+    for (const sku of [
+      "places_text_search_essentials_ids_only",
+      "places_details_enterprise",
+      "places_details_essentials",
+      "places_details_essentials_ids_only",
+      "routes_matrix_essentials",
+    ]) {
       expect(Object.keys(TABLE_REELLE.skus)).toContain(sku);
     }
     for (const ligne of Object.values(TABLE_REELLE.skus)) expect(METHODES).toContain(ligne.methode);

@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "edimbourg-3",
+  "type": "reference",
+  "cas": "Brief de référence 3 de Samuel (0027 § 6, `prototype/briefs/edimbourg-3.json`)",
+  "simulation": "edimbourg",
+  "demande": {
+    "story": "Budget serré, on aime marcher, la nature et les points de vue ; on mange simple et local, rien de cher.",
+    "trip": {
+      "destination": "Édimbourg",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Édimbourg",
+    "pays": "Royaume-Uni",
+    "arrivee": "2026-11-23",
+    "depart": "2026-11-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "walk",
+      "nature",
+      "restaurant"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 1
+  },
+  "attentes": {
+    "categories": [
+      "walk",
+      "nature",
+      "restaurant"
+    ],
+    "incontournables": [
+      "château d'Édimbourg",
+      "Royal Mile",
+      "Arthur's Seat et Holyrood Park",
+      "Calton Hill",
+      "Dean Village",
+      "Victoria Street et Grassmarket",
+      "National Museum of Scotland",
+      "Princes Street Gardens et Scott Monument",
+      "Royal Botanic Garden",
+      "Leith et The Shore"
+    ]
+  }
+}

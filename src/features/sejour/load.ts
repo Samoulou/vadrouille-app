@@ -1,7 +1,10 @@
 import { cache } from "react";
 
-import { getRequestContext, getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
+import { getTripReader, type AdapterContext, type TripAdapter } from "@/adapters";
 import type { Day, DayMap, Stop, Trip } from "@/contracts";
+import { contexteFacultatif } from "@/features/compte/session";
+
+import { DAY_PARAM_PATTERN } from "./routes";
 
 export interface TripData {
   trip: Trip;
@@ -23,15 +26,18 @@ export async function readTrip(adapter: TripAdapter, ctx: AdapterContext, tripId
 /**
  * Une seule lecture par requête pour le layout, la page et leurs métadonnées (décision 0015 § 5.3),
  * sur le modèle de `features/presentation/load.ts`. Lecture par `getTripReader()` : un voyage débloqué par
- * un paiement simulé est servi débloqué (décision 0020 § 3).
+ * un paiement simulé est servi débloqué (décision 0020 § 3). Sans session (`better-auth`, B3c) : `null`, comme un voyage
+ * inconnu ; la page redirige avant d'appeler ce chargeur (`exigerSession`), la mise en page et les métadonnées ne
+ * redirigent jamais.
  */
-export const loadTrip = cache(async (tripId: string): Promise<TripData | null> =>
-  readTrip(getTripReader(), getRequestContext(), tripId),
-);
+export const loadTrip = cache(async (tripId: string): Promise<TripData | null> => {
+  const ctx = await contexteFacultatif();
+  return ctx === null ? null : readTrip(getTripReader(), ctx, tripId);
+});
 
-/** `n` de l'adresse : entier écrit sans zéro initial, dans les jours du voyage ; sinon `null` (404). */
+/** `n` de l'adresse : entier écrit sans zéro initial (`DAY_PARAM_PATTERN`), dans les jours du voyage ; sinon `null` (404). */
 export function dayFromParam(trip: Trip, n: string): Day | null {
-  if (!/^[1-9]\d*$/.test(n)) return null;
+  if (!DAY_PARAM_PATTERN.test(n)) return null;
   const index = Number(n);
   return trip.days.find((day) => day.index === index) ?? null;
 }

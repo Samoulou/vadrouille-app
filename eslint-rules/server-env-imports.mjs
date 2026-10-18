@@ -10,7 +10,8 @@ import path from "node:path";
  *   seulement ;
  * - `@/server/env/garde-cles` : depuis la mise en place de Vitest (`tests/unit/setup.ts`) et la configuration de
  *   Playwright seulement ;
- * - `@/server/env` (`index.ts`, B3a) : depuis `src/instrumentation.ts`, le limiteur et son test unitaire seulement ;
+ * - `@/server/env` (`index.ts`, B3a) : depuis `src/instrumentation.ts`, le limiteur, les opérations de connexion
+ *   (`src/server/auth/index.ts`, B3b) et son test unitaire seulement ;
  * - `@/server/env/resolve` (B3a) : depuis `db/connection.ts` et le même test seulement ;
  * - `@/server/env/payment` (B4) : depuis `src/server/routes/` et `src/server/payment/` seulement ;
  * - `@/server/env/p0` (P0r3b) : depuis la garde, l'accès et le lancement du mode réel (`src/server/p0/garde.ts`,
@@ -32,7 +33,8 @@ export const IMPORTATEURS_ADMIS = new Map([
   // B3a (décision 0050, B3-TL-1 point 1) : module d'environnement du serveur (`@/server/env`), nommé fichier par
   // fichier ; résolution de l'environnement, importée par la garde de connexion (`../src/server/env/resolve.ts`) ;
   // module du paiement (B4), depuis les routes et le paiement serveur seulement (handover § 3).
-  ["index", ["src/instrumentation.ts", "src/server/rate-limit.ts", "tests/unit/server/env.test.ts"]],
+  // B3b (décision 0077 § 5.1) : opérations de connexion, configuration par défaut tirée de `serverEnv()`.
+  ["index", ["src/instrumentation.ts", "src/server/rate-limit.ts", "src/server/auth/index.ts", "tests/unit/server/env.test.ts"]],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
   ["payment", ["src/server/routes/", "src/server/payment/"]],
   // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, depuis la garde et l'accès seulement ; ses

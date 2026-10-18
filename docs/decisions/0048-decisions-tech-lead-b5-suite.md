@@ -4,6 +4,10 @@ Statut : décision déléguée (architecture, outillage, tests : « Qui décide 
 
 **§ 1 amendé par 0077** (§ 3 point 1, ticket #415) : `src/ai/erreurs.ts`, et lui seul, est exempté de `interditPartout` et de `violationsPont` (module sans aucun import, codes fermés seulement). Précisé par 0080 (ticket #425) : la mention de `violationsPont` est retirée (`src/ai` y est déjà une ouverture), et `erreurs.ts` est aussi admis quand `egress.ts` ou `port.ts` l'importe.
 
+**§ 1 amendé par 0081** (B9-TL-1, ticket #433) : `src/ai`, `src/research` et `src/grounding` sont atteints, dans le graphe de l'application, seulement par `src/server/composition/generation.ts` (frontière de même forme que celle de `src/domain`) ; le pont `p0Run` ne change pas.
+
+**§ 1 amendé par 0086** (§ 1.2 point 4, ticket #466) : une arête de plus est admise, en `import type` seulement, de `src/mocks/relectures-voyages.ts` (double de relectures de B6a) vers `src/domain/relectures.ts` ; un import de valeur depuis ce fichier reste refusé.
+
 Numérotation (vérifiée le 2026-10-14 sur `main`, `9b76af5`) : `main` contient 0001 à 0045, 0047 et 0049 ; #269 (fusionnée le 2026-10-13) a ajouté `0047`, #266 (ouverte) prend `0046`, #275 (fusionnée) a ajouté `0049` ; #270 (fusionnée) n'ajoute aucun fichier sous `docs/decisions/`. Cette PR ajoute `0048`.
 
 ## Contexte

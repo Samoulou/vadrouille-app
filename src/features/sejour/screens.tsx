@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRequestContext, getRevisionFixtures, isPrototypeAdapter, shareButtonVisible } from "@/adapters";
+import { getRevisionFixtures, isPrototypeAdapter, shareButtonVisible } from "@/adapters";
+import { contexteFacultatif } from "@/features/compte/session";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
@@ -26,10 +27,13 @@ const t = messages.sejour.titreDocument;
 const ROBOTS = { index: false, follow: false } as const;
 
 export async function TripLayout({ tripId, base, children }: { tripId: string; base: TripRoutesBase; children: ReactNode }) {
+  // Sans session (`better-auth`, B3c) : ni carte ni panneau ; la page redirige vers l'écran 4 (`exigerSession`).
+  const ctx = await contexteFacultatif();
+  if (ctx === null) return children;
   const data = await loadTrip(tripId);
   if (!data) notFound();
   // Jeu simulé de révision (F7, décision 0016 § 6) : adaptateur `mock` seulement, sinon `null`.
-  const revisionFixtures = await getRevisionFixtures(getRequestContext(), tripId);
+  const revisionFixtures = await getRevisionFixtures(ctx, tripId);
   // Bouton « Partager » (F10c) : routes `/voyages` seulement, voyage débloqué, partage disponible et pas terminé.
   const shareable = base === "/voyages" && (await shareButtonVisible(data.trip));
   return (

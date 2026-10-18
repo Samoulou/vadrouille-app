@@ -657,6 +657,14 @@ export default defineConfig([
     rules: { "ligne/server-env-imports": "error" },
   },
   {
+    // B3b (spécification B3, B3b point 4 ; décisions 0008 et 0051 § 5.4) : `better-auth` depuis `src/server/auth` et
+    // `src/tenancy` seulement, `@/tenancy/auth` depuis `src/server/auth` seulement, `auth.api` réduit aux appels nommés
+    // de la liste blanche ; secret de Better Auth lu dans `process.env` par le seul module d'environnement. Règles
+    // propres au plugin, posées par ce seul bloc (tests/unit/lint/better-auth-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/better-auth-confinement": "error", "ligne/no-raw-auth-secret": "error" },
+  },
+  {
     // B7a (ticket 423 ; spécification B7a point 5, handover § 3 ; décisions 0077 § 1 point 5 et 0080 §§ 4 et 5) :
     // `src/ai` et `src/research` en liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support`
     // en plus ; toute source non littérale refusée), et `@/ai/complement-p0` confiné aux appels directs de P0. Règles propres au plugin, posées par ce seul bloc sur tout
@@ -664,6 +672,15 @@ export default defineConfig([
     // de P0 (tests/unit/p0/imports.test.ts) reste en place à côté jusqu'à la fin de P0 (0077 § 2 point 6).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "ligne/ia-recherche-liste-blanche": "error", "ligne/complement-p0-imports": "error" },
+  },
+  {
+    // B8a (ticket 462 ; spécification B8a point 6, handover § 3 ; décision 0085 § 1.8 à § 1.10) : `src/grounding` en
+    // liste blanche d'imports, tests compris (`vitest` et modules nommés de `tests/support` en plus ; exception
+    // nominative de `@/prototype/*` pour `ancrage.ts` et les modules de P0r3c, jusqu'à B8-TL-10), et
+    // `@/server/relecture/*` importable par la seule composition de génération. Règles propres au plugin, posées par ce
+    // seul bloc sur tout fichier (eslint-rules/grounding-imports.mjs ; tests/unit/lint/grounding-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/grounding-liste-blanche": "error", "ligne/relecture-imports": "error" },
   },
   {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
@@ -720,6 +737,14 @@ export default defineConfig([
       "src/server/ip.ts",
       "src/server/rate-limit.ts",
       "src/server/config/limites.ts",
+      // B3b (spécification B3, « Critères communs » ; 0050, B3-TL-1 point 5) : fichiers de B3b sous `src/server` et
+      // `src/tenancy`.
+      "src/server/auth/**/*.ts",
+      "src/server/mail/port.ts",
+      "src/server/mail/disabled.ts",
+      "src/server/session.ts",
+      "src/server/with-org.ts",
+      "src/tenancy/**/*.ts",
     ],
     rules: { "no-console": "error" },
   },

@@ -244,7 +244,8 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "usage_ledger":
       return {
-        sql: "INSERT INTO usage_ledger (organization_id, trip_id, step, provider, sku, units, cost_estimate_micros) VALUES ($1, $2, 'b', 'test', 'test', 1, 10) RETURNING id",
+        // Ligne de forfait (B7c, migration 0010_usage_forfait : `usage_ledger_forfait_only_check`).
+        sql: "INSERT INTO usage_ledger (organization_id, trip_id, step, provider, sku, units, cost_estimate_micros) VALUES ($1, $2, 'forfait', 'google', 'test', 1, 10) RETURNING id",
         params: [org, trip],
       };
     case "checkouts":

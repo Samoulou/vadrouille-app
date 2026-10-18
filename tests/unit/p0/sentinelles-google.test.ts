@@ -5,7 +5,7 @@ import type { RequeteModele } from "@/ai/client";
 import { createOpenRouterClient, ErreurOpenRouter } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
-import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
+import { ErreurAncrage, type ClientPlaces, type ClientRoutes } from "@/grounding/interfaces";
 import { createPlacesClient } from "@/grounding/places-client";
 import { dureeSimulee } from "@/grounding/routes.simule";
 import { createRoutesClient } from "@/grounding/routes-client";
@@ -385,10 +385,15 @@ describe("p0: erreur de fournisseur réduite à un code", () => {
   ];
 
   for (const [client, appeler] of appels) {
-    it.each(REPONSES_ERREUR)(`${client}, réponse %s : code fermé, ni clé, ni identifiant de lieu, ni valeur Google dans l'erreur`, async (_nom, reponse) => {
+    it.each(REPONSES_ERREUR)(`${client}, réponse %s : code fermé, ni clé, ni identifiant de lieu, ni valeur Google dans l'erreur`, async (nom, reponse) => {
       const erreur = await erreurDe(appeler(reponse));
-      expect(erreur instanceof ErreurClientGoogle || erreur instanceof ErreurOpenRouter).toBe(true);
-      const code = (erreur as ErreurClientGoogle | ErreurOpenRouter).code;
+      // B8a (décision 0085 § 2 point c, soumis au verdict de la Sécurité) : une 404 de Place Details est la fiche
+      // introuvable, `ErreurAncrage("place_not_found")`, la même erreur que le double ; toujours un code fermé seul.
+      if (client === "Places Details" && nom === "404") {
+        expect(erreur).toBeInstanceOf(ErreurAncrage);
+        expect((erreur as ErreurAncrage).code).toBe("place_not_found");
+      } else expect(erreur instanceof ErreurClientGoogle || erreur instanceof ErreurOpenRouter).toBe(true);
+      const code = (erreur as ErreurClientGoogle | ErreurOpenRouter | ErreurAncrage).code;
       expect(code).toMatch(/^[a-z_]+$/);
       expect((erreur as Error).message).toBe(code);
       expect((erreur as Error).cause).toBeUndefined();

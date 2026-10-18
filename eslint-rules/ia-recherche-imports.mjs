@@ -115,7 +115,7 @@ function sourceText(node) {
  * pas littérale (`import(v)`, `require(v)`, ``import(`${v}`)``, `require()` sans argument) : la liste blanche la refuse
  * (revue du head `5a955f8`, bloquant 2), la règle de `complement-p0` ne peut pas la juger.
  */
-function visiteurs(verifier) {
+export function visiteurs(verifier) {
   const check = (node, sourceNode) => verifier(node, sourceText(sourceNode));
   return {
     ImportDeclaration: (node) => check(node, node.source),
@@ -141,7 +141,7 @@ function visiteurs(verifier) {
   };
 }
 
-const importateurDe = (context) => path.relative(context.cwd, context.filename).split(path.sep).join("/");
+export const importateurDe = (context) => path.relative(context.cwd, context.filename).split(path.sep).join("/");
 
 export const listeBlanche = {
   meta: {

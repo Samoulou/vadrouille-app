@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Prépare la base de test de la CI (spécification B1) : amorçage des rôles avec l'utilisateur administrateur du
-# conteneur, mots de passe jetables pour les cinq rôles de connexion, migrations sous vadrouille_migrator.
+# conteneur, mots de passe jetables pour les six rôles de connexion, migrations sous vadrouille_migrator.
 # Usage : scripts/ci/db-setup.sh [--twice]   (--twice : amorçage et migrations rejoués, la seconde fois sans effet)
 # Entrée : VADROUILLE_DB_ADMIN_URL, ou à défaut PGHOST, PGPORT, PGUSER, PGDATABASE (superutilisateur du conteneur
 # postgres:17.11, jetable, authentification « trust » limitée au conteneur) ; EXPECTED_SERVER_VERSION facultative.
 # Sortie : VADROUILLE_DATABASE_URL, VADROUILLE_DATABASE_URL_AUTH, VADROUILLE_DATABASE_URL_MIGRATOR, et pour les tests
-# de base du prototype (décision 0046) VADROUILLE_DB_PROTOTYPE_URL et VADROUILLE_DB_PROTOTYPE_PURGE_URL, dans
-# $GITHUB_ENV, masquées dans les journaux (jamais l'adresse d'administration). Aucune valeur n'est écrite dans le
-# dépôt. Les deux variables du prototype sont propres aux tests : la base de service de la CI n'est jamais désignée
-# par une variable P0_*, réservée à la préversion de p0-reel (0046, S5).
+# de base du prototype (décision 0046) VADROUILLE_DB_PROTOTYPE_URL et VADROUILLE_DB_PROTOTYPE_PURGE_URL, et pour ceux
+# de la purge du MVP (décision 0060 § 4) VADROUILLE_DB_COORDS_PURGE_URL, dans $GITHUB_ENV, masquées dans les journaux
+# (jamais l'adresse d'administration). Aucune valeur n'est écrite dans le dépôt. Ces trois variables sont propres aux
+# tests : la base de service de la CI n'est jamais désignée par une variable P0_* (réservée à la préversion de p0-reel,
+# 0046, S5) ni par un secret COORDS_PURGE_* (environnement GitHub coords-purge, 0060 § 3.1).
 # Le refus de SKIP_DB_TESTS en CI est fait par scripts/test-db.mjs seulement.
 set -euo pipefail
 
@@ -39,7 +40,7 @@ for _ in $(seq 1 "$runs"); do
   psql "$VADROUILLE_DB_ADMIN_URL" -v ON_ERROR_STOP=1 -q -f db/bootstrap/roles.sql
 done
 
-for role in migrator app auth prototype prototype_purge; do
+for role in migrator app auth prototype prototype_purge coords_purge; do
   password="$(openssl rand -hex 24)"
   echo "::add-mask::${password}"
   # Mot de passe transmis à psql par l'entrée standard (\set dans un document « here »), jamais dans sa ligne de
@@ -56,6 +57,7 @@ SQL
     auth) export VADROUILLE_DATABASE_URL_AUTH="$url"; name=VADROUILLE_DATABASE_URL_AUTH ;;
     prototype) export VADROUILLE_DB_PROTOTYPE_URL="$url"; name=VADROUILLE_DB_PROTOTYPE_URL ;;
     prototype_purge) export VADROUILLE_DB_PROTOTYPE_PURGE_URL="$url"; name=VADROUILLE_DB_PROTOTYPE_PURGE_URL ;;
+    coords_purge) export VADROUILLE_DB_COORDS_PURGE_URL="$url"; name=VADROUILLE_DB_COORDS_PURGE_URL ;;
   esac
   if [ -n "${GITHUB_ENV:-}" ]; then echo "${name}=${url}" >> "$GITHUB_ENV"; fi
 done

@@ -1,34 +1,39 @@
-# État du studio — 2026-10-17 (88e cycle)
+# État du studio — 2026-10-18 (97e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 4 sur 20).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle ; ce cycle lancé à la demande de Samuel (08:04 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 13 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 87e cycle (fil du cycle ni #studio).
+- 06:33 UTC : `owner-approved` posé sur #460, fusionnée.
+- 07:29 UTC : `roles.sql` rejoué, `count(*) = 0`, `db-migrate` lancé ; succès vérifié par le CEO (Q479 close).
+- 07:33 UTC : plafonds de coût, « Ma reco » (Q39, Q45, Q465).
+- 08:04 UTC : « lance un cycle » (ce cycle).
+- 08:05 UTC : `pnpm p0` en mode simulé autorisé pour le studio (Q491).
 
 ## Fait
-- Fusionnées : statut du 87e cycle (#431), **spécification B9** (#429, après un bloquant tardif non compté), **B7a** (#424, couche IA de production, fusionnée à 06:23 UTC après la fin du veto de 0080).
-- **F8c** (#432) : corrections 1 et 2 faites (`activeTripId` dans `ApiError`, références visuelles, textes provisoires consignés dans la spec F8) ; il restait un bloquant de rédaction : troisième tentative bornée (Q470), documentation seulement, poussée.
+- Fusionnées : statut du 96e cycle (#475), **liste d'approbation des migrations 0008 à 0010** (#460) ; **migrations 0008 à 0010 appliquées à la vraie base** par Samuel.
+- Revues reçues : B6a (#473) et décision 0087 (#476), changements demandés (tentative 1 comptée chacune) ; Sécurité **approuvée** sur B6a (0086 § 4 points 1 à 3).
 
 ## En cours
-- tech-lead : **décision 0081** (#434, ticket #433, B9-TL-1 à B9-TL-14) ; correction 1 (comptée) poussée, en revue.
-- backend : **B3b** (ticket #435), envoi du code de connexion par e-mail vers Mailpit seulement.
-- frontend : F8c (#432), revue de la troisième tentative bornée après CI verte.
-- En attente de Samuel : release `main` → `p0-reel` (#422, carte et temps de trajet) après son accord écrit sur #419.
+- backend : **correction 1 de B6a** (#473 : validation de la sortie de `getDay`, erreurs de base fermées, `pnpm p0` simulé).
+- tech-lead : **correction 1 de 0087** (#476 : fiches des villes, commande de reprise du studio).
 
 ## Bloqué
-- **B8c** : pas dans le même cycle que B3b. **B7c** : B9-TL-4 (#434) puis 6 h de veto. **B8a** : B7c. **B4a** : B3b, Q352, Sécurité sur B4-TL-3 et B4-TL-6. **B6a** : B3b. **B3c** : B3b.
-- **B9** : B9b après 0081 (et sa PR de contrat) ; PR de moteur de B9-TL-13 avant B9c ; B9e : Q465 (plafonds), Q467 ; B9c réel : Q468.
+- **B4a** et **B8b** : après B6a (B4a jamais dans le même cycle, 0078).
+- **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
+- **B9** : B9b après B6a, 0087 et les noms de colonnes (data, Q492) ; B9c : 0087, puis la petite PR ia-recherche de B8-PO-13, B8-PO-15 et du remplacement de `ancrerLogement` (veto de #469 fini à 09:35 UTC) ; B9c réel : Q468 ; B9e : Q467.
+- **Purge du MVP** : activation Q438 (Samuel).
 
 ## Prochain cycle
-1. Suivre F8c, 0081 et B3b jusqu'à la fusion ; après 0081 : ticket B7c, ticket de la PR de moteur (B9-TL-13), puis B9b.
-2. B8c au cycle suivant celui de B3b.
-3. Tickets : page de jugement de P0r4 et son e2e ; refus de lancement si la purge a plus de 24 h ; nombre d'appels Google dans le rapport d'essai ; adaptateur Resend. Cartes à Samuel : Q354, puis Q39/Q465.
+1. Relancer la revue de B6a et de 0087 après leurs corrections.
+2. Après la fusion de 0087 : ticket de la petite PR ia-recherche (B8-PO-13, B8-PO-15, remplacement de `ancrerLogement`) et PR de contrat de B9d.
+3. Après la fusion de B6a : B9b (backend), puis B4a dans un autre cycle.
+4. Tickets à placer : police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : aucune pour l'instant (Q325, Q456 et Q457 closes).
-- **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060).
+- **Réponses demandées** : aucune pour l'instant (Q39, Q45, Q465 et Q491 répondues le 2026-10-18).
+- **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060) ; B8c est fusionnée, la purge attend cette réponse pour être activée.
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
-- **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q354, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
+- **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
 - **Prévente** : Q357 et Q362 ; les documents sont fusionnés (#256).
 - **Pour confirmation** : **Q285**. Recommandation : laisser la production telle quelle jusqu'à la mise en public ; aucun réglage Vercel à faire.
 - **Toujours ouvertes** :
@@ -44,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q470, Q471.
+- Q491 et Q492 ; Q39, Q45, Q465, Q479 et Q490 mises à jour.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).

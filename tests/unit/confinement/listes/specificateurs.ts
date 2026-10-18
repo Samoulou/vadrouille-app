@@ -31,6 +31,24 @@ export type LigneSpecificateurNominative = {
 
 const NEUTRES_SAUF = ["@src-non-test", "@sensible"] as const;
 
+/**
+ * B3b (ticket 444 ; spécification B3, B3b ; décisions 0007 et 0008) : requêtes paramétrées (`sql`) de la création de
+ * compte, de l'organisation personnelle, du verrou et de la purge bornée, de `withOrg` ; `drizzle-orm/node-postgres`
+ * (`drizzle.mock`, sans connexion) dans le test des exports. Fichiers nommés, sans motif de dossier (revue du head
+ * `f0b8c5a`, mineur 6). Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446), qui lève la
+ * réserve « sous réserve de ce mineur » du head `f0b8c5a` (même revue, mineur 2).
+ */
+const ZONES_DRIZZLE_B3B = [
+  "src/tenancy/creation-compte.ts",
+  "src/tenancy/organisations.ts",
+  "src/server/auth/index.ts",
+  "src/server/with-org.ts",
+  "tests/db/with-org.test.ts",
+  "tests/unit/auth/operations.test.ts",
+];
+/** B3b : fichiers nommés qui importent `better-auth` (revue du head `f0b8c5a`, mineur 6 : pas de motif de dossier). */
+const ZONES_BETTER_AUTH_B3B = ["src/tenancy/auth.ts", "src/tenancy/adaptateur.ts", "src/tenancy/creation-compte.ts", "src/tenancy/jetons-haches.ts"];
+
 export const SPECIFICATEURS = [
   { specificateur: "react", zones: ["src/**", "tests/unit/**"] },
   { specificateur: "react-dom", zones: ["src/**", "tests/unit/**"] },
@@ -66,19 +84,39 @@ export const SPECIFICATEURS = [
   { specificateur: "node:util", zones: ["scripts/p0/**"] },
   // B1 (PR 188, décisions 0006 et 0036 ; spécification P0c, section 9) : paquets sans capacité du socle base de
   // données. `pg` est un module à capacité : lignes nominatives de `listes/capacites.ts`. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
-  { specificateur: "server-only", zones: ["db/**", "src/server/**"] },
-  { specificateur: "drizzle-orm", zones: ["db/**"] },
+  { specificateur: "server-only", zones: ["db/**", "src/server/**", "src/tenancy/**"] },
+  { specificateur: "drizzle-orm", zones: ["db/**", ...ZONES_DRIZZLE_B3B] },
   // PR du workflow des migrations (décisions 0056 et 0057 ; Q412, Q419, Q422) ; verdict Sécurité à rendre : analyseur de chaînes de
   // connexion de `pg` (même version), pour le refus de tout hôte non local de `db/migrate.ts` (0056 § 2.8). Sans capacité.
   { specificateur: "pg-connection-string", zones: ["db/migrate.ts"] },
+  // B3b (ticket 444 ; spécification B3, B3b point 4 ; décision 0008) : `better-auth` 1.7.7, sous-chemins exacts, dans
+  // `src/tenancy/` seulement (`src/server/auth/` n'importe que `@/tenancy/auth` ; même confinement tenu par
+  // `ligne/better-auth-confinement`). `node:async_hooks` : contexte d'appel (`AsyncLocalStorage`) de l'adresse du code
+  // et de l'état d'envoi, sans capacité. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+  { specificateur: "better-auth", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/adapters/drizzle", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/next-js", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "better-auth/plugins/organization/access", zones: ZONES_BETTER_AUTH_B3B, sousChemins: "exacts" },
+  { specificateur: "node:async_hooks", zones: ["src/tenancy/code-otp.ts", "src/server/auth/index.ts"] },
   { specificateur: "drizzle-kit", zones: ["drizzle.config.ts"] },
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
   // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.
   { specificateur: "workflow", zones: ["src/workflows/**", "next.config.ts", "tests/unit/workflows/**"] },
+  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1 et 4 ; liste de 0008) : deux sous-chemins **exacts** de
+  // `nodemailer` 10.0.16, sans capacité réseau : `MailComposer` (compilation de l'enveloppe) dans `src/server/mail/`,
+  // `addressparser` dans le seul test du critère E3. Ni `nodemailer`, ni `createTransport`, ni `smtp-connection`, ni
+  // `fetch` : le transport SMTP et le classement en module à capacité suivent dans la PR de `src/server/mail/smtp.ts`.
+  // Sécurité : dépendance conforme (lockfile, intégrité, aucun script), lignes exactes demandées par le bloquant 1 de
+  // la revue consolidée du head `1b3a97d` (PR 437).
+  { specificateur: "nodemailer/lib/mail-composer", zones: ["src/server/mail/**"], sousChemins: "exacts" },
+  { specificateur: "nodemailer/lib/addressparser", zones: ["tests/unit/server/email-ip.test.ts"], sousChemins: "exacts" },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
   // composition », décision 0055, section 3 point 2), comme `imports.test.ts`. Verdict Sécurité : approuvé sur le head `59878f0` (PR 326).
-  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts"] },
+  // B8c (ticket 438) : `tests/unit/lint/positions-imports.test.ts` applique les règles d'import de 0060 § 1.4 sur l'arbre
+  // syntaxique, comme `imports.test.ts`. Verdict Sécurité à rendre.
+  { specificateur: "typescript", zones: ["tests/unit/confinement/**", "tests/unit/p0/imports.test.ts", "tests/unit/p0/enregistrer.test.ts", "tests/unit/p0/composition.test.ts", "tests/unit/lint/positions-imports.test.ts"] },
 ] as const satisfies readonly LigneSpecificateur[];
 
 const CHARGEUR =
@@ -128,9 +166,27 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/grounding` de `p0Run`, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-2 (ticket 316), décision 0055, section 6 ; verdict Sécurité : approuvé sur le head `bc0ff4c` (PR 323)",
   })),
+  // B8c (ticket 438) : port du cache de positions (décision 0060 § 1.1), déclarations de type seules. Verdict Sécurité à rendre.
+  {
+    fichier: "src/grounding/port-positions.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du port `PortPositions` de `src/grounding` (types seuls), exigé par `ligne/require-server-only` ; " +
+      "B8c (ticket 438), décision 0060 § 1.1 ; verdict Sécurité à rendre",
+  },
+  // B8a (ticket 462) : modules de production de `src/grounding` (décision 0085 § 1), non chargés par `pnpm p0`.
+  // Verdict Sécurité à rendre (PR de B8a).
+  ...["ancrage-production", "fiches", "resultat", "trajets"].map((nom) => ({
+    fichier: `src/grounding/${nom}.ts`,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un module de production de `src/grounding` (B8a), exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B8a (ticket 462), décision 0085 § 1 ; verdict Sécurité à rendre",
+  })),
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/candidat", noms: ["type:Candidat"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
@@ -165,6 +221,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7a (ticket 423), décision 0077 § 1 et § 2 ; verdict Sécurité demandé (PR de B7a)",
   })),
+  // B7c (ticket 449 ; spécification B7, B7c point 4) : harnais du jeu d'évaluation `evals/`, non chargé par `pnpm p0`
+  // ni par l'application, marqueur `server-only` seul. Verdict Sécurité demandé dans la PR de B7c (PR 454).
+  {
+    fichier: "src/research/evaluation.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/research` (harnais d'`evals/`), exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7c (ticket 449), spécification B7, B7c point 4, décision 0077 § 2 (liste blanche de `src/research`) ; verdict Sécurité demandé (PR 454)",
+  },
   {
     fichier: "src/research/extract-text.ts",
     specificateur: "parse5",

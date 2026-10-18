@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
+import { exigerSession } from "@/features/compte/session";
+import { tripRoutes } from "@/features/sejour/routes";
 import { loadToday } from "@/features/voyage/load-today";
 import { TodayScreen } from "@/features/voyage/TodayScreen";
 import { format } from "@/i18n";
@@ -29,10 +31,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  * Écran 15 « Pendant le voyage » (`R15` ; spécification F10, F10a). Page sans carte, hors du groupe
  * `(programme)` (F10-TL-3) : elle lit le voyage par `getTripReader()` et transmet tous ses jours projetés ;
  * l'écran choisit le jour dans le navigateur (F10-TL-2). Voyage inconnu ou d'une autre organisation : 404 ;
- * erreur de l'adaptateur : page d'erreur commune.
+ * erreur de l'adaptateur : page d'erreur commune. Sans session (`better-auth`, B3c) : redirection vers l'écran 4.
  */
 export default async function AujourdhuiPage({ params }: { params: Params }) {
   const { id } = await params;
+  const routes = tripRoutes("/voyages", id);
+  await exigerSession(routes.aujourdhui() ?? routes.sejour());
   const trip = await loadToday(id);
   if (!trip) notFound();
   // Mention « Données de lieux : Google » avec l'adaptateur `prototype` (spécification P0), comme le Séjour.
