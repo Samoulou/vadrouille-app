@@ -39,7 +39,7 @@ export const CODES_EXTERNES_SUIVI: readonly string[] = ["upstream_unavailable", 
  * déploiement ne porte ce commit. Pour les entrées de 0089, une autre exécution réelle de rome-1/B arrêtée en
  * `pipeline_failed` le même jour sur le même commit répondrait au même tuple : c'est pourquoi `decompte()` n'exclut
  * **qu'une exécution au plus par entrée** (décision 0089, § « Mise en œuvre ») ; une seconde exécution qui répond au
- * même tuple compte.
+ * même tuple compte. Il en va de même pour l'entrée de 0091 (commit `0d0bbaa`).
  */
 export type ExecutionExclue = {
   readonly decision: string;
@@ -82,6 +82,16 @@ export const EXECUTIONS_EXCLUES: readonly ExecutionExclue[] = [
     jourQuota: "2026-10-18",
     codeArret: "pipeline_failed",
     commitSha: "efc0994f3e4e8eb5eb081c84b754797b980cf166",
+  },
+  // Décision 0091 : `wrun_41M57YCVXJ50T41W3BH260MEP2` (le soir), arrêtée par la limite quotidienne de Google Routes
+  // (`upstream_rate_limited` dans le journal, plafond de la console de Samuel), pas par un défaut du programme.
+  {
+    decision: "0091",
+    brief: "rome-1.json",
+    variante: "B",
+    jourQuota: "2026-10-18",
+    codeArret: "pipeline_failed",
+    commitSha: "0d0bbaa36536cf0d26d1d3b55218d9183375b92f",
   },
 ];
 
