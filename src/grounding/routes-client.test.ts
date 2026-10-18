@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { cleTrajet, matriceTrajets, minutesDeTrajets } from "@/grounding/ancrage";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { COUT_ELEMENT_MICROS, createRoutesClient, MASQUE_MATRICE, ORIGINE_ROUTES, SKU_MATRICE, type OptionsRoutes } from "@/grounding/routes-client";
 import { chargerTrajets } from "@/grounding/trajets";
@@ -335,6 +336,88 @@ describe("p0: les clients réels n'appellent que leurs hôtes figés ; no-store 
         expect(secondes.at(de)?.at(vers)).toBe(attendu);
       }
     }
+  });
+});
+
+describe("p0: durées fractionnaires, sans arrondi à la lecture (décision 0090 § 2 et § 3 point 2)", () => {
+  /** Une matrice 1 × 1 dont l'unique élément porte la durée donnée. */
+  const lire = async (duree: string) => {
+    const { client } = monter([async () => json([{ originIndex: 0, destinationIndex: 0, duration: duree, condition: "ROUTE_EXISTS" }])]);
+    return (await client.matrice({ origines: ["A"], destinations: ["B"], mode: "transit" })).secondes;
+  };
+
+  it.each([
+    ["3.5s", 3.5],
+    ["160s", 160],
+    ["0s", 0],
+    ["59.9s", 59.9],
+  ] as const)("%s : %s secondes (fraction gardée)", async (duree, attendu) => {
+    expect(await lire(duree)).toEqual([[attendu]]);
+  });
+
+  it.each(["1.s", "-3s", "3,5s", "1e3s", ".5s", "3.5", "3.5 s", "1234567890s", "1.0123456789s", ""])("« %s » hors de la forme documentée : inconnue", async (duree) => {
+    expect(await lire(duree)).toEqual([[null]]);
+  });
+
+  it("de bout en bout par minutesDeTrajets (client réel) : arrondi supérieur à la minute en un seul endroit", async () => {
+    const { client } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, duration: "60.5s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, duration: "59.9s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 2, duration: "120s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 3, duration: "0.000000001s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    const minutes = await minutesDeTrajets(["A"], ["B", "C", "D", "E"], "transit", client);
+    expect(minutes.get(cleTrajet("A", "B"))).toBe(2);
+    expect(minutes.get(cleTrajet("A", "C"))).toBe(1);
+    expect(minutes.get(cleTrajet("A", "D"))).toBe(2);
+    expect(minutes.get(cleTrajet("A", "E"))).toBe(1);
+  });
+
+  it("de bout en bout par matriceTrajets : durée fractionnaire en minutes entières, paire inconnue absente", async () => {
+    const { client } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, duration: "0s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, duration: "90.25s", condition: "ROUTE_EXISTS" },
+          { originIndex: 1, destinationIndex: 0, condition: "ROUTE_NOT_FOUND" },
+          { originIndex: 1, destinationIndex: 1, duration: "0s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    const trajets = await matriceTrajets(["A", "B"], "transit", client);
+    expect(trajets("A", "B")).toBe(2);
+    expect(Number.isInteger(trajets("A", "B"))).toBe(true);
+    expect(trajets("B", "A")).toBeUndefined();
+    expect(trajets("A", "A")).toBe(0);
+  });
+});
+
+describe("p0: status de l'élément, code seul (décision 0090 § 3 points 3 et 5)", () => {
+  it("status { code: 5, message, details } : paire inconnue, rien d'autre lu ; masque inchangé (status non demandé)", async () => {
+    const { client, appels } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, status: { code: 5, message: "SENTINELLE", details: [{ "@type": "SENTINELLE" }] }, duration: "60s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, status: { message: "SENTINELLE" }, duration: "75s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    const lu = await client.matrice({ origines: ["A"], destinations: ["B", "C"], mode: "transit" });
+    expect(lu).toEqual({ secondes: [[null, 75]] });
+    expect(JSON.stringify(lu)).not.toContain("SENTINELLE");
+    expect(MASQUE_MATRICE).toBe("originIndex,destinationIndex,duration,condition");
+    expect(new Headers(premier(appels).init.headers).get("x-goog-fieldmask")).toBe(MASQUE_MATRICE);
+  });
+
+  it("résidu accepté (0090 § 1) : un seul élément sans aucun index est lu 0:0 ; les autres paires restent inconnues", async () => {
+    const { client } = monter([async () => json([{ duration: "42s", condition: "ROUTE_EXISTS" }])]);
+    expect(await client.matrice({ origines: ["A", "B"], destinations: ["C", "D"], mode: "transit" })).toEqual({
+      secondes: [
+        [42, null],
+        [null, null],
+      ],
+    });
   });
 });
 

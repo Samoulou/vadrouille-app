@@ -61,12 +61,13 @@ export type OptionsRoutes = {
 };
 
 /**
- * Élément de la matrice, lu **un à un** (ticket 493). Formes documentées de `RouteMatrixElement` (référence REST de
+ * Élément de la matrice, lu **un à un** (décision 0090 § 1). Formes documentées de `RouteMatrixElement` (référence REST de
  * `computeRouteMatrix` et page « route matrix on transit ») :
  * - `originIndex` et `destinationIndex` : entiers ; une valeur 0 peut être omise (JSON de proto3) ;
  * - `duration` : secondes avec **jusqu'à neuf décimales**, suivies de `s` (« 160s », mais aussi « 3.5s ») ;
  * - `condition` : `ROUTE_EXISTS`, `ROUTE_NOT_FOUND`, ou omise (`…_UNSPECIFIED`, seulement quand `status` n'est pas OK) ;
- * - `status` (absent du masque, toléré s'il est rendu) : objet `google.rpc.Status`, `{}` ou `code` 0 pour OK ;
+ * - `status` (absent du masque, toléré s'il est rendu ; 0090 § 3 point 5 : ne pas l'ajouter au masque, le SKU facturé
+ *   pourrait changer) : objet `google.rpc.Status`, `{}` ou `code` 0 pour OK, seul `code` est gardé ;
  * - tout autre champ (`localizedValues`, `fallbackInfo`, `travelAdvisory`…) est ignoré.
  */
 const ElementSchema = z.object({
@@ -74,7 +75,9 @@ const ElementSchema = z.object({
   destinationIndex: z.number().int().min(0).optional(),
   duration: z.string().optional(),
   condition: z.string().optional(),
-  status: z.object({ code: z.number().int().optional() }).passthrough().optional(),
+  // `code` seul : Zod retire les champs inconnus (`message`, `details` de `google.rpc.Status` jamais gardés ; 0090 § 3
+  // point 3, défense en profondeur).
+  status: z.object({ code: z.number().int().optional() }).optional(),
 });
 const MatriceSchema = z.array(z.unknown()).max(ELEMENTS_MAX);
 const DUREE = /^\d{1,9}(?:\.\d{1,9})?s$/;
@@ -87,15 +90,19 @@ function secondesDe(duree: string | undefined): number | undefined {
 }
 
 /**
- * Lecture de la matrice (ticket 493 : une réponse Routes en transports en commun ne doit plus arrêter l'exécution).
- * Règle unique : **jamais une durée attribuée à une mauvaise paire** ; toute incertitude donne une durée inconnue
+ * Lecture de la matrice, paire par paire (décision 0090 § 1, ticket 493 : une réponse Routes en transports en commun
+ * ne doit plus arrêter l'exécution ; remplace la correspondance stricte élément → paire de P0r1). Règle unique : **jamais une durée attribuée à une mauvaise paire** ; toute incertitude donne une durée inconnue
  * (`null`), que le moteur traite comme un trajet inconnu (lieu non planifié depuis ou vers ce point), jamais une erreur :
  * - élément illisible (pas un objet, index non entier…) : ignoré ; `status` en erreur : sa paire est inconnue ;
  * - index absent : 0 (JSON de proto3) ; index hors de la matrice : la réponse ne correspond pas à la requête, **toute**
  *   la matrice est inconnue ;
  * - paire rendue deux fois ou plus (élément répété, ou élément sans index qui retombe sur 0) : paire inconnue ;
  * - paire manquante : inconnue ;
- * - durée seulement si `condition` vaut `ROUTE_EXISTS` et si `duration` suit la forme documentée.
+ * - durée seulement si `condition` vaut `ROUTE_EXISTS` et si `duration` suit la forme documentée ; fraction gardée,
+ *   **aucun arrondi ici** (0090 § 2 : la conversion en minutes, `Math.ceil`, est faite par chaque usage).
+ * Résidu accepté (0090 § 1) : une réponse d'un seul élément sans aucun index est lue comme la paire `0:0` ; c'est la
+ * lecture correcte d'un JSON proto3 pour une matrice 1 × 1, et pour une matrice plus grande les autres paires restent
+ * inconnues.
  * Une réponse qui n'est pas un tableau (ou de plus de 625 éléments) reste refusée : `invalid_response`.
  */
 function lireMatrice(brut: unknown, origines: number, destinations: number): (number | null)[][] {

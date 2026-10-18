@@ -10,10 +10,10 @@ import { CODES_ERREUR_ANCRAGE, ErreurAncrage } from "@/grounding/interfaces";
 import { CODES_ARRET, PHASES } from "@/prototype/arret";
 import { ReductionRefusee } from "@/prototype/reduction";
 import { formatLogLine, LOG_EVENTS, LOG_STEP_FAILURE_CODES, LOG_STEP_PHASES } from "@/server/log";
-import { champsEchecEtape, codeFermeDe, journaliserEchecEtape, PHASES_JOURNAL } from "@/server/p0/journal-etape";
+import { champsEchecEtape, CODES_ARRET_PLAFOND, codeFermeDe, journaliserEchecEtape, niveauEchecEtape } from "@/server/p0/journal-etape";
 
 /**
- * Journal fermé de l'arrêt d'une étape de `p0Run` (ticket 493 ; verdict Sécurité S4 attendu) : `p0.step_failed`,
+ * Journal de l'arrêt d'une étape de `p0Run` (ticket 493, décision 0090 ; verdict Sécurité S4 : favorable) : `p0.step_failed`,
  * avec la phase, la classe de l'erreur et son code fermé ; aucun message, aucune donnée Google, aucun identifiant.
  */
 
@@ -43,9 +43,59 @@ describe("p0: journal de l'arrêt d'une étape (p0.step_failed)", () => {
     expect(LOG_STEP_FAILURE_CODES).toContain(CODE_CLE_ABSENTE);
   });
 
-  it("LOG_STEP_PHASES = phases de prototype.runs plus fiches, routes et moteur ; égale au type du module", () => {
-    expect([...LOG_STEP_PHASES]).toEqual([...PHASES_JOURNAL]);
+  it("LOG_STEP_PHASES (liste unique, 0090 § 3 point 4) = phases de prototype.runs plus fiches, routes et moteur", () => {
     expect(new Set(LOG_STEP_PHASES)).toEqual(new Set([...PHASES, "fiches", "routes", "moteur"]));
+    expect(LOG_STEP_PHASES.length).toBe(PHASES.length + 3);
+  });
+
+  it("arrêts attendus par plafond (0090 § 3 point 7) : pris dans LOG_STEP_FAILURE_CODES", () => {
+    expect([...CODES_ARRET_PLAFOND].sort()).toEqual(["cap_reached", "daily_quota_insufficient", "envelope_reached"]);
+    for (const code of CODES_ARRET_PLAFOND) expect(LOG_STEP_FAILURE_CODES).toContain(code);
+  });
+
+  it.each([
+    ["cap_reached", "warn"],
+    ["envelope_reached", "warn"],
+    ["daily_quota_insufficient", "warn"],
+    ["pipeline_failed", "error"],
+    ["invalid_response", "error"],
+    ["autre", "error"],
+  ] as const)("niveau de %s : %s", (code, niveau) => {
+    expect(niveauEchecEtape(code)).toBe(niveau);
+  });
+
+  it.each(["cap_reached", "envelope_reached", "daily_quota_insufficient"] as const)("arrêt par plafond %s : ligne écrite en warn, jamais en error", (code) => {
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const lignes = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    journaliserEchecEtape("routes", new ErreurClientGoogle(code));
+    expect(erreurs).not.toHaveBeenCalled();
+    expect(lignes).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(lignes.mock.calls[0]?.[0]))).toEqual({
+      level: "warn",
+      event: "p0.step_failed",
+      phase: "routes",
+      errorName: "ErreurClientGoogle",
+      failureCode: code,
+    });
+  });
+
+  it.each([
+    ["pipeline_failed", Object.assign(new Error("x"), { code: "pipeline_failed" })],
+    ["invalid_response", new ErreurClientGoogle("invalid_response")],
+    ["autre", new TypeError(SENTINELLE)],
+  ] as const)("%s : ligne écrite en error", (code, erreur) => {
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const lignes = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    journaliserEchecEtape("moteur", erreur);
+    expect(lignes).not.toHaveBeenCalled();
+    expect(erreurs).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(erreurs.mock.calls[0]?.[0]))).toMatchObject({ level: "error", event: "p0.step_failed", phase: "moteur", failureCode: code });
+  });
+
+  it("errorName : nom de classe filtré par NOM_ERREUR (lettres seulement, 40 au plus), absent sinon", () => {
+    const nomme = (name: string) => Object.assign(new Error("x"), { name });
+    expect(champsEchecEtape("routes", nomme("ErreurClientGoogle")).errorName).toBe("ErreurClientGoogle");
+    for (const name of [SENTINELLE, "Erreur 1", "ChIJ123", "A".repeat(41), ""]) expect(champsEchecEtape("routes", nomme(name))).not.toHaveProperty("errorName");
   });
 
   it.each([

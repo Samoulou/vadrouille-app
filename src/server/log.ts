@@ -47,10 +47,11 @@ export const LOG_EVENTS = [
   // `placeId`, coordonnée, durée ni message de base.
   "voyages.read_failed",
   "voyages.relecture_refused",
-  // Ticket 493 (verdict Sécurité S4 attendu) : arrêt d'une étape de `p0Run`, cause fermée seulement. Champs : `phase`
-  // (`LOG_STEP_PHASES`), `errorName` (classe de l'erreur, liste fermée de `src/server/p0/journal-etape.ts`) et
-  // `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message, aucune donnée Google, aucun identifiant de
-  // lieu ni d'exécution.
+  // Ticket 493, décision 0090 (verdict Sécurité S4 : favorable) : arrêt d'une étape de `p0Run`, cause fermée seulement.
+  // Champs : `phase` (`LOG_STEP_PHASES`), `errorName` (nom de classe de l'erreur, filtré par `NOM_ERREUR` : lettres
+  // seulement, 40 au plus ; absent sinon) et `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message,
+  // aucune donnée Google, aucun identifiant de lieu ni d'exécution. Niveau `warn` pour un arrêt attendu par plafond,
+  // `error` sinon (`src/server/p0/journal-etape.ts`).
   "p0.step_failed",
   "log.unknown_event",
 ] as const;
@@ -297,12 +298,13 @@ export const LOG_READ_REASONS: readonly string[] = [
 ];
 const RAISONS_LECTURE: ReadonlySet<string> = new Set(LOG_READ_REASONS);
 /**
- * Phases admises dans `phase` (`p0.step_failed`, ticket 493) : celles de `prototype.runs.phase` (`PHASES`,
- * `src/prototype/arret.ts`), plus trois repères de l'étape finale sans écriture en base : `fiches` (Place Details de
- * la première série), `routes` (regroupement par jour et matrices du séjour) et `moteur` (planification des jours). Égalité vérifiée par le test
- * du journal des étapes.
+ * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
+ * `prototype.runs.phase` (`PHASES`, `src/prototype/arret.ts`), plus trois repères de l'étape finale sans écriture en
+ * base : `fiches` (Place Details de la première série), `routes` (regroupement par jour et matrices du séjour) et
+ * `moteur` (planification des jours). **Liste unique** : le type `PhaseJournal` (`src/server/p0/journal-etape.ts`) en
+ * est dérivé ; égalité avec `PHASES` plus les trois repères vérifiée par le test du journal des étapes.
  */
-export const LOG_STEP_PHASES: readonly string[] = [
+export const LOG_STEP_PHASES = [
   "recherche",
   "ancrage",
   "notation",
@@ -313,13 +315,15 @@ export const LOG_STEP_PHASES: readonly string[] = [
   "raisons",
   "validation",
   "ecriture",
-];
+] as const;
 /**
  * Codes admis dans `failureCode` (`p0.step_failed`, ticket 493) : union des listes fermées des erreurs qu'une étape
  * peut recevoir (`CODES_ERREUR_GOOGLE`, `CODES_ERREUR_ANCRAGE`, `CODES_ERREUR_IA`, `CODES_ARRET`,
  * `CODES_ECHEC_TRAVAIL`, `CODES_ECHEC_ECRITURE`, `reduction_refused`), et `autre` pour toute erreur sans code fermé.
- * Copie écrite ici (le code de clé absente est importé de sa définition unique, `@/ai/erreurs`) ; l'égalité avec l'union est vérifiée par le test du journal
- * des étapes (`tests/unit/p0/journal-etape.test.ts`).
+ * **Copie** écrite ici, écart accepté par 0090 § 3 point 4 : `log.ts` n'importe pas les modules qui définissent ces
+ * listes (frontières d'imports, 0055 § 3 et 0077 § 3) ; seul le code de clé absente est importé de sa définition unique,
+ * `@/ai/erreurs` (exemption exacte de 0077 § 3 point 1). L'égalité avec l'union est vérifiée par le test du journal des
+ * étapes (`tests/unit/p0/journal-etape.test.ts`) : la copie ne peut pas dériver sans le faire échouer.
  */
 export const LOG_STEP_FAILURE_CODES: readonly string[] = [
   // Clients Google (`CODES_ERREUR_GOOGLE`).
@@ -367,7 +371,7 @@ export const LOG_STEP_FAILURE_CODES: readonly string[] = [
   // Toute autre erreur (erreur de programmation, code inconnu).
   "autre",
 ];
-const PHASES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_PHASES);
+const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
 const CODES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_FAILURE_CODES);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXCEPTIONS: ReadonlySet<string> = new Set(LOG_EXIT_EXCEPTIONS);
