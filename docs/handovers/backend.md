@@ -910,13 +910,13 @@ Pipeline de la **variante B** (0027, point 1) ; données admises par étape : **
 
 **Relances amendées par 0081** (B9-TL-3) : étape a : 2 ; étapes b, c, d et e : 0 (une étape rejouée repaierait ses appels) ; un nouvel essai passe par `retryGeneration`.
 
-**Étape `l` ajoutée par 0087** (§ 2) : le contrôle de validité du logement (B8-PO-16 point 1) précède toute dépense d'IA de b sans entrer dans une étape IA ; a et b restent « Google : non ». Rangs : a = 1, l = 2, b = 3, c = 4, d = 5, e = 6 ; voyage complet : a = 1, l = 2, puis b à e de chaque jour planifié par l'exécution. Les étapes c et e ne prennent que des fiches `position` pour les logements (B8-PO-16 point 2).
+**Étape `l` ajoutée par 0087** (§ 2) : le contrôle de validité du logement (B8-PO-16 point 1) précède toute dépense d'IA de b sans entrer dans une étape IA ; a et b restent « Google : non ». Rangs : a = 1, l = 2, b = 3, c = 4, d = 5, e = 6 ; voyage complet : a = 1, l = 2, puis b à e de chaque jour planifié par l'exécution. Les étapes c et e ne prennent que des fiches `position` pour les logements `known` et `suggestedLodging` (B8-PO-16 point 2) ; pour une ville (`area`, `none`), un Text Search de son nom puis une fiche `position`, par étape qui en a besoin (B8-PO-16 point 3) ; `suggestedArea` : aucun appel (0087 § 2 point 3 et § 3).
 
 **Workflow 2 — ancrage (`groundCandidates`)** : l'étape c ci-dessus, appelée comme sous-étape par les workflows 1, 4 et 5. Les trois verdicts (`compatible`, `discarded`, `closedPermanently`, décision 0011 point 2) ne vivent qu'en mémoire ; un candidat réutilisé est **ré-ancré** (le `placeId` présent ne vaut pas verdict).
 
 **Workflow 3 — planification et validation (`planDays`)** : la partie moteur de l'étape e ci-dessus. R1 à R10 en mémoire ; **aucun appel de modèle pour réparer** (décision 0011 point 4) ; rapport de validation en mémoire seulement ; aucune version qui échoue à la validation n'est écrite.
 
-**Workflow 4 — voyage complet (`generateFullTrip`)** : comme le workflow 1, jour par jour, à partir des candidats existants ré-ancrés (c), complétés si besoin par une recherche (b) ; chaque jour terminé passe par e et publie une version (`generating` pour les jours suivants).
+**Workflow 4 — voyage complet (`generateFullTrip`)** : comme le workflow 1, jour par jour, à partir des candidats existants ré-ancrés (c), complétés si besoin par une recherche (b) ; chaque jour terminé passe par e et publie une version (`generating` pour les jours suivants). Étapes a et `l` une fois par exécution, puis b à e pour chaque jour planifié ; rangs comptés parmi les jours que l'exécution planifie, et jours repris lus par le prédicat de 0086 § 1.7 : 0087 § 1.3 points 3 et 4 et § 2 point 5.
 
 **Workflow 5 — recalcul par lot (`batchRecompute`) et révision unitaire** : la révision depuis la réserve s'exécute dans l'action serveur (sans workflow) : ré-ancrage du candidat, planification et validation déterministes du jour, nouvelle version, réponse `PatchResult` dont les `Change[segment]` sont recalculés à la réponse. Le recalcul par lot et la mini-recherche suivent b à e. Aucune liste de candidats écartés n'est écrite.
 
