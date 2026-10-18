@@ -101,6 +101,16 @@ export type LogFields = {
   readonly finishAbnormal?: number;
   /** Fins de la recherche sur l'échéance de l'étape, candidats admis gardés (ticket 407) : 0 ou 1. */
   readonly deadlineStop?: number;
+  /**
+   * Compteurs de l'amendement 3 de `specs/P0-suite-2.md` (P0S2-PO-25), sortie de l'agent avant tout ancrage : secteurs
+   * et incontournables du plan, incontournables sans candidat, candidats regroupés, secteurs inconnus. Des nombres,
+   * jamais un nom ; aucun ne dépend d'une position, d'une fiche ni d'un résultat Google.
+   */
+  readonly sectors?: number;
+  readonly mustSees?: number;
+  readonly mustSeesWithoutCandidate?: number;
+  readonly candidatesGrouped?: number;
+  readonly sectorUnknown?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -426,6 +436,11 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["finishIgnored", entierPositif],
   ["finishAbnormal", entierPositif],
   ["deadlineStop", entierPositif],
+  ["sectors", entierPositif],
+  ["mustSees", entierPositif],
+  ["mustSeesWithoutCandidate", entierPositif],
+  ["candidatesGrouped", entierPositif],
+  ["sectorUnknown", entierPositif],
   ["reason", (v) => chaine(v) && RAISONS_LECTURE.has(v)],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],

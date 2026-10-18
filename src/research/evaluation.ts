@@ -35,7 +35,8 @@ import type { LecteurPages } from "@/research/fetch-page";
 export const ETAPES_EVALUEES = ["structuration", "plan", "recherche", "notation", "raisons"] as const satisfies readonly EtapeRequete[];
 export type EtapeEvaluee = (typeof ETAPES_EVALUEES)[number];
 
-export const TYPES_CAS = ["reference", "cas-limite"] as const;
+/** Types de cas ; `qualite` : jeu de l'amendement 3 de P0 (P0S2-PO-28, partie recherche), `evals/qualite/`. */
+export const TYPES_CAS = ["reference", "cas-limite", "qualite"] as const;
 
 /** Un cas du jeu : demande de structuration, entrée des autres étapes, attentes maison. */
 export const CasEvaluationSchema = z.strictObject({

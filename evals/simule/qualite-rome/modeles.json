@@ -1,0 +1,610 @@
+{
+  "coutParRequeteUsd": 0.002,
+  "plan": {
+    "secteurs": [
+      {
+        "nom": "Monti",
+        "raison": "Le quartier du logement, ses ruelles et ses petites tables.",
+        "voisins": [
+          "La Rome antique",
+          "Trevi et place d'Espagne"
+        ],
+        "incontournables": []
+      },
+      {
+        "nom": "La Rome antique",
+        "raison": "Les grands sites de l'Antiquité, à parcourir à pied.",
+        "voisins": [
+          "Monti",
+          "Centre historique"
+        ],
+        "incontournables": [
+          "Colisée",
+          "Forum romain",
+          "Palatin"
+        ]
+      },
+      {
+        "nom": "Centre historique",
+        "raison": "Les places baroques et le temple antique le mieux conservé.",
+        "voisins": [
+          "La Rome antique",
+          "Trevi et place d'Espagne",
+          "Trastevere",
+          "Vatican et Prati"
+        ],
+        "incontournables": [
+          "Panthéon",
+          "Place Navone"
+        ]
+      },
+      {
+        "nom": "Trevi et place d'Espagne",
+        "raison": "Les fontaines et les escaliers les plus célèbres de la ville.",
+        "voisins": [
+          "Centre historique",
+          "Monti"
+        ],
+        "incontournables": [
+          "Fontaine de Trevi",
+          "Place d'Espagne"
+        ]
+      },
+      {
+        "nom": "Vatican et Prati",
+        "raison": "La basilique, les collections pontificales et le château sur le fleuve.",
+        "voisins": [
+          "Centre historique",
+          "Trastevere"
+        ],
+        "incontournables": [
+          "Basilique Saint-Pierre",
+          "Musées du Vatican",
+          "Château Saint-Ange"
+        ]
+      },
+      {
+        "nom": "Trastevere",
+        "raison": "Les ruelles de l'autre rive, animées le soir.",
+        "voisins": [
+          "Centre historique",
+          "Vatican et Prati"
+        ],
+        "incontournables": []
+      }
+    ],
+    "requetes": [
+      {
+        "requete": "Monti trattorias simples et bonnes",
+        "creneau": "meal",
+        "secteur": "Monti"
+      },
+      {
+        "requete": "Monti caves à vin pour l'apéro",
+        "creneau": "evening",
+        "secteur": "Monti"
+      },
+      {
+        "requete": "Colisée Forum romain Palatin visite billets horaires",
+        "creneau": "activity",
+        "secteur": "La Rome antique"
+      },
+      {
+        "requete": "restaurants près des sites antiques",
+        "creneau": "meal",
+        "secteur": "La Rome antique"
+      },
+      {
+        "requete": "Panthéon place Navone visite horaires",
+        "creneau": "activity",
+        "secteur": "Centre historique"
+      },
+      {
+        "requete": "centre historique tables romaines carbonara",
+        "creneau": "meal",
+        "secteur": "Centre historique"
+      },
+      {
+        "requete": "centre historique bars à cocktails",
+        "creneau": "evening",
+        "secteur": "Centre historique"
+      },
+      {
+        "requete": "fontaine de Trevi place d'Espagne visite conseils",
+        "creneau": "activity",
+        "secteur": "Trevi et place d'Espagne"
+      },
+      {
+        "requete": "déjeuner rapide près de la fontaine",
+        "creneau": "meal",
+        "secteur": "Trevi et place d'Espagne"
+      },
+      {
+        "requete": "basilique Saint-Pierre musées du Vatican château Saint-Ange billets",
+        "creneau": "activity",
+        "secteur": "Vatican et Prati"
+      },
+      {
+        "requete": "Prati osterias de quartier",
+        "creneau": "meal",
+        "secteur": "Vatican et Prati"
+      },
+      {
+        "requete": "Trastevere trattorias réputées",
+        "creneau": "meal",
+        "secteur": "Trastevere"
+      },
+      {
+        "requete": "Trastevere bars du soir",
+        "creneau": "evening",
+        "secteur": "Trastevere"
+      },
+      {
+        "requete": "concerts et fêtes début mai",
+        "creneau": "event",
+        "secteur": null
+      }
+    ]
+  },
+  "recherche": [
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "Monti trattorias simples et bonnes"
+        },
+        {
+          "type": "rechercher",
+          "requete": "Monti caves à vin pour l'apéro"
+        },
+        {
+          "type": "rechercher",
+          "requete": "Colisée Forum romain Palatin visite billets horaires"
+        },
+        {
+          "type": "rechercher",
+          "requete": "restaurants près des sites antiques"
+        },
+        {
+          "type": "rechercher",
+          "requete": "Panthéon place Navone visite horaires"
+        },
+        {
+          "type": "rechercher",
+          "requete": "centre historique tables romaines carbonara"
+        },
+        {
+          "type": "rechercher",
+          "requete": "centre historique bars à cocktails"
+        },
+        {
+          "type": "rechercher",
+          "requete": "fontaine de Trevi place d'Espagne visite conseils"
+        },
+        {
+          "type": "rechercher",
+          "requete": "déjeuner rapide près de la fontaine"
+        },
+        {
+          "type": "rechercher",
+          "requete": "basilique Saint-Pierre musées du Vatican château Saint-Ange billets"
+        }
+      ],
+      "candidats": [],
+      "termine": false
+    },
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "Prati osterias de quartier"
+        },
+        {
+          "type": "rechercher",
+          "requete": "Trastevere trattorias réputées"
+        },
+        {
+          "type": "rechercher",
+          "requete": "Trastevere bars du soir"
+        },
+        {
+          "type": "rechercher",
+          "requete": "concerts et fêtes début mai"
+        },
+        {
+          "type": "lire",
+          "url": "https://site-officiel-fabrique.example/colisee"
+        },
+        {
+          "type": "lire",
+          "url": "https://guide-rome-fabrique.example/place-navone"
+        },
+        {
+          "type": "lire",
+          "url": "https://site-officiel-fabrique.example/musees"
+        }
+      ],
+      "candidats": [],
+      "termine": false
+    },
+    {
+      "actions": [],
+      "candidats": [
+        {
+          "nom": "Colisée",
+          "resume": "L'amphithéâtre antique de la ville, ses gradins et ses galeries souterraines.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/colisee",
+          "sourceDate": "2026-09-20",
+          "aReserver": true,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "La Rome antique",
+          "incontournable": "Colisée",
+          "prix": "18 € billet combiné avec le Forum et le Palatin",
+          "horaires": "9 h – 19 h",
+          "conseil": "Réserver le créneau à l'avance et venir tôt le matin",
+          "prixParPersonne": 18,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Forum romain",
+          "resume": "Le cœur politique de la cité antique, entre temples et basiliques en ruine.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/forum",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "La Rome antique",
+          "incontournable": "Forum romain",
+          "prix": "compris dans le billet combiné",
+          "horaires": "9 h – 19 h",
+          "conseil": "Prévoir de l'eau et de bonnes chaussures",
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Palatin",
+          "resume": "La colline des palais impériaux, avec une vue d'ensemble sur le forum.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/palatin",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "La Rome antique",
+          "incontournable": "Palatin",
+          "prix": "compris dans le billet combiné",
+          "horaires": "9 h – 19 h",
+          "conseil": "Entrer par l'accès sud, moins chargé",
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Osteria des Arcades",
+          "resume": "Une table de quartier aux plats romains classiques, à deux pas des ruines.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/osteria-arcades",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "La Rome antique",
+          "incontournable": null,
+          "prix": "environ 25 € par personne"
+        },
+        {
+          "nom": "Panthéon",
+          "resume": "Le temple antique coiffé de la plus grande coupole de béton non armé du monde.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/pantheon",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Centre historique",
+          "incontournable": "Panthéon",
+          "prix": "5 €",
+          "horaires": "9 h – 19 h",
+          "conseil": "Venir à l'ouverture pour voir la lumière de l'oculus sans la foule",
+          "prixParPersonne": 5,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Place Navone",
+          "resume": "La place baroque bâtie sur un stade antique, avec sa fontaine des fleuves.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/place-navone",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Centre historique",
+          "incontournable": "Place Navone",
+          "prix": "gratuit",
+          "conseil": "Venir le matin, quand la place est presque vide",
+          "prixParPersonne": 0,
+          "dureeMinutes": 30
+        },
+        {
+          "nom": "Balade Panthéon, Trevi et Navone",
+          "resume": "Une promenade qui enchaîne le temple, la fontaine et la place baroque.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/balade-centre",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Centre historique",
+          "incontournable": null,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Table de la Minerve",
+          "resume": "Une trattoria familiale réputée pour ses pâtes à la romaine.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/table-minerve",
+          "sourceDate": "2026-09-20",
+          "aReserver": true,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Centre historique",
+          "incontournable": null,
+          "conseil": "Réserver pour le soir"
+        },
+        {
+          "nom": "Bar des Lanternes",
+          "resume": "Un bar à cocktails dans une cour pavée, calme en début de soirée.",
+          "categorie": "nightlife",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/bar-lanternes",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "evening"
+          ],
+          "secteur": "Centre historique",
+          "incontournable": null,
+          "horaires": "dès 18 h"
+        },
+        {
+          "nom": "Fontaine de Trevi",
+          "resume": "La plus célèbre fontaine baroque de la ville, adossée à un palais.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/fontaine-trevi",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Trevi et place d'Espagne",
+          "incontournable": "Fontaine de Trevi",
+          "prix": "gratuit",
+          "horaires": "accès libre jour et nuit",
+          "conseil": "Venir tôt le matin pour éviter la foule",
+          "prixParPersonne": 0,
+          "dureeMinutes": 20
+        },
+        {
+          "nom": "Place d'Espagne",
+          "resume": "La place et son grand escalier baroque qui monte vers une église.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/place-espagne",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Trevi et place d'Espagne",
+          "incontournable": "Place d'Espagne",
+          "prix": "gratuit",
+          "horaires": "accès libre",
+          "conseil": "Ne pas s'asseoir sur les marches, c'est interdit",
+          "prixParPersonne": 0,
+          "dureeMinutes": 30
+        },
+        {
+          "nom": "Comptoir de la Fontaine",
+          "resume": "Un comptoir de parts de pizza et de croquettes à emporter.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/comptoir-fontaine",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Trevi et place d'Espagne",
+          "incontournable": null,
+          "horaires": "11 h – 22 h"
+        },
+        {
+          "nom": "Basilique Saint-Pierre",
+          "resume": "La plus grande basilique de la chrétienté, avec sa coupole et sa place à colonnades.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/basilique",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Vatican et Prati",
+          "incontournable": "Basilique Saint-Pierre",
+          "prix": "gratuit",
+          "horaires": "7 h – 19 h",
+          "conseil": "Épaules et genoux couverts",
+          "prixParPersonne": 0,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Musées du Vatican",
+          "resume": "Les collections pontificales et la chapelle aux fresques de la Renaissance.",
+          "categorie": "museum",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/musees",
+          "sourceDate": "2026-09-20",
+          "aReserver": true,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Vatican et Prati",
+          "incontournable": "Musées du Vatican",
+          "prix": "20 €",
+          "horaires": "8 h – 19 h, fermé le dimanche",
+          "conseil": "Réserver un créneau en ligne pour éviter la file",
+          "prixParPersonne": 20,
+          "dureeMinutes": 180
+        },
+        {
+          "nom": "Château Saint-Ange",
+          "resume": "Le mausolée impérial devenu forteresse, avec sa terrasse sur le fleuve.",
+          "categorie": "heritage",
+          "typeEtape": "activity",
+          "sourceUrl": "https://site-officiel-fabrique.example/chateau",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Vatican et Prati",
+          "incontournable": "Château Saint-Ange",
+          "prix": "16 €",
+          "horaires": "9 h – 19 h 30",
+          "conseil": "Monter à la terrasse en fin de journée",
+          "prixParPersonne": 16,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Osteria des Remparts",
+          "resume": "Une osteria de quartier fréquentée par les habitants.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/osteria-remparts",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Vatican et Prati",
+          "incontournable": null
+        },
+        {
+          "nom": "Trattoria des Collines",
+          "resume": "Une petite trattoria de quartier aux pâtes fraîches.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/trattoria-collines",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Monti",
+          "incontournable": null,
+          "horaires": "12 h – 23 h"
+        },
+        {
+          "nom": "Cave des Escaliers",
+          "resume": "Une cave à vin où l'on prend l'apéro avec des planches.",
+          "categorie": "tasting",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/cave-escaliers",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "evening"
+          ],
+          "secteur": "Monti",
+          "incontournable": null,
+          "horaires": "dès 17 h"
+        },
+        {
+          "nom": "Trattoria du Fleuve",
+          "resume": "Une trattoria très appréciée de l'autre rive, aux classiques romains.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://guide-rome-fabrique.example/trattoria-fleuve",
+          "sourceDate": "2026-09-20",
+          "aReserver": true,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Trastevere",
+          "incontournable": null,
+          "conseil": "Réserver plusieurs jours à l'avance"
+        },
+        {
+          "nom": "Bar des Pavés",
+          "resume": "Un bar animé des ruelles de l'autre rive.",
+          "categorie": "nightlife",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/bar-paves",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "evening"
+          ],
+          "secteur": "Trastevere",
+          "incontournable": null
+        },
+        {
+          "nom": "Plage du littoral",
+          "resume": "Une plage à une heure de train.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://guide-rome-fabrique.example/plage-littoral",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Littoral",
+          "incontournable": null
+        },
+        {
+          "nom": "Concert de printemps",
+          "resume": "Un concert de musique de chambre dans une église.",
+          "categorie": "nightlife",
+          "typeEtape": "event",
+          "sourceUrl": "https://agenda-rome-fabrique.example/concert-printemps",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "evening"
+          ],
+          "secteur": null,
+          "incontournable": null,
+          "evenement": {
+            "date": "2027-05-06",
+            "heure": "20:30"
+          }
+        }
+      ],
+      "termine": true
+    }
+  ],
+  "notes": {},
+  "notesParDefaut": {
+    "matchesWishes": true,
+    "notForMeRisk": 3,
+    "mustSee": false
+  }
+}

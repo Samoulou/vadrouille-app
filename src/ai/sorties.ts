@@ -123,16 +123,148 @@ export function racineLisible(texte: string, cles: readonly string[]): boolean {
 
 // --- Plan de recherche -------------------------------------------------------
 
+/**
+ * Clé de comparaison d'un nom maison (doublons de l'agent, secteurs et incontournables du plan, mesures de `evals/`) :
+ * formes de compatibilité ramenées (NFKC : lettres pleine chasse, ligatures), minuscules, accents latins, grecs et
+ * cyrilliques retirés (« Château » et « chateau », « Αθήνα » et « αθηνα »), ponctuation et symboles remplacés par une
+ * espace. Les autres marques sont gardées, car elles changent le mot : dakuten japonais (« ガ » n'est pas « カ »),
+ * voyelles du devanagari ou du thaï. Les lettres sans décomposition sont gardées telles quelles (« Łódź » donne
+ * « łodz », « Øresund » donne « øresund »). Un nom fait seulement de symboles donne une clé vide, que les appelants
+ * refusent (plan : `secteur_en_double` ou `incontournable_en_double` ; agent : candidat `invalid`). Réexportée par
+ * `src/research/agent.ts` (`cleDeNom`), où la spécification la cite (amendement 3 de la suite 2 de P0, vocabulaire).
+ */
+export function cleDeNom(nom: string): string {
+  // Correction 2 de la PR 505 (mineurs 3 et 4) : seuls les diacritiques du bloc U+0300 à U+036F sont retirés, puis la
+  // forme composée est rétablie (NFC), pour que les autres marques restent dans leur lettre.
+  return nom
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
+    .trim();
+}
+
+/** Longueurs des textes maison du plan par secteurs (P0S2-PO-19 ; nom de secteur : limite de `StopFacts.area`). */
+export const LONGUEURS_PLAN = { secteur: 60, raisonSecteur: 160, incontournable: 80 } as const;
+
+/** Nombre de secteurs du plan : au plus 9 (P0S2-PO-19 : 3 × 9 + 2 = 29 requêtes, sous la limite de 30). */
+export const SECTEURS_MAX = 9;
+/** Requêtes du plan : 30 au plus (inchangé) ; requêtes d'événements : 2 au plus, en fin de liste. */
+export const REQUETES_PLAN_MAX = 30;
+export const REQUETES_EVENEMENT_MAX = 2;
+
+/**
+ * Borne de forme du schéma par secteur (garde de taille seulement) : 2 incontournables par jour sur 31 jours, au-delà de
+ * tout séjour admis (15 jours au plus pour un brief de P0). La vraie borne, `min(2 × jours, cible d'activités)` sur tout
+ * le plan, est appliquée par `reglePlanManquee`.
+ */
+export const INCONTOURNABLES_SCHEMA_MAX = 2 * 31;
+
+export const SecteurPlanSchema = z.strictObject({
+  nom: texteMaison(LONGUEURS_PLAN.secteur),
+  raison: texteMaison(LONGUEURS_PLAN.raisonSecteur),
+  voisins: z.array(texteMaison(LONGUEURS_PLAN.secteur)).max(SECTEURS_MAX - 1),
+  incontournables: z.array(texteMaison(LONGUEURS_PLAN.incontournable)).max(INCONTOURNABLES_SCHEMA_MAX),
+});
+export type SecteurPlan = z.infer<typeof SecteurPlanSchema>;
+
 export const RequetePlanSchema = z.strictObject({
   requete: texteMaison(LONGUEURS_TEXTE.requete),
   creneau: z.enum([...TYPES_CRENEAU, "event"]),
+  /** Nom d'un secteur du plan ; `null` pour une requête d'événements seulement (P0S2-PO-19). */
+  secteur: texteMaison(LONGUEURS_PLAN.secteur).nullable(),
 });
 export type RequetePlan = z.infer<typeof RequetePlanSchema>;
 
-export function lirePlan(texte: string): Lecture<RequetePlan[]> {
-  const objet = racine(texte, ["requetes"]);
-  if (objet === undefined) return { valeur: [], refuses: 1, illisible: true };
-  return elements(objet.requetes, RequetePlanSchema, 30);
+const PlanSchema = z.strictObject({
+  secteurs: z.array(SecteurPlanSchema).min(1).max(SECTEURS_MAX),
+  requetes: z.array(RequetePlanSchema).max(REQUETES_PLAN_MAX),
+});
+
+/** Plan de recherche par secteurs (prompt `plan` v2), validé en entier par `lirePlan`. */
+export type PlanRecherche = { readonly secteurs: readonly SecteurPlan[]; readonly requetes: readonly RequetePlan[] };
+
+/** Plan vide : sortie refusée en entier, ou recherche sans plan. Aucun secteur : la règle des secteurs ne s'applique pas. */
+export const PLAN_VIDE: PlanRecherche = { secteurs: [], requetes: [] };
+
+/**
+ * Contexte de contrôle du plan : nombre de jours du séjour (arrivée et départ compris) et, quand l'appelant la connaît,
+ * la cible d'activités de la recherche (`bornesDepuisDemande`, 0088 § 1 à § 3), qui borne le nombre d'incontournables.
+ */
+export type ContextePlan = { readonly jours: number; readonly cibleActivites?: number };
+
+/** Nombre de jours d'un séjour, arrivée et départ compris (dates ISO `AAAA-MM-JJ`) ; au moins 1. */
+export function joursDuSejour(arrivee: string, depart: string): number {
+  const jour = 24 * 60 * 60 * 1000;
+  const ecart = Math.round((Date.parse(`${depart}T00:00:00Z`) - Date.parse(`${arrivee}T00:00:00Z`)) / jour);
+  return Number.isFinite(ecart) ? Math.max(1, ecart + 1) : 1;
+}
+
+/** Bornes du nombre de secteurs (P0S2-PO-19) : de `⌈jours / 2⌉` à `min(jours + 1, 9)`. */
+export function bornesSecteurs(jours: number): { min: number; max: number } {
+  return { min: Math.min(SECTEURS_MAX, Math.ceil(jours / 2)), max: Math.min(jours + 1, SECTEURS_MAX) };
+}
+
+/**
+ * Règles de forme du plan par secteurs (P0S2-PO-19), au-delà du schéma : `undefined` si le plan est conforme, sinon la
+ * première règle manquée (jamais montrée au modèle ni journalisée avec un texte du plan).
+ */
+export function reglePlanManquee(plan: PlanRecherche, contexte: ContextePlan): string | undefined {
+  const { min, max } = bornesSecteurs(contexte.jours);
+  if (plan.secteurs.length < min || plan.secteurs.length > max) return "nombre_de_secteurs";
+  const rang = new Map<string, number>();
+  for (const [indice, secteur] of plan.secteurs.entries()) {
+    const cle = cleDeNom(secteur.nom);
+    if (cle === "" || rang.has(cle)) return "secteur_en_double";
+    rang.set(cle, indice);
+  }
+  for (const secteur of plan.secteurs) {
+    for (const voisin of secteur.voisins) {
+      const cle = cleDeNom(voisin);
+      if (!rang.has(cle) || cle === cleDeNom(secteur.nom)) return "voisin_inconnu";
+    }
+  }
+  const incontournables = plan.secteurs.flatMap((secteur) => secteur.incontournables.map(cleDeNom));
+  if (incontournables.some((cle) => cle === "") || new Set(incontournables).size !== incontournables.length) return "incontournable_en_double";
+  const plafond = Math.min(2 * contexte.jours, contexte.cibleActivites ?? Number.POSITIVE_INFINITY);
+  if (incontournables.length > plafond) return "trop_d_incontournables";
+  let evenements = 0;
+  let dernierRang = -1;
+  const creneauxVus = new Map<number, Set<string>>();
+  for (const requete of plan.requetes) {
+    if (requete.creneau === "event") {
+      if (requete.secteur !== null) return "evenement_avec_secteur";
+      evenements += 1;
+      continue;
+    }
+    // Les requêtes d'événements ferment la liste : aucune requête de secteur après elles.
+    if (evenements > 0) return "evenements_hors_fin";
+    if (requete.secteur === null) return "requete_sans_secteur";
+    const indice = rang.get(cleDeNom(requete.secteur));
+    if (indice === undefined) return "requete_secteur_inconnu";
+    if (indice < dernierRang) return "secteurs_hors_ordre";
+    dernierRang = indice;
+    const vus = creneauxVus.get(indice) ?? new Set<string>();
+    if (vus.has(requete.creneau)) return "requete_en_double";
+    // Pour chaque secteur, la requête d'incontournables (activité) précède ses requêtes de repas et de soirée.
+    if (requete.creneau === "activity" && vus.size > 0) return "incontournables_apres_repas";
+    vus.add(requete.creneau);
+    creneauxVus.set(indice, vus);
+  }
+  if (evenements > REQUETES_EVENEMENT_MAX) return "trop_d_evenements";
+  return undefined;
+}
+
+/**
+ * Plan de recherche par secteurs (prompt `plan` v2, P0S2-PO-19). Sortie non conforme, au schéma comme aux règles de
+ * forme (`reglePlanManquee`), refusée **en entier** (`illisible`, comptée une fois) : la recherche part alors sans plan.
+ */
+export function lirePlan(texte: string, contexte: ContextePlan): Lecture<PlanRecherche> {
+  const objet = racine(texte, ["secteurs", "requetes"]);
+  const lu = objet === undefined ? undefined : PlanSchema.safeParse(objet);
+  if (lu === undefined || !lu.success || reglePlanManquee(lu.data, contexte) !== undefined) return { valeur: PLAN_VIDE, refuses: 1, illisible: true };
+  return { valeur: lu.data, refuses: 0 };
 }
 
 // --- Tour de recherche -------------------------------------------------------
@@ -142,6 +274,9 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("lire"), url: z.string().min(1).max(2048) }),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
+
+/** Longueurs des infos pratiques d'un lieu (P0S2-PO-21). */
+export const LONGUEURS_INFOS = { prix: 60, horaires: 120, conseil: 160 } as const;
 
 /** Candidat tel que l'extrait le modèle ; l'identifiant et la classe de source sont posés par le code. */
 export const CandidatExtraitSchema = z.strictObject({
@@ -155,6 +290,14 @@ export const CandidatExtraitSchema = z.strictObject({
   aReserver: z.boolean(),
   prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
   dureeMinutes: z.number().int().min(15).max(600).optional(),
+  /** Secteur du plan où se trouve le lieu (P0S2-PO-20) ; `null` admis pour un événement seulement (contrôlé par l'agent). */
+  secteur: texteMaison(LONGUEURS_PLAN.secteur).nullable().optional(),
+  /** Nom de l'incontournable du plan que ce lieu est, du même secteur ; sinon `null` (P0S2-PO-20). */
+  incontournable: texteMaison(LONGUEURS_PLAN.incontournable).nullable().optional(),
+  /** Infos pratiques tirées de la page source, réécrites en texte maison (P0S2-PO-21) ; absentes si la source ne les donne pas. */
+  prix: texteMaison(LONGUEURS_INFOS.prix).optional(),
+  horaires: texteMaison(LONGUEURS_INFOS.horaires).optional(),
+  conseil: texteMaison(LONGUEURS_INFOS.conseil).optional(),
   /**
    * Créneaux auxquels le lieu convient selon le modèle de recherche (ticket 483, forme du `slotFit` de la notation) : sert
    * seulement à compter les cibles de l'agent (`creneauCompte`), jamais gardé dans le candidat ; la notation reste seule
