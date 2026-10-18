@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaireRelecture } from "@/adapters/prototype";
 import { valeurCookieAcces } from "@/server/p0/acces";
 import { creerCadence, ErreurBudgetRoutes } from "@/grounding/budget-routes";
+import type { PointRoutes } from "@/grounding/interfaces";
 import { cadenceRelecture, creerRelecteurReel, SQL_PURGE_RECENTE, type ClientMatrice, type DependancesRelecteur } from "@/server/p0/relecture";
 import { forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type LimitesForfait } from "@/server/usage/forfait";
 import type { ClientSql, PoolSql, ReglesForfait } from "@/server/usage/neon";
@@ -99,11 +100,12 @@ function poolSimule({ purgeRecente = true, sommes = {} as Sommes } = {}) {
 
 /** Client Routes double : durée en secondes par paire, requêtes enregistrées. */
 function routesSimulees(secondes: (origine: string, destination: string) => number | null = () => 600) {
-  const requetes: { origines: string[]; destinations: string[]; mode: string }[] = [];
+  const requetes: { origines: readonly PointRoutes[]; destinations: readonly PointRoutes[]; mode: string }[] = [];
   const client: ClientMatrice = {
     async matrice(requete) {
       requetes.push(requete);
-      return { secondes: requete.origines.map((o) => requete.destinations.map((d) => secondes(o, d))) };
+      // P0 ne passe que des `placeId` (0087 § 3.2 : un centre maison n'arrive jamais ici).
+      return { secondes: requete.origines.map((o) => requete.destinations.map((d) => secondes(String(o), String(d)))) };
     },
   };
   return { client, requetes };

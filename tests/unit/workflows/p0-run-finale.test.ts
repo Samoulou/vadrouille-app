@@ -559,7 +559,7 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     const vus = new Set<string>();
     for (const matrice of capture.matrices) {
       expect(matrice.origines).toContain(logement);
-      for (const placeId of matrice.origines.filter((p) => p !== logement)) {
+      for (const placeId of matrice.origines.filter((p): p is string => typeof p === "string" && p !== logement)) {
         expect(vus.has(placeId)).toBe(false);
         vus.add(placeId);
       }

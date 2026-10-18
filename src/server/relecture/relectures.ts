@@ -27,7 +27,11 @@ export type EntreeRelectures = {
   readonly usage: UsageRelectures;
   readonly fiches: readonly IssueFiche[];
   readonly trajets: TableTrajets;
-  /** `placeId` du point de départ de chaque nuit (logement, ou ville pour `area`, `none`), index 0 = première nuit. */
+  /**
+   * **Clé de trajet** du point de départ de chaque nuit, index 0 = première nuit (décision 0087 § 3.2) : `placeId` du
+   * logement, ou de la ville pour `area`, `none` ; clé maison (`cleMaison`) du centre d'un `suggestedArea`. Le moteur
+   * garde `Point = { logement: index }`.
+   */
   readonly logementsParNuit: readonly string[];
 };
 

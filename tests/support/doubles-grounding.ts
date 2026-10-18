@@ -1,4 +1,4 @@
-import { ErreurAncrage, type ClientPlacesMvp, type ClientRoutes, type Coordonnees, type DetailsLieu, type ModeRoutes, type RequeteMatrice, type RequeteTextSearch } from "@/grounding/interfaces";
+import { clePointRoutes, ErreurAncrage, type ClientPlacesMvp, type ClientRoutes, type Coordonnees, type DetailsLieu, type ModeRoutes, type RequeteMatrice, type RequeteTextSearch } from "@/grounding/interfaces";
 
 /**
  * Doubles Places et Routes de B8a, à **valeurs sentinelles** (spécification B8, B8a point 7 : position par lieu, statut,
@@ -106,9 +106,17 @@ export function creerRoutesDouble(options: OptionsRoutesDouble): RoutesDouble {
     async matrice(requete) {
       appels.push(requete);
       if (options.erreur !== undefined && appels.length === options.erreur.auAppel) throw options.erreur.fabrique();
-      return { secondes: requete.origines.map((de) => requete.destinations.map((vers) => (de === vers ? 0 : options.secondes(de, vers, requete.mode)))) };
+      // Un centre maison (0087 § 3.2) est désigné par sa clé de trajet (`maison:…`) dans `options.secondes`.
+      const origines = requete.origines.map(clePointRoutes);
+      const destinations = requete.destinations.map(clePointRoutes);
+      return { secondes: origines.map((de) => destinations.map((vers) => (de === vers ? 0 : options.secondes(de, vers, requete.mode)))) };
     },
   };
+}
+
+/** Client Routes qui échoue s'il est appelé (aucun appel attendu). */
+export function routesInterdit(): ClientRoutes {
+  return { matrice: () => Promise.reject(new Error("appel Routes inattendu")) };
 }
 
 /** Client qui échoue s'il est appelé (aucun appel attendu). */

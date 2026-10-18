@@ -1,4 +1,4 @@
-import { ErreurAncrage, type ClientPlaces, type ClientRoutes, type Coordonnees, type DetailsLieu, type ModeRoutes } from "@/grounding/interfaces";
+import { ErreurAncrage, type ClientPlaces, type ClientRoutes, type Coordonnees, type DetailsLieu, type ModeRoutes, type PointRoutes } from "@/grounding/interfaces";
 import type { Ancrage, AncrageResolu, Position, Trajets } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
@@ -95,19 +95,24 @@ export const cleTrajet = (depuis: string, vers: string) => `${depuis}\u0000${ver
  * Durées de trajet de chaque origine vers chaque destination, en minutes (arrondi supérieur), en mémoire, par blocs de
  * `BLOC_MATRICE` × `BLOC_MATRICE` au plus (blocs d'origines, puis de destinations). Une durée absente ou invalide
  * n'est pas inscrite. Partagée avec la reprise de `p0Run` (`budget-routes.ts`).
+ *
+ * `points` (facultatif, décision 0087 § 3.2) : correspondance clé de trajet → point envoyé à Routes, pour une clé maison
+ * (`chargerTrajets`) ; une clé absente est envoyée telle quelle (`placeId`). Absente : comportement de P0 inchangé.
  */
 export async function minutesDeTrajets(
   origines: readonly string[],
   destinations: readonly string[],
   mode: ModeRoutes,
   routes: ClientRoutes,
+  points?: ReadonlyMap<string, PointRoutes>,
 ): Promise<Map<string, number>> {
   const minutes = new Map<string, number>();
+  const versRoutes = (cles: string[]): PointRoutes[] => (points === undefined ? cles : cles.map((cle) => points.get(cle) ?? cle));
   for (let i = 0; i < origines.length; i += BLOC_MATRICE) {
     for (let j = 0; j < destinations.length; j += BLOC_MATRICE) {
       const blocOrigines = origines.slice(i, i + BLOC_MATRICE);
       const blocDestinations = destinations.slice(j, j + BLOC_MATRICE);
-      const { secondes } = await routes.matrice({ origines: blocOrigines, destinations: blocDestinations, mode });
+      const { secondes } = await routes.matrice({ origines: versRoutes(blocOrigines), destinations: versRoutes(blocDestinations), mode });
       blocOrigines.forEach((de, a) => {
         blocDestinations.forEach((vers, b) => {
           const valeur = secondes.at(a)?.at(b);

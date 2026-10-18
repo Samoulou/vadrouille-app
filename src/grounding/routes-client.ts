@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type Transport } from "@/grounding/enveloppe-google";
-import type { ClientRoutes, ModeRoutes, RequeteMatrice } from "@/grounding/interfaces";
+import type { ClientRoutes, ModeRoutes, PointRoutes, RequeteMatrice } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
@@ -27,6 +27,8 @@ import {
  * - Masque minimal : `originIndex,destinationIndex,duration,condition` ; préférence de routage non posée (SKU
  *   Essentials de la table de prix, facturé par élément).
  * - Une requête réserve ses éléments (origines × destinations) avant l'appel (D13) ; délai de 10 s par requête.
+ * - Points : `placeId` ou centre maison en coordonnées (décision 0087 § 3.2, `waypointDe`), contrôlés avant la
+ *   réservation ; un centre maison n'est ni écrit ni journalisé (aucune donnée Google ; verdict de la Sécurité : 0087 § 3.4).
  * Les durées sont des données Google : en mémoire seulement, jamais dans un prompt ni dans le dépôt.
  */
 
@@ -44,6 +46,28 @@ const ELEMENTS_MAX_TRANSIT = 100;
 const COTE_MAX = 25;
 
 const PLACE_ID = PLACE_ID_GOOGLE;
+
+type Waypoint = { readonly waypoint: { readonly placeId: string } | { readonly location: { readonly latLng: { readonly latitude: number; readonly longitude: number } } } };
+
+const coordonneeValide = (valeur: unknown, borne: number): valeur is number =>
+  typeof valeur === "number" && Number.isFinite(valeur) && valeur >= -borne && valeur <= borne;
+
+/**
+ * Point → waypoint de Routes, ou `null` s'il est refusé (décision 0087 § 3.2), contrôlé **avant toute réservation** :
+ * - une chaîne : contrôle `PLACE_ID_GOOGLE`, puis `{ waypoint: { placeId } }` (inchangé) ;
+ * - un centre maison : nombres finis, latitude de −90 à 90, longitude de −180 à 180, puis
+ *   `{ waypoint: { location: { latLng: { latitude, longitude } } } }` (seuls ces deux nombres sont recopiés).
+ * Toute autre forme est refusée. Le SKU et le coût par élément ne dépendent pas de la forme du point (table de prix).
+ */
+function waypointDe(point: PointRoutes): Waypoint | null {
+  if (typeof point === "string") return PLACE_ID.test(point) ? { waypoint: { placeId: point } } : null;
+  if (typeof point !== "object" || point === null) return null;
+  const centre: unknown = (point as { centreMaison?: unknown }).centreMaison;
+  if (typeof centre !== "object" || centre === null) return null;
+  const { lat, lng } = centre as { lat?: unknown; lng?: unknown };
+  if (!coordonneeValide(lat, 90) || !coordonneeValide(lng, 180)) return null;
+  return { waypoint: { location: { latLng: { latitude: lat, longitude: lng } } } };
+}
 
 function modeGoogle(mode: ModeRoutes): "WALK" | "TRANSIT" | "DRIVE" {
   if (mode === "walk") return "WALK";
@@ -84,14 +108,16 @@ export function createRoutesClient(options: OptionsRoutes, transport: Transport 
         destinations.length === 0 ||
         origines.length > COTE_MAX ||
         destinations.length > COTE_MAX ||
-        elements > maximum ||
-        ![...origines, ...destinations].every((id) => PLACE_ID.test(id))
+        elements > maximum
       ) {
         throw new ErreurClientGoogle("invalid_request");
       }
+      const origins = origines.map(waypointDe);
+      const destinationsGoogle = destinations.map(waypointDe);
+      if (origins.includes(null) || destinationsGoogle.includes(null)) throw new ErreurClientGoogle("invalid_request");
       const corps = JSON.stringify({
-        origins: origines.map((placeId) => ({ waypoint: { placeId } })),
-        destinations: destinations.map((placeId) => ({ waypoint: { placeId } })),
+        origins,
+        destinations: destinationsGoogle,
         travelMode: modeGoogle(requete.mode),
       });
       const issue = await avecReservation(
