@@ -44,7 +44,7 @@ export type ComplementP0Structurel = { readonly recit?: string; readonly logemen
 export type CandidatPourModeleP0 = { id: string; nom: string; resume: string; categorie: Category; typeEtape: StopKind };
 
 /** Forme de `LieuRetenu` (`src/ai/entrees.ts`). */
-export type LieuRetenuP0 = CandidatPourModeleP0 & { sourceDomaine: string };
+export type LieuRetenuP0 = CandidatPourModeleP0 & { sourceDomaine: string; secteur?: string; incontournable?: true };
 
 /** Forme de `BornesRecherche` (`src/research/bornes.ts`), sans délai. */
 export type BornesRechercheP0 = {
@@ -174,7 +174,19 @@ export function candidatPourModele(candidat: Candidat): CandidatPourModeleP0 {
   return { id: candidat.id, nom: candidat.nom, resume: candidat.resume, categorie: candidat.categorie, typeEtape: candidat.typeEtape };
 }
 
-/** Lieu retenu de P0 pour l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source. */
-export function lieuRetenuDepuisCandidat(candidat: Candidat): LieuRetenuP0 {
-  return { ...candidatPourModele(candidat), sourceDomaine: new URL(candidat.source.url).hostname };
+/**
+ * Lieu retenu de P0 pour l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source ; avec `infos`
+ * (sortie en mémoire de l'agent, P0S2-PO-21), son secteur maison et sa qualité d'incontournable du plan. Ni prix, ni
+ * horaires, ni conseil : le prompt `raisons` ne les reçoit pas.
+ */
+export function lieuRetenuDepuisCandidat(
+  candidat: Candidat,
+  infos?: { readonly secteur?: string; readonly incontournable?: string },
+): LieuRetenuP0 {
+  return {
+    ...candidatPourModele(candidat),
+    sourceDomaine: new URL(candidat.source.url).hostname,
+    ...(infos?.secteur === undefined ? {} : { secteur: infos.secteur }),
+    ...(infos?.incontournable === undefined ? {} : { incontournable: true as const }),
+  };
 }

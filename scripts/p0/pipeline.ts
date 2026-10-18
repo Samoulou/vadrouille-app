@@ -16,7 +16,7 @@ import type { Candidat, CandidatNote } from "@/prototype/candidat";
 import { CONFIG_SCHEMA, modelesDeLaVariante, RoutageSchema, type Variante } from "@/prototype/config";
 import type { ProgrammeReduit } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
-import { chercherCandidats, type CompteursAgent } from "@/research/agent";
+import { chercherCandidats, type CompteursAgent, type InfosCandidat } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
@@ -125,6 +125,8 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
   const sortiesRefusees = { plan: 0, recherche: 0, notation: 0, raisons: 0 };
   let agent: CompteursAgent | undefined;
   let candidats: Candidat[] = [];
+  /** Secteur, incontournable et infos pratiques des candidats (sortie en mémoire de l'agent, amendement 3 ; P0S2-PO-21). */
+  let infosAgent: ReadonlyMap<string, InfosCandidat> = new Map();
   let ancres = 0;
   let nonRetenus = 0;
   let notes = new Map<string, CandidatNote["notes"]>();
@@ -179,6 +181,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     );
     agent = resultatAgent.compteurs;
     candidats = resultatAgent.candidats;
+    infosAgent = resultatAgent.infos;
     sortiesRefusees.plan += agent.sortiesRefusees.plan;
     sortiesRefusees.recherche += agent.sortiesRefusees.recherche;
     compteurs.consommer("candidatsTrouves", candidats.length);
@@ -268,7 +271,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     const raisons = await chrono("raisons", async () => {
       const resultat = new Map<string, Raison>();
       for (const lot of enLots(lieuxRetenus, configuration.recherche.tailleLotNotation)) {
-        const reponse = await modeles.envoyer(requeteRaisons(entreeIa, lot.map(lieuRetenuDepuisCandidat), choisis.raisons, routage, complement));
+        const reponse = await modeles.envoyer(requeteRaisons(entreeIa, lot.map((candidat) => lieuRetenuDepuisCandidat(candidat, infosAgent.get(candidat.id))), choisis.raisons, routage, complement));
         const lecture = lireRaisons(reponse.texte, new Set(lot.map((candidat) => candidat.id)));
         sortiesRefusees.raisons += lecture.refuses;
         for (const [id, valeur] of lecture.valeur) resultat.set(id, valeur);
@@ -383,6 +386,14 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       candidatsRetenus: retenus,
       propositions,
       jours,
+    },
+    // Amendement 3 (P0S2-PO-25) : compteurs de la sortie de l'agent, avant tout ancrage ; des nombres, aucun nom.
+    qualite: {
+      secteursPlan: agent?.qualite.secteursPlan ?? 0,
+      incontournablesPlan: agent?.qualite.incontournablesPlan ?? 0,
+      incontournableSansCandidat: agent?.qualite.incontournableSansCandidat ?? 0,
+      candidatRegroupe: agent?.qualite.candidatRegroupe ?? 0,
+      secteurInconnu: agent?.qualite.secteurInconnu ?? 0,
     },
     partSourcesLocalesOuIndependantes: candidats.length === 0 ? 0 : locales / candidats.length,
     violations,

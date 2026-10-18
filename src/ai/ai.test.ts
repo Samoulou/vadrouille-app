@@ -134,11 +134,22 @@ describe("p0: sorties des modèles validées par schéma strict", () => {
     expect(lireTour("{}")).toEqual({ valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true });
   });
 
-  it("plan : requête avec balise refusée", () => {
-    const { valeur, refuses } = lirePlan(
-      JSON.stringify({ requetes: [{ requete: "musées", creneau: "activity" }, { requete: "<script>", creneau: "activity" }] }),
+  it("plan (v2, par secteurs) : une requête avec balise fait refuser le plan en entier", () => {
+    const secteurs = [{ nom: "Centre", raison: "Le cœur de la ville.", voisins: [], incontournables: [] }];
+    const valide = lirePlan(JSON.stringify({ secteurs, requetes: [{ requete: "musées", creneau: "activity", secteur: "Centre" }] }), { jours: 1 });
+    expect(valide).toEqual({ valeur: { secteurs, requetes: [{ requete: "musées", creneau: "activity", secteur: "Centre" }] }, refuses: 0 });
+    const { valeur, refuses, illisible } = lirePlan(
+      JSON.stringify({
+        secteurs,
+        requetes: [
+          { requete: "musées", creneau: "activity", secteur: "Centre" },
+          { requete: "<script>", creneau: "meal", secteur: "Centre" },
+        ],
+      }),
+      { jours: 1 },
     );
-    expect(valeur).toHaveLength(1);
+    expect(valeur).toEqual({ secteurs: [], requetes: [] });
     expect(refuses).toBe(1);
+    expect(illisible).toBe(true);
   });
 });

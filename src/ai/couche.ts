@@ -20,6 +20,7 @@ import { creerRedigerRaisons } from "@/ai/rediger-raisons";
 import type { Routage } from "@/ai/reglages";
 import { requetePlan, requeteQuartier, requeteStructuration } from "@/ai/requetes";
 import {
+  joursDuSejour,
   lireBriefDeduit,
   lireNotes,
   lirePlan,
@@ -29,6 +30,7 @@ import {
   type Lecture,
   type LogementPropose,
   type RequetePlan,
+  type SecteurPlan,
   type ZoneProposee,
 } from "@/ai/sorties";
 import { BriefRequestSchema, type BriefRequest, type InferredBrief } from "@/contracts";
@@ -187,7 +189,8 @@ const EntreeRedigerSchema = z.strictObject({
 
 export type EntreeProposerQuartier = { readonly quartier: EntreeQuartier; readonly resultats: readonly ResultatWeb[] };
 export type QuartierLu = { readonly zone: ZoneProposee | null; readonly logements: readonly LogementPropose[]; readonly refuses: number };
-export type PlanLu = { readonly requetes: readonly RequetePlan[]; readonly refuses: number };
+/** Plan lu (prompt `plan` v2, P0S2-PO-19) : secteurs et requêtes ; vides si la sortie est refusée en entier. */
+export type PlanLu = { readonly secteurs: readonly SecteurPlan[]; readonly requetes: readonly RequetePlan[]; readonly refuses: number };
 export type NotesLues = { readonly notes: ReadonlyMap<string, Notes>; readonly refuses: number };
 export type RaisonsLues = { readonly raisons: ReadonlyMap<string, { raison: string; detour: string }>; readonly refuses: number };
 
@@ -302,8 +305,8 @@ export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): Couch
       const { modele, routage } = reglages.plan;
       return appeler(
         () => client.envoyer(requetePlan(lue.entree, modele, routage)),
-        lirePlan,
-        (lecture) => ({ requetes: lecture.valeur, refuses: lecture.refuses }),
+        (texte) => lirePlan(texte, { jours: joursDuSejour(lue.entree.arrivee, lue.entree.depart) }),
+        (lecture) => ({ secteurs: lecture.valeur.secteurs, requetes: lecture.valeur.requetes, refuses: lecture.refuses }),
       );
     },
 

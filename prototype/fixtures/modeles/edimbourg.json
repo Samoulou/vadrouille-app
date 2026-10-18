@@ -1,30 +1,69 @@
 {
   "coutParRequeteUsd": 0.002,
   "plan": {
+    "secteurs": [
+      {
+        "nom": "Vieille ville",
+        "raison": "Le cœur historique perché, ses ruelles et ses points de vue.",
+        "voisins": [
+          "Ville neuve"
+        ],
+        "incontournables": [
+          "Forteresse du rocher"
+        ]
+      },
+      {
+        "nom": "Ville neuve",
+        "raison": "Les rues géorgiennes, les musées et les grandes tables.",
+        "voisins": [
+          "Vieille ville",
+          "Port et rivière"
+        ],
+        "incontournables": [
+          "Musée national des collections"
+        ]
+      },
+      {
+        "nom": "Port et rivière",
+        "raison": "Les quais, la rivière et ses hameaux, plus calmes.",
+        "voisins": [
+          "Ville neuve"
+        ],
+        "incontournables": [
+          "Port ancien et ses quais"
+        ]
+      }
+    ],
     "requetes": [
       {
         "requete": "incontournables historiques et points de vue",
-        "creneau": "activity"
-      },
-      {
-        "requete": "musées histoire et beaux intérieurs",
-        "creneau": "activity"
-      },
-      {
-        "requete": "balades nature et parcs",
-        "creneau": "activity"
+        "creneau": "activity",
+        "secteur": "Vieille ville"
       },
       {
         "requete": "tables locales budget moyen",
-        "creneau": "meal"
+        "creneau": "meal",
+        "secteur": "Vieille ville"
+      },
+      {
+        "requete": "musées histoire et beaux intérieurs",
+        "creneau": "activity",
+        "secteur": "Ville neuve"
       },
       {
         "requete": "cafés simples et cuisine locale",
-        "creneau": "meal"
+        "creneau": "meal",
+        "secteur": "Ville neuve"
+      },
+      {
+        "requete": "balades nature et parcs",
+        "creneau": "activity",
+        "secteur": "Port et rivière"
       },
       {
         "requete": "agenda concerts et soirées novembre",
-        "creneau": "event"
+        "creneau": "event",
+        "secteur": null
       }
     ]
   },
@@ -76,7 +115,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Forteresse du rocher",
@@ -86,7 +127,9 @@
           "sourceUrl": "https://visit-edimbourg.example/forteresse",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Vieille ville",
+          "incontournable": "Forteresse du rocher"
         },
         {
           "nom": "Grande rue pavée de la vieille ville",
@@ -97,7 +140,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 75
+          "dureeMinutes": 75,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Hameau du moulin au fil de l'eau",
@@ -108,7 +153,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 60
+          "dureeMinutes": 60,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Musée national des collections",
@@ -119,7 +166,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Ville neuve",
+          "incontournable": "Musée national des collections"
         },
         {
           "nom": "Jardin botanique du nord",
@@ -130,7 +179,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Port ancien et ses quais",
@@ -141,7 +192,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Port et rivière",
+          "incontournable": "Port ancien et ses quais"
         },
         {
           "nom": "Distillerie de la vallée accessible en train",
@@ -152,7 +205,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": true,
           "prixParPersonne": 25,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Salle de dégustation de whiskies rares",
@@ -163,7 +218,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": true,
           "prixParPersonne": 30,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Brasserie artisanale du canal",
@@ -174,7 +231,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 12,
-          "dureeMinutes": 75
+          "dureeMinutes": 75,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Palais au bout de la grande rue",
@@ -184,7 +243,9 @@
           "sourceUrl": "https://visit-edimbourg.example/palais",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Galerie des portraits",
@@ -195,7 +256,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 75
+          "dureeMinutes": 75,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Maison géorgienne restaurée",
@@ -206,7 +269,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 10,
-          "dureeMinutes": 60
+          "dureeMinutes": 60,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Cimetière des poètes",
@@ -217,7 +282,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 45
+          "dureeMinutes": 45,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Sentier de la rivière jusqu'au village",
@@ -228,7 +295,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Colline de l'observatoire",
@@ -239,7 +308,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 60
+          "dureeMinutes": 60,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Jardins sous le rocher",
@@ -250,7 +321,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 60
+          "dureeMinutes": 60,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Ruelle courbe aux façades colorées",
@@ -261,7 +334,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 45
+          "dureeMinutes": 45,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Musée des écrivains",
@@ -272,7 +347,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 45
+          "dureeMinutes": 45,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Visite des souterrains",
@@ -283,7 +360,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": true,
           "prixParPersonne": 20,
-          "dureeMinutes": 75
+          "dureeMinutes": 75,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Parc des collines au sud",
@@ -294,7 +373,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Boutique de lainages anciens",
@@ -304,7 +385,9 @@
           "sourceUrl": "https://top10-voyages.example/lainages",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "dureeMinutes": 45
+          "dureeMinutes": 45,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Attraction des illusions d'optique",
@@ -315,7 +398,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": true,
           "prixParPersonne": 22,
-          "dureeMinutes": 75
+          "dureeMinutes": 75,
+          "secteur": "Ville neuve",
+          "incontournable": null
         }
       ],
       "termine": false
@@ -352,7 +437,9 @@
           "sourceUrl": "https://guide-local-edimbourg.example/cantine-marche",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 14
+          "prixParPersonne": 14,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Café des fermiers",
@@ -362,7 +449,9 @@
           "sourceUrl": "https://gastronomie-ecossaise.example/cafe-fermiers",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 16
+          "prixParPersonne": 16,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Table du marché couvert",
@@ -372,7 +461,9 @@
           "sourceUrl": "https://gastronomie-ecossaise.example/table-marche",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "prixParPersonne": 55
+          "prixParPersonne": 55,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Bistrot du port",
@@ -382,7 +473,9 @@
           "sourceUrl": "https://gastronomie-ecossaise.example/bistrot-port",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "prixParPersonne": 40
+          "prixParPersonne": 40,
+          "secteur": "Port et rivière",
+          "incontournable": null
         },
         {
           "nom": "Taverne aux tourtes",
@@ -392,7 +485,9 @@
           "sourceUrl": "https://guide-local-edimbourg.example/taverne",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 22
+          "prixParPersonne": 22,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Salon de thé des écrivains",
@@ -402,7 +497,9 @@
           "sourceUrl": "https://guide-local-edimbourg.example/salon-the",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 15
+          "prixParPersonne": 15,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Restaurant gastronomique de la ville neuve",
@@ -412,7 +509,9 @@
           "sourceUrl": "https://gastronomie-ecossaise.example/gastronomique",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "prixParPersonne": 95
+          "prixParPersonne": 95,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Fish and chips de la grande rue",
@@ -422,7 +521,9 @@
           "sourceUrl": "https://guide-local-edimbourg.example/fish-and-chips",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 12
+          "prixParPersonne": 12,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Épicerie fine et comptoir à fromages",
@@ -432,7 +533,9 @@
           "sourceUrl": "https://gastronomie-ecossaise.example/epicerie-fine",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 20
+          "prixParPersonne": 20,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Brasserie de la gare",
@@ -442,7 +545,9 @@
           "sourceUrl": "https://top10-voyages.example/brasserie-gare",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 25
+          "prixParPersonne": 25,
+          "secteur": "Ville neuve",
+          "incontournable": null
         },
         {
           "nom": "Cuisine de rue du marché du samedi",
@@ -452,7 +557,9 @@
           "sourceUrl": "https://agenda-culturel-edimbourg.example/marche-samedi",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 10
+          "prixParPersonne": 10,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Pub aux musiciens",
@@ -462,7 +569,9 @@
           "sourceUrl": "https://guide-local-edimbourg.example/pub-musiciens",
           "sourceDate": "2026-09-15",
           "aReserver": false,
-          "prixParPersonne": 18
+          "prixParPersonne": 18,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Colline aux trois belvédères",
@@ -473,7 +582,9 @@
           "sourceDate": "2026-09-15",
           "aReserver": false,
           "prixParPersonne": 0,
-          "dureeMinutes": 90
+          "dureeMinutes": 90,
+          "secteur": "Vieille ville",
+          "incontournable": null
         },
         {
           "nom": "Lieu au résumé invalide",
@@ -483,7 +594,9 @@
           "sourceUrl": "https://visit-edimbourg.example/forteresse",
           "sourceDate": "2026-09-15",
           "aReserver": true,
-          "dureeMinutes": 120
+          "dureeMinutes": 120,
+          "secteur": "Vieille ville",
+          "incontournable": null
         }
       ],
       "termine": false
@@ -508,7 +621,9 @@
           "evenement": {
             "date": "2026-11-25",
             "heure": "19:30"
-          }
+          },
+          "secteur": null,
+          "incontournable": null
         },
         {
           "nom": "Conte nocturne au musée",
@@ -521,7 +636,9 @@
           "evenement": {
             "date": "2026-11-26",
             "heure": "20:00"
-          }
+          },
+          "secteur": null,
+          "incontournable": null
         },
         {
           "nom": "Marché de Noël hors séjour",
@@ -534,7 +651,9 @@
           "evenement": {
             "date": "2026-12-05",
             "heure": "11:00"
-          }
+          },
+          "secteur": null,
+          "incontournable": null
         },
         {
           "nom": "Lieu injecté",
@@ -543,7 +662,9 @@
           "typeEtape": "activity",
           "sourceUrl": "https://lieu-injecte.example/offre",
           "sourceDate": "2026-09-15",
-          "aReserver": false
+          "aReserver": false,
+          "secteur": "Vieille ville",
+          "incontournable": null
         }
       ],
       "termine": false

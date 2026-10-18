@@ -1,0 +1,143 @@
+{
+  "coutParRequeteUsd": 0.007,
+  "resultats": {
+    "Monti trattorias simples et bonnes": [
+      {
+        "url": "https://guide-rome-fabrique.example/trattoria-collines",
+        "titre": "Trattoria des Collines",
+        "extrait": "Pâtes fraîches, de 12 h à 23 h."
+      }
+    ],
+    "Monti caves à vin pour l'apéro": [
+      {
+        "url": "https://guide-rome-fabrique.example/cave-escaliers",
+        "titre": "Cave des Escaliers",
+        "extrait": "Vins au verre et planches, dès 17 h."
+      }
+    ],
+    "Colisée Forum romain Palatin visite billets horaires": [
+      {
+        "url": "https://site-officiel-fabrique.example/colisee",
+        "titre": "Colisée",
+        "extrait": "L'amphithéâtre antique, billet combiné avec le Forum et le Palatin."
+      },
+      {
+        "url": "https://site-officiel-fabrique.example/forum",
+        "titre": "Forum romain",
+        "extrait": "Le forum antique, ouvert de 9 h à 19 h, compris dans le billet combiné."
+      },
+      {
+        "url": "https://site-officiel-fabrique.example/palatin",
+        "titre": "Palatin",
+        "extrait": "La colline des palais, de 9 h à 19 h ; entrée moins chargée côté sud."
+      },
+      {
+        "url": "https://guide-rome-fabrique.example/plage-littoral",
+        "titre": "Plage du littoral",
+        "extrait": "Une plage accessible en train."
+      }
+    ],
+    "restaurants près des sites antiques": [
+      {
+        "url": "https://guide-rome-fabrique.example/osteria-arcades",
+        "titre": "Osteria des Arcades",
+        "extrait": "Cuisine romaine classique, environ 25 € par personne."
+      }
+    ],
+    "Panthéon place Navone visite horaires": [
+      {
+        "url": "https://site-officiel-fabrique.example/pantheon",
+        "titre": "Panthéon",
+        "extrait": "Entrée 5 €, ouvert de 9 h à 19 h."
+      },
+      {
+        "url": "https://guide-rome-fabrique.example/place-navone",
+        "titre": "Place Navone",
+        "extrait": "La grande place baroque, gratuite."
+      },
+      {
+        "url": "https://guide-rome-fabrique.example/balade-centre",
+        "titre": "Balade Panthéon, Trevi et Navone",
+        "extrait": "Un itinéraire à pied entre trois sites célèbres."
+      }
+    ],
+    "centre historique tables romaines carbonara": [
+      {
+        "url": "https://guide-rome-fabrique.example/table-minerve",
+        "titre": "Table de la Minerve",
+        "extrait": "Pâtes à la romaine, réservation conseillée le soir."
+      }
+    ],
+    "centre historique bars à cocktails": [
+      {
+        "url": "https://guide-rome-fabrique.example/bar-lanternes",
+        "titre": "Bar des Lanternes",
+        "extrait": "Cocktails dans une cour pavée, dès 18 h."
+      }
+    ],
+    "fontaine de Trevi place d'Espagne visite conseils": [
+      {
+        "url": "https://guide-rome-fabrique.example/fontaine-trevi",
+        "titre": "Fontaine de Trevi",
+        "extrait": "Accès libre jour et nuit ; foule dès le milieu de matinée."
+      },
+      {
+        "url": "https://guide-rome-fabrique.example/place-espagne",
+        "titre": "Place d'Espagne",
+        "extrait": "Accès libre ; s'asseoir sur les marches est interdit."
+      }
+    ],
+    "déjeuner rapide près de la fontaine": [
+      {
+        "url": "https://guide-rome-fabrique.example/comptoir-fontaine",
+        "titre": "Comptoir de la Fontaine",
+        "extrait": "Parts de pizza à emporter, de 11 h à 22 h."
+      }
+    ],
+    "basilique Saint-Pierre musées du Vatican château Saint-Ange billets": [
+      {
+        "url": "https://site-officiel-fabrique.example/basilique",
+        "titre": "Basilique Saint-Pierre",
+        "extrait": "Entrée gratuite, de 7 h à 19 h ; tenue correcte exigée."
+      },
+      {
+        "url": "https://site-officiel-fabrique.example/musees",
+        "titre": "Musées du Vatican",
+        "extrait": "Billet de 20 €, réservation d'un créneau en ligne."
+      },
+      {
+        "url": "https://site-officiel-fabrique.example/chateau",
+        "titre": "Château Saint-Ange",
+        "extrait": "Billet de 16 €, de 9 h à 19 h 30."
+      }
+    ],
+    "Prati osterias de quartier": [
+      {
+        "url": "https://guide-rome-fabrique.example/osteria-remparts",
+        "titre": "Osteria des Remparts",
+        "extrait": "Cuisine de quartier, menu du midi."
+      }
+    ],
+    "Trastevere trattorias réputées": [
+      {
+        "url": "https://guide-rome-fabrique.example/trattoria-fleuve",
+        "titre": "Trattoria du Fleuve",
+        "extrait": "Classiques romains, réservation indispensable."
+      }
+    ],
+    "Trastevere bars du soir": [
+      {
+        "url": "https://guide-rome-fabrique.example/bar-paves",
+        "titre": "Bar des Pavés",
+        "extrait": "Bar animé, jusqu'à 2 h."
+      }
+    ],
+    "concerts et fêtes début mai": [
+      {
+        "url": "https://agenda-rome-fabrique.example/concert-printemps",
+        "titre": "Concert de printemps",
+        "extrait": "Le jeudi 6 mai 2027 à 20:30, musique de chambre."
+      }
+    ]
+  }
+}

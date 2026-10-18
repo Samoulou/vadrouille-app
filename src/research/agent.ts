@@ -4,7 +4,7 @@ import type { EntreeModeles } from "@/ai/entrees";
 import { LONGUEURS_RESULTAT, nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/ai/recherche-web";
 import type { Routage } from "@/ai/reglages";
 import { requetePlan, requeteRecherche, type PageLue } from "@/ai/requetes";
-import { lirePlan, lireTour, type CandidatExtrait, type RequetePlan } from "@/ai/sorties";
+import { cleDeNom, joursDuSejour, lirePlan, lireTour, PLAN_VIDE, type CandidatExtrait, type PlanRecherche } from "@/ai/sorties";
 import type { BornesRecherche } from "@/research/bornes";
 import { CandidatRechercheSchema, type CandidatRecherche } from "@/research/candidat";
 import { urlNormalisee, type LecteurPages, type RaisonRefusPage } from "@/research/fetch-page";
@@ -43,6 +43,47 @@ export type CompteursAgent = {
    * s'est terminée avec les candidats déjà admis. 0 ou 1.
    */
   finsEcheance: number;
+  /**
+   * Compteurs de l'amendement 3 de la suite 2 de P0 (P0S2-PO-25), calculés sur la **seule sortie de l'agent**, avant
+   * tout ancrage : aucun ne dépend d'une position, d'une fiche ni d'un résultat Google (0011 § 2), aucun ne porte un nom.
+   */
+  qualite: CompteursQualite;
+};
+
+export type CompteursQualite = {
+  /** Secteurs du plan lu (0 si le plan est refusé ou sans secteur). */
+  secteursPlan: number;
+  /** Incontournables nommés par le plan lu. */
+  incontournablesPlan: number;
+  /** Incontournables du plan qu'aucun candidat admis ne désigne par son champ `incontournable` (P0S2-PO-20). */
+  incontournableSansCandidat: number;
+  /** Candidats écartés parce que leur nom réunit deux incontournables du plan ou plus (P0S2-PO-20). */
+  candidatRegroupe: number;
+  /** Candidats de lieu écartés parce que leur secteur n'est pas un secteur du plan (P0S2-PO-20). */
+  secteurInconnu: number;
+};
+
+/**
+ * Ce que l'agent sait d'un candidat admis en plus du candidat lui-même (amendement 3, P0S2-PO-20 et PO-21) : secteur et
+ * incontournable du plan (noms exacts du plan), infos pratiques tirées de la source. Données maison de la recherche web
+ * seulement, **en mémoire** : tant que le Tech Lead n'a pas tranché où les porter (`CandidatSchema`, la contrainte de
+ * clés de la table de travail du prototype et la copie `src/research/candidat.ts` tenue égale ; question 1 de
+ * l'amendement), elles ne sont ni dans le candidat, ni écrites en base.
+ */
+export type InfosCandidat = {
+  readonly secteur?: string;
+  readonly incontournable?: string;
+  readonly prix?: string;
+  readonly horaires?: string;
+  readonly conseil?: string;
+};
+
+/** Résultat de l'agent : candidats admis, compteurs, plan lu et infos par identifiant de candidat. */
+export type ResultatAgent = {
+  candidats: CandidatRecherche[];
+  compteurs: CompteursAgent;
+  plan: PlanRecherche;
+  infos: ReadonlyMap<string, InfosCandidat>;
 };
 
 /**
@@ -145,14 +186,83 @@ export function ciblesAtteintes(
   );
 }
 
-/** Clé de comparaison d'un nom (doublons de l'agent, mesures de `evals/`) : minuscules, sans accents ni ponctuation. */
-export function cleDeNom(nom: string): string {
-  return nom
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+/** Clé de comparaison d'un nom (doublons de l'agent, secteurs et incontournables, mesures de `evals/`) ; voir `@/ai/sorties`. */
+export { cleDeNom };
+
+/** Longueur minimale d'un mot d'incontournable pour la règle du candidat regroupé (`incontournablesCites`). */
+export const MOT_INCONTOURNABLE_MIN = 4;
+
+/**
+ * Incontournables du plan **cités** par un nom maison de candidat (P0S2-PO-20, « un incontournable = un candidat ») :
+ * l'incontournable est cité si sa clé de nom (`cleDeNom`) figure en mots entiers dans celle du nom, ou si l'un de ses mots
+ * **distinctifs** y figure : mot de `MOT_INCONTOURNABLE_MIN` lettres ou plus, absent du nom de la destination et des
+ * noms des autres incontournables du plan (« Balade Panthéon, Trevi et Navone » cite « Panthéon », « Fontaine de
+ * Trevi » et « Place Navone » : `place` est partagé avec « Place d'Espagne », `trevi` et `navone` sont distinctifs).
+ * Seul le nom est lu, jamais le prix ni le conseil (un billet combiné dit dans le prix ne regroupe rien). Fonction pure.
+ */
+export function incontournablesCites(nom: string, plan: PlanRecherche, destination: string): string[] {
+  const texte = ` ${cleDeNom(nom)} `;
+  const motsDestination = new Set(cleDeNom(destination).split(" "));
+  const tous = plan.secteurs.flatMap((secteur) => secteur.incontournables);
+  const motsDe = (incontournable: string) => cleDeNom(incontournable).split(" ").filter((mot) => mot !== "");
+  const occurrences = new Map<string, number>();
+  for (const incontournable of tous) for (const mot of new Set(motsDe(incontournable))) occurrences.set(mot, (occurrences.get(mot) ?? 0) + 1);
+  return tous.filter((incontournable) => {
+    const cle = cleDeNom(incontournable);
+    if (cle !== "" && texte.includes(` ${cle} `)) return true;
+    return motsDe(incontournable).some(
+      (mot) => mot.length >= MOT_INCONTOURNABLE_MIN && !motsDestination.has(mot) && occurrences.get(mot) === 1 && texte.includes(` ${mot} `),
+    );
+  });
+}
+
+/** Cibles d'un secteur, par créneau (P0S2-PO-20). */
+export type CiblesSecteur = { readonly nom: string; readonly cibles: Record<TypeCreneau, number> };
+
+/**
+ * Répartition des cibles de l'exécution par secteur du plan (P0S2-PO-20) : activités, d'abord un candidat par
+ * incontournable du plan (dans l'ordre du plan), puis le reste au tourniquet sur les secteurs dans l'ordre du plan ; repas
+ * et soirées au tourniquet (au moins 2 repas et 1 soirée par secteur dès que les totaux le permettent). La somme par
+ * créneau égale toujours la cible de l'exécution (`bornesDepuisDemande`, 0088 § 1 à § 3), jamais plus. Plan sans
+ * secteur : aucune répartition. Fonction pure.
+ */
+export function ciblesParSecteur(plan: PlanRecherche, cibles: Readonly<Record<TypeCreneau, number>>): CiblesSecteur[] {
+  const secteurs = plan.secteurs.map((secteur) => ({
+    nom: secteur.nom,
+    incontournables: secteur.incontournables.length,
+    cibles: { activity: 0, meal: 0, evening: 0 },
+  }));
+  if (secteurs.length === 0) return [];
+  let activites = Math.max(0, cibles.activity);
+  for (const secteur of secteurs) {
+    const part = Math.min(activites, secteur.incontournables);
+    secteur.cibles.activity += part;
+    activites -= part;
+  }
+  const tourniquet = (creneau: TypeCreneau, reste: number) => {
+    secteurs.forEach((secteur, rang) => {
+      const part = Math.floor(reste / secteurs.length) + (rang < reste % secteurs.length ? 1 : 0);
+      ajouterAuCreneau(secteur.cibles, creneau, part);
+    });
+  };
+  tourniquet("activity", activites);
+  tourniquet("meal", Math.max(0, cibles.meal));
+  tourniquet("evening", Math.max(0, cibles.evening));
+  return secteurs.map(({ nom, cibles: parCreneau }) => ({ nom, cibles: parCreneau }));
+}
+
+/** Ajoute `nombre` au créneau donné (clés littérales seulement : aucun accès calculé). */
+function ajouterAuCreneau(compte: Record<TypeCreneau, number>, creneau: TypeCreneau, nombre: number): void {
+  if (creneau === "activity") compte.activity += nombre;
+  else if (creneau === "meal") compte.meal += nombre;
+  else compte.evening += nombre;
+}
+
+/** Secteur du plan dont la clé de nom égale celle de `nom` ; `undefined` sinon. */
+function secteurDuPlan(plan: PlanRecherche, nom: string | null | undefined) {
+  if (nom === null || nom === undefined) return undefined;
+  const cle = cleDeNom(nom);
+  return plan.secteurs.find((secteur) => cleDeNom(secteur.nom) === cle);
 }
 
 /**
@@ -375,10 +485,7 @@ function borner(texte: string, max: number): string {
   return texte.replace(/[\p{Cc}\p{Cf}]/gu, " ").slice(0, max);
 }
 
-export async function chercherCandidats(
-  entree: EntreeModeles,
-  dependances: DependancesAgent,
-): Promise<{ candidats: CandidatRecherche[]; compteurs: CompteursAgent }> {
+export async function chercherCandidats(entree: EntreeModeles, dependances: DependancesAgent): Promise<ResultatAgent> {
   const { bornes: config, complement } = dependances;
   const proteges = ensemblesProteges(entree, complement, dependances.protegees);
   const compteurs: CompteursAgent = {
@@ -392,8 +499,19 @@ export async function chercherCandidats(
     finsAnormales: 0,
     candidatsRefuses: { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
     finsEcheance: 0,
+    qualite: { secteursPlan: 0, incontournablesPlan: 0, incontournableSansCandidat: 0, candidatRegroupe: 0, secteurInconnu: 0 },
   };
   const candidats: CandidatRecherche[] = [];
+  const infos = new Map<string, InfosCandidat>();
+  let plan: PlanRecherche = PLAN_VIDE;
+  /** Fin de l'agent : `incontournable_sans_candidat` sur la seule sortie de l'agent, avant tout ancrage (P0S2-PO-20). */
+  const resultat = (): ResultatAgent => {
+    const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [cleDeNom(info.incontournable)])));
+    compteurs.qualite.incontournableSansCandidat = plan.secteurs
+      .flatMap((secteur) => secteur.incontournables)
+      .filter((incontournable) => !designes.has(cleDeNom(incontournable))).length;
+    return { candidats, compteurs, plan, infos };
+  };
   dependances.observer?.({ compteurs, candidats });
   /** Ticket 407 : l'échéance de l'étape admet-elle cet appel ? Non : la fin sur échéance est comptée. */
   const aLeTemps = (appel: AppelAgent): boolean => {
@@ -405,14 +523,22 @@ export async function chercherCandidats(
     if (reponse.fin !== undefined && reponse.fin !== "stop") compteurs.finsAnormales += 1;
   };
 
-  // Étape 2 : plan de recherche, à partir du brief seul.
-  if (!aLeTemps("modele")) return { candidats, compteurs };
-  const reponsePlan = await dependances.modeles.envoyer(requetePlan(entree, dependances.modele, dependances.routage, complement));
+  // Étape 2 : plan de recherche par secteurs (prompt `plan` v2, P0S2-PO-19), à partir du brief seul.
+  if (!aLeTemps("modele")) return resultat();
+  const jours = joursDuSejour(entree.arrivee, entree.depart);
+  const incontournablesMax = Math.min(2 * jours, config.ciblesParCreneau.activity);
+  const reponsePlan = await dependances.modeles.envoyer(
+    requetePlan(entree, dependances.modele, dependances.routage, complement, incontournablesMax),
+  );
   noterFin(reponsePlan);
-  const plan = lirePlan(reponsePlan.texte);
-  compteurs.sortiesRefusees.plan += plan.refuses;
-  if (plan.illisible === true) compteurs.sortiesIllisibles.plan += 1;
-  const requetesPlan: RequetePlan[] = plan.valeur;
+  const lecturePlan = lirePlan(reponsePlan.texte, { jours, cibleActivites: config.ciblesParCreneau.activity });
+  compteurs.sortiesRefusees.plan += lecturePlan.refuses;
+  if (lecturePlan.illisible === true) compteurs.sortiesIllisibles.plan += 1;
+  plan = lecturePlan.valeur;
+  compteurs.qualite.secteursPlan = plan.secteurs.length;
+  compteurs.qualite.incontournablesPlan = plan.secteurs.reduce((total, secteur) => total + secteur.incontournables.length, 0);
+  const cibles = ciblesParSecteur(plan, config.ciblesParCreneau);
+  const trouvesParSecteur = new Map<string, Record<TypeCreneau, number>>(plan.secteurs.map((secteur) => [secteur.nom, { activity: 0, meal: 0, evening: 0 }]));
 
   const urlsVues = new Set<string>();
   const pagesTexte = new Map<string, string>();
@@ -429,8 +555,28 @@ export async function chercherCandidats(
       compteurs.candidatsRefuses.source_not_in_results += 1;
       return;
     }
+    // Amendement 3 (P0S2-PO-20) : avec un plan par secteurs, un lieu porte un secteur du plan (sinon écarté,
+    // `secteur_inconnu`) ; un événement peut ne pas en porter. Plan refusé ou sans secteur : règle sans objet.
+    const avecSecteurs = plan.secteurs.length > 0;
+    const secteur = avecSecteurs ? secteurDuPlan(plan, extrait.secteur) : undefined;
+    if (avecSecteurs && secteur === undefined && extrait.typeEtape !== "event") {
+      compteurs.qualite.secteurInconnu += 1;
+      return;
+    }
+    // Un incontournable = un candidat : un nom qui réunit deux incontournables du plan ou plus est écarté.
+    if (avecSecteurs && incontournablesCites(extrait.nom, plan, entree.destination).length >= 2) {
+      compteurs.qualite.candidatRegroupe += 1;
+      return;
+    }
+    const incontournable =
+      secteur === undefined || extrait.incontournable === null || extrait.incontournable === undefined
+        ? undefined
+        : secteur.incontournables.find((nom) => cleDeNom(nom) === cleDeNom(extrait.incontournable as string));
     const k = cleDeNom(extrait.nom);
-    if (cles.has(k)) {
+    // Deux candidats qui désignent le même incontournable sont fusionnés comme les autres doublons.
+    const memeIncontournable =
+      incontournable !== undefined && [...infos.values()].some((info) => info.incontournable !== undefined && cleDeNom(info.incontournable) === cleDeNom(incontournable));
+    if (cles.has(k) || memeIncontournable) {
       compteurs.candidatsRefuses.duplicate += 1;
       return;
     }
@@ -439,7 +585,7 @@ export async function chercherCandidats(
       return;
     }
     const texte = pagesTexte.get(source);
-    const resultat = CandidatRechercheSchema.safeParse({
+    const lu = CandidatRechercheSchema.safeParse({
       id: `c_${String(candidats.length + 1).padStart(3, "0")}`,
       nom: extrait.nom,
       resume: extrait.resume,
@@ -455,22 +601,47 @@ export async function chercherCandidats(
             },
           }),
       aReserver: extrait.aReserver,
-      ...(extrait.prixParPersonne === undefined ? {} : { prixParPersonne: extrait.prixParPersonne }),
+      ...(prixParPersonneAdmis(extrait) === undefined ? {} : { prixParPersonne: prixParPersonneAdmis(extrait) }),
       ...(extrait.dureeMinutes === undefined ? {} : { dureeMinutes: extrait.dureeMinutes }),
     });
-    if (!resultat.success) {
+    if (!lu.success) {
       compteurs.candidatsRefuses.invalid += 1;
       return;
     }
     cles.add(k);
-    candidats.push(resultat.data);
+    candidats.push(lu.data);
+    infos.set(lu.data.id, {
+      ...(secteur === undefined ? {} : { secteur: secteur.nom }),
+      ...(incontournable === undefined ? {} : { incontournable }),
+      ...(extrait.prix === undefined ? {} : { prix: extrait.prix }),
+      ...(extrait.horaires === undefined ? {} : { horaires: extrait.horaires }),
+      ...(extrait.conseil === undefined ? {} : { conseil: extrait.conseil }),
+    });
     const creneau = creneauCompte(
-      { typeEtape: resultat.data.typeEtape, ...(extrait.slotFit === undefined ? {} : { slotFit: extrait.slotFit }) },
+      { typeEtape: lu.data.typeEtape, ...(extrait.slotFit === undefined ? {} : { slotFit: extrait.slotFit }) },
       trouves.evening < config.ciblesParCreneau.evening,
     );
-    if (creneau === "activity") trouves.activity += 1;
-    else if (creneau === "meal") trouves.meal += 1;
-    else if (creneau === "evening") trouves.evening += 1;
+    if (creneau === undefined) return;
+    ajouterAuCreneau(trouves, creneau, 1);
+    const parSecteur = secteur === undefined ? undefined : trouvesParSecteur.get(secteur.nom);
+    if (parSecteur !== undefined) ajouterAuCreneau(parSecteur, creneau, 1);
+  };
+
+  /** Ce qui manque par secteur, remis au modèle à chaque tour (P0S2-PO-20) ; aucune donnée Google. */
+  const manquantsParSecteur = () => {
+    const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [cleDeNom(info.incontournable)])));
+    return cibles.map(({ nom, cibles: cible }) => {
+      const vus = trouvesParSecteur.get(nom) ?? { activity: 0, meal: 0, evening: 0 };
+      return {
+        nom,
+        manquants: {
+          activity: Math.max(0, cible.activity - vus.activity),
+          meal: Math.max(0, cible.meal - vus.meal),
+          evening: Math.max(0, cible.evening - vus.evening),
+        },
+        incontournablesSansCandidat: (secteurDuPlan(plan, nom)?.incontournables ?? []).filter((i) => !designes.has(cleDeNom(i))),
+      };
+    });
   };
 
   // Étape 3 : tours de l'agent, bornés.
@@ -488,7 +659,8 @@ export async function chercherCandidats(
         {
           entree,
           tour,
-          plan: requetesPlan,
+          plan,
+          secteurs: manquantsParSecteur(),
           resultats,
           pages,
           dejaTrouves: candidats.map((candidat) => candidat.nom),
@@ -557,5 +729,19 @@ export async function chercherCandidats(
     // Ticket 407 : plus le temps d'un appel dans l'étape ; les candidats admis sont gardés.
     if (echeanceAtteinte) break;
   }
-  return { candidats, compteurs };
+  return resultat();
+}
+
+/** Mention d'un prix en francs suisses dans le texte `prix` d'une source (« 12 CHF », « CHF 12 », « 12 fr. »). */
+const PRIX_EN_CHF = /\bchf\b|\bfr\.|\bfrancs?\b/i;
+
+/**
+ * `prixParPersonne` admis (P0S2-PO-21 : le prototype ne convertit aucune devise) : 0 (entrée gratuite) toujours ; un
+ * montant positif seulement si le texte `prix` de la source, quand il est donné, est en francs suisses. Sans texte `prix`,
+ * la règle de la v3 s'applique (montant gardé tel que le modèle le rend, consigne du prompt v4 : CHF seulement).
+ */
+export function prixParPersonneAdmis(extrait: Pick<CandidatExtrait, "prix" | "prixParPersonne">): number | undefined {
+  if (extrait.prixParPersonne === undefined || extrait.prixParPersonne === 0) return extrait.prixParPersonne;
+  if (extrait.prix !== undefined && !PRIX_EN_CHF.test(extrait.prix)) return undefined;
+  return extrait.prixParPersonne;
 }
