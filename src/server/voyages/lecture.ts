@@ -4,6 +4,7 @@ import type { AdapterContext, TripAdapter } from "@/adapters/types";
 import {
   ChecklistItemSchema,
   DayMapSchema,
+  DaySchema,
   PreviewSlotSchema,
   PreviewSlotsSchema,
   ProposalRecordSchema,
@@ -36,7 +37,7 @@ import { EchecPositions, lirePositions } from "@/server/positions/lecture";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
 import { datesDeVerification, identifiantLisible, logementsParNuit, mobiliteDepuisColonne, nombreDeNuits, type VersionDeChaine } from "./conversion";
-import { echec, type ContexteEchec } from "./erreurs";
+import { echec, LectureVoyageError, type ContexteEchec } from "./erreurs";
 
 /**
  * Cas d'usage de lecture des voyages (spécification B6, B6a points 1 à 4 ; décision 0086 § 1.1 à § 1.4 et § 1.7) :
@@ -59,7 +60,10 @@ type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId"
 export type DependancesLecture = {
   /** Port de relectures (B6 : le double de `src/mocks/relectures-voyages.ts` ; B8b : Places et Routes). */
   readonly relectures: SourceRelectures;
-  /** `withOrg` de `src/server/with-org.ts` par défaut ; les tests de base injectent celui de leur client. */
+  /**
+   * **Tests seulement** (revue du head 7402324, mineur 5) : `withOrg` de `src/server/with-org.ts` par défaut ; les tests
+   * de base injectent celui de leur client. Aucun appelant applicatif ne le pose (B6b branche la fabrique sans lui).
+   */
   readonly withOrg?: FonctionWithOrg;
   readonly configuration?: ConfigurationMoteur;
 };
@@ -403,7 +407,19 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
   const withOrg = dependances.withOrg ?? withOrgParDefaut;
   const source = dependances.relectures;
   const configuration = dependances.configuration ?? CONFIGURATION_MOTEUR;
-  const lire = <T>(ctx: AdapterContext, fn: (executeur: ExecuteurLecture) => Promise<T>) => transactionDeLecture(withOrg, ctx, fn);
+  /**
+   * Transaction de lecture d'un cas d'usage. Toute erreur autre que l'erreur fermée (base injoignable, requête en
+   * échec, contexte refusé par `withOrg`) devient `unavailable` (B6-PO-10 ; revue du head 7402324, mineur 8) : ni
+   * son message (texte SQL, identifiants internes) ni sa pile ne remontent ni ne sont journalisés.
+   */
+  const lire = async <T>(ctx: AdapterContext, fn: (executeur: ExecuteurLecture) => Promise<T>, tripId?: string): Promise<T> => {
+    try {
+      return await transactionDeLecture(withOrg, ctx, fn);
+    } catch (erreur) {
+      if (erreur instanceof LectureVoyageError) throw erreur;
+      throw echec("unavailable", tripId === undefined ? {} : { tripId }, "base");
+    }
+  };
 
   return {
     async listTrips(ctx) {
@@ -440,8 +456,10 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
 
     async getTrip(ctx, tripId) {
       if (!identifiantLisible(tripId)) return null;
-      const etat = await lire(ctx, (executeur) =>
-        lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true, debloque: true, checklist: true }),
+      const etat = await lire(
+        ctx,
+        (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true, debloque: true, checklist: true }),
+        tripId,
       );
       if (etat === null) return null;
       const checklist = checklistDe(etat);
@@ -468,16 +486,20 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
 
     async getDay(ctx, tripId, index) {
       if (!identifiantLisible(tripId)) return null;
-      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true }));
+      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true }), tripId);
       const jour = etat?.snapshot.days.find((day) => day.index === index);
       if (etat === null || jour === undefined) return null;
       const [day] = await recomposerJours(source, etat, [jour]);
-      return day ?? null;
+      const contexte = { tripId, version: etat.enTete.version, dayIndex: index };
+      if (day === undefined) throw echec("output_invalid", contexte);
+      // Sortie validée ici comme les autres lectures (revue du head 7402324, bloquant 1) : une durée relue invalide
+      // (minutes non entières ou négatives) est l'erreur fermée `output_invalid`, journalisée, jamais une `ZodError`.
+      return sortie(DaySchema, day, contexte);
     },
 
     async listProposals(ctx, tripId) {
       if (!identifiantLisible(tripId)) return [];
-      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { sejours: true, enCours: true, propositions: "deck" }));
+      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { sejours: true, enCours: true, propositions: "deck" }), tripId);
       if (etat === null) return [];
       const lues = etat.propositions.filter((ligne) => ligne.slot_type === "proposal").map((ligne) => propositionLue(etat, ligne));
       const propositions = await recomposerPropositions(source, etat, lues, configuration);
@@ -486,7 +508,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
 
     async listPreviewSlots(ctx, tripId) {
       if (!identifiantLisible(tripId)) return [];
-      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { sejours: true, enCours: true, propositions: "preview" }));
+      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { sejours: true, enCours: true, propositions: "preview" }), tripId);
       if (etat === null) return [];
       const contexte = { tripId, version: etat.enTete.version };
       const lues = etat.propositions.filter((ligne) => ligne.slot_type === "proposal").map((ligne) => propositionLue(etat, ligne));
@@ -515,7 +537,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
         const logements = logementsDe(etat, contexte);
         const positions = await positionsDe(executeur, placeIdsDesCartes([jour], logementsDesJours([jour], logements)), contexte);
         return carteDuJour(etat, jour, logements, positions);
-      });
+      }, tripId);
     },
 
     async getTripMap(ctx, tripId) {
@@ -532,7 +554,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
           const carte = carteDuJour(etat, jour, logements, positions);
           return carte === null ? [] : [carte];
         });
-      });
+      }, tripId);
     },
   };
 }

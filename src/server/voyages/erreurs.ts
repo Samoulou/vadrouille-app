@@ -38,10 +38,11 @@ export type ContexteEchec = { readonly tripId?: string; readonly version?: numbe
 
 /**
  * Journalise puis rend l'erreur fermée. Refus du port (`quota_reached`, `unavailable`) : `voyages.relecture_refused`,
- * une fois par lecture, par le cas d'usage seul (0086 § 4 point 2 (b)) ; toute autre raison : `voyages.read_failed`.
+ * une fois par lecture, par le cas d'usage seul (0086 § 4 point 2 (b)) ; toute autre raison, et `unavailable` d'une
+ * erreur de la base (`origine: "base"`, revue du head 7402324, mineur 8) : `voyages.read_failed`.
  */
-export function echec(reason: RaisonLecture, contexte: ContexteEchec = {}): LectureVoyageError {
-  const refus = reason === "quota_reached" || reason === "unavailable";
+export function echec(reason: RaisonLecture, contexte: ContexteEchec = {}, origine: "port" | "base" = "port"): LectureVoyageError {
+  const refus = origine === "port" && (reason === "quota_reached" || reason === "unavailable");
   logEvent(refus ? "voyages.relecture_refused" : "voyages.read_failed", { reason, ...contexte }, refus ? "warn" : "error");
   return new LectureVoyageError(reason);
 }

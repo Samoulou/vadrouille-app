@@ -17,7 +17,9 @@ import type { TripAdapter } from "./types";
  *
  * Le port de relectures est **injecté** par la fabrique (B6 : le double de `src/mocks/relectures-voyages.ts` ; B8b :
  * Places et Routes). **Non branché** sur `getTripAdapter()` dans B6a : B6b ajoute le branchement et sa garde (B6-TL-7).
- * Une erreur fermée de lecture remonte telle quelle (B6a point 10).
+ * Une erreur fermée de lecture remonte telle quelle (B6a point 10). Chaque cas d'usage valide déjà sa sortie par le même
+ * schéma (`sortie` de `lecture.ts`, erreur fermée `output_invalid`) : la validation ci-dessous ne peut pas lever sur une
+ * sortie rendue ; elle reste la garde de l'adaptateur. `withOrg` des options : **tests seulement** (`DependancesLecture`).
  */
 export type OptionsAdaptateurApi = DependancesLecture;
 
