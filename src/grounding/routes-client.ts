@@ -84,13 +84,77 @@ export type OptionsRoutes = {
   readonly execArgv?: readonly string[];
 };
 
+/**
+ * Élément de la matrice, lu **un à un** (décision 0090 § 1). Formes documentées de `RouteMatrixElement` (référence REST de
+ * `computeRouteMatrix` et page « route matrix on transit ») :
+ * - `originIndex` et `destinationIndex` : entiers ; une valeur 0 peut être omise (JSON de proto3) ;
+ * - `duration` : secondes avec **jusqu'à neuf décimales**, suivies de `s` (« 160s », mais aussi « 3.5s ») ;
+ * - `condition` : `ROUTE_EXISTS`, `ROUTE_NOT_FOUND`, ou omise (`…_UNSPECIFIED`, seulement quand `status` n'est pas OK) ;
+ * - `status` (absent du masque, toléré s'il est rendu ; 0090 § 3 point 5 : ne pas l'ajouter au masque, le SKU facturé
+ *   pourrait changer) : objet `google.rpc.Status`, `{}` ou `code` 0 pour OK, seul `code` est gardé ;
+ * - tout autre champ (`localizedValues`, `fallbackInfo`, `travelAdvisory`…) est ignoré.
+ */
 const ElementSchema = z.object({
   originIndex: z.number().int().min(0).optional(),
   destinationIndex: z.number().int().min(0).optional(),
-  duration: z.string().regex(/^\d{1,7}s$/).optional(),
-  condition: z.enum(["ROUTE_EXISTS", "ROUTE_NOT_FOUND", "ROUTE_MATRIX_ELEMENT_CONDITION_UNSPECIFIED"]).optional(),
+  duration: z.string().optional(),
+  condition: z.string().optional(),
+  // `code` seul : Zod retire les champs inconnus (`message`, `details` de `google.rpc.Status` jamais gardés ; 0090 § 3
+  // point 3, défense en profondeur).
+  status: z.object({ code: z.number().int().optional() }).optional(),
 });
-const MatriceSchema = z.array(ElementSchema).max(ELEMENTS_MAX);
+const MatriceSchema = z.array(z.unknown()).max(ELEMENTS_MAX);
+const DUREE = /^\d{1,9}(?:\.\d{1,9})?s$/;
+
+/** Durée en secondes d'une valeur `duration` documentée (fraction gardée), ou `undefined`. */
+function secondesDe(duree: string | undefined): number | undefined {
+  if (duree === undefined || !DUREE.test(duree)) return undefined;
+  const valeur = Number.parseFloat(duree.slice(0, -1));
+  return Number.isFinite(valeur) && valeur >= 0 ? valeur : undefined;
+}
+
+/**
+ * Lecture de la matrice, paire par paire (décision 0090 § 1, ticket 493 : une réponse Routes en transports en commun
+ * ne doit plus arrêter l'exécution ; remplace la correspondance stricte élément → paire de P0r1). Règle unique : **jamais une durée attribuée à une mauvaise paire** ; toute incertitude donne une durée inconnue
+ * (`null`), que le moteur traite comme un trajet inconnu (lieu non planifié depuis ou vers ce point), jamais une erreur :
+ * - élément illisible (pas un objet, index non entier…) : ignoré ; `status` en erreur : sa paire est inconnue ;
+ * - index absent : 0 (JSON de proto3) ; index hors de la matrice : la réponse ne correspond pas à la requête, **toute**
+ *   la matrice est inconnue ;
+ * - paire rendue deux fois ou plus (élément répété, ou élément sans index qui retombe sur 0) : paire inconnue ;
+ * - paire manquante : inconnue ;
+ * - durée seulement si `condition` vaut `ROUTE_EXISTS` et si `duration` suit la forme documentée ; fraction gardée,
+ *   **aucun arrondi ici** (0090 § 2 : la conversion en minutes, `Math.ceil`, est faite par chaque usage).
+ * Résidu accepté (0090 § 1) : une réponse d'un seul élément sans aucun index est lue comme la paire `0:0` ; c'est la
+ * lecture correcte d'un JSON proto3 pour une matrice 1 × 1, et pour une matrice plus grande les autres paires restent
+ * inconnues.
+ * Une réponse qui n'est pas un tableau (ou de plus de 625 éléments) reste refusée : `invalid_response`.
+ */
+function lireMatrice(brut: unknown, origines: number, destinations: number): (number | null)[][] {
+  const lu = MatriceSchema.safeParse(brut);
+  if (!lu.success) throw new ErreurClientGoogle("invalid_response");
+  const inconnue = () => Array.from({ length: origines }, () => Array.from({ length: destinations }, (): number | null => null));
+  const vues = new Map<string, number>();
+  const durees = new Map<string, number>();
+  for (const brutElement of lu.data) {
+    const element = ElementSchema.safeParse(brutElement);
+    if (!element.success) continue;
+    const { originIndex, destinationIndex, duration, condition, status } = element.data;
+    const de = originIndex ?? 0;
+    const vers = destinationIndex ?? 0;
+    if (de >= origines || vers >= destinations) return inconnue();
+    const paire = `${de}:${vers}`;
+    vues.set(paire, (vues.get(paire) ?? 0) + 1);
+    const enErreur = status?.code !== undefined && status.code !== 0;
+    const secondes = condition === "ROUTE_EXISTS" && !enErreur ? secondesDe(duration) : undefined;
+    if (secondes !== undefined) durees.set(paire, secondes);
+  }
+  return inconnue().map((ligne, de) =>
+    ligne.map((_, vers) => {
+      const paire = `${de}:${vers}`;
+      return vues.get(paire) === 1 ? (durees.get(paire) ?? null) : null;
+    }),
+  );
+}
 
 export function createRoutesClient(options: OptionsRoutes, transport: Transport = fetch): ClientRoutes {
   const cle = lireCleGoogle(options.environnement, options.execArgv);
@@ -134,25 +198,7 @@ export function createRoutesClient(options: OptionsRoutes, transport: Transport 
         }),
       );
       if (!issue.ok) throw erreurGoogleDe(issue);
-      const lu = MatriceSchema.safeParse(issue.valeur);
-      if (!lu.success) throw new ErreurClientGoogle("invalid_response");
-      // Correspondance stricte élément → paire (mineur de la revue du head `353bb20`) : la matrice rend exactement un
-      // élément par paire, chaque paire une seule fois ; sinon `invalid_response`. Un index absent vaut 0 : c'est la
-      // règle du JSON de proto3, qui omet les valeurs par défaut ; il ne peut plus attribuer une durée à une autre
-      // paire, puisqu'une paire répétée ou manquante fait refuser toute la réponse.
-      if (lu.data.length !== elements) throw new ErreurClientGoogle("invalid_response");
-      const durees = new Map<string, number>();
-      const vues = new Set<string>();
-      for (const element of lu.data) {
-        const de = element.originIndex ?? 0;
-        const vers = element.destinationIndex ?? 0;
-        if (de >= origines.length || vers >= destinations.length) throw new ErreurClientGoogle("invalid_response");
-        const paire = `${de}:${vers}`;
-        if (vues.has(paire)) throw new ErreurClientGoogle("invalid_response");
-        vues.add(paire);
-        if (element.condition === "ROUTE_EXISTS" && element.duration !== undefined) durees.set(paire, Number.parseInt(element.duration, 10));
-      }
-      return { secondes: origines.map((_, de) => destinations.map((__, vers) => durees.get(`${de}:${vers}`) ?? null)) };
+      return { secondes: lireMatrice(issue.valeur, origines.length, destinations.length) };
     },
   };
 }

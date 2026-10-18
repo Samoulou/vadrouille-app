@@ -72,6 +72,7 @@ import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
 import { DELAI_PORT_MS, DELAI_REQUETE_MS, type DemandeReservation, type Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
 import { errorNameOf, logEvent } from "@/server/log";
+import { journaliserEchecEtape, type PhaseJournal } from "@/server/p0/journal-etape";
 
 import edimbourg1 from "../../prototype/briefs/edimbourg-1.json";
 import edimbourg2 from "../../prototype/briefs/edimbourg-2.json";
@@ -549,17 +550,31 @@ function memoireDuCout(contexte: ContexteEtape, registre: RegistreForfait) {
 
 /**
  * Exécute le corps d'une étape : toute erreur sort réduite à un code persisté (S4). `apresAppelPayant` : vrai dès que
- * la composition a été construite (un appel payant a pu partir).
+ * la composition a été construite (un appel payant a pu partir). `noterPhase` : repère du journal d'arrêt (ticket 493),
+ * phase écrite en base ou repère de l'étape finale ; en cas d'erreur, `p0.step_failed` est écrit **avant** la réduction
+ * du code (phase, classe et code fermé de l'erreur d'origine ; aucun message ni donnée Google).
  */
-async function etape(runId: string, phase: PhaseTravail, corps: (contexte: ContexteEtape, marquerAppels: () => void) => Promise<void>): Promise<EtatP0Run> {
+async function etape(
+  runId: string,
+  phase: PhaseTravail,
+  corps: (contexte: ContexteEtape, marquerAppels: () => void, noterPhase: (phase: PhaseJournal) => void) => Promise<void>,
+): Promise<EtatP0Run> {
   let apresAppelPayant = false;
+  let phaseCourante: PhaseJournal = phase;
   try {
     const contexte = await ouvrirEtape(runId, phase);
-    await corps(contexte, () => {
-      apresAppelPayant = true;
-    });
+    await corps(
+      contexte,
+      () => {
+        apresAppelPayant = true;
+      },
+      (suivante) => {
+        phaseCourante = suivante;
+      },
+    );
     return { runId: contexte.garde.runId };
   } catch (erreur) {
+    journaliserEchecEtape(phaseCourante, erreur);
     if (erreur instanceof ArretEtape) throw erreur;
     throw new ArretEtape(codeDe(erreur, apresAppelPayant));
   }
@@ -745,8 +760,13 @@ async function parLots<T>(lots: readonly T[], appel: (lot: T) => Promise<Reponse
  */
 export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
   "use step";
-  return etape(entree.runId, "notation", async (contexte, marquerAppels) => {
+  return etape(entree.runId, "notation", async (contexte, marquerAppels, noterPhase) => {
     const { brief, config, execution, garde } = contexte;
+    /** Phase écrite en base, puis notée pour le journal d'arrêt (ticket 493). */
+    const passerA = async (phase: PhaseTravail) => {
+      await ecrirePhase(poolPrototype(), garde.runId, phase);
+      noterPhase(phase);
+    };
     const { modeles, recherche } = configurationAgent(execution.mode, config);
     const classement = lireClassement(configClassement);
     if (classement === undefined) throw new ArretEtape("config_invalid");
@@ -790,7 +810,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       );
 
       // 2. Logements, zone, squelette, plan Routes.
-      await ecrirePhase(poolPrototype(), garde.runId, "planification");
+      await passerA("planification");
       // Même fonction qu'à l'ancrage (une fiche par logement, zone du séjour), sur la capacité de l'étape finale.
       const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: finale.detailsLogement });
       const { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches } = dimensionsDuSejour(
@@ -801,6 +821,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       if (!plan.tient) throw new ErreurBudgetRoutes();
 
       // 3. Première série et fiches, type par type, dans l'ordre du classement.
+      noterPhase("fiches");
       // Série plus grande que le plafond des fiches : arrêt sans programme (plafond, persisté `pipeline_failed`).
       if (premiereSerie > budgetFiches) throw new ArretEtape("pipeline_failed");
       const marge = margeRemplacement(premiereSerie, { minimum: config.fiches.margeMinimum, part: config.fiches.margePart });
@@ -828,6 +849,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       }
 
       // 4. Regroupement par jour, une matrice Routes par jour, planification.
+      noterPhase("routes");
       // Jours de fermeture (correction 1 de la PR #490) : un lieu dont aucune plage d'ouverture ne recouvre la fenêtre
       // d'un jour n'est mis ce jour-là qu'en dernier recours. Horaires lus sur les fiches, en mémoire, jamais dans un prompt.
       const horaires = relecturesDepuisAncrages(new Map(retenus.map((lieu) => [lieu.ancrage.placeId, lieu.ancrage])), nuits, () => undefined);
@@ -855,6 +877,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
         }
         return undefined;
       };
+      noterPhase("moteur");
       const ancragesParPlace = new Map<string, AncrageResolu>();
       for (const ancrage of [...logements, ...retenus.map((lieu) => lieu.ancrage)]) ancragesParPlace.set(ancrage.placeId, ancrage);
       const relectures = relecturesDepuisAncrages(ancragesParPlace, nuits, trajets);
@@ -877,7 +900,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       );
 
       // 5. Raisons des lieux retenus ; coût des modèles écrit, plus aucun appel de modèle ensuite.
-      await ecrirePhase(poolPrototype(), garde.runId, "raisons");
+      await passerA("raisons");
       const idsRetenus = new Set<string>();
       for (const jour of planifies) {
         for (const etapePlanifiee of jour.etapes) idsRetenus.add(etapePlanifiee.candidatId);
@@ -897,7 +920,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       await cout.ecrire();
 
       // 6. Assemblage et validation complète en mémoire ; une violation : aucun programme.
-      await ecrirePhase(poolPrototype(), garde.runId, "validation");
+      await passerA("validation");
       const positions = new Map<string, Position>([...ancragesParPlace].map(([placeId, ancrage]) => [placeId, ancrage.position]));
       const complet = assembler({
         tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
@@ -923,7 +946,7 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       const programme = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
 
       // 7. Écriture : positions des fiches de cette étape et programme, ensemble ou pas du tout.
-      await ecrirePhase(poolPrototype(), garde.runId, "ecriture");
+      await passerA("ecriture");
       const decoupe = decouperProgramme(programme);
       await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions }, poolPrototype());
     });

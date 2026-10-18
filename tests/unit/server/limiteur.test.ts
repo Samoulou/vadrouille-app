@@ -358,6 +358,8 @@ describe("module de journal", () => {
       "auth.purge_failed",
       "voyages.read_failed",
       "voyages.relecture_refused",
+      // Ticket 493 : arrêt d'une étape de p0Run, phase, classe et code fermés seulement (verdict Sécurité S4 attendu).
+      "p0.step_failed",
       "log.unknown_event",
     ]);
   });
