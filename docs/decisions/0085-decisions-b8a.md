@@ -8,6 +8,8 @@ Date : 2026-10-17 · Décideur : Tech Lead · Ticket : #457 · Spécification : 
 
 Correction 1 (revue consolidée du head `e1ce41d`) : deux bloquants traités (classe d'erreur de « introuvable » et définition de `CODES_ANCRAGE`, § 1.2 et § 2 c ; `ancrerLogement` de production, § 1.3, § 1.9, § 1.10) et sept mineurs (§ 1.8 `generation.ts`, ordre et renvoi de 0011, échéance du veto au § 4.4, test de non-régression de `p0Run`, type `DetailsLieu`, `Plage` au constat 3, dates et blocages des questions).
 
+**§ 1.3 et § 1.6 amendés par 0087** (ticket #474) : `ancrerLogement` est remplacé par une vérification (`details`, étape `l`) et une fonction de zone et départ (`position`) ; un `suggestedArea` part de son centre maison, envoyé à Routes en coordonnées (`PointRoutes`, sous verdict de la Sécurité ; sinon centre de la ville pour les deux calculs).
+
 **Amende, sans les réécrire** (renvoi ajouté en tête de 0011) :
 - **0011 § 2** (verdicts d'ancrage et « Revérification ») : étendu au MVP selon la répartition de 0055 § 6 point 3 (§ 4 ci-dessous) ;
 - **0011 § 5**, paragraphe « Relecture », dernière phrase (durée estimée « par le moteur ») : l'estimation est faite par B8 et passée au moteur par `duree` (0048 § 3.2 ; § 1.6 ci-dessous).
