@@ -356,6 +356,8 @@ describe("module de journal", () => {
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
+      "voyages.read_failed",
+      "voyages.relecture_refused",
       "log.unknown_event",
     ]);
   });
