@@ -4,6 +4,8 @@ Statut : décidée par Samuel (argent et phases G0, réservés à Samuel, « Qui
 
 Date : 2026-10-16 · Décideur : Samuel · Rédacteur : ia-recherche · Source : carte de décision du fil projet « Routine cycle du studio », réponse de Samuel du 2026-10-16 à 14:34 UTC · Renvois : 0063 (points 8 et 9), 0071, 0072 (point 4)
 
+**Point 1 amendé par 0088** (§ 13, décision de Samuel du 2026-10-18) : `routesElements` vaut 840 en essai comme en mode réel ; l'alignement est gardé. Point 4 (profil `recherche-essai.json`) inchangé (0088 § 3).
+
 ## Contexte
 
 Jusqu'ici, l'essai d'intégration (`prototype/config/essai.json`) avait ses propres plafonds par exécution, environ un dixième de ceux de l'exécution comptée (0063, points 8 et 9) : 0,30 USD de modèles, 6 recherches web, 15 pages, 12 candidats, 17 Text Search, 14 Place Details, 3 requêtes de matrice Routes, 120 éléments, 5 min. Avec ces plafonds, le contrôle au lancement de 0072 (point 4, `brief_hors_plafonds`) n'admettait en essai que le brief court : les trois briefs de six jours ne tenaient ni dans le plan Routes ni dans le budget de fiches. Depuis 0071, Samuel lance autant d'essais qu'il le veut et garde la main sur ses tests.

@@ -78,3 +78,35 @@ export function logementsDuJour(jour: number, nombreDeNuits: number): { depart: 
   const derniere = Math.max(nombreDeNuits - 1, 0);
   return { depart: Math.min(Math.max(jour - 1, 0), derniere), arrivee: Math.min(Math.max(jour, 0), derniere) };
 }
+
+// --- Port de relectures de la lecture des voyages (décision 0086 § 1.2 point 3 ; spécification B6, B6-TL-2 (c)) ---
+//
+// Déclarations de type seules, sans entrée-sortie : le port est implémenté côté serveur (B8b, Places et Routes) ou par
+// le double `src/mocks/relectures-voyages.ts` (qui n'importe ce module qu'en `import type`, arête admise de 0086), et
+// injecté dans la lecture des voyages (`src/server/voyages/`) par la fabrique de l'adaptateur `api`.
+
+/** Voyage passé au port : logements par nuit (B6-PO-17). */
+export type VoyageARelire = {
+  /** `stays.place_id` de chaque nuit (B6-PO-17), index 0 = première nuit ; `null` : logement sans lieu. */
+  readonly logementsParNuit: readonly (string | null)[];
+};
+
+/**
+ * Ce que l'assemblage lira, calculé par le moteur (`demandeDeRelectures`, `src/domain/recomposition.ts`) : lieux et
+ * dates (`validite`, `plages`), couples de points et modes (`duree`).
+ */
+export type DemandeRelectures = {
+  readonly lieux: readonly { readonly placeId: string; readonly dates: readonly string[] }[];
+  readonly trajets: readonly { readonly depuis: Point; readonly vers: Point; readonly modes: readonly ModeTrajet[] }[];
+};
+
+/** Refus fermé du port : rendu, jamais levé (une exception levée par le port est lue comme `unavailable`). */
+export type RefusRelectures = "quota_reached" | "unavailable";
+
+/** Port de relectures : un appel par lecture, aucune valeur gardée entre deux appels. */
+export type SourceRelectures = {
+  pour(
+    voyage: VoyageARelire,
+    demande: DemandeRelectures,
+  ): Promise<{ readonly ok: true; readonly relectures: Relectures } | { readonly ok: false; readonly refus: RefusRelectures }>;
+};

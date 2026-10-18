@@ -756,11 +756,18 @@ const interditPartout = (chemin: string) =>
 const MODULES_RELECTURE: readonly string[] = ["src/server/relecture/relectures.ts"];
 const TYPES_GROUNDING_RELECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/trajets.ts"];
 
+/** B6a (décision 0086 § 1.2 point 4) : seule arête de l'application hors de src/server vers src/domain, en type seulement. */
+const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
+const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
+
 const areteAdmise = (de: string, vers: string) =>
   (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
   (MODULES_RELECTURE.includes(de) && TYPES_GROUNDING_RELECTURE.includes(vers)) ||
   // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding.
-  (vers === PORT_POSITIONS && !de.startsWith("src/grounding/"));
+  (vers === PORT_POSITIONS && !de.startsWith("src/grounding/")) ||
+  // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
+  // (`SourceRelectures`, `Relectures`), en type seulement (test ci-dessous et `ligne/voyages-imports`).
+  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE);
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
@@ -1340,6 +1347,51 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // 0085 § 1.8 : seule la composition `src/server/composition/generation.ts` (B9c) pourra l'importer.
       const importeurs = application.filter((f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")));
       expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts")).toEqual([]);
+    });
+
+    it("B6a : le double de relectures n'atteint src/domain que par les types de src/domain/relectures.ts ; aucun autre fichier hors de src/server n'atteint src/domain", () => {
+      expect(application).toContain(DOUBLE_RELECTURES);
+      const { imports } = analyser(DOUBLE_RELECTURES, readFileSync(path.join(RACINE, DOUBLE_RELECTURES), "utf8"));
+      const versDomaine = imports.filter(({ specificateur }) => {
+        const cible = resoudre(DOUBLE_RELECTURES, specificateur);
+        return cible.type === "projet" && cible.chemin.startsWith("src/domain/");
+      });
+      expect(versDomaine.length).toBeGreaterThan(0);
+      for (const { specificateur, forme } of versDomaine) {
+        const cible = resoudre(DOUBLE_RELECTURES, specificateur);
+        expect(cible.type === "projet" && cible.chemin === TYPES_RELECTURES_DOUBLE, specificateur).toBe(true);
+        expect(forme).toMatch(/^import type \{/);
+      }
+      // Sans l'arête admise, le double atteint bien src/domain : la frontière est exercée sur un cas réel.
+      const horsServeur = (depart: string, voisins: Voisins) => [...atteints(depart, voisins, (c) => c.startsWith("src/server/"))].filter((c) => c.startsWith("src/domain/"));
+      expect(horsServeur(DOUBLE_RELECTURES, voisinsReels)).toEqual([TYPES_RELECTURES_DOUBLE]);
+      expect(violationsApplication(DOUBLE_RELECTURES, voisinsReels)).toEqual([]);
+      // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
+      const importeurs = application.filter((f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/")));
+      expect(importeurs).toEqual([DOUBLE_RELECTURES]);
+    });
+
+    it.each([
+      ["admis : double → src/domain/relectures.ts", { [DOUBLE_RELECTURES]: [TYPES_RELECTURES_DOUBLE] }, DOUBLE_RELECTURES, []],
+      ["refusé : double → src/domain/calculs.ts", { [DOUBLE_RELECTURES]: ["src/domain/calculs.ts"] }, DOUBLE_RELECTURES, ["src/domain/calculs.ts"]],
+      ["refusé : autre mock → src/domain/relectures.ts", { "src/mocks/edimbourg.ts": [TYPES_RELECTURES_DOUBLE] }, "src/mocks/edimbourg.ts", [TYPES_RELECTURES_DOUBLE]],
+      ["refusé : src/adapters → src/domain/relectures.ts", { "src/adapters/api.ts": [TYPES_RELECTURES_DOUBLE] }, "src/adapters/api.ts", [TYPES_RELECTURES_DOUBLE]],
+      ["refusé : double → src/domain/temps.ts, à côté de l'arête admise", { [DOUBLE_RELECTURES]: [TYPES_RELECTURES_DOUBLE, "src/domain/temps.ts"] }, DOUBLE_RELECTURES, ["src/domain/temps.ts"]],
+      [
+        "admis : double → src/domain/relectures.ts → src/domain/temps.ts (le parcours ne descend pas au-delà de l'arête)",
+        { [DOUBLE_RELECTURES]: [TYPES_RELECTURES_DOUBLE], [TYPES_RELECTURES_DOUBLE]: ["src/domain/temps.ts"] },
+        DOUBLE_RELECTURES,
+        [],
+      ],
+      [
+        "admis : page → src/adapters → double → src/domain/relectures.ts",
+        { "src/app/x/page.tsx": ["src/adapters/y.ts"], "src/adapters/y.ts": [DOUBLE_RELECTURES], [DOUBLE_RELECTURES]: [TYPES_RELECTURES_DOUBLE] },
+        "src/app/x/page.tsx",
+        [],
+      ],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B6a, arête du double de relectures : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
     });
 
     it("le pont p0Run n'est importé que par src/workflows/index.ts, et l'index n'atteint P0 que par lui", () => {

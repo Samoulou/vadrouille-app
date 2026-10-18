@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as ecriture from "@/adapters/prototype-ecriture";
 import type { GardeOuverte } from "@/server/p0/garde";
 import { LIMITES_PROTOTYPE } from "@/server/usage/forfait";
-import { briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
+import { bornesRechercheDuBriefPourTests, briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
 
 /**
  * Pièces du lancement lues dans le pont `p0Run` (P0r3d) : forfait et règles de la réservation (0046 D13 point 3 ; 0053 ;
@@ -30,6 +30,38 @@ beforeEach(() => {
 });
 
 describe("p0Run : pièces du lancement (P0r3d)", () => {
+  it("ticket 483 : cibles de la recherche de l'exécution comptée calculées depuis la demande, sous les plafonds ; essai inchangé (0073 point 4)", () => {
+    const lireJson = (chemin: string) => JSON.parse(readFileSync(path.join(process.cwd(), chemin), "utf8")) as Record<string, unknown>;
+    const reel = lireJson("prototype/config/mode-reel.json") as { candidatsTrouves: number; placesTextSearch: number };
+    const recherche = lireJson("prototype/config/recherche.json") as { toursMax: number };
+    const rechercheEssai = lireJson("prototype/config/recherche-essai.json") as { ciblesParCreneau: Record<string, number>; totalCandidats: number };
+    // Rome : 19 activités, 9 repas, 4 soirées demandés → 25, 14 (plancher de recherche.json), 6 ; 45 au total (23 trouvés
+    // lors de l'essai du 2026-10-18 sous l'ancien total de 40).
+    expect(bornesRechercheDuBriefPourTests("reel", "rome-1.json")?.ciblesParCreneau).toEqual({ activity: 25, meal: 14, evening: 6 });
+    expect(Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, bornesRechercheDuBriefPourTests("reel", nom)?.totalCandidats]))).toEqual({
+      "edimbourg-1.json": 52,
+      "edimbourg-2.json": 43,
+      "edimbourg-3.json": 52,
+      "edimbourg-court.json": 40,
+      "rome-1.json": 45,
+    });
+    for (const nom of NOMS_BRIEFS) {
+      const bornes = bornesRechercheDuBriefPourTests("reel", nom);
+      expect(bornes, nom).not.toBeNull();
+      const somme = (bornes?.ciblesParCreneau.activity ?? 0) + (bornes?.ciblesParCreneau.meal ?? 0) + (bornes?.ciblesParCreneau.evening ?? 0);
+      expect(somme, nom).toBeLessThanOrEqual(bornes?.totalCandidats ?? 0);
+      // Plafonds du mode réel inchangés : candidats trouvés (85) et Text Search de l'ancrage (90 − 2 × logements).
+      expect(bornes?.totalCandidats ?? Infinity, nom).toBeLessThanOrEqual(Math.min(reel.candidatsTrouves, reel.placesTextSearch - 2));
+      // Fusible des tours inchangé (0073 point 3) : 30 candidats au plus par tour, les tours suffisent au total visé.
+      expect(bornes?.toursMax, nom).toBe(recherche.toursMax);
+      expect((bornes?.toursMax ?? 0) * 30, nom).toBeGreaterThanOrEqual(bornes?.totalCandidats ?? Infinity);
+      // Essai : profil fixe de recherche-essai.json (décision 0073 point 4, réservée à Samuel).
+      expect(bornesRechercheDuBriefPourTests("essai", nom)?.ciblesParCreneau, nom).toEqual(rechercheEssai.ciblesParCreneau);
+      expect(bornesRechercheDuBriefPourTests("essai", nom)?.totalCandidats, nom).toBe(rechercheEssai.totalCandidats);
+    }
+    expect(bornesRechercheDuBriefPourTests("reel", "absent.json")).toBeNull();
+  });
+
   it("ticket 400 et décision 0073 : brief dans les plafonds du mode ; essai et mode réel admettent les cinq briefs (rome-1 compris, ticket 478)", () => {
     const table = Object.fromEntries((["essai", "reel"] as const).map((mode) => [mode, Object.fromEntries(NOMS_BRIEFS.map((nom) => [nom, briefTientDansLeMode(mode, nom)]))]));
     expect(table).toEqual({
@@ -72,15 +104,15 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     expect(Object.isFrozen(SKUS_FORFAIT)).toBe(true);
   });
 
-  it("mode réel : plafonds de mode-reel.json, 4,30 USD de Google au prix plein (0053), 3 USD de modèles, 15 min", () => {
+  it("mode réel : plafonds de mode-reel.json, 6,00 USD de Google au prix plein (0053, 0088 § 13), 3 USD de modèles, 15 min", () => {
     expect(lancementDuMode("reel")).toEqual({
       forfait: {
         nature: "execution",
         textSearchRequetes: 90,
         placeDetailsRequetes: 90,
         routesRequetes: 30,
-        routesElements: 500,
-        coutGoogleMicros: 4_300_000,
+        routesElements: 840,
+        coutGoogleMicros: 6_000_000,
         coutModelesMicros: 3_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
@@ -88,16 +120,16 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
   });
 
   // essai.json aligné sur mode-reel.json (0073) : 90 Text Search (gratuits), 90 fiches à 20 USD les 1 000 (1,80 USD) et
-  // 500 éléments Routes à 5 USD les 1 000 (2,50 USD), au prix plein.
-  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 4,30 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  // 840 éléments Routes à 5 USD les 1 000 (4,20 USD, 0088 § 13), au prix plein.
+  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
         textSearchRequetes: 90,
         placeDetailsRequetes: 90,
         routesRequetes: 30,
-        routesElements: 500,
-        coutGoogleMicros: 4_300_000,
+        routesElements: 840,
+        coutGoogleMicros: 6_000_000,
         coutModelesMicros: 3_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },

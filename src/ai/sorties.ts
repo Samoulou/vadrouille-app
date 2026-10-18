@@ -155,6 +155,12 @@ export const CandidatExtraitSchema = z.strictObject({
   aReserver: z.boolean(),
   prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
   dureeMinutes: z.number().int().min(15).max(600).optional(),
+  /**
+   * Créneaux auxquels le lieu convient selon le modèle de recherche (ticket 483, forme du `slotFit` de la notation) : sert
+   * seulement à compter les cibles de l'agent (`creneauCompte`), jamais gardé dans le candidat ; la notation reste seule
+   * juge des créneaux à la planification. Indication facultative : mal formée, elle est ignorée, le lieu n'est pas écarté.
+   */
+  slotFit: NotesSchema.shape.slotFit.optional().catch(undefined),
 });
 export type CandidatExtrait = z.infer<typeof CandidatExtraitSchema>;
 

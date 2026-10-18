@@ -683,6 +683,15 @@ export default defineConfig([
     rules: { "ligne/grounding-liste-blanche": "error", "ligne/relecture-imports": "error" },
   },
   {
+    // B6a (ticket 471 ; spécification B6, B6a point 9, B6-TL-1 ; décision 0086 § 1.1 point 2 et § 1.2 point 4) :
+    // `@/server/voyages/*` importable hors de `src/server` par `src/adapters/api.ts` seul (tests de
+    // `src/server/voyages/` et `tests/db/` permis, `tests/support` refusé) ; dans `src/mocks`, `@/domain/relectures` en
+    // `import type` seulement, depuis le seul double `src/mocks/relectures-voyages.ts`. Règle propre au plugin, posée
+    // par ce seul bloc sur tout fichier (eslint-rules/voyages-imports.mjs ; tests/unit/lint/voyages-imports-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/voyages-imports": "error" },
+  },
+  {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
     // Workflow SDK dans `src/workflows/` seulement (`workflow/next` admis dans `next.config.ts`) ; `createWebhook`,
     // `createHook`, `defineHook`, `resumeHook`, `resumeWebhook` et `getHookByToken` interdits partout. Règle propre au

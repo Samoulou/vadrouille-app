@@ -14,7 +14,6 @@ export interface ExcludedContract {
  * qui complète un contrat ajoute ses lignes au tableau et retire son entrée.
  */
 export const EXCLUDED_CONTRACTS: ExcludedContract[] = [
-  { contract: "TripSummary", task: "B6", reason: "résumé de « Mes voyages », complété par B6" },
   // Contrats de création : ceux de l'écran 1 et du lancement (`TripDraft`, `Brief`, `Lodging`, `OtherCity`,
   // `TripCommitment`, `Travellers`, `TripRequest`, `GenerationStatus`, `GenerationDay`) ont leurs lignes au § 5 depuis
   // la PR de contrat de B9b (0081 § B9-TL-14 ; spécification B9, B9b point 7). Restent ceux des actions sans compte (B9a).
