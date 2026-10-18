@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DayMapSchema, validateDayMap, type DayMap } from "./map";
+import { DaySnapshotSchema, type DaySnapshot } from "./snapshot";
 import type { Day } from "./trip";
 
 const day: Day = {
@@ -92,6 +93,24 @@ describe("validateDayMap", () => {
     };
     const map = { ...valid, points: [{ ref: { type: "stop" as const, stopId: "evenement" }, lat: 1, lng: 1 }] };
     expect(validateDayMap(withEvent, map, "voyage")).toHaveLength(1);
+  });
+
+  it("contrats: validateDayMap accepte un jour stocké (DaySnapshot, sans assertion de type ; décision 0086 § 1.8)", () => {
+    const stocke: DaySnapshot = DaySnapshotSchema.parse({
+      index: 2,
+      date: "2026-08-30",
+      items: [
+        { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+        { type: "segment", segment: { mode: "walk", estimated: false } },
+        { type: "stop", stop: { id: "a", kind: "activity", name: "[A]", start: "09:15", facts: {}, exceptions: [], locked: false } },
+        { type: "terminus", role: "end", time: "20:00", label: "[Hôtel]" },
+      ],
+      events: [],
+      travelBudgetMinutes: 90,
+    });
+    expect(validateDayMap(stocke, valid, "voyage")).toEqual([]);
+    expect(validateDayMap(stocke, { ...valid, points: [{ ref: { type: "stop", stopId: "b" }, lat: 1, lng: 1 }] }, "voyage")).toEqual([expect.stringContaining("« b »")]);
+    expect(validateDayMap(stocke, { ...valid, dayIndex: 3 }, "voyage")).toEqual([expect.stringContaining("dayIndex")]);
   });
 
   it("signale un tripId ou un dayIndex qui ne correspond pas au jour", () => {

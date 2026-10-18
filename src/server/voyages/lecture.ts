@@ -15,7 +15,6 @@ import {
   validateDayMap,
   type ChecklistItem,
   type Day,
-  type DayLineItem,
   type DayMap,
   type DaySnapshot,
   type MapPoint,
@@ -370,10 +369,8 @@ function carteDuJour(etat: Etat, jour: DaySnapshot, logements: readonly (string 
   if (points.length === 0) return null;
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version, dayIndex: jour.index };
   const carte = DayMapSchema.safeParse({ tripId: etat.enTete.id, dayIndex: jour.index, points });
-  // Contrôle sur le jour **stocké** (B6-TL-11) : seuls `index` et les étapes de la ligne du jour sont lus.
-  const etapesStockees = jour.items.flatMap((item): DayLineItem[] => (item.type === "stop" ? [item] : []));
-  const jourDeControle: Day = { index: jour.index, date: jour.date, items: etapesStockees, events: [], generating: false, travelMinutes: 0, travelBudgetMinutes: 0 };
-  if (!carte.success || validateDayMap(jourDeControle, carte.data, etat.enTete.id).length > 0) throw echec("output_invalid", contexte);
+  // Contrôle sur le jour **stocké** (B6-TL-11 (a), 0086 § 1.8) : `validateDayMap` accepte le `DaySnapshot` tel quel.
+  if (!carte.success || validateDayMap(jour, carte.data, etat.enTete.id).length > 0) throw echec("output_invalid", contexte);
   return carte.data;
 }
 

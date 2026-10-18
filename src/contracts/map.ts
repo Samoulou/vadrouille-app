@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import type { Day } from "./trip";
 import { mapPointKey } from "./values";
 
 /**
@@ -49,8 +48,17 @@ export type DayMap = z.infer<typeof DayMapSchema>;
  * correspondent au jour, et chaque `stopId` désigne un élément `type: "stop"`
  * de `day.items`. Renvoie la liste des problèmes (vide si tout concorde).
  * `Day` ne porte pas l'identifiant du voyage : l'appelant le fournit.
+ *
+ * Paramètre `day` au minimum structurel lu (décision 0086 § 1.8, B6-TL-11 (a)) : `index`, et des `items` dont
+ * seuls `type` et, pour une étape, `stop.id` sont lus. Accepte un `Day` comme un `DaySnapshot` (jour stocké, contrôle
+ * des cartes de la lecture `api`) sans assertion de type ; comportement inchangé.
  */
-export function validateDayMap(day: Day, map: DayMap, tripId: string): string[] {
+export type JourDeCarte = {
+  readonly index: number;
+  readonly items: readonly { readonly type: string; readonly stop?: { readonly id: string } }[];
+};
+
+export function validateDayMap(day: JourDeCarte, map: DayMap, tripId: string): string[] {
   const issues: string[] = [];
   if (map.tripId !== tripId) {
     issues.push(`tripId « ${map.tripId} » différent du voyage « ${tripId} »`);
@@ -58,7 +66,7 @@ export function validateDayMap(day: Day, map: DayMap, tripId: string): string[] 
   if (map.dayIndex !== day.index) {
     issues.push(`dayIndex ${map.dayIndex} différent du jour ${day.index}`);
   }
-  const stopIds = new Set(day.items.flatMap((item) => (item.type === "stop" ? [item.stop.id] : [])));
+  const stopIds = new Set(day.items.flatMap((item) => (item.type === "stop" && item.stop !== undefined ? [item.stop.id] : [])));
   for (const point of map.points) {
     if (point.ref.type === "stop" && !stopIds.has(point.ref.stopId)) {
       issues.push(`stopId « ${point.ref.stopId} » absent des étapes du jour ${day.index}`);
