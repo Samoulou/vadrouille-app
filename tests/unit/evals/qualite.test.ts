@@ -328,10 +328,27 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
     expect(prixParPersonneAdmis({ prix: "12 fr. par personne", prixParPersonne: 12 })).toBe(12);
     expect(prixParPersonneAdmis({ prix: "fr. 9.50", prixParPersonne: 9.5 })).toBe(9.5);
     expect(prixParPersonneAdmis({ prix: "20 francs suisses", prixParPersonne: 20 })).toBe(20);
-    expect(prixParPersonneAdmis({ prixParPersonne: 0 })).toBe(0);
+    // Correction 2 (bloquant 1) : un 0 sans texte de prix est retiré (absent, jamais deviné).
+    expect(prixParPersonneAdmis({ prixParPersonne: 0 })).toBeUndefined();
     expect(prixParPersonneAdmis({ prix: "free entry", prixParPersonne: 0 })).toBe(0);
     expect(prixParPersonneAdmis({ prix: "15 €", prixParPersonne: 0 })).toBeUndefined();
     expect(prixParPersonneAdmis({ prixParPersonne: undefined })).toBeUndefined();
+  });
+
+  it("le 0 n'est gardé que si le texte de prix dit l'entrée gratuite, sans négation, chiffre ni devise (correction 2)", () => {
+    for (const prix of ["gratuit", "Entrée gratuite", "entrée libre", "visite offerte", "gratis", "Free entry"]) {
+      expect(prixParPersonneAdmis({ prix, prixParPersonne: 0 }), prix).toBe(0);
+    }
+    for (const prix of ["non gratuit", "pas gratuit", "n'est pas gratuite", "not free", "free cancellation, 45 CHF", "gratuit enfants, 15 CHF adultes", "gratuit le premier dimanche, sinon 12 €", "payant"]) {
+      expect(prixParPersonneAdmis({ prix, prixParPersonne: 0 }), prix).toBeUndefined();
+    }
+  });
+
+  it("un montant en CHF accompagné d'une autre devise est retiré (correction 2, mineur 6)", () => {
+    for (const prix of ["12 CHF (≈ 13 CAD)", "12 CHF ou 1500 JPY", "CHF 20 / 180 kr", "12 CHF (13 dollars)", "12 CHF (≈ 11 £)", "12 CHF, 1000 ₹"]) {
+      expect(prixParPersonneAdmis({ prix, prixParPersonne: 12 }), prix).toBeUndefined();
+    }
+    expect(prixParPersonneAdmis({ prix: "12 CHF, réservation conseillée", prixParPersonne: 12 })).toBe(12);
   });
 
   it("un texte d'info pratique trop long ou avec une URL fait écarter le candidat (compté), jamais tronquer", async () => {
@@ -402,6 +419,35 @@ describe("qualite: totaux de la PR 490 répartis par secteur", () => {
     const requetes = secteurs.map((s) => ({ requete: `${s.nom} 観光`, creneau: "activity", secteur: s.nom }));
     expect(lirePlan(JSON.stringify({ secteurs, requetes }), { jours: 5 }).refuses).toBe(0);
     expect(cleDeNom("Château d'Ô")).toBe("chateau d o");
+  });
+
+  it("clé de nom : marques porteuses de sens gardées, NFKC, lettres sans décomposition, symboles (correction 2)", () => {
+    expect(cleDeNom("ガイド")).not.toBe(cleDeNom("カイド"));
+    expect(cleDeNom("ガイド")).toBe(cleDeNom("ｶﾞｲﾄﾞ"));
+    expect(cleDeNom("नमस्ते")).not.toBe(cleDeNom("नमसत"));
+    expect(cleDeNom("Αθήνα")).toBe("αθηνα");
+    expect(cleDeNom("Łódź")).toBe("łodz");
+    expect(cleDeNom("ＡＢＣ ﬁn")).toBe("abc fin");
+    expect(cleDeNom("★ ✦ !")).toBe("");
+  });
+
+  it("un candidat au nom fait seulement de symboles est écarté (invalid), jamais pris pour un doublon (correction 2)", async () => {
+    const { candidats, compteurs } = await lancer("rome-1", (f) => {
+      const tour = candidatsFixture(f)[0];
+      if (tour !== undefined) tour.nom = "★★★";
+    });
+    expect(candidats.map((candidat) => candidat.nom)).not.toContain("★★★");
+    expect(compteurs.candidatsRefuses.invalid).toBeGreaterThanOrEqual(1);
+    expect(compteurs.candidatsRefuses.duplicate).toBe(0);
+  });
+
+  it("écriture sans espaces : un nom qui réunit deux incontournables est détecté (correction 2, mineur 5)", () => {
+    const plan: PlanRecherche = {
+      secteurs: [{ nom: "浅草", raison: "Un secteur.", voisins: [], incontournables: ["浅草寺", "雷門"] }],
+      requetes: [],
+    };
+    expect(incontournablesCites("浅草寺と雷門めぐり", plan, "東京")).toEqual(["浅草寺", "雷門"]);
+    expect(incontournablesCites("浅草寺", plan, "東京")).toEqual(["浅草寺"]);
   });
 
   it("chaque tour reçoit ce qui manque par secteur, incontournables sans candidat compris (noms du plan seulement)", async () => {

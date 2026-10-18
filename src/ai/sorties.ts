@@ -125,17 +125,23 @@ export function racineLisible(texte: string, cles: readonly string[]): boolean {
 
 /**
  * Clé de comparaison d'un nom maison (doublons de l'agent, secteurs et incontournables du plan, mesures de `evals/`) :
- * minuscules, sans accents ni ponctuation, lettres de toute écriture gardées. Réexportée par `src/research/agent.ts` (`cleDeNom`), où la spécification la
- * cite (amendement 3 de la suite 2 de P0, vocabulaire).
+ * formes de compatibilité ramenées (NFKC : lettres pleine chasse, ligatures), minuscules, accents latins, grecs et
+ * cyrilliques retirés (« Château » et « chateau », « Αθήνα » et « αθηνα »), ponctuation et symboles remplacés par une
+ * espace. Les autres marques sont gardées, car elles changent le mot : dakuten japonais (« ガ » n'est pas « カ »),
+ * voyelles du devanagari ou du thaï. Les lettres sans décomposition sont gardées telles quelles (« Łódź » donne
+ * « łodz », « Øresund » donne « øresund »). Un nom fait seulement de symboles donne une clé vide, que les appelants
+ * refusent (plan : `secteur_en_double` ou `incontournable_en_double` ; agent : candidat `invalid`). Réexportée par
+ * `src/research/agent.ts` (`cleDeNom`), où la spécification la cite (amendement 3 de la suite 2 de P0, vocabulaire).
  */
 export function cleDeNom(nom: string): string {
-  // Correction 1 de la PR 505 (réserve Sécurité 15) : lettres et chiffres de toute écriture gardés, pour qu'un nom en
-  // écriture non latine (東京, Αθήνα) ne donne pas une clé vide ; pour un nom latin, la clé est celle d'avant.
+  // Correction 2 de la PR 505 (mineurs 3 et 4) : seuls les diacritiques du bloc U+0300 à U+036F sont retirés, puis la
+  // forme composée est rétablie (NFC), pour que les autres marques restent dans leur lettre.
   return nom
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .normalize("NFC")
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
     .trim();
 }
 

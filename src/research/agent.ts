@@ -192,13 +192,19 @@ export { cleDeNom };
 /** Longueur minimale d'un mot d'incontournable pour la règle du candidat regroupé (`incontournablesCites`). */
 export const MOT_INCONTOURNABLE_MIN = 4;
 
+/** Écritures sans espaces entre les mots (`incontournablesCites`). */
+const ECRITURE_SANS_ESPACES = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+
 /**
  * Incontournables du plan **cités** par un nom maison de candidat (P0S2-PO-20, « un incontournable = un candidat ») :
  * l'incontournable est cité si sa clé de nom (`cleDeNom`) figure en mots entiers dans celle du nom, ou si l'un de ses mots
  * **distinctifs** y figure : mot de `MOT_INCONTOURNABLE_MIN` lettres ou plus, absent du nom de la destination et des
  * noms des autres incontournables du plan (« Balade Panthéon, Trevi et Navone » cite « Panthéon », « Fontaine de
  * Trevi » et « Place Navone » : `place` est partagé avec « Place d'Espagne », `trevi` et `navone` sont distinctifs).
- * Seul le nom est lu, jamais le prix ni le conseil (un billet combiné dit dans le prix ne regroupe rien). Fonction pure.
+ * Seul le nom est lu, jamais le prix ni le conseil (un billet combiné dit dans le prix ne regroupe rien).
+ * Écritures sans espaces entre les mots (chinois, japonais, thaï, lao, khmer, birman ; correction 2 de la PR 505,
+ * mineur 5) : la clé d'un incontournable qui en contient est cherchée telle quelle dans la clé du nom, sans exiger
+ * d'espaces autour ; la règle des mots distinctifs ne s'y applique pas (aucun découpage en mots fiable). Fonction pure.
  */
 export function incontournablesCites(nom: string, plan: PlanRecherche, destination: string): string[] {
   const texte = ` ${cleDeNom(nom)} `;
@@ -210,6 +216,7 @@ export function incontournablesCites(nom: string, plan: PlanRecherche, destinati
   return tous.filter((incontournable) => {
     const cle = cleDeNom(incontournable);
     if (cle !== "" && texte.includes(` ${cle} `)) return true;
+    if (cle !== "" && ECRITURE_SANS_ESPACES.test(cle)) return texte.includes(cle);
     return motsDe(incontournable).some(
       (mot) => mot.length >= MOT_INCONTOURNABLE_MIN && !motsDestination.has(mot) && occurrences.get(mot) === 1 && texte.includes(` ${mot} `),
     );
@@ -578,6 +585,11 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
         ? undefined
         : secteur.incontournables.find((nom) => cleDeNom(nom) === cleDeNom(extrait.incontournable as string));
     const k = cleDeNom(extrait.nom);
+    // Correction 2 de la PR 505 (mineur 3) : un nom fait seulement de symboles n'a pas de clé ; écarté, jamais doublon.
+    if (k === "") {
+      compteurs.candidatsRefuses.invalid += 1;
+      return;
+    }
     // Deux candidats qui désignent le même incontournable sont fusionnés comme les autres doublons.
     const memeIncontournable =
       incontournable !== undefined && [...infos.values()].some((info) => info.incontournable !== undefined && cleDeNom(info.incontournable) === cleDeNom(incontournable));
@@ -741,23 +753,38 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
 
 /**
  * Prix en francs suisses dans le texte `prix` d'une source : « 12 CHF », « CHF 12 », « 12 fr. », « fr. 12 », « francs
- * suisses » ; jamais si une autre devise y figure (« 18 € (≈ 17 CHF) » : la source ne donne pas le prix en CHF).
+ * suisses » ; jamais si une autre devise y figure (« 18 € (≈ 17 CHF) », « 12 CHF (≈ 13 CAD) » : la source ne donne pas
+ * le prix en CHF seulement). Autre devise : tout symbole monétaire (le franc suisse n'en a pas), un code ISO courant ou
+ * un nom de devise. La liste des codes et des noms n'est pas exhaustive : une devise absente de la liste et citée à côté
+ * d'un prix en CHF passe (correction 2 de la PR 505, mineur 6 ; limite acceptée, le prix reste une estimation).
  */
 const PRIX_EN_CHF = /\bchf\b|\d\s?fr\.|\bfr\.\s?\d|\bfrancs?\s+suisses?\b/i;
-const AUTRE_DEVISE = /[€£$¥]|\b(?:eur|euros?|usd|gbp|dollars?|livres?)\b/i;
-/** Entrée gratuite dite par le texte `prix` de la source. */
-const PRIX_GRATUIT = /\bgratuite?s?\b|\bfree\b/i;
+const AUTRE_DEVISE =
+  /\p{Sc}|\b(?:eur|usd|gbp|jpy|cny|rmb|cad|aud|nzd|hkd|sgd|sek|nok|dkk|isk|pln|czk|huf|ron|bgn|inr|rub|zar|brl|mxn|krw|thb|ils|aed|xof|xaf|cfa|kr|euros?|dollars?|livres?|pounds?|yens?|yuans?|roubles?|couronnes?|kronor|kroner|lires?|liras?|pesos?|reais|réals?|roupies?|rupees?|dirhams?|zlotys?|forints?)\b/iu;
+/**
+ * Entrée gratuite dite par le texte `prix` de la source (« gratuit », « entrée libre », « offert », « gratis », « free »),
+ * sans négation (« non gratuit », « pas gratuit », « not free ») et sans aucun chiffre ni devise : « gratuit enfants,
+ * 15 CHF adultes » ou « free cancellation, 45 CHF » ne disent pas l'entrée gratuite pour tous (correction 2, mineurs 2 et 7).
+ */
+const PRIX_GRATUIT = /\bgratuite?s?\b|\bentr[ée]e\s+libre\b|\bofferte?s?\b|\bgratis\b|\bfree\b/i;
+const PRIX_GRATUIT_NIE = /\b(?:non|pas|plus|jamais|not|no)\s+(?:\p{L}+\s+)?(?:gratuite?s?|libre|offerte?s?|gratis|free)\b/iu;
+
+/** Vrai si le texte `prix` dit l'entrée gratuite, sans négation, sans chiffre ni devise. Fonction pure. */
+export function prixDitGratuit(prix: string): boolean {
+  return PRIX_GRATUIT.test(prix) && !PRIX_GRATUIT_NIE.test(prix) && !/\d/.test(prix) && !PRIX_EN_CHF.test(prix) && !AUTRE_DEVISE.test(prix);
+}
 
 /**
  * `prixParPersonne` admis (P0S2-PO-21 : le prototype ne convertit aucune devise ; « seulement si la source donne le prix
- * en CHF, ou si l'entrée est gratuite ; sinon absent ») :
+ * en CHF, ou si l'entrée est gratuite ; sinon absent », un champ non donné est absent, jamais deviné) :
  * - un montant positif seulement si le texte `prix` est présent et en francs suisses, sans autre devise ;
- * - 0 si le texte `prix` est absent ou dit l'entrée gratuite ; un 0 contredit par un texte `prix` (« 15 € ») est retiré.
+ * - 0 seulement si le texte `prix` est présent et dit l'entrée gratuite (`prixDitGratuit`) ; sans texte `prix`, ou avec
+ *   un texte qui ne dit pas « gratuit » (« 15 € »), le 0 est retiré (correction 2 de la PR 505, bloquant 1).
  * Fonction pure.
  */
 export function prixParPersonneAdmis(extrait: Pick<CandidatExtrait, "prix" | "prixParPersonne">): number | undefined {
   const { prix, prixParPersonne } = extrait;
   if (prixParPersonne === undefined) return undefined;
-  if (prixParPersonne === 0) return prix === undefined || PRIX_GRATUIT.test(prix) ? 0 : undefined;
+  if (prixParPersonne === 0) return prix !== undefined && prixDitGratuit(prix) ? 0 : undefined;
   return prix !== undefined && PRIX_EN_CHF.test(prix) && !AUTRE_DEVISE.test(prix) ? prixParPersonne : undefined;
 }

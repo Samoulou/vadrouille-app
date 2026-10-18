@@ -117,7 +117,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 90,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Forteresse du rocher",
@@ -142,7 +143,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 75,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Hameau du moulin au fil de l'eau",
@@ -155,7 +157,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 60,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Musée national des collections",
@@ -168,7 +171,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 120,
           "secteur": "Ville neuve",
-          "incontournable": "Musée national des collections"
+          "incontournable": "Musée national des collections",
+          "prix": "gratuit"
         },
         {
           "nom": "Jardin botanique du nord",
@@ -181,7 +185,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 90,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Port ancien et ses quais",
@@ -194,7 +199,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 90,
           "secteur": "Port et rivière",
-          "incontournable": "Port ancien et ses quais"
+          "incontournable": "Port ancien et ses quais",
+          "prix": "gratuit"
         },
         {
           "nom": "Distillerie de la vallée accessible en train",
@@ -261,7 +267,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 75,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Maison géorgienne restaurée",
@@ -288,7 +295,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 45,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Sentier de la rivière jusqu'au village",
@@ -301,7 +309,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 120,
           "secteur": "Port et rivière",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Colline de l'observatoire",
@@ -314,7 +323,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 60,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Jardins sous le rocher",
@@ -327,7 +337,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 60,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Ruelle courbe aux façades colorées",
@@ -340,7 +351,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 45,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Musée des écrivains",
@@ -353,7 +365,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 45,
           "secteur": "Ville neuve",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Visite des souterrains",
@@ -380,7 +393,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 90,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Boutique de lainages anciens",
@@ -602,7 +616,8 @@
           "prixParPersonne": 0,
           "dureeMinutes": 90,
           "secteur": "Vieille ville",
-          "incontournable": null
+          "incontournable": null,
+          "prix": "gratuit"
         },
         {
           "nom": "Lieu au résumé invalide",
