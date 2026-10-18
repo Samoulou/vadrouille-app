@@ -110,10 +110,11 @@ describe("p0: plafonds du lancement comparés aux forfaits", () => {
     expect(refusDuForfait(jourCharge, forfait, LIMITES_EPROUVEES, "elements")).toBeNull();
     // Le même jour en unité « requêtes » (hypothèse écartée) : refusé au seuil de 95.
     expect(refusDuForfait(jourCharge, forfait, LIMITES_EPROUVEES, "requetes")).toBe("daily_quota_insufficient");
-    // 500 éléments (0053) : accepté ; 3 000 : accepté ; 3 001 : refusé, il ne tiendrait pas dans la cadence d'une minute.
+    // 500 éléments (0053) et 840 (0088 § 13) : acceptés ; 3 000 : accepté ; 3 001 : refusé, il ne tiendrait pas dans la cadence d'une minute.
     // Ce contrôle propre au forfait reste appliqué au lancement du prototype (0071) : il vaut aussi pour `LIMITES_PROTOTYPE`.
     for (const [elements, attendu] of [
       [500, null],
+      [840, null],
       [3_000, null],
       [3_001, "daily_quota_insufficient"],
     ] as const) {

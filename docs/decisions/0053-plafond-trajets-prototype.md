@@ -2,6 +2,8 @@
 
 Statut : décision de Samuel (argent, budget des essais : « Qui décide quoi » de `docs/CONTEXT.md`), provisoire « dans un premier temps, pour faire les premiers tests » ; amendement 1 du même jour (recommandation du CEO acceptée par Samuel, à valider à la fin de ses essais) · Date : 2026-10-14 · Décideur : Samuel · Rédigée par le CEO · Liée à Q370 et Q389, à P0r2 (#287) et à P0r3
 
+**Amendée par 0088** (ticket #483, PR #490) : la limite passe de 500 à **840 éléments Routes par voyage** (décision de Samuel, 2026-10-18 11:42 UTC, 0088 § 13) ; la réserve d'un essai passe à 6,00 USD. **Amendement 1 point 4 précisé par 0088** (§ 6) : l'algorithme du regroupement par jour (second temps) est remplacé ; le choix de Samuel (tri en mémoire par notre code, sans modèle, deux temps) est inchangé.
+
 Numérotation (relue le 2026-10-14 pour l'amendement 1) : `main` va de 0001 à 0053 (0052 fusionnée par #283, 0053 par #289) ; les PR ouvertes #298, #294 et #300 ajoutent 0054, 0055 et 0056. L'amendement 1 n'ajoute aucun fichier.
 
 ## Contexte
