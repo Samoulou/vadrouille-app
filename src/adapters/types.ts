@@ -9,6 +9,7 @@ import type {
   CreatedShareLink,
   Day,
   DayMap,
+  FullTripStatus,
   GenerationStatus,
   InferredBrief,
   LodgingRequest,
@@ -114,6 +115,13 @@ export interface CreationAdapter {
    * d'une autre organisation (contrôle d'appartenance repris par B3 et B9, 0017 § 3.6).
    */
   getGenerationStatus(ctx: AdapterContext, tripId: string): Promise<Result<GenerationStatus>>;
+  /**
+   * Séjour et 6b (0087 § 1.5) : état du voyage complet, source des deux bandeaux `error` (`none`, `preparing`,
+   * `ready`, `incomplete`, `failed` avec `retryable`), sans nom de lieu, raison d'échec ni reprises restantes ;
+   * `not_found` pour un voyage inconnu ou d'une autre organisation. Cas d'usage de B9d (expiration et réconciliation
+   * de `getGenerationStatus`, jamais de relance d'une ligne `failed`). Sortie revalidée par l'action.
+   */
+  getFullTripStatus(ctx: AdapterContext, tripId: string): Promise<Result<FullTripStatus>>;
 }
 
 /**

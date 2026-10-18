@@ -31,7 +31,8 @@ import {
  * `TripDraft`, `BriefRequest`, `Brief` et `InferredBrief` ; F8b `LodgingRequest` et `LodgingSuggestion` ; F8c
  * `TripRequest`, `CreatedTrip`, `GenerationStatusRequest` et `GenerationStatus`. La PR de contrat de B9b (0081
  * § B9-TL-14) ajoute les valeurs maison des suggestions retenues (B9-TL-5), `GenerationDay` (exporté pour le tableau
- * des champs du handover § 5) et `RetryGenerationRequest` (B9-TL-11).
+ * des champs du handover § 5) et `RetryGenerationRequest` (B9-TL-11). La PR de contrat de B9d (0087 § 1.1 et § 1.5)
+ * ajoute `kind` à `RetryGenerationRequest`, `FullTripStatusRequest` et `FullTripStatus`.
  */
 
 const text = (bounds: { min: number; max: number }) => z.string().trim().min(bounds.min).max(bounds.max);
@@ -273,8 +274,9 @@ export const TripRequestSchema = z.strictObject({
 });
 export type TripRequest = z.infer<typeof TripRequestSchema>;
 
-// `CreatedTripSchema`, `GenerationStatusRequestSchema` et `RetryGenerationRequestSchema` (B9b) ne sont pas réexportés
-// par `index.ts` (seulement leurs types) : enveloppes d'une action (`{ tripId }`, `{ tripId, requestId }`), absentes
+// `CreatedTripSchema`, `GenerationStatusRequestSchema`, `RetryGenerationRequestSchema` (B9b, `kind` par B9d) et
+// `FullTripStatusRequestSchema` (B9d) ne sont pas réexportés par `index.ts` (seulement leurs types) : enveloppes d'une
+// action (`{ tripId }`, `{ tripId, requestId, kind? }`), absentes
 // de « Contrats à créer » et du tableau des champs du handover § 5 (même règle que `share.ts`). Les actions et l'adaptateur simulé les importent depuis `@/contracts/creation`.
 
 /** Réponse de `createTrip` (0017 § 2.4) : l'identifiant du voyage, que l'écran 5 relit par `TripAdapter`. */
@@ -335,12 +337,41 @@ export const GenerationStatusSchema = z
   });
 export type GenerationStatus = z.infer<typeof GenerationStatusSchema>;
 
+/** Génération que relance `retryGeneration` (0087 § 1.1 point 2) : l'aperçu (écran 5) ou le voyage complet (Séjour, 6b). */
+export const RETRY_GENERATION_KINDS = ["preview", "full"] as const;
+
 /**
- * Entrée de `retryGeneration` (0081 § B9-TL-11, B9-PO-9) : seul chemin d'un nouvel essai par la personne. `requestId`
- * est créé une fois par essai (idempotence par `generation_runs.request_id`, B9-TL-6 (h)). Réponse : `CreatedTrip`
- * (`{ tripId }`), l'écran relisant ensuite `getGenerationStatus`. Refus sans écriture : `validation_failed` si rien
- * n'est à relancer, `active_preview_exists` si une autre génération de l'organisation est en cours, `not_found` pour
- * un voyage d'une autre organisation.
+ * Entrée de `retryGeneration` (0081 § B9-TL-11, B9-PO-9, étendue par 0087 § 1.1 et B9-PO-17 point 2) : seul chemin
+ * d'un nouvel essai par la personne. `requestId` est créé une fois par essai. `kind` désigne la génération relancée ;
+ * **absent, il vaut `preview`** (l'appel de B9b, `{ tripId, requestId }`, est inchangé). Réponse : `CreatedTrip`
+ * (`{ tripId }`). Refus sans écriture : `validation_failed` si rien n'est à relancer, `active_preview_exists` (aperçu
+ * seulement : jamais pour `kind: "full"`, 0087 § 1.1 point 4) si une autre génération de l'organisation est en cours,
+ * `not_found` pour un voyage d'une autre organisation.
  */
-export const RetryGenerationRequestSchema = z.strictObject({ tripId: TripIdSchema, requestId: z.uuid() });
+export const RetryGenerationRequestSchema = z.strictObject({
+  tripId: TripIdSchema,
+  requestId: z.uuid(),
+  kind: z.enum(RETRY_GENERATION_KINDS).optional(),
+});
 export type RetryGenerationRequest = z.infer<typeof RetryGenerationRequestSchema>;
+
+/** Entrée de la lecture `getFullTripStatus` (0087 § 1.5 point 2) : l'identifiant du voyage seulement. */
+export const FullTripStatusRequestSchema = z.strictObject({ tripId: TripIdSchema });
+export type FullTripStatusRequest = z.infer<typeof FullTripStatusRequestSchema>;
+
+/**
+ * État du voyage complet (0087 § 1.5 point 2), source des deux bandeaux `error` de Séjour et de 6b ; union discriminée
+ * sur `phase` : `none` (aucun droit ou aucune exécution du voyage complet), `preparing` (`queued` ou `preparing`),
+ * `ready`, `incomplete`, `failed` avec `retryable`, vrai si et seulement si « Réessayer » est proposé à la personne
+ * (cause réessayable et exécution non bloquée, 0087 § 1.4). Chaque variante porte `tripId`, **rien d'autre** : ni
+ * reprises restantes, ni raison d'échec, ni nom de lieu, ni identifiant d'étape ou de rang. `Day.generating` (0086
+ * § 1.7) reste la source du bandeau `generating`.
+ */
+export const FullTripStatusSchema = z.discriminatedUnion("phase", [
+  z.strictObject({ phase: z.literal("none"), tripId: TripIdSchema }),
+  z.strictObject({ phase: z.literal("preparing"), tripId: TripIdSchema }),
+  z.strictObject({ phase: z.literal("ready"), tripId: TripIdSchema }),
+  z.strictObject({ phase: z.literal("incomplete"), tripId: TripIdSchema }),
+  z.strictObject({ phase: z.literal("failed"), tripId: TripIdSchema, retryable: z.boolean() }),
+]);
+export type FullTripStatus = z.infer<typeof FullTripStatusSchema>;
