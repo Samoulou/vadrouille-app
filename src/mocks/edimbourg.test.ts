@@ -126,7 +126,7 @@ describe("jeu Édimbourg : aucun trou dans le programme", () => {
             clock = toMinutes(item.to);
             break;
           case "segment":
-            clock += item.segment.minutes;
+            clock += item.segment.minutes ?? 0;
             break;
         }
       }
@@ -136,7 +136,7 @@ describe("jeu Édimbourg : aucun trou dans le programme", () => {
   it("travelMinutes de chaque jour est la somme de ses segments", () => {
     for (const day of edimbourg.days) {
       const total = day.items.reduce(
-        (sum, item) => sum + (item.type === "segment" ? item.segment.minutes : 0),
+        (sum, item) => sum + (item.type === "segment" ? (item.segment.minutes ?? 0) : 0),
         0,
       );
       expect(day.travelMinutes, day.date).toBe(total);
@@ -145,7 +145,7 @@ describe("jeu Édimbourg : aucun trou dans le programme", () => {
 
   it("fournit travelBudgetMinutes dans les données, avec au moins un jour en dépassement", () => {
     for (const day of edimbourg.days) expect(day.travelBudgetMinutes).toBeGreaterThan(0);
-    expect(edimbourg.days.some((day) => day.travelMinutes > day.travelBudgetMinutes)).toBe(true);
+    expect(edimbourg.days.some((day) => (day.travelMinutes ?? 0) > day.travelBudgetMinutes)).toBe(true);
   });
 });
 

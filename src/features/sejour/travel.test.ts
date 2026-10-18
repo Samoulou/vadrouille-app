@@ -157,6 +157,24 @@ describe("travel: ligne trajet et budget", () => {
     expect(dayTravelLine({ items: avecSegment, travelMinutes: 0, budgetPerPerson: undefined })).toBe("0 min de trajet");
   });
 
+  it("total indisponible (travelMinutes null, décision 0092) : budget seul ou aucune ligne, jamais un total ; ni bandeau ni plus long trajet sans durée", () => {
+    const items: DayLineItem[] = [
+      ...day(2).items,
+      { type: "segment", segment: { mode: "walk", minutes: null, estimated: false } },
+      { type: "stop", stop: (day(2).items.find((item) => item.type === "stop") as Extract<DayLineItem, { type: "stop" }>).stop },
+    ];
+    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: 95 })).toBe("Environ 95 CHF par personne");
+    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: undefined })).toBeNull();
+    expect(daySummary({ items, travelMinutes: null })).not.toMatch(/trajet/);
+    expect(isOverTravelBudget({ travelMinutes: null, travelBudgetMinutes: 0 })).toBe(false);
+    expect(travelBannerMessage({ ...day(5), travelMinutes: null })).toBeNull();
+    const sansDuree: DayLineItem[] = [
+      { type: "segment", segment: { mode: "walk", minutes: null, estimated: false } },
+      items.at(-1)!,
+    ];
+    expect(longestSegmentToStop(sansDuree)).toBeNull();
+  });
+
   it("formate les montants en fr-CH, sans dépendre de l'ICU (F-ICU, ticket 171)", () => {
     expect(formatMontant(95)).toBe("95");
     expect(formatMontant(999)).toBe("999");

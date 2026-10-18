@@ -62,7 +62,7 @@ function buildDays(prefix: string, hotel: string, plans: readonly DayPlan[]): Da
       items.push(walk(15), stop(id("apres-midi"), "activity", plan.afternoon, "14:30", "16:30"));
     }
     items.push(walk(20), { type: "terminus", role: "end", time: plan.afternoon ? "17:00" : "14:15", label: hotel });
-    const travelMinutes = items.reduce((total, item) => total + (item.type === "segment" ? item.segment.minutes : 0), 0);
+    const travelMinutes = items.reduce((total, item) => total + (item.type === "segment" ? (item.segment.minutes ?? 0) : 0), 0);
     return {
       index,
       date: plan.date,

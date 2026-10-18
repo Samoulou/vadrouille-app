@@ -44,7 +44,8 @@ interface HandoverStop {
   /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
   commitment?: "ticket" | "reservation";
 }
-interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number; estimated: boolean }
+/** `minutes` et `Day.travelMinutes` : `null` pour un temps indisponible (prototype seulement, décision 0092 § 4). */
+interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number | null; estimated: boolean }
 type HandoverDayLineItem =
   | { type: "terminus"; role: "start" | "end"; time: string; label: string }
   | { type: "stop"; stop: HandoverStop }
@@ -59,7 +60,7 @@ interface HandoverDay {
   budgetPerPerson?: number;
   events: HandoverStop[];
   generating: boolean;
-  travelMinutes: number;
+  travelMinutes: number | null;
   travelBudgetMinutes: number;
   /** Ajout signalé (décision 0015, § 3), comme Trip.organizationId. */
   surprise?: HandoverSurpriseIdea;

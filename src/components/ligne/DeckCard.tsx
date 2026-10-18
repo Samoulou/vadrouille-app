@@ -172,7 +172,7 @@ function SwipeCard({
   const faits = formatFaits(stop.facts);
   const tag = deckCardTag(stop.exceptions);
   const travel =
-    proposal.travelFromPrevious && proposal.travelFromPrevious.minutes > DETOUR_THRESHOLD_MINUTES
+    proposal.travelFromPrevious?.minutes != null && proposal.travelFromPrevious.minutes > DETOUR_THRESHOLD_MINUTES
       ? proposal.travelFromPrevious
       : undefined;
   const id = (part: string) => `${ids}-${part}`;

@@ -41,7 +41,8 @@
     "transit": "Bus",
     "car": "En voiture",
     "libelle": "{mode}, {duree}",
-    "libelleEstime": "{mode}, environ {duree} (estimation)"
+    "libelleEstime": "{mode}, environ {duree} (estimation)",
+    "libelleSansDuree": "{mode}, durée indisponible"
   },
   "tempsLibre": {
     "texte": "Temps libre jusqu'à {to}",

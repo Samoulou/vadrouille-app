@@ -223,8 +223,12 @@ function StopRow({ stop, href, compact = false, state, highlighted = false, fade
   );
 }
 
-/** Libellé d'un segment : « À pied, 20 min », « Bus, environ 25 min (estimation) ». */
+/**
+ * Libellé d'un segment : « À pied, 20 min », « Bus, environ 25 min (estimation) » ; sans durée (temps indisponible,
+ * prototype seulement, décision 0092 § 4) : « À pied, durée indisponible », jamais une durée inventée.
+ */
 export function segmentLabel(segment: Segment): string {
+  if (segment.minutes === null) return format(t.segment.libelleSansDuree, { mode: t.segment[segment.mode] });
   const values = { mode: t.segment[segment.mode], duree: formatDuree(segment.minutes) };
   return format(segment.estimated ? t.segment.libelleEstime : t.segment.libelle, values);
 }

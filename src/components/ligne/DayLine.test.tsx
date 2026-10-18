@@ -142,6 +142,12 @@ describe("DayLine", () => {
     expect(segmentLabel({ mode: "transit", minutes: 90, estimated: true })).toBe("Bus, environ 1 h 30 (estimation)");
   });
 
+  it("segment sans durée (temps indisponible, prototype, décision 0092) : le mode et « durée indisponible », jamais une durée", () => {
+    expect(segmentLabel({ mode: "walk", minutes: null, estimated: false })).toBe("À pied, durée indisponible");
+    expect(segmentLabel({ mode: "transit", minutes: null, estimated: true })).toBe("Bus, durée indisponible");
+    expect(segmentLabel({ mode: "car", minutes: null, estimated: false })).not.toMatch(/\d/);
+  });
+
   it("temps libre : heure from, texte, lien « Idées » seulement avec getIdeasHref", () => {
     const { container, unmount } = renderLine(ITEMS, "/idees");
     const free = container.querySelector("li[data-type='free']") as HTMLElement;

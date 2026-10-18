@@ -79,7 +79,7 @@ function j2SansJardin(): Day {
     if (position === index + 1 && item.type === "free") return [{ type: "free", from: dejeuner.stop.end ?? item.from, to: item.to }];
     return [item];
   });
-  return { ...j2, items, travelMinutes: j2.travelMinutes - 10 };
+  return { ...j2, items, travelMinutes: j2.travelMinutes! - 10 };
 }
 
 /** Jardin déplacé au J4, vers 15:45 : 15:45 – 17:15, après « [Arthur's Seat] » (même durée, 1 h 30). */
@@ -102,7 +102,7 @@ function j4AvecJardin(): Day {
     { type: "segment", segment: { mode: "transit", minutes: 10, estimated: true } },
     ...j4.items.slice(index + 2),
   ];
-  return { ...j4, items, travelMinutes: j4.travelMinutes + 15 - 15 + 10 };
+  return { ...j4, items, travelMinutes: j4.travelMinutes! + 15 - 15 + 10 };
 }
 
 const j4Diner = stopOf(j4, "j4-diner");

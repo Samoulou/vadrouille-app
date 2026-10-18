@@ -123,7 +123,7 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
         enAttente = [];
       };
       for (const item of day.items) {
-        if (item.type === "segment") enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
+        if (item.type === "segment" && item.segment.minutes !== null) enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
         else if (item.type === "stop") {
           const lieu = lieuConverti(item.stop);
           resoudre(lieu);
@@ -138,7 +138,7 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
       const jour = joursParIndex.get(proposal.day);
       if (jour === undefined) continue;
       poserPlages(lieuConverti(proposal.stop), jour.date, proposal.stop);
-      if (trajet === undefined) continue;
+      if (trajet === undefined || trajet.minutes === null) continue;
       const instant = proposal.time;
       let depuis = logement;
       for (const { lieu, stop } of etapes(jour.items)) if (stop.id !== proposal.stop.id && stop.start < instant) depuis = lieu;

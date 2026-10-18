@@ -21,22 +21,25 @@ export function formatMontant(amount: number): string {
   return formatNombre(Math.round(amount));
 }
 
-/** Dépassement strict : `travelMinutes` > `travelBudgetMinutes` (égalité : pas de bandeau). */
+/**
+ * Dépassement strict : `travelMinutes` > `travelBudgetMinutes` (égalité : pas de bandeau). Total indisponible
+ * (`null`, décision 0092 § 4) : pas de bandeau, rien n'est déduit d'un total incomplet.
+ */
 export function isOverTravelBudget(day: Pick<Day, "travelMinutes" | "travelBudgetMinutes">): boolean {
-  return day.travelMinutes > day.travelBudgetMinutes;
+  return day.travelMinutes !== null && day.travelMinutes > day.travelBudgetMinutes;
 }
 
 /**
  * Plus long segment immédiatement suivi d'une étape (`type: "stop"`), avec cette étape ; à égalité,
- * le premier. `null` sans segment suivi d'une étape.
+ * le premier. `null` sans segment suivi d'une étape. Un segment sans durée (décision 0092) n'est jamais retenu.
  */
 export function longestSegmentToStop(items: readonly DayLineItem[]): { segment: Segment; stop: Stop } | null {
   let best: { segment: Segment; stop: Stop } | null = null;
   for (let index = 0; index < items.length - 1; index += 1) {
     const item = items[index];
     const next = items[index + 1];
-    if (item?.type !== "segment" || next?.type !== "stop") continue;
-    if (!best || item.segment.minutes > best.segment.minutes) {
+    if (item?.type !== "segment" || next?.type !== "stop" || item.segment.minutes === null) continue;
+    if (!best || item.segment.minutes > (best.segment.minutes ?? 0)) {
       best = { segment: item.segment, stop: next.stop };
     }
   }
@@ -50,7 +53,7 @@ export function longestSegmentToStop(items: readonly DayLineItem[]): { segment: 
 export function travelBannerMessage(day: Day): string | null {
   if (!isOverTravelBudget(day)) return null;
   const first = format(t.bandeauTrajet, {
-    trajet: formatDuree(day.travelMinutes),
+    trajet: formatDuree(day.travelMinutes ?? 0),
     budget: formatDuree(day.travelBudgetMinutes),
   });
   const longest = longestSegmentToStop(day.items);
@@ -67,9 +70,12 @@ export function travelBannerMessage(day: Day): string | null {
  * l'étendre toucherait tous les adaptateurs pour un cas de la préversion. Une journée sans aucun trajet (une seule
  * étape, ou aucune, avec l'adaptateur simulé) n'affiche donc pas non plus « 0 min de trajet » : il n'y a aucun
  * trajet à décrire, et rien d'utile n'est perdu. Testé dans `JourneePanel.test.tsx` et `SejourPanel.test.tsx`.
+ *
+ * Total indisponible (`travelMinutes: null`, un trajet du jour sans durée, prototype seulement, décision 0092 § 4) :
+ * même rendu, aucun total n'est affiché.
  */
 export function withoutTravel(day: Pick<Day, "items" | "travelMinutes">): boolean {
-  return day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment");
+  return day.travelMinutes === null || (day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment"));
 }
 
 /**
@@ -80,7 +86,7 @@ export function dayTravelLine(day: Pick<Day, "items" | "travelMinutes" | "budget
   if (withoutTravel(day)) {
     return day.budgetPerPerson === undefined ? null : format(t.budgetSeul, { montant: formatMontant(day.budgetPerPerson) });
   }
-  const duree = formatDuree(day.travelMinutes);
+  const duree = formatDuree(day.travelMinutes ?? 0);
   return day.budgetPerPerson === undefined
     ? format(t.trajet, { duree })
     : format(t.trajetBudget, { duree, montant: formatMontant(day.budgetPerPerson) });
@@ -143,7 +149,7 @@ export function tripBudgetLine(days: readonly Pick<Day, "index" | "budgetPerPers
  */
 export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
   if (withoutTravel(day)) return dayStopCount(day);
-  return format(ts.jourParJour.resume, { etapes: dayStopCount(day), duree: formatDuree(day.travelMinutes) });
+  return format(ts.jourParJour.resume, { etapes: dayStopCount(day), duree: formatDuree(day.travelMinutes ?? 0) });
 }
 
 /**
