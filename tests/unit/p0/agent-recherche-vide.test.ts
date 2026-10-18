@@ -138,13 +138,14 @@ describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)"
     expect(compteurs.sortiesIllisibles).toEqual({ plan: 0, recherche: 0 });
   });
 
-  it("mineur 11 du head cd614d4 : les tours partent avec le prompt recherche v2 (forme JSON nue, termine après recherche)", async () => {
+  it("mineur 11 du head cd614d4 : les tours partent avec le prompt recherche courant, v3 depuis le ticket 483 (forme JSON nue, termine après recherche)", async () => {
     const { prompts } = await rejouer([PLAN, tour({ actions: [RECHERCHER] }), tour({ termine: true })]);
-    expect(PROMPT_RECHERCHE).toMatchObject({ id: "recherche", version: 2 });
+    expect(PROMPT_RECHERCHE).toMatchObject({ id: "recherche", version: 3 });
     expect(prompts.filter((p) => p.etape === "recherche")).toEqual([
-      { etape: "recherche", id: "recherche", version: 2 },
-      { etape: "recherche", id: "recherche", version: 2 },
+      { etape: "recherche", id: "recherche", version: 3 },
+      { etape: "recherche", id: "recherche", version: 3 },
     ]);
+    expect(PROMPT_RECHERCHE.texte).toContain('"slotFit"');
     expect(PROMPT_RECHERCHE.texte).toContain("sans bloc de code ni texte autour");
     expect(PROMPT_RECHERCHE.texte).toContain("Au premier tour, aucun résultat n'existe encore");
   });

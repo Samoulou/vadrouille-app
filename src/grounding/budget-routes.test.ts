@@ -230,11 +230,10 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
   ];
   const jour = (activity: number, meal: number, evening: number, capacite: number) => ({ demande: { activity, meal, evening }, capacite });
 
-  it("le premier lieu restant ouvre le jour ; puis le plus proche d'un type encore demandé ; aucun lieu dans deux jours", () => {
+  it("un quartier par jour : centres éloignés, lieux au centre le plus proche, groupes rendus dans l'ordre d'entrée", () => {
     const groupes = regrouperParJour(LIEUX, [jour(2, 1, 1, 10), jour(2, 1, 1, 10)]);
     expect(groupes).toEqual([
-      // a2 à ~130 m de a1, a4 à ~170 m, a3 à ~230 m.
-      ["a1", "a2", "a4", "a3"],
+      ["a1", "a2", "a3", "a4"],
       ["b1", "b2", "b3", "b4"],
     ]);
     expect(new Set(groupes.flat()).size).toBe(groupes.flat().length);
@@ -257,5 +256,43 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
     const egaux = [lieu("x", "activity", 0, 0), lieu("y", "activity", 0, 1), lieu("z", "activity", 0, -1)];
     expect(regrouperParJour(egaux, [jour(2, 0, 0, 5)])).toEqual([["x", "y"]]);
     expect(regrouperParJour(egaux, [jour(1, 0, 0, 5), jour(1, 0, 0, 5)])).toEqual([["x"], ["y"]]);
+  });
+
+  // Ticket 483 (essai rome-1, 2026-10-18) : avec moins de lieux que demandé, les derniers jours restaient vides.
+  it("pénurie : répartie sur tous les jours, jamais les derniers jours vides", () => {
+    const quatre = [lieu("p1", "activity", 0, 0), lieu("p2", "activity", 0, 0.001), lieu("p3", "activity", 0, 0.002), lieu("p4", "activity", 0, 0.003)];
+    const groupes = regrouperParJour(quatre, [jour(2, 0, 0, 5), jour(2, 0, 0, 5), jour(2, 0, 0, 5)]);
+    expect(groupes.map((groupe) => groupe.length).sort()).toEqual([1, 1, 2]);
+    expect(new Set(groupes.flat())).toEqual(new Set(["p1", "p2", "p3", "p4"]));
+    // Rome, 5 jours (demandes de l'essai rome-1), 23 lieux pour 32 demandés : chaque jour reçoit sa part, en proportion de
+    // sa demande (le jour du départ, qui demande moins, n'est pas privé de ce qu'il demande).
+    const rome = [jour(3, 2, 1, 20), jour(4, 2, 1, 20), jour(4, 2, 1, 20), jour(4, 2, 1, 20), jour(4, 1, 0, 20)];
+    const vingtTrois = Array.from({ length: 23 }, (_, k) => lieu(`r${k}`, k < 12 ? "activity" : k < 20 ? "meal" : "evening", 41.9 + k * 0.001, 12.49));
+    const tailles = regrouperParJour(vingtTrois, rome).map((groupe) => groupe.length);
+    expect(tailles.reduce((somme, n) => somme + n, 0)).toBe(23);
+    for (const taille of tailles) expect(taille).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...tailles) - Math.min(...tailles)).toBeLessThanOrEqual(2);
+  });
+
+  // Demande de Samuel (2026-10-18 09:47 UTC) : « répartis de manière cohérente, par exemple par quartier ».
+  it("cohérence géographique : un jour ne mélange pas deux zones éloignées, même classées en alternance", () => {
+    // Zone A autour de (41.890, 12.492), zone B à ~4 km (41.903, 12.453) ; ordre d'entrée alterné A, B, A, B…
+    const type = (k: number): Type => (k % 3 === 2 ? "meal" : "activity");
+    const alternes = [0, 1, 2, 3, 4, 5].flatMap((k) => [lieu(`a${k}`, type(k), 41.89 + k * 0.0005, 12.492), lieu(`b${k}`, type(k), 41.903 + k * 0.0005, 12.453)]);
+    const zones = (groupe: readonly string[]) => new Set(groupe.map((id) => id[0])).size;
+    const groupes = regrouperParJour(alternes, [jour(4, 2, 0, 8), jour(4, 2, 0, 8)]);
+    for (const groupe of groupes) {
+      expect(groupe).toHaveLength(6);
+      expect(zones(groupe)).toBe(1);
+    }
+    // Trois jours pour deux zones (8 activités pour 9 demandées) : parts 4, 4 et 3 ; au plus un jour à cheval.
+    const trois = regrouperParJour(alternes, [jour(3, 1, 0, 8), jour(3, 1, 0, 8), jour(3, 1, 0, 8)]);
+    expect(trois.map((groupe) => groupe.length)).toEqual([4, 4, 3]);
+    expect(trois.filter((groupe) => zones(groupe) > 1).length).toBeLessThanOrEqual(1);
+  });
+
+  it("déterministe : mêmes entrées, mêmes groupes", () => {
+    const jours = [jour(2, 1, 1, 4), jour(2, 1, 1, 4)];
+    expect(regrouperParJour(LIEUX, jours)).toEqual(regrouperParJour(LIEUX, jours));
   });
 });

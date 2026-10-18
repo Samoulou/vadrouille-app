@@ -42,13 +42,39 @@ export function joursDuSejour(entree: EntreeJours): JourSquelette[] {
 }
 
 /**
- * Lieux que demande un jour, par type : un par créneau du squelette, plus l'idée « Surprends-moi » (une activité).
- * C'est la part du jour dans la **première série** (0055 § 6 point 3 : « étapes du programme et 8 propositions » ; les
- * propositions de P0 sont prises parmi les étapes planifiées, `assemblage.ts`, et ne demandent aucun lieu de plus).
+ * Lieux que demande un jour, par type : un par créneau du squelette **qui tient dans la fenêtre réelle du jour**, plus
+ * l'idée « Surprends-moi » (une activité). C'est la part du jour dans la **première série** (0055 § 6 point 3 : « étapes
+ * du programme et 8 propositions » ; les propositions de P0 sont prises parmi les étapes planifiées, `assemblage.ts`,
+ * et ne demandent aucun lieu de plus).
+ *
+ * Fenêtre réelle (ticket 483) : les créneaux sont parcourus dans l'ordre depuis `jour.debut` (heure d'arrivée le premier
+ * jour), avec les durées par défaut de la configuration et sans trajet, selon les règles de `planifierJour` : une
+ * activité finit avant la fin au plus tard du repas qui la suit (sinon avant la fin du jour), un repas commence dans sa
+ * fenêtre et finit avant la fin du jour (heure de départ le dernier jour), la soirée finit avant la fin du jour. Un
+ * créneau qui ne tient pas n'est pas demandé. Sans trajet, c'est une borne haute : le planificateur, qui ajoute les
+ * trajets, n'en remplit jamais plus. Le nombre de créneaux reste celui du squelette (rythme) ; un nombre qui suivrait les
+ * durées de visite est l'objet de la spécification PO-27 (ticket 489).
  */
-export function demandeDuJour(jour: JourSquelette): Record<TypeSerie, number> {
+export function demandeDuJour(jour: JourSquelette, configuration: ConfigurationMoteur): Record<TypeSerie, number> {
+  const durees = configuration.dureesParDefaut;
   const demande: Record<TypeSerie, number> = { activity: 1, meal: 0, evening: 0 };
-  for (const creneau of jour.creneaux) demande[creneau.type] += 1;
+  let instant = jour.debut;
+  jour.creneaux.forEach((creneau, rang) => {
+    if (creneau.type === "activity") {
+      const suivant = jour.creneaux.at(rang + 1);
+      const limite = suivant?.type === "meal" ? suivant.auPlusTard : jour.fin;
+      const fin = instant + durees.activity;
+      if (fin > limite || fin > jour.fin) return;
+      demande.activity += 1;
+      instant = fin;
+      return;
+    }
+    const debut = Math.max(instant, creneau.auPlusTot);
+    const fin = debut + (creneau.type === "meal" ? durees[creneau.repas] : durees.evening);
+    if ((creneau.type === "meal" && debut > creneau.auPlusTard) || fin > jour.fin) return;
+    demande[creneau.type] += 1;
+    instant = fin;
+  });
   return demande;
 }
 

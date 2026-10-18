@@ -98,11 +98,31 @@ export type DependancesAgent = {
   observer?: (etat: EtatAgent) => void;
 };
 
-/** Créneau visé par un candidat trouvé (cibles de `recherche.json`). */
+/**
+ * Type d'étape ramené à un créneau, pour les **mesures** de `evals/` (`evaluation.ts`, candidats trouvés par créneau) : un
+ * événement y compte en soirée. Les cibles de l'agent se comptent avec `creneauCompte` (ticket 483).
+ */
 export function creneauDe(typeEtape: CandidatRecherche["typeEtape"]): TypeCreneau {
   if (typeEtape === "meal") return "meal";
   if (typeEtape === "event") return "evening";
   return "activity";
+}
+
+/**
+ * Créneau dont la cible compte un candidat admis (ticket 483), comme la planification remplit ses créneaux
+ * (`admisPourCreneau`) : un repas compte en repas ; une activité compte en soirée si son `slotFit` (rendu par le modèle
+ * de recherche) contient `evening` et que la soirée manque encore (ou que l'activité ne convient qu'au soir), sinon en
+ * activité ; un événement ne compte dans aucun créneau (il va dans les événements du jour, jamais dans la soirée).
+ */
+export function creneauCompte(
+  candidat: { readonly typeEtape: CandidatRecherche["typeEtape"]; readonly slotFit?: readonly TypeCreneau[] },
+  soireeManquante: boolean,
+): TypeCreneau | undefined {
+  if (candidat.typeEtape === "meal") return "meal";
+  if (candidat.typeEtape === "event") return undefined;
+  const soir = candidat.slotFit?.includes("evening") === true;
+  const jour = candidat.slotFit === undefined || candidat.slotFit.includes("activity");
+  return soir && (soireeManquante || !jour) ? "evening" : "activity";
 }
 
 /** Clé de comparaison d'un nom (doublons de l'agent, mesures de `evals/`) : minuscules, sans accents ni ponctuation. */
@@ -428,10 +448,13 @@ export async function chercherCandidats(
     }
     cles.add(k);
     candidats.push(resultat.data);
-    const creneau = creneauDe(resultat.data.typeEtape);
+    const creneau = creneauCompte(
+      { typeEtape: resultat.data.typeEtape, ...(extrait.slotFit === undefined ? {} : { slotFit: extrait.slotFit }) },
+      trouves.evening < config.ciblesParCreneau.evening,
+    );
     if (creneau === "activity") trouves.activity += 1;
     else if (creneau === "meal") trouves.meal += 1;
-    else trouves.evening += 1;
+    else if (creneau === "evening") trouves.evening += 1;
   };
 
   // Étape 3 : tours de l'agent, bornés.

@@ -35,6 +35,7 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assembler, type Raison } from "@/server/p0/assemblage";
 import {
   bornesDepuisConfig,
+  bornesDepuisDemande,
   candidatPourModele,
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
@@ -313,12 +314,38 @@ function dimensionsDuSejour(brief: Brief, config: ConfigModeReel, placeIdsLogeme
   const logementDe = (nuit: number) => (nuits.at(nuit) ?? nuits.at(0))?.placeId;
   const logementsDuJour = jours.map((jour) => [...new Set([logementDe(jour.logementDepart), logementDe(jour.logementArrivee)].flatMap((p) => (p === undefined ? [] : [p])))]);
   const capacites = logementsDuJour.map((ids) => Math.max(0, plan.n - ids.length));
-  const demandes = jours.map((jour, rang) => demandeBornee(demandeDuJour(jour), capacites[rang] ?? 0));
+  const demandes = jours.map((jour, rang) => demandeBornee(demandeDuJour(jour, CONFIGURATION_MOTEUR), capacites[rang] ?? 0));
   const serie: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
   for (const demande of demandes) for (const type of TYPES_SERIE) serie[type] += demande[type];
   const premiereSerie = TYPES_SERIE.reduce((somme, type) => somme + serie[type], 0);
   const budgetFiches = config.placesDetails - 2 * brief.logements.length;
   return { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches };
+}
+
+/** Repères distincts par logement, au lancement et à la recherche (aucun identifiant de lieu n'existe avant l'ancrage). */
+const reperesDesLogements = (brief: Brief) => brief.logements.map((_, rang) => `logement-${rang + 1}`);
+
+/**
+ * Bornes de la recherche de l'exécution (ticket 483) : en **exécution comptée**, cibles calculées depuis la demande du
+ * séjour (`bornesDepuisDemande` : première série de `dimensionsDuSejour`, plus 30 %), sous le plafond des candidats que
+ * l'exécution peut trouver (`candidatsTrouves`) et ancrer (Text Search : `placesTextSearch − 2 × logements`, une requête
+ * par logement à l'ancrage et une à l'étape finale) ; en **essai**, le profil fixe de `recherche-essai.json` (décision
+ * 0073 point 4, réservée à Samuel, inchangée).
+ */
+function bornesDeLaRecherche(mode: ExecutionEnCours["mode"], config: ConfigModeReel, recherche: ConfigRecherche, brief: Brief) {
+  if (mode !== "reel") return bornesDepuisConfig(recherche);
+  const { serie } = dimensionsDuSejour(brief, config, reperesDesLogements(brief));
+  return bornesDepuisDemande(recherche, serie, Math.min(config.candidatsTrouves, config.placesTextSearch - 2 * brief.logements.length));
+}
+
+/** Bornes de la recherche d'un brief commité dans un mode (ticket 483, tests) ; `null` si brief ou configuration refusés. */
+export function bornesRechercheDuBrief(mode: ExecutionEnCours["mode"], nom: string): ReturnType<typeof bornesDepuisConfig> | null {
+  try {
+    const config = configurationDuMode(mode);
+    return bornesDeLaRecherche(mode, config, configurationAgent(mode, config).recherche, briefDe(nom));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -336,8 +363,7 @@ export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string
     // jours de changement, donc une place de plus pour les lieux du jour (`capacites`), et sa première série pourrait
     // dépasser celle calculée ici d'au plus un lieu par jour de changement. Le plan Routes (nombre de jours) et le budget
     // de fiches (nombre de logements du brief) n'en dépendent pas. Cas d'un même logement saisi deux fois : non traité.
-    const reperes = brief.logements.map((_, rang) => `logement-${rang + 1}`);
-    const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperes);
+    const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperesDesLogements(brief));
     return plan.tient && premiereSerie <= budgetFiches;
   } catch {
     return false;
@@ -607,7 +633,8 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
           routage,
           recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
           lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
-          bornes: bornesDepuisConfig(recherche),
+          // Ticket 483 : cibles de l'exécution comptée calculées depuis la demande du séjour.
+          bornes: bornesDeLaRecherche(contexte.execution.mode, contexte.config, recherche, contexte.brief),
           complement: complementDepuisBrief(contexte.brief),
           protegees: donneesProtegeesDepuisBrief(contexte.brief),
           // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même

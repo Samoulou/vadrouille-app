@@ -92,9 +92,9 @@ describe("p0: passage au moteur de l'étape finale (moteur-final.ts)", () => {
     for (const jour of squelette) expect(jour.logementDepart).toBeLessThan(5);
   });
 
-  it("demandeDuJour : un lieu par créneau du squelette, plus une activité pour l'idée du jour", () => {
-    for (const jour of jours()) {
-      const demande = demandeDuJour(jour);
+  it("demandeDuJour : un jour complet demande un lieu par créneau du squelette, plus une activité pour l'idée du jour", () => {
+    for (const jour of jours().filter((candidat) => candidat.complet)) {
+      const demande = demandeDuJour(jour, CONFIGURATION_MOTEUR);
       const compter = (type: string) => jour.creneaux.filter((creneau) => creneau.type === type).length;
       expect(demande).toEqual({
         activity: compter("activity") + 1,
@@ -102,6 +102,33 @@ describe("p0: passage au moteur de l'étape finale (moteur-final.ts)", () => {
         evening: compter("evening"),
       });
     }
+  });
+
+  // Ticket 483 (essai rome-1 du 2026-10-18) : la demande ignorait l'heure d'arrivée et l'heure de départ.
+  it("demandeDuJour : bornée par la fenêtre réelle du jour (arrivée, départ), jamais au-delà du squelette", () => {
+    const rome = BriefSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/rome-1.json"), "utf8")));
+    const squelette = joursDuSejour({
+      voyage: { start: rome.arrivee, end: rome.depart },
+      pace: briefDepuisBrief(rome).pace,
+      nombreDeNuits: 4,
+      engagements: engagementsDepuisBrief(rome),
+      configuration: CONFIGURATION_MOTEUR,
+    });
+    const demandes = squelette.map((jour) => demandeDuJour(jour, CONFIGURATION_MOTEUR));
+    // Arrivée à 12:00 : une seule activité tient avant la fin du déjeuner (14:00), puis déjeuner, après-midi, dîner, soirée.
+    expect(demandes[0]).toEqual({ activity: 3, meal: 2, evening: 1 });
+    // Jours complets : tout le squelette (3 activités et l'idée, 2 repas, la soirée).
+    for (const demande of demandes.slice(1, -1)) expect(demande).toEqual({ activity: 4, meal: 2, evening: 1 });
+    // Départ à 16:00 : ni dîner ni soirée.
+    expect(demandes.at(-1)).toEqual({ activity: 4, meal: 1, evening: 0 });
+
+    const jour = squelette[1] as JourSquelette;
+    const plein = demandeDuJour(jour, CONFIGURATION_MOTEUR);
+    // Départ à 9:30 : seule l'idée du jour reste demandée.
+    expect(demandeDuJour({ ...jour, fin: 9 * 60 + 30 }, CONFIGURATION_MOTEUR)).toEqual({ activity: 1, meal: 0, evening: 0 });
+    // Arrivée à 19:00 : ni activité du matin ni déjeuner ; une activité 19:00-20:30, le dîner 20:30-22:00, plus de soirée.
+    expect(demandeDuJour({ ...jour, debut: 19 * 60 }, CONFIGURATION_MOTEUR)).toEqual({ activity: 2, meal: 1, evening: 0 });
+    for (const type of TYPES_SERIE) expect(demandeDuJour({ ...jour, debut: 15 * 60 }, CONFIGURATION_MOTEUR)[type]).toBeLessThanOrEqual(plein[type]);
   });
 
   it("demandeBornee : jamais au-delà de la capacité, types dans l'ordre activités, repas, soirée", () => {

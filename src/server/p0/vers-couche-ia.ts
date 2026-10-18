@@ -127,6 +127,44 @@ export function bornesDepuisConfig(config: {
   };
 }
 
+/**
+ * Marge des cibles de la recherche sur la demande du séjour, en pour cent (ticket 483) : couvre les candidats perdus à
+ * l'ancrage (non résolus, hors zone), à la notation (sans note, `slotFit` qui ne convient pas) et aux fiches (fermés).
+ */
+export const MARGE_CIBLES_POURCENT = 30;
+
+/**
+ * Bornes de recherche de l'exécution comptée **calculées depuis la demande du séjour** (ticket 483 ; essai rome-1 du
+ * 2026-10-18 : 23 candidats pour 32 lieux demandés, derniers jours vides) : par créneau, la plus grande de la cible de
+ * `recherche.json` et de la demande de la première série (`demandeDuJour` bornée, sommée sur les jours) augmentée de
+ * `MARGE_CIBLES_POURCENT` (arrondi au-dessus). Total visé : le plus grand du total de `recherche.json` et de la somme des
+ * cibles. Le tout borné par `plafond` (candidats que l'exécution peut trouver et ancrer) : au-delà, chaque cible est
+ * réduite en proportion (arrondi au-dessous). `toursMax` et `ageSourceMaxJours` restent ceux de la configuration.
+ */
+export function bornesDepuisDemande(
+  config: Parameters<typeof bornesDepuisConfig>[0],
+  demande: { readonly activity: number; readonly meal: number; readonly evening: number },
+  plafond: number,
+): BornesRechercheP0 {
+  const base = bornesDepuisConfig(config);
+  // Entiers seulement : 10 × 130 / 100 = 13 exactement, sans erreur d'arrondi flottant.
+  const avecMarge = (valeur: number) => Math.ceil((Math.max(0, valeur) * (100 + MARGE_CIBLES_POURCENT)) / 100);
+  let activity = Math.max(base.ciblesParCreneau.activity, avecMarge(demande.activity));
+  let meal = Math.max(base.ciblesParCreneau.meal, avecMarge(demande.meal));
+  let evening = Math.max(base.ciblesParCreneau.evening, avecMarge(demande.evening));
+  const maximum = Math.max(1, Math.floor(plafond));
+  const somme = activity + meal + evening;
+  if (somme > maximum) {
+    const reduire = (valeur: number) => Math.floor((valeur * maximum) / somme);
+    activity = reduire(activity);
+    meal = reduire(meal);
+    evening = reduire(evening);
+  }
+  if (activity + meal + evening === 0) activity = 1;
+  const total = Math.min(maximum, Math.max(base.totalCandidats, activity + meal + evening));
+  return { ...base, ciblesParCreneau: { activity, meal, evening }, totalCandidats: total };
+}
+
 /** Ce qu'un modèle voit d'un candidat de P0 : la projection de `vuePourModele` (cinq champs, rien d'autre). */
 export function candidatPourModele(candidat: Candidat): CandidatPourModeleP0 {
   return { id: candidat.id, nom: candidat.nom, resume: candidat.resume, categorie: candidat.categorie, typeEtape: candidat.typeEtape };

@@ -546,9 +546,12 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     expect(positions.has(ferme.placeId)).toBe(false);
     expect(JSON.stringify(programmeEcrit().contenu)).not.toContain(ferme.placeId);
     expect(capture.matrices.some((m) => m.origines.includes(ferme.placeId))).toBe(false);
-    // Remplacé : une fiche de plus (la marge), autant de lieux au programme.
+    // Remplacé : une fiche de plus (la marge).
     expect(capture.details.length).toBe(reference.fiches + 1);
-    expect(positions.size).toBe(reference.lieux);
+    // Ticket 483 : le regroupement est géographique ; le remplaçant change le groupe de son jour, et un lieu de ce groupe
+    // peut ne plus tenir dans son créneau (horaires, trajets) : une étape de moins au plus, jamais une de plus.
+    expect(positions.size).toBeLessThanOrEqual(reference.lieux);
+    expect(positions.size).toBeGreaterThanOrEqual(reference.lieux - 1);
   });
 
   it("une matrice Routes par jour, chacune avec le logement du jour ; aucun lieu dans deux jours", async () => {
