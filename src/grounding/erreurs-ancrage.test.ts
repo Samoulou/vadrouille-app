@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RAYON_BIAIS_METRES } from "@/grounding/ancrage";
-import { ancrerCandidats, ancrerLogement, ancrerLogementsSuggeres } from "@/grounding/ancrage-production";
+import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
 import { ErreurAncrage, type ClientPlacesMvp, type ClientRoutes } from "@/grounding/interfaces";
@@ -30,8 +30,9 @@ type Cas = readonly [string, (places: ClientPlacesMvp, routes: ClientRoutes) => 
 const MAINTENANT = Date.UTC(2026, 9, 17);
 const FONCTIONS: readonly Cas[] = [
   ["ancrerCandidats", (places) => ancrerCandidats([{ id: "c", nom: "Lieu maison" }], VILLE, ZONE, places)],
-  ["ancrerLogement", (places) => ancrerLogement({ kind: "known", label: "Hôtel maison" }, VILLE, places)],
-  ["ancrerLogementsSuggeres", (places) => ancrerLogementsSuggeres({ zone: null, logements: [{ nom: "Hôtel maison" }] }, VILLE, places)],
+  ["verifierLogement", (places) => verifierLogement({ kind: "known", label: "Hôtel maison" }, VILLE, places)],
+  ["zoneEtDepart", (places) => zoneEtDepart({ kind: "known", placeId: "P_H" }, VILLE, places)],
+  ["ancrerLogementsSuggeres", (places) => ancrerLogementsSuggeres({ zone: { centre: CENTRE, rayonM: 800 }, logements: [{ nom: "Hôtel maison" }] }, VILLE, places)],
   ["rafraichirPlaceId", (places) => rafraichirPlaceId({ placeId: "P_VIEUX", reference: 0 }, MAINTENANT, places)],
   ["chargerFiches", (places) => chargerFiches(["P_A"], places)],
   ["ficherSerie", (places) => ficherSerie([{ id: "c", placeId: "P_A" }], { premiereSerie: 1, marge: 0 }, ZONE, places)],
@@ -75,8 +76,9 @@ describe("ancrage: résultat fermé", () => {
     expect(rafraichi).toEqual({ ok: true, valeur: { placeId: "P_ABSENT", issue: "introuvable" } });
   });
 
-  it("ancrerLogement rend place_not_found sous lodging_unresolved", async () => {
+  it("verifierLogement et zoneEtDepart rendent place_not_found sous lodging_unresolved", async () => {
     const places = creerPlacesDouble({ textes: { [`Hôtel maison, ${VILLE}`]: ["P_ABSENT"] } });
-    expect(await ancrerLogement({ kind: "known", label: "Hôtel maison" }, VILLE, places)).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
+    expect(await verifierLogement({ kind: "known", label: "Hôtel maison" }, VILLE, places)).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
+    expect(await zoneEtDepart({ kind: "known", placeId: "P_ABSENT" }, VILLE, places)).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
   });
 });

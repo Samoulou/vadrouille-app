@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { ancrerLogement as ancrerLogementP0, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
-import { ancrerCandidats, ancrerLogement, ancrerLogementsSuggeres } from "@/grounding/ancrage-production";
+import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
 import { fichesEtapeFinale, fichesLogementsEtapeFinale } from "@/grounding/fiches-finales";
 import { ErreurAncrage } from "@/grounding/interfaces";
@@ -506,8 +506,9 @@ describe("ancrage: erreur de Google réduite à son code (client Places réel)",
   const corps = () => json({ error: { message: `SENTINELLE-FOURNISSEUR ${CLE} ${PLACE_ID}` } }, 403);
   it.each([
     ["ancrerCandidats", (c: ReturnType<typeof createPlacesClient>) => ancrerCandidats([{ id: "c", nom: "Lieu maison" }], "Ville", ZONE, c)],
-    ["ancrerLogement", (c: ReturnType<typeof createPlacesClient>) => ancrerLogement({ kind: "known", label: "Hôtel maison" }, "Ville", c)],
-    ["ancrerLogementsSuggeres", (c: ReturnType<typeof createPlacesClient>) => ancrerLogementsSuggeres({ zone: null, logements: [{ nom: "Hôtel" }] }, "Ville", c)],
+    ["verifierLogement", (c: ReturnType<typeof createPlacesClient>) => verifierLogement({ kind: "known", label: "Hôtel maison" }, "Ville", c)],
+    ["zoneEtDepart", (c: ReturnType<typeof createPlacesClient>) => zoneEtDepart({ kind: "area", label: "Vieille ville" }, "Ville", c)],
+    ["ancrerLogementsSuggeres", (c: ReturnType<typeof createPlacesClient>) => ancrerLogementsSuggeres({ zone: { centre: { lat: 48.8566123, lng: 2.3522456 }, rayonM: 800 }, logements: [{ nom: "Hôtel" }] }, "Ville", c)],
     ["rafraichirPlaceId", (c: ReturnType<typeof createPlacesClient>) => rafraichirPlaceId({ placeId: PLACE_ID, reference: 0 }, Date.UTC(2026, 9, 17), c)],
     ["chargerFiches", (c: ReturnType<typeof createPlacesClient>) => chargerFiches([PLACE_ID], c)],
     ["ficherSerie", (c: ReturnType<typeof createPlacesClient>) => ficherSerie([{ id: "c", placeId: PLACE_ID }], { premiereSerie: 1, marge: 0 }, ZONE, c)],

@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FatalError } from "workflow";
 
 import type { ClientModeles, RequeteModele } from "@/ai/client";
@@ -75,6 +75,8 @@ const d = vi.hoisted(() => ({
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
+  /** Ticket 493 (0090 § 3 point 8) : le moteur lève à la planification des jours. */
+  echecMoteur: false,
   /** Fiches Place Details sans statut d'établissement (quartier, parc, site naturel ; Q460). */
   sansStatut: false,
   /** Contenu servi pour `essai.json`, `mode-reel.json` et `classement.json` (les fichiers commités, sauf cas modifié par un test). */
@@ -99,6 +101,18 @@ vi.mock("../../../prototype/config/classement.json", () => ({
     return d.classement;
   },
 }));
+
+/** Moteur réel, sauf quand un test le fait lever (journal d'arrêt à la phase `moteur`, 0090 § 3 point 8). */
+vi.mock("@/server/p0/moteur-final", async (importOriginal) => {
+  const reel = await importOriginal<typeof import("@/server/p0/moteur-final")>();
+  return {
+    ...reel,
+    planifierLeJour: (...args: Parameters<typeof reel.planifierLeJour>) => {
+      if (d.echecMoteur) throw new RangeError("SENTINELLE-MESSAGE-MOTEUR");
+      return reel.planifierLeJour(...args);
+    },
+  };
+});
 
 vi.mock("@/server/p0/garde", () => ({
   verifierGardeEtape: async (runId: string) => ({
@@ -355,6 +369,7 @@ function reinitialiser(): void {
   d.requetesSql.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
+  d.echecMoteur = false;
   d.sansStatut = false;
   d.composerP0Reel.mockImplementation(compositionSimulee);
   derniere = undefined;
@@ -559,7 +574,7 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     const vus = new Set<string>();
     for (const matrice of capture.matrices) {
       expect(matrice.origines).toContain(logement);
-      for (const placeId of matrice.origines.filter((p) => p !== logement)) {
+      for (const placeId of matrice.origines.filter((p): p is string => typeof p === "string" && p !== logement)) {
         expect(vus.has(placeId)).toBe(false);
         vus.add(placeId);
       }
@@ -946,5 +961,92 @@ describe("p0Run, edimbourg-1.json sous les échéances (ticket 407, 0075)", () =
     expect(phases.get("notation")).toBeLessThanOrEqual(570);
     expect(fin).toBeLessThanOrEqual(870);
     expect(placeIdsDuProgramme(programmeEcrit().contenu as never).size).toBeGreaterThan(0);
+  });
+});
+
+describe("p0Run, journal p0.step_failed de etape() (ticket 493, décision 0090 § 3 point 8)", () => {
+  /** Lignes `p0.step_failed` écrites (niveaux error et warn), lues en JSON. */
+  function espionnerJournal() {
+    const lignes: Record<string, unknown>[] = [];
+    const garder = (ligne: unknown) => {
+      const texte = String(ligne);
+      if (texte.includes('"p0.step_failed"')) lignes.push(JSON.parse(texte) as Record<string, unknown>);
+    };
+    espions.push(vi.spyOn(console, "error").mockImplementation(garder), vi.spyOn(console, "log").mockImplementation(garder));
+    return lignes;
+  }
+  const espions: { mockRestore: () => void }[] = [];
+  afterEach(() => {
+    for (const espion of espions.splice(0)) espion.mockRestore();
+  });
+
+  /** Composition dont l'étape finale lève `invalid_response` (client Google) à la capacité donnée. */
+  function echecA(capacite: "fiches" | "routes") {
+    d.composerP0Reel.mockImplementation((garde: unknown, options: OptionsSimulees) => {
+      const composition = compositionSimulee(garde, options);
+      return {
+        ...composition,
+        etapeFinale: () => {
+          const finale = composition.etapeFinale();
+          const invalide = () => Object.assign(new Error(SENTINELLE_ERREUR), { name: "ErreurClientGoogle", code: "invalid_response" });
+          if (capacite === "fiches") {
+            let appels = 0;
+            return {
+              ...finale,
+              places: {
+                details: async (placeId: string) => {
+                  appels += 1;
+                  if (appels > 3) throw invalide();
+                  return finale.places.details(placeId);
+                },
+              },
+            };
+          }
+          const routes: ClientRoutes = { matrice: async () => Promise.reject(invalide()) };
+          return { ...finale, routes };
+        },
+      };
+    });
+  }
+
+  it.each(["fiches", "routes"] as const)(
+    "échec à la phase %s : phase et code d'origine (invalid_response) journalisés avant la réduction (pipeline_failed)",
+    async (phase) => {
+      echecA(phase);
+      await jusquAEtapeFinale();
+      const lignes = espionnerJournal();
+      const erreur = await refus(etapeFinale({ runId: RUN_ID }));
+      expect(erreur.message).toBe("pipeline_failed");
+      expect(lignes).toEqual([{ level: "error", event: "p0.step_failed", phase, errorName: "ErreurClientGoogle", failureCode: "invalid_response" }]);
+      expect(JSON.stringify(lignes)).not.toContain(SENTINELLE_ERREUR);
+      for (const placeId of IDS_GOOGLE) expect(JSON.stringify(lignes)).not.toContain(placeId);
+    },
+  );
+
+  it("échec à la phase moteur : classe de l'erreur, code autre ; aucun message", async () => {
+    await jusquAEtapeFinale();
+    d.echecMoteur = true;
+    const lignes = espionnerJournal();
+    const erreur = await refus(etapeFinale({ runId: RUN_ID }));
+    expect(erreur.message).toBe("pipeline_failed");
+    expect(lignes).toEqual([{ level: "error", event: "p0.step_failed", phase: "moteur", errorName: "RangeError", failureCode: "autre" }]);
+    expect(JSON.stringify(lignes)).not.toContain("SENTINELLE");
+  });
+
+  it("échec à une phase écrite en base (ecriture) : cette phase journalisée", async () => {
+    await jusquAEtapeFinale();
+    d.echecEcritureProgramme = true;
+    const lignes = espionnerJournal();
+    expect((await refus(etapeFinale({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0]).toMatchObject({ level: "error", event: "p0.step_failed", phase: "ecriture" });
+    expect(JSON.stringify(lignes)).not.toContain("permission denied");
+  });
+
+  it("étape réussie : aucune ligne p0.step_failed", async () => {
+    await jusquAEtapeFinale();
+    const lignes = espionnerJournal();
+    expect(await etapeFinale({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(lignes).toEqual([]);
   });
 });

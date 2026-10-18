@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 
 import {
+  FullTripStatusSchema,
   GenerationStatusSchema,
   InferredBriefSchema,
   LodgingSuggestionSchema,
   fail,
   ok,
   type CreatedTrip,
+  type FullTripStatus,
   type GenerationStatus,
   type InferredBrief,
   type LodgingRequest,
@@ -82,7 +84,10 @@ function latestLaunch(launches: Map<string, LaunchRecord>, organizationId: strin
  *   `requestId` relance la suite d'états ;
  * - `getGenerationStatus` déroule la suite d'états fixe du jeu simulé depuis l'instant du dernier lancement ; un
  *   voyage de l'organisation jamais lancé dans la portée est déjà complet (`ready`) ; un voyage inconnu ou d'une
- *   autre organisation donne `not_found`.
+ *   autre organisation donne `not_found` ;
+ * - `getFullTripStatus` (0087 § 1.5 point 4) lit seulement le voyage du jeu simulé : `ready` pour un voyage débloqué
+ *   dans les données (`Trip.unlocked`), `none` sinon ; `not_found` pour un voyage inconnu ou d'une autre organisation.
+ *   Aucun état du voyage complet n'est gardé dans la portée, et aucun « Réessayer » n'est simulé.
  * Les sorties sont validées par leur schéma ici, comme `mockTripAdapter`, puis de nouveau par l'action (F8-PO-17).
  */
 export function createMockCreationAdapter({
@@ -157,6 +162,14 @@ export function createMockCreationAdapter({
         status = mockGenerationStatus(tripId, Number.POSITIVE_INFINITY);
       }
       const parsed = GenerationStatusSchema.safeParse(status);
+      return parsed.success ? ok(parsed.data) : fail("provider_error");
+    },
+    async getFullTripStatus(ctx: AdapterContext, tripId: string): Promise<Result<FullTripStatus>> {
+      const { reader } = scoped();
+      const trip = await reader.getTrip(ctx, tripId);
+      if (!trip) return fail("not_found");
+      const status: FullTripStatus = trip.unlocked ? { phase: "ready", tripId } : { phase: "none", tripId };
+      const parsed = FullTripStatusSchema.safeParse(status);
       return parsed.success ? ok(parsed.data) : fail("provider_error");
     },
   };

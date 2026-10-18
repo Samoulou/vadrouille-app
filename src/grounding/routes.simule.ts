@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { MODES_ROUTES, type ClientRoutes } from "@/grounding/interfaces";
+import { clePointRoutes, MODES_ROUTES, type ClientRoutes } from "@/grounding/interfaces";
 
 /**
  * Double de Routes à **valeurs sentinelles** (contrainte 8). Durées déterministes, en secondes, calculées à partir
@@ -43,7 +43,10 @@ export function creerRoutesSimule(fixtures: FixturesRoutes): ClientRoutes {
       const sansItineraire = (de: string, vers: string) =>
         (fixtures.sansItineraire ?? []).some((paire) => paire.de === de && paire.vers === vers && paire.modes.includes(requete.mode));
       return {
-        secondes: requete.origines.map((de) => requete.destinations.map((vers) => (sansItineraire(de, vers) ? null : dureeSimulee(fixtures, de, vers)))),
+        // Un centre maison (0087 § 3.2) est lu par sa clé de trajet ; P0 ne passe que des `placeId` : clé = `placeId`.
+        secondes: requete.origines.map(clePointRoutes).map((de) =>
+          requete.destinations.map(clePointRoutes).map((vers) => (sansItineraire(de, vers) ? null : dureeSimulee(fixtures, de, vers))),
+        ),
       };
     },
   };

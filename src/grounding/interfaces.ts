@@ -78,7 +78,33 @@ export interface ClientPlacesMvp extends ClientPlaces {
 export const MODES_ROUTES = ["walk", "transit", "car"] as const;
 export type ModeRoutes = (typeof MODES_ROUTES)[number];
 
-export type RequeteMatrice = { origines: string[]; destinations: string[]; mode: ModeRoutes };
+/**
+ * Point d'une matrice Routes (décision 0087 § 3.2, amende 0085 § 1.6) : un `placeId`, ou un **centre maison enveloppé**
+ * (`area.center` d'un logement `suggestedArea`, valeur du modèle, B7-PO-3 ; jamais une donnée Google). L'enveloppe
+ * `centreMaison` empêche une position Google (`Coordonnees` nu) d'y passer par mégarde. P0 passe des chaînes seulement.
+ */
+export type PointRoutes = string | { readonly centreMaison: Coordonnees };
+
+/**
+ * Préfixe de la clé de trajet d'un centre maison (0087 § 3.2) : le caractère `:` est absent d'un identifiant de lieu
+ * Google (`PLACE_ID_GOOGLE`, `enveloppe-google.ts`), donc une clé maison ne rencontre jamais un `placeId`.
+ */
+export const PREFIXE_CLE_MAISON = "maison:";
+
+/**
+ * **Seule** fonction qui produit la clé de trajet d'un centre maison (0087 § 3.2) : dérivée du centre seul, pour que
+ * l'étape qui planifie et la lecture (B8b, depuis le centre stocké dans `stays`) obtiennent la même clé.
+ */
+export function cleMaison(centre: Coordonnees): string {
+  return `${PREFIXE_CLE_MAISON}${String(centre.lat)},${String(centre.lng)}`;
+}
+
+/** Clé de trajet d'un point : le `placeId` lui-même, ou la clé maison de son centre. */
+export function clePointRoutes(point: PointRoutes): string {
+  return typeof point === "string" ? point : cleMaison(point.centreMaison);
+}
+
+export type RequeteMatrice = { origines: readonly PointRoutes[]; destinations: readonly PointRoutes[]; mode: ModeRoutes };
 
 /** Durées en secondes, `null` si aucun itinéraire. */
 export type ReponseMatrice = { secondes: (number | null)[][] };

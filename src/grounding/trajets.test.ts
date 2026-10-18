@@ -2,11 +2,13 @@
 import { describe, expect, it } from "vitest";
 
 import { BLOC_MATRICE } from "@/grounding/ancrage";
-import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { zoneEtDepart } from "@/grounding/ancrage-production";
+import { ErreurClientGoogle, PLACE_ID_GOOGLE } from "@/grounding/enveloppe-google";
+import { cleMaison } from "@/grounding/interfaces";
 import { chargerTrajets, minutesEstimees } from "@/grounding/trajets";
 import { distanceVolOiseauMetres } from "@/grounding/zone";
 
-import { creerRoutesDouble, LAT_SENTINELLE, LNG_SENTINELLE, SENTINELLES_B8 } from "../../tests/support/doubles-grounding";
+import { creerRoutesDouble, LAT_SENTINELLE, LNG_SENTINELLE, placesInterdit, SENTINELLES_B8 } from "../../tests/support/doubles-grounding";
 
 /**
  * Trajets et estimation sans itinéraire (B8a ; spécification B8, B8-PO-8 ; décision 0085 § 1.6). Durées sentinelles
@@ -62,5 +64,56 @@ describe("relectures: durée estimée seulement sans itinéraire", () => {
       expect(appel.origines.length).toBeLessThanOrEqual(BLOC_MATRICE);
       expect(appel.destinations.length).toBeLessThanOrEqual(BLOC_MATRICE);
     }
+  });
+});
+
+// B8-PO-15, variante (i) de la décision 0087 § 3 : le centre maison d'un `suggestedArea` est le départ de Routes et de
+// l'estimation, sans aucun appel Google pour ce logement.
+describe("trajets: un quartier conseillé part de son centre", () => {
+  const CENTRE_QUARTIER = { lat: 46.201, lng: 6.145 };
+  const QUARTIER = { kind: "suggestedArea", areaId: "z1", name: "Quartier maison", center: CENTRE_QUARTIER, radiusM: 800 } as const;
+
+  async function departDuQuartier() {
+    const ancre = await zoneEtDepart(QUARTIER, "Ville-de-test", placesInterdit());
+    if (!ancre.ok) throw new Error(ancre.code);
+    return ancre.valeur.depart;
+  }
+
+  it("aucun appel Places ; Routes reçoit area.center en coordonnées, durée mesurée sous la clé maison", async () => {
+    const depart = await departDuQuartier();
+    const cle = cleMaison(CENTRE_QUARTIER);
+    expect(depart).toEqual({ cleMaison: cle, centreMaison: CENTRE_QUARTIER });
+    const routes = creerRoutesDouble({ secondes: () => 4321 });
+    const resultat = await chargerTrajets([depart, A], ["walk"], routes);
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(routes.appels).toHaveLength(1);
+    const [appel] = routes.appels;
+    expect(appel?.origines).toEqual([{ centreMaison: CENTRE_QUARTIER }, "P_A"]);
+    expect(appel?.destinations).toEqual([{ centreMaison: CENTRE_QUARTIER }, "P_A"]);
+    expect(resultat.valeur.duree(cle, "P_A", "walk")).toEqual({ minutes: Math.ceil(4321 / 60), estimee: false });
+    expect(resultat.valeur.duree("P_A", cle, "walk")).toEqual({ minutes: Math.ceil(4321 / 60), estimee: false });
+  });
+
+  it("sans itinéraire : estimation calculée depuis area.center, le point envoyé à Routes", async () => {
+    const depart = await departDuQuartier();
+    const cle = cleMaison(CENTRE_QUARTIER);
+    const routes = creerRoutesDouble({ secondes: () => null });
+    const resultat = await chargerTrajets([depart, A], ["walk", "transit"], routes);
+    if (!resultat.ok) throw new Error(resultat.code);
+    for (const mode of ["walk", "transit"] as const)
+      expect(resultat.valeur.duree(cle, "P_A", mode)).toEqual({ minutes: minutesEstimees(CENTRE_QUARTIER, A.position, mode), estimee: true });
+    for (const appel of routes.appels) expect(appel.origines).toContainEqual({ centreMaison: CENTRE_QUARTIER });
+  });
+
+  it("clé maison qui n'est pas celle de son centre : refusée, aucun appel Routes", async () => {
+    const routes = creerRoutesDouble({ secondes: () => 4321 });
+    const resultat = await chargerTrajets([{ cleMaison: "maison:0,0", centreMaison: CENTRE_QUARTIER }, A], ["walk"], routes);
+    expect(resultat).toEqual({ ok: false, code: "upstream_error", retryable: false });
+    expect(routes.appels).toHaveLength(0);
+  });
+
+  it("une clé maison ne rencontre jamais un placeId (préfixe « maison: », « : » absent de PLACE_ID_GOOGLE)", () => {
+    expect(cleMaison(CENTRE_QUARTIER).startsWith("maison:")).toBe(true);
+    expect(PLACE_ID_GOOGLE.test(cleMaison(CENTRE_QUARTIER))).toBe(false);
   });
 });

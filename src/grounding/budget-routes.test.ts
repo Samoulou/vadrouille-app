@@ -120,7 +120,7 @@ describe("p0: budgets Routes par jour (0055 § 6 point 1)", () => {
       expect(requetes.every((r) => r.origines.length <= 10 && r.destinations.length <= 10)).toBe(true);
       // Par jour : éléments demandés ≤ part.
       for (let jour = 0; jour < jours; jour += 1) {
-        const duJour = requetes.filter((r) => r.origines.concat(r.destinations).every((id) => id.startsWith(`J${jour}_`)));
+        const duJour = requetes.filter((r) => r.origines.concat(r.destinations).every((id) => typeof id === "string" && id.startsWith(`J${jour}_`)));
         expect(duJour.reduce((s, r) => s + r.origines.length * r.destinations.length, 0)).toBeLessThanOrEqual(plan.part);
       }
     }
