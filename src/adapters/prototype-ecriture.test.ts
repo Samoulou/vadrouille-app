@@ -4,10 +4,19 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CLES_CONTENU_ECRIT, EchecEcritureProgramme, ecrireProgramme, FONCTION_POSITIONS, SQL_VERROU_S8, verrouS8Leve } from "@/adapters/prototype-ecriture";
+import {
+  CLES_CONTENU_ECRIT,
+  EchecEcritureProgramme,
+  ecrireProgramme,
+  FONCTION_POSITIONS,
+  SQL_TRAJET,
+  SQL_TRAJETS_PRESENTS,
+  SQL_VERROU_S8,
+  verrouS8Leve,
+} from "@/adapters/prototype-ecriture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
-import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
@@ -27,12 +36,26 @@ const FONCTION = ["store", "prototype", "coordinates"].join("_");
 
 function entree(): EcritureProgrammePrototype {
   const { contenu, positions } = decouperProgramme(PROGRAMME);
-  return { runId: RUN_ID, programme: contenu, positions: new Map([...positions.keys()].map((placeId, i) => [placeId, { lat: LAT, lng: LNG + i / 1000 }])) };
+  return {
+    runId: RUN_ID,
+    programme: contenu,
+    positions: new Map([...positions.keys()].map((placeId, i) => [placeId, { lat: LAT, lng: LNG + i / 1000 }])),
+    trajets: new Map(),
+  };
+}
+
+/** Minutes sentinelles d'un temps conservé : jamais dans le texte d'une requête ni dans une erreur (0092 § 5). */
+const MINUTES_SENTINELLE = 1237;
+
+/** Entrée avec les temps de toutes les paires du programme (`trajetsAConserver`, comme l'étape finale). */
+function entreeAvecTrajets(): EcritureProgrammePrototype {
+  const e = entree();
+  return { ...e, trajets: trajetsAConserver(e.programme, () => MINUTES_SENTINELLE) };
 }
 
 type Requete = { texte: string; valeurs: readonly unknown[] | undefined };
 
-function poolSimule(options: { echecSur?: string; statutRendu?: number } = {}) {
+function poolSimule(options: { echecSur?: string; statutRendu?: number; tablePresente?: boolean } = {}) {
   const requetes: Requete[] = [];
   let connexions = 0;
   let liberations = 0;
@@ -46,6 +69,7 @@ function poolSimule(options: { echecSur?: string; statutRendu?: number } = {}) {
             throw Object.assign(new Error(`panne ${String(valeurs?.[1])} ${LAT}`), { code: "23514", detail: `(${LAT}, ${LNG})` });
           }
           if (texte.startsWith("INSERT INTO prototype.programmes")) return { rows: [{ id: "programme-1" }] };
+          if (texte === SQL_TRAJETS_PRESENTS) return { rows: [{ presente: options.tablePresente ?? true }] };
           if (texte.startsWith("UPDATE prototype.runs")) return { rows: Array.from({ length: options.statutRendu ?? 1 }, () => ({ id: RUN_ID })) };
           return { rows: [] };
         },
@@ -152,6 +176,73 @@ describe("p0: échec de la base, transaction annulée, erreur sans valeur (0052 
     const pool: PoolSql = { connect: () => Promise.reject(Object.assign(new Error(`postgres://u:secret@h/b ${LAT}`), { code: "08001" })) };
     const echec = ecrireProgramme(entree(), pool);
     await expect(echec).rejects.toMatchObject({ code: "base", sqlstate: "08001", message: "écriture du programme refusée (base, 08001)" });
+  });
+});
+
+describe("p0: temps de trajet écrits avec le programme (décision 0092 § 4)", () => {
+  it("programme et temps dans la même transaction : après le programme, avant le statut ; paires de pairesDuProgramme seules", async () => {
+    const e = entreeAvecTrajets();
+    const paires = pairesDistinctes(pairesDuProgramme(e.programme));
+    expect(paires.length).toBeGreaterThan(0);
+    const { pool, requetes } = poolSimule();
+    await ecrireProgramme(e, pool);
+    const textes = requetes.map((r) => r.texte);
+    const programme = textes.findIndex((t) => t.startsWith("INSERT INTO prototype.programmes"));
+    const statut = textes.findIndex((t) => t.startsWith("UPDATE prototype.runs"));
+    expect(textes[programme + 1]).toBe(SQL_TRAJETS_PRESENTS);
+    const ecrits = requetes.filter((r) => r.texte === SQL_TRAJET);
+    expect(ecrits).toHaveLength(paires.length);
+    expect(textes.slice(programme + 2, statut).every((t) => t === SQL_TRAJET)).toBe(true);
+    expect(textes.at(-1)).toBe("COMMIT");
+    // Valeurs en paramètres liés : identifiant du programme écrit, mode, origine, destination, minutes.
+    expect(ecrits.map((r) => r.valeurs).sort()).toEqual(paires.map((p) => ["programme-1", p.mode, p.origine, p.destination, MINUTES_SENTINELLE]).sort());
+    for (const { texte } of requetes) {
+      expect(texte).not.toContain(String(MINUTES_SENTINELLE));
+      expect(texte).not.toContain("SENTINELLE_PLACE_ID");
+    }
+    // Nom de la table composé : seuls prototype-ecriture.ts et prototype-lecture.ts le nomment (test de confinement).
+    expect(SQL_TRAJET).toBe(
+      `INSERT INTO ${["prototype", "trajets"].join(".")} (programme_id, mode, origine, destination, minutes) VALUES ($1::uuid, $2::text, $3::text, $4::text, $5::integer)`,
+    );
+  });
+
+  it("une paire sans durée connue n'est pas écrite ; aucun temps : aucune requête sur la table", async () => {
+    const e = entree();
+    const [premiere] = pairesDistinctes(pairesDuProgramme(e.programme));
+    const une = { ...e, trajets: trajetsAConserver(e.programme, (p) => (cleTrajet(p) === cleTrajet(premiere!) ? 4 : undefined)) };
+    const avec = poolSimule();
+    await ecrireProgramme(une, avec.pool);
+    expect(avec.requetes.filter((r) => r.texte === SQL_TRAJET).map((r) => r.valeurs)).toEqual([["programme-1", premiere!.mode, premiere!.origine, premiere!.destination, 4]]);
+    const sans = poolSimule();
+    await ecrireProgramme(e, sans.pool);
+    expect(sans.requetes.some((r) => r.texte === SQL_TRAJETS_PRESENTS || r.texte === SQL_TRAJET)).toBe(false);
+  });
+
+  it("table absente (migration non appliquée) : aucun temps tenté, programme écrit comme avant", async () => {
+    const { pool, requetes } = poolSimule({ tablePresente: false });
+    expect(await ecrireProgramme(entreeAvecTrajets(), pool)).toEqual({ programmeId: "programme-1" });
+    expect(requetes.some((r) => r.texte === SQL_TRAJET)).toBe(false);
+    expect(requetes.at(-1)?.texte).toBe("COMMIT");
+  });
+
+  it("erreur sur un temps : ROLLBACK, ni programme ni position ni temps validés, erreur sans valeur", async () => {
+    const { pool, requetes } = poolSimule({ echecSur: SQL_TRAJET });
+    const erreur = await ecrireProgramme(entreeAvecTrajets(), pool).catch((e: unknown) => e);
+    expect(erreur).toMatchObject({ code: "base", sqlstate: "23514" });
+    expect(String((erreur as Error).message)).not.toContain(String(MINUTES_SENTINELLE));
+    expect(requetes.at(-1)?.texte).toBe("ROLLBACK");
+    expect(requetes.some((r) => r.texte === "COMMIT" || r.texte.startsWith("UPDATE prototype.runs"))).toBe(false);
+  });
+
+  it.each<[string, (e: EcritureProgrammePrototype) => EcritureProgrammePrototype]>([
+    ["paire hors du programme", (e) => ({ ...e, trajets: new Map([...e.trajets, ["walk:AUTRE_LIEU:SENTINELLE_PLACE_ID_1", 3]]) })],
+    ["minutes non entières", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? 1.5 : 3])) })],
+    ["minutes négatives", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? -1 : 3])) })],
+    ["minutes au-delà de 1 440", (e) => ({ ...e, trajets: new Map([...e.trajets].map(([k], i) => [k, i === 0 ? 1441 : 3])) })],
+  ])("%s : entree_refusee, aucune connexion", async (_nom, modifier) => {
+    const { pool, compte } = poolSimule();
+    await expect(ecrireProgramme(modifier(entreeAvecTrajets()), pool)).rejects.toMatchObject({ code: "entree_refusee" });
+    expect(compte().connexions).toBe(0);
   });
 });
 

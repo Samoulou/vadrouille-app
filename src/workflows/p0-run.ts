@@ -26,6 +26,7 @@ import {
   type ConfigRecherche,
 } from "@/prototype/config";
 import { decouperProgramme } from "@/prototype/decoupage";
+import { trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { chercherCandidats, tempsPourAppel, type CompteursAgent, type EtatAgent } from "@/research/agent";
 import { DELAI_MAX_MS, type LecteurPages } from "@/research/fetch-page";
@@ -754,8 +755,9 @@ async function parLots<T>(lots: readonly T[], appel: (lot: T) => Promise<Reponse
  *    moteur sur les seuls lieux de son groupe ; événements sans `placeId` (aucun lieu sans fiche de cette étape) ;
  * 5. **raisons** des lieux retenus, par `redigerRaisons` ; coût des modèles écrit (plus aucun appel de modèle ensuite) ;
  * 6. **validation** R1 à R10 en mémoire : une violation, aucun programme ; réduction ;
- * 7. **écriture** du programme et de ses positions, celles des fiches de cette étape (0052 § 1.1 et § 1.3), ensemble ou
- *    pas du tout ; l'exécution passe à `programme_ecrit`.
+ * 7. **écriture** du programme, de ses positions, celles des fiches de cette étape (0052 § 1.1 et § 1.3), et des temps
+ *    de trajet sur lesquels le moteur a planifié, pour les seules paires de `pairesDuProgramme` (décision 0092 § 4),
+ *    ensemble ou pas du tout ; l'exécution passe à `programme_ecrit`.
  * Aucune réponse Place Details ni Routes n'entre dans un prompt, un journal ou la sortie de l'étape (0052 § 1.4).
  */
 export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
@@ -945,10 +947,12 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       if (Object.values(violations).some((nombre) => nombre > 0)) throw new ArretEtape("pipeline_failed");
       const programme = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
 
-      // 7. Écriture : positions des fiches de cette étape et programme, ensemble ou pas du tout.
+      // 7. Écriture : positions des fiches de cette étape, programme et temps du moteur (0092), ensemble ou pas du tout.
       await passerA("ecriture");
       const decoupe = decouperProgramme(programme);
-      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions }, poolPrototype());
+      // Temps de la matrice de cette étape (`trajets`, celle du moteur), dans le mode du séjour ; aucune autre requête.
+      const conserves = trajetsAConserver(decoupe.contenu, (paire) => (paire.mode === mode ? trajets(paire.origine, paire.destination) : undefined));
+      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, trajets: conserves }, poolPrototype());
     });
   });
 }

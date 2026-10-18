@@ -278,3 +278,130 @@ export const ProgrammeReduitSchema = z
     controlerStructure(programme, ctx);
   });
 export type ProgrammeReduit = z.infer<typeof ProgrammeReduitSchema>;
+
+/** Mode de déplacement d'un trajet (celui de `Segment.mode`). */
+export type ModeTrajet = SegmentReduit["mode"];
+
+/** Trajet entre deux lieux consécutifs du programme, désignés par leur seul identifiant de lieu. */
+export interface PaireTrajet {
+  readonly origine: string;
+  readonly destination: string;
+  readonly mode: ModeTrajet;
+}
+
+/** Programme tel que les paires le lisent : jours, propositions et terminus (le contenu écrit, sans `positions`). */
+type ProgrammeDesPaires = {
+  trip: VoyageReduit;
+  proposals: PropositionReduite[];
+  terminus: z.infer<typeof TerminusReduitSchema>[];
+};
+
+/**
+ * Paires de trajet que la relecture d'un programme demande (décision 0092 § 4), **seule source** de ces paires pour la
+ * relecture (`src/adapters/prototype.ts`) et pour l'écriture des temps conservés (étape finale de `p0Run`) :
+ * - `jours` : par indice de jour, une entrée par ligne `segment`, dans l'ordre de la journée : du lieu qui précède le
+ *   segment (terminus ou étape) au lieu qui le suit ;
+ * - `propositions` : par rang dans `proposals`, pour chaque proposition qui a `travelFromPrevious` : depuis le lieu qui
+ *   précède son étape dans la journée, ou le logement de départ du jour si l'étape n'est pas dans la ligne du jour
+ *   (« depuis l'étape précédente (ou l'hôtel) »), jusqu'à son étape.
+ *
+ * `null` : un des deux lieux manque (étape sans `placeId`, jour sans terminus) ; aucune paire n'est alors devinée.
+ */
+export interface PairesDuProgramme {
+  readonly jours: ReadonlyMap<number, readonly (PaireTrajet | null)[]>;
+  readonly propositions: ReadonlyMap<number, PaireTrajet | null>;
+}
+
+type Terminus = z.infer<typeof TerminusReduitSchema>;
+
+/** Identifiant de lieu d'une ligne qui a une position (terminus, étape), `null` pour les autres lignes. */
+function lieuDe(ligne: LigneReduite, terminus: Terminus): string | undefined | null {
+  if (ligne.type === "terminus") return ligne.role === "start" ? terminus.depart : terminus.arrivee;
+  if (ligne.type === "stop") return ligne.stop.placeId;
+  return null;
+}
+
+/** Lieu qui précède la ligne `index` (terminus ou étape), en remontant la journée ; `null` s'il n'y en a pas. */
+function lieuAvant(jour: JourReduit, terminus: Terminus, index: number): string | undefined | null {
+  for (const ligne of jour.items.slice(0, index).reverse()) {
+    const lieu = lieuDe(ligne, terminus);
+    if (lieu !== null) return lieu;
+  }
+  return null;
+}
+
+function lieuApres(jour: JourReduit, terminus: Terminus, index: number): string | undefined | null {
+  for (const ligne of jour.items.slice(index + 1)) {
+    const lieu = lieuDe(ligne, terminus);
+    if (lieu !== null) return lieu;
+  }
+  return null;
+}
+
+function paireOuNull(origine: string | undefined | null, destination: string | undefined | null, mode: ModeTrajet): PaireTrajet | null {
+  return origine && destination ? { origine, destination, mode } : null;
+}
+
+/** Lieu de départ du trajet d'une proposition (voir `PairesDuProgramme`) ; `null` ou `undefined` : lieu manquant. */
+function origineProposition(programme: ProgrammeDesPaires, proposition: PropositionReduite): string | undefined | null {
+  const terminus = programme.terminus.find((candidat) => candidat.jour === proposition.day);
+  if (!terminus) return null;
+  const jour = programme.trip.days.find((candidat) => candidat.index === proposition.day);
+  const index = jour?.items.findIndex((ligne) => ligne.type === "stop" && ligne.stop.id === proposition.stop.id) ?? -1;
+  if (!jour || index < 0) return terminus.depart;
+  return lieuAvant(jour, terminus, index);
+}
+
+export function pairesDuProgramme(programme: ProgrammeDesPaires): PairesDuProgramme {
+  const jours = new Map<number, (PaireTrajet | null)[]>();
+  for (const jour of programme.trip.days) {
+    const terminus = programme.terminus.find((candidat) => candidat.jour === jour.index);
+    const paires: (PaireTrajet | null)[] = [];
+    jour.items.forEach((ligne, index) => {
+      if (ligne.type !== "segment") return;
+      paires.push(terminus ? paireOuNull(lieuAvant(jour, terminus, index), lieuApres(jour, terminus, index), ligne.segment.mode) : null);
+    });
+    jours.set(jour.index, paires);
+  }
+  const propositions = new Map<number, PaireTrajet | null>();
+  programme.proposals.forEach((proposition, rang) => {
+    if (!proposition.travelFromPrevious) return;
+    propositions.set(rang, paireOuNull(origineProposition(programme, proposition), proposition.stop.placeId, proposition.travelFromPrevious.mode));
+  });
+  return { jours, propositions };
+}
+
+/** Clé d'une paire : mode, origine et destination (aucun des trois ne contient `:`, `PLACE_ID_PATTERN`). */
+export function cleTrajet(paire: PaireTrajet): string {
+  return `${paire.mode}:${paire.origine}:${paire.destination}`;
+}
+
+/** Paires distinctes du programme (jours puis propositions), sans les lieux manquants, dans un ordre fixe. */
+export function pairesDistinctes(paires: PairesDuProgramme): PaireTrajet[] {
+  const vues = new Map<string, PaireTrajet>();
+  const ajouter = (paire: PaireTrajet | null) => {
+    if (paire !== null && !vues.has(cleTrajet(paire))) vues.set(cleTrajet(paire), paire);
+  };
+  for (const liste of paires.jours.values()) liste.forEach(ajouter);
+  for (const paire of paires.propositions.values()) ajouter(paire);
+  return [...vues.values()];
+}
+
+/** Bornes d'un temps conservé, en minutes entières (égales au `CHECK` de la table des temps, décision 0092 § 3). */
+export const MINUTES_TRAJET_MAX = 1440;
+export const minutesTrajetValides = (valeur: unknown): valeur is number =>
+  typeof valeur === "number" && Number.isInteger(valeur) && valeur >= 0 && valeur <= MINUTES_TRAJET_MAX;
+
+/**
+ * Temps à conserver d'un programme (décision 0092 § 4, écriture) : pour chaque paire de `pairesDuProgramme`, la durée
+ * sur laquelle le moteur a planifié (`duree`, celle de l'étape finale) ; une paire sans durée connue ou hors bornes
+ * n'est pas retenue. Aucune autre paire.
+ */
+export function trajetsAConserver(programme: ProgrammeDesPaires, duree: (paire: PaireTrajet) => number | undefined): Map<string, number> {
+  const trajets = new Map<string, number>();
+  for (const paire of pairesDistinctes(pairesDuProgramme(programme))) {
+    const minutes = duree(paire);
+    if (minutesTrajetValides(minutes)) trajets.set(cleTrajet(paire), minutes);
+  }
+  return trajets;
+}

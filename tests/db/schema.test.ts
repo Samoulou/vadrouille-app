@@ -32,8 +32,9 @@ describe("schéma", () => {
       `SELECT relnamespace::regnamespace::text || '.' || relname AS relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class
        WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p') ORDER BY relname`,
     );
-    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 7);
-    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(7);
+    // Huit tables du schéma prototype : les sept de 0046 et `trajets` (décision 0092, migration 0012_trajets_prototype).
+    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 8);
+    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(8);
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
     }

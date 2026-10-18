@@ -26,7 +26,8 @@ const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 const MIGRATION_PROTOTYPE = readFileSync(path.join(RACINE, "db/migrations/0003_prototype.sql"), "utf8");
 const MIGRATION_COORDONNEES = readFileSync(path.join(RACINE, "db/migrations/0002_place_coordinates.sql"), "utf8");
 
-const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges"] as const;
+// `trajets` : décision 0092 (migration 0012_trajets_prototype), éprouvée en détail par `trajets-prototype.test.ts`.
+const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets"] as const;
 const SHA = "a".repeat(40);
 const SIGNATURE_POSITIONS = "store_prototype_coordinates(uuid,text,double precision,double precision)";
 const CANDIDAT = { id: "c_001", nom: "Musée", resume: "Un musée.", aReserver: false };
@@ -598,6 +599,9 @@ describe("invariants et contenus (0046 D24, S4)", () => {
     expect(await colonnes("jugements")).toEqual(["id", "organization_id", "programme_id", "reponses", "expires_at"]);
     expect(await colonnes("run_attempts")).toEqual(["id", "organization_id", "resultat", "created_at", "expires_at"]);
     expect(await colonnes("purges")).toEqual(["id", "purged_at"]);
+    // Seule table du schéma prototype qui porte une donnée dérivée de Routes (décision 0092 § 3, exception de Samuel à
+    // 0011 et 0027) : temps en minutes entières entre deux lieux d'un programme, rien d'autre (ni distance, ni condition).
+    expect(await colonnes("trajets")).toEqual(["id", "organization_id", "programme_id", "mode", "origine", "destination", "minutes", "expires_at"]);
     // Aucune colonne de position ni de contenu Google dans le schéma prototype (Q324, option a).
     for (const table of TABLES) {
       for (const nom of await colonnes(table)) {

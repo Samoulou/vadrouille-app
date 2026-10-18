@@ -15,7 +15,8 @@ import type { ClientPlaces, ClientRoutes, RequeteMatrice, RequeteTextSearch } fr
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { PHASES } from "@/prototype/arret";
-import { placeIdsDuProgramme } from "@/prototype/programme-reduit";
+import { SQL_TRAJET } from "@/adapters/prototype-ecriture";
+import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme } from "@/prototype/programme-reduit";
 import { tempsPourAppel } from "@/research/agent";
 import { creerLecteurPages, DELAI_MAX_MS } from "@/research/fetch-page";
 import { creerHttpSimule, creerResolveurSimule } from "@/research/pages.simule";
@@ -75,6 +76,8 @@ const d = vi.hoisted(() => ({
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
+  /** Table des temps conservés présente (migration 0012 appliquée, décision 0092 § 5 point 6). */
+  tablePresente: true,
   /** Ticket 493 (0090 § 3 point 8) : le moteur lève à la planification des jours. */
   echecMoteur: false,
   /** Fiches Place Details sans statut d'établissement (quartier, parc, site naturel ; Q460). */
@@ -132,6 +135,8 @@ vi.mock("@/server/p0/base", () => ({
             code: "42501",
           });
         if (texte.startsWith("INSERT INTO prototype.programmes")) return { rows: [{ id: "33333333-3333-4333-8333-333333333333" }] };
+        // Présence de la table des temps conservés (`to_regclass`, 0092 § 5 point 6).
+        if (texte.includes("to_regclass(")) return { rows: [{ presente: d.tablePresente }] };
         if (texte.startsWith("UPDATE prototype.runs SET status = 'programme_ecrit'")) {
           if (d.etat.statut !== "en_cours") return { rows: [] };
           d.etat.statut = "programme_ecrit";
@@ -369,6 +374,7 @@ function reinitialiser(): void {
   d.requetesSql.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
+  d.tablePresente = true;
   d.echecMoteur = false;
   d.sansStatut = false;
   d.composerP0Reel.mockImplementation(compositionSimulee);
@@ -587,6 +593,83 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     await etapeFinale({ runId: RUN_ID });
     // Après l'écriture du programme, l'exécution n'est plus en cours : le coût a été écrit avant.
     expect(d.etat.cout).toBeGreaterThan(avant);
+  });
+});
+
+describe("p0Run, étape finale : temps de trajet conservés (décision 0092 § 4)", () => {
+  /** Temps écrits : (clé de la paire, minutes) des `INSERT` de la table des temps, paramètres liés. */
+  const tempsEcrits = () =>
+    d.requetesSql
+      .filter((r) => r.texte === SQL_TRAJET)
+      .map((r) => ({ cle: cleTrajet({ mode: r.valeurs?.[1] as never, origine: String(r.valeurs?.[2]), destination: String(r.valeurs?.[3]) }), minutes: r.valeurs?.[4] }));
+
+  it("écrits dans la transaction du programme : seules les paires de pairesDuProgramme, minutes de la matrice de l'étape (aucune requête Routes de plus)", async () => {
+    await jusquAEtapeFinale();
+    await etapeFinale({ runId: RUN_ID });
+    const { contenu } = programmeEcrit();
+    const paires = new Set(pairesDistinctes(pairesDuProgramme(contenu as never)).map(cleTrajet));
+    const ecrits = tempsEcrits();
+    expect(ecrits.length).toBeGreaterThan(0);
+    for (const { cle, minutes } of ecrits) {
+      expect(paires.has(cle), cle).toBe(true);
+      expect(Number.isInteger(minutes) && (minutes as number) >= 0 && (minutes as number) <= 1440).toBe(true);
+    }
+    expect(new Set(ecrits.map((e) => e.cle)).size).toBe(ecrits.length);
+    // Les minutes écrites sont celles des matrices de l'étape (arrondies à la minute supérieure, 0090 § 2).
+    const routes = creerRoutesSimule(fixtures.routes);
+    for (const { cle, minutes } of ecrits) {
+      const [mode, origine, destination] = cle.split(":") as [RequeteMatrice["mode"], string, string];
+      const reponse = await routes.matrice({ origines: [origine], destinations: [destination], mode });
+      expect(minutes, cle).toBe(Math.ceil(Number(reponse.secondes[0]?.[0]) / 60));
+      expect(capture.matrices.some((m) => m.mode === mode && m.origines.includes(origine) && m.destinations.includes(destination)), cle).toBe(true);
+    }
+    // Ordre : après le programme, avant le passage à programme_ecrit.
+    const textes = d.requetesSql.map((r) => r.texte);
+    const programme = textes.findIndex((t) => t.startsWith("INSERT INTO prototype.programmes"));
+    const statut = textes.findIndex((t) => t.startsWith("UPDATE prototype.runs SET status = 'programme_ecrit'"));
+    const premier = textes.indexOf(SQL_TRAJET);
+    expect(premier).toBeGreaterThan(programme);
+    expect(textes.lastIndexOf(SQL_TRAJET)).toBeLessThan(statut);
+  });
+
+  it("table absente (migration non appliquée) : programme écrit comme avant, aucun temps", async () => {
+    d.tablePresente = false;
+    await jusquAEtapeFinale();
+    await etapeFinale({ runId: RUN_ID });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(tempsEcrits()).toEqual([]);
+  });
+
+  it("canari : aucun temps conservé dans un prompt, un journal, une trace ni la sortie de l'étape ; seulement dans les paramètres de son INSERT", async () => {
+    const sorties: string[] = [];
+    const espions = (["log", "info", "warn", "error", "debug", "trace"] as const).map((methode) =>
+      vi.spyOn(console, methode).mockImplementation((...args: unknown[]) => {
+        sorties.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+      }),
+    );
+    try {
+      await jusquAEtapeFinale();
+      const sortie = await etapeFinale({ runId: RUN_ID });
+      expect(sortie).toEqual({ runId: RUN_ID });
+    } finally {
+      for (const espion of espions) espion.mockRestore();
+    }
+    const ecrits = tempsEcrits();
+    expect(ecrits.length).toBeGreaterThan(0);
+    // Sentinelles : chaque paire conservée, sous sa clé et avec ses minutes (« clé=minutes »), et les clés de trajet.
+    const textes = [JSON.stringify(capture.requetes), ...sorties];
+    for (const texte of textes) {
+      for (const { cle, minutes } of ecrits) {
+        expect(texte).not.toContain(cle);
+        expect(texte).not.toContain(`${cle}=${String(minutes)}`);
+      }
+      expect(texte).not.toMatch(/"(minutes|travelMinutes|trajets)"\s*:/);
+    }
+    // Hors de leur INSERT, aucune requête ne porte un temps conservé ; le contenu du programme n'a aucune durée.
+    for (const requete of d.requetesSql.filter((r) => r.texte !== SQL_TRAJET)) {
+      for (const { cle } of ecrits) expect(JSON.stringify(requete.valeurs ?? [])).not.toContain(cle);
+    }
+    expect(clesDe(programmeEcrit().contenu).has("minutes")).toBe(false);
   });
 });
 

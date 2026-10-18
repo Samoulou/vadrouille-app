@@ -233,35 +233,73 @@ describe("adaptateurs: prototype n'écrit aucune relecture Google", () => {
   });
 });
 
-describe("adaptateurs: relecture en échec ou quota Google atteint, état d'erreur et aucune durée inventée", () => {
-  it.each(["quota_reached", "unavailable"] as const)("refus %s : erreur fermée, aucune sortie", async (refus) => {
+/** Voyage rendu sans aucune durée : chaque trajet `minutes: null`, chaque journée sans total, contrats valides. */
+function attendreSansDurees(trip: Awaited<ReturnType<ReturnType<typeof createPrototypeAdapter>["getTrip"]>>) {
+  expect(trip).not.toBeNull();
+  expect(TripSchema.safeParse(trip).success).toBe(true);
+  for (const day of trip!.days) {
+    const segments = day.items.flatMap((item) => (item.type === "segment" ? [item.segment] : []));
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments) expect(segment).toEqual({ mode: expect.any(String), minutes: null, estimated: false });
+    expect(day.travelMinutes).toBeNull();
+  }
+}
+
+describe("adaptateurs: relecture en échec ou quota Google atteint, page rendue sans ces temps et aucune durée inventée (décision 0092 § 4)", () => {
+  it.each(["quota_reached", "unavailable"] as const)("refus %s : voyage, journée et propositions rendus sans durée, sans total, sans erreur", async (refus) => {
     const adapter = createPrototypeAdapter({
       programmes: source(),
       relecteurs: { trajets: createRelecteurSimule({ refus }) },
     });
-    await expect(adapter.getTrip(ctx, TRIP_ID)).rejects.toThrow(RelectureError);
-    await expect(adapter.getDay(ctx, TRIP_ID, 1)).rejects.toThrow(new RegExp(refus));
-    await expect(adapter.listProposals(ctx, TRIP_ID)).rejects.toThrow(RelectureError);
+    attendreSansDurees(await adapter.getTrip(ctx, TRIP_ID));
+    const day = await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(DaySchema.safeParse(day).success).toBe(true);
+    expect(day!.travelMinutes).toBeNull();
+    const proposals = await adapter.listProposals(ctx, TRIP_ID);
+    expect(proposals.length).toBeGreaterThan(0);
+    for (const proposal of proposals) {
+      expect(ProposalSchema.safeParse(proposal).success).toBe(true);
+      expect(proposal.travelFromPrevious).toBeUndefined();
+      expect(proposal.detour).toBeUndefined();
+    }
+  });
+
+  it("relecteur qui lève : même rendu sans durée, aucune erreur propagée", async () => {
+    const adapter = createPrototypeAdapter({
+      programmes: source(),
+      relecteurs: {
+        trajets: {
+          relireJournee: async () => {
+            throw new Error("SENTINELLE_PANNE");
+          },
+        },
+      },
+    });
+    attendreSansDurees(await adapter.getTrip(ctx, TRIP_ID));
+    expect((await adapter.listProposals(ctx, TRIP_ID)).every((p) => p.travelFromPrevious === undefined)).toBe(true);
   });
 
   it.each<[string, number[]]>([
     ["trop peu de durées", [1]],
     ["durée négative", [-1, 1, 1, 1, 1]],
     ["durée non entière", [1.5, 1, 1, 1, 1]],
-  ])("réponse invalide (%s) : erreur, jamais corrigée", async (_cas, minutes) => {
+  ])("réponse invalide (%s) : durées absentes, jamais corrigées", async (_cas, minutes) => {
     const adapter = createPrototypeAdapter({
       programmes: source(),
       relecteurs: { trajets: { relireJournee: async () => ({ ok: true, minutes }) } },
     });
-    await expect(adapter.getDay(ctx, TRIP_ID, 1)).rejects.toThrow(/invalid_response/);
+    attendreSansDurees(await adapter.getTrip(ctx, TRIP_ID));
   });
 
-  it("le message d'erreur ne contient aucun identifiant de lieu", async () => {
-    const adapter = createPrototypeAdapter({
-      programmes: source(),
-      relecteurs: { trajets: createRelecteurSimule({ refus: "quota_reached" }) },
-    });
-    const erreur = await adapter.getTrip(ctx, TRIP_ID).catch((e: unknown) => e);
+  it("lieu manquant (programme hors forme) : erreur fermée missing_place, sans identifiant de lieu dans le message", async () => {
+    const programme = programmeDeTest();
+    const ligne = programme.trip.days[0]!.items.find((item) => item.type === "stop");
+    if (ligne?.type !== "stop") throw new Error("étape attendue");
+    delete ligne.stop.placeId;
+    const adapter = createPrototypeAdapter({ programmes: source(programme), relecteurs: { trajets: createRelecteurSimule() } });
+    const erreur = await adapter.getDay(ctx, TRIP_ID, 1).catch((e: unknown) => e);
+    expect(erreur).toBeInstanceOf(RelectureError);
+    expect(erreur).toMatchObject({ code: "missing_place" });
     expect(String((erreur as Error).message)).not.toMatch(/SENTINELLE/);
   });
 });

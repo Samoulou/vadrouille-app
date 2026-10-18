@@ -105,8 +105,8 @@ describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
   it("lecture seule : transaction READ ONLY bornée par statement_timeout, SELECT fixes, valeurs en paramètres liés", async () => {
     const simule = poolSimule({ contenus: [contenuEcrit()] });
     const source = createSourceProgrammesReels({ pool: async () => simule.pool });
-    expect((await source.lister()).map((p) => p.trip.id)).toEqual([TRIP_ID]);
-    expect((await source.lire(TRIP_ID))?.trip.id).toBe(TRIP_ID);
+    expect((await source.lister()).map((p) => p.programme.trip.id)).toEqual([TRIP_ID]);
+    expect((await source.lire(TRIP_ID))?.programme.trip.id).toBe(TRIP_ID);
     expect(simule.requetes.map((r) => r.texte)).toEqual([
       "BEGIN READ ONLY",
       SQL_DELAI,
@@ -162,7 +162,7 @@ describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
   it("positions d'un autre lieu ignorées ; aucune position de trop dans le programme recomposé", async () => {
     const simule = poolSimule({ contenus: [contenuEcrit()], positions: [...lignesPositions(), { place_id: "lieu_autre_hors_programme", lat: 1, lng: 2 }] });
     const programme = await createSourceProgrammesReels({ pool: async () => simule.pool }).lire(TRIP_ID);
-    expect(programme?.positions).toEqual(programmeComplet().positions);
+    expect(programme?.programme.positions).toEqual(programmeComplet().positions);
   });
 
   it("« Mes voyages » : une seule connexion pour toute la liste", async () => {
@@ -208,15 +208,20 @@ describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
     }
   });
 
-  it("relecture refusée : la journée n'est pas servie (état d'erreur existant), jamais une durée inventée", async () => {
+  it("relecture refusée : la journée est servie sans ses temps ni son total (décision 0092 § 4), jamais une durée inventée", async () => {
     const simule = poolSimule({ contenus: [contenuEcrit()] });
     for (const raison of ["quota_reached", "unavailable"] as const) {
       const adapter = createPrototypeAdapterReel({
         programmes: createSourceProgrammesReels({ pool: async () => simule.pool }),
         relecteurs: { trajets: { relireJournee: async () => ({ ok: false, raison }) } },
       });
-      await expect(adapter.getTrip(ctx, TRIP_ID)).rejects.toMatchObject({ name: "RelectureError", code: raison });
-      await expect(adapter.getDay(ctx, TRIP_ID, 1)).rejects.toMatchObject({ code: raison });
+      const trip = await adapter.getTrip(ctx, TRIP_ID);
+      TripSchema.parse(trip);
+      for (const jour of trip!.days) {
+        expect(jour.travelMinutes).toBeNull();
+        for (const item of jour.items) if (item.type === "segment") expect(item.segment.minutes).toBeNull();
+      }
+      expect((await adapter.getDay(ctx, TRIP_ID, 1))?.travelMinutes).toBeNull();
     }
   });
 

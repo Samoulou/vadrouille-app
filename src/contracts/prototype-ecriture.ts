@@ -11,7 +11,14 @@ import type { ProgrammeReduit } from "@/prototype/programme-reduit";
  *   champ `position` de la fiche Place Details obtenue **dans l'étape finale de cette exécution**, celle sur laquelle le
  *   plan validé a été calculé (§ 1.3) ; jamais une position du cache, de l'ancrage ou de Text Search.
  *
- * Aucune autre donnée d'une réponse Place Details ou Routes n'a de place dans ce contrat (§ 1.4).
+ * - `trajets` (décision 0092 § 4, exception à 0011 pour le prototype seulement) : temps de trajet en minutes entières,
+ *   par clé `cleTrajet` (mode, origine, destination ; `src/prototype/programme-reduit.ts`), pour des paires de
+ *   `pairesDuProgramme(programme)` seulement, ceux sur lesquels le moteur a planifié **dans l'étape finale de cette
+ *   exécution** (`trajetsAConserver`) ; une paire sans durée connue est absente. Jamais dans un prompt, un journal,
+ *   une trace ni un état de workflow.
+ *
+ * Aucune autre donnée d'une réponse Place Details ou Routes n'a de place dans ce contrat (§ 1.4) : ni distance, ni
+ * condition, ni autre champ de Routes.
  */
 /** Contenu écrit en base : le programme réduit sans `positions` (égal à `ContenuProgramme` de `src/prototype/decoupage.ts`). */
 export type ContenuProgrammePrototype = Omit<ProgrammeReduit, "positions">;
@@ -23,6 +30,7 @@ export type EcritureProgrammePrototype = {
   readonly runId: string;
   readonly programme: ContenuProgrammePrototype;
   readonly positions: ReadonlyMap<string, PositionProgrammePrototype>;
+  readonly trajets: ReadonlyMap<string, number>;
 };
 
 /** Résultat d'une écriture réussie : l'identifiant du programme écrit, rien d'autre. */

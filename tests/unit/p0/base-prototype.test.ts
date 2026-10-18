@@ -48,6 +48,22 @@ describe("ancrage: masques de champs exacts", () => {
   });
 });
 
+describe("imports: table des temps de trajet nommée par deux modules seulement (décision 0092 § 5)", () => {
+  /** Seuls modules hors de `db/` et `tests/db/` qui nomment la table : l'écriture et la lecture des programmes réels. */
+  const ADMIS = ["src/adapters/prototype-ecriture.ts", "src/adapters/prototype-lecture.ts"];
+  const nom = ["prototype", "trajets"].join(".");
+
+  it("hors de db/ et de tests/db/ (et de la documentation), seuls prototype-ecriture.ts et prototype-lecture.ts nomment la table", () => {
+    const nommant: string[] = [];
+    for (const f of fichiers()) {
+      if (!TEXTE.test(f) || f.endsWith(".md") || f === CE_FICHIER) continue;
+      if (["db/", "tests/db/", "docs/", "specs/"].some((d) => f.startsWith(d))) continue;
+      if ((lire(f) ?? "").includes(nom)) nommant.push(f);
+    }
+    expect(nommant.sort()).toEqual([...ADMIS].sort());
+  });
+});
+
 describe("imports: store_prototype_coordinates nommée par un seul module (S6 de 0046, resserrée par 0052 § 1.10)", () => {
   const MODULE = "src/adapters/prototype-ecriture.ts";
   /** Seul importateur admis hors des tests : l'étape finale de `p0Run` (0052 § 1.10). */

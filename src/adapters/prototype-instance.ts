@@ -13,8 +13,9 @@ import type { TripAdapter } from "./types";
  *   **simulé** (P0b1 : aucun relecteur réel, aucune clé lue, aucun appel à Google ; `pnpm dev`, CI, e2e) ;
  * - sinon : programmes **réels** lus dans `prototype.programmes`, en lecture seule, **recomposés avec leurs positions**
  *   (`place_coordinates`, carte Google), derrière la barrière du mode réel (garde ouverte et cookie d'accès, vérifiée à
- *   chaque lecture ; fermée : aucun programme, comme avant), avec le **relecteur Routes réel** (durées relues à chaque
- *   affichage, réservées et plafonnées, P0r4). La barrière (`src/server/p0/lecture-programmes.ts`) et le relecteur
+ *   chaque lecture ; fermée : aucun programme, comme avant), avec leurs temps de trajet conservés (0092) et le
+ *   **relecteur Routes réel** pour les seules paires sans temps conservé (relues à chaque affichage, réservées et
+ *   plafonnées, P0r4). La barrière (`src/server/p0/lecture-programmes.ts`) et le relecteur
  *   (`src/server/p0/relecture.ts`) sont **branchés au démarrage** par `src/instrumentation.ts`
  *   (`brancherLectureProgrammesReels`) : ce module n'importe ni la base, ni la garde, ni Routes (régime de confinement,
  *   doubles de `@/adapters`). Non branchés (tests, `next build`, autre runtime) : aucun programme, aucune relecture.
@@ -54,7 +55,7 @@ export function brancherLectureProgrammesReels(barriere: BarriereLectureProgramm
 /** Barrière lue à chaque lecture ; non branchée : `null` (aucune connexion, aucun programme). */
 const poolLectureProgrammes: BarriereLectureProgrammes = async () => (await holder[INSTANCE_KEY]?.barriere?.()) ?? null;
 
-/** Relecteur réel lu à chaque relecture ; non branché : refus (aucun appel, état d'erreur, jamais une durée inventée). */
+/** Relecteur réel lu à chaque relecture ; non branché : refus (aucun appel ; page sans ces durées, 0092 § 4 ; jamais une durée inventée). */
 const relecteurReel: RelecteurTrajets = {
   relireJournee: async (paires) => (await holder[INSTANCE_KEY]?.relecteur?.relireJournee(paires)) ?? { ok: false, raison: "unavailable" },
 };
