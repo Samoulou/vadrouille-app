@@ -1,35 +1,35 @@
-# État du studio — 2026-10-18 (98e cycle)
+# État du studio — 2026-10-18 (99e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 14 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 15 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 08:39 UTC : essai à Rome avec sa description (ticket #478) ; brief `rome-1` fusionné (#479), report sur le site d'essai (#480) **fusionné par Samuel** à 09:25 UTC ; essai réel lancé par Samuel, programme écrit et listé.
-- 09:40 UTC : « les trois derniers jours les activités s'arrêtent à 13 h » : diagnostic ia-recherche (23 candidats pour environ 34 lieux demandés, jours remplis dans l'ordre) ; correction lancée (ticket #483).
+- 09:47 à 09:58 UTC (essai Rome) : un quartier par jour, incontournables de la destination d'abord (monuments à Rome, autre chose ailleurs) avec explication, fiche pratique par étape (prix, horaires, astuce), nombre d'activités selon la durée des visites (matin 8-12 h : 2 × 2 h ou 3-4 × 1 h, puis repas ; idem après-midi et soir) ; PDF d'exemple (`/mnt/project-files/essai-reel/exemples/rome-samuel.pdf`) ; ticket #487 (amendement 3, PR #489) et correction #483 (PR #490).
+- 11:42 UTC : carte de décision, **« Monter à 840 »** éléments Routes par voyage (Q494) ; appliqué dans 0088 (#490). Réserve Google d'une exécution : 4,30 → 6,00 USD (environ 3 exécutions par mois dans le plafond de 20 USD), dit à Samuel.
 - #studio : aucun message nouveau.
 
 ## Fait
-- Fusionnées : statut du 97e cycle (#477), **brief d'essai Rome** (#479), **décision 0087** (#476, préalables de B9b et B9c ; définitive à 15:23 UTC, 0068), report `main` → `p0-reel` (#480, par Samuel).
-- B6a (#473) : CI réparée (3c8c907 : `lecture.test.ts` sans import direct de drizzle, aucune ligne de confinement ajoutée) ; revue relancée.
-- 0087 : bloquant tardif corrigé (`request_id` des versions d'une exécution `full`, UUID v5 dérivé) avant fusion.
+- Fusionnées : statut du 98e cycle (#485), **B6a** (#473, lecture serveur et adaptateur `api`), note de version v2026.10.18-09 (#488).
+- #490 (remplissage du séjour) : décision 0088 du Tech Lead (cibles depuis la demande, regroupement par quartier sur tous les jours, Routes à 840), puis correction 1 bis 73c8e02 (retrait de `typesPrioritaires`, test de borne `demandeDuJour`, `routesElements` 840 dans `essai.json`, `mode-reel.json` et les bornes du schéma) ; `pnpm verify` vert hors 74 écarts visuels connus ; revue relancée.
 
 ## En cours
-- ia-recherche : **remplissage du séjour** (#483 : cibles de recherche tirées du brief, répartition des lieux sur tous les jours, demande bornée par la fenêtre du jour, soirée comptée sur `slotFit`).
-- ia-recherche : **B8-PO-13, B8-PO-15 et remplacement de `ancrerLogement`** (#481) ; `needs-review` après 15:23 UTC (fin du délai de 0087).
-- backend : **PR de contrat de B9d** (#482 : `kind` de la reprise, `getFullTripStatus`) ; `needs-review` après 15:23 UTC.
-- Revue : B6a (#473).
+- Revue : **#490** (correction 2, la dernière : la revue de `acbc0b9` est comptée).
+- product-owner : **#489** (amendement 3, qualité du programme), correction 2, la dernière (repas du soir et secteur du jour ; 7 activités au plus par jour plein, 715 éléments, 840 retenu par Samuel).
+- #481 (PR #486) et #482 (PR #484) : `needs-review` après 15:23 UTC (fin du délai de 0087).
 
 ## Bloqué
-- **B4a** et **B8b** : après B6a (B4a jamais dans le même cycle, 0078).
+- **B9b** : B6a fusionnée ; attend la fusion de la PR de contrat de B9d (#484, mêmes fichiers d'adaptateur de création) ; noms de colonnes posés par le rôle data dans sa migration (0087 § 1.2, Q492).
+- **B4a** et **B8b** : après B6a, jamais dans le même cycle que B9b (0078) ; à placer.
 - **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
-- **B9** : B9b après B6a et les noms de colonnes (data, Q492) ; B9c après #481 ; B9d : verdict Sécurité (Q492) ; B9c réel : Q468 ; B9e : Q467.
+- **B9c** après #481 ; B9d : verdict Sécurité (Q492) ; B9c réel : Q468 ; B9e : Q467.
 - **Purge du MVP** : activation Q438 (Samuel).
-- **Compteurs de fin d'essai** (`p0.final_counts`, correction 4 du diagnostic Rome) : touche `src/server/log.ts`, interdit dans le cycle de B6a ; après B6a (Q493).
+- **Compteurs de fin d'essai** (`p0.final_counts`, Q493) : B6a fusionnée, ticket à ouvrir.
 
 ## Prochain cycle
-1. Après la fusion de #483 : report `main` → `p0-reel` pour que Samuel relance Rome.
-2. Après 15:23 UTC : `needs-review` sur #481 et #482.
-3. Après la fusion de B6a : B9b (backend), puis B4a dans un autre cycle ; ticket des compteurs de fin d'essai (Q493).
-4. Tickets à placer : police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
+1. Après la fusion de #490 : report `main` → `p0-reel` ; Samuel relance Rome en « Exécution comptée » (les nouvelles cibles ; « Essai d'intégration » garde le profil fixe, 0073 point 4).
+2. Après 15:23 UTC : `needs-review` sur #484 et #486.
+3. Après #484 : B9b (backend avec data pour la migration) ; B4a dans un autre cycle ; ticket Q493.
+4. Code de l'amendement 3 (#489) après sa fusion et celle de #490.
+5. Tickets à placer : police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : aucune pour l'instant (Q39, Q45, Q465 et Q491 répondues le 2026-10-18).
