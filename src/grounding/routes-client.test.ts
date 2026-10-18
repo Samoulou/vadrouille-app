@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { COUT_ELEMENT_MICROS, createRoutesClient, MASQUE_MATRICE, ORIGINE_ROUTES, SKU_MATRICE, type OptionsRoutes } from "@/grounding/routes-client";
+import { cleMaison, type PointRoutes } from "@/grounding/interfaces";
 import { chargerTrajets } from "@/grounding/trajets";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
@@ -264,6 +265,83 @@ describe("fiches: introuvable du client réel (Routes inchangé)", () => {
   it("Routes 404 : upstream_error, jamais upstream_not_found", async () => {
     const { client } = monter([async () => json({ error: { message: "SENTINELLE-FOURNISSEUR" } }, 404)]);
     expect((await erreurDe(client.matrice({ origines: ["A"], destinations: ["B"], mode: "walk" }))).code).toBe("upstream_error");
+  });
+});
+
+// Décision 0087 § 3.2 (B8-PO-15, variante (i)) : centre maison d'un `suggestedArea` envoyé en coordonnées. Requête
+// nouvelle pour le client réel : verdict de la Sécurité demandé dans la PR porteuse (0087 § 3.4).
+describe("trajets: un quartier conseillé part de son centre (client Routes réel)", () => {
+  const CENTRE = { lat: 46.201, lng: 6.145 };
+
+  it("centre maison : waypoint location.latLng (deux nombres seuls) ; placeId inchangé ; même SKU et même coût par élément", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, duration: "0s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, duration: "600s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    const reponse = await client.matrice({ origines: [{ centreMaison: CENTRE }], destinations: [{ centreMaison: CENTRE }, "B1"], mode: "walk" });
+    expect(reponse).toEqual({ secondes: [[0, 600]] });
+    expect(JSON.parse(String(premier(appels).init.body))).toEqual({
+      origins: [{ waypoint: { location: { latLng: { latitude: CENTRE.lat, longitude: CENTRE.lng } } } }],
+      destinations: [{ waypoint: { location: { latLng: { latitude: CENTRE.lat, longitude: CENTRE.lng } } } }, { waypoint: { placeId: "B1" } }],
+      travelMode: "WALK",
+    });
+    expect(new Headers(premier(appels).init.headers).get("x-goog-fieldmask")).toBe(MASQUE_MATRICE);
+    expect(port.lignes.map((l) => [l.etat, l.demande.sku, l.demande.unites, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", SKU_MATRICE, { requetes: 1, elements: 2 }, 2 * COUT_ELEMENT_MICROS],
+    ]);
+  });
+
+  it("chargerTrajets de bout en bout : Routes reçoit area.center, la durée revient sous la clé maison", async () => {
+    const { client, appels } = monter([
+      async () =>
+        json([
+          { originIndex: 0, destinationIndex: 0, duration: "0s", condition: "ROUTE_EXISTS" },
+          { originIndex: 0, destinationIndex: 1, duration: "600s", condition: "ROUTE_EXISTS" },
+          { originIndex: 1, destinationIndex: 0, duration: "660s", condition: "ROUTE_EXISTS" },
+          { originIndex: 1, destinationIndex: 1, duration: "0s", condition: "ROUTE_EXISTS" },
+        ]),
+    ]);
+    const cle = cleMaison(CENTRE);
+    const resultat = await chargerTrajets([{ cleMaison: cle, centreMaison: CENTRE }, { placeId: "P_A", position: { lat: 46.21, lng: 6.15 } }], ["walk"], client);
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(resultat.valeur.duree(cle, "P_A", "walk")).toEqual({ minutes: 10, estimee: false });
+    expect(resultat.valeur.duree("P_A", cle, "walk")).toEqual({ minutes: 11, estimee: false });
+    expect(JSON.parse(String(premier(appels).init.body)).origins[0]).toEqual({ waypoint: { location: { latLng: { latitude: CENTRE.lat, longitude: CENTRE.lng } } } });
+  });
+
+  it.each([
+    ["latitude > 90", { lat: 90.001, lng: 0 }],
+    ["latitude < -90", { lat: -91, lng: 0 }],
+    ["longitude > 180", { lat: 0, lng: 180.5 }],
+    ["longitude < -180", { lat: 0, lng: -181 }],
+    ["NaN", { lat: Number.NaN, lng: 0 }],
+    ["infini", { lat: 0, lng: Number.POSITIVE_INFINITY }],
+    ["chaîne", { lat: "46.2", lng: 6.1 }],
+    ["absent", {}],
+  ])("requête Routes en coordonnées refusée hors bornes avant réservation : %s", async (_cas, centre) => {
+    const { client, transport, port } = monter([]);
+    const point = { centreMaison: centre } as unknown as PointRoutes;
+    expect((await erreurDe(client.matrice({ origines: [point], destinations: ["B"], mode: "walk" }))).code).toBe("invalid_request");
+    expect((await erreurDe(client.matrice({ origines: ["A"], destinations: [point], mode: "walk" }))).code).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("autres formes refusées avant réservation (objet sans enveloppe, Coordonnees nu, null)", async () => {
+    const { client, transport, port } = monter([]);
+    for (const point of [{ lat: 46.2, lng: 6.1 }, { centreMaison: null }, null, 42] as unknown as PointRoutes[])
+      expect((await erreurDe(client.matrice({ origines: [point], destinations: ["B"], mode: "walk" }))).code).toBe("invalid_request");
+    expect(transport).not.toHaveBeenCalled();
+    expect(port.lignes).toEqual([]);
+  });
+
+  it("bornes incluses : ±90 et ±180 admis", async () => {
+    const { client, transport } = monter([async () => json([{ originIndex: 0, destinationIndex: 0, duration: "60s", condition: "ROUTE_EXISTS" }])]);
+    await client.matrice({ origines: [{ centreMaison: { lat: -90, lng: 180 } }], destinations: [{ centreMaison: { lat: 90, lng: -180 } }], mode: "car" });
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 });
 

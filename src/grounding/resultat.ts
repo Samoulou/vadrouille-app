@@ -53,7 +53,7 @@ export function echecDe(erreur: unknown): EchecAncrage {
 }
 
 /**
- * Échec déjà converti d'une étape interne (par exemple `chargerFiches` dans `ficherSerie` ou `ancrerLogement`), levé
+ * Échec déjà converti d'une étape interne (par exemple `chargerFiches` dans `ficherSerie` ou `verifierLogement`), levé
  * pour interrompre la fonction appelante et rendu tel quel par `capturer`, sans nouvelle conversion.
  */
 export class EchecRemonte extends Error {
