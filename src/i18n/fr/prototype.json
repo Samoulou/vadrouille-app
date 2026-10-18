@@ -85,6 +85,7 @@
         "upstream_unavailable": "service externe indisponible",
         "upstream_redirect": "redirection d'un service externe",
         "usage_unavailable": "base d'usage indisponible",
+        "upstream_rate_limited": "limite Google du jour atteinte : réessaie demain après 9 h (heure de Paris)",
         "pipeline_failed": "échec du traitement"
       },
       "jourQuota": "Jour de quota",

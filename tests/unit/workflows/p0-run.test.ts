@@ -306,6 +306,17 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "upstream_unavailable");
   });
 
+  it("limite Google atteinte dans l'étape finale (Routes, HTTP 429) : clôture upstream_rate_limited, sans message", async () => {
+    d.lireCandidats.mockResolvedValue([]);
+    d.ancrerCandidatsDansZone.mockResolvedValue(new Map());
+    d.etapeFinale.mockImplementation(() => {
+      throw Object.assign(new Error(SENTINELLE_ERREUR), { code: "upstream_rate_limited" });
+    });
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.cloreExecution).toHaveBeenCalledTimes(1);
+    expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "upstream_rate_limited");
+  });
+
   it("phase déjà passée (étape redistribuée après expiration) : arrêt avant toute composition, pipeline_failed", async () => {
     d.ecrirePhase.mockRejectedValue(Object.assign(new Error(SENTINELLE_ERREUR), { code: "phase_deja_passee" }));
     for (const etape of [etapeRecherche, etapeAncrage, etapeFinale]) {
@@ -411,6 +422,23 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     const dependances = d.chercherCandidats.mock.calls[0]?.[1] as { peutAppeler?: unknown; observer?: unknown };
     expect(typeof dependances.peutAppeler).toBe("function");
     expect(typeof dependances.observer).toBe("function");
+  });
+
+  it("clôture : un code de limite d'appels (429 de Google) est écrit tel quel", async () => {
+    await etapeClore({ runId: RUN_ID, code: "upstream_rate_limited" });
+    expect(d.cloreExecution).toHaveBeenCalledTimes(1);
+    expect(d.cloreExecution).toHaveBeenCalledWith(d.pool, RUN_ID, "upstream_rate_limited");
+  });
+
+  it("clôture : code de limite refusé par la base (sans la migration 0011) : repris en pipeline_failed ; un autre code n'est pas repris", async () => {
+    d.cloreExecution.mockRejectedValueOnce(new Error("23514"));
+    expect(await etapeClore({ runId: RUN_ID, code: "upstream_rate_limited" })).toEqual({ runId: RUN_ID });
+    expect(d.cloreExecution.mock.calls.map((appel) => appel[2])).toEqual(["upstream_rate_limited", "pipeline_failed"]);
+
+    d.cloreExecution.mockClear();
+    d.cloreExecution.mockRejectedValueOnce(new Error("23514"));
+    expect(await etapeClore({ runId: RUN_ID, code: "upstream_unavailable" })).toEqual({ runId: RUN_ID });
+    expect(d.cloreExecution.mock.calls.map((appel) => appel[2])).toEqual(["upstream_unavailable"]);
   });
 
   it("clôture : un code hors de CODES_ARRET devient pipeline_failed", async () => {

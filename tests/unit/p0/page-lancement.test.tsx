@@ -189,6 +189,15 @@ describe("p0: page de lancement", () => {
     expect(d.requetes).not.toContain(SQL_CONTENU);
   });
 
+  it("arrêt sur la limite Google du jour (Routes, HTTP 429) : cause en clair sur la page et dans le rapport", async () => {
+    d.lignes = [ligne({ status: "arretee", stop_code: "upstream_rate_limited", canary_ok: null })];
+    const page = await pageExecutionsP0();
+    if (page.etat !== "ouverte") throw new Error("page non ouverte");
+    expect(page.modele.rapport?.texte).toContain(`upstream_rate_limited (${t.suivi.codesArret.upstream_rate_limited})`);
+    const html = renderToString(await ExecutionsPage());
+    expect(html).toContain(html$(t.suivi.codesArret.upstream_rate_limited));
+  });
+
   it("base injoignable : suivi indisponible, formulaire conservé", async () => {
     d.panne = true;
     const html = renderToString(await ExecutionsPage());

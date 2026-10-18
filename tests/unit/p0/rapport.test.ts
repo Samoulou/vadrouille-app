@@ -126,7 +126,17 @@ describe("p0: texte du rapport (« Copier le rapport »)", () => {
     const execution = arretee("upstream_unavailable");
     const texte = texteDuRapport(execution, criteresDuRapport(execution, null), null);
     expect(texte).toContain(`${t.issue} : ${t.issues.arretee}`);
-    expect(texte).toContain(`${t.codeArret} : upstream_unavailable`);
+    expect(texte.split("\n")).toContain(`${t.codeArret} : upstream_unavailable (${messages.prototype.lancement.suivi.codesArret.upstream_unavailable})`);
     expect(texte.split("\n").at(-1)).toBe(`${t.dernierePurge} : ${t.aucunePurge}`);
+  });
+
+  it("limite Google du jour atteinte : code et libellé clair ; A7 et A8 non relevés (ce n'est pas un plafond)", () => {
+    const execution = arretee("upstream_rate_limited");
+    const criteres = criteresDuRapport(execution, null);
+    expect(criteres.A7).toBe("non_releve");
+    expect(criteres.A8).toBe("non_releve");
+    const libelle = messages.prototype.lancement.suivi.codesArret.upstream_rate_limited;
+    expect(libelle).toMatch(/limite Google du jour atteinte/);
+    expect(texteDuRapport(execution, criteres, null).split("\n")).toContain(`${t.codeArret} : upstream_rate_limited (${libelle})`);
   });
 });

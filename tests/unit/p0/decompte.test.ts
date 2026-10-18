@@ -42,6 +42,12 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     expect(decompte(executions, "edimbourg-1.json", "B")).toEqual({ comptees: 4, relances: 0 });
   });
 
+  it("limite Google du jour atteinte (upstream_rate_limited) : compte comme pipeline_failed, sans relance (décompte inchangé, question à Samuel)", () => {
+    expect(CODES_EXTERNES_SUIVI).not.toContain("upstream_rate_limited");
+    expect(decompte([arretee("upstream_rate_limited")], "edimbourg-1.json", "B")).toEqual(decompte([arretee("pipeline_failed")], "edimbourg-1.json", "B"));
+    expect(decompte([arretee("upstream_rate_limited")], "edimbourg-1.json", "B")).toEqual({ comptees: 1, relances: 0 });
+  });
+
   it.each(CODES_EXTERNES_SUIVI)("une fin externe (%s) est une relance, au plus une ; la seconde compte", (code) => {
     expect(decompte([arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 1 });
     expect(decompte([arretee(code), arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 1, relances: 1 });

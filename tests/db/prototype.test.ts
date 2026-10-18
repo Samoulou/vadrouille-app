@@ -538,6 +538,8 @@ describe("invariants et contenus (0046 D24, S4)", () => {
       expect(await essai("UPDATE prototype.runs SET phase = 'inconnue' WHERE id = $1")).toBe("23514");
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'place_not_found', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBe("23514");
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'cap_reached', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBe("23514");
+      // Limite d'appels de Google (migration 0011_arret_limite_google) : code admis.
+      expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'upstream_rate_limited', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBeUndefined();
       expect(await essai("UPDATE prototype.runs SET status = 'arretee', stop_code = 'pipeline_failed', phase = NULL, cost_models_micros = NULL WHERE id = $1")).toBeUndefined();
       // Colonnes non modifiables, valeurs hors liste à l'insertion ; seconde exécution du même jour admise (0071).
       await expectRefused(proto, "UPDATE prototype.runs SET started_at = now() - interval '1 day' WHERE id = $1", [id]);

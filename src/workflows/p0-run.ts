@@ -12,7 +12,7 @@ import { creerCadence, ErreurBudgetRoutes, planRoutes, routesDuSejour } from "@/
 import { fichesEtapeFinale, margeRemplacement } from "@/grounding/fiches-finales";
 import { regrouperParJour } from "@/grounding/zone";
 import type { AncrageResolu, Position, Trajets } from "@/prototype/ancrage";
-import { CODES_ARRET, codePersiste, type CodeArret } from "@/prototype/arret";
+import { CODES_ARRET, CODES_LIMITE, codePersiste, type CodeArret } from "@/prototype/arret";
 import { BriefSchema, type Brief } from "@/prototype/brief";
 import { CandidatSchema, type Candidat, type CandidatNote } from "@/prototype/candidat";
 import {
@@ -967,6 +967,16 @@ export async function etapeClore(entree: EtatP0Run & { readonly code: CodeArret 
   try {
     await cloreExecution(poolPrototype(), ouverte.garde.runId, code);
   } catch {
+    // Code de limite d'appels (`CODES_LIMITE`) refusé, par exemple par une base sans la migration
+    // 0011_arret_limite_google : une seconde écriture le reprend en `pipeline_failed`, le code d'avant cette migration
+    // (même décompte). L'écriture d'un autre code n'est pas reprise.
+    if ((CODES_LIMITE as readonly string[]).includes(code)) {
+      try {
+        await cloreExecution(poolPrototype(), ouverte.garde.runId, "pipeline_failed");
+      } catch {
+        // Échec de la base : voir ci-dessous.
+      }
+    }
     // Échec de la base : l'exécution reste `en_cours` et sera close comme orpheline au lancement suivant.
   }
   return { runId: ouverte.garde.runId };

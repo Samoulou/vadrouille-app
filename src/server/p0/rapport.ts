@@ -10,7 +10,7 @@ import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme
  * ouverte 8 de 0046 sont sans réponse). Module pur : calculé à l'affichage, en mémoire, jamais écrit en base.
  *
  * Contenu, et rien d'autre : identité de l'exécution (mode, brief, variante, jour de quota, commit), issue, code
- * d'arrêt de S4, critères A1 à A9 **en oui ou non** (« non relevé » pour A9 tant que le canari n'est pas écrit, et pour
+ * d'arrêt de S4 et son libellé fixe, critères A1 à A9 **en oui ou non** (« non relevé » pour A9 tant que le canari n'est pas écrit, et pour
  * A1, A2 et A6 si le programme n'est plus lisible), date de la dernière purge réussie. Jamais : coût ni durée en valeur
  * (question ouverte 8), coût Google (Q368), nombre de cases « aucune option compatible » (verdict 3), compteur
  * d'ancrage (Q258), `placeId`, nom, adresse, position ou texte du programme.
@@ -29,6 +29,10 @@ import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme
  */
 
 const t = messages.prototype.lancement.rapport;
+const libellesArret: Readonly<Record<string, string>> = messages.prototype.lancement.suivi.codesArret;
+
+/** Code d'arrêt suivi de son libellé (liste fermée de S4), pour que le rapport dise la cause sans la page. */
+const codeEtLibelle = (code: string) => (Object.hasOwn(libellesArret, code) ? `${code} (${libellesArret[code]!})` : code);
 
 const oui = (vrai: boolean): ValeurCritere => (vrai ? "oui" : "non");
 
@@ -98,7 +102,7 @@ export function texteDuRapport(execution: ExecutionSuivie, criteres: CriteresRap
     `${t.jourQuota} : ${execution.jourQuota}`,
     `${t.commit} : ${execution.commitSha}`,
     `${t.issue} : ${execution.statut === "programme_ecrit" ? t.issues.programme_ecrit : t.issues.arretee}`,
-    ...(execution.codeArret === null ? [] : [`${t.codeArret} : ${execution.codeArret}`]),
+    ...(execution.codeArret === null ? [] : [`${t.codeArret} : ${codeEtLibelle(execution.codeArret)}`]),
     ...CRITERES.map((critere) => `${critere} ${t.criteres[critere]} : ${t.valeurs[criteres[critere]]}`),
     `${t.dernierePurge} : ${dernierePurge ?? t.aucunePurge}`,
   ];

@@ -78,6 +78,13 @@
       "when": 1792327160476,
       "tag": "0010_usage_forfait",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792347126169,
+      "tag": "0011_arret_limite_google",
+      "breakpoints": true
     }
   ]
 }

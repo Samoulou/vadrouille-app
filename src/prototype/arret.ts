@@ -26,8 +26,17 @@ export const CODES_AVANT_APPEL = [
 /** Codes **externes**, qui ouvrent la relance (P0S2-PO-13) ; ils ne disent ni l'étape ni le fournisseur. */
 export const CODES_EXTERNES = ["upstream_unavailable", "upstream_redirect", "usage_unavailable"] as const;
 
-/** Énumération fermée de `prototype.runs.stop_code`. */
-export const CODES_ARRET = [...CODES_AVANT_APPEL, ...CODES_EXTERNES, "pipeline_failed"] as const;
+/**
+ * Codes de **limite d'appels** d'un service externe (HTTP 429 de Google, `ErreurClientGoogle`), le plus souvent la
+ * limite du jour fixée dans la console : eux-mêmes, avant comme après un appel payant, pour que la page et le rapport
+ * disent la cause. **Hors de `CODES_EXTERNES`** : ils n'ouvrent pas la relance et comptent comme `pipeline_failed`
+ * (P0S2-PO-13 inchangé ; compter ou non un tel arrêt reste à décider par Samuel). Comme les codes externes, ils ne
+ * disent pas l'étape.
+ */
+export const CODES_LIMITE = ["upstream_rate_limited"] as const;
+
+/** Énumération fermée de `prototype.runs.stop_code` (migrations 0003_prototype puis 0011_arret_limite_google). */
+export const CODES_ARRET = [...CODES_AVANT_APPEL, ...CODES_EXTERNES, ...CODES_LIMITE, "pipeline_failed"] as const;
 export type CodeArret = (typeof CODES_ARRET)[number];
 
 /**
@@ -50,7 +59,7 @@ export const CODES_REFUS_LANCEMENT = ["envelope_reached", "daily_quota_insuffici
  * Code écrit en base pour un code levé par une étape.
  * - `apresAppelPayant` : un code « avant tout appel payant » levé après le premier appel payant devient
  *   `pipeline_failed` (D24) ;
- * - codes externes : eux-mêmes ;
+ * - codes externes et codes de limite d'appels (`CODES_LIMITE`) : eux-mêmes ;
  * - tout le reste (ancrage, planification, plafonds, délai, modèles, erreurs internes, codes inconnus) :
  *   `pipeline_failed`.
  */
@@ -61,6 +70,7 @@ export function codePersiste(code: unknown, apresAppelPayant: boolean): CodeArre
   }
   const normalise = ALIAS.get(code) ?? code;
   if ((CODES_EXTERNES as readonly string[]).includes(normalise)) return normalise as CodeArret;
+  if ((CODES_LIMITE as readonly string[]).includes(normalise)) return normalise as CodeArret;
   if ((CODES_AVANT_APPEL as readonly string[]).includes(normalise)) return apresAppelPayant ? "pipeline_failed" : (normalise as CodeArret);
   return "pipeline_failed";
 }

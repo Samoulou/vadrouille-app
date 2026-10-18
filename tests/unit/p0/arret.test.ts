@@ -5,21 +5,25 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CODES_ARRET, CODES_AVANT_APPEL, CODES_EXTERNES, CODES_REFUS_LANCEMENT, codePersiste, PHASES } from "@/prototype/arret";
+import { CODES_ARRET, CODES_AVANT_APPEL, CODES_EXTERNES, CODES_LIMITE, CODES_REFUS_LANCEMENT, codePersiste, PHASES } from "@/prototype/arret";
 
 import { CODES_JOURNAL } from "../../../scripts/p0/journal";
 
 /** Décision 0046, D24 et S4 : `p0: stop_code et phase selon S4` (correspondance complète et repli). */
 
 const RACINE = fileURLToPath(new URL("../../../", import.meta.url));
-const MIGRATION = readFileSync(path.join(RACINE, "db/migrations/0003_prototype.sql"), "utf8");
+const MIGRATIONS = path.join(RACINE, "db/migrations");
+const JOURNAL = JSON.parse(readFileSync(path.join(MIGRATIONS, "meta/_journal.json"), "utf8")) as { entries: { tag: string }[] };
+/** Migrations appliquées, dans l'ordre du journal (les migrations inverses `.down.sql` n'y sont pas). */
+const TEXTES = JOURNAL.entries.map((entree) => readFileSync(path.join(MIGRATIONS, `${entree.tag}.sql`), "utf8"));
 
-/** Valeurs d'un `CHECK (colonne IN (…))` de la migration. */
+/** Valeurs d'un `CHECK (colonne IN (…))`, dans la dernière migration du journal qui pose la contrainte. */
 function valeursDuCheck(contrainte: string): string[] {
-  const debut = MIGRATION.indexOf(`CONSTRAINT ${contrainte} CHECK`);
-  expect(debut, contrainte).toBeGreaterThan(-1);
-  const fin = MIGRATION.indexOf("))", debut);
-  return [...MIGRATION.slice(debut, fin).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!);
+  const texte = TEXTES.findLast((t) => t.includes(`CONSTRAINT ${contrainte} CHECK`));
+  expect(texte, contrainte).toBeDefined();
+  const debut = texte!.indexOf(`CONSTRAINT ${contrainte} CHECK`);
+  const fin = texte!.indexOf("))", debut);
+  return [...texte!.slice(debut, fin).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!);
 }
 
 /** Correspondance attendue de chaque code du journal (D24, « correspondance avec scripts/p0/journal.ts »). */
@@ -58,6 +62,15 @@ describe("p0: stop_code et phase selon S4", () => {
     for (const code of CODES_EXTERNES) {
       expect(codePersiste(code, false)).toBe(code);
       expect(codePersiste(code, true)).toBe(code);
+    }
+  });
+
+  it("limite d'appels (429 de Google) : elle-même, avant comme après un appel payant ; hors des codes externes (pas de relance)", () => {
+    expect([...CODES_LIMITE]).toEqual(["upstream_rate_limited"]);
+    for (const code of CODES_LIMITE) {
+      expect(codePersiste(code, false)).toBe(code);
+      expect(codePersiste(code, true)).toBe(code);
+      expect(CODES_EXTERNES as readonly string[]).not.toContain(code);
     }
   });
 
