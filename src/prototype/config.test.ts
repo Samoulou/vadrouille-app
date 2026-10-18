@@ -178,7 +178,7 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       placesTextSearch: 90,
       placesDetails: 90,
       routesRequetes: 30,
-      routesElements: 500,
+      routesElements: 840,
       dureeMs: 900_000,
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
@@ -238,7 +238,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       placesTextSearch: 90,
       placesDetails: 90,
       routesRequetes: 30,
-      routesElements: 500,
+      routesElements: 840,
       dureeMs: 900_000,
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
@@ -261,7 +261,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       ["placesTextSearch", 91],
       ["placesDetails", 91],
       ["routesRequetes", 31],
-      ["routesElements", 501],
+      ["routesElements", 841],
       ["dureeMs", 900_001],
     ];
     expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());

@@ -20,6 +20,7 @@ import type { DependancesAgent, DonneesProtegees } from "@/research/agent";
 import { BornesRechercheSchema, type BornesRecherche } from "@/research/bornes";
 import {
   bornesDepuisConfig,
+  bornesDepuisDemande,
   candidatPourModele,
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
@@ -31,6 +32,7 @@ import {
   type DonneesProtegeesP0,
   type EntreeModelesP0,
   type LieuRetenuP0,
+  MARGE_CIBLES_POURCENT,
 } from "@/server/p0/vers-couche-ia";
 import { rythmeVersPace } from "@/server/p0/vers-moteur";
 
@@ -239,5 +241,47 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
       });
       expect(BornesRechercheSchema.safeParse(bornes).success, nom).toBe(true);
     }
+  });
+
+  // Ticket 483 (essai rome-1 du 2026-10-18 : 23 candidats pour 32 lieux demandés).
+  it("bornes depuis la demande : cibles ≥ recherche.json et ≥ demande + 30 % (entiers), sous le plafond, valides", () => {
+    const config = ConfigRechercheSchema.parse(lire("prototype/config/recherche.json"));
+    expect(MARGE_CIBLES_POURCENT).toBe(30);
+    // Rome, première série : 19 activités, 9 repas, 4 soirées.
+    const rome = bornesDepuisDemande(config, { activity: 19, meal: 9, evening: 4 }, 85);
+    expect(rome).toEqual({
+      ciblesParCreneau: { activity: 25, meal: 14, evening: 6 },
+      totalCandidats: 45,
+      toursMax: config.toursMax,
+      ageSourceMaxJours: config.ageSourceMaxJours,
+    });
+    // 10 × 1,3 = 13 tout juste (aucune erreur d'arrondi flottant) ; 20 × 1,3 = 26.
+    const cibles = (demande: { activity: number; meal: number; evening: number }, plafond = 85, c = config) =>
+      bornesDepuisDemande(c, demande, plafond)?.ciblesParCreneau;
+    expect(cibles({ activity: 10, meal: 10, evening: 0 })?.meal).toBe(14);
+    expect(cibles({ activity: 10, meal: 20, evening: 0 })?.meal).toBe(26);
+    expect(cibles({ activity: 0, meal: 10, evening: 0 })?.meal).toBe(14);
+    expect(cibles({ activity: 0, meal: 10, evening: 0 }, 85, { ...config, ciblesParCreneau: { activity: 1, meal: 1, evening: 1 } })?.meal).toBe(13);
+    // Petite demande : les cibles de recherche.json restent un plancher.
+    expect(bornesDepuisDemande(config, { activity: 1, meal: 1, evening: 0 }, 85)).toEqual(bornesDepuisConfig(config));
+    // Au-delà du plafond : cibles réduites en proportion, total au plafond, bornes toujours valides.
+    const borne = bornesDepuisDemande(config, { activity: 80, meal: 40, evening: 10 }, 85);
+    if (borne === null) throw new Error("borne attendue");
+    const somme = borne.ciblesParCreneau.activity + borne.ciblesParCreneau.meal + borne.ciblesParCreneau.evening;
+    expect(somme).toBeLessThanOrEqual(85);
+    expect(borne.totalCandidats).toBe(somme);
+    expect(borne.ciblesParCreneau.activity).toBeGreaterThan(borne.ciblesParCreneau.meal);
+    for (const bornes of [rome, borne, bornesDepuisDemande(config, { activity: 5, meal: 5, evening: 5 }, 2), bornesDepuisDemande(config, { activity: 5, meal: 5, evening: 5 }, 1)]) {
+      expect(bornes).not.toBeNull();
+      expect(BornesRechercheSchema.safeParse(bornes).success).toBe(true);
+    }
+  });
+
+  // Mineur 10 de la revue de la PR #490 (Sécurité) : plafond nul ou négatif (`placesTextSearch − 2 × logements` ≤ 0),
+  // aucune recherche au lieu d'une recherche ramenée à un candidat.
+  it("bornes depuis la demande : plafond inférieur à 1 (nul, négatif, NaN) : null, l'appelant s'arrête", () => {
+    const config = ConfigRechercheSchema.parse(lire("prototype/config/recherche.json"));
+    for (const plafond of [0, 0.5, -1, -40, Number.NaN]) expect(bornesDepuisDemande(config, { activity: 19, meal: 9, evening: 4 }, plafond), String(plafond)).toBeNull();
+    expect(bornesDepuisDemande(config, { activity: 19, meal: 9, evening: 4 }, 1)?.totalCandidats).toBe(1);
   });
 });

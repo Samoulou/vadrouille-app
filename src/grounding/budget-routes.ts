@@ -32,7 +32,7 @@ export class ErreurBudgetRoutes extends Error {
   }
 }
 
-/** Plafonds Routes de l'exécution (configuration du mode réel : 500 éléments, Samuel, 0053 ; 20 requêtes, P0S2-PO-8). */
+/** Plafonds Routes de l'exécution (configuration du mode réel : 840 éléments, Samuel, 0053 amendée par 0088 § 13 ; 20 requêtes, P0S2-PO-8). */
 export type PlafondsRoutes = { readonly elements: number; readonly requetes: number };
 
 const entierPositif = (valeur: number) => Number.isSafeInteger(valeur) && valeur > 0;

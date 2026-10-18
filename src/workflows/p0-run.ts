@@ -35,6 +35,8 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assembler, type Raison } from "@/server/p0/assemblage";
 import {
   bornesDepuisConfig,
+  bornesDepuisDemande,
+  type BornesRechercheP0,
   candidatPourModele,
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
@@ -45,23 +47,23 @@ import { poolPrototype } from "@/server/p0/base";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import {
   classementParType,
-  demandeBornee,
-  demandeDuJour,
   identifiantDuVoyage,
   joursDuSejour,
   lireClassement,
   planifierLeJour,
-  TYPES_SERIE,
-  type TypeSerie,
 } from "@/server/p0/moteur-final";
 import {
   briefDepuisBrief,
   candidatVersMoteur,
+  demandesDuSejour,
   engagementsDepuisBrief,
   evenementVersMoteur,
+  joursDeFermeture,
   modeDeTrajet,
   nuitsDepuisBrief,
   relecturesDepuisAncrages,
+  TYPES_SERIE,
+  type TypeSerie,
   violationsP0,
 } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
@@ -236,8 +238,9 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  * - Forfait : plafonds par méthode du mode au prix plein de `prototype/config/prix-google.json` (Q329), SKU des clients
  *   réels (`SKUS_FORFAIT`), plus le plafond de coût des modèles du mode (`coutUsd`). Google, Text Search (identifiants
  *   seulement) à 0 USD, fiches à 20 USD les 1 000, éléments Routes à 5 USD les 1 000 :
- *   - mode réel (`mode-reel.json`, 0053) : 90 × 0 + 90 × 0,020 + 500 × 0,005 = 0 + 1,80 + 2,50 = **4,30 USD** ;
- *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **4,30 USD**
+ *   - mode réel (`mode-reel.json`, 0053, limite Routes de 840 éléments par 0088 § 13) : 90 × 0 + 90 × 0,020 + 840 × 0,005
+ *     = 0 + 1,80 + 4,20 = **6,00 USD** ;
+ *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **6,00 USD**
  *     (0,88 USD avec les plafonds d'essai de 0063, points 8 et 9).
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
  * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
@@ -313,12 +316,40 @@ function dimensionsDuSejour(brief: Brief, config: ConfigModeReel, placeIdsLogeme
   const logementDe = (nuit: number) => (nuits.at(nuit) ?? nuits.at(0))?.placeId;
   const logementsDuJour = jours.map((jour) => [...new Set([logementDe(jour.logementDepart), logementDe(jour.logementArrivee)].flatMap((p) => (p === undefined ? [] : [p])))]);
   const capacites = logementsDuJour.map((ids) => Math.max(0, plan.n - ids.length));
-  const demandes = jours.map((jour, rang) => demandeBornee(demandeDuJour(jour), capacites[rang] ?? 0));
-  const serie: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
-  for (const demande of demandes) for (const type of TYPES_SERIE) serie[type] += demande[type];
-  const premiereSerie = TYPES_SERIE.reduce((somme, type) => somme + serie[type], 0);
+  const { demandes, serie, premiereSerie } = demandesDuSejour(jours, CONFIGURATION_MOTEUR, capacites);
   const budgetFiches = config.placesDetails - 2 * brief.logements.length;
   return { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches };
+}
+
+/** Repères distincts par logement, au lancement et à la recherche (aucun identifiant de lieu n'existe avant l'ancrage). */
+const reperesDesLogements = (brief: Brief) => brief.logements.map((_, rang) => `logement-${rang + 1}`);
+
+/**
+ * Bornes de la recherche de l'exécution (ticket 483) : en **exécution comptée**, cibles calculées depuis la demande du
+ * séjour (`bornesDepuisDemande` : première série de `dimensionsDuSejour`, plus 30 %), sous le plafond des candidats que
+ * l'exécution peut trouver (`candidatsTrouves`) et ancrer (Text Search : `placesTextSearch − 2 × logements`, une requête
+ * par logement à l'ancrage et une à l'étape finale) ; en **essai**, le profil fixe de `recherche-essai.json` (décision
+ * 0073 point 4, réservée à Samuel, inchangée). `null` : plafond nul ou négatif, aucun candidat ancrable, l'exécution
+ * s'arrête (`briefTientDansLeMode` refuse ce brief au lancement ; `etapeRecherche` s'arrête avant tout appel).
+ */
+function bornesDeLaRecherche(mode: ExecutionEnCours["mode"], config: ConfigModeReel, recherche: ConfigRecherche, brief: Brief): BornesRechercheP0 | null {
+  if (mode !== "reel") return bornesDepuisConfig(recherche);
+  const { serie } = dimensionsDuSejour(brief, config, reperesDesLogements(brief));
+  return bornesDepuisDemande(recherche, serie, Math.min(config.candidatsTrouves, config.placesTextSearch - 2 * brief.logements.length));
+}
+
+/**
+ * **Réservé aux tests** (mineur 4 de la revue de la PR #490 : aucun appelant de production) : bornes de la recherche
+ * d'un brief commité dans un mode, par le même chemin que `etapeRecherche` ; `null` si brief ou configuration refusés,
+ * ou plafond de recherche nul.
+ */
+export function bornesRechercheDuBriefPourTests(mode: ExecutionEnCours["mode"], nom: string): BornesRechercheP0 | null {
+  try {
+    const config = configurationDuMode(mode);
+    return bornesDeLaRecherche(mode, config, configurationAgent(mode, config).recherche, briefDe(nom));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -336,9 +367,11 @@ export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string
     // jours de changement, donc une place de plus pour les lieux du jour (`capacites`), et sa première série pourrait
     // dépasser celle calculée ici d'au plus un lieu par jour de changement. Le plan Routes (nombre de jours) et le budget
     // de fiches (nombre de logements du brief) n'en dépendent pas. Cas d'un même logement saisi deux fois : non traité.
-    const reperes = brief.logements.map((_, rang) => `logement-${rang + 1}`);
-    const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperes);
-    return plan.tient && premiereSerie <= budgetFiches;
+    const { plan, premiereSerie, budgetFiches } = dimensionsDuSejour(brief, config, reperesDesLogements(brief));
+    // Mineur 10 de la revue de la PR #490 : un plafond de recherche nul (`placesTextSearch − 2 × logements` ≤ 0) refuse
+    // le brief au lancement, comme un plan Routes qui ne tient pas.
+    const recherche = bornesDeLaRecherche(mode, config, configurationAgent(mode, config).recherche, brief);
+    return plan.tient && premiereSerie <= budgetFiches && recherche !== null;
   } catch {
     return false;
   }
@@ -587,6 +620,10 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
   "use step";
   return etape(entree.runId, "recherche", async (contexte, marquerAppels) => {
     const { modeles, recherche } = configurationAgent(contexte.execution.mode, contexte.config);
+    // Ticket 483 : cibles de l'exécution comptée calculées depuis la demande du séjour ; plafond de recherche nul : arrêt
+    // avant tout appel (mineur 10 de la revue de la PR #490).
+    const bornes = bornesDeLaRecherche(contexte.execution.mode, contexte.config, recherche, contexte.brief);
+    if (bornes === null) throw new ArretEtape("pipeline_failed");
     const forfait = forfaitDeLEtape(contexte.config, contexte.execution, SANS_GOOGLE);
     const registre = registreDeLEtape(forfait, contexte);
     const composition = composer(contexte, forfait, registre, modeles);
@@ -607,7 +644,7 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
           routage,
           recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
           lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
-          bornes: bornesDepuisConfig(recherche),
+          bornes,
           complement: complementDepuisBrief(contexte.brief),
           protegees: donneesProtegeesDepuisBrief(contexte.brief),
           // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même
@@ -791,8 +828,12 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       }
 
       // 4. Regroupement par jour, une matrice Routes par jour, planification.
+      // Jours de fermeture (correction 1 de la PR #490) : un lieu dont aucune plage d'ouverture ne recouvre la fenêtre
+      // d'un jour n'est mis ce jour-là qu'en dernier recours. Horaires lus sur les fiches, en mémoire, jamais dans un prompt.
+      const horaires = relecturesDepuisAncrages(new Map(retenus.map((lieu) => [lieu.ancrage.placeId, lieu.ancrage])), nuits, () => undefined);
       const groupes = regrouperParJour(
-        retenus.map((lieu) => ({ id: lieu.id, type: lieu.type, position: lieu.ancrage.position })),
+        retenus.map((lieu) => ({ id: lieu.id, type: lieu.type, position: lieu.ancrage.position, fermeLes: joursDeFermeture(horaires, lieu.ancrage.placeId, jours) })),
+        // Demandes déjà bornées par la capacité du jour (`demandeBornee`, seul ordre de service : décision 0088 § 8).
         jours.map((_, rang) => ({ demande: demandes[rang] ?? { activity: 0, meal: 0, evening: 0 }, capacite: capacites[rang] ?? 0 })),
       );
       const ficheDe = new Map(retenus.map((lieu) => [lieu.id, lieu.ancrage]));

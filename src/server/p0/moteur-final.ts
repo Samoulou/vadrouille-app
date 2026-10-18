@@ -3,11 +3,12 @@ import "server-only";
 import type { Pace, TripCommitment } from "@/contracts";
 import { classer, ConfigClassementSchema, type ConfigClassement, type ParametresClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
-import type { CandidatEvenement, CandidatMoteur, TypeCreneau } from "@/domain/entrees";
+import type { CandidatEvenement, CandidatMoteur } from "@/domain/entrees";
 import { identifiantVoyage } from "@/domain/identifiant";
 import { planifier, type JourPlanifie } from "@/domain/planification";
 import type { ModeTrajet, Relectures } from "@/domain/relectures";
 import { squelette, type JourSquelette } from "@/domain/squelette";
+import type { TypeSerie } from "@/server/p0/vers-moteur";
 
 /**
  * Passage au moteur de l'étape finale de `p0Run` (P0r3c-5, ticket 352 ; décision 0063 point 10 et réponse 2 du Tech
@@ -18,9 +19,6 @@ import { squelette, type JourSquelette } from "@/domain/squelette";
  * réponse Google brute : les fiches arrivent par les `Relectures` construites par `vers-moteur.ts`).
  */
 
-/** Types de créneaux de la première série : activités (dont l'idée du jour), repas, soirée. */
-export type TypeSerie = TypeCreneau;
-export const TYPES_SERIE: readonly TypeSerie[] = ["activity", "meal", "evening"];
 
 /** Formule de classement de `prototype/config/classement.json`, validée par le schéma du moteur ; invalide : `undefined`. */
 export function lireClassement(brut: unknown): ConfigClassement | undefined {
@@ -39,31 +37,6 @@ export type EntreeJours = {
 /** Squelette du séjour, celui de P0 (`squelette`, budget de trajet entier). */
 export function joursDuSejour(entree: EntreeJours): JourSquelette[] {
   return squelette({ ...entree, budgetTrajetReduit: false });
-}
-
-/**
- * Lieux que demande un jour, par type : un par créneau du squelette, plus l'idée « Surprends-moi » (une activité).
- * C'est la part du jour dans la **première série** (0055 § 6 point 3 : « étapes du programme et 8 propositions » ; les
- * propositions de P0 sont prises parmi les étapes planifiées, `assemblage.ts`, et ne demandent aucun lieu de plus).
- */
-export function demandeDuJour(jour: JourSquelette): Record<TypeSerie, number> {
-  const demande: Record<TypeSerie, number> = { activity: 1, meal: 0, evening: 0 };
-  for (const creneau of jour.creneaux) demande[creneau.type] += 1;
-  return demande;
-}
-
-/**
- * Demande du jour ramenée à la capacité de sa matrice Routes (lieux admis en plus des logements, 0055 § 6 point 1) :
- * types pris dans l'ordre de `TYPES_SERIE`, aucun lieu au-delà de la capacité.
- */
-export function demandeBornee(demande: Readonly<Record<TypeSerie, number>>, capacite: number): Record<TypeSerie, number> {
-  let reste = Math.max(0, capacite);
-  const bornee: Record<TypeSerie, number> = { activity: 0, meal: 0, evening: 0 };
-  for (const type of TYPES_SERIE) {
-    bornee[type] = Math.min(demande[type], reste);
-    reste -= bornee[type];
-  }
-  return bornee;
 }
 
 /** Candidat admis pour un type de créneau (mêmes règles que `planifierJour`). */

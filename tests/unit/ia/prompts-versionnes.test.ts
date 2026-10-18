@@ -18,7 +18,10 @@ import { PROMPT_STRUCTURATION } from "@/ai/prompts/structuration";
  */
 const EMPREINTES: Record<string, Record<number, string>> = {
   plan: { 1: "cc60044c386a445d8a09f21383982f550a35a8dac592cc9a320b3b594da289ef" },
-  recherche: { 2: "5b48d1a6aa37b9e25b96737e918c9f6ab2ecc4f175d510d343bbe70a8a36b4ad" },
+  recherche: {
+    2: "5b48d1a6aa37b9e25b96737e918c9f6ab2ecc4f175d510d343bbe70a8a36b4ad",
+    3: "57abff2e2bd2ce12f94d145a274c988474436ee4e88736928166a4f268654b18",
+  },
   notation: { 1: "3d65949a6a1720d74bb4173abc46346b945a1bce0b7dbc2d001689fc6716ed1b" },
   raisons: { 1: "14d91f523c80e186228f52ab3604fb4b2490f8a8d1db0ef3b3ab90d069fe08d6" },
   structuration: { 1: "e9d62fe8ce071a2c0a3f3b97dd595408eca3f62dd288e84fbcdc76aee13433be" },

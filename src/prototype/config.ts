@@ -153,7 +153,7 @@ export const UNITES_QUOTA_ROUTES = ["requetes", "elements"] as const;
  * Bornes de la configuration du **mode réel** (`prototype/config/mode-reel.json`, décision 0055, section 6) : valeurs de
  * Samuel et du Product Owner, jamais relevées par le studio. Coût des modèles : 3 USD (Samuel, Q270) ; Text Search et
  * Place Details : 90 (P0S2-PO-8) ; recherches web, pages lues et candidats : 60, 150 et 90 au plus (P0S2-PO-8) ; Routes :
- * 500 éléments (Samuel, 0053), sous le quota de 3 000 éléments par minute (Q330) ; durée : 15 min (A8).
+ * 840 éléments (Samuel, 0053 amendée par 0088 § 13), sous le quota de 3 000 éléments par minute (Q330) ; durée : 15 min (A8).
  */
 export const BORNES_MODE_REEL = {
   coutUsd: 3,
@@ -163,7 +163,7 @@ export const BORNES_MODE_REEL = {
   placesTextSearch: 90,
   placesDetails: 90,
   routesRequetes: BORNES_PLAFONDS.routesRequetes,
-  routesElements: 500,
+  routesElements: 840,
   dureeMs: 900_000,
 } as const;
 
@@ -237,7 +237,7 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
 /**
  * Plafonds de l'**essai d'intégration** : depuis la décision 0073 (Samuel, 2026-10-16), **les mêmes que ceux de
  * `mode-reel.json`** (3 USD de modèles, 40 recherches web, 100 pages, 85 candidats, 90 Text Search, 90 Place Details,
- * 30 requêtes de matrice et 500 éléments, 15 min), pour que tout brief passe en essai ; seul un voyage qui les
+ * 30 requêtes de matrice et 840 éléments depuis 0088 § 13, 15 min), pour que tout brief passe en essai ; seul un voyage qui les
  * dépasserait est arrêté. Valeurs antérieures (P0S2-PO-12 amendé, ticket 355 : 0,30 USD, 6, 15, 12, 17, 14, 3, 120,
  * 5 min) : décision 0063, points 8 et 9. Ce sont des maxima : `essai.json` ne peut pas les dépasser ; un test vérifie
  * qu'ils restent égaux aux plafonds commités du mode réel.
@@ -250,7 +250,7 @@ export const BORNES_ESSAI = {
   placesTextSearch: 90,
   placesDetails: 90,
   routesRequetes: 30,
-  routesElements: 500,
+  routesElements: 840,
   dureeMs: 900_000,
 } as const;
 
