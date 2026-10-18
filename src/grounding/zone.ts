@@ -98,33 +98,24 @@ export type LieuARegrouper<K extends string> = {
   readonly fermeLes?: readonly number[];
 };
 
-/**
- * Options du regroupement. `typesPrioritaires` : types servis d'abord quand la capacité d'un jour est inférieure à sa
- * demande (`partsDesJours`) ; les autres suivent dans l'ordre des clés des demandes.
- */
-export type OptionsRegroupement<K extends string> = { readonly typesPrioritaires?: readonly K[] };
-
 /** Nombre maximal de passes d'affinage du regroupement (centres recalculés, lieux réaffectés). */
 export const PASSES_REGROUPEMENT = 10;
 
 /**
- * Parts des jours (ticket 483) : pour chaque type (les `prioritaires` d'abord, puis dans l'ordre des clés des demandes),
- * les lieux disponibles sont distribués un à un, chaque fois au jour le moins rempli **en proportion de sa demande
- * totale** (égalité : rang du jour), sans dépasser sa demande de ce type ni sa capacité. Une pénurie se répartit ainsi
- * sur tous les jours (un lieu d'écart au plus entre deux jours qui demandent autant), au lieu de vider les derniers ; un
- * jour dont la capacité est inférieure à sa demande sert les types prioritaires d'abord (repas, en P0).
+ * Parts des jours (ticket 483) : pour chaque type, dans l'ordre des clés des demandes, les lieux disponibles sont
+ * distribués un à un, chaque fois au jour le moins rempli **en proportion de sa demande totale** (égalité : rang du
+ * jour), sans dépasser sa demande de ce type ni sa capacité. Une pénurie se répartit ainsi sur tous les jours (un lieu
+ * d'écart au plus entre deux jours qui demandent autant), au lieu de vider les derniers. La demande reçue est déjà bornée
+ * par la capacité du jour (`demandeBornee`, seul endroit qui fixe l'ordre de service de la capacité : décision 0088 § 8) ;
+ * le contrôle de capacité ici n'est qu'un filet.
  */
-function partsDesJours<K extends string>(
-  jours: readonly JourARegrouper<K>[],
-  disponibles: ReadonlyMap<K, number>,
-  prioritaires: readonly K[],
-): Map<K, number>[] {
+function partsDesJours<K extends string>(jours: readonly JourARegrouper<K>[], disponibles: ReadonlyMap<K, number>): Map<K, number>[] {
   const etats = jours.map((jour) => {
     const demande = new Map<K, number>(Object.entries(jour.demande) as [K, number][]);
     const demandeTotale = [...demande.values()].reduce((somme, n) => somme + Math.max(0, n), 0);
     return { demande, demandeTotale, capacite: Math.max(0, jour.capacite), part: new Map<K, number>(), total: 0 };
   });
-  const types = [...new Set([...prioritaires, ...etats.flatMap((etat) => [...etat.demande.keys()])])];
+  const types = [...new Set(etats.flatMap((etat) => [...etat.demande.keys()]))];
   for (const type of types) {
     for (let reste = disponibles.get(type) ?? 0; reste > 0; reste -= 1) {
       let choisi: (typeof etats)[number] | undefined;
@@ -261,12 +252,11 @@ const meilleurCout = (a: { fermes: number; dispersion: number }, b: { fermes: nu
 export function regrouperParJour<K extends string>(
   lieux: readonly LieuARegrouper<K>[],
   jours: readonly JourARegrouper<K>[],
-  options: OptionsRegroupement<K> = {},
 ): string[][] {
   // 1. Parts.
   const disponibles = new Map<K, number>();
   for (const lieu of lieux) disponibles.set(lieu.type, (disponibles.get(lieu.type) ?? 0) + 1);
-  const parts = partsDesJours(jours, disponibles, options.typesPrioritaires ?? []);
+  const parts = partsDesJours(jours, disponibles);
 
   // 2. Lieux retenus : les mieux classés de chaque type, autant que les parts.
   const quota = new Map<K, number>();

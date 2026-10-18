@@ -238,8 +238,9 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  * - Forfait : plafonds par méthode du mode au prix plein de `prototype/config/prix-google.json` (Q329), SKU des clients
  *   réels (`SKUS_FORFAIT`), plus le plafond de coût des modèles du mode (`coutUsd`). Google, Text Search (identifiants
  *   seulement) à 0 USD, fiches à 20 USD les 1 000, éléments Routes à 5 USD les 1 000 :
- *   - mode réel (`mode-reel.json`, 0053) : 90 × 0 + 90 × 0,020 + 500 × 0,005 = 0 + 1,80 + 2,50 = **4,30 USD** ;
- *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **4,30 USD**
+ *   - mode réel (`mode-reel.json`, 0053, limite Routes de 840 éléments par 0088 § 13) : 90 × 0 + 90 × 0,020 + 840 × 0,005
+ *     = 0 + 1,80 + 4,20 = **6,00 USD** ;
+ *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **6,00 USD**
  *     (0,88 USD avec les plafonds d'essai de 0063, points 8 et 9).
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
  * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
@@ -832,9 +833,8 @@ export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
       const horaires = relecturesDepuisAncrages(new Map(retenus.map((lieu) => [lieu.ancrage.placeId, lieu.ancrage])), nuits, () => undefined);
       const groupes = regrouperParJour(
         retenus.map((lieu) => ({ id: lieu.id, type: lieu.type, position: lieu.ancrage.position, fermeLes: joursDeFermeture(horaires, lieu.ancrage.placeId, jours) })),
+        // Demandes déjà bornées par la capacité du jour (`demandeBornee`, seul ordre de service : décision 0088 § 8).
         jours.map((_, rang) => ({ demande: demandes[rang] ?? { activity: 0, meal: 0, evening: 0 }, capacite: capacites[rang] ?? 0 })),
-        // Capacité d'un jour inférieure à sa demande : repas d'abord, puis soirée, puis activités (idée comprise).
-        { typesPrioritaires: ["meal", "evening"] },
       );
       const ficheDe = new Map(retenus.map((lieu) => [lieu.id, lieu.ancrage]));
       const mode = modeDeTrajet(brief);

@@ -493,12 +493,12 @@ describe("p0Run, étape finale de bout en bout sur les doubles (P0r3c-5)", () =>
     expect(plafonds.find((p) => p.methode === "places_details")?.maxRequetes).toBe(89);
     expect(plafonds.find((p) => p.methode === "routes_matrix")).toMatchObject({
       maxRequetes: 30,
-      maxElements: 500,
+      maxElements: 840,
     });
     // Fiches des lieux (hors logement) : au plus placesDetails − 2 × logements.
     expect(capture.details.length - 1).toBeLessThanOrEqual(88);
     const elements = capture.matrices.reduce((somme, m) => somme + m.origines.length * m.destinations.length, 0);
-    expect(elements).toBeLessThanOrEqual(500);
+    expect(elements).toBeLessThanOrEqual(840);
     expect(capture.matrices.length).toBeLessThanOrEqual(30);
     // Aucune fiche lue deux fois (un lieu lu pour un type n'est pas relu pour un autre).
     expect(new Set(capture.details).size).toBe(capture.details.length);

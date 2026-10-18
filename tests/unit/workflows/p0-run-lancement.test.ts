@@ -104,15 +104,15 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     expect(Object.isFrozen(SKUS_FORFAIT)).toBe(true);
   });
 
-  it("mode réel : plafonds de mode-reel.json, 4,30 USD de Google au prix plein (0053), 3 USD de modèles, 15 min", () => {
+  it("mode réel : plafonds de mode-reel.json, 6,00 USD de Google au prix plein (0053, 0088 § 13), 3 USD de modèles, 15 min", () => {
     expect(lancementDuMode("reel")).toEqual({
       forfait: {
         nature: "execution",
         textSearchRequetes: 90,
         placeDetailsRequetes: 90,
         routesRequetes: 30,
-        routesElements: 500,
-        coutGoogleMicros: 4_300_000,
+        routesElements: 840,
+        coutGoogleMicros: 6_000_000,
         coutModelesMicros: 3_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
@@ -120,16 +120,16 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
   });
 
   // essai.json aligné sur mode-reel.json (0073) : 90 Text Search (gratuits), 90 fiches à 20 USD les 1 000 (1,80 USD) et
-  // 500 éléments Routes à 5 USD les 1 000 (2,50 USD), au prix plein.
-  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 4,30 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  // 840 éléments Routes à 5 USD les 1 000 (4,20 USD, 0088 § 13), au prix plein.
+  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
         textSearchRequetes: 90,
         placeDetailsRequetes: 90,
         routesRequetes: 30,
-        routesElements: 500,
-        coutGoogleMicros: 4_300_000,
+        routesElements: 840,
+        coutGoogleMicros: 6_000_000,
         coutModelesMicros: 3_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },

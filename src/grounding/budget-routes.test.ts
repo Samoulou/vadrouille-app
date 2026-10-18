@@ -17,6 +17,7 @@ import { distanceVolOiseauMetres, ordreVolOiseau, regrouperParJour, zoneDuSejour
 
 /** Budgets Routes de `p0Run` (0055 § 6 point 1 ; 0053 ; Q330) : client Routes simulé, aucun appel réel. */
 
+/** Plafonds des exemples de 0055 (500 éléments, 20 requêtes) ; limite en vigueur : 840 et 30 (0088 § 13, test dédié). */
 const PLAFONDS = { elements: 500, requetes: 20 };
 
 function horlogeManuelle(): HorlogeCadence & { attentes: number[] } {
@@ -72,6 +73,20 @@ describe("p0: budgets Routes par jour (0055 § 6 point 1)", () => {
     // Proposition au PO (P0S2-PO-8) : 30 requêtes admettent une reprise chaque jour à 7 et 10 jours.
     expect([7, 10].map((jours) => planRoutes(jours, { elements: 500, requetes: 30 }).reprisesAdmises)).toEqual([7, 10]);
     expect([requetesMatrice(21), requetesReprise(21), requetesReprise(6)]).toEqual([9, 4, 2]);
+  });
+
+  // Décision 0088 § 13 (Samuel, 2026-10-18 11:42 UTC) : 840 éléments par voyage, 30 requêtes ; vérification du Tech Lead.
+  it("limite de 840 éléments et 30 requêtes (0088 § 13) : séjours de 1 à 10 jours tenus ; exemples de la décision", () => {
+    const plafonds = { elements: 840, requetes: 30 };
+    for (let jours = 1; jours <= 10; jours += 1) expect(planRoutes(jours, plafonds).tient, `${jours} jours`).toBe(true);
+    const plans = [1, 4, 5, 7, 10].map((jours) => planRoutes(jours, plafonds));
+    expect(plans.map((p) => [p.n, p.elementsSansReprise, p.requetesSansReprise, p.reprisesAdmises])).toEqual([
+      [28, 784, 9, 1],
+      [13, 676, 16, 3],
+      [12, 720, 20, 2],
+      [10, 700, 7, 7],
+      [8, 640, 10, 10],
+    ]);
   });
 
   it("part insuffisante pour deux lieux : le plan ne tient pas, la matrice est refusée sans appel (cap_reached)", async () => {
@@ -309,7 +324,7 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
   });
 
   // Mineur 7 de la revue de la PR #490 : capacité d'un jour inférieure à sa demande.
-  it("capacité inférieure à la demande : les types prioritaires (repas) sont servis d'abord ; sans priorité, ordre des clés", () => {
+  it("capacité inférieure à la demande : les types sont servis dans l'ordre des clés (filet ; la demande reçue est déjà bornée)", () => {
     const lieux = [
       lieu("a1", "activity", 55.95, -3.19),
       lieu("a2", "activity", 55.95, -3.191),
@@ -317,9 +332,8 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
       lieu("m1", "meal", 55.95, -3.193),
       lieu("m2", "meal", 55.95, -3.194),
     ];
-    const serre = [jour(3, 2, 0, 3)];
-    expect(regrouperParJour(lieux, serre, { typesPrioritaires: ["meal", "evening"] })).toEqual([["a1", "m1", "m2"]]);
-    expect(regrouperParJour(lieux, serre)).toEqual([["a1", "a2", "a3"]]);
+    // Décision 0088 § 8 : l'ordre de service de la capacité n'est écrit que dans `demandeBornee` ; `typesPrioritaires` retiré.
+    expect(regrouperParJour(lieux, [jour(3, 2, 0, 3)])).toEqual([["a1", "a2", "a3"]]);
   });
 
   // Mineur 9 de la revue de la PR #490 : non-régression, la capacité de la matrice Routes du jour n'est jamais dépassée.
@@ -330,20 +344,18 @@ describe("p0: regroupement par jour à vol d'oiseau, après les fiches (0053 ame
     const demandes = [jour(4, 2, 1, 0), jour(4, 2, 1, 1), jour(4, 2, 1, 2), jour(3, 2, 1, 3), jour(4, 2, 1, 5), jour(4, 2, 1, 7), jour(4, 1, 0, 20)];
     for (let decalage = 0; decalage < demandes.length; decalage += 1) {
       const jours = [...demandes.slice(decalage), ...demandes.slice(0, decalage)];
-      for (const options of [{}, { typesPrioritaires: ["meal", "evening"] as Type[] }]) {
-        for (const n of [5, 12, 25, 40]) {
-          const groupes = regrouperParJour(lieux.slice(0, n), jours, options);
-          expect(new Set(groupes.flat()).size).toBe(groupes.flat().length);
-          groupes.forEach((groupe, rang) => {
-            const attendu = jours.at(rang);
-            expect(groupe.length).toBeLessThanOrEqual(attendu?.capacite ?? 0);
-            for (const type of types) {
-              const nombre = groupe.filter((id) => lieux.find((l) => l.id === id)?.type === type).length;
-              const demande = new Map(Object.entries(attendu?.demande ?? {}));
-              expect(nombre).toBeLessThanOrEqual(demande.get(type) ?? 0);
-            }
-          });
-        }
+      for (const n of [5, 12, 25, 40]) {
+        const groupes = regrouperParJour(lieux.slice(0, n), jours);
+        expect(new Set(groupes.flat()).size).toBe(groupes.flat().length);
+        groupes.forEach((groupe, rang) => {
+          const attendu = jours.at(rang);
+          expect(groupe.length).toBeLessThanOrEqual(attendu?.capacite ?? 0);
+          for (const type of types) {
+            const nombre = groupe.filter((id) => lieux.find((l) => l.id === id)?.type === type).length;
+            const demande = new Map(Object.entries(attendu?.demande ?? {}));
+            expect(nombre).toBeLessThanOrEqual(demande.get(type) ?? 0);
+          }
+        });
       }
     }
   });

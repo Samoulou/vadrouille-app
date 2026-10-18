@@ -8,7 +8,7 @@
   "placesTextSearch": 90,
   "placesDetails": 90,
   "routesRequetes": 30,
-  "routesElements": 500,
+  "routesElements": 840,
   "dureeMs": 900000,
   "fiches": {
     "margeMinimum": 4,

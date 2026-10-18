@@ -26,8 +26,8 @@ const brief = BriefSchema.parse(lire(`prototype/briefs/${NOM}.json`));
 const essai = lire("prototype/config/essai.json") as { routesElements: number; routesRequetes: number; placesDetails: number; candidatsTrouves: number };
 const rechercheEssai = lire("prototype/config/recherche-essai.json") as { totalCandidats: number; ciblesParCreneau: Record<"activity" | "meal" | "evening", number> };
 
-/** Plafond d'éléments Routes par essai fixé par Samuel. */
-const PLAFOND_ROUTES_SAMUEL = 500;
+/** Plafond d'éléments Routes par essai fixé par Samuel (0053, relevé à 840 par 0088 § 13). */
+const PLAFOND_ROUTES_SAMUEL = 840;
 
 const nuitsDu = (b: Brief) => b.logements.reduce((total, logement) => total + logement.nuits, 0);
 
@@ -73,12 +73,12 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(brief.engagements).toBeUndefined();
   });
 
-  it("plan Routes tenu sous les plafonds de l'essai et sous les 500 éléments de Samuel", () => {
+  it("plan Routes tenu sous les plafonds de l'essai et sous les 840 éléments de Samuel", () => {
     const { plan } = premiereSerie(brief);
     expect(essai.routesElements).toBeLessThanOrEqual(PLAFOND_ROUTES_SAMUEL);
     expect(plan.tient).toBe(true);
-    // Plafonds de l'essai alignés sur le mode réel (décision 0073) : 500 éléments et 30 requêtes, matrice de 14 lieux.
-    expect(plan.n).toBe(14);
+    // Plafonds de l'essai alignés sur le mode réel (décision 0073) : 840 éléments (0088 § 13) et 30 requêtes, matrice de 19 lieux.
+    expect(plan.n).toBe(19);
     expect(plan.elementsSansReprise).toBeLessThanOrEqual(essai.routesElements);
     expect(plan.requetesSansReprise).toBeLessThanOrEqual(essai.routesRequetes);
   });
@@ -127,14 +127,14 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(cibles.meal - parType.meal).toBe(2);
   });
 
-  it("réserve Google de l'essai (fiches et Routes, méthode Q329) : 4,30 USD, celle du mode réel (0073)", () => {
+  it("réserve Google de l'essai (fiches et Routes, méthode Q329) : 6,00 USD, celle du mode réel (0073, 0088 § 13)", () => {
     const prix = lire("prototype/config/prix-google.json") as { skus: Record<string, { prixPour1000: number }> };
     const prixDe = (sku: string) => (prix.skus[sku]?.prixPour1000 ?? Number.POSITIVE_INFINITY) / 1000;
     // Spécification P0-suite-2, P0S2-PO-12 amendé : fiches au SKU Enterprise, éléments Routes au SKU Essentials ;
     // Text Search au SKU « IDs only », sans coût.
     const reserve = essai.placesDetails * prixDe("places_details_enterprise") + essai.routesElements * prixDe("routes_matrix_essentials");
-    // 90 × 0,020 + 500 × 0,005 = 1,80 + 2,50 (0053). Aucune enveloppe ne borne plus le nombre d'essais (0071).
-    expect(reserve).toBeCloseTo(4.3, 6);
+    // 90 × 0,020 + 840 × 0,005 = 1,80 + 4,20 (0053, 0088 § 13). Aucune enveloppe ne borne plus le nombre d'essais (0071).
+    expect(reserve).toBeCloseTo(6, 6);
   });
 
   it("le modèle de la recherche ne voit pas le logement ; le récit n'en reprend aucun mot ; aucun champ personnel", () => {
