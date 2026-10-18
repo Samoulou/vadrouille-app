@@ -16,7 +16,13 @@ import {
 } from "@/contracts";
 import { MOCK_INFERRED_BRIEF, MOCK_LODGING_SUGGESTION } from "@/mocks/creation-edimbourg";
 
-import { CreatedTripSchema, RetryGenerationRequestSchema } from "./creation";
+import {
+  CreatedTripSchema,
+  FullTripStatusRequestSchema,
+  FullTripStatusSchema,
+  RETRY_GENERATION_KINDS,
+  RetryGenerationRequestSchema,
+} from "./creation";
 
 import {
   ADULTS,
@@ -186,7 +192,94 @@ describe("RetryGenerationRequestSchema (0081 § B9-TL-11)", () => {
     expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, requestId: "essai-2" }).success).toBe(false);
     expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, tripId: "" }).success).toBe(false);
     expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, organizationId: "org_1" }).success).toBe(false);
-    expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, kind: "full" }).success).toBe(false);
+  });
+});
+
+describe("RetryGenerationRequestSchema : champ kind (0087 § 1.1)", () => {
+  const RETRY = { tripId: "mock_trip_edimbourg", requestId: "0b5e0f8e-3b8a-4f2b-9d36-7c1f2e4a9b10" };
+
+  it("kind facultatif : absent, la requête de B9b reste admise telle quelle (absent vaut preview côté serveur)", () => {
+    const parsed = RetryGenerationRequestSchema.safeParse(RETRY);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data).toEqual(RETRY);
+  });
+
+  it("admet preview et full, seuls", () => {
+    expect(RETRY_GENERATION_KINDS).toEqual(["preview", "full"]);
+    expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, kind: "preview" }).success).toBe(true);
+    expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, kind: "full" }).success).toBe(true);
+  });
+
+  it("refuse toute autre valeur de kind, y compris null, vide, casse différente ou nature d'exécution interne", () => {
+    for (const kind of ["", "Full", "FULL", "aperçu", "complete", "studio", null, 1, true, ["full"]]) {
+      expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, kind }).success).toBe(false);
+    }
+  });
+
+  it("kind ne dispense ni du requestId ni du voyage, et n'admet aucun autre champ", () => {
+    expect(RetryGenerationRequestSchema.safeParse({ tripId: RETRY.tripId, kind: "full" }).success).toBe(false);
+    expect(RetryGenerationRequestSchema.safeParse({ requestId: RETRY.requestId, kind: "full" }).success).toBe(false);
+    expect(RetryGenerationRequestSchema.safeParse({ ...RETRY, kind: "full", generationRunId: "run_1" }).success).toBe(false);
+  });
+});
+
+describe("FullTripStatusSchema (0087 § 1.5)", () => {
+  const TRIP = "mock_trip_edimbourg";
+
+  it("admet les cinq phases, chacune avec tripId seulement, et failed avec retryable", () => {
+    for (const phase of ["none", "preparing", "ready", "incomplete"] as const) {
+      expect(FullTripStatusSchema.safeParse({ phase, tripId: TRIP }).success).toBe(true);
+    }
+    expect(FullTripStatusSchema.safeParse({ phase: "failed", tripId: TRIP, retryable: true }).success).toBe(true);
+    expect(FullTripStatusSchema.safeParse({ phase: "failed", tripId: TRIP, retryable: false }).success).toBe(true);
+  });
+
+  it("refuse une phase inconnue, dont queued (lu comme preparing) et la phase interne d'une exécution", () => {
+    for (const phase of ["queued", "unlocked", "generating", "Ready", ""]) {
+      expect(FullTripStatusSchema.safeParse({ phase, tripId: TRIP }).success).toBe(false);
+    }
+  });
+
+  it("chaque variante exige tripId non vide", () => {
+    for (const phase of ["none", "preparing", "ready", "incomplete"] as const) {
+      expect(FullTripStatusSchema.safeParse({ phase }).success).toBe(false);
+      expect(FullTripStatusSchema.safeParse({ phase, tripId: "" }).success).toBe(false);
+    }
+    expect(FullTripStatusSchema.safeParse({ phase: "failed", retryable: true }).success).toBe(false);
+  });
+
+  it("retryable seulement pour failed, obligatoire et booléen", () => {
+    for (const phase of ["none", "preparing", "ready", "incomplete"] as const) {
+      expect(FullTripStatusSchema.safeParse({ phase, tripId: TRIP, retryable: false }).success).toBe(false);
+    }
+    expect(FullTripStatusSchema.safeParse({ phase: "failed", tripId: TRIP }).success).toBe(false);
+    expect(FullTripStatusSchema.safeParse({ phase: "failed", tripId: TRIP, retryable: "oui" }).success).toBe(false);
+  });
+
+  it("aucune autre clé : ni reprises restantes, ni raison d'échec, ni étape, ni rang, ni lieu, ni organisation", () => {
+    const extras: Record<string, unknown> = {
+      retriesLeft: 2,
+      reason: "provider_error",
+      step: "b",
+      stepSeq: 3,
+      day: 4,
+      placeId: "ChIJ",
+      name: "Édimbourg",
+      organizationId: "org_1",
+      generationRunId: "run_1",
+      days: [],
+    };
+    for (const [key, value] of Object.entries(extras)) {
+      expect(FullTripStatusSchema.safeParse({ phase: "failed", tripId: TRIP, retryable: true, [key]: value }).success).toBe(false);
+      expect(FullTripStatusSchema.safeParse({ phase: "preparing", tripId: TRIP, [key]: value }).success).toBe(false);
+    }
+  });
+
+  it("FullTripStatusRequestSchema : l'identifiant du voyage seulement", () => {
+    expect(FullTripStatusRequestSchema.safeParse({ tripId: TRIP }).success).toBe(true);
+    expect(FullTripStatusRequestSchema.safeParse({}).success).toBe(false);
+    expect(FullTripStatusRequestSchema.safeParse({ tripId: "" }).success).toBe(false);
+    expect(FullTripStatusRequestSchema.safeParse({ tripId: TRIP, organizationId: "org_1" }).success).toBe(false);
   });
 });
 
