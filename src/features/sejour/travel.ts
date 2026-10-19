@@ -34,16 +34,16 @@ export function isOverTravelBudget(day: Pick<Day, "travelMinutes" | "travelBudge
  * le premier. `null` sans segment suivi d'une étape. Un segment sans durée (décision 0092) n'est jamais retenu.
  */
 export function longestSegmentToStop(items: readonly DayLineItem[]): { segment: Segment; stop: Stop } | null {
-  let best: { segment: Segment; stop: Stop } | null = null;
+  let best: { segment: Segment; stop: Stop; minutes: number } | null = null;
   for (let index = 0; index < items.length - 1; index += 1) {
     const item = items[index];
     const next = items[index + 1];
-    if (item?.type !== "segment" || next?.type !== "stop" || item.segment.minutes === null) continue;
-    if (!best || item.segment.minutes > (best.segment.minutes ?? 0)) {
-      best = { segment: item.segment, stop: next.stop };
-    }
+    if (item?.type !== "segment" || next?.type !== "stop") continue;
+    const { minutes } = item.segment;
+    if (minutes === null) continue;
+    if (!best || minutes > best.minutes) best = { segment: item.segment, stop: next.stop, minutes };
   }
-  return best;
+  return best && { segment: best.segment, stop: best.stop };
 }
 
 /**
@@ -51,9 +51,10 @@ export function longestSegmentToStop(items: readonly DayLineItem[]): { segment: 
  * « {trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme. Le plus long : {segment}, vers {nom}. »
  */
 export function travelBannerMessage(day: Day): string | null {
-  if (!isOverTravelBudget(day)) return null;
+  // Total inconnu : jamais de bandeau, aucun contrôle du budget n'a eu lieu (décision 0095 § 6).
+  if (day.travelMinutes === null || !isOverTravelBudget(day)) return null;
   const first = format(t.bandeauTrajet, {
-    trajet: formatDuree(day.travelMinutes ?? 0),
+    trajet: formatDuree(day.travelMinutes),
     budget: formatDuree(day.travelBudgetMinutes),
   });
   const longest = longestSegmentToStop(day.items);
@@ -62,7 +63,7 @@ export function travelBannerMessage(day: Day): string | null {
 }
 
 /**
- * Journée sans aucune durée de trajet connue : aucune ligne de trajet et un total nul. C'est le cas des programmes
+ * Journée **sans aucun trajet** : aucune ligne de trajet et un total nul. C'est le cas des programmes
  * réels servis sans relecture des durées (adaptateur `prototype` sans carte, décision 0074) : l'interface n'affiche
  * alors aucune durée, plutôt qu'un « 0 min de trajet » qui serait inventé.
  *
@@ -71,22 +72,29 @@ export function travelBannerMessage(day: Day): string | null {
  * étape, ou aucune, avec l'adaptateur simulé) n'affiche donc pas non plus « 0 min de trajet » : il n'y a aucun
  * trajet à décrire, et rien d'utile n'est perdu. Testé dans `JourneePanel.test.tsx` et `SejourPanel.test.tsx`.
  *
- * Total indisponible (`travelMinutes: null`, un trajet du jour sans durée, prototype seulement, décision 0092 § 4) :
- * même rendu, aucun total n'est affiché.
+ * **Total inconnu** (`travelMinutes: null`, un trajet du jour sans durée, prototype seulement, décision 0092 § 4) :
+ * ce n'est **pas** une journée sans trajet (décision 0095 § 3) ; `withoutTravel` rend alors `false`, et les lignes
+ * de la Journée et du Séjour disent « Temps de trajet à confirmer ».
  */
 export function withoutTravel(day: Pick<Day, "items" | "travelMinutes">): boolean {
-  return day.travelMinutes === null || (day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment"));
+  return day.travelMinutes === 0 && !day.items.some((item) => item.type === "segment");
 }
 
 /**
- * Ligne sous le titre du jour : « 1 h 25 de trajet · environ 95 CHF par personne » (budget s'il est défini). Sans
- * durée connue (`withoutTravel`) : le budget seul, ou `null` (la ligne n'est pas rendue).
+ * Ligne sous le titre du jour : « 1 h 25 de trajet · environ 95 CHF par personne » (budget s'il est défini). Total
+ * inconnu (`null`, décision 0095 § 3) : « Temps de trajet à confirmer », avec le budget s'il est défini. Sans aucun
+ * trajet (`withoutTravel`) : le budget seul, ou `null` (la ligne n'est pas rendue).
  */
 export function dayTravelLine(day: Pick<Day, "items" | "travelMinutes" | "budgetPerPerson">): string | null {
+  if (day.travelMinutes === null) {
+    return day.budgetPerPerson === undefined
+      ? t.trajetAConfirmer
+      : format(t.trajetAConfirmerBudget, { montant: formatMontant(day.budgetPerPerson) });
+  }
   if (withoutTravel(day)) {
     return day.budgetPerPerson === undefined ? null : format(t.budgetSeul, { montant: formatMontant(day.budgetPerPerson) });
   }
-  const duree = formatDuree(day.travelMinutes ?? 0);
+  const duree = formatDuree(day.travelMinutes);
   return day.budgetPerPerson === undefined
     ? format(t.trajet, { duree })
     : format(t.trajetBudget, { duree, montant: formatMontant(day.budgetPerPerson) });
@@ -120,12 +128,20 @@ export function pathTo(items: readonly DayLineItem[], stopId: string): { segment
   return { segment: found.segment };
 }
 
-/** Texte de « Pour y aller » : « À pied, 20 min depuis [Royal Mile] », ou le segment seul sans origine. */
+/**
+ * Texte de « Pour y aller » : « À pied, 20 min depuis [Royal Mile] », ou le segment seul sans origine (libellé de la
+ * ligne du jour). Chaînes complètes de `sejour.json` (décision 0095 § 2), jamais un fragment collé : sans durée,
+ * l'origine suit le mode et la durée à confirmer vient en fin de phrase (« À pied depuis Royal Mile, durée à
+ * confirmer »).
+ */
 export function pathToLabel(path: { segment: Segment; origin?: string }): string {
-  const segment = segmentLabel(path.segment);
-  return path.origin === undefined
-    ? segment
-    : format(messages.sejour.fiche.pourYAllerDepuis, { segment, origin: path.origin });
+  const { segment, origin } = path;
+  if (origin === undefined) return segmentLabel(segment);
+  const fiche = messages.sejour.fiche;
+  const mode = messages.ligne.segment[segment.mode];
+  if (segment.minutes === null) return format(fiche.pourYAllerDepuisSansDuree, { mode, origin });
+  const duree = formatDuree(segment.minutes);
+  return format(segment.estimated ? fiche.pourYAllerDepuisEstime : fiche.pourYAllerDepuis, { mode, duree, origin });
 }
 
 const ts = messages.sejour.sejour;
@@ -144,12 +160,15 @@ export function tripBudgetLine(days: readonly Pick<Day, "index" | "budgetPerPers
 }
 
 /**
- * Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet » ; le nombre
- * d'étapes seul sans durée connue (`withoutTravel`, décision 0074).
+ * Résumé d'un jour dans « Jour par jour » (F5-PO-3, provisoire UX/UI) : « 6 étapes · 1 h 30 de trajet » ; total
+ * inconnu (`null`, décision 0095 § 3) : « 6 étapes · temps de trajet à confirmer » ; le nombre d'étapes seul sans
+ * aucun trajet (`withoutTravel`, décision 0074).
  */
 export function daySummary(day: Pick<Day, "items" | "travelMinutes">): string {
-  if (withoutTravel(day)) return dayStopCount(day);
-  return format(ts.jourParJour.resume, { etapes: dayStopCount(day), duree: formatDuree(day.travelMinutes ?? 0) });
+  const etapes = dayStopCount(day);
+  if (day.travelMinutes === null) return format(ts.jourParJour.resumeTrajetAConfirmer, { etapes });
+  if (withoutTravel(day)) return etapes;
+  return format(ts.jourParJour.resume, { etapes, duree: formatDuree(day.travelMinutes) });
 }
 
 /**

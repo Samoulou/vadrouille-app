@@ -57,6 +57,29 @@ describe("chaque schéma dérivé valide la projection du voyage simulé", () =>
   });
 });
 
+describe("trajet sans durée dans la vue partagée (décisions 0092 § 4 et 0095)", () => {
+  it("SharedDaySchema admet minutes: null (rendu « durée à confirmer »), jamais une durée inventée ; refuse undefined et un négatif", () => {
+    const segment = day2.items.find((item) => item.type === "segment");
+    if (segment?.type !== "segment") throw new Error("jour 2 sans trajet");
+    const avec = (minutes: unknown) => ({ ...day2, items: day2.items.map((item) => (item === segment ? { ...segment, segment: { ...segment.segment, minutes } } : item)) });
+    expect(SharedDaySchema.parse(avec(null)).items.find((item) => item.type === "segment")).toMatchObject({ segment: { minutes: null } });
+    expect(SharedDaySchema.safeParse(avec(undefined)).success).toBe(false);
+    expect(SharedDaySchema.safeParse(avec(-1)).success).toBe(false);
+    expect(SharedDaySchema.safeParse(avec("20")).success).toBe(false);
+  });
+
+  it("la projection recopie la valeur, sans la remplacer : null reste null", () => {
+    const jour = edimbourgDebloque.days[1]!;
+    const index = jour.items.findIndex((item) => item.type === "segment");
+    const sansDuree = {
+      ...jour,
+      items: jour.items.map((item, i) => (i === index && item.type === "segment" ? { ...item, segment: { ...item.segment, minutes: null } } : item)),
+    };
+    const projete = projectSharedTrip({ ...edimbourgDebloque, days: [sansDuree] }).days[0]!;
+    expect(projete.items[index]).toMatchObject({ type: "segment", segment: { minutes: null } });
+  });
+});
+
 describe("chaque champ exclu est refusé (un cas par champ)", () => {
   it.each([
     ["id", "mock_trip_edimbourg_debloque"],

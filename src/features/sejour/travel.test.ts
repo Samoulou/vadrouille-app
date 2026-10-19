@@ -137,6 +137,17 @@ describe("travel: « Pour y aller » (F5-PO-9)", () => {
     expect(pathTo(items, "b")).toEqual({ segment: { mode: "walk", minutes: 12, estimated: false }, origin: stop("a").name });
     expect(pathToLabel({ segment: { mode: "car", minutes: 15, estimated: false } })).toBe("En voiture, 15 min");
   });
+
+  it("textes exacts de « Pour y aller » (décision 0095 § 2) : avec et sans origine, durée connue, estimée ou à confirmer", () => {
+    const origin = "Royal Mile";
+    expect(pathToLabel({ segment: { mode: "walk", minutes: 20, estimated: false }, origin })).toBe("À pied, 20 min depuis Royal Mile");
+    expect(pathToLabel({ segment: { mode: "transit", minutes: 25, estimated: true }, origin })).toBe("Bus, environ 25 min (estimation) depuis Royal Mile");
+    expect(pathToLabel({ segment: { mode: "walk", minutes: null, estimated: false }, origin })).toBe("À pied depuis Royal Mile, durée à confirmer");
+    expect(pathToLabel({ segment: { mode: "transit", minutes: null, estimated: true }, origin })).toBe("Bus depuis Royal Mile, durée à confirmer");
+    expect(pathToLabel({ segment: { mode: "car", minutes: null, estimated: false }, origin })).toBe("En voiture depuis Royal Mile, durée à confirmer");
+    expect(pathToLabel({ segment: { mode: "walk", minutes: null, estimated: false } })).toBe("À pied, durée à confirmer");
+    expect(pathToLabel({ segment: { mode: "walk", minutes: 20, estimated: false } })).toBe("À pied, 20 min");
+  });
 });
 
 describe("travel: ligne trajet et budget", () => {
@@ -157,15 +168,22 @@ describe("travel: ligne trajet et budget", () => {
     expect(dayTravelLine({ items: avecSegment, travelMinutes: 0, budgetPerPerson: undefined })).toBe("0 min de trajet");
   });
 
-  it("total indisponible (travelMinutes null, décision 0092) : budget seul ou aucune ligne, jamais un total ; ni bandeau ni plus long trajet sans durée", () => {
+  it("total inconnu (travelMinutes null, décisions 0092 et 0095 § 3) : « Temps de trajet à confirmer », jamais un total ; ni bandeau ni plus long trajet sans durée", () => {
     const items: DayLineItem[] = [
       ...day(2).items,
       { type: "segment", segment: { mode: "walk", minutes: null, estimated: false } },
       { type: "stop", stop: (day(2).items.find((item) => item.type === "stop") as Extract<DayLineItem, { type: "stop" }>).stop },
     ];
-    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: 95 })).toBe("Environ 95 CHF par personne");
-    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: undefined })).toBeNull();
-    expect(daySummary({ items, travelMinutes: null })).not.toMatch(/trajet/);
+    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: 35 })).toBe("Temps de trajet à confirmer · environ 35 CHF par personne");
+    expect(dayTravelLine({ items, travelMinutes: null, budgetPerPerson: undefined })).toBe("Temps de trajet à confirmer");
+    const etapes = items.filter((item) => item.type === "stop").length;
+    expect(daySummary({ items, travelMinutes: null })).toBe(`${etapes} étapes · temps de trajet à confirmer`);
+    // Une journée sans total n'est pas une journée sans trajet (0095 § 3) : jamais « 3 étapes » seul.
+    expect(daySummary({ items: day(2).items.filter((item) => item.type !== "segment").slice(0, 3), travelMinutes: null })).toMatch(/ · temps de trajet à confirmer$/);
+    for (const texte of [dayTravelLine({ items, travelMinutes: null, budgetPerPerson: 35 }), daySummary({ items, travelMinutes: null })]) {
+      expect(texte).not.toMatch(/\d+\s*min/);
+      expect(texte).not.toMatch(/\d+ h/);
+    }
     expect(isOverTravelBudget({ travelMinutes: null, travelBudgetMinutes: 0 })).toBe(false);
     expect(travelBannerMessage({ ...day(5), travelMinutes: null })).toBeNull();
     const sansDuree: DayLineItem[] = [

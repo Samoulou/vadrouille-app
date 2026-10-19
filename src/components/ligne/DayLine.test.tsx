@@ -142,10 +142,24 @@ describe("DayLine", () => {
     expect(segmentLabel({ mode: "transit", minutes: 90, estimated: true })).toBe("Bus, environ 1 h 30 (estimation)");
   });
 
-  it("segment sans durée (temps indisponible, prototype, décision 0092) : le mode et « durée indisponible », jamais une durée", () => {
-    expect(segmentLabel({ mode: "walk", minutes: null, estimated: false })).toBe("À pied, durée indisponible");
-    expect(segmentLabel({ mode: "transit", minutes: null, estimated: true })).toBe("Bus, durée indisponible");
-    expect(segmentLabel({ mode: "car", minutes: null, estimated: false })).not.toMatch(/\d/);
+  it("segment sans durée (prototype, décisions 0092 et 0095 § 2) : le mode et « durée à confirmer », jamais une durée ni « environ »", () => {
+    expect(segmentLabel({ mode: "walk", minutes: null, estimated: false })).toBe("À pied, durée à confirmer");
+    expect(segmentLabel({ mode: "transit", minutes: null, estimated: true })).toBe("Bus, durée à confirmer");
+    expect(segmentLabel({ mode: "car", minutes: null, estimated: false })).toBe("En voiture, durée à confirmer");
+  });
+
+  it("SegmentRow sans durée : élément de liste lu « À pied, durée à confirmer », rail pointillé inchangé, aucun aria-label (0095 § 5)", () => {
+    const { container, unmount } = renderLine([
+      { type: "terminus", role: "start", time: "09:30", label: "Hôtel" },
+      { type: "segment", segment: { mode: "walk", minutes: null, estimated: false } },
+      { type: "terminus", role: "end", time: "18:00", label: "Hôtel" },
+    ]);
+    const segment = container.querySelector("li[data-type='segment']") as HTMLElement;
+    expect(segment).toHaveTextContent("À pied, durée à confirmer");
+    expect(segment.textContent).not.toMatch(/\d+\s*min/);
+    expect(segment.querySelector("[aria-label]")).toBeNull();
+    expect(segment.getAttribute("data-mode")).toBe("walk");
+    unmount();
   });
 
   it("temps libre : heure from, texte, lien « Idées » seulement avec getIdeasHref", () => {

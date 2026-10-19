@@ -171,10 +171,11 @@ function SwipeCard({
   const { stop } = proposal;
   const faits = formatFaits(stop.facts);
   const tag = deckCardTag(stop.exceptions);
+  // Sans trajet relu (`travelFromPrevious` absent) ou sans durée (`minutes: null`, prototype, décision 0092 § 4
+  // point 3) : ni ligne de trajet ni détour, et rien ne les remplace (voulu, décision 0095 § 4).
+  const previous = proposal.travelFromPrevious;
   const travel =
-    proposal.travelFromPrevious?.minutes != null && proposal.travelFromPrevious.minutes > DETOUR_THRESHOLD_MINUTES
-      ? proposal.travelFromPrevious
-      : undefined;
+    previous !== undefined && previous.minutes !== null && previous.minutes > DETOUR_THRESHOLD_MINUTES ? previous : undefined;
   const id = (part: string) => `${ids}-${part}`;
   const describedBy = [
     id("moment"),

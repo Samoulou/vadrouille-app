@@ -79,6 +79,17 @@ describe("PresentationScreen", () => {
     expect(button("Tout garder pour le jour 1")).toBeInTheDocument();
   });
 
+  it("deck_decision : durée inconnue (minutes: null, décision 0092 § 4) : travel_minutes absent, jamais 0", async () => {
+    const [premiere, ...autres] = propositions;
+    const sansDuree = { ...premiere!, travelFromPrevious: { ...premiere!.travelFromPrevious!, minutes: null } };
+    const { events } = setup({ proposals: [sansDuree, ...autres] });
+    await click("J'aime");
+    await waitFor(() => expect(events("deck_decision")).toHaveLength(1));
+    const properties = events("deck_decision")[0]!.properties as Record<string, unknown>;
+    expect(properties).toMatchObject({ decision: "like", position: 1 });
+    expect("travel_minutes" in properties).toBe(false);
+  });
+
   it("presentation: boutons et clavier", async () => {
     const { events } = setup();
     await click("J'aime");
