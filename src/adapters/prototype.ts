@@ -12,7 +12,6 @@ import {
   type DayMap,
   type MapPoint,
   type Proposal,
-  type Segment,
   type Trip,
   type TripSummary,
 } from "@/contracts";
@@ -50,8 +49,8 @@ import type { AdapterContext, TripAdapter } from "./types";
  * avec leurs positions, et relecteur Routes réel (P0r4, décisions 0074 et 0079) : `createPrototypeAdapterReel`.
  */
 
-/** Mode de déplacement d'un segment. */
-export type ModeTrajet = Segment["mode"] & ModeTrajetReduit;
+/** Mode de déplacement d'un segment (égal à `Segment["mode"]`). */
+export type ModeTrajet = ModeTrajetReduit;
 
 /** Trajet à relire entre deux lieux, désignés par leur seul identifiant de lieu (`PaireTrajet` de la forme réduite). */
 export type PaireRelecture = PaireTrajet;
@@ -122,9 +121,13 @@ interface ProgrammeServi {
 
 const AUCUN_TRAJET: TrajetsConserves = new Map();
 
-/** Erreur fermée d'une relecture : son message ne contient que le code, jamais un identifiant de lieu. */
+/**
+ * Erreur fermée de la recomposition : son message ne contient que le code, jamais un identifiant de lieu. Seul code
+ * levé : `missing_place` (programme hors forme). Un refus ou un échec de la relecture ne lève plus (0092 § 4 point 3) :
+ * la page s'affiche sans les temps manquants.
+ */
 export class RelectureError extends Error {
-  readonly code: RaisonRelecture | "invalid_response" | "missing_place";
+  readonly code: "missing_place";
   constructor(code: RelectureError["code"]) {
     super(`relecture des trajets impossible : ${code}`);
     this.name = "RelectureError";

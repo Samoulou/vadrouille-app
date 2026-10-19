@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { DayMapSchema, DaySchema, TripSchema } from "@/contracts";
-import { PROTOTYPE_ORG_ID, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesDistinctes, pairesDuProgramme, PROTOTYPE_ORG_ID, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 import { createPrototypeAdapterReel, type PaireRelecture, type RelecteurTrajets } from "./prototype";
@@ -18,7 +18,10 @@ import {
   SQL_LISTE,
   SQL_POSITIONS,
   SQL_PROGRAMME,
+  SQL_TRAJETS,
+  SQL_TRAJETS_PRESENTS,
 } from "./prototype-lecture";
+import { SQL_TRAJETS_PRESENTS as SQL_TRAJETS_PRESENTS_ECRITURE } from "./prototype-ecriture";
 
 /**
  * Source des programmes réels (décision 0074, complétée par 0079 : P0r4) : client `pg` simulé. Lecture seule bornée,
@@ -50,14 +53,32 @@ function lignesPositions(sauf: readonly string[] = []) {
 
 type Requete = { texte: string; valeurs?: readonly unknown[] };
 
-function poolSimule(reponses: { contenus?: unknown[]; positions?: Record<string, unknown>[]; echec?: boolean; connexionRefusee?: boolean } = {}) {
+function poolSimule(
+  reponses: {
+    contenus?: unknown[];
+    /** Identifiant (`id`) de chaque programme de `contenus`, dans le même ordre ; absent : ligne sans `id`. */
+    ids?: string[];
+    positions?: Record<string, unknown>[];
+    /** Présence de la table des temps conservés (`to_regclass`) ; temps conservés rendus par `SQL_TRAJETS`. */
+    tablePresente?: boolean;
+    trajets?: Record<string, unknown>[];
+    /** Requête qui échoue (texte exact) ; `echec` : toutes. */
+    echecSur?: string;
+    echec?: boolean;
+    connexionRefusee?: boolean;
+  } = {},
+) {
   const requetes: Requete[] = [];
   const liberations: unknown[] = [];
   const client: ClientSql = {
     async query(texte, valeurs) {
       requetes.push({ texte, valeurs });
-      if (reponses.echec && texte !== "ROLLBACK") throw Object.assign(new Error("secret de la base"), { code: "08006" });
-      if (texte === SQL_LISTE || texte === SQL_PROGRAMME) return { rows: (reponses.contenus ?? []).map((contenu) => ({ contenu })) };
+      if ((reponses.echec || texte === reponses.echecSur) && texte !== "ROLLBACK") throw Object.assign(new Error("secret de la base"), { code: "08006" });
+      if (texte === SQL_LISTE || texte === SQL_PROGRAMME) {
+        return { rows: (reponses.contenus ?? []).map((contenu, rang) => (reponses.ids?.[rang] === undefined ? { contenu } : { id: reponses.ids[rang], contenu })) };
+      }
+      if (texte === SQL_TRAJETS_PRESENTS) return { rows: [{ presente: reponses.tablePresente ?? false }] };
+      if (texte === SQL_TRAJETS) return { rows: reponses.trajets ?? [] };
       if (texte === SQL_POSITIONS) return { rows: reponses.positions ?? lignesPositions() };
       return { rows: [] };
     },
@@ -279,5 +300,118 @@ describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
     });
     const simule = poolSimule({ contenus });
     await expect(createSourceProgrammesReels({ pool: async () => simule.pool }).lister()).rejects.toBeInstanceOf(EchecLectureProgrammes);
+  });
+});
+
+describe("p0: temps conservés lus avec le programme (décision 0092 § 4 « Lecture » et § 5 point 6)", () => {
+  const PROGRAMME_ID = "5e1f0000-0000-4000-8000-0000000000a1";
+  const AUTRE_ID = "5e1f0000-0000-4000-8000-0000000000a2";
+  const AUTRE_TRIP = "proto_test_20261012_2";
+
+  /** Contenu écrit d'un second voyage (mêmes lieux, autre identifiant de voyage). */
+  function contenuAutre(): Record<string, unknown> {
+    const contenu = contenuEcrit() as { trip: { id: string } };
+    return { ...contenu, trip: { ...contenu.trip, id: AUTRE_TRIP } };
+  }
+
+  /** Paires du programme de test, de la seule fonction qui les calcule. */
+  const paires = () => pairesDistinctes(pairesDuProgramme(contenuEcrit() as never));
+  const ligne = (paire: PaireRelecture, minutes: unknown, programmeId = PROGRAMME_ID) => ({
+    programme_id: programmeId,
+    mode: paire.mode,
+    origine: paire.origine,
+    destination: paire.destination,
+    minutes,
+  });
+  const textes = (simule: ReturnType<typeof poolSimule>) => simule.requetes.map((r) => r.texte);
+
+  it("SQL : SELECT fixes, en lecture seule, nom de table composé ; même test de présence que l'écriture", () => {
+    expect(SQL_TRAJETS_PRESENTS).toBe(`SELECT pg_catalog.to_regclass('${["prototype", "trajets"].join(".")}') IS NOT NULL AS presente`);
+    // Constante écrite deux fois (lecture, écriture) : toute dérive est refusée ici (mineur 7 de la revue de #507).
+    expect(SQL_TRAJETS_PRESENTS_ECRITURE).toBe(SQL_TRAJETS_PRESENTS);
+    expect(SQL_TRAJETS.trimStart().startsWith(`SELECT programme_id, mode, origine, destination, minutes FROM ${["prototype", "trajets"].join(".")}`)).toBe(true);
+    expect(SQL_TRAJETS).toContain("programme_id = ANY($1::uuid[])");
+    expect(SQL_TRAJETS).toContain("expires_at > pg_catalog.now()");
+    expect(SQL_TRAJETS).not.toMatch(/INSERT|UPDATE|DELETE|\$\{/i);
+  });
+
+  it("(a) table absente : aucune requête sur la table, aucune erreur, programme servi sans temps, tout relu", async () => {
+    const simule = poolSimule({ contenus: [contenuEcrit()], ids: [PROGRAMME_ID], tablePresente: false });
+    const source = createSourceProgrammesReels({ pool: async () => simule.pool });
+    const lu = await source.lire(TRIP_ID);
+    expect(lu?.programme.trip.id).toBe(TRIP_ID);
+    expect(lu?.trajets.size).toBe(0);
+    expect(textes(simule)).toEqual(["BEGIN READ ONLY", SQL_DELAI, SQL_PROGRAMME, SQL_POSITIONS, SQL_TRAJETS_PRESENTS, "COMMIT"]);
+    const liste = await source.lister();
+    expect(liste.map((p) => [p.programme.trip.id, p.trajets.size])).toEqual([[TRIP_ID, 0]]);
+    expect(textes(simule).filter((t) => t === SQL_TRAJETS)).toEqual([]);
+    // Adaptateur : sans temps conservés, chaque paire est relue.
+    const relecteur = relecteurFixe(7);
+    const adapter = createPrototypeAdapterReel({ programmes: source, relecteurs: { trajets: relecteur } });
+    expect(await adapter.getDay(ctx, TRIP_ID, 1)).not.toBeNull();
+    expect(relecteur.paires.flat().length).toBeGreaterThan(0);
+  });
+
+  it("(b) table présente : une seule requête pour tous les programmes, identifiants triés en paramètre lié ; temps rendus par programme", async () => {
+    const [premiere, seconde] = paires();
+    const simule = poolSimule({
+      contenus: [contenuEcrit(), contenuAutre()],
+      ids: [PROGRAMME_ID, AUTRE_ID],
+      tablePresente: true,
+      trajets: [ligne(premiere!, 13), ligne(seconde!, 21, AUTRE_ID)],
+    });
+    const source = createSourceProgrammesReels({ pool: async () => simule.pool });
+    const liste = await source.lister();
+    const lectures = simule.requetes.filter((r) => r.texte === SQL_TRAJETS);
+    expect(lectures).toHaveLength(1);
+    expect(lectures[0]?.valeurs).toEqual([[PROGRAMME_ID, AUTRE_ID].sort()]);
+    expect(textes(simule)).toEqual(["BEGIN READ ONLY", SQL_DELAI, SQL_LISTE, SQL_POSITIONS, SQL_TRAJETS_PRESENTS, SQL_TRAJETS, "COMMIT"]);
+    const parVoyage = new Map(liste.map((p) => [p.programme.trip.id, p.trajets]));
+    expect([...(parVoyage.get(TRIP_ID) ?? [])]).toEqual([[cleTrajet(premiere!), 13]]);
+    expect([...(parVoyage.get(AUTRE_TRIP) ?? [])]).toEqual([[cleTrajet(seconde!), 21]]);
+    // Un seul voyage : même requête, son seul identifiant.
+    const seul = poolSimule({ contenus: [contenuEcrit()], ids: [PROGRAMME_ID], tablePresente: true, trajets: [ligne(premiere!, 13)] });
+    const lu = await createSourceProgrammesReels({ pool: async () => seul.pool }).lire(TRIP_ID);
+    expect(seul.requetes.find((r) => r.texte === SQL_TRAJETS)?.valeurs).toEqual([[PROGRAMME_ID]]);
+    expect([...(lu?.trajets ?? [])]).toEqual([[cleTrajet(premiere!), 13]]);
+  });
+
+  it("(c) ligne hors forme ignorée, jamais corrigée : la paire est relue", async () => {
+    const [valide, autre] = paires();
+    const hors = [
+      { ...ligne(autre!, 9), mode: "bike" },
+      { ...ligne(autre!, 9), origine: "id avec espace" },
+      { ...ligne(autre!, 9), destination: "x".repeat(300) },
+      ligne(autre!, 2.5),
+      ligne(autre!, -1),
+      ligne(autre!, 1441),
+      ligne(autre!, "9"),
+      ligne(autre!, 9, AUTRE_ID),
+      { ...ligne(autre!, 9), programme_id: 42 },
+    ];
+    const simule = poolSimule({ contenus: [contenuEcrit()], ids: [PROGRAMME_ID], tablePresente: true, trajets: [ligne(valide!, 13), ...hors] });
+    const source = createSourceProgrammesReels({ pool: async () => simule.pool });
+    const lu = await source.lire(TRIP_ID);
+    expect([...(lu?.trajets ?? [])]).toEqual([[cleTrajet(valide!), 13]]);
+    // L'adaptateur relit la paire écartée (et toute autre paire absente), jamais celle qui est conservée.
+    const relecteur = relecteurFixe(7);
+    const adapter = createPrototypeAdapterReel({ programmes: source, relecteurs: { trajets: relecteur } });
+    await adapter.getTrip(ctx, TRIP_ID);
+    const relues = new Set(relecteur.paires.flat().map(cleTrajet));
+    expect(relues.has(cleTrajet(autre!))).toBe(true);
+    expect(relues.has(cleTrajet(valide!))).toBe(false);
+  });
+
+  it("(d) échec de la requête des temps : EchecLectureProgrammes (état d'erreur existant), transaction annulée, client détruit", async () => {
+    for (const echecSur of [SQL_TRAJETS_PRESENTS, SQL_TRAJETS]) {
+      const simule = poolSimule({ contenus: [contenuEcrit()], ids: [PROGRAMME_ID], tablePresente: true, echecSur });
+      const source = createSourceProgrammesReels({ pool: async () => simule.pool });
+      const erreur = await source.lire(TRIP_ID).catch((e: unknown) => e);
+      expect(erreur, echecSur).toBeInstanceOf(EchecLectureProgrammes);
+      expect(String((erreur as Error).message)).not.toContain("secret");
+      expect(textes(simule).at(-1)).toBe("ROLLBACK");
+      expect(simule.liberations).toEqual([true]);
+      await expect(source.lister()).rejects.toBeInstanceOf(EchecLectureProgrammes);
+    }
   });
 });

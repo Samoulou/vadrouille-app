@@ -114,12 +114,10 @@ function controler(entree: EcritureProgrammePrototype): { positions: [string, nu
     }
     lignes.push([placeId, position.lat, position.lng]);
   }
-  let paires: ReturnType<typeof pairesAConserver>;
-  try {
-    paires = pairesAConserver(entree.programme, entree.mode);
-  } catch {
-    throw new EchecEcritureProgramme("entree_refusee");
-  }
+  // `pairesAConserver` est pure et ne lève pas (`src/prototype/programme-reduit.ts`, sans `throw`) ; la structure du
+  // programme vient d'être parcourue par `placeIdsDuProgramme`. Aucun refus n'est possible ici : un programme payé
+  // n'est jamais perdu pour un temps (0092 § 4, « Écriture »).
+  const paires = pairesAConserver(entree.programme, entree.mode);
   const trajets: LigneTrajet[] = [];
   for (const paire of [...paires].sort((a, b) => (cleTrajet(a) < cleTrajet(b) ? -1 : 1))) {
     const minutes = entree.trajets.get(cleTrajet(paire));
