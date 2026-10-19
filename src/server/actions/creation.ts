@@ -19,7 +19,7 @@ import {
   type Result,
   type Session,
 } from "@/contracts";
-import { CreatedTripSchema, GenerationStatusRequestSchema } from "@/contracts/creation";
+import { CreatedTripSchema, GenerationStatusRequestSchema, RetryGenerationRequestSchema } from "@/contracts/creation";
 import type { ApiErrorCode } from "@/contracts/values";
 import { contexteFacultatif } from "@/features/compte/session";
 
@@ -126,16 +126,29 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
   } catch {
     return fail("provider_error");
   }
-  if (!result.ok && result.error.code === "active_preview_exists") {
-    // Le conflit est reconstruit avec `code` et `activeTripId` seulement : `retryable` et `field` éventuels de
-    // l'adaptateur sont écartés (rien à rejouer ni à corriger dans le brouillon), comme les autres erreurs ramenées à
-    // leur code ci-dessous.
-    const conflict = ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: result.error.activeTripId });
-    return conflict.success ? { ok: false, error: conflict.data } : fail("provider_error");
-  }
+  if (!result.ok && result.error.code === "active_preview_exists") return conflictOf(result.error);
+  // B9b : refus de l'adaptateur `api` sur une ville (table des fuseaux, B9-PO-18) ou sur la date d'arrivée dans le
+  // fuseau du voyage ; seul un champ de la forme de `parseInput` est transmis.
+  if (!result.ok && result.error.code === "validation_failed") return fail("validation_failed", fieldOf(result.error));
   if (!result.ok) return fail(CREATE_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
   const output = CreatedTripSchema.safeParse(result.value);
   return output.success ? ok(output.data) : fail("provider_error");
+}
+
+/**
+ * Conflit `active_preview_exists` reconstruit avec `code` et `activeTripId` seulement : `retryable` et `field` éventuels
+ * de l'adaptateur sont écartés (rien à rejouer ni à corriger dans le brouillon), comme les autres erreurs ramenées à
+ * leur code.
+ */
+function conflictOf(error: { activeTripId?: string }): Result<never> {
+  const conflict = ApiErrorSchema.safeParse({ code: "active_preview_exists", activeTripId: error.activeTripId });
+  return conflict.success ? { ok: false, error: conflict.data } : fail("provider_error");
+}
+
+/** Champ d'un refus de l'adaptateur, gardé seulement s'il a la forme d'un chemin de `parseInput` (`draft.otherCities.0.name`). */
+const FIELD_PATTERN = /^[A-Za-z][A-Za-z0-9]*(\.([A-Za-z][A-Za-z0-9]*|[0-9]+))*$/;
+function fieldOf(error: { field?: string }): string | undefined {
+  return typeof error.field === "string" && error.field.length <= 64 && FIELD_PATTERN.test(error.field) ? error.field : undefined;
 }
 
 /**
@@ -164,5 +177,38 @@ export async function getGenerationStatus(input: unknown): Promise<Result<Genera
   }
   if (!result.ok) return fail(result.error.code === "not_found" ? "not_found" : "provider_error");
   const output = GenerationStatusSchema.safeParse(result.value);
+  return output.success && output.data.tripId === parsed.value.tripId ? ok(output.data) : fail("provider_error");
+}
+
+/** Erreurs du nouvel essai transmises telles quelles (B9-TL-11) ; toute autre devient `provider_error`. */
+const RETRY_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["validation_failed", "not_found", "provider_error"]);
+
+/**
+ * Nouvel essai de l'écran 5 (B9b, B9-PO-9 ; décision 0081 B9-TL-11, 0087 § 1.1) : action authentifiée, contexte de
+ * `contexteFacultatif()` comme `getGenerationStatus` (`unauthenticated` sans session, avant toute lecture de l'entrée) ;
+ * `parseInput` par `RetryGenerationRequestSchema` ; appel de l'adaptateur ; `active_preview_exists` reconstruit avec le
+ * voyage en préparation ; sortie validée et du même voyage. Le bouton « Réessayer » y est branché par une tâche
+ * d'interface à part (question 13 de la spécification B9). Aucun journal.
+ */
+export async function retryGeneration(input: unknown): Promise<Result<CreatedTrip>> {
+  let ctx: AdapterContext | null;
+  try {
+    ctx = await contexteFacultatif();
+  } catch {
+    return fail("provider_error");
+  }
+  if (ctx === null) return fail("unauthenticated");
+  const parsed = parseInput(RetryGenerationRequestSchema, input);
+  if (!parsed.ok) return parsed;
+  const scope = await getSimulationScope();
+  let result: Result<CreatedTrip>;
+  try {
+    result = await getCreationAdapter(undefined, { scope }).retryGeneration(ctx, parsed.value);
+  } catch {
+    return fail("provider_error");
+  }
+  if (!result.ok && result.error.code === "active_preview_exists") return conflictOf(result.error);
+  if (!result.ok) return fail(RETRY_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
+  const output = CreatedTripSchema.safeParse(result.value);
   return output.success && output.data.tripId === parsed.value.tripId ? ok(output.data) : fail("provider_error");
 }

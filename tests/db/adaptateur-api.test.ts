@@ -44,6 +44,7 @@ const db = createDatabase("vadrouille_app");
 const withOrg = creerWithOrg(db);
 let app: DbClient;
 let auth: DbClient;
+let admin: DbClient;
 let a: Org;
 let b: Org;
 let ctxA: AdapterContext;
@@ -158,7 +159,7 @@ function table(durees: Record<string, number>, lieux: string[], inconnus: string
 }
 
 async function ecrire(org: Org, donnees: DonneesVoyage): Promise<string> {
-  return ecrireVoyage(app, org, donnees);
+  return ecrireVoyage(app, org, donnees, admin);
 }
 
 /** Copie d'un objet sans les champs nommés. */
@@ -171,6 +172,8 @@ const raison = (reason: string) => expect.objectContaining({ name: "LectureVoyag
 beforeAll(async () => {
   app = await connect("app");
   auth = await connect("auth");
+  // Voyages sans fuseau (`time_zone_missing`) : lignes antérieures à la migration 0012, reproduites par l'administration.
+  admin = await connect("admin");
   a = await createOrg(auth);
   b = await createOrg(auth);
   ctxA = contexte(a);
@@ -236,7 +239,7 @@ describe("adaptateur api : suite de contrat et isolation", () => {
       const contexteLu = (await executeur.query("SELECT app_current_org() AS org")).rows[0]?.org;
       expect(contexteLu).toBe(a.org);
       await executeur.query(
-        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults) VALUES ($1, $2, gen_random_uuid(), 'X', '2027-01-01', '2027-01-02', 1)",
+        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults, time_zone) VALUES ($1, $2, gen_random_uuid(), 'X', '2027-01-01', '2027-01-02', 1, 'Europe/Paris')",
         [a.org, a.owner],
       );
     }).catch((e: unknown) => e);
@@ -825,10 +828,10 @@ describe("lecture: identifiants, données incohérentes, voyages sans version", 
     const ctx = contexte(org);
     const days = [jour(1, "2028-04-01", [term("start", "09:00"), term("end", "18:00")])];
     const visible = await ecrireVoyage(app, org, voyage(days, { destination: "Visible" }));
-    await ecrireVoyage(app, org, voyage(days, { destination: "En création", timeZone: null, currentVersion: null }));
+    await ecrireVoyage(app, org, voyage(days, { destination: "En création", timeZone: null, currentVersion: null }), admin);
     const { adapter } = banc();
     expect((await adapter.listTrips(ctx)).map((t) => t.id)).toEqual([visible]);
-    await ecrireVoyage(app, org, voyage(days, { destination: "Fuseau nul", timeZone: null }));
+    await ecrireVoyage(app, org, voyage(days, { destination: "Fuseau nul", timeZone: null }), admin);
     await expect(adapter.listTrips(ctx)).rejects.toEqual(raison("time_zone_missing"));
   });
 

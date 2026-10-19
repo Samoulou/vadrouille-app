@@ -760,6 +760,9 @@ const TYPES_GROUNDING_RELECTURE: readonly string[] = ["src/grounding/fiches.ts",
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 
+/** B9b (0081 B9-TL-1 point 2) : classification des codes de la couche IA (0077 § 3 point 4). */
+const NATURES_IA = "src/ai/natures.ts";
+
 const areteAdmise = (de: string, vers: string) =>
   (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
   (MODULES_RELECTURE.includes(de) && TYPES_GROUNDING_RELECTURE.includes(vers)) ||
@@ -767,7 +770,11 @@ const areteAdmise = (de: string, vers: string) =>
   (vers === PORT_POSITIONS && !de.startsWith("src/grounding/")) ||
   // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
   // (`SourceRelectures`, `Relectures`), en type seulement (test ci-dessous et `ligne/voyages-imports`).
-  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE);
+  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
+  // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
+  // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
+  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Le test du graphe est réécrit par B9c (point 4).
+  (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
@@ -1390,6 +1397,28 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         [],
       ],
     ] satisfies [string, Record<string, string[]>, string, string[]][])("B6a, arête du double de relectures : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    it.each([
+      ["admis : src/server/generation → src/ai/natures.ts", { "src/server/generation/codes.ts": [NATURES_IA] }, "src/server/generation/codes.ts", []],
+      ["admis : src/server/creation → src/ai/natures.ts", { "src/server/creation/y.ts": [NATURES_IA] }, "src/server/creation/y.ts", []],
+      [
+        "admis : page → action → src/server/creation → src/ai/natures.ts → src/ai/erreurs.ts (terminal, rien au-delà)",
+        {
+          "src/app/x/page.tsx": ["src/server/actions/creation.ts"],
+          "src/server/actions/creation.ts": ["src/server/creation/y.ts"],
+          "src/server/creation/y.ts": [NATURES_IA],
+          [NATURES_IA]: ["src/ai/couche.ts"],
+        },
+        "src/app/x/page.tsx",
+        [],
+      ],
+      ["refusé : src/server/x.ts → src/ai/natures.ts", { "src/server/x.ts": [NATURES_IA] }, "src/server/x.ts", [NATURES_IA]],
+      ["refusé : src/adapters → src/ai/natures.ts", { "src/adapters/y.ts": [NATURES_IA] }, "src/adapters/y.ts", [NATURES_IA]],
+      ["refusé : src/server/creation → @/ai/couche", { "src/server/creation/y.ts": ["src/ai/couche.ts"] }, "src/server/creation/y.ts", ["src/ai/couche.ts"]],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B9b, terminal de la conversion des codes (0081 B9-TL-1 point 2) : %s", (_nom, aretes, depart, attendu) => {
       const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       expect(violationsApplication(depart, graphe)).toEqual(attendu);
     });

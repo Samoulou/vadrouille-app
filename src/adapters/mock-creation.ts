@@ -14,6 +14,7 @@ import {
   type LodgingRequest,
   type LodgingSuggestion,
   type Result,
+  type RetryGenerationRequest,
   type TripRequest,
 } from "@/contracts";
 import { CreatedTripSchema } from "@/contracts/creation";
@@ -82,6 +83,9 @@ function latestLaunch(launches: Map<string, LaunchRecord>, organizationId: strin
  *   du lancement (ni récit, ni brouillon, ni brief) ; `active_preview_exists` si une génération de la même
  *   organisation n'est pas finie et que le `requestId` est nouveau ; une fois la génération finie, un nouveau
  *   `requestId` relance la suite d'états ;
+ * - `retryGeneration` (B9-PO-9) : idempotent par (organisation, `requestId`) ; seulement si le dernier lancement du
+ *   voyage est `failed` et `retryable` (sinon `validation_failed`, et toujours pour `kind: "full"`) ; le nouvel essai
+ *   déroule la suite d'états jusqu'à `ready` ; `not_found` pour un voyage jamais lancé dans la portée ;
  * - `getGenerationStatus` déroule la suite d'états fixe du jeu simulé depuis l'instant du dernier lancement ; un
  *   voyage de l'organisation jamais lancé dans la portée est déjà complet (`ready`) ; un voyage inconnu ou d'une
  *   autre organisation donne `not_found` ;
@@ -104,7 +108,7 @@ export function createMockCreationAdapter({
   }
 
   const statusOf = (launch: LaunchRecord, at: number, outcome: CreationStore["outcome"]): GenerationStatus =>
-    mockGenerationStatus(launch.tripId, at - launch.launchedAt, outcome);
+    mockGenerationStatus(launch.tripId, at - launch.launchedAt, launch.retry ? "ready" : outcome);
 
   return {
     async structureBrief(): Promise<Result<InferredBrief>> {
@@ -149,6 +153,20 @@ export function createMockCreationAdapter({
         creation.launches.delete(oldest);
       }
       return ok(created.data);
+    },
+    async retryGeneration(ctx: AdapterContext, request: RetryGenerationRequest): Promise<Result<CreatedTrip>> {
+      const { clock, creation } = scoped();
+      const at = clock();
+      const key = launchKey(ctx.organizationId, request.requestId);
+      const existing = creation.launches.get(key);
+      if (existing && existing.tripId === request.tripId) return ok({ tripId: existing.tripId });
+      const latest = latestLaunch(creation.launches, ctx.organizationId, request.tripId);
+      if (!latest) return fail("not_found");
+      if (request.kind === "full" || existing) return fail("validation_failed");
+      const status = statusOf(latest, at, creation.outcome);
+      if (status.phase !== "failed" || !status.retryable) return fail("validation_failed");
+      creation.launches.set(key, { organizationId: ctx.organizationId, requestId: request.requestId, tripId: request.tripId, launchedAt: at, retry: true });
+      return ok({ tripId: request.tripId });
     },
     async getGenerationStatus(ctx: AdapterContext, tripId: string): Promise<Result<GenerationStatus>> {
       const { clock, creation, reader } = scoped();

@@ -32,8 +32,8 @@ describe("withOrg", () => {
       { organizationId: org, userId: owner },
       async (tx) => {
         await tx.execute(
-          sql`INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults)
-              VALUES (${org}, ${owner}, ${randomUUID()}, 'Édimbourg', '2027-05-01', '2027-05-06', 2)`,
+          sql`INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults, time_zone)
+              VALUES (${org}, ${owner}, ${randomUUID()}, 'Édimbourg', '2027-05-01', '2027-05-06', 2, 'Europe/London')`,
         );
         const contexte = await tx.execute<{ org: string; utilisateur: string }>(sql`SELECT app_current_org() AS org, app_current_user() AS utilisateur`);
         const voyages = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM trips`);
