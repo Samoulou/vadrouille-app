@@ -1,34 +1,37 @@
-# État du studio — 2026-10-19 (107e cycle)
+# État du studio — 2026-10-19 (108e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 5 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 6 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 106e cycle ; #studio : aucun message nouveau. Q511 (carte) et Q507 (« Je confirme 0093 ») toujours sans réponse.
+- 21:38 UTC : « Je confirme 0093 » sur #512 (Q507) : les points 2, 6 et 7 de 0093 sont définitifs ; tâches A et C débloquées.
+- 21:39 UTC : carte « un ou deux quartiers par jour » : **un ou deux quartiers voisins** (Q511) ; `secteursParJourMax` reste à 2.
+- 21:40 UTC : « Tout est aligné, passe à 4 fils toutes les deux heures, je veux que l'app marche de bout en bout rapidement pour que je teste » : cycle toutes les 2 heures, 4 fils, priorité au parcours complet testable.
+- #studio : aucun message nouveau.
 
 ## Fait
-- Fusionnées : **décision 0094** (#516, amendement 3 lots 2 à 4 ; table `prototype.run_secteurs`) ; release v2026.10.19-09 (#526) ; statut du 106e cycle (#523).
-- **B9c** (#522) arrêtée avant tout code : B7b n'avait jamais été codée. Ticket **B7b** ouvert (#524) ; lui-même arrêté : règles du Tech Lead B7-TL-5, TL-7 et TL-8 manquantes, écrites dans **0096** (#525).
-- Ticket #527 ouvert : `coords-purge` en échec (rôle data).
+- Fusionnées : **code de 0092** (#507, temps de trajet conservés) ; **amendement 1 de 0092** (#529, suppression de `prototype.trajets` au retour arrière acceptée) ; statut du 107e cycle (#528).
+- `coords-purge` (#527) : cause trouvée, ce n'est pas le code. L'environnement `coords-purge` n'a pas ses quatre secrets (`COORDS_PURGE_PG*` vides), le rôle `vadrouille_coords_purge` est à créer (`db/README.md` § 4) ; attend Samuel (Q438).
+- Les sous-agents Opus ont atteint leur limite de la semaine (jusqu'au 2026-10-22 00:00 UTC) ; les fils tournent sur Sonnet d'ici là. Le 108e cycle de 15 h 13 et celui de 18 h 08 n'ont rien lancé de neuf pour cette raison.
 
 ## En cours
-- tech-lead : **0096** (#525), correction 1 comptée (0094 fusionnée, `entrees.ts` commun avec Q-L2a, point de traçage de la recherche web).
-- backend : **#507** (code de 0092), correction 1 comptée (tests de `lireTrajets`, mineurs).
-- tech-lead : amendement 1 de 0092 (exception de suppression de `prototype.trajets` au retour arrière, avis Sécurité favorable), préalable du bloquant 2 de #507.
+- tech-lead : **0096** (#525), correction 2, la **dernière** (normalisation des noms de lieux, trois bloquants Sécurité).
+- backend : **B4a** (#531, paiement simulé en base et déblocage).
+- backend : **B6b** (#532, lecture réelle des séjours et journées).
+- data : PR de workflow pour ajouter 0011 et 0012 à `MIGRATIONS_APPROUVEES` (Q509), puis `owner-approved` de Samuel.
 
 ## Bloqué
-- **Chaîne de l'aperçu** : 0096 → B7b (#524) → B9c (#522) → B9d, B9e ; B9a attend aussi B7b (`suggererQuartier`).
-- **Affichage des voyages sur `p0-reel`** : #507 → migration 0011 → report `main` → `p0-reel`.
-- **0093, tâches A et C** : « Je confirme 0093 » de Samuel sur #512 (Q507) ; C aussi après un verdict Sécurité.
-- **Lots 2 à 4 de l'amendement 3** (0094 fusionnée) : Q-L2a partage `agent.ts`, `sorties.ts` et `entrees.ts` avec B7b ; décision du CEO : B7b d'abord, Q-L2a après sa fusion, jamais dans le même cycle (Q516). Verdicts Sécurité (Q508).
+- **Chaîne de l'aperçu** : 0096 → B7b (#524) → B9c (#522) → B9d, B9e ; B9a attend aussi B7b.
+- **Affichage des voyages sur `p0-reel`** : migrations 0011 et 0012 approuvées puis appliquées par Samuel → report `main` → `p0-reel`.
+- **0093, tâche C** : verdict Sécurité ; tâche A prête (après un fil libre).
+- **Lots 2 à 4 de l'amendement 3** : Q-L2a après la fusion de B7b (Q516) ; verdicts Sécurité (Q508).
 - **#519** (règles de lint de B9-TL-1) : pas dans le même cycle qu'une sous-tâche de B9.
-- **B4a**, **B8b**, **B9a** : jamais dans le même cycle qu'une autre sous-tâche de B9 qui partage leurs fichiers (0078, spécification B9).
-- **Purge du MVP** : Q438.
+- **Purge du MVP et `coords-purge`** : Q438.
 
 ## Prochain cycle
-1. Fusion de 0096, puis B7b (#524) ; puis B9c.
-2. #507 et l'amendement 1 de 0092 ; puis migrations approuvées et `p0-reel`.
-3. `coords-purge` (#527) dès qu'un fil se libère.
-4. Samuel : « Je confirme 0093 » sur #512 ; carte « un ou deux quartiers » ; carte du fusible en mode réel (Q506) ; ouvrir le voyage Rome une seule fois.
+1. Fusion de 0096, puis B7b (#524), puis B9c.
+2. B4a et B6b : revue et corrections.
+3. 0093 tâche A ; #519 ; B8b.
+4. Samuel : `owner-approved` sur la PR des migrations, puis lancer `db-migrate` ; carte du fusible en mode réel (Q506) ; ouvrir le voyage Rome une seule fois.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q511 (un seul quartier par jour, ou un ou deux voisins ; carte de décision), Q507 (« Je confirme 0093 » sur #512), Q506 (fusible de 2 USD aussi en mode réel ?), Q509 (0012 dans `MIGRATIONS_APPROUVEES`) ; Q502 et Q497 n'ont plus d'effet une fois Q507 donnée (0093 point 2).
@@ -50,7 +53,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q514 à Q516.
+- Aucune ; Q507 et Q511 répondues.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
