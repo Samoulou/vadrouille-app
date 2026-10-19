@@ -1,5 +1,7 @@
 # 0068 — Délai de veto de Samuel ramené à 6 heures
 
+**Remplacée par 0093** (PR #512) : plus de délai de veto, une décision déléguée est définitive dès sa fusion ; le § 3 ci-dessous reste valable (repris au point 1 de 0093).
+
 Statut : décidée par Samuel (réservée à Samuel : elle règle sa propre garde, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion.
 
 Date : 2026-10-15 · Décideur : Samuel · Rédacteur : CEO · Source : fil « Routine cycle du studio » du projet Vadrouille (deux messages de Samuel, ci-dessous) · PR #378 · Confirmation écrite de Samuel : [commentaire du 2026-10-15 13:57 UTC sur #378](https://github.com/Samoulou/vadrouille-app/pull/378#issuecomment-6193837503) (« Je confirme 00068 », coquille pour 0068)
