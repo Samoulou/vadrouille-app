@@ -57,7 +57,7 @@ La réserve d'un essai reste au prix plein, sans gratuité (Q329), et reste de *
 
 ### Refusées (recommandation du CEO acceptée par Samuel)
 - **Temps de trajet estimés par un modèle d'IA** : durées plausibles mais fausses, sans horaires ni travaux.
-- **Temps de trajet gardés en base pour d'autres voyageurs** (même ville) : exclu par la règle provisoire de Q5 (0011 § 1, aucune durée de trajet en base) ; réutilisation possible seulement en mémoire, pendant une même exécution.
+- **Temps de trajet gardés en base pour d'autres voyageurs** (même ville) : exclu par la règle provisoire de Q5 (0011 § 1, aucune durée de trajet en base) ; réutilisation possible seulement en mémoire, pendant une même exécution. *Se lit avec 0092* : les temps d'un programme du prototype sont gardés en base avec lui, jamais réutilisés pour un autre voyage ; l'exclusion tient.
 
 ### En réserve (rien n'est appliqué ; chaque point revient à Samuel, à la fin de ses essais ou quand les volumes augmentent)
 - **Compter la gratuité Google dans la réserve d'un essai** (10 000 éléments Routes et 1 000 fiches Enterprise par mois) : le plus gros levier, mais il revient sur Q329.

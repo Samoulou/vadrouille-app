@@ -16,7 +16,7 @@
 ## Jamais
 - Fusionner toi-même une PR de code (la fusion automatique s'en charge quand la CI et le Tech Lead sont au vert).
 - Désactiver ou supprimer un test sans décision écrite dans `docs/decisions/`.
-- Mettre une donnée Google dans un prompt, stocker autre chose que l'identifiant d'un lieu Google (seule exception : ses coordonnées, 30 jours au plus, dans le cache serveur `place_coordinates` ; décisions 0027 et 0011), afficher des données Google sur une carte non Google.
+- Mettre une donnée Google dans un prompt, stocker autre chose que l'identifiant d'un lieu Google (exceptions : ses coordonnées, 30 jours au plus, dans le cache serveur `place_coordinates`, décisions 0027 et 0011 ; pour le prototype seulement, les temps de trajet Routes d'un programme de `p0Run`, côté serveur dans le schéma `prototype`, supprimés avec le programme, décision 0092), afficher des données Google sur une carte non Google.
 - Utiliser une clé de production ou committer un secret.
 - Committer `.next/` ou `node_modules/`.
 - Utiliser un stockage ou une API propres à Vercel (KV, Edge Config) : voir `docs/decisions/0002-hebergement-vercel.md`.
