@@ -118,7 +118,8 @@ export type Stop = z.infer<typeof StopSchema>;
 
 export const SegmentSchema = z.strictObject({
   mode: z.enum(["walk", "transit", "car"]),
-  minutes: MinutesSchema,
+  /** `null` : temps indisponible (prototype seulement, décision 0092 § 4) ; le MVP ne produit jamais `null`. */
+  minutes: MinutesSchema.nullable(),
   /** Affiche « (estimation) ». */
   estimated: z.boolean(),
 });
@@ -186,8 +187,11 @@ export const DaySchema = z.strictObject({
   /** Événements du jour seulement. */
   events: z.array(EventStopSchema),
   generating: z.boolean(),
-  /** Total des trajets du jour, hors excursion. */
-  travelMinutes: MinutesSchema,
+  /**
+   * Total des trajets du jour, hors excursion. `null` : total indisponible, un trajet du jour est sans durée
+   * (prototype seulement, décision 0092 § 4) ; le MVP ne produit jamais `null`.
+   */
+  travelMinutes: MinutesSchema.nullable(),
   /** Budget du rythme choisi, fourni par les données (à calibrer, Q8). */
   travelBudgetMinutes: MinutesSchema,
   /** Idée « Surprends-moi » du jour, facultative (décision 0015 § 3) : ajout au handover § 9, signalé. */

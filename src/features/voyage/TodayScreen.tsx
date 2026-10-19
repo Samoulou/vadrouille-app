@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
+import type { Segment } from "@/contracts";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { ActionBanner } from "@/components/ligne/ActionBanner";
-import { DayLine, segmentLabel } from "@/components/ligne/DayLine";
+import { DayLine } from "@/components/ligne/DayLine";
 import { iconButtonClassName } from "@/components/ligne/IconButton";
 import { IconRetour } from "@/components/ligne/icons";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
@@ -16,6 +17,7 @@ import { tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatTitreJour } from "@/lib/dates";
+import { formatDuree } from "@/lib/duree";
 import { formatFaits } from "@/lib/faits";
 import { registerOfflineFallback } from "@/lib/offline/register";
 import { useOnline } from "@/lib/online";
@@ -131,6 +133,17 @@ function CurrentBlock({ current }: { current: CurrentMoment }) {
   );
 }
 
+/**
+ * « Pour y aller : à pied, 20 min » (décision 0095 § 2) : chaînes complètes de `voyage.json`, mode en minuscule après
+ * « : » dans les trois cas ; sans durée (prototype, décision 0092 § 4) : « Pour y aller : à pied, durée à confirmer ».
+ */
+export function pourYAller(segment: Segment): string {
+  const mode = t.prochaine.modes[segment.mode];
+  if (segment.minutes === null) return format(t.prochaine.pourYAllerSansDuree, { mode });
+  const duree = formatDuree(segment.minutes);
+  return format(segment.estimated ? t.prochaine.pourYAllerEstime : t.prochaine.pourYAller, { mode, duree });
+}
+
 function NextBlock({ next, title, online }: { next: NextUp; title: string; online: boolean }) {
   const { stop, segment } = next;
   return (
@@ -143,7 +156,7 @@ function NextBlock({ next, title, online }: { next: NextUp; title: string; onlin
       <Tags stop={stop} />
       {segment ? (
         <p data-part="pour-y-aller" className="text-corps-s text-ink-soft tabular-nums">
-          {format(t.prochaine.pourYAller, { segment: segmentLabel(segment) })}
+          {pourYAller(segment)}
         </p>
       ) : null}
       {stop.placeId ? (

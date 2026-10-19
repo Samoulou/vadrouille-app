@@ -55,6 +55,16 @@ describe("DeckCard", () => {
     expect(within(card).getByText("Photo du lieu")).toBeInTheDocument();
   });
 
+  it("DeckCard: trajet sans durée (minutes: null, décisions 0092 et 0095 § 4) : ni trajet ni détour, ni dans le rendu ni dans aria-describedby", () => {
+    const sansDuree: Proposal = { ...distillerie, travelFromPrevious: { ...distillerie.travelFromPrevious!, minutes: null } };
+    const { container, card } = renderCard(sansDuree);
+    expect(container.querySelector("[data-part='trajet']")).toBeNull();
+    expect(container.textContent).not.toContain(distillerie.detour!);
+    expect(container.textContent).not.toMatch(/durée à confirmer|\d+\s*min/);
+    const ids = (card.getAttribute("aria-describedby") ?? "").split(/\s+/);
+    expect(ids.some((id) => id.endsWith("-trajet") || id.endsWith("-detour"))).toBe(false);
+  });
+
   it("DeckCard: trajet au-delà de 20 min (distillerie 50 min, pas Dean Village à 20 min)", () => {
     const far = renderCard(distillerie);
     const trajet = far.container.querySelector("[data-part='trajet']");

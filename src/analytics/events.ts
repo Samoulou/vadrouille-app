@@ -32,7 +32,11 @@ export const DeckDecisionEventSchema = z.strictObject({
     category: CategoryPropertySchema,
     position: PositionSchema,
     gesture: z.enum(["swipe", "button", "key"]),
-    travel_minutes: z.int().check(z.nonnegative()),
+    /**
+     * Trajet depuis l'étape précédente, en minutes. Absent quand la durée est inconnue (`minutes: null`, prototype,
+     * décisions 0092 § 4 point 3 et 0095) : jamais une durée inventée.
+     */
+    travel_minutes: z.optional(z.int().check(z.nonnegative())),
     /** Jamais renseigné dans F6 : la raison se donne dans la feuille (F6-PO-14). */
     reason: z.optional(EventReasonSchema),
   }),

@@ -9,6 +9,8 @@
   "journee": {
     "trajet": "{duree} de trajet",
     "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
+    "trajetAConfirmer": "Temps de trajet à confirmer",
+    "trajetAConfirmerBudget": "Temps de trajet à confirmer · environ {montant} CHF par personne",
     "budgetSeul": "Environ {montant} CHF par personne",
     "enPreparation": "Jour {n} en préparation",
     "etapes": "Étapes du jour {n}",
@@ -31,7 +33,9 @@
     "verrou": "Étape verrouillée : elle ne bougera pas quand tu modifies ton programme.",
     "evenement": "Proposé pendant ton séjour, pas dans ton programme.",
     "pourYAller": "Pour y aller",
-    "pourYAllerDepuis": "{segment} depuis {origin}",
+    "pourYAllerDepuis": "{mode}, {duree} depuis {origin}",
+    "pourYAllerDepuisEstime": "{mode}, environ {duree} (estimation) depuis {origin}",
+    "pourYAllerDepuisSansDuree": "{mode} depuis {origin}, durée à confirmer",
     "actions": "Actions",
     "remplacer": "Remplacer",
     "deplacer": "Déplacer",
@@ -57,6 +61,7 @@
     "jourParJour": {
       "titre": "Jour par jour",
       "resume": "{etapes} · {duree} de trajet",
+      "resumeTrajetAConfirmer": "{etapes} · temps de trajet à confirmer",
       "etapes": {
         "aucune": "Aucune étape",
         "un": "1 étape",
