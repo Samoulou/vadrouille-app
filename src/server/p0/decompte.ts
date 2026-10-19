@@ -10,19 +10,22 @@ import type { ExecutionSuivie } from "@/contracts/prototype-suivi";
  *
  * - **Exécutions comptées** : 2 pour la variante B, 1 pour la variante A, par brief (P0a2 : « 2 de la variante B et
  *   1 de la variante A »).
- * - **Relance** : une exécution arrêtée par une cause externe (`CODES_EXTERNES_SUIVI`) avant tout programme est relancée
- *   un autre jour, **au plus une fois par brief et variante** ; elle n'est alors pas comptée. Toute autre fin compte,
- *   y compris une exécution en cours (elle finira comptée ou relancée) et un plafond atteint ; une seconde fin externe
- *   compte aussi.
+ * - **Une exécution qui n'écrit aucun programme ne compte jamais** (décision 0093, point 2, confirmée par Samuel sur
+ *   #512 le 2026-10-19 : « Je confirme 0093 »), quelle que soit la cause (défaut du code, panne, limite Google, fusible) :
+ *   toute exécution `arretee` est ni comptée ni relance. Plus de décision au cas par cas. Seules comptent une exécution
+ *   dont le programme est écrit et une exécution en cours (elle finira avec un programme ou ne comptera plus).
+ *   Les relances (P0S2-PO-13 avant 0093) n'existent plus : `relances` vaut toujours 0 ; `RELANCES_MAX` ne
+ *   sert qu'au contrat de la page (colonne « relances »), jusqu'à son retrait ; `CODES_EXTERNES_SUIVI` n'ouvre plus rien.
  * - Les essais d'intégration (`mode = essai`) ne comptent pas pour G0 (spécification, « Essai d'intégration ») : ils
  *   ne sont pas décomptés.
- * - **Exécutions exclues** (`EXECUTIONS_EXCLUES`) : liste fermée d'exécutions réelles que Samuel a retirées du décompte
- *   par une décision écrite ; elles ne sont ni comptées ni relances.
+ * - **Exécutions exclues** (`EXECUTIONS_EXCLUES`) : liste fermée d'exécutions réelles arrêtées que Samuel avait retirées
+ *   du décompte par une décision écrite (0070, 0089, 0091). Elles restent valables, mais la règle générale de 0093 les
+ *   couvre : une exécution arrêtée ne compte plus, listée ou non.
  */
 
 /** Exécutions comptées au plus, par brief, selon la variante (P0a2). */
 export const COMPTEES_MAX = { A: 1, B: 2 } as const;
-/** Relances au plus, par brief et variante (P0S2-PO-13). */
+/** Relances au plus, par brief et variante (P0S2-PO-13) : sans effet depuis 0093 (aucune exécution arrêtée ne compte). */
 export const RELANCES_MAX = 1;
 
 /**
@@ -115,33 +118,21 @@ export function estExclue(execution: ExecutionSuivie, exclues: readonly Executio
 
 export type Decompte = { readonly comptees: number; readonly relances: number };
 
-const estRelancable = (execution: ExecutionSuivie) =>
-  execution.statut === "arretee" && execution.codeArret !== null && CODES_EXTERNES_SUIVI.includes(execution.codeArret);
-
 /**
- * Décompte d'un brief et d'une variante, à partir des exécutions réelles (`mode = reel`) non exclues seulement. Chaque
- * entrée de `exclues` retire **une exécution au plus** (décision 0089) : une seconde exécution qui répond au même tuple
- * compte. Les exécutions qui répondent à un même tuple ont les mêmes champs décomptés : le total ne dépend pas de celle
- * qui est retirée.
+ * Décompte d'un brief et d'une variante, à partir des exécutions réelles (`mode = reel`) seulement. Une exécution
+ * arrêtée (aucun programme écrit) ne compte jamais (décision 0093, point 2) ; `EXECUTIONS_EXCLUES` n'a donc plus
+ * d'effet sur le total (toute exécution qui répond à une entrée est arrêtée).
  */
 export function decompte(
   executions: readonly ExecutionSuivie[],
   brief: string,
   variante: "A" | "B",
-  exclues: readonly ExecutionExclue[] = EXECUTIONS_EXCLUES,
 ): Decompte {
   let comptees = 0;
-  let relances = 0;
-  const entreesUtilisees = new Set<number>();
   for (const execution of executions) {
     if (execution.mode !== "reel" || execution.brief !== brief || execution.variante !== variante) continue;
-    const entree = exclues.findIndex((exclue, index) => !entreesUtilisees.has(index) && repondA(execution, exclue));
-    if (entree !== -1) {
-      entreesUtilisees.add(entree);
-      continue;
-    }
-    if (estRelancable(execution) && relances < RELANCES_MAX) relances += 1;
-    else comptees += 1;
+    if (execution.statut === "arretee") continue;
+    comptees += 1;
   }
-  return { comptees, relances };
+  return { comptees, relances: 0 };
 }
