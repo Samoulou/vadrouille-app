@@ -19,7 +19,8 @@ import {
 /**
  * `retryGeneration(ctx, { tripId, requestId, kind? })` (spécification B9, B9b point 3 bis ; B9-PO-9 ; décisions 0081
  * B9-TL-11 et 0087 § 1.1) : seul chemin d'un nouvel essai par la personne. Sous le verrou d'organisation de B9-PO-4 :
- * voyage d'une autre organisation ou inconnu → `not_found` ; même `requestId` pour ce voyage → le même `{ tripId }`
+ * voyage d'une autre organisation ou inconnu → `not_found` ; `requestId` de `createTrip` → `validation_failed` (ce
+ * n'est pas un essai) ; même `requestId` qu'un essai de ce voyage → le même `{ tripId }`
  * sans écriture (idempotence par `generation_runs.request_id`) ; sinon la dernière exécution `preview` du voyage doit
  * être `failed` et réessayable (`relancable`), sinon `validation_failed` ; une autre génération `preview` de
  * l'organisation en cours → `active_preview_exists` ; sinon une **nouvelle** exécution `preview` `queued` du même
@@ -29,7 +30,7 @@ import {
  * `validation_failed`, sans écriture (B9d remplace cette branche).
  */
 
-const SQL_VOYAGE = "SELECT id FROM public.trips WHERE organization_id = $1 AND id = $2";
+const SQL_VOYAGE = "SELECT request_id FROM public.trips WHERE organization_id = $1 AND id = $2";
 const SQL_MEME_DEMANDE = "SELECT id FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3";
 const SQL_DERNIERE = `SELECT phase, stop_reason FROM public.generation_runs
   WHERE organization_id = $1 AND trip_id = $2 AND kind = 'preview'
@@ -55,8 +56,11 @@ export async function relancerGeneration(o: Outils, ctx: AdapterContext | null |
     issue = await o.withOrg(ctx, async (tx): Promise<Issue> => {
       const sql = executeurSql(tx);
       await sql.query(SQL_VERROU_APERCU, [org]);
-      if ((await sql.query(SQL_VOYAGE, [org, tripId])).rows.length === 0) return { type: "inconnu" };
+      const voyage = (await sql.query(SQL_VOYAGE, [org, tripId])).rows[0];
+      if (voyage === undefined) return { type: "inconnu" };
       if (kind === "full") return { type: "rien" };
+      // Le `requestId` de `createTrip` désigne la première exécution, pas un essai : rien à relancer.
+      if (String(voyage.request_id).toLowerCase() === requestId.toLowerCase()) return { type: "rien" };
       if ((await sql.query(SQL_MEME_DEMANDE, [org, tripId, requestId])).rows.length > 0) return { type: "existant" };
       const derniere = (await sql.query(SQL_DERNIERE, [org, tripId])).rows[0];
       if (derniere === undefined || derniere.phase !== "failed") return { type: "rien" };

@@ -158,6 +158,13 @@ describe("création du voyage (B9b)", () => {
     expect(await compter(a, "generation_runs")).toBe(1);
     expect(demarrer).toHaveBeenCalledTimes(2);
 
+    // Rejeu après la date d'arrivée (horloge au-delà du départ) : le même voyage, avant tout contrôle du brouillon.
+    const tard = banc(() => Date.parse("2027-08-01T12:00:00Z"));
+    expect(trip(await tard.adapter.createTrip(contexte(a), req))).toBe(premier);
+    expect(await tard.adapter.createTrip(contexte(a), demande())).toEqual(fail("validation_failed", "draft.start"));
+    expect(await compter(a, "trips")).toBe(1);
+    expect(tard.demarrer).not.toHaveBeenCalled();
+
     // Le même requestId dans une autre organisation crée un autre voyage.
     const autre = trip(await adapter.createTrip(contexte(b), req));
     expect(autre).not.toBe(premier);
@@ -167,8 +174,13 @@ describe("création du voyage (B9b)", () => {
   it("création: un nouvel essai relance sans second voyage", async () => {
     const a = await nouvelleOrg();
     const { adapter, demarrer } = banc();
-    const tripId = trip(await adapter.createTrip(contexte(a), demande()));
+    const creation = demande();
+    const tripId = trip(await adapter.createTrip(contexte(a), creation));
     await poser(a, tripId, { phase: "failed", stopReason: "upstream_timeout" });
+    // Le requestId de createTrip n'est pas un essai : validation_failed, sans écriture.
+    expect(await adapter.retryGeneration(contexte(a), { tripId, requestId: creation.requestId })).toEqual(fail("validation_failed"));
+    expect(await compter(a, "generation_runs")).toBe(1);
+    expect(demarrer).toHaveBeenCalledTimes(1);
     const essai = { tripId, requestId: randomUUID() };
     const deux = await Promise.all([adapter.retryGeneration(contexte(a), essai), adapter.retryGeneration(contexte(a), essai)]);
     expect(deux).toEqual([

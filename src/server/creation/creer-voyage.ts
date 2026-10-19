@@ -19,6 +19,7 @@ import {
  * `createTrip(ctx, TripRequest)` (spécification B9, B9b points 2 à 4 ; B9-PO-1 à B9-PO-5, B9-PO-18 ; décisions 0081
  * B9-TL-5 à B9-TL-7 et 0087 §§ 4 et 5). Ordre :
  * 1. contexte de la session (`unauthenticated` sinon, rien n'est lu ni écrit) et revalidation par `TripRequestSchema` ;
+ *    puis le même `requestId` déjà écrit → le même voyage, avant tout autre contrôle (B9b point 3) ;
  * 2. villes : chacune connue de la table maison et de même décalage UTC que la destination pendant le voyage
  *    (`validation_failed` sur le nom de la première ville refusée) ; fuseau du voyage : celui de la destination, jamais
  *    tiré d'une réponse Google ;
@@ -62,13 +63,26 @@ export async function creerVoyage(o: Outils, ctx: AdapterContext | null | undefi
   if (!parsed.success) return fail("validation_failed");
   const request = parsed.data;
   const { draft } = request;
+  const org = ctx.organizationId;
+
+  // Idempotence d'abord (B9b point 3) : un rejeu du même `requestId` rend le même voyage, même si les contrôles des
+  // villes ou de la date d'arrivée refuseraient désormais le brouillon (date passée depuis la création).
+  let deja: string | null;
+  try {
+    deja = await o.withOrg(ctx, async (tx) => {
+      const ligne = (await executeurSql(tx).query(SQL_EXISTANT, [org, request.requestId])).rows[0];
+      return ligne === undefined ? null : String(ligne.id);
+    });
+  } catch {
+    return fail("provider_error");
+  }
+  if (deja !== null) return ok({ tripId: deja });
 
   const controle = controlerVilles([draft.destination, ...draft.otherCities.map((ville) => ville.name)], draft.start, draft.end);
   if (!controle.ok) return fail("validation_failed", champVille(controle.indice));
   if (draft.start < dateLocale(controle.fuseau, o.maintenant())) return fail("validation_failed", "draft.start");
 
   const lignes = lignesDuBrouillon(request);
-  const org = ctx.organizationId;
   let issue: Issue;
   try {
     issue = await o.withOrg(ctx, async (tx): Promise<Issue> => {
