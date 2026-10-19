@@ -178,7 +178,7 @@ describe("p0: relecture refusée si le plafond Google du mois ou l'enveloppe est
   it.each<[string, Sommes]>([
     ["plafond du mois", { moisGoogle: 20_000_000 - FORFAIT.coutGoogleMicros + 1 }],
     ["enveloppe jusqu'à G0", { enveloppeGoogle: 40_000_000 }],
-  ])("%s atteint : quota_reached, aucun appel Routes (l'adaptateur affiche l'état d'erreur)", async (_cas, sommes) => {
+  ])("%s atteint : quota_reached, aucun appel Routes (l'adaptateur affiche la journée sans ces temps, décision 0092 § 5)", async (_cas, sommes) => {
     const base = poolSimule({ sommes });
     const { relecteur: r, fabrique } = relecteur({ pool: () => base.pool, relecture: async () => ({ forfait: FORFAIT, regles: regles(limites) }) });
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "quota_reached" });
