@@ -1,5 +1,7 @@
 # 0088 — Remplissage du séjour (ticket #483, PR #490) : cibles depuis la demande, regroupement par quartier sur tous les jours, limite Routes de 840 éléments
 
+**Concernée par 0093** (PR #512) : le § 13 (840 éléments Routes par voyage) reste en vigueur jusqu'à la tâche B de 0093 (optimisation des trajets).
+
 Statut : **deux régimes**.
 - **§ 1 à § 12 : décision déléguée** (architecture, outillage et tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; **définitive sans veto de Samuel 6 heures après sa fusion** (décision 0068). Les valeurs de profil de recherche citées (marge de 30 %) sont celles d'ia-recherche, dans les plafonds (0055 § 6 point 5) ; le Tech Lead les valide sur l'architecture, il ne touche à aucun montant.
 - **§ 13 : décision de Samuel** (argent, plafond de dépense Routes), reportée ici à la demande du CEO ; **pas de délai de veto** : elle vaut dès sa fusion. Le Tech Lead n'a pas vu la carte de décision lui-même ; la source est celle que le CEO transmet (ci-dessous) et qu'il reporte dans `QUESTIONS.md`.

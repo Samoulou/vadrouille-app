@@ -1,5 +1,7 @@
 # 0073 — Fusibles de l'essai alignés sur ceux de l'exécution comptée
 
+**Amendée par 0093 point 5** (PR #512), à la fusion de la tâche A : l'essai et l'exécution comptée gardent un seul fusible d'arrêt, 2 USD de coût des modèles (plus les limites Routes jusqu'à la tâche B).
+
 Statut : décidée par Samuel (argent et phases G0, réservés à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion. La mise en œuvre est rédigée par ia-recherche.
 
 Date : 2026-10-16 · Décideur : Samuel · Rédacteur : ia-recherche · Source : carte de décision du fil projet « Routine cycle du studio », réponse de Samuel du 2026-10-16 à 14:34 UTC · Renvois : 0063 (points 8 et 9), 0071, 0072 (point 4)

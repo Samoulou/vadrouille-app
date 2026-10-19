@@ -1,5 +1,7 @@
 # 0056 — Workflow des migrations et déverrouillage du prototype
 
+**Amendée par 0093 point 7** (PR #512), à la fusion de la tâche C et après le verdict de la Sécurité : le § 3 (`owner-approved` sur chaque ligne de `MIGRATIONS_APPROUVEES`) ne vaut plus pour les migrations de la base d'essai jusqu'à l'ouverture à un public (G1).
+
 **Amendée par 0061** (ticket #337) : réponses du Tech Lead à la revue de #332 (Q419, Q412, liste vide, `SET search_path` non local, `push: main`, test des 600 lignes) ; le cas `SET search_path` non local des « Tests imposés » se lit « cas accepté, sans effet ».
 
 **Amendée par 0067** (PR #376) : au § 2.6.2, la condition « `ssl` vrai dans `pg_catalog.pg_stat_ssl` » est retirée (sur Neon, elle décrit la connexion du proxy, jamais celle du client) et remplacée par une garantie côté client uniquement : une ligne de contrôle avant toute connexion (seules les six variables `PG*` attendues, `PGSSLMODE=verify-full`, `PGSSLROOTCERT=system`). Les contrôles de rôle du § 2.6.2 et S9 sont inchangés ; les « Tests imposés » se lisent avec 0067 § 4.
