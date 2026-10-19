@@ -145,3 +145,23 @@ Après :
 - Samuel décide du sort des temps de trajet pour le MVP (question 1), ou la validation juridique de Q5 tombe ;
 - Google suspend ou menace de suspendre la clé ;
 - la relecture n'est plus nécessaire à l'affichage (fin de la phase 0, ou fin du prototype : la table est supprimée avec le schéma `prototype`).
+
+## Amendement 1 — suppression de `prototype.trajets` par la migration inverse de 0011 (Tech Lead, 2026-10-19)
+
+Statut : **acceptée** · Date : 2026-10-19 · Décideur : Tech Lead (décision déléguée : architecture, « Qui décide quoi » de `docs/CONTEXT.md` ; définitive dès sa fusion, décision 0093 point 1 ; listée dans la note de version suivante) · Source : revue consolidée du head `a15132c` de la PR #507, bloquant 2 ; avis de la Sécurité dans cette revue.
+
+**Exception à la règle des migrations inverses** (« aucune suppression de données », `.claude/agents/data.md` ; « une migration inverse qui supprime des tables ou des colonnes porteuses de données n'est donc jamais écrite », `db/README.md` § 2) : `db/migrations/0011_trajets_prototype.down.sql` rétablit `prototype.purge_expired()` de `0003_prototype` à l'identique puis **supprime la table `prototype.trajets`** et sa fonction de déclencheur `prototype.trajets_set_values()`, sur le modèle des exceptions nommées de 0004 et 0009 (`docs/decisions/0007-rls.md`, amendement B3b).
+
+**Portée.** L'exception ne vaut que pour la seule table `prototype.trajets`, dans la seule migration inverse de `0011_trajets_prototype`. Elle ne s'étend à aucune autre table, colonne ou migration, ni à une version future de ce fichier `.down.sql` qui supprimerait autre chose ; toute autre suppression par une migration inverse demande sa propre décision écrite.
+
+**Motifs.**
+1. La table ne porte que des temps de trajet Routes (en minutes) liés à un programme de `p0Run`, sous `org_prototype` : aucune donnée d'une personne ni d'une organisation cliente. C'est une donnée Google conservée par exception (§ 1), qui doit de toute façon être supprimée avec son programme (§ 1 point 2), au plus tard 29 jours après le début de l'exécution.
+2. La garder après la descente serait pire que la supprimer : la purge rétablie de `0003_prototype` ne la vide plus, ce qui enfreindrait § 1 point 2 (temps Google conservés sans purge), et la clé étrangère composite vers `prototype.programmes` ferait échouer la suppression des programmes expirés, donc toute la purge du prototype.
+3. Aucune autre ligne n'est touchée : les programmes restent et sont relus par Routes comme avant 0092 (§ 5 point 6 : le code fonctionne sans la table). La perte se limite à des minutes que Routes redonne à la relecture.
+4. Il n'existe pas d'option réversible meilleure : une descente déclarée « irréversible » laisserait, pour annuler 0011, une migration corrective vers l'avant qui ferait la même suppression ; écrire et relire la descente maintenant est plus sûr.
+
+**Avis de la Sécurité** (revue consolidée de #507, bloquant 2) : exception acceptable sur le fond — la table ne contient que des minutes Routes, aucune donnée de personne ni d'organisation ; la garder sans sa purge enfreindrait 0092 § 1 point 2 ; pas d'alternative réversible meilleure.
+
+**Condition d'emploi.** La descente se joue hors de toute exécution `p0Run` en cours : le `DROP TABLE` prend un verrou exclusif, et une écriture concurrente d'un programme échouerait (revue de #507, point 11).
+
+**Suite.** La ligne `0011_trajets_prototype` de `db/README.md` § 2 et l'en-tête de `0011_trajets_prototype.down.sql` citent cet amendement (PR #507).
