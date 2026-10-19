@@ -55,7 +55,13 @@ const REPONSES: Record<EtapeRequete, string> = {
     zone: { nom: "Vieille ville", raison: "Proche des musées.", centre: { lat: 55.95, lng: -3.19 }, rayonM: 800 },
     logements: [{ nom: "Maison d'hôtes", meta: "Maison d'hôtes · près du tram", sourceUrl: "https://guide.example/logements" }],
   }),
-  plan: JSON.stringify({ requetes: [{ requete: "musées Édimbourg", creneau: "activity" }] }),
+  plan: JSON.stringify({
+    secteurs: [
+      { nom: "Vieille ville", raison: "Le cœur historique.", voisins: ["Ville neuve"], incontournables: [] },
+      { nom: "Ville neuve", raison: "Les rues géorgiennes.", voisins: ["Vieille ville"], incontournables: [] },
+    ],
+    requetes: [{ requete: "musées Édimbourg", creneau: "activity", secteur: "Vieille ville" }],
+  }),
   recherche: JSON.stringify({ actions: [], candidats: [], termine: true }),
   notation: JSON.stringify({
     notes: [
@@ -115,7 +121,9 @@ describe("creerCoucheIa : cinq méthodes, un résultat fermé (0077 § 2)", () =
     const quartier = await couche.proposerQuartier({ quartier: QUARTIER, resultats: RESULTATS });
     expect(quartier.ok && quartier.valeur.zone?.nom).toBe("Vieille ville");
     const plan = await couche.planifierRecherche({ entree: ENTREE });
-    expect(plan).toEqual({ ok: true, valeur: { requetes: [{ requete: "musées Édimbourg", creneau: "activity" }], refuses: 0 } });
+    expect(plan.ok && plan.valeur.secteurs.map((secteur) => secteur.nom)).toEqual(["Vieille ville", "Ville neuve"]);
+    expect(plan.ok && plan.valeur.requetes).toEqual([{ requete: "musées Édimbourg", creneau: "activity", secteur: "Vieille ville" }]);
+    expect(plan.ok && plan.valeur.refuses).toBe(0);
     const notes = await couche.noter({ entree: ENTREE, candidats: CANDIDATS });
     expect(notes.ok && [...notes.valeur.notes.keys()]).toEqual(["c_001", "c_002"]);
     const raisons = await couche.rediger({ entree: ENTREE, lieux: LIEUX });
@@ -316,7 +324,7 @@ describe("prompts: le récit et le logement de P0 n'atteignent la couche IA par 
     expect(await couche.proposerQuartier({ quartier: { ville: brief.destination, debut: brief.arrivee, fin: brief.depart }, resultats: RESULTATS })).toMatchObject({ ok: true });
     expect(await couche.planifierRecherche({ entree })).toMatchObject({ ok: true });
     expect(await couche.noter({ entree, candidats: candidats.map(candidatPourModele) })).toMatchObject({ ok: true });
-    expect(await couche.rediger({ entree, lieux: candidats.map(lieuRetenuDepuisCandidat) })).toMatchObject({ ok: true });
+    expect(await couche.rediger({ entree, lieux: candidats.map((candidat) => lieuRetenuDepuisCandidat(candidat)) })).toMatchObject({ ok: true });
     expect(journal.requetes).toHaveLength(5);
     for (const sentinelle of ["SENTINELLE-LOGEMENT", "SENTINELLE-RECIT-P0", "SENTINELLE-ENGAGEMENT", "Martine", "Hotel-c9e1"]) {
       expect(journal.texte(), sentinelle).not.toContain(sentinelle);

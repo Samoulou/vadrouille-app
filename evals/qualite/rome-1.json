@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "rome-1",
+  "type": "qualite",
+  "cas": "Amendement 3 de P0 (P0S2-PO-28, cas 1) : Rome, brief rome-1, secteurs, incontournables d'abord, infos pratiques",
+  "simulation": "qualite-rome",
+  "demande": {
+    "story": "Un couple qui veut surtout visiter, à pied et en transports, et bien manger le soir.",
+    "trip": {
+      "destination": "Rome",
+      "start": "2027-05-04",
+      "end": "2027-05-08",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Rome",
+    "pays": "Italie",
+    "arrivee": "2027-05-04",
+    "depart": "2027-05-08",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "heritage",
+      "museum",
+      "walk",
+      "restaurant",
+      "tasting"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "heritage",
+      "museum",
+      "walk",
+      "restaurant"
+    ],
+    "incontournables": [
+      "Colisée",
+      "Forum romain",
+      "Palatin",
+      "Panthéon",
+      "Place Navone",
+      "Fontaine de Trevi",
+      "Place d'Espagne",
+      "Basilique Saint-Pierre",
+      "Musées du Vatican",
+      "Château Saint-Ange"
+    ]
+  }
+}

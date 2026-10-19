@@ -85,7 +85,7 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
     commitSha: "d61e9faefacf568ad39833e8ac611ba717e0fbdd",
   });
 
-  it("liste fermée : l'entrée de la décision 0070, puis les deux de la décision 0089", () => {
+  it("liste fermée : l'entrée de la décision 0070, les deux de la décision 0089, puis celle de la décision 0091", () => {
     expect(EXECUTIONS_EXCLUES).toEqual([
       {
         decision: "0070",
@@ -110,6 +110,14 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
         jourQuota: "2026-10-18",
         codeArret: "pipeline_failed",
         commitSha: "efc0994f3e4e8eb5eb081c84b754797b980cf166",
+      },
+      {
+        decision: "0091",
+        brief: "rome-1.json",
+        variante: "B",
+        jourQuota: "2026-10-18",
+        codeArret: "pipeline_failed",
+        commitSha: "0d0bbaa36536cf0d26d1d3b55218d9183375b92f",
       },
     ]);
   });
@@ -199,5 +207,58 @@ describe("p0: exécutions exclues du décompte (décision 0089)", () => {
   it("un essai d'intégration du même jour n'est pas visé (il ne compte déjà pas)", () => {
     expect(estExclue({ ...apresMidi1, mode: "essai" })).toBe(false);
     expect(estExclue({ ...apresMidi2, mode: "essai" })).toBe(false);
+  });
+});
+
+/**
+ * Décision 0091 : l'exécution réelle rome-1/B du soir du 2026-10-18 (`wrun_41M57YCVXJ50T41W3BH260MEP2`, commit `0d0bbaa`),
+ * arrêtée par la limite quotidienne de Google Routes, est exclue du décompte G0. L'entrée n'exclut qu'une exécution au plus.
+ */
+describe("p0: exécutions exclues du décompte (décision 0091)", () => {
+  const CFCA = "cfca0b58ccf67e4d10196adea296045ec98fdb61";
+  const EFC0 = "efc0994f3e4e8eb5eb081c84b754797b980cf166";
+  const ODBB = "0d0bbaa36536cf0d26d1d3b55218d9183375b92f";
+  const rome = (champs: Parameters<typeof executionSuivie>[0] = {}) =>
+    executionSuivie({ brief: "rome-1.json", jourQuota: "2026-10-18", ...champs });
+  const soir = rome({ statut: "arretee", codeArret: "pipeline_failed", commitSha: ODBB });
+  const apresMidi1 = rome({ statut: "arretee", codeArret: "pipeline_failed", commitSha: CFCA });
+  const apresMidi2 = rome({ statut: "arretee", codeArret: "pipeline_failed", commitSha: EFC0 });
+  const matin = rome({ commitSha: CFCA });
+
+  it("l'exécution du soir n'est ni comptée ni relance ; avec 0089, seule celle du matin compte", () => {
+    expect(estExclue(soir)).toBe(true);
+    expect(decompte([soir], "rome-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
+    expect(decompte([matin, apresMidi1, apresMidi2, soir], "rome-1.json", "B")).toEqual({ comptees: 1, relances: 0 });
+    expect(placeLibre([matin, apresMidi1, apresMidi2, soir], "rome-1.json", "B")).toBe(true);
+    expect(placeLibre([matin, apresMidi1, apresMidi2, soir, rome()], "rome-1.json", "B")).toBe(false);
+  });
+
+  it("l'entrée n'exclut qu'une exécution : une seconde exécution du même tuple compte", () => {
+    expect(decompte([soir, { ...soir, id: "44444444-4444-4444-8444-444444444444" }], "rome-1.json", "B")).toEqual({
+      comptees: 1,
+      relances: 0,
+    });
+    expect(
+      decompte([matin, apresMidi1, apresMidi2, soir, { ...soir, id: "55555555-5555-4555-8555-555555555555" }], "rome-1.json", "B"),
+    ).toEqual({ comptees: 2, relances: 0 });
+  });
+
+  it.each([
+    ["autre jour", { jourQuota: "2026-10-19" }],
+    ["autre commit", { commitSha: "b".repeat(40) }],
+    ["autre code", { codeArret: "upstream_unavailable" }],
+    ["autre brief", { brief: "rome-2.json" }],
+    ["autre variante", { variante: "A" as const }],
+    ["programme écrit", { statut: "programme_ecrit" as const, codeArret: null }],
+    ["en cours", { statut: "en_cours" as const, codeArret: null }],
+  ])("un seul champ différent (%s) : l'exécution n'est pas exclue", (_cas, champs) => {
+    const execution = { ...soir, ...champs };
+    expect(estExclue(execution)).toBe(false);
+    const attendu = execution.codeArret === "upstream_unavailable" ? { comptees: 0, relances: 1 } : { comptees: 1, relances: 0 };
+    expect(decompte([execution], execution.brief, execution.variante)).toEqual(attendu);
+  });
+
+  it("un essai d'intégration du même jour n'est pas visé (il ne compte déjà pas)", () => {
+    expect(estExclue({ ...soir, mode: "essai" })).toBe(false);
   });
 });

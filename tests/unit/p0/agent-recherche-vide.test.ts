@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReponseModele } from "@/ai/client";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
-import { BLOCS_ESSAYES_MAX, LONGUEUR_REPONSE_MAX, lirePlan, lireTour } from "@/ai/sorties";
+import { BLOCS_ESSAYES_MAX, LONGUEUR_REPONSE_MAX, lirePlan as lirePlanV2, lireTour, PLAN_VIDE } from "@/ai/sorties";
 import type { Brief } from "@/prototype/brief";
 import { ConfigRechercheSchema } from "@/prototype/config";
 
@@ -26,7 +26,11 @@ const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbo
 const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche-essai.json"), "utf8")));
 
 const URL_SOURCE = "https://guide.example/musees";
-const PLAN = JSON.stringify({ requetes: [{ requete: "musées Édimbourg", creneau: "activity" }] });
+/** Plan par secteurs (prompt `plan` v2) : edimbourg-1 dure 6 jours, donc 3 à 7 secteurs. */
+const SECTEURS = ["Vieille ville", "Ville neuve", "Port"].map((nom) => ({ nom, raison: "Un secteur maison.", voisins: [], incontournables: [] }));
+const planDe = (requete: string) => JSON.stringify({ secteurs: SECTEURS, requetes: [{ requete, creneau: "activity", secteur: "Vieille ville" }] });
+const PLAN = planDe("musées Édimbourg");
+const lirePlan = (texte: string) => lirePlanV2(texte, { jours: 6 });
 const RECHERCHER = { type: "rechercher", requete: "musées Édimbourg" };
 const CANDIDAT = {
   nom: "Musée maison",
@@ -36,6 +40,7 @@ const CANDIDAT = {
   sourceUrl: URL_SOURCE,
   sourceDate: "2026-09-01",
   aReserver: false,
+  secteur: "Vieille ville",
 };
 const tour = (valeur: Record<string, unknown>) => JSON.stringify({ actions: [], candidats: [], termine: false, ...valeur });
 const enBloc = (texte: string) => "Voici ma réponse :\n```json\n" + texte + "\n```\n";
@@ -69,12 +74,12 @@ async function rejouer(reponses: (string | ReponseModele)[]) {
 
 describe("ia: sorties de modèle habillées (ticket 400)", () => {
   it("objet JSON dans un bloc de code, après une phrase ou un raisonnement : lu, schéma toujours strict", () => {
-    expect(lirePlan(enBloc(PLAN)).valeur).toEqual([{ requete: "musées Édimbourg", creneau: "activity" }]);
-    expect(lirePlan(`<think>{"brouillon": 1}</think>\n${PLAN}`).valeur).toHaveLength(1);
-    expect(lirePlan(`Plan : ${PLAN} Bonne recherche.`).valeur).toHaveLength(1);
+    expect(lirePlan(enBloc(PLAN)).valeur.requetes).toEqual([{ requete: "musées Édimbourg", creneau: "activity", secteur: "Vieille ville" }]);
+    expect(lirePlan(`<think>{"brouillon": 1}</think>\n${PLAN}`).valeur.requetes).toHaveLength(1);
+    expect(lirePlan(`Plan : ${PLAN} Bonne recherche.`).valeur.requetes).toHaveLength(1);
     expect(lireTour(enBloc(tour({ actions: [RECHERCHER] }))).valeur.actions).toEqual([RECHERCHER]);
     // Clé inconnue à la racine : toujours refusée en entier.
-    expect(lirePlan(enBloc(JSON.stringify({ requetes: [], autre: 1 })))).toEqual({ valeur: [], refuses: 1, illisible: true });
+    expect(lirePlan(enBloc(JSON.stringify({ secteurs: SECTEURS, requetes: [], autre: 1 })))).toEqual({ valeur: PLAN_VIDE, refuses: 1, illisible: true });
   });
 
   it("réponse sans objet JSON (texte vide, prose) : illisible, et le tour ne termine pas la boucle", () => {
@@ -86,13 +91,13 @@ describe("ia: sorties de modèle habillées (ticket 400)", () => {
 });
 
 describe("ia: habillage des sorties, cas limites (mineurs 8 et bloquant 1 du head cd614d4)", () => {
-  const plan = (requete: string) => JSON.stringify({ requetes: [{ requete, creneau: "activity" }] });
+  const plan = planDe;
 
   it("plusieurs blocs de code : le dernier bloc lisible gagne", () => {
     const texte = `Brouillon :\n\`\`\`json\n${plan("premier")}\n\`\`\`\nVersion finale :\n\`\`\`json\n${plan("dernier")}\n\`\`\`\n`;
-    expect(lirePlan(texte).valeur.map((r) => r.requete)).toEqual(["dernier"]);
+    expect(lirePlan(texte).valeur.requetes.map((r) => r.requete)).toEqual(["dernier"]);
     // Dernier bloc illisible : l'avant-dernier est essayé.
-    expect(lirePlan(`${texte}\`\`\`\npas du json\n\`\`\``).valeur.map((r) => r.requete)).toEqual(["dernier"]);
+    expect(lirePlan(`${texte}\`\`\`\npas du json\n\`\`\``).valeur.requetes.map((r) => r.requete)).toEqual(["dernier"]);
     // Seuls les BLOCS_ESSAYES_MAX derniers blocs sont essayés (accolades dans les blocs vides : l'empan du premier
     // « { » au dernier « } » n'est pas non plus un objet JSON).
     const vides = Array.from({ length: BLOCS_ESSAYES_MAX }, () => "```\n{rien}\n```").join("\n");
@@ -100,9 +105,9 @@ describe("ia: habillage des sorties, cas limites (mineurs 8 et bloquant 1 du hea
   });
 
   it("accolades dans la prose : lu si l'objet est dans un bloc ; prose nue autour d'accolades : illisible (limite)", () => {
-    expect(lirePlan(`Je cherche {des musées} puis :\n\`\`\`json\n${plan("musées")}\n\`\`\`\nEt {voilà}.`).valeur).toHaveLength(1);
+    expect(lirePlan(`Je cherche {des musées} puis :\n\`\`\`json\n${plan("musées")}\n\`\`\`\nEt {voilà}.`).valeur.requetes).toHaveLength(1);
     // Sans bloc, l'empan du premier « { » au dernier « } » englobe la prose : refusé en entier.
-    expect(lirePlan(`Je cherche {des musées} : ${plan("musées")} et {voilà}.`)).toEqual({ valeur: [], refuses: 1, illisible: true });
+    expect(lirePlan(`Je cherche {des musées} : ${plan("musées")} et {voilà}.`)).toEqual({ valeur: PLAN_VIDE, refuses: 1, illisible: true });
     expect(lirePlan(`Plan {${plan("musées")}}`).illisible).toBe(true);
   });
 
@@ -118,10 +123,10 @@ describe("ia: habillage des sorties, cas limites (mineurs 8 et bloquant 1 du hea
   });
 
   it("réponse plus longue que LONGUEUR_REPONSE_MAX : refusée en entier sans examen", () => {
-    const long = JSON.stringify({ requetes: [], marge: " ".repeat(LONGUEUR_REPONSE_MAX) });
-    expect(lirePlan(long)).toEqual({ valeur: [], refuses: 1, illisible: true });
+    const long = JSON.stringify({ secteurs: SECTEURS, requetes: [], marge: " ".repeat(LONGUEUR_REPONSE_MAX) });
+    expect(lirePlan(long)).toEqual({ valeur: PLAN_VIDE, refuses: 1, illisible: true });
     const justeSousLePlafond = PLAN + " ".repeat(LONGUEUR_REPONSE_MAX - PLAN.length);
-    expect(lirePlan(justeSousLePlafond).valeur).toHaveLength(1);
+    expect(lirePlan(justeSousLePlafond).valeur.requetes).toHaveLength(1);
   });
 });
 
@@ -138,12 +143,12 @@ describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)"
     expect(compteurs.sortiesIllisibles).toEqual({ plan: 0, recherche: 0 });
   });
 
-  it("mineur 11 du head cd614d4 : les tours partent avec le prompt recherche courant, v3 depuis le ticket 483 (forme JSON nue, termine après recherche)", async () => {
+  it("mineur 11 du head cd614d4 : les tours partent avec le prompt recherche courant, v4 depuis l'amendement 3 (forme JSON nue, termine après recherche)", async () => {
     const { prompts } = await rejouer([PLAN, tour({ actions: [RECHERCHER] }), tour({ termine: true })]);
-    expect(PROMPT_RECHERCHE).toMatchObject({ id: "recherche", version: 3 });
+    expect(PROMPT_RECHERCHE).toMatchObject({ id: "recherche", version: 4 });
     expect(prompts.filter((p) => p.etape === "recherche")).toEqual([
-      { etape: "recherche", id: "recherche", version: 3 },
-      { etape: "recherche", id: "recherche", version: 3 },
+      { etape: "recherche", id: "recherche", version: 4 },
+      { etape: "recherche", id: "recherche", version: 4 },
     ]);
     expect(PROMPT_RECHERCHE.texte).toContain('"slotFit"');
     expect(PROMPT_RECHERCHE.texte).toContain("sans bloc de code ni texte autour");
