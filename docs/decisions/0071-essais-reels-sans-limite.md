@@ -1,5 +1,7 @@
 # 0071 — Exécutions réelles et essais sans limite côté studio
 
+**Amendée par 0093 point 5** (PR #512), à la fusion de la tâche A : parmi les « plafonds par exécution » de « Ce qui reste », seul le coût des modèles (2 USD) arrête encore une exécution, avec `routesRequetes` et `routesElements` jusqu'à la tâche B.
+
 Statut : décidée par Samuel (argent et phases G0, réservés à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion. La mise en œuvre (§ « Mise en œuvre ») est un choix d'outillage du Tech Lead, définitif sans veto de Samuel 6 heures après la fusion (décision 0068).
 
 Date : 2026-10-16 · Décideur : Samuel · Rédacteur : Tech Lead · Source : fil du projet Vadrouille, messages de Samuel ci-dessous · Ticket : #397

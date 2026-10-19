@@ -1,5 +1,7 @@
 # 0035 — `owner-approved` exigé pour toute PR qui modifie `.github/workflows/`
 
+**Amendée par 0093 point 7** (PR #512), à la fusion de la tâche C et après le verdict de la Sécurité : plus d'`owner-approved` de Samuel pour les migrations de la base d'essai jusqu'à l'ouverture à un public (G1) ; inchangée pour tout le reste.
+
 Statut : accepté (décision de Samuel, citée mot pour mot ci-dessous) ; modalités déléguées, définitives sans veto de Samuel sous 2 jours, à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-12 · Décideur : Samuel (Q245, `#studio`, 2026-10-12 10:35 CEST) · Décideurs des modalités : Tech Lead (outillage : T1 à T5 ci-dessous), Product Owner (D1 à D4) · Ticket #163 · Spécification `specs/T18-owner-approved-workflows.md` · Consigné par l'agent release (PR de code T18)
 
 Numérotation : 0035 est le prochain numéro libre (D1). Revérifié le 2026-10-12 au moment d'écrire la PR de code : sur `origin/main`, 0001 à 0032, 0034 et 0036 ; sur les branches des PR ouvertes, seule 0033 (#177) ajoute une décision.
