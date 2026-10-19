@@ -353,7 +353,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       }
       // Schéma prototype (0046) : aucune politique ne vise vadrouille_owner, même avec le contexte d'org_prototype.
       await migrator.query("SELECT set_config('app.organization_id', $1, true)", [PROTOTYPE_ORG_ID]);
-      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges"]) {
+      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets"]) {
         expect(Number((await migrator.query(`SELECT count(*) AS n FROM prototype.${table}`)).rows[0].n), `prototype.${table}`).toBe(0);
       }
       await migrator.query("RESET ROLE");
@@ -440,7 +440,8 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
  * chacun des 18 rôles. Tout droit absent est refusé.
  */
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
-  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "runs"];
+  // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
+  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "runs", "trajets"];
   const EXPECTED_PROTOTYPE: Record<string, Record<string, string[]>> = {
     vadrouille_prototype: {
       runs: ["SELECT"],
@@ -450,6 +451,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: ["SELECT"],
       run_candidates: ["SELECT", "DELETE"],
       purges: ["SELECT"],
+      // Ni UPDATE ni DELETE (0092 § 3).
+      trajets: ["SELECT"],
     },
     vadrouille_fn_prototype_purge: {
       programmes: ["DELETE"],
@@ -457,6 +460,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: ["DELETE"],
       run_candidates: ["DELETE"],
       purges: ["INSERT", "DELETE"],
+      trajets: ["DELETE"],
     },
   };
   const EXPECTED_PROTOTYPE_COLUMNS: Record<string, Record<string, Record<string, string[]>>> = {
@@ -483,6 +487,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { INSERT: ["resultat"], UPDATE: [] },
       run_candidates: { INSERT: ["candidat", "cle", "place_id", "run_id"], UPDATE: [] },
       purges: { INSERT: [], UPDATE: [] },
+      // Sans id, organization_id ni expires_at, posés par le déclencheur (0092 § 3).
+      trajets: { INSERT: ["destination", "minutes", "mode", "origine", "programme_id"], UPDATE: [] },
     },
     vadrouille_fn_prototype_purge: {
       programmes: { SELECT: ["expires_at"] },
@@ -492,6 +498,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       purges: { SELECT: ["purged_at"] },
       runs: { SELECT: [] },
       forfaits: { SELECT: [] },
+      trajets: { SELECT: ["expires_at"] },
     },
     // Décision 0052 § 1.9 (migration 0005_prototype_coordinates_run) : lecture des exécutions en cours, pour la seule
     // fonction store_prototype_coordinates (started_at de l'exécution) ; rien d'autre dans le schéma.
@@ -503,6 +510,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { SELECT: [] },
       run_candidates: { SELECT: [] },
       purges: { SELECT: [] },
+      trajets: { SELECT: [] },
     },
   };
 

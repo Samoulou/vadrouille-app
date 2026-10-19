@@ -18,9 +18,12 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  * décision 0079, qui complète 0074). Branché au démarrage par `src/instrumentation.ts` sur l'adaptateur `prototype`
  * (`brancherLectureProgrammesReels`), appelé une fois par Journée relue.
  *
+ * Décision 0092 § 4 : l'adaptateur ne l'appelle que pour les paires **sans temps conservé** (programme écrit avant la
+ * migration `0011_trajets_prototype`, ou paire absente) ; toutes conservées, il n'est pas appelé. Il n'écrit jamais
+ * les durées qu'il obtient (seule l'étape finale de `p0Run` écrit les temps).
+ *
  * À **chaque** relecture, dans cet ordre, le premier refus l'emportant (refus : `{ ok: false }`, aucun appel Routes ;
- * l'adaptateur lève alors `RelectureError` et la page affiche l'état d'erreur existant, jamais une durée inventée ni
- * conservée) :
+ * l'adaptateur rend alors la page sans ces durées, 0092 § 4 point 3, jamais une durée inventée) :
  * 1. **même barrière que le lancement** (exigence 4) : garde du mode réel ouverte (conditions (1) à (7), déploiement
  *    autre que la production) et cookie d'accès valide ; sinon aucune connexion à la base ;
  * 2. **purge** : la dernière purge réussie a moins de 24 h (0046 D16 point 8), lu par la base ; sinon refus ;
