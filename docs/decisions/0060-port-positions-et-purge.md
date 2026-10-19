@@ -8,6 +8,8 @@ Numérotation (relue le 2026-10-14 sur `main` `37f788b`) : `main` porte 0001 à 
 
 **Amende** : **0011 § 6** (écriture « derrière le port de `src/grounding` » au lieu de « appelée par `src/grounding` » ; expiration du MVP à 29 jours ; purge planifiée propre au MVP ; `EXECUTE` de `purge_expired_coordinates` à un rôle de plus), renvoi ajouté en tête de 0011. **Précise** 0059 § 5 points 1 et 3 (nom du fichier de type ; module de lecture commun à B6a et B8c) et **0059 § 4** (cycles de B8c, fichier commun `eslint.config.mjs`, § 1.4 ci-dessous), renvoi ajouté en tête de 0059. Ne change ni 0046 (D16, S8), ni 0052, ni 0056.
 
+**§ 1.3, « Moment d'écriture », précisé par 0100** (ticket #544, B8-TL-9) : à la lecture, l'écriture des positions est une transaction `withOrg` à part, ouverte par la source de relectures de B8b après les appels Google, pour les seules positions des fiches de la lecture absentes du cache ; la carte ne relit rien.
+
 ## Contexte
 B8c (0059 § 3) livre le port du cache `place_coordinates`, l'expiration et la purge propres au MVP. La spécification B8 laisse au Tech Lead le nom du module (B8-TL-2) et le choix de l'expiration et du mécanisme de purge (B8-TL-3), avant le code de B8c.
 
