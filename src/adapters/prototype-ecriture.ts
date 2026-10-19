@@ -1,7 +1,15 @@
 import "server-only";
 
 import type { CodeEchecEcriture, EcritureProgrammePrototype, ProgrammeEcrit } from "@/contracts/prototype-ecriture";
-import { CLES_PROGRAMME_ECRIT, PLACE_ID_PATTERN, PROTOTYPE_ORG_ID, placeIdsDuProgramme } from "@/prototype/programme-reduit";
+import {
+  CLES_PROGRAMME_ECRIT,
+  PLACE_ID_PATTERN,
+  PROTOTYPE_ORG_ID,
+  cleTrajet,
+  minutesTrajetValides,
+  pairesAConserver,
+  placeIdsDuProgramme,
+} from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
@@ -14,9 +22,16 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  *
  * Une seule transaction sous `vadrouille_prototype`, contexte posé selon 0046 D15 point 5, puis dans l'ordre (§ 1.1) :
  * (i) la fonction de la base pour chaque `placeId` du programme, l'exécution étant encore `en_cours` ; (ii) le
- * programme **sans** `positions` (Q324) ; (iii) le passage de l'exécution à `programme_ecrit` ; `COMMIT`. Toute erreur
- * annule la transaction : **aucune position n'est écrite sans son programme**. Valeurs toujours en paramètres liés
- * (§ 1.8) : le texte des requêtes ne contient ni identifiant de lieu ni coordonnée.
+ * programme **sans** `positions` (Q324) ; (ii bis) les temps de trajet conservés du programme, un `INSERT` par paire
+ * dans `prototype.trajets` (décision 0092 § 4) ; (iii) le passage de l'exécution à `programme_ecrit` ; `COMMIT`. Toute
+ * erreur annule la transaction : **aucune position ni aucun temps n'est écrit sans son programme, aucun programme sans
+ * ses temps**. Valeurs toujours en paramètres liés (§ 1.8) : le texte des requêtes ne contient ni identifiant de lieu,
+ * ni coordonnée, ni durée.
+ *
+ * Compatibilité (0092 § 5 point 6) : tant que la migration `0011_trajets_prototype` n'est pas appliquée, la table
+ * n'existe pas (`to_regclass`, lu dans la même transaction) et l'étape (ii bis) n'est pas tentée ; le programme est
+ * écrit comme avant. Avec `prototype-lecture.ts`, seul module hors de `db/` et `tests/db/` qui nomme
+ * `prototype.trajets` (test de confinement).
  *
  * Le module reçoit le pool `vadrouille_prototype` de la garde de connexion (`poolPrototype()`, `src/server/p0/base.ts`)
  * comme le port de consommation (`src/server/usage/neon.ts`) : le pool est la connexion, pas une implémentation de
@@ -41,6 +56,11 @@ const SQLSTATE = /^[0-9A-Z]{5}$/;
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
 const SQL_POSITION = "SELECT public.store_prototype_coordinates($1::uuid, $2::text, $3::double precision, $4::double precision)";
 const SQL_PROGRAMME = "INSERT INTO prototype.programmes (run_id, contenu) VALUES ($1::uuid, $2::jsonb) RETURNING id";
+/** Présence de la table des temps conservés (migration `0011_trajets_prototype`, décision 0092 § 5 point 6). */
+export const SQL_TRAJETS_PRESENTS = "SELECT pg_catalog.to_regclass('prototype.trajets') IS NOT NULL AS presente";
+/** Un temps conservé ; `id`, `organization_id` et `expires_at` sont posés par le déclencheur de la base (0092 § 3). */
+export const SQL_TRAJET =
+  "INSERT INTO prototype.trajets (programme_id, mode, origine, destination, minutes) VALUES ($1::uuid, $2::text, $3::text, $4::text, $5::integer)";
 const SQL_STATUT = `UPDATE prototype.runs SET status = 'programme_ecrit', phase = NULL, cost_models_micros = NULL
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 
@@ -65,11 +85,17 @@ export class EchecEcritureProgramme extends Error {
 
 const borne = (valeur: number, max: number) => Number.isFinite(valeur) && valeur >= -max && valeur <= max;
 
+type LigneTrajet = [mode: string, origine: string, destination: string, minutes: number];
+
 /**
  * Contrôles avant toute requête (§ 1.10) : identifiant d'exécution, contenu sans `positions` ni clé inconnue, clés de
- * `positions` **égales** à `placeIdsDuProgramme(programme)`, formes et bornes. Rend les positions dans un ordre fixe.
+ * `positions` **égales** à `placeIdsDuProgramme(programme)`, formes et bornes. Les temps (0092 § 4, « Écriture ») ne
+ * sont pas contrôlés mais **filtrés** : seules les paires de `pairesAConserver(programme, mode)` dont les minutes sont
+ * un entier entre 0 et 1 440 sont retenues ; une paire sans durée, d'un autre mode, hors bornes ou étrangère au
+ * programme est écartée sans refus (jamais un programme payé perdu pour un temps). Rend les positions et les temps
+ * dans un ordre fixe.
  */
-function controler(entree: EcritureProgrammePrototype): [string, number, number][] {
+function controler(entree: EcritureProgrammePrototype): { positions: [string, number, number][]; trajets: LigneTrajet[] } {
   if (!UUID.test(entree.runId)) throw new EchecEcritureProgramme("entree_refusee");
   const cles = Object.keys(entree.programme);
   if (cles.some((cle) => !(CLES_CONTENU_ECRIT as readonly string[]).includes(cle))) throw new EchecEcritureProgramme("entree_refusee");
@@ -88,7 +114,16 @@ function controler(entree: EcritureProgrammePrototype): [string, number, number]
     }
     lignes.push([placeId, position.lat, position.lng]);
   }
-  return lignes;
+  // `pairesAConserver` est pure et ne lève pas (`src/prototype/programme-reduit.ts`, sans `throw`) ; la structure du
+  // programme vient d'être parcourue par `placeIdsDuProgramme`. Aucun refus n'est possible ici : un programme payé
+  // n'est jamais perdu pour un temps (0092 § 4, « Écriture »).
+  const paires = pairesAConserver(entree.programme, entree.mode);
+  const trajets: LigneTrajet[] = [];
+  for (const paire of [...paires].sort((a, b) => (cleTrajet(a) < cleTrajet(b) ? -1 : 1))) {
+    const minutes = entree.trajets.get(cleTrajet(paire));
+    if (minutesTrajetValides(minutes)) trajets.push([paire.mode, paire.origine, paire.destination, minutes]);
+  }
+  return { positions: lignes, trajets };
 }
 
 const codeSql = (erreur: unknown): string | undefined => {
@@ -98,7 +133,7 @@ const codeSql = (erreur: unknown): string | undefined => {
 
 /** Écrit le programme et ses positions ensemble, ou rien (0052 § 1.1). */
 export async function ecrireProgramme(entree: EcritureProgrammePrototype, pool: PoolSql): Promise<ProgrammeEcrit> {
-  const positions = controler(entree);
+  const { positions, trajets } = controler(entree);
   const contenu = JSON.stringify(entree.programme);
   let client: ClientSql;
   try {
@@ -114,6 +149,11 @@ export async function ecrireProgramme(entree: EcritureProgrammePrototype, pool: 
     for (const [placeId, lat, lng] of positions) await client.query(SQL_POSITION, [entree.runId, placeId, lat, lng]);
     const programmeId = (await client.query(SQL_PROGRAMME, [entree.runId, contenu])).rows[0]?.id;
     if (typeof programmeId !== "string") throw new EchecEcritureProgramme("base");
+    if (trajets.length > 0 && (await client.query(SQL_TRAJETS_PRESENTS)).rows[0]?.presente === true) {
+      for (const [mode, origine, destination, minutes] of trajets) {
+        await client.query(SQL_TRAJET, [programmeId, mode, origine, destination, minutes]);
+      }
+    }
     if ((await client.query(SQL_STATUT, [entree.runId])).rows.length !== 1) throw new EchecEcritureProgramme("execution_close");
     await client.query("COMMIT");
     enTransaction = false;
