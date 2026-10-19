@@ -7,6 +7,7 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -94,6 +95,8 @@ export const trips = pgTable(
     check("trips_status_check", oneOf(t.status, ["active", "archived"])),
     check("trips_dates_check", sql`${t.endDate} >= ${t.startDate}`),
     check("trips_travellers_check", sql`${t.travellersAdults} >= 0 AND ${t.travellersChildren} >= 0`),
+    // B9b (0081 B9-TL-6 (d)) : `NOT VALID` dans la migration 0012 (lignes antérieures non vérifiées, toute écriture l'est).
+    check("trips_time_zone_check", sql`${t.timeZone} IS NOT NULL`),
   ],
 );
 
@@ -107,10 +110,15 @@ export const briefs = pgTable(
     version: integer("version").notNull(),
     story: text("story"),
     pace: text("pace"),
+    /** Ancienne colonne (`text`) : plus écrite depuis B9b (0081 B9-TL-6 (e)), retirée par une migration ultérieure. */
     mobility: text("mobility"),
+    /** Modes de `Brief.mobility` dans l'ordre reçu (B9b, 0081 B9-TL-6 (e)) ; nul pour les lignes antérieures. */
+    mobilityModes: text("mobility_modes").array(),
     /** Codes `Category`. */
     wishes: text("wishes").array().notNull().default(sql`'{}'::text[]`),
     limits: text("limits"),
+    /** Codes `Category` de `Brief.limits`, dans l'ordre reçu (B9b) ; nul pour les lignes antérieures. */
+    limitCategories: text("limit_categories").array(),
     mealBudget: text("meal_budget"),
     inferredFields: text("inferred_fields").array().notNull().default(sql`'{}'::text[]`),
     createdAt: createdAt(),
@@ -118,6 +126,7 @@ export const briefs = pgTable(
   (t) => [
     tripFk("briefs_trip_fk", t),
     unique(uniqueKeyName("briefs_organization_id_trip_id_version")).on(t.organizationId, t.tripId, t.version),
+    check("briefs_mobility_modes_check", sql`${t.mobilityModes} IS NULL OR ${t.mobilityModes} <@ ARRAY['walk', 'transit', 'car']::text[]`),
   ],
 );
 
@@ -136,14 +145,63 @@ export const stays = pgTable(
     arrivalTime: text("arrival_time"),
     departureTime: text("departure_time"),
     luggage: text("luggage"),
+    /** B9b (0081 B9-TL-6 (a)) : libellé de la ville du `TripDraft` ; nul pour les lignes antérieures. */
+    city: text("city"),
+    /** B9b (0081 B9-TL-6 (c)) : type de logement d'origine (`LODGING_KINDS`) ; nul pour les lignes antérieures. */
+    lodgingKind: text("lodging_kind"),
+    /** Identifiant maison de la suggestion retenue (`lodgingId` ou `areaId`, B9-TL-5) ; jamais un identifiant Google. */
+    suggestionId: text("suggestion_id"),
+    /** Centre et rayon d'une zone maison (`suggestedArea`, sortie du modèle) : jamais des coordonnées Google (0011, 0027). */
+    areaCenterLat: doublePrecision("area_center_lat"),
+    areaCenterLng: doublePrecision("area_center_lng"),
+    areaRadiusM: integer("area_radius_m"),
   },
   (t) => [
     tripFk("stays_trip_fk", t),
     index("stays_organization_id_trip_id_from_date_idx").on(t.organizationId, t.tripId, t.fromDate),
-    check("stays_kind_check", oneOf(t.kind, ["lodging", "neighbourhood"])),
+    check("stays_kind_check", oneOf(t.kind, ["lodging", "neighbourhood", "none"])),
     check("stays_dates_check", sql`${t.toDate} >= ${t.fromDate}`),
+    // B9b (0081 B9-TL-6 (f)) : borne de fin exclusive ; `NOT VALID` dans la migration 0012.
+    check("stays_to_date_exclusive_check", sql`${t.toDate} > ${t.fromDate}`),
+    check(
+      "stays_lodging_kind_check",
+      sql`${t.lodgingKind} IS NULL OR ${oneOf(t.lodgingKind, ["known", "area", "none", "suggestedLodging", "suggestedArea"])}`,
+    ),
+    check(
+      "stays_area_center_check",
+      sql`(${t.areaCenterLat} IS NULL AND ${t.areaCenterLng} IS NULL AND ${t.areaRadiusM} IS NULL) OR (${t.areaCenterLat} BETWEEN -90 AND 90 AND ${t.areaCenterLng} BETWEEN -180 AND 180 AND ${t.areaRadiusM} BETWEEN 50 AND 20000)`,
+    ),
     check("stays_arrival_time_check", sql`${t.arrivalTime} IS NULL OR ${hhmm(t.arrivalTime)}`),
     check("stays_departure_time_check", sql`${t.departureTime} IS NULL OR ${hhmm(t.departureTime)}`),
+  ],
+);
+
+/**
+ * Engagements de l'écran 1 (`TripCommitment`, B9b ; 0081 B9-TL-6 (b)) : vol, réservation ou billet, relus par les
+ * workflows 1 et 4 et posés comme étapes verrouillées (`Stop.commitment`). Même modèle de RLS que `stays`.
+ */
+export const tripCommitments = pgTable(
+  "trip_commitments",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    /** Rang dans `TripDraft.commitments` (0 pour le premier). */
+    rank: smallint("rank").notNull(),
+    kind: text("kind").notNull(),
+    label: text("label").notNull(),
+    date: date("date").notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tripFk("trip_commitments_trip_fk", t),
+    unique(uniqueKeyName("trip_commitments_organization_id_trip_id_rank")).on(t.organizationId, t.tripId, t.rank),
+    check("trip_commitments_kind_check", oneOf(t.kind, ["flight", "booking", "ticket"])),
+    check("trip_commitments_rank_check", sql`${t.rank} >= 0`),
+    check("trip_commitments_start_time_check", hhmm(t.startTime)),
+    check("trip_commitments_end_time_check", sql`${t.endTime} IS NULL OR (${hhmm(t.endTime)} AND ${t.endTime} > ${t.startTime})`),
   ],
 );
 
@@ -192,12 +250,37 @@ export const generationRuns = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    /** B9b (0081 B9-TL-3 et B9-TL-6 (h), 0087 § 2) : étape en cours (observation), nulle avant la première étape. */
+    step: text("step"),
+    /** Rang de la dernière étape commencée (garde d'idempotence), 0 à la réservation. */
+    stepSeq: integer("step_seq").notNull().default(0),
+    /** `requestId` de `createTrip` ou de `retryGeneration` (aperçu) ; nul pour une ligne `full` (0087 § 1.2). */
+    requestId: uuid("request_id"),
+    /** `requestId` des reprises acceptées de la personne (ligne `full` seulement, 0087 § 1.2) : compteur et idempotence. */
+    personRetryRequestIds: uuid("person_retry_request_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    /** Reprises par le studio (ligne `full` seulement, 0087 § 1.2). */
+    studioRetries: integer("studio_retries").notNull().default(0),
   },
   (t) => [
     tripFk("generation_runs_trip_fk", t),
     unique(uniqueKeyName("generation_runs_organization_id_id")).on(t.organizationId, t.id),
     index("generation_runs_organization_id_trip_id_started_at_idx").on(t.organizationId, t.tripId, t.startedAt),
+    uniqueIndex("generation_runs_organization_id_trip_id_request_id_idx")
+      .on(t.organizationId, t.tripId, t.requestId)
+      .where(sql`${t.requestId} IS NOT NULL`),
+    uniqueIndex("generation_runs_organization_id_trip_id_full_idx").on(t.organizationId, t.tripId).where(sql`${t.kind} = 'full'`),
     check("generation_runs_kind_check", oneOf(t.kind, ["preview", "full", "batch", "mini"])),
+    // `NOT VALID` dans la migration 0012 pour `phase` et `stop_reason` (lignes antérieures non vérifiées).
+    check("generation_runs_phase_check", oneOf(t.phase, ["queued", "preparing", "ready", "incomplete", "failed"])),
+    // `generation_runs_stop_reason_check` (codes fermés de la couche IA et de l'ancrage, `step_expired`) : posée par la
+    // migration 0012 seule, comparée aux listes de code par `tests/unit/db/migration-creation.test.ts`.
+    check("generation_runs_step_check", sql`${t.step} IS NULL OR ${oneOf(t.step, ["a", "l", "b", "c", "d", "e"])}`),
+    check("generation_runs_step_seq_check", sql`${t.stepSeq} >= 0`),
+    check("generation_runs_studio_retries_check", sql`${t.studioRetries} >= 0`),
+    check(
+      "generation_runs_retries_full_check",
+      sql`${t.kind} = 'full' OR (cardinality(${t.personRetryRequestIds}) = 0 AND ${t.studioRetries} = 0)`,
+    ),
   ],
 );
 
@@ -256,6 +339,10 @@ export const candidates = pgTable(
     notForMeRisk: smallint("not_for_me_risk"),
     mustSee: boolean("must_see"),
     slotFit: text("slot_fit").array(),
+    /** B9b (0081 B9-TL-6 (g), question 13 (a) de B7) : type d'étape (`activity`, `meal`, `event`), rempli par `versLignes`. */
+    stopKind: text("stop_kind"),
+    /** « À réserver » (question 13 (a) de B7), rempli par `versLignes`. */
+    toReserve: boolean("to_reserve"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -270,6 +357,7 @@ export const candidates = pgTable(
     check("candidates_kind_check", oneOf(t.kind, ["place", "event"])),
     check("candidates_confidence_check", sql`${t.confidence} IS NULL OR ${oneOf(t.confidence, ["low", "medium", "high"])}`),
     check("candidates_not_for_me_risk_check", sql`${t.notForMeRisk} IS NULL OR ${t.notForMeRisk} BETWEEN 1 AND 10`),
+    check("candidates_stop_kind_check", sql`${t.stopKind} IS NULL OR ${oneOf(t.stopKind, ["activity", "meal", "event"])}`),
     check("candidates_slot_fit_check", sql`${t.slotFit} IS NULL OR ${t.slotFit} <@ ARRAY['activity', 'meal', 'evening']::text[]`),
     check("candidates_facts_check", closedObject(t.facts, STOP_FACTS_KEYS)),
     check(

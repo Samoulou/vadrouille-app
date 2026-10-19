@@ -286,15 +286,65 @@ async function enTransaction<T>(executeur: ExecuteurTest, org: OrgTest, fn: () =
   }
 }
 
-/** Écrit un voyage pour l'organisation ; rend l'`uuid` du voyage. */
-export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donnees: DonneesVoyage): Promise<string> {
-  return enTransaction(executeur, org, async () => {
+/** Fuseau provisoire d'un voyage écrit « sans fuseau », remplacé par `NULL` par `simulerFuseauNul` après l'écriture. */
+const FUSEAU_PROVISOIRE = "UTC";
+
+/**
+ * Ligne `trips` sans fuseau, antérieure à la migration 0012_creation_voyage (B9b, 0081 B9-TL-6 (d) : `CHECK (time_zone
+ * IS NOT NULL) NOT VALID`, qui refuse toute écriture d'un fuseau nul, y compris par l'administration). Reproduite, pour
+ * les seuls tests de lecture de B6a qui l'éprouvent (`time_zone_missing`), par la connexion d'administration (rôle
+ * propriétaire de la base de test) dans **une** transaction : la contrainte est retirée, la valeur mise à `NULL`, puis la
+ * contrainte reposée à l'identique (`NOT VALID`), si bien qu'aucune autre session ne la voit absente. Base de test
+ * seulement (`tests/db`, fichiers en série).
+ */
+async function simulerFuseauNul(admin: ExecuteurTest, tripId: string): Promise<void> {
+  await admin.query("BEGIN");
+  try {
+    await admin.query('ALTER TABLE public.trips DROP CONSTRAINT "trips_time_zone_check"');
+    await admin.query("UPDATE public.trips SET time_zone = NULL WHERE id = $1", [tripId]);
+    await admin.query('ALTER TABLE public.trips ADD CONSTRAINT "trips_time_zone_check" CHECK (time_zone IS NOT NULL) NOT VALID');
+    await admin.query("COMMIT");
+  } catch (erreur) {
+    await admin.query("ROLLBACK").catch(() => undefined);
+    throw erreur;
+  }
+}
+
+/**
+ * Ligne `stays` qui ne couvre aucune nuit (`to_date` ≤ `from_date`), antérieure à la migration 0012_creation_voyage
+ * (0081 B9-TL-6 (f) : `CHECK (to_date > from_date) NOT VALID`). Même procédé que `simulerFuseauNul` : écrite avec une
+ * borne provisoire, puis, par la connexion d'administration et dans une transaction, la contrainte est retirée, la borne
+ * posée et la contrainte reposée à l'identique (`NOT VALID`). Seuls tests de lecture de B6a qui l'éprouvent (`stay_missing`).
+ */
+async function simulerSejourSansNuit(admin: ExecuteurTest, stayId: string, toDate: string): Promise<void> {
+  await admin.query("BEGIN");
+  try {
+    await admin.query('ALTER TABLE public.stays DROP CONSTRAINT "stays_to_date_exclusive_check"');
+    await admin.query("UPDATE public.stays SET to_date = $2::date WHERE id = $1", [stayId, toDate]);
+    await admin.query('ALTER TABLE public.stays ADD CONSTRAINT "stays_to_date_exclusive_check" CHECK (to_date > from_date) NOT VALID');
+    await admin.query("COMMIT");
+  } catch (erreur) {
+    await admin.query("ROLLBACK").catch(() => undefined);
+    throw erreur;
+  }
+}
+
+/**
+ * Écrit un voyage pour l'organisation ; rend l'`uuid` du voyage. Un voyage sans fuseau (`timeZone: null`) ou avec une
+ * ligne `stays` sans nuit exige la connexion d'administration (`admin`, voir `simulerFuseauNul` et
+ * `simulerSejourSansNuit`).
+ */
+export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donnees: DonneesVoyage, admin?: ExecuteurTest): Promise<string> {
+  if (donnees.timeZone === null && admin === undefined) throw new Error("voyage sans fuseau : connexion d'administration requise (migration 0012)");
+  if (donnees.stays.some((stay) => stay.to <= stay.from) && admin === undefined) throw new Error("séjour sans nuit : connexion d'administration requise (migration 0012)");
+  const sansNuit: { id: string; to: string }[] = [];
+  const ecrit = await enTransaction(executeur, org, async () => {
     const q = (texte: string, valeurs: readonly unknown[] = []) => executeur.query(texte, valeurs);
     const tripId = (
       await q(
         `INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults, travellers_children, time_zone)
          VALUES ($1, $2, gen_random_uuid(), $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [org.org, org.owner, donnees.destination, donnees.start, donnees.end, donnees.travellers.adults, donnees.travellers.children, donnees.timeZone],
+        [org.org, org.owner, donnees.destination, donnees.start, donnees.end, donnees.travellers.adults, donnees.travellers.children, donnees.timeZone ?? FUSEAU_PROVISOIRE],
       )
     ).rows[0]?.id as string;
     for (const [i, version] of donnees.versions.entries()) {
@@ -307,15 +357,12 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
     const courante = donnees.currentVersion === undefined ? (donnees.versions.length > 0 ? donnees.versions.length : null) : donnees.currentVersion;
     await q("UPDATE trips SET current_version = $1 WHERE organization_id = $2 AND id = $3", [courante, org.org, tripId]);
     for (const stay of donnees.stays) {
-      await q("INSERT INTO stays (organization_id, trip_id, kind, place_id, label, from_date, to_date) VALUES ($1, $2, $3, $4, $5, $6, $7)", [
-        org.org,
-        tripId,
-        stay.kind,
-        stay.placeId,
-        stay.label,
-        stay.from,
-        stay.to,
-      ]);
+      const provisoire = stay.to <= stay.from;
+      const ligne = await q(
+        "INSERT INTO stays (organization_id, trip_id, kind, place_id, label, from_date, to_date) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $8 THEN $6::date + 1 ELSE $7::date END) RETURNING id",
+        [org.org, tripId, stay.kind, stay.placeId, stay.label, stay.from, stay.to, provisoire],
+      );
+      if (provisoire) sansNuit.push({ id: ligne.rows[0]?.id as string, to: stay.to });
     }
     if (donnees.mobility !== undefined) {
       await q("INSERT INTO briefs (organization_id, trip_id, version, mobility) VALUES ($1, $2, 1, $3)", [org.org, tripId, donnees.mobility]);
@@ -331,7 +378,8 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
         await q(
           `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
            VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
-          [org.org, tripId, run.kind, run.finished ? "done" : "running", courante, 100 - rang, run.finished],
+          // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
+          [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, 100 - rang, run.finished],
         )
       ).rows[0]?.id as string;
       for (const ligne of run.propositions) {
@@ -348,6 +396,9 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
     }
     return tripId;
   });
+  if (donnees.timeZone === null && admin !== undefined) await simulerFuseauNul(admin, ecrit);
+  for (const { id, to } of sansNuit) if (admin !== undefined) await simulerSejourSansNuit(admin, id, to);
+  return ecrit;
 }
 
 /** Écrit les quatre voyages convertis ; rend l'`uuid` de chacun par identifiant de `mock`. */
