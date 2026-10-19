@@ -1,33 +1,32 @@
-# État du studio — 2026-10-18 (105e cycle)
+# État du studio — 2026-10-19 (106e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 3 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 4 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 104e cycle ; #studio : aucun message nouveau.
-- 06:15 UTC : carte de décision posée à Samuel (Q511) : un seul quartier par jour, ou un ou deux quartiers voisins.
+- Aucun nouveau message depuis le 105e cycle ; #studio : aucun message nouveau. Q511 (carte) et Q507 (« Je confirme 0093 ») toujours sans réponse.
 
 ## Fait
-- Fusionnées : **décision 0092** (#504, temps de trajet du prototype conservés) ; **B9b** (#517, création du voyage et état de génération, migration 0012) ; statut du 104e cycle (#518).
-- Ticket #519 ouvert : consigner les décisions du Tech Lead sur B9b, puis les règles de lint de B9-TL-1 (jamais dans le même cycle qu'une sous-tâche de B9).
+- Fusionnées : **décision 0095** (#521, trajet sans durée et journée sans total : « durée à confirmer », « Temps de trajet à confirmer ») ; **contrat des durées nullables** (#509, correction 1) ; statut du 105e cycle (#520).
+- #507 (code de 0092) : `main` fusionnée avec B9b (journal 0011 puis 0012, parent de l'instantané 0012 corrigé, base neuve vérifiée en local).
+- Ticket #522 ouvert : **B9c** (aperçu, workflows 1, 2 et 3).
 
 ## En cours
-- tech-lead : **0094** (#516), correction 2, la **dernière** : valeur par défaut `secteursParJourMax` remise à 2 (la règle d'un ou deux secteurs voisins reste en vigueur jusqu'à la réponse de Samuel, Q511), migration 0013 après 0011 et 0012, tests qui énumèrent les tables du schéma `prototype`.
-- ux-ui : décision écrite sur l'affichage d'un trajet sans durée (libellés, journée sans total, carte sans trajet, accessibilité) ; préalable de la correction de #509.
-- backend : #507 (code de 0092) remis à jour avec `main`, conflits avec B9b (journal des migrations, instantané 0012, tests de base).
+- backend : **B9c** (#522), priorité 1 de Samuel ; vérifie d'abord ses préalables, doubles seulement, aucun appel réel.
+- tech-lead : **0094** (#516), bloquant tardif non compté (table `prototype.run_plans` renommée sans « plan », garde de `schema.test.ts`) et mineurs.
+- backend : #507 remise à jour après #509, puis `needs-review`.
 
 ## Bloqué
-- **#509** (contrat des durées nullables) : changements demandés, correction 1 comptée (tests du contrat, durée inventée dans l'analytique, libellés sans décision UX) ; reprise après la décision UX.
-- **Affichage des voyages sur `p0-reel`** : #509 → #507 → migration 0011 → report `main` → `p0-reel`.
-- **0093, tâches A et C** : « Je confirme 0093 » de Samuel sur #512 (Q507), pas encore écrit ; C aussi après un verdict Sécurité.
-- **B9c** (aperçu) : B9b fusionnée ; pas dans le même cycle qu'une PR qui modifie `src/server/env/index.ts`, `eslint.config.mjs` ou les listes du confinement (donc pas avec #519).
+- **Affichage des voyages sur `p0-reel`** : #507 → migration 0011 → report `main` → `p0-reel`.
+- **0093, tâches A et C** : « Je confirme 0093 » de Samuel sur #512 (Q507) ; C aussi après un verdict Sécurité.
+- **#519** (règles de lint de B9-TL-1) : pas dans le même cycle que B9c.
 - **Lots 2 à 4 de l'amendement 3** : fusion de 0094 ; verdicts Sécurité (Q508).
 - **B4a**, **B8b**, **B9a** : jamais dans le même cycle qu'une autre sous-tâche de B9 qui partage leurs fichiers (0078, spécification B9).
 - **Purge du MVP** : Q438. **`coords-purge`** en échec : ticket à ouvrir.
 
 ## Prochain cycle
-1. Correction de #509 après la décision UX, puis `needs-review` sur #507.
-2. B9c (aperçu), priorité 1 de Samuel.
-3. Vague 1 des lots 2 à 4 dès la fusion de 0094.
+1. Suite de B9c ; `needs-review` et revue de #507.
+2. Vague 1 des lots 2 à 4 dès la fusion de 0094.
+3. Après B9c : #519, puis B10 (« J'aime / J'aime pas »).
 4. Samuel : « Je confirme 0093 » sur #512 ; carte « un ou deux quartiers » ; carte du fusible en mode réel (Q506) ; ouvrir le voyage Rome une seule fois.
 
 ## Décisions attendues de Samuel
@@ -50,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q511.
+- Q512, Q513.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
