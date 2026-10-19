@@ -9,7 +9,7 @@ import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
 import { axeViolations } from "../../../tests/unit/axe";
 
 import { projectTodayTrip } from "./today";
-import { TodayScreen, type TodayScreenProps } from "./TodayScreen";
+import { pourYAller, TodayScreen, type TodayScreenProps } from "./TodayScreen";
 
 /** Écran 15 (spécification F10, critères [a] : C5, C7 à C15, C17, C18 en rendu unitaire, horloge injectée). */
 
@@ -40,6 +40,28 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("TodayScreen : « Pour y aller » (décision 0095 § 2)", () => {
+  it("textes exacts : mode en minuscule après « : », avec durée, estimée ou à confirmer", () => {
+    expect(pourYAller({ mode: "walk", minutes: 20, estimated: false })).toBe("Pour y aller : à pied, 20 min");
+    expect(pourYAller({ mode: "transit", minutes: 25, estimated: true })).toBe("Pour y aller : bus, environ 25 min (estimation)");
+    expect(pourYAller({ mode: "car", minutes: 15, estimated: false })).toBe("Pour y aller : en voiture, 15 min");
+    expect(pourYAller({ mode: "walk", minutes: null, estimated: false })).toBe("Pour y aller : à pied, durée à confirmer");
+    expect(pourYAller({ mode: "transit", minutes: null, estimated: true })).toBe("Pour y aller : bus, durée à confirmer");
+    expect(pourYAller({ mode: "car", minutes: null, estimated: false })).toBe("Pour y aller : en voiture, durée à confirmer");
+  });
+
+  it("trajet sans durée : paragraphe lu « Pour y aller : à pied, durée à confirmer », lien « Itinéraire » conservé", () => {
+    const jour = edimbourg.days[1]!;
+    const index = jour.items.findIndex((item) => item.type === "stop" && item.stop.name === "[Dean Village]");
+    const items = jour.items.map((item, i) => (i === index - 1 && item.type === "segment" ? { ...item, segment: { ...item.segment, minutes: null } } : item));
+    const trip = projectTodayTrip({ ...edimbourg, days: edimbourg.days.map((day) => (day === jour ? { ...day, items, travelMinutes: null } : day)) });
+    renderAt("2026-08-30T10:40:00+01:00", { trip });
+    const next = region(t.prochaine.titre);
+    expect(next.querySelector("[data-part='pour-y-aller']")?.textContent).toBe("Pour y aller : à pied, durée à confirmer");
+    expect(within(next).getByRole("link", { name: "Itinéraire vers [Dean Village] (nouvelle fenêtre)" })).toBeInTheDocument();
+  });
+});
+
 describe("TodayScreen : jour J (C7)", () => {
   it("titre, sous-titre, pas de « En ce moment » ; « Prochaine étape » avec horaire, nom, trajet et itinéraire", () => {
     renderAt("2026-08-30T10:40:00+01:00");
@@ -50,7 +72,7 @@ describe("TodayScreen : jour J (C7)", () => {
     const next = region(t.prochaine.titre);
     expect(next).toHaveTextContent("10:50 – 11:50");
     expect(next).toHaveTextContent("[Dean Village]");
-    expect(next).toHaveTextContent("Pour y aller : À pied, 20 min");
+    expect(next).toHaveTextContent("Pour y aller : à pied, 20 min");
     const link = within(next).getByRole("link", { name: "Itinéraire vers [Dean Village] (nouvelle fenêtre)" });
     expect(link).toHaveTextContent("Itinéraire");
     expect(link).toHaveAttribute("target", "_blank");

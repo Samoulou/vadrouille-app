@@ -49,6 +49,10 @@ describe("analytics: événements deck sans donnée personnelle", () => {
     expect(bad({ category: "Musées" })).toBe(false);
     expect(bad({ position: 0 })).toBe(false);
     expect(bad({ travel_minutes: -1 })).toBe(false);
+    // Durée inconnue (décision 0092 § 4) : la propriété est absente, jamais null ni 0 inventé.
+    expect(bad({ travel_minutes: null })).toBe(false);
+    const sansDuree = Object.fromEntries(Object.entries(decision.properties).filter(([cle]) => cle !== "travel_minutes"));
+    expect(AnalyticsEventSchema.safeParse({ name: "deck_decision", properties: sansDuree }).success).toBe(true);
     expect(
       AnalyticsEventSchema.safeParse({ name: "preference_prompt_answered", properties: { category: "distance", answer: "yes", reason: "Trop loin" } })
         .success,

@@ -123,7 +123,9 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
         enAttente = [];
       };
       for (const item of day.items) {
-        if (item.type === "segment") enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
+        // Un segment sans durée (`null`, prototype seulement, décision 0092 § 4) n'a aucune durée à servir : il est
+        // ignoré, jamais compté 0. Les voyages simulés n'en contiennent pas (MVP).
+        if (item.type === "segment" && item.segment.minutes !== null) enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
         else if (item.type === "stop") {
           const lieu = lieuConverti(item.stop);
           resoudre(lieu);
@@ -138,7 +140,8 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
       const jour = joursParIndex.get(proposal.day);
       if (jour === undefined) continue;
       poserPlages(lieuConverti(proposal.stop), jour.date, proposal.stop);
-      if (trajet === undefined) continue;
+      // Sans trajet ou sans durée (`null`, décision 0092 § 4) : rien à servir pour cette proposition, jamais 0.
+      if (trajet === undefined || trajet.minutes === null) continue;
       const instant = proposal.time;
       let depuis = logement;
       for (const { lieu, stop } of etapes(jour.items)) if (stop.id !== proposal.stop.id && stop.start < instant) depuis = lieu;

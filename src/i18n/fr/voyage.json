@@ -19,7 +19,14 @@
       "titre": "Prochaine étape",
       "ensuite": "Ensuite",
       "plage": "{start} – {end}",
-      "pourYAller": "Pour y aller : {segment}",
+      "modes": {
+        "walk": "à pied",
+        "transit": "bus",
+        "car": "en voiture"
+      },
+      "pourYAller": "Pour y aller : {mode}, {duree}",
+      "pourYAllerEstime": "Pour y aller : {mode}, environ {duree} (estimation)",
+      "pourYAllerSansDuree": "Pour y aller : {mode}, durée à confirmer",
       "itineraire": "Itinéraire",
       "itineraireNom": "Itinéraire vers {name} (nouvelle fenêtre)",
       "plusDEtape": "Plus d'étape aujourd'hui.",

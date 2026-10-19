@@ -341,7 +341,7 @@ export interface Stop {
 
 export interface Segment {
   mode: "walk" | "transit" | "car";
-  minutes: number;
+  minutes: number | null;      // null : durée à confirmer (prototype seulement, décisions 0092 § 4 et 0095)
   estimated: boolean;          // affiche « (estimation) »
 }
 
@@ -360,7 +360,7 @@ export interface Day {
   budgetPerPerson?: number;
   events: Stop[];              // kind: "event", du jour seulement
   generating: boolean;
-  travelMinutes: number;       // total des trajets du jour, hors excursion
+  travelMinutes: number | null; // total des trajets du jour, hors excursion ; null : total à confirmer (prototype, 0092, 0095)
   travelBudgetMinutes: number; // budget du rythme choisi (à calibrer, D14)
 }
 
@@ -442,7 +442,7 @@ Noms en `snake_case`, propriétés sans donnée personnelle. Ils alimentent les 
 |---|---|
 | `brief_completed` | `inferred_fields_count`, `edited_fields_count` |
 | `preview_ready` | `duration_ms` |
-| `deck_decision` | `decision: like \| dislike`, `kind`, `category`, `position`, `gesture: swipe \| button \| key`, `travel_minutes`, `reason?` (`too_far`…) |
+| `deck_decision` | `decision: like \| dislike`, `kind`, `category`, `position`, `gesture: swipe \| button \| key`, `travel_minutes?` (absent si la durée est inconnue, décision 0092), `reason?` (`too_far`…) |
 | `deck_undo` | `position` |
 | `deck_skipped` | `position` |
 | `preference_prompt_answered` | `category` (dont `distance`), `answer: yes \| no`, `reason?` |

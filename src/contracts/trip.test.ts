@@ -44,7 +44,8 @@ interface HandoverStop {
   /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
   commitment?: "ticket" | "reservation";
 }
-interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number; estimated: boolean }
+/** `minutes` et `Day.travelMinutes` : `null` pour un temps indisponible (prototype seulement, décision 0092 § 4). */
+interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number | null; estimated: boolean }
 type HandoverDayLineItem =
   | { type: "terminus"; role: "start" | "end"; time: string; label: string }
   | { type: "stop"; stop: HandoverStop }
@@ -59,7 +60,7 @@ interface HandoverDay {
   budgetPerPerson?: number;
   events: HandoverStop[];
   generating: boolean;
-  travelMinutes: number;
+  travelMinutes: number | null;
   travelBudgetMinutes: number;
   /** Ajout signalé (décision 0015, § 3), comme Trip.organizationId. */
   surprise?: HandoverSurpriseIdea;
@@ -352,6 +353,22 @@ describe("DaySchema", () => {
     }
   });
 
+  it("durée à confirmer (décision 0092 § 4) : Segment.minutes et Day.travelMinutes acceptent null ; refusent undefined, une chaîne, un négatif", () => {
+    const avecMinutes = (minutes: unknown) => ({
+      ...validDay,
+      items: [validDay.items[0], { type: "segment", segment: { mode: "walk", minutes, estimated: false } }, validDay.items[2]],
+    });
+    expect(DaySchema.parse(avecMinutes(null)).items[1]).toEqual({ type: "segment", segment: { mode: "walk", minutes: null, estimated: false } });
+    expect(DaySchema.parse({ ...validDay, travelMinutes: null }).travelMinutes).toBeNull();
+    for (const invalide of [undefined, "20", -1]) {
+      expect(DaySchema.safeParse(avecMinutes(invalide)).success, `minutes ${String(invalide)}`).toBe(false);
+      expect(DaySchema.safeParse({ ...validDay, travelMinutes: invalide }).success, `travelMinutes ${String(invalide)}`).toBe(false);
+    }
+    // Clé absente : refusée (null se dit explicitement, jamais par omission).
+    expect(DaySchema.safeParse({ ...validDay, items: [{ type: "segment", segment: { mode: "walk", estimated: false } }] }).success).toBe(false);
+    expect(DaySchema.safeParse(Object.fromEntries(Object.entries(validDay).filter(([cle]) => cle !== "travelMinutes"))).success).toBe(false);
+  });
+
   it("refuse une date non ISO", () => {
     expect(DaySchema.safeParse({ ...validDay, date: "29.08.2026" }).success).toBe(false);
     expect(DaySchema.safeParse({ ...validDay, date: "2026-02-30" }).success).toBe(false);
@@ -388,6 +405,13 @@ describe("ProposalSchema", () => {
       detour: "[À 25 min de ton hôtel en bus, sur ton chemin vers …]",
     };
     expect(ProposalSchema.safeParse(proposal).success).toBe(true);
+  });
+
+  it("refineDetour : trajet sans durée (minutes: null, décision 0092 § 4) accepté sans detour, jamais compté comme un détour", () => {
+    const proposal = { ...validProposal, travelFromPrevious: { ...bus25, minutes: null } };
+    expect(ProposalSchema.safeParse(proposal).success).toBe(true);
+    expect(ProposalSchema.parse(proposal).travelFromPrevious?.minutes).toBeNull();
+    expect(ProposalSchema.safeParse({ ...validProposal, travelFromPrevious: { ...bus25, minutes: "25" } }).success).toBe(false);
   });
 
   it("accepte 20 min pile sans detour", () => {
