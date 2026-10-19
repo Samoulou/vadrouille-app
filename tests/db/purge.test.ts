@@ -65,7 +65,7 @@ describe("purge: vadrouille_app ne peut pas purger une autre organisation", () =
     const member = shared.members[0];
     await inTx(app, { org: shared.org, user: shared.owner }, (c) =>
       c.query(
-        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults) VALUES ($1, $2, gen_random_uuid(), 'Porto', '2027-06-01', '2027-06-03', 2)",
+        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults, time_zone) VALUES ($1, $2, gen_random_uuid(), 'Porto', '2027-06-01', '2027-06-03', 2, 'Europe/Lisbon')",
         [shared.org, shared.owner],
       ),
     );

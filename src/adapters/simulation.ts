@@ -128,6 +128,8 @@ export interface LaunchRecord {
   requestId: string;
   tripId: string;
   launchedAt: number;
+  /** Nouvel essai (`retryGeneration`, B9-PO-9) : la suite d'états rejouée aboutit (`ready`), quelle que soit l'issue réglée. */
+  retry?: boolean;
 }
 
 export interface CreationStore {

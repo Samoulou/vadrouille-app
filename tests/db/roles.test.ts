@@ -51,6 +51,8 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     checklist_items: SIUD,
     preferences: SIUD,
     stays: SIUD,
+    // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
+    trip_commitments: SIUD,
     ...Object.fromEntries(
       ["trips", "briefs", "generation_runs", "research_runs", "candidates", "event_occurrences", "feedback", "preference_signals", "share_links"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],

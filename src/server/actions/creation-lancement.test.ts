@@ -9,7 +9,7 @@ import { MOCK_AUTH_CODE, MOCK_KNOWN_EMAIL } from "@/mocks/auth-simule";
 import { MOCK_DEMO_TRIP_DRAFT, MOCK_GENERATION_STEP_MS, MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
 
 import { hasSession, requestCode, verifyCode } from "./compte";
-import { createTrip, getGenerationStatus } from "./creation";
+import { createTrip, getGenerationStatus, retryGeneration } from "./creation";
 
 const scopeName = vi.hoisted(() => ({ value: "lancement-1" }));
 vi.mock("next/headers", () => ({
@@ -240,6 +240,68 @@ describe("getGenerationStatus", () => {
       }),
     } as never);
     expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toEqual(fail("provider_error"));
+  });
+});
+
+describe("retryGeneration (B9b, B9-PO-9)", () => {
+  const RETRY = { tripId: "mock_trip_edimbourg", requestId: "7d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09" };
+
+  it("après un échec réessayable : le même voyage, la suite d'états reprend", async () => {
+    configureGeneration(scopeName.value, "failed");
+    await signIn();
+    await createTrip(REQUEST);
+    advanceClock(scopeName.value, 3 * MOCK_GENERATION_STEP_MS);
+    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toMatchObject({ ok: true, value: { phase: "failed", retryable: true } });
+    expect(await retryGeneration(RETRY)).toEqual({ ok: true, value: { tripId: "mock_trip_edimbourg" } });
+    expect(await getGenerationStatus({ tripId: "mock_trip_edimbourg" })).toMatchObject({ ok: true, value: { phase: "preparing" } });
+  });
+
+  it("rien à relancer : validation_failed ; voyage inconnu : not_found", async () => {
+    await signIn();
+    await createTrip(REQUEST);
+    expect(await retryGeneration(RETRY)).toEqual(fail("validation_failed"));
+    expect(await retryGeneration({ ...RETRY, tripId: "mock_trip_inconnu" })).toEqual(fail("not_found"));
+  });
+
+  it.each([
+    ["requestId mal formé", { ...RETRY, requestId: "x" }],
+    ["kind inconnu", { ...RETRY, kind: "mini" }],
+    ["champ inconnu", { ...RETRY, organizationId: "mock_org_autre" }],
+  ])("%s : validation_failed sans appeler l'adaptateur", async (_label, input) => {
+    await signIn();
+    vi.mocked(adapters.getCreationAdapter).mockClear();
+    expect(await retryGeneration(input)).toMatchObject({ ok: false, error: { code: "validation_failed" } });
+    expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
+  });
+
+  it("conflit reconstruit avec le seul voyage en préparation ; sortie d'un autre voyage : provider_error", async () => {
+    await signIn();
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({
+      retryGeneration: async () => ({ ok: false, error: { code: "active_preview_exists", activeTripId: "mock_trip_autre", retryable: true } }),
+    } as never);
+    expect(await retryGeneration(RETRY)).toEqual(conflict("mock_trip_autre"));
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({
+      retryGeneration: async () => ({ ok: true, value: { tripId: "mock_trip_autre" } }),
+    } as never);
+    expect(await retryGeneration(RETRY)).toEqual(fail("provider_error"));
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({
+      retryGeneration: async () => ({ ok: false, error: { code: "unauthenticated" } }),
+    } as never);
+    expect(await retryGeneration(RETRY)).toEqual(fail("provider_error"));
+  });
+});
+
+describe("createTrip : refus de l'adaptateur sur un champ (B9b)", () => {
+  it("validation_failed transmis avec un champ de la forme de parseInput, sans autre valeur", async () => {
+    await signIn();
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({
+      createTrip: async () => ({ ok: false, error: { code: "validation_failed", field: "draft.otherCities.0.name" } }),
+    } as never);
+    expect(await createTrip(REQUEST)).toEqual(fail("validation_failed", "draft.otherCities.0.name"));
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({
+      createTrip: async () => ({ ok: false, error: { code: "validation_failed", field: "draft[0] <script>" } }),
+    } as never);
+    expect(await createTrip(REQUEST)).toEqual(fail("validation_failed"));
   });
 });
 
