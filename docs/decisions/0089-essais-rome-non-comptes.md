@@ -1,5 +1,7 @@
 # 0089 — Les deux exécutions réelles Rome ratées du 2026-10-18 ne comptent pas pour G0
 
+**Concernée par 0093 point 2** (PR #512) : une exécution qui n'écrit aucun programme ne compte plus jamais pour G0 ; plus de décision au cas par cas. Les exclusions ci-dessous restent valables.
+
 Statut : décidée par Samuel (le décompte de P0a2 relève des phases G0, réservées à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion, sans délai de veto (c'est la décision de Samuel lui-même). Le mécanisme (§ « Mise en œuvre ») est un choix d'outillage soumis au Tech Lead.
 
 Date : 2026-10-18 · Décideur : Samuel · Rédacteur : Product Owner (pour le CEO) · Source : fil « Routine cycle du studio », projet Vadrouille (carte de décision ci-dessous) · Ticket : #493 · Diagnostic : note de l'IA-recherche « Diagnostic des exécutions Rome de l'après-midi (2026-10-18) » (fichier du projet `essai-reel/diagnostic-rome-2.md`, hors dépôt) · Précédent : décision 0070

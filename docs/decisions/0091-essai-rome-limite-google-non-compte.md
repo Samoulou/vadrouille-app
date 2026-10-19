@@ -1,5 +1,7 @@
 # 0091 — L'exécution réelle Rome arrêtée par la limite Google le soir du 2026-10-18 ne compte pas pour G0
 
+**Concernée par 0093 point 2** (PR #512) : une exécution qui n'écrit aucun programme ne compte plus jamais pour G0 ; plus de décision au cas par cas. L'exclusion ci-dessous reste valable.
+
 Statut : décidée par Samuel (le décompte de P0a2 relève des phases G0, réservées à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; définitive dès sa fusion, sans délai de veto (c'est la décision de Samuel lui-même). Le mécanisme (§ « Mise en œuvre ») est celui de 0089, choix d'outillage soumis au Tech Lead.
 
 Date : 2026-10-18 · Décideur : Samuel · Rédacteur : Product Owner (pour le CEO) · Source : carte de décision du projet Vadrouille (ci-dessous) · Précédents : décisions 0070 et 0089

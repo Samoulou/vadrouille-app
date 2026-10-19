@@ -40,7 +40,7 @@ Ces questions vont dans `#studio` et dans `QUESTIONS.md` (par le CEO) ; le studi
 - Product Owner : détails fonctionnels, dans le cadre du cadrage.
 - CEO : ordre des tâches.
 
-Une décision déléguée est écrite dans `docs/decisions/` ou dans la spécification, listée dans la note de version suivante (rubrique « Décisions prises par le studio ») et devient définitive sans veto de Samuel 6 heures après sa fusion (décision 0068).
+Une décision déléguée est écrite dans `docs/decisions/` ou dans la spécification, listée dans la note de version suivante (rubrique « Décisions prises par le studio ») et devient définitive dès sa fusion, sans délai de veto ; Samuel peut la remettre en cause à tout moment, par une nouvelle décision (décision 0093, qui remplace le délai de 6 heures de 0068).
 Tout ce qui engage de l'argent, un compte externe ou des données personnelles hors UE remonte à Samuel, même dans un domaine délégué.
 
 ## Où trouver quoi
