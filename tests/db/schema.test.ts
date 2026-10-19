@@ -141,9 +141,10 @@ describe("schéma", () => {
   });
 
   it("schéma: aucune colonne de contenu Google", async () => {
-    // Handover § 6, « Colonnes interdites ». Seule exception admise : place_coordinates.lat et .lng (cache de
-    // 30 jours au plus, décision 0011 point 6), inactive tant que B8 n'a pas créé la table.
-    const ALLOWED = new Set(["place_coordinates.lat", "place_coordinates.lng"]);
+    // Handover back-end § 6, « Colonnes interdites » : seules exceptions, place_coordinates.lat et .lng (cache de
+    // 30 jours au plus, décision 0011 point 6) et stays.area_center_lat et .area_center_lng (centre d'une zone maison,
+    // valeurs du client non fiables ; conditions (a) à (c) du handover ; tout envoi à Google : 0087 § 3 point 4).
+    const ALLOWED = new Set(["place_coordinates.lat", "place_coordinates.lng", "stays.area_center_lat", "stays.area_center_lng"]);
     const PATTERNS = [
       /rating/,
       /review/,
