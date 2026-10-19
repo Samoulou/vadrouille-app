@@ -302,7 +302,9 @@ describe("p0: séparation des capacités de la composition (types)", () => {
 
   it("rédaction des raisons : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
     expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"entree" | "retenus" | "complement">();
-    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine">();
+    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<
+      "id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine" | "secteur" | "incontournable"
+    >();
     type Lieu = EntreeRaisons["retenus"][number];
     // Aucun champ d'ancrage, de fiche ni de trajet dans ce qu'un prompt peut recevoir.
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");

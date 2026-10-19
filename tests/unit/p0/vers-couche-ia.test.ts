@@ -166,11 +166,15 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
       expect(requetePlan(entree, modele, ROUTAGE, complement)).toEqual(requeteAvant("plan", PROMPT_PLAN, modele, { brief: avant.briefPourRecherche(brief) }));
       const donneesRecherche = {
         tour: 2,
-        plan: [{ requete: "musées Édimbourg", creneau: "activity" }],
+        plan: {
+          secteurs: [{ nom: "Vieille ville", voisins: ["Ville neuve"], incontournables: ["Forteresse"] }],
+          requetes: [{ requete: "musées Édimbourg", creneau: "activity", secteur: "Vieille ville" }],
+        },
         resultats: [{ url: "https://guide.example/musees", titre: "Musées", extrait: "Extrait." }],
         pages: [{ url: "https://guide.example/musees", texte: "Texte de page." }],
         dejaTrouves: ["Musée maison"],
         manquants: { activity: 1, meal: 2, evening: 0 },
+        secteurs: [{ nom: "Vieille ville", manquants: { activity: 1, meal: 2, evening: 0 }, incontournablesSansCandidat: ["Forteresse"] }],
       };
       expect(requeteRecherche({ entree, ...donneesRecherche }, modele, ROUTAGE, complement)).toEqual(
         requeteAvant("recherche", PROMPT_RECHERCHE, modele, { brief: avant.briefPourRecherche(brief), ...donneesRecherche }),
@@ -178,7 +182,7 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
       expect(requeteNotation(entree, CANDIDATS.map(candidatPourModele), modele, ROUTAGE, complement)).toEqual(
         requeteAvant("notation", PROMPT_NOTATION, modele, { brief: avant.briefPourModele(brief), candidats: CANDIDATS.map(vuePourModele) }),
       );
-      expect(requeteRaisons(entree, CANDIDATS.map(lieuRetenuDepuisCandidat), modele, ROUTAGE, complement)).toEqual(
+      expect(requeteRaisons(entree, CANDIDATS.map((candidat) => lieuRetenuDepuisCandidat(candidat)), modele, ROUTAGE, complement)).toEqual(
         requeteAvant("raisons", PROMPT_RAISONS, modele, {
           brief: avant.briefPourModele(brief),
           lieux: CANDIDATS.map((candidat) => ({ ...vuePourModele(candidat), sourceDomaine: new URL(candidat.source.url).hostname })),
@@ -196,7 +200,7 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
       expect(octets(requeteNotation(entree, CANDIDATS.map(candidatPourModele), modele, ROUTAGE, complement))).toStrictEqual(
         octets(requeteAvant("notation", PROMPT_NOTATION, modele, { brief: avant.briefPourModele(brief), candidats: CANDIDATS.map(vuePourModele) })),
       );
-      expect(octets(requeteRaisons(entree, CANDIDATS.map(lieuRetenuDepuisCandidat), modele, ROUTAGE, complement))).toStrictEqual(
+      expect(octets(requeteRaisons(entree, CANDIDATS.map((candidat) => lieuRetenuDepuisCandidat(candidat)), modele, ROUTAGE, complement))).toStrictEqual(
         octets(
           requeteAvant("raisons", PROMPT_RAISONS, modele, {
             brief: avant.briefPourModele(brief),

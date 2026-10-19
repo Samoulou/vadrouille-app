@@ -1,0 +1,347 @@
+{
+  "coutParRequeteUsd": 0.002,
+  "plan": {
+    "secteurs": [
+      {
+        "nom": "Port et vieille ville",
+        "raison": "Le port, ses ruelles blanches et ses tavernes.",
+        "voisins": [
+          "Plages de l'ouest"
+        ],
+        "incontournables": [
+          "Belvédère du couchant"
+        ]
+      },
+      {
+        "nom": "Plages de l'ouest",
+        "raison": "Les longues plages de sable au sud du port.",
+        "voisins": [
+          "Port et vieille ville",
+          "Villages de la montagne"
+        ],
+        "incontournables": [
+          "Grande plage de sable"
+        ]
+      },
+      {
+        "nom": "Villages de la montagne",
+        "raison": "Les villages de pierre et de marbre de l'intérieur.",
+        "voisins": [
+          "Plages de l'ouest",
+          "Côte nord"
+        ],
+        "incontournables": [
+          "Village de marbre à arpenter",
+          "Fromagerie du plateau"
+        ]
+      },
+      {
+        "nom": "Côte nord",
+        "raison": "Une côte sauvage, ses criques et ses sentiers.",
+        "voisins": [
+          "Villages de la montagne"
+        ],
+        "incontournables": []
+      }
+    ],
+    "requetes": [
+      {
+        "requete": "point de vue coucher du soleil port",
+        "creneau": "activity",
+        "secteur": "Port et vieille ville"
+      },
+      {
+        "requete": "tavernes du port poisson grillé",
+        "creneau": "meal",
+        "secteur": "Port et vieille ville"
+      },
+      {
+        "requete": "bars du port en terrasse",
+        "creneau": "evening",
+        "secteur": "Port et vieille ville"
+      },
+      {
+        "requete": "plus belle plage de sable ouest",
+        "creneau": "activity",
+        "secteur": "Plages de l'ouest"
+      },
+      {
+        "requete": "tavernes de plage",
+        "creneau": "meal",
+        "secteur": "Plages de l'ouest"
+      },
+      {
+        "requete": "village de marbre et fromagerie de montagne",
+        "creneau": "activity",
+        "secteur": "Villages de la montagne"
+      },
+      {
+        "requete": "tavernes de village spécialités",
+        "creneau": "meal",
+        "secteur": "Villages de la montagne"
+      },
+      {
+        "requete": "sentiers et criques de la côte nord",
+        "creneau": "activity",
+        "secteur": "Côte nord"
+      },
+      {
+        "requete": "fêtes de village fin mai",
+        "creneau": "event",
+        "secteur": null
+      }
+    ]
+  },
+  "recherche": [
+    {
+      "actions": [
+        {
+          "type": "rechercher",
+          "requete": "point de vue coucher du soleil port"
+        },
+        {
+          "type": "rechercher",
+          "requete": "tavernes du port poisson grillé"
+        },
+        {
+          "type": "rechercher",
+          "requete": "bars du port en terrasse"
+        },
+        {
+          "type": "rechercher",
+          "requete": "plus belle plage de sable ouest"
+        },
+        {
+          "type": "rechercher",
+          "requete": "tavernes de plage"
+        },
+        {
+          "type": "rechercher",
+          "requete": "village de marbre et fromagerie de montagne"
+        },
+        {
+          "type": "rechercher",
+          "requete": "tavernes de village spécialités"
+        },
+        {
+          "type": "rechercher",
+          "requete": "sentiers et criques de la côte nord"
+        },
+        {
+          "type": "rechercher",
+          "requete": "fêtes de village fin mai"
+        },
+        {
+          "type": "lire",
+          "url": "https://ile-fabriquee.example/grande-plage"
+        }
+      ],
+      "candidats": [],
+      "termine": false
+    },
+    {
+      "actions": [],
+      "candidats": [
+        {
+          "nom": "Belvédère du couchant",
+          "resume": "Une porte de marbre antique sur un îlot, face au soleil couchant.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/belvedere",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Port et vieille ville",
+          "incontournable": "Belvédère du couchant",
+          "prix": "gratuit",
+          "horaires": "accès libre",
+          "conseil": "Arriver une demi-heure avant le coucher du soleil",
+          "prixParPersonne": 0,
+          "dureeMinutes": 45
+        },
+        {
+          "nom": "Ruelles du vieux bourg",
+          "resume": "Un dédale de ruelles blanches qui monte vers le château.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/ruelles",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Port et vieille ville",
+          "incontournable": null,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Taverne du Quai",
+          "resume": "Une taverne de poisson grillé sur le port.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://ile-fabriquee.example/taverne-quai",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Port et vieille ville",
+          "incontournable": null,
+          "prix": "environ 20 € par personne"
+        },
+        {
+          "nom": "Bar de la Jetée",
+          "resume": "Un bar en terrasse au bout de la jetée.",
+          "categorie": "nightlife",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/bar-jetee",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "evening"
+          ],
+          "secteur": "Port et vieille ville",
+          "incontournable": null,
+          "horaires": "dès 19 h"
+        },
+        {
+          "nom": "Grande plage de sable",
+          "resume": "Une longue plage de sable fin aux eaux peu profondes.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/grande-plage",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Plages de l'ouest",
+          "incontournable": "Grande plage de sable",
+          "prix": "accès libre, transats 10 € la journée",
+          "conseil": "Prendre un parasol, il y a très peu d'ombre",
+          "dureeMinutes": 180
+        },
+        {
+          "nom": "Crique des Pins",
+          "resume": "Une petite crique abritée, plus calme que la grande plage.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/crique-pins",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Plages de l'ouest",
+          "incontournable": null,
+          "dureeMinutes": 120
+        },
+        {
+          "nom": "Taverne des Dunes",
+          "resume": "Une taverne de plage aux salades et grillades.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://ile-fabriquee.example/taverne-dunes",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Plages de l'ouest",
+          "incontournable": null,
+          "horaires": "12 h – 17 h"
+        },
+        {
+          "nom": "Village de marbre à arpenter",
+          "resume": "Un village de montagne aux ruelles pavées de marbre et aux églises blanches.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/village-marbre",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Villages de la montagne",
+          "incontournable": "Village de marbre à arpenter",
+          "prix": "gratuit",
+          "horaires": "accès libre",
+          "conseil": "Garer la voiture à l'entrée du village",
+          "prixParPersonne": 0,
+          "dureeMinutes": 90
+        },
+        {
+          "nom": "Fromagerie du plateau",
+          "resume": "Une fromagerie de montagne qui fait goûter ses fromages de brebis.",
+          "categorie": "tasting",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/fromagerie",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Villages de la montagne",
+          "incontournable": "Fromagerie du plateau",
+          "prix": "8 € la dégustation",
+          "horaires": "10 h – 18 h, fermée le dimanche",
+          "conseil": "Appeler la veille pour un groupe",
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Sentier des terrasses",
+          "resume": "Un sentier entre les terrasses d'oliviers au-dessus du village.",
+          "categorie": "walk",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/sentier-terrasses",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Villages de la montagne",
+          "incontournable": null,
+          "dureeMinutes": 60
+        },
+        {
+          "nom": "Taverne de la Place",
+          "resume": "Une taverne de village à l'ombre d'un platane.",
+          "categorie": "restaurant",
+          "typeEtape": "meal",
+          "sourceUrl": "https://ile-fabriquee.example/taverne-place",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "meal"
+          ],
+          "secteur": "Villages de la montagne",
+          "incontournable": null
+        },
+        {
+          "nom": "Criques sauvages du nord",
+          "resume": "Une succession de criques au pied des falaises.",
+          "categorie": "nature",
+          "typeEtape": "activity",
+          "sourceUrl": "https://ile-fabriquee.example/criques-nord",
+          "sourceDate": "2026-09-20",
+          "aReserver": false,
+          "slotFit": [
+            "activity"
+          ],
+          "secteur": "Côte nord",
+          "incontournable": null,
+          "dureeMinutes": 120
+        }
+      ],
+      "termine": true
+    }
+  ],
+  "notes": {},
+  "notesParDefaut": {
+    "matchesWishes": true,
+    "notForMeRisk": 3,
+    "mustSee": false
+  }
+}
