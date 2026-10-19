@@ -1,5 +1,7 @@
 # 0081 — Décisions du Tech Lead pour B9 (B9-TL-1 à B9-TL-14), dont l'organisation des actions sans compte (B7-TL-10) et la reprise de la suite du paiement (B4-TL-12)
 
+**B9-TL-1 point 1 amendé par 0096** (ticket #524, § 3 point 1) : les bornes de recherche des profils `apercu`, `complet` et `mini` vont dans `src/server/config/ia.ts` (B7-TL-8), les plafonds dans `usage.ts` (0083) ; `src/server/config/generation.ts` ne garde que ses constantes de génération.
+
 Statut : décision déléguée (architecture, schéma, bibliothèques, outillage et tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel 6 heures après sa fusion (décision 0068), **sauf** les points marqués « non tranché : Samuel », qui restent des questions (voir « Ce qui n'est pas tranché ici »).
 
 Date : 2026-10-17 · Décideur : Tech Lead · Ticket : #433 · Spécification : `specs/B9-generation.md` (#429, ticket #426, fusionnée en `8c2bd6e`), section « Propositions au Tech Lead » et question 3 · Répond aussi à **B7-TL-10** (`specs/B7-couche-ia-recherche.md` l. 258, attendue par B7c), à **B4-TL-12** (`specs/B4-paiement-simule.md` l. 226-229) et à la **question 1 de 0078** (l. 75)
