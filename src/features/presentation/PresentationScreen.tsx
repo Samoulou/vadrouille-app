@@ -176,6 +176,9 @@ function Deck({
     if (!card || state.prompt || state.pending) return;
     returnFocusRef.current = from === "card" ? null : (document.activeElement as HTMLElement | null);
     dispatch({ type: "decide", decision });
+    // Durée inconnue (`minutes: null`, prototype, décision 0092 § 4 point 3) : `travel_minutes` n'est pas envoyé,
+    // jamais 0. Sans `travelFromPrevious`, 0 comme avant (comportement de F6, inchangé).
+    const minutes = card.travelFromPrevious === undefined ? 0 : card.travelFromPrevious.minutes;
     track({
       name: "deck_decision",
       properties: {
@@ -184,7 +187,7 @@ function Deck({
         category: card.category,
         position,
         gesture,
-        travel_minutes: card.travelFromPrevious?.minutes ?? 0,
+        ...(minutes === null ? {} : { travel_minutes: minutes }),
       },
     });
     requestFocus(from);

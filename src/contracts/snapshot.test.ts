@@ -134,12 +134,24 @@ describe("instantané et enregistrement de proposition", () => {
       modifier(snapshot);
       expect(TripSnapshotSchema.safeParse(snapshot).success, nom).toBe(false);
     }
+    // Durée à confirmer (`null`, décision 0092 § 4) : la clé reste refusée, même sans valeur. `strictObject` refuse
+    // la clé `minutes` (ou `travelMinutes`) quelle que soit sa valeur ; rien de plus n'est stocké côté MVP.
+    const minutesNull = clone(base);
+    const jour = jourComplet(minutesNull).day;
+    (((jour.items as Json[]).find((i) => i.type === "segment") as Json).segment as Json).minutes = null;
+    expect(TripSnapshotSchema.safeParse(minutesNull).success, "minutes: null dans un trajet").toBe(false);
+    const totalNull = clone(base);
+    jourComplet(totalNull).day.travelMinutes = null;
+    expect(TripSnapshotSchema.safeParse(totalNull).success, "travelMinutes: null dans un jour").toBe(false);
 
     const record = enregistrement(premierePropositionAvecTrajet());
     expect(ProposalRecordSchema.safeParse(record).success).toBe(true);
     const avecMinutes = clone(record);
     (avecMinutes.travelFromPrevious as Json).minutes = 25;
     expect(ProposalRecordSchema.safeParse(avecMinutes).success).toBe(false);
+    const minutesNulles = clone(record);
+    (minutesNulles.travelFromPrevious as Json).minutes = null;
+    expect(ProposalRecordSchema.safeParse(minutesNulles).success, "travelFromPrevious.minutes: null").toBe(false);
     const avecControle = clone(record);
     (avecControle.stop as Json).verifiedAt = "2026-08-01";
     expect(ProposalRecordSchema.safeParse(avecControle).success).toBe(false);

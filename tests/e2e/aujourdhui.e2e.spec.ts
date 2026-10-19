@@ -49,7 +49,7 @@ test("aujourdhui: prochaine étape", async ({ page }) => {
   const next = region(page, "Prochaine étape");
   await expect(next).toContainText("10:50 – 11:50");
   await expect(next).toContainText("[Dean Village]");
-  await expect(next.locator("[data-part='pour-y-aller']")).toHaveText("Pour y aller : À pied, 20 min");
+  await expect(next.locator("[data-part='pour-y-aller']")).toHaveText("Pour y aller : à pied, 20 min"); // casse : décision 0095 § 2
   const itinerary = next.getByRole("link", { name: /^Itinéraire/ });
   await expect(itinerary).toHaveAttribute("target", "_blank");
   const rel = (await itinerary.getAttribute("rel")) ?? "";

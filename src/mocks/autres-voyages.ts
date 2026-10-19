@@ -34,6 +34,12 @@ interface DayPlan {
   afternoon?: PlannedStop;
 }
 
+/** Durée d'un trajet simulé : toujours connue (le MVP ne produit jamais `null`, décision 0092 § 4), jamais remplacée par 0. */
+function minutesConnues(minutes: number | null): number {
+  if (minutes === null) throw new Error("trajet simulé sans durée");
+  return minutes;
+}
+
 const walk = (minutes: number): DayLineItem => ({ type: "segment", segment: { mode: "walk", minutes, estimated: false } });
 
 function stop(id: string, kind: Stop["kind"], planned: PlannedStop, start: string, end: string): DayLineItem {
@@ -62,7 +68,7 @@ function buildDays(prefix: string, hotel: string, plans: readonly DayPlan[]): Da
       items.push(walk(15), stop(id("apres-midi"), "activity", plan.afternoon, "14:30", "16:30"));
     }
     items.push(walk(20), { type: "terminus", role: "end", time: plan.afternoon ? "17:00" : "14:15", label: hotel });
-    const travelMinutes = items.reduce((total, item) => total + (item.type === "segment" ? (item.segment.minutes ?? 0) : 0), 0);
+    const travelMinutes = items.reduce((total, item) => total + (item.type === "segment" ? minutesConnues(item.segment.minutes) : 0), 0);
     return {
       index,
       date: plan.date,
