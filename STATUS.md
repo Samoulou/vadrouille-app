@@ -1,36 +1,37 @@
-# État du studio — 2026-10-20 (113e cycle)
+# État du studio — 2026-10-20 (114e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 11 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 12 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message nouveau depuis le 112e cycle (projet et #studio). Samuel a posé `owner-approved` sur #536 (migrations 0011 et 0012 approuvées dans `db-migrate`), fusionnée.
+- Aucun message nouveau depuis le 113e cycle (projet et #studio).
 
 ## Fait
-- Fusionnées : **B8b** (#554, lecture réelle des journées et carte), **#536** (migrations 0011 et 0012 dans `db-migrate`, Q509), **0101** (#549), **spécification B9 alignée** (#556, B9-PO-19 : `activeTripId`, expiration), statut du 112e cycle (#555).
-- PR ouverte : **0102** (#557, conception de la tâche A2 de 0093), changements demandés.
-- Disque de la machine des agents libéré (caches de construction des branches fusionnées).
+- Fusionnées : **0102** (#557, conception de la tâche A2 de 0093, variante prudente : plafonds Places gardés), **0103** (#560, verdict Sécurité sur les questions 1 à 5 de 0094 : table `run_secteurs` admise sous conditions), statut du 113e cycle (#558).
+- PR ouvertes : **B9c** (#563, aperçu, workflows 1, 2 et 3), **0104** (#559, réponses du Product Owner aux questions 6, 8 et 10 de 0094) ; changements demandés sur les deux.
+- Tickets ouverts : **#561** (`run_candidates` gardée 24 h après l'écriture du programme, constat de 0103) ; **#562** (Q-L2a, après 0104).
 
 ## En cours
-- backend : **B9c** (#522, aperçu, workflows 1, 2 et 3), le maillon central de l'appli de bout en bout.
-- tech-lead : **0102** (#557), correction 1 ; par défaut la variante prudente (plafonds Places gardés) tant que Samuel n'a pas répondu.
-- securite : **0103**, verdict sur les questions 1 à 5 de 0094 (Q508).
-- product-owner : **0104**, réponses aux questions 6, 8 et 10 de 0094 (Q508).
+- backend : **B9c** (#563), correction 1 (barrière des appels réels avant tout forfait, modules partagés au lieu de copies, critères de la spécification).
+- product-owner : **0104** (#559), correction 1.
+- ia-recherche : **tâche A2 de 0093** (#547), variante prudente de 0102.
+- data : **#561**, suppression de `run_candidates` à l'écriture du programme.
 
 ## Bloqué
-- **B4a** (#531) : prêt, mais pas dans le cycle de B9c (`env/index.ts` et règles de lint, spécification B9 « Ordre ») ; au prochain cycle si B9c n'est plus en cours de code, sinon dès sa fusion.
+- **B4a** (#531) : après la fusion de B9c (#563 touche `src/server/env/` et les listes du confinement).
 - **B6b** (#532) : après la suite de B3b (#548, `owner-approved` de Samuel) ; il fait aussi le branchement de la lecture réelle de B8b (0100 § 5.4).
-- **Q-L2a** : après 0103 (table `run_secteurs`) ; sa migration prend le numéro libre suivant.
-- **Affichage des voyages sur `p0-reel`** : #536 fusionnée ; reste `db-migrate` lancé par Samuel → report `main` → `p0-reel`.
-- **0093** : tâche C après Q518 et Q519 ; tâche A2 (#547) après 0102, la réponse de Samuel (Q525) et le verdict Sécurité ; A2-b après la décision UX/UI sur la colonne « relances ».
+- **Q-L2a** (#562) : après 0104 (#559).
+- **B9d, B9e** : après B9c.
+- **Affichage des voyages sur `p0-reel`** : reste `db-migrate` lancé par Samuel → report `main` → `p0-reel`.
+- **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI sur la colonne « relances » ; A2-c (plafonds Places) seulement si Samuel le décide (Q525).
 - **Purge du MVP et `coords-purge`** (#527) : Q438.
 
 ## Prochain cycle
-1. B9c jusqu'à la PR ; puis B9d et B9e.
-2. B4a ; B6b dès la fusion de #548 ; Q-L2a après 0103.
-3. Samuel : `owner-approved` sur #548 ; lancer `db-migrate` (0011, 0012) ; Q506, Q518 à Q520, Q525.
+1. B9c jusqu'à la fusion ; puis B4a, B9d.
+2. Q-L2a dès la fusion de 0104 ; B6b dès la fusion de #548.
+3. Samuel : `owner-approved` sur #548 ; lancer `db-migrate` (0011, 0012) ; Q506, Q518 à Q520, Q525, Q527.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : Q509 (lancer `db-migrate`, #536 étant fusionnée), `owner-approved` sur #548 (suite de B3b, approuvée par le Tech Lead, CI verte), Q525 (réserve Google et plafonds Places de la tâche A2), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
+- **Réponses demandées** : Q509 (lancer `db-migrate`, #536 étant fusionnée), `owner-approved` sur #548 (suite de B3b, approuvée par le Tech Lead, CI verte), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060) ; B8c est fusionnée, la purge attend cette réponse pour être activée.
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -49,7 +50,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q525 (tâche A2 de 0093, décision 0102) et Q526 (spécification B9, question 18).
+- Q527 (questions de B9c) et Q528 (questions de 0103) ; Q508 et Q525 mises à jour.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
