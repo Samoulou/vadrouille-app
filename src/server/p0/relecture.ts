@@ -20,7 +20,8 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  *
  * Décision 0092 § 4 : l'adaptateur ne l'appelle que pour les paires **sans temps conservé** (programme écrit avant la
  * migration `0011_trajets_prototype`, ou paire absente) ; toutes conservées, il n'est pas appelé. Il n'écrit jamais
- * les durées qu'il obtient (seule l'étape finale de `p0Run` écrit les temps).
+ * les durées qu'il obtient : l'étape finale de `p0Run` écrit les temps de l'exécution, et la source des programmes
+ * réels (`src/adapters/prototype-lecture.ts`) conserve ceux d'une relecture réussie (décision 0109).
  *
  * À **chaque** relecture, dans cet ordre, le premier refus l'emportant (refus : `{ ok: false }`, aucun appel Routes ;
  * l'adaptateur rend alors la page sans ces durées, 0092 § 4 point 3, jamais une durée inventée) :
@@ -35,7 +36,7 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  *    relectures confondues, `cadenceRelecture`). Une requête de matrice par lieu de départ et par mode, un élément par
  *    trajet distinct (jamais le produit de toutes les origines et destinations). Durées arrondies à la minute supérieure.
  *
- * Les durées sont des **données Google** : rendues à l'adaptateur seulement, jamais stockées, journalisées ni mises en
+ * Les durées sont des **données Google** : rendues à l'adaptateur seulement, jamais stockées par ce module, journalisées ni mises en
  * cache (pages `force-dynamic` : Next.js répond `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
  * vérifié par `tests/e2e/lecture-reelle.e2e.spec.ts`). Un refus après la garde écrit `p0.read_unavailable`
  * avec un nom fermé seulement (`PurgeAncienne`, `PlafondAtteint`, `ReservationImpossible`, ou le nom de l'erreur du
