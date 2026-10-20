@@ -14,6 +14,8 @@ Correction 1 (revue consolidée du head `e1ce41d`) : deux bloquants traités (cl
 - **0011 § 2** (verdicts d'ancrage et « Revérification ») : étendu au MVP selon la répartition de 0055 § 6 point 3 (§ 4 ci-dessous) ;
 - **0011 § 5**, paragraphe « Relecture », dernière phrase (durée estimée « par le moteur ») : l'estimation est faite par B8 et passée au moteur par `duree` (0048 § 3.2 ; § 1.6 ci-dessous).
 
+**§ 1.6, § 1.8, § 1.12 et § 5 point 3 précisés ou amendés par 0100** (ticket #544) : § 1.6, la lecture mesure les couples de la demande, non la matrice (0100 § 1.5), et `PointTrajet` admet un `placeId` sans position (0100 § 1.6) ; § 1.8, `@/server/relecture/*` est aussi importable par `src/server/composition/lecture.ts` ; § 5 point 3, en lecture, la source de relectures de B8b remplace `recomposer.ts`, **dont le nom disparaît** (0100 § 5.1) ; B8-TL-4, TL-8, TL-9, la question 10 (b) et Q430 sont tranchées ; la forme de `recomposer.ts` devient celle d'une source de relectures (§ 5.1).
+
 ## Contexte
 La spécification B8 renvoie au Tech Lead dix propositions ; 0059 § 3 en exige quatre, plus la question 10 (a), avant le code de B8a. B8-TL-2 et B8-TL-3 sont tranchées par 0060 (B8c fusionnée). B8-TL-4, TL-8, TL-9 et la question 10 (b) attendent B8b ; B8-TL-10 attend la fin de P0. Principe appliqué partout : **l'agent cherche, l'ancrage vérifie, le moteur planifie** ; B8a réutilise le code de P0r3c au lieu de le recopier (0055 § 6 point 3 : « jamais recopiés »), et `pnpm p0`, `ancrage.ts` et `p0Run` gardent leur comportement.
 

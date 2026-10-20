@@ -240,7 +240,8 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
  * 30 requêtes de matrice et 840 éléments depuis 0088 § 13, 15 min), pour que tout brief passe en essai ; seul un voyage qui les
  * dépasserait est arrêté. Valeurs antérieures (P0S2-PO-12 amendé, ticket 355 : 0,30 USD, 6, 15, 12, 17, 14, 3, 120,
  * 5 min) : décision 0063, points 8 et 9. Ce sont des maxima : `essai.json` ne peut pas les dépasser ; un test vérifie
- * qu'ils restent égaux aux plafonds commités du mode réel.
+ * qu'ils restent égaux aux plafonds commités du mode réel. Depuis la décision 0093 (point 5), `essai.json` fixe `coutUsd` à
+ * 2 USD, sous la borne de 3 USD ci-dessous, qui reste inchangée (0073 point 2) ; les autres champs d'`essai.json` égalent leur borne.
  */
 export const BORNES_ESSAI = {
   coutUsd: 3,
