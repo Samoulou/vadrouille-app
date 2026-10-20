@@ -6,7 +6,7 @@ Statut : décision déléguée (architecture, schéma, bibliothèques, outillage
 
 Date : 2026-10-17 · Décideur : Tech Lead · Ticket : #433 · Spécification : `specs/B9-generation.md` (#429, ticket #426, fusionnée en `8c2bd6e`), section « Propositions au Tech Lead » et question 3 · Répond aussi à **B7-TL-10** (`specs/B7-couche-ia-recherche.md` l. 258, attendue par B7c), à **B4-TL-12** (`specs/B4-paiement-simule.md` l. 226-229) et à la **question 1 de 0078** (l. 75)
 
-**B9-TL-1 point 2 amendé par 0100** (ticket #544, § 5) : un chemin vers `src/grounding/` est aussi admis par `src/server/composition/lecture.ts`, composition de la lecture, importée par `src/adapters/index.ts` seulement.
+**B9-TL-1 point 2 amendé par 0100** (ticket #544, § 5) : un chemin vers `src/grounding/` est aussi admis par `src/server/composition/lecture.ts`, composition de la lecture, importée par `src/adapters/index.ts` seulement. **B9-TL-2 point 1 amendé par 0100** (§ 5.2) : `generation.ts` n'étant pas fusionnée (B9c), les clients Google (Places, Routes) sont construits par une **fabrique commune**, `src/server/composition/clients-google.ts` (nom libre), seul importateur de leurs modules de capacité, créée par B8b et reprise par B9c sans être recopiée.
 
 Numérotation (relue le 2026-10-17 sur `main` `8c2bd6e`) : `main` porte 0001 à 0080 ; les PR ouvertes #422 (release), #424 (B7a) et #432 (F8c) n'ajoutent aucun fichier sous `docs/decisions/`. Les numéros de ligne de code et de spécification cités sont ceux de `8c2bd6e` ; pour 0017 et 0048, qui reçoivent un renvoi de tête dans cette PR, cette décision cite des sections, pas des lignes. Correction 1 (revue consolidée du head `b9a9443`) : trois bloquants et neuf mineurs traités ; `main` relue à `8c2bd6e` (inchangée).
 
