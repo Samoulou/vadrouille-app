@@ -44,7 +44,7 @@ function setup(overrides: Partial<MockPaymentOptions> = {}) {
 }
 
 async function start(adapter: ReturnType<typeof setup>["adapter"], method: "twint" | "card" = "twint") {
-  const result = await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method });
+  const result = await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method, requestId: crypto.randomUUID() });
   if (!result.ok) throw new Error(result.error.code);
   return result.value.checkoutId;
 }
@@ -65,7 +65,7 @@ describe("offre", () => {
 describe("création", () => {
   it("paiement pending avec l'instantané du prix de la configuration et une adresse de l'application", async () => {
     const { adapter } = setup();
-    const created = await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method: "card" });
+    const created = await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method: "card", requestId: crypto.randomUUID() });
     expect(created).toEqual({
       ok: true,
       value: { checkoutId: "checkout00000000000001", redirectUrl: `/voyages/${EDIMBOURG_TRIP_ID}/debloquer/paiement-simule/checkout00000000000001` },
@@ -86,20 +86,20 @@ describe("création", () => {
 
   it("not_found pour une autre organisation, sans paiement créé", async () => {
     const { adapter, state } = setup();
-    expect(await adapter.createCheckout(otherCtx, { tripId: EDIMBOURG_TRIP_ID, method: "card" })).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await adapter.createCheckout(otherCtx, { tripId: EDIMBOURG_TRIP_ID, method: "card", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "not_found" } });
     expect(state.checkouts.size).toBe(0);
   });
 
   it("already_unlocked pour un voyage débloqué dans les données ou par un droit, sans paiement créé", async () => {
     const { adapter, state } = setup();
-    expect(await adapter.createCheckout(ctx, { tripId: EDIMBOURG_DEBLOQUE_TRIP_ID, method: "card" })).toEqual({
+    expect(await adapter.createCheckout(ctx, { tripId: EDIMBOURG_DEBLOQUE_TRIP_ID, method: "card", requestId: crypto.randomUUID() })).toEqual({
       ok: false,
       error: { code: "already_unlocked" },
     });
     const id = await start(adapter);
     await adapter.simulateOutcome(ctx, id, "succeeded");
     const size = state.checkouts.size;
-    expect(await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method: "card" })).toEqual({
+    expect(await adapter.createCheckout(ctx, { tripId: EDIMBOURG_TRIP_ID, method: "card", requestId: crypto.randomUUID() })).toEqual({
       ok: false,
       error: { code: "already_unlocked" },
     });

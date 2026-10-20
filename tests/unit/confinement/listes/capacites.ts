@@ -469,6 +469,17 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:undici", formes: ["Agent"], nombre: 1 }],
     ecart: "import d'un paquet à capacité dans un test, exigé par 0055 § 3 point 6 (E4 de 0049) avant la fusion de la composition : verdict Sécurité : approuvé sur le head `59878f0` (PR 326), P0r3c-3, ticket 316",
   },
+  // B4a (ticket 531 ; spécification B4, B4a point 3 ; décision 0097 B4-TL-7). Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
+  {
+    fichier: "src/server/payment/transport-http.ts",
+    portee: "application",
+    usage:
+      "transport du prestataire simulé (B4a) : `POST` de l'événement signé vers `/api/v1/webhooks/simulated` de l'origine `APP_URL` " +
+      "seulement (chemin constant), `redirect: \"error\"`, `credentials: \"omit\"`, délai borné ; aucun secret ni donnée Google " +
+      "dans la requête hors la signature. Justification côté serveur : module `server-only`, importé par la seule composition du paiement simulé",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "module de capacité réseau de B4a (décision 0097 B4-TL-7), webhook simulé ouvert en `local` et `ci` seulement : verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
+  },
 ] as const satisfies readonly LigneCapacite[];
 
 /** Lignes de textes (hôtes, fragments, noms secrets), lues dans les données du régime. */

@@ -165,3 +165,7 @@ Statut : **acceptée** · Date : 2026-10-19 · Décideur : Tech Lead (décision 
 **Condition d'emploi.** La descente se joue hors de toute exécution `p0Run` en cours : le `DROP TABLE` prend un verrou exclusif, et une écriture concurrente d'un programme échouerait (revue de #507, point 11).
 
 **Suite.** La ligne `0011_trajets_prototype` de `db/README.md` § 2 et l'en-tête de `0011_trajets_prototype.down.sql` citent cet amendement (PR #507).
+
+## Amendement 2 — temps relus à l'affichage conservés (Tech Lead, 2026-10-20)
+
+Voir **0109** (ticket #587) : § 1 (première phrase et point 7), § 4 point 4 et le deuxième point des « Conséquences » sont amendés ; un temps relu avec succès à l'affichage d'un programme de `p0Run` est conservé une fois dans `prototype.trajets`, avec les bornes de § 1 points 1 à 6, sans écraser un temps de l'exécution, sans migration ni droit nouveaux.

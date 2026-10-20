@@ -312,6 +312,30 @@ describe("confinement: dépôt", () => {
     expect(importeurs.filter((f) => !f.startsWith("db/schema/"))).toEqual([]);
   });
 
+  // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 (c)) : chemin de lecture du secret du webhook simulé.
+  it("confinement: src/server/env/payment.ts n'a que deux importeurs hors de ses tests (composition et webhook simulés)", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/env/payment.ts")).map((r) => r.fichier);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+    expect(importeurs.filter((f) => estFichierTest(f) && !f.startsWith("src/server/env/"))).toEqual([]);
+  });
+
+  it("confinement: `cleWebhookSimule` n'est appelé, hors des tests, que par la composition et le webhook simulés", () => {
+    const appelants = analyses
+      .filter((f) => f.chemin.startsWith("src/") && !estFichierTest(f.chemin) && /\bcleWebhookSimule\(/.test(lireFichier(f.chemin)))
+      .map((f) => f.chemin)
+      .sort();
+    expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+  });
+
+  it("confinement: le champ du secret décodé n'est nommé que dans src/server/env/index.ts, src/server/env/payment.ts et leurs tests", () => {
+    // Nom assemblé à l'exécution : ce fichier ne doit pas lui-même contenir le texte cherché.
+    const champ = ["simulated", "Webhook", "Secret"].join("");
+    const admis = ["src/server/env/index.ts", "src/server/env/payment.ts", "src/server/env/payment.test.ts", "tests/unit/server/env.test.ts"];
+    const porteurs = suivis.filter((f) => f.mode !== "120000" && !f.chemin.startsWith("docs/") && lireFichier(f.chemin).includes(champ)).map((f) => f.chemin);
+    expect(porteurs.filter((f) => !admis.includes(f))).toEqual([]);
+    expect(porteurs).toContain("src/server/env/index.ts");
+  });
+
   it("confinement: fonctions qui reçoivent process.env entier (section 5, forme 2)", () => {
     const fonctions = new Set(resultats.flatMap((r) => r.fonctionsEnv));
     const passages = constats.filter((c) => c.regle === "environnement" && c.capacite === "entier" && c.forme.startsWith("argument:"));

@@ -4,11 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createPrototypeAdapterReel, type PaireRelecture, type RelecteurTrajets } from "@/adapters/prototype";
 import { ecrireProgramme } from "@/adapters/prototype-ecriture";
 import { createSourceProgrammesReels } from "@/adapters/prototype-lecture";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { pairesAConserver, PROTOTYPE_ORG_ID, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesAConserver, pairesDistinctes, pairesDuProgramme, PROTOTYPE_ORG_ID, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 import { attempt, closeAll, connect, createOrg, type DbClient, expectRefused, inTx, type Org, poserExecution, unique } from "./helpers";
@@ -286,5 +287,76 @@ describe("p0: programme et temps écrits ensemble ou pas du tout, puis lus avec 
     expect(await compter("SELECT count(*) AS n FROM prototype.programmes WHERE run_id = $1", [runId])).toBe(0);
     expect(await compter("SELECT count(*) AS n FROM public.place_coordinates WHERE place_id = ANY($1::text[])", [[...e.positions.keys()]])).toBe(0);
     expect((await admin.query("SELECT status FROM prototype.runs WHERE id = $1", [runId])).rows[0].status).toBe("en_cours");
+  });
+});
+
+describe("p0: temps relus à l'affichage conservés une fois (décision 0109, base migrée)", () => {
+  const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owner" as const };
+
+  /** Relecteur double : durée fixe ou refus, paires reçues notées. */
+  function relecteur(reponse: number | "quota_reached" = 11): RelecteurTrajets & { appels: PaireRelecture[][] } {
+    const appels: PaireRelecture[][] = [];
+    return {
+      appels,
+      async relireJournee(paires) {
+        appels.push([...paires]);
+        return reponse === "quota_reached" ? { ok: false, raison: reponse } : { ok: true, minutes: paires.map(() => reponse) };
+      },
+    };
+  }
+
+  const adaptateur = (r: RelecteurTrajets) => createPrototypeAdapterReel({ programmes: createSourceProgrammesReels({ pool: async () => pool(proto) }), relecteurs: { trajets: r } });
+
+  const lignes = async (programmeId: string) =>
+    (
+      await admin.query(
+        `SELECT mode || ':' || origine || ':' || destination AS cle, minutes, t.expires_at = p.expires_at AS copie, t.organization_id::text AS org
+         FROM ${TABLE} t JOIN prototype.programmes p ON p.id = t.programme_id WHERE t.programme_id = $1`,
+        [programmeId],
+      )
+    ).rows.sort((x, y) => (x.cle < y.cle ? -1 : 1)) as { cle: string; minutes: number; copie: boolean; org: string }[];
+
+  it("programme ancien : les paires relues sont conservées sous vadrouille_prototype ; un second affichage n'appelle pas le relecteur", async () => {
+    const e = entree(await executionValidee(), 0);
+    const { programmeId } = await ecrireProgramme({ ...e, trajets: new Map() }, pool(proto));
+    expect(await lignes(programmeId)).toEqual([]);
+    const premier = relecteur(11);
+    await adaptateur(premier).getTrip(ctx, e.tripId);
+    await adaptateur(premier).listProposals(ctx, e.tripId);
+    expect(premier.appels.length).toBeGreaterThan(0);
+    const toutes = pairesDistinctes(pairesDuProgramme(e.programme)).map(cleTrajet).sort();
+    const ecrites = await lignes(programmeId);
+    expect(ecrites.map((l) => l.cle)).toEqual(toutes);
+    for (const l of ecrites) expect(l).toMatchObject({ minutes: 11, copie: true, org: PROTOTYPE_ORG_ID });
+    const second = relecteur(11);
+    const trip = await adaptateur(second).getTrip(ctx, e.tripId);
+    await adaptateur(second).listProposals(ctx, e.tripId);
+    expect(second.appels).toEqual([]);
+    expect(trip!.days.every((jour) => jour.travelMinutes !== null)).toBe(true);
+  });
+
+  it("aucun écrasement d'un temps de l'exécution ; une seconde conservation des mêmes paires n'écrit rien et ne lève pas", async () => {
+    const e = entree(await executionValidee(), 9);
+    const { programmeId } = await ecrireProgramme(e, pool(proto));
+    const execution = new Set(pairesAConserver(e.programme, "walk").map(cleTrajet));
+    const lu = await createSourceProgrammesReels({ pool: async () => pool(proto) }).lire(e.tripId);
+    expect(lu?.conserver).toBeDefined();
+    const toutes = pairesDistinctes(pairesDuProgramme(e.programme)).map(cleTrajet);
+    expect(toutes.some((cle) => !execution.has(cle))).toBe(true);
+    await lu!.conserver!(new Map(toutes.map((cle) => [cle, 30])));
+    await lu!.conserver!(new Map(toutes.map((cle) => [cle, 45])));
+    const ecrites = await lignes(programmeId);
+    expect(ecrites.map((l) => l.cle)).toEqual([...toutes].sort());
+    for (const l of ecrites) expect(l.minutes, l.cle).toBe(execution.has(l.cle) ? 9 : 30);
+  });
+
+  it("relecture refusée : rien n'est écrit", async () => {
+    const e = entree(await executionValidee(), 0);
+    const { programmeId } = await ecrireProgramme({ ...e, trajets: new Map() }, pool(proto));
+    const r = relecteur("quota_reached");
+    await adaptateur(r).getTrip(ctx, e.tripId);
+    await adaptateur(r).listProposals(ctx, e.tripId);
+    expect(r.appels.length).toBeGreaterThan(0);
+    expect(await lignes(programmeId)).toEqual([]);
   });
 });

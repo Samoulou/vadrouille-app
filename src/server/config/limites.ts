@@ -28,6 +28,11 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 600, threshold: 10 },
     { kind: "email", windowSeconds: 3600, threshold: 10 },
   ],
+  // B4a (décision 0097 B4-TL-6 point 2) : actions du paiement simulé, par adresse IP (le limiteur n'a pas de règle par
+  // personne). En `local` et `ci`, sans en-tête de confiance, tous les appels partagent le compartiment commun. Seuils
+  // de la phase simulée seulement : ils ne valent pas pour `stripe` (B4c, Q86).
+  "payment-start": [{ kind: "ip", windowSeconds: 3600, threshold: 20 }],
+  "payment-simulate": [{ kind: "ip", windowSeconds: 3600, threshold: 60 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */
