@@ -2,7 +2,6 @@ import "server-only";
 
 import type { AdapterContext, TripAdapter } from "@/adapters/types";
 import {
-  ChecklistItemSchema,
   DayMapSchema,
   DaySchema,
   PreviewSlotSchema,
@@ -44,7 +43,7 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { EchecPositions, lirePositions } from "@/server/positions/lecture";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
-import { datesDeVerification, identifiantLisible, mobiliteDepuisColonne, nombreDeNuits, sejoursParNuit, type VersionDeChaine } from "./conversion";
+import { datesDeVerification, elementAFaire, identifiantLisible, mobiliteDepuisColonne, nombreDeNuits, sejoursParNuit, type VersionDeChaine } from "./conversion";
 import { echec, LectureVoyageError, type ContexteEchec } from "./erreurs";
 
 /**
@@ -355,17 +354,9 @@ function checklistDe(etat: Etat): ChecklistItem[] {
   return etat.checklist.map((ligne) => {
     const stopId = ligne.stop_id === null ? undefined : texte(ligne.stop_id);
     if (stopId !== undefined && !etapes.has(stopId)) throw echec("checklist_orphan", contexte);
-    const item = ChecklistItemSchema.safeParse({
-      id: ligne.id,
-      label: ligne.label,
-      when: ligne.moment,
-      done: ligne.done,
-      sponsored: ligne.sponsored,
-      ...(ligne.booking_url === null ? {} : { bookingUrl: ligne.booking_url }),
-      ...(stopId === undefined ? {} : { stopId }),
-    });
-    if (!item.success) throw echec("output_invalid", contexte);
-    return item.data;
+    const item = elementAFaire(ligne);
+    if (item === null) throw echec("output_invalid", contexte);
+    return item;
   });
 }
 

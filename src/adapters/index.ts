@@ -2,6 +2,7 @@ import type { RevisionFixtures, Trip } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
+import { apiTripAdapter } from "./api-instance";
 import { assertAuthAdapter } from "./auth-guard";
 import { betterAuthServerAdapter } from "./better-auth";
 import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock";
@@ -34,6 +35,7 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
  */
 export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
 export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
+export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { shareAvailable, shareDemoAvailable } from "./share-guard";
@@ -53,7 +55,8 @@ export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPT
  * Choisit l'adaptateur selon la variable serveur `DATA_ADAPTER`
  * (`mock` par défaut). Sans préfixe `NEXT_PUBLIC_`, elle n'est jamais
  * exposée au navigateur. `prototype` (décision 0032 § A4) lève une erreur hors de la liste blanche
- * `prototypeAdapterAllowed(env)`.
+ * `prototypeAdapterAllowed(env)` ; `api` (B6b) lève hors de sa garde (`assertApiAdapter`), sans repli vers `mock`, et
+ * rend l'adaptateur branché au démarrage par `src/instrumentation.ts` (`./api-instance.ts`).
  */
 export function getTripAdapter(value: string | undefined = process.env.DATA_ADAPTER, env: NodeJS.ProcessEnv = process.env): TripAdapter {
   const choice = adapterChoice(value);
@@ -61,7 +64,8 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
     case "mock":
       return mockTripAdapter;
     case "api":
-      throw new Error("adaptateur api non implémenté");
+      // Garde lue sur l'environnement du processus, jamais sur `env` (src/adapters/api-guard.ts).
+      return apiTripAdapter();
     case "prototype":
       return prototypeTripAdapter(env);
     default:

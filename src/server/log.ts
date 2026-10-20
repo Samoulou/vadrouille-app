@@ -58,6 +58,11 @@ export const LOG_EVENTS = [
   // est servie), une fois par lecture, par la source de relectures seule. Champ unique : `reason`
   // (`LOG_POSITIONS_REASONS`, liste fermée) ; ni identifiant (voyage, lieu, organisation), ni coordonnée, ni message.
   "voyages.positions_non_ecrites",
+  // B6b (spécification B6, B6b point 2 ; décision 0086 § 2.2, verdict Sécurité attendu § 4 point 4) : action sur un
+  // voyage terminée par `internal` (erreur inattendue convertie), ou échec du branchement de l'adaptateur `api` au
+  // démarrage (`action` : `branchement`, `src/instrumentation.ts`). Champs : `action` (nom fixe de l'action), `errorName`
+  // et `tripId` ; aucun message de base, aucune entrée.
+  "voyages.action_failed",
   // Ticket 493, décision 0090 (verdict Sécurité S4 : favorable) : arrêt d'une étape de `p0Run`, cause fermée seulement.
   // Champs : `phase` (`LOG_STEP_PHASES`), `errorName` (nom de classe de l'erreur, filtré par `NOM_ERREUR` : lettres
   // seulement, 40 au plus ; absent sinon) et `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message,

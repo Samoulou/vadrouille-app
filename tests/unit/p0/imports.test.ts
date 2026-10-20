@@ -727,8 +727,9 @@ const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/w
  * B8b (décision 0100 § 5.2) : la fabrique commune des clients Google est un pont de plus vers `src/grounding` (modules de
  * capacité `places-client.ts` et `routes-client.ts`). Le parcours de la frontière s'arrête à elle ; ses importateurs
  * (`composition/lecture.ts`, plus `generation.ts` quand B9c existera) sont contrôlés à part par `composition.test.ts` et la
- * règle `ligne/relecture-imports`. Admis : `src/adapters/index.ts` → `composition/lecture.ts` → `composition/clients-google.ts`
- * → `@/grounding/*` (cas fabriqués ci-dessous).
+ * règle `ligne/relecture-imports`. Admis (décision 0108, qui amende 0100 § 5.2 et § 5.4 : branchement au démarrage, jamais
+ * par `src/adapters/index.ts`) : `src/instrumentation.ts` → `composition/lecture.ts` → `composition/clients-google.ts` →
+ * `@/grounding/*` (cas fabriqués ci-dessous).
  */
 // B9c (décision 0105 § 2) : `fixtures-simulees.ts` est le module des doubles d'Édimbourg de la composition simulée, atteint par
 // `import()` dynamique depuis `generation.ts` seulement ; il ouvre `@/ai`, `@/research` et `@/grounding` comme elle (doubles).
@@ -1381,6 +1382,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         }
       }
       // 0085 § 1.8 et 0100 § 5.2 : seules les compositions `generation.ts` (B9c) et `lecture.ts` (B8b) l'importent.
+      // `src/instrumentation.ts` (0108) n'importe que la composition de la lecture, jamais `@/server/relecture/*` directement.
       const importeurs = application.filter(
         (f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && f !== MODULE_SOURCE_LECTURE && f !== "src/server/relecture/planification.ts" && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")),
       );
@@ -1406,14 +1408,14 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
 
     it.each([
       [
-        "admis : adaptateurs → composition/lecture → fabrique → modules de capacité (le parcours s'arrête à la fabrique)",
+        "admis : src/instrumentation.ts → composition/lecture → fabrique → modules de capacité (0108 ; le parcours s'arrête à la fabrique)",
         {
-          "src/adapters/index.ts": ["src/server/composition/lecture.ts"],
+          "src/instrumentation.ts": ["src/server/composition/lecture.ts"],
           "src/server/composition/lecture.ts": ["src/server/composition/clients-google.ts", "src/server/relecture/source.ts"],
           "src/server/composition/clients-google.ts": ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"],
           "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts"],
         },
-        "src/adapters/index.ts",
+        "src/instrumentation.ts",
         [],
       ],
       ["admis : source → fiches, trajets, interfaces (arêtes exactes)", { "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts", "src/grounding/interfaces.ts"] }, "src/server/relecture/source.ts", []],

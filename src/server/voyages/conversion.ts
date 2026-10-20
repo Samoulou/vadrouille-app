@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { DaySnapshot, TripSnapshot } from "@/contracts";
+import { ChecklistItemSchema, type ChecklistItem, type DaySnapshot, type TripSnapshot } from "@/contracts";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import type { DateDeVerification, RefVerification } from "@/domain/recomposition";
 import { ORDRE_MODES, type ModeTrajet } from "@/domain/relectures";
@@ -12,6 +12,26 @@ import { ORDRE_MODES, type ModeTrajet } from "@/domain/relectures";
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ligne de `checklist_items` (colonnes `id`, `label`, `moment`, `done`, `booking_url`, `sponsored`, `stop_id`) en
+ * `ChecklistItem` validé, ou `null` si elle ne valide pas le contrat. Partagée par la lecture (`getTrip`) et l'action
+ * `toggleChecklistItem` (B6b) : une seule conversion. Le contrôle de l'étape désignée (`checklist_orphan`) reste à la
+ * lecture, qui a l'instantané.
+ */
+export function elementAFaire(ligne: Readonly<Record<string, unknown>>): ChecklistItem | null {
+  const stopId = typeof ligne.stop_id === "string" ? ligne.stop_id : undefined;
+  const item = ChecklistItemSchema.safeParse({
+    id: ligne.id,
+    label: ligne.label,
+    when: ligne.moment,
+    done: ligne.done,
+    sponsored: ligne.sponsored,
+    ...(ligne.booking_url === null ? {} : { bookingUrl: ligne.booking_url }),
+    ...(stopId === undefined ? {} : { stopId }),
+  });
+  return item.success ? item.data : null;
+}
 
 /** Identifiant lisible en base (B6-PO-11) : `TRIP_ID_PATTERN`, puis `uuid` ; sinon inconnu, sans requête. */
 export function identifiantLisible(tripId: unknown): tripId is string {
