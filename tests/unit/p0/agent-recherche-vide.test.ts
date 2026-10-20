@@ -45,7 +45,7 @@ const CANDIDAT = {
 const tour = (valeur: Record<string, unknown>) => JSON.stringify({ actions: [], candidats: [], termine: false, ...valeur });
 const enBloc = (texte: string) => "Voici ma réponse :\n```json\n" + texte + "\n```\n";
 
-async function rejouer(reponses: (string | ReponseModele)[]) {
+async function rejouer(reponses: (string | ReponseModele)[], configAgent = config) {
   let appels = 0;
   const requetesWeb: string[] = [];
   const prompts: { etape: string; id: string; version: number }[] = [];
@@ -67,7 +67,7 @@ async function rejouer(reponses: (string | ReponseModele)[]) {
       },
     },
     lecteur: { lire: async () => ({ ok: false, raison: "not_in_search_results" }) },
-    config,
+    config: configAgent,
   });
   return { appels, requetesWeb, prompts, ...resultat };
 }
@@ -166,6 +166,18 @@ describe("ia: agent de recherche, arrêt prématuré sans candidat (ticket 400)"
     expect(compteurs.candidatsRefuses.source_not_in_results).toBe(1);
     expect(requetesWeb).toHaveLength(1);
     expect(candidats).toHaveLength(1);
+  });
+
+  it("mineur 3 de la revue de la PR 565 (0102 § 2) : plus de plafond candidatsTrouves, l'agent ne dépasse jamais totalCandidats (refus over_total)", async () => {
+    const limite = { ...config, totalCandidats: 2 };
+    const noms = ["Musée un", "Musée deux", "Musée trois", "Musée quatre"];
+    const { candidats, compteurs } = await rejouer(
+      [PLAN, tour({ actions: [RECHERCHER] }), tour({ candidats: noms.map((nom) => ({ ...CANDIDAT, nom })), termine: true })],
+      limite,
+    );
+    expect(candidats.map((c) => c.nom)).toEqual(["Musée un", "Musée deux"]);
+    expect(candidats.length).toBeLessThanOrEqual(limite.totalCandidats);
+    expect(compteurs.candidatsRefuses.over_total).toBe(2);
   });
 
   it("sorties illisibles à chaque tour : la boucle va jusqu'à toursMax (bornée), 0 candidat, compteurs à jour", async () => {

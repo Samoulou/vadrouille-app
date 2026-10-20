@@ -365,6 +365,8 @@ describe("module de journal", () => {
       // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
       "email.address_refused",
       "email.transport_disabled",
+      // B3b-envoi : enveloppe refusée avant l'envoi (aucune valeur).
+      "email.envelope_refused",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",

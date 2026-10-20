@@ -89,6 +89,9 @@ export function modelesDeLaVariante(config: ConfigModeles, variante: Variante): 
 
 const entier = (max: number) => z.number().int().min(1).max(max);
 
+/** Borne de forme du total de candidats visé (`totalCandidats`) ; plafond de `bornesDepuisDemande` du mode réel (0102 § 3). */
+export const TOTAL_CANDIDATS_MAX = 300;
+
 /** `recherche.json` : bornes de l'agent (P0-PO-4). */
 export const ConfigRechercheSchema = z.strictObject({
   schema: Version,
@@ -99,7 +102,7 @@ export const ConfigRechercheSchema = z.strictObject({
     evening: entier(200),
   }),
   /** Total de candidats visé par exécution. */
-  totalCandidats: entier(300),
+  totalCandidats: entier(TOTAL_CANDIDATS_MAX),
   /** Taille des lots envoyés au modèle de notation. */
   tailleLotNotation: entier(50),
   /** Nombre maximal de tours de l'agent de recherche. */
@@ -152,23 +155,28 @@ export const UNITES_QUOTA_ROUTES = ["requetes", "elements"] as const;
 /**
  * Bornes de la configuration du **mode réel** (`prototype/config/mode-reel.json`, décision 0055, section 6) : valeurs de
  * Samuel et du Product Owner, jamais relevées par le studio. Coût des modèles : 3 USD (Samuel, Q270) ; Text Search et
- * Place Details : 90 (P0S2-PO-8) ; recherches web, pages lues et candidats : 60, 150 et 90 au plus (P0S2-PO-8) ; Routes :
- * 840 éléments (Samuel, 0053 amendée par 0088 § 13), sous le quota de 3 000 éléments par minute (Q330) ; durée : 15 min (A8).
+ * Place Details : 90 (P0S2-PO-8), conservés comme plafonds de cohérence du registre jusqu'à la réponse de Samuel
+ * (décision 0102 § 4, question 1) ; Routes : 840 éléments (Samuel, 0053 amendée par 0088 § 13), sous le quota de
+ * 3 000 éléments par minute (Q330). Depuis la décision 0093 (point 5, tâche A2, décision 0102), les recherches web, les
+ * pages lues, les candidats et la durée ne sont plus des fusibles : ces quatre champs n'existent plus ici.
  */
 export const BORNES_MODE_REEL = {
   coutUsd: 3,
-  recherchesWeb: 60,
-  pagesLues: 150,
-  candidatsTrouves: 90,
   placesTextSearch: 90,
   placesDetails: 90,
   routesRequetes: BORNES_PLAFONDS.routesRequetes,
   routesElements: 840,
-  dureeMs: 900_000,
 } as const;
 
 /** Logements d'un brief au plus (`BriefSchema`) : chacun demande un Text Search à l'ancrage. */
-const LOGEMENTS_MAX = 5;
+export const LOGEMENTS_MAX = 5;
+
+/**
+ * Contrôle de cohérence (décision 0102 § 5) : chaque candidat visé par la recherche et chaque logement demandent un
+ * Text Search, `totalCandidats + 5 ≤ placesTextSearch`. Vérifie que le plafond Places, qui reste en place jusqu'à la
+ * réponse de Samuel (0102, question 1), n'est pas absurde par rapport à la recherche.
+ */
+export const rechercheTientSousPlaces = (totalCandidats: number, placesTextSearch: number): boolean => totalCandidats + LOGEMENTS_MAX <= placesTextSearch;
 
 /**
  * Champs du mode réel **sans valeur par défaut**, décidés par le Product Owner (amendement 1 de la spécification
@@ -189,14 +197,10 @@ export const ConfigModeReelSchema = z.strictObject({
   /** Unité du quota Routes (Q330 : `"elements"`), obligatoire, sans valeur par défaut. */
   uniteQuotaRoutes: z.enum(UNITES_QUOTA_ROUTES),
   coutUsd: z.number().finite().gt(0).max(BORNES_MODE_REEL.coutUsd),
-  recherchesWeb: plafondReel(BORNES_MODE_REEL.recherchesWeb),
-  pagesLues: plafondReel(BORNES_MODE_REEL.pagesLues),
-  candidatsTrouves: plafondReel(BORNES_MODE_REEL.candidatsTrouves),
   placesTextSearch: plafondReel(BORNES_MODE_REEL.placesTextSearch),
   placesDetails: plafondReel(BORNES_MODE_REEL.placesDetails),
   routesRequetes: plafondReel(BORNES_MODE_REEL.routesRequetes),
   routesElements: plafondReel(BORNES_MODE_REEL.routesElements),
-  dureeMs: plafondReel(BORNES_MODE_REEL.dureeMs),
   /** Marge de remplacement de l'étape finale : `max(margeMinimum, ⌈margePart × première série⌉)` (Q389). */
   fiches: z.strictObject({
     margeMinimum: z.number().int().min(0).max(BORNES_MODE_REEL.placesDetails),
@@ -219,10 +223,11 @@ export type CodeConfigModeReel = (typeof CODES_CONFIG_MODE_REEL)[number];
 
 /**
  * Configuration du mode réel, ou un code fermé (jamais la valeur reçue) : `config_reel_incomplete` si un champ
- * obligatoire manque (décision en attente), `config_reel_invalide` sinon. Contrôle croisé : chaque candidat et chaque
- * logement demandent un Text Search, `candidatsTrouves + 5 ≤ placesTextSearch`.
+ * obligatoire manque (décision en attente), `config_reel_invalide` sinon. Contrôle croisé : `totalCandidats` (celui de
+ * `recherche.json` ou `recherche-essai.json`, **obligatoire** : aucun appelant ne peut l'omettre) + 5 ≤ `placesTextSearch`
+ * (0102 § 5).
  */
-export function validerConfigModeReel(brut: unknown): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+export function validerConfigModeReel(brut: unknown, totalCandidats: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
   if (typeof brut === "object" && brut !== null && !Array.isArray(brut)) {
     const presents = new Set(Object.keys(brut));
     const obligatoires = Object.keys(ConfigModeReelSchema.shape);
@@ -230,50 +235,43 @@ export function validerConfigModeReel(brut: unknown): { ok: true; config: Config
   }
   const lu = ConfigModeReelSchema.safeParse(brut);
   if (!lu.success) return { ok: false, code: "config_reel_invalide" };
-  if (lu.data.candidatsTrouves + LOGEMENTS_MAX > lu.data.placesTextSearch) return { ok: false, code: "config_reel_invalide" };
+  if (!rechercheTientSousPlaces(totalCandidats, lu.data.placesTextSearch)) return { ok: false, code: "config_reel_invalide" };
   return { ok: true, config: lu.data };
 }
 
 /**
  * Plafonds de l'**essai d'intégration** : depuis la décision 0073 (Samuel, 2026-10-16), **les mêmes que ceux de
- * `mode-reel.json`** (3 USD de modèles, 40 recherches web, 100 pages, 85 candidats, 90 Text Search, 90 Place Details,
- * 30 requêtes de matrice et 840 éléments depuis 0088 § 13, 15 min), pour que tout brief passe en essai ; seul un voyage qui les
- * dépasserait est arrêté. Valeurs antérieures (P0S2-PO-12 amendé, ticket 355 : 0,30 USD, 6, 15, 12, 17, 14, 3, 120,
+ * `mode-reel.json`** (3 USD de modèles, 90 Text Search, 90 Place Details,
+ * 30 requêtes de matrice et 840 éléments depuis 0088 § 13), pour que tout brief passe en essai ; seul un voyage qui les
+ * dépasserait est arrêté. Les recherches web, pages lues, candidats et durée en
+ * ont été retirés (0093 point 5, décision 0102). Valeurs antérieures (P0S2-PO-12 amendé, ticket 355 : 0,30 USD, 6, 15, 12, 17, 14, 3, 120,
  * 5 min) : décision 0063, points 8 et 9. Ce sont des maxima : `essai.json` ne peut pas les dépasser ; un test vérifie
  * qu'ils restent égaux aux plafonds commités du mode réel. Depuis la décision 0093 (point 5), `essai.json` fixe `coutUsd` à
  * 2 USD, sous la borne de 3 USD ci-dessous, qui reste inchangée (0073 point 2) ; les autres champs d'`essai.json` égalent leur borne.
  */
 export const BORNES_ESSAI = {
   coutUsd: 3,
-  recherchesWeb: 40,
-  pagesLues: 100,
-  candidatsTrouves: 85,
   placesTextSearch: 90,
   placesDetails: 90,
   routesRequetes: 30,
   routesElements: 840,
-  dureeMs: 900_000,
 } as const;
 
 /**
  * Configuration de l'essai d'intégration (`prototype/config/essai.json`) : même schéma que le mode réel
  * (`ConfigModeReelSchema`, mêmes codes fermés), puis chaque plafond sous `BORNES_ESSAI`.
  */
-export function validerConfigEssai(brut: unknown): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
-  const lu = validerConfigModeReel(brut);
+export function validerConfigEssai(brut: unknown, totalCandidats: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+  const lu = validerConfigModeReel(brut, totalCandidats);
   if (!lu.ok) return lu;
   const c = lu.config;
   const b = BORNES_ESSAI;
   const dansLesBornes =
     c.coutUsd <= b.coutUsd &&
-    c.recherchesWeb <= b.recherchesWeb &&
-    c.pagesLues <= b.pagesLues &&
-    c.candidatsTrouves <= b.candidatsTrouves &&
     c.placesTextSearch <= b.placesTextSearch &&
     c.placesDetails <= b.placesDetails &&
     c.routesRequetes <= b.routesRequetes &&
-    c.routesElements <= b.routesElements &&
-    c.dureeMs <= b.dureeMs;
+    c.routesElements <= b.routesElements;
   return dansLesBornes ? lu : { ok: false, code: "config_reel_invalide" };
 }
 

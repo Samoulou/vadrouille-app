@@ -28,11 +28,6 @@ export type ExecutionEnCours = {
    * rend l'identifiant de voyage unique (P0r3c-5, étape finale).
    */
   readonly numeroDuJour: number;
-  /**
-   * Temps écoulé depuis le début de l'exécution, en millisecondes, mesuré par la base (`now() - started_at`) : borne
-   * l'échéance de l'étape sous la durée maximale du mode (P0r3c-5, marge de durée). Lu en mémoire, jamais écrit.
-   */
-  readonly ecouleMs: number;
 };
 
 /** Ligne de la table de travail : clé `c_000`, contenu (clés de `CandidatSchema`), `place_id` éventuel. */

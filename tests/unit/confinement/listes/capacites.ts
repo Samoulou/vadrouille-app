@@ -328,6 +328,17 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; sentinelle : le worker ne met pas en cache les requêtes Google)",
   },
+  // B3b-envoi (ticket 435 ; spécification B3b-envoi, critères E5, E6 et E8 ; décision 0098 § 5) : lecture de l'API de
+  // Mailpit par les tests de base. Verdict Sécurité à rendre dans la PR de code.
+  {
+    fichier: "tests/db/mailpit.ts",
+    portee: "test",
+    usage:
+      "outils des tests de base de B3b-envoi : lecture des messages reçus par Mailpit (API sur 127.0.0.1:8025, service du job `db` de la CI ou de docker-compose), " +
+      "adresses `exemple.test` uniques à l'essai ; seul fichier de `tests/db/` qui appelle `fetch`",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "appel `fetch` réel (section 4) dans un test de base vers la boucle locale, B3b-envoi (décision 0098 § 5) : portée test ; verdict Sécurité à rendre dans la PR de code",
+  },
   // B1 (PR 188, fusionnée le 2026-10-13, `d1ba047`, après P0c1) : lignes attendues par la spécification P0c, section 9,
   // relevées par la PR du ticket 242. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242) pour chacune.
   {
