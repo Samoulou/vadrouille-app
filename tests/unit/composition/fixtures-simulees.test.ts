@@ -60,6 +60,22 @@ describe("fixtures simulées : jamais chargées en production", () => {
     }
   });
 
+  it("composerSimulee sans env donne fixtures_refusees, même si le processus déclare un environnement admis (mineur 6)", async () => {
+    vi.stubEnv("VADROUILLE_ENV", "ci");
+    try {
+      const avant = lecturesDeFixtures.fichiers;
+      const { composerSimulee } = await import("@/server/composition/generation");
+      for (const options of [undefined, {}, { env: undefined }]) {
+        const erreur = await composerSimulee(options).catch((e: unknown) => e);
+        expect(erreur).toBeInstanceOf(ErreurFixtures);
+        expect((erreur as ErreurFixtures).code).toBe("fixtures_refusees");
+      }
+      expect(lecturesDeFixtures.fichiers).toBe(avant);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("hors production, les cinq familles de fixtures sont lues et validées par leurs schémas", async () => {
     const fabrique = await chargerDoublesEdimbourg({ VADROUILLE_ENV: "ci" });
     const doubles = fabrique();

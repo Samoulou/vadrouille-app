@@ -35,6 +35,7 @@ import { cloreEnEchec, commencerEtape, exigerGarde } from "./garde";
 import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
 import { genererSansEchec } from "./programme";
 import { publier } from "./publication";
+import { estRefusDeReserve } from "./raison-echec";
 
 /**
  * Étapes de `generatePreview` (spécification B9, B9c ; décisions 0081 B9-TL-3, 0087 § 2 et 0100). **Fonctions ordinaires,
@@ -657,6 +658,8 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
       // Programme, puis raisons des seuls lieux retenus ; au plus deux passes (la seconde sans les lieux restés sans raison).
       const raisons = new Map<string, { raison: string; detour: string }>();
       const essayes = new Set<string>();
+      // Idées retirées d'un lot refusé (0105 § 5.1 point 4) : jamais reproposées, ni dans une autre ville, ni à la seconde passe.
+      const ideesAbandonnees = new Set<string>();
       let candidats: readonly CandidatMoteur[] = planification.valeur.candidats;
       let programme: TripSnapshot | null = null;
       let idsIdees = new Set<string>();
@@ -696,8 +699,9 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
               typeEtape: candidat.stopKind === "meal" ? "meal" : "activity",
               sourceUrl: candidat.sources.find((source) => source.url !== "")?.url,
             }));
+          const nombreEtapes = lieux.length;
           // Candidats d'idée de la ville (0105 § 5.1 point 2) : dans le même lot que les étapes, jamais un appel de plus.
-          for (const candidat of candidatsIdees.filter((c) => c.ville === ville.rang && !raisons.has(c.id) && !essayes.has(c.id) && !lieux.some((l) => l.id === c.id))) {
+          for (const candidat of candidatsIdees.filter((c) => c.ville === ville.rang && !raisons.has(c.id) && !essayes.has(c.id) && !ideesAbandonnees.has(c.id) && !lieux.some((l) => l.id === c.id))) {
             lieux.push({
               id: candidat.id,
               nom: candidat.nom,
@@ -708,9 +712,20 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
             });
           }
           if (lieux.length === 0) continue;
-          const issue = await capacite.rediger(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, lieux);
+          const villeARedige = { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart };
+          let lot = lieux;
+          let issue = await capacite.rediger(voyage.brief, villeARedige, lot);
+          // Abandon des idées seules (0105 § 5.1 point 4) : un refus de réserve (quota, plafond) sur un lot qui porte des idées
+          // est retenté sans elles, une à une, de la moins bien classée à la mieux classée (ordre de `candidatsDIdees` : jour,
+          // puis rang ; on retire depuis la fin du lot). Les étapes restent dans chaque lot, intactes. Un refus qui persiste
+          // avec les seules étapes, ou un autre code, arrête l'étape comme avant.
+          while (!issue.ok && estRefusDeReserve(issue.code) && lot.length > nombreEtapes) {
+            ideesAbandonnees.add((lot[lot.length - 1] as LieuARedige).id);
+            lot = lot.slice(0, -1);
+            issue = await capacite.rediger(voyage.brief, villeARedige, lot);
+          }
           if (!issue.ok) throw new ArretEtape(issue.code);
-          for (const lieu of lieux) essayes.add(lieu.id);
+          for (const lieu of lot) essayes.add(lieu.id);
           for (const [id, raison] of issue.valeur) raisons.set(id, raison);
         }
         // Un lieu dont la raison manque (rédaction échouée ou omise) est retiré, et le programme replanifié sans lui (deux passes au

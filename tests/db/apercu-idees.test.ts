@@ -146,7 +146,11 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
         return {
           async ancrer(...args: Parameters<typeof reel.ancrer>) {
             const issue = await reel.ancrer(...args);
-            return issue.ok ? { ok: true as const, valeur: new Map([...issue.valeur].slice(0, 3)) } : issue;
+            // Ordre stable (par nom) : l'ordre de lecture des candidats suit leur `id` aléatoire (même `created_at`), et un
+            // découpage dans cet ordre laissait parfois un candidat d'idée admissible (test instable).
+            const nom = new Map(args[2].map((c) => [c.id, c.nom] as const));
+            const tries = [...(issue.ok ? issue.valeur : [])].sort(([a], [b]) => (nom.get(a) ?? "").localeCompare(nom.get(b) ?? ""));
+            return issue.ok ? { ok: true as const, valeur: new Map(tries.slice(0, 3)) } : issue;
           },
         };
       },
@@ -212,17 +216,20 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
    * n'empêche ni les étapes ni la publication : rien n'échoue, aucune étape ne change.
    */
   it("coût : aucune fiche ni élément Routes propre aux idées ; forfait Google épuisé après le plan : étapes intactes, jamais failed", async () => {
-    async function etapeE(ideesParJour: number | undefined, limite?: { places: number; routes: number }) {
+    async function etapeE(ideesParJour: number | undefined, refuserApresLePlan = false) {
       const org = await createOrg(auth);
       const { tripId, etat } = await lancer(org);
       const progres = await derouler(etat, dependances(), ETAPE_E);
       expect(progres.arret).toBeUndefined();
       const compteurs: Compteurs = compteursVides();
-      const fabrique = () =>
+      // Vrai dès que `planifier` a rendu son résultat : le double refuse alors tout appel Google, dès le premier.
+      let planFini = false;
+      let refusApresLePlan = 0;
+      const simulee = () =>
         composerSimuleeAvec({
           doubles: () => {
             const d = compterAppels(doublesEdimbourg(), compteurs);
-            if (limite === undefined) return d;
+            if (!refuserApresLePlan) return d;
             const refuser = <T extends object>(famille: "places" | "routes", objet: T): T =>
               Object.fromEntries(
                 Object.entries(objet).map(([nom, valeur]) => [
@@ -230,8 +237,10 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
                   typeof valeur !== "function"
                     ? valeur
                     : (...args: unknown[]) => {
-                        // Le compteur vient d'être incrémenté par `compterAppels` à l'intérieur : on refuse au-delà de la limite.
-                        if (compteurs[famille] >= limite[famille]) throw Object.assign(new Error("forfait épuisé (double)"), { code: "cap_reached" });
+                        if (planFini) {
+                          refusApresLePlan += 1;
+                          throw Object.assign(new Error(`forfait ${famille} épuisé (double)`), { code: "cap_reached" });
+                        }
                         return (valeur as (...a: unknown[]) => unknown).apply(objet, args);
                       },
                 ]),
@@ -239,10 +248,27 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
             return { ...d, places: refuser("places", d.places), routes: refuser("routes", d.routes) };
           },
         });
+      const fabrique = (): FabriqueGeneration => {
+        const base = simulee();
+        return {
+          ...base,
+          finale: (o) => {
+            const finale = base.finale(o);
+            return {
+              ...finale,
+              async planifier(entree) {
+                const issue = await finale.planifier(entree);
+                planFini = true;
+                return issue;
+              },
+            };
+          },
+        };
+      };
       const { etapePlanification } = await import("@/server/generation/etapes");
       const fin = await etapePlanification(progres, { ...dependances(fabrique), ...(ideesParJour === undefined ? {} : { ideesParJour }) });
       const run = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT phase, stop_reason FROM public.generation_runs WHERE trip_id = $1", [tripId])).rows[0]);
-      return { fin, compteurs: { ...compteurs }, jours: await jours(org, tripId), run };
+      return { fin, compteurs: { ...compteurs }, jours: await jours(org, tripId), run, refusApresLePlan };
     }
     const sans = await etapeE(0);
     const avec = await etapeE(undefined);
@@ -251,12 +277,107 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
     expect(avec.compteurs.places).toBe(sans.compteurs.places);
     expect(avec.compteurs.routes).toBe(sans.compteurs.routes);
     expect(avec.compteurs.modeles).toBe(sans.compteurs.modeles);
-    // Forfait de fiches et d'éléments Routes épuisé juste après les mesures du plan.
-    const epuise = await etapeE(undefined, { places: sans.compteurs.places, routes: sans.compteurs.routes });
+    // Forfait de fiches et d'éléments Routes épuisé dès la fin du plan : tout appel Google de plus est refusé, et aucun ne part.
+    const epuise = await etapeE(undefined, true);
     expect(epuise.fin.arret).toBeUndefined();
+    expect(epuise.refusApresLePlan).toBe(0);
+    expect(epuise.compteurs.places).toBe(sans.compteurs.places);
+    expect(epuise.compteurs.routes).toBe(sans.compteurs.routes);
     expect(epuise.run.phase).not.toBe("failed");
     expect(["ready", "incomplete"]).toContain(epuise.run.phase);
     const etapes = (js: DaySnapshot[]) => js.map((jour) => [jour.index, jour.items.map((item) => (item.type === "stop" ? [item.stop.kind, item.stop.placeId, item.stop.start] : item.type))]);
     expect(etapes(epuise.jours)).toEqual(etapes(sans.jours));
+  });
+
+  /**
+   * Abandon des idées seules (0105 § 5.1 point 4, bloquant 1 de la revue du head 0b2897a) : un double de la rédaction tient
+   * une réserve de modèles réduite, exprimée en lieux par lot ; au-delà, il refuse (`cap_reached`) dès le premier appel. Les
+   * idées sont retirées du lot, de la moins bien classée à la mieux classée, jusqu'à ce qu'il passe ; les étapes restent
+   * intactes et l'aperçu finit `ready` ou `incomplete`, jamais `failed`. Sans aucune idée, le refus arrête l'étape comme avant.
+   */
+  it("réserve de modèles réduite : idées abandonnées dans l'ordre, étapes intactes", async () => {
+    type Lot = readonly { readonly id: string; readonly nom: string }[];
+    async function etapeE(ideesParJour: number | undefined, reserve?: (lot: Lot) => boolean) {
+      const org = await createOrg(auth);
+      const { tripId, etat } = await lancer(org);
+      const progres = await derouler(etat, dependances(), ETAPE_E);
+      expect(progres.arret).toBeUndefined();
+      const lots: { noms: string[]; refuse: boolean }[] = [];
+      const fabrique = (): FabriqueGeneration => {
+        const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
+        return {
+          ...base,
+          finale: (o) => {
+            const finale = base.finale(o);
+            return {
+              ...finale,
+              async rediger(brief, ville, lieux) {
+                const refuse = reserve !== undefined && !reserve(lieux);
+                lots.push({ noms: lieux.map((l) => l.nom), refuse });
+                if (refuse) return { ok: false as const, code: "cap_reached", retryable: false };
+                return finale.rediger(brief, ville, lieux);
+              },
+            };
+          },
+        };
+      };
+      const { etapePlanification } = await import("@/server/generation/etapes");
+      const fin = await etapePlanification(progres, { ...dependances(fabrique), ...(ideesParJour === undefined ? {} : { ideesParJour }) });
+      const run = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT phase, stop_reason FROM public.generation_runs WHERE trip_id = $1", [tripId])).rows[0]);
+      return { fin, lots, jours: await jours(org, tripId).catch(() => [] as DaySnapshot[]), run };
+    }
+    const etapes = (js: DaySnapshot[]) => js.map((jour) => [jour.index, jour.items.map((item) => (item.type === "stop" ? [item.stop.kind, item.stop.placeId, item.stop.start, item.stop.end, item.stop.reason] : item.type))]);
+    const surprises = (js: DaySnapshot[]) => js.flatMap((j) => ((j as { surprise?: { placeId?: string } }).surprise?.placeId === undefined ? [] : [j.index]));
+
+    // Référence : les lots des seules étapes (sans idée), puis les lots avec idées sans refus.
+    const sans = await etapeE(0);
+    const avec = await etapeE(undefined);
+    expect(sans.fin.arret).toBeUndefined();
+    expect(avec.fin.arret).toBeUndefined();
+    const nomsEtapes = new Set(sans.lots.flatMap((l) => l.noms));
+    const ideesDe = (noms: readonly string[]) => noms.filter((nom) => !nomsEtapes.has(nom));
+    // Lot unique portant les candidats d'idée (une ville), dans l'ordre de `candidatsDIdees` : du mieux au moins bien classé.
+    const lotAvecIdees = avec.lots.find((l) => ideesDe(l.noms).length > 0);
+    expect(lotAvecIdees).toBeDefined();
+    expect(ideesDe(lotAvecIdees!.noms).length).toBeGreaterThanOrEqual(2);
+    expect(surprises(avec.jours)).toEqual([1, 2]);
+    // Le premier lot d'un essai porte ses candidats d'idée dans l'ordre de `candidatsDIdees` (le choix exact varie d'un voyage
+    // à l'autre : identifiants aléatoires). Quand la réserve n'admet que `garde` idées, chaque nouvel essai retire la dernière
+    // (la moins bien classée) ; le lot qui passe garde les `garde` mieux classées, et toutes les étapes.
+    const verifierAbandon = (essai: { lots: { noms: string[]; refuse: boolean }[] }, garde: number) => {
+      const classees = ideesDe(essai.lots[0]?.noms ?? []);
+      expect(classees.length).toBeGreaterThan(garde);
+      expect(essai.lots[0]?.refuse).toBe(true);
+      const attendus = Array.from({ length: classees.length - garde }, (_, i) => classees.slice(0, classees.length - i));
+      expect(essai.lots.filter((l) => l.refuse).map((l) => ideesDe(l.noms))).toEqual(attendus);
+      const passes = essai.lots.filter((l) => !l.refuse);
+      expect(passes.flatMap((l) => ideesDe(l.noms))).toEqual(classees.slice(0, garde));
+      // Les étapes de chaque lot refusé sont toutes reprises dans le lot qui passe.
+      for (const refuse of essai.lots.filter((l) => l.refuse)) for (const nom of refuse.noms.filter((n) => nomsEtapes.has(n))) expect(passes.flatMap((l) => l.noms)).toContain(nom);
+    };
+
+    // Réserve d'une seule idée : refus dès le premier appel ; les moins bien classées partent une à une, la mieux classée reste.
+    const uneIdee = await etapeE(undefined, (lot) => ideesDe(lot.map((l) => l.nom)).length <= 1);
+    expect(uneIdee.fin.arret).toBeUndefined();
+    verifierAbandon(uneIdee, 1);
+    expect(etapes(uneIdee.jours)).toEqual(etapes(sans.jours));
+    expect(surprises(uneIdee.jours)).toEqual([1]);
+    expect(["ready", "incomplete"]).toContain(uneIdee.run.phase);
+    expect(uneIdee.run.stop_reason).toBeNull();
+
+    // Réserve des seules étapes : toutes les idées partent, de la moins bien classée à la mieux classée ; étapes intactes.
+    const aucune = await etapeE(undefined, (lot) => ideesDe(lot.map((l) => l.nom)).length === 0);
+    expect(aucune.fin.arret).toBeUndefined();
+    verifierAbandon(aucune, 0);
+    expect(etapes(aucune.jours)).toEqual(etapes(sans.jours));
+    expect(surprises(aucune.jours)).toEqual([]);
+    expect(["ready", "incomplete"]).toContain(aucune.run.phase);
+    expect(aucune.run.stop_reason).toBeNull();
+
+    // Refus qui persiste sans aucune idée : comportement inchangé, l'étape s'arrête sur le code du refus.
+    const toujours = await etapeE(undefined, () => false);
+    expect(toujours.fin.arret).toBeDefined();
+    expect(toujours.lots.at(-1)?.noms.every((nom) => nomsEtapes.has(nom))).toBe(true);
+    expect(toujours.run.stop_reason).toBe("cap_reached");
   });
 });

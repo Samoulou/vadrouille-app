@@ -118,7 +118,12 @@ function intervallesOccupes(jour: DaySnapshot, configuration: ConfigurationMoteu
   return etapes.map((stop) => ({ debut: versMinutes(stop.start), fin: finOccupee(stop, configuration) }));
 }
 
-/** Vrai si l'heure tombe dans l'intervalle d'une étape, d'un événement, d'un engagement ou d'un repas de ce jour (0106 § 6.1). */
+/**
+ * Vrai si l'heure tombe dans l'intervalle d'une étape, d'un événement, d'un engagement ou d'un repas de ce jour (0106 § 6.1).
+ * Seule l'heure de début de la case est testée, pas sa durée : une étape qui commence à 10:15 ne bloque pas la case de
+ * 10:00. Choix assumé (0106 § 6.1 ne compare que l'heure de la case ; mineur 2 de la revue du head 0b2897a) : une case
+ * `noOption` est un repère horaire, pas une plage réservée.
+ */
 function creneauOccupe(occupes: ReadonlyMap<number, readonly Intervalle[]>, day: number, time: string): boolean {
   const instant = versMinutes(time);
   return (occupes.get(day) ?? []).some(({ debut, fin }) => instant >= debut && instant < Math.max(fin, debut + 1));
