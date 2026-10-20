@@ -14,7 +14,7 @@ import {
   SQL_VERROU_S8,
   verrouS8Leve,
 } from "@/adapters/prototype-ecriture";
-import { SQL_SUPPRIMER } from "./prototype-travail";
+import { SQL_SUPPRIMER } from "@/adapters/prototype-travail";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
 import { cleTrajet, pairesAConserver, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";

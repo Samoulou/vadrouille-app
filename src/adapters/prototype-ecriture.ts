@@ -1,5 +1,6 @@
 import "server-only";
 
+import { supprimerCandidatsDansTransaction } from "@/adapters/prototype-travail";
 import type { CodeEchecEcriture, EcritureProgrammePrototype, ProgrammeEcrit } from "@/contracts/prototype-ecriture";
 import {
   CLES_PROGRAMME_ECRIT,
@@ -11,9 +12,6 @@ import {
   placeIdsDuProgramme,
 } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
-
-// Import relatif : la suppression des candidats vit dans l'adaptateur de la table de travail (Q531), qui seul la nomme.
-import { supprimerCandidatsDansTransaction } from "./prototype-travail";
 
 /**
  * Écriture d'un programme du prototype et de ses positions (décision 0052 § 1 ; exigence Sécurité S10 ; 0055,

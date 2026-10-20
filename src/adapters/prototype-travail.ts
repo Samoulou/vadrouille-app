@@ -6,9 +6,11 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 /**
  * Table de travail et registre d'une exécution `p0Run` (décision 0046, D15, D24, S1 et S4 ; 0009 point 3 et 0011 § 3) :
- * **implémentation unique** du contrat `src/contracts/prototype-travail.ts`, importée par `src/workflows/p0-run.ts` et
- * ses tests seulement (comme `prototype-ecriture.ts`, 0052 § 1.10) ; ni fabrique ni réexportation par
- * `src/adapters/index.ts`.
+ * **implémentation unique** du contrat `src/contracts/prototype-travail.ts`, importée par `src/workflows/p0-run.ts`, par
+ * `src/adapters/prototype-ecriture.ts` pour la seule suppression des candidats dans la transaction du programme
+ * (`supprimerCandidatsDansTransaction`, constat A de 0103 ; admission : décision 0107) et par leurs tests seulement
+ * (comme `prototype-ecriture.ts`, 0052 § 1.10 ; garde `tests/unit/p0/base-prototype.test.ts`, quelle que soit la forme
+ * du spécificateur) ; ni fabrique ni réexportation par `src/adapters/index.ts`.
  *
  * Droits de `vadrouille_prototype` respectés (0046, D15 point 6) : `SELECT` ; `UPDATE` de `runs` par colonnes
  * (`phase`, `cost_models_micros`, `status`, `stop_code`) ; `INSERT` et `DELETE` de `run_candidates` (aucun `UPDATE` :
