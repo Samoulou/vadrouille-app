@@ -17,6 +17,7 @@ import {
 } from "@/contracts";
 import {
   cleTrajet,
+  minutesTrajetValides,
   pairesDuProgramme,
   type JourReduit,
   type ModeTrajet as ModeTrajetReduit,
@@ -38,8 +39,10 @@ import type { AdapterContext, TripAdapter } from "./types";
  * `detour` selon le seuil), puis valide chaque sortie par son contrat (`TripSchema`, `DaySchema`, `ProposalSchema`,
  * `DayMapSchema`). Les paires viennent toutes de `pairesDuProgramme` (aucune seconde liste).
  *
- * Aucune durée relue n'est gardée : ni fichier, ni cache de module, ni cache partagé entre requêtes, ni écriture en
- * base (seule l'étape finale de `p0Run` écrit les temps, 0092 § 1 point 6). Une relecture refusée ou en échec (quota
+ * Aucune durée relue n'est gardée en mémoire : ni fichier, ni cache de module, ni cache partagé entre requêtes. Seule
+ * exception (décision 0109) : les minutes d'une relecture **réussie** d'un programme réel sont rendues à la fonction
+ * `conserver` que la source attache au programme lu (écriture côté serveur dans les temps conservés, sans écraser un
+ * temps existant) ; l'adaptateur ne connaît ni la base ni l'identifiant du programme. Une relecture refusée ou en échec (quota
  * atteint, service indisponible, réponse invalide, relecteur qui lève) **n'empêche pas l'affichage** (0092 § 4) : les
  * temps conservés restent, un trajet non relu s'affiche sans durée (`minutes: null`), la journée sans total
  * (`travelMinutes: null`), une proposition sans trajet relu perd `travelFromPrevious` et `detour` ; jamais une durée
@@ -60,6 +63,13 @@ export type PaireRelecture = PaireTrajet;
  * origine, destination). Vide pour un programme écrit avant la migration et pour les programmes de test.
  */
 export type TrajetsConserves = ReadonlyMap<string, number>;
+
+/**
+ * Conservation des temps relus d'un programme réel (décision 0109) : minutes entières par clé `cleTrajet`, des seules
+ * paires relues avec succès. Attachée par la source au programme lu (absente : rien n'est conservé). Ne doit jamais
+ * faire échouer la page : l'adaptateur ignore son échec.
+ */
+export type ConserverTrajets = (releves: ReadonlyMap<string, number>) => Promise<void>;
 
 /** Raisons fermées d'une relecture refusée (aucun message de fournisseur n'est jamais repris). */
 export const RAISONS_RELECTURE = ["quota_reached", "unavailable"] as const;
@@ -107,6 +117,8 @@ export interface SourceProgrammesReels {
 export interface ProgrammeReelLu {
   readonly programme: ProgrammeReduit;
   readonly trajets: TrajetsConserves;
+  /** Conservation des temps relus (décision 0109) ; absente : table absente, identifiant illisible ou double de test. */
+  readonly conserver?: ConserverTrajets;
 }
 
 /**
@@ -117,6 +129,7 @@ interface ProgrammeServi {
   readonly programme: ProgrammeEcrit;
   readonly positions: ProgrammeReduit["positions"];
   readonly trajets: TrajetsConserves;
+  readonly conserver?: ConserverTrajets;
 }
 
 const AUCUN_TRAJET: TrajetsConserves = new Map();
@@ -175,13 +188,34 @@ async function relire(relecteur: RelecteurTrajets, paires: readonly PaireRelectu
 }
 
 /**
+ * Temps relus avec succès rendus à `conserver` (décision 0109) : minutes entières entre 0 et 1 440 seulement (une
+ * valeur hors bornes est affichée, jamais écrite) ; rien sans relecture réussie. Un échec n'empêche jamais l'affichage.
+ */
+async function conserverRelues(conserver: ConserverTrajets | undefined, manquantes: readonly PaireRelecture[], relues: readonly number[] | null): Promise<void> {
+  if (conserver === undefined || relues === null) return;
+  const releves = new Map<string, number>();
+  manquantes.forEach((paire, rang) => {
+    const minutes = relues[rang];
+    if (minutesTrajetValides(minutes)) releves.set(cleTrajet(paire), minutes);
+  });
+  if (releves.size === 0) return;
+  try {
+    await conserver(releves);
+  } catch {
+    // Temps non conservé : la paire sera relue au prochain affichage ; la page est servie.
+  }
+}
+
+/**
  * Durées des paires, dans leur ordre : la valeur conservée si elle existe, sinon la valeur relue ; le relecteur n'est
  * appelé que pour les paires absentes des temps conservés (aucun appel si toutes y sont). `null` : durée indisponible.
+ * Les valeurs relues avec succès sont conservées (décision 0109) quand la source le permet.
  */
-async function durees(paires: readonly PaireRelecture[], trajets: TrajetsConserves, relecteur: RelecteurTrajets): Promise<(number | null)[]> {
+async function durees(paires: readonly PaireRelecture[], { trajets, conserver }: Pick<ProgrammeServi, "trajets" | "conserver">, relecteur: RelecteurTrajets): Promise<(number | null)[]> {
   const conservees = paires.map((paire) => trajets.get(cleTrajet(paire)));
   const manquantes = paires.filter((_, rang) => conservees[rang] === undefined);
   const relues = await relire(relecteur, manquantes);
+  await conserverRelues(conserver, manquantes, relues);
   let suivante = 0;
   return conservees.map((valeur) => {
     if (valeur !== undefined) return valeur;
@@ -195,10 +229,11 @@ async function durees(paires: readonly PaireRelecture[], trajets: TrajetsConserv
  * Recompose une journée : durées conservées ou relues (`estimated: false`), `null` pour une durée indisponible ;
  * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché).
  */
-async function recomposerJour({ programme, trajets }: ProgrammeServi, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
+async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
+  const { programme } = servi;
   terminusDu(programme, jour.index);
   const paires = (pairesDuProgramme(programme).jours.get(jour.index) ?? []).map(exiger);
-  const minutes = await durees(paires, trajets, relecteur);
+  const minutes = await durees(paires, servi, relecteur);
   let suivant = 0;
   const items: DayLineItem[] = jour.items.map((ligne) => {
     if (ligne.type !== "segment") return ligne;
@@ -218,7 +253,8 @@ async function recomposerJour({ programme, trajets }: ProgrammeServi, jour: Jour
  * paires manquantes ; `detour` gardé au-delà du seuil. Sans durée (indisponible), la proposition perd
  * `travelFromPrevious` et `detour`.
  */
-async function recomposerPropositions({ programme, trajets }: ProgrammeServi, relecteur: RelecteurTrajets): Promise<Proposal[]> {
+async function recomposerPropositions(servi: ProgrammeServi, relecteur: RelecteurTrajets): Promise<Proposal[]> {
+  const { programme } = servi;
   const paires = pairesDuProgramme(programme).propositions;
   const relues = new Map<number, number>();
   const jours = [...new Set(programme.proposals.filter((p) => p.travelFromPrevious).map((p) => p.day))];
@@ -228,7 +264,7 @@ async function recomposerPropositions({ programme, trajets }: ProgrammeServi, re
       .filter(({ proposition }) => proposition.day === jour && proposition.travelFromPrevious);
     const minutes = await durees(
       concernees.map(({ index }) => exiger(paires.get(index))),
-      trajets,
+      servi,
       relecteur,
     );
     concernees.forEach(({ index }, rang) => {
@@ -318,16 +354,16 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
 }
 
 /**
- * Adaptateur des programmes **réels** (P0r4, décisions 0074, 0079 et 0092) : programmes lus en base et recomposés avec
- * leurs positions (carte Google) et leurs temps conservés ; seules les paires sans temps conservé sont relues à chaque
- * affichage par le relecteur injecté (Routes réel, payant, réservé et plafonné : `src/server/p0/relecture.ts`). « Mes voyages » lit tous les programmes en une seule lecture (`lister`).
+ * Adaptateur des programmes **réels** (P0r4, décisions 0074, 0079, 0092 et 0109) : programmes lus en base et recomposés
+ * avec leurs positions (carte Google) et leurs temps conservés ; seules les paires sans temps conservé sont relues par le
+ * relecteur injecté, puis conservées par la source après une relecture réussie (0109) (Routes réel, payant, réservé et plafonné : `src/server/p0/relecture.ts`). « Mes voyages » lit tous les programmes en une seule lecture (`lister`).
  */
 export function createPrototypeAdapterReel({ programmes, relecteurs }: { programmes: SourceProgrammesReels; relecteurs: { trajets: RelecteurTrajets } }): TripAdapter {
   return creerAdapter({
-    lister: async () => (await programmes.lister()).map(({ programme, trajets }) => ({ programme, positions: programme.positions, trajets })),
+    lister: async () => (await programmes.lister()).map(({ programme, trajets, conserver }) => ({ programme, positions: programme.positions, trajets, conserver })),
     async lire(tripId) {
       const lu = await programmes.lire(tripId);
-      return lu ? { programme: lu.programme, positions: lu.programme.positions, trajets: lu.trajets } : null;
+      return lu ? { programme: lu.programme, positions: lu.programme.positions, trajets: lu.trajets, conserver: lu.conserver } : null;
     },
     relecteur: relecteurs.trajets,
   });
@@ -350,7 +386,7 @@ function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
 
   const voyage = async (servi: ProgrammeServi): Promise<Trip> => {
     const days: Day[] = [];
-    // Une requête par journée (paires manquantes seulement), dans l'ordre : aucune durée relue n'est gardée.
+    // Une requête par journée (paires manquantes seulement), dans l'ordre ; rien en mémoire entre deux requêtes (0109 : relues conservées par la source).
     for (const jour of servi.programme.trip.days) days.push(await recomposerJour(servi, jour, relecteur));
     return TripSchema.parse({ ...servi.programme.trip, days });
   };

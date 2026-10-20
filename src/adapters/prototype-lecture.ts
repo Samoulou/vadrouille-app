@@ -4,6 +4,8 @@ import { TRIP_ID_PATTERN } from "@/contracts/values";
 import {
   cleTrajet,
   minutesTrajetValides,
+  pairesDistinctes,
+  pairesDuProgramme,
   PLACE_ID_PATTERN,
   placeIdsDuProgramme,
   ProgrammeEcritSchema,
@@ -14,7 +16,7 @@ import {
 } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
-import type { ProgrammeReelLu, SourceProgrammesReels, TrajetsConserves } from "./prototype";
+import type { ConserverTrajets, ProgrammeReelLu, SourceProgrammesReels, TrajetsConserves } from "./prototype";
 
 /**
  * Source des programmes **réels** de l'adaptateur `prototype` (décision 0074, complétée par 0079 ; spécification
@@ -22,7 +24,7 @@ import type { ProgrammeReelLu, SourceProgrammesReels, TrajetsConserves } from ".
  * **recomposés avec leurs positions** lues dans `public.place_coordinates`, pour « Mes voyages » et les pages du voyage
  * de la préversion de `p0-reel`.
  *
- * - **Lecture seule** : une transaction `BEGIN READ ONLY` par lecture, `SET LOCAL statement_timeout`, des `SELECT`
+ * - **Lecture seule** (hors la conservation des temps relus, dernier point) : une transaction `BEGIN READ ONLY` par lecture, `SET LOCAL statement_timeout`, des `SELECT`
  *   fixes, valeurs en paramètres liés. Rôle : `vadrouille_prototype` (pool de la garde de connexion), dont les politiques
  *   de lecture ne rendent que les lignes d'`org_prototype` non expirées (programmes et positions) ; `expires_at > now()`
  *   est aussi écrit ici.
@@ -48,6 +50,14 @@ import type { ProgrammeReelLu, SourceProgrammesReels, TrajetsConserves } from ".
  *   appliquée, la table n'existe pas (`to_regclass`, lu dans la même transaction, avant toute requête qui la nomme) :
  *   aucun temps n'est lu, tout est relu comme avant. Avec `prototype-ecriture.ts`, seul module hors de `db/` et
  *   `tests/db/` qui nomme `prototype.trajets`.
+ * - **Temps relus conservés** (décision 0109, seule écriture du module) : à chaque programme servi, si la table existe
+ *   et que son identifiant a la forme d'un uuid, la source attache `conserver`, que l'adaptateur appelle après une
+ *   relecture **réussie** avec les minutes relues. `conserver` rappelle la barrière (fermée : rien), ne garde que les
+ *   paires de `pairesDuProgramme` du programme lu et les minutes entières entre 0 et 1 440, puis écrit dans une
+ *   transaction courte et distincte (`SQL_CONSERVER_TRAJETS`, une requête, valeurs en tableaux liés), sans jamais
+ *   remplacer un temps existant (`ON CONFLICT DO NOTHING` ; ni `UPDATE` ni `DELETE` pour `vadrouille_prototype`).
+ *   Expiration et organisation posées par le déclencheur de la base. Toute erreur : `ROLLBACK`, client détruit, rien
+ *   n'est écrit ni journalisé, la page est servie.
  *
  * Erreur de base (connexion, requête, délai) : `EchecLectureProgrammes`, sans message de la base ni valeur ; la page
  * affiche l'état d'erreur existant.
@@ -81,6 +91,17 @@ export const SQL_TRAJETS_PRESENTS = "SELECT pg_catalog.to_regclass('prototype.tr
  */
 export const SQL_TRAJETS = `SELECT programme_id, mode, origine, destination, minutes FROM prototype.trajets
 WHERE programme_id = ANY($1::uuid[]) AND expires_at > pg_catalog.now()`;
+
+/**
+ * Temps relus à l'affichage conservés (décision 0109) : `id`, `organization_id` et `expires_at` posés par le déclencheur
+ * de la base (programme d'`org_prototype` non expiré, sinon refus) ; un temps déjà conservé n'est jamais remplacé.
+ * Identifiant du programme et colonnes en paramètres liés (tableaux de même longueur).
+ */
+export const SQL_CONSERVER_TRAJETS = `INSERT INTO prototype.trajets (programme_id, mode, origine, destination, minutes)
+SELECT $1::uuid, t.mode, t.origine, t.destination, t.minutes
+FROM ROWS FROM (pg_catalog.unnest($2::text[]), pg_catalog.unnest($3::text[]), pg_catalog.unnest($4::text[]), pg_catalog.unnest($5::integer[]))
+  AS t (mode, origine, destination, minutes)
+ON CONFLICT DO NOTHING`;
 
 export class EchecLectureProgrammes extends Error {
   constructor() {
@@ -162,14 +183,20 @@ const MODES: ReadonlySet<string> = new Set<ModeTrajet>(["walk", "transit", "car"
 /** Identifiant d'un programme lu (colonne `id`), `undefined` s'il n'a pas la forme d'un uuid. */
 const idProgramme = (valeur: unknown): string | undefined => (typeof valeur === "string" && UUID.test(valeur) ? valeur : undefined);
 
+/** Temps conservés lus : par identifiant de programme, et présence de la table (`conserver` n'est attachée qu'avec elle). */
+interface TrajetsLus {
+  readonly presente: boolean;
+  readonly parProgramme: ReadonlyMap<string, Map<string, number>>;
+}
+
 /**
  * Temps conservés des programmes lus, par identifiant de programme (aucune requête sans programme ni sans la table).
  * Une ligne hors forme est ignorée (la paire sera relue), jamais corrigée.
  */
-async function lireTrajets(lire: Lire, programmeIds: readonly string[]): Promise<Map<string, Map<string, number>>> {
+async function lireTrajets(lire: Lire, programmeIds: readonly string[]): Promise<TrajetsLus> {
   const parProgramme = new Map<string, Map<string, number>>();
-  if (programmeIds.length === 0) return parProgramme;
-  if ((await lire(SQL_TRAJETS_PRESENTS))[0]?.presente !== true) return parProgramme;
+  if (programmeIds.length === 0) return { presente: false, parProgramme };
+  if ((await lire(SQL_TRAJETS_PRESENTS))[0]?.presente !== true) return { presente: false, parProgramme };
   const demandes = new Set(programmeIds);
   for (const ligne of await lire(SQL_TRAJETS, [[...demandes].sort()])) {
     const { programme_id: programmeId, mode, origine, destination, minutes } = ligne;
@@ -180,10 +207,57 @@ async function lireTrajets(lire: Lire, programmeIds: readonly string[]): Promise
     trajets.set(cleTrajet({ mode: mode as ModeTrajet, origine, destination }), minutes);
     parProgramme.set(programmeId, trajets);
   }
-  return parProgramme;
+  return { presente: true, parProgramme };
 }
 
 const AUCUN_TRAJET: TrajetsConserves = new Map();
+
+/**
+ * Écrit les temps relus d'un programme (décision 0109) : seules les paires du programme lu, minutes entières entre 0 et
+ * 1 440, triées par clé ; barrière rappelée (fermée : aucune connexion). N'échoue jamais : toute erreur annule la
+ * transaction, détruit le client et n'écrit rien.
+ */
+async function conserverTrajets(
+  pool: SourceProgrammesReelsOptions["pool"],
+  programmeId: string,
+  programme: ProgrammeEcrit,
+  releves: ReadonlyMap<string, number>,
+): Promise<void> {
+  const permises = new Map(pairesDistinctes(pairesDuProgramme(programme)).map((paire) => [cleTrajet(paire), paire]));
+  const lignes = [...releves]
+    .flatMap(([cle, minutes]) => {
+      const paire = permises.get(cle);
+      return paire !== undefined && minutesTrajetValides(minutes) ? [{ cle, paire, minutes }] : [];
+    })
+    .sort((a, b) => (a.cle < b.cle ? -1 : a.cle > b.cle ? 1 : 0));
+  if (lignes.length === 0) return;
+  let client: ClientSql;
+  try {
+    const ouvert = await pool();
+    if (ouvert === null) return;
+    client = await ouvert.connect();
+  } catch {
+    return;
+  }
+  let casse = false;
+  try {
+    await client.query("BEGIN");
+    await client.query(SQL_DELAI);
+    await client.query(SQL_CONSERVER_TRAJETS, [
+      programmeId,
+      lignes.map(({ paire }) => paire.mode),
+      lignes.map(({ paire }) => paire.origine),
+      lignes.map(({ paire }) => paire.destination),
+      lignes.map(({ minutes }) => minutes),
+    ]);
+    await client.query("COMMIT");
+  } catch {
+    casse = true;
+    await client.query("ROLLBACK").catch(() => undefined);
+  } finally {
+    client.release(casse);
+  }
+}
 
 /** Programme recomposé avec ses positions, ou `null` si une position manque (programme non servi). */
 function recomposer(programme: ProgrammeEcrit, positions: ReadonlyMap<string, PositionLieu>): ProgrammeReduit | null {
@@ -210,6 +284,10 @@ function programmeValide(contenu: unknown, tripId: string): ProgrammeEcrit | nul
 }
 
 export function createSourceProgrammesReels({ pool }: SourceProgrammesReelsOptions): SourceProgrammesReels {
+  /** `conserver` du programme lu (décision 0109) : seulement avec la table et un identifiant de forme uuid. */
+  const conservation = (presente: boolean, programmeId: string | undefined, programme: ProgrammeEcrit): { conserver?: ConserverTrajets } =>
+    presente && programmeId !== undefined ? { conserver: (releves) => conserverTrajets(pool, programmeId, programme, releves) } : {};
+
   return {
     async lister() {
       const ouvert = await pool();
@@ -239,7 +317,8 @@ export function createSourceProgrammesReels({ pool }: SourceProgrammesReelsOptio
         // Position manquante ou expirée : le programme n'est pas listé (0046 D15 point 9).
         return valides.flatMap(({ programme, programmeId }): ProgrammeReelLu[] => {
           const recompose = recomposer(programme, positions);
-          return recompose ? [{ programme: recompose, trajets: (programmeId && trajets.get(programmeId)) || AUCUN_TRAJET }] : [];
+          if (!recompose) return [];
+          return [{ programme: recompose, trajets: (programmeId && trajets.parProgramme.get(programmeId)) || AUCUN_TRAJET, ...conservation(trajets.presente, programmeId, programme) }];
         });
       });
     },
@@ -257,13 +336,17 @@ export function createSourceProgrammesReels({ pool }: SourceProgrammesReelsOptio
         // Programme non servi : aucun temps n'est lu.
         if (recompose === null) return { programme: null, trajets: AUCUN_TRAJET };
         const programmeId = idProgramme(lignes[0]?.id);
-        const trajets = programmeId === undefined ? undefined : (await lireTrajets(lire, [programmeId])).get(programmeId);
-        return { programme: recompose, trajets: trajets ?? AUCUN_TRAJET };
+        const trajets = programmeId === undefined ? undefined : await lireTrajets(lire, [programmeId]);
+        return {
+          programme: recompose,
+          trajets: (programmeId !== undefined && trajets?.parProgramme.get(programmeId)) || AUCUN_TRAJET,
+          ...conservation(trajets?.presente === true, programmeId, programme),
+        };
       });
       if (lu === null) return null;
       // Programme trouvé sans toutes ses positions : non servi, état d'erreur existant (0046 D15 point 9).
       if (lu.programme === null) throw new PositionsManquantes();
-      return { programme: lu.programme, trajets: lu.trajets };
+      return { programme: lu.programme, trajets: lu.trajets, ...(lu.conserver ? { conserver: lu.conserver } : {}) };
     },
   };
 }
