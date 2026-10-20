@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { TripSnapshotSchema, type DaySnapshot, type TripSnapshot } from "@/contracts";
 import type { EntreeMoteur } from "@/domain/entrees";
-import { BRANCHE_APPELS_REELS, ECRITURE_POSITIONS_AUTORISEE, ECRITURE_PROGRAMMES_REELS_AUTORISEE, PARTS_FORFAIT, RANG_ETAPE, ETAPES_APERCU, MAX_RETRIES_ETAPE } from "@/server/config/generation";
+import { BRANCHE_APPELS_REELS, ECRITURE_POSITIONS_AUTORISEE, ECRITURE_PROGRAMMES_REELS_AUTORISEE, PARTS_FORFAIT, RANG_ETAPE, ETAPES_APERCU, JOURS_PLANIFIES_APERCU, MAX_RETRIES_ETAPE } from "@/server/config/generation";
 import { PLAFONDS_USAGE } from "@/server/config/usage";
 
 import { PLAFONDS_USAGE_TEST } from "../../../tests/support/plafonds-usage";
@@ -51,6 +51,13 @@ describe("génération: parts du forfait", () => {
         expect(somme).toBe(total);
       }
     }
+  });
+
+  it("forfait réel `apercu` (30 fiches) : la part de l'étape l couvre sa fiche de logement par ville (revue de la PR 563, mineur 19)", () => {
+    const fiches = (etape: "l" | "c" | "e") => partDe(30, PARTS_FORFAIT.details, etape);
+    expect([fiches("l"), fiches("c"), fiches("e")]).toEqual([3, 3, 24]);
+    // Une fiche de logement par ville de l'aperçu (au plus deux villes sur J1 et J2) : la part de `l` suffit.
+    expect(fiches("l")).toBeGreaterThanOrEqual(JOURS_PLANIFIES_APERCU.length);
   });
 
   it("une étape sans part n'a rien", () => {
@@ -147,12 +154,12 @@ describe("génération: la variante réelle n'est jamais choisie sans la répons
 
   it("barrière ouverte mais question 9 sans réponse : composition simulée ; sinon réelle ; jamais en production", async () => {
     const sans = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte });
-    expect(sans.composer(await sans.barriere()).variante).toBe("simulee");
+    expect((await sans.composer(await sans.barriere())).variante).toBe("simulee");
     const avec = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte, programmesReelsAutorises: true });
-    expect(avec.composer(await avec.barriere()).variante).toBe("reelle");
+    expect((await avec.composer(await avec.barriere())).variante).toBe("reelle");
     const production = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: { env: {} } });
     expect(await production.barriere()).toBe("production");
-    expect(() => production.composer("production")).toThrow(ArretEtape);
+    await expect(production.composer("production")).rejects.toBeInstanceOf(ArretEtape);
   });
 
   it("sans cookie d'accès (fermé par défaut) ou sans branche posée, la barrière ne s'ouvre pas", async () => {
@@ -164,7 +171,7 @@ describe("génération: la variante réelle n'est jamais choisie sans la répons
     const source = readFileSync(path.join(import.meta.dirname, "../../workflows/apercu.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const appels = [...source.matchAll(/return\s+(\w+)\(([^)]*)\);/g)].map((m) => ({ nom: m[1], arguments: m[2]?.trim() }));
     expect(appels.length).toBeGreaterThanOrEqual(6);
-    for (const appel of appels) expect(appel.arguments, `${appel.nom} ne reçoit que l'entrée`).toMatch(/^(entree|entree, "upstream_error")$/);
+    for (const appel of appels) expect(appel.arguments, `${appel.nom} ne reçoit que l'entrée`).toMatch(/^(entree|entree, "upstream_unavailable")$/);
     expect(source).not.toMatch(/dependances/i);
   });
 });
@@ -178,9 +185,9 @@ describe("génération: écriture des positions (0081 B9-TL-9, 0060 § 1.3)", ()
     expect(ecriturePositionsPermise({ env: { POSITIONS_ECRITURE_SUSPENDUE: "true" }, autorisee: true })).toBe(true);
   });
 
-  it("jamais pour la variante simulée par défaut ; forcée seulement par les tests", () => {
-    const simulee = resoudre({ plafonds: PLAFONDS_USAGE_TEST });
-    const fabrique = simulee.composer("simulee");
+  it("jamais pour la variante simulée par défaut ; forcée seulement par les tests", async () => {
+    const simulee = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: { env: { VADROUILLE_ENV: "ci" } } });
+    const fabrique = await simulee.composer("simulee");
     expect(simulee.ecriturePositions(fabrique)).toBe(false);
     expect(resoudre({ plafonds: PLAFONDS_USAGE_TEST, ecriturePositions: true }).ecriturePositions(fabrique)).toBe(true);
     expect(resoudre({ plafonds: PLAFONDS_USAGE_TEST, ecriturePositions: false }).ecriturePositions({ ...fabrique, variante: "reelle" })).toBe(false);
@@ -207,6 +214,8 @@ describe("génération: `no_option` n'est jamais une raison d'échec (B9-PO-9)",
 
   // Le contrat est validé par le module testé ; ces instantanés de test ne passent pas toujours `TripSnapshotSchema`.
   const sansSchema = vi.spyOn(TripSnapshotSchema, "parse").mockImplementation((v) => v as never);
+  // Revue de la PR 563, mineur 14 : le simulacre ne fuit pas hors de ce bloc.
+  afterAll(() => sansSchema.mockRestore());
 
   it("le programme entier d'abord : aucun repli quand le moteur réussit", () => {
     const moteur = vi.fn(() => ({ ok: true as const, instantane: instantane(jour(1, ["A"]), jour(2, ["B"])), rapport: [] }));

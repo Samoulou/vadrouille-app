@@ -31,7 +31,5 @@ export function lireEnvGeneration(env: Env = process.env): EnvGeneration {
   };
 }
 
-/** Vrai quand les écritures de positions au cache sont suspendues (0060 § 1.3, « Interrupteur d'écriture »). */
-export function ecriturePositionsSuspendue(env: Env = process.env): boolean {
-  return env.POSITIONS_ECRITURE_SUSPENDUE === "1";
-}
+/** Vrai quand les écritures de positions au cache sont suspendues (0060 § 1.3) : un seul lecteur, celui de `relectures.ts`. */
+export { ecriturePositionsSuspendue } from "./relectures";

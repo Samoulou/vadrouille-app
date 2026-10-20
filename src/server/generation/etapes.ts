@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Category, DaySnapshot, StopFacts, StopSnapshot, TripSnapshot } from "@/contracts";
-import type { CandidatEvenement, CandidatMoteur, NotesMoteur, TypeCreneau } from "@/domain/entrees";
+import type { CandidatEvenement, CandidatIdee, CandidatMoteur, NotesMoteur, TypeCreneau } from "@/domain/entrees";
 import { modesAdmis } from "@/domain/generation";
 import { squeletteAvecEngagements } from "@/domain/squelette";
 import { joursEntre } from "@/domain/temps";
@@ -44,7 +44,9 @@ import { publier } from "./publication";
  * 2. **garde d'idempotence** (`commencerEtape`) avant toute composition et tout appel : refusée, l'étape rend l'arrêt
  *    `step_expired` sans rien écrire (jamais une étape suivante sur une étape interrompue) ;
  * 3. **barrière** (`dependances.barriere`, B9-TL-8) **évaluée par `executer`, à l'entrée de chaque étape, après la garde et
- *    avant tout forfait** (étape `a` comprise, qui réserve le forfait) : `production` clôt l'exécution sur `production_refused`
+ *    avant tout forfait** (étape `a` comprise, qui réserve le forfait) ; ordre assumé (revue de la PR 563, mineur 8) : elle est
+ *    évaluée après `commencerEtape` (transaction ouverte), et en production la garde 0034 refuse déjà la connexion avant, si bien
+ *    que `production_refused` n'y est jamais écrit ; ni appel ni forfait n'a lieu dans les deux cas : `production` clôt l'exécution sur `production_refused`
  *    sans réservation, composition ni appel ; puis forfait : réservé (idempotent) avant tout appel, refusé → arrêt ;
  * 4. **fabriques appelées dans l'étape** : aucun client, registre ni composition en cache de module ;
  * 5. un registre en mémoire par étape, borné par sa part du forfait ; échéance vérifiée avant chaque appel externe ;
@@ -143,7 +145,7 @@ function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtap
 
 async function ouvrirCapacites(contexte: Contexte): Promise<{ readonly fabrique: FabriqueGeneration; readonly forfait: ForfaitDeLEtape; readonly options: OptionsEtape }> {
   const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId }, contexte.etape);
-  const fabrique = contexte.dep.composer(contexte.barriere);
+  const fabrique = await contexte.dep.composer(contexte.barriere);
   return { fabrique, forfait, options: optionsEtape(contexte, forfait) };
 }
 
@@ -428,6 +430,9 @@ export function etapeAncrage(entree: unknown, dependances?: DependancesGeneratio
           if (placeId !== undefined) resolus.set(candidat.id, placeId);
         }
       }
+      // Dédoublonnage avant la notation (revue de la PR 563, mineur 17) : le candidat gardé pour un lieu est celui que l'étape `d`
+      // note. S'il n'obtient pas de notes, le lieu n'a plus de candidat éligible en `e` (l'autre a perdu son `place_id`) : il
+      // n'est pas planifié, sans erreur. Écart assumé, un lieu de moins plutôt qu'un lieu sans notes.
       // Deux candidats peuvent se résoudre au même lieu (aucune unicité sur `candidates.place_id`) : le mieux classé, c'est-à-dire
       // le premier de la recherche (`created_at`, étape `b`), garde le lieu, l'autre le perd et n'a plus de rôle. Le moteur
       // garde de toute façon le premier classé : la correspondance lieu → candidat de l'étape `e` est alors sans ambiguïté.
@@ -514,6 +519,45 @@ function candidatMoteur(candidat: CandidatLu): (CandidatMoteur & { readonly vill
   };
 }
 
+/**
+ * Candidats d'idée « Surprends-moi » (0106 § 1, 0105 § 5.1 point 1) : par jour planifié, les candidats `place` ancrés et notés de
+ * la ville du soir qui ne sont dans **aucun** jour du plan, les `ideesParJour` (`IDEES_PAR_JOUR_APERCU`) mieux notés au plus (voeux, incontournable,
+ * risque faible ; ordre de la recherche à égalité). L'étape ne choisit pas l'idée : `ideeDuJour` (moteur) le fait.
+ */
+function choisirCandidatsIdees(
+  programme: TripSnapshot,
+  candidats: readonly CandidatMoteur[],
+  parPlaceId: ReadonlyMap<string, CandidatLu>,
+  squelette: readonly { readonly index: number; readonly logementArrivee: number }[],
+  nuitsVille: readonly number[],
+  parJour: number,
+): CandidatLu[] {
+  const auPlan = new Set(programme.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
+  const retenus = new Map<string, CandidatLu>();
+  for (const jour of squelette) {
+    const ville = nuitsVille[jour.logementArrivee];
+    const classes = candidats
+      .map((moteur, rang) => ({ moteur, rang, lu: moteur.placeId === undefined ? undefined : parPlaceId.get(moteur.placeId) }))
+      .filter((c): c is typeof c & { lu: CandidatLu } => c.lu !== undefined && c.lu.ville === ville && c.moteur.placeId !== undefined && !auPlan.has(c.moteur.placeId))
+      .sort(
+        (a, b) =>
+          Number(b.moteur.notes.matchesWishes) - Number(a.moteur.notes.matchesWishes) ||
+          Number(b.moteur.notes.mustSee) - Number(a.moteur.notes.mustSee) ||
+          a.moteur.notes.notForMeRisk - b.moteur.notes.notForMeRisk ||
+          a.rang - b.rang,
+      );
+    for (const { lu } of classes.slice(0, parJour)) retenus.set(lu.id, lu);
+  }
+  return [...retenus.values()];
+}
+
+/** Les étapes (lieu, genre, heure, jour) de deux programmes sont les mêmes : seule l'idée du jour peut différer. */
+function memesEtapes(a: TripSnapshot, b: TripSnapshot): boolean {
+  const etapes = (t: TripSnapshot) =>
+    JSON.stringify(t.days.map((jour) => [jour.index, jour.items.map((item) => (item.type === "stop" ? [item.stop.kind, item.stop.placeId, item.stop.start, item.stop.end] : item.type))]));
+  return etapes(a) === etapes(b);
+}
+
 /** Date du jour (`YYYY-MM-DD`) dans le fuseau du voyage (B9-PO-3) ; UTC si le fuseau est illisible. */
 function dateDansFuseau(instant: number, fuseau: string): string {
   try {
@@ -537,7 +581,9 @@ function eligibles(candidats: readonly CandidatLu[]): { readonly lu: CandidatLu;
 /**
  * Étape `e` (rang 6) : relectures Google des seuls jours planifiés (J1 et J2 : fiches des lieux retenus, une matrice Routes
  * par jour, aucune pour un jour non planifié, B9-TL-13), moteur partiel (`generer` avec `jours`), réparation déterministe
- * (**aucun appel de modèle** entre la validation et la rédaction), raisons (`rediger`, par ville, seuls les lieux retenus),
+ * (**aucun appel de modèle** entre la validation et la rédaction), raisons (`rediger`, par ville : les lieux retenus et les
+ * candidats d'idée « Surprends-moi » dans le même lot, jamais un appel de plus), idée du jour (second passage de `generer`, 0106 § 1
+ * et 0105 § 5),
  * puis la **transaction unique de publication** (`publication.ts`), qui écrit aussi, quand la configuration l'autorise,
  * les positions des fiches lues pour les seuls lieux de la version (0081 B9-TL-9). Statut `ready` avec 8 cases `proposal`,
  * `incomplete` sinon (cases `noOption` à la suite, jamais un lieu non ancré).
@@ -589,7 +635,7 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
 
       const parPlaceId = new Map(retenables.flatMap(({ lu, moteur }) => (moteur.placeId === undefined ? [] : [[moteur.placeId, lu] as const])));
       const evenements = evenementsDe(lus.candidats, lus.occurrences);
-      const entreeMoteur = (candidats: readonly CandidatMoteur[]) => ({
+      const entreeMoteur = (candidats: readonly CandidatMoteur[], idees: readonly CandidatIdee[] = []) => ({
         voyage: {
           destination: voyage.draft.destination,
           start: voyage.draft.start,
@@ -602,8 +648,8 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         engagements: voyage.draft.commitments,
         candidats,
         evenements,
-        // Idée « Surprends-moi » : hors de l'aperçu (écart signalé dans la PR, question au Tech Lead et au Product Owner).
-        idees: [],
+        // Idée « Surprends-moi » (0106 § 1, 0105 § 5) : vide au premier passage ; remplie au second, avec les raisons déjà écrites.
+        idees,
         choix: new Map(),
         configuration: CONFIGURATION_MOTEUR,
         classement: { formule: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: AGE_SOURCE_MAX_JOURS_APERCU },
@@ -620,6 +666,7 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
       const essayes = new Set<string>();
       let candidats: readonly CandidatMoteur[] = planification.valeur.candidats;
       let programme: TripSnapshot | null = null;
+      let idsIdees = new Set<string>();
       let etapes: { stop: StopSnapshot; candidat: CandidatLu }[] = [];
       for (let passe = 1; passe <= 2; passe += 1) {
         programme = genererSansEchec(entreeMoteur(candidats));
@@ -628,6 +675,8 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         etapes = programme.days
           .filter((jour) => jours.includes(jour.index))
           .flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined && parPlaceId.has(item.stop.placeId) ? [{ stop: item.stop, candidat: parPlaceId.get(item.stop.placeId) as CandidatLu }] : [])));
+        const candidatsIdees = choisirCandidatsIdees(programme, candidats, parPlaceId, squelette, nuitsVille, contexte.dep.ideesParJour);
+        idsIdees = new Set(candidatsIdees.map((candidat) => candidat.id));
         for (const ville of villes) {
           const lieux: LieuARedige[] = etapes
             .filter(({ candidat }) => candidat.ville === ville.rang && !raisons.has(candidat.id) && !essayes.has(candidat.id))
@@ -639,18 +688,45 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
               typeEtape: candidat.stopKind === "meal" ? "meal" : "activity",
               sourceUrl: candidat.sources.find((source) => source.url !== "")?.url,
             }));
+          // Candidats d'idée de la ville (0105 § 5.1 point 2) : dans le même lot que les étapes, jamais un appel de plus.
+          for (const candidat of candidatsIdees.filter((c) => c.ville === ville.rang && !raisons.has(c.id) && !essayes.has(c.id) && !lieux.some((l) => l.id === c.id))) {
+            lieux.push({
+              id: candidat.id,
+              nom: candidat.nom,
+              resume: candidat.resume,
+              categorie: candidat.categorie,
+              typeEtape: candidat.stopKind === "meal" ? "meal" : "activity",
+              sourceUrl: candidat.sources.find((source) => source.url !== "")?.url,
+            });
+          }
           if (lieux.length === 0) continue;
           const issue = await capacite.rediger(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, lieux);
           if (!issue.ok) throw new ArretEtape(issue.code);
           for (const lieu of lieux) essayes.add(lieu.id);
           for (const [id, raison] of issue.valeur) raisons.set(id, raison);
         }
+        // Un lieu dont la raison manque (rédaction échouée ou omise) est retiré, et le programme replanifié sans lui (deux passes au
+        // plus). Passé la seconde, une étape sans raison reste dans la version 1, sans `reason` (`StopSnapshot.reason` est
+        // facultatif) et sans case `proposal` : jamais inventée (décision 0105 § 4.2).
         const sansRaison = new Set(etapes.filter(({ candidat }) => !raisons.has(candidat.id)).map(({ candidat }) => candidat.id));
         if (sansRaison.size === 0) break;
         const ids = new Set(retenables.filter(({ lu }) => sansRaison.has(lu.id)).flatMap(({ moteur }) => moteur.id));
         candidats = candidats.filter((candidat) => !ids.has(candidat.id));
       }
       if (programme === null) throw new ArretEtape("invalid_input");
+
+      // Idée du jour : second passage de la fonction pure `generer` avec les idées qui ont une raison (0105 § 5.1 point 3). Le
+      // choix de l'idée, son filtre R1 et son exclusion restent ceux de `ideeDuJour` (moteur). Invariant : les étapes ne
+      // changent pas ; sinon le premier passage est gardé, sans idée et sans échec.
+      const idees: CandidatIdee[] = candidats.flatMap((candidat) => {
+        const raison = raisons.get(candidat.id);
+        const lu = candidat.placeId === undefined ? undefined : parPlaceId.get(candidat.placeId);
+        return raison === undefined || lu === undefined || !idsIdees.has(candidat.id) ? [] : [{ ...candidat, raison: raison.raison }];
+      });
+      if (idees.length > 0) {
+        const avecIdees = genererSansEchec(entreeMoteur(candidats, idees));
+        if (avecIdees !== null && memesEtapes(programme, avecIdees)) programme = avecIdees;
+      }
 
       const lieux = new Map<string, LieuDeCase>();
       const jourAvecRaisons = (jour: DaySnapshot): DaySnapshot => ({

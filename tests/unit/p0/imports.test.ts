@@ -730,7 +730,14 @@ const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/w
  * règle `ligne/relecture-imports`. Admis : `src/adapters/index.ts` → `composition/lecture.ts` → `composition/clients-google.ts`
  * → `@/grounding/*` (cas fabriqués ci-dessous).
  */
-const PONTS_LECTURE: readonly string[] = ["src/server/composition/clients-google.ts", "src/server/composition/generation.ts", "src/server/relecture/planification.ts"];
+// B9c (décision 0105 § 2) : `fixtures-simulees.ts` est le module des doubles d'Édimbourg de la composition simulée, atteint par
+// `import()` dynamique depuis `generation.ts` seulement ; il ouvre `@/ai`, `@/research` et `@/grounding` comme elle (doubles).
+const PONTS_LECTURE: readonly string[] = [
+  "src/server/composition/clients-google.ts",
+  "src/server/composition/generation.ts",
+  "src/server/composition/fixtures-simulees.ts",
+  "src/server/relecture/planification.ts",
+];
 const estPont = (chemin: string) => PONTS_P0.includes(chemin) || PONTS_LECTURE.includes(chemin);
 
 /**
@@ -792,7 +799,7 @@ const areteAdmise = (de: string, vers: string) =>
   (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
   // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
   // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
-  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Le test du graphe est réécrit par B9c (point 4).
+  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart de B9c consigné dans sa PR : la réécriture complète de ce test du graphe (point 4) n'est pas faite ; les arêtes de la génération sont couvertes par les cas « B9c admis/refusé » ci-dessous et par `composition.test.ts`.
   (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */

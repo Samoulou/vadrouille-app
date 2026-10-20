@@ -10,9 +10,11 @@ import { CODES_ARRET } from "./raison-echec";
  * de son organisation, le rang de la dernière étape terminée et, si l'exécution s'est arrêtée, le **code fermé** de l'arrêt.
  * Rien d'autre : ni brouillon, ni brief, ni candidat, ni `placeId`, ni verdict, ni date de contrôle, ni compteur d'ancrage.
  *
- * Écart à 0081 (signalé dans la PR) : `organizationId` s'ajoute à `{ generationRunId, rang }`. Les politiques de sécurité par
- * ligne des tables de génération ne voient une ligne que sous `app.organization_id` (`withSystemOrg`) : une étape ne peut
- * pas lire son exécution sans connaître l'organisation. L'identifiant d'organisation n'est pas une donnée de lieu.
+ * Règle de la décision 0105 § 1 (qui amende 0081 B9-TL-3 points 1 (4) et 3 : `{ generationRunId, rang }` en était le minimum, non une
+ * liste fermée) : l'état contient au plus ces quatre champs, `z.strictObject` ; tout autre exige une décision écrite.
+ * `organizationId` est une **indication de portée, jamais une preuve** : l'étape lit sa ligne `generation_runs` sous
+ * `withSystemOrg(organizationId)` ; si la ligne n'est pas visible (organisation fausse), elle s'arrête sans écriture ni appel.
+ * Le démarreur tire l'organisation de la ligne réservée en base, jamais d'une entrée de la personne.
  */
 export const EtatEtapeSchema = z.strictObject({
   generationRunId: z.uuid(),

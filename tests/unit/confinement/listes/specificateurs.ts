@@ -420,11 +420,11 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/port", noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/reservation", noms: ["type:ReglesUsage"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B9C },
-  { fichier: "src/server/composition/generation.ts", specificateur: "../../../prototype/fixtures/modeles/edimbourg.json", noms: ["default"], motif: COMPOSITION_B9C },
-  { fichier: "src/server/composition/generation.ts", specificateur: "../../../prototype/fixtures/pages/edimbourg.json", noms: ["default"], motif: COMPOSITION_B9C },
-  { fichier: "src/server/composition/generation.ts", specificateur: "../../../prototype/fixtures/places/edimbourg.json", noms: ["default"], motif: COMPOSITION_B9C },
-  { fichier: "src/server/composition/generation.ts", specificateur: "../../../prototype/fixtures/recherche/edimbourg.json", noms: ["default"], motif: COMPOSITION_B9C },
-  { fichier: "src/server/composition/generation.ts", specificateur: "../../../prototype/fixtures/routes/edimbourg.json", noms: ["default"], motif: COMPOSITION_B9C },
+  // Décision 0105 § 2 : les fixtures d'Édimbourg sont lues à l'exécution par un module séparé (aucun import de `prototype/`),
+  // atteint par `import()` dynamique depuis `generation.ts` après la barrière ; il refuse de lire sous `production`.
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:fs/promises", noms: ["readFile"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:path", noms: ["resolve"], motif: COMPOSITION_B9C },
   { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.

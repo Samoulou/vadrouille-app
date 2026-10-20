@@ -55,7 +55,6 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
   const { organizationId, generationRunId, tripId } = contexte;
   if (contexte.requestId === null) throw new ArretEtape("invalid_input");
   const requestId = contexte.requestId;
-  let derniere: unknown;
   for (let tentative = 1; tentative <= TENTATIVES_PUBLICATION; tentative += 1) {
     try {
       return await dependances.transaction(organizationId, async (tx) => {
@@ -99,9 +98,10 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
       });
     } catch (erreur) {
       if (erreur instanceof ArretEtape) throw erreur;
-      derniere = erreur;
       if (dependances.maintenant() + DELAI_PORT_MS >= contexte.echeance) break;
     }
   }
-  throw derniere instanceof Error ? derniere : new Error("publication");
+  // Publication épuisée (panne de base, connexion perdue, positions `base` réessayables) : cause externe passagère, donc
+  // `upstream_unavailable` (réessayable, 0081 B9-TL-3 points 2 et 4) ; l'erreur brute, qui peut porter des données, ne sort pas.
+  throw new ArretEtape("upstream_unavailable");
 }

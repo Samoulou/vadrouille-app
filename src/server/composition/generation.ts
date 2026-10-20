@@ -7,7 +7,6 @@ import type { EntreeModeles } from "@/ai/entrees";
 import { ErreurOpenRouter, createOpenRouterClient } from "@/ai/openrouter-client";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
-import { creerModelesSimules, FixturesModelesSchema } from "@/ai/modeles.simule";
 import type { TracesIa } from "@/ai/traces";
 import type { Brief, Category, Lodging, MobilityMode } from "@/contracts";
 import type { ParametresClassement } from "@/domain/classement";
@@ -18,13 +17,9 @@ import type { JourSquelette } from "@/domain/squelette";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import type { ClientPlacesMvp, ClientRoutes } from "@/grounding/interfaces";
 import { ancrerCandidats, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
-import { creerPlacesSimule, FixturesPlacesSchema } from "@/grounding/places.simule";
-import { creerRoutesSimule, FixturesRoutesSchema } from "@/grounding/routes.simule";
 import { capturer, valeurOuEchec, type ResultatAncrage } from "@/grounding/resultat";
 import { creerLecteurPages, type LecteurPages } from "@/research/fetch-page";
-import { creerHttpSimule, creerResolveurSimule, FixturesPagesSchema } from "@/research/pages.simule";
 import { creerRecherche, type ConfigurationRecherche } from "@/research/recherche";
-import { creerRechercheSimulee, FixturesRechercheSchema } from "@/research/recherche-web.simule";
 import { versLignes, type LignesCandidat } from "@/research/candidat-trouve";
 import { classerSource } from "@/research/sources";
 import { createUndiciTransport } from "@/research/undici-transport";
@@ -50,11 +45,6 @@ import {
 import type { ReglesUsage } from "@/server/usage/reservation";
 import type { PlafondsUsage } from "@/server/config/usage";
 
-import fixturesModeles from "../../../prototype/fixtures/modeles/edimbourg.json";
-import fixturesPages from "../../../prototype/fixtures/pages/edimbourg.json";
-import fixturesPlaces from "../../../prototype/fixtures/places/edimbourg.json";
-import fixturesRecherche from "../../../prototype/fixtures/recherche/edimbourg.json";
-import fixturesRoutes from "../../../prototype/fixtures/routes/edimbourg.json";
 
 /**
  * Composition de la génération (spécification B9, B9c ; décisions 0081 B9-TL-2, amendée par 0100 § 5.2, B9-TL-1 et
@@ -71,7 +61,7 @@ import fixturesRoutes from "../../../prototype/fixtures/routes/edimbourg.json";
  *   web, pages : rien de Google), `ancrage` (Text Search et position), `notation` (modèles), `finale` (fiches, Routes et
  *   rédaction des raisons : jamais la recherche web ni les pages).
  * - **Variantes** : `reelle` (clients de `clients-google.ts`, OpenRouter, recherche web et pages sur le transport réel) et
- *   `simulee` (doubles sur les fixtures d'Édimbourg de `prototype/fixtures/`, les seules en local et en CI). Les doubles
+ *   `simulee` (doubles sur les fixtures d'Édimbourg de `prototype/fixtures/`, les seules en local et en CI, chargées hors du graphe de production par `doubles-edimbourg.ts`, atteint seulement par `import()` dynamique : décision 0105). Les doubles
  *   sont enveloppés dans la même réservation que les clients réels (`avecReservation`) : un plafond ou un quota agit de la
  *   même façon dans les deux variantes. Le choix de la variante est celui de la barrière (`generation/barriere.ts`).
  * - **Positions** (B8c fusionnée, 0081 B9-TL-9) : la composition n'écrit rien elle-même ; `planifier` rend les positions des fiches
@@ -245,18 +235,6 @@ export type DoublesGeneration = {
   readonly places: ClientPlacesMvp;
   readonly routes: ClientRoutes;
 };
-
-/** Doubles sur les fixtures d'Édimbourg de `prototype/fixtures/` (valeurs sentinelles, aucune réponse réelle enregistrée). */
-export function doublesEdimbourg(): DoublesGeneration {
-  const pages = FixturesPagesSchema.parse(fixturesPages);
-  return {
-    modeles: creerModelesSimules(FixturesModelesSchema.parse(fixturesModeles)),
-    rechercheWeb: creerRechercheSimulee(FixturesRechercheSchema.parse(fixturesRecherche)),
-    lecteur: creerLecteurPages({ resoudre: creerResolveurSimule(pages.dns), http: creerHttpSimule(pages.pages) }),
-    places: creerPlacesSimule(FixturesPlacesSchema.parse(fixturesPlaces)),
-    routes: creerRoutesSimule(FixturesRoutesSchema.parse(fixturesRoutes)),
-  };
-}
 
 function contexteDe(options: OptionsEtape, fournisseur: Fournisseur, horloge: Horloge): () => ContexteAppel {
   return () => ({ nature: "execution", executionId: options.executionId, periodes: periodesDe(fournisseur, horloge) });
@@ -499,13 +477,22 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
 // --- Variante simulée --------------------------------------------------------------------------------------------------
 
 export type OptionsSimulee = {
-  /** Doubles de test (journal de prompts, sentinelles, compteurs) ; les fixtures d'Édimbourg par défaut, neufs à chaque étape. */
+  /** Doubles de test (journal de prompts, sentinelles, compteurs), neufs à chaque étape ; absents : fixtures d'Édimbourg (`fixtures-simulees.ts`, `import()` dynamique, décision 0105 § 2). */
   readonly doubles?: () => DoublesGeneration;
+  /** Déclarations de déploiement (`VADROUILLE_ENV`, `VERCEL_ENV`) que le chargeur de fixtures vérifie ; requises sans `doubles`. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
   readonly traces?: TracesIa;
 };
 
-export function composerSimulee(options: OptionsSimulee = {}): FabriqueGeneration {
-  const doubles = options.doubles ?? doublesEdimbourg;
+export async function composerSimulee(options: OptionsSimulee = {}): Promise<FabriqueGeneration> {
+  // Seul point d'entrée vers le module de fixtures (`import()` dynamique d'un fichier de `src/`, décision 0105 § 2 point 1).
+  const doubles = options.doubles ?? (await (await import("@/server/composition/fixtures-simulees")).chargerDoublesEdimbourg(options.env ?? {}));
+  return composerSimuleeAvec({ doubles, ...(options.traces === undefined ? {} : { traces: options.traces }) });
+}
+
+/** Composition simulée sur des doubles déjà construits (synchrone) ; `composerSimulee` y ajoute le chargement des fixtures. */
+export function composerSimuleeAvec(options: { readonly doubles: () => DoublesGeneration; readonly traces?: TracesIa }): FabriqueGeneration {
+  const doubles = options.doubles;
   const reglages = CONFIGURATION_IA.reglages;
   return {
     variante: "simulee",

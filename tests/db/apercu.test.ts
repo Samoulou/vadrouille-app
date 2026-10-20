@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { composerSimulee, doublesEdimbourg, type FabriqueGeneration } from "@/server/composition/generation";
+import { composerSimuleeAvec, type FabriqueGeneration } from "@/server/composition/generation";
 import type { DependancesGeneration } from "@/server/generation/dependances";
 import type { OrgTransaction } from "@/server/with-org";
 import { EtatEtapeSchema, type EtatEtape } from "@/server/generation/etat";
@@ -8,6 +8,7 @@ import { etapeBrief, etapeCloture, etapeLogement } from "@/server/generation/eta
 
 import {
   MAINTENANT,
+  doublesEdimbourg,
   PLAFONDS_LARGES,
   banc,
   contexteDe,
@@ -15,8 +16,10 @@ import {
   creerWithOrg,
   creerWithSystemOrgPourTests,
   demandeEdimbourg,
+  ETAPES,
   derouler,
 } from "../support/banc-apercu";
+import { compterAppels, compteursVides } from "../support/compteur-appels";
 import { journalDePrompts } from "../support/journal-prompts";
 import { avecSentinellesGoogle, sentinellesPresentes } from "../support/sentinelles-google";
 import { creerBaseApercu, type BaseApercu } from "./base-apercu";
@@ -59,7 +62,7 @@ function dependances(surcharge: Partial<DependancesGeneration> = {}, fabrique?: 
 }
 
 const avec = (surcharge: Surcharge): (() => FabriqueGeneration) => {
-  const base = composerSimulee();
+  const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
   return () => ({ ...base, ...surcharge });
 };
 
@@ -151,7 +154,7 @@ describe("aperçu : chemin nominal (Édimbourg)", () => {
     expect(run.id).toBe(apres.id);
   });
 
-  it("rejeu de la publication : une seule version, aucune case en double", async () => {
+  it("garde de la publication : une étape e déjà passée est refusée, une seule version, aucune case en double", async () => {
     const org = await nouvelleOrg();
     const { tripId, etat } = await lancer(org);
     await derouler(etat, dependances());
@@ -180,6 +183,44 @@ describe("aperçu : état sérialisé, prompts et données Google", () => {
     }
   });
 
+  it("l'état est un strictObject { generationRunId, organizationId, rang, arret? } (0105 § 1) : clé en plus ou en moins refusée", () => {
+    const valide = { generationRunId: crypto.randomUUID(), organizationId: crypto.randomUUID(), rang: 0 };
+    expect(EtatEtapeSchema.safeParse(valide).success).toBe(true);
+    expect(EtatEtapeSchema.safeParse({ ...valide, arret: "cap_reached" }).success).toBe(true);
+    expect(EtatEtapeSchema.safeParse({ ...valide, arret: "message libre" }).success).toBe(false);
+    expect(EtatEtapeSchema.safeParse({ ...valide, tripId: crypto.randomUUID() }).success).toBe(false);
+    expect(EtatEtapeSchema.safeParse({ ...valide, lat: 55.95 }).success).toBe(false);
+    const sans = { generationRunId: valide.generationRunId, rang: valide.rang };
+    expect(EtatEtapeSchema.safeParse(sans).success).toBe(false);
+    expect(EtatEtapeSchema.safeParse({ ...valide, organizationId: "pas-un-uuid" }).success).toBe(false);
+  });
+
+  it("organisation qui ne possède pas l'exécution : arrêt sans écriture ni appel, la portée n'est jamais élargie", async () => {
+    const proprietaire = await nouvelleOrg();
+    const autre = await nouvelleOrg();
+    const { tripId, run, etat } = await lancer(proprietaire);
+    const compteurs = compteursVides();
+    const deps = dependances({}, () => composerSimuleeAvec({ doubles: () => compterAppels(doublesEdimbourg(), compteurs) }));
+    const avant = await dernierRun(proprietaire, tripId);
+    const registreAvant = await inTx(app, { org: proprietaire.org, user: proprietaire.owner }, async (c) => (await c.query("SELECT count(*)::int AS n FROM public.usage_ledger")).rows[0].n as number);
+    const fausse: EtatEtape = { ...etat, organizationId: autre.org };
+    for (const etape of ETAPES) {
+      const sortie = await etape(fausse, deps);
+      expect(sortie.arret, "l'étape s'arrête").toBeDefined();
+      expect(sortie.organizationId).toBe(autre.org);
+    }
+    expect(compteurs).toEqual(compteursVides());
+    expect(await dernierRun(proprietaire, tripId)).toEqual(avant);
+    expect(avant.id).toBe(run.id);
+    expect(await nombre(proprietaire, "research_runs", tripId)).toBe(0);
+    expect(await nombre(proprietaire, "trip_versions", tripId)).toBe(0);
+    const registreApres = await inTx(app, { org: proprietaire.org, user: proprietaire.owner }, async (c) => (await c.query("SELECT count(*)::int AS n FROM public.usage_ledger")).rows[0].n as number);
+    expect(registreApres).toBe(registreAvant);
+    // L'autre organisation n'a reçu aucune exécution ni aucune ligne.
+    const chez = await inTx(app, { org: autre.org, user: autre.owner }, async (c) => (await c.query("SELECT count(*)::int AS n FROM public.generation_runs")).rows[0].n as number);
+    expect(chez).toBe(0);
+  });
+
   it("canari : aucun prompt ni requête de recherche ne contient de donnée Google", async () => {
     const org = await nouvelleOrg();
     const { etat } = await lancer(org);
@@ -187,7 +228,7 @@ describe("aperçu : état sérialisé, prompts et données Google", () => {
     const sentinelles = avecSentinellesGoogle(doublesEdimbourg());
     const journaux: ReturnType<typeof journalDePrompts>[] = [];
     const fabrique = () =>
-      composerSimulee({
+      composerSimuleeAvec({
         doubles: () => {
           const d = doublesEdimbourg();
           const s = avecSentinellesGoogle(d);
@@ -220,7 +261,7 @@ describe("aperçu : échecs et reprise", () => {
   it("erreur du fournisseur à la recherche : failed, retryable, rien d'écrit, puis relance sans doublon", async () => {
     const org = await nouvelleOrg();
     const { adapter, tripId, etat } = await lancer(org);
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const fin = await derouler(
       etat,
       dependances({}, avec({ recherche: () => ({ rechercher: async () => ECHEC_FOURNISSEUR }) as never }) ),
@@ -307,7 +348,7 @@ describe("aperçu : cases, publication et forfait", () => {
 
   it("publication atomique : trois échecs de l'écriture finale ne laissent ni case ni version", async () => {
     const org = await nouvelleOrg();
-    const { tripId, etat } = await lancer(org);
+    const { adapter, tripId, etat } = await lancer(org);
     let refus = 0;
     const transaction = transactionIntercepte((texte) => {
       if (!texte.includes("last_version")) return null;
@@ -316,7 +357,11 @@ describe("aperçu : cases, publication et forfait", () => {
     });
     const fin = await derouler(etat, dependances({ transaction }));
     expect(refus).toBe(3);
-    expect(fin.arret).toBe("upstream_error");
+    // Panne de base ou publication épuisée : cause externe passagère, donc réessayable (0081 B9-TL-3 points 2 et 4).
+    expect(fin.arret).toBe("upstream_unavailable");
+    const statut = await adapter.getGenerationStatus(contexteDe(org), tripId);
+    expect(statut.ok && statut.value.phase === "failed" && statut.value.retryable).toBe(true);
+    expect((await dernierRun(org, tripId)).stop_reason).toBe("upstream_unavailable");
     expect(await nombre(org, "trip_versions", tripId)).toBe(0);
     expect(await nombre(org, "proposals", tripId)).toBe(0);
     const run = await dernierRun(org, tripId);
@@ -343,7 +388,7 @@ describe("aperçu : cases, publication et forfait", () => {
     const org = await nouvelleOrg();
     const { tripId, etat } = await lancer(org);
     let compositions = 0;
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const fin = await derouler(
       etat,
       dependances({ plafonds: { ...PLAFONDS_LARGES, parOrganisationJourMicros: 1 } }, () => {
@@ -377,7 +422,7 @@ describe("aperçu : cases, publication et forfait", () => {
     const { etat } = await lancer(org);
     const journaux: ReturnType<typeof journalDePrompts>[] = [];
     const fabrique = () =>
-      composerSimulee({
+      composerSimuleeAvec({
         doubles: () => {
           const d = doublesEdimbourg();
           const j = journalDePrompts(d.modeles);

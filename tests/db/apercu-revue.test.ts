@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
-import { composerSimulee, doublesEdimbourg, type FabriqueGeneration } from "@/server/composition/generation";
+import { composerSimuleeAvec, type FabriqueGeneration } from "@/server/composition/generation";
 import type { DependancesGeneration } from "@/server/generation/dependances";
 import type { PortPositions } from "@/grounding/port-positions";
 import type { EtatEtape } from "@/server/generation/etat";
@@ -10,6 +10,7 @@ import type { OrgTransaction } from "@/server/with-org";
 
 import {
   ETAPES,
+  doublesEdimbourg,
   MAINTENANT,
   PLAFONDS_LARGES,
   banc,
@@ -62,7 +63,7 @@ function dependances(surcharge: Partial<DependancesGeneration> = {}, fabrique?: 
 }
 
 const avec = (surcharge: Surcharge): (() => FabriqueGeneration) => {
-  const base = composerSimulee();
+  const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
   return () => ({ ...base, ...surcharge });
 };
 
@@ -119,7 +120,7 @@ describe("aperçu (revue) : barrière à l'entrée de chaque étape", () => {
     expect(apres.arret).toBeUndefined();
     const avant = await usage(org, run.id);
     let compositions = 0;
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const refusee = await ETAPES[rang]!(
       apres,
       dependances({ barriere: { env: {} } }, () => {
@@ -139,7 +140,7 @@ describe("aperçu (revue) : barrière à l'entrée de chaque étape", () => {
 });
 
 describe("aperçu (revue) : forfait et registre d'usage", () => {
-  it("chemin nominal : le registre ne porte que des lignes réservées par étape, une fiche de logement et aucune lecture de six jours", async () => {
+  it("chemin nominal : le registre ne porte que des lignes réservées par étape (fiches et matrices : tests `critères`)", async () => {
     const org = await nouvelleOrg();
     const { run, etat } = await lancer(org);
     const fin = await derouler(etat, dependances());
@@ -148,8 +149,6 @@ describe("aperçu (revue) : forfait et registre d'usage", () => {
     expect(lignes.length).toBeGreaterThan(0);
     const etapes = new Set(lignes.map((l) => l.step));
     for (const e of etapes) expect(["b", "c", "d", "e", "f", "forfait"]).toContain(e);
-    const fichesLogement = lignes.filter((l) => l.step === "b" && l.sku.toLowerCase().includes("details"));
-    expect(fichesLogement.reduce((somme, l) => somme + l.units, 0)).toBeLessThanOrEqual(1);
   });
 
   it("rejeu : une étape déjà passée ne se réexécute pas et le registre ne bouge pas", async () => {
@@ -217,7 +216,7 @@ describe("aperçu (revue) : erreurs de fournisseur par étape", () => {
     const org = await nouvelleOrg();
     const { tripId, etat } = await lancer(org);
     const progres = await derouler(etat, dependances(), 5);
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const fin = await ETAPES[5]!(
       progres,
       dependances({}, () => ({ ...base, finale: (o) => ({ ...base.finale(o), planifier: async () => ECHEC_RETRYABLE }) })),
@@ -250,18 +249,22 @@ describe("aperçu (revue) : étape a et panne de la base", () => {
 });
 
 describe("aperçu (revue) : repli sans option", () => {
-  it("aucun candidat publiable : huit cases noOption, phase incomplète, aucun motif d'échec", async () => {
+  it("aucun candidat noté : huit cases noOption, phase incomplète, aucun motif d'échec, une version publiée", async () => {
     const org = await nouvelleOrg();
-    const { tripId, etat } = await lancer(org);
-    const progres = await derouler(etat, dependances(), 3);
-    const fin = await derouler(
-      progres,
-      dependances({}, avec({ notation: () => ({ noter: async () => ({ ok: true, valeur: new Map() }) }) })),
-    ).catch(() => progres);
-    expect(fin.arret === undefined || typeof fin.arret === "string").toBe(true);
+    const { adapter, tripId, etat } = await lancer(org);
+    // La notation ne note rien : aucun candidat n'a de notes, donc aucun n'a de rôle dans le programme (B9-PO-9).
+    const fin = await derouler(etat, dependances({}, avec({ notation: () => ({ noter: async () => ({ ok: true, valeur: new Map() }) }) })));
+    expect(fin.arret).toBeUndefined();
     const run = await dernierRun(org, tripId);
-    if (run.phase !== "failed") expect(run.stop_reason).toBeNull();
-    if (run.phase === "incomplete") expect(await nombre(org, "proposals", tripId)).toBe(8);
+    expect(run.phase).toBe("incomplete");
+    expect(run.stop_reason).toBeNull();
+    const cases = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT slot_type, day, time FROM public.proposals WHERE trip_id = $1 ORDER BY position", [tripId])).rows as { slot_type: string; day: number; time: string }[]);
+    expect(cases).toHaveLength(8);
+    expect(cases.every((c) => c.slot_type === "noOption")).toBe(true);
+    expect(new Set(cases.map((c) => `${c.day}|${c.time}`)).size).toBe(8);
+    expect(await nombre(org, "trip_versions", tripId)).toBe(1);
+    const statut = await adapter.getGenerationStatus(contexteDe(org), tripId);
+    expect(statut.ok && statut.value.phase === "incomplete" && [statut.value.ready, statut.value.expected]).toEqual([0, 8]);
   });
 });
 
@@ -273,7 +276,7 @@ describe("aperçu (revue) : aucune donnée Google en entrée de la recherche web
     const sentinelles = avecSentinellesGoogle(doublesEdimbourg());
     const journaux: ReturnType<typeof journalDePrompts>[] = [];
     const fabrique = () =>
-      composerSimulee({
+      composerSimuleeAvec({
         doubles: () => {
           const d = doublesEdimbourg();
           const s = avecSentinellesGoogle(d);
@@ -321,7 +324,7 @@ describe("aperçu (revue) : coordonnées: positions au cache (0060 § 4, B8c fus
 
   it("coordonnées: aucune position écrite quand la publication échoue (transaction annulée en entier)", async () => {
     const org = await nouvelleOrg();
-    const { tripId, etat } = await lancer(org);
+    const { adapter, tripId, etat } = await lancer(org);
     const base = creerWithSystemOrgPourTests(db);
     const transaction: NonNullable<DependancesGeneration["transaction"]> = (organizationId, fn) =>
       base(organizationId, (tx) => {
@@ -336,7 +339,10 @@ describe("aperçu (revue) : coordonnées: positions au cache (0060 § 4, B8c fus
         return fn(enveloppe);
       });
     const fin = await derouler(etat, dependances({ transaction, ecriturePositions: true, horloge: horlogeDeLaBase() }));
-    expect(fin.arret).toBe("upstream_error");
+    // Publication épuisée : panne externe passagère, donc réessayable (0081 B9-TL-3 points 2 et 4).
+    expect(fin.arret).toBe("upstream_unavailable");
+    const statut = await adapter.getGenerationStatus(contexteDe(org), tripId);
+    expect(statut.ok && statut.value.phase === "failed" && statut.value.retryable).toBe(true);
     expect(await nombre(org, "trip_versions", tripId)).toBe(0);
     expect(await positionsCache(org)).toEqual([]);
   });
@@ -388,7 +394,7 @@ describe("aperçu (revue) : cinq lieux résolus, huit cases", () => {
   it("5 lieux résolus à l'ancrage : proposals et noOption cohérents, incomplete avec ready < expected, aucune erreur", async () => {
     const org = await nouvelleOrg();
     const { adapter, tripId, etat } = await lancer(org);
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const fabrique = () => ({
       ...base,
       ancrage: (o: Parameters<FabriqueGeneration["ancrage"]>[0]) => {
@@ -397,29 +403,28 @@ describe("aperçu (revue) : cinq lieux résolus, huit cases", () => {
           async ancrer(...args: Parameters<typeof reel.ancrer>) {
             const issue = await reel.ancrer(...args);
             if (!issue.ok) return issue;
-            return { ok: true as const, valeur: new Map([...issue.valeur].slice(0, 5)) };
+            // Cinq lieux résolus, ceux que le programme nominal retient (J1 : 001, 003, 004 ; J2 : 002, 006).
+            const gardes = new Set(["SENTINELLE_PLACE_ID_001", "SENTINELLE_PLACE_ID_002", "SENTINELLE_PLACE_ID_003", "SENTINELLE_PLACE_ID_004", "SENTINELLE_PLACE_ID_006"]);
+            return { ok: true as const, valeur: new Map([...issue.valeur].filter(([, placeId]) => gardes.has(placeId))) };
           },
         };
       },
     });
     const fin = await derouler(etat, dependances({}, fabrique));
     expect(fin.arret).toBeUndefined();
-    const cases = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT slot_type FROM public.proposals WHERE trip_id = $1 ORDER BY position", [tripId])).rows as { slot_type: string }[]);
-    expect(cases).toHaveLength(8);
-    const prets = cases.filter((c) => c.slot_type === "proposal").length;
-    expect(prets).toBeLessThanOrEqual(5);
-    expect(cases.filter((c) => c.slot_type === "noOption")).toHaveLength(8 - prets);
+    const cases = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT position, slot_type, day, time FROM public.proposals WHERE trip_id = $1 ORDER BY position", [tripId])).rows as { position: number; slot_type: string; day: number; time: string }[]);
+    // B9-PO-5 (0106 § 4, 0105 § 4.1) : 5 `proposal` en ordre chronologique (jour, heure), puis 3 `noOption`, sans doublon de créneau.
+    expect(cases.map((c) => c.position)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(cases.map((c) => c.slot_type)).toEqual(["proposal", "proposal", "proposal", "proposal", "proposal", "noOption", "noOption", "noOption"]);
+    const chrono = cases.slice(0, 5).map((c) => c.day * 10_000 + Number(c.time.slice(0, 2)) * 60 + Number(c.time.slice(3)));
+    expect(chrono).toEqual([...chrono].sort((a, b) => a - b));
+    expect(new Set(cases.map((c) => `${c.day}|${c.time}`)).size).toBe(8);
+    expect(cases.every((c) => c.day === 1 || c.day === 2)).toBe(true);
     const run = await dernierRun(org, tripId);
+    expect(run.phase).toBe("incomplete");
     expect(run.stop_reason).toBeNull();
     const statut = await adapter.getGenerationStatus(contexteDe(org), tripId);
-    expect(statut.ok).toBe(true);
-    if (statut.ok && statut.value.phase === "incomplete") {
-      expect(statut.value.ready).toBe(prets);
-      expect(statut.value.expected).toBe(8);
-      expect(statut.value.ready).toBeLessThan(statut.value.expected);
-    } else {
-      throw new Error("l'aperçu aurait dû être incomplet");
-    }
+    expect(statut.ok && statut.value.phase === "incomplete" && [statut.value.ready, statut.value.expected]).toEqual([5, 8]);
   });
 });
 
@@ -443,7 +448,7 @@ describe("aperçu (revue) : durée avec latence fixe des fournisseurs", () => {
         ]),
       ) as T;
     const fabrique = () =>
-      composerSimulee({
+      composerSimuleeAvec({
         doubles: () => {
           const d = doublesEdimbourg();
           return { modeles: lent(d.modeles), rechercheWeb: lent(d.rechercheWeb), lecteur: lent(d.lecteur), places: lent(d.places), routes: lent(d.routes) };
@@ -465,7 +470,7 @@ describe("aperçu (revue) : deux candidats sur le même lieu", () => {
   it("un lieu n'est publié qu'une fois, avec le candidat gardé par le moteur : aucune case en double, pas d'échec", async () => {
     const org = await nouvelleOrg();
     const { tripId, etat } = await lancer(org);
-    const base = composerSimulee();
+    const base = composerSimuleeAvec({ doubles: doublesEdimbourg });
     const fabrique = () => ({
       ...base,
       ancrage: (o: Parameters<FabriqueGeneration["ancrage"]>[0]) => {
@@ -486,11 +491,19 @@ describe("aperçu (revue) : deux candidats sur le même lieu", () => {
     expect(fin.arret).toBeUndefined();
     const lignes = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT slot_type, candidate_id FROM public.proposals WHERE trip_id = $1 ORDER BY position", [tripId])).rows as { slot_type: string; candidate_id: string | null }[]);
     expect(lignes).toHaveLength(8);
-    const candidats = lignes.filter((l) => l.slot_type === "proposal").map((l) => l.candidate_id);
-    expect(new Set(candidats).size).toBe(candidats.length);
-    const places = await inTx(app, { org: org.org, user: org.owner }, async (c) =>
-      (await c.query("SELECT place_id FROM public.candidates WHERE id = ANY($1::uuid[])", [candidats])).rows.map((r) => r.place_id as string),
+    const candidatsLieux = await inTx(app, { org: org.org, user: org.owner }, async (c) =>
+      (await c.query("SELECT id, place_id FROM public.candidates WHERE trip_id = $1 AND kind = 'place' ORDER BY created_at, id", [tripId])).rows as { id: string; place_id: string | null }[],
     );
-    expect(new Set(places).size).toBe(places.length);
+    // Le mieux classé (premier de la recherche) garde le lieu ; le second le perd et n'a plus de rôle (aucune case).
+    const [premier, second] = candidatsLieux;
+    expect(premier?.place_id).not.toBeNull();
+    expect(second?.place_id).toBeNull();
+    const portes = lignes.filter((l) => l.slot_type === "proposal").map((l) => l.candidate_id);
+    expect(new Set(portes).size).toBe(portes.length);
+    expect(portes).not.toContain(second?.id);
+    // La case qui porte ce lieu, s'il est retenu, porte le premier candidat.
+    expect(portes).toContain(premier?.id);
+    const parLieu = new Map(candidatsLieux.filter((c) => c.place_id !== null).map((c) => [c.place_id as string, c.id]));
+    expect(new Set(candidatsLieux.map((c) => c.place_id).filter((p) => p !== null)).size).toBe(parLieu.size);
   });
 });

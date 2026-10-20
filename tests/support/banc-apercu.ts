@@ -9,12 +9,15 @@ import type { PlafondsUsage } from "@/server/config/usage";
 import type { DependancesGeneration } from "@/server/generation/dependances";
 import { etapeAncrage, etapeBrief, etapeLogement, etapeNotation, etapePlanification, etapeRecherche } from "@/server/generation/etapes";
 import type { EtatEtape } from "@/server/generation/etat";
+import { chargerDoublesEdimbourg } from "@/server/composition/fixtures-simulees";
 import { creerWithOrg, creerWithSystemOrgPourTests } from "./banc-apercu-contexte";
 
 import { PLAFONDS_USAGE_TEST } from "./plafonds-usage";
 import { creerHorlogeManuelle } from "./horloge-manuelle";
 
 export { creerWithOrg, creerWithSystemOrgPourTests };
+/** Doubles sur les fixtures d'Édimbourg (lues une fois par le chargeur de production, environnement `ci`) ; neufs à chaque appel. */
+export const doublesEdimbourg = await chargerDoublesEdimbourg({ VADROUILLE_ENV: "ci" });
 export const MAINTENANT = Date.parse("2026-10-20T10:00:00Z");
 
 /**

@@ -69,13 +69,16 @@ export const DUREE_ETAPE_MS = 700_000;
  */
 export const BRANCHE_APPELS_REELS: string | null = null;
 
+/** Candidats d'idée « Surprends-moi » gardés par jour planifié, avant le choix de `ideeDuJour` (0105 § 5.1 point 1). */
+export const IDEES_PAR_JOUR_APERCU = 3;
+
 /** Villes de l'aperçu : J1 et J2 (`JOURS_APERCU`) ; une recherche par ville, dans l'ordre du séjour. */
 export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
 
 /**
  * Écriture des positions de la version publiée au cache `place_coordinates` (0081 B9-TL-9, 0060 § 3.4 condition (a), 0100
  * § 3.1 point 2). `false` tant que `coords-purge.yml` n'a réussi aucun passage (aucun succès relevé au 2026-10-20) : aucune
- * écriture du MVP sur la base réelle avant ce premier succès. Le CEO la passe à `true` par une PR dès qu'il l'a relevé ;
+ * écriture du MVP sur la base réelle avant ce premier succès. La condition (a) de 0060 § 3.4 (premier succès de `coords-purge.yml`) suffit à la passer à `true`, par une PR du rôle qui l'a relevé ;
  * `POSITIONS_ECRITURE_SUSPENDUE=1` la suspend ensuite sans redéploiement de code (0060 § 1.3). Jamais d'écriture non plus
  * pour la variante simulée : ses positions viennent des fixtures, pas de Google.
  */

@@ -42,6 +42,12 @@ const normalise = (valeur: string | undefined): string | undefined => {
 
 const LOCAUX: ReadonlySet<string> = new Set(["local", "development", "ci", "test"]);
 
+/** Déclarations de déploiement que lit la barrière (`VADROUILLE_ENV`, `VERCEL_ENV`), rendues telles quelles au chargeur de fixtures. */
+export function declarationsDeploiement(env?: Env): Readonly<Record<string, string | undefined>> {
+  const lues = lireEnvGeneration(env);
+  return { VADROUILLE_ENV: lues.VADROUILLE_ENV, VERCEL_ENV: lues.VERCEL_ENV };
+}
+
 export async function evaluerBarriere(options: OptionsBarriere): Promise<EtatBarriere> {
   const env = options.env ?? lireEnvGeneration();
   const declarees = [normalise(env.VADROUILLE_ENV), normalise(env.VERCEL_ENV)].filter((v): v is string => v !== undefined);

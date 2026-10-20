@@ -11,10 +11,11 @@ import { versHeure, versMinutes } from "@/domain/temps";
  * étapes `activity` et `meal` de la version 1, dans l'ordre chronologique (jour, puis heure de début), en commençant par le
  * jour 1 ; les engagements, logements et événements ne sont pas des cases. Une case `proposal` porte un `ProposalRecord`
  * validé (raison et détour compris). Moins de 8 étapes ancrées et rédigées : cases `noOption` à la suite (`day`, `time`,
- * `kind` du créneau manquant, pris dans le squelette), jamais un lieu non ancré.
+ * `kind` du créneau manquant, pris dans le squelette : d'abord les créneaux attendus restés libres, puis les créneaux de repli, jamais
+ * deux fois le même `(jour, heure)` ; décision 0105 § 4.1), jamais un lieu non ancré.
  *
- * Écart signalé dans la PR : « un repas avec options compte une case par option » (B9-PO-5, en attendant Q57) n'est pas
- * applicable : `PreviewSlotsSchema` interdit deux cases au même créneau (jour, heure) ; un repas compte une case.
+ * B9-PO-5 amendé (décision 0106 § 4) : un repas compte une case (`PreviewSlotsSchema` interdit deux cases au même créneau) ;
+ * les options de repas sont reportées à B10, après la question 57 de Samuel.
  */
 
 export type CaseApercu =

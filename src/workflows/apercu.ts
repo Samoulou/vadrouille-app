@@ -24,7 +24,7 @@ import type { EtatEtape } from "@/server/generation/etat";
  *   appels (`MAX_RETRIES_ETAPE`). Une étape rejouée par la file est de toute façon refusée par la garde `step_seq`.
  * - **Arrêt** : une étape arrêtée (plafond, quota, erreur de fournisseur, échéance, garde) a clos l'exécution en `failed` sur
  *   un code fermé ; les suivantes sont passées. Une erreur inattendue qui sort d'une étape clôt l'exécution sur
- *   `upstream_error` (`etapeClore`).
+ *   `upstream_unavailable` (réessayable : panne de base après les reprises de la file, `etapeClore`).
  */
 
 export async function etapeBrief(entree: EtatEtape): Promise<EtatEtape> {
@@ -65,7 +65,7 @@ etapePlanification.maxRetries = 0;
 
 export async function etapeClore(entree: EtatEtape): Promise<EtatEtape> {
   "use step";
-  return cloture(entree, "upstream_error");
+  return cloture(entree, "upstream_unavailable");
 }
 etapeClore.maxRetries = 0;
 
