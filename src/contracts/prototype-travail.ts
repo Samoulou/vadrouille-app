@@ -1,8 +1,8 @@
 /**
  * Table de travail et registre d'une exécution `p0Run` (décision 0046, D15 et D24, S1, S4 ; décision 0009 point 3 et
  * 0011 § 3 : l'état sérialisé du workflow ne porte que l'identifiant d'exécution, chaque étape relit ici ce dont elle a
- * besoin). Contrat implémenté par le seul module `src/adapters/prototype-travail.ts`, importé par
- * `src/workflows/p0-run.ts` seulement ; ni réexporté par `src/contracts/index.ts`, ni par `src/adapters/index.ts`.
+ * besoin). Contrat implémenté par le seul module `src/adapters/prototype-travail.ts`, importé hors tests par
+ * `src/workflows/p0-run.ts` et `src/adapters/prototype-ecriture.ts` seulement (décision 0107) ; ni réexporté par `src/contracts/index.ts`, ni par `src/adapters/index.ts`.
  *
  * Aucun schéma ici : le contenu d'un candidat est validé par l'étape (`CandidatSchema` de `src/prototype/candidat.ts`,
  * que l'application n'atteint pas, 0048 § 1) ; la base n'en admet que les clés (`CHECK` de la table de travail).

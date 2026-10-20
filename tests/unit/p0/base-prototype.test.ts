@@ -187,7 +187,7 @@ describe("p0: run_candidates lue par aucun rapport", () => {
    */
   function nommeAdaptateurTravail(fichier: string, texte: string): boolean {
     const cible = ADAPTATEUR_TRAVAIL.replace(/\.ts$/, "");
-    for (const m of texte.matchAll(/["']((?:@\/|\.\.?\/)[^"'\s]*prototype-travail(?:\.ts)?)["']/g)) {
+    for (const m of texte.matchAll(/["'`]((?:@\/|\.\.?\/)[^"'`$\s]*prototype-travail(?:\.ts)?)["'`]/g)) {
       const spec = m[1]!.replace(/\.ts$/, "");
       const resolu = spec.startsWith("@/") ? `src/${spec.slice(2)}` : path.posix.normalize(path.posix.join(path.posix.dirname(fichier), spec));
       if (resolu === cible) return true;
@@ -210,13 +210,15 @@ describe("p0: run_candidates lue par aucun rapport", () => {
   });
 
   it("contrôle du motif : toute forme de spécificateur est reconnue, le contrat ne l'est pas", () => {
-    // Positifs : alias, relatif depuis le dossier, relatif remontant, extension, `vi.mock`, import dynamique, `export … from`.
+    // Positifs : alias, relatif depuis le dossier, relatif remontant, extension, `vi.mock`, import dynamique (guillemets ou obliques), `export … from`, `require`.
     expect(nommeAdaptateurTravail("src/workflows/p0-run.ts", 'import { lireCandidats } from "@/adapters/prototype-travail";')).toBe(true);
     expect(nommeAdaptateurTravail("src/adapters/prototype-ecriture.ts", 'import { supprimerCandidatsDansTransaction } from "./prototype-travail";')).toBe(true);
     expect(nommeAdaptateurTravail("src/adapters/x.ts", "import { y } from './prototype-travail.ts';")).toBe(true);
     expect(nommeAdaptateurTravail("src/server/p0/x.ts", 'export * from "../../adapters/prototype-travail";')).toBe(true);
     expect(nommeAdaptateurTravail("scripts/p0/x.ts", 'await import("../../src/adapters/prototype-travail");')).toBe(true);
     expect(nommeAdaptateurTravail("src/app/x.ts", 'vi.mock("@/adapters/prototype-travail.ts", () => ({}));')).toBe(true);
+    expect(nommeAdaptateurTravail("src/server/x.ts", "await import(`@/adapters/prototype-travail`);")).toBe(true);
+    expect(nommeAdaptateurTravail("src/workflows/x.ts", 'const t = require("../adapters/prototype-travail");')).toBe(true);
     // Négatifs : le contrat (alias ou relatif), un autre module, une mention hors spécificateur.
     expect(nommeAdaptateurTravail("src/adapters/x.ts", 'import type { LigneCandidat } from "@/contracts/prototype-travail";')).toBe(false);
     expect(nommeAdaptateurTravail("src/contracts/x.ts", 'import type { PhaseTravail } from "./prototype-travail";')).toBe(false);
