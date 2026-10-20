@@ -202,6 +202,16 @@ describe("p0: run_candidates lue par aucun rapport", () => {
     expect(hors).toEqual([]);
   });
 
+  // Décision 0094 § 11 et verdict de la Sécurité 0103 (question 1, condition 8 ; question 3, condition 1) : la table du
+  // plan de secteurs suit la même garde, avec le même module nommé ; aucun rapport, script ni autre module ne la nomme.
+  it("p0: run_secteurs lue par aucun rapport : aucun module de scripts/ ni de src/ ne nomme la table du plan, hors son adaptateur", () => {
+    const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && (lire(f) ?? "").includes("run_secteurs"));
+    expect(hors).toEqual([]);
+    // L'adaptateur, lui, la nomme (contrôle de la garde : elle porte sur le bon nom de table).
+    expect(lire(ADAPTATEUR_TRAVAIL) ?? "").toContain("prototype.run_secteurs");
+    for (const rapport of ["src/server/p0/rapport.ts", "scripts/p0/rapport.ts"]) expect(lire(rapport) ?? "", rapport).not.toMatch(/run_secteurs|run_candidates/);
+  });
+
   it("l'adaptateur de la table de travail n'est importé que par p0Run et l'écriture du programme (0107), hors tests", () => {
     const importeurs = fichiers().filter(
       (f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && !estTest(f) && nommeAdaptateurTravail(f, lire(f) ?? ""),

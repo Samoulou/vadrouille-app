@@ -64,26 +64,14 @@ export type CompteursQualite = {
 };
 
 /**
- * Ce que l'agent sait d'un candidat admis en plus du candidat lui-même (amendement 3, P0S2-PO-20 et PO-21) : secteur et
- * incontournable du plan (noms exacts du plan), infos pratiques tirées de la source. Données maison de la recherche web
- * seulement, **en mémoire** : tant que le Tech Lead n'a pas tranché où les porter (`CandidatSchema`, la contrainte de
- * clés de la table de travail du prototype et la copie `src/research/candidat.ts` tenue égale ; question 1 de
- * l'amendement), elles ne sont ni dans le candidat, ni écrites en base.
+ * Résultat de l'agent : candidats admis, compteurs et plan lu. Secteur, incontournable et infos pratiques d'un candidat
+ * (P0S2-PO-20 et PO-21) sont **dans le candidat** (`CandidatRechercheSchema`, décision 0094 § 1 point 4) : plus aucun
+ * porteur à côté.
  */
-export type InfosCandidat = {
-  readonly secteur?: string;
-  readonly incontournable?: string;
-  readonly prix?: string;
-  readonly horaires?: string;
-  readonly conseil?: string;
-};
-
-/** Résultat de l'agent : candidats admis, compteurs, plan lu et infos par identifiant de candidat. */
 export type ResultatAgent = {
   candidats: CandidatRecherche[];
   compteurs: CompteursAgent;
   plan: PlanRecherche;
-  infos: ReadonlyMap<string, InfosCandidat>;
 };
 
 /**
@@ -358,7 +346,8 @@ export const MOTS_RECIT_FENETRE = 4;
  */
 export const FENETRE_RECIT_CARACTERES = 8;
 
-type Fragments = { mots: string[]; suites: string[] };
+/** `repli` : `mots` ne porte que la suite des mots courts hors lieu, comparée en entier (jamais exemptée, 0103 question 4). */
+type Fragments = { mots: string[]; suites: string[]; repli: boolean };
 
 /**
  * Fragments d'un texte protégé (logement ou libellé d'engagement), hors mots de la destination et du pays :
@@ -380,7 +369,8 @@ function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): Fragme
     .split(" ")
     .filter((mot) => mot !== "" && !motsLieu.has(mot));
   const mots = horsLieu.filter((mot) => [...mot].length >= LONGUEUR_FRAGMENT_MIN);
-  if (mots.length === 0 && horsLieu.length > 0) mots.push(horsLieu.join(" "));
+  const repli = mots.length === 0 && horsLieu.length > 0;
+  if (repli) mots.push(horsLieu.join(" "));
   const suites: string[] = [];
   const courts: string[] = [];
   for (const suite of normalise.match(SUITES_SANS_ESPACE) ?? []) {
@@ -393,7 +383,7 @@ function fragmentsProteges(texte: string, motsLieu: ReadonlySet<string>): Fragme
   }
   // Repli : une écriture sans espace dont il ne reste que des caractères isolés est comparée en entier.
   if (suites.length === 0 && courts.length > 0) suites.push(courts.join(""));
-  return { mots, suites };
+  return { mots, suites, repli };
 }
 
 /**
@@ -410,12 +400,59 @@ export type DonneesProtegees = {
 };
 
 /**
+ * Exemption du filtre des logements par le plan validé (verdict de la Sécurité 0103, question 4) : un mot d'un logement
+ * qui est aussi un **mot entier** d'un nom du plan (secteur ou incontournable, `cleRequete`) cesse d'être protégé seul.
+ * `noms` : les mots de chaque nom du plan lu et validé (`lirePlan`), un ensemble par nom ; plan refusé, illisible ou vide :
+ * aucun nom, aucune exemption. `motsRecit` : mots des récits de tous les ensembles protégés de la recherche ; un mot du
+ * récit n'est jamais exempté (le modèle du plan voit le récit, l'indépendance n'est pas établie). Rien d'autre (nom de
+ * candidat, titre ou extrait de résultat, page lue) ne lève une protection.
+ */
+export type ExemptionPlan = { readonly noms: readonly ReadonlySet<string>[]; readonly motsRecit: ReadonlySet<string> };
+
+/** Aucune exemption (filtre de la PR 326 tel quel). */
+export const SANS_EXEMPTION: ExemptionPlan = { noms: [], motsRecit: new Set() };
+
+/** Mots normalisés d'un texte (`cleRequete`), écriture à espaces ; les suites sans espace restent un seul mot. */
+function motsDe(texte: string): string[] {
+  return cleRequete(texte)
+    .split(" ")
+    .filter((mot) => mot !== "");
+}
+
+/**
+ * Exemption de la recherche (0103, question 4) : mots des noms de secteur et d'incontournable du plan **validé** ; mots
+ * des récits des ensembles protégés. Le modèle du plan et celui de la recherche ne voient jamais les logements
+ * (`briefPourRecherche`, garde de `tests/unit/p0/composition.test.ts`) : c'est la condition de l'exemption. Bornée par le
+ * plan (9 secteurs, `min(2 × jours, cible d'activités)` incontournables). Fonction pure.
+ */
+export function exemptionDuPlan(plan: PlanRecherche, ensembles: readonly DonneesProtegees[]): ExemptionPlan {
+  const noms = plan.secteurs
+    .flatMap((secteur) => [secteur.nom, ...secteur.incontournables])
+    .map((nom) => new Set(motsDe(nom)))
+    .filter((mots) => mots.size > 0);
+  return { noms, motsRecit: new Set(ensembles.flatMap((ensemble) => motsDe(ensemble.recit ?? ""))) };
+}
+
+/**
+ * Mots d'un logement trouvés dans une requête, admis par l'exemption du plan (0103, question 4, conditions 1 à 3) : jamais
+ * pour le repli (suite de mots courts comparée en entier) ; jamais pour un mot du récit ; **tous** les mots touchés du
+ * même logement doivent être des mots d'un **même** nom du plan (« Colisée » seul ou « Monti » seul passent ; « Colisée
+ * Monti » reste refusé tant que le plan n'a pas un nom qui les réunit).
+ */
+function motsExemptes(touches: readonly string[], fragments: Fragments, exemption: ExemptionPlan, motsRecit: ReadonlySet<string>): boolean {
+  if (fragments.repli || touches.some((mot) => motsRecit.has(mot))) return false;
+  return exemption.noms.some((nom) => touches.every((mot) => nom.has(mot)));
+}
+
+/**
  * Requête de recherche web admise au regard du brief (PR 326, bloquant 1d et corrections 1 à 3 : la requête part
  * chez le moteur de recherche du fournisseur, Exa, hors du réglage `data_collection: "deny"`). Filet de sécurité :
  * depuis la correction 2, le modèle de l'étape de recherche ne voit ni les logements ni les engagements
  * (`briefPourRecherche`). La requête est jugée telle qu'elle part (`nettoyerRequeteWeb` appliquée avant). Refusée :
  * - si un texte de logement ou un libellé d'engagement devient vide après normalisation (protection impossible) ;
- * - dès qu'un fragment d'un logement ou d'un libellé y apparaît (`fragmentsProteges`) ;
+ * - dès qu'un fragment d'un logement ou d'un libellé y apparaît (`fragmentsProteges`), sauf, pour un logement, des
+ *   mots entiers qui sont tous des mots d'un même nom du plan validé et d'aucun récit (`exemption`, verdict 0103,
+ *   question 4 ; sans plan : aucune exemption) ;
  * - écriture à espaces : si ses mots (suites sans espace retirées) contiennent `MOTS_RECIT_FENETRE` mots consécutifs
  *   des mots du récit libre (suites sans espace retirées de même), ou tous ces mots s'il en a moins (récit vide après
  *   normalisation : refusée) ;
@@ -435,17 +472,20 @@ export type DonneesProtegees = {
  * (particules ou suffixes collés : « 롯데호텔에서 », turc, finnois, composés allemands). Seul appelant du moteur de
  * recherche web : cet agent (la composition `p0-reel` n'a pas le brief ; voir `src/ai/recherche-web-reelle.ts`).
  */
-export function requeteSansDonneeDuBrief(requete: string, brief: DonneesProtegees): boolean {
+export function requeteSansDonneeDuBrief(requete: string, brief: DonneesProtegees, exemption: ExemptionPlan = SANS_EXEMPTION): boolean {
   const texte = cleRequete(requete);
   const texteSansEspace = compactSansEspace(texte);
   // Mots de la requête en écriture à espaces, séparés de toute suite sans espace collée (« 新宿hotel »).
   const texteMots = texte.replace(SUITES_SANS_ESPACE, " ").replace(/ +/g, " ").trim();
   const motsLieu = new Set(`${cleRequete(brief.destination)} ${cleRequete(brief.pays ?? "")}`.split(" ").filter((mot) => mot !== ""));
-  const proteges = [...(brief.logements ?? []).map((l) => l.texte), ...(brief.engagements ?? []).map((e) => e.libelle)];
-  for (const protege of proteges) {
+  const logements = (brief.logements ?? []).map((l) => l.texte);
+  const proteges = [...logements, ...(brief.engagements ?? []).map((e) => e.libelle)];
+  const motsRecit = new Set([...motsDe(brief.recit ?? ""), ...exemption.motsRecit]);
+  for (const [rang, protege] of proteges.entries()) {
     const fragments = fragmentsProteges(protege, motsLieu);
     if (fragments === undefined) return false;
-    if (fragments.mots.some((mot) => contientMots(texteMots, mot))) return false;
+    const touches = fragments.mots.filter((mot) => contientMots(texteMots, mot));
+    if (touches.length > 0 && !(rang < logements.length && motsExemptes(touches, fragments, exemption, motsRecit))) return false;
     if (fragments.suites.some((suite) => texteSansEspace.includes(suite))) return false;
   }
   if (brief.recit !== undefined) {
@@ -517,20 +557,22 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
     qualite: { secteursPlan: 0, incontournablesPlan: 0, incontournableSansCandidat: 0, candidatRegroupe: 0, secteurInconnu: 0 },
   };
   const candidats: CandidatRecherche[] = [];
-  const infos = new Map<string, InfosCandidat>();
   let plan: PlanRecherche = PLAN_VIDE;
+  /** Clés des incontournables déjà désignés par un candidat admis (champ `incontournable` du candidat). */
+  const incontournablesDesignes = () =>
+    new Set(candidats.flatMap((candidat) => (candidat.incontournable === undefined ? [] : [cleDeNom(candidat.incontournable)])));
   /**
    * `incontournable_sans_candidat` sur la seule sortie de l'agent, avant tout ancrage (P0S2-PO-20) : tenu à jour après la
    * lecture du plan et à chaque admission, pour que l'état vivant (`observer`, journal sur erreur ou échéance, ticket 407)
    * porte la bonne valeur même si la recherche lève.
    */
   const majSansCandidat = () => {
-    const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [cleDeNom(info.incontournable)])));
+    const designes = incontournablesDesignes();
     compteurs.qualite.incontournableSansCandidat = plan.secteurs
       .flatMap((secteur) => secteur.incontournables)
       .filter((incontournable) => !designes.has(cleDeNom(incontournable))).length;
   };
-  const resultat = (): ResultatAgent => ({ candidats, compteurs, plan, infos });
+  const resultat = (): ResultatAgent => ({ candidats, compteurs, plan });
   dependances.observer?.({ compteurs, candidats });
   /** Ticket 407 : l'échéance de l'étape admet-elle cet appel ? Non : la fin sur échéance est comptée. */
   const aLeTemps = (appel: AppelAgent): boolean => {
@@ -557,6 +599,8 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
   compteurs.qualite.secteursPlan = plan.secteurs.length;
   compteurs.qualite.incontournablesPlan = plan.secteurs.reduce((total, secteur) => total + secteur.incontournables.length, 0);
   majSansCandidat();
+  // Verdict 0103, question 4 : exemption du filtre des logements par les noms du plan lu et validé (aucune sans plan).
+  const exemption = exemptionDuPlan(plan, proteges);
   const cibles = ciblesParSecteur(plan, config.ciblesParCreneau);
   const trouvesParSecteur = new Map<string, Record<TypeCreneau, number>>(plan.secteurs.map((secteur) => [secteur.nom, { activity: 0, meal: 0, evening: 0 }]));
 
@@ -600,8 +644,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
       return;
     }
     // Deux candidats qui désignent le même incontournable sont fusionnés comme les autres doublons.
-    const memeIncontournable =
-      incontournable !== undefined && [...infos.values()].some((info) => info.incontournable !== undefined && cleDeNom(info.incontournable) === cleDeNom(incontournable));
+    const memeIncontournable = incontournable !== undefined && incontournablesDesignes().has(cleDeNom(incontournable));
     if (cles.has(k) || memeIncontournable) {
       compteurs.candidatsRefuses.duplicate += 1;
       return;
@@ -630,6 +673,12 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
       aReserver: extrait.aReserver,
       ...(prixParPersonne === undefined ? {} : { prixParPersonne }),
       ...(extrait.dureeMinutes === undefined ? {} : { dureeMinutes: extrait.dureeMinutes }),
+      // Candidat enrichi (décision 0094 § 1 point 4) : noms exacts du plan, infos pratiques de la source.
+      ...(secteur === undefined ? {} : { secteur: secteur.nom }),
+      ...(incontournable === undefined ? {} : { incontournable }),
+      ...(extrait.prix === undefined ? {} : { prix: extrait.prix }),
+      ...(extrait.horaires === undefined ? {} : { horaires: extrait.horaires }),
+      ...(extrait.conseil === undefined ? {} : { conseil: extrait.conseil }),
     });
     if (!lu.success) {
       compteurs.candidatsRefuses.invalid += 1;
@@ -637,13 +686,6 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
     }
     cles.add(k);
     candidats.push(lu.data);
-    infos.set(lu.data.id, {
-      ...(secteur === undefined ? {} : { secteur: secteur.nom }),
-      ...(incontournable === undefined ? {} : { incontournable }),
-      ...(extrait.prix === undefined ? {} : { prix: extrait.prix }),
-      ...(extrait.horaires === undefined ? {} : { horaires: extrait.horaires }),
-      ...(extrait.conseil === undefined ? {} : { conseil: extrait.conseil }),
-    });
     if (incontournable !== undefined) majSansCandidat();
     const creneau = creneauCompte(
       { typeEtape: lu.data.typeEtape, ...(extrait.slotFit === undefined ? {} : { slotFit: extrait.slotFit }) },
@@ -657,7 +699,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
 
   /** Ce qui manque par secteur, remis au modèle à chaque tour (P0S2-PO-20) ; aucune donnée Google. */
   const manquantsParSecteur = () => {
-    const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [cleDeNom(info.incontournable)])));
+    const designes = incontournablesDesignes();
     return cibles.map(({ nom, cibles: cible }) => {
       const vus = trouvesParSecteur.get(nom) ?? { activity: 0, meal: 0, evening: 0 };
       return {
@@ -717,7 +759,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
         // Mineur 4 du head `3254723` : nettoyée d'abord, la requête est jugée telle qu'elle part (longueur déjà bornée
         // à `LONGUEURS_TEXTE.requete` par le schéma des sorties, la même borne que le client réel).
         const requete = nettoyerRequeteWeb(action.requete);
-        if (!proteges.every((ensemble) => requeteSansDonneeDuBrief(requete, ensemble))) {
+        if (!proteges.every((ensemble) => requeteSansDonneeDuBrief(requete, ensemble, exemption))) {
           compteurs.sortiesRefusees.recherche += 1;
           continue;
         }
