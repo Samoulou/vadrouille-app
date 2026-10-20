@@ -526,7 +526,7 @@ describe("env: gardes de configuration (B3b-envoi : EMAIL_TRANSPORT et SMTP_URL,
   });
 
   it("SMTP_URL acceptée : forme stricte, liste fermée ; hôte rendu = constante de la liste, port entier", () => {
-    const acceptes: [string, string, "localhost" | "127.0.0.1" | "::1" | "mailpit", number][] = [
+    const acceptes: [string, string, "localhost" | "127.0.0.1" | "::1", number][] = [
       ["smtp://127.0.0.1:1025", "ci", "127.0.0.1", 1025],
       ["smtp://127.0.0.1:1025", "local", "127.0.0.1", 1025],
       ["smtp://[::1]:1025", "ci", "::1", 1025],
@@ -538,8 +538,6 @@ describe("env: gardes de configuration (B3b-envoi : EMAIL_TRANSPORT et SMTP_URL,
       ["smtp://localhost:65535", "ci", "localhost", 65535],
       ["smtp://localhost:1", "ci", "localhost", 1],
       ["  smtp://127.0.0.1:1025  ", "ci", "127.0.0.1", 1025],
-      ["smtp://mailpit:1025", "ci", "mailpit", 1025],
-      ["smtp://MAILPIT:1025/", "ci", "mailpit", 1025],
     ];
     for (const [url, environnement, host, port] of acceptes) {
       const config = parseServerEnv(smtp(url, environnement));
@@ -612,9 +610,10 @@ describe("env: gardes de configuration (B3b-envoi : EMAIL_TRANSPORT et SMTP_URL,
     }
   });
 
-  it("`mailpit` : accepté en ci seulement ; refusé en local", () => {
-    expect(parseServerEnv(smtp("smtp://mailpit:1025", "ci")).smtp).toEqual({ host: "mailpit", port: 1025 });
-    refus(smtp("smtp://mailpit:1025", "local"), URL_SMTP, "invalid_value");
+  it("`mailpit` et `mailpit.` : hors de la liste fermée (0098 § 2.4), refusés en local et en ci", () => {
+    for (const url of ["smtp://mailpit:1025", "smtp://MAILPIT:1025/", "smtp://mailpit.:1025"]) {
+      for (const environnement of ["local", "ci"]) refus(smtp(url, environnement), URL_SMTP, "invalid_value");
+    }
   });
 
   it("le résultat ne porte pas la chaîne brute : seuls `host` et `port`, aucune sentinelle", () => {

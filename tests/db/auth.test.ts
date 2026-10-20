@@ -480,7 +480,7 @@ describe("parcours", () => {
     try {
       const enTetes = new Headers({ "x-vercel-forwarded-for": ip, "user-agent": `agent-${ip}` });
       // Envoi réel vers Mailpit, code lu par l'API, vérification.
-      expect(await bancSmtp.operations.requestCode(email)).toEqual({ ok: true, value: { sent: true } });
+      expect(await bancSmtp.operations.requestCode(email)).toEqual({ ok: true });
       await attendreMessages(email);
       const code = await dernierCodeMailpit(email);
       expect(code).toMatch(/^[0-9]{6}$/);

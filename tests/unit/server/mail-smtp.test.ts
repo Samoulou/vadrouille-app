@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SENDER_ADDRESS } from "@/server/config/email";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 import type { LoginCodeMessage } from "@/server/mail/port";
-import { createSmtpCodeMailer, CodeMailerRefusalError, type MessageSmtp, OPTIONS_FIXES, optionsTransport, SmtpEnvoiError, type SmtpHost } from "@/server/mail/smtp";
+import { createSmtpCodeMailer, CodeMailerRefusalError, type MessageSmtp, OPTIONS_FIXES, optionsTransport, SmtpEnvoiError } from "@/server/mail/smtp";
 
 const envoyer = vi.hoisted(() => ({ sendMail: vi.fn() }));
 const fabrique = vi.hoisted(() => ({ createTransport: vi.fn() }));
@@ -45,11 +45,10 @@ afterEach(() => {
 });
 
 describe("email: transport SMTP par options explicites", () => {
-  it.each<[SmtpHost, number]>([
+  it.each<[string, number]>([
     ["127.0.0.1", 1025],
     ["localhost", 2525],
     ["::1", 1025],
-    ["mailpit", 1025],
   ])("%s:%i → un objet aux seules clés de la décision 0098 § 3.2, jamais une chaîne", async (host, port) => {
     const mailer = createSmtpCodeMailer({ host, port });
     expect(fabrique.createTransport).not.toHaveBeenCalled();

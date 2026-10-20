@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+
 import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
 
 /**
@@ -115,12 +116,11 @@ export type BetterAuthSettings = {
   readonly appUrl: string;
 };
 
-/** Hôtes de la liste fermée de `SMTP_URL` (décision 0098 § 2.3), en minuscules ; `mailpit` en `ci` seulement. */
+/** Hôtes de la liste fermée de `SMTP_URL` (décision 0098 § 2.3), en minuscules (aucun hôte de service : la CI vise `127.0.0.1`). */
 const HOTES_SMTP = [
   { texte: "localhost", hote: "localhost" },
   { texte: "127.0.0.1", hote: "127.0.0.1" },
   { texte: "[::1]", hote: "::1" },
-  { texte: "mailpit", hote: "mailpit" },
 ] as const;
 export type SmtpHost = (typeof HOTES_SMTP)[number]["hote"];
 
@@ -163,7 +163,7 @@ const FORME_SMTP = /^smtp:\/\/(\[[0-9a-fA-F:]+\]|[A-Za-z0-9.]+):([1-9][0-9]{0,4}
  * minuscules par **notre** code : pour un schéma non spécial, `URL` laisse l'hôte tel quel). Rend `null` au moindre
  * écart ; ne copie, ne rend ni ne journalise la chaîne.
  */
-function analyserSmtp(valeur: string, environment: ServerEnvironment): SmtpSettings | null {
+function analyserSmtp(valeur: string): SmtpSettings | null {
   const brute = valeur.trim();
   const forme = FORME_SMTP.exec(brute);
   if (forme === null) return null;
@@ -177,7 +177,6 @@ function analyserSmtp(valeur: string, environment: ServerEnvironment): SmtpSetti
   const hote = url.hostname.toLowerCase();
   const admis = HOTES_SMTP.find((entree) => entree.texte === hote);
   if (admis === undefined) return null;
-  if (admis.hote === "mailpit" && environment !== "ci") return null;
   return Object.freeze({ host: admis.hote, port });
 }
 
@@ -372,7 +371,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     if (env.EMAIL_TRANSPORT.trim() !== "smtp") throw new ServerEnvError(V.EMAIL_TRANSPORT, "invalid_value");
     if (choix !== "better-auth" || (environment !== "local" && environment !== "ci")) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
     if (env.SMTP_URL === undefined) throw new ServerEnvError(V.SMTP_URL, "missing");
-    smtp = analyserSmtp(env.SMTP_URL, environment);
+    smtp = analyserSmtp(env.SMTP_URL);
     if (smtp === null) throw new ServerEnvError(V.SMTP_URL, "invalid_value");
   } else if (env.SMTP_URL !== undefined) {
     throw new ServerEnvError(V.SMTP_URL, "forbidden");

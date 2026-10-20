@@ -29,7 +29,7 @@ const adresses = (liste: readonly AdresseMailpit[] | null | undefined): string[]
 async function lireJson(chemin: string): Promise<unknown> {
   let reponse: Response;
   try {
-    reponse = await fetch(`${API}${chemin}`);
+    reponse = await fetch(`${API}${chemin}`, { redirect: "error", signal: AbortSignal.timeout(5_000) });
   } catch {
     throw new Error("Mailpit injoignable sur 127.0.0.1:8025 (service du job `db` de la CI, ou `docker compose up -d mailpit`).");
   }

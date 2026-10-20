@@ -27,7 +27,7 @@ L'envoi du code par SMTP n'existe que **vers Mailpit, en local et en CI** : aucu
 | Variable | Valeur | Où la poser |
 |---|---|---|
 | `EMAIL_TRANSPORT` | exactement `smtp` (après `trim()`, en minuscules) | `.env.local` du poste (`VADROUILLE_ENV=local`) ; le serveur `auth` de `playwright.config.ts` (`ci`). **Jamais** sur Vercel ni en `staging` ou `production`. |
-| `SMTP_URL` | `smtp://<hôte>:<port>` ou avec un `/` final, hôte parmi `localhost`, `127.0.0.1`, `[::1]` (et `mailpit` en `ci` seulement) ; port de 1 à 65535, sans zéro de tête | idem. Exemple : `smtp://127.0.0.1:1025` (`docker compose up -d mailpit`, boîte sur `http://127.0.0.1:8025`). |
+| `SMTP_URL` | `smtp://<hôte>:<port>` ou avec un `/` final, hôte parmi `localhost`, `127.0.0.1`, `[::1]` ; port de 1 à 65535, sans zéro de tête | idem. Exemple : `smtp://127.0.0.1:1025` (`docker compose up -d mailpit`, boîte sur `http://127.0.0.1:8025`). |
 
 Refus au démarrage (`ServerEnvError`, nom de la variable et code de règle seulement, valeur jamais rendue) :
 - l'une ou l'autre variable **présente**, même vide, en `staging` ou `production`, **ou sur Vercel quel que soit `VADROUILLE_ENV`** ;

@@ -33,11 +33,11 @@ import type { CodeMailer, LoginCodeMessage } from "./port";
  *   `provider_error` (`retryable: true`).
  */
 
-/** Hôtes que `parseServerEnv` peut rendre (liste fermée de la décision 0098 § 2.3), `::1` sans crochets. */
-export type SmtpHost = "localhost" | "127.0.0.1" | "::1" | "mailpit";
-
-/** Cible du transport : l'hôte est la constante de la liste, le port un entier (décision 0098 § 2.3). */
-export type SmtpTarget = { readonly host: SmtpHost; readonly port: number };
+/**
+ * Cible du transport : l'hôte est la constante de la liste fermée de `parseServerEnv` (`SmtpHost`, seule définition, dans
+ * `src/server/env/index.ts`, que ce module ne peut importer : `ligne/server-env-imports`), le port un entier (0098 § 2.3).
+ */
+export type SmtpTarget = { readonly host: string; readonly port: number };
 
 /** Délai maximal de chaque étape de la connexion (décision 0098 § 3.2 : 10 secondes au plus). */
 export const SMTP_DELAI_MS = 10_000;
@@ -73,7 +73,7 @@ export type TransportSmtp = { sendMail(message: MessageSmtp): Promise<unknown> }
 export type SmtpDeps = {
   /** Transport déjà construit (tests) ; sinon créé par `createTransport` au premier envoi. */
   readonly transport?: TransportSmtp;
-  /** Contrôle de l'adresse reçue (point 4.1) ; remplaçable par les tests du critère E5 seulement. */
+  /** Contrôle de l'adresse reçue (point 4.1) ; réservé aux doubles de test du critère E5 (aucun appel de production). */
   readonly adresseAdmise?: (to: string) => boolean;
 };
 
