@@ -6,6 +6,8 @@ import {
   CHECKOUT_STATUSES,
   CURRENCIES,
   OFFER_INCLUSIONS,
+  PAYMENT_EVENT_STATUSES,
+  PAYMENT_EVENT_TYPES,
   PAYMENT_METHODS,
   PRICE_VARIANTS,
   TRIP_ID_PATTERN,
@@ -48,8 +50,12 @@ export type OfferConfig = z.infer<typeof OfferConfigSchema>;
 export const OfferSchema = z.strictObject({ tripId: TripIdSchema, ...OfferConfigSchema.shape });
 export type Offer = z.infer<typeof OfferSchema>;
 
-/** Entrée de `startCheckout` : champ inconnu (un `amount` du navigateur) refusé. */
-export const CheckoutRequestSchema = z.strictObject({ tripId: TripIdSchema, method: PaymentMethodSchema });
+/**
+ * Entrée de `startCheckout` : champ inconnu (un `amount` du navigateur) refusé. `requestId` (spécification B4,
+ * B4-PO-8) : tiré par l'écran à chaque appui sur un bouton de paiement, réutilisé par « Réessayer » ; même forme que
+ * `TripPatch.requestId`.
+ */
+export const CheckoutRequestSchema = z.strictObject({ tripId: TripIdSchema, method: PaymentMethodSchema, requestId: z.uuid() });
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 
 /**
@@ -98,3 +104,29 @@ export type SimulateOutcomeRequest = z.infer<typeof SimulateOutcomeRequestSchema
 
 export const CheckoutStatusRequestSchema = z.strictObject({ checkoutId: CheckoutIdSchema });
 export type CheckoutStatusRequest = z.infer<typeof CheckoutStatusRequestSchema>;
+
+/**
+ * Événement de paiement normalisé (spécification B4, B4a point 1 ; handover § 5) : **contrat interne du serveur**,
+ * jamais importé par `src/features` ni `src/components` (règle `ligne/route-handlers`). Analysé depuis l'événement
+ * du prestataire (`src/server/payment/evenement.ts`) ; un champ absent de l'événement reçu est absent ici, jamais
+ * inventé. Aucune donnée de la personne (e-mail, nom, adresse, moyen de paiement détaillé).
+ */
+export const PaymentEventTypeSchema = z.enum(PAYMENT_EVENT_TYPES);
+export const PaymentEventStatusSchema = z.enum(PAYMENT_EVENT_STATUSES);
+
+export const PaymentEventSchema = z.strictObject({
+  eventId: z.string().min(1).max(255),
+  type: PaymentEventTypeSchema,
+  livemode: z.boolean(),
+  checkoutSessionId: z.string().min(1).max(255).optional(),
+  /** `uuid` interne du paiement, lu dans les métadonnées de la session (décision 0097 B4-TL-1 point 3). */
+  checkoutId: z.string().min(1).max(255).optional(),
+  paymentStatus: PaymentEventStatusSchema.optional(),
+  /** Centimes (unité mineure). */
+  amount: z.number().int().nonnegative().optional(),
+  /** Normalisée en majuscules. */
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  /** Secondes depuis l'époque Unix (champ `created` de l'événement). */
+  createdAt: z.number().int().nonnegative().optional(),
+});
+export type PaymentEvent = z.infer<typeof PaymentEventSchema>;

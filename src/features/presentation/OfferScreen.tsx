@@ -111,7 +111,8 @@ function OfferContent({
   const router = useRouter();
   const session = useTripSession(tripId);
   const [pending, setPending] = useState<PaymentMethod | null>(null);
-  const [startError, setStartError] = useState<PaymentMethod | null>(null);
+  /** Appui en échec : son moyen et son `requestId`, que « Réessayer » réutilise (spécification B4, B4-PO-8). */
+  const [startError, setStartError] = useState<{ method: PaymentMethod; requestId: string } | null>(null);
   const buttons = useRef<Partial<Record<PaymentMethod, HTMLButtonElement | null>>>({});
   const viewed = useRef(false);
 
@@ -131,13 +132,17 @@ function OfferContent({
     }
   }, [priceVariant, failure, session, track]);
 
-  async function pay(method: PaymentMethod) {
+  /**
+   * Un appui sur un bouton de paiement tire un nouveau `requestId` ; « Réessayer » repasse celui de l'appui en échec
+   * (B4-PO-8 : même demande, même paiement côté serveur).
+   */
+  async function pay(method: PaymentMethod, requestId: string = crypto.randomUUID()) {
     if (pending || !offer) return;
     setPending(method);
     setStartError(null);
     let result: Awaited<ReturnType<StartCheckout>> | null = null;
     try {
-      result = await start({ tripId, method });
+      result = await start({ tripId, method, requestId });
     } catch {
       result = null;
     }
@@ -152,7 +157,7 @@ function OfferContent({
       router.refresh();
       return;
     }
-    setStartError(method);
+    setStartError({ method, requestId });
     // Focus inchangé : le bouton appuyé le garde (il a pu le perdre pendant qu'il était désactivé).
     requestAnimationFrame(() => buttons.current[method]?.focus());
   }
@@ -203,7 +208,7 @@ function OfferContent({
           kind="error"
           message={t.offre.erreurDebut}
           action={
-            <Button variant="text" size="sm" onClick={() => void pay(startError)}>
+            <Button variant="text" size="sm" onClick={() => void pay(startError.method, startError.requestId)}>
               {t.offre.reessayer}
             </Button>
           }

@@ -342,6 +342,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "P0r3b (ticket 311), décision 0055, section 1 point 2 ; verdict Sécurité à rendre",
   },
   {
+    fichier: "src/server/env/payment.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
+      "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité à rendre dans la PR de B4a",
+  },
+  {
     fichier: "src/adapters/prototype-ecriture.ts",
     specificateur: "server-only",
     noms: ["effet"],

@@ -23,6 +23,8 @@ vi.mock("@/server/actions/paiement", () => ({
 /** Écran 9 « Débloquer » (F9a). */
 
 const TRIP = "mock_trip_edimbourg";
+/** `requestId` tiré par `crypto.randomUUID()` (spécification B4, B4-PO-8). */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: "user_test", role: "owner" as const };
 const BASE: OfferConfig = {
   amount: 2900,
@@ -150,7 +152,7 @@ describe("paiement", () => {
     const start = vi.fn(() => new Promise<Awaited<ReturnType<StartCheckout>>>((r) => (resolve = r)));
     const { recorder } = await renderOffer({ start: start as unknown as StartCheckout });
     fireEvent.click(screen.getByRole("button", { name: "Payer avec TWINT" }));
-    expect(start).toHaveBeenCalledWith({ tripId: TRIP, method: "twint" });
+    expect(start).toHaveBeenCalledWith({ tripId: TRIP, method: "twint", requestId: expect.stringMatching(UUID) });
     expect(screen.getByRole("button", { name: "Payer avec TWINT" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Payer par carte" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Préparation du paiement…");
@@ -174,6 +176,30 @@ describe("paiement", () => {
     expect(card).toBeEnabled();
     expect(card).toHaveFocus();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("debloquer: requestId tiré par appui et réutilisé par Réessayer", async () => {
+    // Spécification B4, critère A23 (B4-PO-8) : textes et rendu inchangés, seule l'entrée de `startCheckout` change.
+    const start = vi.fn<(input: { tripId: string; method: string; requestId: string }) => Promise<unknown>>(async () => ({
+      ok: false as const,
+      error: { code: "provider_error" as const, retryable: true },
+    }));
+    await renderOffer({ start: start as unknown as StartCheckout });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Payer avec TWINT" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Payer par carte" })));
+    const [premier, second] = start.mock.calls.map(([input]) => input);
+    expect(premier?.requestId).toMatch(UUID);
+    expect(second?.requestId).toMatch(UUID);
+    expect(second?.requestId).not.toBe(premier?.requestId);
+    // « Réessayer » renvoie le `requestId` de l'appui en échec (le second), avec le même moyen.
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Réessayer" })));
+    expect(start.mock.calls.at(-1)?.[0]).toEqual({ tripId: TRIP, method: "card", requestId: second?.requestId });
+    // Un nouvel appui sur un bouton de paiement après l'erreur en tire un nouveau.
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Payer par carte" })));
+    const dernier = start.mock.calls.at(-1)?.[0];
+    expect(dernier?.requestId).toMatch(UUID);
+    expect([premier?.requestId, second?.requestId]).not.toContain(dernier?.requestId);
+    expect(screen.getByRole("alert")).toHaveTextContent("Le paiement n'a pas pu commencer.");
   });
 
   it("already_unlocked : l'écran est relu (état « déjà débloqué »)", async () => {

@@ -2,14 +2,18 @@
 import { randomBytes } from "node:crypto";
 import { inspect } from "node:util";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
 import { isProductionDeployment } from "@/dev/flags";
+import * as route from "@/app/api/v1/webhooks/simulated/route";
 import * as moduleEnv from "@/server/env";
 import { assertServerProcessEnv, parseServerEnv, rateLimitSettings, SERVER_ENV_VARIABLES, ServerEnvError, type ServerEnvRule, type ServerEnvVariable } from "@/server/env";
 import { resolveServerEnvironment, ServerEnvironmentUndeclaredError } from "@/server/env/resolve";
-import { LOG_VARIABLES } from "@/server/log";
+import { formatLogLine, LOG_VARIABLES } from "@/server/log";
+import type { DependancesPaiement } from "@/server/payment/dependances";
+import { signer } from "@/server/payment/signature";
+import { configurationDepuisEnv, creerWebhookSimule, TAILLE_MAX_CORPS, type OptionsWebhookSimule } from "@/server/routes/simulated-webhook";
 
 import { isProductionForDatabase } from "../../../db/connection";
 
@@ -659,7 +663,18 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
     const octets = aleatoire();
     refusParse(ci({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.P0_RUN_TOKEN]: hex(octets) }), NOM.P0_RUN_TOKEN, "secret_duplicate");
     const config = parseServerEnv(ci(code()));
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "smtp", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual([
+      "authAdapter",
+      "betterAuth",
+      "dataAdapter",
+      "environment",
+      "paymentAdapter",
+      "rateLimitHmacSecret",
+      "simulatedWebhookFlag",
+      "simulatedWebhookSecret",
+      "smtp",
+      "trustedIpHeader",
+    ]);
   });
 });
 
@@ -673,7 +688,18 @@ describe("env: modules d'environnement", () => {
     const config = parseServerEnv(env);
     expect(JSON.stringify(config)).not.toContain(SENTINELLE);
     expect(inspect(config, { depth: 5 })).not.toContain(SENTINELLE);
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "smtp", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual([
+      "authAdapter",
+      "betterAuth",
+      "dataAdapter",
+      "environment",
+      "paymentAdapter",
+      "rateLimitHmacSecret",
+      "simulatedWebhookFlag",
+      "simulatedWebhookSecret",
+      "smtp",
+      "trustedIpHeader",
+    ]);
   });
 
   it("la liste des variables du journal est celle de src/server/env/index.ts", () => {
@@ -728,3 +754,347 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
     expect(betterAuthAllowed({ NODE_ENV: "test", VADROUILLE_ENV: "  " })).toBe(false);
   });
 });
+
+describe("env: gardes de configuration du paiement simulé (B4a ; critère A21 ; décision 0097 B4-TL-7)", () => {
+  /** Configuration où le webhook simulé est ouvert en `ci`, plus `extra` (secrets tirés au hasard, noms en clés d'objet). */
+  const simule = (extra: Env = {}): Env =>
+    ci(
+      connexionReelle({
+        [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(aleatoire()),
+        [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(aleatoire()),
+        SIMULATED_WEBHOOK_ENABLED: "true",
+        PAYMENT_ADAPTER: "simulated",
+        DATA_ADAPTER: "api",
+        ...extra,
+      }),
+    );
+
+  it("configuration complète en `ci` et en `local` → acceptée, choix et drapeau rendus", () => {
+    for (const environnement of ["ci", "local"]) {
+      const config = parseServerEnv(simule({ VADROUILLE_ENV: environnement }));
+      expect({ p: config.paymentAdapter, d: config.dataAdapter, f: config.simulatedWebhookFlag }).toEqual({ p: "simulated", d: "api", f: true });
+      expect(config.simulatedWebhookSecret).toHaveLength(32);
+    }
+  });
+
+  it("`PAYMENT_ADAPTER` et `DATA_ADAPTER` : absents ou vides = `mock` ; valeur inconnue → refus de démarrer, sans la valeur", () => {
+    for (const vide of [undefined, "", "  "]) {
+      const config = parseServerEnv(ci({ PAYMENT_ADAPTER: vide, DATA_ADAPTER: vide }));
+      expect([config.paymentAdapter, config.dataAdapter]).toEqual(["mock", "mock"]);
+    }
+    expect(parseServerEnv(ci({ PAYMENT_ADAPTER: " stripe ", DATA_ADAPTER: "prototype" }))).toMatchObject({ paymentAdapter: "stripe", dataAdapter: "prototype" });
+    for (const inconnu of [SENTINELLE, "Simulated", "postgres", "constructor"]) {
+      refusParse(ci({ PAYMENT_ADAPTER: inconnu }), NOM.PAYMENT_ADAPTER, "invalid_value");
+      refusParse(ci({ DATA_ADAPTER: inconnu }), NOM.DATA_ADAPTER, "invalid_value");
+    }
+  });
+
+  it("secret de signature simulé de 31 octets, trivial ou égal à un autre secret → refus, sans la valeur", () => {
+    refusParse(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(aleatoire(31)) }), NOM.SIMULATED_WEBHOOK_SECRET, "secret_too_short");
+    refusParse(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: "changeme".repeat(8) }), NOM.SIMULATED_WEBHOOK_SECRET, "secret_trivial");
+    refusParse(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: `${SENTINELLE}!` }), NOM.SIMULATED_WEBHOOK_SECRET, "secret_encoding");
+    const octets = aleatoire();
+    refusParse(simule({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.SIMULATED_WEBHOOK_SECRET]: hex(octets) }), NOM.SIMULATED_WEBHOOK_SECRET, "secret_duplicate");
+  });
+
+  it.each(["staging", "production"])("`%s` : drapeau à vrai (casse et espaces ignorés) ou secret simulé présent → refus de démarrer", (environnement) => {
+    for (const drapeau of ["true", "TRUE", " true ", "True"]) {
+      refusParse({ VADROUILLE_ENV: environnement, SIMULATED_WEBHOOK_ENABLED: drapeau }, NOM.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+    }
+    refusParse({ VADROUILLE_ENV: environnement, [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(aleatoire()) }, NOM.SIMULATED_WEBHOOK_SECRET, "forbidden");
+    refusParse({ VADROUILLE_ENV: environnement, PAYMENT_ADAPTER: "simulated" }, NOM.PAYMENT_ADAPTER, "forbidden");
+    // Drapeau faux ou absent : démarrage admis, webhook fermé.
+    expect(parseServerEnv({ VADROUILLE_ENV: environnement, SIMULATED_WEBHOOK_ENABLED: "false" }).simulatedWebhookFlag).toBe(false);
+  });
+
+  it("environnement non déclaré → refus de démarrer, même avec une configuration simulée complète", () => {
+    const env = simule();
+    delete env.VADROUILLE_ENV;
+    refusParse(env, NOM.VADROUILLE_ENV, "missing");
+  });
+
+  it("`PAYMENT_ADAPTER=simulated` : drapeau exactement `true`, `DATA_ADAPTER=api`, connexion réelle, secret du limiteur et secret simulé exigés", () => {
+    for (const drapeau of [undefined, "TRUE", "1", " true"]) refusParse(simule({ SIMULATED_WEBHOOK_ENABLED: drapeau }), NOM.SIMULATED_WEBHOOK_ENABLED, "missing");
+    for (const donnees of [undefined, "mock", "prototype"]) refusParse(simule({ DATA_ADAPTER: donnees }), NOM.DATA_ADAPTER, "invalid_value");
+    refusParse(simule({ AUTH_ADAPTER: "mock" }), NOM.AUTH_ADAPTER, "invalid_value");
+    refusParse(simule({ [NOM.RATE_LIMIT_HMAC_SECRET]: undefined }), NOM.RATE_LIMIT_HMAC_SECRET, "missing");
+    refusParse(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: undefined }), NOM.SIMULATED_WEBHOOK_SECRET, "missing");
+  });
+
+  it("le drapeau seul n'est vrai qu'avec exactement `true` ; le secret décodé n'apparaît dans aucune ligne du journal ni dans la liste des variables", () => {
+    for (const drapeau of ["TRUE", "1", " true", "true ", "yes"]) expect(parseServerEnv(ci({ SIMULATED_WEBHOOK_ENABLED: drapeau })).simulatedWebhookFlag).toBe(false);
+    expect(parseServerEnv(ci({ SIMULATED_WEBHOOK_ENABLED: "true" })).simulatedWebhookFlag).toBe(true);
+    const octets = aleatoire();
+    const config = parseServerEnv(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(octets) }));
+    expect(config.simulatedWebhookSecret?.equals(octets)).toBe(true);
+    const formes = [hex(octets), base64(octets), base64url(octets)];
+    const lignes = [
+      formatLogLine("payment.webhook_config_invalid", { rule: "forbidden", variable: hex(octets) }, "warn"),
+      formatLogLine("payment.webhook_config_invalid", { rule: base64(octets), variable: "SIMULATED_WEBHOOK_ENABLED" }, "warn"),
+      formatLogLine("payment.alert", { alertCode: base64url(octets), eventId: hex(octets) }, "error"),
+      formatLogLine("payment.webhook_config_invalid", { secret: octets } as object, "warn"),
+    ];
+    for (const ligne of lignes) for (const forme of formes) expect(ligne).not.toContain(forme);
+    for (const forme of formes) expect(LOG_VARIABLES.join(" ")).not.toContain(forme);
+  });
+});
+
+// --- Webhook simulé (spécification B4, critères A10 et A24 ; décision 0097 B4-TL-11) -------------------------------
+// Ici parce que ce test est le seul, hors de `src/server/env/`, admis à importer `@/server/env` (`parseServerEnv`) :
+// le gestionnaire reçoit une configuration validée injectée, jamais `process.env` (sauf l'export par défaut de la route,
+// fermé dans l'environnement des tests). Aucun accès à la base : le client est un double qui lève et compte ses appels.
+const CLE = aleatoire();
+const MAINTENANT_MS = 1_800_000_000_000;
+const MAINTENANT_S = MAINTENANT_MS / 1000;
+
+/** Environnement où le webhook simulé est ouvert (`ci`), plus `extra`. */
+const ouvertWebhook = (extra: Env = {}): Env => ({
+  VADROUILLE_ENV: "ci",
+  AUTH_ADAPTER: "better-auth",
+  [NOM.BETTER_AUTH_SECRET]: base64url(aleatoire()),
+  [NOM.BETTER_AUTH_URL]: "http://127.0.0.1:3000",
+  [NOM.APP_URL]: "http://127.0.0.1:3000",
+  [NOM.VADROUILLE_DATABASE_URL_AUTH]: "postgresql://vadrouille_auth@127.0.0.1:5432/vadrouille",
+  [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(aleatoire()),
+  [NOM.SIMULATED_WEBHOOK_SECRET]: CLE.toString("base64url"),
+  SIMULATED_WEBHOOK_ENABLED: "true",
+  PAYMENT_ADAPTER: "simulated",
+  DATA_ADAPTER: "api",
+  ...extra,
+});
+
+/** Client de base dont la transaction lève, et compte ses appels (aucun ne doit avoir lieu avant la signature). */
+function baseIndisponible() {
+  const acces = { nombre: 0 };
+  const panne = () => {
+    acces.nombre += 1;
+    throw new Error("base indisponible");
+  };
+  const database = { transaction: panne, execute: panne } as unknown as DependancesPaiement["database"];
+  const withOrg = panne as unknown as DependancesPaiement["withOrg"];
+  return { acces, dependances: { database, withOrg, maintenant: () => MAINTENANT_MS } satisfies DependancesPaiement };
+}
+
+const URL_WEBHOOK = "http://127.0.0.1:3000/api/v1/webhooks/simulated";
+const encodeur = new TextEncoder();
+
+function requete(corps: string | Uint8Array<ArrayBuffer>, entetes: Record<string, string> = {}, method = "POST"): Request {
+  return new Request(URL_WEBHOOK, { method, body: method === "GET" || method === "HEAD" ? null : (corps as BodyInit), headers: { "content-type": "application/json", ...entetes } });
+}
+
+function signee(corps: string, horodatage = MAINTENANT_S, cle = CLE): Request {
+  return requete(corps, { "stripe-signature": signer(encodeur.encode(corps), cle, horodatage) });
+}
+
+const evenement = () =>
+  JSON.stringify({
+    id: `evt_sim_${randomBytes(16).toString("hex")}`,
+    type: "checkout.session.completed",
+    livemode: false,
+    created: MAINTENANT_S,
+    data: { object: { id: `cs_sim_${randomBytes(16).toString("base64url")}`, payment_status: "paid", amount_total: 900, currency: "chf", metadata: { checkoutId: crypto.randomUUID() } } },
+  });
+
+const METHODES = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
+/** Exports de méthodes de la route, nommés un à un (aucun accès calculé). */
+const EXPORTS_ROUTE = [
+  ["GET", route.GET],
+  ["HEAD", route.HEAD],
+  ["POST", route.POST],
+  ["PUT", route.PUT],
+  ["PATCH", route.PATCH],
+  ["DELETE", route.DELETE],
+  ["OPTIONS", route.OPTIONS],
+] as const;
+
+function journal() {
+  const espions = [vi.spyOn(console, "log").mockImplementation(() => undefined), vi.spyOn(console, "error").mockImplementation(() => undefined)];
+  return () => espions.flatMap((espion) => espion.mock.calls.map((appel) => String(appel[0])));
+}
+
+describe("paiement: webhook simulé fermé par défaut et en production (A10)", () => {
+  it("la route exporte les sept méthodes vers le même gestionnaire, fermé sans drapeau : 404 pour chacune, corps vide", async () => {
+    expect(EXPORTS_ROUTE.map(([methode]) => methode)).toEqual([...METHODES]);
+    for (const [methode, gestionnaire] of EXPORTS_ROUTE) {
+      expect(gestionnaire).toBe(route.POST);
+      const reponse = await gestionnaire(requete("{}", {}, methode));
+      expect(reponse.status).toBe(404);
+      expect(await reponse.text()).toBe("");
+      expect(reponse.headers.get("cache-control")).toBe("no-store");
+    }
+    expect(route.dynamic).toBe("force-dynamic");
+  });
+
+  it.each([
+    ["sans drapeau", { VADROUILLE_ENV: "ci" }],
+    ["`TRUE`", { VADROUILLE_ENV: "ci", SIMULATED_WEBHOOK_ENABLED: "TRUE" }],
+    ["`1`", { VADROUILLE_ENV: "ci", SIMULATED_WEBHOOK_ENABLED: "1" }],
+    ["` true`", { VADROUILLE_ENV: "ci", SIMULATED_WEBHOOK_ENABLED: " true" }],
+    ["`true` sans `PAYMENT_ADAPTER=simulated`", { VADROUILLE_ENV: "ci", SIMULATED_WEBHOOK_ENABLED: "true" }],
+    ["`true` avec `PAYMENT_ADAPTER=mock`", { VADROUILLE_ENV: "local", SIMULATED_WEBHOOK_ENABLED: "true", PAYMENT_ADAPTER: "mock" }],
+  ] as const)("%s → 404 pour toute méthode, sans lire le corps ni la base", async (_cas, env) => {
+    const { acces, dependances } = baseIndisponible();
+    const verifier = vi.fn(() => true);
+    const gestionnaire = creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(parseServerEnv(env)), dependances, verifier });
+    for (const methode of METHODES) {
+      const demande = methode === "POST" ? signee(evenement()) : requete("{}", {}, methode);
+      const reponse = await gestionnaire(demande);
+      expect(reponse.status).toBe(404);
+      expect(await reponse.text()).toBe("");
+      expect(demande.bodyUsed).toBe(false);
+    }
+    expect(verifier).not.toHaveBeenCalled();
+    expect(acces.nombre).toBe(0);
+  });
+
+  it.each(["staging", "production"])("`%s` avec le drapeau → 404 et une ligne `payment.webhook_config_invalid`", async (environnement) => {
+    const lignes = journal();
+    const { acces, dependances } = baseIndisponible();
+    const gestionnaire = creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(parseServerEnv({ VADROUILLE_ENV: environnement, SIMULATED_WEBHOOK_ENABLED: "true", PAYMENT_ADAPTER: "simulated" })), dependances });
+    const reponse = await gestionnaire(signee(evenement()));
+    expect(reponse.status).toBe(404);
+    expect(acces.nombre).toBe(0);
+    const ecrites = lignes().map((ligne) => JSON.parse(ligne) as Record<string, unknown>);
+    expect(ecrites).toEqual([expect.objectContaining({ event: "payment.webhook_config_invalid", level: "warn", rule: "forbidden", variable: NOM.SIMULATED_WEBHOOK_ENABLED })]);
+  });
+
+  it("configuration invalide sans rapport (secret du limiteur trivial) → 404 et une ligne avec `rule` et `variable`, sans valeur", async () => {
+    const lignes = journal();
+    const trivial = "a".repeat(64);
+    const gestionnaire = creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(parseServerEnv(ouvertWebhook({ [NOM.RATE_LIMIT_HMAC_SECRET]: trivial }))), dependances: baseIndisponible().dependances });
+    for (const methode of ["POST", "GET"]) {
+      const reponse = await gestionnaire(methode === "POST" ? signee(evenement()) : requete("{}", {}, methode));
+      expect(reponse.status).toBe(404);
+      expect(await reponse.text()).toBe("");
+    }
+    const ecrites = lignes();
+    expect(ecrites).toHaveLength(2);
+    for (const ligne of ecrites) {
+      expect(JSON.parse(ligne)).toEqual(expect.objectContaining({ event: "payment.webhook_config_invalid", rule: "secret_trivial", variable: NOM.RATE_LIMIT_HMAC_SECRET }));
+      expect(ligne).not.toContain(trivial.slice(0, 8));
+      expect(ligne).not.toContain(CLE.toString("hex"));
+      expect(ligne).not.toContain(CLE.toString("base64url"));
+    }
+  });
+
+  it("une erreur qui n'est pas une `ServerEnvError` ferme aussi (404), sans ligne", async () => {
+    const lignes = journal();
+    const gestionnaire = creerWebhookSimule({
+      lireConfiguration: () => {
+        throw new Error("inattendu");
+      },
+    });
+    expect((await gestionnaire(signee(evenement()))).status).toBe(404);
+    expect(lignes()).toEqual([]);
+  });
+});
+
+describe("paiement: réponses du webhook simulé (A24)", () => {
+  const ouvertAvec = (options: Pick<OptionsWebhookSimule, "verifier"> = {}) => {
+    const env = parseServerEnv(ouvertWebhook());
+    const base = baseIndisponible();
+    return { ...base, gestionnaire: creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(env), dependances: base.dependances, ...options }) };
+  };
+
+  async function attendre(reponse: Response, status: number, corps: Record<string, unknown>) {
+    expect(reponse.status).toBe(status);
+    expect(reponse.headers.get("cache-control")).toBe("no-store");
+    expect(await reponse.json()).toEqual(corps);
+  }
+
+  it("`GET`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` → 405 (`Allow: POST`), corps constant", async () => {
+    const { gestionnaire, acces } = ouvertAvec();
+    for (const methode of ["GET", "PUT", "PATCH", "DELETE", "OPTIONS"]) {
+      const reponse = await gestionnaire(requete(evenement(), {}, methode));
+      expect(reponse.headers.get("allow")).toBe("POST");
+      await attendre(reponse, 405, { error: "method_not_allowed" });
+    }
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("type de contenu `text/plain` ou absent → 400 ; `application/json; charset=utf-8` et la casse sont admis", async () => {
+    const verifier = vi.fn(() => false);
+    const { gestionnaire } = ouvertAvec({ verifier });
+    await attendre(await gestionnaire(requete(evenement(), { "content-type": "text/plain" })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(new Request(URL_WEBHOOK, { method: "POST", body: new Uint8Array([123, 125]) })), 400, { error: "invalid_request" });
+    expect(verifier).not.toHaveBeenCalled();
+    await attendre(await gestionnaire(requete(evenement(), { "content-type": "Application/JSON; charset=utf-8" })), 400, { error: "invalid_request" });
+    expect(verifier).toHaveBeenCalledTimes(1);
+  });
+
+  it("corps de taille maximale + 1 octet → 413 avant tout calcul de signature (annoncé ou lu en flux), sans base", async () => {
+    const verifier = vi.fn(() => true);
+    const { gestionnaire, acces } = ouvertAvec({ verifier });
+    const gros = new Uint8Array(TAILLE_MAX_CORPS + 1).fill(32);
+    await attendre(await gestionnaire(requete(gros, { "stripe-signature": "t=1,v1=00" })), 413, { error: "payload_too_large" });
+    const flux = new ReadableStream<Uint8Array>({
+      start(controleur) {
+        controleur.enqueue(gros.subarray(0, TAILLE_MAX_CORPS));
+        controleur.enqueue(gros.subarray(TAILLE_MAX_CORPS));
+        controleur.close();
+      },
+    });
+    const sansLongueur = new Request(URL_WEBHOOK, { method: "POST", body: flux, headers: { "content-type": "application/json" }, duplex: "half" } as RequestInit);
+    expect(sansLongueur.headers.get("content-length")).toBeNull();
+    await attendre(await gestionnaire(sansLongueur), 413, { error: "payload_too_large" });
+    await attendre(await gestionnaire(requete("{}", { "content-length": "abc" })), 413, { error: "payload_too_large" });
+    expect(verifier).not.toHaveBeenCalled();
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("corps de taille maximale exacte → passe à la signature", async () => {
+    const verifier = vi.fn(() => false);
+    const { gestionnaire } = ouvertAvec({ verifier });
+    await attendre(await gestionnaire(requete(new Uint8Array(TAILLE_MAX_CORPS).fill(32))), 400, { error: "invalid_request" });
+    expect(verifier).toHaveBeenCalledTimes(1);
+  });
+
+  it("signature absente, fausse, d'une autre clé ou hors tolérance, base indisponible → 400 (pas 500), sans accès à la base", async () => {
+    const { gestionnaire, acces } = ouvertAvec();
+    const corps = evenement();
+    await attendre(await gestionnaire(requete(corps)), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(requete(corps, { "stripe-signature": `t=${MAINTENANT_S},v1=${"0".repeat(64)}` })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(signee(corps, MAINTENANT_S, randomBytes(32))), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(signee(corps, MAINTENANT_S - 301)), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(signee(corps, MAINTENANT_S + 301)), 400, { error: "invalid_request" });
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("corps signé non analysable (UTF-8 invalide, JSON invalide, JSON sans type) → 400 sans accès à la base", async () => {
+    const { gestionnaire, acces } = ouvertAvec();
+    const octetsInvalides = new Uint8Array([0x7b, 0xff, 0x7d]);
+    const reponse = await gestionnaire(requete(octetsInvalides, { "stripe-signature": signer(octetsInvalides, CLE, MAINTENANT_S) }));
+    await attendre(reponse, 400, { error: "invalid_request" });
+    for (const corps of ["{", "[]", JSON.stringify({ id: "evt_sim_0", livemode: false }), JSON.stringify({ id: "evt_sim_0", type: "x" })]) {
+      await attendre(await gestionnaire(signee(corps)), 400, { error: "invalid_request" });
+    }
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("signature valide (à 299 s dans le passé ou le futur) et base indisponible → 500, corps constant", async () => {
+    const { gestionnaire, acces } = ouvertAvec();
+    for (const decalage of [0, -299, 299]) {
+      await attendre(await gestionnaire(signee(evenement(), MAINTENANT_S + decalage)), 500, { error: "server_error" });
+    }
+    expect(acces.nombre).toBeGreaterThan(0);
+  });
+
+  it("aucun corps de réponse ne contient d'identifiant, de message ni de valeur reçue", async () => {
+    const { gestionnaire } = ouvertAvec();
+    const corps = evenement();
+    const recu = JSON.parse(corps) as { id: string; data: { object: { id: string; metadata: { checkoutId: string } } } };
+    const reponses = [
+      await gestionnaire(requete(corps, {}, "PUT")),
+      await gestionnaire(requete(corps, { "content-type": "text/plain" })),
+      await gestionnaire(signee(corps)),
+      await gestionnaire(requete(corps)),
+    ];
+    for (const reponse of reponses) {
+      const texte = await reponse.text();
+      expect(["method_not_allowed", "invalid_request", "server_error"].some((code) => texte === JSON.stringify({ error: code }))).toBe(true);
+      for (const valeur of [recu.id, recu.data.object.id, recu.data.object.metadata.checkoutId, "base indisponible"]) expect(texte).not.toContain(valeur);
+    }
+  });
+});
+
+afterEach(() => vi.restoreAllMocks());

@@ -129,11 +129,11 @@ describe("sans paiement simulé autorisé (NODE_ENV=production, sans drapeau)", 
   });
 
   it("les trois actions renvoient not_found sans appeler l'adaptateur ni le contexte", async () => {
-    expect(await startCheckout({ tripId: TRIP, method: "twint" })).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await startCheckout({ tripId: TRIP, method: "twint", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "not_found" } });
     expect(await simulateCheckoutOutcome({ checkoutId: ID, outcome: "succeeded" })).toEqual({ ok: false, error: { code: "not_found" } });
     expect(await getCheckoutStatus({ checkoutId: ID })).toEqual({ ok: false, error: { code: "not_found" } });
     // Même avec une entrée invalide : la garde passe avant la validation.
-    expect(await startCheckout({ tripId: TRIP, method: "paypal" })).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await startCheckout({ tripId: TRIP, method: "paypal", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "not_found" } });
     for (const spy of spies()) expect(spy).not.toHaveBeenCalled();
   });
 });

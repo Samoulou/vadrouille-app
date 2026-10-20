@@ -9,7 +9,9 @@ import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
  * Environnement serveur fermé par défaut (spécification B3, B3a points 1 et 2 ; amendement de 0017 § 11.0 écrit
  * dans 0006 ; décisions 0050, B3-TL-1 et B3-TL-5, et 0051, points 2, 3 et 6.5 ; B3b : 0077 § 5.1). Importé sous le
  * nom `@/server/env`, seulement par `src/instrumentation.ts`, le limiteur (`src/server/rate-limit.ts`), les opérations
- * de connexion (`src/server/auth/index.ts`) et ses tests (`ligne/server-env-imports`).
+ * de connexion (`src/server/auth/index.ts`), la composition du paiement simulé (`src/server/payment/composition.ts`),
+ * le webhook simulé (`src/server/routes/simulated-webhook.ts`) et ses tests (`ligne/server-env-imports` ; B4a,
+ * décision 0097 B4-TL-3 point 5 (e)).
  *
  * - `parseServerEnv(env)` : fonction pure, valide l'objet reçu et rend un objet figé, sans aucune chaîne secrète (les
  *   secrets n'y sont que leurs octets décodés) ni clé de fournisseur.
@@ -55,6 +57,10 @@ const VARIABLES = {
   AUTH_SECRET: 0,
   SIMULATED_WEBHOOK_SECRET: 0,
   SIMULATED_WEBHOOK_ENABLED: 0,
+  // B4a (spécification B4, B4a point 5 ; décision 0097 B4-TL-7) : choix des adaptateurs de paiement et de données,
+  // validés au démarrage (une valeur inconnue refuse de démarrer).
+  PAYMENT_ADAPTER: 0,
+  DATA_ADAPTER: 0,
   VADROUILLE_DATABASE_URL_MIGRATOR: 0,
   VADROUILLE_DB_ADMIN_URL: 0,
   STRIPE_SECRET_KEY: 0,
@@ -143,7 +149,35 @@ export type ServerEnv = {
   readonly rateLimitHmacSecret: Buffer | null;
   /** `null` ⇔ `EMAIL_TRANSPORT` absente : port d'envoi désactivé, aucun envoi implicite (B3b-envoi-PO-2). */
   readonly smtp: SmtpSettings | null;
+  /** `PAYMENT_ADAPTER` normalisé (B4a ; absent ou vide : `mock`, comme `payment-guard.ts`). */
+  readonly paymentAdapter: PaymentAdapterChoice;
+  /** `DATA_ADAPTER` normalisé (B4a ; absent ou vide : `mock`, comme `adapterChoice`). */
+  readonly dataAdapter: DataAdapterChoice;
+  /**
+   * `SIMULATED_WEBHOOK_ENABLED` vaut **exactement** `true` (ni `TRUE`, ni `1`, ni ` true` ; décision 0097 B4-TL-7).
+   * Seul, il n'ouvre rien : le prédicat « webhook simulé ouvert » est `webhookSimuleOuvert` (`./payment.ts`).
+   */
+  readonly simulatedWebhookFlag: boolean;
+  /**
+   * Octets décodés de `SIMULATED_WEBHOOK_SECRET` (décision 0097 B4-TL-3 point 5 (a)), `null` si la variable est
+   * absente. Champ `readonly`, jamais exporté ni muté ; lu seulement par `cleWebhookSimule` (`./payment.ts`), et ce
+   * nom de champ n'apparaît que dans ce module, `./payment.ts` et leurs tests (test de graphe du confinement).
+   */
+  readonly simulatedWebhookSecret: Buffer | null;
 };
+
+/** Valeurs admises de `PAYMENT_ADAPTER` (spécification B4, B4-PO-1). */
+export const PAYMENT_ADAPTER_CHOICES = ["mock", "simulated", "stripe"] as const;
+export type PaymentAdapterChoice = (typeof PAYMENT_ADAPTER_CHOICES)[number];
+/** Valeurs admises de `DATA_ADAPTER` : celles de `getTripAdapter` (décision 0097 B4-TL-7). */
+export const DATA_ADAPTER_CHOICES = ["mock", "api", "prototype"] as const;
+export type DataAdapterChoice = (typeof DATA_ADAPTER_CHOICES)[number];
+
+/** Choix d'adaptateur normalisé (`trim()`, vide = `mock`) dans une liste fermée, ou `null` si la valeur est inconnue. */
+function choixAdaptateur<T extends string>(valeur: string | undefined, admis: readonly T[]): T | null {
+  const normalise = valeur?.trim() || "mock";
+  return admis.find((choix) => choix === normalise) ?? null;
+}
 
 /** « Présente » : définie et non vide après `trim()` (tableau « requis quand » de la spécification). */
 const presente = (value: string | undefined): value is string => value !== undefined && value.trim() !== "";
@@ -271,6 +305,8 @@ const ServerEnvSchema = z.object({
   APP_URL: z.string().optional(),
   SIMULATED_WEBHOOK_SECRET: z.string().optional(),
   SIMULATED_WEBHOOK_ENABLED: z.string().optional(),
+  PAYMENT_ADAPTER: z.string().optional(),
+  DATA_ADAPTER: z.string().optional(),
   P0_REAL_RUNS: z.string().optional(),
   P0_RUN_TOKEN: z.string().optional(),
 });
@@ -324,6 +360,8 @@ export function parseServerEnv(env: Env): ServerEnv {
     APP_URL: env.APP_URL,
     SIMULATED_WEBHOOK_SECRET: env.SIMULATED_WEBHOOK_SECRET,
     SIMULATED_WEBHOOK_ENABLED: env.SIMULATED_WEBHOOK_ENABLED,
+    PAYMENT_ADAPTER: env.PAYMENT_ADAPTER,
+    DATA_ADAPTER: env.DATA_ADAPTER,
     P0_REAL_RUNS: env.P0_REAL_RUNS,
     P0_RUN_TOKEN: env.P0_RUN_TOKEN,
   });
@@ -410,6 +448,21 @@ export function parseServerEnv(env: Env): ServerEnv {
   // `P0_REAL_RUNS` présente : `enabled` seulement, comparaison exacte, sans `trim()` (0055, section 1 point 2).
   if (presente(brut.P0_REAL_RUNS) && brut.P0_REAL_RUNS !== "enabled") throw new ServerEnvError(V.P0_REAL_RUNS, "invalid_value");
 
+  // PAYMENT_ADAPTER et DATA_ADAPTER (B4a ; décision 0097 B4-TL-7) : valeur inconnue = refus de démarrer.
+  const paymentAdapter = choixAdaptateur(brut.PAYMENT_ADAPTER, PAYMENT_ADAPTER_CHOICES);
+  if (paymentAdapter === null) throw new ServerEnvError(V.PAYMENT_ADAPTER, "invalid_value");
+  const dataAdapter = choixAdaptateur(brut.DATA_ADAPTER, DATA_ADAPTER_CHOICES);
+  if (dataAdapter === null) throw new ServerEnvError(V.DATA_ADAPTER, "invalid_value");
+
+  // Webhook simulé (B4a ; 0097 B4-TL-7) : drapeau vrai (casse et espaces ignorés, comme la garde de B3a) refusé en
+  // `production` et en `staging` tant que Q131 n'est pas tranchée ; secret de signature simulé présent refusé dans ces
+  // deux environnements, quel que soit le drapeau. Présence seulement : la valeur du secret n'est pas lue ici.
+  const exterieur = environment === "staging" || environment === "production";
+  if (exterieur && brut.SIMULATED_WEBHOOK_ENABLED?.trim().toLowerCase() === "true") {
+    throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+  }
+  if (exterieur && presente(brut.SIMULATED_WEBHOOK_SECRET)) throw new ServerEnvError(V.SIMULATED_WEBHOOK_SECRET, "forbidden");
+
   // Secrets : tout secret présent est décodé et contrôlé, utilisé ou non (0051 point 3.6), puis l'unicité est
   // comparée sur les octets décodés de tous les secrets présents (0051 point 3.5).
   const secrets: [ServerEnvVariable, string | undefined][] = [
@@ -422,6 +475,7 @@ export function parseServerEnv(env: Env): ServerEnv {
   const decodes: Buffer[] = [];
   let rateLimitHmacSecret: Buffer | null = null;
   let betterAuthSecret: Buffer | null = null;
+  let simulatedWebhookSecret: Buffer | null = null;
   for (const [nom, valeur] of secrets) {
     if (!presente(valeur)) continue;
     const octets = decodeSecret(nom, valeur);
@@ -429,6 +483,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     decodes.push(octets);
     if (nom === V.RATE_LIMIT_HMAC_SECRET) rateLimitHmacSecret = octets;
     if (nom === V.BETTER_AUTH_SECRET) betterAuthSecret = octets;
+    if (nom === V.SIMULATED_WEBHOOK_SECRET) simulatedWebhookSecret = octets;
   }
 
   // Connexion réelle (B3b) : secret, URL de la bibliothèque, URL de l'application et URL de connexion du rôle
@@ -447,11 +502,32 @@ export function parseServerEnv(env: Env): ServerEnv {
     betterAuth = Object.freeze({ environment, secret: betterAuthSecret, baseUrl, appUrl });
   }
 
-  if (environment === "production" && brut.SIMULATED_WEBHOOK_ENABLED?.trim().toLowerCase() === "true") {
-    throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+  // PAYMENT_ADAPTER=simulated (B4a ; 0097 B4-TL-7) : en `local` ou `ci` seulement, avec le webhook simulé ouvert (drapeau
+  // exactement `true`), `DATA_ADAPTER=api`, `AUTH_ADAPTER=better-auth` (donc `APP_URL`, validée plus haut), le secret du
+  // limiteur (sans lui, le limiteur des actions échouerait fermé à l'usage) et le secret de signature, dont le contrôle
+  // de 32 octets est celui de `decodeSecret`, appliqué plus haut dès qu'il est présent.
+  const simulatedWebhookFlag = brut.SIMULATED_WEBHOOK_ENABLED === "true";
+  if (paymentAdapter === "simulated") {
+    if (environment !== "local" && environment !== "ci") throw new ServerEnvError(V.PAYMENT_ADAPTER, "forbidden");
+    if (!simulatedWebhookFlag) throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "missing");
+    if (dataAdapter !== "api") throw new ServerEnvError(V.DATA_ADAPTER, "invalid_value");
+    if (betterAuth === null) throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
+    if (rateLimitHmacSecret === null) throw new ServerEnvError(V.RATE_LIMIT_HMAC_SECRET, "missing");
+    if (simulatedWebhookSecret === null) throw new ServerEnvError(V.SIMULATED_WEBHOOK_SECRET, "missing");
   }
 
-  return Object.freeze({ environment, authAdapter: choix, betterAuth, trustedIpHeader, rateLimitHmacSecret, smtp });
+  return Object.freeze({
+    environment,
+    authAdapter: choix,
+    betterAuth,
+    trustedIpHeader,
+    rateLimitHmacSecret,
+    smtp,
+    paymentAdapter,
+    dataAdapter,
+    simulatedWebhookFlag,
+    simulatedWebhookSecret,
+  });
 }
 
 /**

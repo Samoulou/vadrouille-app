@@ -5,6 +5,7 @@ import { complementP0, listeBlanche } from "./ia-recherche-imports.mjs";
 import noHardcodedColors from "./no-hardcoded-colors.mjs";
 import noP0ServerModules from "./no-p0-server-modules.mjs";
 import requireServerOnly from "./require-server-only.mjs";
+import { routeHandlers } from "./route-handlers.mjs";
 import serverEnvImports from "./server-env-imports.mjs";
 import { noCacheStorageOpen, noServiceWorkerRegister } from "./service-worker.mjs";
 import useServerOnlyInActions from "./use-server-only-in-actions.mjs";
@@ -31,6 +32,7 @@ const plugin = {
     "creation-imports": creationImports,
     "better-auth-confinement": betterAuthConfinement,
     "no-raw-auth-secret": noRawAuthSecret,
+    "route-handlers": routeHandlers,
   },
 };
 
