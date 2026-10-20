@@ -23,7 +23,7 @@ const RACINE = process.cwd();
 const NOM = "edimbourg-court";
 const lire = (fichier: string): unknown => JSON.parse(readFileSync(path.join(RACINE, fichier), "utf8"));
 const brief = BriefSchema.parse(lire(`prototype/briefs/${NOM}.json`));
-const essai = lire("prototype/config/essai.json") as { routesElements: number; routesRequetes: number; placesDetails: number; candidatsTrouves: number };
+const essai = lire("prototype/config/essai.json") as { routesElements: number; routesRequetes: number; placesDetails: number; placesTextSearch: number };
 const rechercheEssai = lire("prototype/config/recherche-essai.json") as { totalCandidats: number; ciblesParCreneau: Record<"activity" | "meal" | "evening", number> };
 
 /** Plafond d'éléments Routes par essai fixé par Samuel (0053, relevé à 840 par 0088 § 13). */
@@ -109,13 +109,12 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     expect(budgetFiches - serie).toBe(79);
   });
 
-  it("la série tient dans les candidats visés par la recherche de l'essai avec 3 de marge, sous le plafond de 0073", () => {
+  it("la série tient dans les candidats visés par la recherche de l'essai avec 3 de marge, et totalCandidats + 5 ≤ placesTextSearch", () => {
     const { serie, parType } = premiereSerie(brief);
-    expect(essai.candidatsTrouves).toBe(85);
-    expect(essai.candidatsTrouves).toBeLessThanOrEqual(BORNES_ESSAI.candidatsTrouves);
-    // Profil de recherche de l'essai inchangé par 0073 : 12 candidats visés, sous le plafond (fusible) de 85.
+    // Profil de recherche de l'essai inchangé par 0073 : 12 candidats visés ; contrôle de cohérence de 0102 § 5 :
+    // `totalCandidats + 5 ≤ placesTextSearch`.
     expect(rechercheEssai.totalCandidats).toBe(12);
-    expect(rechercheEssai.totalCandidats).toBeLessThanOrEqual(essai.candidatsTrouves);
+    expect(rechercheEssai.totalCandidats + 5).toBeLessThanOrEqual(essai.placesTextSearch);
     expect(serie).toBeLessThanOrEqual(rechercheEssai.totalCandidats);
     expect(rechercheEssai.totalCandidats - serie).toBe(3);
     const cibles = rechercheEssai.ciblesParCreneau;

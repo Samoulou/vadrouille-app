@@ -82,7 +82,7 @@ export async function ouvrirGardeLancement(dependances: DependancesLancement): P
 export type DependancesEtape = DependancesAcces & {
   /** Pool `vadrouille_prototype` (lecture de `prototype.runs` et `prototype.forfaits`). */
   readonly pool: () => PoolSql;
-  /** Durée maximale d'une exécution (`dureeMs` de la configuration du mode : 15 minutes). */
+  /** Durée maximale d'une exécution (`DUREE_MAX_EXECUTION_MS` de `p0-run.ts` : 40 minutes, décision 0102 § 6, valeur en attente de Samuel). */
   readonly dureeMaxMs: number;
 };
 

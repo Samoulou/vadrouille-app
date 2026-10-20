@@ -172,14 +172,10 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       schema: 1,
       uniteQuotaRoutes: "elements",
       coutUsd: 3,
-      recherchesWeb: 40,
-      pagesLues: 100,
-      candidatsTrouves: 85,
       placesTextSearch: 90,
       placesDetails: 90,
       routesRequetes: 30,
       routesElements: 840,
-      dureeMs: 900_000,
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
@@ -202,10 +198,6 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       ["coutUsd", 3.01],
       ["placesDetails", 91],
       ["placesTextSearch", 91],
-      ["recherchesWeb", 61],
-      ["pagesLues", 151],
-      ["candidatsTrouves", 91],
-      ["dureeMs", 900_001],
       ["uniteQuotaRoutes", "minutes"],
       ["fiches", { margeMinimum: 4, margePart: 1.2 }],
       ["mode", "SENTINELLE-MODE"],
@@ -218,9 +210,33 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
       expect(JSON.stringify(resultat)).not.toContain(String(valeur));
     }
-    // Contrôle croisé : 86 candidats + 5 logements dépassent 90 Text Search.
-    expect(validerConfigModeReel({ ...complete(), candidatsTrouves: 86 })).toEqual({ ok: false, code: "config_reel_invalide" });
+    // Contrôle croisé (0102 § 5) : 86 candidats visés + 5 logements dépassent 90 Text Search ; 85 + 5 = 90 passe.
+    expect(validerConfigModeReel(complete(), 86)).toEqual({ ok: false, code: "config_reel_invalide" });
+    expect(validerConfigModeReel(complete(), 85)).toMatchObject({ ok: true });
     expect(validerConfigModeReel(null)).toEqual({ ok: false, code: "config_reel_invalide" });
+  });
+});
+
+describe("p0: champs retirés de la configuration du mode réel et de l'essai (0093 point 5, décision 0102 § 8)", () => {
+  const RETIRES = ["recherchesWeb", "pagesLues", "candidatsTrouves", "dureeMs"] as const;
+  const fichiers = { "mode-reel": validerConfigModeReel, essai: validerConfigEssai } as const;
+
+  it("aucun des quatre noms n'est dans mode-reel.json, essai.json, le schéma ni les bornes", () => {
+    for (const nom of RETIRES) {
+      for (const fichier of ["mode-reel", "essai"]) expect(Object.keys(lire(fichier) as object), `${fichier} : ${nom}`).not.toContain(nom);
+      expect(Object.keys(ConfigModeReelSchema.shape), nom).not.toContain(nom);
+      expect(Object.keys(BORNES_MODE_REEL), nom).not.toContain(nom);
+      expect(Object.keys(BORNES_ESSAI), nom).not.toContain(nom);
+    }
+  });
+
+  it("un des quatre champs retirés présent dans le fichier est refusé (strictObject)", () => {
+    for (const [fichier, valider] of Object.entries(fichiers)) {
+      for (const nom of RETIRES) {
+        const resultat = valider({ ...(lire(fichier) as object), [nom]: 1 });
+        expect(resultat, `${fichier} : ${nom}`).toEqual({ ok: false, code: "config_reel_invalide" });
+      }
+    }
   });
 });
 
@@ -232,14 +248,10 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       schema: 1,
       uniteQuotaRoutes: "elements",
       coutUsd: 2,
-      recherchesWeb: 40,
-      pagesLues: 100,
-      candidatsTrouves: 85,
       placesTextSearch: 90,
       placesDetails: 90,
       routesRequetes: 30,
       routesElements: 840,
-      dureeMs: 900_000,
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
@@ -262,14 +274,10 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
   it("au-delà d'une borne de l'essai, refusée sans recopier la valeur", () => {
     const cas: [string, number][] = [
       ["coutUsd", 3.01],
-      ["recherchesWeb", 41],
-      ["pagesLues", 101],
-      ["candidatsTrouves", 86],
       ["placesTextSearch", 91],
       ["placesDetails", 91],
       ["routesRequetes", 31],
       ["routesElements", 841],
-      ["dureeMs", 900_001],
     ];
     expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());
     for (const [champ, valeur] of cas) {
@@ -288,7 +296,8 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
   it("recherche-essai.json : profil de l'essai (12 candidats visés), fusible toursMax aligné sur le mode réel (0073)", () => {
     const recherche = ConfigRechercheSchema.parse(lire("recherche-essai"));
     expect(recherche.totalCandidats).toBe(12);
-    expect(recherche.totalCandidats).toBeLessThanOrEqual(BORNES_ESSAI.candidatsTrouves);
+    expect(validerConfigEssai(essai(), recherche.totalCandidats)).toMatchObject({ ok: true });
+    expect(recherche.totalCandidats + 5).toBeLessThanOrEqual(BORNES_ESSAI.placesTextSearch);
     expect(recherche.toursMax).toBe(ConfigRechercheSchema.parse(lire("recherche")).toursMax);
     const cibles = Object.values(recherche.ciblesParCreneau).reduce((a, b) => a + b, 0);
     expect(cibles).toBeLessThanOrEqual(recherche.totalCandidats);

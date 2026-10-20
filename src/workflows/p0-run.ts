@@ -19,6 +19,8 @@ import {
   ConfigModelesSchema,
   ConfigRechercheSchema,
   modelesDeLaVariante,
+  rechercheTientSousPlaces,
+  TOTAL_CANDIDATS_MAX,
   validerConfigEssai,
   validerConfigModeReel,
   type ConfigModeReel,
@@ -30,7 +32,7 @@ import { trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { chercherCandidats, tempsPourAppel, type CompteursAgent, type EtatAgent } from "@/research/agent";
 import { DELAI_MAX_MS, type LecteurPages } from "@/research/fetch-page";
-import { bornerLecteur, bornerRecherche, PlafondAgentAtteint } from "@/research/plafonds-agent";
+import { PlafondAgentAtteint } from "@/research/plafonds-agent";
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assembler, type Raison } from "@/server/p0/assemblage";
@@ -151,17 +153,14 @@ export const NOMS_BRIEFS: readonly string[] = [...BRIEFS.keys()];
 export const LIMITE_FONCTION_MS = 800_000;
 
 /**
- * Durée gardée pour les étapes suivantes (décision 0075) : avec 800 s par étape, une étape pourrait consommer presque
- * toute la durée de l'exécution (`dureeMs`, 900 s) et priver les suivantes. L'échéance d'une étape laisse donc, sur la
- * durée restante, 150 s à l'ancrage (Text Search en série) et 300 s à l'étape finale (son ancienne fenêtre entière) :
- * la recherche a au plus 900 − 450 − 30 = 420 s (fenêtre des appels de modèle : 296 s, contre 146 s avant), l'ancrage
- * au plus ce qui reste moins 300 s, l'étape finale tout ce qui reste.
+ * Ancienneté maximale d'une exécution pour la garde de chaque étape (`verifierGardeEtape`) et seuil de clôture des
+ * exécutions orphelines (`neon.ts`, plus 5 min) : trois étapes, chacune au plus à la limite de fonction de la plateforme
+ * (`maxRetries = 0`), soit 40 min (décision 0102 § 6). **Valeur proposée, en attente de Samuel (question 2)** : ce n'est
+ * pas un fusible de coût, mais une exécution dont les étapes seraient séparées par de longs délais de file verrait sa
+ * prochaine étape refusée par la garde. Dérivée de 0075, non choisie (l'ancien `dureeMs` de 900 s ne s'applique plus).
+ * Une constante, pour la changer d'un seul endroit.
  */
-export const RESERVE_ETAPES_SUIVANTES_MS: Readonly<Record<"recherche" | "ancrage" | "notation", number>> = {
-  recherche: 450_000,
-  ancrage: 300_000,
-  notation: 0,
-};
+export const DUREE_MAX_EXECUTION_MS = 3 * LIMITE_FONCTION_MS;
 
 /**
  * Marge de la vérification de l'agent (ticket 407) : l'agent demande s'il a le temps un peu avant que le registre
@@ -245,8 +244,7 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  *   - essai (`essai.json`, plafonds alignés sur ceux du mode réel par la décision 0073) : même calcul, **6,00 USD**
  *     (0,88 USD avec les plafonds d'essai de 0063, points 8 et 9).
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
- * - Durée des orphelines : celle du mode réel, la plus longue, quel que soit le mode lancé ; une exécution réelle encore
- *   en cours n'est jamais close comme orpheline par le lancement d'un essai.
+ * - Durée des orphelines : `DUREE_MAX_EXECUTION_MS`, la même pour tous les modes (plus de durée par mode depuis 0102).
  */
 export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode | null {
   if (mode !== "reel" && mode !== "essai") return null;
@@ -263,7 +261,7 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
       { placesTextSearch: config.placesTextSearch, placesDetails: config.placesDetails, routesRequetes: config.routesRequetes, routesElements: config.routesElements },
       Math.round(config.coutUsd * 1_000_000),
     );
-    return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs } };
+    return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: DUREE_MAX_EXECUTION_MS } };
   } catch {
     return null;
   }
@@ -290,7 +288,7 @@ export function relectureDuMode(): LancementDuMode | null {
   try {
     return {
       forfait: forfaitRelecture(table.data, SKUS_FORFAIT, PLAFONDS_RELECTURE),
-      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: reel.config.uniteQuotaRoutes, dureeMaxMs: reel.config.dureeMs },
+      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: reel.config.uniteQuotaRoutes, dureeMaxMs: DUREE_MAX_EXECUTION_MS },
     };
   } catch {
     return null;
@@ -329,7 +327,7 @@ const reperesDesLogements = (brief: Brief) => brief.logements.map((_, rang) => `
 /**
  * Bornes de la recherche de l'exécution (ticket 483) : en **exécution comptée**, cibles calculées depuis la demande du
  * séjour (`bornesDepuisDemande` : première série de `dimensionsDuSejour`, plus 30 %), sous le plafond des candidats que
- * l'exécution peut trouver (`candidatsTrouves`) et ancrer (Text Search : `placesTextSearch − 2 × logements`, une requête
+ * l'exécution peut trouver (borne de forme de 300, jamais atteinte) et ancrer (Text Search : `placesTextSearch − 2 × logements`, une requête
  * par logement à l'ancrage et une à l'étape finale) ; en **essai**, le profil fixe de `recherche-essai.json` (décision
  * 0073 point 4, réservée à Samuel, inchangée). `null` : plafond nul ou négatif, aucun candidat ancrable, l'exécution
  * s'arrête (`briefTientDansLeMode` refuse ce brief au lancement ; `etapeRecherche` s'arrête avant tout appel).
@@ -337,7 +335,7 @@ const reperesDesLogements = (brief: Brief) => brief.logements.map((_, rang) => `
 function bornesDeLaRecherche(mode: ExecutionEnCours["mode"], config: ConfigModeReel, recherche: ConfigRecherche, brief: Brief): BornesRechercheP0 | null {
   if (mode !== "reel") return bornesDepuisConfig(recherche);
   const { serie } = dimensionsDuSejour(brief, config, reperesDesLogements(brief));
-  return bornesDepuisDemande(recherche, serie, Math.min(config.candidatsTrouves, config.placesTextSearch - 2 * brief.logements.length));
+  return bornesDepuisDemande(recherche, serie, Math.min(TOTAL_CANDIDATS_MAX, config.placesTextSearch - 2 * brief.logements.length));
 }
 
 /**
@@ -393,12 +391,12 @@ export async function cloreExecutionNonDemarree(pool: PoolSql, garde: GardeOuver
 /**
  * Modèles et profil de l'agent du mode : `recherche.json` (mode réel, profil léger de 0055 § 6 point 5) ou
  * `recherche-essai.json` (essai d'intégration : 12 candidats visés ; `toursMax` aligné sur le mode réel par 0073) ; le
- * total visé reste sous `candidatsTrouves`.
+ * total visé tient sous le plafond Text Search du mode (`totalCandidats + 5 ≤ placesTextSearch`, décision 0102 § 3).
  */
 function configurationAgent(mode: ExecutionEnCours["mode"], config: ConfigModeReel): { modeles: ConfigModeles; recherche: ConfigRecherche } {
   const modeles = ConfigModelesSchema.safeParse(configModeles);
   const recherche = ConfigRechercheSchema.safeParse(mode === "essai" ? configRechercheEssai : configRecherche);
-  if (!modeles.success || !recherche.success || recherche.data.totalCandidats > config.candidatsTrouves) throw new ArretEtape("config_invalid");
+  if (!modeles.success || !recherche.success || !rechercheTientSousPlaces(recherche.data.totalCandidats, config.placesTextSearch)) throw new ArretEtape("config_invalid");
   return { modeles: modeles.data, recherche: recherche.data };
 }
 
@@ -443,26 +441,20 @@ type ContexteEtape = {
 };
 
 /**
- * Entrée commune d'une étape : garde (durée du mode réel, la plus longue), exécution relue, configuration et brief ;
- * pour un essai, garde revérifiée avec sa durée propre (`essai.json` : 15 min depuis la décision 0073, 5 min avant). Puis
- * phase écrite (garde d'idempotence) et échéance : la plus proche de la limite de fonction et de la fin de la durée du
- * mode diminuée de la part gardée aux étapes suivantes (0075), moins la marge de fin d'étape.
+ * Entrée commune d'une étape : garde (ancienneté `DUREE_MAX_EXECUTION_MS`), exécution relue, configuration et brief. Puis
+ * phase écrite (garde d'idempotence) et échéance : la limite de fonction de la plateforme (0075), moins la marge de fin
+ * d'étape, soit 770 s pour chaque étape (décision 0102 § 6 : plus de durée d'exécution commune ni de part gardée aux
+ * étapes suivantes).
  */
 async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<ContexteEtape> {
-  const dureeReel = validerConfigModeReel(configModeReel);
-  const ouverte = await verifierGardeEtape(runId, { pool: poolPrototype, dureeMaxMs: dureeReel.ok ? dureeReel.config.dureeMs : 0 });
+  const ouverte = await verifierGardeEtape(runId, { pool: poolPrototype, dureeMaxMs: DUREE_MAX_EXECUTION_MS });
   if (!ouverte.ok) throw new ArretEtape("real_mode_unavailable");
   const debut = Date.now();
   const execution = await lireExecution(poolPrototype(), ouverte.garde.runId);
   const config = configurationDuMode(execution.mode);
-  if (execution.mode === "essai") {
-    const essai = await verifierGardeEtape(runId, { pool: poolPrototype, dureeMaxMs: config.dureeMs });
-    if (!essai.ok) throw new ArretEtape("real_mode_unavailable");
-  }
   const brief = briefDe(execution.brief);
   await ecrirePhase(poolPrototype(), ouverte.garde.runId, phase);
-  const reserve = phase === "recherche" || phase === "ancrage" || phase === "notation" ? RESERVE_ETAPES_SUIVANTES_MS[phase] : 0;
-  const echeance = debut + Math.min(LIMITE_FONCTION_MS, config.dureeMs - execution.ecouleMs - reserve) - MARGE_FIN_ETAPE_MS;
+  const echeance = debut + LIMITE_FONCTION_MS - MARGE_FIN_ETAPE_MS;
   return { garde: ouverte.garde, execution, config, brief, echeance };
 }
 
@@ -663,8 +655,8 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
           modeles: agent.modeles,
           modele: choisis.recherche,
           routage,
-          recherche: bornerRecherche(agent.rechercheWeb, contexte.config.recherchesWeb),
-          lecteur: bornerLecteur(lecteurSousEcheance(agent.pages, contexte.echeance), contexte.config.pagesLues),
+          recherche: agent.rechercheWeb,
+          lecteur: lecteurSousEcheance(agent.pages, contexte.echeance),
           bornes,
           complement: complementDepuisBrief(contexte.brief),
           protegees: donneesProtegeesDepuisBrief(contexte.brief),
@@ -682,7 +674,6 @@ export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
       const { candidats, compteurs } = trouve;
       const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
       journaliserRecherche(compteurs, candidats);
-      if (candidats.length > contexte.config.candidatsTrouves) throw new ArretEtape(codePersiste("cap_reached", true));
       // Ticket 400 : aucun lieu trouvé (les événements seuls ne font pas de programme) : arrêt ici, avant l'ancrage et
       // l'étape finale, qui paieraient leurs appels pour rien. Code interne `research_empty`, persisté `pipeline_failed`
       // (S4) ; la ligne `p0.research_done` du journal en donne les compteurs.
@@ -970,8 +961,7 @@ etapeFinale.maxRetries = 0;
 export async function etapeClore(entree: EtatP0Run & { readonly code: CodeArret }): Promise<EtatP0Run> {
   "use step";
   const code = estCodeArret(entree.code) ? entree.code : "pipeline_failed";
-  const dureeReel = validerConfigModeReel(configModeReel);
-  const ouverte = await verifierGardeEtape(entree.runId, { pool: poolPrototype, dureeMaxMs: dureeReel.ok ? dureeReel.config.dureeMs : 0 });
+  const ouverte = await verifierGardeEtape(entree.runId, { pool: poolPrototype, dureeMaxMs: DUREE_MAX_EXECUTION_MS });
   if (!ouverte.ok) return { runId: entree.runId };
   try {
     await cloreExecution(poolPrototype(), ouverte.garde.runId, code);
