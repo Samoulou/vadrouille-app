@@ -59,7 +59,7 @@ Propositions détaillées dans « Propositions au Tech Lead » ; le frontend les
 | `R11` | `/voyages/[id]` | handover § 6 (Séjour, F5) |
 | `R-sim` | route de contrôle des simulations de F8 (tests seulement) | F8-TL-9, **sous réserve de F9-TL-6** |
 
-`[paiementId]` est un identifiant opaque et aléatoire créé par l'adaptateur (au moins 128 bits), jamais dérivé du voyage ni de la personne.
+`[paiementId]` est un identifiant opaque et aléatoire créé par l'adaptateur (au moins 122 bits, décision 0097 B4-TL-1 point 5), jamais dérivé du voyage ni de la personne.
 
 ## Fichiers à créer ou modifier (proposition)
 **F9a** (écran 9, paiement simulé, confirmation, état débloqué ; la réussite mène à `R11` tant que `R10` n'existe pas, F9-PO-18) :

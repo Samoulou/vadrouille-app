@@ -1,5 +1,7 @@
 # 0020 — Décisions du Tech Lead pour F9 (Débloquer, paiement simulé, Programme ajusté)
 
+> **§ 1.3 amendé par 0097 B4-TL-1 point 5** : « 128 bits aléatoires » se lit « au moins 122 bits aléatoires » (identifiant public du paiement serveur tiré de `checkouts.id`, `gen_random_uuid()`) ; le motif `CHECKOUT_ID_PATTERN` ne change pas et l'adaptateur `mock` garde ses 128 bits.
+
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #78
 
 Numérotation : 0006 à 0012 sont réservés par #26 et #27, 0017 par #65 et 0019 par #72 (en revue). Si l'une d'elles change de numéro, le CEO le signale avant de fusionner cette PR.

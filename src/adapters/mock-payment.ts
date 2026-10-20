@@ -107,6 +107,13 @@ export function createMockPaymentAdapter(options: MockPaymentOptions): PaymentAd
     return record && record.organizationId === ctx.organizationId ? record : undefined;
   }
 
+  function findByRequest(ctx: AdapterContext, requestId: string): CheckoutRecord | undefined {
+    for (const record of store.checkouts.values()) {
+      if (record.organizationId === ctx.organizationId && record.requestId === requestId) return record;
+    }
+    return undefined;
+  }
+
   function view(record: CheckoutRecord): CheckoutStatus {
     return CheckoutStatusSchema.parse({
       checkoutId: record.checkoutId,
@@ -136,6 +143,13 @@ export function createMockPaymentAdapter(options: MockPaymentOptions): PaymentAd
       const trip = await trips.getTrip(ctx, request.tripId);
       if (!trip) return fail("not_found");
       // Lecture et écriture dans le même bloc synchrone, après le seul `await`.
+      // Idempotence par (organisation, `requestId`) dans la portée (spécification B4, B4-PO-8) : même demande, même
+      // réponse, sans nouveau paiement ; autre voyage ou autre moyen : `validation_failed`, rien d'écrit.
+      const deja = findByRequest(ctx, request.requestId);
+      if (deja) {
+        if (deja.tripId !== trip.id || deja.method !== request.method) return fail("validation_failed");
+        return ok(CheckoutStartSchema.parse({ checkoutId: deja.checkoutId, redirectUrl: simulationPath(deja.tripId, deja.checkoutId) }));
+      }
       settleTrip(ctx, trip.id);
       if (trip.unlocked || entitled(ctx.organizationId, trip.id)) return fail("already_unlocked");
       const checkoutId = randomId();
@@ -143,6 +157,7 @@ export function createMockPaymentAdapter(options: MockPaymentOptions): PaymentAd
         checkoutId,
         organizationId: ctx.organizationId,
         tripId: trip.id,
+        requestId: request.requestId,
         method: request.method,
         priceVariant: offer.priceVariant,
         amount: offer.amount,

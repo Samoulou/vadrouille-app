@@ -45,7 +45,7 @@ async function r9(paiement?: string | string[]): Promise<OfferScreenProps> {
 }
 
 async function checkout(outcome?: "succeeded" | "declined" | "cancelled") {
-  const start = await startCheckout({ tripId: TRIP, method: "card" });
+  const start = await startCheckout({ tripId: TRIP, method: "card", requestId: crypto.randomUUID() });
   if (!start.ok) throw new Error(start.error.code);
   if (outcome) await simulateCheckoutOutcome({ checkoutId: start.value.checkoutId, outcome });
   return start.value.checkoutId;
@@ -130,7 +130,7 @@ describe("paramètre paiement sur R9 (F9-PO-20)", () => {
     const reference = () => loadUnlockPage(trips, payment, ctx, TRIP, undefined);
 
     it("paiement d'un autre voyage (même en échec) : ignoré", async () => {
-      const start = await payment.createCheckout(ctx, { tripId: other.id, method: "card" });
+      const start = await payment.createCheckout(ctx, { tripId: other.id, method: "card", requestId: crypto.randomUUID() });
       if (!start.ok) throw new Error();
       await payment.simulateOutcome(ctx, start.value.checkoutId, "declined");
       expect(await loadUnlockPage(trips, payment, ctx, TRIP, start.value.checkoutId)).toEqual(await reference());
@@ -138,14 +138,14 @@ describe("paramètre paiement sur R9 (F9-PO-20)", () => {
 
     it("paiement d'une autre organisation : ignoré", async () => {
       const otherCtx = { organizationId: "mock_org_autre", userId: "user_test", role: "owner" as const };
-      const start = await payment.createCheckout(otherCtx, { tripId: otherOrg.id, method: "card" });
+      const start = await payment.createCheckout(otherCtx, { tripId: otherOrg.id, method: "card", requestId: crypto.randomUUID() });
       if (!start.ok) throw new Error();
       await payment.simulateOutcome(otherCtx, start.value.checkoutId, "declined");
       expect(await loadUnlockPage(trips, payment, ctx, TRIP, start.value.checkoutId)).toEqual(await reference());
     });
 
     it("expiré : bandeau « expired »", async () => {
-      const start = await payment.createCheckout(ctx, { tripId: other.id, method: "twint" });
+      const start = await payment.createCheckout(ctx, { tripId: other.id, method: "twint", requestId: crypto.randomUUID() });
       if (!start.ok) throw new Error();
       t += 1000;
       const data = await loadUnlockPage(trips, payment, ctx, other.id, start.value.checkoutId);
@@ -153,7 +153,7 @@ describe("paramètre paiement sur R9 (F9-PO-20)", () => {
     });
 
     it("réussi : ignoré (le voyage est débloqué : ni offre ni bandeau)", async () => {
-      const start = await payment.createCheckout(ctx, { tripId: TRIP, method: "twint" });
+      const start = await payment.createCheckout(ctx, { tripId: TRIP, method: "twint", requestId: crypto.randomUUID() });
       if (!start.ok) throw new Error();
       await payment.simulateOutcome(ctx, start.value.checkoutId, "succeeded");
       const data = await loadUnlockPage(trips, payment, ctx, TRIP, start.value.checkoutId);

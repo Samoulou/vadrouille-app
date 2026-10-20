@@ -69,6 +69,13 @@ export const LOG_EVENTS = [
   // aucune donnée Google, aucun identifiant de lieu ni d'exécution. Niveau `warn` pour un arrêt attendu par plafond,
   // `error` sinon (`src/server/p0/journal-etape.ts`).
   "p0.step_failed",
+  // B4a (spécification B4, B4-PO-12 ; décision 0097 B4-TL-13 et B4-TL-11 point 1.1) : alerte de paiement (niveau `error`,
+  // champs `eventId`, `eventType`, `alertCode`, `checkoutId` seulement), échec de la suite après un droit validé (`warn`,
+  // `errorName` seulement), configuration invalide sur le webhook simulé (`warn`, `rule` et `variable` seulement). Ni
+  // e-mail, ni nom, ni adresse IP, ni corps d'événement, ni en-tête de signature, ni secret.
+  "payment.alert",
+  "payment.followup_failed",
+  "payment.webhook_config_invalid",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -139,6 +146,14 @@ export type LogFields = {
   readonly phase?: string;
   /** Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) : `LOG_STEP_FAILURE_CODES`, jamais un message. */
   readonly failureCode?: string;
+  /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
+  readonly eventId?: string;
+  /** Type normalisé d'un événement de paiement (`PaymentEvent.type`, liste fermée). */
+  readonly eventType?: string;
+  /** Code d'une alerte de paiement : `LOG_ALERT_CODES`. Jamais le champ `code`, réservé à `API_ERROR_CODES`. */
+  readonly alertCode?: string;
+  /** Identifiant interne d'un paiement (`uuid` de `checkouts.id`), jamais l'identifiant public ni celui du prestataire. */
+  readonly checkoutId?: string;
 };
 
 /**
@@ -171,6 +186,8 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     AUTH_SECRET: 0,
     SIMULATED_WEBHOOK_SECRET: 0,
     SIMULATED_WEBHOOK_ENABLED: 0,
+    PAYMENT_ADAPTER: 0,
+    DATA_ADAPTER: 0,
     VADROUILLE_DATABASE_URL_MIGRATOR: 0,
     VADROUILLE_DB_ADMIN_URL: 0,
     STRIPE_SECRET_KEY: 0,
@@ -420,6 +437,40 @@ export const LOG_STEP_FAILURE_CODES: readonly string[] = [
   // Toute autre erreur (erreur de programmation, code inconnu).
   "autre",
 ];
+/**
+ * Codes du champ `alertCode` (décision 0097 B4-TL-13 point 2) : ceux des contrôles de `handlePaymentEvent`
+ * (`src/server/payment/webhook.ts`, égalité vérifiée par son test), aussi écrits dans `billing.outcome_code`, et ceux
+ * des situations à examiner (second paiement, paiement après un échec, remboursement, litige).
+ */
+export const LOG_ALERT_CODES: readonly string[] = [
+  "unknown_checkout",
+  "livemode",
+  "payment_status",
+  "amount_mismatch",
+  "currency_mismatch",
+  "session_mismatch",
+  "checkout_mismatch",
+  "trip_mismatch",
+  "provider_mismatch",
+  "duplicate_payment",
+  "paid_after_failure",
+  "refund",
+  "dispute",
+];
+const CODES_ALERTE: ReadonlySet<string> = new Set(LOG_ALERT_CODES);
+/** Types de `PaymentEvent` (copie de `PAYMENT_EVENT_TYPES`, égalité vérifiée par le test du journal). */
+export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
+  "checkoutCompleted",
+  "asyncPaymentSucceeded",
+  "asyncPaymentFailed",
+  "checkoutExpired",
+  "refund",
+  "dispute",
+  "other",
+];
+const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
+/** Identifiant d'événement : forme simulée (B4-TL-10) ou forme de Stripe. */
+const ID_EVENEMENT_PAIEMENT = /^(evt_sim_[0-9a-f]{32}|evt_[A-Za-z0-9]{1,255})$/;
 const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
 const CODES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_FAILURE_CODES);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -485,6 +536,10 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["dayIndex", entierStrict],
   ["phase", (v) => chaine(v) && PHASES_ETAPE.has(v)],
   ["failureCode", (v) => chaine(v) && CODES_ETAPE.has(v)],
+  ["eventId", (v) => chaine(v) && ID_EVENEMENT_PAIEMENT.test(v)],
+  ["eventType", (v) => chaine(v) && TYPES_EVENEMENT_PAIEMENT.has(v)],
+  ["alertCode", (v) => chaine(v) && CODES_ALERTE.has(v)],
+  ["checkoutId", (v) => chaine(v) && UUID.test(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
