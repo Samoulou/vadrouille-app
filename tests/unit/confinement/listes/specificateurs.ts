@@ -454,6 +454,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   })),
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
+  // B9d (ticket 599) : workflow 4 `generateFullTrip`, pont sans capacité (étapes de `src/server/generation/etapes-complet.ts`).
+  // Verdict Sécurité à rendre dans la PR.
+  {
+    fichier: "src/workflows/voyage-complet.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow 4 du voyage complet, exigé par `ligne/require-server-only` ; B9d, ticket 599, décision 0087 § 1.3",
+  },
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({
     fichier,
     specificateur: "server-only",

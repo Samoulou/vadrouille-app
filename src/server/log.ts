@@ -76,6 +76,10 @@ export const LOG_EVENTS = [
   "payment.alert",
   "payment.followup_failed",
   "payment.webhook_config_invalid",
+  // B9d (spécification B9, B9-PO-17 points 3 et 4 ; décision 0087 § 1.4) : un voyage complet entre en état bloqué (reprise par
+  // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
+  // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
+  "generation.full_stuck",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -154,6 +158,12 @@ export type LogFields = {
   readonly alertCode?: string;
   /** Identifiant interne d'un paiement (`uuid` de `checkouts.id`), jamais l'identifiant public ni celui du prestataire. */
   readonly checkoutId?: string;
+  /** Identifiant interne d'une organisation (`uuid`) : argument de la commande de reprise du studio (B9d, 0087 § 1.6). */
+  readonly organizationId?: string;
+  /** Identifiant interne d'une exécution de génération (`uuid` de `generation_runs.id`, B9d, 0087 § 1.4 point 3). */
+  readonly generationRunId?: string;
+  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`), jamais un message. */
+  readonly stopReason?: string;
 };
 
 /**
@@ -469,6 +479,12 @@ export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
   "other",
 ];
 const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
+/**
+ * Forme du champ `stopReason` (B9d) : un code fermé de `generation_runs.stop_reason`, que seul l'écrivain de
+ * `generation.full_stuck` passe, depuis la ligne lue en base (liste fermée par le `CHECK` de la migration 0012 et `CODES_ARRET`,
+ * que ce module n'importe pas : `ligne/creation-imports`). Le journal n'en vérifie que la forme : minuscules et `_`, 40 au plus.
+ */
+const CODE_ARRET_GENERATION = /^[a-z][a-z_]{0,39}$/;
 /** Identifiant d'événement : forme simulée (B4-TL-10) ou forme de Stripe. */
 const ID_EVENEMENT_PAIEMENT = /^(evt_sim_[0-9a-f]{32}|evt_[A-Za-z0-9]{1,255})$/;
 const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
@@ -540,6 +556,9 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["eventType", (v) => chaine(v) && TYPES_EVENEMENT_PAIEMENT.has(v)],
   ["alertCode", (v) => chaine(v) && CODES_ALERTE.has(v)],
   ["checkoutId", (v) => chaine(v) && UUID.test(v)],
+  ["organizationId", (v) => chaine(v) && UUID.test(v)],
+  ["generationRunId", (v) => chaine(v) && UUID.test(v)],
+  ["stopReason", (v) => chaine(v) && CODE_ARRET_GENERATION.test(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

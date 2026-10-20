@@ -37,7 +37,7 @@ import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type
 import { genererSansEchec } from "./programme";
 import { publier } from "./publication";
 import { estRefusDeReserve } from "./raison-echec";
-import { normaliser, reprendreRecherche, sourceDeReprise } from "./reprise";
+import { normaliser, reprendreRecherche, sourceDeReprise } from "./reprise-recherches";
 
 /**
  * Étapes de `generatePreview` (spécification B9, B9c ; décisions 0081 B9-TL-3, 0087 § 2 et 0100). **Fonctions ordinaires,
@@ -170,7 +170,7 @@ async function lireVoyageOuArreter(contexte: Contexte, x: Executeur): Promise<{ 
 }
 
 /** Logement d'une ville prêt pour la zone : `placeId` vérifié (étape `l`) pour `known` et `suggestedLodging`, sinon le quartier. */
-function logementVille(ville: VilleDeLApercu): LogementVille {
+export function logementVille(ville: Pick<VilleDeLApercu, "sejour">): LogementVille {
   const { logement, placeId } = ville.sejour;
   switch (logement.kind) {
     case "known":
@@ -184,7 +184,7 @@ function logementVille(ville: VilleDeLApercu): LogementVille {
   }
 }
 
-type CandidatLu = {
+export type CandidatLu = {
   readonly id: string;
   readonly nom: string;
   readonly resume: string;
@@ -207,7 +207,7 @@ type CandidatLu = {
  * `started_at` puis `id` : `candidates` n'a ni colonne de ville ni de `generation_run_id` (question au rôle data, dans la
  * PR). Une recherche par ville, écrite dans l'ordre du séjour, avec un `started_at` strictement croissant.
  */
-const SQL_CANDIDATS = `WITH villes AS (
+export const SQL_CANDIDATS = `WITH villes AS (
     SELECT id, (row_number() OVER (ORDER BY started_at, id) - 1)::int AS ville
     FROM public.research_runs WHERE organization_id = $1 AND generation_run_id = $2)
   SELECT c.id, c.name, c.summary, c.category, c.kind, c.stop_kind, c.to_reserve, c.facts, c.sources, c.place_id, c.fit,
@@ -218,7 +218,7 @@ const SQL_CANDIDATS = `WITH villes AS (
 
 const json = (valeur: unknown): unknown => (typeof valeur === "string" ? JSON.parse(valeur) : valeur);
 
-async function lireCandidats(x: Executeur, contexte: Contexte): Promise<CandidatLu[]> {
+export async function lireCandidats(x: Executeur, contexte: Pick<Contexte, "organizationId" | "generationRunId">): Promise<CandidatLu[]> {
   const { rows } = await x.query(SQL_CANDIDATS, [contexte.organizationId, contexte.generationRunId]);
   return rows.map((ligne): CandidatLu => ({
     id: String(ligne.id),
@@ -260,7 +260,7 @@ export function etapeBrief(entree: unknown, dependances?: DependancesGeneration)
 
 // --- Étape l : logement ------------------------------------------------------------------------------------------------------
 
-const SQL_PLACE_SEJOUR = `UPDATE public.stays SET place_id = $5
+export const SQL_PLACE_SEJOUR = `UPDATE public.stays SET place_id = $5
   WHERE organization_id = $1 AND trip_id = $2 AND city = $3 AND from_date = $4::date`;
 
 /**
@@ -297,13 +297,13 @@ export function etapeLogement(entree: unknown, dependances?: DependancesGenerati
 
 // --- Étape b : recherche -----------------------------------------------------------------------------------------------------
 
-const SQL_RECHERCHE = `INSERT INTO public.research_runs (organization_id, trip_id, generation_run_id, queries, pages_read, duration_ms, cost_estimate_micros, errors, started_at, finished_at)
+export const SQL_RECHERCHE = `INSERT INTO public.research_runs (organization_id, trip_id, generation_run_id, queries, pages_read, duration_ms, cost_estimate_micros, errors, started_at, finished_at)
   VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8::text[], $9::timestamptz, $10::timestamptz) RETURNING id`;
-const SQL_CANDIDAT = `INSERT INTO public.candidates (organization_id, trip_id, research_run_id, kind, name, summary, category, facts, sources, confidence, stop_kind, to_reserve, created_at)
+export const SQL_CANDIDAT = `INSERT INTO public.candidates (organization_id, trip_id, research_run_id, kind, name, summary, category, facts, sources, confidence, stop_kind, to_reserve, created_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13::timestamptz) RETURNING id`;
-const SQL_OCCURRENCE = `INSERT INTO public.event_occurrences (organization_id, trip_id, candidate_id, starts_at, ends_at, timezone, category, price_note, source_url, source_checked_at, status)
+export const SQL_OCCURRENCE = `INSERT INTO public.event_occurrences (organization_id, trip_id, candidate_id, starts_at, ends_at, timezone, category, price_note, source_url, source_checked_at, status)
   VALUES ($1, $2, $3, $4::timestamptz, NULL, $5, $6, NULL, $7, $8::timestamptz, $9)`;
-const SQL_NOMS = `SELECT c.name FROM public.candidates c
+export const SQL_NOMS = `SELECT c.name FROM public.candidates c
   JOIN public.research_runs r ON r.organization_id = c.organization_id AND r.id = c.research_run_id
   WHERE c.organization_id = $1 AND r.generation_run_id = $2`;
 
@@ -314,7 +314,7 @@ const SQL_NOMS = `SELECT c.name FROM public.candidates c
  * (`dejaTrouves`) et jamais réécrits (unicité par exécution et nom normalisé). Une recherche sans candidat échoue sur son
  * code fermé ; une recherche partielle (des candidats et des erreurs) continue, ses codes d'erreur sont dans `errors`.
  *
- * **Nouvel essai** (`retryGeneration`, B9c-suite, 0106 § 5 et 0105 § 6 ; `reprise.ts`) : une ville déjà cherchée par une
+ * **Nouvel essai** (`retryGeneration`, B9c-suite, 0106 § 5 et 0105 § 6 ; `reprise-recherches.ts`) : une ville déjà cherchée par une
  * exécution `preview` précédente du même voyage n'est pas cherchée à nouveau. Sa recherche et ses candidats sont copiés dans
  * l'exécution courante, dans la même transaction gardée, sans aucun appel (ni modèle, ni recherche web, ni page) ; l'étape `c`
  * les ré-ancre comme les autres. Composition et forfait ne sont ouverts que pour la première ville à chercher.
@@ -413,7 +413,7 @@ export function etapeRecherche(entree: unknown, dependances?: DependancesGenerat
 
 // --- Étape c : ancrage (workflow 2) ----------------------------------------------------------------------------------------
 
-const SQL_ANCRAGE = `UPDATE public.candidates SET place_id = $3 WHERE organization_id = $1 AND id = $2`;
+export const SQL_ANCRAGE = `UPDATE public.candidates SET place_id = $3 WHERE organization_id = $1 AND id = $2`;
 
 /**
  * Étape `c` (rang 4 ; **workflow 2**, réutilisable par B9d) : zone du séjour de chaque ville (une fiche de position, ou
@@ -468,7 +468,7 @@ export function etapeAncrage(entree: unknown, dependances?: DependancesGeneratio
 
 // --- Étape d : notation (workflow 3) -----------------------------------------------------------------------------------------
 
-const SQL_NOTES = `UPDATE public.candidates SET fit = $3, not_for_me_risk = $4, must_see = $5, slot_fit = $6::text[]
+export const SQL_NOTES = `UPDATE public.candidates SET fit = $3, not_for_me_risk = $4, must_see = $5, slot_fit = $6::text[]
   WHERE organization_id = $1 AND id = $2`;
 
 /**
@@ -511,7 +511,7 @@ export function etapeNotation(entree: unknown, dependances?: DependancesGenerati
 
 // --- Étape e : planification et publication ----------------------------------------------------------------------------------
 
-const SQL_OCCURRENCES = `SELECT candidate_id, to_char(starts_at AT TIME ZONE timezone, 'YYYY-MM-DD') AS date,
+export const SQL_OCCURRENCES = `SELECT candidate_id, to_char(starts_at AT TIME ZONE timezone, 'YYYY-MM-DD') AS date,
     to_char(starts_at AT TIME ZONE timezone, 'HH24:MI') AS heure, status
   FROM public.event_occurrences WHERE organization_id = $1 AND trip_id = $2`;
 
@@ -557,7 +557,7 @@ function memesEtapes(a: TripSnapshot, b: TripSnapshot): boolean {
 }
 
 /** Date du jour (`YYYY-MM-DD`) dans le fuseau du voyage (B9-PO-3) ; UTC si le fuseau est illisible. */
-function dateDansFuseau(instant: number, fuseau: string): string {
+export function dateDansFuseau(instant: number, fuseau: string): string {
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone: fuseau, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
   } catch {
@@ -566,7 +566,7 @@ function dateDansFuseau(instant: number, fuseau: string): string {
 }
 
 /** Candidats que le moteur peut retenir (noté, ancré), **un par lieu** : le mieux classé (premier de la recherche) garde le lieu. */
-function eligibles(candidats: readonly CandidatLu[]): { readonly lu: CandidatLu; readonly moteur: CandidatMoteur & { readonly ville: number } }[] {
+export function eligibles(candidats: readonly CandidatLu[]): { readonly lu: CandidatLu; readonly moteur: CandidatMoteur & { readonly ville: number } }[] {
   const vus = new Set<string>();
   return candidats.flatMap((lu) => {
     const moteur = candidatMoteur(lu);
@@ -799,7 +799,7 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
 type LigneOccurrence = Record<string, unknown>;
 
 /** Événements de l'aperçu : candidats `event` dont l'heure est lue (une occurrence), date et heure dans le fuseau du voyage. */
-function evenementsDe(candidats: readonly CandidatLu[], occurrences: readonly LigneOccurrence[]): CandidatEvenement[] {
+export function evenementsDe(candidats: readonly CandidatLu[], occurrences: readonly LigneOccurrence[]): CandidatEvenement[] {
   const parCandidat = new Map(occurrences.map((ligne) => [String(ligne.candidate_id), ligne] as const));
   return candidats.flatMap((candidat): CandidatEvenement[] => {
     const occurrence = parCandidat.get(candidat.id);

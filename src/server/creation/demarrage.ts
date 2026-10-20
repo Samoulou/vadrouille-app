@@ -25,3 +25,7 @@ export const demarrerApercuReel: DemarrerApercu = async (generationRunId, organi
   const issue = await demarrerApercu(generationRunId, organizationId);
   return issue.ok ? issue.workflowRunId : null;
 };
+
+/** Port et démarrages du workflow 4 (`generateFullTrip`, B9d) : ceux de `src/server/generation/`, partagés avec la suite du paiement. */
+export type { DemarrerVoyageComplet } from "@/server/generation/reconciliation";
+export { demarrerVoyageCompletReel, demarrerVoyageCompletSansAppel } from "@/server/generation/demarrage";

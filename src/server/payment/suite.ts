@@ -9,7 +9,8 @@ import { errorNameOf, logEvent } from "@/server/log";
  * pour un événement déjà enregistré `granted` ou `alreadyGranted` (reprise idempotente) ; jamais pour `ignored` ni
  * `rejected`. Trois relances internes (démarrages sans appel payant, handover § 8), puis une ligne
  * `payment.followup_failed` (nom d'erreur seulement). Un échec ne retire jamais le droit et ne change pas la réponse du
- * webhook (`200`). Sans effet jusqu'à B9d, qui y branche la réconciliation dans le contexte système de l'organisation.
+ * webhook (`200`). B9d y branche la réconciliation du voyage complet dans le contexte système de l'organisation
+ * (`suite-voyage-complet.ts`, posée par défaut par le webhook simulé).
  */
 
 export type VoyageDebloque = { readonly entitlementId: string; readonly tripId: string; readonly organizationId: string };

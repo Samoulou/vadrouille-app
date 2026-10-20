@@ -37,6 +37,15 @@ export function estJourNonPlanifie(jour: Pick<DaySnapshot, "items" | "events" | 
   return jour.items.every((item) => item.type === "terminus") && jour.events.length === 0 && jour.surprise === undefined;
 }
 
+/**
+ * Jour sans aucun élément de type `stop` (décision 0086 § 1.7) : prédicat unique du « jour pas encore planifié » pendant une
+ * exécution `full` (B6a, lecture du voyage : `Day.generating`), réemployé par le voyage complet pour les jours qui manquent
+ * (0087 § 1.3 point 3). Un jour planifié dont toutes les cases sont `noOption` y répond aussi vrai (conséquence acceptée).
+ */
+export function jourSansEtape(jour: Pick<DaySnapshot, "items">): boolean {
+  return !jour.items.some((item) => item.type === "stop");
+}
+
 /** Points datés d'un jour : nuits de son logement de départ et d'arrivée, engagements et événements de sa date. */
 export type PointsDuJour = {
   /** 1 = J1. */
