@@ -25,6 +25,15 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres -d vadrouille"
           --health-interval 2s --health-timeout 5s --health-retries 30
+      # Mailpit aussi : `pnpm verify` rejoue les tests de base de B3b-envoi (E5, E6, E8), qui ne s'ignorent jamais en CI.
+      mailpit:
+        image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+        env:
+          MP_DISABLE_VERSION_CHECK: "1"
+        ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+        # Pas de `--health-cmd` : l'image (sans shell) porte son propre HEALTHCHECK `/mailpit readyz` en forme exec, qu'un
+        # `--health-cmd` (forme shell) remplacerait par une commande introuvable ; seuls les délais sont ajustés.
+        options: --health-interval 2s --health-timeout 5s --health-retries 30
     # Accès administrateur de la base jetable (PG*) : seulement dans les étapes qui en ont besoin, jamais au niveau du
     # job ni dans $GITHUB_ENV ; les étapes suivantes (Lighthouse, artefacts) ne le reçoivent pas.
     steps:
@@ -113,6 +122,19 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres -d vadrouille"
           --health-interval 2s --health-timeout 5s --health-retries 30
+      # B3b-envoi (spécification B3b-envoi, point 1 ; B3-TL-8 ; décision 0098 § 5) : Mailpit, la boîte qui reçoit les e-mails
+      # du code (jamais d'envoi réel). Même image, même digest que `docker-compose.yml` (décision 0008). Aucune option de
+      # relais (`MP_SMTP_RELAY_*` absentes), aucun secret, aucun volume (base temporaire), aucune commande : la seule
+      # variable est `MP_DISABLE_VERSION_CHECK` (aucune requête vers GitHub). SMTP (1025) et API (8025) publiés sur la boucle
+      # locale du runner seulement : l'interface n'a pas d'authentification.
+      mailpit:
+        image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+        env:
+          MP_DISABLE_VERSION_CHECK: "1"
+        ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+        # Pas de `--health-cmd` : l'image (sans shell) porte son propre HEALTHCHECK `/mailpit readyz` en forme exec, qu'un
+        # `--health-cmd` (forme shell) remplacerait par une commande introuvable ; seuls les délais sont ajustés.
+        options: --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with: { fetch-depth: 0 }

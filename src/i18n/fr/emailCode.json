@@ -1,0 +1,4 @@
+{
+  "objet": "Ton code de connexion {produit}",
+  "corps": "Ton code de connexion : {code}\n\nIl est valable {minutes} minutes.\n\nSi tu n'as rien demandé, ignore ce message."
+}
