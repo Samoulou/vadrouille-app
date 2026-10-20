@@ -28,6 +28,9 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   creerContexteServeur: ["src/server/session.ts"],
   brancherConnexionReelle: ["src/adapters/better-auth.ts", "src/instrumentation.ts"],
   debrancherConnexionReellePourTests: ["src/adapters/better-auth.ts"],
+  // B6b (spécification B6, B6b point 1) : même règle pour le branchement de l'adaptateur `api` (fabrique sur `globalThis`).
+  brancherLectureVoyages: ["src/adapters/api-instance.ts", "src/instrumentation.ts"],
+  debrancherLectureVoyagesPourTests: ["src/adapters/api-instance.ts"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];

@@ -146,8 +146,13 @@ const COMPOSITION_LECTURE = "src/server/composition/lecture";
  * la lecture (B8b).
  */
 export const IMPORTATEURS_RELECTURE = ["src/server/composition/generation.ts", "src/server/composition/lecture.ts"];
-/** Importateurs admis de `@/server/composition/lecture` hors des tests (0100 § 5.2) : le branchement statique de l'adaptateur. */
-export const IMPORTATEURS_COMPOSITION_LECTURE = ["src/adapters/index.ts"];
+/**
+ * Importateurs admis de `@/server/composition/lecture` hors des tests (0100 § 5.2) : le branchement statique de
+ * l'adaptateur, et (B6b) son branchement au démarrage par `src/instrumentation.ts` (`import()`), seul retenu : un import
+ * depuis `src/adapters/index.ts`, même par `import()`, ferait atteindre `src/server/composition` et `src/server/env`
+ * depuis `src/features` (test « p0: clé côté serveur seulement ») et un module à capacité par les doubles de `@/adapters`.
+ */
+export const IMPORTATEURS_COMPOSITION_LECTURE = ["src/adapters/index.ts", "src/instrumentation.ts"];
 
 const estTestOuSupport = (importateur) => estTest(importateur) || importateur.startsWith("tests/");
 
@@ -155,7 +160,7 @@ const estTestOuSupport = (importateur) => estTest(importateur) || importateur.st
  * Vrai si `importateur` peut importer `source` (0100 § 5.2) :
  * - `@/server/relecture/*` : les deux compositions, les fichiers de `src/server/relecture/` et les tests ;
  * - `@/server/composition/clients-google` : les deux compositions et les tests (ni `p0-reel.ts`, ni un autre module) ;
- * - `@/server/composition/lecture` : `src/adapters/index.ts` et les tests seulement.
+ * - `@/server/composition/lecture` : `src/adapters/index.ts`, `src/instrumentation.ts` (B6b) et les tests seulement.
  * Un module de `src/server/voyages/` n'est donc jamais admis : il reçoit la source par injection.
  */
 export function importRelectureAdmis(source, importateur) {
@@ -176,7 +181,7 @@ export const relectureImports = {
     schema: [],
     messages: {
       forbidden:
-        "@/server/relecture n'est importable que depuis les compositions src/server/composition/generation.ts et lecture.ts, src/server/relecture et les tests ; composition/clients-google, depuis ces deux compositions et les tests ; composition/lecture, depuis src/adapters/index.ts et les tests (décisions 0085 § 1.8 et 0100 § 5.2) ({{source}}).",
+        "@/server/relecture n'est importable que depuis les compositions src/server/composition/generation.ts et lecture.ts, src/server/relecture et les tests ; composition/clients-google, depuis ces deux compositions et les tests ; composition/lecture, depuis src/adapters/index.ts, src/instrumentation.ts et les tests (décisions 0085 § 1.8 et 0100 § 5.2) ({{source}}).",
     },
   },
   create(context) {

@@ -9,6 +9,14 @@ import { withWorkflow } from "workflow/next";
  */
 export const RESPONSE_HEADERS = [
   {
+    // B6b (Q524 ; handover « Partie Q5 », règles de relecture ; spécification B8, règle 3) : les pages du voyage servies
+    // par l'adaptateur `api` portent des données relues (durées de trajet, horaires à confirmer) et les données de
+    // l'organisation de la session. Ni cache partagé ni cache du navigateur, pour toutes leurs réponses (« Mes voyages »,
+    // Séjour, Journée, présentation, 404 et 500 comprises). La règle de `aujourdhui` ci-dessous reste, inchangée.
+    source: "/voyages/:path*",
+    headers: [{ key: "Cache-Control", value: "private, no-store" }],
+  },
+  {
     source: "/voyages/:id/aujourdhui",
     headers: [{ key: "Cache-Control", value: "private, no-store" }],
   },

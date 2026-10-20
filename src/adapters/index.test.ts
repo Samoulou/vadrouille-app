@@ -29,9 +29,13 @@ describe("getTripAdapter", () => {
     expect(getTripAdapter()).toBe(mockTripAdapter);
   });
 
-  it("lève « adaptateur api non implémenté » avec DATA_ADAPTER=api", () => {
+  // B6b (décision 0086 § 2.1) : l'attente « adaptateur api non implémenté » de F1 est remplacée par la garde de l'adaptateur
+  // `api` (critère `adaptateurs: getTripAdapter api et sa garde`, `tests/unit/adapters/api-garde.test.ts`).
+  it("DATA_ADAPTER=api sans environnement déclaré : refus de la garde, sans repli vers mock", () => {
     vi.stubEnv("DATA_ADAPTER", "api");
-    expect(() => getTripAdapter()).toThrow("adaptateur api non implémenté");
+    vi.stubEnv("VADROUILLE_ENV", undefined);
+    vi.stubEnv("VERCEL_ENV", undefined);
+    expect(() => getTripAdapter()).toThrow("adaptateur api refusé hors local et ci");
   });
 
   it("refuse une valeur inconnue", () => {

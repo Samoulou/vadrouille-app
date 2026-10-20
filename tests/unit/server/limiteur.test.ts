@@ -374,6 +374,7 @@ describe("module de journal", () => {
       "voyages.relecture_refused",
       "voyages.fiches_non_relues",
       "voyages.positions_non_ecrites",
+      "voyages.action_failed",
       // Ticket 493 : arrêt d'une étape de p0Run, phase, classe et code fermés seulement (verdict Sécurité S4 attendu).
       "p0.step_failed",
       "log.unknown_event",
