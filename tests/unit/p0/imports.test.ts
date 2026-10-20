@@ -730,7 +730,14 @@ const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/w
  * règle `ligne/relecture-imports`. Admis : `src/adapters/index.ts` → `composition/lecture.ts` → `composition/clients-google.ts`
  * → `@/grounding/*` (cas fabriqués ci-dessous).
  */
-const PONTS_LECTURE: readonly string[] = ["src/server/composition/clients-google.ts"];
+// B9c (décision 0105 § 2) : `fixtures-simulees.ts` est le module des doubles d'Édimbourg de la composition simulée, atteint par
+// `import()` dynamique depuis `generation.ts` seulement ; il ouvre `@/ai`, `@/research` et `@/grounding` comme elle (doubles).
+const PONTS_LECTURE: readonly string[] = [
+  "src/server/composition/clients-google.ts",
+  "src/server/composition/generation.ts",
+  "src/server/composition/fixtures-simulees.ts",
+  "src/server/relecture/planification.ts",
+];
 const estPont = (chemin: string) => PONTS_P0.includes(chemin) || PONTS_LECTURE.includes(chemin);
 
 /**
@@ -792,7 +799,10 @@ const areteAdmise = (de: string, vers: string) =>
   (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
   // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
   // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
-  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Le test du graphe est réécrit par B9c (point 4).
+  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart consigné par la décision 0105 § 7 :
+  // la réécriture complète de ce test du graphe (0081 B9-TL-1 point 4) est la tâche de suite `B9c-graphe` ; les arêtes de la
+  // génération sont couvertes par les cinq cas nominatifs « B9c admis/refusé » ci-dessous et par `composition.test.ts`, et
+  // B9c n'ajoute aucune arête à `areteAdmise`.
   (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
@@ -1372,7 +1382,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       }
       // 0085 § 1.8 et 0100 § 5.2 : seules les compositions `generation.ts` (B9c) et `lecture.ts` (B8b) l'importent.
       const importeurs = application.filter(
-        (f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && f !== MODULE_SOURCE_LECTURE && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")),
+        (f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && f !== MODULE_SOURCE_LECTURE && f !== "src/server/relecture/planification.ts" && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")),
       );
       expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts" && f !== "src/server/composition/lecture.ts")).toEqual([]);
       expect(importeurs).toContain("src/server/composition/lecture.ts");
@@ -1414,6 +1424,26 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         { "src/server/composition/autre.ts": ["src/grounding/places-client.ts"] },
         "src/server/composition/autre.ts",
         ["src/grounding/places-client.ts"],
+      ],
+      [
+        "B9c admis (0081 B9-TL-4 point 4) : src/features/x.tsx → action de création → src/server/creation/y.ts → composition/generation → @/ai/couche",
+        {
+          "src/features/x.tsx": ["src/server/actions/creation.ts"],
+          "src/server/actions/creation.ts": ["src/server/creation/y.ts"],
+          "src/server/creation/y.ts": ["src/server/composition/generation.ts"],
+          "src/server/composition/generation.ts": ["src/ai/couche.ts", "src/grounding/places-client.ts"],
+        },
+        "src/features/x.tsx",
+        [],
+      ],
+      ["B9c admis : src/server/generation → src/ai/natures (terminal exact)", { "src/server/generation/codes.ts": ["src/ai/natures.ts"] }, "src/server/generation/codes.ts", []],
+      ["B9c refusé : src/server/creation → src/ai sans la composition", { "src/server/creation/y.ts": ["src/ai/couche.ts"] }, "src/server/creation/y.ts", ["src/ai/couche.ts"]],
+      ["B9c refusé : un module de src/server → src/research", { "src/server/x.ts": ["src/research/agent.ts"] }, "src/server/x.ts", ["src/research/agent.ts"]],
+      [
+        "B9c refusé : une étape de génération → src/grounding (chemin direct, sans la composition)",
+        { "src/server/generation/etapes.ts": ["src/grounding/fiches.ts"] },
+        "src/server/generation/etapes.ts",
+        ["src/grounding/fiches.ts"],
       ],
       [
         "refusé : module de la lecture des voyages → src/grounding (chemin direct)",
@@ -1627,7 +1657,7 @@ function importsExecutesDe(fichier: string, source: string): string[] {
 }
 
 /** Seuls imports exécutés admis dans le terminal `src/workflows/index.ts`. */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./complet", "./p0-run"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run"];
 
 /**
  * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
@@ -1866,7 +1896,7 @@ describe("p0: clé côté serveur seulement", () => {
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
     expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./complet", "./p0-run", "./p0-run", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

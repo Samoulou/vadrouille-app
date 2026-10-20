@@ -14,7 +14,7 @@ import type { CodeEchecPositions, PositionGoogleFraiche } from "@/grounding/port
 import { chargerTrajetsParCouples, type CoupleTrajet, type PointTrajet, type TableTrajets } from "@/grounding/trajets";
 import { versRelectures } from "@/server/relecture/relectures";
 import { logEvent } from "@/server/log";
-import { creerPortPositions } from "@/server/positions/cache-positions";
+import { ecrirePositionsAbsentes, LOT_ECRITURE_POSITIONS } from "@/server/relecture/positions-ecriture";
 import { periodesDe } from "@/server/usage/periodes";
 import type { ContexteAppel, Horloge, Plafond, PortConsommation } from "@/server/usage/port";
 import { creerRegistreForfait } from "@/server/usage/registre";
@@ -44,8 +44,7 @@ import { forfaitDuProfil, plafondsDuForfait, reserverForfait, type ProfilForfait
  * les positions fraîches vont au cache (port `PortPositions`, 0060). Aucune n'est journalisée, ni mise dans un prompt.
  */
 
-/** Taille d'un lot d'écriture au cache (0100 § 3.2 point 4). */
-export const LOT_ECRITURE_POSITIONS = 500;
+export { LOT_ECRITURE_POSITIONS };
 
 /** Clients Places et Routes d'une lecture, construits par la fabrique commune (`composition/clients-google.ts`). */
 export type ClientsLecture = { readonly places: ClientPlacesMvp; readonly routes: ClientRoutes };
@@ -272,14 +271,8 @@ async function ecrirePositions(
   if (fraiches.size === 0 || dep.positionsSuspendues()) return;
   try {
     await dep.transaction(contexte)(async (executeur) => {
-      const port = creerPortPositions(executeur);
-      const vivantes = await port.lire([...fraiches.keys()]);
-      if (!vivantes.ok) throw new EchecPositions(vivantes.code);
-      const absentes = [...fraiches].filter(([placeId]) => !vivantes.valeur.has(placeId));
-      for (let debut = 0; debut < absentes.length; debut += LOT_ECRITURE_POSITIONS) {
-        const ecrite = await port.ecrire(new Map(absentes.slice(debut, debut + LOT_ECRITURE_POSITIONS)), obtenuesA);
-        if (!ecrite.ok) throw new EchecPositions(ecrite.code);
-      }
+      const ecrite = await ecrirePositionsAbsentes(executeur, fraiches, obtenuesA);
+      if (!ecrite.ok) throw new EchecPositions(ecrite.code);
     });
   } catch (erreur) {
     logEvent("voyages.positions_non_ecrites", { reason: erreur instanceof EchecPositions ? erreur.raison : "exception" }, "warn");

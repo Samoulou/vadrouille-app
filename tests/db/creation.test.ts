@@ -32,7 +32,7 @@ const MINUTE = 60_000;
 const contexte = (org: Org): AdapterContext => ({ organizationId: org.org, userId: org.owner, role: "owner" });
 
 function banc(maintenant = () => NOW) {
-  const demarrer = vi.fn<(generationRunId: string) => Promise<string | null>>(async () => null);
+  const demarrer = vi.fn<(generationRunId: string, organizationId: string) => Promise<string | null>>(async () => null);
   const adapter = createApiCreationAdapter({ withOrg, maintenant, demarrerApercu: demarrer });
   return { adapter, demarrer };
 }
@@ -144,6 +144,7 @@ describe("création du voyage (B9b)", () => {
     expect(trip(await adapter.createTrip(contexte(a), req))).toBe(premier);
     expect(await toutCompter(a)).toEqual({ trips: 1, briefs: 1, stays: 1, trip_commitments: 0, generation_runs: 1 });
     expect(demarrer).toHaveBeenCalledTimes(1);
+    expect(demarrer).toHaveBeenCalledWith(expect.any(String), a.org);
 
     // Deux appels simultanés d'une nouvelle organisation : un seul voyage, une seule exécution, un seul démarrage.
     const c = await nouvelleOrg();

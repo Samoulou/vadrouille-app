@@ -4,12 +4,12 @@ import type { AdapterContext } from "@/adapters/types";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
-import { demarrerApercuSansAppel, type DemarrerApercu } from "./demarrage";
+import { demarrerApercuReel, type DemarrerApercu } from "./demarrage";
 
 /**
  * Dépendances et outils communs des cas d'usage de la création (spécification B9, B9b ; décision 0081 B9-TL-1 :
  * `src/server/creation/`). Les tests injectent `withOrg` (client de test), l'horloge et l'espion du démarrage ; aucun
- * appelant applicatif ne les pose, sauf `demarrerApercu` que B9c branchera sur le workflow 1.
+ * appelant applicatif ne les pose.
  */
 
 type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>) => Promise<T>;
@@ -19,7 +19,7 @@ export interface DependancesCreation {
   readonly withOrg?: FonctionWithOrg;
   /** Horloge (instant en millisecondes) ; `Date.now` par défaut. */
   readonly maintenant?: () => number;
-  /** Démarrage du workflow 1 ; le double sans appel par défaut (B9b). */
+  /** Démarrage du workflow 1 ; `generatePreview` par défaut (B9c), un double sans appel (`demarrerApercuSansAppel`) dans les tests. */
   readonly demarrerApercu?: DemarrerApercu;
 }
 
@@ -33,7 +33,7 @@ export function outils(dependances: DependancesCreation): Outils {
   return {
     withOrg: dependances.withOrg ?? withOrgParDefaut,
     maintenant: dependances.maintenant ?? Date.now,
-    demarrerApercu: dependances.demarrerApercu ?? demarrerApercuSansAppel,
+    demarrerApercu: dependances.demarrerApercu ?? demarrerApercuReel,
   };
 }
 
@@ -81,7 +81,7 @@ const SQL_WORKFLOW = `UPDATE public.generation_runs SET workflow_run_id = $3
 export async function demarrer(o: Outils, ctx: AdapterContext, generationRunId: string): Promise<void> {
   let workflowRunId: string | null;
   try {
-    workflowRunId = await o.demarrerApercu(generationRunId);
+    workflowRunId = await o.demarrerApercu(generationRunId, ctx.organizationId);
   } catch {
     return;
   }

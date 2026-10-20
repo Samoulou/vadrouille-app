@@ -170,6 +170,7 @@ function atteints(depot: Depot, depart: string): Set<string> {
   return vus;
 }
 
+const COMPOSITION_GENERATION = "src/server/composition/generation.ts";
 const lireDepot = (fichier: string) => readFileSync(path.join(RACINE, fichier), "utf8");
 /** Fichiers de configuration de la racine (`*.config.ts`, `*.mjs`…), analysés comme le reste du dépôt (mineur 10). */
 const racine = () => readdirSync(RACINE).filter((nom) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(nom) && !nom.endsWith(".d.ts") && statSync(path.join(RACINE, nom)).isFile());
@@ -200,7 +201,7 @@ describe("p0: modules de capacité importés par la seule composition", () => {
   });
 
   it("hors des tests, seul src/server/composition/p0-reel.ts importe un module de capacité ; aucun import() calculé", () => {
-    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION, CLIENTS_GOOGLE])).toEqual([]);
+    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION, CLIENTS_GOOGLE, COMPOSITION_GENERATION])).toEqual([]);
     // La composition importe bien les quatre modules (le test porte sur un cas réel).
     const directs = aretesDe(COMPOSITION, lireDepot(COMPOSITION)).map((a) => resoudre(COMPOSITION, a.specificateur));
     for (const capacite of MODULES_CAPACITE) expect(directs).toContainEqual({ type: "projet", chemin: capacite });

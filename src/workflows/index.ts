@@ -4,6 +4,9 @@ import { getRun as runDuSdk, start } from "workflow/api";
 
 import type { GardeOuverte } from "@/server/p0/garde";
 
+import type { EtatEtape } from "@/server/generation/etat";
+
+import { generatePreview } from "./apercu";
 import { P0RUN_COMPLET } from "./complet";
 import { p0Run } from "./p0-run";
 
@@ -31,7 +34,7 @@ export { briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lanceme
 
 export const REGION_WORKFLOWS = "fra1";
 
-/** Workflows démarrables ; B9 ajoute les siens. */
+/** Workflows démarrables par `startWorkflow` (garde de P0) ; `generatePreview` a son propre démarrage, `demarrerApercu`. */
 export type NomWorkflow = "p0Run";
 
 export type ResultatDemarrage =
@@ -57,4 +60,22 @@ export type StatutWorkflow = "pending" | "running" | "completed" | "failed" | "c
 /** État d'une exécution du SDK, par son identifiant. */
 export async function getRun(workflowRunId: string): Promise<{ readonly statut: StatutWorkflow }> {
   return { statut: await runDuSdk(workflowRunId).status };
+}
+
+/**
+ * Démarre `generatePreview` pour l'exécution `preview` réservée (`queued`) par `createTrip` ou `retryGeneration` (B9c) :
+ * entrée `{ generationRunId, organizationId, rang: 0 }` (`EtatEtapeSchema`), région `fra1`. Aucune garde de P0 : la barrière
+ * de B9-TL-8 est vérifiée à l'entrée de chaque étape. Une erreur du SDK rend `start_failed`, jamais son message ; l'exécution
+ * reste `queued` et expire (B9-TL-3 point 5).
+ */
+export async function demarrerApercu(generationRunId: string, organizationId: string): Promise<ResultatDemarrage> {
+  const entree: EtatEtape = { generationRunId, organizationId, rang: 0 };
+  let workflowRunId: unknown;
+  try {
+    const run = await start(generatePreview, [entree], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
 }

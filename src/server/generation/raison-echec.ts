@@ -57,6 +57,17 @@ const REESSAYABLES: ReadonlySet<string> = new Set(["upstream_unavailable", "upst
 
 const estCodeIa = (code: string): code is CodeErreurIa => CODES_IA.has(code);
 
+/**
+ * Vrai pour un refus de réserve (nature `quota` ou `plafond` : `daily_quota_insufficient`, `cap_reached`,
+ * `envelope_reached`) : la seule famille de refus qu'un lot plus petit peut lever. Sert à l'abandon des idées seules à la
+ * rédaction de l'aperçu (0105 § 5.1 point 4).
+ */
+export function estRefusDeReserve(code: string): boolean {
+  if (!estCodeIa(code)) return false;
+  const nature = natureEchec(code);
+  return nature === "quota" || nature === "plafond";
+}
+
 /** Raison d'échec et `retryable` d'une exécution `failed`. */
 export interface Echec {
   readonly reason: GenerationFailureReason;

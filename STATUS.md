@@ -1,24 +1,22 @@
-# État du studio — 2026-10-20 (117e cycle)
+# État du studio — 2026-10-20 (118e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 15 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 16 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-20 13:30 UTC : la limite d'usage est revenue ; retour au modèle normal pour les fils et au rythme normal (cycle toutes les 2 heures, 4 fils). Appliqué dès 13:35 UTC.
-- 2026-10-20 13:31 UTC : « rien à valider » ; réponse : seul le libellé `owner-approved` sur #548 bloquait le parcours. Samuel l'a posé, #548 est fusionnée.
+- Aucun nouveau depuis le 117e cycle.
 
 ## Fait
-- Fusionnées : **0105** (#570, décisions Tech Lead de B9c), **0106** (#569, écarts produit de B9c), **B3b-envoi, partie 2** (#548, envoi du code par e-mail vers Mailpit), statut du 116e cycle (#571).
-- Tickets ouverts : **#573** (B9c-suite, réutilisation des candidats par « Réessayer », 0106 et 0105 § 6) et **#574** (B9c-graphe, réécriture du test du graphe d'imports, 0105 § 7) ; tous deux après B9c et avant B9d.
-- **#572** (#561) : correction 1 poussée (garde renforcée, décision 0107 dans la PR) ; deuxième revue avec deux bloquants de forme.
+- Fusionnées : **#572** (#561, suppression des candidats d'un essai à l'écriture de son programme, décision 0107), statut du 117e cycle (#575).
+- **B9c** (#563) : approuvée par le Tech Lead ; un seul test du job CI `db` échoue (`tests/db/apercu-idees.test.ts`, invariant « étapes identiques avec et sans idées »).
+- **B6b** (#576) : PR ouverte ; revue avec un bloquant (écart à 0100 § 5.2 et § 5.4 à consigner, tests de frontière à aligner), Sécurité d'accord.
 
 ## En cours
-- backend : **B9c** (#563), troisième tentative bornée (Q532) : fusion de `main`, alignement sur 0105 et 0106 fusionnées, mineurs.
-- backend : **B6b** (#532), lecture réelle des séjours et journées, avec le branchement de la lecture réelle de B8b.
-- data : **#572**, correction 2 (dernière) : format de 0107, commentaire de `src/contracts/prototype-travail.ts`.
+- backend : **B9c** (#563), cause racine et correction du test `db` en échec (sans le désactiver).
+- backend : **B6b** (#576), correction 1 : amendement de 0100 (branchement par `src/instrumentation.ts`, validé par le Tech Lead), tests de frontière, mineurs.
+- ia-recherche : **Q-L2a** (#562), reprise : vérification, PR.
 
 ## Bloqué
-- **Q-L2a** (#562) : après #572 (mêmes modules du prototype).
-- **B4a** (#531) : après la fusion de B9c (#563 touche `src/server/env/` et les listes du confinement).
+- **B4a** (#531) : après la fusion de B9c.
 - **B9c-suite** (#573), **B9c-graphe** (#574), puis **B9d, B9e** : après B9c.
 - **Affichage des voyages sur `p0-reel`** : reste `db-migrate` lancé par Samuel → report `main` → `p0-reel`.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI sur la colonne « relances » ; A2-c (plafonds Places) seulement si Samuel le décide (Q525).
@@ -26,7 +24,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## Prochain cycle
 1. B9c jusqu'à la fusion ; puis B9c-suite, B9c-graphe, B4a, B9d.
-2. B6b jusqu'à la fusion (après B9c si elle touche les listes du confinement) ; #572 puis Q-L2a.
+2. B6b jusqu'à la fusion ; Q-L2a en revue.
 3. Samuel : lancer `db-migrate` (0011, 0012) ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
 
 ## Décisions attendues de Samuel
@@ -49,7 +47,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q533 (note de version : 0105, 0106 et 0107) ; Q530 et Q532 mises à jour.
+- Aucune ; Q531 et Q533 mises à jour.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
