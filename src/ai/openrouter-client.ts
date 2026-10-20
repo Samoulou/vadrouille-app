@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   FINS_MODELE,
   MAX_RESULTATS_WEB,
+  MAX_TOKENS,
   MOTEURS_GREFFON_WEB,
   type ClientModeles,
   type FinModele,
@@ -124,8 +125,25 @@ type AppelModele = {
 };
 
 /** Résultat brut d'un appel : texte, sources (citations d'adresses), coût et raison de fin (liste fermée). */
-type ResultatAppel = { readonly texte: string; readonly sources: readonly SourceWebFournisseur[]; readonly coutUsd: number; readonly fin: FinModele };
+type ResultatAppel = {
+  readonly texte: string;
+  readonly sources: readonly SourceWebFournisseur[];
+  readonly coutUsd: number;
+  readonly fin: FinModele;
+  readonly tokens?: { readonly entree: number; readonly sortie: number };
+};
 
+const jetons = z.number().int().min(0).max(MAX_TOKENS);
+const UsageSchema = z.object({ inputTokens: jetons, outputTokens: jetons });
+
+/**
+ * Jetons lus dans `usage` de l'AI SDK (décision 0096 § 2 point 6) : `inputTokens` et `outputTokens` **seulement**, gardés
+ * si entiers sûrs de 0 à `MAX_TOKENS` ; absents sinon (les deux, ou aucun). Rien d'autre de `usage` n'est lu.
+ */
+function jetonsDe(usage: unknown): { entree: number; sortie: number } | undefined {
+  const lu = UsageSchema.safeParse(usage);
+  return lu.success ? { entree: lu.data.inputTokens, sortie: lu.data.outputTokens } : undefined;
+}
 /** Raison de fin de l'AI SDK, réduite à la liste fermée (`other` sinon) : jamais la raison brute du fournisseur. */
 function finDe(raison: unknown): FinModele {
   return typeof raison === "string" && (FINS_MODELE as readonly string[]).includes(raison) ? (raison as FinModele) : "other";
@@ -258,8 +276,9 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
               if (source.success) sources.push({ url: source.data.url, titre: source.data.title ?? "", extrait: source.data.providerMetadata?.openrouter?.content ?? "" });
             }
           }
+          const tokens = jetonsDe(resultat.usage);
           return {
-            valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? coutEstimeMicros) / 1_000_000, fin: finDe(resultat.finishReason) },
+            valeur: { texte: resultat.text, sources, coutUsd: (coutReelMicros ?? coutEstimeMicros) / 1_000_000, fin: finDe(resultat.finishReason), ...(tokens === undefined ? {} : { tokens }) },
             coutReelMicros,
           };
         } finally {
@@ -277,8 +296,8 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
 
   return {
     async envoyer(requete: RequeteModele): Promise<ReponseModele> {
-      const { texte, coutUsd, fin } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
-      return { texte, coutUsd, fin };
+      const { texte, coutUsd, fin, tokens } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
+      return { texte, coutUsd, fin, ...(tokens === undefined ? {} : { tokens }) };
     },
     async rechercherWeb(requete) {
       const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats } });

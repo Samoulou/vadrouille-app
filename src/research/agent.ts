@@ -137,6 +137,13 @@ export type DependancesAgent = {
   peutAppeler?: (appel: AppelAgent) => boolean;
   /** Reçoit l'état vivant de l'agent au départ (ticket 407 : compteurs journalisés même si la recherche lève). */
   observer?: (etat: EtatAgent) => void;
+  /**
+   * Noms déjà connus de l'appelant (B7b, spécification B7 : `dejaTrouves` de `rechercher`, recherche complémentaire du
+   * voyage complet et mini-recherche). Remis au modèle avec les noms trouvés pendant l'exécution, et jamais re-trouvés :
+   * un candidat dont le nom (`cleDeNom`) en fait partie est écarté comme doublon. Ils ne comptent dans aucune cible ni
+   * dans le total. Absent : comportement de P0, inchangé.
+   */
+  dejaConnus?: readonly string[];
 };
 
 /**
@@ -554,7 +561,8 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
 
   const urlsVues = new Set<string>();
   const pagesTexte = new Map<string, string>();
-  const cles = new Set<string>();
+  const connus = dependances.dejaConnus ?? [];
+  const cles = new Set<string>(connus.map(cleDeNom).filter((cle) => cle !== ""));
   const trouves: Record<TypeCreneau, number> = { activity: 0, meal: 0, evening: 0 };
   let resultats: ResultatWeb[] = [];
   let pages: PageLue[] = [];
@@ -682,7 +690,7 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
           secteurs: manquantsParSecteur(),
           resultats,
           pages,
-          dejaTrouves: candidats.map((candidat) => candidat.nom),
+          dejaTrouves: [...connus, ...candidats.map((candidat) => candidat.nom)],
           manquants,
         },
         dependances.modele,

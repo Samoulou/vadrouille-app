@@ -19,6 +19,7 @@ import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/ai/recherche-web";
 import { creerRedigerRaisons } from "@/ai/rediger-raisons";
 import type { Routage } from "@/ai/reglages";
 import { requetePlan, requeteQuartier, requeteStructuration } from "@/ai/requetes";
+import { tracerModeles, type HorlogeTraces, type TracesIa } from "@/ai/traces";
 import {
   joursDuSejour,
   lireBriefDeduit,
@@ -66,7 +67,12 @@ export type ReglagesIa = {
   readonly raisons: ReglageEtape;
 };
 
-export type DependancesCoucheIa = { readonly modeles: ClientModeles; readonly reglages: ReglagesIa };
+/**
+ * Dépendances de la couche IA. `traces` est facultatif (décision 0077 § 2 point 2, 0096 § 2 point 4 : ajout compatible,
+ * aucune signature de B7a ne change) : fourni, le client de modèles est décoré par `tracerModeles` ; absent, aucune
+ * exportation (comportement de B7a). `horloge` (millisecondes) ne sert qu'aux traces.
+ */
+export type DependancesCoucheIa = { readonly modeles: ClientModeles; readonly reglages: ReglagesIa; readonly traces?: TracesIa; readonly horloge?: HorlogeTraces };
 
 /** Nombre maximal de candidats d'un lot de notation (borne de l'entrée, au-dessus des lots de P0). */
 export const MAX_CANDIDATS_NOTATION = 50;
@@ -261,8 +267,10 @@ function hrefDe(brut: string): string | undefined {
   }
 }
 
-export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): CoucheIa {
-  const client = avecGardeDataCollection(modeles);
+export function creerCoucheIa({ modeles, reglages, traces, horloge = Date.now }: DependancesCoucheIa): CoucheIa {
+  // Le client reçu est décoré d'abord (un client déjà décoré par la composition est rendu tel quel : aucune étape n'est
+  // tracée deux fois), puis protégé par la garde `data_collection` : un refus de la garde ne part pas, il n'est pas tracé.
+  const client = avecGardeDataCollection(traces === undefined ? modeles : tracerModeles(modeles, traces, horloge));
   const noterLot = creerNoterCandidats(client, reglages.notation);
   const redigerLieux = creerRedigerRaisons(client, reglages.raisons);
 
