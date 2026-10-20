@@ -13,7 +13,7 @@ import { executeurSql, withOrg } from "@/server/with-org";
  * Composition de la lecture des voyages (B8b ; décision 0100 § 5, Q430) : câble la source réelle de relectures
  * (`src/server/relecture/source.ts`) à la fabrique commune des clients Google (`clients-google.ts`), au forfait de
  * relecture (`PLAFONDS_USAGE` et la table de prix), à `withOrg` et à l'interrupteur des écritures de positions. **Câble
- * seulement** : aucune logique de lecture, aucune lecture de clé ici (les clients la lisent après la barrière de sortie).
+ * seulement** : aucune logique de lecture, aucune lecture de clé ici (chaque client la lit à sa construction, après la barrière de sortie).
  *
  * - **Seconde composition** après celle de la génération (`generation.ts`, B9c, future) : un chemin vers `src/grounding`
  *   n'est admis que par la fabrique commune, importée par ce module (règle `ligne/relecture-imports`, test du graphe).
@@ -34,10 +34,17 @@ export type OptionsLecture = {
   readonly transaction?: DependancesSource["transaction"];
   readonly clients?: DependancesSource["clients"];
   readonly positionsSuspendues?: DependancesSource["positionsSuspendues"];
+  /** Environnement lu par la sélection (défaut : `process.env`) ; les tests l'injectent. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
 };
 
-/** Source réelle de relectures, câblée sur `withOrg` et la fabrique des clients Google. */
+/**
+ * Source réelle de relectures, câblée sur `withOrg` et la fabrique des clients Google. **Refuse hors `local` avec
+ * `RELECTURES_SOURCE=google`** (0100 § 5.3) : la règle ne dépend pas du seul appelant `choisirSourceRelectures` ; elle
+ * lève sans message ni valeur, avant toute construction.
+ */
 export function creerSourceLecture(options: OptionsLecture = {}): SourceRelectures {
+  if (!sourceReelleChoisie(options.env)) throw new Error("lecture: source réelle non choisie");
   const horloge = options.horloge ?? horlogeSysteme;
   return creerSourceRelectures({
     regles: reglesDeLecture(horloge, options.plafonds),
@@ -54,5 +61,5 @@ export function creerSourceLecture(options: OptionsLecture = {}): SourceRelectur
  * premier cas.
  */
 export function choisirSourceRelectures(repli: SourceRelectures, env?: Readonly<Record<string, string | undefined>>): SourceRelectures {
-  return sourceReelleChoisie(env) ? creerSourceLecture() : repli;
+  return sourceReelleChoisie(env) ? creerSourceLecture({ env }) : repli;
 }

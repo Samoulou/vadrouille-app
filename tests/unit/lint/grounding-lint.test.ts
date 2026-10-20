@@ -197,7 +197,7 @@ describe("lint: composition de la lecture (0100 § 5.2) : fabrique des clients G
     expect(await signalements('export * from "@/server/composition/lecture";\n', fichier, RELECTURE)).not.toHaveLength(0);
   });
 
-  it.each(["src/adapters/index.ts", "src/server/composition/lecture.test.ts", "tests/unit/exemple.test.ts"])("%s : import de @/server/composition/lecture admis", async (fichier) => {
+  it.each(["src/adapters/index.ts", "tests/unit/server/composition-lecture.test.ts", "tests/unit/exemple.test.ts"])("%s : import de @/server/composition/lecture admis", async (fichier) => {
     expect(await signalements(imp("@/server/composition/lecture"), fichier, RELECTURE)).toHaveLength(0);
   });
 });

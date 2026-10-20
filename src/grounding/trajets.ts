@@ -132,7 +132,9 @@ function positionDe(point: PointTrajet): Coordonnees | undefined {
  * demande, non la matrice complète. Un couple, un mode, **un élément** (requête 1 × 1, même masque et même SKU que la
  * matrice) ; un couple répété ou un mode répété n'est mesuré qu'une fois. Les requêtes partent par groupes d'au plus
  * `CONCURRENCE_COUPLES` ; au premier échec (erreur, plafond, quota), aucune requête de plus ne part et l'appel entier
- * rend l'échec : aucune durée.
+ * rend l'échec : aucune durée. Les requêtes **déjà parties** (au plus `CONCURRENCE_COUPLES` - 1 autres) vont jusqu'au bout
+ * : leur unité est réservée au registre avant l'appel (surestimation bornée par le plafond du forfait, jamais
+ * sous-estimation) et leur résultat est écarté.
  *
  * Estimation (B8-PO-8) : seulement quand Routes répond sans itinéraire pour **tous** les modes admis du couple **et**
  * que les deux positions sont connues ; sinon le couple reste inconnu (`undefined`), jamais une durée inventée. Un

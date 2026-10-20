@@ -304,11 +304,11 @@ type PorteeDeSession = { readonly ctx: Pick<AdapterContext, "organizationId" | "
 async function relire(
   source: SourceRelectures,
   etat: Etat,
+  sejoursParNuit: readonly SejourDeNuit[],
   session: PorteeDeSession,
   demande: DemandeRelectures,
   contexte: ContexteEchec,
 ): Promise<Relectures> {
-  const sejoursParNuit = sejoursDe(etat, contexte);
   let reponse: Awaited<ReturnType<SourceRelectures["pour"]>>;
   try {
     reponse = await source.pour(
@@ -333,12 +333,13 @@ const joursALire = (etat: Etat, jours: readonly DaySnapshot[]): JourALire[] =>
 
 async function recomposerJours(source: SourceRelectures, etat: Etat, jours: readonly DaySnapshot[], session: PorteeDeSession): Promise<Day[]> {
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
-  logementsDe(etat, contexte);
+  // Séjours lus une fois : `stay_missing` même quand aucun jour n'est relu, puis passés à `relire`.
+  const sejours = sejoursDe(etat, contexte);
   const modes = modesDe(etat, contexte);
   const nuits = nombreDeNuits(etat.enTete.start, etat.enTete.end);
   const aLire = joursALire(etat, jours);
   const relectures = aLire.some((j) => j.mesure)
-    ? await relire(source, etat, session, demandeDeRelectures({ jours: aLire, nombreDeNuits: nuits, modes }), contexte)
+    ? await relire(source, etat, sejours, session, demandeDeRelectures({ jours: aLire, nombreDeNuits: nuits, modes }), contexte)
     : undefined;
   const verification = datesDeVerification(etat.chaine, etat.enTete.timeZone);
   return aLire.map(({ jour, mesure }) => {
@@ -391,10 +392,10 @@ async function recomposerPropositions(
 ): Promise<Proposal[]> {
   if (lues.length === 0) return [];
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
-  logementsDe(etat, contexte);
+  const sejours = sejoursDe(etat, contexte);
   const nuits = nombreDeNuits(etat.enTete.start, etat.enTete.end);
   const demande = demandeDeRelectures({ jours: [], propositions: lues.map(({ record, jour }) => ({ proposition: record, jour })), nombreDeNuits: nuits, modes: [] });
-  const relectures = await relire(source, etat, session, demande, contexte);
+  const relectures = await relire(source, etat, sejours, session, demande, contexte);
   const options = optionsDesRepas(lues.map(({ record }) => record));
   return lues.map(({ record, jour }, rang) => {
     const option = options[rang];

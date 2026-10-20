@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { INCONNU, type DemandeRelectures, type VoyageARelire } from "@/domain/relectures";
-import { erreurGoogleDe } from "@/grounding/enveloppe-google";
+import { ErreurClientGoogle, erreurGoogleDe } from "@/grounding/enveloppe-google";
 import { cleMaison, type ClientPlacesMvp, type ClientRoutes, type Coordonnees, type ModeRoutes } from "@/grounding/interfaces";
 import { creerSourceRelectures, LOT_ECRITURE_POSITIONS, type DependancesSource, type FabriqueClients } from "@/server/relecture/source";
 import * as journal from "@/server/log";
@@ -45,6 +45,8 @@ function base(options: Options = {}) {
   const inserts: { unites: unknown; cout: unknown }[] = [];
   const ecritures: string[][] = [];
   const lectures: string[][] = [];
+  /** Éléments Routes réservés, un par requête (registre : éléments = couples × modes, 0100 § 1.5). */
+  const elementsRoutes: number[] = [];
   const transaction = (): TransactionOrganisation => async (fn) => {
     ouvertes += 1;
     maxOuvertes = Math.max(maxOuvertes, ouvertes);
@@ -95,6 +97,7 @@ function base(options: Options = {}) {
     inserts,
     ecritures,
     lectures,
+    elementsRoutes,
     ouvertes: () => ouvertes,
     maxOuvertes: () => maxOuvertes,
     appelEnTransaction: () => {
@@ -121,6 +124,7 @@ function fabrique(places: ClientPlacesMvp, routes: ClientRoutes, db: ReturnType<
       const issue = await avecReservation({ port: usage, horloge }, demande, 1_000, async (_signal, transporte) => {
         transporte();
         db.appelEnTransaction();
+        if (methode === "routes_matrix") db.elementsRoutes.push(elements);
         appels.push(methode);
         db.chronologie.push(`google:${methode}`);
         return { valeur: await f(), coutReelMicros: null };
@@ -284,6 +288,20 @@ describe("lecture: trajets par couples (0100 § 1.5)", () => {
     for (const requete of routes.appels) expect(requete.origines.length * requete.destinations.length).toBe(1);
   });
 
+  it("le registre réserve autant d'éléments que de couples × modes (3 ici), jamais plus", async () => {
+    const { source, db } = monter();
+    const demande: DemandeRelectures = {
+      lieux: ["test_place_a", "test_place_b", "test_place_c"].map((placeId) => ({ placeId, dates: [LUNDI] })),
+      trajets: [
+        { depuis: { lieu: "test_place_a" }, vers: { lieu: "test_place_b" }, modes: ["walk", "transit"] },
+        { depuis: { lieu: "test_place_b" }, vers: { lieu: "test_place_c" }, modes: ["car"] },
+      ],
+    };
+    expect((await source.pour(voyageDeBase(), demande)).ok).toBe(true);
+    expect(db.elementsRoutes).toEqual([1, 1, 1]);
+    expect(db.elementsRoutes.reduce((somme, n) => somme + n, 0)).toBe(2 * 1 + 1 * 1);
+  });
+
   it("une durée mesurée n'est pas estimée ; sans itinéraire pour tous les modes, estimée à partir des fiches", async () => {
     const mesure = monter();
     const a = await mesure.source.pour(voyageDeBase(), demandeDeBase());
@@ -304,11 +322,26 @@ describe("lecture: trajets par couples (0100 § 1.5)", () => {
     const { source } = monter({ routes });
     expect(await source.pour(voyageDeBase(), demandeDeBase())).toEqual({ ok: false, refus: "unavailable" });
   });
+
+  it.each([
+    ["cap_reached", "quota_reached"],
+    ["envelope_reached", "quota_reached"],
+    ["daily_quota_insufficient", "quota_reached"],
+    ["upstream_rate_limited", "unavailable"],
+    ["upstream_timeout", "unavailable"],
+  ] as const)("Routes en échec (%s) : refus %s, aucune durée", async (code, refus) => {
+    const routes = creerRoutesDouble({ secondes: secondesParDefaut, erreur: { auAppel: 1, fabrique: () => new ErreurClientGoogle(code) } });
+    const { source } = monter({ routes });
+    expect(await source.pour(voyageDeBase(), demandeDeBase())).toEqual({ ok: false, refus });
+  });
 });
 
 describe("lecture: fiche en échec, trajets mesurés (B8-PO-9, 0100 § 4.1)", () => {
   it.each([
     ["une erreur de Google", { places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 2, fabrique: () => new Error("boom") } }) }, "unavailable"],
+    ["un quota du jour insuffisant", { places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 1, fabrique: () => new ErreurClientGoogle("daily_quota_insufficient") } }) }, "quota_reached"],
+    ["l'enveloppe Google atteinte", { places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 1, fabrique: () => new ErreurClientGoogle("envelope_reached") } }) }, "quota_reached"],
+    ["une limite de débit amont (hors de nos plafonds)", { places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 1, fabrique: () => new ErreurClientGoogle("upstream_rate_limited") } }) }, "unavailable"],
     ["un plafond atteint avant l'appel", { regles: { plafonds: { ...PLAFONDS_USAGE_TEST, relecture: { ...PLAFONDS_USAGE_TEST.relecture, voyage: { ...PLAFONDS_USAGE_TEST.relecture.voyage, placesDetails: 0 } } }, table: TABLE, horloge: horlogeSysteme } }, "cap_reached"],
   ] as const)("%s : relectures sans fiches, trajets mesurés, un seul journal", async (_nom, mise, raison) => {
     const { source, appels } = monter({ ...mise, places: "places" in mise ? mise.places : undefined });
@@ -321,6 +354,71 @@ describe("lecture: fiche en échec, trajets mesurés (B8-PO-9, 0100 § 4.1)", ()
     expect(fiches).toHaveLength(1);
     expect(fiches[0]?.champs).toMatchObject({ reason: raison });
     expect(appels).toContain("routes_matrix");
+  });
+});
+
+describe("lecture: fiches en échec et Routes sans itinéraire (0100 § 4.1 et § 1.6, exception assumée)", () => {
+  const depuis = { lieu: "test_place_a" };
+  const vers = { lieu: "test_place_b" };
+
+  it("fiches en échec : le couple que Routes ne mesure pas reste inconnu (travel_unknown en aval) ; avec ses fiches, la même épreuve reçoit une durée estimée", async () => {
+    const sansFiches = monter({
+      places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 1, fabrique: () => new Error("boom") } }),
+      routes: creerRoutesDouble({ secondes: () => null }),
+    });
+    const a = await sansFiches.source.pour(voyageDeBase(), demandeDeBase());
+    if (!a.ok) throw new Error("attendu : ok");
+    expect(a.relectures.validite("test_place_a")).toBe(INCONNU);
+    for (const mode of ["walk", "transit"] as const) expect(a.relectures.duree(depuis, vers, mode)).toBe(INCONNU);
+    expect(evenements.filter((e) => e.evenement === "voyages.fiches_non_relues")).toHaveLength(1);
+
+    const avecFiches = monter({ routes: creerRoutesDouble({ secondes: () => null }) });
+    const b = await avecFiches.source.pour(voyageDeBase(), demandeDeBase());
+    if (!b.ok) throw new Error("attendu : ok");
+    expect(b.relectures.duree(depuis, vers, "walk")).toMatchObject({ estimee: true });
+  });
+
+  it("fiches en échec et Routes qui mesure : la durée est mesurée, jamais estimée", async () => {
+    const { source } = monter({ places: creerPlacesDouble({ lieux: LIEUX, erreur: { auAppel: 1, fabrique: () => new Error("boom") } }) });
+    const rendu = await source.pour(voyageDeBase(), demandeDeBase());
+    if (!rendu.ok) throw new Error("attendu : ok");
+    expect(rendu.relectures.duree(depuis, vers, "walk")).toMatchObject({ estimee: false });
+  });
+});
+
+describe("lecture: seules les nuits référencées par la demande se résolvent (0100 § 1.4 et § 6.2)", () => {
+  const ville = (nom: string) => ({ placeId: null, ville: nom, centre: null, type: "neighbourhood", logement: "area" }) as const;
+  const lieuxVilles = { ...LIEUX, test_place_v1: lieu(0.11), test_place_v2: lieu(0.12), test_place_v3: lieu(0.13) };
+  const textes = { Edimbourg: ["test_place_ville"], Ville1: ["test_place_v1"], Ville2: ["test_place_v2"], Ville3: ["test_place_v3"] };
+  const voyage: VoyageARelire = {
+    ...voyageARelire([null, null, null, null], "jour"),
+    sejoursParNuit: [ville("Ville1"), ville("Ville2"), ville("Ville3"), ville("Edimbourg")],
+  };
+  const demande: DemandeRelectures = { lieux: [{ placeId: "test_place_a", dates: [LUNDI] }], trajets: [{ depuis: { logement: 3 }, vers: { lieu: "test_place_a" }, modes: ["walk"] }] };
+
+  it("portée jour, trois villes hors demande : le plafond de Text Search (2) n'est pas consommé, la nuit demandée reçoit sa durée", async () => {
+    expect(PLAFONDS_USAGE_TEST.relecture.jour.placesTextSearch).toBe(2);
+    const places = creerPlacesDouble({ lieux: lieuxVilles, textes });
+    const { source, appels } = monter({ places });
+    const rendu = await source.pour(voyage, demande);
+    if (!rendu.ok) throw new Error("attendu : ok");
+    const recherches = places.appels.filter((appel) => appel.methode === "textSearch");
+    expect(recherches.map((appel) => (appel.methode === "textSearch" ? appel.requete.texte : ""))).toEqual(["Edimbourg"]);
+    expect(places.appels.filter((appel) => appel.methode === "position")).toHaveLength(1);
+    expect(appels.filter((a) => a === "places_text_search")).toHaveLength(1);
+    expect(rendu.relectures.duree({ logement: 3 }, { lieu: "test_place_a" }, "walk")).not.toBe(INCONNU);
+    for (const nuit of [0, 1, 2]) expect(rendu.relectures.duree({ logement: nuit }, { lieu: "test_place_a" }, "walk")).toBe(INCONNU);
+    expect(evenements.filter((e) => e.evenement === "voyages.fiches_non_relues")).toEqual([]);
+  });
+
+  it("un logement pourvu d'un lieu, hors demande : ni fiche de position, ni écriture au cache", async () => {
+    const places = creerPlacesDouble({ lieux: LIEUX, textes });
+    const { source, db } = monter({ places });
+    const hors: VoyageARelire = voyageARelire(["test_place_hotel"], "jour");
+    const rendu = await source.pour(hors, demandeDeBase());
+    expect(rendu.ok).toBe(true);
+    expect(places.appels.filter((appel) => appel.methode === "position")).toEqual([]);
+    expect(db.ecritures.flat()).not.toContain("test_place_hotel");
   });
 });
 
@@ -388,9 +486,17 @@ describe("lecture: logement sans lieu (0100 § 6.2)", () => {
 });
 
 describe("carte: positions du cache alimenté par la lecture (0100 § 3.2 point 4)", () => {
+  /** Demande qui référence la nuit 0 (le logement `test_place_hotel`) : seule une nuit référencée est résolue. */
+  const demandeAvecLogement = (): DemandeRelectures => {
+    const base = demandeDeBase();
+    return { ...base, trajets: [...base.trajets, { depuis: { logement: 0 }, vers: { lieu: "test_place_a" }, modes: ["walk"] }] };
+  };
+  const evenementsPositions = () => evenements.filter((e) => e.evenement === "voyages.positions_non_ecrites");
+
   it("écrit les positions fraîches absentes du cache, jamais celles que `lire` rend", async () => {
     const { source, db } = monter({ options: { cache: { test_place_a: { lat: 1, lng: 2 } } } });
-    await source.pour(voyageDeBase(), demandeDeBase());
+    await source.pour(voyageDeBase(), demandeAvecLogement());
+    expect(evenementsPositions()).toEqual([]);
     expect(db.ecritures).toHaveLength(1);
     expect(db.ecritures[0]).toEqual(["test_place_b", "test_place_hotel"]);
   });
@@ -431,6 +537,7 @@ describe("carte: positions du cache alimenté par la lecture (0100 § 3.2 point 
     expect(rendu.ok).toBe(true);
     expect(db.chronologie.filter((e) => e === "tx:annulee")).toHaveLength(1);
     expect(db.ecritures).toEqual([]);
+    expect(evenementsPositions()).toEqual([{ evenement: "voyages.positions_non_ecrites", champs: { reason: "base" } }]);
   });
 
   it("lecture du cache qui échoue : écriture abandonnée, lecture servie", async () => {
@@ -438,6 +545,49 @@ describe("carte: positions du cache alimenté par la lecture (0100 § 3.2 point 
     const rendu = await source.pour(voyageDeBase(), demandeDeBase());
     expect(rendu.ok).toBe(true);
     expect(db.ecritures).toEqual([]);
+    expect(evenementsPositions()).toEqual([{ evenement: "voyages.positions_non_ecrites", champs: { reason: "base" } }]);
+  });
+
+  it("transaction d'écriture qui lève (hors du port) : raison exception, aucun message ni valeur dans le journal", async () => {
+    const db = base();
+    let ouvertures = 0;
+    const dep: DependancesSource = {
+      regles: { plafonds: PLAFONDS_USAGE_TEST, table: TABLE, horloge: horlogeSysteme },
+      // La réservation (première transaction) réussit ; l'écriture (seconde) lève.
+      transaction: () => {
+        ouvertures += 1;
+        return ouvertures === 1 ? db.transaction() : () => Promise.reject(new Error("SENTINELLE-BASE"));
+      },
+      clients: fabrique(creerPlacesDouble({ lieux: LIEUX }), creerRoutesDouble({ secondes: secondesParDefaut }), db, []),
+      positionsSuspendues: () => false,
+      horloge: horlogeSysteme,
+    };
+    const rendu = await creerSourceRelectures(dep).pour(voyageDeBase(), demandeDeBase());
+    expect(rendu.ok).toBe(true);
+    expect(evenementsPositions()).toEqual([{ evenement: "voyages.positions_non_ecrites", champs: { reason: "exception" } }]);
+    expect(JSON.stringify(evenements)).not.toContain("SENTINELLE");
+  });
+
+  it("une écriture qui réussit ou une écriture suspendue ne journalise rien", async () => {
+    const reussie = monter();
+    await reussie.source.pour(voyageDeBase(), demandeDeBase());
+    const suspendue = monter({ suspendues: true });
+    await suspendue.source.pour(voyageDeBase(), demandeDeBase());
+    expect(evenementsPositions()).toEqual([]);
+  });
+
+  it("les lieux de la demande sont écrits, y compris un lieu de proposition ou le lieu qui est aussi le centre d'une ville ; le centre d'une ville seule ne l'est pas", async () => {
+    // 0100 § 3.1 point 2 (b) : toute fiche chargée par la lecture alimente le cache ; `demande.lieux` ne distingue pas les
+    // étapes des propositions, et un lieu de la demande qui est aussi le centre d'une ville est une fiche chargée.
+    const villeSeule = monter();
+    const voyageVille: VoyageARelire = { ...voyageARelire([null]), sejoursParNuit: [{ placeId: null, ville: "Edimbourg", centre: null, type: "neighbourhood", logement: "area" }] };
+    const demandeVille: DemandeRelectures = { lieux: [{ placeId: "test_place_a", dates: [LUNDI] }], trajets: [{ depuis: { logement: 0 }, vers: { lieu: "test_place_a" }, modes: ["walk"] }] };
+    await villeSeule.source.pour(voyageVille, demandeVille);
+    expect(villeSeule.db.ecritures.flat()).toEqual(["test_place_a"]);
+
+    const villeEtLieu = monter();
+    await villeEtLieu.source.pour(voyageVille, { ...demandeVille, lieux: [...demandeVille.lieux, { placeId: "test_place_ville", dates: [LUNDI] }] });
+    expect(villeEtLieu.db.ecritures.flat().sort()).toEqual(["test_place_a", "test_place_ville"]);
   });
 
   it("positions périmées (plus d'une heure) : écriture abandonnée", async () => {
@@ -455,6 +605,7 @@ describe("carte: positions du cache alimenté par la lecture (0100 § 3.2 point 
     expect(rendu.ok).toBe(true);
     expect(db.ecritures).toEqual([]);
     expect(db.chronologie).toContain("tx:annulee");
+    expect(evenementsPositions()).toEqual([{ evenement: "voyages.positions_non_ecrites", champs: { reason: "perimees" } }]);
   });
 
   it("par lots de 500 au plus", () => {

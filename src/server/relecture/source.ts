@@ -10,7 +10,7 @@ import {
 } from "@/domain/relectures";
 import { chargerFiches, chargerPosition, placeIdDeVille, positionsFraiches, type IssueFiche, type IssuePosition } from "@/grounding/fiches";
 import { cleMaison, type ClientPlacesMvp, type ClientRoutes, type Coordonnees } from "@/grounding/interfaces";
-import type { PositionGoogleFraiche } from "@/grounding/port-positions";
+import type { CodeEchecPositions, PositionGoogleFraiche } from "@/grounding/port-positions";
 import { chargerTrajetsParCouples, type CoupleTrajet, type PointTrajet, type TableTrajets } from "@/grounding/trajets";
 import { versRelectures } from "@/server/relecture/relectures";
 import { logEvent } from "@/server/log";
@@ -69,12 +69,16 @@ export type DependancesSource = {
   readonly horloge: Horloge;
 };
 
+/**
+ * Codes qui rendent `quota_reached` (plafond, enveloppe, quota du jour). `upstream_rate_limited` (limite de débit de Google,
+ * transitoire, hors de nos plafonds) n'en fait pas partie : c'est `unavailable`, pour Routes comme pour les fiches.
+ */
 const REFUS_QUOTA: ReadonlySet<string> = new Set(["cap_reached", "envelope_reached", "daily_quota_insufficient"]);
 
 /** Raison fermée du journal des fiches non relues. */
 function raisonFiches(code: string): "cap_reached" | "quota_reached" | "unavailable" {
   if (code === "cap_reached") return "cap_reached";
-  if (code === "envelope_reached" || code === "daily_quota_insufficient" || code === "upstream_rate_limited") return "quota_reached";
+  if (code === "envelope_reached" || code === "daily_quota_insufficient") return "quota_reached";
   return "unavailable";
 }
 
@@ -91,6 +95,15 @@ function genreDe(sejour: SejourDeNuit): GenreNuit {
   if (sejour.logement === "known" || sejour.logement === "suggestedLodging") return "aucun";
   if (sejour.logement === null && sejour.type === "lodging") return "aucun";
   return sejour.ville !== null && sejour.ville.trim() !== "" ? "ville" : "aucun";
+}
+
+/** Index des nuits dont le logement est un point d'un trajet de la demande. */
+function nuitsDeLaDemande(demande: DemandeRelectures): ReadonlySet<number> {
+  const nuits = new Set<number>();
+  for (const trajet of demande.trajets) {
+    for (const point of [trajet.depuis, trajet.vers]) if ("logement" in point) nuits.add(point.logement);
+  }
+  return nuits;
 }
 
 const refus = (r: RefusRelectures) => ({ ok: false, refus: r }) as const;
@@ -133,8 +146,11 @@ async function lire(dep: DependancesSource, voyage: VoyageARelire, demande: Dema
   };
 
   // 1. Logements sans lieu (0100 § 6.2) : Text Search « IDs only » de chaque ville distincte.
+  // Seules les nuits **référencées par la demande** se résolvent (0100 § 1.4 et § 6.2) : une nuit hors demande ne consomme
+  // ni Text Search ni fiche de position du plafond du profil (le jour demandé ne passe pas en `travel_unknown` à cause d'elle).
   const sejours = voyage.sejoursParNuit;
-  const genres = sejours.map(genreDe);
+  const nuitsDemandees = nuitsDeLaDemande(demande);
+  const genres = sejours.map((sejour, i) => (nuitsDemandees.has(i) ? genreDe(sejour) : "aucun"));
   const placeIdDesVilles = new Map<string, string | null>();
   const villes = [...new Set(sejours.flatMap((sejour, i) => (genres[i] === "ville" ? [(sejour.ville as string).trim()] : [])))];
   for (const ville of villes) {
@@ -202,8 +218,11 @@ async function lire(dep: DependancesSource, voyage: VoyageARelire, demande: Dema
   }
   const trajets = couples.length === 0 ? null : await chargerTrajetsParCouples(couples, routes);
 
-  // 5. Transaction 2 : positions fraîches des fiches de cette lecture (étapes, événements et logements pourvus d'un
-  // lieu ; jamais le centre d'une ville), absentes du cache. Après les appels, quelle qu'en soit l'issue.
+  // 5. Transaction 2 : positions fraîches des fiches de cette lecture, absentes du cache. Après les appels, quelle qu'en
+  // soit l'issue. Sont écrites **toutes** les fiches de `demande.lieux` (étapes, événements, et aussi lieux des propositions
+  // et des créneaux : 0100 § 3.1 point 2 (b), qui alimente le cache de toute fiche chargée, l'emporte sur la liste
+  // du § 3.2 point 6, qui ne vise que ce qui s'ajoute) et les logements **demandés** pourvus d'un lieu ; jamais le centre
+  // d'une ville qui n'est pas aussi un lieu de la demande (position de ville, § 6.2).
   const fraiches = positionsFraiches([...fiches, ...positionsLues.filter((position) => logements.has(position.placeId))]);
   await ecrirePositions(dep, contexte, fraiches, obtenuesA);
 
@@ -225,11 +244,24 @@ function pointLieu(placeId: string, positions: ReadonlyMap<string, Coordonnees>)
   return position === undefined ? { placeId } : { placeId, position: { lat: position.lat, lng: position.lng } };
 }
 
+type RaisonPositions = "perimees" | "base" | "exception";
+
+/** Échec du port des positions, porté jusqu'à la sortie de la transaction (qui l'annule) ; ne porte que le code fermé. */
+class EchecPositions extends Error {
+  readonly raison: RaisonPositions;
+  constructor(code: CodeEchecPositions) {
+    super("positions");
+    this.name = "EchecPositions";
+    this.raison = code === "perimees" || code === "base" ? code : "exception";
+  }
+}
+
 /**
  * Écrit au cache les positions fraîches **absentes** du cache (0100 § 3.2 point 4) : `lire` d'abord, puis `ecrire` des
  * seules positions des fiches de cette lecture dont le `placeId` n'est pas vivant, par lots de `LOT_ECRITURE_POSITIONS`.
  * Une position rendue par `lire` n'est jamais réécrite (0060 § 1.3). Échec (`perimees`, `base`, exception) : la transaction
- * est annulée en entier, l'écriture abandonnée, la lecture continue ; aucune relance.
+ * est annulée en entier, l'écriture abandonnée, la lecture continue ; aucune relance. Seul le code est journalisé
+ * (`voyages.positions_non_ecrites`, `reason` fermée, 0060 § 1.3) : ni identifiant, ni position, ni message.
  */
 async function ecrirePositions(
   dep: DependancesSource,
@@ -242,15 +274,15 @@ async function ecrirePositions(
     await dep.transaction(contexte)(async (executeur) => {
       const port = creerPortPositions(executeur);
       const vivantes = await port.lire([...fraiches.keys()]);
-      if (!vivantes.ok) throw new Error("positions: lecture refusée");
+      if (!vivantes.ok) throw new EchecPositions(vivantes.code);
       const absentes = [...fraiches].filter(([placeId]) => !vivantes.valeur.has(placeId));
       for (let debut = 0; debut < absentes.length; debut += LOT_ECRITURE_POSITIONS) {
         const ecrite = await port.ecrire(new Map(absentes.slice(debut, debut + LOT_ECRITURE_POSITIONS)), obtenuesA);
-        if (!ecrite.ok) throw new Error("positions: écriture refusée");
+        if (!ecrite.ok) throw new EchecPositions(ecrite.code);
       }
     });
-  } catch {
-    // Écriture abandonnée : transaction annulée, lecture servie (aucun message, aucune valeur).
+  } catch (erreur) {
+    logEvent("voyages.positions_non_ecrites", { reason: erreur instanceof EchecPositions ? erreur.raison : "exception" }, "warn");
   }
 }
 
