@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supprimerCandidatsDansTransaction } from "@/adapters/prototype-travail";
+import { supprimerCandidatsDansTransaction, supprimerSecteursDansTransaction } from "@/adapters/prototype-travail";
 import type { CodeEchecEcriture, EcritureProgrammePrototype, ProgrammeEcrit } from "@/contracts/prototype-ecriture";
 import {
   CLES_PROGRAMME_ECRIT,
@@ -25,7 +25,8 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * (i) la fonction de la base pour chaque `placeId` du programme, l'exécution étant encore `en_cours` ; (ii) le
  * programme **sans** `positions` (Q324) ; (ii bis) les temps de trajet conservés du programme, un `INSERT` par paire
  * dans `prototype.trajets` (décision 0092 § 4) ; (iii) le passage de l'exécution à `programme_ecrit` ; (iv) la suppression
- * des candidats de l'exécution, table de travail (0046 D15 point 3 et S4 ; constat A de 0103) ; `COMMIT`. Toute
+ * des candidats de l'exécution, table de travail (0046 D15 point 3 et S4 ; constat A de 0103), puis de son plan de
+ * secteurs (même constat ; sans requête de suppression si la table n'existe pas encore) ; `COMMIT`. Toute
  * erreur annule la transaction : **aucune position ni aucun temps n'est écrit sans son programme, aucun programme sans
  * ses temps**. Valeurs toujours en paramètres liés (§ 1.8) : le texte des requêtes ne contient ni identifiant de lieu,
  * ni coordonnée, ni durée.
@@ -160,6 +161,9 @@ export async function ecrireProgramme(entree: EcritureProgrammePrototype, pool: 
     // (iv) Fin d'exécution : les candidats de cette exécution (table de travail), dans la même transaction (0046 D15
     // point 3 et S4). Un échec annule tout : l'exécution reste `en_cours`, ses candidats aussi, l'étape peut être rejouée.
     await supprimerCandidatsDansTransaction(client, entree.runId);
+    // Plan de secteurs de l'exécution, dans la même transaction (constat A de 0103 ; 0107, « Hors
+    // périmètre ») ; table absente avant la migration `0013_secteurs_prototype` : rien à supprimer.
+    await supprimerSecteursDansTransaction(client, entree.runId);
     await client.query("COMMIT");
     enTransaction = false;
     return { programmeId };
