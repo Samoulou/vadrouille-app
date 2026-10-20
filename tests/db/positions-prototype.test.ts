@@ -268,6 +268,57 @@ describe("p0: positions et programme écrits ensemble ou pas du tout (module, ba
     expect(await etat(admin, runId)).toEqual({ statut: "en_cours", programmes: 0 });
   });
 
+  describe("p0: candidats supprimés à l'écriture du programme (0046 D15 point 3 et S4 ; constat A de 0103)", () => {
+    const CANDIDAT = { id: "c_001", nom: "Musée", resume: "Un musée.", aReserver: false };
+    const poserCandidats = async (runId: string, n: number) => {
+      for (let i = 1; i <= n; i += 1) {
+        await proto.query("INSERT INTO prototype.run_candidates (run_id, cle, candidat, place_id) VALUES ($1, $2, $3, $4)", [
+          runId,
+          `c_${String(i).padStart(3, "0")}`,
+          { ...CANDIDAT, id: `c_${String(i).padStart(3, "0")}` },
+          i % 2 === 0 ? null : `Pcand${unique()}`,
+        ]);
+      }
+    };
+    const candidats = async (runId: string) =>
+      Number((await admin.query("SELECT count(*) AS n FROM prototype.run_candidates WHERE run_id = $1", [runId])).rows[0].n);
+
+    it("réussite : aucune ligne de run_candidates ne reste après programme_ecrit ; celles d'une autre exécution restent", async () => {
+      const runId = await executionValidee(admin);
+      const autre = await executionValidee(admin);
+      await poserCandidats(runId, 4);
+      await poserCandidats(autre, 2);
+      expect(await candidats(runId)).toBe(4);
+      await ecrireProgramme(entree(runId), pool(proto));
+      expect((await etat(admin, runId)).statut).toBe("programme_ecrit");
+      expect(await candidats(runId)).toBe(0);
+      expect(await candidats(autre)).toBe(2);
+    });
+
+    it.each([
+      ["après le passage à programme_ecrit, avant la suppression des candidats", "DELETE FROM prototype.run_candidates"],
+      ["avant le passage à programme_ecrit", "UPDATE prototype.runs"],
+    ])("échec forcé %s : transaction annulée, candidats conservés, reprise de l'étape possible", async (_cas, debutRequete) => {
+      const runId = await executionValidee(admin);
+      await poserCandidats(runId, 3);
+      const e = entree(runId);
+      await expect(
+        ecrireProgramme(
+          e,
+          pool(proto, (texte) => {
+            if (texte.startsWith(debutRequete)) throw Object.assign(new Error("panne simulée"), { code: "08006" });
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "base", sqlstate: "08006" });
+      expect(await candidats(runId)).toBe(3);
+      expect(await etat(admin, runId)).toEqual({ statut: "en_cours", programmes: 0 });
+      // Reprise : le même appel, sans panne, écrit le programme et vide la table de travail.
+      await ecrireProgramme(e, pool(proto));
+      expect(await etat(admin, runId)).toEqual({ statut: "programme_ecrit", programmes: 1 });
+      expect(await candidats(runId)).toBe(0);
+    });
+  });
+
   it("exécution arrêtée entre-temps : refus de la fonction, rien n'est écrit", async () => {
     const runId = await executionValidee(admin, "arretee");
     const e = entree(runId);

@@ -157,7 +157,9 @@ vi.mock("@/server/p0/base", () => ({
 }));
 
 /** Table de travail en mémoire : mêmes règles que l'adaptateur (exécution en cours, garde d'idempotence des phases). */
-vi.mock("@/adapters/prototype-travail", () => {
+vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
+  // La suppression des candidats à l'écriture du programme (0103) s'exécute dans la transaction de `ecrireProgramme` : version réelle.
+  const { supprimerCandidatsDansTransaction, SQL_SUPPRIMER } = await importOriginal<typeof import("@/adapters/prototype-travail")>();
   const absente = () =>
     Object.assign(new Error("execution_absente"), {
       code: "execution_absente",
@@ -166,6 +168,8 @@ vi.mock("@/adapters/prototype-travail", () => {
     if (d.etat.statut !== "en_cours") throw absente();
   };
   return {
+    supprimerCandidatsDansTransaction,
+    SQL_SUPPRIMER,
     lireExecution: async () => {
       enCours();
       if (d.etat.avanceALaLectureMs > 0) vi.setSystemTime(Date.now() + d.etat.avanceALaLectureMs);

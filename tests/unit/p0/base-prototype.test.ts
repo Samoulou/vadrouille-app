@@ -174,19 +174,60 @@ describe("imports: store_prototype_coordinates nommée par un seul module (S6 de
 
 describe("p0: run_candidates lue par aucun rapport", () => {
   // Seule exception nominative : l'adaptateur de la table de travail (P0r3c-4, décision 0063 point 9), importé par
-  // `src/workflows/p0-run.ts` seul ; aucun rapport ni script ne la lit.
+  // `src/workflows/p0-run.ts` et, pour la seule suppression des candidats dans la transaction du programme,
+  // `src/adapters/prototype-ecriture.ts` (constat A de 0103 ; admission : décision 0107) ; aucun rapport ni script ne la lit.
   const ADAPTATEUR_TRAVAIL = "src/adapters/prototype-travail.ts";
+  /** Importeurs admis hors des tests (0063 point 9 ; 0107 : `prototype-ecriture.ts`, constat A de 0103). */
+  const IMPORTEURS_TRAVAIL = ["src/adapters/prototype-ecriture.ts", "src/workflows/p0-run.ts"];
+
+  /**
+   * Vrai si `fichier` nomme l'adaptateur par un spécificateur de module (import statique ou dynamique,
+   * `export … from`, `vi.mock`, `require`), quelle qu'en soit la forme : `@/adapters/prototype-travail` ou relatif
+   * (`./`, `../`), extension `.ts` facultative. Le spécificateur relatif est résolu depuis le dossier du fichier.
+   */
+  function nommeAdaptateurTravail(fichier: string, texte: string): boolean {
+    const cible = ADAPTATEUR_TRAVAIL.replace(/\.ts$/, "");
+    for (const m of texte.matchAll(/["'`]((?:@\/|\.\.?\/)[^"'`$\s]*prototype-travail(?:\.ts)?)["'`]/g)) {
+      const spec = m[1]!.replace(/\.ts$/, "");
+      const resolu = spec.startsWith("@/") ? `src/${spec.slice(2)}` : path.posix.normalize(path.posix.join(path.posix.dirname(fichier), spec));
+      if (resolu === cible) return true;
+    }
+    return false;
+  }
+
+  const estTest = (f: string) => f.startsWith("tests/") || /\.test\.tsx?$/.test(f);
 
   it("aucun module de scripts/ ni de src/ ne nomme la table de travail, hors son adaptateur", () => {
     const hors = fichiers().filter((f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && (lire(f) ?? "").includes("run_candidates"));
     expect(hors).toEqual([]);
   });
 
-  it("l'adaptateur de la table de travail n'est importé que par p0Run", () => {
+  it("l'adaptateur de la table de travail n'est importé que par p0Run et l'écriture du programme (0107), hors tests", () => {
     const importeurs = fichiers().filter(
-      (f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && /["']@\/adapters\/prototype-travail["']/.test(lire(f) ?? ""),
+      (f) => /^(scripts|src)\//.test(f) && TEXTE.test(f) && f !== ADAPTATEUR_TRAVAIL && !estTest(f) && nommeAdaptateurTravail(f, lire(f) ?? ""),
     );
-    expect(importeurs).toEqual(["src/workflows/p0-run.ts"]);
+    expect(importeurs.sort()).toEqual(IMPORTEURS_TRAVAIL);
+  });
+
+  it("contrôle du motif : toute forme de spécificateur est reconnue, le contrat ne l'est pas", () => {
+    // Positifs : alias, relatif depuis le dossier, relatif remontant, extension, `vi.mock`, import dynamique (guillemets ou obliques), `export … from`, `require`.
+    expect(nommeAdaptateurTravail("src/workflows/p0-run.ts", 'import { lireCandidats } from "@/adapters/prototype-travail";')).toBe(true);
+    expect(nommeAdaptateurTravail("src/adapters/prototype-ecriture.ts", 'import { supprimerCandidatsDansTransaction } from "./prototype-travail";')).toBe(true);
+    expect(nommeAdaptateurTravail("src/adapters/x.ts", "import { y } from './prototype-travail.ts';")).toBe(true);
+    expect(nommeAdaptateurTravail("src/server/p0/x.ts", 'export * from "../../adapters/prototype-travail";')).toBe(true);
+    expect(nommeAdaptateurTravail("scripts/p0/x.ts", 'await import("../../src/adapters/prototype-travail");')).toBe(true);
+    expect(nommeAdaptateurTravail("src/app/x.ts", 'vi.mock("@/adapters/prototype-travail.ts", () => ({}));')).toBe(true);
+    expect(nommeAdaptateurTravail("src/server/x.ts", "await import(`@/adapters/prototype-travail`);")).toBe(true);
+    expect(nommeAdaptateurTravail("src/workflows/x.ts", 'const t = require("../adapters/prototype-travail");')).toBe(true);
+    // Négatifs : le contrat (alias ou relatif), un autre module, une mention hors spécificateur.
+    expect(nommeAdaptateurTravail("src/adapters/x.ts", 'import type { LigneCandidat } from "@/contracts/prototype-travail";')).toBe(false);
+    expect(nommeAdaptateurTravail("src/contracts/x.ts", 'import type { PhaseTravail } from "./prototype-travail";')).toBe(false);
+    expect(nommeAdaptateurTravail("src/adapters/x.ts", 'import { z } from "./prototype-travail-bis";')).toBe(false);
+    expect(nommeAdaptateurTravail("src/adapters/x.ts", "// voir src/adapters/prototype-travail.ts")).toBe(false);
+    // Les tests sont exclus de la garde, pas les modules dont le nom contient « test ».
+    expect(estTest("src/adapters/prototype-ecriture.test.ts")).toBe(true);
+    expect(estTest("tests/unit/workflows/p0-run.test.ts")).toBe(true);
+    expect(estTest("src/adapters/prototype-ecriture.ts")).toBe(false);
   });
 });
 
