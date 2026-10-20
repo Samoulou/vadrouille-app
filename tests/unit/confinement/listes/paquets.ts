@@ -72,12 +72,13 @@ const PAQUETS_TS = [
   {
     paquet: "nodemailer",
     usage:
-      "e-mail du code de connexion vers Mailpit (B3b-envoi, décision 0008) : compilation de l'enveloppe par `nodemailer/lib/mail-composer` (`src/server/mail/enveloppe.ts`), " +
-      "`nodemailer/lib/addressparser` du critère E3 ; sous-chemins exacts, aucun transport ; aucune dépendance, aucun script d'installation",
+      "e-mail du code de connexion vers Mailpit (B3b-envoi, décisions 0008 et 0098) : compilation de l'enveloppe par `nodemailer/lib/mail-composer` (`src/server/mail/enveloppe.ts`), " +
+      "`nodemailer/lib/addressparser` du critère E3, `createTransport` de la racine du paquet dans `src/server/mail/smtp.ts` seulement (transport SMTP par options explicites, " +
+      "hôte de la liste fermée) ; spécificateurs exacts ; aucune dépendance, aucun script d'installation",
     verdict:
       "B3b-envoi (ticket 435, PR 437) ; Sécurité : dépendance conforme sur le head `1b3a97d` (revue consolidée : lockfile, version exacte 10.0.16, intégrité " +
       "`sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==`, aucun script d'installation, hors de `onlyBuiltDependencies`) ; " +
-      "spécificateurs réduits à deux sous-chemins exacts (bloquant 1 de cette revue)",
+      "spécificateurs réduits à des lignes exactes (bloquant 1 de cette revue) ; ligne de `smtp.ts` : décision 0098 § 6 (Sécurité, plafond accepté ; verdict de la PR de code à rendre)",
   },
   {
     paquet: "better-auth",

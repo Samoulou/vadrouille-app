@@ -180,8 +180,9 @@ export const LECTURES_ENV = [
   // par propriété littérale, à l'appel, valeur jamais rendue. Verdict Sécurité à rendre.
   { fichier: "src/server/env/index.ts", noms: ["P0_REAL_RUNS"] },
   // B3b (ticket 444 ; spécification B3, B3b ; décision 0077 § 5.1) : adresses de la connexion réelle (contrôlées par
-  // `origineHttp`, origine seule rendue) ; `EMAIL_TRANSPORT` et `SMTP_URL` : présence seulement, refusée au démarrage
-  // tant que le transport SMTP n'est pas livré (B3b-envoi). Lues par propriété littérale. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
+  // `origineHttp`, origine seule rendue) ; `EMAIL_TRANSPORT` et `SMTP_URL` : règles de B3b-envoi (décision 0098 § 4 et § 6 :
+  // présence, `staging`, `production` et Vercel refusés, valeur `smtp` exacte, forme stricte de l'URL, liste fermée
+  // d'hôtes ; valeur jamais rendue). Lues par propriété littérale, dans ce fichier seulement. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
   { fichier: "src/server/env/index.ts", noms: ["BETTER_AUTH_URL", "APP_URL", "EMAIL_TRANSPORT", "SMTP_URL"] },
   // B3b, correction 1 (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7
   // lit d'elle-même, refusées au démarrage par leur seule présence (`!== undefined`), valeur jamais lue ; le secret de

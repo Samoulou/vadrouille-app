@@ -8,8 +8,9 @@ import type { CanonicalEmail } from "@/server/email";
  * durée de validité. Le port ne reçoit ni objet, ni corps, ni en-tête, ni option de transport : la composition du
  * message et son envoi appartiennent à l'implémentation (B3b-envoi).
  *
- * Implémentations : `disabledCodeMailer` (`./disabled.ts`), seule implémentation sous `src/` jusqu'à B3b-envoi ; un
- * double de capture hors de `src/` pour les tests (`tests/support/capture-code-mailer.ts`). Le port est **injecté**
+ * Implémentations : `disabledCodeMailer` (`./disabled.ts`), retenue sans `EMAIL_TRANSPORT` ; `createSmtpCodeMailer`
+ * (`./smtp.ts`, B3b-envoi), SMTP vers Mailpit seulement, avec `EMAIL_TRANSPORT=smtp` ; un double de capture hors de
+ * `src/` pour les tests (`tests/support/capture-code-mailer.ts`). Le port est **injecté**
  * dans la configuration de `src/server/auth`, jamais choisi par une variable d'environnement.
  *
  * Contrat : un refus ou une panne **lève** (l'opération de `src/server/auth` rend alors `provider_error`) ; le message

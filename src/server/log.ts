@@ -38,6 +38,8 @@ export const LOG_EVENTS = [
   // seulement). Aucune valeur : ni adresse, ni code, ni jeton, ni adresse IP.
   "email.address_refused",
   "email.transport_disabled",
+  // B3b-envoi (critères E5 et E6) : enveloppe refusée par `checkEnvelope` avant tout appel du transport ; aucune valeur.
+  "email.envelope_refused",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",

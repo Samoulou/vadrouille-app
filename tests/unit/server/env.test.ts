@@ -394,25 +394,6 @@ describe("env: gardes de configuration", () => {
       }
     });
 
-    it("EMAIL_TRANSPORT ou SMTP_URL présente → refus dans les quatre environnements, valeur jamais rendue ni journalisée", () => {
-      const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
-      try {
-        for (const env of [ci(), { VADROUILLE_ENV: "local" }, vercel("preview"), vercel("production")]) {
-          for (const transport of ["smtp", "ses", SENTINELLE, ""]) {
-            refusParse({ ...env, [NOM.EMAIL_TRANSPORT]: transport }, NOM.EMAIL_TRANSPORT, "forbidden");
-          }
-          for (const smtp of ["smtp://127.0.0.1:1025", `smtp://u:${SENTINELLE}@127.0.0.1:1025`, ""]) {
-            attendreRefus(() => parseServerEnv({ ...env, [NOM.SMTP_URL]: smtp }), NOM.SMTP_URL, "forbidden", [smtp, SENTINELLE]);
-          }
-          refusParse({ ...env, ...connexionReelle(), [NOM.SMTP_URL]: "smtp://127.0.0.1:1025" }, NOM.SMTP_URL, "forbidden");
-        }
-        const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
-        expect(ecrit).not.toContain(SENTINELLE);
-      } finally {
-        for (const espion of espions) espion.mockRestore();
-      }
-    });
-
     it("variables lues par Better Auth (origines, télémétrie, secrets de repli) présentes → refus dans les quatre environnements, mock compris (décision 0082)", () => {
       const noms = [
         NOM.BETTER_AUTH_TRUSTED_ORIGINS,
@@ -459,6 +440,191 @@ describe("env: gardes de configuration", () => {
   });
 });
 
+describe("env: gardes de configuration (B3b-envoi : EMAIL_TRANSPORT et SMTP_URL, décision 0098 § 4)", () => {
+  const TRANSPORT = NOM.EMAIL_TRANSPORT;
+  const URL_SMTP = NOM.SMTP_URL;
+  /** Environnement de la connexion réelle avec le transport SMTP, plus `extra` (qui peut retirer ou remplacer). */
+  const smtp = (url: string | undefined, environnement = "ci", extra: Env = {}): Env => ({
+    VADROUILLE_ENV: environnement,
+    ...connexionReelle(),
+    [TRANSPORT]: "smtp",
+    [URL_SMTP]: url,
+    ...extra,
+  });
+
+  /** Refus avec journaux capturés : ni la sentinelle ni la valeur n'y figurent (0098 § 4, cas de test de E2). */
+  function refus(env: Env, variable: ServerEnvVariable, rule: ServerEnvRule): void {
+    const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
+    try {
+      attendreRefus(
+        () => parseServerEnv(env),
+        variable,
+        rule,
+        Object.values(env).filter((v): v is string => v !== undefined && v.length >= 8 && !NOMS_ENVIRONNEMENT.has(v.trim().toLowerCase())),
+      );
+      const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+      expect(ecrit).not.toContain(SENTINELLE);
+    } finally {
+      for (const espion of espions) espion.mockRestore();
+    }
+  }
+
+  it("sans EMAIL_TRANSPORT ni SMTP_URL : port désactivé, `smtp` vaut null (B3b-envoi-PO-2)", () => {
+    expect(parseServerEnv(ci()).smtp).toBeNull();
+    expect(parseServerEnv({ VADROUILLE_ENV: "local", ...connexionReelle() }).smtp).toBeNull();
+    expect(parseServerEnv({ VADROUILLE_ENV: "production" }).smtp).toBeNull();
+  });
+
+  it("EMAIL_TRANSPORT=smtp sans SMTP_URL → refus ; SMTP_URL sans EMAIL_TRANSPORT → refus (même vide)", () => {
+    refus(smtp(undefined), URL_SMTP, "missing");
+    refus(smtp(undefined, "local"), URL_SMTP, "missing");
+    for (const environnement of ["ci", "local"]) {
+      for (const valeur of ["smtp://127.0.0.1:1025", `smtp://u:${SENTINELLE}@127.0.0.1:1025`, "", "   ", SENTINELLE]) {
+        refus({ VADROUILLE_ENV: environnement, ...connexionReelle(), [URL_SMTP]: valeur }, URL_SMTP, "forbidden");
+        refus({ VADROUILLE_ENV: environnement, [URL_SMTP]: valeur }, URL_SMTP, "forbidden");
+      }
+    }
+  });
+
+  it("EMAIL_TRANSPORT : exactement `smtp` après trim() ; SMTP, ses, resend, vide → refus", () => {
+    for (const valeur of ["ses", "resend", "SMTP", "Smtp", "", "   ", "smtp,ses", `smtp${SENTINELLE}`, SENTINELLE]) {
+      refus(smtp("smtp://127.0.0.1:1025", "ci", { [TRANSPORT]: valeur }), TRANSPORT, "invalid_value");
+      // Une valeur inconnue passe avant le contrôle de l'adresse du transport.
+      refus(smtp(undefined, "ci", { [TRANSPORT]: valeur }), TRANSPORT, "invalid_value");
+    }
+    expect(parseServerEnv(smtp("smtp://127.0.0.1:1025", "ci", { [TRANSPORT]: " smtp " })).smtp).toEqual({ host: "127.0.0.1", port: 1025 });
+  });
+
+  it("EMAIL_TRANSPORT=smtp avec AUTH_ADAPTER=mock, absent ou vide → refus", () => {
+    for (const adaptateur of ["mock", "", undefined]) {
+      refus({ VADROUILLE_ENV: "ci", AUTH_ADAPTER: adaptateur, [TRANSPORT]: "smtp", [URL_SMTP]: "smtp://127.0.0.1:1025" }, TRANSPORT, "forbidden");
+    }
+  });
+
+  it("staging, production et Vercel, quelle que soit VADROUILLE_ENV : l'une ou l'autre variable présente → refus, valeur non examinée", () => {
+    const valeurs = ["smtp", "smtp://127.0.0.1:1025", "", "   ", `smtp://u:${SENTINELLE}@smtp.exemple.test:587`, SENTINELLE];
+    const deploiements: Env[] = [
+      { VADROUILLE_ENV: "staging" },
+      { VADROUILLE_ENV: "production" },
+      vercel("preview"),
+      vercel("production"),
+      // Déclaration de l'opérateur fausse : Vercel prime sur VADROUILLE_ENV=local ou ci.
+      vercel("preview", { VADROUILLE_ENV: "ci" }),
+      vercel("preview", { VADROUILLE_ENV: "local" }),
+      vercel("development", { VADROUILLE_ENV: "ci" }),
+      vercel("development", { VADROUILLE_ENV: "local" }),
+      vercel("development"),
+    ];
+    for (const base of deploiements) {
+      for (const valeur of valeurs) {
+        refus({ ...base, [TRANSPORT]: valeur }, TRANSPORT, "forbidden");
+        refus({ ...base, [URL_SMTP]: valeur }, URL_SMTP, "forbidden");
+        refus({ ...base, ...connexionReelle(), [TRANSPORT]: "smtp", [URL_SMTP]: valeur }, TRANSPORT, "forbidden");
+        refus({ ...base, [TRANSPORT]: "smtp", [URL_SMTP]: valeur }, TRANSPORT, "forbidden");
+      }
+    }
+  });
+
+  it("SMTP_URL acceptée : forme stricte, liste fermée ; hôte rendu = constante de la liste, port entier", () => {
+    const acceptes: [string, string, "localhost" | "127.0.0.1" | "::1" | "mailpit", number][] = [
+      ["smtp://127.0.0.1:1025", "ci", "127.0.0.1", 1025],
+      ["smtp://127.0.0.1:1025", "local", "127.0.0.1", 1025],
+      ["smtp://[::1]:1025", "ci", "::1", 1025],
+      ["smtp://[0:0:0:0:0:0:0:1]:1025", "local", "::1", 1025],
+      ["smtp://[0000:0000:0000:0000:0000:0000:0000:0001]:2525", "ci", "::1", 2525],
+      ["smtp://LocalHost:1025", "ci", "localhost", 1025],
+      ["smtp://LOCALHOST:1025", "local", "localhost", 1025],
+      ["smtp://localhost:1025/", "local", "localhost", 1025],
+      ["smtp://localhost:65535", "ci", "localhost", 65535],
+      ["smtp://localhost:1", "ci", "localhost", 1],
+      ["  smtp://127.0.0.1:1025  ", "ci", "127.0.0.1", 1025],
+      ["smtp://mailpit:1025", "ci", "mailpit", 1025],
+      ["smtp://MAILPIT:1025/", "ci", "mailpit", 1025],
+    ];
+    for (const [url, environnement, host, port] of acceptes) {
+      const config = parseServerEnv(smtp(url, environnement));
+      expect(config.smtp, url).toEqual({ host, port });
+      expect(Object.isFrozen(config.smtp), url).toBe(true);
+      expect(Object.keys(config.smtp ?? {}).sort()).toEqual(["host", "port"]);
+    }
+  });
+
+  it("SMTP_URL refusée → invalid_value en local comme en ci, sans valeur dans l'erreur ni le journal", () => {
+    const refusees = [
+      // Spécification B3b-envoi, critère E2.
+      "smtp://smtp.exemple.test:587",
+      "smtp://localhost.exemple.test:25",
+      "smtp://127.1:1025",
+      "smtps://localhost:465",
+      "smtp://localhost",
+      "smtp://utilisateur:motdepasse@localhost:1025",
+      "smtp://u@localhost:1025",
+      "smtp://localhost:1025/?host=smtp.exemple.test",
+      "smtp://localhost:1025?host=smtp.exemple.test",
+      "smtp://localhost:1025?logger=true",
+      "smtp://localhost:1025?",
+      "smtp://localhost:1025#x",
+      "smtp://localhost:1025#",
+      "smtp://local\thost:1025",
+      "smtp://localhost:1025/chemin",
+      // Décision 0098 § 4 : écarts de la règle de la spécification, fermés par la forme de la chaîne brute.
+      "smtp://:@localhost:1025",
+      "smtp://localhost:1025/%2e",
+      "smtp://127.0.0.1:1025/.",
+      "smtp://localhost:001025",
+      "smtp://localhost:01025",
+      "smtp://localhost:0",
+      "smtp://localhost:99999",
+      "smtp://localhost:65536",
+      "SMTP://localhost:1025",
+      "Smtp://localhost:1025",
+      "smtp://local%68ost:1025",
+      "smtp://localhost:1025\\@x.test",
+      "smtp://[::ffff:127.0.0.1]:1025",
+      "smtp://localhost.:1025",
+      "smtp://127.0.0.1.:1025",
+      "smtp://localhost:1025//",
+      "smtp://ｌocalhost:1025",
+      "smtp://localhost:１０２５",
+      "smtp:localhost:1025",
+      "smtp:/localhost:1025",
+      "direct://localhost:1025",
+      "smtp://local\nhost:1025",
+      "smtp://localhost:1025\n/",
+      "smtp://local host:1025",
+      "smtp://[::1]:1025?x=1",
+      "smtp://[::2]:1025",
+      "smtp://[::1:1025",
+      "smtp://0.0.0.0:1025",
+      "smtp://10.0.0.1:1025",
+      "smtp://mailpit.:1025",
+      "localhost:1025",
+      "127.0.0.1",
+      "",
+      "   ",
+      SENTINELLE,
+      `smtp://${SENTINELLE}.exemple.test:25`,
+      `smtp://localhost:1025/${SENTINELLE}`,
+      `smtp://u:${SENTINELLE}@localhost:1025`,
+    ];
+    for (const url of refusees) {
+      for (const environnement of ["local", "ci"]) refus(smtp(url, environnement), URL_SMTP, "invalid_value");
+    }
+  });
+
+  it("`mailpit` : accepté en ci seulement ; refusé en local", () => {
+    expect(parseServerEnv(smtp("smtp://mailpit:1025", "ci")).smtp).toEqual({ host: "mailpit", port: 1025 });
+    refus(smtp("smtp://mailpit:1025", "local"), URL_SMTP, "invalid_value");
+  });
+
+  it("le résultat ne porte pas la chaîne brute : seuls `host` et `port`, aucune sentinelle", () => {
+    const config = parseServerEnv(smtp("  smtp://LocalHost:1025/  ", "ci", { RATE_LIMIT_HMAC_SECRET: base64url(aleatoire()) }));
+    expect(config.smtp).toEqual({ host: "localhost", port: 1025 });
+    expect(JSON.stringify(config)).not.toContain("smtp://");
+    expect(inspect(config, { depth: 6 })).not.toContain("LocalHost");
+  });
+});
+
 describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 2)", () => {
   const code = () => ({ [NOM.P0_RUN_TOKEN]: hex(aleatoire()) });
 
@@ -494,7 +660,7 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
     const octets = aleatoire();
     refusParse(ci({ [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(octets), [NOM.P0_RUN_TOKEN]: hex(octets) }), NOM.P0_RUN_TOKEN, "secret_duplicate");
     const config = parseServerEnv(ci(code()));
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "smtp", "trustedIpHeader"]);
   });
 });
 
@@ -508,7 +674,7 @@ describe("env: modules d'environnement", () => {
     const config = parseServerEnv(env);
     expect(JSON.stringify(config)).not.toContain(SENTINELLE);
     expect(inspect(config, { depth: 5 })).not.toContain(SENTINELLE);
-    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "trustedIpHeader"]);
+    expect(Object.keys(config).sort()).toEqual(["authAdapter", "betterAuth", "environment", "rateLimitHmacSecret", "smtp", "trustedIpHeader"]);
   });
 
   it("la liste des variables du journal est celle de src/server/env/index.ts", () => {

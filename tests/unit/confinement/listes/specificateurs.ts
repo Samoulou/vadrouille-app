@@ -103,13 +103,17 @@ export const SPECIFICATEURS = [
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
   // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.
   { specificateur: "workflow", zones: ["src/workflows/**", "next.config.ts", "tests/unit/workflows/**"] },
-  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1 et 4 ; liste de 0008) : deux sous-chemins **exacts** de
-  // `nodemailer` 10.0.16, sans capacité réseau : `MailComposer` (compilation de l'enveloppe) dans `src/server/mail/`,
-  // `addressparser` dans le seul test du critère E3. Ni `nodemailer`, ni `createTransport`, ni `smtp-connection`, ni
-  // `fetch` : le transport SMTP et le classement en module à capacité suivent dans la PR de `src/server/mail/smtp.ts`.
+  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1, 3 et 4 ; liste de 0008 ; décision 0098 § 6) : trois lignes
+  // **exactes** pour `nodemailer` 10.0.16. `MailComposer` (compilation de l'enveloppe, sans capacité réseau) dans
+  // `src/server/mail/`, `addressparser` dans le seul test du critère E3, et la **racine du paquet** dans le seul
+  // `src/server/mail/smtp.ts`, pour `createTransport` seulement (module à capacité réseau : socket TCP vers l'hôte de
+  // la liste fermée de 0098 ; le chargement de la racine tire aussi le code du transport `sendmail`, que seule l'option
+  // `sendmail`, jamais passée, atteint : le test E2 de création du transport protège contre un ajout). Aucun autre
+  // sous-chemin (`smtp-connection`, `well-known`, `fetch`, `ses-transport`, `sendmail-transport`, `xoauth2`…).
   // Sécurité : dépendance conforme (lockfile, intégrité, aucun script), lignes exactes demandées par le bloquant 1 de
-  // la revue consolidée du head `1b3a97d` (PR 437).
+  // la revue consolidée du head `1b3a97d` (PR 437) ; ligne de `smtp.ts` : plafond accepté par la décision 0098 § 6.
   { specificateur: "nodemailer/lib/mail-composer", zones: ["src/server/mail/**"], sousChemins: "exacts" },
+  { specificateur: "nodemailer", zones: ["src/server/mail/smtp.ts"], sousChemins: "exacts" },
   { specificateur: "nodemailer/lib/addressparser", zones: ["tests/unit/server/email-ip.test.ts"], sousChemins: "exacts" },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule

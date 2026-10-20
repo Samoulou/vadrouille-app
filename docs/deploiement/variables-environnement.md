@@ -20,6 +20,22 @@ Note de sécurité (revue de F9a, PR #86). Elle ne crée aucune règle : elle ra
 
 Ni l'une ni l'autre n'ouvre quoi que ce soit à elle seule : l'ouverture dépend des variables du tableau précédent.
 
+## Envoi du code de connexion par e-mail (B3b-envoi ; décision 0098)
+
+L'envoi du code par SMTP n'existe que **vers Mailpit, en local et en CI** : aucun fournisseur réel (Q25, Samuel). Il faut `AUTH_ADAPTER=better-auth`. Sans `EMAIL_TRANSPORT`, le port d'envoi reste désactivé : rien ne part, aucun repli vers Mailpit.
+
+| Variable | Valeur | Où la poser |
+|---|---|---|
+| `EMAIL_TRANSPORT` | exactement `smtp` (après `trim()`, en minuscules) | `.env.local` du poste (`VADROUILLE_ENV=local`) ; le serveur `auth` de `playwright.config.ts` (`ci`). **Jamais** sur Vercel ni en `staging` ou `production`. |
+| `SMTP_URL` | `smtp://<hôte>:<port>` ou avec un `/` final, hôte parmi `localhost`, `127.0.0.1`, `[::1]` (et `mailpit` en `ci` seulement) ; port de 1 à 65535, sans zéro de tête | idem. Exemple : `smtp://127.0.0.1:1025` (`docker compose up -d mailpit`, boîte sur `http://127.0.0.1:8025`). |
+
+Refus au démarrage (`ServerEnvError`, nom de la variable et code de règle seulement, valeur jamais rendue) :
+- l'une ou l'autre variable **présente**, même vide, en `staging` ou `production`, **ou sur Vercel quel que soit `VADROUILLE_ENV`** ;
+- `EMAIL_TRANSPORT` autre que `smtp` (`SMTP`, `ses`, `resend`, vide) ; `smtp` avec `AUTH_ADAPTER=mock` ; `smtp` sans `SMTP_URL` ; `SMTP_URL` sans `EMAIL_TRANSPORT=smtp` ;
+- `SMTP_URL` qui n'a pas exactement la forme ci-dessus : identifiants, chemin, `?`, `#`, espace, `%`, caractère hors ASCII, port absent ou écrit avec un zéro de tête, schéma autre que `smtp://` en minuscules, hôte hors de la liste fermée. La liste n'est pas extensible par configuration : un hôte de plus demande une décision de la Sécurité.
+
+Aucune valeur par défaut d'`SMTP_URL` dans le code, `.env.example` ou les scripts. Le transport est créé par options explicites (jamais par la chaîne), sans trace SMTP, avec des délais de 10 secondes au plus. Mailpit n'a aucune option de relais et son interface n'a pas d'authentification : ne la publier que sur `127.0.0.1`.
+
 ## Adaptateur prototype (spécification P0, P0b1 ; décision 0032 § A4 et § A6)
 
 `DATA_ADAPTER=prototype` fait parcourir un programme produit par le prototype de recherche dans les écrans existants (accueil, présentation, Séjour, Journée, carte). **Jamais sur l'environnement « Production »** de Vercel ni dans l'image `docker`.
