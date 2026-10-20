@@ -1,4 +1,5 @@
 import { betterAuthConfinement, noRawAuthSecret } from "./better-auth-confinement.mjs";
+import { creationImports } from "./creation-imports.mjs";
 import { listeBlancheGrounding, relectureImports } from "./grounding-imports.mjs";
 import { complementP0, listeBlanche } from "./ia-recherche-imports.mjs";
 import noHardcodedColors from "./no-hardcoded-colors.mjs";
@@ -27,6 +28,7 @@ const plugin = {
     "grounding-liste-blanche": listeBlancheGrounding,
     "relecture-imports": relectureImports,
     "voyages-imports": voyagesImports,
+    "creation-imports": creationImports,
     "better-auth-confinement": betterAuthConfinement,
     "no-raw-auth-secret": noRawAuthSecret,
   },

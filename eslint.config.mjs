@@ -692,6 +692,14 @@ export default defineConfig([
     rules: { "ligne/voyages-imports": "error" },
   },
   {
+    // B9 (ticket 519 ; décisions 0081 B9-TL-1 point 3, 0087 § 1.6 et 0101 § 4) : `@/server/creation/*`,
+    // `@/server/generation/*`, `@/server/composition/generation` et `@/server/with-system-org` importables par les seuls
+    // fichiers nommés (dont `src/adapters/api-creation.ts`, dérogation de 0101 § 1). Règle propre au plugin, posée par ce
+    // seul bloc sur tout fichier (eslint-rules/creation-imports.mjs ; tests/unit/lint/creation-imports-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/creation-imports": "error" },
+  },
+  {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et
     // Workflow SDK dans `src/workflows/` seulement (`workflow/next` admis dans `next.config.ts`) ; `createWebhook`,
     // `createHook`, `defineHook`, `resumeHook`, `resumeWebhook` et `getHookByToken` interdits partout. Règle propre au
