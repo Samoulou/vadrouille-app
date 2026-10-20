@@ -24,7 +24,10 @@ import {
  * sans écriture (idempotence par `generation_runs.request_id`) ; sinon la dernière exécution `preview` du voyage doit
  * être `failed` et réessayable (`relancable`), sinon `validation_failed` ; une autre génération `preview` de
  * l'organisation en cours → `active_preview_exists` ; sinon une **nouvelle** exécution `preview` `queued` du même
- * voyage (jamais un second voyage), puis démarrage du workflow 1 après validation.
+ * voyage (jamais un second voyage), puis démarrage du workflow 1 après validation. Cette nouvelle exécution reprend, à son
+ * étape `b`, les recherches et les candidats des essais précédents du voyage, ré-ancrés à l'étape `c`, au lieu de chercher à
+ * nouveau les villes déjà cherchées (B9c-suite : décisions 0106 § 5 et 0105 § 6 ; `@/server/generation/reprise`). Rien
+ * n'est écrit ici pour cela : ni la ligne précédente, ni un compteur.
  *
  * `kind: "full"` (0087 § 1.1.4) : aucune ligne `full` n'existe avant B9d, donc rien n'est à relancer :
  * `validation_failed`, sans écriture (B9d remplace cette branche).
