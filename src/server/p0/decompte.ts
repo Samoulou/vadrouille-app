@@ -29,7 +29,7 @@ export const COMPTEES_MAX = { A: 1, B: 2 } as const;
 export const RELANCES_MAX = 1;
 
 /**
- * Codes d'arrêt externes, qui ouvrent la relance : égaux à `CODES_EXTERNES` de `src/prototype/arret.ts` (test
+ * Codes d'arrêt externes (usage de test seulement depuis 0093 : une exécution arrêtée n'est plus une relance, quel que soit son code) : égaux à `CODES_EXTERNES` de `src/prototype/arret.ts` (test
  * d'égalité ; l'application n'importe pas `src/prototype`, 0048 § 1).
  */
 export const CODES_EXTERNES_SUIVI: readonly string[] = ["upstream_unavailable", "upstream_redirect", "usage_unavailable"];
@@ -39,10 +39,9 @@ export const CODES_EXTERNES_SUIVI: readonly string[] = ["upstream_unavailable", 
  * exécutions peuvent partager un jour de quota (index `runs_one_per_quota_day_idx` supprimé par la migration
  * 0007_essais_sans_limite) : le tuple ne désigne plus une seule ligne par construction. Il la désigne encore pour
  * l'entrée de 0070 : le déploiement `d61e9fa` refusait lui-même une seconde exécution du jour, et aucun autre
- * déploiement ne porte ce commit. Pour les entrées de 0089, une autre exécution réelle de rome-1/B arrêtée en
- * `pipeline_failed` le même jour sur le même commit répondrait au même tuple : c'est pourquoi `decompte()` n'exclut
- * **qu'une exécution au plus par entrée** (décision 0089, § « Mise en œuvre ») ; une seconde exécution qui répond au
- * même tuple compte. Il en va de même pour l'entrée de 0091 (commit `0d0bbaa`).
+ * déploiement ne porte ce commit. Pour les entrées de 0089 et de 0091, plusieurs exécutions réelles arrêtées peuvent
+ * répondre au même tuple. Depuis la décision 0093 (point 2), cela n'a plus d'effet sur le total : toute exécution
+ * arrêtée est hors décompte, quel que soit le nombre d'exécutions qui répondent à une entrée.
  */
 export type ExecutionExclue = {
   readonly decision: string;

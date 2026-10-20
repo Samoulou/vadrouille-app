@@ -164,7 +164,7 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
 /**
  * Décision 0089 : les deux exécutions réelles rome-1/B de l'après-midi du 2026-10-18 (`wrun_41M57JCM3G50T1SSVCX1XG7HRT`
  * au commit `cfca0b5`, `wrun_41M57JWPHV50HNB1M3TH4D2140` au commit `efc0994`) sont exclues du décompte G0 ; l'exécution
- * réussie du matin reste comptée. Chaque entrée n'exclut qu'une exécution au plus.
+ * réussie du matin reste comptée. Depuis 0093 (point 2), toute exécution arrêtée est hors décompte.
  */
 describe("p0: exécutions exclues du décompte (décision 0089)", () => {
   const CFCA = "cfca0b58ccf67e4d10196adea296045ec98fdb61";
@@ -222,7 +222,7 @@ describe("p0: exécutions exclues du décompte (décision 0089)", () => {
 
 /**
  * Décision 0091 : l'exécution réelle rome-1/B du soir du 2026-10-18 (`wrun_41M57YCVXJ50T41W3BH260MEP2`, commit `0d0bbaa`),
- * arrêtée par la limite quotidienne de Google Routes, est exclue du décompte G0. L'entrée n'exclut qu'une exécution au plus.
+ * arrêtée par la limite quotidienne de Google Routes, est exclue du décompte G0. Depuis 0093 (point 2), toute exécution arrêtée est hors décompte.
  */
 describe("p0: exécutions exclues du décompte (décision 0091)", () => {
   const CFCA = "cfca0b58ccf67e4d10196adea296045ec98fdb61";
