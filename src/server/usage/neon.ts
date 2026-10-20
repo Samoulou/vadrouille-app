@@ -11,7 +11,7 @@ import type { CodeRefusUsage } from "@/server/usage/port";
  *    réglage n'est pas la garantie d'isolation, que portent les politiques liées à l'uuid fixe, S2) ;
  * 2. prend `pg_advisory_xact_lock` sur une clé constante du port : deux réservations simultanées sont sérialisées,
  *    une seule réussit si elles dépassaient un plafond ;
- * 3. clôt les exécutions orphelines (`en_cours` au-delà de `dureeMs` + 5 min : `arretee`, `pipeline_failed`, phase et
+ * 3. clôt les exécutions orphelines (`en_cours` au-delà de `dureeMaxMs` + 5 min : `arretee`, `pipeline_failed`, phase et
  *    coût des modèles nuls) ;
  * 4. somme les forfaits du jour de quota et du mois Google **de la base** (`prototype.quota_day_at(now())`, S1), du
  *    mois UTC des modèles et de l'enveloppe, et les compare aux limites reçues, forfait à lancer compris. Pour le
@@ -44,7 +44,7 @@ export type PoolSql = { connect(): Promise<ClientSql> };
 export type ReglesForfait = {
   readonly limites: LimitesForfait;
   readonly uniteQuotaRoutes: UniteQuotaRoutes;
-  /** Durée maximale d'une exécution (`dureeMs` de la configuration). */
+  /** Durée maximale d'une exécution (`DUREE_MAX_EXECUTION_MS` de `p0-run.ts`, décision 0102 § 6). */
   readonly dureeMaxMs: number;
 };
 
