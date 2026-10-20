@@ -9,12 +9,12 @@ import {
   EchecEcritureProgramme,
   ecrireProgramme,
   FONCTION_POSITIONS,
-  SQL_CANDIDATS_SUPPRIMES,
   SQL_TRAJET,
   SQL_TRAJETS_PRESENTS,
   SQL_VERROU_S8,
   verrouS8Leve,
 } from "@/adapters/prototype-ecriture";
+import { SQL_SUPPRIMER } from "./prototype-travail";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
 import { cleTrajet, pairesAConserver, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
@@ -120,7 +120,7 @@ describe("p0: coordonnées passées en paramètres liés (0052 § 1.8)", () => {
     expect(Object.keys(contenu).sort()).toEqual([...CLES_CONTENU_ECRIT].sort());
     expect(JSON.stringify(contenu)).not.toMatch(/"(lat|lng|positions)"/);
     expect(requetes[3 + n]?.texte.startsWith("UPDATE prototype.runs SET status = 'programme_ecrit'")).toBe(true);
-    expect(requetes[4 + n]).toEqual({ texte: SQL_CANDIDATS_SUPPRIMES, valeurs: [RUN_ID] });
+    expect(requetes[4 + n]).toEqual({ texte: SQL_SUPPRIMER, valeurs: [RUN_ID] });
     expect(requetes[5 + n]?.texte).toBe("COMMIT");
     expect(requetes).toHaveLength(6 + n);
     expect(compte()).toEqual({ connexions: 1, liberations: 1 });

@@ -41,11 +41,22 @@ const JOUR = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const SQL_COUT = `UPDATE prototype.runs SET cost_models_micros = GREATEST(COALESCE(cost_models_micros, 0), $2::bigint)
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 const SQL_EN_COURS = `SELECT 1 FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours' FOR UPDATE`;
-const SQL_SUPPRIMER = "DELETE FROM prototype.run_candidates WHERE run_id = $1::uuid";
+/** Suppression des candidats d'une exécution (importée par le test d'ordre de l'écriture). */
+export const SQL_SUPPRIMER = "DELETE FROM prototype.run_candidates WHERE run_id = $1::uuid";
 const SQL_INSERER = "INSERT INTO prototype.run_candidates (run_id, cle, candidat, place_id) VALUES ($1::uuid, $2, $3::jsonb, $4)";
 const SQL_CANDIDATS = "SELECT cle, candidat, place_id FROM prototype.run_candidates WHERE run_id = $1::uuid ORDER BY cle";
 const SQL_CLORE = `UPDATE prototype.runs SET status = 'arretee', stop_code = $2, phase = NULL, cost_models_micros = NULL
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
+
+/**
+ * Fin d'exécution (0046 D15 point 3 et S4 ; constat A de 0103) : supprime les lignes de `run_candidates` de l'exécution
+ * **dans la transaction de l'appelant** (l'écriture du programme, `prototype-ecriture.ts`) : aucune connexion ni
+ * transaction propre, pas de `COMMIT` ici. Une erreur remonte telle quelle à l'appelant, qui annule tout. `runId` déjà
+ * contrôlé par l'appelant ; revérifié ici.
+ */
+export async function supprimerCandidatsDansTransaction(client: ClientSql, runId: string): Promise<void> {
+  await client.query(SQL_SUPPRIMER, [runIdControle(runId)]);
+}
 
 /** Échec : code de la liste fermée et, pour `base`, le SQLSTATE seul. Aucune valeur. */
 export class EchecTravail extends Error {
