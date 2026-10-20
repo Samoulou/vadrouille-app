@@ -219,12 +219,48 @@ describe("p0: copies de src/prototype tenues égales", () => {
       { ...valide, source: { ...valide.source, placeId: "x" } },
       { ...valide, placeId: "x" },
       { ...valide, aReserver: undefined },
+      // Candidat enrichi (décision 0094 § 1 point 3) : pour chaque champ, une valeur admise, une trop longue, une avec URL,
+      // une avec balise ; `incontournable` sans `secteur` refusé.
+      ...(
+        [
+          ["secteur", "Rome antique", 60],
+          ["incontournable", "Colisée", 80],
+          ["prix", "18 EUR, billet combiné", 60],
+          ["horaires", "9h-19h, fermé le lundi", 120],
+          ["conseil", "Réserver le premier créneau.", 160],
+        ] as const
+      ).flatMap(([champ, admise, max]) => {
+        const avecSecteur = champ === "incontournable" ? { secteur: "Rome antique" } : {};
+        return [
+          { ...valide, ...avecSecteur, [champ]: admise },
+          { ...valide, ...avecSecteur, [champ]: "x".repeat(max) },
+          { ...valide, ...avecSecteur, [champ]: "x".repeat(max + 1) },
+          { ...valide, ...avecSecteur, [champ]: "voir https://exemple.org" },
+          { ...valide, ...avecSecteur, [champ]: "voir exemple.com" },
+          { ...valide, ...avecSecteur, [champ]: "un <b>lieu</b>" },
+          { ...valide, ...avecSecteur, [champ]: "" },
+          { ...valide, ...avecSecteur, [champ]: 12 },
+        ];
+      }),
+      { ...valide, incontournable: "Colisée" },
+      { ...valide, secteur: "Rome antique", incontournable: "Colisée", prix: "18 EUR", horaires: "9h-19h", conseil: "Tôt le matin." },
+      { ...valide, secteur: "Rome antique", raison: "pas une clé du candidat" },
     ];
     for (const valeur of table) {
       it(JSON.stringify(valeur), () => {
         expect(copieRecherche.CandidatRechercheSchema.safeParse(valeur).success).toBe(originalCandidat.CandidatSchema.safeParse(valeur).success);
       });
     }
+    it("verdicts attendus du candidat enrichi (0094 § 1 points 1 et 3)", () => {
+      const avec = (champs: Record<string, unknown>) => originalCandidat.CandidatSchema.safeParse({ ...valide, ...champs }).success;
+      expect(avec({ secteur: "Rome antique", incontournable: "Colisée", prix: "18 EUR", horaires: "9h-19h", conseil: "Tôt." })).toBe(true);
+      expect(avec({ incontournable: "Colisée" })).toBe(false);
+      expect(avec({ secteur: "x".repeat(61) })).toBe(false);
+      expect(avec({ conseil: "x".repeat(160) })).toBe(true);
+      expect(avec({ horaires: "voir www.exemple.ch" })).toBe(false);
+      expect(avec({ prix: "<b>x</b>" })).toBe(false);
+    });
+
     it("types égaux (Candidat)", () => {
       expectTypeOf<copieRecherche.CandidatRecherche>().toEqualTypeOf<originalCandidat.Candidat>();
     });

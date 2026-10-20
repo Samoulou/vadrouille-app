@@ -13,6 +13,7 @@ import {
   classeDeSource,
   type CapaciteAncrage,
   type CapaciteFinale,
+  type CapaciteRecherche,
   type ExecuteurPublication,
   type FabriqueGeneration,
   type LieuARedige,
@@ -36,6 +37,7 @@ import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type
 import { genererSansEchec } from "./programme";
 import { publier } from "./publication";
 import { estRefusDeReserve } from "./raison-echec";
+import { normaliser, reprendreRecherche, sourceDeReprise } from "./reprise";
 
 /**
  * Étapes de `generatePreview` (spécification B9, B9c ; décisions 0081 B9-TL-3, 0087 § 2 et 0100). **Fonctions ordinaires,
@@ -183,14 +185,6 @@ function logementVille(ville: VilleDeLApercu): LogementVille {
   }
 }
 
-const normaliser = (nom: string): string =>
-  nom
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-
 type CandidatLu = {
   readonly id: string;
   readonly nom: string;
@@ -320,6 +314,11 @@ const SQL_NOMS = `SELECT c.name FROM public.candidates c
  * `event_occurrences` pour un événement dont l'heure est lue. Les noms déjà écrits pour l'exécution sont passés au modèle
  * (`dejaTrouves`) et jamais réécrits (unicité par exécution et nom normalisé). Une recherche sans candidat échoue sur son
  * code fermé ; une recherche partielle (des candidats et des erreurs) continue, ses codes d'erreur sont dans `errors`.
+ *
+ * **Nouvel essai** (`retryGeneration`, B9c-suite, 0106 § 5 et 0105 § 6 ; `reprise.ts`) : une ville déjà cherchée par une
+ * exécution `preview` précédente du même voyage n'est pas cherchée à nouveau. Sa recherche et ses candidats sont copiés dans
+ * l'exécution courante, dans la même transaction gardée, sans aucun appel (ni modèle, ni recherche web, ni page) ; l'étape `c`
+ * les ré-ancre comme les autres. Composition et forfait ne sont ouverts que pour la première ville à chercher.
  */
 export function etapeRecherche(entree: unknown, dependances?: DependancesGeneration): Promise<EtatEtape> {
   return executer(
@@ -327,11 +326,23 @@ export function etapeRecherche(entree: unknown, dependances?: DependancesGenerat
     "b",
     async (contexte) => {
       const { voyage, villes } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
-      const { fabrique, options } = await ouvrirCapacites(contexte);
-      const capacite = fabrique.recherche(options);
+      let capacite: CapaciteRecherche | null = null;
       for (const ville of villes) {
         const connus = (await sql(contexte, (x) => x.query(SQL_NOMS, [contexte.organizationId, contexte.generationRunId]))).rows.map((ligne) => String(ligne.name));
         const debut = contexte.dep.maintenant();
+        const source = await sql(contexte, (x) => sourceDeReprise(x, contexte.organizationId, contexte.generationRunId, ville.rang));
+        if (source !== null) {
+          // Ville déjà cherchée par un essai précédent : copie de sa recherche, aucun appel (0106 § 5).
+          await sql(contexte, async (x) => {
+            await exigerGarde(x, contexte.organizationId, contexte.generationRunId, "b", maintenant(contexte));
+            await reprendreRecherche(x, contexte, source, new Set(connus.map(normaliser)), debut + ville.rang);
+          });
+          continue;
+        }
+        if (capacite === null) {
+          const { fabrique, options } = await ouvrirCapacites(contexte);
+          capacite = fabrique.recherche(options);
+        }
         const issue = await capacite.rechercher(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, connus, voyage.timeZone);
         if (!issue.ok) throw new ArretEtape(issue.code);
         const { lignes, bilan } = issue.valeur;

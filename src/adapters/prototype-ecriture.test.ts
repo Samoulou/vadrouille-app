@@ -14,7 +14,7 @@ import {
   SQL_VERROU_S8,
   verrouS8Leve,
 } from "@/adapters/prototype-ecriture";
-import { SQL_SUPPRIMER } from "@/adapters/prototype-travail";
+import { SQL_SECTEURS_PRESENTS, SQL_SUPPRIMER, SQL_SUPPRIMER_SECTEURS } from "@/adapters/prototype-travail";
 import type { EcritureProgrammePrototype } from "@/contracts/prototype-ecriture";
 import { CLES_CONTENU, decouperProgramme } from "@/prototype/decoupage";
 import { cleTrajet, pairesAConserver, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, trajetsAConserver } from "@/prototype/programme-reduit";
@@ -60,7 +60,7 @@ function entreeAvecTrajets(): EcritureProgrammePrototype {
 
 type Requete = { texte: string; valeurs: readonly unknown[] | undefined };
 
-function poolSimule(options: { echecSur?: string; statutRendu?: number; tablePresente?: boolean } = {}) {
+function poolSimule(options: { echecSur?: string; statutRendu?: number; tablePresente?: boolean; secteursPresents?: boolean } = {}) {
   const requetes: Requete[] = [];
   let connexions = 0;
   let liberations = 0;
@@ -75,6 +75,7 @@ function poolSimule(options: { echecSur?: string; statutRendu?: number; tablePre
           }
           if (texte.startsWith("INSERT INTO prototype.programmes")) return { rows: [{ id: "programme-1" }] };
           if (texte === SQL_TRAJETS_PRESENTS) return { rows: [{ presente: options.tablePresente ?? true }] };
+          if (texte === SQL_SECTEURS_PRESENTS) return { rows: [{ presente: options.secteursPresents ?? true }] };
           if (texte.startsWith("UPDATE prototype.runs")) return { rows: Array.from({ length: options.statutRendu ?? 1 }, () => ({ id: RUN_ID })) };
           return { rows: [] };
         },
@@ -107,7 +108,7 @@ describe("p0: coordonnées passées en paramètres liés (0052 § 1.8)", () => {
     }
   });
 
-  it("ordre de 0052 § 1.1 dans une transaction : contexte, positions, programme sans positions, statut, suppression des candidats, COMMIT ; connexion libérée", async () => {
+  it("ordre de 0052 § 1.1 dans une transaction : contexte, positions, programme sans positions, statut, suppression des candidats et du plan de secteurs, COMMIT ; connexion libérée", async () => {
     const e = entree();
     const { pool, requetes, compte } = poolSimule();
     await ecrireProgramme(e, pool);
@@ -121,9 +122,27 @@ describe("p0: coordonnées passées en paramètres liés (0052 § 1.8)", () => {
     expect(JSON.stringify(contenu)).not.toMatch(/"(lat|lng|positions)"/);
     expect(requetes[3 + n]?.texte.startsWith("UPDATE prototype.runs SET status = 'programme_ecrit'")).toBe(true);
     expect(requetes[4 + n]).toEqual({ texte: SQL_SUPPRIMER, valeurs: [RUN_ID] });
-    expect(requetes[5 + n]?.texte).toBe("COMMIT");
-    expect(requetes).toHaveLength(6 + n);
+    // Constat A de 0103 : le plan de secteurs de l'exécution est supprimé dans la même transaction.
+    expect(requetes[5 + n]?.texte).toBe(SQL_SECTEURS_PRESENTS);
+    expect(requetes[6 + n]).toEqual({ texte: SQL_SUPPRIMER_SECTEURS, valeurs: [RUN_ID] });
+    expect(requetes[7 + n]?.texte).toBe("COMMIT");
+    expect(requetes).toHaveLength(8 + n);
     expect(compte()).toEqual({ connexions: 1, liberations: 1 });
+  });
+
+  it("p0: plan de secteurs supprimé à l'écriture du programme ; table absente (avant 0013_secteurs_prototype) : aucune suppression tentée, programme écrit", async () => {
+    const e = entree();
+    const n = e.positions.size;
+    const absente = poolSimule({ secteursPresents: false });
+    expect(await ecrireProgramme(e, absente.pool)).toEqual({ programmeId: "programme-1" });
+    expect(absente.requetes.map((r) => r.texte)).not.toContain(SQL_SUPPRIMER_SECTEURS);
+    expect(absente.requetes[5 + n]?.texte).toBe(SQL_SECTEURS_PRESENTS);
+    expect(absente.requetes.at(-1)?.texte).toBe("COMMIT");
+    // Échec de la suppression du plan : tout est annulé, le programme compris.
+    const panne = poolSimule({ echecSur: SQL_SUPPRIMER_SECTEURS });
+    await expect(ecrireProgramme(e, panne.pool)).rejects.toMatchObject({ code: "base", sqlstate: "23514" });
+    expect(panne.requetes.at(-1)?.texte).toBe("ROLLBACK");
+    expect(panne.requetes.some((r) => r.texte === "COMMIT")).toBe(false);
   });
 
   it("clés du contenu égales à CLES_CONTENU de src/prototype/decoupage.ts", () => {

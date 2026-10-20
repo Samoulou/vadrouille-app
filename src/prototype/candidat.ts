@@ -21,8 +21,11 @@ export type TypeCreneau = (typeof TYPES_CRENEAU)[number];
 export const CLASSES_SOURCE = ["officielle", "independante", "generique"] as const;
 export type ClasseSource = (typeof CLASSES_SOURCE)[number];
 
-/** Longueurs maximales des textes produits par un modèle (spécification, « Sorties des modèles »). */
-export const LONGUEURS_TEXTE = { nom: 80, resume: 300, raison: 280, requete: 200 } as const;
+/**
+ * Longueurs maximales des textes produits par un modèle (spécification, « Sorties des modèles ») ; secteur,
+ * incontournable et infos pratiques du candidat enrichi (décision 0094 § 1 point 2 ; P0S2-PO-20 et PO-21).
+ */
+export const LONGUEURS_TEXTE = { nom: 80, resume: 300, raison: 280, requete: 200, secteur: 60, incontournable: 80, prix: 60, horaires: 120, conseil: 160 } as const;
 
 /** Identifiant interne d'un candidat, attribué par le code (jamais par le modèle). */
 export const CANDIDAT_ID_PATTERN = /^c_\d{3}$/;
@@ -67,24 +70,38 @@ export const SourceCandidatSchema = z.strictObject({
   classe: z.enum(CLASSES_SOURCE),
 });
 
-export const CandidatSchema = z.strictObject({
-  id: z.string().regex(CANDIDAT_ID_PATTERN),
-  nom: texteMaison(LONGUEURS_TEXTE.nom),
-  resume: texteMaison(LONGUEURS_TEXTE.resume),
-  categorie: CategorySchema,
-  typeEtape: z.enum(STOP_KINDS),
-  source: SourceCandidatSchema,
-  /** Événement : date et heure lues sur la page ; `dateConfirmee` si la page relue mentionne la date (R2). */
-  evenement: z
-    .strictObject({ date: DateSchema, heure: TimeSchema.optional(), dateConfirmee: z.boolean() })
-    .optional(),
-  /** La source indique qu'il faut réserver (badge `toReserve`). */
-  aReserver: z.boolean(),
-  /** Prix par personne d'après la source web, en devise locale (R9) ; absent si aucune source ne le donne. */
-  prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
-  /** Durée de visite d'après la source web, en minutes. */
-  dureeMinutes: z.number().int().min(15).max(600).optional(),
-});
+export const CandidatSchema = z
+  .strictObject({
+    id: z.string().regex(CANDIDAT_ID_PATTERN),
+    nom: texteMaison(LONGUEURS_TEXTE.nom),
+    resume: texteMaison(LONGUEURS_TEXTE.resume),
+    categorie: CategorySchema,
+    typeEtape: z.enum(STOP_KINDS),
+    source: SourceCandidatSchema,
+    /** Événement : date et heure lues sur la page ; `dateConfirmee` si la page relue mentionne la date (R2). */
+    evenement: z
+      .strictObject({ date: DateSchema, heure: TimeSchema.optional(), dateConfirmee: z.boolean() })
+      .optional(),
+    /** La source indique qu'il faut réserver (badge `toReserve`). */
+    aReserver: z.boolean(),
+    /** Prix par personne d'après la source web, en devise locale (R9) ; absent si aucune source ne le donne. */
+    prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
+    /** Durée de visite d'après la source web, en minutes. */
+    dureeMinutes: z.number().int().min(15).max(600).optional(),
+    /**
+     * Candidat enrichi (décision 0094 § 1 ; P0S2-PO-20 et PO-21) : secteur du plan où se trouve le lieu (nom exact du
+     * plan), nom de l'incontournable du plan que ce lieu est, et infos pratiques tirées de la source, réécrites en texte
+     * maison. Données de notre recherche web seulement, **jamais une donnée Google** ; jamais vues par la notation
+     * (`vuePourModele`). `prix`, `horaires` et `conseil` restent du contenu non fiable jusqu'à l'écran (0094 § 8).
+     */
+    secteur: texteMaison(LONGUEURS_TEXTE.secteur).optional(),
+    incontournable: texteMaison(LONGUEURS_TEXTE.incontournable).optional(),
+    prix: texteMaison(LONGUEURS_TEXTE.prix).optional(),
+    horaires: texteMaison(LONGUEURS_TEXTE.horaires).optional(),
+    conseil: texteMaison(LONGUEURS_TEXTE.conseil).optional(),
+  })
+  /** L'incontournable est celui d'un secteur du plan : `incontournable` présent exige `secteur` présent (0094 § 1 point 1). */
+  .refine((candidat) => candidat.incontournable === undefined || candidat.secteur !== undefined, "incontournable sans secteur");
 export type Candidat = z.infer<typeof CandidatSchema>;
 
 /** Les quatre notes de l'étape « Notation » (décisions 0027 et 0076). */

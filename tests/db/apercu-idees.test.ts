@@ -66,6 +66,7 @@ async function lancer(org: Org) {
 async function jours(org: Org, tripId: string): Promise<DaySnapshot[]> {
   return inTx(app, { org: org.org, user: org.owner }, async (c) => {
     const { rows } = await c.query("SELECT snapshot FROM public.trip_versions WHERE trip_id = $1 ORDER BY version DESC LIMIT 1", [tripId]);
+    expect(rows, `version publiée du voyage ${tripId}`).toHaveLength(1);
     const brut = rows[0]?.snapshot as { days: DaySnapshot[] } | string;
     return (typeof brut === "string" ? JSON.parse(brut) : brut).days;
   });
@@ -165,17 +166,22 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
   });
 
   it("invariant : les étapes du programme sont identiques avec et sans idées", async () => {
-    const [avec, sans] = await Promise.all(
-      [undefined, 0].map(async (ideesParJour) => {
-        const org = await createOrg(auth);
-        const { tripId, etat } = await lancer(org);
-        const progres = await derouler(etat, dependances(), ETAPE_E);
-        const { etapePlanification } = await import("@/server/generation/etapes");
-        const fin = await etapePlanification(progres, { ...dependances(), ...(ideesParJour === undefined ? {} : { ideesParJour }) });
-        expect(fin.arret).toBeUndefined();
-        return jours(org, tripId);
-      }),
-    );
+    // Les deux exécutions tournent l'une après l'autre, jamais en parallèle : `createOrg`, `lancer` et `jours` passent par
+    // `inTx` sur les clients uniques `auth` et `app` (une seule connexion chacun). En parallèle, leurs BEGIN, `set_config` et
+    // COMMIT s'entrelaçaient sur la même connexion : la lecture d'une organisation tournait parfois sous le contexte de
+    // l'autre, la RLS cachait la version et `rows[0]` manquait (test instable, CI de #563).
+    const programmes: DaySnapshot[][] = [];
+    for (const ideesParJour of [undefined, 0]) {
+      const org = await createOrg(auth);
+      const { tripId, etat } = await lancer(org);
+      const progres = await derouler(etat, dependances(), ETAPE_E);
+      expect(progres.arret).toBeUndefined();
+      const { etapePlanification } = await import("@/server/generation/etapes");
+      const fin = await etapePlanification(progres, { ...dependances(), ...(ideesParJour === undefined ? {} : { ideesParJour }) });
+      expect(fin.arret).toBeUndefined();
+      programmes.push(await jours(org, tripId));
+    }
+    const [avec, sans] = programmes;
     const etapes = (js: DaySnapshot[]) => js.map((jour) => [jour.index, jour.items.map((item) => (item.type === "stop" ? [item.stop.kind, item.stop.placeId, item.stop.start, item.stop.end, item.stop.reason] : item.type))]);
     expect(etapes(avec!)).toEqual(etapes(sans!));
     expect(avec!.filter((j) => (j as { surprise?: unknown }).surprise !== undefined)).toHaveLength(2);

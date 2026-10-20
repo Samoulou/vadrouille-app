@@ -132,7 +132,7 @@ const DOMAINE_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9
 export const LieuRetenuSchema = z.strictObject({
   ...CandidatPourModeleSchema.shape,
   sourceDomaine: z.string().min(1).max(253).regex(DOMAINE_PATTERN),
-  secteur: texteMaison(60).optional(),
+  secteur: texteMaison(LONGUEURS_TEXTE.secteur).optional(),
   incontournable: z.literal(true).optional(),
 });
 export type LieuRetenu = z.infer<typeof LieuRetenuSchema>;

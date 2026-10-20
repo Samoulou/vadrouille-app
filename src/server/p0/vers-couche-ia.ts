@@ -175,18 +175,15 @@ export function candidatPourModele(candidat: Candidat): CandidatPourModeleP0 {
 }
 
 /**
- * Lieu retenu de P0 pour l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source ; avec `infos`
- * (sortie en mémoire de l'agent, P0S2-PO-21), son secteur maison et sa qualité d'incontournable du plan. Ni prix, ni
- * horaires, ni conseil : le prompt `raisons` ne les reçoit pas.
+ * Lieu retenu de P0 pour l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source ; quand le candidat
+ * enrichi les porte (décision 0094 § 1 point 6), son secteur maison et sa qualité d'incontournable du plan, lus dans le
+ * candidat lui-même. Ni prix, ni horaires, ni conseil : le prompt `raisons` ne les reçoit pas.
  */
-export function lieuRetenuDepuisCandidat(
-  candidat: Candidat,
-  infos?: { readonly secteur?: string; readonly incontournable?: string },
-): LieuRetenuP0 {
+export function lieuRetenuDepuisCandidat(candidat: Candidat): LieuRetenuP0 {
   return {
     ...candidatPourModele(candidat),
     sourceDomaine: new URL(candidat.source.url).hostname,
-    ...(infos?.secteur === undefined ? {} : { secteur: infos.secteur }),
-    ...(infos?.incontournable === undefined ? {} : { incontournable: true as const }),
+    ...(candidat.secteur === undefined ? {} : { secteur: candidat.secteur }),
+    ...(candidat.incontournable === undefined ? {} : { incontournable: true as const }),
   };
 }

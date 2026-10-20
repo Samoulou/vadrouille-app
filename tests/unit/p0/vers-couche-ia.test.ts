@@ -231,6 +231,26 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
     expect(lieuRetenuDepuisCandidat(CANDIDATS[1] as Candidat).sourceDomaine).toBe("www.agenda.example");
   });
 
+  it("candidat enrichi (décision 0094 § 1 point 6) : lieu retenu avec secteur et incontournable lus dans le candidat, jamais prix, horaires ni conseil", () => {
+    const enrichi: Candidat = {
+      ...(CANDIDATS[0] as Candidat),
+      secteur: "Rome antique",
+      incontournable: "Colisée",
+      prix: "18 EUR",
+      horaires: "9h-19h",
+      conseil: "Réserver le matin.",
+    };
+    const lieu = lieuRetenuDepuisCandidat(enrichi);
+    expect(lieu).toEqual({ ...vuePourModele(enrichi), sourceDomaine: new URL(enrichi.source.url).hostname, secteur: "Rome antique", incontournable: true });
+    expect(LieuRetenuSchema.safeParse(lieu).success).toBe(true);
+    expect(JSON.stringify(lieu)).not.toMatch(/18 EUR|9h-19h|Réserver/);
+    // La notation ne voit pas les champs enrichis : `candidatPourModele` garde ses cinq clés.
+    expect(Object.keys(candidatPourModele(enrichi)).sort()).toEqual(["categorie", "id", "nom", "resume", "typeEtape"]);
+    const sansIncontournable: Candidat = { ...enrichi };
+    delete sansIncontournable.incontournable;
+    expect(lieuRetenuDepuisCandidat(sansIncontournable)).not.toHaveProperty("incontournable");
+  });
+
   it("bornes : depuis chaque recherche*.json de P0, sans délai, valides", () => {
     const fichiers = readdirSync(path.join(RACINE, "prototype/config")).filter((nom) => /^recherche.*\.json$/.test(nom));
     expect(fichiers.length).toBeGreaterThan(0);

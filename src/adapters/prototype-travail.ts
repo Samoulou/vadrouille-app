@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CodeEchecTravail, ExecutionEnCours, LigneCandidat, PhaseTravail } from "@/contracts/prototype-travail";
+import type { CodeEchecTravail, ContenuSecteurs, ExecutionEnCours, LigneCandidat, PhaseTravail } from "@/contracts/prototype-travail";
 import { PLACE_ID_PATTERN, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -13,10 +13,22 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * du spécificateur) ; ni fabrique ni réexportation par `src/adapters/index.ts`.
  *
  * Droits de `vadrouille_prototype` respectés (0046, D15 point 6) : `SELECT` ; `UPDATE` de `runs` par colonnes
- * (`phase`, `cost_models_micros`, `status`, `stop_code`) ; `INSERT` et `DELETE` de `run_candidates` (aucun `UPDATE` :
- * une étape qui change les candidats les remplace dans une transaction). Les lignes d'une exécution qui n'est plus
- * `en_cours` ne sont jamais écrites. Valeurs toujours en paramètres liés ; erreurs réduites à un code fermé et au
- * SQLSTATE, jamais un message ni un paramètre.
+ * (`phase`, `cost_models_micros`, `status`, `stop_code`) ; `INSERT` et `DELETE` de `run_candidates` et de `run_secteurs`
+ * (aucun `UPDATE` : une étape qui change les candidats les remplace dans une transaction). Les lignes d'une exécution qui
+ * n'est plus `en_cours` ne sont jamais écrites. Valeurs toujours en paramètres liés ; erreurs réduites à un code fermé et
+ * au SQLSTATE, jamais un message ni un paramètre.
+ *
+ * Plan de secteurs (`prototype.run_secteurs`, décision 0094 § 2 point 1 ; verdict de la Sécurité 0103, question 1) : une
+ * ligne par exécution, écrite **pendant la phase `recherche` seulement** (`ecrireSecteurs`, avant tout ancrage), relue
+ * par `lireSecteurs`, supprimée avec les candidats : à la clôture d'une exécution arrêtée (`cloreExecution`) et dans la
+ * transaction du programme (`supprimerSecteursDansTransaction`, constat A de 0103, décision 0107). Seul module de `src/`
+ * qui nomme la table (garde `p0: run_secteurs lue par aucun rapport`). Le contenu est validé par l'étape
+ * (`PlanSecteursStockeSchema` de `src/ai/sorties.ts`) ; ici, la seule forme (clés et types), la base fermant le reste.
+ *
+ * Compatibilité (comme 0092 § 5 point 6) : tant que la migration `0013_secteurs_prototype` n'est pas appliquée, la table
+ * n'existe pas (`to_regclass`, lu dans la même transaction) ; la suppression du plan n'est pas tentée, et les cinq clés du
+ * candidat enrichi (`CLES_CANDIDAT_ENRICHI`), que l'ancienne contrainte `run_candidates_candidat_check` refuse, sont
+ * retirées du contenu écrit, exactement comme le faisait l'agent avant 0094 (aucune de ces clés n'était écrite).
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -45,6 +57,20 @@ WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 const SQL_EN_COURS = `SELECT 1 FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours' FOR UPDATE`;
 /** Suppression des candidats d'une exécution (importée par le test d'ordre de l'écriture). */
 export const SQL_SUPPRIMER = "DELETE FROM prototype.run_candidates WHERE run_id = $1::uuid";
+/** Présence de la table du plan de secteurs (migration `0013_secteurs_prototype`) ; importée par le test d'ordre de l'écriture. */
+export const SQL_SECTEURS_PRESENTS = "SELECT pg_catalog.to_regclass('prototype.run_secteurs') IS NOT NULL AS presente";
+/** Suppression du plan de secteurs d'une exécution (importée par le test d'ordre de l'écriture). */
+export const SQL_SUPPRIMER_SECTEURS = "DELETE FROM prototype.run_secteurs WHERE run_id = $1::uuid";
+const SQL_INSERER_SECTEURS = "INSERT INTO prototype.run_secteurs (run_id, secteurs) VALUES ($1::uuid, $2::jsonb)";
+const SQL_SECTEURS = "SELECT secteurs FROM prototype.run_secteurs WHERE run_id = $1::uuid";
+/**
+ * Clés du candidat enrichi (décision 0094 § 1 point 1), admises par `run_candidates_candidat_check` depuis la migration
+ * `0013_secteurs_prototype` seulement ; égales aux cinq dernières clés de `CandidatSchema` (test d'égalité).
+ */
+export const CLES_CANDIDAT_ENRICHI = ["secteur", "incontournable", "prix", "horaires", "conseil"] as const;
+/** Secteurs du plan au plus (`SECTEURS_MAX` de `src/ai/sorties.ts`, test d'égalité ; `CHECK` de `run_secteurs`). */
+export const SECTEURS_STOCKES_MAX = 9;
+const CLES_SECTEUR = ["incontournables", "nom", "voisins"];
 const SQL_INSERER = "INSERT INTO prototype.run_candidates (run_id, cle, candidat, place_id) VALUES ($1::uuid, $2, $3::jsonb, $4)";
 const SQL_CANDIDATS = "SELECT cle, candidat, place_id FROM prototype.run_candidates WHERE run_id = $1::uuid ORDER BY cle";
 const SQL_CLORE = `UPDATE prototype.runs SET status = 'arretee', stop_code = $2, phase = NULL, cost_models_micros = NULL
@@ -58,6 +84,21 @@ WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
  */
 export async function supprimerCandidatsDansTransaction(client: ClientSql, runId: string): Promise<void> {
   await client.query(SQL_SUPPRIMER, [runIdControle(runId)]);
+}
+
+/**
+ * Fin d'exécution (constat A de 0103 ; 0107, « Hors périmètre ») : supprime la ligne de `run_secteurs` de l'exécution
+ * **dans la transaction de l'appelant** (l'écriture du programme), comme `supprimerCandidatsDansTransaction`. Table
+ * absente (migration `0013_secteurs_prototype` non appliquée) : rien à supprimer, aucune requête de suppression.
+ */
+export async function supprimerSecteursDansTransaction(client: ClientSql, runId: string): Promise<void> {
+  const id = runIdControle(runId);
+  if (await secteursPresents(client)) await client.query(SQL_SUPPRIMER_SECTEURS, [id]);
+}
+
+/** La table `prototype.run_secteurs` existe-t-elle (migration `0013_secteurs_prototype` appliquée) ? Lu dans la transaction. */
+async function secteursPresents(client: ClientSql): Promise<boolean> {
+  return (await client.query(SQL_SECTEURS_PRESENTS)).rows[0]?.presente === true;
 }
 
 /** Échec : code de la liste fermée et, pour `base`, le SQLSTATE seul. Aucune valeur. */
@@ -175,7 +216,7 @@ export async function remplacerCandidats(pool: PoolSql, runId: string, lignes: r
   const id = runIdControle(runId);
   if (lignes.length > CANDIDATS_MAX) throw new EchecTravail("entree_refusee");
   const cles = new Set<string>();
-  const valeurs: [string, string, string | null][] = [];
+  const valeurs: [string, Readonly<Record<string, unknown>>, string | null][] = [];
   for (const ligne of lignes) {
     const contenu = ligne.candidat;
     if (!CLE.test(ligne.cle) || cles.has(ligne.cle) || typeof contenu !== "object" || contenu === null || Array.isArray(contenu)) {
@@ -183,12 +224,80 @@ export async function remplacerCandidats(pool: PoolSql, runId: string, lignes: r
     }
     if (ligne.placeId !== null && (typeof ligne.placeId !== "string" || !PLACE_ID_PATTERN.test(ligne.placeId))) throw new EchecTravail("entree_refusee");
     cles.add(ligne.cle);
-    valeurs.push([ligne.cle, JSON.stringify(contenu), ligne.placeId]);
+    valeurs.push([ligne.cle, contenu, ligne.placeId]);
   }
+  const enrichis = valeurs.some(([, contenu]) => CLES_CANDIDAT_ENRICHI.some((cle) => Object.hasOwn(contenu, cle)));
   await transaction(pool, async (client) => {
     if ((await client.query(SQL_EN_COURS, [id])).rows.length !== 1) throw new EchecTravail("execution_absente");
+    // Compatibilité avant `0013_secteurs_prototype` : clés du candidat enrichi retirées si la base ne les admet pas encore.
+    const admisEnrichi = !enrichis || (await secteursPresents(client));
     await client.query(SQL_SUPPRIMER, [id]);
-    for (const [cle, contenu, placeId] of valeurs) await client.query(SQL_INSERER, [id, cle, contenu, placeId]);
+    for (const [cle, contenu, placeId] of valeurs) {
+      await client.query(SQL_INSERER, [id, cle, JSON.stringify(admisEnrichi ? contenu : sansClesEnrichies(contenu)), placeId]);
+    }
+  });
+}
+
+/** Contenu d'un candidat privé des clés du candidat enrichi (compatibilité avant `0013_secteurs_prototype`). */
+function sansClesEnrichies(contenu: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const copie: Record<string, unknown> = { ...contenu };
+  for (const cle of CLES_CANDIDAT_ENRICHI) delete copie[cle];
+  return copie;
+}
+
+/** Texte non vide, sinon refus (forme seulement : longueurs et texte maison sont fermés par l'étape et par la base). */
+const texte = (valeur: unknown): boolean => typeof valeur === "string" && valeur.length > 0;
+const textes = (valeur: unknown): boolean => Array.isArray(valeur) && valeur.every(texte);
+
+/**
+ * Forme du plan stocké, contrôlée avant toute requête (0103, question 1, condition 1) : un objet dont la seule clé est
+ * `secteurs`, de 1 à `SECTEURS_STOCKES_MAX` secteurs, chacun avec exactement `nom` (texte), `voisins` et
+ * `incontournables` (textes). Rien d'autre : ni raison, ni requête, ni jour, rang, position ou compteur.
+ */
+function formePlanAdmise(contenu: unknown): contenu is ContenuSecteurs {
+  if (typeof contenu !== "object" || contenu === null || Array.isArray(contenu)) return false;
+  if (Object.keys(contenu).join() !== "secteurs") return false;
+  const secteurs = (contenu as { secteurs?: unknown }).secteurs;
+  if (!Array.isArray(secteurs) || secteurs.length < 1 || secteurs.length > SECTEURS_STOCKES_MAX) return false;
+  return secteurs.every((secteur: unknown) => {
+    if (typeof secteur !== "object" || secteur === null || Array.isArray(secteur)) return false;
+    const { nom, voisins, incontournables } = secteur as Record<string, unknown>;
+    return Object.keys(secteur).sort().join() === CLES_SECTEUR.join() && texte(nom) && textes(voisins) && textes(incontournables);
+  });
+}
+
+/**
+ * Plan de secteurs de l'exécution `en_cours` (0094 § 2 point 1 ; 0103, question 1, conditions 1, 2 et 4) : écrit
+ * **pendant la phase `recherche` seulement** (sinon `phase_deja_passee` : jamais après l'ancrage), sous verrou de la
+ * ligne de l'exécution ; un remplacement est une suppression suivie d'une insertion dans la transaction (aucun `UPDATE`).
+ * `id`, `organization_id` et `expires_at` sont posés par la base. Contenu contrôlé avant toute requête.
+ */
+export async function ecrireSecteurs(pool: PoolSql, runId: string, secteurs: ContenuSecteurs): Promise<void> {
+  const id = runIdControle(runId);
+  if (!formePlanAdmise(secteurs)) throw new EchecTravail("entree_refusee");
+  const contenu = JSON.stringify(secteurs);
+  await transaction(pool, async (client) => {
+    const ligne = (await client.query(SQL_PHASE_EN_COURS, [id])).rows[0];
+    if (ligne === undefined) throw new EchecTravail("execution_absente");
+    if (ligne.phase !== "recherche") throw new EchecTravail("phase_deja_passee");
+    await client.query(SQL_SUPPRIMER_SECTEURS, [id]);
+    await client.query(SQL_INSERER_SECTEURS, [id, contenu]);
+  });
+}
+
+/**
+ * Plan de secteurs de l'exécution `en_cours`, tel qu'écrit ; `undefined` si aucune ligne (l'étape traite l'absence comme
+ * une erreur fermée, jamais un plan par défaut : 0103, question 1, condition 8). Contenu hors forme : `base`.
+ */
+export async function lireSecteurs(pool: PoolSql, runId: string): Promise<ContenuSecteurs | undefined> {
+  const id = runIdControle(runId);
+  return transaction(pool, async (client) => {
+    if ((await client.query(SQL_EN_COURS, [id])).rows.length !== 1) throw new EchecTravail("execution_absente");
+    const lignes = (await client.query(SQL_SECTEURS, [id])).rows;
+    if (lignes.length === 0) return undefined;
+    const contenu: unknown = lignes[0]?.secteurs;
+    if (lignes.length !== 1 || !formePlanAdmise(contenu)) throw new EchecTravail("base");
+    return contenu;
   });
 }
 
@@ -209,7 +318,8 @@ export async function lireCandidats(pool: PoolSql, runId: string): Promise<Ligne
 
 /**
  * Clôture d'une exécution arrêtée : candidats supprimés, puis `arretee` avec son code persisté (S4), phase et coût
- * remis à nul. Sans effet si l'exécution n'est plus `en_cours` (déjà close ou programme écrit).
+ * remis à nul, puis plan de secteurs supprimé (0103, question 1, condition 7 ; table absente : rien à supprimer). Sans
+ * effet si l'exécution n'est plus `en_cours` (déjà close ou programme écrit).
  */
 export async function cloreExecution(pool: PoolSql, runId: string, codeArret: string): Promise<void> {
   const id = runIdControle(runId);
@@ -218,5 +328,6 @@ export async function cloreExecution(pool: PoolSql, runId: string, codeArret: st
     if ((await client.query(SQL_EN_COURS, [id])).rows.length !== 1) return;
     await client.query(SQL_SUPPRIMER, [id]);
     await client.query(SQL_CLORE, [id, codeArret]);
+    if (await secteursPresents(client)) await client.query(SQL_SUPPRIMER_SECTEURS, [id]);
   });
 }

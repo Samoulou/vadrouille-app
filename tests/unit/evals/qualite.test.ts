@@ -10,6 +10,7 @@ import { creerModelesSimules, FixturesModelesSchema, type FixturesModeles } from
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { donneesDe, requeteRaisons } from "@/ai/requetes";
 import { bornesSecteurs, cleDeNom, lirePlan, LONGUEURS_INFOS, PLAN_VIDE, type PlanRecherche } from "@/ai/sorties";
+import { CandidatSchema } from "@/prototype/candidat";
 import { chercherCandidats, ciblesParSecteur, incontournablesCites, prixParPersonneAdmis } from "@/research/agent";
 import { BornesRechercheSchema, type BornesRecherche } from "@/research/bornes";
 import { CasEvaluationSchema, type CasEvaluation } from "@/research/evaluation";
@@ -195,10 +196,10 @@ describe("qualite: plan par secteurs (P0S2-PO-19)", () => {
 
 describe("qualite: un incontournable = un candidat (P0S2-PO-20, sortie de l'agent)", () => {
   it("Rome : chacun des dix incontournables attendus est un candidat propre ; le candidat regroupé est écarté ; le Colisée à billet combiné est gardé", async () => {
-    const { cas: c, candidats, infos, compteurs } = await lancer("rome-1");
+    const { cas: c, candidats, compteurs } = await lancer("rome-1");
     const parIncontournable = new Map<string, string[]>();
     for (const candidat of candidats) {
-      const incontournable = infos.get(candidat.id)?.incontournable;
+      const incontournable = candidat.incontournable;
       if (incontournable !== undefined) parIncontournable.set(incontournable, [...(parIncontournable.get(incontournable) ?? []), candidat.id]);
     }
     for (const attendu of c.attentes.incontournables) expect(parIncontournable.get(attendu), attendu).toHaveLength(1);
@@ -206,7 +207,7 @@ describe("qualite: un incontournable = un candidat (P0S2-PO-20, sortie de l'agen
     expect(candidats.map((candidat) => candidat.nom)).not.toContain("Balade Panthéon, Trevi et Navone");
     const colisee = candidats.find((candidat) => candidat.nom === "Colisée");
     expect(colisee).toBeDefined();
-    expect(infos.get(colisee?.id ?? "")?.prix).toContain("billet combiné");
+    expect(colisee?.prix).toContain("billet combiné");
   });
 
   it("règle du nom : mots entiers ou mots distinctifs d'un incontournable ; le prix ni le conseil ne sont lus", () => {
@@ -219,12 +220,12 @@ describe("qualite: un incontournable = un candidat (P0S2-PO-20, sortie de l'agen
   });
 
   it("deux candidats qui désignent le même incontournable : le second est fusionné comme un doublon", async () => {
-    const { candidats, compteurs, infos } = await lancer("rome-1", (f) => {
+    const { candidats, compteurs } = await lancer("rome-1", (f) => {
       const tour = (f.modeles.recherche as { candidats: CandidatFixture[] }[]).at(-1);
       const colisee = tour?.candidats.find((candidat) => candidat.nom === "Colisée");
       if (tour !== undefined && colisee !== undefined) tour.candidats.push({ ...colisee, nom: "Amphithéâtre flavien" });
     });
-    expect([...infos.values()].filter((info) => info.incontournable === "Colisée")).toHaveLength(1);
+    expect(candidats.filter((candidat) => candidat.incontournable === "Colisée")).toHaveLength(1);
     expect(candidats.map((candidat) => candidat.nom)).not.toContain("Amphithéâtre flavien");
     expect(compteurs.candidatsRefuses.duplicate).toBe(1);
   });
@@ -232,8 +233,8 @@ describe("qualite: un incontournable = un candidat (P0S2-PO-20, sortie de l'agen
 
 describe("qualite: incontournable sans candidat avant ancrage (P0S2-PO-20)", () => {
   it.each(CAS)("%s : compteur égal au nombre d'incontournables du plan qu'aucun candidat ne désigne", async (id) => {
-    const { compteurs, infos, plan } = await lancer(id);
-    const designes = new Set([...infos.values()].flatMap((info) => (info.incontournable === undefined ? [] : [info.incontournable])));
+    const { compteurs, candidats, plan } = await lancer(id);
+    const designes = new Set(candidats.flatMap((candidat) => (candidat.incontournable === undefined ? [] : [candidat.incontournable])));
     const attendu = plan.secteurs.flatMap((s) => s.incontournables).filter((nom) => !designes.has(nom)).length;
     expect(compteurs.qualite.incontournableSansCandidat).toBe(attendu);
     expect(attendu).toBe(0);
@@ -261,15 +262,15 @@ describe("qualite: incontournable sans candidat avant ancrage (P0S2-PO-20)", () 
 
 describe("qualite: incontournables sans catégorie codée (partie recherche)", () => {
   it("naxos-eval : plage, point de vue, village et spécialité, hors patrimoine, sont reliés à leur incontournable", async () => {
-    const { cas: c, candidats, infos } = await lancer("naxos-eval");
-    const relies = candidats.filter((candidat) => infos.get(candidat.id)?.incontournable !== undefined);
-    expect(relies.map((candidat) => infos.get(candidat.id)?.incontournable).sort()).toEqual([...c.attentes.incontournables].sort());
+    const { cas: c, candidats } = await lancer("naxos-eval");
+    const relies = candidats.filter((candidat) => candidat.incontournable !== undefined);
+    expect(relies.map((candidat) => candidat.incontournable).sort()).toEqual([...c.attentes.incontournables].sort());
     for (const candidat of relies) expect(["heritage", "museum"]).not.toContain(candidat.categorie);
   });
 
   it.each(CAS)("%s : changer la catégorie des incontournables en heritage, ou en nature, ne change pas leur désignation", async (id) => {
     const designation = (resultat: Awaited<ReturnType<typeof lancer>>) =>
-      resultat.candidats.map((candidat) => [candidat.nom, resultat.infos.get(candidat.id)?.incontournable ?? null]);
+      resultat.candidats.map((candidat) => [candidat.nom, candidat.incontournable ?? null]);
     const base = await lancer(id);
     for (const categorie of ["heritage", "nature"]) {
       const mute = await lancer(id, (f) => {
@@ -282,13 +283,13 @@ describe("qualite: incontournables sans catégorie codée (partie recherche)", (
 
 describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
   it.each(CAS)("%s : chaque incontournable a prix, horaires et conseil quand sa source les donne ; rien d'inventé ; textes bornés", async (id) => {
-    const { candidats, infos, fixtures: f, compteurs } = await lancer(id);
+    const { candidats, fixtures: f, compteurs } = await lancer(id);
     const parNom = new Map(candidatsFixture(f).map((candidat) => [candidat.nom, candidat]));
     const textesSource = new Map<string, string>();
     for (const resultats of Object.values(f.recherche.resultats)) for (const r of resultats) textesSource.set(r.url, `${textesSource.get(r.url) ?? ""} ${r.extrait}`);
     for (const [url, page] of Object.entries(f.pages.pages)) textesSource.set(url, `${textesSource.get(url) ?? ""} ${page.corps}`);
     for (const candidat of candidats) {
-      const info = infos.get(candidat.id) ?? {};
+      const info = candidat;
       const fixture = parNom.get(candidat.nom);
       expect(fixture, candidat.nom).toBeDefined();
       // Sortie de l'agent égale à ce que la source donne (fixture), champ absent compris.
@@ -309,9 +310,9 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
   });
 
   it("Rome : la page sans horaires donne un candidat sans horaires ; prixParPersonne seulement en CHF (texte de prix exigé), 0 pour « gratuit »", async () => {
-    const { candidats, infos } = await lancer("rome-1");
+    const { candidats } = await lancer("rome-1");
     const par = (nom: string) => candidats.find((candidat) => candidat.nom === nom);
-    expect(infos.get(par("Place Navone")?.id ?? "")?.horaires).toBeUndefined();
+    expect(par("Place Navone")?.horaires).toBeUndefined();
     expect(par("Place Navone")?.prixParPersonne).toBe(0);
     expect(par("Colisée")?.prixParPersonne).toBeUndefined();
     expect(par("Panthéon")?.prixParPersonne).toBeUndefined();
@@ -364,23 +365,49 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
   });
 });
 
+describe("qualite: champs du candidat portés par le candidat (décision 0094 § 1)", () => {
+  it.each(CAS)("%s : secteur, incontournable et infos pratiques dans le candidat, mêmes valeurs qu'au lot 1, plus aucun porteur à côté", async (id) => {
+    const resultat = await lancer(id);
+    const { candidats, fixtures: f, plan } = resultat;
+    expect(Object.keys(resultat)).not.toContain("infos");
+    const parNom = new Map(candidatsFixture(f).map((candidat) => [candidat.nom, candidat]));
+    const nomDuPlan = (nom: string | null) => plan.secteurs.find((secteur) => cleDeNom(secteur.nom) === cleDeNom(nom ?? ""))?.nom;
+    expect(candidats.length).toBeGreaterThan(0);
+    for (const candidat of candidats) {
+      const fixture = parNom.get(candidat.nom);
+      expect(fixture, candidat.nom).toBeDefined();
+      // Valeurs du lot 1 : secteur ramené au nom exact du plan, incontournable du même secteur, infos de la source.
+      expect(candidat.secteur, candidat.nom).toBe(nomDuPlan(fixture?.secteur ?? null));
+      expect(candidat.incontournable, candidat.nom).toBe(fixture?.incontournable ?? undefined);
+      expect(candidat.prix, candidat.nom).toBe(fixture?.prix);
+      expect(candidat.horaires, candidat.nom).toBe(fixture?.horaires);
+      expect(candidat.conseil, candidat.nom).toBe(fixture?.conseil);
+      // Candidat valide pour l'original et sa copie (contrainte de clés de la table de travail : mêmes quinze clés).
+      expect(CandidatSchema.safeParse(candidat).success, candidat.nom).toBe(true);
+      expect(Object.keys(candidat).every((cle) => Object.keys(CandidatSchema.shape).includes(cle)), candidat.nom).toBe(true);
+    }
+    expect(candidats.some((candidat) => candidat.incontournable !== undefined)).toBe(true);
+    expect(candidats.some((candidat) => candidat.prix !== undefined)).toBe(true);
+  });
+});
+
 describe("qualite: secteur de chaque candidat (P0S2-PO-20)", () => {
   it("Rome : un lieu hors des secteurs du plan est écarté et compté ; l'événement sans secteur est gardé ; chaque lieu porte un nom de secteur du plan", async () => {
-    const { candidats, infos, compteurs, plan } = await lancer("rome-1");
+    const { candidats, compteurs, plan } = await lancer("rome-1");
     expect(compteurs.qualite.secteurInconnu).toBe(1);
     expect(candidats.map((candidat) => candidat.nom)).not.toContain("Plage du littoral");
     const evenement = candidats.find((candidat) => candidat.typeEtape === "event");
     expect(evenement).toBeDefined();
-    expect(infos.get(evenement?.id ?? "")?.secteur).toBeUndefined();
+    expect(evenement?.secteur).toBeUndefined();
     const noms = plan.secteurs.map((s) => s.nom);
-    for (const candidat of candidats.filter((c) => c.typeEtape !== "event")) expect(noms).toContain(infos.get(candidat.id)?.secteur);
+    for (const candidat of candidats.filter((c) => c.typeEtape !== "event")) expect(noms).toContain(candidat.secteur);
   });
 
   it("secteur écrit autrement (casse, accents) : ramené au nom exact du plan", async () => {
-    const { candidats, infos } = await lancer("rome-1", (f) => {
+    const { candidats } = await lancer("rome-1", (f) => {
       for (const candidat of candidatsFixture(f)) if (candidat.nom === "Colisée") candidat.secteur = "la rome ANTIQUE";
     });
-    expect(infos.get(candidats.find((c) => c.nom === "Colisée")?.id ?? "")?.secteur).toBe("La Rome antique");
+    expect(candidats.find((c) => c.nom === "Colisée")?.secteur).toBe("La Rome antique");
   });
 });
 
@@ -472,9 +499,9 @@ describe("qualite: compteurs de l'agent (P0S2-PO-25, partie recherche)", () => {
 
 describe("qualite: raisons v2 (P0S2-PO-21)", () => {
   it("le prompt raisons reçoit le secteur et la qualité d'incontournable, jamais prix, horaires ni conseil", async () => {
-    const { candidats, infos } = await lancer("rome-1");
+    const { candidats } = await lancer("rome-1");
     const colisee = candidats.find((c) => c.nom === "Colisée");
-    const info = infos.get(colisee?.id ?? "");
+    const info = colisee;
     expect(PROMPT_RAISONS.version).toBe(2);
     const lieu = {
       id: colisee?.id ?? "",
