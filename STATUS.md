@@ -1,34 +1,35 @@
-# État du studio — 2026-10-20 (118e cycle)
+# État du studio — 2026-10-20 (119e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 16 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 17 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau depuis le 117e cycle.
+- 2026-10-20 16:59 UTC : « On en est où ? […] je vois rien ». Réponse honnête : rien de nouveau n'était visible dans l'appli depuis la veille ; restes listés ; priorité désormais à ce qui se voit dans l'appli (B9e passe avant B9d).
+- 2026-10-20 17:01 et 17:31 UTC : `db-migrate` lancé par Samuel. Premier lancement refusé (commit attendu dépassé, `main` avait bougé, rien appliqué) ; second réussi (run 39466766844) : **0011 et 0012 appliquées** à la base d'essai. Fusions gelées entre-temps.
 
 ## Fait
-- Fusionnées : **#572** (#561, suppression des candidats d'un essai à l'écriture de son programme, décision 0107), statut du 117e cycle (#575).
-- **B9c** (#563) : approuvée par le Tech Lead ; un seul test du job CI `db` échoue (`tests/db/apercu-idees.test.ts`, invariant « étapes identiques avec et sans idées »).
-- **B6b** (#576) : PR ouverte ; revue avec un bloquant (écart à 0100 § 5.2 et § 5.4 à consigner, tests de frontière à aligner), Sécurité d'accord.
+- Fusionnées : **B9c** (#563, aperçu : workflows 1, 2 et 3), **B9c-suite** (#581, « Réessayer » reprend les recherches), **B6b** (#576, lecture réelle des séjours et journées, décision 0108), **Q-L2a** (#578, candidat enrichi et table `run_secteurs`, migration 0013 non approuvée), test d'invariant de B9c rendu déterministe (#579), statut du 118e cycle (#577).
+- **Migrations 0011 et 0012 appliquées** à la base d'essai (Samuel, `db-migrate`).
+- **Report `main` → `p0-reel`** : PR #580 ouverte (Release) ; à fusionner par Samuel (« Create a merge commit »).
 
 ## En cours
-- backend : **B9c** (#563), cause racine et correction du test `db` en échec (sans le désactiver).
-- backend : **B6b** (#576), correction 1 : amendement de 0100 (branchement par `src/instrumentation.ts`, validé par le Tech Lead), tests de frontière, mineurs.
-- ia-recherche : **Q-L2a** (#562), reprise : vérification, PR.
+- backend : **B4a** (#582), correction 1 : webhook (400 avant toute dépendance), écarts 1 et 3 écrits, mineurs.
+- backend : **B9e** (#583), branchement sur préversion : parcours écrans 1 à 5, « Mes voyages » et Séjour sur vraies données, bout en bout simulé.
+- product-owner : **spécification B10** (#584), « J'aime / Pas pour moi » et préférences.
 
 ## Bloqué
-- **B4a** (#531) : après la fusion de B9c.
-- **B9c-suite** (#573), **B9c-graphe** (#574), puis **B9d, B9e** : après B9c.
-- **Affichage des voyages sur `p0-reel`** : reste `db-migrate` lancé par Samuel → report `main` → `p0-reel`.
+- **Voyages de Rome sur la page d'essai** : fusion de #580 par Samuel.
+- **B9d** (voyage complet) : après B4a. **B9c-graphe** (#574) : après B4a (même fichier `tests/unit/p0/imports.test.ts`).
+- **Migration 0013** : PR d'approbation (`MIGRATIONS_APPROUVEES`), Q534.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI sur la colonne « relances » ; A2-c (plafonds Places) seulement si Samuel le décide (Q525).
 - **Purge du MVP et `coords-purge`** (#527) : Q438.
 
 ## Prochain cycle
-1. B9c jusqu'à la fusion ; puis B9c-suite, B9c-graphe, B4a, B9d.
-2. B6b jusqu'à la fusion ; Q-L2a en revue.
-3. Samuel : lancer `db-migrate` (0011, 0012) ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
+1. B9e puis B4a jusqu'à la fusion ; B9c-graphe, puis B9d.
+2. Spécification B10, puis son code.
+3. Samuel : fusionner #580 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : Q509 (lancer `db-migrate`, #536 étant fusionnée), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
+- **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060) ; B8c est fusionnée, la purge attend cette réponse pour être activée.
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -47,7 +48,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Aucune ; Q531 et Q533 mises à jour.
+- Q534 à Q537 ; Q509 et Q533 mises à jour.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
