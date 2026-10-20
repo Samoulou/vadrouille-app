@@ -1,9 +1,9 @@
 import "server-only";
 
-import type { SourceRelectures } from "@/domain/relectures";
-import { creerClientsGoogle } from "@/server/composition/clients-google";
-import type { PlafondsUsage } from "@/server/config/usage";
-import { ecriturePositionsSuspendue, sourceReelleChoisie } from "@/server/env/relectures";
+import type { DemandeRelectures, SourceRelectures, VoyageARelire } from "@/domain/relectures";
+import { creerClientsGoogle, envelopperClientsGoogle } from "@/server/composition/clients-google";
+import { PLAFONDS_VARIANTE_SIMULEE, type PlafondsUsage } from "@/server/config/usage";
+import { declarationsLectureSimulee, ecriturePositionsSuspendue, sourceReelleChoisie } from "@/server/env/relectures";
 import { reglesDeLecture } from "@/server/relecture/regles";
 import { creerSourceRelectures, type DependancesSource } from "@/server/relecture/source";
 import { horlogeSysteme, type Horloge } from "@/server/usage/port";
@@ -57,9 +57,63 @@ export function creerSourceLecture(options: OptionsLecture = {}): SourceRelectur
 
 /**
  * Source de relectures de l'adaptateur `api` : la source réelle si `sourceReelleChoisie(env)` (environnement `local` et
- * `RELECTURES_SOURCE=google`, 0100 § 5.3), sinon `repli` (le double). La source réelle n'est construite que dans le
- * premier cas.
+ * `RELECTURES_SOURCE=google`, 0100 § 5.3) ; sinon, en `local` et en `ci`, `repli` (le double de B6) **complété** pour les
+ * voyages générés par la variante simulée (`avecVoyagesGeneresSimules`, B9e) ; partout ailleurs, `repli` seul. La source
+ * réelle n'est construite que dans le premier cas.
  */
 export function choisirSourceRelectures(repli: SourceRelectures, env?: Readonly<Record<string, string | undefined>>): SourceRelectures {
-  return sourceReelleChoisie(env) ? creerSourceLecture({ env }) : repli;
+  if (sourceReelleChoisie(env)) return creerSourceLecture({ env });
+  const declarations = declarationsLectureSimulee(env);
+  return declarations === null ? repli : avecVoyagesGeneresSimules(repli, declarations);
+}
+
+/**
+ * Préfixe des `placeId` des fixtures d'Édimbourg de la variante simulée (`prototype/fixtures/places/edimbourg.json` :
+ * valeurs sentinelles fabriquées, aucune réponse réelle). Le double de B6 ne les connaît pas (`mock_place_`, `test_place_`).
+ */
+export const PREFIXE_LIEU_FIXTURES = "SENTINELLE_PLACE_ID";
+
+/** Lieux d'une lecture : nuits, lieux demandés et points des trajets. */
+function lieuxDeLaLecture(voyage: VoyageARelire, demande: DemandeRelectures): string[] {
+  const points = demande.trajets.flatMap((t) => [t.depuis, t.vers]).flatMap((p) => ("lieu" in p ? [p.lieu] : []));
+  return [...voyage.logementsParNuit.filter((l): l is string => l !== null), ...demande.lieux.map((l) => l.placeId), ...points];
+}
+
+/**
+ * Lecture d'un voyage **généré par la variante simulée** (spécification B9, B9e point 3 : « Mes voyages » et Séjour du bout
+ * en bout simulé ; à valider par le Tech Lead, question de la PR). La génération simulée écrit les `placeId` des fixtures
+ * d'Édimbourg, que le double de B6 ne connaît pas : sans cette source, Séjour d'un voyage généré rend `travel_unknown`.
+ *
+ * - **Aiguillage** : si chaque lieu de la lecture porte le préfixe des fixtures, la lecture passe par la source de B8b
+ *   (`creerSourceRelectures`) sur les doubles Places et Routes des fixtures, enveloppés dans la même réservation que les
+ *   clients réels (`envelopperClientsGoogle`) ; sinon, `repli` (le double de B6, inchangé pour ses voyages).
+ * - **Jamais réel** : environnement résolu `local` ou `ci` seulement (`declarationsLectureSimulee`, sinon `repli` seul) ;
+ *   aucun client réel construit ; forfait de relecture sur les valeurs de test de la variante simulée
+ *   (`PLAFONDS_VARIANTE_SIMULEE`) ; aucune écriture de position (`positionsSuspendues` vrai) : les positions des fixtures ne
+ *   viennent pas de Google.
+ * - **Fixtures** : lues à l'appel par `fixtures-simulees.ts`, atteint par `import()` dynamique (décision 0105 § 2), qui
+ *   refuse de lire en production ou sous une déclaration inconnue.
+ */
+export function avecVoyagesGeneresSimules(repli: SourceRelectures, declarations: Readonly<Record<string, string | undefined>>): SourceRelectures {
+  return {
+    async pour(voyage, demande) {
+      const lieux = lieuxDeLaLecture(voyage, demande);
+      if (lieux.length === 0 || !lieux.every((l) => l.startsWith(PREFIXE_LIEU_FIXTURES))) return repli.pour(voyage, demande);
+      let doubles;
+      try {
+        doubles = (await (await import("@/server/composition/fixtures-simulees")).chargerDoublesEdimbourg(declarations))();
+      } catch {
+        return { ok: false, refus: "unavailable" };
+      }
+      const bases = { places: doubles.places, routes: doubles.routes };
+      const source = creerSourceRelectures({
+        regles: reglesDeLecture(horlogeSysteme, PLAFONDS_VARIANTE_SIMULEE),
+        transaction: (contexte) => (fn) => withOrg(contexte, (tx) => fn(executeurSql(tx))),
+        clients: (options) => envelopperClientsGoogle(bases, options),
+        positionsSuspendues: () => true,
+        horloge: horlogeSysteme,
+      });
+      return source.pour(voyage, demande);
+    },
+  };
 }

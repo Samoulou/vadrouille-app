@@ -119,6 +119,21 @@
       "ecart": "ligne ordinaire de portée application (B6b, ticket 532 ; spécification B6, B6b point 1), modèle accepté par 0040 D4 ; verdict Sécurité attendu"
     },
     {
+      "fichier": "src/adapters/api-creation-instance.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `api-instance.ts` et de `better-auth.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `CREATION_KEY` (`Symbol.for(\"vadrouille.creation-voyages\")`) ; garde la fabrique de la création sur l'adaptateur `api` (cas d'usage de `src/server/creation/`) branchée une fois au démarrage par `src/instrumentation.ts` entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`) ; non branchée, chaque méthode rejette (échec fermé) ; la garde `assertApiAdapter` est vérifiée à chaque appel, avant la fabrique. Garde-fou : `brancherCreationVoyages` lève `CreationDejaBrancheeError` si la clé est déjà définie, hors de `tests/` seuls ce module et `src/instrumentation.ts` la nomment, et la remise à zéro `debrancherCreationVoyagesPourTests` n'est nommée hors de `tests/` que par ce module (`tests/unit/auth/points-injection.test.ts`) ; toute autre écriture de `globalThis` reste refusée par ce régime",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[CREATION_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (B9e, ticket 583 ; spécification B9, B9e point 1), modèle accepté par 0040 D4 ; verdict Sécurité attendu"
+    },
+    {
       "fichier": "src/adapters/prototype.test.ts",
       "portee": "test",
       "usage": "vérifie que P0b1 n'appelle jamais Google",

@@ -2,7 +2,7 @@ import "server-only";
 
 import { composerReelle, composerSimulee, reglesDeGeneration, type FabriqueGeneration, type FabriquePortPositions } from "@/server/composition/generation";
 import { ECRITURE_PROGRAMMES_REELS_AUTORISEE, IDEES_PAR_JOUR } from "@/server/config/generation";
-import { PLAFONDS_USAGE, type PlafondsUsage } from "@/server/config/usage";
+import { PLAFONDS_USAGE, PLAFONDS_VARIANTE_SIMULEE, type PlafondsUsage } from "@/server/config/usage";
 import { horlogeSysteme, type Horloge } from "@/server/usage/port";
 import type { ReglesUsage } from "@/server/usage/reservation";
 import { withSystemOrg } from "@/server/with-system-org";
@@ -23,7 +23,10 @@ export type TransactionSysteme = <T>(organizationId: string, fn: (tx: OrgTransac
 export interface DependancesGeneration {
   readonly transaction?: TransactionSysteme;
   readonly horloge?: Horloge;
-  /** Plafonds du forfait ; `PLAFONDS_USAGE` (`null` en production) par défaut. */
+  /**
+   * Plafonds du forfait, pour les deux variantes (tests). Par défaut : `PLAFONDS_USAGE` (`null` tant que Samuel ne les a pas
+   * fixés) pour la barrière et la variante réelle, `PLAFONDS_VARIANTE_SIMULEE` (valeurs de test) pour la variante simulée.
+   */
   readonly plafonds?: PlafondsUsage | null;
   /** Composition choisie par la barrière ; défaut : `reelle` (si la réponse de Samuel à la question 9 l'autorise), sinon `simulee`. */
   readonly composition?: (etat: EtatBarriere) => FabriqueGeneration | Promise<FabriqueGeneration>;
@@ -44,8 +47,14 @@ export interface DependancesGeneration {
 export type DependancesResolues = {
   readonly transaction: TransactionSysteme;
   readonly horloge: Horloge;
+  /** Plafonds lus par la barrière et la variante réelle : `PLAFONDS_USAGE` en production (jamais ceux de la variante simulée). */
   readonly plafonds: PlafondsUsage | null;
-  readonly regles: ReglesUsage | null;
+  /**
+   * Règles du forfait de l'étape, selon l'état de la barrière (B9e point 2, B9-PO-10) : `reelle`, celles de `PLAFONDS_USAGE`
+   * (aucune tant que Samuel n'a pas fixé les plafonds) ; `simulee`, celles des valeurs de test de la variante simulée ;
+   * `production`, aucune.
+   */
+  reglesPour(etat: EtatBarriere): ReglesUsage | null;
   readonly maintenant: () => number;
   /** Barrière de B9-TL-8, évaluée **à l'entrée de chaque étape**, avant tout forfait, toute composition et tout appel. */
   barriere(): Promise<EtatBarriere>;
@@ -60,7 +69,9 @@ export type DependancesResolues = {
 export function resoudre(dependances: DependancesGeneration = {}): DependancesResolues {
   const horloge = dependances.horloge ?? horlogeSysteme;
   const plafonds = dependances.plafonds === undefined ? PLAFONDS_USAGE : dependances.plafonds;
+  const plafondsSimules = dependances.plafonds === undefined ? PLAFONDS_VARIANTE_SIMULEE : dependances.plafonds;
   const regles = reglesDeGeneration(horloge, plafonds);
+  const reglesSimulees = reglesDeGeneration(horloge, plafondsSimules);
   const programmesReels = dependances.programmesReelsAutorises ?? ECRITURE_PROGRAMMES_REELS_AUTORISEE;
   const composition =
     dependances.composition ??
@@ -75,7 +86,7 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
     transaction: dependances.transaction ?? withSystemOrg,
     horloge,
     plafonds,
-    regles,
+    reglesPour: (etat) => (etat === "reelle" ? regles : etat === "simulee" ? reglesSimulees : null),
     maintenant: () => horloge.maintenant(),
     barriere: () => evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
     async composer(etat) {

@@ -3,6 +3,8 @@ import "server-only";
 import { PARTS_FORFAIT, RANG_ETAPE, type EtapeApercu } from "@/server/config/generation";
 import type { Forfait } from "@/server/usage/forfait";
 import type { Plafond } from "@/server/usage/port";
+
+import type { EtatBarriere } from "./barriere";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
 import { plafondsDuForfait, reserverForfait } from "@/server/usage/reservation";
 import { executeurSql } from "@/server/with-org";
@@ -52,11 +54,12 @@ export function forfaitPartiel(forfait: Forfait, etape: EtapeApercu): Forfait {
 
 export async function forfaitDeLEtape(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string },
+  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
   etape: EtapeApercu,
 ): Promise<ForfaitDeLEtape> {
-  if (dependances.regles === null) throw new ArretEtape("usage_unavailable");
-  const regles = dependances.regles;
+  // Règles de la variante que la barrière vient de choisir (B9e point 2) : jamais les valeurs de test pour un appel réel.
+  const regles = dependances.reglesPour(contexte.barriere);
+  if (regles === null) throw new ArretEtape("usage_unavailable");
   const reserve = await reserverForfait(
     (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
     { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, profil: "apercu" },

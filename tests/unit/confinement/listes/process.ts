@@ -203,6 +203,10 @@ export const LECTURES_ENV = [
   // `POSITIONS_ECRITURE_SUSPENDUE` (`1` seulement, 0060 § 1.3), lues par propriété littérale, à l'appel, valeur jamais
   // rendue ni journalisée. Verdict Sécurité : attendu (0100 § 7 point 4).
   { fichier: "src/server/env/relectures.ts", noms: ["RELECTURES_SOURCE", "POSITIONS_ECRITURE_SUSPENDUE"] },
+  // B9e (spécification B9, B9e point 3) : déclarations de déploiement de la source simulée des voyages générés, lues par
+  // propriété littérale, à l'appel, rendues au seul chargeur de fixtures (0105 § 2 point 2) et seulement en `local` ou `ci`.
+  // Verdict Sécurité : attendu.
+  { fichier: "src/server/env/relectures.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV"] },
   // B9c (décision 0081 B9-TL-8) : déclarations de déploiement et drapeau d'activation de la barrière des appels réels, lues
   // par propriété littérale, à l'appel, valeurs jamais journalisées. Verdict Sécurité : attendu.
   { fichier: "src/server/env/generation.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV", "VERCEL_GIT_COMMIT_REF", "GENERATION_APPELS_REELS"] },
@@ -287,6 +291,8 @@ export const ENV_ENTIER = [
   // B8b (décision 0100 § 5.3) : même forme pour le module étroit de la lecture ; l'environnement entier va au seul calcul de
   // l'environnement (B3a). Verdict Sécurité : attendu.
   { fichier: "src/server/env/relectures.ts", formes: ["defaut:ecriturePositionsSuspendue", "defaut:sourceReelleChoisie", "argument:resolveServerEnvironment"] },
+  // B9e : même forme pour les déclarations de la source simulée des voyages générés. Verdict Sécurité : attendu.
+  { fichier: "src/server/env/relectures.ts", formes: ["defaut:declarationsLectureSimulee"] },
   // B9c : même forme pour la barrière des appels réels (l'environnement lu rend quatre déclarations, jamais une clé).
   { fichier: "src/server/env/generation.ts", formes: ["defaut:lireEnvGeneration"] },
   // P0r3d (ticket 354) : même forme pour le commit du déploiement, lu par propriété littérale. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
