@@ -242,10 +242,8 @@ function tokensDe(reponse: ReponseModele): {
 
 // --- Décorateurs --------------------------------------------------------------------------------------------------------
 
-/** Marque privée : un client déjà décoré est rendu tel quel (aucune étape n'est tracée deux fois). */
-const MARQUE = Symbol("traces-ia");
-type Marque = { readonly [MARQUE]: true };
-const estDecore = (client: object): boolean => (client as Partial<Marque>)[MARQUE] === true;
+/** Clients déjà décorés (ensemble privé, faible) : un client déjà décoré est rendu tel quel, aucune étape n'est tracée deux fois. */
+const DECORES = new WeakSet<object>();
 
 /**
  * Décore un client de modèles : une étape tracée = un appel de modèle. Appliqué **par `creerCoucheIa`** quand `traces`
@@ -254,9 +252,8 @@ const estDecore = (client: object): boolean => (client as Partial<Marque>)[MARQU
  * est rendu tel quel).
  */
 export function tracerModeles(client: ClientModeles, traces: TracesIa, horloge: HorlogeTraces): ClientModeles {
-  if (estDecore(client)) return client;
-  const decore: ClientModeles & Marque = {
-    [MARQUE]: true,
+  if (DECORES.has(client)) return client;
+  const decore: ClientModeles = {
     async envoyer(requete) {
       const debut = maintenant(horloge);
       const jeton = debuter(traces, debutDeRequete(requete));
@@ -278,6 +275,7 @@ export function tracerModeles(client: ClientModeles, traces: TracesIa, horloge: 
       }
     },
   };
+  DECORES.add(decore);
   return decore;
 }
 
@@ -293,9 +291,8 @@ export function tracerRechercheWeb(
   reglage: { readonly modele: string },
   horloge: HorlogeTraces,
 ): ClientRechercheWeb {
-  if (estDecore(client)) return client;
-  const decore: ClientRechercheWeb & Marque = {
-    [MARQUE]: true,
+  if (DECORES.has(client)) return client;
+  const decore: ClientRechercheWeb = {
     async rechercher(requete) {
       const debut = maintenant(horloge);
       const lu = DebutEtapeSchema.safeParse({
@@ -324,5 +321,6 @@ export function tracerRechercheWeb(
       }
     },
   };
+  DECORES.add(decore);
   return decore;
 }
