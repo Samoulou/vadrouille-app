@@ -185,7 +185,7 @@ describe("p0: forfait réservé en base, plusieurs exécutions par jour (0071)",
 
   it("p0: exécution orpheline close au lancement suivant", async () => {
     // Deux exécutions en cours d'un jour passé, posées par l'administration (déclencheurs désactivés pour cette seule
-    // transaction) : l'une au-delà de dureeMs + 5 min, l'autre en deçà.
+    // transaction) : l'une au-delà de dureeMaxMs + 5 min, l'autre en deçà.
     await admin.query("BEGIN");
     let orpheline: string;
     let recente: string;

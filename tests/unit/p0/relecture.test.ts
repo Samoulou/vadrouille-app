@@ -10,7 +10,7 @@ import type { PointRoutes } from "@/grounding/interfaces";
 import { cadenceRelecture, creerRelecteurReel, SQL_PURGE_RECENTE, type ClientMatrice, type DependancesRelecteur } from "@/server/p0/relecture";
 import { forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type LimitesForfait } from "@/server/usage/forfait";
 import type { ClientSql, PoolSql, ReglesForfait } from "@/server/usage/neon";
-import { PLAFONDS_RELECTURE, relectureDuMode, SKUS_FORFAIT } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, PLAFONDS_RELECTURE, relectureDuMode, SKUS_FORFAIT } from "@/workflows/p0-run";
 import prixGoogle from "../../../prototype/config/prix-google.json";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 
@@ -288,7 +288,7 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
       coutGoogleMicros: 200_000,
       coutModelesMicros: null,
     });
-    expect(lu!.regles).toEqual({ limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 });
+    expect(lu!.regles).toEqual({ limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: DUREE_MAX_EXECUTION_MS });
     expect(relectureDuMode()).toEqual(lu);
   });
 });
