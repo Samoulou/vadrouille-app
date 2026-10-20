@@ -23,7 +23,7 @@ export const MODULE_COMPOSITION = "src/server/composition/p0-reel.ts";
  * B8b (décision 0100 § 5.2), la fabrique commune des clients Google (`places-client.ts`, `routes-client.ts`), que seules
  * les compositions de la lecture (et de la génération, B9c) importent (`ligne/relecture-imports`, `composition.test.ts`).
  */
-export const MODULES_COMPOSITION: readonly string[] = [MODULE_COMPOSITION, "src/server/composition/clients-google.ts"];
+export const MODULES_COMPOSITION: readonly string[] = [MODULE_COMPOSITION, "src/server/composition/clients-google.ts", "src/server/composition/generation.ts"];
 
 export function construireGraphe(resultats: readonly Resultat[]): Graphe {
   const graphe = new Map<string, Set<string>>();

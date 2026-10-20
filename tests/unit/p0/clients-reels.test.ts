@@ -112,12 +112,16 @@ describe("p0: modules de capacité branchés à aucun point d'entrée", () => {
     const COMPOSITION = "src/server/composition/p0-reel.ts";
     // B8b (0100 § 5.1) : la fabrique commune des clients Google, importée par les deux compositions, nomme Places et Routes.
     const FABRIQUE = "src/server/composition/clients-google.ts";
+    // B9c : la composition de la génération nomme le client de modèles et le transport de lecture de pages (variante réelle, derrière la barrière B9-TL-8).
+    const GENERATION = "src/server/composition/generation.ts";
+    // B9c (revue #563, bloquant 3) : le test d'égalité des lignes réservées entre clients réels (transport de test) et enveloppe des doubles.
+    const ENVELOPPE = "tests/unit/p0/clients-google-enveloppe.test.ts";
     const tries = Object.fromEntries([...importateurs].map(([m, liste]) => [m, [...liste].sort()]));
     expect(tries).toEqual({
-      [CLIENT_MODELES]: [CLIENT_MODELES.replace(/\.ts$/, ".test.ts"), COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
-      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", COMPOSITION, FABRIQUE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
-      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", COMPOSITION, FABRIQUE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
-      "src/research/undici-transport.ts": ["src/research/undici-transport.test.ts", COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/undici-contrat.test.ts"].sort(),
+      [CLIENT_MODELES]: [CLIENT_MODELES.replace(/\.ts$/, ".test.ts"), COMPOSITION, GENERATION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
+      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", COMPOSITION, FABRIQUE, ENVELOPPE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
+      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", COMPOSITION, FABRIQUE, ENVELOPPE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
+      "src/research/undici-transport.ts": ["src/research/undici-transport.test.ts", COMPOSITION, GENERATION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/undici-contrat.test.ts"].sort(),
     });
   });
 });

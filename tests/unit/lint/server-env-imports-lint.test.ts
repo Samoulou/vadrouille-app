@@ -49,6 +49,9 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/composition/lecture.ts", "@/server/env/relectures"],
     ["src/server/env/relectures.test.ts", "./relectures"],
     ["src/server/env/relectures.ts", "@/server/env/resolve"],
+    // B9c (décision 0081 B9-TL-8) : déclarations de la barrière des appels réels, importées par la barrière seule.
+    ["src/server/generation/barriere.ts", "@/server/env/generation"],
+    ["src/server/env/generation.test.ts", "./generation"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
@@ -57,6 +60,10 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
   const REFUSES: [string, string][] = [
     // B8b : `relectures` hors de la composition de la lecture.
     ["src/server/composition/p0-reel.ts", "@/server/env/relectures"],
+    // B9c : `generation` hors de la barrière.
+    ["src/server/generation/etapes.ts", "@/server/env/generation"],
+    ["src/server/composition/generation.ts", "@/server/env/generation"],
+    ["src/workflows/apercu.ts", "@/server/env/generation"],
     ["src/server/composition/clients-google.ts", "@/server/env/relectures"],
     ["src/server/relecture/source.ts", "@/server/env/relectures"],
     ["src/server/voyages/lecture.ts", "@/server/env/relectures"],
