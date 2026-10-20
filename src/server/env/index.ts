@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+
 import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
 
 /**
@@ -37,7 +38,7 @@ const VARIABLES = {
   RATE_LIMIT_HMAC_SECRET: 0,
   BETTER_AUTH_SECRET: 0,
   // B3b (spécification B3, B3a point 1 ; décision 0077 § 5.1) : requises avec `AUTH_ADAPTER=better-auth` ;
-  // `EMAIL_TRANSPORT` et `SMTP_URL` : présence refusée partout jusqu'à B3b-envoi (lecture de présence seulement).
+  // `EMAIL_TRANSPORT` et `SMTP_URL` : règles de B3b-envoi (décision 0098 § 4), valeurs jamais rendues.
   BETTER_AUTH_URL: 0,
   APP_URL: 0,
   VADROUILLE_DATABASE_URL_AUTH: 0,
@@ -115,6 +116,21 @@ export type BetterAuthSettings = {
   readonly appUrl: string;
 };
 
+/** Hôtes de la liste fermée de `SMTP_URL` (décision 0098 § 2.3), en minuscules (aucun hôte de service : la CI vise `127.0.0.1`). */
+const HOTES_SMTP = [
+  { texte: "localhost", hote: "localhost" },
+  { texte: "127.0.0.1", hote: "127.0.0.1" },
+  { texte: "[::1]", hote: "::1" },
+] as const;
+export type SmtpHost = (typeof HOTES_SMTP)[number]["hote"];
+
+/**
+ * Transport d'e-mail SMTP (B3b-envoi ; décision 0098 § 2.3 et § 4 point 5) : l'hôte est **la constante de la liste
+ * fermée**, jamais le texte de l'URL (`::1` sans crochets), le port un entier. Aucun autre champ ; la chaîne brute de
+ * `SMTP_URL` ne sort pas de ce module.
+ */
+export type SmtpSettings = { readonly host: SmtpHost; readonly port: number };
+
 /** Configuration validée. Aucune chaîne secrète : les secrets n'y sont que leurs octets décodés. */
 export type ServerEnv = {
   readonly environment: ServerEnvironment;
@@ -125,10 +141,44 @@ export type ServerEnv = {
   readonly trustedIpHeader: TrustedIpHeader | null;
   /** Octets décodés de `RATE_LIMIT_HMAC_SECRET` ; `null` si absente (le limiteur échoue alors fermé, à l'usage). */
   readonly rateLimitHmacSecret: Buffer | null;
+  /** `null` ⇔ `EMAIL_TRANSPORT` absente : port d'envoi désactivé, aucun envoi implicite (B3b-envoi-PO-2). */
+  readonly smtp: SmtpSettings | null;
 };
 
 /** « Présente » : définie et non vide après `trim()` (tableau « requis quand » de la spécification). */
 const presente = (value: string | undefined): value is string => value !== undefined && value.trim() !== "";
+
+// --- SMTP_URL (B3b-envoi ; décision 0098 § 2) ---------------------------------------------------------------
+
+/**
+ * Forme stricte de la chaîne brute (0098 § 2.2), contrôlée **avant** `new URL()` : `smtp://` en minuscules, hôte
+ * IPv6 entre crochets (hexadécimal et `:`) ou lettres ASCII, chiffres et points, `:`, port en chiffres sans zéro de
+ * tête, puis rien ou un unique `/`. Aucun autre caractère : ni `@`, `%`, `\`, `?`, `#`, espace, contrôle, ni hors ASCII.
+ */
+const FORME_SMTP = /^smtp:\/\/(\[[0-9a-fA-F:]+\]|[A-Za-z0-9.]+):([1-9][0-9]{0,4})\/?$/;
+
+/**
+ * Contrôle de `SMTP_URL` (0098 § 2.2 puis § 2.3) : forme de la chaîne brute, puis recoupement par `new URL()`
+ * (schéma exact, identifiants, `search`, `hash` et chemin vides, port écrit), puis liste fermée (hôte mis en
+ * minuscules par **notre** code : pour un schéma non spécial, `URL` laisse l'hôte tel quel). Rend `null` au moindre
+ * écart ; ne copie, ne rend ni ne journalise la chaîne.
+ */
+function analyserSmtp(valeur: string): SmtpSettings | null {
+  const brute = valeur.trim();
+  const forme = FORME_SMTP.exec(brute);
+  if (forme === null) return null;
+  const port = Number(forme[2]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  if (!URL.canParse(brute)) return null;
+  const url = new URL(brute);
+  if (url.protocol !== "smtp:" || url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") return null;
+  if (url.pathname !== "" && url.pathname !== "/") return null;
+  if (url.port === "" || Number(url.port) !== port) return null;
+  const hote = url.hostname.toLowerCase();
+  const admis = HOTES_SMTP.find((entree) => entree.texte === hote);
+  if (admis === undefined) return null;
+  return Object.freeze({ host: admis.hote, port });
+}
 
 // --- Secrets (B3-TL-5, 0051 point 3) ------------------------------------------------------------------------
 
@@ -284,11 +334,15 @@ export function parseServerEnv(env: Env): ServerEnv {
   }
   const brut = lu.data;
 
-  // EMAIL_TRANSPORT et SMTP_URL (décision 0077 § 5.1 ; découpage Q361) : aucun envoi avant B3b-envoi ; la présence
-  // de l'une ou de l'autre refuse le démarrage dans les quatre environnements. Lecture de **présence** seulement
-  // (`!== undefined`) : la valeur n'est ni copiée, ni rendue, ni journalisée, ni jointe à l'erreur.
-  if (env.EMAIL_TRANSPORT !== undefined) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
-  if (env.SMTP_URL !== undefined) throw new ServerEnvError(V.SMTP_URL, "forbidden");
+  // EMAIL_TRANSPORT et SMTP_URL (B3b-envoi ; décision 0098 § 4, qui remplace le refus de 0077 § 5.1). Ordre : présence
+  // (`!== undefined` : une valeur vide ou d'espaces est présente), puis refus en `staging` et `production` **et sur
+  // Vercel quel que soit `VADROUILLE_ENV`**, sans examiner la valeur ; la suite (valeurs, adaptateur) vient après le
+  // choix de `AUTH_ADAPTER`. Aucune valeur n'est copiée, rendue, journalisée ni jointe à une erreur.
+  if (env.EMAIL_TRANSPORT !== undefined || env.SMTP_URL !== undefined) {
+    if (environment === "staging" || environment === "production" || surVercel(brut.VERCEL_ENV, brut.VERCEL)) {
+      throw new ServerEnvError(env.EMAIL_TRANSPORT !== undefined ? V.EMAIL_TRANSPORT : V.SMTP_URL, "forbidden");
+    }
+  }
 
   // Variables lues par Better Auth 1.7.7 sans passer par nos options (revue consolidée du head `f0b8c5a`, bloquant 1 ;
   // décision 0082) : `BETTER_AUTH_TRUSTED_ORIGINS` ajoute des origines de confiance à `trustedOrigins` ;
@@ -309,6 +363,19 @@ export function parseServerEnv(env: Env): ServerEnv {
   const choix = brut.AUTH_ADAPTER?.trim() || "mock";
   if (choix !== "mock" && choix !== "better-auth") throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
   if (choix === "better-auth" && environment !== "local" && environment !== "ci") throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
+
+  // EMAIL_TRANSPORT (0098 § 4 points 3 à 6) : exactement `smtp` après `trim()` (minuscules), avec
+  // `AUTH_ADAPTER=better-auth` en `local` ou `ci` seulement ; `SMTP_URL` requise avec lui, refusée sans lui.
+  let smtp: SmtpSettings | null = null;
+  if (env.EMAIL_TRANSPORT !== undefined) {
+    if (env.EMAIL_TRANSPORT.trim() !== "smtp") throw new ServerEnvError(V.EMAIL_TRANSPORT, "invalid_value");
+    if (choix !== "better-auth" || (environment !== "local" && environment !== "ci")) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
+    if (env.SMTP_URL === undefined) throw new ServerEnvError(V.SMTP_URL, "missing");
+    smtp = analyserSmtp(env.SMTP_URL);
+    if (smtp === null) throw new ServerEnvError(V.SMTP_URL, "invalid_value");
+  } else if (env.SMTP_URL !== undefined) {
+    throw new ServerEnvError(V.SMTP_URL, "forbidden");
+  }
 
   // TRUSTED_IP_HEADER (B3a point 5 ; 0051 point 2).
   let trustedIpHeader: TrustedIpHeader | null = null;
@@ -384,7 +451,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "forbidden");
   }
 
-  return Object.freeze({ environment, authAdapter: choix, betterAuth, trustedIpHeader, rateLimitHmacSecret });
+  return Object.freeze({ environment, authAdapter: choix, betterAuth, trustedIpHeader, rateLimitHmacSecret, smtp });
 }
 
 /**

@@ -1,5 +1,9 @@
 # 0081 — Décisions du Tech Lead pour B9 (B9-TL-1 à B9-TL-14), dont l'organisation des actions sans compte (B7-TL-10) et la reprise de la suite du paiement (B4-TL-12)
 
+**B9-TL-3 points 2 et 3 amendés par 0105** (ticket #522) : l'entrée de `generatePreview` et `generateFullTrip` porte aussi `organizationId` (§ 1) ; la réutilisation des candidats par un nouvel essai de l'aperçu est reportée à la sous-tâche `B9c-suite` (§ 6). Le point 1 de B9-TL-3 avait déjà été amendé par 0087.
+
+**B9-TL-1 point 4 : écart consigné par 0105 § 7** (réécriture complète du test du graphe, tâche de suite `B9c-graphe`).
+
 **B9-TL-1 points 1 et 3 amendés par 0101** (ticket #519) : `src/adapters/api-creation.ts` importe aussi `@/server/creation` (dérogation limitée à ce fichier) ; liste des importateurs de la règle de lint (`ligne/creation-imports`) fixée par 0101 § 4. Le délai de veto de 6 heures (0068) de l'en-tête ci-dessous est remplacé par 0093 : définitive dès sa fusion.
 
 **B9-TL-1 point 1 amendé par 0096** (ticket #524, § 3 point 1) : les bornes de recherche des profils `apercu`, `complet` et `mini` vont dans `src/server/config/ia.ts` (B7-TL-8), les plafonds dans `usage.ts` (0083) ; `src/server/config/generation.ts` ne garde que ses constantes de génération.

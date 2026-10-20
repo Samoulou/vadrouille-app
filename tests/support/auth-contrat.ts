@@ -22,8 +22,8 @@ export type BancContrat = {
   readonly adapter: AuthAdapter;
   /** Adresse valide propre à l'appel ; le banc peut en profiter pour changer de client (adresse IP de confiance). */
   adresse(): string;
-  /** Dernier code reçu par `email` (double de capture ou constante du simulé), ou `undefined`. */
-  code(email: string): string | undefined;
+  /** Dernier code reçu par `email` (double de capture, constante du simulé ou API de Mailpit), ou `undefined`. */
+  code(email: string): string | undefined | Promise<string | undefined>;
   /** Fait expirer le code en cours de `email` (horloge de portée, ou échéance reculée en base). */
   expirer(email: string): Promise<void>;
 };
@@ -32,7 +32,7 @@ const codeFaux = (code: string) => (code === "000000" ? "111111" : "000000");
 
 async function demander(banc: BancContrat, email: string): Promise<string> {
   expect(await banc.adapter.requestCode({ email })).toEqual({ ok: true, value: { sent: true } });
-  const code = banc.code(email);
+  const code = await banc.code(email);
   expect(code).toMatch(/^[0-9]{6}$/);
   return code as string;
 }

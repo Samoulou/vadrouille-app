@@ -176,7 +176,9 @@ export default defineConfig({
     ...(AUTH_SERVER
       ? [
           {
-            // Même build, connexion réelle (B3c point 7) ; ni `EMAIL_TRANSPORT` ni `SMTP_URL` : port d'envoi désactivé.
+            // Même build, connexion réelle (B3c point 7) ; envoi du code par SMTP vers le Mailpit du job `db` (B3b-envoi,
+            // décision 0098 § 5.6) : `EMAIL_TRANSPORT` et `SMTP_URL` posées **en clair** ici (valeurs de la boucle locale,
+            // sans valeur secrète), jamais dans `$GITHUB_ENV` ni dans un secret du dépôt.
             command: serve,
             url: authURL,
             reuseExistingServer: false,
@@ -187,6 +189,8 @@ export default defineConfig({
               AUTH_ADAPTER: "better-auth",
               VADROUILLE_ENV: "ci",
               TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
+              EMAIL_TRANSPORT: "smtp",
+              SMTP_URL: "smtp://127.0.0.1:1025",
               BETTER_AUTH_URL: authURL,
               APP_URL: authURL,
               BETTER_AUTH_SECRET: secretJetable(),

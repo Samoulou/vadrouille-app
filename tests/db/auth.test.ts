@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { envoyerCodeRecu } from "@/server/auth/envoi";
 import { disabledCodeMailer } from "@/server/mail/disabled";
+import { createSmtpCodeMailer } from "@/server/mail/smtp";
 import { creerContexteServeur } from "@/server/session";
 import { fabriqueAdaptateur, MODELES } from "@/tenancy/adaptateur";
 import { RechercheJetonRefuseeError } from "@/tenancy/jetons-haches";
@@ -11,6 +12,7 @@ import { RechercheJetonRefuseeError } from "@/tenancy/jetons-haches";
 import { createDatabase } from "../../db/index";
 import { adresse, canonique, codeFaux, connecter, demanderCode, identifiant, jetonDuCookie, preparerBanc } from "./auth-outils";
 import { closeAll, connect, type DbClient, inTx, unique } from "./helpers";
+import { attendreMessages, dernierCodeMailpit, MAILPIT_SMTP } from "./mailpit";
 
 /**
  * Better Auth, organisations et contexte (spécification B3, critères B1, B4 à B10, B12, B13 et B15 ; décision 0077 § 5).
@@ -459,6 +461,45 @@ describe("parcours", () => {
       for (const espion of espions) espion.mockRestore();
       await bancIp.fermer();
       await bancDesactive.fermer();
+    }
+  });
+  it("journaux: aucun email ni code dans les journaux (SMTP vers Mailpit, critère E6)", async () => {
+    const ip = `198.51.100.${1 + Math.floor(Math.random() * 250)}`;
+    const email = adresse("journal-smtp");
+    const panne = adresse("journal-smtp-panne");
+    const refusee = adresse("journal-smtp-refus");
+    const bancSmtp = preparerBanc({ trustedIpHeader: "x-vercel-forwarded-for", port: createSmtpCodeMailer(MAILPIT_SMTP) });
+    // Port fermé de la boucle locale : erreur de connexion dont le message de `nodemailer` porte l'adresse IP et le port.
+    const bancPanne = preparerBanc({ trustedIpHeader: "x-vercel-forwarded-for", port: createSmtpCodeMailer({ host: "127.0.0.1", port: 1 }) });
+    const espions = [
+      ...(["log", "info", "warn", "error", "debug"] as const).map((methode) => vi.spyOn(console, methode)),
+      vi.spyOn(process.stdout, "write"),
+      vi.spyOn(process.stderr, "write"),
+    ];
+    const codes: string[] = [];
+    try {
+      const enTetes = new Headers({ "x-vercel-forwarded-for": ip, "user-agent": `agent-${ip}` });
+      // Envoi réel vers Mailpit, code lu par l'API, vérification.
+      expect(await bancSmtp.operations.requestCode(email)).toEqual({ ok: true });
+      await attendreMessages(email);
+      const code = await dernierCodeMailpit(email);
+      expect(code).toMatch(/^[0-9]{6}$/);
+      codes.push(code ?? "", codeFaux(code ?? ""));
+      expect((await bancSmtp.operations.verifyCode({ email, code: code ?? "", headers: enTetes })).ok).toBe(true);
+      // Erreur SMTP réelle (connexion refusée) : `provider_error`, message de la bibliothèque jamais journalisé.
+      expect(await bancPanne.operations.requestCode(panne)).toEqual({ ok: false, code: "provider_error" });
+      // Enveloppe refusée : valeur forcée dans le type de marque, contrôle d'adresse neutralisé.
+      const mailerRefus = createSmtpCodeMailer(MAILPIT_SMTP, { adresseAdmise: () => true });
+      await expect(mailerRefus.sendLoginCode({ to: `${refusee},autre@exemple.test` as typeof refusee, code: "135791", expiresInMinutes: 10 })).rejects.toThrow();
+      const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+      expect(ecrit).toContain("email.envelope_refused");
+      for (const interdit of [email, panne, refusee, "autre@exemple.test", "127.0.0.1", ip, "135791", ...codes]) {
+        expect(ecrit).not.toContain(interdit);
+      }
+    } finally {
+      for (const espion of espions) espion.mockRestore();
+      await bancSmtp.fermer();
+      await bancPanne.fermer();
     }
   });
 });

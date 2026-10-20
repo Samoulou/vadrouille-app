@@ -17,6 +17,7 @@ export { default as debloquer } from "./fr/debloquer.json";
 export { default as etats } from "./fr/etats.json";
 export { default as creation } from "./fr/creation.json";
 export { default as connexion } from "./fr/connexion.json";
+export { default as emailCode } from "./fr/emailCode.json";
 export { default as revision } from "./fr/revision.json";
 export { default as partage } from "./fr/partage.json";
 export { default as prototype } from "./fr/prototype.json";
