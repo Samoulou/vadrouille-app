@@ -21,6 +21,8 @@ Correction 1 (revue consolidée du head `2b8181f`) : deux bloquants (fiches des 
 
 Correction 2 (revue consolidée du head `64c6e30`) : un bloquant tardif (`request_id` des versions publiées par une exécution `full`, § 1.7, amendement de B9-TL-10) et cinq mineurs traités (module feuille de `src/server/generation/` et destinataires du contexte système ; emplacement du constructeur du contexte système ; nom périmé de la fonction de zone et départ ; chiffrage de la question 4 ; cas du test du graphe) ; `main` relue à `4c03f43` (inchangée, fusionnée dans la branche ; `main` porte toujours 0001 à 0086).
 
+**§ 3 point 2 précisé par 0100** (ticket #544, § 1.6, § 6.2) : `PointTrajet` admet aussi, en lecture, un `placeId` sans position ; la lecture applique la clé maison d'un `suggestedArea` depuis le centre stocké dans `stays`, sous le verdict de la Sécurité du point 4.
+
 ## Contexte
 L'amendement 1 de B9 (reprise d'un voyage complet échoué, voyages à plusieurs fuseaux) et les amendements de B8 et B9 sur les logements renvoient au Tech Lead six formes techniques que B9b, B9c et B9d attendent : la question 14 (a) bloque la migration de B9b (colonne du compteur), (c) et (e) bloquent `createTrip`, (d) bloque la tâche frontend des bandeaux, la question 17 bloque B9c, la question 11 de B8 bloque la configuration de B9c. Principe appliqué partout : **l'agent cherche, l'ancrage vérifie, le moteur planifie** ; aucune règle n'est écrite deux fois (une seule écriture conditionnelle de reprise, une seule table des fuseaux, une seule fonction de vérification du logement, un seul prédicat « jour pas encore planifié »).
 
