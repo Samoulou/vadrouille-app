@@ -32,7 +32,6 @@ const CENT_MICROS = 10_000;
 
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
 const SQL_EXECUTION = `SELECT r.mode, r.brief, r.variant, r.cost_models_micros, pg_catalog.to_char(r.quota_day, 'YYYY-MM-DD') AS jour_quota,
-  pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now() - r.started_at) * 1000)::bigint AS ecoule_ms,
   (SELECT pg_catalog.count(*) FROM prototype.runs AS a
     WHERE a.quota_day = r.quota_day AND a.mode IN ('reel', 'essai') AND (a.started_at, a.id) <= (r.started_at, r.id)) AS numero_jour
 FROM prototype.runs AS r WHERE r.id = $1::uuid AND r.status = 'en_cours'`;
@@ -102,7 +101,6 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
     const ligne = (await client.query(SQL_EXECUTION, [id])).rows[0];
     if (ligne === undefined) throw new EchecTravail("execution_absente");
     const cout = ligne.cost_models_micros === null ? 0 : Number(ligne.cost_models_micros);
-    const ecoule = typeof ligne.ecoule_ms === "string" || typeof ligne.ecoule_ms === "number" ? Number(ligne.ecoule_ms) : Number.NaN;
     const numero = typeof ligne.numero_jour === "string" || typeof ligne.numero_jour === "number" ? Number(ligne.numero_jour) : Number.NaN;
     const { mode, brief, variant, jour_quota: jourQuota } = ligne;
     if (
@@ -113,14 +111,12 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
       cout < 0 ||
       typeof jourQuota !== "string" ||
       !JOUR.test(jourQuota) ||
-      !Number.isSafeInteger(ecoule) ||
       !Number.isSafeInteger(numero) ||
       numero < 1
     ) {
       throw new EchecTravail("base");
     }
-    // Horloges de la base et du serveur légèrement décalées : un écoulé négatif compte pour zéro.
-    return { mode, brief, variante: variant, coutModelesMicros: cout, jourQuota, numeroDuJour: numero, ecouleMs: Math.max(0, ecoule) };
+    return { mode, brief, variante: variant, coutModelesMicros: cout, jourQuota, numeroDuJour: numero };
   });
 }
 
