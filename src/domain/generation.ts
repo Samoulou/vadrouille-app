@@ -115,7 +115,7 @@ export function sourceDe(candidat: { sources: readonly { url: string }[] }): Sou
   return source === undefined ? undefined : { label: new URL(source.url).hostname, url: source.url };
 }
 
-function lieuValide(relectures: Relectures, placeId: string | undefined): placeId is string {
+export function lieuValide(relectures: Relectures, placeId: string | undefined): placeId is string {
   return placeId !== undefined && relectures.validite(placeId) === "valide";
 }
 

@@ -1,9 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ArretEtape } from "@/server/generation/codes";
 import { resoudre } from "@/server/generation/dependances";
 
-import { chargerDoublesEdimbourg, ErreurFixtures, lectureAdmise, lecturesDeFixtures } from "@/server/composition/fixtures-simulees";
+import { chargerDoublesEdimbourg, ErreurFixtures, lectureAdmise } from "@/server/composition/fixtures-simulees";
+
+/** Espion sur la lecture de fichiers (mineur 12 de la revue du head `7b69742` : aucun compteur exporté par le module de production). */
+const lecturesDeFixtures = vi.hoisted(() => ({ fichiers: 0, contenu: undefined as string | undefined }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const reel = await importOriginal<typeof import("node:fs/promises")>();
+  const readFile = async (...args: Parameters<typeof reel.readFile>) => {
+    lecturesDeFixtures.fichiers += 1;
+    return lecturesDeFixtures.contenu ?? (reel.readFile as (...a: unknown[]) => Promise<string>)(...args);
+  };
+  return { ...reel, default: { ...reel, readFile }, readFile };
+});
 
 /**
  * Fixtures d'Édimbourg hors du graphe de production (décision 0105 § 2 ; revue de la PR 563, bloquant 1) : `production` ne
@@ -54,5 +65,17 @@ describe("fixtures simulées : jamais chargées en production", () => {
     const doubles = fabrique();
     expect(Object.keys(doubles).sort()).toEqual(["lecteur", "modeles", "places", "rechercheWeb", "routes"]);
     expect(fabrique().places).not.toBe(doubles.places);
+  });
+
+  it("une fixture invalide rend l'erreur fermée fixtures_illisibles, jamais une ZodError ni un chemin", async () => {
+    lecturesDeFixtures.contenu = JSON.stringify({ inattendu: true });
+    try {
+      const erreur = await chargerDoublesEdimbourg({ VADROUILLE_ENV: "ci" }).catch((e: unknown) => e);
+      expect(erreur).toBeInstanceOf(ErreurFixtures);
+      expect((erreur as ErreurFixtures).code).toBe("fixtures_illisibles");
+      expect((erreur as Error).message).not.toMatch(/prototype|\.json|\//);
+    } finally {
+      lecturesDeFixtures.contenu = undefined;
+    }
   });
 });

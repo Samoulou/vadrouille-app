@@ -13,6 +13,7 @@ import { creerRoutesSimule, FixturesRoutesSchema } from "@/grounding/routes.simu
 import { creerLecteurPages } from "@/research/fetch-page";
 import { creerHttpSimule, creerResolveurSimule, FixturesPagesSchema } from "@/research/pages.simule";
 import { creerRechercheSimulee, FixturesRechercheSchema } from "@/research/recherche-web.simule";
+import { deploiementTraiteCommeProduction } from "@/server/config/generation";
 
 
 /** Doubles des fournisseurs ; structurellement `DoublesGeneration` de la composition (qui ne peut pas être importée d'ici). */
@@ -43,19 +44,12 @@ export class ErreurFixtures extends Error {
  *   barrière : la plus restrictive des deux déclarations) ; les déclarations lui sont passées par l'appelant (aucune lecture d'environnement ici) ;
  * - aucune fixture en cache de module : chaque appel relit les fichiers.
  */
-const LOCAUX: ReadonlySet<string> = new Set(["local", "development", "ci", "test", "preview", "staging"]);
-
-/** Faux si l'une des déclarations de déploiement vaut `production` ou est inconnue, ou si aucune n'est posée. */
+/** Faux si l'une des déclarations de déploiement vaut `production` ou est inconnue, ou si aucune n'est posée (prédicat de la barrière). */
 export function lectureAdmise(env: Readonly<Record<string, string | undefined>>): boolean {
-  const declarees = [env.VADROUILLE_ENV, env.VERCEL_ENV].map((v) => v?.trim().toLowerCase()).filter((v): v is string => v !== undefined && v !== "");
-  return declarees.length > 0 && declarees.every((v) => LOCAUX.has(v));
+  return !deploiementTraiteCommeProduction(env);
 }
 
-/** Mesure de test : nombre de fichiers de fixtures lus depuis le chargement du module (jamais un contenu ni un chemin). */
-export const lecturesDeFixtures = { fichiers: 0 };
-
 async function lire(famille: string): Promise<unknown> {
-  lecturesDeFixtures.fichiers += 1;
   try {
     // Chemin calculé à l'exécution, relatif au répertoire de travail : ni le bundler ni le traceur n'ont de littéral à résoudre.
     const fichier = resolve("prototype", "fixtures", famille, "edimbourg.json");
@@ -69,13 +63,19 @@ async function lire(famille: string): Promise<unknown> {
 export async function chargerDoublesEdimbourg(env: Readonly<Record<string, string | undefined>>): Promise<() => DoublesFixtures> {
   if (!lectureAdmise(env)) throw new ErreurFixtures("fixtures_refusees");
   const [modeles, pages, places, recherche, routes] = await Promise.all(["modeles", "pages", "places", "recherche", "routes"].map(lire));
-  const fixtures = {
-    modeles: FixturesModelesSchema.parse(modeles),
-    pages: FixturesPagesSchema.parse(pages),
-    places: FixturesPlacesSchema.parse(places),
-    recherche: FixturesRechercheSchema.parse(recherche),
-    routes: FixturesRoutesSchema.parse(routes),
-  };
+  // Validation dans le `try` : une fixture invalide rend la même erreur fermée (jamais une `ZodError` ni un chemin).
+  let fixtures;
+  try {
+    fixtures = {
+      modeles: FixturesModelesSchema.parse(modeles),
+      pages: FixturesPagesSchema.parse(pages),
+      places: FixturesPlacesSchema.parse(places),
+      recherche: FixturesRechercheSchema.parse(recherche),
+      routes: FixturesRoutesSchema.parse(routes),
+    };
+  } catch {
+    throw new ErreurFixtures("fixtures_illisibles");
+  }
   return () => ({
     modeles: creerModelesSimules(fixtures.modeles),
     rechercheWeb: creerRechercheSimulee(fixtures.recherche),

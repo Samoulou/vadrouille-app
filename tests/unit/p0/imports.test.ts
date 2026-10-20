@@ -799,7 +799,10 @@ const areteAdmise = (de: string, vers: string) =>
   (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
   // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
   // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
-  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart de B9c consigné dans sa PR : la réécriture complète de ce test du graphe (point 4) n'est pas faite ; les arêtes de la génération sont couvertes par les cas « B9c admis/refusé » ci-dessous et par `composition.test.ts`.
+  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart consigné par la décision 0105 § 7 :
+  // la réécriture complète de ce test du graphe (0081 B9-TL-1 point 4) est la tâche de suite `B9c-graphe` ; les arêtes de la
+  // génération sont couvertes par les cinq cas nominatifs « B9c admis/refusé » ci-dessous et par `composition.test.ts`, et
+  // B9c n'ajoute aucune arête à `areteAdmise`.
   (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */

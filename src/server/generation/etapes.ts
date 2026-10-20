@@ -3,6 +3,9 @@ import "server-only";
 import type { Category, DaySnapshot, StopFacts, StopSnapshot, TripSnapshot } from "@/contracts";
 import type { CandidatEvenement, CandidatIdee, CandidatMoteur, NotesMoteur, TypeCreneau } from "@/domain/entrees";
 import { modesAdmis } from "@/domain/generation";
+import { candidatsDIdees, type JourPourIdees } from "@/domain/idees";
+import type { Trajet } from "@/domain/planification";
+import { INCONNU, trajetLePlusRapide } from "@/domain/relectures";
 import { squeletteAvecEngagements } from "@/domain/squelette";
 import { joursEntre } from "@/domain/temps";
 import {
@@ -17,7 +20,7 @@ import {
   type OptionsEtape,
 } from "@/server/composition/generation";
 import { CONFIGURATION_CLASSEMENT } from "@/server/config/classement";
-import { CASES_APERCU, DUREE_ETAPE_MS, JOURS_PLANIFIES_APERCU, RANG_ETAPE, type EtapeApercu } from "@/server/config/generation";
+import { CASES_APERCU, DUREE_ETAPE_MS, IDEES_CANDIDATES_MAX, JOURS_PLANIFIES_APERCU, RANG_ETAPE, type EtapeApercu } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { executeurSql } from "@/server/with-org";
 
@@ -520,35 +523,19 @@ function candidatMoteur(candidat: CandidatLu): (CandidatMoteur & { readonly vill
 }
 
 /**
- * Candidats d'idée « Surprends-moi » (0106 § 1, 0105 § 5.1 point 1) : par jour planifié, les candidats `place` ancrés et notés de
- * la ville du soir qui ne sont dans **aucun** jour du plan, les `ideesParJour` (`IDEES_PAR_JOUR_APERCU`) mieux notés au plus (voeux, incontournable,
- * risque faible ; ordre de la recherche à égalité). L'étape ne choisit pas l'idée : `ideeDuJour` (moteur) le fait.
+ * Entrée de `candidatsDIdees` (0105 § 5.1 point 2) depuis le premier passage : pour chaque jour planifié, son logement du soir,
+ * les identifiants des candidats retenus et les lieux de ses étapes et de ses événements. La sélection et la borne sont la
+ * fonction pure de `src/domain/idees.ts` : l'étape ne trie ni ne choisit rien.
  */
-function choisirCandidatsIdees(
-  programme: TripSnapshot,
-  candidats: readonly CandidatMoteur[],
-  parPlaceId: ReadonlyMap<string, CandidatLu>,
-  squelette: readonly { readonly index: number; readonly logementArrivee: number }[],
-  nuitsVille: readonly number[],
-  parJour: number,
-): CandidatLu[] {
-  const auPlan = new Set(programme.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
-  const retenus = new Map<string, CandidatLu>();
-  for (const jour of squelette) {
-    const ville = nuitsVille[jour.logementArrivee];
-    const classes = candidats
-      .map((moteur, rang) => ({ moteur, rang, lu: moteur.placeId === undefined ? undefined : parPlaceId.get(moteur.placeId) }))
-      .filter((c): c is typeof c & { lu: CandidatLu } => c.lu !== undefined && c.lu.ville === ville && c.moteur.placeId !== undefined && !auPlan.has(c.moteur.placeId))
-      .sort(
-        (a, b) =>
-          Number(b.moteur.notes.matchesWishes) - Number(a.moteur.notes.matchesWishes) ||
-          Number(b.moteur.notes.mustSee) - Number(a.moteur.notes.mustSee) ||
-          a.moteur.notes.notForMeRisk - b.moteur.notes.notForMeRisk ||
-          a.rang - b.rang,
-      );
-    for (const { lu } of classes.slice(0, parJour)) retenus.set(lu.id, lu);
-  }
-  return [...retenus.values()];
+function joursPourIdees(programme: TripSnapshot, candidats: readonly CandidatMoteur[], squelette: readonly { readonly index: number; readonly logementArrivee: number }[]): JourPourIdees[] {
+  return squelette.flatMap((jourSquelette) => {
+    const jour = programme.days.find((j) => j.index === jourSquelette.index);
+    if (jour === undefined) return [];
+    const lieux = [...jour.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])), ...jour.events].flatMap((stop) => (stop.placeId === undefined ? [] : [stop.placeId]));
+    const ensemble = new Set(lieux);
+    const ids = candidats.filter((candidat) => candidat.placeId !== undefined && ensemble.has(candidat.placeId)).map((candidat) => candidat.id);
+    return [{ logementArrivee: jourSquelette.logementArrivee, ids, lieux }];
+  });
 }
 
 /** Les étapes (lieu, genre, heure, jour) de deux programmes sont les mêmes : seule l'idée du jour peut différer. */
@@ -635,6 +622,12 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
 
       const parPlaceId = new Map(retenables.flatMap(({ lu, moteur }) => (moteur.placeId === undefined ? [] : [[moteur.placeId, lu] as const])));
       const evenements = evenementsDe(lus.candidats, lus.occurrences);
+      // Trajet du premier passage (mêmes relectures que le moteur, mêmes modes) : celui que classe `candidatsDIdees`.
+      const modes = modesAdmis(voyage.brief.mobility);
+      const trajetDuPremierPassage: Trajet = (depuis, vers) => {
+        const resultat = trajetLePlusRapide(planification.valeur.relectures, depuis, vers, modes);
+        return resultat === INCONNU ? undefined : resultat;
+      };
       const entreeMoteur = (candidats: readonly CandidatMoteur[], idees: readonly CandidatIdee[] = []) => ({
         voyage: {
           destination: voyage.draft.destination,
@@ -675,7 +668,22 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         etapes = programme.days
           .filter((jour) => jours.includes(jour.index))
           .flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined && parPlaceId.has(item.stop.placeId) ? [{ stop: item.stop, candidat: parPlaceId.get(item.stop.placeId) as CandidatLu }] : [])));
-        const candidatsIdees = choisirCandidatsIdees(programme, candidats, parPlaceId, squelette, nuitsVille, contexte.dep.ideesParJour);
+        // Candidats d'idée « Surprends-moi » (0105 § 5.1 point 2) : fonction pure du domaine, sur les relectures et le trajet du
+        // premier passage (aucune mesure redemandée, aucune fiche ni aucun élément Routes propre aux idées, 0105 § 5.1 point 4).
+        // Le lot de rédaction grossit de `IDEES_CANDIDATES_MAX` lieux au plus (0105 § 5.1 point 3).
+        const candidatsIdees = candidatsDIdees({
+          jours: joursPourIdees(programme, candidats, squelette),
+          candidats,
+          relectures: planification.valeur.relectures,
+          trajet: trajetDuPremierPassage,
+          parametres: classement,
+          parJour: contexte.dep.ideesParJour,
+        })
+          .slice(0, IDEES_CANDIDATES_MAX)
+          .flatMap((candidat) => {
+            const lu = candidat.placeId === undefined ? undefined : parPlaceId.get(candidat.placeId);
+            return lu === undefined ? [] : [lu];
+          });
         idsIdees = new Set(candidatsIdees.map((candidat) => candidat.id));
         for (const ville of villes) {
           const lieux: LieuARedige[] = etapes
@@ -707,7 +715,10 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         }
         // Un lieu dont la raison manque (rédaction échouée ou omise) est retiré, et le programme replanifié sans lui (deux passes au
         // plus). Passé la seconde, une étape sans raison reste dans la version 1, sans `reason` (`StopSnapshot.reason` est
-        // facultatif) et sans case `proposal` : jamais inventée (décision 0105 § 4.2).
+        // facultatif) et sans case `proposal` : jamais inventée (décision 0105 § 4.2 ; 0106 § 6.2 : un lieu du programme, pas une
+        // proposition, `incomplete`, jamais `failed`). Limites assumées (mineur 8 de la revue de #563) : le dédoublonnage de
+        // l'étape `c` avant la notation peut retirer un lieu entier, et un candidat gardé mais non noté laisse son lieu sans
+        // candidat éligible ici (`eligibles` exige les notes).
         const sansRaison = new Set(etapes.filter(({ candidat }) => !raisons.has(candidat.id)).map(({ candidat }) => candidat.id));
         if (sansRaison.size === 0) break;
         const ids = new Set(retenables.filter(({ lu }) => sansRaison.has(lu.id)).flatMap(({ moteur }) => moteur.id));

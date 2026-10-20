@@ -8,9 +8,10 @@ import "server-only";
  * barrière, rendues telles quelles (jamais journalisées) :
  * - `VADROUILLE_ENV` et `VERCEL_ENV` : déploiement déclaré (la barrière retient la plus restrictive) ;
  * - `VERCEL_GIT_COMMIT_REF` : branche du déploiement (identifiant public posé par Vercel) ;
- * - `GENERATION_APPELS_REELS` : drapeau d'activation côté serveur, comparaison exacte à `1` par la barrière ;
- * - `POSITIONS_ECRITURE_SUSPENDUE` (nom fixé par 0060 § 1.3) : `1` suspend l'écriture des positions au cache de la
- *   génération ; lue par `ecriturePositionsSuspendue`, comparaison exacte à `1`.
+ * - `GENERATION_APPELS_REELS` : drapeau d'activation côté serveur, comparaison exacte à `1` par la barrière.
+ * `POSITIONS_ECRITURE_SUSPENDUE` (nom fixé par 0060 § 1.3) n'est **pas** lue ici : ce module réexporte seulement
+ * `ecriturePositionsSuspendue` de `./relectures`, son seul lecteur (comparaison exacte à `1`), pour que la barrière n'importe
+ * qu'un module d'environnement.
  */
 
 type Env = Readonly<Record<string, string | undefined>>;

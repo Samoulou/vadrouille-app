@@ -503,7 +503,9 @@ describe("aperçu (revue) : deux candidats sur le même lieu", () => {
     expect(portes).not.toContain(second?.id);
     // La case qui porte ce lieu, s'il est retenu, porte le premier candidat.
     expect(portes).toContain(premier?.id);
-    const parLieu = new Map(candidatsLieux.filter((c) => c.place_id !== null).map((c) => [c.place_id as string, c.id]));
-    expect(new Set(candidatsLieux.map((c) => c.place_id).filter((p) => p !== null)).size).toBe(parLieu.size);
+    // Aucun lieu n'est porté par deux candidats après l'ancrage (assertion indépendante des données comparées, mineur 6).
+    const lieuxPortes = candidatsLieux.flatMap((c) => (c.place_id === null ? [] : [c.place_id]));
+    expect(lieuxPortes.length).toBeGreaterThan(0);
+    expect(new Set(lieuxPortes).size).toBe(lieuxPortes.length);
   });
 });

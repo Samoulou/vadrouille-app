@@ -61,7 +61,7 @@ import type { PlafondsUsage } from "@/server/config/usage";
  *   web, pages : rien de Google), `ancrage` (Text Search et position), `notation` (modèles), `finale` (fiches, Routes et
  *   rédaction des raisons : jamais la recherche web ni les pages).
  * - **Variantes** : `reelle` (clients de `clients-google.ts`, OpenRouter, recherche web et pages sur le transport réel) et
- *   `simulee` (doubles sur les fixtures d'Édimbourg de `prototype/fixtures/`, les seules en local et en CI, chargées hors du graphe de production par `doubles-edimbourg.ts`, atteint seulement par `import()` dynamique : décision 0105). Les doubles
+ *   `simulee` (doubles sur les fixtures d'Édimbourg de `prototype/fixtures/`, les seules en local et en CI, chargées hors du graphe de production par `fixtures-simulees.ts`, atteint seulement par `import()` dynamique : décision 0105). Les doubles
  *   sont enveloppés dans la même réservation que les clients réels (`avecReservation`) : un plafond ou un quota agit de la
  *   même façon dans les deux variantes. Le choix de la variante est celui de la barrière (`generation/barriere.ts`).
  * - **Positions** (B8c fusionnée, 0081 B9-TL-9) : la composition n'écrit rien elle-même ; `planifier` rend les positions des fiches

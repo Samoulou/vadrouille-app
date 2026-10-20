@@ -3,7 +3,7 @@ import "server-only";
 import { ProposalRecordSchema, type Category, type DaySnapshot, type ProposalRecord, type SegmentSnapshot, type StopSnapshot, type TripSnapshot } from "@/contracts";
 import { MAX_PREVIEW_SLOTS } from "@/contracts/values";
 import type { ConfigurationMoteur } from "@/domain/configuration";
-import type { JourSquelette } from "@/domain/squelette";
+import { finOccupee, type JourSquelette } from "@/domain/squelette";
 import { versHeure, versMinutes } from "@/domain/temps";
 
 /**
@@ -11,11 +11,14 @@ import { versHeure, versMinutes } from "@/domain/temps";
  * étapes `activity` et `meal` de la version 1, dans l'ordre chronologique (jour, puis heure de début), en commençant par le
  * jour 1 ; les engagements, logements et événements ne sont pas des cases. Une case `proposal` porte un `ProposalRecord`
  * validé (raison et détour compris). Moins de 8 étapes ancrées et rédigées : cases `noOption` à la suite (`day`, `time`,
- * `kind` du créneau manquant, pris dans le squelette : d'abord les créneaux attendus restés libres, puis les créneaux de repli, jamais
- * deux fois le même `(jour, heure)` ; décision 0105 § 4.1), jamais un lieu non ancré.
+ * `kind` du créneau manquant, pris dans le squelette : d'abord les créneaux attendus restés libres, puis les créneaux de repli ;
+ * décision 0105 § 4.1), jamais un lieu non ancré. Une case `noOption` n'est jamais posée dans l'intervalle (début à fin) d'une
+ * étape, d'un événement, d'un engagement ou d'un repas du jour (0106 § 6.1 ; comparaison sur les intervalles de l'instantané,
+ * jamais sur l'heure de début seule) ; si les heures libres ne suffisent pas, il y a moins de huit cases (`incomplete`, 0105
+ * § 8 point 3), jamais une case en chevauchement.
  *
- * B9-PO-5 amendé (décision 0106 § 4) : un repas compte une case (`PreviewSlotsSchema` interdit deux cases au même créneau) ;
- * les options de repas sont reportées à B10, après la question 57 de Samuel.
+ * Repas (0106 § 4, **provisoire jusqu'à la réponse de Samuel à la question 57**, qu'elle ne préjuge pas) : une case par repas
+ * (l'option que le moteur retient ; `PreviewSlotsSchema` interdit deux cases au même créneau).
  */
 
 export type CaseApercu =
@@ -107,6 +110,20 @@ function creneauxDeRepli(jours: readonly JourSquelette[]): { day: number; time: 
   return repli;
 }
 
+type Intervalle = { readonly debut: number; readonly fin: number };
+
+/** Intervalles occupés `[début, fin[` d'un jour de l'instantané, en minutes : étapes (engagements et repas compris) et événements. */
+function intervallesOccupes(jour: DaySnapshot, configuration: ConfigurationMoteur): Intervalle[] {
+  const etapes = [...jour.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])), ...jour.events];
+  return etapes.map((stop) => ({ debut: versMinutes(stop.start), fin: finOccupee(stop, configuration) }));
+}
+
+/** Vrai si l'heure tombe dans l'intervalle d'une étape, d'un événement, d'un engagement ou d'un repas de ce jour (0106 § 6.1). */
+function creneauOccupe(occupes: ReadonlyMap<number, readonly Intervalle[]>, day: number, time: string): boolean {
+  const instant = versMinutes(time);
+  return (occupes.get(day) ?? []).some(({ debut, fin }) => instant >= debut && instant < Math.max(fin, debut + 1));
+}
+
 export function composerCases(entree: EntreeCases): CaseApercu[] {
   const retenues = entree.instantane.days
     .filter((jour) => entree.jours.includes(jour.index))
@@ -131,21 +148,22 @@ export function composerCases(entree: EntreeCases): CaseApercu[] {
     return { type: "proposal", position: rang + 1, day: jour.index, time: stop.start, kind, candidatId: lieu.candidatId, contenu };
   });
 
+  const occupes = new Map(entree.instantane.days.filter((jour) => entree.jours.includes(jour.index)).map((jour) => [jour.index, intervallesOccupes(jour, entree.configuration)] as const));
+  // Une case par `(jour, heure)` (contrat `PreviewSlotsSchema`) et jamais dans un intervalle occupé (0106 § 6.1).
   const pris = new Set(cases.map((c) => `${c.day}|${c.time}`));
+  const libre = (day: number, time: string) => !pris.has(`${day}|${time}`) && !creneauOccupe(occupes, day, time);
   const manquants = creneauxAttendus(entree.squelette.filter((jour) => entree.jours.includes(jour.index)), entree.configuration);
   const planifies = entree.squelette.filter((jour) => entree.jours.includes(jour.index));
   for (const attendu of manquants) {
     if (cases.length >= MAX_PREVIEW_SLOTS) break;
-    const cle = `${attendu.day}|${attendu.time}`;
-    if (pris.has(cle)) continue;
-    pris.add(cle);
+    if (!libre(attendu.day, attendu.time)) continue;
+    pris.add(`${attendu.day}|${attendu.time}`);
     cases.push({ type: "noOption", position: cases.length + 1, day: attendu.day, time: attendu.time, kind: attendu.kind });
   }
   for (const repli of creneauxDeRepli(planifies)) {
     if (cases.length >= MAX_PREVIEW_SLOTS) break;
-    const cle = `${repli.day}|${repli.time}`;
-    if (pris.has(cle)) continue;
-    pris.add(cle);
+    if (!libre(repli.day, repli.time)) continue;
+    pris.add(`${repli.day}|${repli.time}`);
     cases.push({ type: "noOption", position: cases.length + 1, ...repli });
   }
   return cases;

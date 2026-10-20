@@ -18,6 +18,7 @@ import {
   derouler,
   doublesEdimbourg,
 } from "../support/banc-apercu";
+import { compterAppels, compteursVides, type Compteurs } from "../support/compteur-appels";
 import { journalDePrompts } from "../support/journal-prompts";
 import { avecSentinellesGoogle, sentinellesPresentes } from "../support/sentinelles-google";
 import { creerBaseApercu, type BaseApercu } from "./base-apercu";
@@ -118,6 +119,10 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
       expect(jour.surprise?.placeId, `idée du jour ${index}`).toBeDefined();
       expect(lieuxDuJour(jour)).not.toContain(jour.surprise?.placeId);
       expect(auPlan.has(jour.surprise?.placeId as string)).toBe(false);
+      // Admissibilité complète (0106 § 1) : source `https:`, raison maison écrite.
+      const idee = jour.surprise as { source?: { url: string }; reason?: string };
+      expect(idee.source?.url.startsWith("https:")).toBe(true);
+      expect(idee.reason?.trim()).not.toBe("");
     }
     const idees = js.slice(0, 2).map((j) => (j as { surprise?: { placeId?: string } }).surprise?.placeId);
     expect(new Set(idees).size).toBe(2);
@@ -198,5 +203,60 @@ describe("aperçu : Surprends-moi (0106 § 1, 0105 § 5)", () => {
     expect(fin.arret).toBeUndefined();
     expect(texte.length).toBeGreaterThan(0);
     expect(sentinellesPresentes(texte, sentinelles)).toEqual([]);
+  });
+
+  /**
+   * Coût des idées (0105 § 5.1 point 4, cas (f)) : les candidats d'idée sont mesurés par les relectures et le trajet du premier
+   * passage ; aucune fiche ni aucun élément Routes propre aux idées n'est demandé. Le compteur d'appels Google de l'étape e est
+   * le même avec et sans idées, et un forfait épuisé juste après les mesures du plan (double qui refuse tout appel de plus)
+   * n'empêche ni les étapes ni la publication : rien n'échoue, aucune étape ne change.
+   */
+  it("coût : aucune fiche ni élément Routes propre aux idées ; forfait Google épuisé après le plan : étapes intactes, jamais failed", async () => {
+    async function etapeE(ideesParJour: number | undefined, limite?: { places: number; routes: number }) {
+      const org = await createOrg(auth);
+      const { tripId, etat } = await lancer(org);
+      const progres = await derouler(etat, dependances(), ETAPE_E);
+      expect(progres.arret).toBeUndefined();
+      const compteurs: Compteurs = compteursVides();
+      const fabrique = () =>
+        composerSimuleeAvec({
+          doubles: () => {
+            const d = compterAppels(doublesEdimbourg(), compteurs);
+            if (limite === undefined) return d;
+            const refuser = <T extends object>(famille: "places" | "routes", objet: T): T =>
+              Object.fromEntries(
+                Object.entries(objet).map(([nom, valeur]) => [
+                  nom,
+                  typeof valeur !== "function"
+                    ? valeur
+                    : (...args: unknown[]) => {
+                        // Le compteur vient d'être incrémenté par `compterAppels` à l'intérieur : on refuse au-delà de la limite.
+                        if (compteurs[famille] >= limite[famille]) throw Object.assign(new Error("forfait épuisé (double)"), { code: "cap_reached" });
+                        return (valeur as (...a: unknown[]) => unknown).apply(objet, args);
+                      },
+                ]),
+              ) as T;
+            return { ...d, places: refuser("places", d.places), routes: refuser("routes", d.routes) };
+          },
+        });
+      const { etapePlanification } = await import("@/server/generation/etapes");
+      const fin = await etapePlanification(progres, { ...dependances(fabrique), ...(ideesParJour === undefined ? {} : { ideesParJour }) });
+      const run = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT phase, stop_reason FROM public.generation_runs WHERE trip_id = $1", [tripId])).rows[0]);
+      return { fin, compteurs: { ...compteurs }, jours: await jours(org, tripId), run };
+    }
+    const sans = await etapeE(0);
+    const avec = await etapeE(undefined);
+    expect(sans.fin.arret).toBeUndefined();
+    expect(avec.fin.arret).toBeUndefined();
+    expect(avec.compteurs.places).toBe(sans.compteurs.places);
+    expect(avec.compteurs.routes).toBe(sans.compteurs.routes);
+    expect(avec.compteurs.modeles).toBe(sans.compteurs.modeles);
+    // Forfait de fiches et d'éléments Routes épuisé juste après les mesures du plan.
+    const epuise = await etapeE(undefined, { places: sans.compteurs.places, routes: sans.compteurs.routes });
+    expect(epuise.fin.arret).toBeUndefined();
+    expect(epuise.run.phase).not.toBe("failed");
+    expect(["ready", "incomplete"]).toContain(epuise.run.phase);
+    const etapes = (js: DaySnapshot[]) => js.map((jour) => [jour.index, jour.items.map((item) => (item.type === "stop" ? [item.stop.kind, item.stop.placeId, item.stop.start] : item.type))]);
+    expect(etapes(epuise.jours)).toEqual(etapes(sans.jours));
   });
 });

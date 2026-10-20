@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BRANCHE_APPELS_REELS, ECRITURE_POSITIONS_AUTORISEE } from "@/server/config/generation";
+import { BRANCHE_APPELS_REELS, deploiementTraiteCommeProduction, ECRITURE_POSITIONS_AUTORISEE } from "@/server/config/generation";
 import type { PlafondsUsage } from "@/server/config/usage";
 import { ecriturePositionsSuspendue, lireEnvGeneration } from "@/server/env/generation";
 
@@ -40,8 +40,6 @@ const normalise = (valeur: string | undefined): string | undefined => {
   return v === undefined || v === "" ? undefined : v;
 };
 
-const LOCAUX: ReadonlySet<string> = new Set(["local", "development", "ci", "test"]);
-
 /** Déclarations de déploiement que lit la barrière (`VADROUILLE_ENV`, `VERCEL_ENV`), rendues telles quelles au chargeur de fixtures. */
 export function declarationsDeploiement(env?: Env): Readonly<Record<string, string | undefined>> {
   const lues = lireEnvGeneration(env);
@@ -50,9 +48,9 @@ export function declarationsDeploiement(env?: Env): Readonly<Record<string, stri
 
 export async function evaluerBarriere(options: OptionsBarriere): Promise<EtatBarriere> {
   const env = options.env ?? lireEnvGeneration();
-  const declarees = [normalise(env.VADROUILLE_ENV), normalise(env.VERCEL_ENV)].filter((v): v is string => v !== undefined);
-  // Aucune déclaration, ou une valeur inconnue : la plus restrictive des deux déploiements ; jamais un appel réel.
-  if (declarees.length === 0 || declarees.some((v) => v === "production" || !(LOCAUX.has(v) || v === "preview" || v === "staging"))) return "production";
+  // Aucune déclaration, ou une valeur inconnue : la plus restrictive des deux déploiements ; jamais un appel réel. Même
+  // prédicat que le chargeur de fixtures (`deploiementTraiteCommeProduction`, 0105 § 2 point 2).
+  if (deploiementTraiteCommeProduction(env)) return "production";
   // Préversion seulement si Vercel la déclare **et** que la déclaration du dépôt ne la contredit pas (B9-TL-8 point 1 :
   // « jamais local ni CI ») : `VADROUILLE_ENV=ci` ou `local` sur une préversion reste simulé.
   const vadrouille = normalise(env.VADROUILLE_ENV);

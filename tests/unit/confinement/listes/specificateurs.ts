@@ -429,6 +429,8 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:fs/promises", noms: ["readFile"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:path", noms: ["resolve"], motif: COMPOSITION_B9C },
+  // Mineur 7 de la revue du head `7b69742` : prédicat de déploiement partagé avec la barrière (fonction pure, aucune lecture d'environnement).
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "@/server/config/generation", noms: ["deploiementTraiteCommeProduction"], motif: COMPOSITION_B9C },
   { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.

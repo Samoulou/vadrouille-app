@@ -1,7 +1,7 @@
 import "server-only";
 
 import { composerReelle, composerSimulee, reglesDeGeneration, type FabriqueGeneration, type FabriquePortPositions } from "@/server/composition/generation";
-import { ECRITURE_PROGRAMMES_REELS_AUTORISEE, IDEES_PAR_JOUR_APERCU } from "@/server/config/generation";
+import { ECRITURE_PROGRAMMES_REELS_AUTORISEE, IDEES_PAR_JOUR } from "@/server/config/generation";
 import { PLAFONDS_USAGE, type PlafondsUsage } from "@/server/config/usage";
 import { horlogeSysteme, type Horloge } from "@/server/usage/port";
 import type { ReglesUsage } from "@/server/usage/reservation";
@@ -37,7 +37,7 @@ export interface DependancesGeneration {
   readonly ecriturePositions?: boolean;
   /** Port d'écriture des positions de la composition (tests : double qui compte ses appels). */
   readonly portPositions?: FabriquePortPositions;
-  /** Candidats d'idée « Surprends-moi » gardés par jour (tests : 0 donne l'aperçu sans idées) ; `IDEES_PAR_JOUR_APERCU` par défaut. */
+  /** Candidats d'idée « Surprends-moi » gardés par jour (tests : 0 donne l'aperçu sans idées) ; `IDEES_PAR_JOUR` par défaut. */
   readonly ideesParJour?: number;
 }
 
@@ -84,6 +84,6 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
     },
     ecriturePositions: (fabrique) => dependances.ecriturePositions ?? (fabrique.variante === "reelle" && ecriturePositionsPermise({ env: dependances.barriere?.env })),
     portPositions: dependances.portPositions,
-    ideesParJour: dependances.ideesParJour ?? IDEES_PAR_JOUR_APERCU,
+    ideesParJour: dependances.ideesParJour ?? IDEES_PAR_JOUR,
   };
 }

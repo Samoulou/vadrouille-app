@@ -69,8 +69,27 @@ export const DUREE_ETAPE_MS = 700_000;
  */
 export const BRANCHE_APPELS_REELS: string | null = null;
 
-/** Candidats d'idée « Surprends-moi » gardés par jour planifié, avant le choix de `ideeDuJour` (0105 § 5.1 point 1). */
-export const IDEES_PAR_JOUR_APERCU = 3;
+/** Déclarations de déploiement (`VADROUILLE_ENV`, `VERCEL_ENV`) qui ne sont pas la production. */
+const DEPLOIEMENTS_HORS_PRODUCTION: ReadonlySet<string> = new Set(["local", "development", "ci", "test", "preview", "staging"]);
+
+/**
+ * Prédicat partagé de la barrière (B9-TL-8, `evaluerBarriere`) et du chargeur de fixtures (0105 § 2 point 2) : vrai si
+ * aucune déclaration n'est posée, si l'une vaut `production` ou si l'une est inconnue (la plus restrictive des deux).
+ * Fonction pure : les déclarations sont passées par l'appelant, jamais lues ici.
+ */
+export function deploiementTraiteCommeProduction(env: Readonly<Record<string, string | undefined>>): boolean {
+  const declarees = [env.VADROUILLE_ENV, env.VERCEL_ENV].map((v) => v?.trim().toLowerCase()).filter((v): v is string => v !== undefined && v !== "");
+  return declarees.length === 0 || declarees.some((v) => !DEPLOIEMENTS_HORS_PRODUCTION.has(v));
+}
+
+/**
+ * Candidats d'idée « Surprends-moi » offerts par jour planifié, avant le choix de `ideeDuJour` (0105 § 5.1 point 2), passés en
+ * paramètre à `candidatsDIdees` (le domaine ne lit aucune configuration).
+ */
+export const IDEES_PAR_JOUR = 3;
+
+/** Borne du lot de rédaction ajouté par les idées (0105 § 5.1 points 2 et 3) : dérivée, jamais écrite en dur (6 aujourd'hui). */
+export const IDEES_CANDIDATES_MAX = IDEES_PAR_JOUR * JOURS_APERCU;
 
 /** Villes de l'aperçu : J1 et J2 (`JOURS_APERCU`) ; une recherche par ville, dans l'ordre du séjour. */
 export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
@@ -78,7 +97,8 @@ export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
 /**
  * Écriture des positions de la version publiée au cache `place_coordinates` (0081 B9-TL-9, 0060 § 3.4 condition (a), 0100
  * § 3.1 point 2). `false` tant que `coords-purge.yml` n'a réussi aucun passage (aucun succès relevé au 2026-10-20) : aucune
- * écriture du MVP sur la base réelle avant ce premier succès. La condition (a) de 0060 § 3.4 (premier succès de `coords-purge.yml`) suffit à la passer à `true`, par une PR du rôle qui l'a relevé ;
+ * écriture du MVP sur la base réelle avant ce premier succès. Le CEO la passe à `true` par une PR dès qu'il a relevé ce premier
+ * succès (condition (a) de 0060 § 3.4) ;
  * `POSITIONS_ECRITURE_SUSPENDUE=1` la suspend ensuite sans redéploiement de code (0060 § 1.3). Jamais d'écriture non plus
  * pour la variante simulée : ses positions viennent des fixtures, pas de Google.
  */
