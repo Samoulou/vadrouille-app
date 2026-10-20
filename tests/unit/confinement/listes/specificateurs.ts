@@ -149,9 +149,9 @@ const COMPOSITION_B8B =
   "composition de la lecture des voyages (B8b, décision 0100 § 5) : câblage seul de la source de relectures, de la fabrique commune des " +
   "clients Google, de `withOrg` et du forfait de relecture ; verdict Sécurité : attendu (0100 § 7 points 4 et 5)";
 const COMPOSITION_B9E =
-  "composition de la lecture des voyages, complétée par B9e (spécification B9, B9e point 3 ; décisions 0081 B9-TL-2, 0100 § 5.3 et 0105 § 2) : source simulée des voyages générés, " +
-  "doubles des fixtures d'Édimbourg enveloppés dans la réservation, forfait sur les valeurs de test de la variante simulée, " +
-  "`local` et `ci` seulement ; verdict Sécurité : attendu";
+  "composition de la lecture des voyages, complétée par B9e (spécification B9, B9e point 3 ; décisions 0081 B9-TL-2, 0100 § 5.3 amendée par 0110 § 1, et 0105 § 2) : source simulée des voyages générés, " +
+  "doubles des fixtures d'Édimbourg enveloppés dans le registre du forfait, en mémoire (0110 § 3), forfait sur les valeurs de test de la variante simulée, " +
+  "`local` et `ci` seulement ; verdict Sécurité : approuvé (revue consolidée de la PR 588)";
 const COMPOSITION_B9C =
   "composition de la génération (B9c, décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8) : câblage seul des capacités à types neutres, du forfait, " +
   "des fixtures d'Édimbourg de la variante simulée et des modules de capacité de la variante réelle ; verdict Sécurité : attendu";

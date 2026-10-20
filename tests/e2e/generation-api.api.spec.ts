@@ -13,8 +13,8 @@ import { sheet } from "./sejour-helpers";
  * simulé » ; décisions 0081 B9-TL-2 et B9-TL-8). Projet `api` : serveur à connexion réelle (`AUTH_ADAPTER=better-auth`) et
  * données réelles (`DATA_ADAPTER=api`) sur la base du job `db`, `VADROUILLE_ENV=ci` : la barrière des appels réels est
  * fermée, la composition de la génération est la variante **simulée** (doubles de B7 et B8 sur les fixtures d'Édimbourg),
- * le monde local du Workflow SDK exécute `generatePreview` dans le même serveur, et la lecture garde le double de relectures
- * (0100 § 5.3). Aucune clé n'est posée (garde de `playwright.config.ts`).
+ * le monde local du Workflow SDK exécute `generatePreview` dans le même serveur, et la lecture garde le double de relectures,
+ * complété pour les lieux des fixtures (0100 § 5.3, amendée par 0110 § 1). Aucune clé n'est posée (garde de `playwright.config.ts`).
  *
  * Parcours : écrans 1 et 2 (brouillon d'Édimbourg avec un logement connu, donc sans écran 3, F8-PO-8 ; brief rempli à la
  * main : `structureBrief` et `suggestLodging` ne sont pas livrés sur l'adaptateur `api`, B9a ; les fixtures n'ont pas de
@@ -104,14 +104,11 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
   // Écran 5 du voyage créé en base (`uuid`), jusqu'à l'état final : les étapes de `generatePreview` tournent sur les doubles.
   await expect(page).toHaveURL((url) => PREPARATION.test(url.pathname), { timeout: 30_000 });
   const tripId = PREPARATION.exec(new URL(page.url()).pathname)?.[1] as string;
-  // Écart connu, signalé dans la PR (question au Tech Lead et au Product Owner) : la page de l'écran 5 vérifie le voyage par
-  // `getTrip`, qui rend `null` tant qu'aucune version n'est publiée (B6-PO-2) ; sur l'adaptateur `api`, l'écran 5 rend donc
-  // « Page introuvable » pendant la génération et ne s'affiche qu'une fois la version 1 écrite. La page est rechargée
-  // jusque-là ; l'aperçu simulé dure environ 2 secondes.
-  await expect(async () => {
-    if ((await page.getByRole("heading", { level: 1 }).textContent()) !== "Tes premières propositions sont prêtes") await page.reload();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tes premières propositions sont prêtes", { timeout: 2_000 });
-  }).toPass({ timeout: 120_000, intervals: [1_000, 2_000] });
+  // L'écran 5 s'affiche dès le lancement, pendant la génération (aucune version publiée : la page vérifie le voyage par
+  // `getGenerationStatus`, plus par `getTrip`, revue de la PR #588, bloquant 2), puis suit l'avancement sans recharger.
+  // Le compteur n'existe que sur l'écran 5 (jamais sur « Page introuvable ») ; aucune page n'est rechargée ensuite.
+  await expect(page.locator("[data-compteur]")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tes premières propositions sont prêtes", { timeout: 120_000 });
   // Aperçu `ready` ou `incomplete` (cases `noOption` des fixtures), jamais interrompu : région d'alerte vide, compteur sur 8.
   await expect(page.locator("main [role='alert']")).toHaveText("");
   await expect(page.locator("[data-compteur]")).toHaveText(/^[1-8] propositions? prêtes? sur 8$/);
@@ -132,5 +129,8 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
   await expect(sheet(page)).toContainText("Jour 1");
   await expect(sheet(page)).toContainText("Jour 2");
 
+  // Seul le navigateur est surveillé ici. Côté serveur, aucun appel réel ne peut partir : aucune clé n'est posée (garde de
+  // `playwright.config.ts`) et la barrière est fermée en `ci` (variante simulée, doubles sur fixtures) ; les clients réels
+  // ne sont construits que par la variante `reelle` (revue de la PR #588, mineur 8).
   expect(horsServeur, "requêtes du navigateur hors du serveur de test").toEqual([]);
 });

@@ -57,7 +57,7 @@ export function creerSourceLecture(options: OptionsLecture = {}): SourceRelectur
 
 /**
  * Source de relectures de l'adaptateur `api` : la source réelle si `sourceReelleChoisie(env)` (environnement `local` et
- * `RELECTURES_SOURCE=google`, 0100 § 5.3) ; sinon, en `local` et en `ci`, `repli` (le double de B6) **complété** pour les
+ * `RELECTURES_SOURCE=google`, 0100 § 5.3) ; sinon, en `local` et en `ci` (décision 0110 § 1), `repli` (le double de B6) **complété** pour les
  * voyages générés par la variante simulée (`avecVoyagesGeneresSimules`, B9e) ; partout ailleurs, `repli` seul. La source
  * réelle n'est construite que dans le premier cas.
  */
@@ -81,15 +81,15 @@ function lieuxDeLaLecture(voyage: VoyageARelire, demande: DemandeRelectures): st
 
 /**
  * Lecture d'un voyage **généré par la variante simulée** (spécification B9, B9e point 3 : « Mes voyages » et Séjour du bout
- * en bout simulé ; à valider par le Tech Lead, question de la PR). La génération simulée écrit les `placeId` des fixtures
+ * en bout simulé ; décision 0110 § 1, qui amende 0100 § 5.3). La génération simulée écrit les `placeId` des fixtures
  * d'Édimbourg, que le double de B6 ne connaît pas : sans cette source, Séjour d'un voyage généré rend `travel_unknown`.
  *
  * - **Aiguillage** : si chaque lieu de la lecture porte le préfixe des fixtures, la lecture passe par la source de B8b
- *   (`creerSourceRelectures`) sur les doubles Places et Routes des fixtures, enveloppés dans la même réservation que les
+ *   (`creerSourceRelectures`) sur les doubles Places et Routes des fixtures, enveloppés dans le même registre que les
  *   clients réels (`envelopperClientsGoogle`) ; sinon, `repli` (le double de B6, inchangé pour ses voyages).
  * - **Jamais réel** : environnement résolu `local` ou `ci` seulement (`declarationsLectureSimulee`, sinon `repli` seul) ;
  *   aucun client réel construit ; forfait de relecture sur les valeurs de test de la variante simulée
- *   (`PLAFONDS_VARIANTE_SIMULEE`) ; aucune écriture de position (`positionsSuspendues` vrai) : les positions des fixtures ne
+ *   (`PLAFONDS_VARIANTE_SIMULEE`), **en mémoire seulement** (aucune ligne dans `usage_ledger`, 0110 § 3) ; aucune écriture de position (`positionsSuspendues` vrai) : les positions des fixtures ne
  *   viennent pas de Google.
  * - **Fixtures** : lues à l'appel par `fixtures-simulees.ts`, atteint par `import()` dynamique (décision 0105 § 2), qui
  *   refuse de lire en production ou sous une déclaration inconnue.
@@ -112,6 +112,8 @@ export function avecVoyagesGeneresSimules(repli: SourceRelectures, declarations:
         clients: (options) => envelopperClientsGoogle(bases, options),
         positionsSuspendues: () => true,
         horloge: horlogeSysteme,
+        // Aucune ligne dans `usage_ledger` : le forfait des doubles reste en mémoire (0110 § 3).
+        reservation: "memoire",
       });
       return source.pour(voyage, demande);
     },

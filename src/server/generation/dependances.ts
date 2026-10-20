@@ -42,6 +42,13 @@ export interface DependancesGeneration {
   readonly portPositions?: FabriquePortPositions;
   /** Candidats d'idée « Surprends-moi » gardés par jour (tests : 0 donne l'aperçu sans idées) ; `IDEES_PAR_JOUR` par défaut. */
   readonly ideesParJour?: number;
+  /**
+   * Réserve aussi le forfait de la variante **simulée** dans `usage_ledger` (`true` : bancs de la base, qui éprouvent la
+   * séquence de réservation sans appel réel). Par défaut `false` : la variante simulée borne ses doubles par un forfait en
+   * mémoire et n'écrit aucune ligne, qui s'ajouterait aux cumuls lus par la variante réelle (décision 0110 § 3). La variante
+   * réelle réserve toujours.
+   */
+  readonly reserverEnSimulee?: boolean;
 }
 
 export type DependancesResolues = {
@@ -55,6 +62,8 @@ export type DependancesResolues = {
    * `production`, aucune.
    */
   reglesPour(etat: EtatBarriere): ReglesUsage | null;
+  /** Forfait de la variante simulée réservé dans `usage_ledger` (bancs de la base) ; sinon en mémoire seulement (0110 § 3). */
+  readonly reserverEnSimulee: boolean;
   readonly maintenant: () => number;
   /** Barrière de B9-TL-8, évaluée **à l'entrée de chaque étape**, avant tout forfait, toute composition et tout appel. */
   barriere(): Promise<EtatBarriere>;
@@ -87,6 +96,7 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
     horloge,
     plafonds,
     reglesPour: (etat) => (etat === "reelle" ? regles : etat === "simulee" ? reglesSimulees : null),
+    reserverEnSimulee: dependances.reserverEnSimulee === true,
     maintenant: () => horloge.maintenant(),
     barriere: () => evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
     async composer(etat) {

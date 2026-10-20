@@ -3,9 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAFONDS_USAGE, PLAFONDS_VARIANTE_SIMULEE } from "@/server/config/usage";
 import { BRANCHE_APPELS_REELS } from "@/server/config/generation";
 
+import type { OrgTransaction } from "@/server/with-org";
+
 import { PLAFONDS_USAGE_TEST } from "../../../tests/support/plafonds-usage";
 import { ArretEtape } from "./codes";
-import { resoudre } from "./dependances";
+import { resoudre, type DependancesGeneration } from "./dependances";
+import { etapeBrief, etapeRecherche } from "./etapes";
+import { forfaitDeLEtape } from "./forfait-etape";
 
 /**
  * Critère `génération réelle: barrière fermée, aucun appel` (spécification B9, B9e ; décision 0081 B9-TL-8 point 5 et
@@ -129,5 +133,67 @@ describe("génération: les valeurs de test de la variante simulée n'autorisent
     const dep = resoudre({ plafonds: PLAFONDS_USAGE_TEST });
     expect(dep.reglesPour("simulee")?.plafonds).toBe(PLAFONDS_USAGE_TEST);
     expect(dep.reglesPour("reelle")?.plafonds).toBe(PLAFONDS_USAGE_TEST);
+  });
+});
+
+/** Transaction de test : chaque requête est notée et rend une ligne d'exécution ouverte (garde de l'étape, clôture). */
+function transactionNotee(requetes: string[]): NonNullable<DependancesGeneration["transaction"]> {
+  const tx = {
+    execute: async (requete: unknown) => {
+      requetes.push(JSON.stringify(requete));
+      return { rows: [{ trip_id: TRIP, request_id: null, id: RUN }] };
+    },
+  } as unknown as OrgTransaction;
+  return async (_organisation, fn) => fn(tx);
+}
+
+const ORG = "5e1f0000-0000-4000-8000-0000000000aa";
+const TRIP = "5e1f0000-0000-4000-8000-0000000000bb";
+const RUN = "5e1f0000-0000-4000-8000-0000000000cc";
+
+describe("génération réelle: barrière fermée, aucun appel (étape complète)", () => {
+  it.each<[string, (entree: unknown, dep?: DependancesGeneration) => Promise<unknown>]>([
+    ["étape a (brief)", etapeBrief],
+    ["étape b (recherche)", etapeRecherche],
+  ])("%s en production : arrêt production_refused, exécution close, aucune requête réseau ni réservation", async (_nom, etape) => {
+    const requetes: string[] = [];
+    const sortie = await etape(
+      { generationRunId: RUN, organizationId: ORG, rang: 0 },
+      { transaction: transactionNotee(requetes), plafonds: PLAFONDS_USAGE_TEST, programmesReelsAutorises: true, barriere: { env: { VERCEL_ENV: "production" }, branche: BRANCHE, cookieValide } },
+    );
+    expect(sortie).toMatchObject({ arret: "production_refused" });
+    expect(fetchInterdit).not.toHaveBeenCalled();
+    // Garde de l'étape puis clôture en échec ; jamais `usage_ledger` (aucun forfait), ni lecture du voyage.
+    expect(requetes).toHaveLength(2);
+    expect(requetes.some((r) => r.includes("usage_ledger"))).toBe(false);
+    expect(requetes[1]).toContain("phase = 'failed'");
+  });
+});
+
+describe("génération: forfait de la variante simulée en mémoire, aucune ligne dans usage_ledger (0110 § 3)", () => {
+  const contexte = (barriere: "simulee" | "reelle") => ({ organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere });
+
+  it("simulée par défaut : forfait de l'aperçu borné, aucune transaction ouverte", async () => {
+    const transaction = vi.fn();
+    const dep = resoudre({ transaction: transaction as unknown as NonNullable<DependancesGeneration["transaction"]> });
+    const { forfait, registre } = await forfaitDeLEtape(dep, contexte("simulee"), "c");
+    expect(transaction).not.toHaveBeenCalled();
+    expect(forfait.nature).toBe("execution");
+    expect(registre).toBeDefined();
+    expect(forfait.textSearchRequetes).toBeGreaterThan(0);
+  });
+
+  it("simulée sous un banc de la base (`reserverEnSimulee`) et réelle : la réservation ouvre une transaction", async () => {
+    for (const [barriere, options] of [
+      ["simulee", { reserverEnSimulee: true }],
+      ["reelle", {}],
+    ] as const) {
+      const transaction = vi.fn(async () => {
+        throw new Error("base de test absente");
+      });
+      const dep = resoudre({ ...options, plafonds: PLAFONDS_USAGE_TEST, transaction: transaction as unknown as NonNullable<DependancesGeneration["transaction"]> });
+      await expect(forfaitDeLEtape(dep, contexte(barriere), "c")).rejects.toThrow("usage_unavailable");
+      expect(transaction).toHaveBeenCalled();
+    }
   });
 });

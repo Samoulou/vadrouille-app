@@ -125,16 +125,16 @@ export const PLAFONDS_USAGE: PlafondsUsage | null = null;
 /**
  * **Valeurs de test de la variante simulée** (spécification B9, B9e points 2 et 3 ; B9-PO-10) : forfait des générations dont
  * la composition est **simulée** (doubles sur les fixtures d'Édimbourg, aucun appel réseau), en local, en CI et sur une
- * préversion barrière fermée. Elles permettent au bout en bout simulé de réserver son forfait (les doubles sont enveloppés
- * dans la même réservation que les clients réels, B9c) ; ce ne sont pas des montants, aucun fournisseur n'est payé.
+ * préversion barrière fermée. Elles bornent le forfait du bout en bout simulé (les doubles sont enveloppés dans le même
+ * registre que les clients réels, B9c) ; ce ne sont pas des montants, aucun fournisseur n'est payé.
  *
  * **Incapables d'autoriser un appel réel** : la barrière ne les lit jamais (elle lit `PLAFONDS_USAGE` seul), et les
  * dépendances de la génération (`src/server/generation/dependances.ts`) ne les passent qu'au forfait d'une étape dont la
  * barrière a rendu `simulee`. Valeurs de test (celles de `tests/support/plafonds-usage.ts`, aperçu et limites élargis comme
  * `PLAFONDS_LARGES` de `tests/support/banc-apercu.ts` pour qu'un aperçu simulé d'Édimbourg tienne dans son forfait), sans
- * lien avec les montants réels réservés à Samuel. Les limites globales (quota du jour, mois, enveloppe) sont larges : les
- * réservations simulées s'ajoutent au registre `usage_ledger` de la base, et une préversion simulée ne doit pas s'arrêter
- * sur le cumul de ses propres essais.
+ * lien avec les montants réels réservés à Samuel ; leur alignement sur les valeurs des bancs est testé (`usage.test.ts`).
+ * La variante simulée n'en tire que des forfaits **en mémoire** : elle n'écrit aucune ligne dans `usage_ledger` (décision
+ * 0110 § 3), si bien que les limites globales et le plafond par organisation ne sont pas lus par elle.
  */
 export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
   schema: 1,

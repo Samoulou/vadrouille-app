@@ -24,7 +24,7 @@ describe("composition: source réelle seulement en local", () => {
     }
   });
 
-  // B9e (spécification B9, B9e point 3) : en `ci` et en `local` sans source réelle, le double reste la source de ses voyages,
+  // B9e (spécification B9, B9e point 3 ; décision 0110 § 1, qui amende 0100 § 5.3) : en `ci` et en `local` sans source réelle, le double reste la source de ses voyages,
   // complété pour les voyages générés par la variante simulée (lieux des fixtures d'Édimbourg).
   it("ci, ou local sans source réelle : le repli complété, qui lui confie les lieux qui ne sont pas des fixtures", async () => {
     const appels: unknown[] = [];
@@ -82,6 +82,16 @@ describe("composition: lecture des voyages générés par la variante simulée (
     await source.pour(voyageARelire([FIXTURE]), DEMANDE);
     await source.pour(voyageARelire([null]), { lieux: [], trajets: [] });
     expect(appels).toBe(2);
+  });
+
+  it("lieux des fixtures en ci : relu sur les doubles, forfait en mémoire, aucune transaction ni ligne dans usage_ledger (0110 § 3)", async () => {
+    let appels = 0;
+    const repli: SourceRelectures = { pour: async () => (appels++, { ok: false, refus: "quota_reached" }) };
+    const source = avecVoyagesGeneresSimules(repli, { VADROUILLE_ENV: "ci" });
+    const demande = { lieux: [{ placeId: FIXTURE, dates: ["2027-05-03"] }], trajets: [] };
+    // Aucune base dans ce test : une réservation (`withOrg`) échouerait et rendrait `unavailable`.
+    expect(await source.pour(voyageARelire([FIXTURE]), demande)).toMatchObject({ ok: true });
+    expect(appels).toBe(0);
   });
 
   it("déclaration de production : le chargeur de fixtures refuse, unavailable, jamais le repli ni un client réel", async () => {

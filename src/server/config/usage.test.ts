@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { horlogeSysteme } from "@/server/usage/port";
 import { reglesDeLecture } from "@/server/relecture/regles";
 
+import { PLAFONDS_LARGES } from "../../../tests/support/banc-apercu";
 import { PLAFONDS_USAGE_TEST } from "../../../tests/support/plafonds-usage";
 import { BORNES_DE_GARDE_MICROS, chargerPlafondsUsage, PLAFONDS_USAGE, PLAFONDS_VARIANTE_SIMULEE, type PlafondsUsage } from "./usage";
 
@@ -24,6 +25,18 @@ describe("configuration des plafonds : bornes de garde (B9e)", () => {
   it("les valeurs de test et celles de la variante simulée passent", () => {
     expect(() => chargerPlafondsUsage(PLAFONDS_USAGE_TEST)).not.toThrow();
     expect(chargerPlafondsUsage(PLAFONDS_VARIANTE_SIMULEE)).toEqual(PLAFONDS_VARIANTE_SIMULEE);
+  });
+
+  // Revue de la PR #588, bloquant 4 : les valeurs de la variante simulée sont une copie des valeurs de test des bancs ; ce
+  // test d'égalité les garde alignées (seules les limites globales et le plafond par organisation diffèrent, et la variante
+  // simulée ne les lit pas : aucune réservation dans `usage_ledger`, décision 0110 § 3).
+  it("les valeurs de la variante simulée sont celles des bancs (`PLAFONDS_LARGES`, `PLAFONDS_USAGE_TEST`)", () => {
+    expect(PLAFONDS_VARIANTE_SIMULEE.generations).toEqual(PLAFONDS_LARGES.generations);
+    expect(PLAFONDS_VARIANTE_SIMULEE.relecture).toEqual(PLAFONDS_USAGE_TEST.relecture);
+    expect(PLAFONDS_VARIANTE_SIMULEE.actions).toEqual(PLAFONDS_USAGE_TEST.actions);
+    expect(PLAFONDS_VARIANTE_SIMULEE.skus).toEqual(PLAFONDS_USAGE_TEST.skus);
+    expect(PLAFONDS_VARIANTE_SIMULEE.actionsSansCompteJourMicros).toBe(PLAFONDS_USAGE_TEST.actionsSansCompteJourMicros);
+    expect(PLAFONDS_VARIANTE_SIMULEE.parOrganisationJourMicros).toBe(PLAFONDS_LARGES.parOrganisationJourMicros);
   });
 
   it.each<[string, Modif]>([
