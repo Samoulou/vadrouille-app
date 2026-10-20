@@ -137,8 +137,7 @@ export async function etapeCloture(entree: unknown, code: unknown, dependances?:
 // --- Outils communs ------------------------------------------------------------------------------------------------------------
 
 function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtape {
-  const regles = contexte.dep.regles;
-  if (regles === null) throw new ArretEtape("usage_unavailable");
+  if (contexte.dep.reglesPour(contexte.barriere) === null) throw new ArretEtape("usage_unavailable");
   return {
     usage: forfait.registre,
     plafonds: forfait.plafonds,
@@ -150,7 +149,7 @@ function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtap
 }
 
 async function ouvrirCapacites(contexte: Contexte): Promise<{ readonly fabrique: FabriqueGeneration; readonly forfait: ForfaitDeLEtape; readonly options: OptionsEtape }> {
-  const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId }, contexte.etape);
+  const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, contexte.etape);
   const fabrique = await contexte.dep.composer(contexte.barriere);
   return { fabrique, forfait, options: optionsEtape(contexte, forfait) };
 }
@@ -253,7 +252,7 @@ export function etapeBrief(entree: unknown, dependances?: DependancesGeneration)
     "a",
     async (contexte) => {
       await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
-      await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId }, "a");
+      await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, "a");
     },
     dependances,
   );

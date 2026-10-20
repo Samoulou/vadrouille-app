@@ -24,6 +24,21 @@ import { QUOTA_ROUTES_ELEMENTS_PAR_MINUTE } from "@/server/usage/forfait";
 /** Micro-USD : entier, au plus 1 000 USD (garde contre une faute de frappe d'un ordre de grandeur). */
 const micros = z.number().int().min(0).max(1_000_000_000);
 const microsPositifs = micros.min(1);
+
+/**
+ * **Bornes de garde** (spécification B9, critère « Configuration des plafonds » de B9e) : bornes de **validation**, pas des
+ * plafonds. Elles refusent au chargement (`chargerPlafondsUsage`) une faute de saisie d'un ordre de grandeur ; les plafonds
+ * eux-mêmes sont des valeurs de départ fixées par Samuel (question 4 de B9). Une génération (plafond de coût des modèles de
+ * chaque profil) : 50 USD ; une organisation et un jour : 100 USD ; les actions sans compte, par jour (plafond global et
+ * plafond de chaque action) : 20 USD. Les requêtes Google gardent leurs bornes en nombre (`requetes`, `elements`).
+ */
+export const BORNES_DE_GARDE_MICROS = {
+  parGeneration: 50_000_000,
+  parOrganisationJour: 100_000_000,
+  actionsSansCompteJour: 20_000_000,
+} as const;
+const microsGeneration = microsPositifs.max(BORNES_DE_GARDE_MICROS.parGeneration);
+const microsActions = microsPositifs.max(BORNES_DE_GARDE_MICROS.actionsSansCompteJour);
 const requetes = z.number().int().min(0).max(100_000);
 /** Éléments Routes d'un forfait : au plus le quota d'une minute (Q330, `refusDuForfait`). */
 const elements = z.number().int().min(0).max(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE);
@@ -39,7 +54,7 @@ const skuDe = (prefixe: string) => sku.refine((valeur) => valeur.startsWith(pref
 
 /** Plafonds d'une génération : par méthode (portée `execution`) et coût des modèles. */
 const ProfilGenerationSchema = z.strictObject({
-  coutModelesMicros: microsPositifs,
+  coutModelesMicros: microsGeneration,
   placesTextSearch: requetes,
   placesDetails: requetes,
   routesRequetes: requetes,
@@ -65,13 +80,13 @@ export const PlafondsUsageSchema = z.strictObject({
   relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
   /** Actions sans compte (B7-TL-10, 0081 B9-TL-4 point 3). */
   actions: z.strictObject({
-    structureBrief: z.strictObject({ coutModelesMicros: microsPositifs }),
-    suggestLodging: z.strictObject({ coutModelesMicros: microsPositifs, placesTextSearch: requetes }),
+    structureBrief: z.strictObject({ coutModelesMicros: microsActions }),
+    suggestLodging: z.strictObject({ coutModelesMicros: microsActions, placesTextSearch: requetes }),
   }),
   /** Plafond par organisation et par jour (UTC), tous fournisseurs, forfaits compris. */
-  parOrganisationJourMicros: microsPositifs,
+  parOrganisationJourMicros: microsPositifs.max(BORNES_DE_GARDE_MICROS.parOrganisationJour),
   /** Plafond global quotidien (UTC) des actions sans compte, en coût (0081 B9-TL-4 point 3). */
-  actionsSansCompteJourMicros: microsPositifs,
+  actionsSansCompteJourMicros: microsActions,
   /**
    * Limites globales (une clé pour toutes les organisations) : quota du jour Google par méthode (jour du Pacifique),
    * mois et enveloppe jusqu'à G0 par fournisseur. Même forme que `LimitesForfait` (`forfait.ts`), lue par
@@ -100,7 +115,55 @@ export function chargerPlafondsUsage(valeur: unknown): PlafondsUsage {
 }
 
 /**
- * Plafonds de production : **non fixés** (Q39, Q45, Q465 à Samuel). `null` : aucune réservation possible, donc aucun
- * appel payant du MVP, jusqu'à ce qu'une PR écrive les montants qu'il aura validés.
+ * Plafonds de production : **non fixés** (Q39, Q45, Q465 à Samuel ; questions 4 et 5 de la spécification B9). `null` : aucune
+ * réservation possible, donc aucun appel payant du MVP, jusqu'à ce qu'une PR écrive les montants qu'il aura validés. C'est la
+ * forme des « 0 USD partout » de B9-PO-10 : la barrière de B9-TL-8 (`plafondsDeGenerationPoses`) ne lit **que** cette
+ * constante, si bien qu'aucun appel réel ne peut être autorisé, même barrière ouverte par ailleurs.
  */
 export const PLAFONDS_USAGE: PlafondsUsage | null = null;
+
+/**
+ * **Valeurs de test de la variante simulée** (spécification B9, B9e points 2 et 3 ; B9-PO-10) : forfait des générations dont
+ * la composition est **simulée** (doubles sur les fixtures d'Édimbourg, aucun appel réseau), en local, en CI et sur une
+ * préversion barrière fermée. Elles bornent le forfait du bout en bout simulé (les doubles sont enveloppés dans le même
+ * registre que les clients réels, B9c) ; ce ne sont pas des montants, aucun fournisseur n'est payé.
+ *
+ * **Incapables d'autoriser un appel réel** : la barrière ne les lit jamais (elle lit `PLAFONDS_USAGE` seul), et les
+ * dépendances de la génération (`src/server/generation/dependances.ts`) ne les passent qu'au forfait d'une étape dont la
+ * barrière a rendu `simulee`. Valeurs de test (celles de `tests/support/plafonds-usage.ts`, aperçu et limites élargis comme
+ * `PLAFONDS_LARGES` de `tests/support/banc-apercu.ts` pour qu'un aperçu simulé d'Édimbourg tienne dans son forfait), sans
+ * lien avec les montants réels réservés à Samuel ; leur alignement sur les valeurs des bancs est testé (`usage.test.ts`).
+ * La variante simulée n'en tire que des forfaits **en mémoire** : elle n'écrit aucune ligne dans `usage_ledger` (décision
+ * 0110 § 3), si bien que les limites globales et le plafond par organisation ne sont pas lus par elle.
+ */
+export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
+  schema: 1,
+  generations: {
+    apercu: { coutModelesMicros: 600_000, placesTextSearch: 30, placesDetails: 30, routesRequetes: 10, routesElements: 300 },
+    complet: { coutModelesMicros: 200_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
+    mini: { coutModelesMicros: 20_000, placesTextSearch: 6, placesDetails: 6, routesRequetes: 0, routesElements: 0 },
+  },
+  relecture: {
+    jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },
+    voyage: { placesTextSearch: 20, placesDetails: 100, routesRequetes: 240, routesElements: 240 },
+  },
+  actions: {
+    structureBrief: { coutModelesMicros: 10_000 },
+    suggestLodging: { coutModelesMicros: 20_000, placesTextSearch: 3 },
+  },
+  parOrganisationJourMicros: 50_000_000,
+  actionsSansCompteJourMicros: 100_000,
+  limites: {
+    quotaJourParMethode: 100_000,
+    moisGoogleMicros: 1_000_000_000,
+    enveloppeGoogleMicros: 1_000_000_000,
+    moisModelesMicros: 1_000_000_000,
+    enveloppeModelesMicros: 1_000_000_000,
+  },
+  skus: {
+    textSearch: "places_text_search_essentials_ids_only",
+    details: "places_details_enterprise",
+    matrice: "routes_matrix_essentials",
+    modeles: "modeles_forfait",
+  },
+});

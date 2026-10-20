@@ -726,7 +726,7 @@ const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/w
 /**
  * B8b (décision 0100 § 5.2) : la fabrique commune des clients Google est un pont de plus vers `src/grounding` (modules de
  * capacité `places-client.ts` et `routes-client.ts`). Le parcours de la frontière s'arrête à elle ; ses importateurs
- * (`composition/lecture.ts`, plus `generation.ts` quand B9c existera) sont contrôlés à part par `composition.test.ts` et la
+ * (`composition/lecture.ts` et `composition/generation.ts`, B9c) sont contrôlés à part par `composition.test.ts` et la
  * règle `ligne/relecture-imports`. Admis (décision 0108, qui amende 0100 § 5.2 et § 5.4 : branchement au démarrage, jamais
  * par `src/adapters/index.ts`) : `src/instrumentation.ts` → `composition/lecture.ts` → `composition/clients-google.ts` →
  * `@/grounding/*` (cas fabriqués ci-dessous).
@@ -763,48 +763,110 @@ const interditPartout = (chemin: string) =>
   (["src/ai/", "src/research/", "src/grounding/", "scripts/"].some((d) => chemin.startsWith(d)) ||
     (chemin.startsWith("src/prototype/") && chemin !== "src/prototype/programme-reduit.ts"));
 
-/**
- * Seules arêtes de l'application vers `src/prototype` (hors programme réduit) admises : d'un module serveur de P0 vers
- * une feuille de types (P0r3c-5a). Ces imports sont des `import type` (test ci-dessous) : rien de `src/prototype`
- * n'est chargé à l'exécution, et les feuilles n'importent que les contrats et `zod`.
- */
-/**
- * B8a (décision 0085 § 1.7 et § 1.8) : `versRelectures` importe de `@/grounding` **des types seulement** (issues de
- * fiches, table de trajets) ; test ci-dessous. Liste fermée ; B9c ajoute la composition `generation.ts` au graphe.
- */
+// --- Arêtes admises du graphe de l'application (B9c-graphe : 0081 B9-TL-1 point 4, 0105 § 7) -----------------------
+
+/** Modules de la relecture des voyages (B8a, décision 0085 § 1.7 et § 1.8). */
 const MODULES_RELECTURE: readonly string[] = ["src/server/relecture/relectures.ts"];
 const TYPES_GROUNDING_RELECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/trajets.ts"];
-/**
- * B8b (décision 0100 § 5.1) : la source de relectures appelle `chargerFiches`, `chargerTrajetsParCouples`… de
- * `src/grounding` avec des **clients injectés** par la composition de la lecture ; elle n'importe donc aucun module de
- * capacité, seulement ces trois modules de fonctions (valeurs) et le type du port du cache. Liste fermée ; arêtes exactes.
- */
+/** Source de relectures (B8b, décision 0100 § 5.1) : clients injectés par la composition de la lecture. */
 const MODULE_SOURCE_LECTURE = "src/server/relecture/source.ts";
 const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/interfaces.ts", "src/grounding/trajets.ts"];
-
-/** B6a (décision 0086 § 1.2 point 4) : seule arête de l'application hors de src/server vers src/domain, en type seulement. */
+/** Double de relectures (B6a, décision 0086 § 1.2 point 4). */
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
-
-/** B9b (0081 B9-TL-1 point 2) : classification des codes de la couche IA (0077 § 3 point 4). */
+/** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
 
-const areteAdmise = (de: string, vers: string) =>
-  (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
-  (MODULES_RELECTURE.includes(de) && TYPES_GROUNDING_RELECTURE.includes(vers)) ||
-  (de === MODULE_SOURCE_LECTURE && GROUNDING_SOURCE_LECTURE.includes(vers)) ||
-  // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding.
-  (vers === PORT_POSITIONS && !de.startsWith("src/grounding/")) ||
-  // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
-  // (`SourceRelectures`, `Relectures`), en type seulement (test ci-dessous et `ligne/voyages-imports`).
-  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
-  // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
-  // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
-  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart consigné par la décision 0105 § 7 :
-  // la réécriture complète de ce test du graphe (0081 B9-TL-1 point 4) est la tâche de suite `B9c-graphe` ; les arêtes de la
-  // génération sont couvertes par les cinq cas nominatifs « B9c admis/refusé » ci-dessous et par `composition.test.ts`, et
-  // B9c n'ajoute aucune arête à `areteAdmise`.
-  (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
+/**
+ * Une arête admise : un import **exact** de l'application (origine `de`, cible prise dans `vers`, chemins exacts, jamais
+ * un préfixe côté cible) que `violationsApplication` retire du graphe avant le parcours. Le parcours ne descend donc pas
+ * au-delà de la cible : ce qu'elle importe n'est pas atteint par cette arête. `typeSeulement` : chaque import réel qui
+ * emprunte l'arête est un `import type` (contrôlé sur les fichiers réels ci-dessous). `exemple` est un import fabriqué
+ * admis par l'arête, `horsArete` une origine fabriquée qui ne l'est pas (ou `undefined` si toute l'application hors de la
+ * zone de la cible l'est) : chaque ligne est exercée par ses propres cas fabriqués (test « chaque arête admise… »).
+ */
+type AreteAdmise = {
+  nom: string;
+  de: (chemin: string) => boolean;
+  vers: readonly string[];
+  typeSeulement: boolean;
+  exemple: string;
+  horsArete: string | undefined;
+};
+
+/**
+ * Liste fermée, une ligne par décision ; elle remplace la disjonction écrite à la main de B9c (0105 § 7), sans changement
+ * de verdict. Un ajout demande une décision du Tech Lead qui nomme l'arête, et ses cas fabriqués dans cette liste.
+ */
+const ARETES_ADMISES: readonly AreteAdmise[] = [
+  {
+    // P0r3c-5a (ticket 349, amendement de 0063) : seules arêtes de l'application vers `src/prototype` (hors programme
+    // réduit), d'un module serveur de P0 vers une feuille de types ; rien de `src/prototype` n'est chargé à l'exécution,
+    // et les feuilles n'importent que les contrats et `zod`.
+    nom: "P0r3c-5a : module serveur de P0 → feuille de types de src/prototype",
+    de: (chemin) => MODULES_SERVEUR_P0.includes(chemin),
+    vers: TYPES_PROTOTYPE_SERVEUR_P0,
+    typeSeulement: true,
+    exemple: "src/server/p0/assemblage.ts",
+    horsArete: "src/server/p0/garde.ts",
+  },
+  {
+    // B8a (décision 0085 § 1.7 et § 1.8) : `versRelectures` importe de `@/grounding` des types seulement (issues de
+    // fiches, table de trajets).
+    nom: "B8a : relecture des voyages → types de fiches et de trajets",
+    de: (chemin) => MODULES_RELECTURE.includes(chemin),
+    vers: TYPES_GROUNDING_RELECTURE,
+    typeSeulement: true,
+    exemple: "src/server/relecture/relectures.ts",
+    horsArete: "src/server/voyages/lecture.ts",
+  },
+  {
+    // B8b (décision 0100 § 5.1) : la source de relectures appelle `chargerFiches`, `chargerTrajetsParCouples`… avec des
+    // clients injectés par la composition de la lecture : ces trois modules de fonctions (valeurs), aucun module de capacité.
+    nom: "B8b : source de relectures → fiches, interfaces et trajets",
+    de: (chemin) => chemin === MODULE_SOURCE_LECTURE,
+    vers: GROUNDING_SOURCE_LECTURE,
+    typeSeulement: false,
+    exemple: MODULE_SOURCE_LECTURE,
+    horsArete: "src/server/composition/autre.ts",
+  },
+  {
+    // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding
+    // (`tests/unit/lint/positions-imports.test.ts`).
+    nom: "B8c : application → port du cache de positions",
+    de: (chemin) => !chemin.startsWith("src/grounding/"),
+    vers: [PORT_POSITIONS],
+    typeSeulement: true,
+    exemple: "src/server/x.ts",
+    horsArete: undefined,
+  },
+  {
+    // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
+    // (`SourceRelectures`, `Relectures`), en type seulement (`ligne/voyages-imports`).
+    nom: "B6a : double de relectures → types de src/domain/relectures.ts",
+    de: (chemin) => chemin === DOUBLE_RELECTURES,
+    vers: [TYPES_RELECTURES_DOUBLE],
+    typeSeulement: true,
+    exemple: DOUBLE_RELECTURES,
+    horsArete: "src/mocks/edimbourg.ts",
+  },
+  {
+    // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
+    // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
+    // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. L'écart de B9c sur ce test (réécriture complète
+    // non faite par B9c) est consigné par la décision 0105 § 7 ; la tâche de suite `B9c-graphe` (0081 B9-TL-1 point 4) a
+    // réécrit le test du graphe autour de cette liste, sans arête ni verdict nouveaux ; les cinq cas nominatifs « B9c
+    // admis/refusé » ci-dessous et `composition.test.ts` couvrent les arêtes de la génération.
+    nom: "B9b : src/server/generation et src/server/creation → src/ai/natures.ts",
+    de: (chemin) => chemin.startsWith("src/server/generation/") || chemin.startsWith("src/server/creation/"),
+    vers: [NATURES_IA],
+    typeSeulement: false,
+    exemple: "src/server/generation/codes.ts",
+    horsArete: "src/server/x.ts",
+  },
+];
+
+const areteAdmise = (de: string, vers: string) => ARETES_ADMISES.some((arete) => arete.vers.includes(vers) && arete.de(de));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
@@ -1296,12 +1358,15 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
   });
 
   /*
-   * Décision 0048 § 1 : frontière « src/domain n'est atteint que par src/server ». Deux parcours sur le graphe de
-   * l'application : (1) parcours complet, @/ai, @/research, @/grounding, scripts/ et src/prototype (sauf
-   * programme-reduit) refusés pour tout fichier, src/server compris ; (2) parcours qui ne descend pas dans
-   * src/server/, src/domain/ refusé pour tout fichier hors src/server.
+   * Décision 0048 § 1, amendée par 0081 B9-TL-1 point 2 : frontière « src/domain n'est atteint que par src/server » et
+   * « @/ai, @/research, @/grounding seulement par les compositions ». Deux parcours sur le graphe de l'application :
+   * (1) parcours complet, arrêté aux ponts (`PONTS_P0`, `PONTS_LECTURE`), @/ai, @/research, @/grounding, scripts/ et
+   * src/prototype (sauf programme-reduit) refusés pour tout fichier, src/server compris ; (2) parcours qui ne descend pas
+   * dans src/server/, src/domain/ refusé pour tout fichier hors src/server. Les deux retirent d'abord les arêtes exactes
+   * de `ARETES_ADMISES`. Réécrit par B9c-graphe (0081 B9-TL-1 point 4, écart de B9c consigné par 0105 § 7) : liste
+   * déclarative des arêtes admises, chacune exercée par ses cas fabriqués et sur les fichiers réels ; verdicts inchangés.
    */
-  describe("graphe de l'application : @/domain seulement par src/server (décision 0048 § 1)", () => {
+  describe("graphe de l'application : @/domain seulement par src/server (décision 0048 § 1), @/ai, @/research et @/grounding par les compositions (0081 B9-TL-1)", () => {
     const application = fichiers("src").filter((fichier) => !DOSSIERS_P0.some((d) => fichier.startsWith(`${d}/`)) && !fichier.startsWith("src/contracts/"));
     const configs = ["next.config.ts"].filter((fichier) => existsSync(path.join(RACINE, fichier)));
 
@@ -1523,6 +1588,42 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     ] satisfies [string, Record<string, string[]>, string, string[]][])("B9b, terminal de la conversion des codes (0081 B9-TL-1 point 2) : %s", (_nom, aretes, depart, attendu) => {
       const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    it.each(ARETES_ADMISES.map((arete) => [arete.nom, arete] as const))("B9c-graphe, arête admise exacte et exercée par ses cas fabriqués (0081 B9-TL-1 point 4) : %s", (_nom, arete) => {
+      const graphe = (aretes: Record<string, string[]>): Voisins => (fichier) => aretes[fichier] ?? [];
+      expect(arete.de(arete.exemple), arete.exemple).toBe(true);
+      for (const cible of arete.vers) {
+        // Cible exacte : un fichier réel, jamais un préfixe.
+        expect(existsSync(path.join(RACINE, cible)) && statSync(path.join(RACINE, cible)).isFile(), cible).toBe(true);
+        // Admis : l'arête, et rien de ce que la cible importe n'est atteint par elle.
+        expect(violationsApplication(arete.exemple, graphe({ [arete.exemple]: [cible], [cible]: ["src/ai/couche.ts", "src/domain/temps.ts"] })), cible).toEqual([]);
+        // Refusé : un fichier voisin de la cible, depuis la même origine (égalité de chaîne, pas de préfixe).
+        const voisin = cible.replace(/\.ts$/, "-autre.ts");
+        expect(violationsApplication(arete.exemple, graphe({ [arete.exemple]: [voisin] })), voisin).toEqual([voisin]);
+        // Refusé : la même cible depuis une origine hors de l'arête.
+        if (arete.horsArete !== undefined) {
+          expect(arete.de(arete.horsArete), arete.horsArete).toBe(false);
+          expect(violationsApplication(arete.horsArete, graphe({ [arete.horsArete]: [cible] })), arete.horsArete).toEqual([cible]);
+        }
+      }
+    });
+
+    it("B9c-graphe : chaque arête admise est empruntée par un import réel de l'application, en `import type` quand elle l'exige", () => {
+      const empruntees = new Set<string>();
+      for (const fichier of application.filter((f) => !estTest(f))) {
+        const { imports } = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8"));
+        for (const { specificateur, forme } of imports) {
+          const cible = resoudre(fichier, specificateur);
+          if (cible.type !== "projet") continue;
+          for (const arete of ARETES_ADMISES.filter((a) => a.vers.includes(cible.chemin) && a.de(fichier))) {
+            empruntees.add(arete.nom);
+            if (arete.typeSeulement) expect(forme, `${fichier} → ${cible.chemin}`).toMatch(/^(?:import|export) type \{/);
+          }
+        }
+      }
+      // Aucune ligne morte : une arête que rien n'emprunte élargirait la frontière sans raison.
+      expect([...empruntees].sort()).toEqual(ARETES_ADMISES.map((a) => a.nom).sort());
     });
 
     it("le pont p0Run n'est importé que par src/workflows/index.ts, et l'index n'atteint P0 que par lui", () => {

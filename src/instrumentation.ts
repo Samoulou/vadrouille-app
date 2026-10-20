@@ -27,6 +27,13 @@
  * `RELECTURES_SOURCE=google`) est branchée sur `src/adapters/api-instance.ts` ; rien n'est lu ni connecté ici, et la
  * garde (`assertApiAdapter`) reste vérifiée à chaque `getTripAdapter("api")`. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement`) sans arrêter le serveur : chaque lecture rejette (page d'erreur).
+ *
+ * B9e (spécification B9, B9e points 1 et 3 ; décision 0081 B9-TL-2 et B9-TL-8, sur le modèle de 0108) : environnement valide
+ * et `DATA_ADAPTER=api`, la fabrique de la création (`createApiCreationAdapter`, cas d'usage de `src/server/creation/`) est
+ * branchée sur `src/adapters/api-creation-instance.ts`. Rien n'est lu ni connecté ici ; la garde (`assertApiAdapter`) reste
+ * vérifiée à chaque `getCreationAdapter("api")`, et la barrière des appels réels (B9-TL-8) à l'entrée de chaque étape de la
+ * génération. Un échec du branchement est journalisé (`voyages.action_failed`, action `branchement-creation`) sans arrêter
+ * le serveur : chaque action de création rend `provider_error`.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -39,6 +46,7 @@ export async function register(): Promise<void> {
       await brancherLecturePrototype(logEvent, errorNameOf);
       await brancherConnexion(logEvent, errorNameOf);
       await brancherLectureApi(logEvent, errorNameOf);
+      await brancherCreationApi(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -100,5 +108,22 @@ async function brancherLectureApi(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche la fabrique de la création sur l'adaptateur `api` (spécification B9, B9e point 1). */
+async function brancherCreationApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherCreationVoyages } = await import("@/adapters/api-creation-instance");
+    const { createApiCreationAdapter } = await import("@/adapters/api-creation");
+    brancherCreationVoyages(() => createApiCreationAdapter());
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-creation", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }

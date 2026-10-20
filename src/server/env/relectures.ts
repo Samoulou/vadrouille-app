@@ -37,3 +37,18 @@ export function sourceReelleChoisie(env: Env = process.env): boolean {
   }
   return environnement === "local";
 }
+
+/**
+ * Déclarations de déploiement (`VADROUILLE_ENV`, `VERCEL_ENV`) de la source simulée des voyages générés (spécification B9,
+ * B9e point 3), rendues seulement si l'environnement résolu est `local` ou `ci` ; `null` partout ailleurs (préversion,
+ * production, valeur absente ou illisible), jamais une levée. Le chargeur de fixtures les relit (0105 § 2 point 2).
+ */
+export function declarationsLectureSimulee(env: Env = process.env): Readonly<Record<string, string | undefined>> | null {
+  let environnement: ServerEnvironment;
+  try {
+    environnement = resolveServerEnvironment(env);
+  } catch {
+    return null;
+  }
+  return environnement === "local" || environnement === "ci" ? { VADROUILLE_ENV: env.VADROUILLE_ENV, VERCEL_ENV: env.VERCEL_ENV } : null;
+}

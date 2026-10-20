@@ -66,6 +66,13 @@ export type DependancesSource = {
   /** `POSITIONS_ECRITURE_SUSPENDUE` vaut `1` (0060 § 1.3). */
   readonly positionsSuspendues: () => boolean;
   readonly horloge: Horloge;
+  /**
+   * Où le forfait est compté : `usage_ledger` (défaut, transaction 1) ou en mémoire seulement (`"memoire"` : registre du
+   * forfait, aucune ligne écrite). `"memoire"` est réservé à la lecture des voyages générés par la variante simulée, sur les
+   * doubles des fixtures, sans client réel (décision 0110 § 3) : ses lignes ne doivent pas s'ajouter aux cumuls que lit la
+   * variante réelle.
+   */
+  readonly reservation?: "usage_ledger" | "memoire";
 };
 
 /**
@@ -129,13 +136,15 @@ async function lire(dep: DependancesSource, voyage: VoyageARelire, demande: Dema
     return refus("unavailable");
   }
 
-  // Transaction 1 : réservation, validée avant le premier appel Google.
-  const reserve = await reserverForfait(
-    dep.transaction(contexte),
-    { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: null, profil },
-    regles,
-  );
-  if (!reserve.ok) return refus(REFUS_QUOTA.has(reserve.code) ? "quota_reached" : "unavailable");
+  // Transaction 1 : réservation, validée avant le premier appel Google (sauf forfait en mémoire seulement, 0110 § 3).
+  if (dep.reservation !== "memoire") {
+    const reserve = await reserverForfait(
+      dep.transaction(contexte),
+      { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: null, profil },
+      regles,
+    );
+    if (!reserve.ok) return refus(REFUS_QUOTA.has(reserve.code) ? "quota_reached" : "unavailable");
+  }
 
   const { places, routes } = clients;
   const obtenuesA = dep.horloge.maintenant();
