@@ -155,10 +155,15 @@ describe("usage: forfait d'un profil et lignes de usage_ledger (B7-TL-9)", () =>
     ]);
     // Fonction de la configuration seule : deux appels, mêmes lignes.
     expect(lignesDuForfait(TABLE, PLAFONDS_USAGE_TEST.skus, "modeles_forfait", forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "apercu"))).toEqual(lignes);
-    // Relecture : Routes seulement, aucune ligne de modèles ; mini : aucune ligne Routes (plafond nul).
-    expect(lignesDuForfait(TABLE, PLAFONDS_USAGE_TEST.skus, "modeles_forfait", forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relecture")).map((l) => l.sku)).toEqual([
-      "routes_matrix_essentials",
-    ]);
+    // Relecture (0100 § 1) : une ligne par méthode non nulle (Text Search, fiches, Routes), aucune ligne de modèles ;
+    // mini : aucune ligne Routes (plafond nul).
+    for (const profil of ["relecture", "relectureVoyage"] as const) {
+      expect(lignesDuForfait(TABLE, PLAFONDS_USAGE_TEST.skus, "modeles_forfait", forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, profil)).map((l) => l.sku)).toEqual([
+        "places_text_search_essentials_ids_only",
+        "places_details_enterprise",
+        "routes_matrix_essentials",
+      ]);
+    }
     expect(lignesDuForfait(TABLE, PLAFONDS_USAGE_TEST.skus, "modeles_forfait", forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "mini")).map((l) => l.sku)).not.toContain(
       "routes_matrix_essentials",
     );
@@ -195,6 +200,16 @@ describe("usage: forfait d'un profil et lignes de usage_ledger (B7-TL-9)", () =>
     expect(plafonds.map((p) => p.methode)).toEqual(["chat", "places_text_search", "places_details", "routes_matrix"]);
     expect(plafondsDuForfait(forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relecture")).map((p) => p.methode)).not.toContain("chat");
   });
+
+  it("usage: la portée choisit le profil : relecture (jour) et relectureVoyage (voyage) aux plafonds distincts, fonction du profil et de la configuration seulement", () => {
+    const jour = forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relecture");
+    const voyage = forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relectureVoyage");
+    expect(jour).toMatchObject({ nature: "relecture", textSearchRequetes: 2, placeDetailsRequetes: 20, routesRequetes: 24, routesElements: 24, coutGoogleMicros: 520_000 });
+    expect(voyage).toMatchObject({ nature: "relecture", textSearchRequetes: 20, placeDetailsRequetes: 100, routesRequetes: 240, routesElements: 240, coutGoogleMicros: 3_200_000 });
+    // Même profil, même configuration : même forfait (S4, 0046 D13) ; aucune autre entrée n'influe.
+    expect(forfaitDuProfil({ ...PLAFONDS_USAGE_TEST }, { ...TABLE }, "relectureVoyage")).toEqual(voyage);
+    // Aucune ligne n'est écrite par un profil : seul `reserverForfait` écrit, avec le profil de la demande.
+  });
 });
 
 describe("usage: réservation du forfait (séquence de « Consommation et plafonds »)", () => {
@@ -216,6 +231,24 @@ describe("usage: réservation du forfait (séquence de « Consommation et plafon
     expect(base.inserts()[0]?.valeurs.slice(0, 3)).toEqual([ORG, null, RUN]);
     expect(base.inserts()[0]?.valeurs[3]).toEqual(["forfait", "forfait", "forfait", "forfait"]);
     expect(textes.at(-1)).toBe("COMMIT");
+  });
+
+  it("usage: relectures : relecture et relectureVoyage écrivent les lignes de leur profil, sans génération", async () => {
+    for (const [profil, unites] of [
+      ["relecture", [2, 20, 24]],
+      ["relectureVoyage", [20, 100, 240]],
+    ] as const) {
+      const base = baseSimulee();
+      const resultat = await reserverForfait(base.transaction(), { organisationId: ORG, tripId: null, generationRunId: null, profil }, regles());
+      expect(resultat, profil).toMatchObject({ ok: true, executionId: null });
+      expect(base.inserts(), profil).toHaveLength(1);
+      expect(base.inserts()[0]?.valeurs.slice(0, 3), profil).toEqual([ORG, null, null]);
+      expect(base.inserts()[0]?.valeurs[6], profil).toEqual(unites);
+    }
+    // Une génération ne peut pas porter le profil d'une relecture, ni une relecture un identifiant de génération.
+    const base = baseSimulee();
+    expect(await reserverForfait(base.transaction(), { ...demandeApercu, profil: "relectureVoyage" }, regles())).toEqual({ ok: false, code: "usage_unavailable" });
+    expect(base.requetes).toEqual([]);
   });
 
   it("usage: plafond atteint, aucun appel", async () => {
@@ -340,6 +373,7 @@ describe("usage: réservation du forfait (séquence de « Consommation et plafon
       { ...demandeApercu, generationRunId: null },
       { ...demandeApercu, tripId: "x" },
       { ...demandeApercu, profil: "relecture" as const },
+      { ...demandeApercu, profil: "relectureVoyage" as const },
       { ...demandeApercu, profil: "inconnu" as never },
     ]) {
       expect(await reserverForfait(base.transaction(), demande, regles())).toEqual({ ok: false, code: "usage_unavailable" });

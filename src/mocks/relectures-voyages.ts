@@ -159,6 +159,14 @@ export type DoubleRelectures = SourceRelectures & {
   appels(): number;
   /** Dernière demande reçue (lecture des tests). */
   derniereDemande(): DemandeRelectures | undefined;
+  /** Dernier voyage reçu (contexte, portée et séjours posés par le cas d'usage ; lecture des tests, 0100 § 3.2 point 1). */
+  dernierVoyage(): VoyageARelire | undefined;
+  /**
+   * `placeId` interrogés (`validite` ou `plages`) alors qu'ils ne figurent pas dans la demande vue par le double, distincts,
+   * dans l'ordre d'apparition (décision 0100 § 4.3 : renforce `relectures: la demande couvre l'assemblage`, que la
+   * non-relecture d'un lieu, devenue sans `toConfirm`, ne détecterait plus par la sortie seule).
+   */
+  lieuxHorsDemande(): readonly string[];
 };
 
 export type OptionsDoubleRelectures = {
@@ -179,15 +187,22 @@ export function creerRelecturesVoyages(options: OptionsDoubleRelectures = {}): D
   const table = options.table ?? tableDesRelectures();
   let appels = 0;
   let derniere: DemandeRelectures | undefined;
+  let dernierVoyage: VoyageARelire | undefined;
+  const horsDemande: string[] = [];
   return {
     async pour(voyage: VoyageARelire, demandeRecue: DemandeRelectures) {
       appels += 1;
       derniere = demandeRecue;
+      dernierVoyage = voyage;
       if (options.leve) throw new Error("double de relectures : exception simulée");
       if (options.refus !== undefined) return { ok: false as const, refus: options.refus };
       const demande = options.filtrerDemande ? options.filtrerDemande(demandeRecue) : demandeRecue;
       const lieu = (point: Point): string | null => ("lieu" in point ? point.lieu : (voyage.logementsParNuit[point.logement] ?? null));
-      const demandeLieu = (placeId: string) => demande.lieux.find((entree) => entree.placeId === placeId);
+      const demandeLieu = (placeId: string) => {
+        const entree = demande.lieux.find((e) => e.placeId === placeId);
+        if (entree === undefined && !horsDemande.includes(placeId)) horsDemande.push(placeId);
+        return entree;
+      };
       const relectures: Relectures = {
         validite(placeId): Validite {
           return demandeLieu(placeId) !== undefined && table.plages.has(placeId) ? "valide" : INCONNU;
@@ -209,5 +224,7 @@ export function creerRelecturesVoyages(options: OptionsDoubleRelectures = {}): D
     },
     appels: () => appels,
     derniereDemande: () => derniere,
+    dernierVoyage: () => dernierVoyage,
+    lieuxHorsDemande: () => [...horsDemande],
   };
 }

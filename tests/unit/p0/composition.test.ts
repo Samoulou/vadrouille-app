@@ -51,6 +51,15 @@ const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
  */
 const RELECTEUR_REEL = "src/server/p0/relecture.ts";
 const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RELECTEUR_REEL];
+/**
+ * Fabrique commune des clients Google (B8b, décision 0100 § 5.2, qui amende 0081 B9-TL-2 point 1) : seul importateur des
+ * modules de capacité Google (`places-client.ts`, `routes-client.ts`) hors de la composition du prototype, importée par la
+ * composition de la lecture (`lecture.ts`) et, quand elle existera, par celle de la génération (`generation.ts`, B9c).
+ */
+const CLIENTS_GOOGLE = "src/server/composition/clients-google.ts";
+const COMPOSITION_LECTURE = "src/server/composition/lecture.ts";
+const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [COMPOSITION_LECTURE, "src/server/composition/generation.ts"];
+const CAPACITES_GOOGLE = ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"];
 
 /**
  * Fichiers exemptés : les fichiers de test (`*.test.*`, `*.spec.*`) et les supports de test (`tests/support/`) seulement
@@ -191,10 +200,45 @@ describe("p0: modules de capacité importés par la seule composition", () => {
   });
 
   it("hors des tests, seul src/server/composition/p0-reel.ts importe un module de capacité ; aucun import() calculé", () => {
-    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION])).toEqual([]);
+    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION, CLIENTS_GOOGLE])).toEqual([]);
     // La composition importe bien les quatre modules (le test porte sur un cas réel).
     const directs = aretesDe(COMPOSITION, lireDepot(COMPOSITION)).map((a) => resoudre(COMPOSITION, a.specificateur));
     for (const capacite of MODULES_CAPACITE) expect(directs).toContainEqual({ type: "projet", chemin: capacite });
+  });
+
+  it("composition: la fabrique des clients Google est le seul importateur des modules de capacité Google (hors la composition du prototype)", () => {
+    // Hors des tests : la fabrique et la composition du prototype sont les deux seuls importateurs de `places-client` et `routes-client`.
+    for (const capacite of CAPACITES_GOOGLE) {
+      expect(importateurs(DEPOT, capacite), capacite).toEqual([COMPOSITION, CLIENTS_GOOGLE].sort());
+    }
+    // La fabrique importe ces deux modules et aucun autre module de capacité (ni modèles, ni transport undici).
+    const directs = aretesDe(CLIENTS_GOOGLE, lireDepot(CLIENTS_GOOGLE)).map((a) => resoudre(CLIENTS_GOOGLE, a.specificateur));
+    for (const capacite of MODULES_CAPACITE) {
+      expect(directs.some((c) => c.type === "projet" && c.chemin === capacite), capacite).toBe(CAPACITES_GOOGLE.includes(capacite));
+    }
+    // Elle est importée par la composition de la lecture seule (B9c y ajoutera `generation.ts`), qui n'importe aucun module de capacité.
+    expect(importateurs(DEPOT, CLIENTS_GOOGLE).filter((f) => !IMPORTATEURS_CLIENTS_GOOGLE.includes(f))).toEqual([]);
+    expect(importateurs(DEPOT, CLIENTS_GOOGLE)).toContain(COMPOSITION_LECTURE);
+    const lecture = aretesDe(COMPOSITION_LECTURE, lireDepot(COMPOSITION_LECTURE)).map((a) => resoudre(COMPOSITION_LECTURE, a.specificateur));
+    for (const capacite of MODULES_CAPACITE) expect(lecture).not.toContainEqual({ type: "projet", chemin: capacite });
+    // Ni la fabrique, ni la composition de la lecture ne sont atteintes depuis une page, une action ou un composant client.
+    for (const cible of [CLIENTS_GOOGLE, COMPOSITION_LECTURE]) {
+      for (const interdit of ["src/app/", "src/features/", "src/components/", "src/server/actions/", "src/server/voyages/", "src/server/composition/p0-reel.ts"]) {
+        expect(importateurs(DEPOT, cible).some((f) => f.startsWith(interdit)), `${cible} ← ${interdit}`).toBe(false);
+      }
+    }
+  });
+
+  it("composition: cas négatifs de la fabrique des clients Google (import direct d'un module de capacité, import par un autre module)", () => {
+    const depot = depotFictif({
+      "src/server/composition/clients-google.ts": 'import { a } from "@/capacite";\n',
+      "src/server/composition/lecture.ts": 'import { f } from "@/server/composition/clients-google";\n',
+      "src/server/relecture/source.ts": 'import { a } from "@/capacite";\n',
+      "src/server/voyages/lecture.ts": 'import { f } from "@/server/composition/clients-google";\n',
+      "src/capacite.ts": "export const a = 1;\n",
+    });
+    expect(violationsCapacite(depot, ["src/capacite.ts"], ["src/server/composition/clients-google.ts"])).toEqual(["src/server/relecture/source.ts → src/capacite.ts"]);
+    expect(importateurs(depot, CLIENTS_GOOGLE).filter((f) => !IMPORTATEURS_CLIENTS_GOOGLE.includes(f))).toEqual(["src/server/voyages/lecture.ts"]);
   });
 
   it(`seuls ${IMPORTATEURS_COMPOSITION.join(" et ")} peuvent importer la composition ; le relecteur, par l'instrumentation seule`, () => {

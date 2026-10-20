@@ -47,6 +47,10 @@ export const LOG_EVENTS = [
   // `placeId`, coordonnée, durée ni message de base.
   "voyages.read_failed",
   "voyages.relecture_refused",
+  // B8b (décision 0100 § 4.4, verdict Sécurité attendu § 7 point 3) : une lecture dont les fiches (horaires, positions) ont
+  // échoué, une fois par lecture, par la source de relectures seule. Champs : `reason` (`LOG_FICHES_REASONS`, liste
+  // fermée) et `tripId` ; aucun identifiant de lieu, aucune donnée Google.
+  "voyages.fiches_non_relues",
   // Ticket 493, décision 0090 (verdict Sécurité S4 : favorable) : arrêt d'une étape de `p0Run`, cause fermée seulement.
   // Champs : `phase` (`LOG_STEP_PHASES`), `errorName` (nom de classe de l'erreur, filtré par `NOM_ERREUR` : lettres
   // seulement, 40 au plus ; absent sinon) et `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message,
@@ -308,6 +312,12 @@ export const LOG_READ_REASONS: readonly string[] = [
 ];
 const RAISONS_LECTURE: ReadonlySet<string> = new Set(LOG_READ_REASONS);
 /**
+ * Raisons de `voyages.fiches_non_relues` (B8b, 0100 § 4.4) : plafond atteint avant l'appel, quota, tout le reste. Ajoutées
+ * au contrôle du champ `reason` ; `LOG_READ_REASONS` (égale à `RAISONS_LECTURE` de la lecture) ne change pas.
+ */
+export const LOG_FICHES_REASONS: readonly string[] = ["cap_reached", "quota_reached", "unavailable"];
+const RAISONS_FICHES: ReadonlySet<string> = new Set(LOG_FICHES_REASONS);
+/**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
  * `prototype.runs.phase` (`PHASES`, `src/prototype/arret.ts`), plus trois repères de l'étape finale sans écriture en
  * base : `fiches` (Place Details de la première série), `routes` (regroupement par jour et matrices du séjour) et
@@ -441,7 +451,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["mustSeesWithoutCandidate", entierPositif],
   ["candidatesGrouped", entierPositif],
   ["sectorUnknown", entierPositif],
-  ["reason", (v) => chaine(v) && RAISONS_LECTURE.has(v)],
+  ["reason", (v) => chaine(v) && (RAISONS_LECTURE.has(v) || RAISONS_FICHES.has(v))],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],

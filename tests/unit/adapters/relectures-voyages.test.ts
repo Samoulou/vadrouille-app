@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DemandeRelectures, Plage } from "@/domain/relectures";
 import { creerRelecturesVoyages, lieuConverti, lieuDeTest, logementDeTest, tableDesRelectures, VOYAGES_SIMULES, type TableRelectures } from "@/mocks/relectures-voyages";
+import { voyageARelire } from "../../support/voyage-a-relire";
 
 /**
  * Double de relectures de la lecture des voyages (spécification B6, B6a point 3 ; décision 0086 § 1.2 point 4) :
@@ -39,7 +40,7 @@ const demande: DemandeRelectures = {
 
 async function relire(options: Parameters<typeof creerRelecturesVoyages>[0], logements: (string | null)[] = [H], recue = demande) {
   const double = creerRelecturesVoyages({ table, ...options });
-  const reponse = await double.pour({ logementsParNuit: logements }, recue);
+  const reponse = await double.pour(voyageARelire(logements), recue);
   return { double, reponse };
 }
 
@@ -79,8 +80,8 @@ describe("double de relectures : indexation et demande", () => {
 
   it("jamais indexé par voyage : deux voyages aux mêmes lieux reçoivent les mêmes valeurs", async () => {
     const double = creerRelecturesVoyages({ table });
-    const un = await double.pour({ logementsParNuit: [H] }, demande);
-    const deux = await double.pour({ logementsParNuit: [H] }, demande);
+    const un = await double.pour(voyageARelire([H]), demande);
+    const deux = await double.pour(voyageARelire([H]), demande);
     if (!un.ok || !deux.ok) throw new Error("refus inattendu");
     expect(deux.relectures.duree({ logement: 0 }, { lieu: A }, "walk")).toEqual(un.relectures.duree({ logement: 0 }, { lieu: A }, "walk"));
   });
@@ -98,8 +99,8 @@ describe("double de relectures : appels et refus", () => {
     const double = creerRelecturesVoyages({ table });
     expect(double.appels()).toBe(0);
     expect(double.derniereDemande()).toBeUndefined();
-    await double.pour({ logementsParNuit: [H] }, demande);
-    await double.pour({ logementsParNuit: [H] }, { lieux: [], trajets: [] });
+    await double.pour(voyageARelire([H]), demande);
+    await double.pour(voyageARelire([H]), { lieux: [], trajets: [] });
     expect(double.appels()).toBe(2);
     expect(double.derniereDemande()).toEqual({ lieux: [], trajets: [] });
   });
@@ -112,7 +113,7 @@ describe("double de relectures : appels et refus", () => {
 
   it("exception simulée", async () => {
     const double = creerRelecturesVoyages({ table, leve: true });
-    await expect(double.pour({ logementsParNuit: [H] }, demande)).rejects.toThrow();
+    await expect(double.pour(voyageARelire([H]), demande)).rejects.toThrow();
     expect(double.appels()).toBe(1);
   });
 });

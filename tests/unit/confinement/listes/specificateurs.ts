@@ -140,6 +140,9 @@ const PORT_P0R1 =
 const COMPOSITION_P0R3C =
   "module de composition du mode réel (D18) : câblage seul, garde exigée (type `GardeOuverte`), contexte d'appel et périodes (D20) " +
   "du port de consommation ; P0r3c-3 (ticket 316), décision 0055, section 3 points 1 et 7, avis S-3 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)";
+const COMPOSITION_B8B =
+  "composition de la lecture des voyages (B8b, décision 0100 § 5) : câblage seul de la source de relectures, de la fabrique commune des " +
+  "clients Google, de `withOrg` et du forfait de relecture ; verdict Sécurité : attendu (0100 § 7 points 4 et 5)";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -363,6 +366,24 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"],
     motif: COMPOSITION_P0R3C,
   },
+  // B8b (décision 0100 § 5 ; verdict Sécurité attendu, § 7 points 4 et 5) : fabrique commune des clients Google et
+  // composition de la lecture. Câblage seul : marqueurs `server-only`, types et fabriques de `src/server`, aucune capacité
+  // directe hors des deux clients de `src/grounding` (fermeture du module de composition étendue à la fabrique).
+  { fichier: "src/server/composition/clients-google.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  {
+    fichier: "src/server/composition/clients-google.ts",
+    specificateur: "@/server/usage/port",
+    noms: ["horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
+    motif: COMPOSITION_B8B,
+  },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/domain/relectures", noms: ["type:SourceRelectures"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/source", noms: ["creerSourceRelectures", "type:DependancesSource"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:Horloge"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/with-org", noms: ["executeurSql", "withOrg"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/env/relectures.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({

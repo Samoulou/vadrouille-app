@@ -22,9 +22,11 @@ import { distanceVolOiseauMetres } from "@/grounding/zone";
  * - ou centre maison d'un logement `suggestedArea` (`area.center`, B8-PO-15) et sa clé, produite par `cleMaison`
  *   (`interfaces.ts`, seule fonction qui la produit ; une autre valeur est refusée).
  * Routes reçoit le point et l'estimation part de sa position : toujours le même point (B8-PO-15).
+ * Sans position (lecture, décision 0100 § 1.6) : Routes est interrogée par `placeId`, mais la paire n'est jamais estimée.
+ * `chargerTrajets` (matrice complète, planification) exige la position de ses points `placeId`.
  */
 export type PointTrajet =
-  | { readonly placeId: string; readonly position: Coordonnees }
+  | { readonly placeId: string; readonly position?: Coordonnees }
   | { readonly cleMaison: string; readonly centreMaison: Coordonnees };
 
 /** Clé de trajet d'un point : son `placeId`, ou sa clé maison. */
@@ -64,6 +66,7 @@ export async function chargerTrajets(
       const cle = cleDuPoint(point);
       if (positions.has(cle)) continue;
       if ("placeId" in point) {
+        if (point.position === undefined) throw new RangeError("trajets: position manquante");
         positions.set(cle, { lat: point.position.lat, lng: point.position.lng });
       } else {
         const centre = { lat: point.centreMaison.lat, lng: point.centreMaison.lng };
@@ -98,6 +101,107 @@ export async function chargerTrajets(
     return {
       duree(depuis, vers, mode) {
         if (!admis.includes(mode) || !positions.has(depuis) || !positions.has(vers)) return undefined;
+        if (depuis === vers) return { minutes: 0, estimee: false };
+        return table.get(cleTrajet(depuis, vers))?.get(mode);
+      },
+    };
+  });
+}
+
+/** Couple à mesurer en lecture : deux points et les modes admis du couple (un élément Routes par mode, 0100 § 1.5). */
+export type CoupleTrajet = { readonly depuis: PointTrajet; readonly vers: PointTrajet; readonly modes: readonly ModeRoutes[] };
+
+/** Requêtes Routes simultanées au plus pour les couples d'une lecture (0100 § 1.5 : concurrence bornée, sous le registre). */
+export const CONCURRENCE_COUPLES = 4;
+
+/** Point envoyé à Routes (clé maison : centre en coordonnées maison ; sinon le `placeId`). */
+function pointRoutesDe(point: PointTrajet): PointRoutes {
+  if ("placeId" in point) return point.placeId;
+  if (point.cleMaison !== cleMaisonDe(point.centreMaison)) throw new RangeError("trajets: clé maison incohérente");
+  return { centreMaison: { lat: point.centreMaison.lat, lng: point.centreMaison.lng } };
+}
+
+/** Position d'un point pour l'estimation, ou `undefined` (point `placeId` sans position). */
+function positionDe(point: PointTrajet): Coordonnees | undefined {
+  if ("placeId" in point) return point.position === undefined ? undefined : { lat: point.position.lat, lng: point.position.lng };
+  return { lat: point.centreMaison.lat, lng: point.centreMaison.lng };
+}
+
+/**
+ * Trajets d'une **lecture** (décision 0100 § 1.5 et § 1.6 ; amende 0085 § 1.6) : Routes mesure les couples de la
+ * demande, non la matrice complète. Un couple, un mode, **un élément** (requête 1 × 1, même masque et même SKU que la
+ * matrice) ; un couple répété ou un mode répété n'est mesuré qu'une fois. Les requêtes partent par groupes d'au plus
+ * `CONCURRENCE_COUPLES` ; au premier échec (erreur, plafond, quota), aucune requête de plus ne part et l'appel entier
+ * rend l'échec : aucune durée.
+ *
+ * Estimation (B8-PO-8) : seulement quand Routes répond sans itinéraire pour **tous** les modes admis du couple **et**
+ * que les deux positions sont connues ; sinon le couple reste inconnu (`undefined`), jamais une durée inventée. Un
+ * point sans position (fiche en échec) ne rend donc jamais d'estimation (0100 § 1.6).
+ */
+export async function chargerTrajetsParCouples(couples: readonly CoupleTrajet[], routes: ClientRoutes): Promise<ResultatAncrage<TableTrajets>> {
+  return capturer(async () => {
+    const demandes: { cle: string; de: string; vers: string; mode: ModeRoutes; origine: PointRoutes; destination: PointRoutes }[] = [];
+    const lues = new Set<string>();
+    const positions = new Map<string, Coordonnees | undefined>();
+    const connus = new Set<string>();
+    const admisParCouple = new Map<string, Set<ModeRoutes>>();
+    for (const couple of couples) {
+      const de = cleDuPoint(couple.depuis);
+      const vers = cleDuPoint(couple.vers);
+      connus.add(de);
+      connus.add(vers);
+      if (!positions.has(de) || positions.get(de) === undefined) positions.set(de, positionDe(couple.depuis));
+      if (!positions.has(vers) || positions.get(vers) === undefined) positions.set(vers, positionDe(couple.vers));
+      if (de === vers) continue;
+      const couleKey = cleTrajet(de, vers);
+      const admis = admisParCouple.get(couleKey) ?? new Set<ModeRoutes>();
+      admisParCouple.set(couleKey, admis);
+      for (const mode of couple.modes) {
+        admis.add(mode);
+        const cle = `${couleKey}\u0000${mode}`;
+        if (lues.has(cle)) continue;
+        lues.add(cle);
+        demandes.push({ cle, de, vers, mode, origine: pointRoutesDe(couple.depuis), destination: pointRoutesDe(couple.vers) });
+      }
+    }
+
+    const mesures = new Map<string, number>();
+    const file = [...demandes];
+    let echec: { readonly erreur: unknown } | null = null;
+    const travailleur = async () => {
+      while (echec === null) {
+        const demande = file.shift();
+        if (demande === undefined) return;
+        try {
+          const { secondes } = await routes.matrice({ origines: [demande.origine], destinations: [demande.destination], mode: demande.mode });
+          const valeur = secondes.at(0)?.at(0);
+          if (typeof valeur === "number" && Number.isFinite(valeur) && valeur >= 0) mesures.set(demande.cle, Math.ceil(valeur / 60));
+        } catch (erreur) {
+          echec ??= { erreur };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCE_COUPLES, demandes.length) }, travailleur));
+    if (echec !== null) throw (echec as { erreur: unknown }).erreur;
+
+    const table = new Map<string, Map<ModeRoutes, DureeTrajet>>();
+    for (const [couleKey, admis] of admisParCouple) {
+      const [de, vers] = couleKey.split("\u0000") as [string, string];
+      const parMode = new Map<ModeRoutes, DureeTrajet>();
+      for (const mode of admis) {
+        const minutes = mesures.get(`${couleKey}\u0000${mode}`);
+        if (minutes !== undefined) parMode.set(mode, { minutes, estimee: false });
+      }
+      const a = positions.get(de);
+      const b = positions.get(vers);
+      if (parMode.size === 0 && a !== undefined && b !== undefined) {
+        for (const mode of admis) parMode.set(mode, { minutes: minutesEstimees(a, b, mode), estimee: true });
+      }
+      table.set(couleKey, parMode);
+    }
+    return {
+      duree(depuis, vers, mode) {
+        if (!connus.has(depuis) || !connus.has(vers)) return undefined;
         if (depuis === vers) return { minutes: 0, estimee: false };
         return table.get(cleTrajet(depuis, vers))?.get(mode);
       },

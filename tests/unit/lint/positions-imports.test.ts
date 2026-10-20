@@ -28,15 +28,15 @@ import { RACINE, rel, resoudre } from "../p0/resolution";
  * 5. Aucun littéral de chaîne d'un fichier de `src/` autre que `lecture.ts` ne contient `\bplace_coordinates\b` (nom de
  *    la table ; `store_place_coordinates` n'y répond pas ; les commentaires ne comptent pas). Les fichiers de test et
  *    l'exception nommée `TABLE_NOMMEE_PERMISE` (lecture du prototype, P0r4) n'y sont pas soumis.
- * 6. La chaîne `as PositionGoogleFraiche` n'apparaît dans aucun fichier de `src/` ; la PR qui crée le module de
- *    conversion des fiches (B8a ou B8b) ajoute son seul fichier à `ASSERTION_PERMISE`.
+ * 6. La chaîne `as PositionGoogleFraiche` n'apparaît dans aucun fichier de `src/` autre que le module de conversion des
+ *    fiches (`src/grounding/fiches.ts`, B8b, `ASSERTION_PERMISE`), où elle n'apparaît qu'une fois.
  */
 
 const CACHE = "src/server/positions/cache-positions.ts";
 const LECTURE = "src/server/positions/lecture.ts";
 const PORT = "src/grounding/port-positions.ts";
-/** Module de conversion des fiches Place Details (0060 § 1.1) : aucun tant que B8a ou B8b ne l'a pas créé. */
-const ASSERTION_PERMISE: readonly string[] = [];
+/** Module de conversion des fiches Place Details (0060 § 1.1) : `positionsFraiches` (B8b, 0100 § 3.2 point 4). */
+const ASSERTION_PERMISE: readonly string[] = ["src/grounding/fiches.ts"];
 /**
  * Exception nommée à la règle 5, hors de 0060 § 1.4 (signalée au Tech Lead dans la PR de B8c) : lecture des positions
  * d'`org_prototype` sous `vadrouille_prototype` (P0r4, ticket 414 ; décision 0079), fusionnée avant B8c. Ce n'est pas
@@ -182,6 +182,14 @@ describe("coordonnées: écrites par un seul module, en paramètres liés (règl
     expect(lire(CACHE)).toContain("store_place_coordinates");
   });
 
+  it("règle 6 : le module de conversion des fiches affirme PositionGoogleFraiche une fois, et lui seul (B8b)", () => {
+    expect(ASSERTION_PERMISE).toEqual(["src/grounding/fiches.ts"]);
+    const texte = lire("src/grounding/fiches.ts");
+    expect(texte.match(/as\s+PositionGoogleFraiche\b/g)).toHaveLength(1);
+    expect(ecartsNoms("src/grounding/fiches.ts", texte)).toEqual([]);
+    expect(ecartsNoms("src/server/relecture/source.ts", "const p = position as PositionGoogleFraiche;")).toEqual(["src/server/relecture/source.ts affirme PositionGoogleFraiche"]);
+  });
+
   it("cas éprouvés : chaque règle signale son écart et laisse passer le cas permis", () => {
     const imp = (fichier: string, texte: string) => ecartsImports(fichier, texte).length;
     expect(imp("src/grounding/carte.ts", 'import { creerPortPositions } from "@/server/positions/cache-positions";')).toBe(1);
@@ -210,7 +218,7 @@ describe("coordonnées: écrites par un seul module, en paramètres liés (règl
     expect(noms("src/server/voyages/carte.ts", "// lit place_coordinates par lecture.ts")).toBe(0);
     expect(noms(LECTURE, 'const SQL = "SELECT lat FROM public.place_coordinates";')).toBe(0);
     expect(noms("src/server/voyages/carte.test.ts", 'const SQL = "SELECT lat FROM public.place_coordinates";')).toBe(0);
-    expect(noms("src/grounding/fiches.ts", "const p = position as PositionGoogleFraiche;")).toBe(1);
-    expect(noms("src/grounding/fiches.ts", "const p = position as  PositionGoogleFraiche;")).toBe(1);
+    expect(noms("src/grounding/zone.ts", "const p = position as PositionGoogleFraiche;")).toBe(1);
+    expect(noms("src/grounding/zone.ts", "const p = position as  PositionGoogleFraiche;")).toBe(1);
   });
 });
