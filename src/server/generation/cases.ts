@@ -86,8 +86,25 @@ export type EntreeCases = {
   readonly configuration: ConfigurationMoteur;
 };
 
-/** Heures de repli d'une case `noOption` quand le squelette n'a plus de créneau libre (jamais deux cases au même créneau). */
-const HEURES_DE_REPLI = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"] as const;
+/** Pas, en minutes, des créneaux de repli d'une case `noOption` quand le squelette n'en a plus de libre. */
+const PAS_DE_REPLI = 30;
+
+/**
+ * Créneaux de repli, **tirés du squelette** (jamais des heures fixes) : pour chaque jour planifié, chaque demi-heure de sa
+ * fenêtre (`debut` à `fin`), de type `meal` quand elle tombe dans la fenêtre d'un repas du jour, `activity` sinon.
+ */
+function creneauxDeRepli(jours: readonly JourSquelette[]): { day: number; time: string; kind: "activity" | "meal" }[] {
+  const repli: { day: number; time: string; kind: "activity" | "meal" }[] = [];
+  for (const jour of jours) {
+    const repas = jour.creneaux.flatMap((creneau) => (creneau.type === "meal" ? [{ de: creneau.auPlusTot, a: creneau.auPlusTard }] : []));
+    for (let instant = Math.ceil(jour.debut / PAS_DE_REPLI) * PAS_DE_REPLI; instant < jour.fin; instant += PAS_DE_REPLI) {
+      const heure = heureDuJour(instant);
+      if (heure === undefined) continue;
+      repli.push({ day: jour.index, time: heure, kind: repas.some(({ de, a }) => instant >= de && instant <= a) ? "meal" : "activity" });
+    }
+  }
+  return repli;
+}
 
 export function composerCases(entree: EntreeCases): CaseApercu[] {
   const retenues = entree.instantane.days
@@ -115,7 +132,7 @@ export function composerCases(entree: EntreeCases): CaseApercu[] {
 
   const pris = new Set(cases.map((c) => `${c.day}|${c.time}`));
   const manquants = creneauxAttendus(entree.squelette.filter((jour) => entree.jours.includes(jour.index)), entree.configuration);
-  const dernier = Math.max(...entree.jours);
+  const planifies = entree.squelette.filter((jour) => entree.jours.includes(jour.index));
   for (const attendu of manquants) {
     if (cases.length >= MAX_PREVIEW_SLOTS) break;
     const cle = `${attendu.day}|${attendu.time}`;
@@ -123,12 +140,12 @@ export function composerCases(entree: EntreeCases): CaseApercu[] {
     pris.add(cle);
     cases.push({ type: "noOption", position: cases.length + 1, day: attendu.day, time: attendu.time, kind: attendu.kind });
   }
-  for (const heure of HEURES_DE_REPLI) {
+  for (const repli of creneauxDeRepli(planifies)) {
     if (cases.length >= MAX_PREVIEW_SLOTS) break;
-    const cle = `${dernier}|${heure}`;
+    const cle = `${repli.day}|${repli.time}`;
     if (pris.has(cle)) continue;
     pris.add(cle);
-    cases.push({ type: "noOption", position: cases.length + 1, day: dernier, time: heure, kind: cases.length % 2 === 0 ? "activity" : "meal" });
+    cases.push({ type: "noOption", position: cases.length + 1, ...repli });
   }
   return cases;
 }

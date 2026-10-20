@@ -8,7 +8,9 @@ import "server-only";
  * barrière, rendues telles quelles (jamais journalisées) :
  * - `VADROUILLE_ENV` et `VERCEL_ENV` : déploiement déclaré (la barrière retient la plus restrictive) ;
  * - `VERCEL_GIT_COMMIT_REF` : branche du déploiement (identifiant public posé par Vercel) ;
- * - `GENERATION_APPELS_REELS` : drapeau d'activation côté serveur, comparaison exacte à `1` par la barrière.
+ * - `GENERATION_APPELS_REELS` : drapeau d'activation côté serveur, comparaison exacte à `1` par la barrière ;
+ * - `POSITIONS_ECRITURE_SUSPENDUE` (nom fixé par 0060 § 1.3) : `1` suspend l'écriture des positions au cache de la
+ *   génération ; lue par `ecriturePositionsSuspendue`, comparaison exacte à `1`.
  */
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -27,4 +29,9 @@ export function lireEnvGeneration(env: Env = process.env): EnvGeneration {
     VERCEL_GIT_COMMIT_REF: env.VERCEL_GIT_COMMIT_REF,
     GENERATION_APPELS_REELS: env.GENERATION_APPELS_REELS,
   };
+}
+
+/** Vrai quand les écritures de positions au cache sont suspendues (0060 § 1.3, « Interrupteur d'écriture »). */
+export function ecriturePositionsSuspendue(env: Env = process.env): boolean {
+  return env.POSITIONS_ECRITURE_SUSPENDUE === "1";
 }

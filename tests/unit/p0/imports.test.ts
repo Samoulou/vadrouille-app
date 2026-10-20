@@ -1416,13 +1416,14 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         ["src/grounding/places-client.ts"],
       ],
       [
-        "B9c admis : action de création → src/server/creation → composition/generation (le parcours s'arrête au pont)",
+        "B9c admis (0081 B9-TL-4 point 4) : src/features/x.tsx → action de création → src/server/creation/y.ts → composition/generation → @/ai/couche",
         {
-          "src/server/actions/creation.ts": ["src/server/creation/commun.ts"],
-          "src/server/creation/commun.ts": ["src/server/composition/generation.ts"],
+          "src/features/x.tsx": ["src/server/actions/creation.ts"],
+          "src/server/actions/creation.ts": ["src/server/creation/y.ts"],
+          "src/server/creation/y.ts": ["src/server/composition/generation.ts"],
           "src/server/composition/generation.ts": ["src/ai/couche.ts", "src/grounding/places-client.ts"],
         },
-        "src/server/actions/creation.ts",
+        "src/features/x.tsx",
         [],
       ],
       ["B9c admis : src/server/generation → src/ai/natures (terminal exact)", { "src/server/generation/codes.ts": ["src/ai/natures.ts"] }, "src/server/generation/codes.ts", []],

@@ -71,3 +71,19 @@ export const BRANCHE_APPELS_REELS: string | null = null;
 
 /** Villes de l'aperçu : J1 et J2 (`JOURS_APERCU`) ; une recherche par ville, dans l'ordre du séjour. */
 export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
+
+/**
+ * Écriture des positions de la version publiée au cache `place_coordinates` (0081 B9-TL-9, 0060 § 3.4 condition (a), 0100
+ * § 3.1 point 2). `false` tant que `coords-purge.yml` n'a réussi aucun passage (aucun succès relevé au 2026-10-20) : aucune
+ * écriture du MVP sur la base réelle avant ce premier succès. Le CEO la passe à `true` par une PR dès qu'il l'a relevé ;
+ * `POSITIONS_ECRITURE_SUSPENDUE=1` la suspend ensuite sans redéploiement de code (0060 § 1.3). Jamais d'écriture non plus
+ * pour la variante simulée : ses positions viennent des fixtures, pas de Google.
+ */
+export const ECRITURE_POSITIONS_AUTORISEE = false;
+
+/**
+ * Écriture de programmes réels (spécification B9, question 9 à Samuel ; 0011 l. 77 : « d'ici là, B9 ne branche pas
+ * l'écriture de programmes réels »). `false` tant qu'il n'a pas répondu : même quand la barrière rend `reelle`, la
+ * composition reste simulée. B9e la lie à sa réponse.
+ */
+export const ECRITURE_PROGRAMMES_REELS_AUTORISEE = false;

@@ -75,7 +75,7 @@ export const contexteDe = (org: { org: string; owner: string }): AdapterContext 
 export const ETAPES = [etapeBrief, etapeLogement, etapeRecherche, etapeAncrage, etapeNotation, etapePlanification] as const;
 
 /** Déroule les six étapes comme `generatePreview`, sans le SDK : une étape arrêtée passe les suivantes. */
-export async function derouler(etat: EtatEtape, dependances: DependancesGeneration, jusqua = ETAPES.length): Promise<EtatEtape> {
+export async function derouler(etat: EtatEtape, dependances: DependancesGeneration, jusqua: number = ETAPES.length): Promise<EtatEtape> {
   let courant = etat;
   for (const etape of ETAPES.slice(0, jusqua)) {
     if (courant.arret !== undefined) break;

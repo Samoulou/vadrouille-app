@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { TripSnapshot } from "@/contracts";
-import { TENTATIVES_PUBLICATION } from "@/server/config/generation";
+import type { ExecuteurPublication, ResultatEcriturePositions } from "@/server/composition/generation";
+import { RANG_ETAPE, TENTATIVES_PUBLICATION } from "@/server/config/generation";
 import { DELAI_PORT_MS } from "@/server/usage/port";
 import { ecrireVersion } from "@/server/versions/ecrire";
 import { executeurSql } from "@/server/with-org";
@@ -16,8 +17,11 @@ import { gardeOuverte } from "./garde";
  * point 3, critère `aperçu: une seule transaction de publication`) : sous la garde `step_seq = 6 AND phase = 'preparing'`,
  * la version 1 (`ecrireVersion`, `author_kind` `workflow`, `request_id` de l'exécution, `trips.current_version`), les cases
  * `proposals` (`phase` `preview`) et la fin de l'exécution (`ready` ou `incomplete`, `last_version`). Une erreur de base
- * annule tout. Aucune position n'est écrite : la condition (a) de 0060 n'est pas remplie (B8c absente), et ce dossier
- * n'importe pas le port d'écriture (critère `coordonnées: aucune écriture sans B8c`).
+ * annule tout. **Positions** (B8c fusionnée ; 0081 B9-TL-9, 0060 § 1.3 « Ce que fait l'appelant ») : quand l'appelant fournit
+ * `ecrirePositions` (configuration et interrupteur de suspension, `barriere.ts`), les positions des lieux de la version sont
+ * écrites **dans cette transaction** : `perimees` (ou entrée refusée) → la version est écrite sans elles, la transaction
+ * continue ; `base` → la transaction est annulée en entier (version comprise) et rejouée si `retryable`, sinon l'étape
+ * s'arrête. Ce dossier n'importe jamais le port d'écriture : il reçoit une fonction de la composition.
  *
  * **Rejeu borné** : une erreur de la transaction (connexion perdue, conflit) la rejoue, `TENTATIVES_PUBLICATION` fois au plus,
  * **sans aucun nouvel appel externe** (les données sont déjà en mémoire) et seulement si l'échéance de l'étape le permet. Si la
@@ -29,6 +33,8 @@ export type DonneesPublication = {
   readonly instantane: TripSnapshot;
   readonly cases: readonly CaseApercu[];
   readonly statut: "ready" | "incomplete";
+  /** Écriture des positions de la version dans la transaction de publication ; absente : aucune écriture (suspendue, non autorisée, simulée). */
+  readonly ecrirePositions?: (executeur: ExecuteurPublication) => Promise<ResultatEcriturePositions>;
 };
 
 export type ContextePublication = {
@@ -39,7 +45,7 @@ export type ContextePublication = {
   readonly echeance: number;
 };
 
-const SQL_PHASE = `SELECT phase FROM public.generation_runs WHERE organization_id = $1 AND id = $2`;
+const SQL_PHASE = `SELECT phase, last_version FROM public.generation_runs WHERE organization_id = $1 AND id = $2`;
 const SQL_CASE = `INSERT INTO public.proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, candidate_id, content)
   VALUES ($1, $2, $3, 'preview', $4, $5, $6, $7, $8, $9, $10::jsonb)`;
 const SQL_FIN = `UPDATE public.generation_runs SET phase = $4, stop_reason = NULL, last_version = $5, updated_at = $6::timestamptz, finished_at = $6::timestamptz
@@ -57,7 +63,11 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
         const instant = new Date(dependances.maintenant());
         if (!(await gardeOuverte(x, organizationId, generationRunId, "e", instant))) {
           const ligne = (await x.query(SQL_PHASE, [organizationId, generationRunId])).rows[0];
-          if (ligne !== undefined && (ligne.phase === "ready" || ligne.phase === "incomplete")) return { version: 1, dejaPubliee: true };
+          if (ligne !== undefined && (ligne.phase === "ready" || ligne.phase === "incomplete")) {
+            const derniere = Number(ligne.last_version);
+            if (!Number.isInteger(derniere) || derniere < 1) throw new ArretEtape("step_expired");
+            return { version: derniere, dejaPubliee: true };
+          }
           throw new ArretEtape("step_expired");
         }
         const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: donnees.instantane });
@@ -75,7 +85,15 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
             c.type === "proposal" ? JSON.stringify(c.contenu) : null,
           ]);
         }
-        const fin = await x.query(SQL_FIN, [organizationId, generationRunId, 6, donnees.statut, ecrite.version, instant.toISOString()]);
+        if (donnees.ecrirePositions !== undefined) {
+          const positions = await donnees.ecrirePositions(x);
+          if (!positions.ok && positions.code === "base") {
+            // Transaction annulée en entier : rejouée dans une nouvelle transaction si l'erreur s'y prête, sinon l'étape s'arrête.
+            if (positions.retryable) throw new Error("positions");
+            throw new ArretEtape("upstream_error");
+          }
+        }
+        const fin = await x.query(SQL_FIN, [organizationId, generationRunId, RANG_ETAPE.e, donnees.statut, ecrite.version, instant.toISOString()]);
         if (fin.rows.length === 0) throw new ArretEtape("step_expired");
         return { version: ecrite.version, dejaPubliee: false };
       });

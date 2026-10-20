@@ -28,10 +28,11 @@ import { creerRechercheSimulee, FixturesRechercheSchema } from "@/research/reche
 import { versLignes, type LignesCandidat } from "@/research/candidat-trouve";
 import { classerSource } from "@/research/sources";
 import { createUndiciTransport } from "@/research/undici-transport";
-import { creerClientsGoogle } from "@/server/composition/clients-google";
+import { creerClientsGoogle, envelopperClientsGoogle, type ClientsGoogle } from "@/server/composition/clients-google";
 import { CONFIGURATION_IA } from "@/server/config/ia";
 import { COUTS_ESTIMES_MICROS, MARGE_FICHES } from "@/server/config/generation";
 import { preparerPlanification } from "@/server/relecture/planification";
+import { ecrirePositionsAbsentes, type FabriquePortPositions, type ResultatEcriturePositions } from "@/server/relecture/positions-ecriture";
 import { reglesDeLecture } from "@/server/relecture/regles";
 import { periodesDe } from "@/server/usage/periodes";
 import type { Forfait } from "@/server/usage/forfait";
@@ -73,8 +74,10 @@ import fixturesRoutes from "../../../prototype/fixtures/routes/edimbourg.json";
  *   `simulee` (doubles sur les fixtures d'Édimbourg de `prototype/fixtures/`, les seules en local et en CI). Les doubles
  *   sont enveloppés dans la même réservation que les clients réels (`avecReservation`) : un plafond ou un quota agit de la
  *   même façon dans les deux variantes. Le choix de la variante est celui de la barrière (`generation/barriere.ts`).
- * - Aucun appel à `ecrire` (port d'écriture des positions) : condition (a) de 0060 non remplie, B8c absente
- *   (test `coordonnées: aucune écriture sans B8c`).
+ * - **Positions** (B8c fusionnée, 0081 B9-TL-9) : la composition n'écrit rien elle-même ; `planifier` rend les positions des fiches
+ *   lues sous la forme `PositionsDeLEtape`, que l'étape `e` écrit dans la transaction de la version publiée seulement si
+ *   `ECRITURE_POSITIONS_AUTORISEE` (condition (a) de 0060 § 3.4 : premier succès de `coords-purge.yml`) et si
+ *   `POSITIONS_ECRITURE_SUSPENDUE` n'est pas posé (`src/server/generation/barriere.ts`).
  */
 
 // --- Types neutres ------------------------------------------------------------------------------------------------------
@@ -110,7 +113,8 @@ export type CandidatANoter = {
   readonly typeEtape: "activity" | "meal";
 };
 
-export type LieuARedige = CandidatANoter & { readonly sourceUrl: string };
+/** Lieu à rédiger : la source est facultative (aucune URL lisible : le champ `sourceDomaine` est omis, jamais inventé). */
+export type LieuARedige = CandidatANoter & { readonly sourceUrl?: string };
 
 export type EntreePlanifier = {
   readonly jours: readonly JourSquelette[];
@@ -122,7 +126,21 @@ export type EntreePlanifier = {
   readonly configuration: ConfigurationMoteur;
 };
 
-export type SortiePlanifier = { readonly candidats: readonly CandidatMoteur[]; readonly relectures: Relectures };
+/** Exécuteur SQL de la transaction de publication (même forme que `ExecuteurPositions` de `@/server/positions/lecture`). */
+export type ExecuteurPublication = { query(texte: string, valeurs: readonly unknown[]): Promise<{ rows: readonly Record<string, unknown>[] }> };
+
+/**
+ * Positions des fiches lues par la planification (données Google, en mémoire), que l'étape `e` écrit au cache **dans la
+ * transaction de la version publiée** (0081 B9-TL-9 ; 0100 § 3.1 point 2) : les seuls `placeId` de la version publiée,
+ * absents du cache (jamais une position rendue par `lire`). Ne porte aucune valeur lisible par `generation/`.
+ */
+export interface PositionsDeLEtape {
+  ecrire(executeur: ExecuteurPublication, publies: ReadonlySet<string>, obtenuesA: number, creerPort?: FabriquePortPositions): Promise<ResultatEcriturePositions>;
+}
+
+export type SortiePlanifier = { readonly candidats: readonly CandidatMoteur[]; readonly relectures: Relectures; readonly positions: PositionsDeLEtape };
+
+export type { FabriquePortPositions, ResultatEcriturePositions };
 
 export interface CapaciteLogement {
   /** `null` : logement sans `placeId` à vérifier, aucun appel. */
@@ -153,7 +171,6 @@ export type OptionsEtape = {
   readonly plafonds: readonly Plafond[];
   readonly executionId: string;
   readonly forfait: Forfait;
-  readonly skus: PlafondsUsage["skus"];
   readonly horloge?: Horloge;
   /** Instant (horloge du serveur) après lequel aucun appel externe ne doit encore partir. */
   readonly echeance?: number;
@@ -207,8 +224,15 @@ function depuisAncrage<T>(resultat: ResultatAncrage<T>): ResultatCapacite<T> {
   return resultat.ok ? resultat : echecDeCode(resultat.code, resultat.retryable);
 }
 
-function domaine(url: string): string {
-  return new URL(url).hostname;
+/** Domaine d'une source, ou `undefined` si l'URL stockée est illisible (le champ est alors omis du prompt). */
+function domaine(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  try {
+    const nom = new URL(url).hostname;
+    return nom === "" ? undefined : nom;
+  } catch {
+    return undefined;
+  }
 }
 
 // --- Doubles et clients --------------------------------------------------------------------------------------------------
@@ -234,18 +258,20 @@ export function doublesEdimbourg(): DoublesGeneration {
   };
 }
 
-/** SKU des fiches de position et d'identifiant (table de prix) : valeurs des clients réels, copiées (module de capacité non importé). */
-const SKU_POSITION = "places_details_essentials";
-const SKU_IDENTIFIANT = "places_details_essentials_ids_only";
-const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0, element: 5 } as const;
-
 function contexteDe(options: OptionsEtape, fournisseur: Fournisseur, horloge: Horloge): () => ContexteAppel {
   return () => ({ nature: "execution", executionId: options.executionId, periodes: periodesDe(fournisseur, horloge) });
 }
 
+/** Échéance de l'étape (0075) : aucun appel externe ne part si son délai entier ne tient plus avant elle. */
+function verifierEcheance(options: OptionsEtape, delai: number, erreur: (code: string) => Error): void {
+  const horloge = options.horloge ?? horlogeSysteme;
+  if (options.echeance !== undefined && horloge.maintenant() + delai > options.echeance) throw erreur("cap_reached");
+}
+
 /**
- * Réservation d'un appel de double, comme celle d'un client réel : refus du port ou du registre → l'erreur fermée du
- * client (aucun appel du double), délai → `upstream_timeout`, erreur du double → `upstream_error`.
+ * Réservation d'un appel de double de **modèles**, comme celle d'un client réel : refus du port ou du registre → l'erreur
+ * fermée du client (aucun appel du double), délai → `upstream_timeout`, erreur du double → `upstream_error`. Les doubles
+ * Google passent par `envelopperClientsGoogle` (`clients-google.ts`), qui importe les SKU et coûts des clients réels.
  */
 async function sousReservation<T>(
   options: OptionsEtape,
@@ -256,7 +282,7 @@ async function sousReservation<T>(
   operation: () => Promise<{ readonly valeur: T; readonly coutReelMicros: number | null }>,
 ): Promise<T> {
   const horloge = options.horloge ?? horlogeSysteme;
-  if (options.echeance !== undefined && horloge.maintenant() + delai > options.echeance) throw erreur("cap_reached");
+  verifierEcheance(options, delai, erreur);
   const issue = await avecReservation({ port: options.usage, horloge }, demandeDe(contexteDe(options, fournisseur, horloge)(), appel, options.plafonds), delai, async (_signal, appele) => {
     appele();
     return operation();
@@ -269,33 +295,28 @@ async function sousReservation<T>(
 const erreurGoogle = (code: string): Error => new ErreurClientGoogle(code as ConstructorParameters<typeof ErreurClientGoogle>[0]);
 const erreurModele = (code: string): Error => new ErreurOpenRouter(code as ConstructorParameters<typeof ErreurOpenRouter>[0]);
 
-function placesSousPlafond(base: ClientPlacesMvp, options: OptionsEtape): ClientPlacesMvp {
-  const unite = { requetes: 1, elements: 0 } as const;
-  const sans = <T>(valeur: T) => ({ valeur, coutReelMicros: null });
-  const google = <T>(methode: "places_text_search" | "places_details", sku: string, cout: number, operation: () => Promise<T>) =>
-    sousReservation(options, "google", { fournisseur: "google", methode, sku, unites: unite, coutEstimeMicros: cout }, DELAI_REQUETE_MS.places, erreurGoogle, async () => sans(await operation()));
+/** Clients Google (réels ou enveloppés) sous l'échéance de l'étape ; aucune réservation ici. */
+function googleAvecEcheance(clients: ClientsGoogle, options: OptionsEtape): ClientsGoogle {
+  const garde = (delai: number) => verifierEcheance(options, delai, erreurGoogle);
+  const { places, routes } = clients;
   return {
-    textSearch: (requete) => google("places_text_search", options.skus.textSearch, COUT_ESTIME_MICROS.textSearch, () => base.textSearch(requete)),
-    details: (placeId) => google("places_details", options.skus.details, COUT_ESTIME_MICROS.details, () => base.details(placeId)),
-    position: (placeId) => google("places_details", SKU_POSITION, COUT_ESTIME_MICROS.position, () => base.position(placeId)),
-    identifiant: (placeId) => google("places_details", SKU_IDENTIFIANT, COUT_ESTIME_MICROS.identifiant, () => base.identifiant(placeId)),
+    places: {
+      textSearch: async (requete) => (garde(DELAI_REQUETE_MS.places), places.textSearch(requete)),
+      details: async (placeId) => (garde(DELAI_REQUETE_MS.places), places.details(placeId)),
+      position: async (placeId) => (garde(DELAI_REQUETE_MS.places), places.position(placeId)),
+      identifiant: async (placeId) => (garde(DELAI_REQUETE_MS.places), places.identifiant(placeId)),
+    },
+    routes: { matrice: async (requete) => (garde(DELAI_REQUETE_MS.routes), routes.matrice(requete)) },
   };
 }
 
-function routesSousPlafond(base: ClientRoutes, options: OptionsEtape): ClientRoutes {
-  return {
-    matrice: (requete) => {
-      const elements = requete.origines.length * requete.destinations.length;
-      return sousReservation(
-        options,
-        "google",
-        { fournisseur: "google", methode: "routes_matrix", sku: options.skus.matrice, unites: { requetes: 1, elements }, coutEstimeMicros: elements * COUT_ESTIME_MICROS.element },
-        DELAI_REQUETE_MS.routes,
-        erreurGoogle,
-        async () => ({ valeur: await base.matrice(requete), coutReelMicros: null }),
-      );
-    },
-  };
+/** Clients Google de la variante simulée : les doubles, enveloppés dans la réservation des clients réels. */
+function googleSimule(doubles: DoublesGeneration, options: OptionsEtape): ClientsGoogle {
+  const horloge = options.horloge ?? horlogeSysteme;
+  return googleAvecEcheance(
+    envelopperClientsGoogle({ places: doubles.places, routes: doubles.routes }, { usage: options.usage, contexte: contexteDe(options, "google", horloge), plafonds: options.plafonds, horloge }),
+    options,
+  );
 }
 
 function modelesSousPlafond(base: ClientModeles, options: OptionsEtape): ClientModeles {
@@ -431,23 +452,42 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
         },
         { places, routes },
       );
-      return depuisAncrage(issue);
+      if (!issue.ok) return depuisAncrage(issue);
+      const { positions } = issue.valeur;
+      return {
+        ok: true,
+        valeur: {
+          candidats: issue.valeur.candidats,
+          relectures: issue.valeur.relectures,
+          positions: {
+            ecrire: (executeur, publies, obtenuesA, creerPort) =>
+              ecrirePositionsAbsentes(executeur, new Map([...positions].filter(([placeId]) => publies.has(placeId))), obtenuesA, creerPort),
+          },
+        },
+      };
     },
     async rediger(brief, ville, lieux) {
+      // Un lieu dont la source n'a pas de domaine lisible n'est pas rédigé (le prompt exige `sourceDomaine`, jamais inventé) :
+      // il reste sans raison, donc sans case.
+      const lisibles = lieux.flatMap((lieu) => {
+        const sourceDomaine = domaine(lieu.sourceUrl);
+        return sourceDomaine === undefined ? [] : [{ lieu, sourceDomaine }];
+      });
+      if (lisibles.length === 0) return { ok: true, valeur: new Map() };
       const issue = await ia.rediger({
         entree: entreeModelesDeVille(brief, ville),
-        lieux: lieux.map((lieu, rang) => ({
+        lieux: lisibles.map(({ lieu, sourceDomaine }, rang) => ({
           id: identifiantModele(rang),
           nom: lieu.nom,
           resume: lieu.resume,
           categorie: lieu.categorie,
           typeEtape: lieu.typeEtape,
-          sourceDomaine: domaine(lieu.sourceUrl),
+          sourceDomaine,
         })),
       });
       if (!issue.ok) return echecDeCode(issue.code, issue.retryable);
       const raisons = new Map<string, { raison: string; detour: string }>();
-      lieux.forEach((lieu, rang) => {
+      lisibles.forEach(({ lieu }, rang) => {
         const lue = issue.valeur.raisons.get(identifiantModele(rang));
         if (lue !== undefined) raisons.set(lieu.id, { raison: lue.raison, detour: lue.detour });
       });
@@ -469,18 +509,19 @@ export function composerSimulee(options: OptionsSimulee = {}): FabriqueGeneratio
   const reglages = CONFIGURATION_IA.reglages;
   return {
     variante: "simulee",
-    logement: (o) => capaciteLogement(placesSousPlafond(doubles().places, o)),
+    logement: (o) => capaciteLogement(googleSimule(doubles(), o).places),
     recherche: (o) => {
       const d = doubles();
       const modeles = modelesSousPlafond(d.modeles, o);
       return capaciteRecherche(modeles, rechercheWebSousPlafond(d.rechercheWeb, o), d.lecteur, o.horloge ?? horlogeSysteme, options.traces);
     },
-    ancrage: (o) => capaciteAncrage(placesSousPlafond(doubles().places, o)),
+    ancrage: (o) => capaciteAncrage(googleSimule(doubles(), o).places),
     notation: (o) => capaciteNotation(creerCoucheIa({ modeles: modelesSousPlafond(doubles().modeles, o), reglages, ...(options.traces === undefined ? {} : { traces: options.traces }) })),
     finale: (o) => {
       const d = doubles();
       const ia = creerCoucheIa({ modeles: modelesSousPlafond(d.modeles, o), reglages, ...(options.traces === undefined ? {} : { traces: options.traces }) });
-      return capaciteFinale(placesSousPlafond(d.places, o), routesSousPlafond(d.routes, o), ia, o.forfait);
+      const google = googleSimule(d, o);
+      return capaciteFinale(google.places, google.routes, ia, o.forfait);
     },
   };
 }
@@ -493,7 +534,7 @@ export function composerReelle(options: OptionsReelle = {}): FabriqueGeneration 
   const reglages = CONFIGURATION_IA.reglages;
   const clientsGoogle = (o: OptionsEtape) => {
     const horloge = o.horloge ?? horlogeSysteme;
-    return creerClientsGoogle({ usage: o.usage, contexte: contexteDe(o, "google", horloge), plafonds: o.plafonds, horloge });
+    return googleAvecEcheance(creerClientsGoogle({ usage: o.usage, contexte: contexteDe(o, "google", horloge), plafonds: o.plafonds, horloge }), o);
   };
   const clientModeles = (o: OptionsEtape) => {
     const horloge = o.horloge ?? horlogeSysteme;

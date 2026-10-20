@@ -3,13 +3,17 @@ import "server-only";
 import { classer, type ParametresClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatMoteur, TypeCreneau } from "@/domain/entrees";
+import { demandeBornee, demandeDuJour, TYPES_SERIE } from "@/domain/demande-du-jour";
 import { INCONNU, logementsDuJour, type Relectures } from "@/domain/relectures";
 import type { JourSquelette } from "@/domain/squelette";
 import { element, lire } from "@/domain/tables";
 import { margeRemplacement } from "@/grounding/fiches-finales";
-import { ficherSerie, type FicheChargee, type IssueFiche } from "@/grounding/fiches";
+import { BLOC_MATRICE } from "@/grounding/ancrage";
+import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { ficherSerie, positionsFraiches, type FicheChargee, type IssueFiche } from "@/grounding/fiches";
 import { zoneEtDepart, type LogementAncre, type LogementAPositionner } from "@/grounding/ancrage-production";
 import type { ClientPlacesMvp, ClientRoutes, ModeRoutes } from "@/grounding/interfaces";
+import type { PositionGoogleFraiche } from "@/grounding/port-positions";
 import { capturer, valeurOuEchec, type ResultatAncrage } from "@/grounding/resultat";
 import { chargerTrajets, cleDuPoint, type DureeTrajet, type PointTrajet, type TableTrajets } from "@/grounding/trajets";
 import { regrouperParJour } from "@/grounding/zone";
@@ -75,59 +79,14 @@ export type SortiePlanification = {
   /** Candidats retenus (fiche lue, dans la zone, regroupés dans un jour), sans le rang de ville. */
   readonly candidats: readonly CandidatMoteur[];
   readonly relectures: Relectures;
+  /**
+   * Positions des fiches lues par cette planification (donnée Google, en mémoire), marquées pour l'écriture au cache : celle
+   * de l'étape `e` n'en écrit que les `placeId` de la version publiée (0081 B9-TL-9).
+   */
+  readonly positions: ReadonlyMap<string, PositionGoogleFraiche>;
 };
 
-const TYPES: readonly TypeCreneau[] = ["activity", "meal", "evening"];
-
-type Demande = Record<TypeCreneau, number>;
-
-const ajouter = (demande: Demande, type: TypeCreneau, n: number): Demande => ({
-  activity: demande.activity + (type === "activity" ? n : 0),
-  meal: demande.meal + (type === "meal" ? n : 0),
-  evening: demande.evening + (type === "evening" ? n : 0),
-});
-
-/**
- * Lieux que demande un jour, par type : un par créneau du squelette qui tient dans la fenêtre réelle du jour (durées par
- * défaut, sans trajet : borne haute), plus l'idée « Surprends-moi » (une activité). Même règle que le prototype
- * (`demandeDuJour` de P0, ticket 483).
- */
-export function demandeDuJour(jour: JourSquelette, configuration: ConfigurationMoteur): Demande {
-  const durees = configuration.dureesParDefaut;
-  let demande: Demande = { activity: 1, meal: 0, evening: 0 };
-  let instant = jour.debut;
-  jour.creneaux.forEach((creneau, rang) => {
-    if (creneau.type === "activity") {
-      const suivant = jour.creneaux.at(rang + 1);
-      const limite = suivant?.type === "meal" ? suivant.auPlusTard : jour.fin;
-      const fin = instant + durees.activity;
-      if (fin > limite || fin > jour.fin) return;
-      demande = ajouter(demande, "activity", 1);
-      instant = fin;
-      return;
-    }
-    const debut = Math.max(instant, creneau.auPlusTot);
-    const fin = debut + (creneau.type === "meal" ? lire(durees, creneau.repas) : durees.evening);
-    if ((creneau.type === "meal" && debut > creneau.auPlusTard) || fin > jour.fin) return;
-    demande = ajouter(demande, creneau.type, 1);
-    instant = fin;
-  });
-  return demande;
-}
-
-/** Demande ramenée à la capacité de la matrice du jour : types pris dans l'ordre de `TYPES`. */
-export function demandeBornee(demande: Demande, capacite: number): Demande {
-  let reste = Math.max(0, capacite);
-  let bornee: Demande = { activity: 0, meal: 0, evening: 0 };
-  for (const type of TYPES) {
-    const pris = Math.min(lire(demande, type), reste);
-    bornee = ajouter(bornee, type, pris);
-    reste -= pris;
-  }
-  return bornee;
-}
-
-const BLOC = 10;
+const TYPES = TYPES_SERIE;
 
 /**
  * Nombre de points (logements et lieux) que la matrice d'un jour admet : `jours × modes` matrices de `n × n` éléments,
@@ -137,7 +96,7 @@ export function capaciteMatrice(jours: number, modes: number, budget: { readonly
   if (jours <= 0 || modes <= 0) return 0;
   let n = 0;
   for (let candidat = 1; candidat <= 60; candidat += 1) {
-    const blocs = Math.ceil(candidat / BLOC) ** 2;
+    const blocs = Math.ceil(candidat / BLOC_MATRICE) ** 2;
     if (jours * modes * candidat * candidat > budget.routesElements || jours * modes * blocs > budget.routesRequetes) break;
     n = candidat;
   }
@@ -211,6 +170,9 @@ export async function preparerPlanification(entree: EntreePlanification, clients
       }
     }
     const premiereSerie = series.reduce((somme, serie) => somme + serie.n, 0);
+    // Comme P0 (`premiereSerie > budgetFiches` : refus sans programme) : une première série qui ne tient pas dans le budget de
+    // fiches n'est pas lue en partie, elle est refusée avant toute fiche (`cap_reached`, jamais un lieu inventé).
+    if (premiereSerie > Math.max(0, budgets.fiches)) throw new ErreurClientGoogle("cap_reached");
     const marge = margeRemplacement(premiereSerie, budgets.marge);
     let restant = Math.min(Math.max(0, budgets.fiches), premiereSerie + marge);
     let aVenir = premiereSerie;
@@ -284,6 +246,6 @@ export async function preparerPlanification(entree: EntreePlanification, clients
       void ville;
       return candidat;
     });
-    return { candidats: gardes, relectures };
+    return { candidats: gardes, relectures, positions: positionsFraiches(fichesLues) };
   });
 }

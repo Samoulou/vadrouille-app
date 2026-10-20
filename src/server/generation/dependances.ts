@@ -1,6 +1,7 @@
 import "server-only";
 
-import { composerReelle, composerSimulee, reglesDeGeneration, type FabriqueGeneration } from "@/server/composition/generation";
+import { composerReelle, composerSimulee, reglesDeGeneration, type FabriqueGeneration, type FabriquePortPositions } from "@/server/composition/generation";
+import { ECRITURE_PROGRAMMES_REELS_AUTORISEE } from "@/server/config/generation";
 import { PLAFONDS_USAGE, type PlafondsUsage } from "@/server/config/usage";
 import { horlogeSysteme, type Horloge } from "@/server/usage/port";
 import type { ReglesUsage } from "@/server/usage/reservation";
@@ -8,7 +9,7 @@ import { withSystemOrg } from "@/server/with-system-org";
 import type { OrgTransaction } from "@/server/with-org";
 
 import { ArretEtape } from "./codes";
-import { evaluerBarriere, type EtatBarriere } from "./barriere";
+import { ecriturePositionsPermise, evaluerBarriere, plafondsDeGenerationPoses, type EtatBarriere } from "./barriere";
 
 /**
  * Dépendances des étapes de génération. **Tests seulement** : tout est remplaçable (base, composition, horloge, plafonds,
@@ -24,9 +25,18 @@ export interface DependancesGeneration {
   readonly horloge?: Horloge;
   /** Plafonds du forfait ; `PLAFONDS_USAGE` (`null` en production) par défaut. */
   readonly plafonds?: PlafondsUsage | null;
-  /** Composition choisie par la barrière ; défaut : `reelle`, `simulee` ou aucune (production). */
+  /** Composition choisie par la barrière ; défaut : `reelle` (si la réponse de Samuel à la question 9 l'autorise), sinon `simulee`. */
   readonly composition?: (etat: EtatBarriere) => FabriqueGeneration;
   readonly barriere?: { readonly env?: Readonly<Record<string, string | undefined>>; readonly branche?: string | null; readonly cookieValide?: () => Promise<boolean> };
+  /** Écriture de programmes réels autorisée (question 9) ; `ECRITURE_PROGRAMMES_REELS_AUTORISEE` (`false`) par défaut. */
+  readonly programmesReelsAutorises?: boolean;
+  /**
+   * Écriture des positions de la version publiée au cache : `true` ou `false` pour la forcer (tests) ; par défaut, la variante
+   * réelle seulement, si la configuration l'autorise et si l'interrupteur de suspension n'est pas posé.
+   */
+  readonly ecriturePositions?: boolean;
+  /** Port d'écriture des positions de la composition (tests : double qui compte ses appels). */
+  readonly portPositions?: FabriquePortPositions;
 }
 
 export type DependancesResolues = {
@@ -35,19 +45,27 @@ export type DependancesResolues = {
   readonly plafonds: PlafondsUsage | null;
   readonly regles: ReglesUsage | null;
   readonly maintenant: () => number;
-  /** Barrière de B9-TL-8, évaluée à l'entrée de l'étape ; la composition qu'elle autorise, ou un arrêt `production_refused`. */
-  composer(): Promise<FabriqueGeneration>;
+  /** Barrière de B9-TL-8, évaluée **à l'entrée de chaque étape**, avant tout forfait, toute composition et tout appel. */
+  barriere(): Promise<EtatBarriere>;
+  /** Composition qu'autorise l'état de la barrière (jamais `production` : l'étape s'est déjà arrêtée sur `production_refused`). */
+  composer(etat: EtatBarriere): FabriqueGeneration;
+  /** Vrai si l'étape `e` écrit les positions de la version publiée au cache avec cette composition. */
+  ecriturePositions(fabrique: FabriqueGeneration): boolean;
+  readonly portPositions: FabriquePortPositions | undefined;
 };
 
 export function resoudre(dependances: DependancesGeneration = {}): DependancesResolues {
   const horloge = dependances.horloge ?? horlogeSysteme;
   const plafonds = dependances.plafonds === undefined ? PLAFONDS_USAGE : dependances.plafonds;
   const regles = reglesDeGeneration(horloge, plafonds);
+  const programmesReels = dependances.programmesReelsAutorises ?? ECRITURE_PROGRAMMES_REELS_AUTORISEE;
   const composition =
     dependances.composition ??
     ((etat: EtatBarriere): FabriqueGeneration => {
       if (etat === "production") throw new ArretEtape("production_refused");
-      return etat === "reelle" ? composerReelle() : composerSimulee();
+      // La variante réelle écrirait des programmes réels : tant que Samuel n'a pas répondu à la question 9, la composition
+      // reste simulée même si la barrière est ouverte (0011 l. 77 ; spécification B9, question 9).
+      return etat === "reelle" && programmesReels ? composerReelle() : composerSimulee();
     });
   return {
     transaction: dependances.transaction ?? withSystemOrg,
@@ -55,10 +73,12 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
     plafonds,
     regles,
     maintenant: () => horloge.maintenant(),
-    async composer() {
-      const etat = await evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafonds !== null });
+    barriere: () => evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
+    composer(etat) {
       if (etat === "production") throw new ArretEtape("production_refused");
       return composition(etat);
     },
+    ecriturePositions: (fabrique) => dependances.ecriturePositions ?? (fabrique.variante === "reelle" && ecriturePositionsPermise({ env: dependances.barriere?.env })),
+    portPositions: dependances.portPositions,
   };
 }

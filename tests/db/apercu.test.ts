@@ -6,7 +6,6 @@ import type { OrgTransaction } from "@/server/with-org";
 import { EtatEtapeSchema, type EtatEtape } from "@/server/generation/etat";
 import { etapeBrief, etapeCloture, etapeLogement } from "@/server/generation/etapes";
 
-import { createDatabase } from "../../db/index";
 import {
   MAINTENANT,
   PLAFONDS_LARGES,
@@ -20,24 +19,29 @@ import {
 } from "../support/banc-apercu";
 import { journalDePrompts } from "../support/journal-prompts";
 import { avecSentinellesGoogle, sentinellesPresentes } from "../support/sentinelles-google";
-import { closeAll, connect, createOrg, inTx, type DbClient, type Org } from "./helpers";
+import { creerBaseApercu, type BaseApercu } from "./base-apercu";
+import { closeAll, createOrg, inTx, type DbClient, type Org } from "./helpers";
 
 /**
  * Aperçu de B9c (workflows 1, 2 et 3) sur la base réelle, avec les doubles de fournisseurs (variante simulée : fixtures
  * d'Édimbourg). Aucune clé, aucun appel réel, aucune écriture de programme.
  */
 
-const db = createDatabase("vadrouille_app");
-const withOrg = creerWithOrg(db);
+let base: BaseApercu;
+let db: BaseApercu["db"];
+let withOrg: ReturnType<typeof creerWithOrg>;
 let app: DbClient;
 let auth: DbClient;
+let admin: DbClient;
 
+// Base jetable : les forfaits de l'aperçu n'entrent pas dans les sommes du jour de la base commune (`usage.test.ts`).
 beforeAll(async () => {
-  app = await connect("app");
-  auth = await connect("auth");
-});
+  base = await creerBaseApercu("apercu");
+  ({ db, app, auth, admin } = base);
+  withOrg = creerWithOrg(db);
+}, 120_000);
 afterAll(async () => {
-  await db.$client.end();
+  await base.supprimer();
   await closeAll();
 });
 
@@ -131,10 +135,10 @@ describe("aperçu : chemin nominal (Édimbourg)", () => {
     const fin = await derouler(etat, dependances());
     expect(fin.arret).toBeUndefined();
     const apres = await dernierRun(org, tripId);
-    expect(["ready", "incomplete"]).toContain(apres.phase);
     expect(apres.stop_reason).toBeNull();
     const cases = await propositions(org, tripId);
     expect(cases).toHaveLength(8);
+    expect(apres.phase).toBe(cases.every((c) => c.slot_type === "proposal") ? "ready" : "incomplete");
     expect(cases.filter((c) => c.slot_type === "proposal").length + cases.filter((c) => c.slot_type === "noOption").length).toBe(8);
     expect(await nombre(org, "trip_versions", tripId)).toBe(1);
     const creneaux = await inTx(app, { org: org.org, user: org.owner }, async (c) => {
@@ -153,10 +157,13 @@ describe("aperçu : chemin nominal (Édimbourg)", () => {
     await derouler(etat, dependances());
     const avant = await propositions(org, tripId);
     const { etapePlanification } = await import("@/server/generation/etapes");
-    const rejeu = await etapePlanification({ ...etat, rang: 5 }, dependances());
-    expect(rejeu.arret === undefined || typeof rejeu.arret === "string").toBe(true);
+    const runAvant = await dernierRun(org, tripId);
+    // Rejeu d'une étape déjà passée (même rang d'entrée que l'original) : la garde `step_seq` refuse, rien n'est écrit.
+    const rejeu = await etapePlanification({ ...etat, rang: 4 }, dependances());
+    expect(rejeu.arret).toBe("step_expired");
     expect(await nombre(org, "trip_versions", tripId)).toBe(1);
-    expect(await propositions(org, tripId)).toHaveLength(avant.length);
+    expect(await propositions(org, tripId)).toEqual(avant);
+    expect((await dernierRun(org, tripId)).step_seq).toBe(runAvant.step_seq);
   });
 });
 
@@ -269,12 +276,14 @@ describe("aperçu : échecs et reprise", () => {
     expect(await nombre(org, "proposals", tripId)).toBe(0);
   });
 
-  it("aucune ligne de coordonnées ni de trajet écrite sans B8c : une seule version", async () => {
+  it("coordonnées: par défaut (écriture non autorisée, 0081 B9-TL-9), aucune position ni trajet écrit : une seule version", async () => {
     const org = await nouvelleOrg();
     const { tripId, etat } = await lancer(org);
     const fin = await derouler(etat, dependances());
     expect(fin.arret).toBeUndefined();
     expect(await nombre(org, "trip_versions", tripId)).toBe(1);
+    const { rows } = await admin.query("SELECT count(*)::int AS n FROM public.place_coordinates WHERE organization_id = $1", [org.org]);
+    expect(rows[0].n).toBe(0);
   });
 });
 
@@ -381,7 +390,11 @@ describe("aperçu : cases, publication et forfait", () => {
         },
       });
     const fin = await derouler(etat, dependances({}, fabrique));
-    expect(fin.arret).not.toBeUndefined();
+    expect(fin.arret).toBe("lodging_unresolved");
     expect(journaux.flatMap((j) => j.requetes)).toHaveLength(0);
+    const { adapter, tripId } = { adapter: banc(withOrg).adapter, tripId: (await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT trip_id FROM public.generation_runs WHERE id = $1", [etat.generationRunId])).rows[0].trip_id as string)) };
+    const statut = await adapter.getGenerationStatus(contexteDe(org), tripId);
+    expect(statut.ok && statut.value.phase === "failed" && statut.value.reason).toBe("provider_error");
+    expect(statut.ok && statut.value.phase === "failed" && statut.value.retryable).toBe(false);
   });
 });

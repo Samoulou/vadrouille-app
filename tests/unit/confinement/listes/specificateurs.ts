@@ -388,7 +388,9 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   {
     fichier: "src/server/composition/clients-google.ts",
     specificateur: "@/server/usage/port",
-    noms: ["horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
+    // B9c (revue de la PR #563, bloquant 3) : l'enveloppe de réservation des clients injectés (`envelopperClientsGoogle`) réserve
+    // par le même port que les clients réels (`avecReservation`, `demandeDe`, délai de requête) ; verdict Sécurité attendu.
+    noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:AppelFacture", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
     motif: COMPOSITION_B8B,
   },
   { fichier: "src/server/composition/lecture.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
@@ -411,6 +413,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/ia", noms: ["CONFIGURATION_IA"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/generation", noms: ["COUTS_ESTIMES_MICROS", "MARGE_FICHES"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/planification", noms: ["preparerPlanification"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/positions-ecriture", noms: ["ecrirePositionsAbsentes", "type:FabriquePortPositions", "type:ResultatEcriturePositions"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_B9C },
   { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/forfait", noms: ["type:Forfait"], motif: COMPOSITION_B9C },

@@ -1,8 +1,8 @@
 import "server-only";
 
-import type { Category, DaySnapshot, StopFacts } from "@/contracts";
+import type { Category, DaySnapshot, StopFacts, StopSnapshot, TripSnapshot } from "@/contracts";
 import type { CandidatEvenement, CandidatMoteur, NotesMoteur, TypeCreneau } from "@/domain/entrees";
-import { generer, modesAdmis } from "@/domain/generation";
+import { modesAdmis } from "@/domain/generation";
 import { squeletteAvecEngagements } from "@/domain/squelette";
 import { joursEntre } from "@/domain/temps";
 import {
@@ -10,24 +10,27 @@ import {
   classeDeSource,
   type CapaciteAncrage,
   type CapaciteFinale,
+  type ExecuteurPublication,
   type FabriqueGeneration,
   type LieuARedige,
   type LogementVille,
   type OptionsEtape,
 } from "@/server/composition/generation";
 import { CONFIGURATION_CLASSEMENT } from "@/server/config/classement";
-import { DUREE_ETAPE_MS, JOURS_PLANIFIES_APERCU, RANG_ETAPE, type EtapeApercu } from "@/server/config/generation";
+import { CASES_APERCU, DUREE_ETAPE_MS, JOURS_PLANIFIES_APERCU, RANG_ETAPE, type EtapeApercu } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { executeurSql } from "@/server/with-org";
 
 import { ArretEtape, codeDeErreur, codeFerme } from "./codes";
 import { composerCases, type LieuDeCase } from "./cases";
+import type { EtatBarriere } from "./barriere";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtat, type EtatEtape } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape } from "./forfait-etape";
 import { cloreEnEchec, commencerEtape, exigerGarde } from "./garde";
 import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
+import { genererSansEchec } from "./programme";
 import { publier } from "./publication";
 
 /**
@@ -40,7 +43,9 @@ import { publier } from "./publication";
  * 1. entrée validée par `EtatEtapeSchema` (identifiants et rang, rien d'autre) ; un état déjà arrêté passe tel quel ;
  * 2. **garde d'idempotence** (`commencerEtape`) avant toute composition et tout appel : refusée, l'étape rend l'arrêt
  *    `step_expired` sans rien écrire (jamais une étape suivante sur une étape interrompue) ;
- * 3. **barrière** (`dependances.composer`, B9-TL-8) puis forfait : réservé (idempotent) avant tout appel, refusé → arrêt ;
+ * 3. **barrière** (`dependances.barriere`, B9-TL-8) **évaluée par `executer`, à l'entrée de chaque étape, après la garde et
+ *    avant tout forfait** (étape `a` comprise, qui réserve le forfait) : `production` clôt l'exécution sur `production_refused`
+ *    sans réservation, composition ni appel ; puis forfait : réservé (idempotent) avant tout appel, refusé → arrêt ;
  * 4. **fabriques appelées dans l'étape** : aucun client, registre ni composition en cache de module ;
  * 5. un registre en mémoire par étape, borné par sa part du forfait ; échéance vérifiée avant chaque appel externe ;
  * 6. toute écriture est conditionnée à `step_seq = n AND phase = 'preparing'` ; un arrêt (plafond, quota, erreur de
@@ -59,6 +64,8 @@ type Contexte = {
   readonly requestId: string | null;
   readonly echeance: number;
   readonly etape: EtapeApercu;
+  /** État de la barrière évalué à l'entrée de l'étape (jamais `production` : l'étape s'est alors arrêtée). */
+  readonly barriere: EtatBarriere;
 };
 
 const sql = <T>(contexte: Contexte, travail: (executeur: Executeur) => Promise<T>): Promise<T> =>
@@ -66,7 +73,11 @@ const sql = <T>(contexte: Contexte, travail: (executeur: Executeur) => Promise<T
 
 const maintenant = (contexte: Contexte): Date => new Date(contexte.dep.maintenant());
 
-/** Gabarit commun : garde, corps, clôture en échec sur un code fermé. */
+/**
+ * Gabarit commun : garde, barrière, corps, clôture en échec sur un code fermé. La barrière de B9-TL-8 est évaluée ici, à
+ * l'entrée de **chaque** étape, après la garde et avant le corps : aucun forfait n'est réservé (étape `a` comprise) ni aucune
+ * composition ouverte sur `production`.
+ */
 async function executer(entree: unknown, etape: EtapeApercu, corps: (contexte: Contexte) => Promise<void>, dependances?: DependancesGeneration): Promise<EtatEtape> {
   const etat = lireEtat(entree);
   if (etat.arret !== undefined) return etat;
@@ -74,15 +85,21 @@ async function executer(entree: unknown, etape: EtapeApercu, corps: (contexte: C
   const { organizationId, generationRunId } = etat;
   const ouverte = await dep.transaction(organizationId, (tx) => commencerEtape(executeurSql(tx), organizationId, generationRunId, etape, new Date(dep.maintenant())));
   if (ouverte === null) return { ...etat, arret: "step_expired" };
-  const contexte: Contexte = { dep, organizationId, generationRunId, tripId: ouverte.tripId, requestId: ouverte.requestId, echeance: dep.maintenant() + DUREE_ETAPE_MS, etape };
+  const commun = { dep, organizationId, generationRunId, tripId: ouverte.tripId, requestId: ouverte.requestId, echeance: dep.maintenant() + DUREE_ETAPE_MS, etape };
   try {
-    await corps(contexte);
+    const barriere = await dep.barriere();
+    if (barriere === "production") throw new ArretEtape("production_refused");
+    await corps({ ...commun, barriere });
     return { generationRunId, organizationId, rang: RANG_ETAPE[etape] };
   } catch (erreur) {
+    // Seule l'étape `a` (déterministe, sans appel) est rejouée par la file (`maxRetries` 2) : une panne passagère de la base
+    // sort alors telle quelle pour être rejouée ; la garde de `a` admet le rejeu. Les autres étapes ne sont jamais rejouées
+    // (une étape rejouée repaierait ses appels), et un arrêt fermé (`ArretEtape`) ne l'est jamais.
+    if (etape === "a" && !(erreur instanceof ArretEtape)) throw erreur;
     // Un code fermé et rien d'autre : ni le message ni la pile de l'erreur (qui peut porter un nom de lieu) ne sortent.
     const code = erreur instanceof ArretEtape ? erreur.code : codeDeErreur(erreur);
     try {
-      await sql(contexte, (x) => cloreEnEchec(x, organizationId, generationRunId, etape, code, maintenant(contexte)));
+      await sql({ ...commun, barriere: "simulee" }, (x) => cloreEnEchec(x, organizationId, generationRunId, etape, code, new Date(dep.maintenant())));
     } catch {
       // Clôture impossible : l'exécution expire (`step_expired`, 0081 B9-TL-3 point 5).
     }
@@ -119,7 +136,6 @@ function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtap
     plafonds: forfait.plafonds,
     executionId: contexte.generationRunId,
     forfait: forfait.forfait,
-    skus: regles.plafonds.skus,
     horloge: contexte.dep.horloge,
     echeance: contexte.echeance,
   };
@@ -127,7 +143,7 @@ function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtap
 
 async function ouvrirCapacites(contexte: Contexte): Promise<{ readonly fabrique: FabriqueGeneration; readonly forfait: ForfaitDeLEtape; readonly options: OptionsEtape }> {
   const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId }, contexte.etape);
-  const fabrique = await contexte.dep.composer();
+  const fabrique = contexte.dep.composer(contexte.barriere);
   return { fabrique, forfait, options: optionsEtape(contexte, forfait) };
 }
 
@@ -284,8 +300,8 @@ export function etapeLogement(entree: unknown, dependances?: DependancesGenerati
 
 const SQL_RECHERCHE = `INSERT INTO public.research_runs (organization_id, trip_id, generation_run_id, queries, pages_read, duration_ms, cost_estimate_micros, errors, started_at, finished_at)
   VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8::text[], $9::timestamptz, $10::timestamptz) RETURNING id`;
-const SQL_CANDIDAT = `INSERT INTO public.candidates (organization_id, trip_id, research_run_id, kind, name, summary, category, facts, sources, confidence, stop_kind, to_reserve)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12) RETURNING id`;
+const SQL_CANDIDAT = `INSERT INTO public.candidates (organization_id, trip_id, research_run_id, kind, name, summary, category, facts, sources, confidence, stop_kind, to_reserve, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13::timestamptz) RETURNING id`;
 const SQL_OCCURRENCE = `INSERT INTO public.event_occurrences (organization_id, trip_id, candidate_id, starts_at, ends_at, timezone, category, price_note, source_url, source_checked_at, status)
   VALUES ($1, $2, $3, $4::timestamptz, NULL, $5, $6, NULL, $7, $8::timestamptz, $9)`;
 const SQL_NOMS = `SELECT c.name FROM public.candidates c
@@ -331,10 +347,15 @@ export function etapeRecherche(entree: unknown, dependances?: DependancesGenerat
             ])
           ).rows[0];
           if (run === undefined) throw new Error("recherche : exécution non écrite");
+          let ordre = 0;
           for (const { candidat, occurrence } of lignes) {
             const cle = normaliser(candidat.name);
             if (dejaConnus.has(cle)) continue;
             dejaConnus.add(cle);
+            // `created_at` porte l'ordre de la recherche (le premier est le mieux classé) : une transaction n'a qu'un `now()`,
+            // et le rang d'un candidat départage deux candidats d'un même lieu (étape `c`, étape `e`).
+            const creeLe = new Date(debut + ordre).toISOString();
+            ordre += 1;
             const ecrit = (
               await x.query(SQL_CANDIDAT, [
                 contexte.organizationId,
@@ -349,6 +370,7 @@ export function etapeRecherche(entree: unknown, dependances?: DependancesGenerat
                 candidat.confidence,
                 candidat.stopKind,
                 candidat.toReserve,
+                creeLe,
               ])
             ).rows[0];
             if (ecrit === undefined) throw new Error("recherche : candidat non écrit");
@@ -405,6 +427,16 @@ export function etapeAncrage(entree: unknown, dependances?: DependancesGeneratio
           const placeId = issue.valeur.get(candidat.id);
           if (placeId !== undefined) resolus.set(candidat.id, placeId);
         }
+      }
+      // Deux candidats peuvent se résoudre au même lieu (aucune unicité sur `candidates.place_id`) : le mieux classé, c'est-à-dire
+      // le premier de la recherche (`created_at`, étape `b`), garde le lieu, l'autre le perd et n'a plus de rôle. Le moteur
+      // garde de toute façon le premier classé : la correspondance lieu → candidat de l'étape `e` est alors sans ambiguïté.
+      const pris = new Set<string>();
+      for (const id of traites) {
+        const placeId = resolus.get(id);
+        if (placeId === undefined) continue;
+        if (pris.has(placeId)) resolus.delete(id);
+        else pris.add(placeId);
       }
       await sql(contexte, async (x) => {
         await exigerGarde(x, contexte.organizationId, contexte.generationRunId, "c", maintenant(contexte));
@@ -482,13 +514,37 @@ function candidatMoteur(candidat: CandidatLu): (CandidatMoteur & { readonly vill
   };
 }
 
+/** Date du jour (`YYYY-MM-DD`) dans le fuseau du voyage (B9-PO-3) ; UTC si le fuseau est illisible. */
+function dateDansFuseau(instant: number, fuseau: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: fuseau, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
+  } catch {
+    return new Date(instant).toISOString().slice(0, 10);
+  }
+}
+
+/** Candidats que le moteur peut retenir (noté, ancré), **un par lieu** : le mieux classé (premier de la recherche) garde le lieu. */
+function eligibles(candidats: readonly CandidatLu[]): { readonly lu: CandidatLu; readonly moteur: CandidatMoteur & { readonly ville: number } }[] {
+  const vus = new Set<string>();
+  return candidats.flatMap((lu) => {
+    const moteur = candidatMoteur(lu);
+    if (moteur === undefined || moteur.placeId === undefined || vus.has(moteur.placeId)) return [];
+    vus.add(moteur.placeId);
+    return [{ lu, moteur }];
+  });
+}
+
 /**
  * Étape `e` (rang 6) : relectures Google des seuls jours planifiés (J1 et J2 : fiches des lieux retenus, une matrice Routes
  * par jour, aucune pour un jour non planifié, B9-TL-13), moteur partiel (`generer` avec `jours`), réparation déterministe
  * (**aucun appel de modèle** entre la validation et la rédaction), raisons (`rediger`, par ville, seuls les lieux retenus),
- * puis la **transaction unique de publication** (`publication.ts`). Statut `ready` avec 8 cases `proposal`, `incomplete`
- * sinon (cases `noOption` à la suite, jamais un lieu non ancré). Une case dont la raison ou le détour manque devient
- * `noOption` (choix signalé dans la PR).
+ * puis la **transaction unique de publication** (`publication.ts`), qui écrit aussi, quand la configuration l'autorise,
+ * les positions des fiches lues pour les seuls lieux de la version (0081 B9-TL-9). Statut `ready` avec 8 cases `proposal`,
+ * `incomplete` sinon (cases `noOption` à la suite, jamais un lieu non ancré).
+ *
+ * `no_option` n'est jamais une raison d'échec (B9-PO-9) : un jour qui ne se planifie pas devient des cases `noOption`
+ * (`genererSansEchec`, repli par jour), jamais un arrêt. Une étape retenue dont la raison ou le détour manque n'est pas une
+ * case : une seconde passe replanifie sans elle et ne rédige que les lieux nouveaux.
  */
 export function etapePlanification(entree: unknown, dependances?: DependancesGeneration): Promise<EtatEtape> {
   return executer(
@@ -503,7 +559,9 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
       const { fabrique, options } = await ouvrirCapacites(contexte);
       const capacite: CapaciteFinale = fabrique.finale(options);
 
-      const dateReference = new Date(contexte.dep.maintenant()).toISOString().slice(0, 10);
+      // Instant pris **avant** l'appel des fiches qui rendent les positions (0060 § 1.3 point 2 : jamais après la réponse).
+      const obtenuesA = contexte.dep.maintenant();
+      const dateReference = dateDansFuseau(obtenuesA, voyage.timeZone);
       const { nuits, nuitsVille } = nuitsDuVoyage(voyage, villes);
       const squeletteDuVoyage = squeletteAvecEngagements({
         voyage: { start: voyage.draft.start, end: voyage.draft.end },
@@ -516,20 +574,22 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
       const squelette = squeletteDuVoyage.filter((jour) => jours.includes(jour.index));
       const classement = { classement: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: AGE_SOURCE_MAX_JOURS_APERCU, dateReference };
 
-      const retenus = lus.candidats.flatMap((candidat) => candidatMoteur(candidat) ?? []);
+      // Un seul candidat par lieu, la même règle des deux côtés : celui que le moteur planifie est celui dont on rédige la raison.
+      const retenables = eligibles(lus.candidats);
       const planification = await capacite.planifier({
         jours: squelette,
         nuitsVille,
         villes: villes.map((ville) => ({ rang: ville.rang, nom: ville.nom, logement: logementVille(ville) })),
-        candidats: retenus,
+        candidats: retenables.map(({ moteur }) => moteur),
         modes: [...modesAdmis(voyage.brief.mobility)],
         classement,
         configuration: CONFIGURATION_MOTEUR,
       });
       if (!planification.ok) throw new ArretEtape(planification.code);
 
+      const parPlaceId = new Map(retenables.flatMap(({ lu, moteur }) => (moteur.placeId === undefined ? [] : [[moteur.placeId, lu] as const])));
       const evenements = evenementsDe(lus.candidats, lus.occurrences);
-      const entreeMoteur = {
+      const entreeMoteur = (candidats: readonly CandidatMoteur[]) => ({
         voyage: {
           destination: voyage.draft.destination,
           start: voyage.draft.start,
@@ -540,9 +600,9 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         brief: voyage.brief,
         nuits,
         engagements: voyage.draft.commitments,
-        candidats: planification.valeur.candidats,
+        candidats,
         evenements,
-        // Idée « Surprends-moi » : hors de l'aperçu (signalé dans la PR), aucun candidat d'idée n'est construit.
+        // Idée « Surprends-moi » : hors de l'aperçu (écart signalé dans la PR, question au Tech Lead et au Product Owner).
         idees: [],
         choix: new Map(),
         configuration: CONFIGURATION_MOTEUR,
@@ -553,34 +613,44 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
         version: 1,
         budgetTrajetReduit: false,
         jours,
-      };
-      let resultat = generer(entreeMoteur);
-      // `no_option` n'est jamais une raison d'échec (B9-PO-9) : sans programme valide, version sans étape et cases `noOption`.
-      if (!resultat.ok) resultat = generer({ ...entreeMoteur, candidats: [], evenements: [] });
-      if (!resultat.ok) throw new ArretEtape("no_option");
+      });
 
-      // Raisons : par ville, les seuls lieux retenus par le moteur.
-      const parPlaceId = new Map(lus.candidats.flatMap((candidat) => (candidat.placeId === null ? [] : [[candidat.placeId, candidat] as const])));
-      const etapes = resultat.instantane.days
-        .filter((jour) => jours.includes(jour.index))
-        .flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined && parPlaceId.has(item.stop.placeId) ? [{ stop: item.stop, candidat: parPlaceId.get(item.stop.placeId) as CandidatLu }] : [])));
+      // Programme, puis raisons des seuls lieux retenus ; au plus deux passes (la seconde sans les lieux restés sans raison).
       const raisons = new Map<string, { raison: string; detour: string }>();
-      for (const ville of villes) {
-        const lieux: LieuARedige[] = etapes
-          .filter(({ candidat }) => candidat.ville === ville.rang)
-          .map(({ candidat }) => ({
-            id: candidat.id,
-            nom: candidat.nom,
-            resume: candidat.resume,
-            categorie: candidat.categorie,
-            typeEtape: candidat.stopKind === "meal" ? "meal" : "activity",
-            sourceUrl: candidat.sources[0]?.url ?? "https://example.invalid/",
-          }));
-        if (lieux.length === 0) continue;
-        const issue = await capacite.rediger(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, lieux);
-        if (!issue.ok) throw new ArretEtape(issue.code);
-        for (const [id, raison] of issue.valeur) raisons.set(id, raison);
+      const essayes = new Set<string>();
+      let candidats: readonly CandidatMoteur[] = planification.valeur.candidats;
+      let programme: TripSnapshot | null = null;
+      let etapes: { stop: StopSnapshot; candidat: CandidatLu }[] = [];
+      for (let passe = 1; passe <= 2; passe += 1) {
+        programme = genererSansEchec(entreeMoteur(candidats));
+        // Même sans candidat, les engagements du séjour sont incompatibles : une donnée d'entrée, jamais `no_option`.
+        if (programme === null) throw new ArretEtape("invalid_input");
+        etapes = programme.days
+          .filter((jour) => jours.includes(jour.index))
+          .flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined && parPlaceId.has(item.stop.placeId) ? [{ stop: item.stop, candidat: parPlaceId.get(item.stop.placeId) as CandidatLu }] : [])));
+        for (const ville of villes) {
+          const lieux: LieuARedige[] = etapes
+            .filter(({ candidat }) => candidat.ville === ville.rang && !raisons.has(candidat.id) && !essayes.has(candidat.id))
+            .map(({ candidat }) => ({
+              id: candidat.id,
+              nom: candidat.nom,
+              resume: candidat.resume,
+              categorie: candidat.categorie,
+              typeEtape: candidat.stopKind === "meal" ? "meal" : "activity",
+              sourceUrl: candidat.sources.find((source) => source.url !== "")?.url,
+            }));
+          if (lieux.length === 0) continue;
+          const issue = await capacite.rediger(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, lieux);
+          if (!issue.ok) throw new ArretEtape(issue.code);
+          for (const lieu of lieux) essayes.add(lieu.id);
+          for (const [id, raison] of issue.valeur) raisons.set(id, raison);
+        }
+        const sansRaison = new Set(etapes.filter(({ candidat }) => !raisons.has(candidat.id)).map(({ candidat }) => candidat.id));
+        if (sansRaison.size === 0) break;
+        const ids = new Set(retenables.filter(({ lu }) => sansRaison.has(lu.id)).flatMap(({ moteur }) => moteur.id));
+        candidats = candidats.filter((candidat) => !ids.has(candidat.id));
       }
+      if (programme === null) throw new ArretEtape("invalid_input");
 
       const lieux = new Map<string, LieuDeCase>();
       const jourAvecRaisons = (jour: DaySnapshot): DaySnapshot => ({
@@ -594,14 +664,20 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
           return { ...item, stop: { ...item.stop, reason: raison.raison } };
         }),
       });
-      const instantane = { days: resultat.instantane.days.map(jourAvecRaisons) };
+      const instantane = { days: programme.days.map(jourAvecRaisons) };
       const cases = composerCases({ instantane, jours, lieux, squelette, configuration: CONFIGURATION_MOTEUR });
       const pretes = cases.filter((c) => c.type === "proposal").length;
+
+      // Positions des seuls lieux de la version publiée, écrites dans la transaction de publication (0081 B9-TL-9).
+      const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
+      const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
+        ? (executeur: ExecuteurPublication) => planification.valeur.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
+        : undefined;
 
       await publier(
         contexte.dep,
         { organizationId: contexte.organizationId, generationRunId: contexte.generationRunId, tripId: contexte.tripId, requestId: contexte.requestId, echeance: contexte.echeance },
-        { instantane, cases, statut: pretes === 8 ? "ready" : "incomplete" },
+        { instantane, cases, statut: pretes === CASES_APERCU ? "ready" : "incomplete", ...(ecrirePositions === undefined ? {} : { ecrirePositions }) },
       );
     },
     dependances,
