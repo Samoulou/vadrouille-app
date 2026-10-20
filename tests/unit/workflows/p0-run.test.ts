@@ -441,7 +441,7 @@ describe("p0Run : forme du module (décision 0063)", () => {
     for (const texte of [source, index, complet]) expect(texte).not.toMatch(/createWebhook|createHook|defineHook|resumeHook|resumeWebhook|getHookByToken/);
     expect(complet).not.toMatch(/"use (?:workflow|step|server|client)"/);
     expect([...complet.matchAll(/^import .*$/gm)].map((m) => m[0])).toEqual(['import "server-only";']);
-    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["complet.ts", "index.ts", "p0-run.ts"]);
+    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["apercu.test.ts", "apercu.ts", "complet.ts", "index.ts", "p0-run.ts"]);
   });
 
   it("aucune composition, aucun client ni registre au niveau du module (fabriques appelées dans l'étape)", () => {

@@ -19,3 +19,55 @@ export const JOURS_APERCU = 2;
  * si la durée maximale d'une étape change (0075).
  */
 export const EXPIRATION_EXECUTION_MS = 20 * 60_000;
+
+/**
+ * Étapes de `generatePreview` et rang `step_seq` de chacune (décisions 0081 B9-TL-3 point 2 et 0087 § 2 : l'étape `l`,
+ * contrôle du logement, s'insère entre `a` et `b`). Le rang d'une étape est fixé ici, jamais calculé par le workflow.
+ */
+export const ETAPES_APERCU = ["a", "l", "b", "c", "d", "e"] as const;
+export type EtapeApercu = (typeof ETAPES_APERCU)[number];
+
+export const RANG_ETAPE: Readonly<Record<EtapeApercu, number>> = { a: 1, l: 2, b: 3, c: 4, d: 5, e: 6 };
+
+/**
+ * `maxRetries` de chaque étape (0081 B9-TL-3 point 1) : seule l'étape `a` (déterministe, sans appel) est rejouée par la
+ * file. Les étapes `l` à `e` ne le sont jamais : une étape rejouée repaierait ses appels. Un nouvel essai passe par
+ * `retryGeneration` seulement.
+ */
+export const MAX_RETRIES_ETAPE: Readonly<Record<EtapeApercu, number>> = { a: 2, l: 0, b: 0, c: 0, d: 0, e: 0 };
+
+/**
+ * Part du forfait de l'aperçu qui revient à chaque étape, en pourcentage (valeurs de départ du Tech Lead, B9-TL-3
+ * point 5). Pour chaque ressource, les parts des étapes qui la consomment font 100 ; la dernière étape reçoit le reste
+ * de l'arrondi. Un registre en mémoire par étape est borné par sa part.
+ */
+export const PARTS_FORFAIT = {
+  modeles: { b: 60, d: 20, e: 20 },
+  details: { l: 10, c: 10, e: 80 },
+  textSearch: { l: 20, c: 80 },
+  routes: { e: 100 },
+} as const;
+
+/** Marge de fiches de remplacement (Q389), même règle que le mode réel de P0 (`prototype/config/mode-reel.json`). */
+export const MARGE_FICHES = { minimum: 4, part: 0.2 } as const;
+
+/** Coûts estimés réservés avant chaque appel de modèle, en micro-USD (valeurs de `mode-reel.json`, remplacées par le coût réel). */
+export const COUTS_ESTIMES_MICROS = { requeteModele: 20_000, rechercheWeb: 40_000 } as const;
+
+/** Rejeu borné de la transaction de publication de l'étape e (0081 B9-TL-3 point 6) : tentatives au plus, sans nouvel appel externe. */
+export const TENTATIVES_PUBLICATION = 3;
+
+/**
+ * Durée maximale d'une étape (décision 0075 : 800 s par fonction Vercel) diminuée d'une marge : aucun appel externe ne part
+ * si son délai entier ne tient plus avant l'échéance.
+ */
+export const DUREE_ETAPE_MS = 700_000;
+
+/**
+ * Branche de préversion Vercel sur laquelle la barrière (B9-TL-8) peut s'ouvrir : valeur posée par Samuel (question 6).
+ * `null` tant qu'il n'en a pas désigné : la barrière reste fermée, la composition simulée.
+ */
+export const BRANCHE_APPELS_REELS: string | null = null;
+
+/** Villes de l'aperçu : J1 et J2 (`JOURS_APERCU`) ; une recherche par ville, dans l'ordre du séjour. */
+export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
