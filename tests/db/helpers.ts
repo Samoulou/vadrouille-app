@@ -142,10 +142,13 @@ export const PURGED_TABLES = BUSINESS_TABLES.filter((t) => t !== "billing" && t 
 
 export type Org = { org: string; owner: string; email: string };
 
-/** Crée une personne, son organisation personnelle et son adhésion `owner`, sous `vadrouille_auth`. */
-export async function createOrg(auth: pg.Client, extraMembers = 0): Promise<Org & { members: string[] }> {
+/**
+ * Crée une personne, son organisation personnelle et son adhésion `owner`, sous `vadrouille_auth`. `adresse` : adresse
+ * fixée par l'appelant (données de bout en bout de B6b, `tests/db/donnees-bout-en-bout.test.ts`) ; par défaut, unique.
+ */
+export async function createOrg(auth: pg.Client, extraMembers = 0, adresse?: string): Promise<Org & { members: string[] }> {
   return inTx(auth, {}, async (c) => {
-    const email = `test-${unique()}@exemple.ch`;
+    const email = adresse ?? `test-${unique()}@exemple.ch`;
     const owner = (await c.query("INSERT INTO users (email) VALUES ($1) RETURNING id", [email])).rows[0].id as string;
     const org = (
       await c.query("INSERT INTO organizations (name, slug, kind) VALUES ('Organisation', $1, 'personal') RETURNING id", [`org-${unique()}`])

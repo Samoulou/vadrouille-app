@@ -151,6 +151,9 @@ export const API_ERROR_CODES = [
   // `quota_reached` n'est pas un code d'`ApiError` (0077 § 3 point 5) : seulement une raison d'arrêt d'une génération.
   "unauthenticated",
   "active_preview_exists",
+  // B6b (décision 0086 § 2.2 point 3) : erreur inattendue d'une action sur un voyage, sans message de la base ; état
+  // `error` du handover § 4. Ajouté à la fin, sans renommer ni réordonner.
+  "internal",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

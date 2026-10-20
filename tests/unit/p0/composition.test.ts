@@ -230,6 +230,12 @@ describe("p0: modules de capacité importés par la seule composition", () => {
     }
   });
 
+  it("composition: la composition de la lecture n'est importée que par src/instrumentation.ts (décision 0108)", () => {
+    // 0108 (amende 0100 § 5.2 et § 5.4) : hors des tests, le seul branchement au démarrage (`import()`) l'importe,
+    // jamais `src/adapters/index.ts`.
+    expect(importateurs(DEPOT, COMPOSITION_LECTURE)).toEqual(["src/instrumentation.ts"]);
+  });
+
   it("composition: cas négatifs de la fabrique des clients Google (import direct d'un module de capacité, import par un autre module)", () => {
     const depot = depotFictif({
       "src/server/composition/clients-google.ts": 'import { a } from "@/capacite";\n',
@@ -242,6 +248,8 @@ describe("p0: modules de capacité importés par la seule composition", () => {
     expect(importateurs(depot, CLIENTS_GOOGLE).filter((f) => !IMPORTATEURS_CLIENTS_GOOGLE.includes(f))).toEqual(["src/server/voyages/lecture.ts"]);
   });
 
+  // `src/instrumentation.ts` importe aussi la composition de la lecture (`lecture.ts`, décision 0108), contrôlée plus haut :
+  // ce test-ci ne vise que la composition du prototype (`p0-reel.ts`).
   it(`seuls ${IMPORTATEURS_COMPOSITION.join(" et ")} peuvent importer la composition ; le relecteur, par l'instrumentation seule`, () => {
     const trouves = importateurs(DEPOT, COMPOSITION);
     expect(trouves.filter((f) => !IMPORTATEURS_COMPOSITION.includes(f))).toEqual([]);

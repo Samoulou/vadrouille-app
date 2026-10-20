@@ -33,10 +33,32 @@ vi.mock("@/server/p0/lecture-programmes", () => ({
   },
 }));
 
+// B6b : branchement de l'adaptateur `api` (doubles : aucun cas d'usage, aucune base, aucune composition réelle).
+const brancherApi = vi.fn();
+const createApiTripAdapter = vi.fn((options: unknown) => ({ options }));
+const choisirSourceRelectures = vi.fn((double: unknown) => ({ choisie: double }));
+let echecApi: Error | null = null;
+vi.mock("@/adapters/api-instance", () => ({
+  brancherLectureVoyages: (fabrique: unknown) => brancherApi(fabrique),
+}));
+vi.mock("@/adapters/api", () => ({
+  get createApiTripAdapter() {
+    if (echecApi) throw echecApi;
+    return (options: unknown) => createApiTripAdapter(options);
+  },
+}));
+vi.mock("@/server/composition/lecture", () => ({
+  choisirSourceRelectures: (double: unknown) => choisirSourceRelectures(double),
+}));
+
 beforeEach(() => {
   vi.resetModules();
   logEvent.mockClear();
   brancher.mockClear();
+  brancherApi.mockClear();
+  createApiTripAdapter.mockClear();
+  choisirSourceRelectures.mockClear();
+  echecApi = null;
   poolLectureProgrammes.mockClear();
   echecBarriere = null;
   vi.stubEnv("NEXT_RUNTIME", "nodejs");
@@ -91,6 +113,37 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     expect(brancher).not.toHaveBeenCalled();
     expect(logEvent).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement de l'adaptateur api (spécification B6, B6b point 1)", () => {
+  it("DATA_ADAPTER=api : fabrique branchée ; elle passe le double à choisirSourceRelectures puis à createApiTripAdapter", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await register();
+    expect(brancherApi).toHaveBeenCalledTimes(1);
+    expect(brancher).not.toHaveBeenCalled();
+    // Rien n'est construit au démarrage : la fabrique ne sert qu'à la lecture.
+    expect(createApiTripAdapter).not.toHaveBeenCalled();
+    const fabrique = brancherApi.mock.calls[0]?.[0] as (double: unknown) => unknown;
+    const double = { double: true };
+    expect(fabrique(double)).toEqual({ options: { relectures: { choisie: double } } });
+    expect(choisirSourceRelectures).toHaveBeenCalledWith(double);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "prototype"])("DATA_ADAPTER=%j : adaptateur api non branché", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", valeur);
+    await register();
+    expect(brancherApi).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement) avec le seul nom d'erreur, serveur non arrêté", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    echecApi = Object.assign(new TypeError("secret du module"), { cause: "secret" });
+    await register();
+    expect(brancherApi).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });
