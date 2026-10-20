@@ -113,8 +113,30 @@ export type CheckoutFailure = (typeof CHECKOUT_FAILURES)[number];
 export const CHECKOUT_OUTCOMES = ["succeeded", "declined", "cancelled"] as const;
 export type CheckoutOutcome = (typeof CHECKOUT_OUTCOMES)[number];
 
-/** `checkoutId` : 128 bits aléatoires en base64url, 22 caractères (décision 0020 § 1.3). */
+/**
+ * `checkoutId` : au moins 122 bits aléatoires en base64url, 22 caractères (décision 0020 § 1.3, amendée par 0097
+ * B4-TL-1 point 5 : 128 bits pour l'adaptateur `mock`, `uuid` v4 encodé pour l'adaptateur `simulated`).
+ */
 export const CHECKOUT_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+
+/**
+ * Types normalisés d'un événement de paiement (`PaymentEvent`, spécification B4, B4a point 1) : contrat interne du
+ * serveur, jamais lu par le client.
+ */
+export const PAYMENT_EVENT_TYPES = [
+  "checkoutCompleted",
+  "asyncPaymentSucceeded",
+  "asyncPaymentFailed",
+  "checkoutExpired",
+  "refund",
+  "dispute",
+  "other",
+] as const;
+export type PaymentEventType = (typeof PAYMENT_EVENT_TYPES)[number];
+
+/** `payment_status` d'une session de paiement, normalisé (B4a point 1). */
+export const PAYMENT_EVENT_STATUSES = ["paid", "unpaid", "noPaymentRequired"] as const;
+export type PaymentEventStatus = (typeof PAYMENT_EVENT_STATUSES)[number];
 
 /** Identifiant de voyage reçu d'une entrée (règle de 0017 § 1). */
 export const TRIP_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;

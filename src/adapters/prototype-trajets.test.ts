@@ -141,3 +141,115 @@ describe("p0: Google refuse ou échoue : page rendue sans les temps manquants (0
     for (const proposal of autres) expect(proposal.travelFromPrevious?.minutes).toBe(CONSERVE);
   });
 });
+
+describe("p0: temps relus avec succès conservés, une fois (décision 0109)", () => {
+  /**
+   * Source qui garde ce que `conserver` écrit, comme la table : un second affichage lit les temps conservés. `ON CONFLICT
+   * DO NOTHING` simulé : une clé déjà présente n'est jamais remplacée.
+   */
+  function sourceConservante(initiaux: TrajetsConserves = new Map(), echec = false) {
+    const table = new Map(initiaux);
+    const ecritures: Map<string, number>[] = [];
+    const conserver = vi.fn(async (releves: ReadonlyMap<string, number>) => {
+      ecritures.push(new Map(releves));
+      if (echec) throw new Error("SENTINELLE_BASE");
+      for (const [cle, minutes] of releves) if (!table.has(cle)) table.set(cle, minutes);
+    });
+    const lu = () => ({ programme: programme(), trajets: new Map(table), conserver });
+    const src: SourceProgrammesReels = { lister: async () => [lu()], lire: async (id) => (id === TRIP_ID ? lu() : null) };
+    return { src, table, ecritures, conserver };
+  }
+
+  it("relecture réussie : exactement les paires relues et leurs minutes ; second affichage sans appel du relecteur", async () => {
+    const p = programme();
+    const manquante = cleTrajet(pairesDuProgramme(p).jours.get(1)![0]!);
+    const s = sourceConservante(conserves((paire) => cleTrajet(paire) !== manquante));
+    const r = relecteur();
+    const adapter = createPrototypeAdapterReel({ programmes: s.src, relecteurs: { trajets: r } });
+    await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(r.appels).toHaveLength(1);
+    // Seule la paire relue est rendue, jamais une paire déjà conservée (aucun écrasement d'un temps de l'exécution).
+    expect(s.ecritures).toEqual([new Map([[manquante, RELU]])]);
+    expect(s.table.get(manquante)).toBe(RELU);
+    const second = await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(r.appels).toHaveLength(1);
+    expect(segments(second!)[0]).toBe(RELU);
+    expect(second!.travelMinutes).not.toBeNull();
+  });
+
+  it("programme ancien sans aucun temps : voyage et propositions conservés au premier affichage, plus aucun appel ensuite", async () => {
+    const s = sourceConservante();
+    const r = relecteur();
+    const adapter = createPrototypeAdapterReel({ programmes: s.src, relecteurs: { trajets: r } });
+    await adapter.getTrip(ctx, TRIP_ID);
+    await adapter.listProposals(ctx, TRIP_ID);
+    const appels = r.appels.length;
+    expect(appels).toBeGreaterThan(0);
+    // Toutes les paires du programme (jours et propositions) sont conservées, chacune à la valeur relue.
+    expect([...s.table.keys()].sort()).toEqual(pairesDistinctes(pairesDuProgramme(programme())).map(cleTrajet).sort());
+    expect([...s.table.values()].every((m) => m === RELU)).toBe(true);
+    await adapter.getTrip(ctx, TRIP_ID);
+    await adapter.listProposals(ctx, TRIP_ID);
+    for (let jour = 1; jour <= programme().trip.days.length; jour += 1) await adapter.getDay(ctx, TRIP_ID, jour);
+    expect(r.appels).toHaveLength(appels);
+  });
+
+  it.each(["quota_reached", "unavailable", "leve"] as const)("%s : rien n'est écrit, aucune durée inventée ; la paire est relue au prochain affichage", async (reponse) => {
+    const s = sourceConservante();
+    const r = relecteur(reponse);
+    const adapter = createPrototypeAdapterReel({ programmes: s.src, relecteurs: { trajets: r } });
+    await adapter.getTrip(ctx, TRIP_ID);
+    await adapter.listProposals(ctx, TRIP_ID);
+    expect(s.conserver).not.toHaveBeenCalled();
+    expect(s.table.size).toBe(0);
+    const avant = r.appels.length;
+    await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(r.appels.length).toBe(avant + 1);
+  });
+
+  it("réponse hors contrat (longueur, valeur) : rien n'est écrit", async () => {
+    for (const minutes of [(n: number) => Array.from({ length: n + 1 }, () => RELU), (n: number) => Array.from({ length: n }, () => -1), (n: number) => Array.from({ length: n }, () => 2.5)]) {
+      const s = sourceConservante();
+      const adapter = createPrototypeAdapterReel({
+        programmes: s.src,
+        relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: minutes(paires.length) }) } },
+      });
+      const jour = await adapter.getDay(ctx, TRIP_ID, 1);
+      expect(segments(jour!).every((m) => m === null)).toBe(true);
+      expect(s.conserver).not.toHaveBeenCalled();
+    }
+  });
+
+  it("minutes au-delà de 1 440 : affichées comme aujourd'hui, jamais écrites", async () => {
+    const s = sourceConservante();
+    const adapter = createPrototypeAdapterReel({
+      programmes: s.src,
+      relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: paires.map((_, i) => (i === 0 ? 1500 : RELU)) }) } },
+    });
+    const jour = await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(segments(jour!)[0]).toBe(1500);
+    const premiere = cleTrajet(pairesDuProgramme(programme()).jours.get(1)![0]!);
+    expect(s.ecritures.length).toBe(1);
+    expect(s.ecritures[0]!.has(premiere)).toBe(false);
+    expect([...s.ecritures[0]!.values()].every((m) => m === RELU)).toBe(true);
+  });
+
+  it("conserver qui échoue : page servie avec les temps relus, aucune erreur propagée", async () => {
+    const s = sourceConservante(new Map(), true);
+    const r = relecteur();
+    const adapter = createPrototypeAdapterReel({ programmes: s.src, relecteurs: { trajets: r } });
+    const trip = await adapter.getTrip(ctx, TRIP_ID);
+    TripSchema.parse(trip);
+    expect(trip!.days.flatMap(segments).every((m) => m === RELU)).toBe(true);
+    expect(s.conserver).toHaveBeenCalled();
+    expect(s.table.size).toBe(0);
+  });
+
+  it("source sans conserver (table absente, programme de dossier) : relu à chaque affichage, comme avant", async () => {
+    const r = relecteur();
+    const adapter = createPrototypeAdapterReel({ programmes: source(new Map()), relecteurs: { trajets: r } });
+    await adapter.getDay(ctx, TRIP_ID, 1);
+    await adapter.getDay(ctx, TRIP_ID, 1);
+    expect(r.appels).toHaveLength(2);
+  });
+});

@@ -125,6 +125,29 @@ describe("configuration versionnée : drapeau du paiement simulé (décision 002
     }
   });
 
+  // B4a (spécification B4, point 8 et critère A26 ; décision 0097 B4-TL-8 point 3) : drapeau et secret du webhook simulé,
+  // sans aucune exception en B4a (l'exception « docker run » du job docker entre avec B4b). Noms en clés d'objet (le
+  // second est un nom secret : jamais un texte).
+  const NOMS_WEBHOOK_SIMULE = Object.keys({ SIMULATED_WEBHOOK_ENABLED: 0, SIMULATED_WEBHOOK_SECRET: 0 });
+  const lignesWebhookSimule = (contenu: string) => contenu.split("\n").filter((ligne) => NOMS_WEBHOOK_SIMULE.some((nom) => ligne.includes(nom)));
+
+  it("aucun fichier de configuration versionné ne contient le drapeau ni le secret du webhook simulé (A26, sans exception)", () => {
+    for (const path of configs) expect(lignesWebhookSimule(readFileSync(join(ROOT, path), "utf8")), path).toEqual([]);
+  });
+
+  it("la fonction de contrôle refuse le drapeau dans un .env.example, un Dockerfile et un env: de workflow, et le secret partout (A26)", () => {
+    const [drapeau, secret] = NOMS_WEBHOOK_SIMULE as [string, string];
+    const contenus = [
+      `APP_URL=\n${drapeau}=true\n`,
+      `FROM node:24\nENV ${drapeau}=true\n`,
+      `jobs:\n  test:\n    env:\n      ${drapeau}: "true"\n`,
+      `jobs:\n  test:\n    steps:\n      - run: docker run --rm -e ${drapeau}=true image\n`,
+      `${secret}=\n`,
+    ];
+    for (const contenu of contenus) expect(lignesWebhookSimule(contenu), contenu).toHaveLength(1);
+    expect(lignesWebhookSimule("APP_URL=\nPAYMENT_ADAPTER=\n")).toEqual([]);
+  });
+
   it("playwright.config.ts pose le drapeau du partage pour les tests (F10-TL-7)", () => {
     expect(readFileSync(join(ROOT, "playwright.config.ts"), "utf8")).toMatch(/VADROUILLE_DEMO_SHARE: "1"/);
   });

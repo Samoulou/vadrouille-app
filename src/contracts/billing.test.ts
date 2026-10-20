@@ -10,6 +10,7 @@ import {
   OfferSchema,
   PriceVariantSchema,
 } from "./index";
+import { PaymentEventSchema } from "./billing";
 import { CHECKOUT_ID_PATTERN, OFFER_INCLUSIONS, PRICE_VARIANTS, isCheckoutFailure } from "./values";
 
 /** Contrats de paiement (décision 0020 § 1). */
@@ -68,14 +69,16 @@ describe("OfferSchema", () => {
 
 describe("CheckoutRequestSchema", () => {
   it("accepte { tripId, method }", () => {
-    expect(CheckoutRequestSchema.safeParse({ tripId: "mock_trip_edimbourg", method: "twint" }).success).toBe(true);
+    expect(CheckoutRequestSchema.safeParse({ tripId: "mock_trip_edimbourg", method: "twint", requestId: "00000000-0000-4000-8000-000000000001" }).success).toBe(true);
   });
 
   it.each([
-    ["moyen inconnu", { tripId: "t1", method: "paypal" }],
-    ["montant envoyé par le navigateur", { tripId: "t1", method: "card", amount: 1 }],
-    ["tripId vide", { tripId: "", method: "card" }],
-    ["tripId hors motif", { tripId: "../t1", method: "card" }],
+    ["moyen inconnu", { tripId: "t1", method: "paypal", requestId: "00000000-0000-4000-8000-000000000001" }],
+    ["montant envoyé par le navigateur", { tripId: "t1", method: "card", requestId: "00000000-0000-4000-8000-000000000001", amount: 1 }],
+    ["tripId vide", { tripId: "", method: "card", requestId: "00000000-0000-4000-8000-000000000001" }],
+    ["tripId hors motif", { tripId: "../t1", method: "card", requestId: "00000000-0000-4000-8000-000000000001" }],
+    ["requestId absent (B4-PO-8)", { tripId: "t1", method: "card" }],
+    ["requestId hors format uuid", { tripId: "t1", method: "card", requestId: "demande-1" }],
   ])("refuse : %s", (_, input) => {
     expect(CheckoutRequestSchema.safeParse(input).success).toBe(false);
   });
@@ -129,5 +132,28 @@ describe("CheckoutStatusSchema", () => {
   it("refuse un état inconnu ou un identifiant mal formé", () => {
     expect(CheckoutStatusSchema.safeParse({ ...status, status: "refunded" }).success).toBe(false);
     expect(CheckoutStatusSchema.safeParse({ ...status, checkoutId: "court" }).success).toBe(false);
+  });
+});
+
+describe("PaymentEventSchema (contrat interne du serveur, B4a point 1)", () => {
+  const base = { eventId: "evt_sim_0123456789abcdef0123456789abcdef", type: "checkoutCompleted", livemode: false };
+
+  it("accepte l'événement minimal et l'événement complet", () => {
+    expect(PaymentEventSchema.safeParse(base).success).toBe(true);
+    const complet = { ...base, checkoutSessionId: "cs_sim_x", checkoutId: "0b6f3c7e-6a1e-4c55-9f2d-3c1a2b4d5e6f", paymentStatus: "paid", amount: 3900, currency: "CHF", createdAt: 1 };
+    expect(PaymentEventSchema.safeParse(complet).success).toBe(true);
+  });
+
+  it.each([
+    ["type inconnu", { ...base, type: "checkout.session.completed" }],
+    ["mode absent", { eventId: base.eventId, type: base.type }],
+    ["devise en minuscules", { ...base, currency: "chf" }],
+    ["montant négatif", { ...base, amount: -1 }],
+    ["montant non entier", { ...base, amount: 1.5 }],
+    ["statut inconnu", { ...base, paymentStatus: "no_payment_required" }],
+    ["champ en plus (objet strict)", { ...base, email: "personne@exemple.test" }],
+    ["identifiant vide", { ...base, eventId: "" }],
+  ])("refuse : %s", (_, input) => {
+    expect(PaymentEventSchema.safeParse(input).success).toBe(false);
   });
 });

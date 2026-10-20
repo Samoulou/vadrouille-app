@@ -36,8 +36,12 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["tests/unit/server/env.test.ts", "@/server/env/resolve"],
     ["db/connection.ts", "../src/server/env/resolve.ts"],
     ["src/server/env/index.ts", "./resolve"],
-    ["src/server/routes/exemple.ts", "@/server/env/payment"],
-    ["src/server/payment/exemple.ts", "@/server/env/payment"],
+    // B4a (décision 0097 B4-TL-3 point 5 (e)) : deux importateurs nommés, pour `index` comme pour `payment`.
+    ["src/server/payment/composition.ts", "@/server/env/payment"],
+    ["src/server/routes/simulated-webhook.ts", "@/server/env/payment"],
+    ["src/server/payment/composition.ts", "@/server/env"],
+    ["src/server/routes/simulated-webhook.ts", "@/server/env"],
+    ["src/server/env/payment.test.ts", "./payment"],
     // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
     ["src/server/p0/garde.ts", "@/server/env/p0"],
     ["src/server/p0/acces.ts", "@/server/env/p0"],
@@ -91,6 +95,13 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/rate-limit.ts", "@/server/env/resolve"],
     ["src/instrumentation.ts", "@/server/env/payment"],
     ["src/server/actions/paiement.ts", "@/server/env/payment"],
+    // B4a : l'entrée `payment` n'admet plus les dossiers entiers (0097 B4-TL-3 point 5 (e)).
+    ["src/server/routes/exemple.ts", "@/server/env/payment"],
+    ["src/server/payment/exemple.ts", "@/server/env/payment"],
+    ["src/server/payment/simulated-provider.ts", "@/server/env/payment"],
+    ["src/server/payment/paiements.ts", "@/server/env"],
+    ["src/server/routes/autre.ts", "@/server/env"],
+    ["src/adapters/simulated-payment.ts", "@/server/env/payment"],
     // P0r3b : `p0` hors de la garde et de l'accès (action, page, autre module de src/server/p0, tests de tests/).
     ["src/server/actions/p0-acces.ts", "@/server/env/p0"],
     ["src/app/prototype/executions/page.tsx", "@/server/env/p0"],

@@ -108,6 +108,9 @@ Le webhook répond `200` dès que la transaction du droit est validée, même si
 - **Critère commun** : « aucune dépendance nouvelle hors du paquet `stripe` » se lit « aucune dépendance nouvelle en B4a ».
 - **Handover § 9 et § 4** : traiter `async_payment_failed` et `expired` pour le statut seulement (écart 5) ; retirer `payment_failed` de la ligne « 9 Débloquer » et du tableau des états (écart 6).
 - **Point 7 de B4a (lint)** et **point 9 (confinement)** : le chemin de lecture du secret de B4-TL-3 point 5 (champ `readonly simulatedWebhookSecret` de `ServerEnv`, deux importeurs de `env/payment.ts`, ajout de `composition.ts` et de `simulated-webhook.ts` à l'entrée `index` de `server-env-imports`, réduction de l'entrée `payment` à ces deux fichiers, graphe d'imports, texte `simulatedWebhookSecret` confiné, texte `SIMULATED_WEBHOOK_SECRET` hors clé d'objet).
+- **Écarts 1 et 3 de la PR de B4a** (#582, revue consolidée du head `d50acfa`, Tech Lead, 2026-10-20) :
+  - **A25, « Refuser » puis « Payer »** : la garde de B4-TL-3 point 3 est conservée (le prestataire simulé n'émet que pour un paiement `pending`, ou le rejeu de la même issue). A25 devient : « Refuser » puis « Payer » : aucun événement émis, statut `declined` ; l'identifiant d'une réussite aurait été distinct (l'ordre inhabituel est couvert par A14).
+  - **Remboursement et litige** : jusqu'à B4c, alerte seule (`refund` ou `dispute`), sans ligne `billing` : l'événement normalisé ne porte pas de session, il suit le traitement d'une session inconnue (A9). B4-PO-4 (tableau), B4-PO-16, A13 et le handover § 9 sont alignés ; B4c reprend leur enregistrement (et Q129 leur effet sur le droit).
 - La PR de B4a liste ces corrections comme écarts, selon le critère commun de la spécification.
 
 ## Corrections de 0078 (portée)

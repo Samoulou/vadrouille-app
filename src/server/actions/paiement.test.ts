@@ -43,16 +43,16 @@ afterEach(() => {
 });
 
 async function started(method: "twint" | "card" = "twint") {
-  const result = await startCheckout({ tripId: TRIP, method });
+  const result = await startCheckout({ tripId: TRIP, method, requestId: crypto.randomUUID() });
   if (!result.ok) throw new Error(result.error.code);
   return result.value;
 }
 
 describe("startCheckout", () => {
   it.each([
-    ["moyen hors schéma", { tripId: TRIP, method: "paypal" }, "method"],
-    ["champ amount ajouté", { tripId: TRIP, method: "card", amount: 1 }, undefined],
-    ["tripId vide", { tripId: "", method: "card" }, "tripId"],
+    ["moyen hors schéma", { tripId: TRIP, method: "paypal", requestId: crypto.randomUUID() }, "method"],
+    ["champ amount ajouté", { tripId: TRIP, method: "card", requestId: crypto.randomUUID(), amount: 1 }, undefined],
+    ["tripId vide", { tripId: "", method: "card", requestId: crypto.randomUUID() }, "tripId"],
     ["entrée qui n'est pas un objet", "mock_trip_edimbourg", undefined],
   ])("%s : validation_failed sans appel à l'adaptateur", async (_label, input, field) => {
     const result = await startCheckout(input);
@@ -61,7 +61,7 @@ describe("startCheckout", () => {
   });
 
   it("le montant vient de la configuration : un amount du navigateur n'est jamais lu", async () => {
-    const result = await startCheckout({ tripId: TRIP, method: "card", amount: 1 });
+    const result = await startCheckout({ tripId: TRIP, method: "card", requestId: crypto.randomUUID(), amount: 1 });
     expect(result.ok).toBe(false);
     const { checkoutId } = await started("card");
     const status = await getCheckoutStatus({ checkoutId });
@@ -76,19 +76,19 @@ describe("startCheckout", () => {
 
   it("voyage d'une autre organisation ou inconnu : not_found, sans paiement créé", async () => {
     contextMock.organizationId = "mock_org_autre";
-    expect(await startCheckout({ tripId: TRIP, method: "card" })).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await startCheckout({ tripId: TRIP, method: "card", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "not_found" } });
     contextMock.organizationId = MOCK_ORGANIZATION_ID;
-    expect(await startCheckout({ tripId: "inconnu", method: "card" })).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await startCheckout({ tripId: "inconnu", method: "card", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "not_found" } });
   });
 
   it("voyage déjà débloqué : already_unlocked", async () => {
-    expect(await startCheckout({ tripId: "mock_trip_edimbourg_debloque", method: "card" })).toEqual({
+    expect(await startCheckout({ tripId: "mock_trip_edimbourg_debloque", method: "card", requestId: crypto.randomUUID() })).toEqual({
       ok: false,
       error: { code: "already_unlocked" },
     });
     const { checkoutId } = await started();
     await simulateCheckoutOutcome({ checkoutId, outcome: "succeeded" });
-    expect(await startCheckout({ tripId: TRIP, method: "card" })).toEqual({ ok: false, error: { code: "already_unlocked" } });
+    expect(await startCheckout({ tripId: TRIP, method: "card", requestId: crypto.randomUUID() })).toEqual({ ok: false, error: { code: "already_unlocked" } });
   });
 });
 
