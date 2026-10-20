@@ -347,7 +347,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif:
       "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
-      "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité à rendre dans la PR de B4a",
+      "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
   {
     fichier: "src/adapters/prototype-ecriture.ts",

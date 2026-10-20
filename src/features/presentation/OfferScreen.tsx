@@ -53,6 +53,20 @@ export interface OfferScreenProps {
 }
 
 /** Écran 9 « Débloquer » (spécification F9a ; rendus et textes provisoires, UX/UI, F9-Q1). */
+/**
+ * `requestId` d'un appui (B4-PO-8) : uuid v4. `crypto.randomUUID` n'existe qu'en contexte sécurisé (HTTPS ou
+ * `localhost`) ; ailleurs (adresse du réseau local en HTTP), le même format est tiré de `crypto.getRandomValues`, qui
+ * existe partout, pour qu'un appui ne lève jamais avant l'appel.
+ */
+export function nouveauRequestId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const octets = crypto.getRandomValues(new Uint8Array(16));
+  octets[6] = ((octets[6] ?? 0) & 0x0f) | 0x40;
+  octets[8] = ((octets[8] ?? 0) & 0x3f) | 0x80;
+  const h = Array.from(octets, (octet) => octet.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 export function OfferScreen({ recorderKind = "none", recorder, ...props }: OfferScreenProps) {
   const chosen = useMemo(() => recorder ?? recorderFor(recorderKind), [recorder, recorderKind]);
   return (
@@ -136,7 +150,7 @@ function OfferContent({
    * Un appui sur un bouton de paiement tire un nouveau `requestId` ; « Réessayer » repasse celui de l'appui en échec
    * (B4-PO-8 : même demande, même paiement côté serveur).
    */
-  async function pay(method: PaymentMethod, requestId: string = crypto.randomUUID()) {
+  async function pay(method: PaymentMethod, requestId: string = nouveauRequestId()) {
     if (pending || !offer) return;
     setPending(method);
     setStartError(null);

@@ -1685,6 +1685,13 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
  * `./complet` et `./p0-run` seulement (les imports de type sont effacés). Atteinte hors d'une entrée admise, ou sans sa
  * propriété, elle est parcourue comme un fichier ordinaire, et chaque module de P0 au-delà redevient une violation.
  * Tech Lead : validé ; Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
+ *
+ * B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : la frontière, nommée d'après P0r3b, porte aussi une
+ * entrée hors de P0, le webhook simulé (`src/server/routes/simulated-webhook.ts`, seul module du route handler
+ * `src/app/api/v1/webhooks/simulated/route.ts`). La liste `admis` est **commune à toutes les entrées** : `env/payment.ts`,
+ * ajouté pour le webhook, est donc aussi admis derrière les entrées de P0, qui ne l'importent pas aujourd'hui ; il ne lit
+ * aucune clé de service ni `process.env` (ses deux importeurs sont fixés par `ligne/server-env-imports`). Sécurité :
+ * approuvé, revue du head d50acfa (PR 582).
  */
 const FRONTIERE_P0R3B = {
   entrees: [
@@ -1692,7 +1699,7 @@ const FRONTIERE_P0R3B = {
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
-    // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité demandé dans la PR de B4a.
+    // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
     {
       fichier: "src/server/routes/simulated-webhook.ts",
       admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
@@ -1706,7 +1713,8 @@ const FRONTIERE_P0R3B = {
     },
   ],
   // B7a (décision 0077 § 3 point 1) : `src/ai/erreurs.ts` (codes réexportés par `egress.ts`), admis comme **terminal** :
-  // jamais parcouru au-delà (il n'importe rien).
+  // jamais parcouru au-delà (il n'importe rien). B4a : `env/payment.ts` pour l'entrée du webhook, admis pour toutes les
+  // entrées (liste commune, voir le commentaire de tête).
   admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/payment.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts", FICHIER_ERREURS_IA],
   terminaux: [
     {

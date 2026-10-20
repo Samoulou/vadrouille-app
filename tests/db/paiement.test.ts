@@ -129,7 +129,7 @@ const RECU = JSON.stringify({ received: true });
 // --- Critères -----------------------------------------------------------------------------------------------------
 
 describe("paiement simulé en base (B4a)", () => {
-  it("paiement: un événement rejoué ne crédite pas deux fois (A1)", async () => {
+  it("paiement: un événement rejoué ne crédite pas deux fois", async () => {
     const suite = vi.fn(async () => undefined);
     const banc = creerBanc({ suite });
     const { ctx, tripId } = await organisation();
@@ -148,7 +148,7 @@ describe("paiement simulé en base (B4a)", () => {
     }
   });
 
-  it("paiement: signature invalide refusée sans écriture (A2)", async () => {
+  it("paiement: signature invalide refusée sans écriture", async () => {
     const banc = creerBanc();
     const { ctx, tripId, org } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -166,7 +166,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(lignesJournal.join("\n")).not.toContain(org.email);
   });
 
-  it("paiement: horodatage de signature hors tolérance refusé sans écriture (A3)", async () => {
+  it("paiement: horodatage de signature hors tolérance refusé sans écriture", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -177,7 +177,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect((await etat(ctx, p, tripId)).droits).toHaveLength(1);
   });
 
-  it("paiement: le droit n'est accordé que par le webhook (A4)", async () => {
+  it("paiement: le droit n'est accordé que par le webhook", async () => {
     const interceptees: { corps: Uint8Array; entetes: Readonly<Record<string, string>> }[] = [];
     const banc = creerBanc({
       transport: () => async (requete) => {
@@ -203,7 +203,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await banc.adapter.getEntitlement(ctx, tripId)).toEqual({ unlocked: true });
   });
 
-  it("paiement: prix lu dans la configuration (A5)", async () => {
+  it("paiement: prix lu dans la configuration", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     expect(await banc.adapter.createCheckout(ctx, { tripId, method: "twint", requestId: randomUUID(), amount: 1 } as never)).toEqual({
@@ -223,7 +223,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(statut.ok && statut.value).toMatchObject({ status: "succeeded", amount: 3900 });
   });
 
-  describe("paiement: statut, montant, devise, mode ou voyage incohérents n'accordent rien (A6)", () => {
+  describe("paiement: statut, montant, devise, mode ou voyage incohérents n'accordent rien", () => {
     const CAS: [string, (banc: Banc, p: Paiement, autre: Paiement) => unknown][] = [
       ["livemode", (banc, p) => evenement(banc, p, "succeeded", {}, { livemode: true })],
       ["payment_status", (banc, p) => evenement(banc, p, "succeeded", { payment_status: "no_payment_required" })],
@@ -280,7 +280,7 @@ describe("paiement simulé en base (B4a)", () => {
     });
   });
 
-  it("paiement: une panne entre l'enregistrement et le droit ne perd pas le paiement (A7)", async () => {
+  it("paiement: une panne entre l'enregistrement et le droit ne perd pas le paiement", async () => {
     let panne = true;
     const banc = creerBanc({
       apresEnregistrement: () => {
@@ -298,7 +298,8 @@ describe("paiement simulé en base (B4a)", () => {
     expect({ status, n: billing.length, d: droits.length }).toEqual({ status: "succeeded", n: 1, d: 1 });
   });
 
-  it("paiement: un événement déjà enregistré relance la suite manquante (A8, option B)", async () => {
+  // A8, option B de B4-TL-12 (0097) : réponse 200 malgré la suite en échec, reprise à la livraison suivante.
+  it("paiement: un événement déjà enregistré relance la suite manquante", async () => {
     let echec = true;
     const suite = vi.fn(async () => {
       if (echec) throw new TypeError("suite en échec");
@@ -333,7 +334,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(suite).toHaveBeenCalledWith({ entitlementId: avant.droits[0]?.id, tripId, organizationId: ctx.organizationId });
   });
 
-  it("paiement: un événement d'une session inconnue n'écrit rien, n'accorde rien et alerte (A9)", async () => {
+  it("paiement: un événement d'une session inconnue n'écrit rien, n'accorde rien et alerte", async () => {
     const banc = creerBanc();
     const eventId = `evt_sim_${randomBytes(16).toString("hex")}`;
     const objet = {
@@ -351,7 +352,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(alertes()).toEqual([{ level: "error", event: "payment.alert", eventId, eventType: "checkoutCompleted", alertCode: "unknown_checkout" }]);
   });
 
-  it("paiement: un second paiement du même voyage n'accorde pas de second droit (A11)", async () => {
+  it("paiement: un second paiement du même voyage n'accorde pas de second droit", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -367,7 +368,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await lignes(ctx, "SELECT 1 FROM checkouts WHERE trip_id = $1", [tripId])).toHaveLength(n);
   });
 
-  it("paiement: deux réussites simultanées n'accordent qu'un droit (A12)", async () => {
+  it("paiement: deux réussites simultanées n'accordent qu'un droit", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -379,7 +380,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect((await etat(ctx, p, tripId)).droits).toHaveLength(1);
   });
 
-  describe("paiement: statuts tirés des événements (A13)", () => {
+  describe("paiement: statuts tirés des événements", () => {
     it("checkoutCompleted non payé : pending, ignored ; reste pending après la durée de vie", async () => {
       const banc = creerBanc();
       const { ctx, tripId } = await organisation();
@@ -425,7 +426,7 @@ describe("paiement simulé en base (B4a)", () => {
       expect((await etat(ctx, p, tripId)).status).toBe("pending");
     });
 
-    it("refund, dispute, other : statut inchangé, ignored ; alerte pour refund et dispute", async () => {
+    it("other : statut inchangé, ignored ; refund et dispute, alerte seule sans ligne jusqu'à B4c ; other sans session, rien", async () => {
       const banc = creerBanc();
       const { ctx, tripId } = await organisation();
       const p = await commencer(banc, ctx, tripId);
@@ -442,11 +443,18 @@ describe("paiement simulé en base (B4a)", () => {
         expect((await livrer(banc, objet)).status).toBe(200);
         expect(alertes().at(-1)).toEqual(expect.objectContaining({ alertCode: code, eventType: code }));
       }
-      expect((await etat(ctx, p, tripId)).status).toBe("pending");
+      expect(alertes()).toHaveLength(2);
+      // Événement `other` sans session (type hors de `checkout.session.*`) : ni ligne ni alerte.
+      const horsPaiement = { id: `evt_sim_${randomBytes(16).toString("hex")}`, type: "customer.created", livemode: false, data: { object: { id: "cus_x" } } };
+      expect((await livrer(banc, horsPaiement)).status).toBe(200);
+      expect(alertes()).toHaveLength(2);
+      const decompte = await admin.query("SELECT count(*)::int AS n FROM billing WHERE stripe_event_id = $1", [horsPaiement.id]);
+      expect(decompte.rows[0]?.n).toBe(0);
+      expect(await etat(ctx, p, tripId)).toEqual({ status: "pending", billing: [{ outcome: "ignored", outcome_code: null, type: "other" }], droits: [] });
     });
   });
 
-  describe("paiement: un paiement encaissé n'est jamais perdu (A14)", () => {
+  describe("paiement: un paiement encaissé n'est jamais perdu", () => {
     it.each(["cancelled", "declined"] as const)("réussite valide sur un paiement %s → droit, succeeded, alerte paid_after_failure", async (echec) => {
       const banc = creerBanc();
       const { ctx, tripId } = await organisation();
@@ -482,7 +490,7 @@ describe("paiement simulé en base (B4a)", () => {
     });
   });
 
-  it("paiement: idempotence de startCheckout (A15)", async () => {
+  it("paiement: idempotence de startCheckout", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     const autreVoyage = await nouveauVoyage(app, { org: ctx.organizationId, owner: ctx.userId, email: "" });
@@ -499,7 +507,8 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await lignes(ctx, "SELECT 1 FROM checkouts WHERE trip_id = $1", [autreVoyage])).toHaveLength(0);
   });
 
-  it("paiement: isolation et lecture par la personne (A16, sans la partie « sans session » de B4b)", async () => {
+  // A16 sans sa partie « sans session », vérifiée en B4b avec les actions serveur.
+  it("paiement: isolation et lecture par la personne", async () => {
     const banc = creerBanc();
     const { ctx, tripId, org } = await organisation(1);
     const p = await commencer(banc, ctx, tripId);
@@ -519,7 +528,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await banc.adapter.getEntitlement(autreOrg, tripId)).toEqual({ unlocked: false });
   });
 
-  it("paiement: le webhook simulé refuse un identifiant non simulé (A17)", async () => {
+  it("paiement: le webhook simulé refuse un identifiant non simulé", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     // Session connue mais sans la forme simulée (écrite par un prestataire de test) : provider_mismatch.
@@ -542,7 +551,7 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await banc.adapter.getEntitlement(ctx, tripId)).toEqual({ unlocked: false });
   });
 
-  it("paiement: aucune donnée personnelle dans les alertes ni les journaux (A19)", async () => {
+  it("paiement: aucune donnée personnelle dans les alertes ni les journaux", async () => {
     const banc = creerBanc();
     const { ctx, tripId, org } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -562,7 +571,7 @@ describe("paiement simulé en base (B4a)", () => {
     for (const alerte of alertes()) expect(Object.keys(alerte).filter((champ) => !champsAdmis.has(champ))).toEqual([]);
   });
 
-  it("paiement: rejouer une issue simulée réémet le même événement (A25)", async () => {
+  it("paiement: rejouer une issue simulée réémet le même événement", async () => {
     const banc = creerBanc();
     const { ctx, tripId } = await organisation();
     const p = await commencer(banc, ctx, tripId);
@@ -579,7 +588,7 @@ describe("paiement simulé en base (B4a)", () => {
 
     // « Refuser » puis « Payer » : le prestataire ne signe que pour un paiement `pending` (B4-TL-3 point 3), donc
     // « Payer » ne réémet rien et le statut reste `declined` ; l'événement de réussite, s'il arrivait (ordre inhabituel),
-    // a un autre identifiant et suit B4-PO-5 (droit et `paid_after_failure`, A14). Écart avec A25 signalé dans la PR.
+    // a un autre identifiant et suit B4-PO-5 (droit et `paid_after_failure`, A14). A25 amendée en ce sens (0097, corrections).
     const banc2 = creerBanc();
     const autre = await organisation();
     const q = await commencer(banc2, autre.ctx, autre.tripId);

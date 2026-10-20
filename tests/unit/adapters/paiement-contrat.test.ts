@@ -20,7 +20,7 @@ const OFFRE: OfferConfig = {
 };
 const DUREE_VIE = 30 * 60_000;
 
-describe("adaptateurs: mock passe la suite de contrat paiement (A18)", () => {
+describe("adaptateurs: mock et simulated passent la même suite de contrat paiement", () => {
   decrireContratPaiement("mock", {
     offre: OFFRE,
     dureeVieMs: DUREE_VIE,

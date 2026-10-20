@@ -83,14 +83,22 @@ export type OptionsWebhookSimule = {
    * hasard (A22) : ils ne passent ni par `process.env` ni par `@/server/env`.
    */
   readonly lireConfiguration?: () => ConfigurationWebhook;
-  /** Dépendances des cas d'usage (défaut : client de `vadrouille_app`, horloge système). */
+  /** Dépendances des cas d'usage (défaut : `creerDependances()`, appelée à la première requête qui atteint l'étape 7). */
   readonly dependances?: DependancesPaiement;
+  /** Fabrique des dépendances par défaut (client de `vadrouille_app`, horloge système) ; espion des tests. */
+  readonly creerDependances?: () => DependancesPaiement;
   /** Vérification de la signature (défaut : `verifier` de `src/server/payment/signature.ts` ; espion des tests). */
   readonly verifier?: typeof verifier;
 };
 
+/** Dépendances par défaut : client de `vadrouille_app` (lève si sa variable manque), `withOrg`, horloge système. */
+function dependancesParDefaut(): DependancesPaiement {
+  return { database: createDatabase("vadrouille_app"), withOrg, maintenant: () => Date.now() };
+}
+
 export function creerWebhookSimule(options: OptionsWebhookSimule = {}): (request: Request) => Promise<Response> {
   let dependances = options.dependances;
+  const creerDependances = options.creerDependances ?? dependancesParDefaut;
   const verifierSignature = options.verifier ?? verifier;
   return async (request) => {
     // 1. Fermé : aucun en-tête ni corps lu. Une configuration invalide ferme aussi, mais pas en silence.
@@ -107,10 +115,10 @@ export function creerWebhookSimule(options: OptionsWebhookSimule = {}): (request
     if (!typeJson(request.headers.get("content-type"))) return requeteInvalide();
     const corps = await lireCorps(request);
     if (corps === null) return json(413, { error: "payload_too_large" });
-    // 5. Signature : la clé n'est lue qu'ici.
+    // 5. Signature : la clé n'est lue qu'ici. L'horloge est lue sans créer les dépendances par défaut : une requête mal
+    // signée ne touche jamais à la configuration de la base (B4-TL-11 point 1 : `400`, jamais `500`).
     const cle = configuration.cle();
-    const deps = (dependances ??= { database: createDatabase("vadrouille_app"), withOrg, maintenant: () => Date.now() });
-    const maintenant = Math.floor(deps.maintenant() / 1000);
+    const maintenant = Math.floor((dependances === undefined ? Date.now() : dependances.maintenant()) / 1000);
     if (cle === null || !verifierSignature(corps, request.headers.get(ENTETE_SIGNATURE), cle, maintenant)) return requeteInvalide();
     // 6. Analyse du corps signé.
     let brut: unknown;
@@ -121,8 +129,10 @@ export function creerWebhookSimule(options: OptionsWebhookSimule = {}): (request
     }
     const evenement = analyserEvenement(brut);
     if (evenement === null) return requeteInvalide();
-    // 7. Base.
+    // 7. Base. Les dépendances par défaut (client de `vadrouille_app`) ne sont créées qu'ici, dans le `try` : une variable
+    // de base absente donne `500`, comme une base indisponible.
     try {
+      const deps = (dependances ??= creerDependances());
       await handlePaymentEvent(deps, evenement, { formeAttendue: formeSimulee });
     } catch {
       return json(500, { error: "server_error" });

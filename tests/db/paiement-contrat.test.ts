@@ -23,7 +23,7 @@ afterAll(async () => {
   await closeAll();
 });
 
-describe("adaptateurs: simulated passe la suite de contrat paiement (A18)", () => {
+describe("adaptateurs: mock et simulated passent la même suite de contrat paiement", () => {
   decrireContratPaiement("simulated", {
     offre: OFFRE,
     dureeVieMs: 30 * 60_000,

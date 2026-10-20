@@ -100,9 +100,11 @@ export async function handlePaymentEvent(deps: DependancesPaiement, evenement: P
 
   const suite = await transactionWebhook(deps, async (executeur): Promise<VoyageDebloque | null> => {
     const session = evenement.checkoutSessionId;
-    // Session inconnue : aucune organisation, donc rien d'écrit et aucun verrou (handover § 9, A9).
+    // Session inconnue : aucune organisation, donc rien d'écrit et aucun verrou (handover § 9, A9). Un événement `other`
+    // sans session (type hors de `checkout.session.*`, `charge.*` des remboursements et litiges à part) ne concerne aucun
+    // paiement : ni ligne ni alerte, pour que le flux complet de Stripe (B4c) ne produise pas d'alertes `unknown_checkout`.
     if (session === undefined) {
-      sansSession();
+      if (evenement.type !== "other") sansSession();
       return null;
     }
     const organisation = (await executeur.query("SELECT public.checkout_organization($1)::text AS org", [session])).rows[0]?.org;
@@ -157,6 +159,10 @@ export async function handlePaymentEvent(deps: DependancesPaiement, evenement: P
       // Paiement encaissé après un échec affiché (B4-PO-5) : le droit est accordé quand même, et signalé.
       let echecAffiche = ECHECS.includes(ligne.status);
       if (!echecAffiche && ligne.status === "pending" && expireParLeTemps) {
+        // Écart connu avec `statutLu` (`paiements.ts`), qui exige `type = 'checkoutCompleted'` : `vadrouille_webhook` ne
+        // lit que `id`, `stripe_event_id`, `checkout_id` et `outcome` de `billing` (0001_securite.sql). Un `other` avec
+        // session enregistré sur ce paiement masque donc l'alerte `paid_after_failure` (le droit est accordé quand même).
+        // Aligner demande le droit `SELECT (type)` pour ce rôle, donc une migration : reporté à B4b (PR #582, mineur 2).
         const enCours = await executeur.query("SELECT 1 FROM billing WHERE checkout_id = $1 AND outcome = 'ignored' LIMIT 1", [ligne.id]);
         echecAffiche = enCours.rows.length === 0;
       }

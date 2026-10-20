@@ -214,7 +214,7 @@ export const LECTURES_ENV = [
   // ignoré. Jeton envoyé seulement à l'adresse donnée, jamais écrit. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "tests/e2e/p0-flux.e2e.spec.ts", noms: ["E2E_P0_REEL_URL", "E2E_P0_REEL_BYPASS"] },
   // B4a (ticket 531 ; spécification B4, B4a point 6 ; décision 0097 B4-TL-3) : choix des adaptateurs de paiement et de
-  // données, lus par propriété littérale, valeur contrôlée contre une liste fermée et jamais journalisée. Verdict Sécurité : à rendre dans la PR de B4a.
+  // données, lus par propriété littérale, valeur contrôlée contre une liste fermée et jamais journalisée. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
   { fichier: "src/server/env/index.ts", noms: ["PAYMENT_ADAPTER", "DATA_ADAPTER"] },
 ] as const satisfies readonly LigneLectureEnv[];
 

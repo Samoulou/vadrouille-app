@@ -798,7 +798,7 @@ describe("env: gardes de configuration du paiement simulé (B4a ; critère A21 ;
   });
 
   it.each(["staging", "production"])("`%s` : drapeau à vrai (casse et espaces ignorés) ou secret simulé présent → refus de démarrer", (environnement) => {
-    for (const drapeau of ["true", "TRUE", " true ", "True"]) {
+    for (const drapeau of ["true", "TRUE", " true ", "True", " TRUE"]) {
       refusParse({ VADROUILLE_ENV: environnement, SIMULATED_WEBHOOK_ENABLED: drapeau }, NOM.SIMULATED_WEBHOOK_ENABLED, "forbidden");
     }
     refusParse({ VADROUILLE_ENV: environnement, [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(aleatoire()) }, NOM.SIMULATED_WEBHOOK_SECRET, "forbidden");
@@ -822,7 +822,12 @@ describe("env: gardes de configuration du paiement simulé (B4a ; critère A21 ;
   });
 
   it("le drapeau seul n'est vrai qu'avec exactement `true` ; le secret décodé n'apparaît dans aucune ligne du journal ni dans la liste des variables", () => {
-    for (const drapeau of ["TRUE", "1", " true", "true ", "yes"]) expect(parseServerEnv(ci({ SIMULATED_WEBHOOK_ENABLED: drapeau })).simulatedWebhookFlag).toBe(false);
+    for (const drapeau of ["TRUE", "1", " true", "true ", "yes", " TRUE"]) expect(parseServerEnv(ci({ SIMULATED_WEBHOOK_ENABLED: drapeau })).simulatedWebhookFlag).toBe(false);
+    // En `local`, ` TRUE` est admis au démarrage (la garde normalisée ne vise que `staging` et `production`) et laisse
+    // le webhook fermé (prédicat exact).
+    const local = parseServerEnv({ VADROUILLE_ENV: "local", SIMULATED_WEBHOOK_ENABLED: " TRUE", PAYMENT_ADAPTER: "mock" });
+    expect(local.simulatedWebhookFlag).toBe(false);
+    expect(configurationDepuisEnv(local).ouvert).toBe(false);
     expect(parseServerEnv(ci({ SIMULATED_WEBHOOK_ENABLED: "true" })).simulatedWebhookFlag).toBe(true);
     const octets = aleatoire();
     const config = parseServerEnv(simule({ [NOM.SIMULATED_WEBHOOK_SECRET]: base64url(octets) }));
@@ -1069,6 +1074,26 @@ describe("paiement: réponses du webhook simulé (A24)", () => {
       await attendre(await gestionnaire(signee(corps)), 400, { error: "invalid_request" });
     }
     expect(acces.nombre).toBe(0);
+  });
+
+  it("configuration ouverte, aucune URL de base, signature fausse → 400 ; les dépendances par défaut ne sont créées qu'après la signature et l'analyse", async () => {
+    const env = parseServerEnv(ouvertWebhook());
+    // Fabrique qui lève comme `createDatabase` sans sa variable (`DatabaseGuardError`).
+    const creerDependances = vi.fn((): DependancesPaiement => {
+      throw new Error("variable de base absente");
+    });
+    const gestionnaire = creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(env), creerDependances });
+    const maintenant = Math.floor(Date.now() / 1000);
+    const corps = evenement();
+    await attendre(await gestionnaire(requete(corps, { "stripe-signature": `t=${maintenant},v1=${"0".repeat(64)}` })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(signee("{", maintenant)), 400, { error: "invalid_request" });
+    expect(creerDependances).not.toHaveBeenCalled();
+    // Signature valide : la création échoue dans le `try` de l'étape 7 → 500 constant, jamais une exception non gérée.
+    await attendre(await gestionnaire(signee(corps, maintenant)), 500, { error: "server_error" });
+    expect(creerDependances).toHaveBeenCalledTimes(1);
+    // Chemin par défaut réel (aucune injection de dépendances) : une signature fausse reste un 400.
+    const parDefaut = creerWebhookSimule({ lireConfiguration: () => configurationDepuisEnv(env) });
+    await attendre(await parDefaut(requete(corps, { "stripe-signature": `t=${maintenant},v1=${"0".repeat(64)}` })), 400, { error: "invalid_request" });
   });
 
   it("signature valide (à 299 s dans le passé ou le futur) et base indisponible → 500, corps constant", async () => {

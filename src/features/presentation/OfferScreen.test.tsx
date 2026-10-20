@@ -10,7 +10,7 @@ import { MOCK_ORGANIZATION_ID } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { OfferScreen, type OfferScreenProps, type StartCheckout } from "./OfferScreen";
+import { nouveauRequestId, OfferScreen, type OfferScreenProps, type StartCheckout } from "./OfferScreen";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -200,6 +200,20 @@ describe("paiement", () => {
     expect(dernier?.requestId).toMatch(UUID);
     expect([premier?.requestId, second?.requestId]).not.toContain(dernier?.requestId);
     expect(screen.getByRole("alert")).toHaveTextContent("Le paiement n'a pas pu commencer.");
+  });
+
+  it("requestId hors contexte sécurisé (sans crypto.randomUUID) : uuid v4 tiré de getRandomValues, distinct à chaque appel", () => {
+    const reel = globalThis.crypto;
+    vi.stubGlobal("crypto", { getRandomValues: (tableau: Uint8Array<ArrayBuffer>) => reel.getRandomValues(tableau) });
+    try {
+      const a = nouveauRequestId();
+      const b = nouveauRequestId();
+      expect(a).toMatch(UUID);
+      expect(b).toMatch(UUID);
+      expect(a).not.toBe(b);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("already_unlocked : l'écran est relu (état « déjà débloqué »)", async () => {
