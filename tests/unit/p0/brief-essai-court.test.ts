@@ -102,7 +102,7 @@ describe("p0: brief court de l'essai d'intégration (ticket 355)", () => {
     const { serie } = premiereSerie(brief);
     // `p0-run.ts` : budgetFiches = placesDetails − 2 × logements ; série plus grande : arrêt avant toute fiche.
     const budgetFiches = essai.placesDetails - 2 * brief.logements.length;
-    expect(validerConfigEssai(lire("prototype/config/essai.json")).ok).toBe(true);
+    expect(validerConfigEssai(lire("prototype/config/essai.json"), rechercheEssai.totalCandidats).ok).toBe(true);
     expect(essai.placesDetails).toBe(90);
     expect(essai.placesDetails).toBeLessThanOrEqual(BORNES_ESSAI.placesDetails);
     expect(serie).toBeLessThanOrEqual(budgetFiches);

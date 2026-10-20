@@ -223,10 +223,11 @@ export type CodeConfigModeReel = (typeof CODES_CONFIG_MODE_REEL)[number];
 
 /**
  * Configuration du mode réel, ou un code fermé (jamais la valeur reçue) : `config_reel_incomplete` si un champ
- * obligatoire manque (décision en attente), `config_reel_invalide` sinon. Contrôle croisé, si `totalCandidats` (celui de
- * `recherche.json` ou `recherche-essai.json`) est donné : `totalCandidats + 5 ≤ placesTextSearch` (0102 § 5).
+ * obligatoire manque (décision en attente), `config_reel_invalide` sinon. Contrôle croisé : `totalCandidats` (celui de
+ * `recherche.json` ou `recherche-essai.json`, **obligatoire** : aucun appelant ne peut l'omettre) + 5 ≤ `placesTextSearch`
+ * (0102 § 5).
  */
-export function validerConfigModeReel(brut: unknown, totalCandidats?: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+export function validerConfigModeReel(brut: unknown, totalCandidats: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
   if (typeof brut === "object" && brut !== null && !Array.isArray(brut)) {
     const presents = new Set(Object.keys(brut));
     const obligatoires = Object.keys(ConfigModeReelSchema.shape);
@@ -234,7 +235,7 @@ export function validerConfigModeReel(brut: unknown, totalCandidats?: number): {
   }
   const lu = ConfigModeReelSchema.safeParse(brut);
   if (!lu.success) return { ok: false, code: "config_reel_invalide" };
-  if (totalCandidats !== undefined && !rechercheTientSousPlaces(totalCandidats, lu.data.placesTextSearch)) return { ok: false, code: "config_reel_invalide" };
+  if (!rechercheTientSousPlaces(totalCandidats, lu.data.placesTextSearch)) return { ok: false, code: "config_reel_invalide" };
   return { ok: true, config: lu.data };
 }
 
@@ -260,7 +261,7 @@ export const BORNES_ESSAI = {
  * Configuration de l'essai d'intégration (`prototype/config/essai.json`) : même schéma que le mode réel
  * (`ConfigModeReelSchema`, mêmes codes fermés), puis chaque plafond sous `BORNES_ESSAI`.
  */
-export function validerConfigEssai(brut: unknown, totalCandidats?: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
+export function validerConfigEssai(brut: unknown, totalCandidats: number): { ok: true; config: ConfigModeReel } | { ok: false; code: CodeConfigModeReel } {
   const lu = validerConfigModeReel(brut, totalCandidats);
   if (!lu.ok) return lu;
   const c = lu.config;

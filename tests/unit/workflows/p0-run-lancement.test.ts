@@ -140,6 +140,41 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     expect(lancementDuMode("autre" as "reel")).toBeNull();
   });
 
+  // Condition de la Sécurité sur la PR 565 et 0102 § 5 : `totalCandidats + 5 ≤ placesTextSearch` est contrôlé par le
+  // lancement, avant toute réservation. `lancementDuMode` rend `null` (le lancement est refusé, `real_mode_unavailable`) :
+  // la base n'est jamais ouverte ici et l'appelant ne réserve que sur un forfait rendu.
+  describe("contrôle croisé totalCandidats + 5 ≤ placesTextSearch (0102 § 5), avant toute réservation", () => {
+    const FICHIERS = { reel: "mode-reel", essai: "essai" } as const;
+    const lireJson = (chemin: string) => JSON.parse(readFileSync(path.join(process.cwd(), chemin), "utf8")) as Record<string, unknown>;
+    const total = (mode: "reel" | "essai") => (lireJson(`prototype/config/${mode === "reel" ? "recherche" : "recherche-essai"}.json`) as { totalCandidats: number }).totalCandidats;
+
+    async function lancerAvecTextSearch(mode: "reel" | "essai", placesTextSearch: number) {
+      vi.resetModules();
+      const commite = lireJson(`prototype/config/${FICHIERS[mode]}.json`) as Record<string, unknown>;
+      if (mode === "reel") vi.doMock("../../../prototype/config/mode-reel.json", () => ({ default: { ...commite, placesTextSearch } }));
+      else vi.doMock("../../../prototype/config/essai.json", () => ({ default: { ...commite, placesTextSearch } }));
+      const { lancementDuMode: lancement } = await import("@/workflows/p0-run");
+      const rendu = lancement(mode);
+      vi.doUnmock("../../../prototype/config/mode-reel.json");
+      vi.doUnmock("../../../prototype/config/essai.json");
+      vi.resetModules();
+      return rendu;
+    }
+
+    for (const mode of ["reel", "essai"] as const) {
+      it(`${mode} : totalCandidats + 4 Text Search, refusé (null), aucune réservation`, async () => {
+        expect(await lancerAvecTextSearch(mode, total(mode) + 4)).toBeNull();
+        expect(d.pool.connect).not.toHaveBeenCalled();
+        expect(d.cloreExecution).not.toHaveBeenCalled();
+      });
+
+      it(`${mode} : totalCandidats + 5 Text Search, la borne est atteinte : un forfait est rendu pour ce plafond`, async () => {
+        const rendu = await lancerAvecTextSearch(mode, total(mode) + 5);
+        expect(rendu?.forfait.textSearchRequetes).toBe(total(mode) + 5);
+      });
+    }
+  });
+
   it("table de prix refusée : null, aucune réservation possible", async () => {
     vi.resetModules();
     vi.doMock("@/server/usage/cout-google", async (original) => ({

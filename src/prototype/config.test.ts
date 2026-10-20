@@ -23,6 +23,9 @@ import { TYPES_CRENEAU } from "./candidat";
 
 const DOSSIER = join(process.cwd(), "prototype", "config");
 const lire = (nom: string): unknown => JSON.parse(readFileSync(join(DOSSIER, `${nom}.json`), "utf8"));
+
+/** Total de candidats visé qui tient sous les 90 Text Search des fichiers commités (40 + 5 ≤ 90) : le paramètre est obligatoire (0102 § 5). */
+const TOTAL = 40;
 const brut = () => ({
   modeles: lire("modeles"),
   recherche: lire("recherche"),
@@ -180,15 +183,15 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
     for (const champ of CHAMPS_MODE_REEL_DECIDES_PO) expect(Object.keys(fichier())).toContain(champ);
-    expect(validerConfigModeReel(fichier())).toEqual({ ok: true, config: fichier() });
+    expect(validerConfigModeReel(fichier(), TOTAL)).toEqual({ ok: true, config: fichier() });
   });
 
   it("chaque champ obligatoire, sans valeur par défaut : absent, refusé (config_reel_incomplete)", () => {
-    expect(validerConfigModeReel(complete())).toMatchObject({ ok: true });
+    expect(validerConfigModeReel(complete(), TOTAL)).toMatchObject({ ok: true });
     for (const champ of Object.keys(ConfigModeReelSchema.shape)) {
       const sans: Record<string, unknown> = { ...complete() };
       delete sans[champ];
-      expect(validerConfigModeReel(sans), champ).toEqual({ ok: false, code: "config_reel_incomplete" });
+      expect(validerConfigModeReel(sans, TOTAL), champ).toEqual({ ok: false, code: "config_reel_incomplete" });
     }
   });
 
@@ -206,14 +209,21 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
       ["coutsEstimesMicros", { requeteModele: 20_000 }],
     ];
     for (const [champ, valeur] of cas) {
-      const resultat = validerConfigModeReel({ ...complete(), [champ]: valeur });
+      const resultat = validerConfigModeReel({ ...complete(), [champ]: valeur }, TOTAL);
       expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
       expect(JSON.stringify(resultat)).not.toContain(String(valeur));
     }
     // Contrôle croisé (0102 § 5) : 86 candidats visés + 5 logements dépassent 90 Text Search ; 85 + 5 = 90 passe.
     expect(validerConfigModeReel(complete(), 86)).toEqual({ ok: false, code: "config_reel_invalide" });
     expect(validerConfigModeReel(complete(), 85)).toMatchObject({ ok: true });
-    expect(validerConfigModeReel(null)).toEqual({ ok: false, code: "config_reel_invalide" });
+    // Le total de chaque fichier de recherche commité tient (recherche.json, recherche-essai.json) ; la limite est exacte.
+    for (const nom of ["recherche", "recherche-essai"]) {
+      const total = ConfigRechercheSchema.parse(lire(nom)).totalCandidats;
+      expect(validerConfigModeReel(fichier(), total), nom).toMatchObject({ ok: true });
+      expect(validerConfigModeReel({ ...complete(), placesTextSearch: total + 4 }, total), nom).toEqual({ ok: false, code: "config_reel_invalide" });
+      expect(validerConfigModeReel({ ...complete(), placesTextSearch: total + 5 }, total), nom).toMatchObject({ ok: true });
+    }
+    expect(validerConfigModeReel(null, TOTAL)).toEqual({ ok: false, code: "config_reel_invalide" });
   });
 });
 
@@ -233,7 +243,7 @@ describe("p0: champs retirés de la configuration du mode réel et de l'essai (0
   it("un des quatre champs retirés présent dans le fichier est refusé (strictObject)", () => {
     for (const [fichier, valider] of Object.entries(fichiers)) {
       for (const nom of RETIRES) {
-        const resultat = valider({ ...(lire(fichier) as object), [nom]: 1 });
+        const resultat = valider({ ...(lire(fichier) as object), [nom]: 1 }, TOTAL);
         expect(resultat, `${fichier} : ${nom}`).toEqual({ ok: false, code: "config_reel_invalide" });
       }
     }
@@ -255,7 +265,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       fiches: { margeMinimum: 4, margePart: 0.2 },
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
-    expect(validerConfigEssai(essai())).toEqual({ ok: true, config: essai() });
+    expect(validerConfigEssai(essai(), TOTAL)).toEqual({ ok: true, config: essai() });
     // Chaque valeur commitée est exactement la borne : le fichier ne peut que descendre. Seul `coutUsd` est sous sa
     // borne (0093 point 5 : 2 USD d'IA pour l'essai, 3 USD de borne comme le mode réel, `BORNES_ESSAI` inchangé).
     for (const [champ, borne] of Object.entries(BORNES_ESSAI)) {
@@ -281,7 +291,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
     ];
     expect(cas.map(([champ]) => champ).sort()).toEqual(Object.keys(BORNES_ESSAI).sort());
     for (const [champ, valeur] of cas) {
-      const resultat = validerConfigEssai({ ...essai(), [champ]: valeur });
+      const resultat = validerConfigEssai({ ...essai(), [champ]: valeur }, TOTAL);
       expect(resultat, champ).toEqual({ ok: false, code: "config_reel_invalide" });
       expect(JSON.stringify(resultat)).not.toContain(String(valeur));
     }
@@ -290,7 +300,7 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
   it("mêmes codes que le mode réel : champ absent, config_reel_incomplete", () => {
     const sans: Record<string, unknown> = { ...essai() };
     delete sans.coutsEstimesMicros;
-    expect(validerConfigEssai(sans)).toEqual({ ok: false, code: "config_reel_incomplete" });
+    expect(validerConfigEssai(sans, TOTAL)).toEqual({ ok: false, code: "config_reel_incomplete" });
   });
 
   it("recherche-essai.json : profil de l'essai (12 candidats visés), fusible toursMax aligné sur le mode réel (0073)", () => {

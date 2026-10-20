@@ -188,9 +188,24 @@ function codeDe(erreur: unknown, apresAppelPayant: boolean): CodeArret {
   return codePersiste(typeof code === "string" ? code : undefined, apresAppelPayant);
 }
 
-/** Configuration du mode de l'exécution, validée ; refusée : `config_invalid` (avant tout appel). */
+/**
+ * Total de candidats visé par la recherche du mode (`recherche-essai.json` pour l'essai, `recherche.json` sinon) ;
+ * `config_invalid` si le fichier est refusé. Il est passé aux validateurs de la configuration du mode (0102 § 5).
+ */
+function totalCandidatsDuMode(mode: ExecutionEnCours["mode"]): number {
+  const recherche = ConfigRechercheSchema.safeParse(mode === "essai" ? configRechercheEssai : configRecherche);
+  if (!recherche.success) throw new ArretEtape("config_invalid");
+  return recherche.data.totalCandidats;
+}
+
+/**
+ * Configuration du mode de l'exécution, validée ; refusée : `config_invalid` (avant tout appel). Le contrôle croisé
+ * `totalCandidats + 5 ≤ placesTextSearch` (0102 § 5) en fait partie, donc aussi du lancement (`lancementDuMode`), avant
+ * toute réservation.
+ */
 function configurationDuMode(mode: ExecutionEnCours["mode"]): ConfigModeReel {
-  const lue = mode === "essai" ? validerConfigEssai(configEssai) : validerConfigModeReel(configModeReel);
+  const total = totalCandidatsDuMode(mode);
+  const lue = mode === "essai" ? validerConfigEssai(configEssai, total) : validerConfigModeReel(configModeReel, total);
   if (!lue.ok) throw new ArretEtape("config_invalid");
   return lue.config;
 }
@@ -248,10 +263,11 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  */
 export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode | null {
   if (mode !== "reel" && mode !== "essai") return null;
-  const reel = validerConfigModeReel(configModeReel);
   const table = TablePrixGoogleSchema.safeParse(prixGoogle);
-  if (!reel.ok || !table.success) return null;
+  if (!table.success) return null;
   try {
+    // Mode réel d'abord (comme avant : un fichier du mode réel refusé refuse aussi l'essai), puis celui du mode demandé.
+    if (!validerConfigModeReel(configModeReel, totalCandidatsDuMode("reel")).ok) return null;
     const config = configurationDuMode(mode);
     configurationAgent(mode, config);
     if (lireClassement(configClassement) === undefined) return null;
@@ -282,10 +298,11 @@ export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ placesTextS
  * de prix est refusée (la relecture échoue alors fermée). Durée des orphelines : celle du mode réel, comme au lancement.
  */
 export function relectureDuMode(): LancementDuMode | null {
-  const reel = validerConfigModeReel(configModeReel);
   const table = TablePrixGoogleSchema.safeParse(prixGoogle);
-  if (!reel.ok || !table.success) return null;
+  if (!table.success) return null;
   try {
+    const reel = validerConfigModeReel(configModeReel, totalCandidatsDuMode("reel"));
+    if (!reel.ok) return null;
     return {
       forfait: forfaitRelecture(table.data, SKUS_FORFAIT, PLAFONDS_RELECTURE),
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: reel.config.uniteQuotaRoutes, dureeMaxMs: DUREE_MAX_EXECUTION_MS },
