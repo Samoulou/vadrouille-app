@@ -145,8 +145,12 @@ export function cleDeNom(nom: string): string {
     .trim();
 }
 
-/** Longueurs des textes maison du plan par secteurs (P0S2-PO-19 ; nom de secteur : limite de `StopFacts.area`). */
-export const LONGUEURS_PLAN = { secteur: 60, raisonSecteur: 160, incontournable: 80 } as const;
+/**
+ * Longueurs des textes maison du plan par secteurs (P0S2-PO-19 ; nom de secteur : limite de `StopFacts.area`).
+ * `secteur` et `incontournable` sont **dérivées** de `LONGUEURS_TEXTE` (décision 0094 § 1 point 2 : le candidat enrichi
+ * porte les mêmes champs) ; `raisonSecteur` reste propre au plan.
+ */
+export const LONGUEURS_PLAN = { secteur: LONGUEURS_TEXTE.secteur, raisonSecteur: 160, incontournable: LONGUEURS_TEXTE.incontournable } as const;
 
 /** Nombre de secteurs du plan : au plus 9 (P0S2-PO-19 : 3 × 9 + 2 = 29 requêtes, sous la limite de 30). */
 export const SECTEURS_MAX = 9;
@@ -267,6 +271,39 @@ export function lirePlan(texte: string, contexte: ContextePlan): Lecture<PlanRec
   return { valeur: lu.data, refuses: 0 };
 }
 
+/**
+ * Plan de secteurs gardé entre les étapes de `p0Run` dans la table du plan de secteurs du prototype (décision 0094 § 2 point 1 ; verdict de
+ * la Sécurité 0103, question 1) : le **schéma du plan restreint** aux clés stockées, sans second schéma. Noms, voisins et
+ * incontournables seulement : **ni `raison`, ni `requetes`** (les requêtes reprennent des envies du brief), ni jour, rang,
+ * ordre, position ou compteur. Contenu maison, écrit avant tout ancrage, fonction de la sortie de l'agent seule.
+ */
+export const PlanSecteursStockeSchema = z.strictObject({
+  secteurs: z.array(SecteurPlanSchema.pick({ nom: true, voisins: true, incontournables: true })).min(1).max(SECTEURS_MAX),
+});
+export type PlanSecteursStocke = z.infer<typeof PlanSecteursStockeSchema>;
+
+/**
+ * Forme stockée du plan lu et validé (`lirePlan`) : chaque secteur réduit à `nom`, `voisins` et `incontournables`, dans
+ * l'ordre du plan. Plan vide (refusé, illisible ou sans secteur) : `undefined`, rien n'est stocké (jamais un plan par défaut
+ * inventé). Fonction pure.
+ */
+export function planSecteursStocke(plan: PlanRecherche): PlanSecteursStocke | undefined {
+  if (plan.secteurs.length === 0) return undefined;
+  const lu = PlanSecteursStockeSchema.safeParse({
+    secteurs: plan.secteurs.map((secteur) => ({ nom: secteur.nom, voisins: [...secteur.voisins], incontournables: [...secteur.incontournables] })),
+  });
+  return lu.success ? lu.data : undefined;
+}
+
+/**
+ * Relecture d'une ligne de la table du plan de secteurs (0103, question 1, condition 8) : validée par `PlanSecteursStockeSchema`
+ * ; contenu invalide : `undefined`, que l'appelant traite comme une erreur fermée (jamais un plan par défaut).
+ */
+export function lirePlanSecteursStocke(valeur: unknown): PlanSecteursStocke | undefined {
+  const lu = PlanSecteursStockeSchema.safeParse(valeur);
+  return lu.success ? lu.data : undefined;
+}
+
 // --- Tour de recherche -------------------------------------------------------
 
 export const ActionSchema = z.discriminatedUnion("type", [
@@ -275,8 +312,8 @@ export const ActionSchema = z.discriminatedUnion("type", [
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
-/** Longueurs des infos pratiques d'un lieu (P0S2-PO-21). */
-export const LONGUEURS_INFOS = { prix: 60, horaires: 120, conseil: 160 } as const;
+/** Longueurs des infos pratiques d'un lieu (P0S2-PO-21), dérivées de `LONGUEURS_TEXTE` (décision 0094 § 1 point 2). */
+export const LONGUEURS_INFOS = { prix: LONGUEURS_TEXTE.prix, horaires: LONGUEURS_TEXTE.horaires, conseil: LONGUEURS_TEXTE.conseil } as const;
 
 /** Candidat tel que l'extrait le modèle ; l'identifiant et la classe de source sont posés par le code. */
 export const CandidatExtraitSchema = z.strictObject({

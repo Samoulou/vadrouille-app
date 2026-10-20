@@ -26,20 +26,29 @@ export const SourceCandidatRechercheSchema = z.strictObject({
 });
 
 /** Candidat sortant de l'agent : données maison issues de la recherche web seulement, **aucune donnée Google**. */
-export const CandidatRechercheSchema = z.strictObject({
-  id: z.string().regex(CANDIDAT_ID_PATTERN),
-  nom: texteMaison(LONGUEURS_TEXTE.nom),
-  resume: texteMaison(LONGUEURS_TEXTE.resume),
-  categorie: CategorySchema,
-  typeEtape: z.enum(STOP_KINDS),
-  source: SourceCandidatRechercheSchema,
-  /** Événement : date et heure lues sur la page ; `dateConfirmee` si la page relue mentionne la date (R2). */
-  evenement: z.strictObject({ date: IsoDateSchema, heure: TimeSchema.optional(), dateConfirmee: z.boolean() }).optional(),
-  /** La source indique qu'il faut réserver (badge `toReserve`). */
-  aReserver: z.boolean(),
-  /** Prix par personne d'après la source web, en devise locale (R9) ; absent si aucune source ne le donne. */
-  prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
-  /** Durée de visite d'après la source web, en minutes. */
-  dureeMinutes: z.number().int().min(15).max(600).optional(),
-});
+export const CandidatRechercheSchema = z
+  .strictObject({
+    id: z.string().regex(CANDIDAT_ID_PATTERN),
+    nom: texteMaison(LONGUEURS_TEXTE.nom),
+    resume: texteMaison(LONGUEURS_TEXTE.resume),
+    categorie: CategorySchema,
+    typeEtape: z.enum(STOP_KINDS),
+    source: SourceCandidatRechercheSchema,
+    /** Événement : date et heure lues sur la page ; `dateConfirmee` si la page relue mentionne la date (R2). */
+    evenement: z.strictObject({ date: IsoDateSchema, heure: TimeSchema.optional(), dateConfirmee: z.boolean() }).optional(),
+    /** La source indique qu'il faut réserver (badge `toReserve`). */
+    aReserver: z.boolean(),
+    /** Prix par personne d'après la source web, en devise locale (R9) ; absent si aucune source ne le donne. */
+    prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
+    /** Durée de visite d'après la source web, en minutes. */
+    dureeMinutes: z.number().int().min(15).max(600).optional(),
+    /** Candidat enrichi (décision 0094 § 1) : secteur et incontournable du plan, infos pratiques de la source. */
+    secteur: texteMaison(LONGUEURS_TEXTE.secteur).optional(),
+    incontournable: texteMaison(LONGUEURS_TEXTE.incontournable).optional(),
+    prix: texteMaison(LONGUEURS_TEXTE.prix).optional(),
+    horaires: texteMaison(LONGUEURS_TEXTE.horaires).optional(),
+    conseil: texteMaison(LONGUEURS_TEXTE.conseil).optional(),
+  })
+  /** `incontournable` présent exige `secteur` présent (0094 § 1 point 1). */
+  .refine((candidat) => candidat.incontournable === undefined || candidat.secteur !== undefined, "incontournable sans secteur");
 export type CandidatRecherche = z.infer<typeof CandidatRechercheSchema>;

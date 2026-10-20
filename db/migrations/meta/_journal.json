@@ -92,6 +92,13 @@
       "when": 1792369603417,
       "tag": "0012_creation_voyage",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792373203417,
+      "tag": "0013_secteurs_prototype",
+      "breakpoints": true
     }
   ]
 }
