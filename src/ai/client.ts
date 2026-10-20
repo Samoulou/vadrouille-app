@@ -45,7 +45,16 @@ export type ReponseModele = {
   coutUsd: number;
   /** Raison de fin rendue par le client réel (absente du double sur fixtures). */
   fin?: FinModele;
+  /**
+   * Jetons en entrée et en sortie lus dans `usage` de l'AI SDK par le client réel (décision 0096 § 2 point 6) :
+   * `inputTokens` et `outputTokens` seulement, entiers sûrs de 0 à `MAX_TOKENS` ; absents sinon, et absents du double sur
+   * fixtures. Rien d'autre de `usage`, de `providerMetadata`, de `response` ni du corps brut n'entre dans la réponse.
+   */
+  tokens?: { entree: number; sortie: number };
 };
+
+/** Borne des jetons rendus par le client (décision 0096 § 2 point 6) : au-delà, la valeur est absente. */
+export const MAX_TOKENS = 10_000_000;
 
 export interface ClientModeles {
   envoyer(requete: RequeteModele): Promise<ReponseModele>;
@@ -74,8 +83,13 @@ export type RequeteRechercheWebFournisseur = {
 
 /**
  * Source rendue par le fournisseur (citation d'adresse), avant tout contrôle. Même forme que `ResultatWeb`
- * (`src/ai/recherche-web.ts`), mais type distinct : une source brute n'est pas un résultat admis (adresse, longueurs) ;
- * l'égalité des deux formes est vérifiée par `recherche-web-reelle.test.ts`.
+ * (`src/ai/recherche-web.ts`), mais type distinct et conservé (décision 0096 § 4.3) : une source brute est une donnée
+ * **non contrôlée** (adresse non vérifiée, longueurs non bornées) alors qu'un `ResultatWeb` est un résultat **admis** par
+ * `recherche-web-reelle.ts` (`https:` seulement, sans identifiants, borné, dédoublonné) : deux noms rendent ce passage
+ * visible. Le contrat du module de capacité (`RequeteRechercheWebFournisseur`, `ReponseRechercheWebFournisseur`,
+ * `PointEntreeRechercheWeb`) vit ici, et `openrouter-client.ts` n'importe rien de `recherche-web.ts` : le remplacer par
+ * `ResultatWeb` ajouterait un import au module de capacité, donc une revue de la Sécurité, sans gain. L'égalité de forme
+ * des deux types est vérifiée par `recherche-web-reelle.test.ts` (la conversion est un passage champ à champ).
  */
 export type SourceWebFournisseur = { readonly url: string; readonly titre: string; readonly extrait: string };
 

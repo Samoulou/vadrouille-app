@@ -10,14 +10,14 @@ import { parseInput } from "./parse-input";
 
 describe("parseInput", () => {
   it("renvoie la valeur validée", () => {
-    expect(parseInput(CheckoutRequestSchema, { tripId: "t1", method: "card" })).toEqual({
+    expect(parseInput(CheckoutRequestSchema, { tripId: "t1", method: "card", requestId: "00000000-0000-4000-8000-000000000001" })).toEqual({
       ok: true,
-      value: { tripId: "t1", method: "card" },
+      value: { tripId: "t1", method: "card", requestId: "00000000-0000-4000-8000-000000000001" },
     });
   });
 
   it("champ refusé : validation_failed avec le chemin du champ", () => {
-    expect(parseInput(CheckoutRequestSchema, { tripId: "t1", method: "paypal" })).toEqual({
+    expect(parseInput(CheckoutRequestSchema, { tripId: "t1", method: "paypal", requestId: "00000000-0000-4000-8000-000000000001" })).toEqual({
       ok: false,
       error: { code: "validation_failed", field: "method" },
     });
@@ -32,7 +32,7 @@ describe("parseInput", () => {
   });
 
   it.each(["<script>", "personne@example.ch", "amount"])("clé inconnue « %s » : ni dans field ni dans la réponse", (key) => {
-    const result = parseInput(CheckoutRequestSchema, { tripId: "t1", method: "card", [key]: "valeur-hostile" });
+    const result = parseInput(CheckoutRequestSchema, { tripId: "t1", method: "card", requestId: "00000000-0000-4000-8000-000000000001", [key]: "valeur-hostile" });
     expect(result).toEqual({ ok: false, error: { code: "validation_failed" } });
     expect(JSON.stringify(result)).not.toContain(key);
     expect(JSON.stringify(result)).not.toContain("valeur-hostile");
@@ -44,7 +44,7 @@ describe("parseInput", () => {
   });
 
   it("la valeur reçue n'apparaît jamais", () => {
-    const result = parseInput(CheckoutRequestSchema, { tripId: "<img src=x>", method: "card" });
+    const result = parseInput(CheckoutRequestSchema, { tripId: "<img src=x>", method: "card", requestId: "00000000-0000-4000-8000-000000000001" });
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result)).not.toContain("<img");
   });

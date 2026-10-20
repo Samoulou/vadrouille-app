@@ -46,14 +46,23 @@ const ProfilGenerationSchema = z.strictObject({
   routesElements: elements,
 });
 
-/** Plafonds d'une relecture de Journée : Routes seulement, aucun coût de modèle (0046 D13 point 3). */
-const ProfilRelectureSchema = z.strictObject({ routesRequetes: requetes.min(1), routesElements: elements.min(1) });
+/**
+ * Plafonds d'une relecture (décision 0100 § 1) : Text Search des villes, fiches (tous masques) et Routes, aucun coût de
+ * modèle. Deux profils du même schéma, choisis par la portée de la lecture (`jour`, `voyage`).
+ */
+const ProfilRelectureSchema = z.strictObject({
+  placesTextSearch: requetes,
+  placesDetails: requetes,
+  routesRequetes: requetes.min(1),
+  routesElements: elements.min(1),
+});
 
 export const PlafondsUsageSchema = z.strictObject({
   schema: z.literal(1),
   /** Profils de génération (B7-PO-5) : `apercu` (workflow 1), `complet` (workflow 4), `mini` (workflow 5). */
   generations: z.strictObject({ apercu: ProfilGenerationSchema, complet: ProfilGenerationSchema, mini: ProfilGenerationSchema }),
-  relecture: ProfilRelectureSchema,
+  /** Relectures (0100 § 1.3) : `jour` (un jour, une présentation : `getDay`, `listProposals`, `listPreviewSlots`) et `voyage` (`getTrip`). */
+  relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
   /** Actions sans compte (B7-TL-10, 0081 B9-TL-4 point 3). */
   actions: z.strictObject({
     structureBrief: z.strictObject({ coutModelesMicros: microsPositifs }),

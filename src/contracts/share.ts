@@ -46,6 +46,12 @@ export type SharedEvent = z.infer<typeof SharedEventSchema>;
 export const SharedTerminusItemSchema = TerminusItemSchema.omit({ label: true });
 export const SharedStopItemSchema = z.strictObject({ type: z.literal("stop"), stop: SharedStopSchema });
 
+/**
+ * `SegmentItemSchema` est repris tel quel : il admet `minutes: null` (durée à confirmer, décision 0092 § 4). Choix
+ * documenté plutôt qu'une restriction : le prototype n'est jamais partagé et le MVP ne produit jamais `null` ; si un
+ * `null` arrivait, la vue partagée le rendrait comme la vue de la personne (« durée à confirmer », décision 0095),
+ * jamais une durée. Testé dans `share.test.ts`.
+ */
 export const SharedDayItemSchema = z.discriminatedUnion("type", [
   SharedTerminusItemSchema,
   SharedStopItemSchema,

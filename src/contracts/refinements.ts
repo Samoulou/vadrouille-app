@@ -35,7 +35,7 @@ export function refineNoCommitment(proposal: { stop: { commitment?: unknown } },
 
 /** `detour` obligatoire quand le trajet depuis l'étape précédente dépasse `DETOUR_THRESHOLD_MINUTES`. */
 export function refineDetour(
-  proposal: { travelFromPrevious?: { minutes: number }; detour?: string },
+  proposal: { travelFromPrevious?: { minutes: number | null }; detour?: string },
   ctx: Ctx,
 ): void {
   const minutes = proposal.travelFromPrevious?.minutes ?? 0;

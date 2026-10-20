@@ -328,6 +328,17 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "appel `fetch` réel (section 4) dans un test e2e, F10b (PR 212) : 0040 D6, accepté, permanent (portée test ; sentinelle : le worker ne met pas en cache les requêtes Google)",
   },
+  // B3b-envoi (ticket 435 ; spécification B3b-envoi, critères E5, E6 et E8 ; décision 0098 § 5) : lecture de l'API de
+  // Mailpit par les tests de base. Verdict Sécurité à rendre dans la PR de code.
+  {
+    fichier: "tests/db/mailpit.ts",
+    portee: "test",
+    usage:
+      "outils des tests de base de B3b-envoi : lecture des messages reçus par Mailpit (API sur 127.0.0.1:8025, service du job `db` de la CI ou de docker-compose), " +
+      "adresses `exemple.test` uniques à l'essai ; seul fichier de `tests/db/` qui appelle `fetch`",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "appel `fetch` réel (section 4) dans un test de base vers la boucle locale, B3b-envoi (décision 0098 § 5) : portée test ; verdict Sécurité à rendre dans la PR de code",
+  },
   // B1 (PR 188, fusionnée le 2026-10-13, `d1ba047`, après P0c1) : lignes attendues par la spécification P0c, section 9,
   // relevées par la PR du ticket 242. Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242) pour chacune.
   {
@@ -457,6 +468,17 @@ export const LIGNES_CAPACITE = [
       "local de test (`127.0.0.1`, port `0`) seulement ; aucun autre hôte (les noms `.test` ne se résolvent pas)",
     capacites: [{ capacite: "module:undici", formes: ["Agent"], nombre: 1 }],
     ecart: "import d'un paquet à capacité dans un test, exigé par 0055 § 3 point 6 (E4 de 0049) avant la fusion de la composition : verdict Sécurité : approuvé sur le head `59878f0` (PR 326), P0r3c-3, ticket 316",
+  },
+  // B4a (ticket 531 ; spécification B4, B4a point 3 ; décision 0097 B4-TL-7). Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
+  {
+    fichier: "src/server/payment/transport-http.ts",
+    portee: "application",
+    usage:
+      "transport du prestataire simulé (B4a) : `POST` de l'événement signé vers `/api/v1/webhooks/simulated` de l'origine `APP_URL` " +
+      "seulement (chemin constant), `redirect: \"error\"`, `credentials: \"omit\"`, délai borné ; aucun secret ni donnée Google " +
+      "dans la requête hors la signature. Justification côté serveur : module `server-only`, importé par la seule composition du paiement simulé",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "module de capacité réseau de B4a (décision 0097 B4-TL-7), webhook simulé ouvert en `local` et `ci` seulement : verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
 ] as const satisfies readonly LigneCapacite[];
 

@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { donneesDe } from "@/ai/requetes";
@@ -24,7 +27,7 @@ afterEach(() => vi.restoreAllMocks());
 const { brief: briefBase, configuration: configBase, fixtures: fixturesBase } = charger();
 const lieux = fixturesBase.places.lieux;
 
-type Vue = { id: string; nom: string; resume: string; categorie: string; typeEtape: string; sourceDomaine?: string };
+type Vue = { id: string; nom: string; resume: string; categorie: string; typeEtape: string; sourceDomaine?: string; secteur?: string; incontournable?: boolean };
 
 /** Vue typée du message simulé, sans signature d'index (décision 0042, P0cS-TL-3). */
 type DonneesVues = { candidats?: Vue[]; lieux?: Vue[] };
@@ -80,14 +83,20 @@ describe("p0: la notation ne note que des candidats ancrés et ne reçoit que de
 });
 
 describe("p0: les raisons ne sont demandées que pour les lieux retenus", () => {
-  it("mêmes champs limités (plus le domaine de la source), et seulement les lieux du programme", async () => {
+  it("mêmes champs limités (plus le domaine de la source ; secteur et incontournable du plan, raisons v2), et seulement les lieux du programme", async () => {
     const { capture, resultat } = await executerCapture();
     const programme = resultat.programme as ProgrammeReduit;
     const lieuxRaisons = vues(capture.requetes, "raisons", "lieux");
     expect(lieuxRaisons.length).toBeGreaterThan(0);
     for (const vue of lieuxRaisons) {
-      expect(Object.keys(vue).sort()).toEqual(["categorie", "id", "nom", "resume", "sourceDomaine", "typeEtape"]);
+      const cles = Object.keys(vue).sort();
+      // Un événement n'a pas de secteur (P0S2-PO-20) ; tout lieu en a un.
+      const attendues = ["categorie", "id", "nom", "resume", ...(vue.typeEtape === "event" ? [] : ["secteur"]), "sourceDomaine", "typeEtape"];
+      expect(cles.filter((cle) => cle !== "incontournable")).toEqual(attendues);
+      if (cles.includes("incontournable")) expect(vue.incontournable).toBe(true);
     }
+    // Amendement 3 (P0S2-PO-21) : au moins un incontournable du plan parmi les lieux du programme.
+    expect(lieuxRaisons.some((vue) => vue.incontournable === true)).toBe(true);
     expect(new Set(lieuxRaisons.map((vue) => vue.nom))).toEqual(nomsDuProgramme(programme));
     expect(JSON.stringify(capture.requetes.filter((r) => r.etape === "raisons"))).not.toContain("SENTINELLE");
   });
@@ -351,5 +360,29 @@ describe("p0: aucune clé dans le journal ni dans un message d'erreur", () => {
       expect(sortie).not.toContain(interdit);
     }
     expect(capture.journal.at(-1)).toBe(JSON.stringify({ code: "internal_error" }));
+  });
+});
+
+describe("qualite: compteurs de l'agent au rapport de pnpm p0 (P0S2-PO-25, correction 1 de la PR 505)", () => {
+  it("Édimbourg : bloc qualite égal aux compteurs de l'agent ; le rapport ne contient aucun nom de secteur, d'incontournable ni de candidat", async () => {
+    const { resultat } = await executerCapture();
+    expect(resultat.rapport.qualite).toEqual({
+      secteursPlan: 3,
+      incontournablesPlan: 3,
+      incontournableSansCandidat: 0,
+      candidatRegroupe: 0,
+      secteurInconnu: 0,
+    });
+    const fixture = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/fixtures/modeles/edimbourg.json"), "utf8")) as {
+      plan: { secteurs: { nom: string; incontournables: string[] }[] };
+      recherche: { candidats?: { nom: string }[] }[];
+    };
+    const noms = [
+      ...fixture.plan.secteurs.flatMap((secteur) => [secteur.nom, ...secteur.incontournables]),
+      ...fixture.recherche.flatMap((tour) => (tour.candidats ?? []).map((candidat) => candidat.nom)),
+    ];
+    expect(noms.length).toBeGreaterThan(20);
+    const texte = JSON.stringify(resultat.rapport);
+    for (const nom of noms) expect(texte.includes(nom), nom).toBe(false);
   });
 });

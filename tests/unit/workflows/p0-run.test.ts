@@ -7,7 +7,7 @@ import { FatalError } from "workflow";
 
 import type { LigneCandidat } from "@/contracts/prototype-travail";
 import type { Candidat } from "@/prototype/candidat";
-import { etapeAncrage, etapeClore, etapeFinale, etapeRecherche, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, etapeAncrage, etapeClore, etapeFinale, etapeRecherche, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
 
 /**
  * Workflow `p0Run` (P0r3c-4, décisions 0009, 0055 et 0063), sur des doubles seulement : garde, table de travail,
@@ -76,7 +76,7 @@ const textSearch = vi.fn();
 const detailsLogement = vi.fn();
 
 function execution(mode: "reel" | "essai" = "reel", brief = "edimbourg-1.json") {
-  return { mode, brief, variante: "A" as const, coutModelesMicros: 0, jourQuota: "2026-10-15", numeroDuJour: 1, ecouleMs: 0 };
+  return { mode, brief, variante: "A" as const, coutModelesMicros: 0, jourQuota: "2026-10-15", numeroDuJour: 1 };
 }
 
 beforeEach(() => {
@@ -134,21 +134,21 @@ describe("p0Run : garde à l'entrée de chaque étape (0055 § 1 point 2, répon
     expect(d.cloreExecution).not.toHaveBeenCalled();
   });
 
-  it("garde vérifiée avant la composition, avec la durée du mode réel ; pour un essai, revérifiée avec la durée d'essai.json (15 min depuis 0073)", async () => {
+  it("garde vérifiée avant la composition, avec DUREE_MAX_EXECUTION_MS (40 min, 0102 § 6) ; pour un essai, la même garde, une seule fois (plus de durée propre à l'essai)", async () => {
     await etapeRecherche({ runId: RUN_ID });
     expect(d.verifierGardeEtape).toHaveBeenCalledTimes(1);
-    expect(d.verifierGardeEtape.mock.calls[0]?.[1]).toMatchObject({ dureeMaxMs: 900_000 });
+    expect(d.verifierGardeEtape.mock.calls[0]?.[1]).toMatchObject({ dureeMaxMs: DUREE_MAX_EXECUTION_MS });
     expect(d.verifierGardeEtape.mock.invocationCallOrder[0]).toBeLessThan(d.composerP0Reel.mock.invocationCallOrder[0] ?? 0);
 
     vi.clearAllMocks();
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
-    expect(d.verifierGardeEtape.mock.calls.map((appel) => (appel[1] as { dureeMaxMs: number }).dureeMaxMs)).toEqual([900_000, 900_000]);
+    expect(d.verifierGardeEtape.mock.calls.map((appel) => (appel[1] as { dureeMaxMs: number }).dureeMaxMs)).toEqual([DUREE_MAX_EXECUTION_MS]);
   });
 
-  it("garde de l'essai fermée (durée d'essai.json dépassée) : arrêt sans composition", async () => {
+  it("garde de l'essai fermée (exécution plus vieille que DUREE_MAX_EXECUTION_MS) : arrêt sans composition", async () => {
     d.lireExecution.mockResolvedValue(execution("essai"));
-    d.verifierGardeEtape.mockResolvedValueOnce({ ok: true, garde: { runId: RUN_ID } }).mockResolvedValueOnce({ ok: false, code: "run_refused" });
+    d.verifierGardeEtape.mockResolvedValueOnce({ ok: false, code: "run_refused" });
     expect((await refus(etapeRecherche({ runId: RUN_ID }))).message).toBe("real_mode_unavailable");
     aucunAppel();
   });
@@ -184,17 +184,18 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
     expect(d.ancrage).toHaveBeenCalledTimes(1);
   });
 
-  it("recherche de l'essai : profil de l'essai (12 candidats visés), plafonds de l'agent alignés sur le mode réel (0073 : 40 recherches web), la 41e lève cap_reached sans appel", async () => {
+  it("recherche de l'essai : profil de l'essai (12 candidats visés), recherche web et lecteur de pages sans plafond de nombre (0102 § 3)", async () => {
     d.lireExecution.mockResolvedValue(execution("essai"));
     await etapeRecherche({ runId: RUN_ID });
     const deps = d.chercherCandidats.mock.calls[0]?.[1] as { recherche: { rechercher: (r: unknown) => Promise<unknown> }; bornes: { totalCandidats: number; toursMax: number } };
     expect(deps.bornes.totalCandidats).toBe(12);
     expect(deps.bornes.toursMax).toBe(6);
-    for (let i = 0; i < 40; i += 1) await deps.recherche.rechercher({ requete: "x" });
-    await expect(deps.recherche.rechercher({ requete: "x" })).rejects.toMatchObject({ code: "cap_reached" });
-    expect(recherche.rechercher).toHaveBeenCalledTimes(40);
+    // Plus de plafond de recherches web (`recherchesWeb` retiré, 0093 point 5) : la 41e passe, la recherche reste bornée
+    // par `toursMax`, `totalCandidats`, le coût des modèles et l'échéance de l'étape.
+    for (let i = 0; i < 41; i += 1) await deps.recherche.rechercher({ requete: "x" });
+    expect(recherche.rechercher).toHaveBeenCalledTimes(41);
     const plafonds = (d.composerP0Reel.mock.calls[0]?.[1] as { plafonds: { fournisseur: string; maxCoutMicros?: number }[] }).plafonds;
-    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(3_000_000);
+    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(2_000_000);
   });
 
   it("coût des modèles déjà compté : l'étape ne dispose que du reste du plafond", async () => {
@@ -353,6 +354,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
       finsAnormales: 1,
       candidatsRefuses: { source_not_in_results: 4, duplicate: 0, over_total: 0, invalid: 1 },
       finsEcheance: 1,
+      qualite: { secteursPlan: 6, incontournablesPlan: 10, incontournableSansCandidat: 2, candidatRegroupe: 1, secteurInconnu: 3 },
     };
     d.chercherCandidats.mockResolvedValue({ candidats: [], compteurs });
     await refus(etapeRecherche({ runId: RUN_ID }));
@@ -374,6 +376,11 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         finishIgnored: 1,
         finishAbnormal: 1,
         deadlineStop: 1,
+        sectors: 6,
+        mustSees: 10,
+        mustSeesWithoutCandidate: 2,
+        candidatesGrouped: 1,
+        sectorUnknown: 3,
       },
     ]);
     info.mockClear();
@@ -435,7 +442,7 @@ describe("p0Run : forme du module (décision 0063)", () => {
     for (const texte of [source, index, complet]) expect(texte).not.toMatch(/createWebhook|createHook|defineHook|resumeHook|resumeWebhook|getHookByToken/);
     expect(complet).not.toMatch(/"use (?:workflow|step|server|client)"/);
     expect([...complet.matchAll(/^import .*$/gm)].map((m) => m[0])).toEqual(['import "server-only";']);
-    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["complet.ts", "index.ts", "p0-run.ts"]);
+    expect(readdirSync(path.join(process.cwd(), "src/workflows")).sort()).toEqual(["apercu.test.ts", "apercu.ts", "complet.ts", "index.ts", "p0-run.ts"]);
   });
 
   it("aucune composition, aucun client ni registre au niveau du module (fabriques appelées dans l'étape)", () => {

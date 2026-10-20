@@ -36,8 +36,12 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["tests/unit/server/env.test.ts", "@/server/env/resolve"],
     ["db/connection.ts", "../src/server/env/resolve.ts"],
     ["src/server/env/index.ts", "./resolve"],
-    ["src/server/routes/exemple.ts", "@/server/env/payment"],
-    ["src/server/payment/exemple.ts", "@/server/env/payment"],
+    // B4a (décision 0097 B4-TL-3 point 5 (e)) : deux importateurs nommés, pour `index` comme pour `payment`.
+    ["src/server/payment/composition.ts", "@/server/env/payment"],
+    ["src/server/routes/simulated-webhook.ts", "@/server/env/payment"],
+    ["src/server/payment/composition.ts", "@/server/env"],
+    ["src/server/routes/simulated-webhook.ts", "@/server/env"],
+    ["src/server/env/payment.test.ts", "./payment"],
     // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
     ["src/server/p0/garde.ts", "@/server/env/p0"],
     ["src/server/p0/acces.ts", "@/server/env/p0"],
@@ -45,12 +49,31 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/p0/lancement.ts", "@/server/env/p0"],
     ["src/server/env/p0.test.ts", "./p0"],
     ["src/server/env/p0.ts", "@/server/env/index"],
+    // B8b (décision 0100 § 5.3) : module étroit de la lecture, importé par la composition de la lecture seule.
+    ["src/server/composition/lecture.ts", "@/server/env/relectures"],
+    ["src/server/env/relectures.test.ts", "./relectures"],
+    ["src/server/env/relectures.ts", "@/server/env/resolve"],
+    // B9c (décision 0081 B9-TL-8) : déclarations de la barrière des appels réels, importées par la barrière seule.
+    ["src/server/generation/barriere.ts", "@/server/env/generation"],
+    ["src/server/env/generation.test.ts", "./generation"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
   });
 
   const REFUSES: [string, string][] = [
+    // B8b : `relectures` hors de la composition de la lecture.
+    ["src/server/composition/p0-reel.ts", "@/server/env/relectures"],
+    // B9c : `generation` hors de la barrière.
+    ["src/server/generation/etapes.ts", "@/server/env/generation"],
+    ["src/server/composition/generation.ts", "@/server/env/generation"],
+    ["src/workflows/apercu.ts", "@/server/env/generation"],
+    ["src/server/composition/clients-google.ts", "@/server/env/relectures"],
+    ["src/server/relecture/source.ts", "@/server/env/relectures"],
+    ["src/server/voyages/lecture.ts", "@/server/env/relectures"],
+    ["src/adapters/index.ts", "@/server/env/relectures"],
+    ["src/grounding/exemple.ts", "@/server/env/relectures"],
+    ["tests/unit/exemple.test.ts", "@/server/env/relectures"],
     ["src/grounding/exemple.ts", "@/server/env/ai"],
     ["src/ai/exemple.ts", "@/server/env/grounding"],
     ["src/research/agent.ts", "@/server/env/egress"],
@@ -72,6 +95,13 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/rate-limit.ts", "@/server/env/resolve"],
     ["src/instrumentation.ts", "@/server/env/payment"],
     ["src/server/actions/paiement.ts", "@/server/env/payment"],
+    // B4a : l'entrée `payment` n'admet plus les dossiers entiers (0097 B4-TL-3 point 5 (e)).
+    ["src/server/routes/exemple.ts", "@/server/env/payment"],
+    ["src/server/payment/exemple.ts", "@/server/env/payment"],
+    ["src/server/payment/simulated-provider.ts", "@/server/env/payment"],
+    ["src/server/payment/paiements.ts", "@/server/env"],
+    ["src/server/routes/autre.ts", "@/server/env"],
+    ["src/adapters/simulated-payment.ts", "@/server/env/payment"],
     // P0r3b : `p0` hors de la garde et de l'accès (action, page, autre module de src/server/p0, tests de tests/).
     ["src/server/actions/p0-acces.ts", "@/server/env/p0"],
     ["src/app/prototype/executions/page.tsx", "@/server/env/p0"],

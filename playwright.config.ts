@@ -47,6 +47,14 @@ const AUTH_SERVER = process.env.E2E_AUTH_SERVER === "1";
 const AUTH_PORT = PORT + 3 * PROTOTYPE_PORT_OFFSET;
 const authURL = `http://127.0.0.1:${AUTH_PORT}`;
 
+// B6b (spécification B6, B6b point 5 ; décision 0086 § 2.3, B6-TL-10) : cinquième serveur sur le même build, connexion
+// réelle **et** lecture réelle (`DATA_ADAPTER=api`, double de relectures en `ci`), sur la base du job `db`. Démarré par
+// la même variable d'outillage que le serveur `auth` (`E2E_AUTH_SERVER=1`), avec son propre projet (`api`, fichiers
+// `*.api.spec.ts`). Port décalé de 4 000. Le serveur et les tests de B3c ne changent pas : le projet `auth` déclare
+// seulement `api` comme dépendance, pour que `--project=auth` du job `db` l'exécute aussi sans modifier le workflow.
+const API_PORT = PORT + 4 * PROTOTYPE_PORT_OFFSET;
+const apiURL = `http://127.0.0.1:${API_PORT}`;
+
 // B3a (spécification B3, B3a point 3 ; décisions 0050, P2, et 0051, points 2.3 et 6.4) : les serveurs des e2e
 // tournent en `VADROUILLE_ENV=ci`. Le secret du limiteur est tiré au hasard à chaque exécution et posé dans le seul
 // `env` du serveur principal : ni écrit sur disque, ni journalisé, ni posé dans `process.env` de Playwright (aucun
@@ -59,7 +67,7 @@ const secretJetable = () => randomBytes(32).toString("base64url");
 const serve = "node scripts/serve-standalone.mjs";
 const command = process.env.E2E_SKIP_BUILD ? serve : `pnpm build && ${serve}`;
 
-export default defineConfig({
+export default defineConfig<{ urlMock: string }>({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -106,7 +114,19 @@ export default defineConfig({
     { name: "perf", testDir: "tests/perf", testMatch: /.*\.perf\.spec\.ts$/, retries: 0 },
     // B3c (critère C7, partie « pages ») : serveur à connexion réelle ; aucune trace (cookies de session), en-tête de
     // confiance posé par fixture dans chaque test (`tests/e2e/sans-session.auth.spec.ts`).
-    ...(AUTH_SERVER ? [{ name: "auth", testDir: "tests/e2e", testMatch: /.*\.auth\.spec\.ts$/, use: { baseURL: authURL, trace: "off" as const } }] : []),
+    // B6b (B6-TL-10) : serveur à connexion et lecture réelles ; `urlMock` désigne le serveur principal (adaptateur
+    // `mock`, même build), auquel les scénarios comparent le rendu des écrans 11, 12 et 17. Aucune trace (cookies).
+    ...(AUTH_SERVER
+      ? [
+          {
+            name: "api",
+            testDir: "tests/e2e",
+            testMatch: /.*\.api\.spec\.ts$/,
+            use: { baseURL: apiURL, urlMock: baseURL, trace: "off" as const },
+          },
+          { name: "auth", testDir: "tests/e2e", testMatch: /.*\.auth\.spec\.ts$/, use: { baseURL: authURL, trace: "off" as const }, dependencies: ["api"] },
+        ]
+      : []),
   ],
   webServer: [
     {
@@ -176,7 +196,9 @@ export default defineConfig({
     ...(AUTH_SERVER
       ? [
           {
-            // Même build, connexion réelle (B3c point 7) ; ni `EMAIL_TRANSPORT` ni `SMTP_URL` : port d'envoi désactivé.
+            // Même build, connexion réelle (B3c point 7) ; envoi du code par SMTP vers le Mailpit du job `db` (B3b-envoi,
+            // décision 0098 § 5.6) : `EMAIL_TRANSPORT` et `SMTP_URL` posées **en clair** ici (valeurs de la boucle locale,
+            // sans valeur secrète), jamais dans `$GITHUB_ENV` ni dans un secret du dépôt.
             command: serve,
             url: authURL,
             reuseExistingServer: false,
@@ -187,6 +209,8 @@ export default defineConfig({
               AUTH_ADAPTER: "better-auth",
               VADROUILLE_ENV: "ci",
               TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
+              EMAIL_TRANSPORT: "smtp",
+              SMTP_URL: "smtp://127.0.0.1:1025",
               BETTER_AUTH_URL: authURL,
               APP_URL: authURL,
               BETTER_AUTH_SECRET: secretJetable(),
@@ -194,6 +218,31 @@ export default defineConfig({
               PORT: String(AUTH_PORT),
               HOSTNAME: "127.0.0.1",
               [SERVER_LOG_ENV]: serverLogPath({ port: AUTH_PORT, tmpDir: tmpdir() }),
+            },
+          },
+          {
+            // Même build, connexion réelle et adaptateur `api` (B6b) : mêmes variables que le serveur `auth`, plus
+            // `DATA_ADAPTER=api`. `RELECTURES_SOURCE` n'est pas posée : la garde de 0100 § 5.3 garde le double en `ci`.
+            command: serve,
+            url: apiURL,
+            reuseExistingServer: false,
+            timeout: 180_000,
+            stdout: "pipe" as const,
+            stderr: "pipe" as const,
+            env: {
+              AUTH_ADAPTER: "better-auth",
+              DATA_ADAPTER: "api",
+              VADROUILLE_ENV: "ci",
+              TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
+              EMAIL_TRANSPORT: "smtp",
+              SMTP_URL: "smtp://127.0.0.1:1025",
+              BETTER_AUTH_URL: apiURL,
+              APP_URL: apiURL,
+              BETTER_AUTH_SECRET: secretJetable(),
+              RATE_LIMIT_HMAC_SECRET: secretJetable(),
+              PORT: String(API_PORT),
+              HOSTNAME: "127.0.0.1",
+              [SERVER_LOG_ENV]: serverLogPath({ port: API_PORT, tmpDir: tmpdir() }),
             },
           },
         ]

@@ -441,6 +441,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // `src/research`).
   ...["complement-p0", "couche", "entrees", "natures"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   ["src/research/bornes.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
+  // B7b (ticket 524, décision 0096 § 2 et § 5) : traces, candidats maison et recherche de production, non chargés par
+  // `pnpm p0`, marqueur `server-only` seul ; imports de projet par les règles de base.
+  ...["src/ai/traces.ts", "src/research/candidat-trouve.ts", "src/research/recherche.ts"].map((fichier) => [fichier, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   // B8a (ticket 462, décision 0085 § 1) : modules de production de `src/grounding`, non chargés par `pnpm p0` ; marqueur
   // `server-only` seul, imports de projet par les règles de base (`src/contracts`, `src/grounding`).
   ...["ancrage-production", "fiches", "resultat", "trajets"].map(
@@ -720,7 +723,23 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
  * `p0Run` : `src/workflows/index.ts` seul, ci-dessous).
  */
 const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/workflows/p0-run.ts"];
-const estPont = (chemin: string) => PONTS_P0.includes(chemin);
+/**
+ * B8b (décision 0100 § 5.2) : la fabrique commune des clients Google est un pont de plus vers `src/grounding` (modules de
+ * capacité `places-client.ts` et `routes-client.ts`). Le parcours de la frontière s'arrête à elle ; ses importateurs
+ * (`composition/lecture.ts`, plus `generation.ts` quand B9c existera) sont contrôlés à part par `composition.test.ts` et la
+ * règle `ligne/relecture-imports`. Admis (décision 0108, qui amende 0100 § 5.2 et § 5.4 : branchement au démarrage, jamais
+ * par `src/adapters/index.ts`) : `src/instrumentation.ts` → `composition/lecture.ts` → `composition/clients-google.ts` →
+ * `@/grounding/*` (cas fabriqués ci-dessous).
+ */
+// B9c (décision 0105 § 2) : `fixtures-simulees.ts` est le module des doubles d'Édimbourg de la composition simulée, atteint par
+// `import()` dynamique depuis `generation.ts` seulement ; il ouvre `@/ai`, `@/research` et `@/grounding` comme elle (doubles).
+const PONTS_LECTURE: readonly string[] = [
+  "src/server/composition/clients-google.ts",
+  "src/server/composition/generation.ts",
+  "src/server/composition/fixtures-simulees.ts",
+  "src/server/relecture/planification.ts",
+];
+const estPont = (chemin: string) => PONTS_P0.includes(chemin) || PONTS_LECTURE.includes(chemin);
 
 /**
  * B7a (décision 0077 § 3 point 1, amende 0048 § 1 et 0055 § 3 sur ce seul point) : `src/ai/erreurs.ts`, **et lui seul**
@@ -755,19 +774,37 @@ const interditPartout = (chemin: string) =>
  */
 const MODULES_RELECTURE: readonly string[] = ["src/server/relecture/relectures.ts"];
 const TYPES_GROUNDING_RELECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/trajets.ts"];
+/**
+ * B8b (décision 0100 § 5.1) : la source de relectures appelle `chargerFiches`, `chargerTrajetsParCouples`… de
+ * `src/grounding` avec des **clients injectés** par la composition de la lecture ; elle n'importe donc aucun module de
+ * capacité, seulement ces trois modules de fonctions (valeurs) et le type du port du cache. Liste fermée ; arêtes exactes.
+ */
+const MODULE_SOURCE_LECTURE = "src/server/relecture/source.ts";
+const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/interfaces.ts", "src/grounding/trajets.ts"];
 
 /** B6a (décision 0086 § 1.2 point 4) : seule arête de l'application hors de src/server vers src/domain, en type seulement. */
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 
+/** B9b (0081 B9-TL-1 point 2) : classification des codes de la couche IA (0077 § 3 point 4). */
+const NATURES_IA = "src/ai/natures.ts";
+
 const areteAdmise = (de: string, vers: string) =>
   (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
   (MODULES_RELECTURE.includes(de) && TYPES_GROUNDING_RELECTURE.includes(vers)) ||
+  (de === MODULE_SOURCE_LECTURE && GROUNDING_SOURCE_LECTURE.includes(vers)) ||
   // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding.
   (vers === PORT_POSITIONS && !de.startsWith("src/grounding/")) ||
   // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
   // (`SourceRelectures`, `Relectures`), en type seulement (test ci-dessous et `ligne/voyages-imports`).
-  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE);
+  (de === DOUBLE_RELECTURES && vers === TYPES_RELECTURES_DOUBLE) ||
+  // B9b (décision 0081 B9-TL-1 point 2, amende 0048 § 1) : `src/ai/natures.ts`, terminal admis pour la conversion des
+  // codes depuis `src/server/generation/**` et `src/server/creation/**` seulement (il n'importe que `@/ai/erreurs` et
+  // `@/contracts`). Arête exacte : le parcours ne descend pas au-delà. Écart consigné par la décision 0105 § 7 :
+  // la réécriture complète de ce test du graphe (0081 B9-TL-1 point 4) est la tâche de suite `B9c-graphe` ; les arêtes de la
+  // génération sont couvertes par les cinq cas nominatifs « B9c admis/refusé » ci-dessous et par `composition.test.ts`, et
+  // B9c n'ajoute aucune arête à `areteAdmise`.
+  (vers === NATURES_IA && (de.startsWith("src/server/generation/") || de.startsWith("src/server/creation/")));
 
 /** Violations de la frontière de 0048 § 1 pour un fichier de l'application, dans l'ordre de découverte. */
 function violationsApplication(fichier: string, voisinsBruts: Voisins): string[] {
@@ -1272,8 +1309,8 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // D18 (décision 0055, section 3) : la composition du mode réel est le seul pont de l'application vers les modules
       // de P0 ; elle est contrôlée à part (`tests/unit/p0/composition.test.ts` : seul importateur des modules de
       // capacité, importée par le seul workflow `p0Run`). Tout autre fichier qui l'atteint reste une violation ici.
-      const sources = [...application.filter((f) => !estTest(f) && !PONTS_P0.includes(f)), ...configs];
-      expect(PONTS_P0.every((f) => application.includes(f))).toBe(true);
+      const sources = [...application.filter((f) => !estTest(f) && !estPont(f)), ...configs];
+      expect([...PONTS_P0, ...PONTS_LECTURE].every((f) => application.includes(f))).toBe(true);
       expect(sources).toContain("src/server/config/moteur.ts");
       for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
       // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
@@ -1344,9 +1381,81 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
           expect(forme, fichier).toMatch(/^import type \{/);
         }
       }
-      // 0085 § 1.8 : seule la composition `src/server/composition/generation.ts` (B9c) pourra l'importer.
-      const importeurs = application.filter((f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")));
-      expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts")).toEqual([]);
+      // 0085 § 1.8 et 0100 § 5.2 : seules les compositions `generation.ts` (B9c) et `lecture.ts` (B8b) l'importent.
+      // `src/instrumentation.ts` (0108) n'importe que la composition de la lecture, jamais `@/server/relecture/*` directement.
+      const importeurs = application.filter(
+        (f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && f !== MODULE_SOURCE_LECTURE && f !== "src/server/relecture/planification.ts" && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")),
+      );
+      expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts" && f !== "src/server/composition/lecture.ts")).toEqual([]);
+      expect(importeurs).toContain("src/server/composition/lecture.ts");
+    });
+
+    it("B8b : la source de relectures n'importe de src/grounding que fiches, interfaces et trajets (aucun module de capacité), ni l'environnement ni src/adapters", () => {
+      expect(application).toContain(MODULE_SOURCE_LECTURE);
+      const { imports } = analyser(MODULE_SOURCE_LECTURE, readFileSync(path.join(RACINE, MODULE_SOURCE_LECTURE), "utf8"));
+      const cibles = imports.map(({ specificateur }) => resoudre(MODULE_SOURCE_LECTURE, specificateur));
+      const grounding = cibles.flatMap((c) => (c.type === "projet" && c.chemin.startsWith("src/grounding/") ? [c.chemin] : []));
+      expect(grounding.sort()).toEqual([...GROUNDING_SOURCE_LECTURE, "src/grounding/port-positions.ts"].sort());
+      for (const c of cibles) {
+        if (c.type !== "projet") continue;
+        expect(c.chemin.startsWith("src/adapters/") || c.chemin.startsWith("src/server/env/") || c.chemin.startsWith("src/server/composition/"), c.chemin).toBe(false);
+      }
+      // Le type du port du cache est importé en type seulement.
+      const port = imports.filter(({ specificateur }) => resoudre(MODULE_SOURCE_LECTURE, specificateur).type === "projet" && specificateur.endsWith("port-positions"));
+      expect(port).toHaveLength(1);
+      for (const { forme } of port) expect(forme).toMatch(/^import type \{/);
+    });
+
+    it.each([
+      [
+        "admis : src/instrumentation.ts → composition/lecture → fabrique → modules de capacité (0108 ; le parcours s'arrête à la fabrique)",
+        {
+          "src/instrumentation.ts": ["src/server/composition/lecture.ts"],
+          "src/server/composition/lecture.ts": ["src/server/composition/clients-google.ts", "src/server/relecture/source.ts"],
+          "src/server/composition/clients-google.ts": ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"],
+          "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts"],
+        },
+        "src/instrumentation.ts",
+        [],
+      ],
+      ["admis : source → fiches, trajets, interfaces (arêtes exactes)", { "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts", "src/grounding/interfaces.ts"] }, "src/server/relecture/source.ts", []],
+      ["refusé : source → module de capacité", { "src/server/relecture/source.ts": ["src/grounding/places-client.ts"] }, "src/server/relecture/source.ts", ["src/grounding/places-client.ts"]],
+      ["refusé : source → un autre module de src/grounding", { "src/server/relecture/source.ts": ["src/grounding/ancrage-zone.ts"] }, "src/server/relecture/source.ts", ["src/grounding/ancrage-zone.ts"]],
+      [
+        "refusé : une autre composition de src/server → src/grounding (pas par la fabrique)",
+        { "src/server/composition/autre.ts": ["src/grounding/places-client.ts"] },
+        "src/server/composition/autre.ts",
+        ["src/grounding/places-client.ts"],
+      ],
+      [
+        "B9c admis (0081 B9-TL-4 point 4) : src/features/x.tsx → action de création → src/server/creation/y.ts → composition/generation → @/ai/couche",
+        {
+          "src/features/x.tsx": ["src/server/actions/creation.ts"],
+          "src/server/actions/creation.ts": ["src/server/creation/y.ts"],
+          "src/server/creation/y.ts": ["src/server/composition/generation.ts"],
+          "src/server/composition/generation.ts": ["src/ai/couche.ts", "src/grounding/places-client.ts"],
+        },
+        "src/features/x.tsx",
+        [],
+      ],
+      ["B9c admis : src/server/generation → src/ai/natures (terminal exact)", { "src/server/generation/codes.ts": ["src/ai/natures.ts"] }, "src/server/generation/codes.ts", []],
+      ["B9c refusé : src/server/creation → src/ai sans la composition", { "src/server/creation/y.ts": ["src/ai/couche.ts"] }, "src/server/creation/y.ts", ["src/ai/couche.ts"]],
+      ["B9c refusé : un module de src/server → src/research", { "src/server/x.ts": ["src/research/agent.ts"] }, "src/server/x.ts", ["src/research/agent.ts"]],
+      [
+        "B9c refusé : une étape de génération → src/grounding (chemin direct, sans la composition)",
+        { "src/server/generation/etapes.ts": ["src/grounding/fiches.ts"] },
+        "src/server/generation/etapes.ts",
+        ["src/grounding/fiches.ts"],
+      ],
+      [
+        "refusé : module de la lecture des voyages → src/grounding (chemin direct)",
+        { "src/server/voyages/lecture.ts": ["src/grounding/fiches.ts"] },
+        "src/server/voyages/lecture.ts",
+        ["src/grounding/fiches.ts"],
+      ],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B8b, graphe de la lecture : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
     });
 
     it("B6a : le double de relectures n'atteint src/domain que par les types de src/domain/relectures.ts ; aucun autre fichier hors de src/server n'atteint src/domain", () => {
@@ -1390,6 +1499,28 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
         [],
       ],
     ] satisfies [string, Record<string, string[]>, string, string[]][])("B6a, arête du double de relectures : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    it.each([
+      ["admis : src/server/generation → src/ai/natures.ts", { "src/server/generation/codes.ts": [NATURES_IA] }, "src/server/generation/codes.ts", []],
+      ["admis : src/server/creation → src/ai/natures.ts", { "src/server/creation/y.ts": [NATURES_IA] }, "src/server/creation/y.ts", []],
+      [
+        "admis : page → action → src/server/creation → src/ai/natures.ts → src/ai/erreurs.ts (terminal, rien au-delà)",
+        {
+          "src/app/x/page.tsx": ["src/server/actions/creation.ts"],
+          "src/server/actions/creation.ts": ["src/server/creation/y.ts"],
+          "src/server/creation/y.ts": [NATURES_IA],
+          [NATURES_IA]: ["src/ai/couche.ts"],
+        },
+        "src/app/x/page.tsx",
+        [],
+      ],
+      ["refusé : src/server/x.ts → src/ai/natures.ts", { "src/server/x.ts": [NATURES_IA] }, "src/server/x.ts", [NATURES_IA]],
+      ["refusé : src/adapters → src/ai/natures.ts", { "src/adapters/y.ts": [NATURES_IA] }, "src/adapters/y.ts", [NATURES_IA]],
+      ["refusé : src/server/creation → @/ai/couche", { "src/server/creation/y.ts": ["src/ai/couche.ts"] }, "src/server/creation/y.ts", ["src/ai/couche.ts"]],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B9b, terminal de la conversion des codes (0081 B9-TL-1 point 2) : %s", (_nom, aretes, depart, attendu) => {
       const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       expect(violationsApplication(depart, graphe)).toEqual(attendu);
     });
@@ -1528,7 +1659,7 @@ function importsExecutesDe(fichier: string, source: string): string[] {
 }
 
 /** Seuls imports exécutés admis dans le terminal `src/workflows/index.ts`. */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./complet", "./p0-run"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run"];
 
 /**
  * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
@@ -1554,11 +1685,25 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
  * `./complet` et `./p0-run` seulement (les imports de type sont effacés). Atteinte hors d'une entrée admise, ou sans sa
  * propriété, elle est parcourue comme un fichier ordinaire, et chaque module de P0 au-delà redevient une violation.
  * Tech Lead : validé ; Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
+ *
+ * B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : la frontière, nommée d'après P0r3b, porte aussi une
+ * entrée hors de P0, le webhook simulé (`src/server/routes/simulated-webhook.ts`, seul module du route handler
+ * `src/app/api/v1/webhooks/simulated/route.ts`). La liste `admis` est **commune à toutes les entrées** : `env/payment.ts`,
+ * ajouté pour le webhook, est donc aussi admis derrière les entrées de P0, qui ne l'importent pas aujourd'hui ; il ne lit
+ * aucune clé de service ni `process.env` (ses deux importeurs sont fixés par `ligne/server-env-imports`). Sécurité :
+ * approuvé, revue du head d50acfa (PR 582).
  */
 const FRONTIERE_P0R3B = {
   entrees: [
     { fichier: "src/server/actions/p0-acces.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
+    // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
+    // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
+    {
+      fichier: "src/server/routes/simulated-webhook.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
     {
       fichier: "src/server/p0/page-acces.ts",
       admise: (f: string, source: string) => {
@@ -1568,8 +1713,9 @@ const FRONTIERE_P0R3B = {
     },
   ],
   // B7a (décision 0077 § 3 point 1) : `src/ai/erreurs.ts` (codes réexportés par `egress.ts`), admis comme **terminal** :
-  // jamais parcouru au-delà (il n'importe rien).
-  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts", FICHIER_ERREURS_IA],
+  // jamais parcouru au-delà (il n'importe rien). B4a : `env/payment.ts` pour l'entrée du webhook, admis pour toutes les
+  // entrées (liste commune, voir le commentaire de tête).
+  admis: ["src/server/env/p0.ts", "src/server/env/index.ts", "src/server/env/payment.ts", "src/server/env/egress.ts", "src/server/env/openssl-conf.ts", "src/server/env/resolve.ts", FICHIER_ERREURS_IA],
   terminaux: [
     {
       fichier: "src/workflows/index.ts",
@@ -1758,16 +1904,17 @@ describe("p0: clé côté serveur seulement", () => {
     expect(directivesDuPrologue("x.ts", '"use strict";\n"use server";\nexport {};\n')).toEqual(["use strict", "use server"]);
   });
 
-  it("frontière de P0r3b sur le dépôt : les trois entrées réelles et le terminal portent leur propriété", () => {
+  it("frontière de P0r3b sur le dépôt : les trois entrées réelles, celle du webhook simulé (B4a) et le terminal portent leur propriété", () => {
     expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).toEqual([
       "src/server/actions/p0-acces.ts",
       "src/server/actions/p0-lancement.ts",
+      "src/server/routes/simulated-webhook.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
     expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./complet", "./p0-run", "./p0-run", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

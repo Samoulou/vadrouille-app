@@ -44,6 +44,7 @@ const db = createDatabase("vadrouille_app");
 const withOrg = creerWithOrg(db);
 let app: DbClient;
 let auth: DbClient;
+let admin: DbClient;
 let a: Org;
 let b: Org;
 let ctxA: AdapterContext;
@@ -158,7 +159,7 @@ function table(durees: Record<string, number>, lieux: string[], inconnus: string
 }
 
 async function ecrire(org: Org, donnees: DonneesVoyage): Promise<string> {
-  return ecrireVoyage(app, org, donnees);
+  return ecrireVoyage(app, org, donnees, admin);
 }
 
 /** Copie d'un objet sans les champs nommés. */
@@ -171,6 +172,8 @@ const raison = (reason: string) => expect.objectContaining({ name: "LectureVoyag
 beforeAll(async () => {
   app = await connect("app");
   auth = await connect("auth");
+  // Voyages sans fuseau (`time_zone_missing`) : lignes antérieures à la migration 0012, reproduites par l'administration.
+  admin = await connect("admin");
   a = await createOrg(auth);
   b = await createOrg(auth);
   ctxA = contexte(a);
@@ -236,7 +239,7 @@ describe("adaptateur api : suite de contrat et isolation", () => {
       const contexteLu = (await executeur.query("SELECT app_current_org() AS org")).rows[0]?.org;
       expect(contexteLu).toBe(a.org);
       await executeur.query(
-        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults) VALUES ($1, $2, gen_random_uuid(), 'X', '2027-01-01', '2027-01-02', 1)",
+        "INSERT INTO trips (organization_id, created_by, request_id, destination, start_date, end_date, travellers_adults, time_zone) VALUES ($1, $2, gen_random_uuid(), 'X', '2027-01-01', '2027-01-02', 1, 'Europe/Paris')",
         [a.org, a.owner],
       );
     }).catch((e: unknown) => e);
@@ -489,11 +492,35 @@ describe("lecture: relectures", () => {
     const tripId = idsA.get(EDIMBOURG_TRIP_ID) ?? "";
     const { adapter } = banc({ filtrerDemande: (d) => ({ ...d, trajets: d.trajets.slice(1) }) });
     await expect(adapter.getDay(ctxA, tripId, 2)).rejects.toEqual(raison("travel_unknown"));
-    const { adapter: sansLieu } = banc({ filtrerDemande: (d) => ({ ...d, lieux: d.lieux.slice(1) }) });
-    // Un lieu retiré : ses plages deviennent inconnues, la marque toConfirm apparaît (aucune valeur inventée).
-    const jour = await sansLieu.getDay(ctxA, tripId, 2);
-    const reference = await banc().adapter.getDay(ctxA, tripId, 2);
-    expect(jour).not.toEqual(reference);
+    // Un lieu retiré de la demande : un lieu non relu n'est plus à confirmer (0100 § 4.2), donc la sortie seule ne trahit
+    // plus le défaut ; le double compte les lieux interrogés hors de la demande et le test échoue s'il y en a (0100 § 4.3).
+    const { adapter: sansLieu, relectures: doubleSansLieu } = banc({ filtrerDemande: (d) => ({ ...d, lieux: d.lieux.slice(1) }) });
+    await sansLieu.getDay(ctxA, tripId, 2);
+    expect(doubleSansLieu.lieuxHorsDemande().length).toBeGreaterThan(0);
+    const { adapter: complet, relectures: doubleComplet } = banc();
+    await complet.getDay(ctxA, tripId, 2);
+    await complet.getTrip(ctxA, tripId);
+    await complet.listProposals(ctxA, tripId);
+    expect(doubleComplet.lieuxHorsDemande()).toEqual([]);
+  });
+
+  it("lecture: le contexte et la portée de chaque méthode atteignent la source (0100 § 3.2 point 1)", async () => {
+    const tripId = idsA.get(EDIMBOURG_TRIP_ID) ?? "";
+    const { adapter, relectures } = banc();
+    const attendus = [
+      ["getDay", "jour", () => adapter.getDay(ctxA, tripId, 2)],
+      ["listProposals", "jour", () => adapter.listProposals(ctxA, tripId)],
+      ["listPreviewSlots", "jour", () => adapter.listPreviewSlots(ctxA, tripId)],
+      ["getTrip", "voyage", () => adapter.getTrip(ctxA, tripId)],
+    ] as const;
+    for (const [nom, portee, appeler] of attendus) {
+      await appeler();
+      const voyage = relectures.dernierVoyage();
+      expect(voyage?.portee, nom).toBe(portee);
+      expect(voyage?.contexte.tripId, nom).toBe(tripId);
+      expect(voyage?.contexte.organizationId, nom).toBe(a.org);
+      expect(voyage?.sejoursParNuit.length, nom).toBe(voyage?.logementsParNuit.length);
+    }
   });
 
   it("lecture: Mes voyages ne relit rien, en un nombre constant de requêtes, sans lire place_coordinates ni proposals", async () => {
@@ -675,7 +702,8 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
     expect((await lire("walk,transit,car"))?.travelMinutes).toBe(30);
     for (const invalide of ["transit,walk", "walk,walk", " walk", "walk,", "walk,plane"]) await expect(lire(invalide), invalide).rejects.toEqual(raison("mobility_invalid"));
 
-    // estimated stocké servi tel quel, même si la relecture dit l'inverse.
+    // lecture: estimated stocké ou relu (0100 § 6.1) : `stocké || estimee`. Une durée relue estimée n'est jamais présentée
+    // comme mesurée ; un `estimated` stocké vrai reste vrai quand la relecture répond `estimee: false`.
     const id = await ecrire(a, voyage(days, { destination: "Estimé" }));
     const base = table(durees, P);
     const inverse: SourceRelectures = {
@@ -690,7 +718,9 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
       },
     };
     const day = await createApiTripAdapter({ relectures: inverse, withOrg }).getDay(ctxA, id, 1);
-    expect((day?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([false, true, false, false]);
+    expect((day?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([true, true, true, true]);
+    const mesuree = await createApiTripAdapter({ relectures: creerRelecturesVoyages({ table: base }), withOrg }).getDay(ctxA, id, 1);
+    expect((mesuree?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([false, true, false, false]);
   });
 
   it("lecture: toConfirm dans la limite de deux badges", async () => {
@@ -825,10 +855,10 @@ describe("lecture: identifiants, données incohérentes, voyages sans version", 
     const ctx = contexte(org);
     const days = [jour(1, "2028-04-01", [term("start", "09:00"), term("end", "18:00")])];
     const visible = await ecrireVoyage(app, org, voyage(days, { destination: "Visible" }));
-    await ecrireVoyage(app, org, voyage(days, { destination: "En création", timeZone: null, currentVersion: null }));
+    await ecrireVoyage(app, org, voyage(days, { destination: "En création", timeZone: null, currentVersion: null }), admin);
     const { adapter } = banc();
     expect((await adapter.listTrips(ctx)).map((t) => t.id)).toEqual([visible]);
-    await ecrireVoyage(app, org, voyage(days, { destination: "Fuseau nul", timeZone: null }));
+    await ecrireVoyage(app, org, voyage(days, { destination: "Fuseau nul", timeZone: null }), admin);
     await expect(adapter.listTrips(ctx)).rejects.toEqual(raison("time_zone_missing"));
   });
 

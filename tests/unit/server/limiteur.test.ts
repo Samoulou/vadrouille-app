@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { errorNameOf, formatLogLine, LOG_EVENTS, logEvent } from "@/server/log";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent } from "@/server/log";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 
 /**
@@ -323,6 +323,18 @@ describe("module de journal", () => {
     expect(ligne({ deadlineStop: "1" })).toEqual({ level: "warn", event: "p0.research_done", dropped: 1 });
   });
 
+  it.each(["sectors", "mustSees", "mustSeesWithoutCandidate", "candidatesGrouped", "sectorUnknown"])(
+    "amendement 3 (P0S2-PO-25) : %s, entier positif ou nul, admis sur p0.research_done ; négatif, chaîne, non-entier ou nom retirés",
+    (champ) => {
+      const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.research_done", { [champ]: valeur }, "info")) as Record<string, unknown>;
+      expect(ligne(0)).toEqual({ level: "info", event: "p0.research_done", [champ]: 0 });
+      expect(ligne(6)).toEqual({ level: "info", event: "p0.research_done", [champ]: 6 });
+      for (const refusee of [-1, 1.5, "3", "La Rome antique", null, Number.NaN]) {
+        expect(ligne(refusee), String(refusee)).toEqual({ level: "info", event: "p0.research_done", dropped: 1 });
+      }
+    },
+  );
+
   it("errorNameOf ne lit que error.name, jamais message, code ni cause", () => {
     expect(errorNameOf(new TypeError(SENTINELLE))).toBe("TypeError");
     expect(errorNameOf({ name: `a@exemple.test`, message: SENTINELLE })).toBeUndefined();
@@ -353,14 +365,58 @@ describe("module de journal", () => {
       // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
       "email.address_refused",
       "email.transport_disabled",
+      // B3b-envoi : enveloppe refusée avant l'envoi (aucune valeur).
+      "email.envelope_refused",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
       "voyages.read_failed",
       "voyages.relecture_refused",
+      "voyages.fiches_non_relues",
+      "voyages.positions_non_ecrites",
+      "voyages.action_failed",
       // Ticket 493 : arrêt d'une étape de p0Run, phase, classe et code fermés seulement (verdict Sécurité S4 attendu).
       "p0.step_failed",
+      // B4a (décision 0097 B4-TL-11 point 1 et B4-TL-13 point 4) : alertes de paiement, échec de la suite, webhook fermé
+      // par une configuration invalide (identifiants internes et codes fermés seulement).
+      "payment.alert",
+      "payment.followup_failed",
+      "payment.webhook_config_invalid",
       "log.unknown_event",
     ]);
+  });
+
+  describe("raison fermée par événement (B6a, B8b)", () => {
+    const READ = ["time_zone_missing", "snapshot_invalid", "checklist_orphan", "proposal_invalid", "proposal_day_missing", "stay_missing", "mobility_invalid", "travel_unknown", "output_invalid", "quota_reached", "unavailable"];
+    const FICHES = ["cap_reached", "quota_reached", "unavailable"];
+    const POSITIONS = ["perimees", "base", "exception"];
+    const admises = (evenement: string, reason: string) => JSON.parse(formatLogLine(evenement, { reason })) as { reason?: string; dropped?: number };
+
+    it("les trois listes sont fixées", () => {
+      expect([...LOG_READ_REASONS]).toEqual(READ);
+      expect([...LOG_FICHES_REASONS]).toEqual(FICHES);
+      expect([...LOG_POSITIONS_REASONS]).toEqual(POSITIONS);
+    });
+
+    it.each([
+      ["voyages.read_failed", READ, [...FICHES, ...POSITIONS].filter((r) => !READ.includes(r))],
+      ["voyages.relecture_refused", READ, [...FICHES, ...POSITIONS].filter((r) => !READ.includes(r))],
+      ["voyages.fiches_non_relues", FICHES, [...READ, ...POSITIONS].filter((r) => !FICHES.includes(r))],
+      ["voyages.positions_non_ecrites", POSITIONS, [...READ, ...FICHES]],
+    ])("%s : seules ses raisons passent, celles d'un autre événement sont retirées", (evenement, siennes, autres) => {
+      for (const reason of siennes) expect(admises(evenement, reason), reason).toEqual({ level: "info", event: evenement, reason });
+      for (const reason of autres) expect(admises(evenement, reason), reason).toEqual({ level: "info", event: evenement, dropped: 1 });
+      expect(admises(evenement, "SENTINELLE").dropped).toBe(1);
+    });
+
+    it("un événement sans raison admise retire `reason`", () => {
+      expect(admises("p0.research_done", "unavailable").dropped).toBe(1);
+    });
+
+    it("voyages.positions_non_ecrites : ni identifiant ni valeur ne passent, seule la raison est conservée", () => {
+      const ligneBrute = formatLogLine("voyages.positions_non_ecrites", { reason: "base", placeId: "SENTINELLE-LIEU", lat: 55.9, message: "SENTINELLE-MESSAGE" }, "warn");
+      expect(JSON.parse(ligneBrute)).toEqual({ level: "warn", event: "voyages.positions_non_ecrites", reason: "base", dropped: 3 });
+      expect(ligneBrute).not.toContain("SENTINELLE");
+    });
   });
 });

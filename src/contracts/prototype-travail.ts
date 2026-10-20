@@ -1,10 +1,10 @@
 /**
  * Table de travail et registre d'une exécution `p0Run` (décision 0046, D15 et D24, S1, S4 ; décision 0009 point 3 et
  * 0011 § 3 : l'état sérialisé du workflow ne porte que l'identifiant d'exécution, chaque étape relit ici ce dont elle a
- * besoin). Contrat implémenté par le seul module `src/adapters/prototype-travail.ts`, importé par
- * `src/workflows/p0-run.ts` seulement ; ni réexporté par `src/contracts/index.ts`, ni par `src/adapters/index.ts`.
+ * besoin). Contrat implémenté par le seul module `src/adapters/prototype-travail.ts`, importé hors tests par
+ * `src/workflows/p0-run.ts` et `src/adapters/prototype-ecriture.ts` seulement (décision 0107) ; ni réexporté par `src/contracts/index.ts`, ni par `src/adapters/index.ts`.
  *
- * Aucun schéma ici : le contenu d'un candidat est validé par l'étape (`CandidatSchema` de `src/prototype/candidat.ts`,
+ * Aucun schéma ici : le contenu d'un candidat (ou du plan de secteurs) est validé par l'étape (`CandidatSchema` de `src/prototype/candidat.ts`,
  * que l'application n'atteint pas, 0048 § 1) ; la base n'en admet que les clés (`CHECK` de la table de travail).
  */
 
@@ -28,11 +28,6 @@ export type ExecutionEnCours = {
    * rend l'identifiant de voyage unique (P0r3c-5, étape finale).
    */
   readonly numeroDuJour: number;
-  /**
-   * Temps écoulé depuis le début de l'exécution, en millisecondes, mesuré par la base (`now() - started_at`) : borne
-   * l'échéance de l'étape sous la durée maximale du mode (P0r3c-5, marge de durée). Lu en mémoire, jamais écrit.
-   */
-  readonly ecouleMs: number;
 };
 
 /** Ligne de la table de travail : clé `c_000`, contenu (clés de `CandidatSchema`), `place_id` éventuel. */
@@ -41,6 +36,14 @@ export type LigneCandidat = {
   readonly candidat: Readonly<Record<string, unknown>>;
   readonly placeId: string | null;
 };
+
+/**
+ * Plan de secteurs d'une exécution (table du plan de secteurs du schéma `prototype`, décision 0094 § 2 point 1 ; verdict de la Sécurité 0103,
+ * question 1) : `{ secteurs: [{ nom, voisins, incontournables }] }`, 9 secteurs au plus, noms maison du plan seulement ;
+ * ni raison, ni requête, ni jour, rang, ordre, position ou compteur. Contenu validé par l'étape
+ * (`PlanSecteursStockeSchema` de `src/ai/sorties.ts`) ; la base en ferme les clés à chaque niveau (`CHECK`).
+ */
+export type ContenuSecteurs = Readonly<Record<string, unknown>>;
 
 /** Phases écrites dans `prototype.runs.phase` par les étapes livrées (égales à `PHASES` de `src/prototype/arret.ts`). */
 export type PhaseTravail = "recherche" | "ancrage" | "notation" | "planification" | "raisons" | "validation" | "ecriture";

@@ -50,6 +50,15 @@ const SERVER_PATTERN = {
 };
 
 /**
+ * B4a (spécification B4, B4a point 7 ; amendement de 0006) : un route handler de `src/app/api/` n'importe de `src/server`
+ * que `@/server/routes/*` (ni les actions, ni aucun autre module) ; repris et précisé par `ligne/route-handlers`.
+ */
+const SERVER_ROUTE_PATTERN = {
+  regex: "^(@/server/(?!routes/[^/]+$)|(\\.{1,2}/)+(.*/)?server/(?!routes/[^/]+$))",
+  message: "Un route.ts de src/app/api n'importe de src/server que @/server/routes/* (spécification B4, B4a point 7).",
+};
+
+/**
  * P0r3b (décision 0055, section 2 ; revue du head 6be9299, mineur 7) : exception nominative à F9a pour la seule page
  * `src/app/prototype/executions/page.tsx` (composant serveur), qui lit l'état de la garde par
  * `@/server/p0/page-acces`, module ordinaire : exporté d'une action (`"use server"`), cet état serait appelable par
@@ -346,6 +355,11 @@ export default defineConfig([
     files: ["src/app/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: restrictedImports(MOCKS_PATTERN, SERVER_PATTERN),
+  },
+  {
+    // B4a (spécification B4, B4a point 7) : route handlers de `src/app/api/`, `@/server/routes/*` seulement (F1 tient).
+    files: ["src/app/api/**/route.ts"],
+    rules: restrictedImports(MOCKS_PATTERN, SERVER_ROUTE_PATTERN),
   },
   {
     // P0r3b : la page de saisie du code d'accès lit l'état de la garde par un module ordinaire (SERVER_PATTERN_PAGE_P0).
@@ -690,6 +704,21 @@ export default defineConfig([
     // par ce seul bloc sur tout fichier (eslint-rules/voyages-imports.mjs ; tests/unit/lint/voyages-imports-lint.test.ts).
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "ligne/voyages-imports": "error" },
+  },
+  {
+    // B9 (ticket 519 ; décisions 0081 B9-TL-1 point 3, 0087 § 1.6 et 0101 § 4) : `@/server/creation/*`,
+    // `@/server/generation/*`, `@/server/composition/generation` et `@/server/with-system-org` importables par les seuls
+    // fichiers nommés (dont `src/adapters/api-creation.ts`, dérogation de 0101 § 1). Règle propre au plugin, posée par ce
+    // seul bloc sur tout fichier (eslint-rules/creation-imports.mjs ; tests/unit/lint/creation-imports-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/creation-imports": "error" },
+  },
+  {
+    // B4a (spécification B4, B4a point 7 ; amendement de 0017 § 3.3 et 0020 § 11 écrit dans 0006) : route handlers et
+    // actions du paiement. Règle propre au plugin, posée par ce seul bloc sur tout fichier (eslint-rules/route-handlers.mjs ;
+    // tests/unit/lint/route-handlers-lint.test.ts).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "ligne/route-handlers": "error" },
   },
   {
     // P0r3c-4 (décisions 0009, points 1 et 2, et 0063, points 3 et 4) : directives `"use workflow"` et `"use step"` et

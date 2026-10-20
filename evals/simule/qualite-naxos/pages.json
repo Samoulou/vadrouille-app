@@ -1,0 +1,16 @@
+{
+  "dns": {
+    "ile-fabriquee.example": [
+      "45.10.20.30"
+    ]
+  },
+  "pages": {
+    "https://ile-fabriquee.example/grande-plage": {
+      "statut": 200,
+      "entetes": {
+        "Content-Type": "text/html; charset=utf-8"
+      },
+      "corps": "<!doctype html><html><head><title>Grande plage de sable</title></head><body><h1>Grande plage de sable</h1><p>Plage en accès libre. Transats à 10 € la journée. Très peu d'ombre : prendre un parasol.</p></body></html>"
+    }
+  }
+}

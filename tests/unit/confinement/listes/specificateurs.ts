@@ -43,6 +43,7 @@ const ZONES_DRIZZLE_B3B = [
   "src/tenancy/organisations.ts",
   "src/server/auth/index.ts",
   "src/server/with-org.ts",
+  "src/server/with-system-org.ts",
   "tests/db/with-org.test.ts",
   "tests/unit/auth/operations.test.ts",
 ];
@@ -103,13 +104,17 @@ export const SPECIFICATEURS = [
   // P0r3c-4 (ticket 316, décisions 0009 et 0063) : Workflow SDK, confiné à `src/workflows/` (et `workflow/next` à
   // `next.config.ts`) ; même confinement tenu par `ligne/workflow-directives`. Verdict Sécurité à rendre dans la PR.
   { specificateur: "workflow", zones: ["src/workflows/**", "next.config.ts", "tests/unit/workflows/**"] },
-  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1 et 4 ; liste de 0008) : deux sous-chemins **exacts** de
-  // `nodemailer` 10.0.16, sans capacité réseau : `MailComposer` (compilation de l'enveloppe) dans `src/server/mail/`,
-  // `addressparser` dans le seul test du critère E3. Ni `nodemailer`, ni `createTransport`, ni `smtp-connection`, ni
-  // `fetch` : le transport SMTP et le classement en module à capacité suivent dans la PR de `src/server/mail/smtp.ts`.
+  // B3b-envoi (ticket 435, spécification B3b-envoi, points 1, 3 et 4 ; liste de 0008 ; décision 0098 § 6) : trois lignes
+  // **exactes** pour `nodemailer` 10.0.16. `MailComposer` (compilation de l'enveloppe, sans capacité réseau) dans
+  // `src/server/mail/`, `addressparser` dans le seul test du critère E3, et la **racine du paquet** dans le seul
+  // `src/server/mail/smtp.ts`, pour `createTransport` seulement (module à capacité réseau : socket TCP vers l'hôte de
+  // la liste fermée de 0098 ; le chargement de la racine tire aussi le code du transport `sendmail`, que seule l'option
+  // `sendmail`, jamais passée, atteint : le test E2 de création du transport protège contre un ajout). Aucun autre
+  // sous-chemin (`smtp-connection`, `well-known`, `fetch`, `ses-transport`, `sendmail-transport`, `xoauth2`…).
   // Sécurité : dépendance conforme (lockfile, intégrité, aucun script), lignes exactes demandées par le bloquant 1 de
-  // la revue consolidée du head `1b3a97d` (PR 437).
+  // la revue consolidée du head `1b3a97d` (PR 437) ; ligne de `smtp.ts` : plafond accepté par la décision 0098 § 6.
   { specificateur: "nodemailer/lib/mail-composer", zones: ["src/server/mail/**"], sousChemins: "exacts" },
+  { specificateur: "nodemailer", zones: ["src/server/mail/smtp.ts"], sousChemins: "exacts" },
   { specificateur: "nodemailer/lib/addressparser", zones: ["tests/unit/server/email-ip.test.ts"], sousChemins: "exacts" },
   // Amendement A1 de 0038 : zone exacte de la ligne `typescript`.
   // P0r3c-3 (ticket 316) : `tests/unit/p0/composition.test.ts` lit les imports du dépôt sur l'arbre syntaxique (test « seule
@@ -140,6 +145,12 @@ const PORT_P0R1 =
 const COMPOSITION_P0R3C =
   "module de composition du mode réel (D18) : câblage seul, garde exigée (type `GardeOuverte`), contexte d'appel et périodes (D20) " +
   "du port de consommation ; P0r3c-3 (ticket 316), décision 0055, section 3 points 1 et 7, avis S-3 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)";
+const COMPOSITION_B8B =
+  "composition de la lecture des voyages (B8b, décision 0100 § 5) : câblage seul de la source de relectures, de la fabrique commune des " +
+  "clients Google, de `withOrg` et du forfait de relecture ; verdict Sécurité : attendu (0100 § 7 points 4 et 5)";
+const COMPOSITION_B9C =
+  "composition de la génération (B9c, décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8) : câblage seul des capacités à types neutres, du forfait, " +
+  "des fixtures d'Édimbourg de la variante simulée et des modules de capacité de la variante réelle ; verdict Sécurité : attendu";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -220,6 +231,17 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif:
       "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7a (ticket 423), décision 0077 § 1 et § 2 ; verdict Sécurité demandé (PR de B7a)",
+  })),
+  // B7b (ticket 524, décision 0096 § 2 et § 5) : traces de la couche IA, candidats maison et recherche de production,
+  // non chargés par `pnpm p0` ni par l'application (aucun importateur avant B9c), marqueur `server-only` seul.
+  // Verdict Sécurité demandé dans la PR de B7b.
+  ...["src/ai/traces.ts", "src/research/candidat-trouve.ts", "src/research/recherche.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA ou de la recherche de production, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7b (ticket 524), décision 0096 ; verdict Sécurité demandé (PR de B7b)",
   })),
   // B7c (ticket 449 ; spécification B7, B7c point 4) : harnais du jeu d'évaluation `evals/`, non chargé par `pnpm p0`
   // ni par l'application, marqueur `server-only` seul. Verdict Sécurité demandé dans la PR de B7c (PR 454).
@@ -320,6 +342,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "P0r3b (ticket 311), décision 0055, section 1 point 2 ; verdict Sécurité à rendre",
   },
   {
+    fichier: "src/server/env/payment.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
+      "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
+  },
+  {
     fichier: "src/adapters/prototype-ecriture.ts",
     specificateur: "server-only",
     noms: ["effet"],
@@ -363,9 +393,56 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"],
     motif: COMPOSITION_P0R3C,
   },
+  // B8b (décision 0100 § 5 ; verdict Sécurité attendu, § 7 points 4 et 5) : fabrique commune des clients Google et
+  // composition de la lecture. Câblage seul : marqueurs `server-only`, types et fabriques de `src/server`, aucune capacité
+  // directe hors des deux clients de `src/grounding` (fermeture du module de composition étendue à la fabrique).
+  { fichier: "src/server/composition/clients-google.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  {
+    fichier: "src/server/composition/clients-google.ts",
+    specificateur: "@/server/usage/port",
+    // B9c (revue de la PR #563, bloquant 3) : l'enveloppe de réservation des clients injectés (`envelopperClientsGoogle`) réserve
+    // par le même port que les clients réels (`avecReservation`, `demandeDe`, délai de requête) ; verdict Sécurité attendu.
+    noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:AppelFacture", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
+    motif: COMPOSITION_B8B,
+  },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/domain/relectures", noms: ["type:SourceRelectures"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/source", noms: ["creerSourceRelectures", "type:DependancesSource"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:Horloge"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/with-org", noms: ["executeurSql", "withOrg"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/env/relectures.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  // B9c (décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8 ; verdict Sécurité attendu) : composition de la génération, câblage seul.
+  // Les lignes que l'analyseur relève pour `generation.ts`, et rien d'autre : marqueur, types et fonctions pures de
+  // `src/server` et `src/domain`, et les cinq fixtures d'Édimbourg de la variante simulée (valeurs sentinelles).
+  { fichier: "src/server/composition/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/classement", noms: ["type:ParametresClassement"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/configuration", noms: ["type:ConfigurationMoteur"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/entrees", noms: ["type:CandidatMoteur", "type:NotesMoteur"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/relectures", noms: ["type:Relectures"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/squelette", noms: ["type:JourSquelette"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/ia", noms: ["CONFIGURATION_IA"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/generation", noms: ["COUTS_ESTIMES_MICROS", "MARGE_FICHES"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/planification", noms: ["preparerPlanification"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/positions-ecriture", noms: ["ecrirePositionsAbsentes", "type:FabriquePortPositions", "type:ResultatEcriturePositions"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/forfait", noms: ["type:Forfait"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/port", noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/reservation", noms: ["type:ReglesUsage"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B9C },
+  // Décision 0105 § 2 : les fixtures d'Édimbourg sont lues à l'exécution par un module séparé (aucun import de `prototype/`),
+  // atteint par `import()` dynamique depuis `generation.ts` après la barrière ; il refuse de lire sous `production`.
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:fs/promises", noms: ["readFile"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:path", noms: ["resolve"], motif: COMPOSITION_B9C },
+  // Mineur 7 de la revue du head `7b69742` : prédicat de déploiement partagé avec la barrière (fonction pure, aucune lecture d'environnement).
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "@/server/config/generation", noms: ["deploiementTraiteCommeProduction"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
-  ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
+  ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
     fichier,
     specificateur: "server-only",
     noms: ["effet"],

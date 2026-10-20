@@ -8,7 +8,7 @@ import {
   refineEventKind,
   refineNoCommitment,
 } from "./refinements";
-import { STOP_KINDS, WEEKDAYS } from "./values";
+import { STOP_KINDS, TRIP_ID_PATTERN, WEEKDAYS } from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -118,7 +118,8 @@ export type Stop = z.infer<typeof StopSchema>;
 
 export const SegmentSchema = z.strictObject({
   mode: z.enum(["walk", "transit", "car"]),
-  minutes: MinutesSchema,
+  /** `null` : temps indisponible (prototype seulement, décision 0092 § 4) ; le MVP ne produit jamais `null`. */
+  minutes: MinutesSchema.nullable(),
   /** Affiche « (estimation) ». */
   estimated: z.boolean(),
 });
@@ -158,7 +159,7 @@ export type DayLineItem = z.infer<typeof DayLineItemSchema>;
 
 /**
  * Idée « Surprends-moi » d'un jour (décision 0015 § 3) : hors programme, choisie côté serveur
- * (sélection de B6). Justification et source obligatoires : une idée sans source n'existe pas
+ * par la génération (`ideeDuJour` de B5b, B9 ; décision 0086 § 3, question 3) et lue telle que stockée. Justification et source obligatoires : une idée sans source n'existe pas
  * (principe produit 2). Seul `placeId` peut venir de Google ; `name` suit la règle de `Stop.name`.
  */
 export const SurpriseIdeaSchema = z.strictObject({
@@ -186,8 +187,11 @@ export const DaySchema = z.strictObject({
   /** Événements du jour seulement. */
   events: z.array(EventStopSchema),
   generating: z.boolean(),
-  /** Total des trajets du jour, hors excursion. */
-  travelMinutes: MinutesSchema,
+  /**
+   * Total des trajets du jour, hors excursion. `null` : total indisponible, un trajet du jour est sans durée
+   * (prototype seulement, décision 0092 § 4) ; le MVP ne produit jamais `null`.
+   */
+  travelMinutes: MinutesSchema.nullable(),
   /** Budget du rythme choisi, fourni par les données (à calibrer, Q8). */
   travelBudgetMinutes: MinutesSchema,
   /** Idée « Surprends-moi » du jour, facultative (décision 0015 § 3) : ajout au handover § 9, signalé. */
@@ -221,6 +225,19 @@ export const ChecklistItemSchema = z.strictObject({
   stopId: TextSchema.optional(),
 });
 export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
+
+/**
+ * Coche ou décoche une ligne « À faire » (handover § 4, écran 11 ; décision 0086 § 2.2 point 2, créé par B6b au lieu
+ * de B11) : état final, rejouer donne le même résultat. Objet strict : aucun `organizationId` ni `userId` (le contexte
+ * vient de la session). `tripId` suit `TRIP_ID_PATTERN` ; un identifiant qui n'est pas un `uuid` est traité comme
+ * inconnu par le serveur (`not_found`, B6-PO-11).
+ */
+export const ChecklistUpdateSchema = z.strictObject({
+  tripId: z.string().regex(TRIP_ID_PATTERN),
+  itemId: TextSchema,
+  done: z.boolean(),
+});
+export type ChecklistUpdate = z.infer<typeof ChecklistUpdateSchema>;
 
 /**
  * Voyage, objet strict **non raffiné** : base des dérivations (`TripSummarySchema`, `TripSnapshotSchema`, forme

@@ -268,7 +268,7 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     const raisons = await chrono("raisons", async () => {
       const resultat = new Map<string, Raison>();
       for (const lot of enLots(lieuxRetenus, configuration.recherche.tailleLotNotation)) {
-        const reponse = await modeles.envoyer(requeteRaisons(entreeIa, lot.map(lieuRetenuDepuisCandidat), choisis.raisons, routage, complement));
+        const reponse = await modeles.envoyer(requeteRaisons(entreeIa, lot.map((candidat) => lieuRetenuDepuisCandidat(candidat)), choisis.raisons, routage, complement));
         const lecture = lireRaisons(reponse.texte, new Set(lot.map((candidat) => candidat.id)));
         sortiesRefusees.raisons += lecture.refuses;
         for (const [id, valeur] of lecture.valeur) resultat.set(id, valeur);
@@ -383,6 +383,14 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       candidatsRetenus: retenus,
       propositions,
       jours,
+    },
+    // Amendement 3 (P0S2-PO-25) : compteurs de la sortie de l'agent, avant tout ancrage ; des nombres, aucun nom.
+    qualite: {
+      secteursPlan: agent?.qualite.secteursPlan ?? 0,
+      incontournablesPlan: agent?.qualite.incontournablesPlan ?? 0,
+      incontournableSansCandidat: agent?.qualite.incontournableSansCandidat ?? 0,
+      candidatRegroupe: agent?.qualite.candidatRegroupe ?? 0,
+      secteurInconnu: agent?.qualite.secteurInconnu ?? 0,
     },
     partSourcesLocalesOuIndependantes: candidats.length === 0 ? 0 : locales / candidats.length,
     violations,

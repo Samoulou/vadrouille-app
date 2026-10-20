@@ -6,6 +6,7 @@ import {
   ADULTS,
   CategorySchema,
   CHILDREN,
+  CITY_NAME_LENGTH,
   DESTINATION_LENGTH,
   IsoDateSchema,
   MEAL_BUDGET_CHF,
@@ -29,8 +30,47 @@ import { CANDIDAT_ID_PATTERN, LONGUEURS_TEXTE, texteMaison } from "@/ai/candidat
 
 const sansDoublon = <T>(valeurs: readonly T[]) => new Set(valeurs).size === valeurs.length;
 
-/** Texte de lieu saisi (destination, ville, pays) : une ligne, Unicode imprimable, sans balise ni URL. */
+/** Texte de lieu de P0 (`pays`, hors contrat) : une ligne, Unicode imprimable, sans balise ni URL (règle des sorties). */
 const lieu = (max: number) => texteMaison(max);
+
+/**
+ * Valeur de lieu saisie passée au modèle (décision 0096 § 4.2 point 1) : la valeur **rognée**, puis normalisée. Fonction
+ * pure unique, qui ne peut qu'enlever ou remplacer par une espace (la borne maximale du contrat ne peut donc pas être
+ * dépassée) :
+ * - caractères de contrôle C0 et C1 (`\p{Cc}`, tabulation et retours à la ligne compris) et séparateurs de ligne et de
+ *   paragraphe U+2028 et U+2029 : remplacés par une espace ;
+ * - tout caractère de format `\p{Cf}` **retiré**, sauf U+200C et U+200D (indispensables en persan et dans les écritures
+ *   indiennes) : même classe que `nettoyerRequeteWeb` (contrôles de direction, U+200B, U+2060 à U+2064, U+00AD, U+180E,
+ *   U+206A à U+206F, U+FEFF, U+FFF9 à U+FFFB, balises U+E0000 à U+E007F) ;
+ * - sélecteurs de variation U+FE00 à U+FE0F et U+E0100 à U+E01EF **retirés** (invisibles, sans valeur dans un nom de
+ *   lieu saisi, et ils servent à cacher du texte à la relecture) ;
+ * - puis rognée de nouveau.
+ * La saisie est protégée par sa mise en forme (cette fonction, puis `encadrer`), pas par un refus : `<`, `>`, les formes
+ * d'URL et les noms de domaine restent admis ici, comme dans le contrat (« St. Gallen », « booking.com »).
+ */
+export function normaliserLieu(valeur: string): string {
+  return valeur
+    .trim()
+    .replace(/[\p{Cc}\u2028\u2029]/gu, " ")
+    .replace(/(?![\u200C\u200D])\p{Cf}/gu, "")
+    .replace(/[\uFE00-\uFE0F\u{E0100}-\u{E01EF}]/gu, "")
+    .trim();
+}
+
+/**
+ * Lieu saisi (`destination`, `ville`) : **le verdict du contrat** (`z.string().trim()` borné, aucune seconde copie des
+ * bornes), puis la valeur normalisée (`normaliserLieu`). Exception déclarée à « verdict identique à celui du contrat » :
+ * une valeur que le contrat accepte mais dont il ne reste rien d'utilisable après normalisation (moins que la borne
+ * minimale : `"\u200B\u200B"`, `"a\u202E"`, des contrôles) est refusée `invalid_input`.
+ */
+const lieuSaisi = (bornes: { readonly min: number; readonly max: number }) =>
+  z
+    .string()
+    .trim()
+    .min(bornes.min)
+    .max(bornes.max)
+    .transform(normaliserLieu)
+    .pipe(z.string().min(bornes.min).max(bornes.max));
 
 /**
  * Entrée des étapes `plan`, `recherche`, `notation` et `raisons` (B7-PO-1) : destination et dates **d'une** ville,
@@ -39,7 +79,7 @@ const lieu = (max: number) => texteMaison(max);
  */
 export const EntreeModelesSchema = z
   .strictObject({
-    destination: lieu(DESTINATION_LENGTH.max),
+    destination: lieuSaisi(DESTINATION_LENGTH),
     pays: lieu(60).optional(),
     arrivee: IsoDateSchema,
     depart: IsoDateSchema,
@@ -83,10 +123,17 @@ export type CandidatPourModele = z.infer<typeof CandidatPourModeleSchema>;
 /** Nom d'hôte d'une source (`exemple.org`) : lettres, chiffres, tirets et points seulement. */
 const DOMAINE_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/;
 
-/** Lieu retenu passé à l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source (P0, étape 9). */
+/**
+ * Lieu retenu passé à l'étape `raisons` : le candidat vu par le modèle et le domaine de sa source (P0, étape 9) ; depuis
+ * la version 2 du prompt (P0S2-PO-21), et quand l'appelant les connaît, le **secteur maison** du plan (60 caractères au
+ * plus, limite de `StopFacts.area`) et `incontournable` (le lieu est un incontournable du plan). Jamais un prix, un
+ * horaire, un conseil ni une donnée Google.
+ */
 export const LieuRetenuSchema = z.strictObject({
   ...CandidatPourModeleSchema.shape,
   sourceDomaine: z.string().min(1).max(253).regex(DOMAINE_PATTERN),
+  secteur: texteMaison(LONGUEURS_TEXTE.secteur).optional(),
+  incontournable: z.literal(true).optional(),
 });
 export type LieuRetenu = z.infer<typeof LieuRetenuSchema>;
 
@@ -95,7 +142,7 @@ export type LieuRetenu = z.infer<typeof LieuRetenuSchema>;
  * contrat** `LodgingRequest` (ni voyageurs, ni rythme, ni envies : question 12 de la spécification B7).
  */
 export const EntreeQuartierSchema = z
-  .strictObject({ ville: lieu(DESTINATION_LENGTH.max), debut: IsoDateSchema, fin: IsoDateSchema })
+  .strictObject({ ville: lieuSaisi(CITY_NAME_LENGTH), debut: IsoDateSchema, fin: IsoDateSchema })
   .superRefine((entree, ctx) => {
     if (entree.fin < entree.debut) ctx.addIssue({ code: "custom", path: ["fin"], message: "fin avant le début" });
   });

@@ -1,41 +1,35 @@
-# État du studio — 2026-10-18 (100e cycle)
+# État du studio — 2026-10-20 (119e cycle)
 
-Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 3 heures (routine « Vadrouille - Cycle (projet) », 7 */3 * * * UTC), au plus 3 fils en parallèle · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 16 sur 20) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
+Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (cycle 17 sur 20 de la nouvelle feuille, cycles 103 à 122) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 13:13 UTC : report `main` → `p0-reel` (#492) **fusionné par Samuel** (remplissage du séjour, Routes 840).
-- 13:21 et 13:30 UTC : deux exécutions comptées rome-1/B arrêtées en `pipeline_failed` dans l'étape finale (la première partie sur l'ancien déploiement avant la fin du report, la seconde sur `efc0994`) ; diagnostic `/mnt/project-files/essai-reel/diagnostic-rome-2.md` (lecture de la matrice Routes trop stricte, cause probable) ; ticket #493.
-- 13:50 UTC : carte de décision, **« Ne pas compter »** ces deux exécutions (Q495) : décision 0089 (#494) **fusionnée**.
-- 14:18 UTC : « Pourquoi Google ne donne pas de trajet » : répondu (paires sans trajet en transports en commun, réponse rejetée en entier par notre lecture).
-- #studio : aucun message nouveau.
+- 2026-10-20 16:59 UTC : « On en est où ? […] je vois rien ». Réponse honnête : rien de nouveau n'était visible dans l'appli depuis la veille ; restes listés ; priorité désormais à ce qui se voit dans l'appli (B9e passe avant B9d).
+- 2026-10-20 17:01 et 17:31 UTC : `db-migrate` lancé par Samuel. Premier lancement refusé (commit attendu dépassé, `main` avait bougé, rien appliqué) ; second réussi (run 39466766844) : **0011 et 0012 appliquées** à la base d'essai. Fusions gelées entre-temps.
 
 ## Fait
-- Fusionnées : **remplissage du séjour** (#490, décision 0088 ; Routes 840), statut du 99e cycle (#491), **décision 0089** (#494), report `main` → `p0-reel` (#492, par Samuel).
-- #489 (amendement 3, qualité du programme) : correction 2 et correction de fait nouveau (#490 fusionnée) poussées ; revue : un seul bloquant tardif (500 → 840, l. 196).
+- Fusionnées : **B9c** (#563, aperçu : workflows 1, 2 et 3), **B9c-suite** (#581, « Réessayer » reprend les recherches), **B6b** (#576, lecture réelle des séjours et journées, décision 0108), **Q-L2a** (#578, candidat enrichi et table `run_secteurs`, migration 0013 non approuvée), test d'invariant de B9c rendu déterministe (#579), statut du 118e cycle (#577).
+- **Migrations 0011 et 0012 appliquées** à la base d'essai (Samuel, `db-migrate`).
+- **Report `main` → `p0-reel`** : PR #580 ouverte (Release) ; à fusionner par Samuel (« Create a merge commit »).
 
 ## En cours
-- tech-lead : **décision 0090** (lecture de la matrice Routes paire par paire, bloquant 2 de la revue de #495) ; puis ia-recherche : description de #495 réécrite (écrasée par erreur par celle de #494) et mineurs. Verdict Sécurité S4 sur `p0.step_failed` : favorable.
-- product-owner : #489, bloquant tardif (non compté).
-- #484 et #486 : `needs-review` après 15:23 UTC (fin du délai de 0087).
+- backend : **B4a** (#582), correction 1 : webhook (400 avant toute dépendance), écarts 1 et 3 écrits, mineurs.
+- backend : **B9e** (#583), branchement sur préversion : parcours écrans 1 à 5, « Mes voyages » et Séjour sur vraies données, bout en bout simulé.
+- product-owner : **spécification B10** (#584), « J'aime / Pas pour moi » et préférences.
 
 ## Bloqué
-- **Relance de Rome par Samuel** : après la fusion de #495, report `main` → `p0-reel`, annonce « p0-reel prêt, commit … » ; relance en « Essai d'intégration » (ne compte pas).
-- **B9b** : après #484 (mêmes fichiers d'adaptateur de création) ; noms de colonnes posés par le rôle data dans sa migration (0087 § 1.2, Q492).
-- **B4a** et **B8b** : jamais dans le même cycle que B9b (0078) ; à placer.
-- **B3b-envoi, suite** (#435) : P5 de la Sécurité pour `SMTP_URL`.
-- **B9c** après #481 ; B9d : verdict Sécurité (Q492) ; B9c réel : Q468 ; B9e : Q467.
-- **Purge du MVP** : activation Q438 (Samuel).
-- **`coords-purge`** : en échec à ses trois premiers runs (note de version v2026.10.18-09) ; cause à analyser avant que des positions atteignent 30 jours (0027) : ticket à ouvrir.
+- **Voyages de Rome sur la page d'essai** : fusion de #580 par Samuel.
+- **B9d** (voyage complet) : après B4a. **B9c-graphe** (#574) : après B4a (même fichier `tests/unit/p0/imports.test.ts`).
+- **Migration 0013** : PR d'approbation (`MIGRATIONS_APPROUVEES`), Q534.
+- **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI sur la colonne « relances » ; A2-c (plafonds Places) seulement si Samuel le décide (Q525).
+- **Purge du MVP et `coords-purge`** (#527) : Q438.
 
 ## Prochain cycle
-1. Après #495 : report `main` → `p0-reel` ; Samuel relance rome-1 en « Essai d'intégration » seulement après l'annonce du commit prêt.
-2. `needs-review` sur #484 et #486.
-3. Après #484 : B9b (backend avec data) ; B4a dans un autre cycle ; ticket Q493 (compteurs de fin d'essai).
-4. Code de l'amendement 3 (#489) après sa fusion.
-5. Tickets à placer : `coords-purge` en échec, relecture des trajets en rafales (429 Google, voir le diagnostic Rome 2), commit affiché sur la page d'essai, police servie localement (Q484), mineurs de B8a, page de jugement de P0r4, refus de lancement si la purge a plus de 24 h, appels Google dans le rapport d'essai, adaptateur Resend, message « accès expiré », mineurs de B8c et erratum de 0060 (Q477), purge de rétention de `verifications.identifier`, PR de décision sur 0007.
+1. B9e puis B4a jusqu'à la fusion ; B9c-graphe, puis B9d.
+2. Spécification B10, puis son code.
+3. Samuel : fusionner #580 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
 
 ## Décisions attendues de Samuel
-- **Réponses demandées** : aucune pour l'instant (Q39, Q45, Q465 et Q491 répondues le 2026-10-18).
+- **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
 - **Rappel** : Q438 (extension de Q321 et Q322 à la purge du MVP, avec les actions à 18 h ajoutées par la correction 1 de 0060) ; B8c est fusionnée, la purge attend cette réponse pour être activée.
 - **Rappel aussi** : Q420 (coller les étapes 7, 7 bis et 8 dans la routine R1, #307).
 - **Déjà posées** : Q410, Q401, Q397, Q394, Q378, Q263, Q353, Q345, Q332, Q323, Q317, Q296, Q297, Q288, P0c-Q2.
@@ -54,7 +48,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q493.
+- Q534 à Q537 ; Q509 et Q533 mises à jour.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).

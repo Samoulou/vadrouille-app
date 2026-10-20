@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "id": "naxos-eval",
+  "type": "qualite",
+  "cas": "Amendement 3 de P0 (P0S2-PO-28, cas 2) : destination non monumentale fabriquée, incontournables hors patrimoine",
+  "simulation": "qualite-naxos",
+  "demande": {
+    "story": "Une semaine de nature : plages, villages de montagne à pied et produits locaux, avec une voiture.",
+    "trip": {
+      "destination": "Naxos",
+      "start": "2027-05-24",
+      "end": "2027-05-28",
+      "otherCities": []
+    }
+  },
+  "entree": {
+    "destination": "Naxos",
+    "pays": "Grèce",
+    "arrivee": "2027-05-24",
+    "depart": "2027-05-28",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "balanced",
+    "envies": [
+      "nature",
+      "walk",
+      "tasting",
+      "restaurant"
+    ],
+    "deplacements": [
+      "walk",
+      "car"
+    ],
+    "budgetRepas": 2
+  },
+  "attentes": {
+    "categories": [
+      "nature",
+      "walk",
+      "tasting",
+      "restaurant"
+    ],
+    "incontournables": [
+      "Grande plage de sable",
+      "Belvédère du couchant",
+      "Village de marbre à arpenter",
+      "Fromagerie du plateau"
+    ]
+  }
+}

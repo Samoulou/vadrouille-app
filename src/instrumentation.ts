@@ -20,6 +20,13 @@
  * contexte de session (`getServerRequestContext()`) sont branchés sur l'adaptateur `better-auth`
  * (`brancherConnexionReelle`) ; rien n'est lu ni connecté ici (pools créés au premier appel). Un échec du branchement
  * est journalisé sans arrêter le serveur : la connexion reste fermée (`provider_error`, page d'erreur).
+ *
+ * B6b (spécification B6, B6b point 1 ; décisions 0086 § 2.1 et 0100 § 5.4, amendée par 0108) : environnement valide et `DATA_ADAPTER=api`,
+ * la fabrique de l'adaptateur `api` (cas d'usage de B6a sur la source de relectures choisie par
+ * `choisirSourceRelectures` : le double de la requête, ou la source réelle de B8b en `local` avec
+ * `RELECTURES_SOURCE=google`) est branchée sur `src/adapters/api-instance.ts` ; rien n'est lu ni connecté ici, et la
+ * garde (`assertApiAdapter`) reste vérifiée à chaque `getTripAdapter("api")`. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement`) sans arrêter le serveur : chaque lecture rejette (page d'erreur).
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -31,6 +38,7 @@ export async function register(): Promise<void> {
       assertServerProcessEnv(process.env);
       await brancherLecturePrototype(logEvent, errorNameOf);
       await brancherConnexion(logEvent, errorNameOf);
+      await brancherLectureApi(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -74,5 +82,23 @@ async function brancherConnexion(
     brancherConnexionReelle({ operations: authOperations, limiter: checkRateLimit, contexte: getServerRequestContext });
   } catch (error) {
     logEvent("auth.operation_failed", { action: "branchement", errorName: errorNameOf(error) }, "error");
+  }
+}
+
+/** Branche la fabrique de l'adaptateur `api` (spécification B6, B6b point 1). */
+async function brancherLectureApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherLectureVoyages } = await import("@/adapters/api-instance");
+    const { createApiTripAdapter } = await import("@/adapters/api");
+    const { choisirSourceRelectures } = await import("@/server/composition/lecture");
+    brancherLectureVoyages((double) => createApiTripAdapter({ relectures: choisirSourceRelectures(double) }));
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }

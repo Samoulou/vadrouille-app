@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "variante": "b",
+  "zdr": {
+    "structuration": true
+  },
+  "profils": {
+    "apercu": {
+      "ciblesParCreneau": {
+        "activity": 8,
+        "meal": 8,
+        "evening": 2
+      },
+      "totalCandidats": 18,
+      "toursMax": 3,
+      "delaiMs": 30000
+    },
+    "complet": {
+      "delaiMs": 300000
+    },
+    "mini": {
+      "cible": 6,
+      "totalCandidats": 6,
+      "toursMax": 2,
+      "delaiMs": 20000,
+      "logements": {
+        "cible": 3,
+        "recherchesWeb": 2
+      }
+    }
+  }
+}

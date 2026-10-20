@@ -545,3 +545,14 @@ describe("p0: fiche introuvable écartée en mode réel", () => {
     expect((viaP0 as ErreurAncrage).code).toBe("lodging_unresolved");
   });
 });
+
+describe("places: horaires qui passent minuit (B8-PO-17)", () => {
+  it("vendredi 22 h – samedi 2 h : fin 1 440 et finLendemain 120 ; deux minuits ou plus : coupée à 1 440, sans lendemain", async () => {
+    const { client } = monter([
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { day: 5, hour: 22, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }] } }),
+      async () => json({ ...DETAILS, regularOpeningHours: { periods: [{ open: { day: 5, hour: 22, minute: 0 }, close: { day: 0, hour: 2, minute: 0 } }] } }),
+    ]);
+    expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440, finLendemain: 120 }]);
+    expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440 }]);
+  });
+});

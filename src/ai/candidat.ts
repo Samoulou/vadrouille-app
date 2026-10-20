@@ -15,8 +15,12 @@ import { z } from "zod";
 export const TYPES_CRENEAU = ["activity", "meal", "evening"] as const;
 export type TypeCreneau = (typeof TYPES_CRENEAU)[number];
 
-/** Longueurs maximales des textes produits par un modèle (B7-PO-8). */
-export const LONGUEURS_TEXTE = { nom: 80, resume: 300, raison: 280, requete: 200 } as const;
+/**
+ * Longueurs maximales des textes produits par un modèle (B7-PO-8) ; secteur, incontournable et infos pratiques du
+ * candidat enrichi (décision 0094 § 1 point 2 : écrites ici une seule fois pour `src/ai`, d'où `LONGUEURS_PLAN` et
+ * `LONGUEURS_INFOS` de `sorties.ts` sont dérivées).
+ */
+export const LONGUEURS_TEXTE = { nom: 80, resume: 300, raison: 280, requete: 200, secteur: 60, incontournable: 80, prix: 60, horaires: 120, conseil: 160 } as const;
 
 /** Identifiant interne d'un candidat, attribué par le code (jamais par le modèle). */
 export const CANDIDAT_ID_PATTERN = /^c_\d{3}$/;

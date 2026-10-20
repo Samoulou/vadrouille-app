@@ -12,12 +12,14 @@ import {
 } from "@/adapters/better-auth";
 import { RATE_LIMITS, type RateLimitConfig } from "@/server/config/limites";
 import { disabledCodeMailer } from "@/server/mail/disabled";
+import { createSmtpCodeMailer } from "@/server/mail/smtp";
 import { createRateLimiter } from "@/server/rate-limit";
 
 import { createDatabase } from "../../db/index";
 import { executerContratAuth } from "../support/auth-contrat";
 import { type Banc, connecter, identifiant, preparerBanc } from "./auth-outils";
 import { closeAll, connect, type DbClient, unique } from "./helpers";
+import { attendreMessages, dernierCodeMailpit, MAILPIT_SMTP } from "./mailpit";
 
 /**
  * Adaptateur `better-auth` et actions de `compte.ts` sur la base réelle (spécification B3, B3c ; critères C1 à C6).
@@ -106,6 +108,40 @@ describe("contrat auth : better-auth", () => {
         await auth.query("UPDATE verifications SET expires_at = now() - interval '1 second' WHERE identifier = $1", [`sign-in-otp-${email}`]);
       },
     });
+  });
+});
+
+describe("contrat auth : better-auth avec l'implémentation SMTP (Mailpit)", () => {
+  it("adaptateurs: better-auth passe la même suite de contrat auth, code lu par l'API de Mailpit (critère E8)", async () => {
+    const b = banc({ port: createSmtpCodeMailer(MAILPIT_SMTP) });
+    const limiteur = limiteurPropre("contrat-smtp");
+    let ip = ipDocumentation();
+    const adapter = createBetterAuthAdapter({
+      operations: () => b.operations,
+      headers: () => b.enTetes({ [ENTETE]: ip }),
+      limiter: limiteur.check,
+    });
+    expect(adapter.mode).toBe("real");
+    await executerContratAuth({
+      adapter,
+      adresse: () => {
+        ip = ipDocumentation();
+        return `b3e8-${unique()}@exemple.test`;
+      },
+      code: (email) => dernierCodeMailpit(email),
+      expirer: async (email) => {
+        await auth.query("UPDATE verifications SET expires_at = now() - interval '1 second' WHERE identifier = $1", [`sign-in-otp-${email}`]);
+      },
+    });
+    // Le message respecte B3b-envoi-PO-1 : code de 6 chiffres, durée, phrase de sécurité, aucun lien, aucune image.
+    const email = `b3e8-${unique()}@exemple.test`;
+    expect(await adapter.requestCode({ email })).toEqual({ ok: true, value: { sent: true } });
+    const [message] = await attendreMessages(email);
+    expect(message?.text).toMatch(/[0-9]{6}/);
+    expect(message?.text).toContain("10 minutes");
+    expect(message?.text).toContain("Si tu n'as rien demandé, ignore ce message.");
+    expect(`${message?.text}\n${message?.html}`).not.toMatch(/https?:|www\.|<a |<img/i);
+    expect(message?.to).toEqual([email]);
   });
 });
 

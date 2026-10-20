@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { DEBUT_DONNEES } from "@/ai/requetes";
-import { lireTour } from "@/ai/sorties";
+import { lirePlan, lireTour, PLAN_VIDE, type PlanRecherche } from "@/ai/sorties";
 import type { EntreeNotation, NoterCandidats } from "@/ai/noter-candidats";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
@@ -15,7 +15,7 @@ import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import type { Brief } from "@/prototype/brief";
 import { LONGUEURS_TEXTE } from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
-import { FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
+import { exemptionDuPlan, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
 import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/ai/recherche-web";
 import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
@@ -51,6 +51,15 @@ const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
  */
 const RELECTEUR_REEL = "src/server/p0/relecture.ts";
 const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RELECTEUR_REEL];
+/**
+ * Fabrique commune des clients Google (B8b, décision 0100 § 5.2, qui amende 0081 B9-TL-2 point 1) : seul importateur des
+ * modules de capacité Google (`places-client.ts`, `routes-client.ts`) hors de la composition du prototype, importée par la
+ * composition de la lecture (`lecture.ts`) et, quand elle existera, par celle de la génération (`generation.ts`, B9c).
+ */
+const CLIENTS_GOOGLE = "src/server/composition/clients-google.ts";
+const COMPOSITION_LECTURE = "src/server/composition/lecture.ts";
+const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [COMPOSITION_LECTURE, "src/server/composition/generation.ts"];
+const CAPACITES_GOOGLE = ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"];
 
 /**
  * Fichiers exemptés : les fichiers de test (`*.test.*`, `*.spec.*`) et les supports de test (`tests/support/`) seulement
@@ -161,6 +170,7 @@ function atteints(depot: Depot, depart: string): Set<string> {
   return vus;
 }
 
+const COMPOSITION_GENERATION = "src/server/composition/generation.ts";
 const lireDepot = (fichier: string) => readFileSync(path.join(RACINE, fichier), "utf8");
 /** Fichiers de configuration de la racine (`*.config.ts`, `*.mjs`…), analysés comme le reste du dépôt (mineur 10). */
 const racine = () => readdirSync(RACINE).filter((nom) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(nom) && !nom.endsWith(".d.ts") && statSync(path.join(RACINE, nom)).isFile());
@@ -191,12 +201,55 @@ describe("p0: modules de capacité importés par la seule composition", () => {
   });
 
   it("hors des tests, seul src/server/composition/p0-reel.ts importe un module de capacité ; aucun import() calculé", () => {
-    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION])).toEqual([]);
+    expect(violationsCapacite(DEPOT, MODULES_CAPACITE, [COMPOSITION, CLIENTS_GOOGLE, COMPOSITION_GENERATION])).toEqual([]);
     // La composition importe bien les quatre modules (le test porte sur un cas réel).
     const directs = aretesDe(COMPOSITION, lireDepot(COMPOSITION)).map((a) => resoudre(COMPOSITION, a.specificateur));
     for (const capacite of MODULES_CAPACITE) expect(directs).toContainEqual({ type: "projet", chemin: capacite });
   });
 
+  it("composition: la fabrique des clients Google est le seul importateur des modules de capacité Google (hors la composition du prototype)", () => {
+    // Hors des tests : la fabrique et la composition du prototype sont les deux seuls importateurs de `places-client` et `routes-client`.
+    for (const capacite of CAPACITES_GOOGLE) {
+      expect(importateurs(DEPOT, capacite), capacite).toEqual([COMPOSITION, CLIENTS_GOOGLE].sort());
+    }
+    // La fabrique importe ces deux modules et aucun autre module de capacité (ni modèles, ni transport undici).
+    const directs = aretesDe(CLIENTS_GOOGLE, lireDepot(CLIENTS_GOOGLE)).map((a) => resoudre(CLIENTS_GOOGLE, a.specificateur));
+    for (const capacite of MODULES_CAPACITE) {
+      expect(directs.some((c) => c.type === "projet" && c.chemin === capacite), capacite).toBe(CAPACITES_GOOGLE.includes(capacite));
+    }
+    // Elle est importée par la composition de la lecture seule (B9c y ajoutera `generation.ts`), qui n'importe aucun module de capacité.
+    expect(importateurs(DEPOT, CLIENTS_GOOGLE).filter((f) => !IMPORTATEURS_CLIENTS_GOOGLE.includes(f))).toEqual([]);
+    expect(importateurs(DEPOT, CLIENTS_GOOGLE)).toContain(COMPOSITION_LECTURE);
+    const lecture = aretesDe(COMPOSITION_LECTURE, lireDepot(COMPOSITION_LECTURE)).map((a) => resoudre(COMPOSITION_LECTURE, a.specificateur));
+    for (const capacite of MODULES_CAPACITE) expect(lecture).not.toContainEqual({ type: "projet", chemin: capacite });
+    // Ni la fabrique, ni la composition de la lecture ne sont atteintes depuis une page, une action ou un composant client.
+    for (const cible of [CLIENTS_GOOGLE, COMPOSITION_LECTURE]) {
+      for (const interdit of ["src/app/", "src/features/", "src/components/", "src/server/actions/", "src/server/voyages/", "src/server/composition/p0-reel.ts"]) {
+        expect(importateurs(DEPOT, cible).some((f) => f.startsWith(interdit)), `${cible} ← ${interdit}`).toBe(false);
+      }
+    }
+  });
+
+  it("composition: la composition de la lecture n'est importée que par src/instrumentation.ts (décision 0108)", () => {
+    // 0108 (amende 0100 § 5.2 et § 5.4) : hors des tests, le seul branchement au démarrage (`import()`) l'importe,
+    // jamais `src/adapters/index.ts`.
+    expect(importateurs(DEPOT, COMPOSITION_LECTURE)).toEqual(["src/instrumentation.ts"]);
+  });
+
+  it("composition: cas négatifs de la fabrique des clients Google (import direct d'un module de capacité, import par un autre module)", () => {
+    const depot = depotFictif({
+      "src/server/composition/clients-google.ts": 'import { a } from "@/capacite";\n',
+      "src/server/composition/lecture.ts": 'import { f } from "@/server/composition/clients-google";\n',
+      "src/server/relecture/source.ts": 'import { a } from "@/capacite";\n',
+      "src/server/voyages/lecture.ts": 'import { f } from "@/server/composition/clients-google";\n',
+      "src/capacite.ts": "export const a = 1;\n",
+    });
+    expect(violationsCapacite(depot, ["src/capacite.ts"], ["src/server/composition/clients-google.ts"])).toEqual(["src/server/relecture/source.ts → src/capacite.ts"]);
+    expect(importateurs(depot, CLIENTS_GOOGLE).filter((f) => !IMPORTATEURS_CLIENTS_GOOGLE.includes(f))).toEqual(["src/server/voyages/lecture.ts"]);
+  });
+
+  // `src/instrumentation.ts` importe aussi la composition de la lecture (`lecture.ts`, décision 0108), contrôlée plus haut :
+  // ce test-ci ne vise que la composition du prototype (`p0-reel.ts`).
   it(`seuls ${IMPORTATEURS_COMPOSITION.join(" et ")} peuvent importer la composition ; le relecteur, par l'instrumentation seule`, () => {
     const trouves = importateurs(DEPOT, COMPOSITION);
     expect(trouves.filter((f) => !IMPORTATEURS_COMPOSITION.includes(f))).toEqual([]);
@@ -302,7 +355,9 @@ describe("p0: séparation des capacités de la composition (types)", () => {
 
   it("rédaction des raisons : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
     expectTypeOf<keyof EntreeRaisons>().toEqualTypeOf<"entree" | "retenus" | "complement">();
-    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<"id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine">();
+    expectTypeOf<keyof EntreeRaisons["retenus"][number]>().toEqualTypeOf<
+      "id" | "nom" | "resume" | "categorie" | "typeEtape" | "sourceDomaine" | "secteur" | "incontournable"
+    >();
     type Lieu = EntreeRaisons["retenus"][number];
     // Aucun champ d'ancrage, de fiche ni de trajet dans ce qu'un prompt peut recevoir.
     expectTypeOf<Lieu>().not.toHaveProperty("placeId");
@@ -406,7 +461,7 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const { composition, appels, port } = monter([async () => reponseModele({ content: '{"ok":true}' })]);
     const agent = composition.agent();
     expect(Object.keys(agent).sort()).toEqual(["modeles", "pages", "rechercheWeb"]);
-    expect(await agent.modeles.envoyer(requete)).toEqual({ texte: '{"ok":true}', coutUsd: 0.003, fin: "stop" });
+    expect(await agent.modeles.envoyer(requete)).toEqual({ texte: '{"ok":true}', coutUsd: 0.003, fin: "stop", tokens: { entree: 10, sortie: 5 } });
     expect(appels).toHaveLength(1);
     const { url, init } = appels[0] as Appel;
     expect(new URL(url).protocol).toBe("https:");
@@ -585,7 +640,121 @@ describe("p0: requête de recherche web, aucune donnée de logement ni texte lib
     ["cyrillique, quartier", "Гостиница Метрополь, Тверской район", "бары тверской"],
     ["lettres hors ASCII conservées", "Kærlighed Søndergade", "brunch søndergade"],
   ])("logement, %s : requête refusée", (_cas, logement, requete) => {
-    expect(requeteSansDonneeDuBrief(requete, avec({ logements: [{ texte: logement, nuits: 5 }] }))).toBe(false);
+    const brief = avec({ logements: [{ texte: logement, nuits: 5 }] });
+    expect(requeteSansDonneeDuBrief(requete, brief)).toBe(false);
+    // Verdict 0103, question 4 : restent refusées avec un plan validé qui ne contient pas le mot (et avec le plan vide).
+    expect(requeteSansDonneeDuBrief(requete, brief, exemptionDuPlan(PLAN_SANS_LE_MOT, [brief]))).toBe(false);
+    expect(requeteSansDonneeDuBrief(requete, brief, exemptionDuPlan(PLAN_VIDE, [brief]))).toBe(false);
+  });
+
+  // --- Verdict de la Sécurité 0103, question 4 : mot du logement qui est aussi un nom du plan validé ----------------------
+  const secteur = (nom: string, incontournables: string[] = [], voisins: string[] = []) => ({ nom, raison: "Secteur maison.", voisins, incontournables });
+  const PLAN_SANS_LE_MOT: PlanRecherche = { secteurs: [secteur("Vieille ville", ["Château"]), secteur("Stockbridge"), secteur("Port")], requetes: [] };
+  const PLAN_ROME: PlanRecherche = {
+    secteurs: [secteur("Monti", [], ["Rome antique"]), secteur("Rome antique", ["Colisée", "Forum romain"], ["Monti"]), secteur("Trastevere")],
+    requetes: [],
+  };
+  const romeBrief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/rome-1.json"), "utf8")) as Brief;
+  const rome = { ...romeBrief, engagements: undefined };
+  const exemptionRome = exemptionDuPlan(PLAN_ROME, [rome]);
+
+  it("recherche: mot du logement présent dans un nom du plan, admis seul (rome-1 : « Colisée horaires », « Monti restaurants »)", () => {
+    expect(rome.logements[0]?.texte).toBe("Rione Monti (près du Colisée), Rome");
+    for (const requete of ["Colisée horaires", "Monti restaurants", "COLISEE billets", "Forum romain Colisée visite"]) {
+      expect(requeteSansDonneeDuBrief(requete, rome), `${requete} sans plan`).toBe(false);
+      expect(requeteSansDonneeDuBrief(requete, rome, exemptionRome), requete).toBe(true);
+    }
+  });
+
+  it("recherche: deux mots du logement hors d'un même nom du plan, refusée (« Colisée Monti restaurants »)", () => {
+    for (const requete of ["Colisée Monti restaurants", "Monti près Colisée", "Rione Monti brunch", "Rione Monti (près du Colisée)"]) {
+      expect(requeteSansDonneeDuBrief(requete, rome, exemptionRome), requete).toBe(false);
+    }
+    // Un nom du plan qui réunit les deux mots les admet ensemble.
+    const reunis: PlanRecherche = { ...PLAN_ROME, secteurs: [...PLAN_ROME.secteurs, secteur("Monti et Colisée")] };
+    expect(requeteSansDonneeDuBrief("Colisée Monti restaurants", rome, exemptionDuPlan(reunis, [rome]))).toBe(true);
+  });
+
+  it("recherche: mot du logement présent dans le récit, protégé", () => {
+    const avecRecit = { ...rome, recit: "On loge à Monti, près de chez des amis." };
+    expect(requeteSansDonneeDuBrief("Monti restaurants", avecRecit, exemptionDuPlan(PLAN_ROME, [avecRecit]))).toBe(false);
+    // Récit porté par un autre ensemble protégé de la recherche : protégé aussi.
+    expect(requeteSansDonneeDuBrief("Monti restaurants", rome, exemptionDuPlan(PLAN_ROME, [rome, avecRecit]))).toBe(false);
+    expect(requeteSansDonneeDuBrief("Colisée horaires", avecRecit, exemptionDuPlan(PLAN_ROME, [avecRecit]))).toBe(true);
+  });
+
+  it("recherche: nom de candidat ou résultat web sans effet sur la protection ; engagements et récit inchangés", () => {
+    // Seuls les noms de secteur et d'incontournable du plan validé comptent : l'exemption n'a pas d'autre source.
+    expect(Object.keys(exemptionRome).sort()).toEqual(["motsRecit", "noms"]);
+    expect(requeteSansDonneeDuBrief("Monti restaurants", rome, { noms: [], motsRecit: new Set() })).toBe(false);
+    const engagement = { ...rome, engagements: [{ libelle: "Dîner à Monti", date: rome.arrivee, heure: "20:00", type: "reservation" as const }] };
+    expect(requeteSansDonneeDuBrief("Monti restaurants", engagement, exemptionDuPlan(PLAN_ROME, [engagement]))).toBe(false);
+    const recit = { ...rome, logements: [], recit: "Nous adorons Monti le soir" };
+    expect(requeteSansDonneeDuBrief("adorons Monti le soir", recit, exemptionDuPlan(PLAN_ROME, [recit]))).toBe(false);
+  });
+
+  it("recherche: plan refusé ou vide, aucune exemption", () => {
+    expect(exemptionDuPlan(PLAN_VIDE, [rome]).noms).toEqual([]);
+    expect(requeteSansDonneeDuBrief("Colisée horaires", rome, exemptionDuPlan(PLAN_VIDE, [rome]))).toBe(false);
+    // Plan refusé par sa règle de forme : `lirePlan` rend le plan vide, donc aucune exemption.
+    const refuse = lirePlan(JSON.stringify({ ...PLAN_ROME, secteurs: [secteur("Monti"), secteur("monti"), secteur("Colisée")] }), { jours: 5 });
+    expect(refuse.illisible).toBe(true);
+    expect(requeteSansDonneeDuBrief("Colisée horaires", rome, exemptionDuPlan(refuse.valeur, [rome]))).toBe(false);
+  });
+
+  it("recherche: mot entier seulement (« rom » ne lève pas « roma » ; « romano » ne lève pas « roma »)", () => {
+    const roma = { ...rome, destination: "Lazio", pays: "Italia", logements: [{ texte: "Hotel Roma Termini", nuits: 4 }] };
+    for (const nom of ["Rom", "Romano"]) {
+      const plan: PlanRecherche = { secteurs: [secteur(nom), secteur("Esquilino"), secteur("Prati")], requetes: [] };
+      expect(requeteSansDonneeDuBrief("roma musei", roma, exemptionDuPlan(plan, [roma])), nom).toBe(false);
+    }
+    const plan: PlanRecherche = { secteurs: [secteur("Roma"), secteur("Esquilino"), secteur("Prati")], requetes: [] };
+    expect(requeteSansDonneeDuBrief("roma musei", roma, exemptionDuPlan(plan, [roma]))).toBe(true);
+    // Repli (mots courts comparés en entier) et écritures sans espace : régime inchangé.
+    const court = { ...rome, logements: [{ texte: "Le 12", nuits: 4 }] };
+    expect(requeteSansDonneeDuBrief("le 12 bar", court, exemptionDuPlan({ ...plan, secteurs: [secteur("Le 12"), secteur("Prati"), secteur("Monti")] }, [court]))).toBe(false);
+    const tokyo = { ...rome, destination: "東京", pays: "日本", logements: [{ texte: "新宿ホテル", nuits: 3 }] };
+    expect(requeteSansDonneeDuBrief("新宿 レストラン", tokyo, exemptionDuPlan({ ...plan, secteurs: [secteur("新宿"), secteur("渋谷"), secteur("浅草")] }, [tokyo]))).toBe(false);
+  });
+
+  it("recherche: l'agent applique l'exemption du plan validé seulement ; le plan ne voit pas le logement", async () => {
+    const parties = async (planTexte: string) => {
+      const envoyees: string[] = [];
+      const recherche: ClientRechercheWeb = {
+        rechercher: async (requete) => {
+          envoyees.push(requete);
+          return { resultats: [], coutUsd: 0 };
+        },
+      };
+      const actions = ["Colisée horaires", "Monti restaurants", "Colisée Monti restaurants"].map((requete) => ({ type: "rechercher", requete }));
+      const reponses = [planTexte, JSON.stringify({ actions, candidats: [], termine: false }), JSON.stringify({ actions: [], candidats: [], termine: true })];
+      const vus: RequeteModele[] = [];
+      const config = ConfigRechercheSchema.parse(JSON.parse(readFileSync(path.join(RACINE, "prototype/config/recherche.json"), "utf8")));
+      const { compteurs } = await chercherCandidatsP0(romeBrief, {
+        modeles: {
+          envoyer: async (requete) => {
+            vus.push(requete);
+            return { texte: reponses.shift() ?? '{"actions":[],"candidats":[],"termine":true}', coutUsd: 0 };
+          },
+        },
+        modele: "fournisseur/recherche-test",
+        routage: { data_collection: "deny" },
+        recherche,
+        lecteur: { lire: async () => ({ ok: false, raison: "not_in_search_results" }) },
+        config,
+      });
+      for (const requete of vus.filter((r) => r.etape === "plan" || r.etape === "recherche")) {
+        const vu = requete.messages.map((m) => m.contenu).join("\n");
+        expect(vu).not.toContain("Rione");
+        expect(vu).not.toContain("logements");
+      }
+      return { envoyees, refusees: compteurs.sortiesRefusees.recherche };
+    };
+    const valide = await parties(JSON.stringify(PLAN_ROME));
+    expect(valide.envoyees).toEqual(["Colisée horaires", "Monti restaurants"]);
+    expect(valide.refusees).toBe(1);
+    const refuse = await parties("pas un plan");
+    expect(refuse.envoyees).toEqual([]);
   });
 
   it("japonais (écriture sans espace) : logement entier ou privé du nom de la destination refusé ; destination seule admise", () => {

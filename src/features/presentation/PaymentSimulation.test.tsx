@@ -36,7 +36,7 @@ async function checkoutAt3900(): Promise<CheckoutStatus> {
     confirmationDelayMs: 0,
     simulationPath: () => "/x",
   });
-  const start = await adapter.createCheckout(ctx, { tripId: TRIP, method: "twint" });
+  const start = await adapter.createCheckout(ctx, { tripId: TRIP, method: "twint", requestId: crypto.randomUUID() });
   if (!start.ok) throw new Error();
   const status = await adapter.getCheckoutStatus(ctx, start.value.checkoutId);
   if (!status.ok) throw new Error();

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as ecriture from "@/adapters/prototype-ecriture";
 import type { GardeOuverte } from "@/server/p0/garde";
 import { LIMITES_PROTOTYPE } from "@/server/usage/forfait";
-import { bornesRechercheDuBriefPourTests, briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
+import { bornesRechercheDuBriefPourTests, briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, DUREE_MAX_EXECUTION_MS, lancementDuMode, NOMS_BRIEFS, SKUS_FORFAIT, verrouS8Leve } from "@/workflows/p0-run";
 
 /**
  * Pièces du lancement lues dans le pont `p0Run` (P0r3d) : forfait et règles de la réservation (0046 D13 point 3 ; 0053 ;
@@ -32,7 +32,7 @@ beforeEach(() => {
 describe("p0Run : pièces du lancement (P0r3d)", () => {
   it("ticket 483 : cibles de la recherche de l'exécution comptée calculées depuis la demande, sous les plafonds ; essai inchangé (0073 point 4)", () => {
     const lireJson = (chemin: string) => JSON.parse(readFileSync(path.join(process.cwd(), chemin), "utf8")) as Record<string, unknown>;
-    const reel = lireJson("prototype/config/mode-reel.json") as { candidatsTrouves: number; placesTextSearch: number };
+    const reel = lireJson("prototype/config/mode-reel.json") as { placesTextSearch: number };
     const recherche = lireJson("prototype/config/recherche.json") as { toursMax: number };
     const rechercheEssai = lireJson("prototype/config/recherche-essai.json") as { ciblesParCreneau: Record<string, number>; totalCandidats: number };
     // Rome : 19 activités, 9 repas, 4 soirées demandés → 25, 14 (plancher de recherche.json), 6 ; 45 au total (23 trouvés
@@ -50,8 +50,8 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
       expect(bornes, nom).not.toBeNull();
       const somme = (bornes?.ciblesParCreneau.activity ?? 0) + (bornes?.ciblesParCreneau.meal ?? 0) + (bornes?.ciblesParCreneau.evening ?? 0);
       expect(somme, nom).toBeLessThanOrEqual(bornes?.totalCandidats ?? 0);
-      // Plafonds du mode réel inchangés : candidats trouvés (85) et Text Search de l'ancrage (90 − 2 × logements).
-      expect(bornes?.totalCandidats ?? Infinity, nom).toBeLessThanOrEqual(Math.min(reel.candidatsTrouves, reel.placesTextSearch - 2));
+      // Plafonds du mode réel (0102 § 3) : borne de forme de 300 et Text Search de l'ancrage (90 − 2 × logements).
+      expect(bornes?.totalCandidats ?? Infinity, nom).toBeLessThanOrEqual(Math.min(300, reel.placesTextSearch - 2));
       // Fusible des tours inchangé (0073 point 3) : 30 candidats au plus par tour, les tours suffisent au total visé.
       expect(bornes?.toursMax, nom).toBe(recherche.toursMax);
       expect((bornes?.toursMax ?? 0) * 30, nom).toBeGreaterThanOrEqual(bornes?.totalCandidats ?? Infinity);
@@ -76,7 +76,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     vi.resetModules();
     const commite = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/config/essai.json"), "utf8")) as Record<string, unknown>;
     vi.doMock("../../../prototype/config/essai.json", () => ({
-      default: { ...commite, coutUsd: 0.3, recherchesWeb: 6, pagesLues: 15, candidatsTrouves: 12, placesTextSearch: 17, placesDetails: 14, routesRequetes: 3, routesElements: 120, dureeMs: 300_000 },
+      default: { ...commite, coutUsd: 0.3, placesTextSearch: 17, placesDetails: 14, routesRequetes: 3, routesElements: 120 },
     }));
     const { briefTientDansLeMode: tientAncien, NOMS_BRIEFS: noms } = await import("@/workflows/p0-run");
     expect(Object.fromEntries(noms.map((nom) => [nom, tientAncien("essai", nom)]))).toEqual({
@@ -104,7 +104,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     expect(Object.isFrozen(SKUS_FORFAIT)).toBe(true);
   });
 
-  it("mode réel : plafonds de mode-reel.json, 6,00 USD de Google au prix plein (0053, 0088 § 13), 3 USD de modèles, 15 min", () => {
+  it("mode réel : plafonds de mode-reel.json, 6,00 USD de Google au prix plein (0053, 0088 § 13), 3 USD de modèles, orphelines et garde sur DUREE_MAX_EXECUTION_MS (0102 § 6)", () => {
     expect(lancementDuMode("reel")).toEqual({
       forfait: {
         nature: "execution",
@@ -115,13 +115,13 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
         coutGoogleMicros: 6_000_000,
         coutModelesMicros: 3_000_000,
       },
-      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
+      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: DUREE_MAX_EXECUTION_MS },
     });
   });
 
   // essai.json aligné sur mode-reel.json (0073) : 90 Text Search (gratuits), 90 fiches à 20 USD les 1 000 (1,80 USD) et
   // 840 éléments Routes à 5 USD les 1 000 (4,20 USD, 0088 § 13), au prix plein.
-  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 2 USD de modèles ; orphelines comptées sur DUREE_MAX_EXECUTION_MS, la même pour tous les modes", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
@@ -130,14 +130,49 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
         routesRequetes: 30,
         routesElements: 840,
         coutGoogleMicros: 6_000_000,
-        coutModelesMicros: 3_000_000,
+        coutModelesMicros: 2_000_000,
       },
-      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
+      regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: DUREE_MAX_EXECUTION_MS },
     });
   });
 
   it("mode inconnu : null (configuration refusée), sans exception", () => {
     expect(lancementDuMode("autre" as "reel")).toBeNull();
+  });
+
+  // Condition de la Sécurité sur la PR 565 et 0102 § 5 : `totalCandidats + 5 ≤ placesTextSearch` est contrôlé par le
+  // lancement, avant toute réservation. `lancementDuMode` rend `null` (le lancement est refusé, `real_mode_unavailable`) :
+  // la base n'est jamais ouverte ici et l'appelant ne réserve que sur un forfait rendu.
+  describe("contrôle croisé totalCandidats + 5 ≤ placesTextSearch (0102 § 5), avant toute réservation", () => {
+    const FICHIERS = { reel: "mode-reel", essai: "essai" } as const;
+    const lireJson = (chemin: string) => JSON.parse(readFileSync(path.join(process.cwd(), chemin), "utf8")) as Record<string, unknown>;
+    const total = (mode: "reel" | "essai") => (lireJson(`prototype/config/${mode === "reel" ? "recherche" : "recherche-essai"}.json`) as { totalCandidats: number }).totalCandidats;
+
+    async function lancerAvecTextSearch(mode: "reel" | "essai", placesTextSearch: number) {
+      vi.resetModules();
+      const commite = lireJson(`prototype/config/${FICHIERS[mode]}.json`) as Record<string, unknown>;
+      if (mode === "reel") vi.doMock("../../../prototype/config/mode-reel.json", () => ({ default: { ...commite, placesTextSearch } }));
+      else vi.doMock("../../../prototype/config/essai.json", () => ({ default: { ...commite, placesTextSearch } }));
+      const { lancementDuMode: lancement } = await import("@/workflows/p0-run");
+      const rendu = lancement(mode);
+      vi.doUnmock("../../../prototype/config/mode-reel.json");
+      vi.doUnmock("../../../prototype/config/essai.json");
+      vi.resetModules();
+      return rendu;
+    }
+
+    for (const mode of ["reel", "essai"] as const) {
+      it(`${mode} : totalCandidats + 4 Text Search, refusé (null), aucune réservation`, async () => {
+        expect(await lancerAvecTextSearch(mode, total(mode) + 4)).toBeNull();
+        expect(d.pool.connect).not.toHaveBeenCalled();
+        expect(d.cloreExecution).not.toHaveBeenCalled();
+      });
+
+      it(`${mode} : totalCandidats + 5 Text Search, la borne est atteinte : un forfait est rendu pour ce plafond`, async () => {
+        const rendu = await lancerAvecTextSearch(mode, total(mode) + 5);
+        expect(rendu?.forfait.textSearchRequetes).toBe(total(mode) + 5);
+      });
+    }
   });
 
   it("table de prix refusée : null, aucune réservation possible", async () => {

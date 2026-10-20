@@ -1,5 +1,7 @@
 # 0054 — Découpage de B7 (couche IA et recherche)
 
+**§ 2 amendé par 0096** (ticket #524) : le verdict de la Sécurité sur B7-TL-7 (traces) porte sur B7b, qui livre le port, et conditionne la fusion de B7b (B7c, fusionnée par #454, n'en dépend plus) ; question 9 de la spécification lue de même pour cette partie.
+
 Statut : décision déléguée (ordre et découpage des tâches, « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel dans les 2 jours qui suivent cette publication · Date : 2026-10-14 · Décideur : CEO · Spécification `specs/B7-couche-ia-recherche.md` (#288, fusionnée), questions 1 à 3 tranchées par le CEO (Q396) · Découpage de P0r3 : Q399 (la décision 0055, PR #294, est en cours de correction et n'est pas encore fusionnée)
 
 ## Contexte

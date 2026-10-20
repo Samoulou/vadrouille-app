@@ -38,6 +38,8 @@ export const LOG_EVENTS = [
   // seulement). Aucune valeur : ni adresse, ni code, ni jeton, ni adresse IP.
   "email.address_refused",
   "email.transport_disabled",
+  // B3b-envoi (critères E5 et E6) : enveloppe refusée par `checkEnvelope` avant tout appel du transport ; aucune valeur.
+  "email.envelope_refused",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
@@ -47,12 +49,33 @@ export const LOG_EVENTS = [
   // `placeId`, coordonnée, durée ni message de base.
   "voyages.read_failed",
   "voyages.relecture_refused",
+  // B8b (décision 0100 § 4.4, verdict Sécurité attendu § 7 point 3) : une lecture dont les fiches (horaires, positions) ont
+  // échoué, une fois par lecture, par la source de relectures seule. Champs : `reason` (`LOG_FICHES_REASONS`, liste
+  // fermée) et `tripId` ; aucun identifiant de lieu, aucune donnée Google.
+  "voyages.fiches_non_relues",
+  // B8b (correction 1 de la PR #554, revue du head 244b81a, bloquant 2 ; décision 0060 § 1.3 : « seul le code est journalisé » ;
+  // verdict Sécurité attendu, 0100 § 7 point 3) : l'écriture au cache des positions a échoué et a été abandonnée (la lecture
+  // est servie), une fois par lecture, par la source de relectures seule. Champ unique : `reason`
+  // (`LOG_POSITIONS_REASONS`, liste fermée) ; ni identifiant (voyage, lieu, organisation), ni coordonnée, ni message.
+  "voyages.positions_non_ecrites",
+  // B6b (spécification B6, B6b point 2 ; décision 0086 § 2.2, verdict Sécurité attendu § 4 point 4) : action sur un
+  // voyage terminée par `internal` (erreur inattendue convertie), ou échec du branchement de l'adaptateur `api` au
+  // démarrage (`action` : `branchement`, `src/instrumentation.ts`). Champs : `action` (nom fixe de l'action), `errorName`
+  // et `tripId` ; aucun message de base, aucune entrée.
+  "voyages.action_failed",
   // Ticket 493, décision 0090 (verdict Sécurité S4 : favorable) : arrêt d'une étape de `p0Run`, cause fermée seulement.
   // Champs : `phase` (`LOG_STEP_PHASES`), `errorName` (nom de classe de l'erreur, filtré par `NOM_ERREUR` : lettres
   // seulement, 40 au plus ; absent sinon) et `failureCode` (`LOG_STEP_FAILURE_CODES`, `autre` sinon) ; aucun message,
   // aucune donnée Google, aucun identifiant de lieu ni d'exécution. Niveau `warn` pour un arrêt attendu par plafond,
   // `error` sinon (`src/server/p0/journal-etape.ts`).
   "p0.step_failed",
+  // B4a (spécification B4, B4-PO-12 ; décision 0097 B4-TL-13 et B4-TL-11 point 1.1) : alerte de paiement (niveau `error`,
+  // champs `eventId`, `eventType`, `alertCode`, `checkoutId` seulement), échec de la suite après un droit validé (`warn`,
+  // `errorName` seulement), configuration invalide sur le webhook simulé (`warn`, `rule` et `variable` seulement). Ni
+  // e-mail, ni nom, ni adresse IP, ni corps d'événement, ni en-tête de signature, ni secret.
+  "payment.alert",
+  "payment.followup_failed",
+  "payment.webhook_config_invalid",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -101,6 +124,16 @@ export type LogFields = {
   readonly finishAbnormal?: number;
   /** Fins de la recherche sur l'échéance de l'étape, candidats admis gardés (ticket 407) : 0 ou 1. */
   readonly deadlineStop?: number;
+  /**
+   * Compteurs de l'amendement 3 de `specs/P0-suite-2.md` (P0S2-PO-25), sortie de l'agent avant tout ancrage : secteurs
+   * et incontournables du plan, incontournables sans candidat, candidats regroupés, secteurs inconnus. Des nombres,
+   * jamais un nom ; aucun ne dépend d'une position, d'une fiche ni d'un résultat Google.
+   */
+  readonly sectors?: number;
+  readonly mustSees?: number;
+  readonly mustSeesWithoutCandidate?: number;
+  readonly candidatesGrouped?: number;
+  readonly sectorUnknown?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -113,6 +146,14 @@ export type LogFields = {
   readonly phase?: string;
   /** Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) : `LOG_STEP_FAILURE_CODES`, jamais un message. */
   readonly failureCode?: string;
+  /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
+  readonly eventId?: string;
+  /** Type normalisé d'un événement de paiement (`PaymentEvent.type`, liste fermée). */
+  readonly eventType?: string;
+  /** Code d'une alerte de paiement : `LOG_ALERT_CODES`. Jamais le champ `code`, réservé à `API_ERROR_CODES`. */
+  readonly alertCode?: string;
+  /** Identifiant interne d'un paiement (`uuid` de `checkouts.id`), jamais l'identifiant public ni celui du prestataire. */
+  readonly checkoutId?: string;
 };
 
 /**
@@ -145,6 +186,8 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     AUTH_SECRET: 0,
     SIMULATED_WEBHOOK_SECRET: 0,
     SIMULATED_WEBHOOK_ENABLED: 0,
+    PAYMENT_ADAPTER: 0,
+    DATA_ADAPTER: 0,
     VADROUILLE_DATABASE_URL_MIGRATOR: 0,
     VADROUILLE_DB_ADMIN_URL: 0,
     STRIPE_SECRET_KEY: 0,
@@ -298,6 +341,29 @@ export const LOG_READ_REASONS: readonly string[] = [
 ];
 const RAISONS_LECTURE: ReadonlySet<string> = new Set(LOG_READ_REASONS);
 /**
+ * Raisons de `voyages.fiches_non_relues` (B8b, 0100 § 4.4) : plafond atteint avant l'appel, quota, tout le reste.
+ * `LOG_READ_REASONS` (égale à `RAISONS_LECTURE` de la lecture) ne change pas.
+ */
+export const LOG_FICHES_REASONS: readonly string[] = ["cap_reached", "quota_reached", "unavailable"];
+const RAISONS_FICHES: ReadonlySet<string> = new Set(LOG_FICHES_REASONS);
+/**
+ * Raisons de `voyages.positions_non_ecrites` : `perimees` et `base` sont les codes fermés du port des positions
+ * (`CodeEchecPositions`, `src/grounding/port-positions.ts`) ; `exception` : tout autre échec de la transaction (y compris
+ * `entree_invalide`). Jamais un message, un code de base ni une valeur.
+ */
+export const LOG_POSITIONS_REASONS: readonly string[] = ["perimees", "base", "exception"];
+const RAISONS_POSITIONS: ReadonlySet<string> = new Set(LOG_POSITIONS_REASONS);
+/**
+ * Liste de `reason` admise **par événement** (mineur 3 de la revue du head 244b81a) : une raison d'un autre événement est
+ * retirée. Un événement absent de la table n'admet aucune `reason`.
+ */
+const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["voyages.read_failed", RAISONS_LECTURE],
+  ["voyages.relecture_refused", RAISONS_LECTURE],
+  ["voyages.fiches_non_relues", RAISONS_FICHES],
+  ["voyages.positions_non_ecrites", RAISONS_POSITIONS],
+]);
+/**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
  * `prototype.runs.phase` (`PHASES`, `src/prototype/arret.ts`), plus trois repères de l'étape finale sans écriture en
  * base : `fiches` (Place Details de la première série), `routes` (regroupement par jour et matrices du séjour) et
@@ -371,6 +437,40 @@ export const LOG_STEP_FAILURE_CODES: readonly string[] = [
   // Toute autre erreur (erreur de programmation, code inconnu).
   "autre",
 ];
+/**
+ * Codes du champ `alertCode` (décision 0097 B4-TL-13 point 2) : ceux des contrôles de `handlePaymentEvent`
+ * (`src/server/payment/webhook.ts`, égalité vérifiée par son test), aussi écrits dans `billing.outcome_code`, et ceux
+ * des situations à examiner (second paiement, paiement après un échec, remboursement, litige).
+ */
+export const LOG_ALERT_CODES: readonly string[] = [
+  "unknown_checkout",
+  "livemode",
+  "payment_status",
+  "amount_mismatch",
+  "currency_mismatch",
+  "session_mismatch",
+  "checkout_mismatch",
+  "trip_mismatch",
+  "provider_mismatch",
+  "duplicate_payment",
+  "paid_after_failure",
+  "refund",
+  "dispute",
+];
+const CODES_ALERTE: ReadonlySet<string> = new Set(LOG_ALERT_CODES);
+/** Types de `PaymentEvent` (copie de `PAYMENT_EVENT_TYPES`, égalité vérifiée par le test du journal). */
+export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
+  "checkoutCompleted",
+  "asyncPaymentSucceeded",
+  "asyncPaymentFailed",
+  "checkoutExpired",
+  "refund",
+  "dispute",
+  "other",
+];
+const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
+/** Identifiant d'événement : forme simulée (B4-TL-10) ou forme de Stripe. */
+const ID_EVENEMENT_PAIEMENT = /^(evt_sim_[0-9a-f]{32}|evt_[A-Za-z0-9]{1,255})$/;
 const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
 const CODES_ETAPE: ReadonlySet<string> = new Set(LOG_STEP_FAILURE_CODES);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -426,12 +526,20 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["finishIgnored", entierPositif],
   ["finishAbnormal", entierPositif],
   ["deadlineStop", entierPositif],
-  ["reason", (v) => chaine(v) && RAISONS_LECTURE.has(v)],
+  ["sectors", entierPositif],
+  ["mustSees", entierPositif],
+  ["mustSeesWithoutCandidate", entierPositif],
+  ["candidatesGrouped", entierPositif],
+  ["sectorUnknown", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],
   ["phase", (v) => chaine(v) && PHASES_ETAPE.has(v)],
   ["failureCode", (v) => chaine(v) && CODES_ETAPE.has(v)],
+  ["eventId", (v) => chaine(v) && ID_EVENEMENT_PAIEMENT.test(v)],
+  ["eventType", (v) => chaine(v) && TYPES_EVENEMENT_PAIEMENT.has(v)],
+  ["alertCode", (v) => chaine(v) && CODES_ALERTE.has(v)],
+  ["checkoutId", (v) => chaine(v) && UUID.test(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
@@ -452,7 +560,7 @@ export function formatLogLine(event: string, fields: object = {}, level: LogLeve
   const ligne: Record<string, unknown> = { level, event: EVENEMENTS.has(event) ? event : "log.unknown_event" };
   let retires = 0;
   for (const [cle, valeur] of Object.entries(fields)) {
-    const controle = CONTROLES.get(cle);
+    const controle = cle === "reason" ? (v: unknown) => chaine(v) && (RAISONS_PAR_EVENEMENT.get(event)?.has(v) ?? false) : CONTROLES.get(cle);
     if (controle !== undefined && controle(valeur)) ligne[cle] = valeur;
     else retires += 1;
   }

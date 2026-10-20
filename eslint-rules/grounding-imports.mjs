@@ -20,9 +20,12 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  * ci-dessus) n'importe de `@/grounding/ancrage` que `RAYON_BIAIS_METRES`, `BLOC_MATRICE`, `cleTrajet` et
  * `minutesDeTrajets` (0085 § 1.9), par des noms explicites (ni `*`, ni défaut, ni réexport global, ni `import()`).
  *
- * `ligne/relecture-imports` (0085 § 1.8, frontière de 0081) : `@/server/relecture/*` n'est importable que depuis
- * `src/server/composition/generation.ts`, les fichiers de `src/server/relecture/` et les tests ; ni `p0-reel.ts` ni
- * un autre module de `src/server/composition/`.
+ * `ligne/relecture-imports` (0085 § 1.8, frontière de 0081, étendue par 0100 § 5.2) : `@/server/relecture/*` n'est
+ * importable que depuis les deux compositions (`src/server/composition/generation.ts`, B9c, et `lecture.ts`, B8b), les
+ * fichiers de `src/server/relecture/` et les tests ; la fabrique commune des clients Google
+ * (`@/server/composition/clients-google`), depuis ces deux compositions et les tests ; la composition de la lecture
+ * (`@/server/composition/lecture`), depuis `src/instrumentation.ts` (branchement au démarrage, 0108) et les tests. Ni `p0-reel.ts` ni un autre module de
+ * `src/server/composition/`, ni `src/server/voyages/`.
  *
  * Toutes les formes de chargement sont lues (celles de `ligne/ia-recherche-liste-blanche`) ; sous `src/grounding`,
  * une source non littérale est refusée.
@@ -134,24 +137,51 @@ export const listeBlancheGrounding = {
 };
 
 const RELECTURE = "src/server/relecture";
-/** Importateurs admis de `@/server/relecture/*` hors des tests et de son dossier (0085 § 1.8). */
-export const IMPORTATEURS_RELECTURE = ["src/server/composition/generation.ts"];
+/** Fabrique commune des clients Google (0100 § 5.2) et composition de la lecture (0100 § 5). */
+const CLIENTS_GOOGLE = "src/server/composition/clients-google";
+const COMPOSITION_LECTURE = "src/server/composition/lecture";
+/**
+ * Importateurs admis de `@/server/relecture/*` et de la fabrique commune des clients Google hors des tests et de leur
+ * dossier (0085 § 1.8, amendé par 0100 § 5.2) : les deux compositions, celle de la génération (B9c, future) et celle de
+ * la lecture (B8b).
+ */
+export const IMPORTATEURS_RELECTURE = ["src/server/composition/generation.ts", "src/server/composition/lecture.ts"];
+/**
+ * Importateur admis de `@/server/composition/lecture` hors des tests (0100 § 5.2, amendé par 0108) : le branchement au
+ * démarrage par `src/instrumentation.ts` (`import()`), seul. Un import depuis `src/adapters/index.ts`, même par
+ * `import()`, ferait atteindre `src/server/composition` et `src/server/env` depuis `src/features` (test « p0: clé côté
+ * serveur seulement ») et un module à capacité par les doubles de `@/adapters`.
+ */
+export const IMPORTATEURS_COMPOSITION_LECTURE = ["src/instrumentation.ts"];
 
+const estTestOuSupport = (importateur) => estTest(importateur) || importateur.startsWith("tests/");
+
+/**
+ * Vrai si `importateur` peut importer `source` (0100 § 5.2) :
+ * - `@/server/relecture/*` : les deux compositions, les fichiers de `src/server/relecture/` et les tests ;
+ * - `@/server/composition/clients-google` : les deux compositions et les tests (ni `p0-reel.ts`, ni un autre module) ;
+ * - `@/server/composition/lecture` : `src/instrumentation.ts` (B6b, 0108) et les tests seulement.
+ * Un module de `src/server/voyages/` n'est donc jamais admis : il reçoit la source par injection.
+ */
 export function importRelectureAdmis(source, importateur) {
   const cible = cibleDe(source, importateur);
-  if (cible.chemin === undefined || !dans(cible.chemin, RELECTURE)) return true;
-  if (estTest(importateur) || importateur.startsWith("tests/") || importateur.startsWith(`${RELECTURE}/`)) return true;
-  return IMPORTATEURS_RELECTURE.includes(importateur);
+  if (cible.chemin === undefined) return true;
+  if (dans(cible.chemin, RELECTURE)) {
+    return estTestOuSupport(importateur) || importateur.startsWith(`${RELECTURE}/`) || IMPORTATEURS_RELECTURE.includes(importateur);
+  }
+  if (cible.chemin === CLIENTS_GOOGLE) return estTestOuSupport(importateur) || IMPORTATEURS_RELECTURE.includes(importateur);
+  if (cible.chemin === COMPOSITION_LECTURE) return estTestOuSupport(importateur) || IMPORTATEURS_COMPOSITION_LECTURE.includes(importateur);
+  return true;
 }
 
 export const relectureImports = {
   meta: {
     type: "problem",
-    docs: { description: "@/server/relecture importable par la seule composition de génération (décision 0085 § 1.8)." },
+    docs: { description: "@/server/relecture, la fabrique des clients Google et la composition de la lecture confinés (décisions 0085 § 1.8 et 0100 § 5.2)." },
     schema: [],
     messages: {
       forbidden:
-        "@/server/relecture n'est importable que depuis src/server/composition/generation.ts, src/server/relecture et les tests (décision 0085 § 1.8, frontière de 0081) ({{source}}).",
+        "@/server/relecture n'est importable que depuis les compositions src/server/composition/generation.ts et lecture.ts, src/server/relecture et les tests ; composition/clients-google, depuis ces deux compositions et les tests ; composition/lecture, depuis src/instrumentation.ts et les tests (décisions 0085 § 1.8, 0100 § 5.2 et 0108) ({{source}}).",
     },
   },
   create(context) {

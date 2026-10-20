@@ -1,0 +1,82 @@
+{
+  "coutParRequeteUsd": 0.007,
+  "resultats": {
+    "point de vue coucher du soleil port": [
+      {
+        "url": "https://ile-fabriquee.example/belvedere",
+        "titre": "Belvédère du couchant",
+        "extrait": "Accès libre ; le meilleur moment est le coucher du soleil."
+      },
+      {
+        "url": "https://ile-fabriquee.example/ruelles",
+        "titre": "Ruelles du vieux bourg",
+        "extrait": "Une promenade dans les ruelles, à toute heure."
+      }
+    ],
+    "tavernes du port poisson grillé": [
+      {
+        "url": "https://ile-fabriquee.example/taverne-quai",
+        "titre": "Taverne du Quai",
+        "extrait": "Poisson grillé du jour, environ 20 € par personne."
+      }
+    ],
+    "bars du port en terrasse": [
+      {
+        "url": "https://ile-fabriquee.example/bar-jetee",
+        "titre": "Bar de la Jetée",
+        "extrait": "Terrasse sur la jetée, dès 19 h."
+      }
+    ],
+    "plus belle plage de sable ouest": [
+      {
+        "url": "https://ile-fabriquee.example/grande-plage",
+        "titre": "Grande plage de sable",
+        "extrait": "Plage libre, transats payants ; peu d'ombre."
+      },
+      {
+        "url": "https://ile-fabriquee.example/crique-pins",
+        "titre": "Crique des Pins",
+        "extrait": "Une crique abritée du vent."
+      }
+    ],
+    "tavernes de plage": [
+      {
+        "url": "https://ile-fabriquee.example/taverne-dunes",
+        "titre": "Taverne des Dunes",
+        "extrait": "Grillades et salades, de 12 h à 17 h."
+      }
+    ],
+    "village de marbre et fromagerie de montagne": [
+      {
+        "url": "https://ile-fabriquee.example/village-marbre",
+        "titre": "Village de marbre à arpenter",
+        "extrait": "Accès libre ; garer la voiture à l'entrée du village."
+      },
+      {
+        "url": "https://ile-fabriquee.example/fromagerie",
+        "titre": "Fromagerie du plateau",
+        "extrait": "Dégustation 8 €, de 10 h à 18 h, fermée le dimanche."
+      },
+      {
+        "url": "https://ile-fabriquee.example/sentier-terrasses",
+        "titre": "Sentier des terrasses",
+        "extrait": "Un sentier balisé d'une heure."
+      }
+    ],
+    "tavernes de village spécialités": [
+      {
+        "url": "https://ile-fabriquee.example/taverne-place",
+        "titre": "Taverne de la Place",
+        "extrait": "Cuisine de village, plats du jour."
+      }
+    ],
+    "sentiers et criques de la côte nord": [
+      {
+        "url": "https://ile-fabriquee.example/criques-nord",
+        "titre": "Criques sauvages du nord",
+        "extrait": "Accès par un chemin de terre."
+      }
+    ],
+    "fêtes de village fin mai": []
+  }
+}

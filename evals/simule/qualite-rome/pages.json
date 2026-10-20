@@ -1,0 +1,36 @@
+{
+  "dns": {
+    "agenda-rome-fabrique.example": [
+      "45.10.20.30"
+    ],
+    "guide-rome-fabrique.example": [
+      "45.10.20.30"
+    ],
+    "site-officiel-fabrique.example": [
+      "45.10.20.30"
+    ]
+  },
+  "pages": {
+    "https://site-officiel-fabrique.example/colisee": {
+      "statut": 200,
+      "entetes": {
+        "Content-Type": "text/html; charset=utf-8"
+      },
+      "corps": "<!doctype html><html><head><title>Colisée</title></head><body><h1>Colisée</h1><p>Ouvert de 9 h à 19 h. Billet de 18 € combiné avec le Forum romain et le Palatin. Réservation du créneau conseillée, file plus courte le matin.</p></body></html>"
+    },
+    "https://guide-rome-fabrique.example/place-navone": {
+      "statut": 200,
+      "entetes": {
+        "Content-Type": "text/html; charset=utf-8"
+      },
+      "corps": "<!doctype html><html><head><title>Place Navone</title></head><body><h1>Place Navone</h1><p>Une place piétonne bâtie sur un ancien stade. Accès libre et gratuit. Le matin, la place est presque vide.</p></body></html>"
+    },
+    "https://site-officiel-fabrique.example/musees": {
+      "statut": 200,
+      "entetes": {
+        "Content-Type": "text/html; charset=utf-8"
+      },
+      "corps": "<!doctype html><html><head><title>Musées du Vatican</title></head><body><h1>Musées du Vatican</h1><p>Ouvert de 8 h à 19 h, fermé le dimanche. Billet de 20 € par personne. Réserver un créneau en ligne évite la file.</p></body></html>"
+    }
+  }
+}

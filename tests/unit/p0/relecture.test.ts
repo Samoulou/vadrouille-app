@@ -10,7 +10,7 @@ import type { PointRoutes } from "@/grounding/interfaces";
 import { cadenceRelecture, creerRelecteurReel, SQL_PURGE_RECENTE, type ClientMatrice, type DependancesRelecteur } from "@/server/p0/relecture";
 import { forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type LimitesForfait } from "@/server/usage/forfait";
 import type { ClientSql, PoolSql, ReglesForfait } from "@/server/usage/neon";
-import { PLAFONDS_RELECTURE, relectureDuMode, SKUS_FORFAIT } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, PLAFONDS_RELECTURE, relectureDuMode, SKUS_FORFAIT } from "@/workflows/p0-run";
 import prixGoogle from "../../../prototype/config/prix-google.json";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 
@@ -178,7 +178,7 @@ describe("p0: relecture refusée si le plafond Google du mois ou l'enveloppe est
   it.each<[string, Sommes]>([
     ["plafond du mois", { moisGoogle: 20_000_000 - FORFAIT.coutGoogleMicros + 1 }],
     ["enveloppe jusqu'à G0", { enveloppeGoogle: 40_000_000 }],
-  ])("%s atteint : quota_reached, aucun appel Routes (l'adaptateur affiche l'état d'erreur)", async (_cas, sommes) => {
+  ])("%s atteint : quota_reached, aucun appel Routes (l'adaptateur affiche la journée sans ces temps, décision 0092 § 5)", async (_cas, sommes) => {
     const base = poolSimule({ sommes });
     const { relecteur: r, fabrique } = relecteur({ pool: () => base.pool, relecture: async () => ({ forfait: FORFAIT, regles: regles(limites) }) });
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "quota_reached" });
@@ -236,7 +236,7 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
   });
 
   it("le registre du forfait borne les appels : au-delà de ses requêtes, la réservation est refusée", async () => {
-    const petit: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { routesRequetes: 1, routesElements: 1 });
+    const petit: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { placesTextSearch: 0, placesDetails: 0, routesRequetes: 1, routesElements: 1 });
     let usage: Parameters<NonNullable<DependancesRelecteur["routes"]>>[1] | undefined;
     const r = creerRelecteurReel({
       env: preversion(),
@@ -288,7 +288,7 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
       coutGoogleMicros: 200_000,
       coutModelesMicros: null,
     });
-    expect(lu!.regles).toEqual({ limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 });
+    expect(lu!.regles).toEqual({ limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: DUREE_MAX_EXECUTION_MS });
     expect(relectureDuMode()).toEqual(lu);
   });
 });
@@ -353,7 +353,7 @@ describe("p0: cadence Routes unique par processus pour la relecture (3 000 élé
 
 describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed)", () => {
   it("daily_quota_insufficient (forfait au-delà du quota d'une minute) n'est pas un plafond atteint : unavailable", async () => {
-    const enorme: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { routesRequetes: 1, routesElements: QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1 });
+    const enorme: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { placesTextSearch: 0, placesDetails: 0, routesRequetes: 1, routesElements: QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1 });
     const base = poolSimule();
     const { relecteur: r, fabrique } = relecteur({ pool: () => base.pool, relecture: async () => ({ forfait: enorme, regles: regles() }) });
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });

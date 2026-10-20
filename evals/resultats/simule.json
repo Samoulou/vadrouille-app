@@ -6,9 +6,9 @@
       "cas": "edimbourg-1",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -68,9 +68,9 @@
       "cas": "edimbourg-2",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -130,9 +130,9 @@
       "cas": "edimbourg-3",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -192,9 +192,9 @@
       "cas": "arrivee-tardive",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -254,9 +254,9 @@
       "cas": "budget-mixte",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -315,8 +315,8 @@
     {
       "cas": "destination-peu-couverte",
       "prompts": {
-        "plan": 1,
-        "recherche": 3,
+        "plan": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -372,9 +372,9 @@
       "cas": "evenement-horaire-fixe",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -434,9 +434,9 @@
       "cas": "pas-de-musee",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {
@@ -496,9 +496,9 @@
       "cas": "sans-voiture",
       "prompts": {
         "notation": 1,
-        "plan": 1,
-        "raisons": 1,
-        "recherche": 3,
+        "plan": 2,
+        "raisons": 2,
+        "recherche": 4,
         "structuration": 1
       },
       "modeles": {

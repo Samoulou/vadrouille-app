@@ -11,6 +11,7 @@ import { serverEnv } from "@/server/env";
 import { errorNameOf, logEvent } from "@/server/log";
 import { disabledCodeMailer } from "@/server/mail/disabled";
 import type { CodeMailer } from "@/server/mail/port";
+import { createSmtpCodeMailer } from "@/server/mail/smtp";
 import { creerAuth, type InstanceAuth, OrganisationEnSuppressionError } from "@/tenancy/auth";
 import { avecAdresse } from "@/tenancy/code-otp";
 import { hacherJeton } from "@/tenancy/jetons-haches";
@@ -339,8 +340,9 @@ let parDefaut: AuthOperations | undefined;
 
 /**
  * Opérations du serveur : configuration de `serverEnv()` (`AUTH_ADAPTER=better-auth`, admis en `local` et `ci`
- * seulement, B3-TL-2), pools `vadrouille_auth` de `db/index.ts`, port d'envoi désactivé (`disabledCodeMailer`,
- * jusqu'à B3b-envoi). Lève une `ServerEnvError` (sans valeur) si la configuration est refusée ou si l'adaptateur
+ * seulement, B3-TL-2), pools `vadrouille_auth` de `db/index.ts`, port d'envoi désactivé (`disabledCodeMailer`)
+ * sans `EMAIL_TRANSPORT`, SMTP vers Mailpit (`createSmtpCodeMailer`, B3b-envoi, décision 0098) avec
+ * `EMAIL_TRANSPORT=smtp`. Lève une `ServerEnvError` (sans valeur) si la configuration est refusée ou si l'adaptateur
  * n'est pas `better-auth`.
  */
 export function authOperations(): AuthOperations {
@@ -355,7 +357,7 @@ export function authOperations(): AuthOperations {
     trustedIpHeader: env.trustedIpHeader,
     database: createDatabase("vadrouille_auth", undefined, POOL_OPERATIONS),
     verrous: createDatabase("vadrouille_auth", undefined, POOL_VERROUS),
-    mailer: disabledCodeMailer,
+    mailer: env.smtp === null ? disabledCodeMailer : createSmtpCodeMailer(env.smtp),
   });
   return parDefaut;
 }

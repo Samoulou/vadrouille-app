@@ -11,11 +11,17 @@ import path from "node:path";
  * - `@/server/env/garde-cles` : depuis la mise en place de Vitest (`tests/unit/setup.ts`) et la configuration de
  *   Playwright seulement ;
  * - `@/server/env` (`index.ts`, B3a) : depuis `src/instrumentation.ts`, le limiteur, les opérations de connexion
- *   (`src/server/auth/index.ts`, B3b) et son test unitaire seulement ;
+ *   (`src/server/auth/index.ts`, B3b), la composition du paiement simulé et le webhook simulé (B4a) et son test unitaire
+ *   seulement ;
  * - `@/server/env/resolve` (B3a) : depuis `db/connection.ts` et le même test seulement ;
- * - `@/server/env/payment` (B4) : depuis `src/server/routes/` et `src/server/payment/` seulement ;
+ * - `@/server/env/payment` (B4a) : depuis `src/server/payment/composition.ts` et `src/server/routes/simulated-webhook.ts`
+ *   seulement ;
  * - `@/server/env/p0` (P0r3b) : depuis la garde, l'accès et le lancement du mode réel (`src/server/p0/garde.ts`,
  *   `src/server/p0/acces.ts`, `src/server/p0/lancement.ts`) seulement ;
+ * - `@/server/env/relectures` (B8b, décision 0100 § 5.3) : depuis la composition de la lecture
+ *   (`src/server/composition/lecture.ts`) seulement ;
+ * - `@/server/env/generation` (B9c, décision 0081 B9-TL-8) : depuis la barrière des appels réels
+ *   (`src/server/generation/barriere.ts`) seulement ;
  * - tout autre module de `src/server/env/` : depuis `src/server/env/` seulement.
  * Les fichiers de `src/server/env/` (tests compris) importent les modules de leur dossier. La source est résolue
  * (alias `@/` ou chemin relatif, segments `.` et `..` normalisés) avant la comparaison ; toutes les formes de
@@ -34,14 +40,33 @@ export const IMPORTATEURS_ADMIS = new Map([
   // fichier ; résolution de l'environnement, importée par la garde de connexion (`../src/server/env/resolve.ts`) ;
   // module du paiement (B4), depuis les routes et le paiement serveur seulement (handover § 3).
   // B3b (décision 0077 § 5.1) : opérations de connexion, configuration par défaut tirée de `serverEnv()`.
-  ["index", ["src/instrumentation.ts", "src/server/rate-limit.ts", "src/server/auth/index.ts", "tests/unit/server/env.test.ts"]],
+  // B4a (décision 0097 B4-TL-3 point 5 (e), verdict Sécurité R1 de la revue de #540) : appelants de `serverEnv()`
+  // ajoutés, la composition du paiement simulé (objet passé à `cleWebhookSimule`, à la construction de l'adaptateur) et
+  // le webhook simulé (prédicat, puis clé à l'étape 5) ; entrée `payment` réduite à ces deux mêmes fichiers.
+  [
+    "index",
+    [
+      "src/instrumentation.ts",
+      "src/server/rate-limit.ts",
+      "src/server/auth/index.ts",
+      "tests/unit/server/env.test.ts",
+      "src/server/payment/composition.ts",
+      "src/server/routes/simulated-webhook.ts",
+    ],
+  ],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
-  ["payment", ["src/server/routes/", "src/server/payment/"]],
+  ["payment", ["src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]],
   // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, depuis la garde et l'accès seulement ; ses
   // tests sont dans `src/server/env/` (`p0.test.ts`).
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (`commitDuDeploiement`), lu par le lancement seulement, garde
   // déjà ouverte. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   ["p0", ["src/server/p0/garde.ts", "src/server/p0/acces.ts", "src/server/p0/lancement.ts"]],
+  // B8b (décision 0100 § 3.2 point 4 et § 5.3) : `RELECTURES_SOURCE` et `POSITIONS_ECRITURE_SUSPENDUE`, lues à l'appel par
+  // la composition de la lecture seule ; aucune clé n'y est lue. Verdict Sécurité : attendu (0100 § 7 point 4).
+  ["relectures", ["src/server/composition/lecture.ts"]],
+  // B9c (décision 0081 B9-TL-8) : déclarations de déploiement de la barrière des appels réels, lues à l'appel par la
+  // barrière seule ; aucune clé n'y est lue. Verdict Sécurité : attendu.
+  ["generation", ["src/server/generation/barriere.ts"]],
 ]);
 
 /** Module de `src/server/env/` visé par une source, ou `null` (chemin relatif au dépôt de l'importateur). */

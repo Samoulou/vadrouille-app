@@ -9,7 +9,9 @@ import {
   analyserUrl,
   creerLecteurPages,
   DELAI_MAX_MS,
+  ENTETE_ACCEPT,
   TAILLE_MAX_OCTETS,
+  TYPES_CONTENU_ADMIS,
   USER_AGENT,
   type CoucheHttp,
   type RequeteHttp,
@@ -61,12 +63,187 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("p0: lecture de pages, garde SSRF", () => {
-  it("lit une page publique autorisée et n'en rend que le texte", async () => {
-    const { resultat } = await lire("https://exemple.org/page", {
-      pages: { "https://exemple.org/page": { corps: () => corps("<html><script>alert(1)</script><p>Texte utile</p></html>") } },
+describe("recherche: le lecteur de pages refuse les adresses internes", () => {
+  it("refuse si une seule des adresses résolues est interdite", async () => {
+    const { resultat, capture } = await lire("https://exemple.org/", { dns: { "exemple.org": [PUBLIQUE, "10.0.0.1"] } });
+    expect(resultat).toEqual({ ok: false, raison: "address_blocked" });
+    expect(capture).toHaveLength(0);
+  });
+
+  it("refuse une adresse IPv6 hors 2000::/3 et accepte une adresse unicast globale", async () => {
+    expect((await lire("https://exemple.org/", { dns: { "exemple.org": ["4000::1"] } })).resultat).toEqual({
+      ok: false,
+      raison: "address_blocked",
     });
-    expect(resultat).toEqual({ ok: true, texte: "Texte utile" });
+    expect((await lire("https://exemple.org/", { dns: { "exemple.org": ["2a00:1450:4001::1"] } })).resultat.ok).toBe(true);
+  });
+
+  it("refuse une redirection d'une URL publique vers une IP privée", async () => {
+    const { resultat } = await lire("https://exemple.org/", {
+      dns: { "exemple.org": [PUBLIQUE], "interne.example": ["192.168.1.10"] },
+      pages: { "https://exemple.org/": { statut: 302, entetes: { location: "https://interne.example/admin" } } },
+    });
+    expect(resultat).toEqual({ ok: false, raison: "address_blocked" });
+    const litterale = await lire("https://exemple.org/", {
+      pages: { "https://exemple.org/": { statut: 301, entetes: { location: "https://169.254.169.254/latest" } } },
+    });
+    expect(litterale.resultat).toEqual({ ok: false, raison: "ip_literal" });
+  });
+});
+
+describe("recherche: le lecteur de pages refuse les formes d'adresse alternatives, les ports non standard et les réponses trop grosses après décompression", () => {
+  // Décision 0096 § 1 (B7-TL-5). Ce test est écrit EN PREMIER : l'admission du type (`estTypeAdmis`) et son traitement
+  // (`extraireTexte` ou texte brut) sont deux endroits distincts ; n'élargir que le premier lirait la page comme du texte.
+  it("lit application/xhtml+xml comme text/html (texte identique à celui de la même page servie en text/html)", async () => {
+    const page =
+      '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title><script>alert(1)</script></head><body><p>Texte <b>utile</b></p><style>x{}</style></body></html>';
+    const lectureHtml = await lire("https://exemple.org/", {
+      pages: {
+        "https://exemple.org/": {
+          entetes: { "content-type": "text/html" },
+          corps: () => corps(page),
+        },
+      },
+    });
+    for (const type of [
+      "application/xhtml+xml",
+      "application/xhtml+xml; charset=utf-8",
+      "APPLICATION/XHTML+XML;charset=UTF-8",
+      " Application/Xhtml+Xml ; q=1",
+    ]) {
+      const lectureXhtml = await lire("https://exemple.org/", {
+        pages: {
+          "https://exemple.org/": {
+            entetes: { "content-type": type },
+            corps: () => corps(page),
+          },
+        },
+      });
+      expect(lectureXhtml.resultat, type).toEqual(lectureHtml.resultat);
+    }
+    expect(lectureHtml.resultat.ok).toBe(true);
+    if (lectureHtml.resultat.ok) {
+      expect(lectureHtml.resultat.texte).toContain("Texte utile");
+      expect(lectureHtml.resultat.texte).not.toMatch(/[<>]|alert/);
+    }
+  });
+
+  it("n'envoie que les types admis dans l'en-tête accept (constante du module)", async () => {
+    const { capture } = await lire("https://exemple.org/");
+    expect(ENTETE_ACCEPT).toBe("text/html, application/xhtml+xml, text/plain");
+    expect(TYPES_CONTENU_ADMIS).toEqual([
+      "text/html",
+      "application/xhtml+xml",
+      "text/plain",
+    ]);
+    expect(capture[0]?.entetes.accept).toBe(ENTETE_ACCEPT);
+  });
+
+  it.each([
+    "application/xml",
+    "text/xml",
+    "image/svg+xml",
+    "application/json",
+    "application/xhtml",
+    "application/xhtml+xml+x",
+    "text/html+xml",
+  ])("refuse le type %s (content_type), sans lire le corps", async (type) => {
+    let lu = false;
+    const { resultat } = await lire("https://exemple.org/", {
+      pages: {
+        "https://exemple.org/": {
+          entetes: { "content-type": type },
+          corps: () => ({
+            [Symbol.asyncIterator]() {
+              lu = true;
+              return corps("<p>x</p>")[Symbol.asyncIterator]();
+            },
+          }),
+        },
+      },
+    });
+    expect(resultat).toEqual({ ok: false, raison: "content_type" });
+    expect(lu).toBe(false);
+  });
+
+  it("lit une page application/xhtml+xml avec <?xml?>, DOCTYPE à entité et CDATA sans résoudre d'entité ni ouvrir le réseau", async () => {
+    const page =
+      '<?xml version="1.0"?><!DOCTYPE html [<!ENTITY secret SYSTEM "file:///etc/passwd"><!ENTITY ext SYSTEM "https://interne.example/x">]>' +
+      '<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Avant &secret; &ext; apres</p><![CDATA[contenu cdata]]></body></html>';
+    const capture: RequeteHttp[] = [];
+    const resolus: string[] = [];
+    const lecteur = creerLecteurPages({
+      resoudre: async (hote) => {
+        resolus.push(hote);
+        return [PUBLIQUE];
+      },
+      http: http(
+        {
+          "https://exemple.org/": {
+            entetes: { "content-type": "application/xhtml+xml" },
+            corps: () => corps(page),
+          },
+        },
+        capture,
+      ),
+    });
+    const resultat = await lecteur.lire(
+      "https://exemple.org/",
+      new Set(["https://exemple.org/"]),
+    );
+    expect(resultat.ok).toBe(true);
+    if (resultat.ok) {
+      expect(resultat.texte).toContain("Avant");
+      expect(resultat.texte).toContain("apres");
+      expect(resultat.texte).not.toContain("root:");
+    }
+    // Une seule requête, un seul nom résolu : aucune entité n'a déclenché d'accès.
+    expect(capture).toHaveLength(1);
+    expect(resolus).toEqual(["exemple.org"]);
+  });
+
+  it("refuse une page application/xhtml+xml en gzip de plus de 2 Mo une fois décompressée", async () => {
+    const compresse = gzipSync(Buffer.alloc(TAILLE_MAX_OCTETS + 1024, 97));
+    expect(compresse.byteLength).toBeLessThan(TAILLE_MAX_OCTETS);
+    const { resultat } = await lire("https://exemple.org/", {
+      pages: {
+        "https://exemple.org/": {
+          entetes: {
+            "content-type": "application/xhtml+xml",
+            "content-encoding": "gzip",
+          },
+          corps: () => corps(new Uint8Array(compresse)),
+        },
+      },
+    });
+    expect(resultat).toEqual({ ok: false, raison: "too_large" });
+  });
+
+  it.each([
+    ["http://exemple.org/", "scheme"],
+    ["https://exemple.org:80/", "port"],
+    ["https://exemple.org:8443/", "port"],
+    ["https://exemple.org:444/", "port"],
+  ])("refuse %s (%s), sans aucune requête", async (url, raison) => {
+    const { resultat, capture } = await lire(url);
+    expect(resultat).toEqual({ ok: false, raison });
+    expect(capture).toHaveLength(0);
+  });
+
+  it("refuse une redirection vers http:// ou vers le port 80", async () => {
+    for (const location of [
+      "http://exemple.org/suite",
+      "https://exemple.org:80/suite",
+      "https://exemple.org:8443/suite",
+    ]) {
+      const { resultat } = await lire("https://exemple.org/", {
+        pages: {
+          "https://exemple.org/": { statut: 302, entetes: { location } },
+        },
+      });
+      expect(resultat.ok, location).toBe(false);
+      if (!resultat.ok) expect(["scheme", "port"]).toContain(resultat.raison);
+    }
   });
 
   it.each([
@@ -94,7 +271,9 @@ describe("p0: lecture de pages, garde SSRF", () => {
 
   it("normalise le nom d'hôte avant la résolution (minuscules, point final, IDN)", async () => {
     expect(analyserUrl("https://EXEMPLE.org./a").hote).toBe("exemple.org");
-    expect(analyserUrl("https://bücher.example/a").hote).toBe("xn--bcher-kva.example");
+    expect(analyserUrl("https://bücher.example/a").hote).toBe(
+      "xn--bcher-kva.example",
+    );
     const resolus: string[] = [];
     const lecteur = creerLecteurPages({
       resoudre: async (hote) => {
@@ -103,53 +282,12 @@ describe("p0: lecture de pages, garde SSRF", () => {
       },
       http: http({ "https://xn--bcher-kva.example/a": {} }),
     });
-    const resultat = await lecteur.lire("https://BÜCHER.example./a", new Set(["https://bücher.example/a"]));
+    const resultat = await lecteur.lire(
+      "https://BÜCHER.example./a",
+      new Set(["https://bücher.example/a"]),
+    );
     expect(resultat.ok).toBe(true);
     expect(resolus).toEqual(["xn--bcher-kva.example"]);
-  });
-
-  it("refuse si une seule des adresses résolues est interdite", async () => {
-    const { resultat, capture } = await lire("https://exemple.org/", { dns: { "exemple.org": [PUBLIQUE, "10.0.0.1"] } });
-    expect(resultat).toEqual({ ok: false, raison: "address_blocked" });
-    expect(capture).toHaveLength(0);
-  });
-
-  it("refuse une adresse IPv6 hors 2000::/3 et accepte une adresse unicast globale", async () => {
-    expect((await lire("https://exemple.org/", { dns: { "exemple.org": ["4000::1"] } })).resultat).toEqual({
-      ok: false,
-      raison: "address_blocked",
-    });
-    expect((await lire("https://exemple.org/", { dns: { "exemple.org": ["2a00:1450:4001::1"] } })).resultat.ok).toBe(true);
-  });
-
-  it("p0: aucune URL lue hors des résultats de recherche (not_in_search_results)", async () => {
-    const { resultat, capture } = await lire("https://exemple.org/autre", { autorisees: ["https://exemple.org/page"] });
-    expect(resultat).toEqual({ ok: false, raison: "not_in_search_results" });
-    expect(capture).toHaveLength(0);
-  });
-
-  it("refuse une redirection d'une URL publique vers une IP privée", async () => {
-    const { resultat } = await lire("https://exemple.org/", {
-      dns: { "exemple.org": [PUBLIQUE], "interne.example": ["192.168.1.10"] },
-      pages: { "https://exemple.org/": { statut: 302, entetes: { location: "https://interne.example/admin" } } },
-    });
-    expect(resultat).toEqual({ ok: false, raison: "address_blocked" });
-    const litterale = await lire("https://exemple.org/", {
-      pages: { "https://exemple.org/": { statut: 301, entetes: { location: "https://169.254.169.254/latest" } } },
-    });
-    expect(litterale.resultat).toEqual({ ok: false, raison: "ip_literal" });
-  });
-
-  it("suit 3 redirections au plus et refuse la quatrième", async () => {
-    const chaine = (n: number): Record<string, Page> =>
-      Object.fromEntries(
-        Array.from({ length: n + 1 }, (_, i) => [
-          `https://exemple.org/${i}`,
-          i < n ? { statut: 302, entetes: { location: `/${i + 1}` } } : {},
-        ]),
-      );
-    expect((await lire("https://exemple.org/0", { pages: chaine(3) })).resultat.ok).toBe(true);
-    expect((await lire("https://exemple.org/0", { pages: chaine(4) })).resultat).toEqual({ ok: false, raison: "too_many_redirects" });
   });
 
   it("coupe une page géante à 2 Mo et l'ignore", async () => {
@@ -203,6 +341,44 @@ describe("p0: lecture de pages, garde SSRF", () => {
     });
     expect(resultat).toEqual({ ok: false, raison: "content_type" });
     expect(lu).toBe(false);
+  });
+});
+
+describe("p0: lecture de pages, garde SSRF", () => {
+  it("lit une page publique autorisée et n'en rend que le texte", async () => {
+    const { resultat } = await lire("https://exemple.org/page", {
+      pages: {
+        "https://exemple.org/page": {
+          corps: () =>
+            corps("<html><script>alert(1)</script><p>Texte utile</p></html>"),
+        },
+      },
+    });
+    expect(resultat).toEqual({ ok: true, texte: "Texte utile" });
+  });
+
+  it("p0: aucune URL lue hors des résultats de recherche (not_in_search_results)", async () => {
+    const { resultat, capture } = await lire("https://exemple.org/autre", {
+      autorisees: ["https://exemple.org/page"],
+    });
+    expect(resultat).toEqual({ ok: false, raison: "not_in_search_results" });
+    expect(capture).toHaveLength(0);
+  });
+
+  it("suit 3 redirections au plus et refuse la quatrième", async () => {
+    const chaine = (n: number): Record<string, Page> =>
+      Object.fromEntries(
+        Array.from({ length: n + 1 }, (_, i) => [
+          `https://exemple.org/${i}`,
+          i < n ? { statut: 302, entetes: { location: `/${i + 1}` } } : {},
+        ]),
+      );
+    expect(
+      (await lire("https://exemple.org/0", { pages: chaine(3) })).resultat.ok,
+    ).toBe(true);
+    expect(
+      (await lire("https://exemple.org/0", { pages: chaine(4) })).resultat,
+    ).toEqual({ ok: false, raison: "too_many_redirects" });
   });
 
   it("coupe à 10 s une résolution DNS lente", async () => {
@@ -259,7 +435,7 @@ describe("p0: lecture de pages, garde SSRF", () => {
   });
 });
 
-describe("p0: lecture de pages, épinglage de l'adresse", () => {
+describe("recherche: le lecteur de pages refuse les adresses internes", () => {
   it("se connecte à l'adresse vérifiée, avec le nom d'hôte pour TLS et SNI", async () => {
     let appels = 0;
     const capture: RequeteHttp[] = [];

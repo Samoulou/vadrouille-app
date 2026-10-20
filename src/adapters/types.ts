@@ -18,6 +18,7 @@ import type {
   PreviewSlot,
   Proposal,
   Result,
+  RetryGenerationRequest,
   Session,
   ShareStatus,
   SharedDayView,
@@ -115,6 +116,13 @@ export interface CreationAdapter {
    * d'une autre organisation (contrôle d'appartenance repris par B3 et B9, 0017 § 3.6).
    */
   getGenerationStatus(ctx: AdapterContext, tripId: string): Promise<Result<GenerationStatus>>;
+  /**
+   * Nouvel essai de l'écran 5 (B9b, B9-PO-9 ; 0081 B9-TL-11) : nouvelle exécution `preview` du même voyage si et
+   * seulement si la dernière est `failed` et `retryable` ; idempotent par (organisation, `requestId`) ; refus sans
+   * écriture : `validation_failed` (rien à relancer ; toujours pour `kind: "full"` avant B9d), `active_preview_exists`
+   * (autre génération de l'organisation en cours), `not_found`. Sortie revalidée par l'action.
+   */
+  retryGeneration(ctx: AdapterContext, request: RetryGenerationRequest): Promise<Result<CreatedTrip>>;
   /**
    * Séjour et 6b (0087 § 1.5) : état du voyage complet, source des deux bandeaux `error` (`none`, `preparing`,
    * `ready`, `incomplete`, `failed` avec `retryable`), sans nom de lieu, raison d'échec ni reprises restantes ;

@@ -1,8 +1,18 @@
 # 0081 — Décisions du Tech Lead pour B9 (B9-TL-1 à B9-TL-14), dont l'organisation des actions sans compte (B7-TL-10) et la reprise de la suite du paiement (B4-TL-12)
 
+**B9-TL-3 points 2 et 3 amendés par 0105** (ticket #522) : l'entrée de `generatePreview` et `generateFullTrip` porte aussi `organizationId` (§ 1) ; la réutilisation des candidats par un nouvel essai de l'aperçu est reportée à la sous-tâche `B9c-suite` (§ 6). Le point 1 de B9-TL-3 avait déjà été amendé par 0087.
+
+**B9-TL-1 point 4 : écart consigné par 0105 § 7** (réécriture complète du test du graphe, tâche de suite `B9c-graphe`).
+
+**B9-TL-1 points 1 et 3 amendés par 0101** (ticket #519) : `src/adapters/api-creation.ts` importe aussi `@/server/creation` (dérogation limitée à ce fichier) ; liste des importateurs de la règle de lint (`ligne/creation-imports`) fixée par 0101 § 4. Le délai de veto de 6 heures (0068) de l'en-tête ci-dessous est remplacé par 0093 : définitive dès sa fusion.
+
+**B9-TL-1 point 1 amendé par 0096** (ticket #524, § 3 point 1) : les bornes de recherche des profils `apercu`, `complet` et `mini` vont dans `src/server/config/ia.ts` (B7-TL-8), les plafonds dans `usage.ts` (0083) ; `src/server/config/generation.ts` ne garde que ses constantes de génération.
+
 Statut : décision déléguée (architecture, schéma, bibliothèques, outillage et tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive sans veto de Samuel 6 heures après sa fusion (décision 0068), **sauf** les points marqués « non tranché : Samuel », qui restent des questions (voir « Ce qui n'est pas tranché ici »).
 
 Date : 2026-10-17 · Décideur : Tech Lead · Ticket : #433 · Spécification : `specs/B9-generation.md` (#429, ticket #426, fusionnée en `8c2bd6e`), section « Propositions au Tech Lead » et question 3 · Répond aussi à **B7-TL-10** (`specs/B7-couche-ia-recherche.md` l. 258, attendue par B7c), à **B4-TL-12** (`specs/B4-paiement-simule.md` l. 226-229) et à la **question 1 de 0078** (l. 75)
+
+**B9-TL-1 point 2 amendé par 0100** (ticket #544, § 5) : un chemin vers `src/grounding/` est aussi admis par `src/server/composition/lecture.ts`, composition de la lecture, importée par `src/adapters/index.ts` seulement. **B9-TL-2 point 1 amendé par 0100** (§ 5.2) : `generation.ts` n'étant pas fusionnée (B9c), les clients Google (Places, Routes) sont construits par une **fabrique commune**, `src/server/composition/clients-google.ts` (nom libre), seul importateur de leurs modules de capacité, créée par B8b et reprise par B9c sans être recopiée.
 
 Numérotation (relue le 2026-10-17 sur `main` `8c2bd6e`) : `main` porte 0001 à 0080 ; les PR ouvertes #422 (release), #424 (B7a) et #432 (F8c) n'ajoutent aucun fichier sous `docs/decisions/`. Les numéros de ligne de code et de spécification cités sont ceux de `8c2bd6e` ; pour 0017 et 0048, qui reçoivent un renvoi de tête dans cette PR, cette décision cite des sections, pas des lignes. Correction 1 (revue consolidée du head `b9a9443`) : trois bloquants et neuf mineurs traités ; `main` relue à `8c2bd6e` (inchangée).
 

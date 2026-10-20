@@ -1,15 +1,11 @@
 {
   "schema": 1,
   "uniteQuotaRoutes": "elements",
-  "coutUsd": 3,
-  "recherchesWeb": 40,
-  "pagesLues": 100,
-  "candidatsTrouves": 85,
+  "coutUsd": 2,
   "placesTextSearch": 90,
   "placesDetails": 90,
   "routesRequetes": 30,
   "routesElements": 840,
-  "dureeMs": 900000,
   "fiches": {
     "margeMinimum": 4,
     "margePart": 0.2

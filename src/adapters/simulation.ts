@@ -44,11 +44,13 @@ export interface Clock {
   now(): number;
 }
 
-/** Un paiement simulé : identifiant, organisation, voyage, moyen, instantané du prix, instants. Rien d'autre. */
+/** Un paiement simulé : identifiant, organisation, voyage, clé d'idempotence, moyen, instantané du prix, instants. Rien d'autre. */
 export interface CheckoutRecord {
   checkoutId: string;
   organizationId: string;
   tripId: string;
+  /** Clé d'idempotence de `startCheckout` dans l'organisation (spécification B4, B4-PO-8). */
+  requestId: string;
   method: PaymentMethod;
   priceVariant: PriceVariant;
   amount: number;
@@ -128,6 +130,8 @@ export interface LaunchRecord {
   requestId: string;
   tripId: string;
   launchedAt: number;
+  /** Nouvel essai (`retryGeneration`, B9-PO-9) : la suite d'états rejouée aboutit (`ready`), quelle que soit l'issue réglée. */
+  retry?: boolean;
 }
 
 export interface CreationStore {

@@ -51,8 +51,8 @@ describe("p0: recomposition de la lecture réelle identique à recomposerProgram
     const source = createSourceProgrammesReels({ pool: async () => pool(positions) });
     const liste = await source.lister();
     if (attendu.ok) {
-      expect(liste).toEqual([attendu.programme]);
-      expect(await source.lire(TRIP_ID)).toEqual(attendu.programme);
+      expect(liste.map((lu) => lu.programme)).toEqual([attendu.programme]);
+      expect((await source.lire(TRIP_ID))?.programme).toEqual(attendu.programme);
     } else {
       expect(liste).toEqual([]);
       await expect(source.lire(TRIP_ID)).rejects.toThrow();

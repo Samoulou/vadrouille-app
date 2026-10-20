@@ -9,6 +9,14 @@ import { withWorkflow } from "workflow/next";
  */
 export const RESPONSE_HEADERS = [
   {
+    // B6b (Q524 ; handover « Partie Q5 », règles de relecture ; spécification B8, règle 3) : les pages du voyage servies
+    // par l'adaptateur `api` portent des données relues (durées de trajet, horaires à confirmer) et les données de
+    // l'organisation de la session. Ni cache partagé ni cache du navigateur, pour toutes leurs réponses (« Mes voyages »,
+    // Séjour, Journée, présentation, 404 et 500 comprises). La règle de `aujourdhui` ci-dessous reste, inchangée.
+    source: "/voyages/:path*",
+    headers: [{ key: "Cache-Control", value: "private, no-store" }],
+  },
+  {
     source: "/voyages/:id/aujourdhui",
     headers: [{ key: "Cache-Control", value: "private, no-store" }],
   },
@@ -51,6 +59,13 @@ export const nextConfig: NextConfig = {
   // Décision 0005 : le build vérifie les types sans les tests (absents de l'image Docker).
   // `pnpm typecheck` garde le tsconfig.json complet.
   typescript: { tsconfigPath: "tsconfig.build.json" },
+  // Décision 0105 § 2 point 5 : les fixtures d'Édimbourg de la variante simulée sont lues à l'exécution (`node:fs`,
+  // `src/server/composition/fixtures-simulees.ts`), jamais importées. Sur Vercel (préversion), le traçage de fichiers les
+  // embarque pour les routes du workflow ; dans l'image Docker, `prototype/` est hors du contexte (`.dockerignore`) et ce
+  // réglage reste sans effet : la composition simulée n'y est jamais atteinte (production refusée avant tout chargement).
+  outputFileTracingIncludes: {
+    "/.well-known/workflow/**": ["./prototype/fixtures/**/edimbourg.json"],
+  },
   async headers() {
     return RESPONSE_HEADERS;
   },

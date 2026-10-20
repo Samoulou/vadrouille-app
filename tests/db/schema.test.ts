@@ -32,8 +32,10 @@ describe("schéma", () => {
       `SELECT relnamespace::regnamespace::text || '.' || relname AS relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class
        WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p') ORDER BY relname`,
     );
-    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 7);
-    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(7);
+    // Neuf tables du schéma prototype : les sept de 0046, `trajets` (décision 0092, migration 0011_trajets_prototype) et
+    // `run_secteurs` (décision 0094 § 1 point 5, migration 0013_secteurs_prototype).
+    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 9);
+    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(9);
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
     }
@@ -141,9 +143,10 @@ describe("schéma", () => {
   });
 
   it("schéma: aucune colonne de contenu Google", async () => {
-    // Handover § 6, « Colonnes interdites ». Seule exception admise : place_coordinates.lat et .lng (cache de
-    // 30 jours au plus, décision 0011 point 6), inactive tant que B8 n'a pas créé la table.
-    const ALLOWED = new Set(["place_coordinates.lat", "place_coordinates.lng"]);
+    // Handover back-end § 6, « Colonnes interdites » : seules exceptions, place_coordinates.lat et .lng (cache de
+    // 30 jours au plus, décision 0011 point 6) et stays.area_center_lat et .area_center_lng (centre d'une zone maison,
+    // valeurs du client non fiables ; conditions (a) à (c) du handover ; tout envoi à Google : 0087 § 3 point 4).
+    const ALLOWED = new Set(["place_coordinates.lat", "place_coordinates.lng", "stays.area_center_lat", "stays.area_center_lng"]);
     const PATTERNS = [
       /rating/,
       /review/,

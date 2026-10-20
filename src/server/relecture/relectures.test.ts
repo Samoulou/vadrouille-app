@@ -207,3 +207,27 @@ function entreeDeTest(ids: readonly string[], relectures: Relectures): EntreeMot
     budgetTrajetReduit: false,
   };
 }
+
+describe("relectures: le lendemain d'une plage qui passe minuit (B8-PO-17)", () => {
+  const VENDREDI = "2026-11-27";
+  const SAMEDI = "2026-11-28";
+  const DIMANCHE = "2026-11-29";
+
+  it("vendredi 22 h – 2 h : 1 320 à 1 560 le vendredi, rien le samedi (la fin du lendemain est portée par la plage de la veille)", () => {
+    const r = versRelectures({
+      usage: "lecture",
+      fiches: [chargee("P_BAR", { horaires: [{ jour: 5, debut: 1320, fin: 1440, finLendemain: 120 }] })],
+      trajets: TABLE_VIDE,
+      logementsParNuit: [],
+    });
+    expect(r.plages("P_BAR", VENDREDI)).toEqual([{ debut: 1320, fin: 1560 }]);
+    expect(r.plages("P_BAR", SAMEDI)).toEqual([]);
+  });
+
+  it("plage qui traverse deux minuits : coupée à 1 440, rien le samedi ni le dimanche", () => {
+    const r = versRelectures({ usage: "lecture", fiches: [chargee("P_BAR", { horaires: [{ jour: 5, debut: 1320, fin: 1440 }] })], trajets: TABLE_VIDE, logementsParNuit: [] });
+    expect(r.plages("P_BAR", VENDREDI)).toEqual([{ debut: 1320, fin: 1440 }]);
+    expect(r.plages("P_BAR", SAMEDI)).toEqual([]);
+    expect(r.plages("P_BAR", DIMANCHE)).toEqual([]);
+  });
+});
