@@ -23,7 +23,8 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * Une seule transaction sous `vadrouille_prototype`, contexte posé selon 0046 D15 point 5, puis dans l'ordre (§ 1.1) :
  * (i) la fonction de la base pour chaque `placeId` du programme, l'exécution étant encore `en_cours` ; (ii) le
  * programme **sans** `positions` (Q324) ; (ii bis) les temps de trajet conservés du programme, un `INSERT` par paire
- * dans `prototype.trajets` (décision 0092 § 4) ; (iii) le passage de l'exécution à `programme_ecrit` ; `COMMIT`. Toute
+ * dans `prototype.trajets` (décision 0092 § 4) ; (iii) le passage de l'exécution à `programme_ecrit` ; (iv) la suppression
+ * des lignes de `prototype.run_candidates` de l'exécution (0046 D15 point 3 et S4 ; constat A de 0103) ; `COMMIT`. Toute
  * erreur annule la transaction : **aucune position ni aucun temps n'est écrit sans son programme, aucun programme sans
  * ses temps**. Valeurs toujours en paramètres liés (§ 1.8) : le texte des requêtes ne contient ni identifiant de lieu,
  * ni coordonnée, ni durée.
@@ -63,6 +64,8 @@ export const SQL_TRAJET =
   "INSERT INTO prototype.trajets (programme_id, mode, origine, destination, minutes) VALUES ($1::uuid, $2::text, $3::text, $4::text, $5::integer)";
 const SQL_STATUT = `UPDATE prototype.runs SET status = 'programme_ecrit', phase = NULL, cost_models_micros = NULL
 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
+/** Candidats de l'exécution (`place_id` compris) : supprimés avec l'écriture du programme (0046 D15 point 3 et S4, constat 0103 A). */
+export const SQL_CANDIDATS_SUPPRIMES = "DELETE FROM prototype.run_candidates WHERE run_id = $1::uuid";
 
 /**
  * Signature de la fonction d'écriture des positions (0052 § 1.7, migration `0005`). Le verrou S8 (0046, 0052 § 3,
@@ -155,6 +158,9 @@ export async function ecrireProgramme(entree: EcritureProgrammePrototype, pool: 
       }
     }
     if ((await client.query(SQL_STATUT, [entree.runId])).rows.length !== 1) throw new EchecEcritureProgramme("execution_close");
+    // (iv) Fin d'exécution : les lignes de `run_candidates` de cette exécution, dans la même transaction (0046 D15
+    // point 3 et S4). Un échec annule tout : l'exécution reste `en_cours`, ses candidats aussi, l'étape peut être rejouée.
+    await client.query(SQL_CANDIDATS_SUPPRIMES, [entree.runId]);
     await client.query("COMMIT");
     enTransaction = false;
     return { programmeId };
