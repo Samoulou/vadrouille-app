@@ -52,14 +52,8 @@ const CiblesSchema = z.strictObject({
 const ProductionSchema = z.strictObject({
   schema: z.literal(1),
   variante: z.enum(["a", "b"]),
-  zdr: z.strictObject({
-    plan: z.boolean().optional(),
-    recherche: z.boolean().optional(),
-    notation: z.boolean().optional(),
-    raisons: z.boolean().optional(),
-    structuration: z.boolean().optional(),
-    quartier: z.boolean().optional(),
-  }),
+  // Clés dérivées de `ETAPES_ZDR` (une seule liste) ; une clé inconnue est refusée (objet strict).
+  zdr: z.strictObject(Object.fromEntries(ETAPES_ZDR.map((etape) => [etape, z.boolean().optional()])) as Record<(typeof ETAPES_ZDR)[number], z.ZodOptional<z.ZodBoolean>>),
   profils: z.strictObject({
     apercu: z.strictObject({
       ciblesParCreneau: CiblesSchema,

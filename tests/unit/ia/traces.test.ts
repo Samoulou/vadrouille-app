@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { ErreurModele, ETAPES_REQUETE, type ClientModeles, type EtapeRequete, type ReponseModele } from "@/ai/client";
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
@@ -239,8 +239,9 @@ describe("traces: aucun prompt ni brief dans les attributs exportés", () => {
     });
 
     // Agent : étape `recherche` (client partagé), et recherche web décorée par la composition.
+    const webScripte = rechercheScriptee([{ ...GUIDE, titre: SENTINELLES[2], extrait: SENTINELLES[2] }]);
     const web = tracerRechercheWeb(
-      rechercheScriptee([{ ...GUIDE, titre: SENTINELLES[2], extrait: SENTINELLES[2] }]).client,
+      webScripte.client,
       sortie.traces,
       { modele: "test/web" },
       horloge(),
@@ -273,6 +274,12 @@ describe("traces: aucun prompt ni brief dans les attributs exportés", () => {
     for (const fin of sortie.fins as FinEtape[]) expect(fin.statut).toBe("ok");
     // Chaque étape ouverte est fermée, une fois.
     expect(sortie.fins).toHaveLength(sortie.debuts.length);
+    // Une décoration, pas deux (0096 § 2 point 4) : autant de débuts que d'appels réels, par étape.
+    const debutsDe = (etape: string) => sortie.debuts.filter((debut) => (debut as DebutEtape).etape === etape).length;
+    expect(scripte.appels("recherche")).toBeGreaterThan(0);
+    expect(webScripte.requetes.length).toBeGreaterThan(0);
+    expect(debutsDe("recherche")).toBe(scripte.appels("recherche"));
+    expect(debutsDe("recherche_web")).toBe(webScripte.requetes.length);
   });
 
   it("le début d'une étape ne porte que étape, modèle, promptId et promptVersion ; la requête web n'est jamais lue", async () => {
@@ -453,6 +460,13 @@ describe("traces: les traces ne cassent jamais une étape", () => {
   it("identifiant d'exécution : seul un motif opaque est admis, le reste est omis", () => {
     expect(executionIdAdmis("0b6f2c1e-8c7a-4d11-9f3e-5a1d2b3c4d5e")).toBe("0b6f2c1e-8c7a-4d11-9f3e-5a1d2b3c4d5e");
     for (const mauvais of ["", "a b", "org/123", "x".repeat(65), "é", undefined, 12, null, "id\n"]) expect(executionIdAdmis(mauvais)).toBeUndefined();
+  });
+
+  it("les clés de DebutEtape et FinEtape réunies sont exactement ATTRIBUTS_TRACE sans executionId (0096 § 2 point 9)", () => {
+    type Attendu = Exclude<(typeof ATTRIBUTS_TRACE)[number], "executionId">;
+    expectTypeOf<keyof DebutEtape | keyof FinEtape>().toEqualTypeOf<Attendu>();
+    expectTypeOf<Attendu>().toEqualTypeOf<keyof DebutEtape | keyof FinEtape>();
+    expect(ATTRIBUTS_TRACE).toContain("executionId");
   });
 
   it("toutes les étapes de modèle sont dans la liste des étapes tracées", () => {

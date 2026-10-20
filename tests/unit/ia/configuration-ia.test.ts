@@ -145,6 +145,11 @@ describe("configuration ia: valeur absente, inconnue ou hors bornes refusée", (
     expect(() => charge(avec(ia(), ["zdr", "structuration"], "oui"))).toThrow();
   });
 
+  it("le schéma accepte exactement les six clés zdr de ETAPES_ZDR (clés réelles, pas la copie)", () => {
+    expect(ETAPES_ZDR).toHaveLength(6);
+    for (const etape of ETAPES_ZDR) expect(() => charge(avec(ia(), ["zdr", etape], true)), etape).not.toThrow();
+  });
+
   it("un moteur de recherche web inconnu est refusé", () => {
     expect(() => charge(ia(), avec(modeles(), ["rechercheWeb", "moteur"], "inconnu"))).toThrow();
     expect(MOTEURS_RECHERCHE_WEB).toContain(modelesJson.rechercheWeb.moteur);

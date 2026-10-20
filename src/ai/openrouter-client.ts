@@ -144,6 +144,7 @@ function jetonsDe(usage: unknown): { entree: number; sortie: number } | undefine
   const lu = UsageSchema.safeParse(usage);
   return lu.success ? { entree: lu.data.inputTokens, sortie: lu.data.outputTokens } : undefined;
 }
+
 /** Raison de fin de l'AI SDK, réduite à la liste fermée (`other` sinon) : jamais la raison brute du fournisseur. */
 function finDe(raison: unknown): FinModele {
   return typeof raison === "string" && (FINS_MODELE as readonly string[]).includes(raison) ? (raison as FinModele) : "other";

@@ -5,8 +5,9 @@ import { z } from "zod";
 import { LONGUEURS_TEXTE, TYPES_CRENEAU, type TypeCreneau } from "@/ai/candidat";
 import { avecGardeDataCollection, usdEnMicros, type ClientModeles } from "@/ai/client";
 import { MAX_RESULTATS_QUARTIER, type CoucheIa } from "@/ai/couche";
+import { codeFermeDe as codeFerme, echecIa as echec } from "@/ai/traces";
 import { EntreeModelesSchema, EntreeQuartierSchema, type EntreeModeles, type EntreeQuartier } from "@/ai/entrees";
-import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } from "@/ai/erreurs";
+import type { CodeErreurIa, ResultatIa } from "@/ai/erreurs";
 import { nettoyerRequeteWeb, type ClientRechercheWeb, type ResultatWeb } from "@/ai/recherche-web";
 import type { Routage } from "@/ai/reglages";
 import { LodgingSuggestionSchema, MAX_SUGGESTED_LODGINGS, type LodgingSuggestion } from "@/contracts";
@@ -102,20 +103,6 @@ export type Recherche = {
 
 // --- Aides ----------------------------------------------------------------------------------------------------------------------
 
-const CODES: ReadonlySet<string> = new Set(CODES_ERREUR_IA);
-const CODES_REESSAYABLES: ReadonlySet<string> = new Set(REESSAYABLES);
-
-/** Code fermé porté par une erreur d'un client (`ErreurOpenRouter`, `ErreurModele`) ; `undefined` pour toute autre exception. */
-function codeFerme(erreur: unknown): CodeErreurIa | undefined {
-  if (!(erreur instanceof Error) || !("code" in erreur)) return undefined;
-  const code: unknown = erreur.code;
-  return typeof code === "string" && CODES.has(code) ? (code as CodeErreurIa) : undefined;
-}
-
-function echec<T>(code: CodeErreurIa): ResultatIa<T> {
-  return { ok: false, code, retryable: CODES_REESSAYABLES.has(code) };
-}
-
 const JOUR_MS = 86_400_000;
 
 /** Date « AAAA-MM-JJ » (UTC) d'un instant en millisecondes. */
@@ -125,6 +112,8 @@ const entier = (valeur: number): number => (Number.isFinite(valeur) ? Math.max(0
 
 const DemandeRechercheSchema = z.strictObject({
   entree: EntreeModelesSchema,
+  // Noms remis tels quels au modèle (revue de B7b, sécurité 1) : l'appelant (B9) n'y passe jamais un `displayName` ni un nom
+  // issu de Places ou de l'ancrage, seulement des noms produits par la recherche elle-même.
   dejaTrouves: z.array(z.string().min(1).max(200)).max(300).optional(),
 });
 
@@ -280,6 +269,8 @@ export function creerRecherche(dependances: DependancesRecherche): Recherche {
     }
 
     if (erreur !== undefined && candidats.length === 0) return echec(erreur);
+    // `queries` : requêtes web en texte libre (revue de B7b, sécurité 2). B9 et B9c ne les journalisent pas et ne les
+    // envoient pas à l'adaptateur de traces ; le bilan ne sert qu'à l'évaluation et au rapport interne.
     const bilan = BilanRechercheSchema.parse({
       queries: requetes,
       pagesRead: pagesLues,
@@ -325,6 +316,8 @@ export function creerRecherche(dependances: DependancesRecherche): Recherche {
         break;
       }
     }
+    // Un code d'échec de la recherche de logements n'est rendu que si aucun résultat n'a été lu : avec des résultats déjà
+    // rendus, la proposition se fait sur ceux-là et le code est volontairement ignoré (échec partiel toléré).
     if (erreur !== undefined && resultats.length === 0) return echec(erreur);
 
     const proposition = await ia.proposerQuartier({ quartier, resultats });

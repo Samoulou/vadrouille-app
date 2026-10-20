@@ -141,7 +141,8 @@ export type DependancesAgent = {
    * Noms déjà connus de l'appelant (B7b, spécification B7 : `dejaTrouves` de `rechercher`, recherche complémentaire du
    * voyage complet et mini-recherche). Remis au modèle avec les noms trouvés pendant l'exécution, et jamais re-trouvés :
    * un candidat dont le nom (`cleDeNom`) en fait partie est écarté comme doublon. Ils ne comptent dans aucune cible ni
-   * dans le total. Absent : comportement de P0, inchangé.
+   * dans le total. Absent : comportement de P0, inchangé. Remis au modèle sans normalisation : l'appelant n'y passe jamais
+   * un `displayName` ni un nom issu de Places ou de l'ancrage (revue de B7b, sécurité 1).
    */
   dejaConnus?: readonly string[];
 };

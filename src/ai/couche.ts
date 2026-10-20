@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { avecGardeDataCollection, type ClientModeles, type ReponseModele } from "@/ai/client";
-import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } from "@/ai/erreurs";
+import type { ResultatIa } from "@/ai/erreurs";
 import {
   CandidatPourModeleSchema,
   EntreeModelesSchema,
@@ -19,7 +19,7 @@ import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/ai/recherche-web";
 import { creerRedigerRaisons } from "@/ai/rediger-raisons";
 import type { Routage } from "@/ai/reglages";
 import { requetePlan, requeteQuartier, requeteStructuration } from "@/ai/requetes";
-import { tracerModeles, type HorlogeTraces, type TracesIa } from "@/ai/traces";
+import { codeFermeDe, echecIa as echec, tracerModeles, type HorlogeTraces, type TracesIa } from "@/ai/traces";
 import {
   joursDuSejour,
   lireBriefDeduit,
@@ -215,17 +215,6 @@ export type CoucheIa = {
 
 // --- Conversion des erreurs attendues ------------------------------------------
 
-const CODES: ReadonlySet<string> = new Set(CODES_ERREUR_IA);
-const CODES_REESSAYABLES: ReadonlySet<string> = new Set(REESSAYABLES);
-
-function estCodeIa(code: unknown): code is CodeErreurIa {
-  return typeof code === "string" && CODES.has(code);
-}
-
-function echec<T>(code: CodeErreurIa): ResultatIa<T> {
-  return { ok: false, code, retryable: CODES_REESSAYABLES.has(code) };
-}
-
 /**
  * Envoie la requête et lit la réponse. Une erreur levée par le client qui porte un code fermé de `CODES_ERREUR_IA`
  * devient un échec ; toute autre exception (défaut de programmation) se propage telle quelle (0077 § 2 point 1). Une
@@ -240,7 +229,8 @@ async function appeler<L, T>(
   try {
     reponse = await envoi();
   } catch (erreur) {
-    if (erreur instanceof Error && "code" in erreur && estCodeIa(erreur.code)) return echec(erreur.code);
+    const code = codeFermeDe(erreur);
+    if (code !== undefined) return echec(code);
     throw erreur;
   }
   const lecture = lire(reponse.texte);

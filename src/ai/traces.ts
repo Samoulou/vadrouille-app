@@ -2,8 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
-import { ETAPES_REQUETE, usdEnMicros, type ClientModeles, type RequeteModele, type ReponseModele } from "@/ai/client";
-import { CODES_ERREUR_IA } from "@/ai/erreurs";
+import { ETAPES_REQUETE, MAX_TOKENS, usdEnMicros, type ClientModeles, type RequeteModele, type ReponseModele } from "@/ai/client";
+import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } from "@/ai/erreurs";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
@@ -85,7 +85,7 @@ export function executionIdAdmis(valeur: unknown): string | undefined {
 
 /** Bornes des attributs numériques (décision 0096 § 2 point 3). */
 export const DUREE_MAX_MS = 1_800_000;
-export const TOKENS_MAX = 10_000_000;
+export const TOKENS_MAX = MAX_TOKENS;
 export const COUT_MAX_MICROS = 1_000_000_000;
 
 export const DebutEtapeSchema = z.strictObject({
@@ -171,14 +171,30 @@ function terminer(traces: TracesIa, jeton: JetonEtape | undefined, fin: unknown)
 
 const CODES_FERMES: ReadonlySet<string> = new Set(CODES_ERREUR_IA);
 
-/** Statut d'une exception du client : son code fermé, sinon `erreur_inattendue` ; jamais le message ni la pile. */
-function statutDe(erreur: unknown): StatutTrace {
+const CODES_REESSAYABLES: ReadonlySet<string> = new Set(REESSAYABLES);
+
+/**
+ * Code fermé porté par une exception (`ErreurOpenRouter`, `ErreurModele`), sinon `undefined` : jamais le message ni la
+ * pile. La lecture de `code` est dans un `try` (un accesseur qui lève ne casse ni la couche ni la trace). Définition
+ * unique, lue aussi par `couche.ts` et `recherche.ts` (revue de B7b, mineur 2).
+ */
+export function codeFermeDe(erreur: unknown): CodeErreurIa | undefined {
   try {
     const code: unknown = erreur instanceof Error ? (erreur as { code?: unknown }).code : undefined;
-    return typeof code === "string" && CODES_FERMES.has(code) ? (code as StatutTrace) : "erreur_inattendue";
+    return typeof code === "string" && CODES_FERMES.has(code) ? (code as CodeErreurIa) : undefined;
   } catch {
-    return "erreur_inattendue";
+    return undefined;
   }
+}
+
+/** Échec attendu d'une fonction de la couche IA : code fermé, `retryable` vrai seulement pour `REESSAYABLES`. */
+export function echecIa<T>(code: CodeErreurIa): ResultatIa<T> {
+  return { ok: false, code, retryable: CODES_REESSAYABLES.has(code) };
+}
+
+/** Statut d'une exception du client : son code fermé, sinon `erreur_inattendue` ; jamais le message ni la pile. */
+function statutDe(erreur: unknown): StatutTrace {
+  return codeFermeDe(erreur) ?? "erreur_inattendue";
 }
 
 /** Début d'une étape de modèle : lit `etape`, `modele` et `prompt` de la requête, **jamais** `messages`. */
@@ -266,11 +282,12 @@ export function tracerModeles(client: ClientModeles, traces: TracesIa, horloge: 
         statut = statutDe(erreur);
         throw erreur;
       } finally {
+        const cout = reponse === undefined ? undefined : coutMicrosDe(reponse.coutUsd);
         terminer(traces, jeton, {
           statut,
           dureeMs: dureeDe(debut, maintenant(horloge)),
           ...(reponse === undefined ? {} : tokensDe(reponse)),
-          ...(reponse === undefined || coutMicrosDe(reponse.coutUsd) === undefined ? {} : { coutMicros: coutMicrosDe(reponse.coutUsd) }),
+          ...(cout === undefined ? {} : { coutMicros: cout }),
         });
       }
     },
