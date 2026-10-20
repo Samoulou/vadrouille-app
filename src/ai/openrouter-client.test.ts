@@ -145,7 +145,7 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
   it("une requête : origine figée, redirect manual, data_collection deny, clé en en-tête seulement, coût réel confirmé", async () => {
     const { client, appels, port } = monter([async () => reponseOk(0.0042)]);
     const reponse = await client.envoyer(requete());
-    expect(reponse).toEqual({ texte: '{"ok":true}', coutUsd: 0.0042, fin: "stop" });
+    expect(reponse).toEqual({ texte: '{"ok":true}', coutUsd: 0.0042, fin: "stop", tokens: { entree: 10, sortie: 5 } });
     expect(appels).toHaveLength(1);
     const { url, init } = premier(appels);
     expect(new URL(url).origin).toBe(ORIGINE_MODELES);
@@ -162,10 +162,69 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
     expect(port.lignes.map((l) => [l.etat, l.coutReelMicros, l.demande.fournisseur, l.demande.methode])).toEqual([["confirmee", 4200, "modeles", "chat"]]);
   });
 
+  it("décision 0096 § 2 point 6 : seuls inputTokens et outputTokens entrent dans la réponse, gardés s'ils sont des entiers bornés", async () => {
+    const corps = (usage: Record<string, unknown>) =>
+      new Response(
+        JSON.stringify({
+          id: "g",
+          object: "chat.completion",
+          created: 1,
+          model: "m",
+          provider: "SENTINELLE-FOURNISSEUR",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "x" },
+              finish_reason: "stop",
+            },
+          ],
+          usage,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    const ok = monter([
+      async () =>
+        corps({
+          prompt_tokens: 1200,
+          completion_tokens: 340,
+          total_tokens: 1540,
+          cost: 0.002,
+        }),
+    ]);
+    const reponse = await ok.client.envoyer(requete());
+    expect(reponse.tokens).toEqual({ entree: 1200, sortie: 340 });
+    expect(Object.keys(reponse).sort()).toEqual([
+      "coutUsd",
+      "fin",
+      "texte",
+      "tokens",
+    ]);
+    expect(JSON.stringify(reponse)).not.toContain("SENTINELLE");
+    // Au-delà de la borne : l'attribut manque, la réponse reste valide.
+    const trop = monter([
+      async () =>
+        corps({
+          prompt_tokens: 10_000_001,
+          completion_tokens: 5,
+          total_tokens: 10_000_006,
+          cost: 0.002,
+        }),
+    ]);
+    const reponseTrop = await trop.client.envoyer(requete());
+    expect(reponseTrop.tokens).toBeUndefined();
+    expect(reponseTrop.texte).toBe("x");
+  });
+
   it("zdr est transmis quand la configuration le demande", async () => {
     const { client, appels } = monter([async () => reponseOk()]);
     await client.envoyer(requete({ routage: { data_collection: "deny", zdr: true } }));
     expect(JSON.parse(String(appels[0]?.init.body))).toMatchObject({ provider: { data_collection: "deny", zdr: true } });
+  });
+
+  it("zdr absent du corps quand le routage n'en pose pas (décision 0096 § 4.1 : jamais de zdr hors de l'étape qui le demande)", async () => {
+    const { client, appels } = monter([async () => reponseOk()]);
+    await client.envoyer(requete());
+    expect((JSON.parse(String(appels[0]?.init.body)) as { provider: unknown }).provider).toEqual({ data_collection: "deny" });
   });
 
   it("sans coût rendu : l'estimation reste comptée", async () => {
@@ -176,7 +235,8 @@ describe("p0: fournisseur explicite et hôte figé (client de modèles)", () => 
           { status: 200 },
         ),
     ]);
-    expect(await client.envoyer(requete())).toEqual({ texte: "x", coutUsd: 0.01, fin: "stop" });
+    // Sans `usage`, l'AI SDK rend des jetons nuls (0) : la valeur 0 est admise (entier de 0 à 10 000 000).
+    expect(await client.envoyer(requete())).toEqual({ texte: "x", coutUsd: 0.01, fin: "stop", tokens: { entree: 0, sortie: 0 } });
     expect(port.lignes[0]?.etat).toBe("confirmee");
     expect(port.lignes[0]?.coutReelMicros).toBeNull();
   });

@@ -441,6 +441,9 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // `src/research`).
   ...["complement-p0", "couche", "entrees", "natures"].map((nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   ["src/research/bornes.ts", { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }],
+  // B7b (ticket 524, décision 0096 § 2 et § 5) : traces, candidats maison et recherche de production, non chargés par
+  // `pnpm p0`, marqueur `server-only` seul ; imports de projet par les règles de base.
+  ...["src/ai/traces.ts", "src/research/candidat-trouve.ts", "src/research/recherche.ts"].map((fichier) => [fichier, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const),
   // B8a (ticket 462, décision 0085 § 1) : modules de production de `src/grounding`, non chargés par `pnpm p0` ; marqueur
   // `server-only` seul, imports de projet par les règles de base (`src/contracts`, `src/grounding`).
   ...["ancrage-production", "fiches", "resultat", "trajets"].map(

@@ -224,6 +224,17 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7a (ticket 423), décision 0077 § 1 et § 2 ; verdict Sécurité demandé (PR de B7a)",
   })),
+  // B7b (ticket 524, décision 0096 § 2 et § 5) : traces de la couche IA, candidats maison et recherche de production,
+  // non chargés par `pnpm p0` ni par l'application (aucun importateur avant B9c), marqueur `server-only` seul.
+  // Verdict Sécurité demandé dans la PR de B7b.
+  ...["src/ai/traces.ts", "src/research/candidat-trouve.ts", "src/research/recherche.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de la couche IA ou de la recherche de production, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B7b (ticket 524), décision 0096 ; verdict Sécurité demandé (PR de B7b)",
+  })),
   // B7c (ticket 449 ; spécification B7, B7c point 4) : harnais du jeu d'évaluation `evals/`, non chargé par `pnpm p0`
   // ni par l'application, marqueur `server-only` seul. Verdict Sécurité demandé dans la PR de B7c (PR 454).
   {
