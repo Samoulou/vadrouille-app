@@ -48,7 +48,7 @@ const CAS_IPV6: Record<string, string> = {
   "ff00::/8": "ff02::1",
 };
 
-describe("p0: lecture de pages, garde SSRF — plages d'adresses (ip-guard)", () => {
+describe("recherche: le lecteur de pages refuse les adresses internes", () => {
   it("couvre chaque plage de la spécification par un cas", () => {
     expect(Object.keys(CAS_IPV4).sort()).toEqual(PLAGES_INTERDITES_IPV4.map(([a, p]) => `${a}/${p}`).sort());
     expect(Object.keys(CAS_IPV6).sort()).toEqual(PLAGES_INTERDITES_IPV6.map(([a, p]) => `${a}/${p}`).sort());

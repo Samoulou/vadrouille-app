@@ -274,6 +274,11 @@ describe("lint: @/ai/complement-p0 confiné aux appels directs de P0 (décision 
     "src/ai/noter-candidats.ts",
     "src/ai/entrees.ts",
     "src/research/agent.ts",
+    // B7b (décision 0096 § 5, Q6) : ni la recherche de production ni les traces ne reçoivent le complément de P0.
+    "src/research/recherche.ts",
+    "src/research/candidat-trouve.ts",
+    "src/ai/traces.ts",
+    "src/server/config/ia.ts",
     "src/workflows/autre.ts",
     "src/server/composition/autre.ts",
     "src/server/actions/exemple.ts",
@@ -305,5 +310,32 @@ describe("lint: @/ai/complement-p0 confiné aux appels directs de P0 (décision 
         COMPLEMENT,
       ),
     ).toHaveLength(0);
+  });
+});
+
+describe("lint: le complément de P0 n'est cité que par ses appelants nommés (décision 0096 § 5, Q6)", () => {
+  it("aucun fichier de src/ hors liste n'importe complement-p0, et les modules de B7b ne parlent pas du complément", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join, relative } = await import("node:path");
+    const racine = join(__dirname, "../../..");
+    const admis = new Set(["src/ai/complement-p0.ts", "src/ai/requetes.ts", "src/workflows/p0-run.ts", "src/server/composition/p0-reel.ts"].map((chemin) => join(racine, chemin)));
+    const fautifs: string[] = [];
+    const parcourir = (dossier: string) => {
+      for (const nom of readdirSync(dossier)) {
+        const chemin = join(dossier, nom);
+        if (statSync(chemin).isDirectory()) parcourir(chemin);
+        else if (/\.(ts|tsx)$/.test(nom) && !/\.test\.(ts|tsx)$/.test(nom) && !admis.has(chemin)) {
+          const relatif = relative(racine, chemin);
+          if (relatif.startsWith(join("src", "server", "p0"))) continue;
+          if (/(?:from|import\(|require\()\s*["'][^"']*complement-p0["']/.test(readFileSync(chemin, "utf8"))) fautifs.push(relatif);
+        }
+      }
+    };
+    parcourir(join(racine, "src"));
+    expect(fautifs).toEqual([]);
+    // Les modules de production de B7b ne reçoivent, ne construisent ni ne transmettent ni récit ni logement de P0.
+    for (const fichier of ["src/research/recherche.ts", "src/research/candidat-trouve.ts", "src/ai/traces.ts", "src/server/config/ia.ts"]) {
+      expect(readFileSync(join(racine, fichier), "utf8"), fichier).not.toMatch(/ComplementP0|complement-p0|\bcomplement\b/);
+    }
   });
 });

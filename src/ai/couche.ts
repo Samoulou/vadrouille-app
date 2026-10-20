@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { avecGardeDataCollection, type ClientModeles, type ReponseModele } from "@/ai/client";
-import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } from "@/ai/erreurs";
+import type { ResultatIa } from "@/ai/erreurs";
 import {
   CandidatPourModeleSchema,
   EntreeModelesSchema,
@@ -19,6 +19,7 @@ import { LONGUEURS_RESULTAT, type ResultatWeb } from "@/ai/recherche-web";
 import { creerRedigerRaisons } from "@/ai/rediger-raisons";
 import type { Routage } from "@/ai/reglages";
 import { requetePlan, requeteQuartier, requeteStructuration } from "@/ai/requetes";
+import { codeFermeDe, echecIa as echec, tracerModeles, type HorlogeTraces, type TracesIa } from "@/ai/traces";
 import {
   joursDuSejour,
   lireBriefDeduit,
@@ -66,7 +67,12 @@ export type ReglagesIa = {
   readonly raisons: ReglageEtape;
 };
 
-export type DependancesCoucheIa = { readonly modeles: ClientModeles; readonly reglages: ReglagesIa };
+/**
+ * Dépendances de la couche IA. `traces` est facultatif (décision 0077 § 2 point 2, 0096 § 2 point 4 : ajout compatible,
+ * aucune signature de B7a ne change) : fourni, le client de modèles est décoré par `tracerModeles` ; absent, aucune
+ * exportation (comportement de B7a). `horloge` (millisecondes) ne sert qu'aux traces.
+ */
+export type DependancesCoucheIa = { readonly modeles: ClientModeles; readonly reglages: ReglagesIa; readonly traces?: TracesIa; readonly horloge?: HorlogeTraces };
 
 /** Nombre maximal de candidats d'un lot de notation (borne de l'entrée, au-dessus des lots de P0). */
 export const MAX_CANDIDATS_NOTATION = 50;
@@ -209,17 +215,6 @@ export type CoucheIa = {
 
 // --- Conversion des erreurs attendues ------------------------------------------
 
-const CODES: ReadonlySet<string> = new Set(CODES_ERREUR_IA);
-const CODES_REESSAYABLES: ReadonlySet<string> = new Set(REESSAYABLES);
-
-function estCodeIa(code: unknown): code is CodeErreurIa {
-  return typeof code === "string" && CODES.has(code);
-}
-
-function echec<T>(code: CodeErreurIa): ResultatIa<T> {
-  return { ok: false, code, retryable: CODES_REESSAYABLES.has(code) };
-}
-
 /**
  * Envoie la requête et lit la réponse. Une erreur levée par le client qui porte un code fermé de `CODES_ERREUR_IA`
  * devient un échec ; toute autre exception (défaut de programmation) se propage telle quelle (0077 § 2 point 1). Une
@@ -234,7 +229,8 @@ async function appeler<L, T>(
   try {
     reponse = await envoi();
   } catch (erreur) {
-    if (erreur instanceof Error && "code" in erreur && estCodeIa(erreur.code)) return echec(erreur.code);
+    const code = codeFermeDe(erreur);
+    if (code !== undefined) return echec(code);
     throw erreur;
   }
   const lecture = lire(reponse.texte);
@@ -261,8 +257,10 @@ function hrefDe(brut: string): string | undefined {
   }
 }
 
-export function creerCoucheIa({ modeles, reglages }: DependancesCoucheIa): CoucheIa {
-  const client = avecGardeDataCollection(modeles);
+export function creerCoucheIa({ modeles, reglages, traces, horloge = Date.now }: DependancesCoucheIa): CoucheIa {
+  // Le client reçu est décoré d'abord (un client déjà décoré par la composition est rendu tel quel : aucune étape n'est
+  // tracée deux fois), puis protégé par la garde `data_collection` : un refus de la garde ne part pas, il n'est pas tracé.
+  const client = avecGardeDataCollection(traces === undefined ? modeles : tracerModeles(modeles, traces, horloge));
   const noterLot = creerNoterCandidats(client, reglages.notation);
   const redigerLieux = creerRedigerRaisons(client, reglages.raisons);
 

@@ -14,7 +14,8 @@ import { adresseAutorisee, estIpLitterale } from "@/research/ip-guard";
  * 2. résolution par le module, refus si **une** adresse est interdite (`ip-guard.ts`), connexion **à l'adresse
  *    vérifiée** (épinglage), nom d'hôte transmis pour TLS et SNI ;
  * 3. redirections suivies à la main, 3 au plus ;
- * 4. 2 Mo de corps au plus après décompression, 10 s au total, `text/html` ou `text/plain` seulement ;
+ * 4. 2 Mo de corps au plus après décompression, 10 s au total, `text/html`, `application/xhtml+xml` (lu comme
+ *    `text/html`, jamais par un analyseur XML) ou `text/plain` seulement (`TYPES_CONTENU_ADMIS`, décision 0096 § 1) ;
  * 5. ni cookie, ni en-tête d'identification ; `User-Agent` fixe.
  * Ces valeurs sont des constantes : une garde de sécurité ne s'assouplit pas par configuration (A3.1).
  */
@@ -24,6 +25,21 @@ export const DELAI_MAX_MS = 10_000;
 export const REDIRECTIONS_MAX = 3;
 export const PORT_HTTPS = 443;
 export const USER_AGENT = "PrototypeRecherche/1.0";
+
+/**
+ * Types de contenu admis (décision 0096 § 1 point 3, B7-TL-5) : **constante** du module, jamais une valeur de
+ * configuration (A3.1 de 0032 : une garde ne s'assouplit pas par configuration). `application/xhtml+xml` est lu comme
+ * `text/html` par `extraireTexte` (`parse5`, analyseur HTML) : aucune entité n'est résolue, aucun accès réseau, aucun
+ * analyseur XML. Tout autre type (`application/xml`, `text/xml`, `image/svg+xml`, `application/json`…) est refusé
+ * (`content_type`). Le type est lu avant le premier `;`, sans espaces, en minuscules.
+ */
+export const TYPES_CONTENU_ADMIS = ["text/html", "application/xhtml+xml", "text/plain"] as const;
+type TypeContenuAdmis = (typeof TYPES_CONTENU_ADMIS)[number];
+
+/** En-tête `accept` envoyé : les types admis, dans l'ordre de `TYPES_CONTENU_ADMIS`. */
+export const ENTETE_ACCEPT = TYPES_CONTENU_ADMIS.join(", ");
+
+const estTypeAdmis = (type: string): type is TypeContenuAdmis => (TYPES_CONTENU_ADMIS as readonly string[]).includes(type);
 
 /** Raisons fermées d'un refus de lecture (comptées dans le rapport, sans l'URL). */
 export const RAISONS_REFUS_PAGE = [
@@ -100,7 +116,7 @@ class Refus extends Error {
 
 const ENTETES: Readonly<Record<string, string>> = Object.freeze({
   "user-agent": USER_AGENT,
-  accept: "text/html, text/plain",
+  accept: ENTETE_ACCEPT,
   "accept-encoding": "gzip, deflate, identity",
 });
 
@@ -266,13 +282,14 @@ export function creerLecteurPages(dependances: DependancesLecteur): LecteurPages
             }
             if (reponse.statut !== 200) throw new Refus("http_status");
             const type = (reponse.entetes["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-            if (type !== "text/html" && type !== "text/plain") throw new Refus("content_type");
+            if (!estTypeAdmis(type)) throw new Refus("content_type");
             const codage = (reponse.entetes["content-encoding"] ?? "identity").trim().toLowerCase();
             if (codage !== "identity" && codage !== "gzip" && codage !== "deflate") throw new Refus("content_encoding");
             const bruts = await lireBorne(reponse.corps, controleur.signal);
             const morceaux = codage === "identity" ? bruts : await decompresser(bruts, codage, controleur.signal);
             const contenu = new TextDecoder("utf-8", { fatal: false }).decode(concatener(morceaux));
-            const texte = type === "text/html" ? extraireTexte(contenu) : nettoyer(contenu).slice(0, TEXTE_MAX);
+            // `application/xhtml+xml` passe par l'analyseur HTML comme `text/html` (décision 0096 § 1) : jamais d'analyseur XML.
+            const texte = type === "text/plain" ? nettoyer(contenu).slice(0, TEXTE_MAX) : extraireTexte(contenu);
             return { ok: true, texte };
           } finally {
             await reponse.fermer?.();

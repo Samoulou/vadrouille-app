@@ -2,8 +2,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RequeteModele } from "@/ai/client";
+import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
+import { CODES_ERREUR_IA, REESSAYABLES } from "@/ai/erreurs";
 import { createOpenRouterClient, ErreurOpenRouter } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
+import { tracerModeles, tracerRechercheWeb, type TracesIa } from "@/ai/traces";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { ErreurAncrage, type ClientPlaces, type ClientRoutes } from "@/grounding/interfaces";
 import { createPlacesClient } from "@/grounding/places-client";
@@ -400,4 +403,80 @@ describe("p0: erreur de fournisseur réduite à un code", () => {
       expect(presentes(texteErreur(erreur), INTERDITS_ERREUR)).toEqual([]);
     });
   }
+});
+
+// --- `ia: erreur de fournisseur réduite à un code` (spécification B7, B7b : test de P0r1 étendu aux nouvelles méthodes) -----
+
+describe("ia: erreur de fournisseur réduite à un code", () => {
+  const ROUTAGE = { data_collection: "deny" as const };
+  const REGLAGES: ReglagesIa = {
+    structuration: { modele: "test/structuration", routage: { ...ROUTAGE, zdr: true } },
+    quartier: { modele: "test/quartier", routage: ROUTAGE },
+    plan: { modele: "test/plan", routage: ROUTAGE },
+    notation: { modele: "test/notation", routage: ROUTAGE },
+    raisons: { modele: "test/raisons", routage: ROUTAGE },
+  };
+  const RECIT = "SENTINELLE_RECIT_ERREUR_88a";
+  /** Le code fermé attendu de chaque réponse simulée (la 302 n'est pas une erreur de statut : redirection). */
+  const CODES: Record<string, string> = {
+    "400": "upstream_error",
+    "403": "upstream_error",
+    "404": "upstream_error",
+    "429": "upstream_unavailable",
+    "500": "upstream_unavailable",
+    "302": "upstream_redirect",
+    "200 illisible": "upstream_error",
+    "200 hors schéma": "upstream_error",
+    "erreur réseau": "upstream_unavailable",
+  };
+  const web = (transport: (url: string, init: RequestInit) => Promise<Response>) =>
+    creerRechercheWebReelle(clientModeles(transport).rechercherWeb, { modele: "test/web", routage: ROUTAGE, moteur: "exa", maxResultats: 3 });
+  const fuite = (texte: string) => [...INTERDITS_ERREUR, RECIT].filter((sentinelle) => texte.includes(sentinelle));
+
+  describe.each(REPONSES_ERREUR)("réponse %s", (nom, reponse) => {
+    it("structurerBrief et proposerQuartier : résultat fermé, code de la liste, aucune sentinelle", async () => {
+      const couche = creerCoucheIa({ modeles: clientModeles(reponse), reglages: REGLAGES });
+      const resultats = [
+        await couche.structurerBrief({ story: `Nous aimons marcher. ${RECIT}`, trip: { destination: "Édimbourg", start: "2026-11-23", end: "2026-11-26", otherCities: [] } }),
+        await couche.proposerQuartier({ quartier: { ville: "Édimbourg", debut: "2026-11-23", fin: "2026-11-26" }, resultats: [] }),
+      ];
+      for (const resultat of resultats) {
+        expect(resultat.ok).toBe(false);
+        if (resultat.ok) continue;
+        expect(CODES_ERREUR_IA).toContain(resultat.code);
+        expect(resultat.code).toBe(CODES[nom]);
+        expect(resultat.retryable).toBe((REESSAYABLES as readonly string[]).includes(resultat.code));
+        expect(Object.keys(resultat).sort()).toEqual(["code", "ok", "retryable"]);
+        expect(fuite(JSON.stringify(resultat))).toEqual([]);
+      }
+    });
+
+    it("recherche web : une erreur dont le message est le code, sans cause, sans sentinelle", async () => {
+      const erreur = await erreurDe(web(reponse).rechercher("musées Édimbourg"));
+      expect(erreur).toBeInstanceOf(ErreurOpenRouter);
+      const { code, message, cause, stack } = erreur as ErreurOpenRouter;
+      expect(code).toBe(CODES[nom]);
+      expect(message).toBe(code);
+      expect(cause).toBeUndefined();
+      expect(fuite(`${message} ${stack ?? ""} ${JSON.stringify(erreur)}`)).toEqual([]);
+    });
+
+    it("décorateurs de traces : le code fermé passe, ni message ni pile n'atteint le port", async () => {
+      const recus: unknown[] = [];
+      const traces: TracesIa = {
+        debutEtape: (debut) => (recus.push(structuredClone(debut)), {}),
+        finEtape: (_jeton, fin) => void recus.push(structuredClone(fin)),
+      };
+      const horloge = () => 1_000;
+      const couche = creerCoucheIa({ modeles: tracerModeles(clientModeles(reponse), traces, horloge), reglages: REGLAGES });
+      await couche.structurerBrief({ story: RECIT, trip: { destination: "Édimbourg", start: "2026-11-23", end: "2026-11-26", otherCities: [] } });
+      await tracerRechercheWeb(web(reponse), traces, { modele: "test/web" }, horloge)
+        .rechercher(RECIT)
+        .catch(() => undefined);
+      const fins = recus.filter((recu) => "statut" in (recu as object)) as { statut: string }[];
+      expect(recus).toHaveLength(4);
+      expect(fins.map((fin) => fin.statut)).toEqual([CODES[nom], CODES[nom]]);
+      expect(fuite(JSON.stringify(recus))).toEqual([]);
+    });
+  });
 });
