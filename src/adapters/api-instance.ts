@@ -4,7 +4,7 @@ import { assertApiAdapter } from "./api-guard";
 import type { TripAdapter } from "./types";
 
 /**
- * Adaptateur `api` de l'application (spécification B6, B6b point 1 ; décisions 0086 § 2.1 et 0100 § 5.4).
+ * Adaptateur `api` de l'application (spécification B6, B6b point 1 ; décisions 0086 § 2.1 et 0100 § 5.4, amendée par 0108).
  *
  * **Branchement au démarrage** (sur le modèle de la connexion réelle de `better-auth.ts` et de `brancherLectureProgrammesReels`) : ce
  * module n'importe ni `./api.ts` (cas d'usage de `src/server/voyages/`, donc `withOrg` et la base), ni

@@ -10,6 +10,8 @@ Correction 1 (revues consolidées du head `f3e55d1`) : deux bloquants de chaque 
 
 État vérifié sur `main` `147fc3c` (identique à `fe740e6` pour le code) : B8a (#464), B8c (#442) et B6a (#473) sont fusionnées ; B6b (ticket #532) ne l'est pas ; aucun `getTripAdapter("api")` ; **`src/server/composition/` ne contient que `p0-reel.ts` : `generation.ts` n'existe pas** (composition de la génération, B9c, future). Code relu : `src/grounding/{trajets,fiches,places-client,routes-client,port-positions,ancrage}.ts`, `src/server/relecture/relectures.ts`, `src/server/env/{grounding,resolve}.ts`, `src/server/usage/{forfait,reservation,registre,port}.ts`, `src/server/config/usage.ts`, `src/server/voyages/lecture.ts`, `src/server/positions/{lecture,cache-positions}.ts`, `src/server/with-org.ts`, `src/domain/{relectures,recomposition,calculs}.ts`, `src/mocks/relectures-voyages.ts`, `tests/support/plafonds-usage.ts`, `prototype/config/prix-google.json`, `db/schema/business.ts` (`stays`).
 
+**Amendée par 0108** (§ 5.2 et § 5.4 : branchement de l'adaptateur `api` au démarrage par `src/instrumentation.ts`, seul importateur de `@/server/composition/lecture` hors des tests, à la place de l'import statique depuis `src/adapters/index.ts`).
+
 **Amende, sans les réécrire** (renvoi ajouté en tête de chacune dans cette PR) :
 - **0011 § 5**, lignes `Day.travelMinutes` et `Segment.minutes` et paragraphe « Relecture » : § 2, § 4 et § 6.1 ;
 - **0059 § 3**, ligne B8b (colonnes « Périmètre » et « Fichiers ») : § 3.1 et § 5 ;

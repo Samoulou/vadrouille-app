@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { assertApiAdapter, getTripAdapter, type TripAdapter } from "@/adapters";
-import { brancherLectureVoyages, debrancherLectureVoyagesPourTests } from "@/adapters/api-instance";
+import { brancherLectureVoyages, debrancherLectureVoyagesPourTests, LectureDejaBrancheeError } from "@/adapters/api-instance";
 import { mockTripAdapter } from "@/adapters/mock";
 import type { SourceRelectures } from "@/domain/relectures";
 
@@ -86,6 +86,26 @@ describe("adaptateurs: getTripAdapter api et sa garde", () => {
     expect(getTripAdapter("api")).not.toBe(getTripAdapter("api"));
     expect(doubles).toHaveLength(2);
     expect(doubles[0]).not.toBe(doubles[1]);
+  });
+
+  it("un second branchement lève LectureDejaBrancheeError et ne remplace pas la fabrique du démarrage", () => {
+    poser({ VADROUILLE_ENV: "ci", AUTH_ADAPTER: "better-auth" });
+    const premiere = fabriqueDeTest();
+    const seconde = fabriqueDeTest();
+    brancherLectureVoyages(premiere.fabrique);
+    expect(() => brancherLectureVoyages(seconde.fabrique)).toThrow(LectureDejaBrancheeError);
+    let erreur: unknown;
+    try {
+      brancherLectureVoyages(seconde.fabrique);
+    } catch (e) {
+      erreur = e;
+    }
+    expect(erreur).toBeInstanceOf(LectureDejaBrancheeError);
+    expect((erreur as Error).name).toBe("LectureDejaBrancheeError");
+    expect((erreur as Error).message).toBe("Lecture des voyages déjà branchée.");
+    getTripAdapter("api");
+    expect(premiere.fabrique).toHaveBeenCalledTimes(1);
+    expect(seconde.fabrique).not.toHaveBeenCalled();
   });
 
   it("non branchée (tests, next build) : garde vérifiée, puis chaque méthode rejette sans rien lire", async () => {

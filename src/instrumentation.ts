@@ -21,7 +21,7 @@
  * (`brancherConnexionReelle`) ; rien n'est lu ni connecté ici (pools créés au premier appel). Un échec du branchement
  * est journalisé sans arrêter le serveur : la connexion reste fermée (`provider_error`, page d'erreur).
  *
- * B6b (spécification B6, B6b point 1 ; décisions 0086 § 2.1 et 0100 § 5.4) : environnement valide et `DATA_ADAPTER=api`,
+ * B6b (spécification B6, B6b point 1 ; décisions 0086 § 2.1 et 0100 § 5.4, amendée par 0108) : environnement valide et `DATA_ADAPTER=api`,
  * la fabrique de l'adaptateur `api` (cas d'usage de B6a sur la source de relectures choisie par
  * `choisirSourceRelectures` : le double de la requête, ou la source réelle de B8b en `local` avec
  * `RELECTURES_SOURCE=google`) est branchée sur `src/adapters/api-instance.ts` ; rien n'est lu ni connecté ici, et la

@@ -125,10 +125,17 @@ function ecartDuJ5(rendu: string): string {
   return resultat;
 }
 
-/** Ouvre `chemin` sur le serveur `origine` ; vérifie le statut et, sur le serveur api, `Cache-Control` (Q524). */
+/**
+ * Ouvre `chemin` sur le serveur `origine` ; vérifie le statut et `Cache-Control: private, no-store` (Q524,
+ * `next.config.ts`, règle `/voyages/:path*`) sur **chaque** réponse, 404 comprises. Les deux serveurs servent le même
+ * build : la règle vaut pour l'un comme pour l'autre.
+ */
 async function ouvrir(page: Page, origine: string, chemin: string, statut = 200) {
   const reponse = await page.goto(`${origine}${chemin}`);
   expect(reponse?.status(), chemin).toBe(statut);
+  const cache = reponse?.headers()["cache-control"] ?? "";
+  expect(cache, `Cache-Control de ${chemin}`).toMatch(/\bprivate\b/);
+  expect(cache, `Cache-Control de ${chemin}`).toMatch(/\bno-store\b/);
   return reponse;
 }
 
