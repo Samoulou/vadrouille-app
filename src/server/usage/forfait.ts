@@ -10,8 +10,9 @@ import type { CodeRefusUsage, Fournisseur, Methode, Nature } from "@/server/usag
  *
  * Le forfait d'une exécution est **la somme de ses plafonds par méthode** de la configuration du mode, valorisée au
  * **prix catalogue plein** (sans tranche gratuite : le forfait surestime, jamais il ne sous-estime ; Q329), plus le
- * plafond de coût des modèles du mode ; celui d'une relecture, le plafond d'une relecture (Routes seulement, aucun
- * coût de modèle). **Démonstration de S4** : chaque champ est une fonction de (nature, configuration) seulement ; deux
+ * plafond de coût des modèles du mode ; celui d'une relecture, le plafond de son profil (Text Search, fiches et Routes,
+ * décision 0100 § 1 ; aucun coût de modèle). **Démonstration de S4** : chaque champ est une fonction de (profil,
+ * configuration) seulement ; deux
  * exécutions du même mode ont des forfaits identiques, quel que soit leur ancrage.
  */
 
@@ -23,8 +24,16 @@ export type PlafondsMethodes = {
   readonly routesElements: number;
 };
 
-/** Plafonds d'une relecture de Journée (Routes seulement). */
-export type PlafondsRelecture = { readonly routesRequetes: number; readonly routesElements: number };
+/**
+ * Plafonds d'une relecture (décision 0100 § 1.1, B8-TL-4) : Text Search (villes), fiches (tous masques, comptés au SKU
+ * de `details`) et Routes. Un profil par portée de lecture (`relecture` : un jour ; `relectureVoyage` : le voyage).
+ */
+export type PlafondsRelecture = {
+  readonly placesTextSearch: number;
+  readonly placesDetails: number;
+  readonly routesRequetes: number;
+  readonly routesElements: number;
+};
 
 /** SKU facturés par méthode, ceux des clients réels (P0r1) ; leur prix vient de la table de prix. */
 export type SkusForfait = { readonly textSearch: string; readonly details: string; readonly matrice: string };
@@ -112,17 +121,26 @@ export function forfaitExecution(table: TablePrixGoogle, skus: SkusForfait, plaf
   };
 }
 
-/** Forfait d'une relecture : Routes seulement, aucun coût de modèle. */
-export function forfaitRelecture(table: TablePrixGoogle, skus: Pick<SkusForfait, "matrice">, plafonds: PlafondsRelecture): Forfait {
+/**
+ * Forfait d'une relecture (décision 0100 § 1.1) : Text Search, fiches et Routes au prix plein, aucun coût de modèle.
+ * Toutes les fiches de la lecture (masque de `details` des étapes, masque de position des logements) sont comptées au
+ * SKU de `details` : un majorant, jamais une sous-estimation.
+ */
+export function forfaitRelecture(table: TablePrixGoogle, skus: Pick<SkusForfait, "textSearch" | "details" | "matrice">, plafonds: PlafondsRelecture): Forfait {
+  const textSearchRequetes = entier(plafonds.placesTextSearch, "placesTextSearch");
+  const placeDetailsRequetes = entier(plafonds.placesDetails, "placesDetails");
   const routesRequetes = entier(plafonds.routesRequetes, "routesRequetes");
   const routesElements = entier(plafonds.routesElements, "routesElements");
   return {
     nature: "relecture",
-    textSearchRequetes: 0,
-    placeDetailsRequetes: 0,
+    textSearchRequetes,
+    placeDetailsRequetes,
     routesRequetes,
     routesElements,
-    coutGoogleMicros: prixPlein(table, skus.matrice, "routes_matrix", "element", routesElements),
+    coutGoogleMicros:
+      prixPlein(table, skus.textSearch, "places_text_search", "requete", textSearchRequetes) +
+      prixPlein(table, skus.details, "places_details", "requete", placeDetailsRequetes) +
+      prixPlein(table, skus.matrice, "routes_matrix", "element", routesElements),
     coutModelesMicros: null,
   };
 }

@@ -276,7 +276,7 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
  * prix plein : 40 × 0,005 = **0,20 USD** réservés, alors que le coût réel est d'un élément par trajet (tranche gratuite
  * de 10 000 éléments par mois non déduite, Q329). Constante, comme l'exige S4 : le forfait ne dépend que de la nature.
  */
-export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ routesRequetes: 40, routesElements: 40 });
+export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ placesTextSearch: 0, placesDetails: 0, routesRequetes: 40, routesElements: 40 });
 
 /**
  * Forfait et règles de la réservation d'une relecture Routes (P0r4, décision 0079), lus dans ce pont comme ceux du

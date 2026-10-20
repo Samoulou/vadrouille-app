@@ -5,7 +5,7 @@ import { BLOC_MATRICE } from "@/grounding/ancrage";
 import { zoneEtDepart } from "@/grounding/ancrage-production";
 import { ErreurClientGoogle, PLACE_ID_GOOGLE } from "@/grounding/enveloppe-google";
 import { cleMaison } from "@/grounding/interfaces";
-import { chargerTrajets, minutesEstimees } from "@/grounding/trajets";
+import { CONCURRENCE_COUPLES, chargerTrajets, chargerTrajetsParCouples, minutesEstimees } from "@/grounding/trajets";
 import { distanceVolOiseauMetres } from "@/grounding/zone";
 
 import { creerRoutesDouble, LAT_SENTINELLE, LNG_SENTINELLE, placesInterdit, SENTINELLES_B8 } from "../../tests/support/doubles-grounding";
@@ -115,5 +115,75 @@ describe("trajets: un quartier conseillé part de son centre", () => {
   it("une clé maison ne rencontre jamais un placeId (préfixe « maison: », « : » absent de PLACE_ID_GOOGLE)", () => {
     expect(cleMaison(CENTRE_QUARTIER).startsWith("maison:")).toBe(true);
     expect(PLACE_ID_GOOGLE.test(cleMaison(CENTRE_QUARTIER))).toBe(false);
+  });
+});
+
+describe("lecture: trajets par couples (B8b, décision 0100 § 1.5)", () => {
+  it("un élément par couple et par mode, aucun autre couple n'est mesuré", async () => {
+    const routes = creerRoutesDouble({ secondes: () => 4321 });
+    const resultat = await chargerTrajetsParCouples(
+      [
+        { depuis: A, vers: B, modes: ["walk", "transit"] },
+        { depuis: B, vers: C, modes: ["car"] },
+      ],
+      routes,
+    );
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(routes.appels).toHaveLength(3);
+    for (const requete of routes.appels) expect(requete.origines.length * requete.destinations.length).toBe(1);
+    expect(resultat.valeur.duree("P_A", "P_B", "walk")).toEqual({ minutes: Math.ceil(4321 / 60), estimee: false });
+    expect(resultat.valeur.duree("P_A", "P_C", "walk")).toBeUndefined();
+  });
+
+  it("sans itinéraire pour tous les modes admis : estimation si les deux positions sont connues, sinon rien", async () => {
+    const routes = creerRoutesDouble({ secondes: () => null });
+    const resultat = await chargerTrajetsParCouples(
+      [
+        { depuis: A, vers: B, modes: ["walk"] },
+        { depuis: { placeId: "P_X" }, vers: C, modes: ["walk"] },
+      ],
+      routes,
+    );
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(resultat.valeur.duree("P_A", "P_B", "walk")).toEqual({ minutes: minutesEstimees(A.position, B.position, "walk"), estimee: true });
+    expect(resultat.valeur.duree("P_X", "P_C", "walk")).toBeUndefined();
+  });
+
+  it("un centre maison part de ses coordonnées", async () => {
+    const centre = { lat: LAT_SENTINELLE, lng: LNG_SENTINELLE };
+    const routes = creerRoutesDouble({ secondes: () => 600 });
+    const resultat = await chargerTrajetsParCouples([{ depuis: { cleMaison: cleMaison(centre), centreMaison: centre }, vers: B, modes: ["walk"] }], routes);
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(routes.appels[0]?.origines).toEqual([{ centreMaison: centre }]);
+    expect(resultat.valeur.duree(cleMaison(centre), "P_B", "walk")).toEqual({ minutes: 10, estimee: false });
+  });
+
+  it("concurrence bornée ; la première erreur abandonne le reste", async () => {
+    let enCours = 0;
+    let max = 0;
+    const routes = {
+      async matrice() {
+        enCours += 1;
+        max = Math.max(max, enCours);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        enCours -= 1;
+        return { secondes: [[600]] };
+      },
+    };
+    const couples = Array.from({ length: 20 }, (_, i) => ({ depuis: A, vers: { placeId: `P_${i}`, position: B.position }, modes: ["walk" as const] }));
+    const ok = await chargerTrajetsParCouples(couples, routes);
+    expect(ok.ok).toBe(true);
+    expect(max).toBeLessThanOrEqual(CONCURRENCE_COUPLES);
+    const enEchec = creerRoutesDouble({ secondes: () => 600, erreur: { auAppel: 2, fabrique: () => new ErreurClientGoogle("cap_reached") } });
+    const echec = await chargerTrajetsParCouples(couples, enEchec);
+    expect(echec).toMatchObject({ ok: false, code: "cap_reached" });
+    expect(enEchec.appels.length).toBeLessThan(couples.length);
+  });
+
+  it("position manquante d'un point placeId pour chargerTrajets : échec fermé, aucun appel", async () => {
+    const routes = creerRoutesDouble({ secondes: () => 1 });
+    const resultat = await chargerTrajets([{ placeId: "P_X" }, B], ["walk"], routes);
+    expect(resultat.ok).toBe(false);
+    expect(routes.appels).toHaveLength(0);
   });
 });

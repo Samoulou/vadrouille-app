@@ -85,10 +85,44 @@ export function logementsDuJour(jour: number, nombreDeNuits: number): { depart: 
 // le double `src/mocks/relectures-voyages.ts` (qui n'importe ce module qu'en `import type`, arête admise de 0086), et
 // injecté dans la lecture des voyages (`src/server/voyages/`) par la fabrique de l'adaptateur `api`.
 
-/** Voyage passé au port : logements par nuit (B6-PO-17). */
+/**
+ * Séjour qui couvre une nuit (ligne `stays`), tel que le lit la lecture : de quoi résoudre le point de départ d'un trajet
+ * quand `stays.place_id` est nul (décision 0100 § 6.2). Données maison seulement (le centre est celui d'une zone du
+ * modèle, jamais une coordonnée Google).
+ */
+export type SejourDeNuit = {
+  /** `stays.place_id` ; `null` : séjour sans lieu. */
+  readonly placeId: string | null;
+  /** `stays.city` ; `null` pour une ligne antérieure à B9b. */
+  readonly ville: string | null;
+  /** `stays.area_center_lat` et `area_center_lng` d'une zone maison (`suggestedArea`) ; `null` sinon. */
+  readonly centre: { readonly lat: number; readonly lng: number } | null;
+  /** `stays.kind`. */
+  readonly type: "lodging" | "neighbourhood" | "none";
+  /** `stays.lodging_kind` ; `null` pour une ligne antérieure à B9b. */
+  readonly logement: "known" | "area" | "none" | "suggestedLodging" | "suggestedArea" | null;
+};
+
+/**
+ * Portée d'une lecture (décision 0100 § 1.3) : `voyage` pour `getTrip`, `jour` pour `getDay`, `listProposals` et
+ * `listPreviewSlots`. Elle vient du **cas d'usage** appelé, jamais de la demande ni du navigateur ; elle choisit le
+ * profil du forfait de relecture.
+ */
+export type PorteeLecture = "jour" | "voyage";
+
+/**
+ * Voyage passé au port : logements par nuit (B6-PO-17), et, depuis la décision 0100 (§ 3.2 point 1 et § 6.2),
+ * le contexte de la session, la portée de la lecture et les séjours de chaque nuit. Le contexte est celui de la session
+ * (organisation, utilisateur et voyage lus avec elle), posé par le cas d'usage ; aucun jeton, aucune entrée du navigateur.
+ */
 export type VoyageARelire = {
   /** `stays.place_id` de chaque nuit (B6-PO-17), index 0 = première nuit ; `null` : logement sans lieu. */
   readonly logementsParNuit: readonly (string | null)[];
+  /** Organisation, utilisateur et voyage de la session : la source ouvre ses transactions `withOrg` avec eux (0100 § 3.2). */
+  readonly contexte: { readonly organizationId: string; readonly userId: string; readonly tripId: string };
+  readonly portee: PorteeLecture;
+  /** Séjour de chaque nuit, même index que `logementsParNuit` (0100 § 6.2). */
+  readonly sejoursParNuit: readonly SejourDeNuit[];
 };
 
 /**

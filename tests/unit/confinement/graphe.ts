@@ -18,6 +18,12 @@ export const MODULES_CAPACITE_P0R1: readonly string[] = (
   JSON.parse(readFileSync(new URL("./donnees/refus.json", import.meta.url), "utf8")) as { modulesCapaciteP0r1: string[] }
 ).modulesCapaciteP0r1;
 export const MODULE_COMPOSITION = "src/server/composition/p0-reel.ts";
+/**
+ * Modules de composition, seuls points d'entrée admis vers les modules de capacité de P0r1 : celle du prototype et, depuis
+ * B8b (décision 0100 § 5.2), la fabrique commune des clients Google (`places-client.ts`, `routes-client.ts`), que seules
+ * les compositions de la lecture (et de la génération, B9c) importent (`ligne/relecture-imports`, `composition.test.ts`).
+ */
+export const MODULES_COMPOSITION: readonly string[] = [MODULE_COMPOSITION, "src/server/composition/clients-google.ts"];
 
 export function construireGraphe(resultats: readonly Resultat[]): Graphe {
   const graphe = new Map<string, Set<string>>();
@@ -97,9 +103,9 @@ export function verifierFermeture(
     }
   }
 
-  const sansComposition = new Map([...graphe].map(([f, cibles]) => [f, f === MODULE_COMPOSITION ? new Set<string>() : cibles]));
+  const sansComposition = new Map([...graphe].map(([f, cibles]) => [f, MODULES_COMPOSITION.includes(f) ? new Set<string>() : cibles]));
   for (const r of resultats) {
-    if (estFichierTest(r.fichier) || r.fichier === MODULE_COMPOSITION || MODULES_CAPACITE_P0R1.includes(r.fichier)) continue;
+    if (estFichierTest(r.fichier) || MODULES_COMPOSITION.includes(r.fichier) || MODULES_CAPACITE_P0R1.includes(r.fichier)) continue;
     const atteint = [...atteignables(sansComposition, [r.fichier])].find((f) => f !== r.fichier && MODULES_CAPACITE_P0R1.includes(f));
     if (atteint) {
       violations.push({ fichier: r.fichier, regle: "fermeture-module-p0r1", message: `${r.fichier} : module de capacité de P0r1 atteint hors des tests et du module de composition (${atteint})` });

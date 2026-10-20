@@ -198,6 +198,10 @@ export const LECTURES_ENV = [
     ],
   },
   { fichier: "src/server/env/p0.ts", noms: ["CI", "VERCEL_GIT_COMMIT_REF", "P0_REAL_RUNS"] },
+  // B8b (décision 0100 § 3.2 point 4 et § 5.3) : `RELECTURES_SOURCE` (`google` seulement, comparaison exacte) et
+  // `POSITIONS_ECRITURE_SUSPENDUE` (`1` seulement, 0060 § 1.3), lues par propriété littérale, à l'appel, valeur jamais
+  // rendue ni journalisée. Verdict Sécurité : attendu (0100 § 7 point 4).
+  { fichier: "src/server/env/relectures.ts", noms: ["RELECTURES_SOURCE", "POSITIONS_ECRITURE_SUSPENDUE"] },
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (identifiant public posé par Vercel), consigné avec
   // l'exécution réservée ; lu à l'appel par `commitDuDeploiement`, forme contrôlée. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "src/server/env/p0.ts", noms: ["VERCEL_GIT_COMMIT_SHA"] },
@@ -276,6 +280,9 @@ export const ENV_ENTIER = [
   // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : module étroit du mode réel, environnement lu à l'appel,
   // passé entier à la barrière de sortie et au seul calcul de l'environnement (B3a). Verdict Sécurité à rendre.
   { fichier: "src/server/env/p0.ts", formes: ["defaut:lireEnvP0", "argument:verifierSortie", "argument:resolveServerEnvironment"] },
+  // B8b (décision 0100 § 5.3) : même forme pour le module étroit de la lecture ; l'environnement entier va au seul calcul de
+  // l'environnement (B3a). Verdict Sécurité : attendu.
+  { fichier: "src/server/env/relectures.ts", formes: ["defaut:ecriturePositionsSuspendue", "defaut:sourceReelleChoisie", "argument:resolveServerEnvironment"] },
   // P0r3d (ticket 354) : même forme pour le commit du déploiement, lu par propriété littérale. Verdict Sécurité : approuvé (revue consolidée du head `193603d`, PR 357).
   { fichier: "src/server/env/p0.ts", formes: ["defaut:commitDuDeploiement"] },
   // B3a (ticket 293 ; décision 0050, « Lignes du régime de confinement » ; 0051 point 6.7.3) : `process.env` entier

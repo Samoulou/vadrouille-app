@@ -7,8 +7,9 @@ import type { TableTrajets } from "@/grounding/trajets";
 /**
  * Tables de relecture conformes à l'interface du moteur (B8a ; spécification B8, B8-PO-6 à B8-PO-8 ; décision 0085
  * § 1.7). N'importe de `@/grounding` **que des types** : aucun appel Google, aucune estimation (faite par
- * `chargerTrajets`). Importable seulement par la composition `src/server/composition/generation.ts` et les tests
- * (0085 § 1.8, règle `ligne/relecture-imports`).
+ * `chargerTrajets` et `chargerTrajetsParCouples`). Importable seulement par les compositions
+ * `src/server/composition/generation.ts` (B9c) et `src/server/composition/lecture.ts` (B8b), par la source de la lecture
+ * (`source.ts`) et les tests (0100 § 5.2, règle `ligne/relecture-imports`).
  *
  * Correspondance des issues (B8-PO-6) :
  * - `chargee` + `OPERATIONAL` ou statut absent (Q460) → `valide`, plages des horaires réguliers ;
@@ -16,7 +17,7 @@ import type { TableTrajets } from "@/grounding/trajets";
  *   `lecture` (`aConfirmer` pose `toConfirm`) ;
  * - `chargee` + `CLOSED_PERMANENTLY` → `ferme_definitivement`, plages inconnues dans les deux usages ;
  * - `introuvable` → `introuvable`, plages inconnues dans les deux usages ;
- * - `placeId` sans issue (non relu) → `inconnu` (c'est `recomposer.ts`, B8b, qui ne le passe pas à `aConfirmer`).
+ * - `placeId` sans issue (non relu) → `inconnu` (`exceptionsLues` ne le passe pas à `aConfirmer`, 0100 § 4.2).
  * Horaires (B8-PO-7) : plages du jour de la semaine de la date ; une plage qui passe minuit finit à
  * `1 440 + finLendemain` (≤ 2 880) ; horaires absents : `inconnu`. Les valeurs ne sortent jamais de la mémoire.
  */
@@ -30,9 +31,10 @@ export type EntreeRelectures = {
   /**
    * **Clé de trajet** du point de départ de chaque nuit, index 0 = première nuit (décision 0087 § 3.2) : `placeId` du
    * logement, ou de la ville pour `area`, `none` ; clé maison (`cleMaison`) du centre d'un `suggestedArea`. Le moteur
-   * garde `Point = { logement: index }`.
+   * garde `Point = { logement: index }`. `null` : nuit dont le point n'a pu être résolu (0100 § 6.2) : tout trajet qui
+   * en part ou y arrive est `inconnu`.
    */
-  readonly logementsParNuit: readonly string[];
+  readonly logementsParNuit: readonly (string | null)[];
 };
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -52,7 +54,7 @@ export function versRelectures(entree: EntreeRelectures): Relectures {
   for (const fiche of entree.fiches) if (!issues.has(fiche.placeId)) issues.set(fiche.placeId, fiche);
   const { usage, trajets, logementsParNuit } = entree;
 
-  const placeIdDe = (point: Point): string | undefined => ("lieu" in point ? point.lieu : logementsParNuit[point.logement]);
+  const placeIdDe = (point: Point): string | undefined => ("lieu" in point ? point.lieu : (logementsParNuit[point.logement] ?? undefined));
 
   return {
     validite(placeId: string): Validite {

@@ -723,7 +723,15 @@ function atteints(depart: string, voisins: Voisins, arreter: (chemin: string) =>
  * `p0Run` : `src/workflows/index.ts` seul, ci-dessous).
  */
 const PONTS_P0: readonly string[] = ["src/server/composition/p0-reel.ts", "src/workflows/p0-run.ts"];
-const estPont = (chemin: string) => PONTS_P0.includes(chemin);
+/**
+ * B8b (décision 0100 § 5.2) : la fabrique commune des clients Google est un pont de plus vers `src/grounding` (modules de
+ * capacité `places-client.ts` et `routes-client.ts`). Le parcours de la frontière s'arrête à elle ; ses importateurs
+ * (`composition/lecture.ts`, plus `generation.ts` quand B9c existera) sont contrôlés à part par `composition.test.ts` et la
+ * règle `ligne/relecture-imports`. Admis : `src/adapters/index.ts` → `composition/lecture.ts` → `composition/clients-google.ts`
+ * → `@/grounding/*` (cas fabriqués ci-dessous).
+ */
+const PONTS_LECTURE: readonly string[] = ["src/server/composition/clients-google.ts"];
+const estPont = (chemin: string) => PONTS_P0.includes(chemin) || PONTS_LECTURE.includes(chemin);
 
 /**
  * B7a (décision 0077 § 3 point 1, amende 0048 § 1 et 0055 § 3 sur ce seul point) : `src/ai/erreurs.ts`, **et lui seul**
@@ -758,6 +766,13 @@ const interditPartout = (chemin: string) =>
  */
 const MODULES_RELECTURE: readonly string[] = ["src/server/relecture/relectures.ts"];
 const TYPES_GROUNDING_RELECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/trajets.ts"];
+/**
+ * B8b (décision 0100 § 5.1) : la source de relectures appelle `chargerFiches`, `chargerTrajetsParCouples`… de
+ * `src/grounding` avec des **clients injectés** par la composition de la lecture ; elle n'importe donc aucun module de
+ * capacité, seulement ces trois modules de fonctions (valeurs) et le type du port du cache. Liste fermée ; arêtes exactes.
+ */
+const MODULE_SOURCE_LECTURE = "src/server/relecture/source.ts";
+const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/interfaces.ts", "src/grounding/trajets.ts"];
 
 /** B6a (décision 0086 § 1.2 point 4) : seule arête de l'application hors de src/server vers src/domain, en type seulement. */
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
@@ -769,6 +784,7 @@ const NATURES_IA = "src/ai/natures.ts";
 const areteAdmise = (de: string, vers: string) =>
   (MODULES_SERVEUR_P0.includes(de) && TYPES_PROTOTYPE_SERVEUR_P0.includes(vers)) ||
   (MODULES_RELECTURE.includes(de) && TYPES_GROUNDING_RELECTURE.includes(vers)) ||
+  (de === MODULE_SOURCE_LECTURE && GROUNDING_SOURCE_LECTURE.includes(vers)) ||
   // B8c (décision 0060 § 1.4) : type du port du cache de positions, importé en type seulement hors de src/grounding.
   (vers === PORT_POSITIONS && !de.startsWith("src/grounding/")) ||
   // B6a (décision 0086 § 1.2 point 4, amende 0048 § 1) : le double de relectures importe les types de son port
@@ -1282,8 +1298,8 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // D18 (décision 0055, section 3) : la composition du mode réel est le seul pont de l'application vers les modules
       // de P0 ; elle est contrôlée à part (`tests/unit/p0/composition.test.ts` : seul importateur des modules de
       // capacité, importée par le seul workflow `p0Run`). Tout autre fichier qui l'atteint reste une violation ici.
-      const sources = [...application.filter((f) => !estTest(f) && !PONTS_P0.includes(f)), ...configs];
-      expect(PONTS_P0.every((f) => application.includes(f))).toBe(true);
+      const sources = [...application.filter((f) => !estTest(f) && !estPont(f)), ...configs];
+      expect([...PONTS_P0, ...PONTS_LECTURE].every((f) => application.includes(f))).toBe(true);
       expect(sources).toContain("src/server/config/moteur.ts");
       for (const fichier of sources) expect(violationsApplication(fichier, voisinsReels), fichier).toEqual([]);
       // Le module serveur de configuration atteint bien src/domain : la frontière est exercée sur un cas réel.
@@ -1354,9 +1370,60 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
           expect(forme, fichier).toMatch(/^import type \{/);
         }
       }
-      // 0085 § 1.8 : seule la composition `src/server/composition/generation.ts` (B9c) pourra l'importer.
-      const importeurs = application.filter((f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")));
-      expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts")).toEqual([]);
+      // 0085 § 1.8 et 0100 § 5.2 : seules les compositions `generation.ts` (B9c) et `lecture.ts` (B8b) l'importent.
+      const importeurs = application.filter(
+        (f) => !estTest(f) && !MODULES_RELECTURE.includes(f) && f !== MODULE_SOURCE_LECTURE && voisinsReels(f).some((c) => c.startsWith("src/server/relecture/")),
+      );
+      expect(importeurs.filter((f) => f !== "src/server/composition/generation.ts" && f !== "src/server/composition/lecture.ts")).toEqual([]);
+      expect(importeurs).toContain("src/server/composition/lecture.ts");
+    });
+
+    it("B8b : la source de relectures n'importe de src/grounding que fiches, interfaces et trajets (aucun module de capacité), ni l'environnement ni src/adapters", () => {
+      expect(application).toContain(MODULE_SOURCE_LECTURE);
+      const { imports } = analyser(MODULE_SOURCE_LECTURE, readFileSync(path.join(RACINE, MODULE_SOURCE_LECTURE), "utf8"));
+      const cibles = imports.map(({ specificateur }) => resoudre(MODULE_SOURCE_LECTURE, specificateur));
+      const grounding = cibles.flatMap((c) => (c.type === "projet" && c.chemin.startsWith("src/grounding/") ? [c.chemin] : []));
+      expect(grounding.sort()).toEqual([...GROUNDING_SOURCE_LECTURE, "src/grounding/port-positions.ts"].sort());
+      for (const c of cibles) {
+        if (c.type !== "projet") continue;
+        expect(c.chemin.startsWith("src/adapters/") || c.chemin.startsWith("src/server/env/") || c.chemin.startsWith("src/server/composition/"), c.chemin).toBe(false);
+      }
+      // Le type du port du cache est importé en type seulement.
+      const port = imports.filter(({ specificateur }) => resoudre(MODULE_SOURCE_LECTURE, specificateur).type === "projet" && specificateur.endsWith("port-positions"));
+      expect(port).toHaveLength(1);
+      for (const { forme } of port) expect(forme).toMatch(/^import type \{/);
+    });
+
+    it.each([
+      [
+        "admis : adaptateurs → composition/lecture → fabrique → modules de capacité (le parcours s'arrête à la fabrique)",
+        {
+          "src/adapters/index.ts": ["src/server/composition/lecture.ts"],
+          "src/server/composition/lecture.ts": ["src/server/composition/clients-google.ts", "src/server/relecture/source.ts"],
+          "src/server/composition/clients-google.ts": ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"],
+          "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts"],
+        },
+        "src/adapters/index.ts",
+        [],
+      ],
+      ["admis : source → fiches, trajets, interfaces (arêtes exactes)", { "src/server/relecture/source.ts": ["src/grounding/fiches.ts", "src/grounding/trajets.ts", "src/grounding/interfaces.ts"] }, "src/server/relecture/source.ts", []],
+      ["refusé : source → module de capacité", { "src/server/relecture/source.ts": ["src/grounding/places-client.ts"] }, "src/server/relecture/source.ts", ["src/grounding/places-client.ts"]],
+      ["refusé : source → un autre module de src/grounding", { "src/server/relecture/source.ts": ["src/grounding/ancrage-zone.ts"] }, "src/server/relecture/source.ts", ["src/grounding/ancrage-zone.ts"]],
+      [
+        "refusé : une autre composition de src/server → src/grounding (pas par la fabrique)",
+        { "src/server/composition/autre.ts": ["src/grounding/places-client.ts"] },
+        "src/server/composition/autre.ts",
+        ["src/grounding/places-client.ts"],
+      ],
+      [
+        "refusé : module de la lecture des voyages → src/grounding (chemin direct)",
+        { "src/server/voyages/lecture.ts": ["src/grounding/fiches.ts"] },
+        "src/server/voyages/lecture.ts",
+        ["src/grounding/fiches.ts"],
+      ],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B8b, graphe de la lecture : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
     });
 
     it("B6a : le double de relectures n'atteint src/domain que par les types de src/domain/relectures.ts ; aucun autre fichier hors de src/server n'atteint src/domain", () => {

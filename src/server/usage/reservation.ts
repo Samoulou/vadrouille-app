@@ -66,8 +66,11 @@ const ORGANISATION_PROTOTYPE = "5e1f0000-0000-4000-8000-000000000001";
 /** Clé du verrou consultatif des forfaits du MVP (« 5e1f0003 »), distincte de celle du prototype (`CLE_VERROU_FORFAIT`). */
 export const CLE_VERROU_USAGE = 0x5e1f0003;
 
-/** Profils d'un forfait de génération (B7-PO-5) et de relecture (B8-TL-4). */
-export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "relecture"] as const;
+/**
+ * Profils d'un forfait de génération (B7-PO-5) et de relecture (B8-TL-4, décision 0100 § 1.3) : `relecture` (un jour, une
+ * présentation) et `relectureVoyage` (le voyage), choisis par la **portée** de la lecture, jamais par un contenu.
+ */
+export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "relecture", "relectureVoyage"] as const;
 export type ProfilForfait = (typeof PROFILS_FORFAIT)[number];
 
 /** Actions sans compte (écrans 2 et 3 ; B7-TL-10). */
@@ -112,7 +115,8 @@ function skusDe(plafonds: PlafondsUsage): SkusForfait {
 
 /** Forfait d'un profil : fonction de la configuration seule (B7-TL-9). */
 export function forfaitDuProfil(plafonds: PlafondsUsage, table: TablePrixGoogle, profil: ProfilForfait): Forfait {
-  if (profil === "relecture") return forfaitRelecture(table, skusDe(plafonds), plafonds.relecture);
+  if (profil === "relecture") return forfaitRelecture(table, skusDe(plafonds), plafonds.relecture.jour);
+  if (profil === "relectureVoyage") return forfaitRelecture(table, skusDe(plafonds), plafonds.relecture.voyage);
   const p = plafonds.generations[profil];
   return forfaitExecution(table, skusDe(plafonds), p, p.coutModelesMicros);
 }
@@ -291,14 +295,14 @@ async function reserver(transaction: TransactionOrganisation, ecriture: Ecriture
 }
 
 /**
- * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`) ou d'une relecture, dans la transaction de
+ * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`) ou d'une relecture (`relecture`, `relectureVoyage`), dans la transaction de
  * `withOrg` de la génération (0083 § 2), contre le plafond par organisation et par jour et les limites globales. Une
  * demande mal formée (identifiant qui n'est pas un uuid, relecture avec génération, génération sans identifiant,
  * organisation technique) est une erreur de composition : `usage_unavailable`, sans requête. Une même
  * `generationRunId` réservée deux fois (reprise) rend le même forfait sans nouvelle ligne (0083 § 4).
  */
 export async function reserverForfait(transaction: TransactionOrganisation, demande: DemandeForfait, regles: ReglesUsage): Promise<ResultatForfait> {
-  const relecture = demande.profil === "relecture";
+  const relecture = demande.profil === "relecture" || demande.profil === "relectureVoyage";
   if (
     !(PROFILS_FORFAIT as readonly string[]).includes(demande.profil) ||
     !estUuid(demande.organisationId) ||

@@ -131,23 +131,73 @@ describe("lint: src/grounding en liste blanche", () => {
   });
 });
 
-describe("lint: src/server/relecture importé par la seule composition", () => {
+describe("lint: src/server/relecture importé par les deux compositions seulement (0085 § 1.8, 0100 § 5.2)", () => {
   it.each([
     "src/server/composition/p0-reel.ts",
     "src/server/composition/autre.ts",
+    "src/server/composition/clients-google.ts",
     "src/server/actions/voyage.ts",
+    "src/server/voyages/lecture.ts",
     "src/workflows/generation.ts",
     "src/adapters/api.ts",
+    "src/adapters/index.ts",
     "src/app/page.tsx",
   ])("%s : import de @/server/relecture signalé", async (fichier) => {
     expect(await signalements(imp("@/server/relecture/relectures"), fichier, RELECTURE)).not.toHaveLength(0);
+    expect(await signalements(imp("@/server/relecture/source"), fichier, RELECTURE)).not.toHaveLength(0);
     expect(await signalements('export * from "@/server/relecture/relectures";\n', fichier, RELECTURE)).not.toHaveLength(0);
   });
 
-  it.each(["src/server/composition/generation.ts", "src/server/relecture/recomposer.ts", "src/server/relecture/relectures.test.ts", "tests/unit/exemple.test.ts"])(
-    "%s : import admis",
+  it.each([
+    "src/server/composition/generation.ts",
+    "src/server/composition/lecture.ts",
+    "src/server/relecture/source.ts",
+    "src/server/relecture/relectures.test.ts",
+    "tests/unit/exemple.test.ts",
+  ])("%s : import admis", async (fichier) => {
+    expect(await signalements(imp("@/server/relecture/relectures"), fichier, RELECTURE)).toHaveLength(0);
+    expect(await signalements(imp("@/server/relecture/source"), fichier, RELECTURE)).toHaveLength(0);
+  });
+});
+
+describe("lint: composition de la lecture (0100 § 5.2) : fabrique des clients Google et composition/lecture", () => {
+  it.each([
+    "src/server/composition/p0-reel.ts",
+    "src/server/composition/autre.ts",
+    "src/server/relecture/source.ts",
+    "src/server/voyages/lecture.ts",
+    "src/adapters/index.ts",
+    "src/adapters/api.ts",
+    "src/workflows/p0-run.ts",
+    "src/app/page.tsx",
+  ])("%s : import de la fabrique commune des clients Google signalé", async (fichier) => {
+    expect(await signalements(imp("@/server/composition/clients-google"), fichier, RELECTURE)).not.toHaveLength(0);
+    expect(await signalements(imp("./clients-google"), "src/server/composition/autre.ts", RELECTURE)).not.toHaveLength(0);
+  });
+
+  it.each(["src/server/composition/lecture.ts", "src/server/composition/generation.ts", "src/server/composition/clients-google.test.ts", "tests/unit/exemple.test.ts"])(
+    "%s : import de la fabrique commune des clients Google admis",
     async (fichier) => {
-      expect(await signalements(imp("@/server/relecture/relectures"), fichier, RELECTURE)).toHaveLength(0);
+      expect(await signalements(imp("@/server/composition/clients-google"), fichier, RELECTURE)).toHaveLength(0);
     },
   );
+
+  it.each([
+    "src/server/composition/p0-reel.ts",
+    "src/server/composition/generation.ts",
+    "src/server/composition/clients-google.ts",
+    "src/server/relecture/source.ts",
+    "src/server/voyages/lecture.ts",
+    "src/adapters/api.ts",
+    "src/adapters/api-creation.ts",
+    "src/app/page.tsx",
+    "src/features/voyage/x.tsx",
+  ])("%s : import de @/server/composition/lecture signalé", async (fichier) => {
+    expect(await signalements(imp("@/server/composition/lecture"), fichier, RELECTURE)).not.toHaveLength(0);
+    expect(await signalements('export * from "@/server/composition/lecture";\n', fichier, RELECTURE)).not.toHaveLength(0);
+  });
+
+  it.each(["src/adapters/index.ts", "tests/unit/server/composition-lecture.test.ts", "tests/unit/exemple.test.ts"])("%s : import de @/server/composition/lecture admis", async (fichier) => {
+    expect(await signalements(imp("@/server/composition/lecture"), fichier, RELECTURE)).toHaveLength(0);
+  });
 });

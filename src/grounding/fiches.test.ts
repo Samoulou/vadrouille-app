@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
-import { AGE_RAFRAICHISSEMENT_MS, chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
+import { AGE_RAFRAICHISSEMENT_MS, chargerFiches, ficherSerie, placeIdDeVille, positionsFraiches, positionsSansCache, rafraichirPlaceId } from "@/grounding/fiches";
 import { zoneDuSejour } from "@/grounding/zone";
 
 import { creerPlacesDouble, LAT_SENTINELLE, LNG_SENTINELLE, placesInterdit, SENTINELLES_B8, type LieuDouble } from "../../tests/support/doubles-grounding";
@@ -152,5 +152,38 @@ describe("ancrage: un placeId de plus de 12 mois est rafraîchi", () => {
   it("365 jours ou moins : aucun appel (client qui échoue s'il est appelé)", async () => {
     const recent = { placeId: "P_RECENT", reference: MAINTENANT - AGE_RAFRAICHISSEMENT_MS };
     expect(await rafraichirPlaceId(recent, MAINTENANT, placesInterdit())).toEqual({ ok: true, valeur: { issue: "identifiant", placeId: "P_RECENT", rafraichi: false } });
+  });
+});
+
+describe("fiches: positions de la lecture (B8b, décision 0100 § 3.2 et § 6.2)", () => {
+  it("positionsFraiches : positions des fiches chargées seulement, première position d'un placeId répété", () => {
+    const positions = positionsFraiches([
+      { placeId: "P_A", issue: "chargee", position: CENTRE, horaires: null },
+      { placeId: "P_B", issue: "introuvable" },
+      { placeId: "P_A", issue: "chargee", position: HORS_ZONE, horaires: null },
+      { placeId: "P_C", issue: "chargee", position: HORS_ZONE },
+    ]);
+    expect([...positions.keys()]).toEqual(["P_A", "P_C"]);
+    expect(positions.get("P_A")).toEqual(CENTRE);
+  });
+
+  it("positionsSansCache : une fiche de position par placeId distinct, introuvable absent, arrêt au premier échec", async () => {
+    const places = creerPlacesDouble({ lieux: { P_A: lieu("OPERATIONAL"), P_B: lieu("OPERATIONAL", HORS_ZONE) } });
+    const lues = await positionsSansCache(["P_A", "P_X", "P_B", "P_A"], places);
+    if (!lues.ok) throw new Error(lues.code);
+    expect([...lues.valeur.keys()]).toEqual(["P_A", "P_B"]);
+    expect(places.appels.map((a) => a.methode)).toEqual(["position", "position", "position"]);
+    const enEchec = creerPlacesDouble({ lieux: { P_A: lieu("OPERATIONAL") }, erreur: { auAppel: 1, fabrique: () => new Error(SENTINELLES_B8.corps) } });
+    const echec = await positionsSansCache(["P_A", "P_B"], enEchec);
+    expect(echec).toEqual({ ok: false, code: "upstream_error", retryable: false });
+    expect(enEchec.appels).toHaveLength(1);
+  });
+
+  it("placeIdDeVille : un Text Search sans biais, le premier identifiant ou null", async () => {
+    const places = creerPlacesDouble({ textes: { Ville: ["P_V1", "P_V2"] } });
+    const trouvee = await placeIdDeVille("Ville", places);
+    expect(trouvee).toEqual({ ok: true, valeur: "P_V1" });
+    expect(places.appels).toEqual([{ methode: "textSearch", requete: { texte: "Ville", biais: null } }]);
+    expect(await placeIdDeVille("Autre", places)).toEqual({ ok: true, valeur: null });
   });
 });

@@ -236,7 +236,7 @@ describe("p0: relecture Routes réelle (P0r4)", () => {
   });
 
   it("le registre du forfait borne les appels : au-delà de ses requêtes, la réservation est refusée", async () => {
-    const petit: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { routesRequetes: 1, routesElements: 1 });
+    const petit: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { placesTextSearch: 0, placesDetails: 0, routesRequetes: 1, routesElements: 1 });
     let usage: Parameters<NonNullable<DependancesRelecteur["routes"]>>[1] | undefined;
     const r = creerRelecteurReel({
       env: preversion(),
@@ -353,7 +353,7 @@ describe("p0: cadence Routes unique par processus pour la relecture (3 000 élé
 
 describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed)", () => {
   it("daily_quota_insufficient (forfait au-delà du quota d'une minute) n'est pas un plafond atteint : unavailable", async () => {
-    const enorme: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { routesRequetes: 1, routesElements: QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1 });
+    const enorme: Forfait = forfaitRelecture(TABLE, SKUS_FORFAIT, { placesTextSearch: 0, placesDetails: 0, routesRequetes: 1, routesElements: QUOTA_ROUTES_ELEMENTS_PAR_MINUTE + 1 });
     const base = poolSimule();
     const { relecteur: r, fabrique } = relecteur({ pool: () => base.pool, relecture: async () => ({ forfait: enorme, regles: regles() }) });
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });

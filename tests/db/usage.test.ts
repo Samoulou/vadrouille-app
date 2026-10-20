@@ -315,9 +315,26 @@ describe("usage: reprise et relectures (décision 0083 § 3 et § 4)", () => {
     for (let i = 0; i < 2; i++) {
       expect((await reserverForfait(transactionDe(organisation), { organisationId: organisation.org, tripId: null, generationRunId: null, profil: "relecture" }, regles())).ok).toBe(true);
     }
-    const lignes = await inTx(app, { org: organisation.org }, async (c) => (await c.query("SELECT sku FROM public.usage_ledger WHERE generation_run_id IS NULL")).rows);
-    expect(lignes).toEqual([{ sku: "routes_matrix_essentials" }, { sku: "routes_matrix_essentials" }]);
+    const lignes = await inTx(app, { org: organisation.org }, async (c) => (await c.query("SELECT sku FROM public.usage_ledger WHERE generation_run_id IS NULL ORDER BY sku")).rows);
+    // Chaque relecture écrit ses lignes de forfait : Text Search, fiches et Routes (décision 0100 § 1.1).
+    expect(lignes).toEqual([
+      { sku: "places_details_enterprise" },
+      { sku: "places_details_enterprise" },
+      { sku: "places_text_search_essentials_ids_only" },
+      { sku: "places_text_search_essentials_ids_only" },
+      { sku: "routes_matrix_essentials" },
+      { sku: "routes_matrix_essentials" },
+    ]);
     expect((await totaux(organisation.org)).org_jour_micros).toBe(2 * relecture);
+  });
+
+  it("usage: une relecture de voyage réserve le profil relectureVoyage et compte ses fiches dans le quota du jour", async () => {
+    const organisation = await createOrg(auth);
+    const forfait = forfaitDuProfil(PLAFONDS_USAGE_TEST, TABLE, "relectureVoyage");
+    expect((await reserverForfait(transactionDe(organisation), { organisationId: organisation.org, tripId: null, generationRunId: null, profil: "relectureVoyage" }, regles())).ok).toBe(true);
+    const totalesDuJour = await totaux(organisation.org);
+    expect(totalesDuJour.org_jour_micros).toBe(coutTotalMicros(forfait));
+    expect(totalesDuJour.jour_place_details).toBeGreaterThanOrEqual(forfait.placeDetailsRequetes);
   });
 });
 

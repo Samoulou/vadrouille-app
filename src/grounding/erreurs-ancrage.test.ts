@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
-import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
+import { chargerFiches, ficherSerie, placeIdDeVille, positionsSansCache, rafraichirPlaceId } from "@/grounding/fiches";
 import { ErreurAncrage, type ClientPlacesMvp, type ClientRoutes } from "@/grounding/interfaces";
 import { CODES_ANCRAGE, echecDe, type ResultatAncrage } from "@/grounding/resultat";
-import { chargerTrajets } from "@/grounding/trajets";
+import { chargerTrajets, chargerTrajetsParCouples } from "@/grounding/trajets";
 import { zoneDuSejour } from "@/grounding/zone";
 
 import { creerPlacesDouble, creerRoutesDouble, LAT_SENTINELLE, LNG_SENTINELLE, SENTINELLES_B8 } from "../../tests/support/doubles-grounding";
@@ -36,6 +36,9 @@ const FONCTIONS: readonly Cas[] = [
   ["rafraichirPlaceId", (places) => rafraichirPlaceId({ placeId: "P_VIEUX", reference: 0 }, MAINTENANT, places)],
   ["chargerFiches", (places) => chargerFiches(["P_A"], places)],
   ["ficherSerie", (places) => ficherSerie([{ id: "c", placeId: "P_A" }], { premiereSerie: 1, marge: 0 }, ZONE, places)],
+  ["positionsSansCache", (places) => positionsSansCache(["P_A"], places)],
+  ["placeIdDeVille", (places) => placeIdDeVille(VILLE, places)],
+  ["chargerTrajetsParCouples", (_places, routes) => chargerTrajetsParCouples([{ depuis: { placeId: "P_A", position: CENTRE }, vers: { placeId: "P_B", position: CENTRE }, modes: ["walk"] }], routes)],
   ["chargerTrajets", (_places, routes) => chargerTrajets([{ placeId: "P_A", position: CENTRE }, { placeId: "P_B", position: CENTRE }], ["walk"], routes)],
 ];
 

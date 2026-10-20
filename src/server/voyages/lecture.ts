@@ -31,12 +31,20 @@ import { destinationColor } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { modesAdmis } from "@/domain/generation";
 import { demandeDeRelectures, optionsDesRepas, recomposerJour, recomposerProposition, type JourALire } from "@/domain/recomposition";
-import { logementsDuJour, type DemandeRelectures, type ModeTrajet, type Relectures, type SourceRelectures } from "@/domain/relectures";
+import {
+  logementsDuJour,
+  type DemandeRelectures,
+  type ModeTrajet,
+  type PorteeLecture,
+  type Relectures,
+  type SejourDeNuit,
+  type SourceRelectures,
+} from "@/domain/relectures";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { EchecPositions, lirePositions } from "@/server/positions/lecture";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
-import { datesDeVerification, identifiantLisible, logementsParNuit, mobiliteDepuisColonne, nombreDeNuits, type VersionDeChaine } from "./conversion";
+import { datesDeVerification, identifiantLisible, mobiliteDepuisColonne, nombreDeNuits, sejoursParNuit, type VersionDeChaine } from "./conversion";
 import { echec, LectureVoyageError, type ContexteEchec } from "./erreurs";
 
 /**
@@ -104,7 +112,8 @@ export const SQL_CHAINE = `WITH RECURSIVE chaine AS (
 const SQL_VERSION = `SELECT version, snapshot, (extract(epoch FROM created_at) * 1000)::float8 AS created_ms
   FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND version = $3`;
 
-const SQL_SEJOURS = `SELECT place_id, from_date::text AS "from", to_date::text AS "to"
+/** Séjours : lieu, dates, et de quoi résoudre un logement sans lieu à la lecture (ville, centre maison, types ; 0100 § 6.2). */
+const SQL_SEJOURS = `SELECT place_id, from_date::text AS "from", to_date::text AS "to", kind, lodging_kind, city, area_center_lat, area_center_lng
   FROM public.stays WHERE organization_id = $1 AND trip_id = $2`;
 
 const SQL_MOBILITE = "SELECT mobility FROM public.briefs WHERE organization_id = $1 AND trip_id = $2 ORDER BY version DESC LIMIT 1";
@@ -206,12 +215,17 @@ type Besoins = {
   readonly propositions?: "deck" | "preview";
 };
 
+type SejourLu = SejourDeNuit & { readonly from: string; readonly to: string };
+
+const TYPES_SEJOUR: readonly SejourDeNuit["type"][] = ["lodging", "neighbourhood", "none"];
+const TYPES_LOGEMENT: readonly NonNullable<SejourDeNuit["logement"]>[] = ["known", "area", "none", "suggestedLodging", "suggestedArea"];
+
 type Etat = {
   readonly enTete: EnTete;
   /** `chaine[0]` : version courante. */
   readonly chaine: readonly VersionDeChaine[];
   readonly snapshot: TripSnapshot;
-  readonly sejours: readonly { placeId: string | null; from: string; to: string }[];
+  readonly sejours: readonly SejourLu[];
   readonly mobilite: unknown;
   readonly enCours: boolean;
   readonly debloque: boolean;
@@ -232,12 +246,20 @@ async function lireEtat(executeur: ExecuteurLecture, ctx: AdapterContext, tripId
   const courante = chaine[0];
   if (courante === undefined || courante.version !== enTete.version) throw echec("snapshot_invalid", contexte);
   const sejours = besoins.sejours
-    ? (await executeur.query(SQL_SEJOURS, [org, tripId])).rows.map((s) => {
+    ? (await executeur.query(SQL_SEJOURS, [org, tripId])).rows.map((s): SejourLu => {
         const from = texte(s.from);
         const to = texte(s.to);
         const placeId = s.place_id === null ? null : texte(s.place_id);
-        if (from === undefined || to === undefined || placeId === undefined) throw echec("output_invalid", contexte);
-        return { placeId, from, to };
+        const ville = s.city === null ? null : texte(s.city);
+        const type = TYPES_SEJOUR.find((t) => t === s.kind);
+        const logement = s.lodging_kind === null ? null : (TYPES_LOGEMENT.find((t) => t === s.lodging_kind) ?? undefined);
+        const lat = s.area_center_lat === null ? null : s.area_center_lat;
+        const lng = s.area_center_lng === null ? null : s.area_center_lng;
+        const centre = lat === null && lng === null ? null : typeof lat === "number" && typeof lng === "number" && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+        if (from === undefined || to === undefined || placeId === undefined || ville === undefined || type === undefined || logement === undefined || centre === undefined) {
+          throw echec("output_invalid", contexte);
+        }
+        return { placeId, from, to, ville, centre, type, logement };
       })
     : [];
   const mobilite = besoins.mobilite ? ((await executeur.query(SQL_MOBILITE, [org, tripId])).rows[0]?.mobility ?? null) : null;
@@ -253,10 +275,16 @@ async function lireEtat(executeur: ExecuteurLecture, ctx: AdapterContext, tripId
 
 const sansEtape = (jour: DaySnapshot) => !jour.items.some((item) => item.type === "stop");
 
+/** Séjour de chaque nuit : un voyage dont une nuit n'a pas exactement un séjour est `stay_missing` (B6-PO-17). */
+function sejoursDe(etat: Etat, contexte: ContexteEchec): readonly SejourDeNuit[] {
+  const sejours = sejoursParNuit(etat.sejours, etat.enTete.start, etat.enTete.end);
+  if (sejours === null) throw echec("stay_missing", contexte);
+  // Champs du port seulement (ni dates, ni rien d'autre de la ligne lue).
+  return sejours.map(({ placeId, ville, centre, type, logement }): SejourDeNuit => ({ placeId, ville, centre, type, logement }));
+}
+
 function logementsDe(etat: Etat, contexte: ContexteEchec): (string | null)[] {
-  const logements = logementsParNuit(etat.sejours, etat.enTete.start, etat.enTete.end);
-  if (logements === null) throw echec("stay_missing", contexte);
-  return logements;
+  return sejoursDe(etat, contexte).map((sejour) => sejour.placeId);
 }
 
 function modesDe(etat: Etat, contexte: ContexteEchec): readonly ModeTrajet[] {
@@ -265,11 +293,33 @@ function modesDe(etat: Etat, contexte: ContexteEchec): readonly ModeTrajet[] {
   return modesAdmis(modes);
 }
 
-/** Un appel du port (0086 § 1.2 point 3) : refus rendu ou exception levée, erreur fermée sans durée inventée. */
-async function relire(source: SourceRelectures, logementsParNuit: readonly (string | null)[], demande: DemandeRelectures, contexte: ContexteEchec): Promise<Relectures> {
+/** Session de la lecture et portée du cas d'usage, passées au port avec le voyage (0100 § 3.2 point 1). */
+type PorteeDeSession = { readonly ctx: Pick<AdapterContext, "organizationId" | "userId">; readonly portee: PorteeLecture };
+
+/**
+ * Un appel du port (0086 § 1.2 point 3) : refus rendu ou exception levée, erreur fermée sans durée inventée. Le contexte
+ * (organisation, utilisateur, voyage de la session) et la portée viennent du cas d'usage appelé, jamais de la demande
+ * ni du navigateur (0100 § 3.2 point 1).
+ */
+async function relire(
+  source: SourceRelectures,
+  etat: Etat,
+  sejoursParNuit: readonly SejourDeNuit[],
+  session: PorteeDeSession,
+  demande: DemandeRelectures,
+  contexte: ContexteEchec,
+): Promise<Relectures> {
   let reponse: Awaited<ReturnType<SourceRelectures["pour"]>>;
   try {
-    reponse = await source.pour({ logementsParNuit }, demande);
+    reponse = await source.pour(
+      {
+        logementsParNuit: sejoursParNuit.map((sejour) => sejour.placeId),
+        contexte: { organizationId: session.ctx.organizationId, userId: session.ctx.userId, tripId: etat.enTete.id },
+        portee: session.portee,
+        sejoursParNuit,
+      },
+      demande,
+    );
   } catch {
     throw echec("unavailable", contexte);
   }
@@ -281,14 +331,15 @@ async function relire(source: SourceRelectures, logementsParNuit: readonly (stri
 const joursALire = (etat: Etat, jours: readonly DaySnapshot[]): JourALire[] =>
   jours.map((jour) => ({ jour, mesure: !(etat.enCours && sansEtape(jour)) }));
 
-async function recomposerJours(source: SourceRelectures, etat: Etat, jours: readonly DaySnapshot[]): Promise<Day[]> {
+async function recomposerJours(source: SourceRelectures, etat: Etat, jours: readonly DaySnapshot[], session: PorteeDeSession): Promise<Day[]> {
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
-  const logements = logementsDe(etat, contexte);
+  // Séjours lus une fois : `stay_missing` même quand aucun jour n'est relu, puis passés à `relire`.
+  const sejours = sejoursDe(etat, contexte);
   const modes = modesDe(etat, contexte);
   const nuits = nombreDeNuits(etat.enTete.start, etat.enTete.end);
   const aLire = joursALire(etat, jours);
   const relectures = aLire.some((j) => j.mesure)
-    ? await relire(source, logements, demandeDeRelectures({ jours: aLire, nombreDeNuits: nuits, modes }), contexte)
+    ? await relire(source, etat, sejours, session, demandeDeRelectures({ jours: aLire, nombreDeNuits: nuits, modes }), contexte)
     : undefined;
   const verification = datesDeVerification(etat.chaine, etat.enTete.timeZone);
   return aLire.map(({ jour, mesure }) => {
@@ -332,13 +383,19 @@ function propositionLue(etat: Etat, ligne: Ligne): PropositionLue {
   return { record: record.data, jour };
 }
 
-async function recomposerPropositions(source: SourceRelectures, etat: Etat, lues: readonly PropositionLue[], configuration: ConfigurationMoteur): Promise<Proposal[]> {
+async function recomposerPropositions(
+  source: SourceRelectures,
+  etat: Etat,
+  lues: readonly PropositionLue[],
+  configuration: ConfigurationMoteur,
+  session: PorteeDeSession,
+): Promise<Proposal[]> {
   if (lues.length === 0) return [];
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
-  const logements = logementsDe(etat, contexte);
+  const sejours = sejoursDe(etat, contexte);
   const nuits = nombreDeNuits(etat.enTete.start, etat.enTete.end);
   const demande = demandeDeRelectures({ jours: [], propositions: lues.map(({ record, jour }) => ({ proposition: record, jour })), nombreDeNuits: nuits, modes: [] });
-  const relectures = await relire(source, logements, demande, contexte);
+  const relectures = await relire(source, etat, sejours, session, demande, contexte);
   const options = optionsDesRepas(lues.map(({ record }) => record));
   return lues.map(({ record, jour }, rang) => {
     const option = options[rang];
@@ -463,7 +520,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
       );
       if (etat === null) return null;
       const checklist = checklistDe(etat);
-      const days = await recomposerJours(source, etat, etat.snapshot.days);
+      const days = await recomposerJours(source, etat, etat.snapshot.days, { ctx, portee: "voyage" });
       const { enTete } = etat;
       return sortie(
         TripSchema,
@@ -489,7 +546,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
       const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true }), tripId);
       const jour = etat?.snapshot.days.find((day) => day.index === index);
       if (etat === null || jour === undefined) return null;
-      const [day] = await recomposerJours(source, etat, [jour]);
+      const [day] = await recomposerJours(source, etat, [jour], { ctx, portee: "jour" });
       const contexte = { tripId, version: etat.enTete.version, dayIndex: index };
       if (day === undefined) throw echec("output_invalid", contexte);
       // Sortie validée ici comme les autres lectures (revue du head 7402324, bloquant 1) : une durée relue invalide
@@ -502,7 +559,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
       const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { sejours: true, enCours: true, propositions: "deck" }), tripId);
       if (etat === null) return [];
       const lues = etat.propositions.filter((ligne) => ligne.slot_type === "proposal").map((ligne) => propositionLue(etat, ligne));
-      const propositions = await recomposerPropositions(source, etat, lues, configuration);
+      const propositions = await recomposerPropositions(source, etat, lues, configuration, { ctx, portee: "jour" });
       return sortie(ProposalSchema.array(), propositions, { tripId, version: etat.enTete.version });
     },
 
@@ -512,7 +569,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): TripAdapte
       if (etat === null) return [];
       const contexte = { tripId, version: etat.enTete.version };
       const lues = etat.propositions.filter((ligne) => ligne.slot_type === "proposal").map((ligne) => propositionLue(etat, ligne));
-      const propositions = await recomposerPropositions(source, etat, lues, configuration);
+      const propositions = await recomposerPropositions(source, etat, lues, configuration, { ctx, portee: "jour" });
       let rang = 0;
       const cases = etat.propositions.map((ligne): PreviewSlot => {
         if (ligne.slot_type === "proposal") {
