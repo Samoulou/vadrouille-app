@@ -12,6 +12,8 @@ Correction 1 (revues consolidées du head `f3e55d1`) : deux bloquants de chaque 
 
 **Amendée par 0108** (§ 5.2 et § 5.4 : branchement de l'adaptateur `api` au démarrage par `src/instrumentation.ts`, seul importateur de `@/server/composition/lecture` hors des tests, à la place de l'import statique depuis `src/adapters/index.ts`).
 
+**Amendée par 0110** (§ 5.3 : en `local` et en `ci`, hors de la source réelle, le double de relectures est complété pour les voyages générés par la variante simulée, lieux des fixtures d'Édimbourg, forfait en mémoire).
+
 **Amende, sans les réécrire** (renvoi ajouté en tête de chacune dans cette PR) :
 - **0011 § 5**, lignes `Day.travelMinutes` et `Segment.minutes` et paragraphe « Relecture » : § 2, § 4 et § 6.1 ;
 - **0059 § 3**, ligne B8b (colonnes « Périmètre » et « Fichiers ») : § 3.1 et § 5 ;

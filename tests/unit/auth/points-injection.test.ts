@@ -31,6 +31,9 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   // B6b (spécification B6, B6b point 1) : même règle pour le branchement de l'adaptateur `api` (fabrique sur `globalThis`).
   brancherLectureVoyages: ["src/adapters/api-instance.ts", "src/instrumentation.ts"],
   debrancherLectureVoyagesPourTests: ["src/adapters/api-instance.ts"],
+  // B9e (spécification B9, B9e point 1) : même règle pour le branchement de la création `api`.
+  brancherCreationVoyages: ["src/adapters/api-creation-instance.ts", "src/instrumentation.ts"],
+  debrancherCreationVoyagesPourTests: ["src/adapters/api-creation-instance.ts"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];
