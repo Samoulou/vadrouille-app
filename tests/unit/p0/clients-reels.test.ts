@@ -110,11 +110,13 @@ describe("p0: modules de capacité branchés à aucun point d'entrée", () => {
     }
     // P0r3c-3 (0055 § 3 point 2) : la composition du mode réel est désormais le seul importateur hors des tests.
     const COMPOSITION = "src/server/composition/p0-reel.ts";
+    // B8b (0100 § 5.1) : la fabrique commune des clients Google, importée par les deux compositions, nomme Places et Routes.
+    const FABRIQUE = "src/server/composition/clients-google.ts";
     const tries = Object.fromEntries([...importateurs].map(([m, liste]) => [m, [...liste].sort()]));
     expect(tries).toEqual({
       [CLIENT_MODELES]: [CLIENT_MODELES.replace(/\.ts$/, ".test.ts"), COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
-      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
-      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
+      "src/grounding/places-client.ts": ["src/grounding/places-client.test.ts", COMPOSITION, FABRIQUE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
+      "src/grounding/routes-client.ts": ["src/grounding/routes-client.test.ts", COMPOSITION, FABRIQUE, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/sentinelles-google.test.ts"].sort(),
       "src/research/undici-transport.ts": ["src/research/undici-transport.test.ts", COMPOSITION, "tests/unit/p0/clients-reels.test.ts", "tests/unit/p0/undici-contrat.test.ts"].sort(),
     });
   });

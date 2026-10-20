@@ -45,12 +45,24 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/p0/lancement.ts", "@/server/env/p0"],
     ["src/server/env/p0.test.ts", "./p0"],
     ["src/server/env/p0.ts", "@/server/env/index"],
+    // B8b (décision 0100 § 5.3) : module étroit de la lecture, importé par la composition de la lecture seule.
+    ["src/server/composition/lecture.ts", "@/server/env/relectures"],
+    ["src/server/env/relectures.test.ts", "./relectures"],
+    ["src/server/env/relectures.ts", "@/server/env/resolve"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
   });
 
   const REFUSES: [string, string][] = [
+    // B8b : `relectures` hors de la composition de la lecture.
+    ["src/server/composition/p0-reel.ts", "@/server/env/relectures"],
+    ["src/server/composition/clients-google.ts", "@/server/env/relectures"],
+    ["src/server/relecture/source.ts", "@/server/env/relectures"],
+    ["src/server/voyages/lecture.ts", "@/server/env/relectures"],
+    ["src/adapters/index.ts", "@/server/env/relectures"],
+    ["src/grounding/exemple.ts", "@/server/env/relectures"],
+    ["tests/unit/exemple.test.ts", "@/server/env/relectures"],
     ["src/grounding/exemple.ts", "@/server/env/ai"],
     ["src/ai/exemple.ts", "@/server/env/grounding"],
     ["src/research/agent.ts", "@/server/env/egress"],

@@ -261,3 +261,80 @@ describe("recomposition: propositions (B6-PO-4, B6-PO-9)", () => {
     ]);
   });
 });
+
+describe("lecture: toConfirm d'un lieu relu seulement (décision 0100 § 4.2, B8-PO-9)", () => {
+  type Etat = { validite: "valide" | "introuvable" | "ferme_definitivement" | typeof INCONNU; plages: readonly { debut: number; fin: number }[] | typeof INCONNU };
+  const relu = (parLieu: Record<string, Etat>): Relectures => ({
+    validite: (placeId) => parLieu[placeId]?.validite ?? INCONNU,
+    plages: (placeId) => parLieu[placeId]?.plages ?? INCONNU,
+    duree: (depuis, vers) => (memePoint(depuis, vers) ? { minutes: 0, estimee: false } : { minutes: 5, estimee: false }),
+  });
+  const exceptionsDe = (items: Item[], r: Relectures) => {
+    const resultat = recomposerJour(jour(1, items), { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk"], verification: sansDate });
+    if (!resultat.ok) throw new Error(resultat.raison);
+    return resultat.valeur.items.flatMap((item) => (item.type === "stop" ? [item.stop.exceptions] : []));
+  };
+  const un = (stop: Item) => [term("start", "09:00"), seg("walk"), stop, seg("walk"), term("end", "18:00")];
+  const ouvert = { validite: "valide", plages: [{ debut: 0, fin: 2880 }] } as const;
+
+  it("(1) lieu relu, horaires inconnus : toConfirm", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00", A)), relu({ [A]: { validite: "valide", plages: INCONNU } }))).toEqual([["toConfirm"]]);
+  });
+
+  it("(2) lieu non relu (fiche en échec) : ni toConfirm, ni exception inventée", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00", A)), relu({}))).toEqual([[]]);
+  });
+
+  it("(3) lieu introuvable : toConfirm", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00", A)), relu({ [A]: { validite: "introuvable", plages: INCONNU } }))).toEqual([["toConfirm"]]);
+  });
+
+  it("(4) lieu relu, horaires connus, étape libre : rien", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00", A)), relu({ [A]: ouvert }))).toEqual([[]]);
+  });
+
+  it("(5) étape verrouillée hors des plages connues : toConfirm", () => {
+    const verrouillee: Item = { type: "stop", stop: { id: "a", kind: "activity", placeId: A, name: "[Étape de test]", start: "10:00", end: "11:00", facts: {}, exceptions: [], locked: true } };
+    expect(exceptionsDe(un(verrouillee), relu({ [A]: { validite: "valide", plages: [{ debut: 720, fin: 1080 }] } }))).toEqual([["toConfirm"]]);
+  });
+
+  it("(6) étape sans lieu : rien", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00")), relu({}))).toEqual([[]]);
+  });
+
+  it("lecture: au plus deux badges (stockées d'abord)", () => {
+    expect(exceptionsDe(un(etape("a", "10:00", "11:00", A, ["toReserve", "unconfirmed"])), relu({ [A]: { validite: "valide", plages: INCONNU } }))).toEqual([["toReserve", "unconfirmed"]]);
+  });
+});
+
+describe("lecture: travelMinutes égale minutesDeTrajet, estimated vrai si le stocké ou la relecture le dit (0100 § 6.1)", () => {
+  const j = jour(1, [term("start", "09:00"), seg("car"), etape("a", "10:00", "11:00", A), seg("walk"), term("end", "18:00")]);
+  const r: Relectures = {
+    validite: () => "valide",
+    plages: () => [{ debut: 0, fin: 2880 }],
+    duree: (depuis, vers, mode) => {
+      if (memePoint(depuis, vers)) return { minutes: 0, estimee: false };
+      return mode === "car" ? { minutes: 12, estimee: true } : mode === "transit" ? { minutes: 6, estimee: false } : { minutes: 20, estimee: false };
+    },
+  };
+
+  it("un mode admis plus rapide que le mode stocké fixe travelMinutes ; le segment garde son mode", () => {
+    const resultat = recomposerJour(j, { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk", "transit", "car"], verification: sansDate });
+    if (!resultat.ok) throw new Error(resultat.raison);
+    // Aller (nuit 0 → A) : transit 6 ; retour (A → nuit 0) : transit 6.
+    expect(resultat.valeur.travelMinutes).toBe(12);
+    const segments = resultat.valeur.items.flatMap((item) => (item.type === "segment" ? [item.segment] : []));
+    expect(segments).toEqual([
+      { mode: "car", minutes: 12, estimated: true },
+      { mode: "walk", minutes: 20, estimated: false },
+    ]);
+  });
+
+  it("estimated stocké reste vrai même si la relecture mesure", () => {
+    const stocke = jour(1, [term("start", "09:00"), seg("walk", true), etape("a", "10:00", "11:00", A), seg("walk"), term("end", "18:00")]);
+    const resultat = recomposerJour(stocke, { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk"], verification: sansDate });
+    if (!resultat.ok) throw new Error(resultat.raison);
+    const segments = resultat.valeur.items.flatMap((item) => (item.type === "segment" ? [item.segment.estimated] : []));
+    expect(segments).toEqual([true, false]);
+  });
+});

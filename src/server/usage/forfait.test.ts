@@ -41,16 +41,25 @@ describe("p0: forfait au prix catalogue plein", () => {
     expect(forfaitExecution(TABLE, SKUS, PLAFONDS, 3_000_000)).toEqual(forfaitExecution(TABLE, { ...SKUS }, { ...PLAFONDS }, 3_000_000));
   });
 
-  it("relecture : Routes seulement, aucun coût de modèle", () => {
-    expect(forfaitRelecture(TABLE, SKUS, { routesRequetes: 1, routesElements: 20 })).toEqual({
+  it("usage: forfait de relecture avec fiches : Text Search, fiches et Routes au prix plein, aucun coût de modèle", () => {
+    // Profil `relecture` (0100 § 1.4) : 2 Text Search (0), 20 fiches au prix de `details` (0,40 USD), 24 éléments (0,12 USD).
+    expect(forfaitRelecture(TABLE, SKUS, { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 })).toEqual({
       nature: "relecture",
-      textSearchRequetes: 0,
-      placeDetailsRequetes: 0,
-      routesRequetes: 1,
-      routesElements: 20,
-      coutGoogleMicros: 100_000,
+      textSearchRequetes: 2,
+      placeDetailsRequetes: 20,
+      routesRequetes: 24,
+      routesElements: 24,
+      coutGoogleMicros: 400_000 + 120_000,
       coutModelesMicros: null,
     });
+    // Profil `relectureVoyage` : 3,20 USD.
+    expect(forfaitRelecture(TABLE, SKUS, { placesTextSearch: 20, placesDetails: 100, routesRequetes: 240, routesElements: 240 }).coutGoogleMicros).toBe(3_200_000);
+  });
+
+  it("usage: forfait de relecture, SKU de fiche d'une autre méthode ou plafond invalide : erreur", () => {
+    const plafonds = { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 };
+    expect(() => forfaitRelecture(TABLE, { ...SKUS, details: "routes_matrix_pro" }, plafonds)).toThrow(ErreurForfait);
+    expect(() => forfaitRelecture(TABLE, SKUS, { ...plafonds, placesDetails: -1 })).toThrow(ErreurForfait);
   });
 
   it("SKU inconnu, d'une autre méthode ou plafond invalide : erreur", () => {

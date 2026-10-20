@@ -49,26 +49,32 @@ export function nombreDeNuits(start: string, end: string): number {
 }
 
 /**
- * Logement de chaque nuit (B6-PO-17) : la nuit `n` est la date `start + n` ; elle appartient à la ligne `stays` telle
+ * Séjour (ligne `stays`) de chaque nuit (B6-PO-17, 0100 § 6.2) : la nuit `n` est la date `start + n` ; elle appartient à la ligne `stays` telle
  * que `from_date ≤ D < to_date` (borne exclusive, 0081 (f), confirmée par data). Une nuit sans ligne ou couverte par
  * deux lignes : `null` (`stay_missing`). Une ligne qui ne couvre aucune nuit (`to_date = from_date`) n'est lue par
  * aucune nuit (réponse de data, point 5).
  */
-export function logementsParNuit(
-  stays: readonly { readonly placeId: string | null; readonly from: string; readonly to: string }[],
-  start: string,
-  end: string,
-): (string | null)[] | null {
+export function sejoursParNuit<T extends { readonly from: string; readonly to: string }>(stays: readonly T[], start: string, end: string): T[] | null {
   const nuits = nombreDeNuits(start, end);
-  const logements: (string | null)[] = [];
+  const sejours: T[] = [];
   for (let n = 0; n < nuits; n += 1) {
     const nuit = versDate(versInstant(start) + n * JOUR_MS);
     const lignes = stays.filter((stay) => stay.from <= nuit && nuit < stay.to);
     const [ligne] = lignes;
     if (lignes.length !== 1 || ligne === undefined) return null;
-    logements.push(ligne.placeId);
+    sejours.push(ligne);
   }
-  return logements;
+  return sejours;
+}
+
+/** `stays.place_id` de chaque nuit (B6-PO-17), `null` pour un séjour sans lieu ; mêmes règles que `sejoursParNuit`. */
+export function logementsParNuit(
+  stays: readonly { readonly placeId: string | null; readonly from: string; readonly to: string }[],
+  start: string,
+  end: string,
+): (string | null)[] | null {
+  const sejours = sejoursParNuit(stays, start, end);
+  return sejours === null ? null : sejours.map((sejour) => sejour.placeId);
 }
 
 /** Date (AAAA-MM-JJ) d'un instant dans le fuseau du voyage (B6-PO-6). */

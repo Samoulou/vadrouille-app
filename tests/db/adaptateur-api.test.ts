@@ -492,11 +492,35 @@ describe("lecture: relectures", () => {
     const tripId = idsA.get(EDIMBOURG_TRIP_ID) ?? "";
     const { adapter } = banc({ filtrerDemande: (d) => ({ ...d, trajets: d.trajets.slice(1) }) });
     await expect(adapter.getDay(ctxA, tripId, 2)).rejects.toEqual(raison("travel_unknown"));
-    const { adapter: sansLieu } = banc({ filtrerDemande: (d) => ({ ...d, lieux: d.lieux.slice(1) }) });
-    // Un lieu retiré : ses plages deviennent inconnues, la marque toConfirm apparaît (aucune valeur inventée).
-    const jour = await sansLieu.getDay(ctxA, tripId, 2);
-    const reference = await banc().adapter.getDay(ctxA, tripId, 2);
-    expect(jour).not.toEqual(reference);
+    // Un lieu retiré de la demande : un lieu non relu n'est plus à confirmer (0100 § 4.2), donc la sortie seule ne trahit
+    // plus le défaut ; le double compte les lieux interrogés hors de la demande et le test échoue s'il y en a (0100 § 4.3).
+    const { adapter: sansLieu, relectures: doubleSansLieu } = banc({ filtrerDemande: (d) => ({ ...d, lieux: d.lieux.slice(1) }) });
+    await sansLieu.getDay(ctxA, tripId, 2);
+    expect(doubleSansLieu.lieuxHorsDemande().length).toBeGreaterThan(0);
+    const { adapter: complet, relectures: doubleComplet } = banc();
+    await complet.getDay(ctxA, tripId, 2);
+    await complet.getTrip(ctxA, tripId);
+    await complet.listProposals(ctxA, tripId);
+    expect(doubleComplet.lieuxHorsDemande()).toEqual([]);
+  });
+
+  it("lecture: le contexte et la portée de chaque méthode atteignent la source (0100 § 3.2 point 1)", async () => {
+    const tripId = idsA.get(EDIMBOURG_TRIP_ID) ?? "";
+    const { adapter, relectures } = banc();
+    const attendus = [
+      ["getDay", "jour", () => adapter.getDay(ctxA, tripId, 2)],
+      ["listProposals", "jour", () => adapter.listProposals(ctxA, tripId)],
+      ["listPreviewSlots", "jour", () => adapter.listPreviewSlots(ctxA, tripId)],
+      ["getTrip", "voyage", () => adapter.getTrip(ctxA, tripId)],
+    ] as const;
+    for (const [nom, portee, appeler] of attendus) {
+      await appeler();
+      const voyage = relectures.dernierVoyage();
+      expect(voyage?.portee, nom).toBe(portee);
+      expect(voyage?.contexte.tripId, nom).toBe(tripId);
+      expect(voyage?.contexte.organizationId, nom).toBe(a.org);
+      expect(voyage?.sejoursParNuit.length, nom).toBe(voyage?.logementsParNuit.length);
+    }
   });
 
   it("lecture: Mes voyages ne relit rien, en un nombre constant de requêtes, sans lire place_coordinates ni proposals", async () => {
@@ -678,7 +702,8 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
     expect((await lire("walk,transit,car"))?.travelMinutes).toBe(30);
     for (const invalide of ["transit,walk", "walk,walk", " walk", "walk,", "walk,plane"]) await expect(lire(invalide), invalide).rejects.toEqual(raison("mobility_invalid"));
 
-    // estimated stocké servi tel quel, même si la relecture dit l'inverse.
+    // lecture: estimated stocké ou relu (0100 § 6.1) : `stocké || estimee`. Une durée relue estimée n'est jamais présentée
+    // comme mesurée ; un `estimated` stocké vrai reste vrai quand la relecture répond `estimee: false`.
     const id = await ecrire(a, voyage(days, { destination: "Estimé" }));
     const base = table(durees, P);
     const inverse: SourceRelectures = {
@@ -693,7 +718,9 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
       },
     };
     const day = await createApiTripAdapter({ relectures: inverse, withOrg }).getDay(ctxA, id, 1);
-    expect((day?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([false, true, false, false]);
+    expect((day?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([true, true, true, true]);
+    const mesuree = await createApiTripAdapter({ relectures: creerRelecturesVoyages({ table: base }), withOrg }).getDay(ctxA, id, 1);
+    expect((mesuree?.items ?? []).flatMap((i) => (i.type === "segment" ? [i.segment.estimated] : []))).toEqual([false, true, false, false]);
   });
 
   it("lecture: toConfirm dans la limite de deux badges", async () => {

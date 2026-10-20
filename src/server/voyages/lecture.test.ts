@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiTripAdapter } from "@/adapters/api";
 import type { AdapterContext } from "@/adapters/types";
 import { TripSnapshotSchema, type DaySnapshot } from "@/contracts";
-import type { Relectures, SourceRelectures } from "@/domain/relectures";
+import type { Relectures, SourceRelectures, VoyageARelire } from "@/domain/relectures";
 import type { OrgTransaction } from "@/server/with-org";
 
 import { creerLectureVoyages, type DependancesLecture } from "./lecture";
@@ -58,7 +58,9 @@ function transaction(leve?: string) {
       return [{ id: TRIP, destination: "Testville", start: "2028-03-01", end: "2028-03-02", adults: 2, children: 0, time_zone: "Europe/Zurich", current_version: 1 }];
     }
     if (texte.includes("trip_versions")) return [{ version: 1, snapshot, created_ms: Date.parse("2028-01-01T00:00:00Z") }];
-    if (texte.includes("public.stays")) return [{ place_id: L1, from: "2028-03-01", to: "2028-03-02" }];
+    if (texte.includes("public.stays")) {
+      return [{ place_id: L1, from: "2028-03-01", to: "2028-03-02", kind: "lodging", lodging_kind: "known", city: "Testville", area_center_lat: null, area_center_lng: null }];
+    }
     if (texte.includes("public.briefs")) return [{ mobility: "walk" }];
     if (texte.includes("generation_runs")) return [{ en_cours: false }];
     return [];
@@ -81,6 +83,17 @@ const relectures = (minutes: number): SourceRelectures => ({
     return { ok: true, relectures: r };
   },
 });
+
+/** Source qui garde le voyage reçu (contexte, portée et séjours posés par le cas d'usage). */
+function source(minutes = 5) {
+  const recus: VoyageARelire[] = [];
+  const double = relectures(minutes);
+  const pour: SourceRelectures["pour"] = async (voyage, demande) => {
+    recus.push(voyage);
+    return double.pour(voyage, demande);
+  };
+  return { source: { pour } as SourceRelectures, recus };
+}
 
 function journal() {
   const erreurs = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -150,5 +163,51 @@ describe("lecture: erreur de la base en erreur fermée (mineur 8)", () => {
     const adapter = createApiTripAdapter({ relectures: relectures(-1), withOrg: transaction() });
     await expect(adapter.getDay(ctx, TRIP, 1)).rejects.toEqual(raison("output_invalid"));
     expect(lignes().map((l) => l.reason)).toEqual(["output_invalid"]);
+  });
+});
+
+describe("lecture: propagation du contexte (0100 § 3.2 point 1)", () => {
+  it("lecture: getDay pose le contexte de la session, la portée jour et les séjours de chaque nuit", async () => {
+    const { source: porte, recus } = source();
+    await createApiTripAdapter({ relectures: porte, withOrg: transaction() }).getDay(ctx, TRIP, 1);
+    expect(recus).toHaveLength(1);
+    expect(recus[0]).toEqual({
+      logementsParNuit: [L1],
+      contexte: { organizationId: ORG, userId: USER, tripId: TRIP },
+      portee: "jour",
+      sejoursParNuit: [{ placeId: L1, ville: "Testville", centre: null, type: "lodging", logement: "known" }],
+    });
+  });
+
+  it("lecture: getTrip pose la portée voyage ; le contexte vient de la session, jamais de la demande", async () => {
+    const { source: porte, recus } = source();
+    await createApiTripAdapter({ relectures: porte, withOrg: transaction() }).getTrip(ctx, TRIP);
+    expect(recus).toHaveLength(1);
+    expect(recus[0]?.portee).toBe("voyage");
+    expect(recus[0]?.contexte).toEqual({ organizationId: ORG, userId: USER, tripId: TRIP });
+    // Aucun champ du voyage lu n'est une donnée de la demande : la demande ne porte ni organisation, ni utilisateur, ni portée.
+    const { source: autre, recus: autres } = source();
+    await createApiTripAdapter({ relectures: autre, withOrg: transaction() }).getDay({ ...ctx, userId: "00000000-0000-4000-8000-0000000000b2" }, TRIP, 1);
+    expect(autres[0]?.contexte.userId).toBe("00000000-0000-4000-8000-0000000000b2");
+  });
+
+  it("lecture: une ligne de séjour illisible (type inconnu, centre à moitié posé) est output_invalid, sans valeur", async () => {
+    journal();
+    const lignesStays = (ligne: Record<string, unknown>): NonNullable<DependancesLecture["withOrg"]> => {
+      const base = transaction();
+      return async (c, fn) =>
+        base(c, (tx) =>
+          fn({
+            async execute(requete: unknown) {
+              const texte = texteSql(requete);
+              if (texte.includes("public.stays")) return { rows: [{ place_id: L1, from: "2028-03-01", to: "2028-03-02", kind: "lodging", lodging_kind: "known", city: null, area_center_lat: null, area_center_lng: null, ...ligne }] };
+              return (tx as unknown as { execute(r: unknown): Promise<{ rows: unknown[] }> }).execute(requete);
+            },
+          } as unknown as OrgTransaction),
+        );
+    };
+    for (const ligne of [{ kind: "autre" }, { lodging_kind: "autre" }, { area_center_lat: 12.5 }, { city: 4 }]) {
+      await expect(createApiTripAdapter({ relectures: relectures(5), withOrg: lignesStays(ligne) }).getDay(ctx, TRIP, 1), JSON.stringify(ligne)).rejects.toEqual(raison("output_invalid"));
+    }
   });
 });

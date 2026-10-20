@@ -136,10 +136,17 @@ export function demandeDeRelectures(entree: {
   };
 }
 
-/** `exceptions` stockées, puis `toConfirm` s'il reste une place (B6-PO-5, 0011 point 5 : 2 badges au plus). */
+/**
+ * `exceptions` stockées, puis `toConfirm` s'il reste une place (B6-PO-5, 0011 point 5 : 2 badges au plus).
+ * **`aConfirmer` n'est appelé que pour un lieu relu** (décision 0100 § 4.2, B8-PO-9) : `validite` `inconnu` signifie
+ * « non relu » (fiche en échec), jamais « introuvable » (`introuvable`, lui, reçoit `toConfirm`). Une étape sans
+ * `placeId` n'est pas relue non plus (`aConfirmer` rend déjà faux).
+ */
 function exceptionsLues(stop: StopSnapshot, date: string, relectures: Relectures | undefined): Stop["exceptions"] {
   const exceptions: Stop["exceptions"] = [...stop.exceptions];
-  if (relectures !== undefined && exceptions.length < 2 && aConfirmer(stop, date, relectures)) exceptions.push("toConfirm");
+  if (relectures === undefined || exceptions.length >= 2 || stop.placeId === undefined) return exceptions;
+  if (relectures.validite(stop.placeId) === INCONNU) return exceptions;
+  if (aConfirmer(stop, date, relectures)) exceptions.push("toConfirm");
   return exceptions;
 }
 
@@ -183,7 +190,8 @@ export function recomposerJour(
       const couple = couples.get(rang);
       const duree = relectures === undefined || couple === undefined ? INCONNU : relectures.duree(couple.depuis, couple.vers, item.segment.mode);
       if (duree === INCONNU) return { ok: false, raison: "travel_unknown" };
-      items.push({ type: "segment", segment: { mode: item.segment.mode, minutes: duree.minutes, estimated: item.segment.estimated } });
+      // `estimated` : vrai si la valeur stockée ou la relecture le dit (0100 § 6.1) ; une durée estimée n'est jamais présentée comme mesurée.
+      items.push({ type: "segment", segment: { mode: item.segment.mode, minutes: duree.minutes, estimated: item.segment.estimated || duree.estimee } });
     } else {
       items.push(item);
     }
@@ -267,7 +275,7 @@ export function recomposerProposition(
     const depuis = pointAvantProposition(jour, proposition.time, stop.id, contexte.nombreDeNuits);
     const duree = contexte.relectures.duree(depuis, { lieu: stop.placeId }, travelFromPrevious.mode);
     if (duree === INCONNU) return { ok: false, raison: "travel_unknown" };
-    trajet = { mode: travelFromPrevious.mode, minutes: duree.minutes, estimated: travelFromPrevious.estimated };
+    trajet = { mode: travelFromPrevious.mode, minutes: duree.minutes, estimated: travelFromPrevious.estimated || duree.estimee };
   }
   return {
     ok: true,
