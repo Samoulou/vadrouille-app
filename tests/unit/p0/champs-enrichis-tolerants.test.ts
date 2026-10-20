@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { LONGUEURS_TEXTE } from "@/ai/candidat";
+import { contientUrl, LONGUEURS_TEXTE, texteMaison } from "@/ai/candidat";
 import { CHAMPS_ENRICHIS_TOLERANTS, couperTexte, LONGUEURS_INFOS, LONGUEURS_PLAN, lireTour } from "@/ai/sorties";
 import type { Brief } from "@/prototype/brief";
+import * as originalCandidat from "@/prototype/candidat";
 import { ConfigRechercheSchema } from "@/prototype/config";
 
 import { chercherCandidatsP0 } from "./agent-p0";
@@ -103,14 +104,22 @@ describe("ia: champs d'enrichissement tolérants (ticket 595)", () => {
       horaires: `${"9 h 30 – 18 h, ".repeat(12)}`,
       conseil: `${"Réserver le billet à l'avance. ".repeat(8)}`,
     };
-    const bornes = { nom: LONGUEURS_TEXTE.nom, resume: LONGUEURS_TEXTE.resume, secteur: LONGUEURS_PLAN.secteur, incontournable: LONGUEURS_PLAN.incontournable, prix: LONGUEURS_INFOS.prix, horaires: LONGUEURS_INFOS.horaires, conseil: LONGUEURS_INFOS.conseil };
+    const bornes = new Map<string, number>([
+      ["nom", LONGUEURS_TEXTE.nom],
+      ["resume", LONGUEURS_TEXTE.resume],
+      ["secteur", LONGUEURS_PLAN.secteur],
+      ["incontournable", LONGUEURS_PLAN.incontournable],
+      ["prix", LONGUEURS_INFOS.prix],
+      ["horaires", LONGUEURS_INFOS.horaires],
+      ["conseil", LONGUEURS_INFOS.conseil],
+    ]);
     const { valeur, refuses, champsRetires, textesCoupes } = lu({ ...CANDIDAT, ...longs });
     expect(refuses).toBe(0);
     expect(champsRetires).toBe(0);
     expect(textesCoupes).toBe(7);
     const garde = valeur.candidats[0] as unknown as Record<string, string>;
     for (const [champ, texte] of Object.entries(longs)) {
-      const max = bornes[champ as keyof typeof bornes];
+      const max = bornes.get(champ) ?? 0;
       expect(texte.length, champ).toBeGreaterThan(max);
       expect(garde[champ]?.length, champ).toBeLessThanOrEqual(max);
       // Coupe sur une fin de mot : le texte gardé est un début du texte brut suivi, dans le brut, d'une espace.
@@ -156,6 +165,29 @@ describe("ia: champs d'enrichissement tolérants (ticket 595)", () => {
     const lecture = lu({ ...CANDIDAT, conseil });
     expect(lecture).toMatchObject({ refuses: 0, champsRetires: 1, textesCoupes: 0 });
     expect(lecture.valeur.candidats[0]?.conseil).toBeUndefined();
+  });
+
+  it("coupe qui fait apparaître un domaine (« foo.commerce » → « foo.com ») : échec fermé, champ retiré ou lieu écarté", () => {
+    const conseil = `${"x".repeat(LONGUEURS_INFOS.conseil - 5)}a.commerce`;
+    expect(contientUrl(conseil)).toBe(false);
+    expect(contientUrl(conseil.slice(0, LONGUEURS_INFOS.conseil))).toBe(true);
+    const lecture = lu({ ...CANDIDAT, conseil });
+    expect(lecture).toMatchObject({ refuses: 0, champsRetires: 1 });
+    expect(lecture.valeur.candidats[0]?.conseil).toBeUndefined();
+    expect(lu({ ...CANDIDAT, nom: `${"x".repeat(LONGUEURS_TEXTE.nom - 5)}a.commerce` })).toMatchObject({ refuses: 1 });
+  });
+
+  it("graphème géant (lettre suivie de milliers de marques) : la coupe ne laisse rien, champ retiré ou lieu écarté, sans le recopier", () => {
+    const geant = `e${"\u0301".repeat(5000)}`;
+    expect(couperTexte(geant, LONGUEURS_INFOS.conseil)).toBe("");
+    const lecture = lu({ ...CANDIDAT, conseil: geant });
+    expect(lecture).toMatchObject({ refuses: 0, champsRetires: 1 });
+    expect(lecture.valeur.candidats[0]?.conseil).toBeUndefined();
+    expect(lu({ ...CANDIDAT, nom: geant })).toMatchObject({ refuses: 1 });
+  });
+
+  it("textesCoupes : une valeur assez courte n'est jamais comptée, même avec des espaces de fin", () => {
+    expect(lu({ ...CANDIDAT, prix: "20 £   " })).toMatchObject({ refuses: 0, textesCoupes: 0, champsRetires: 0 });
   });
 
   it("champ absent ou null admis : rien n'est compté comme retiré", () => {
@@ -230,6 +262,54 @@ async function rejouer(candidats: unknown[]) {
   });
 }
 
+/** Formes que `contientUrl` doit refuser : la réécriture linéaire des motifs (revue de #597) n'affaiblit rien. */
+const AVEC_URL = [
+  "https://exemple.org/page",
+  "voir ftp://serveur",
+  "svn+ssh://depot",
+  "x-y.z://a",
+  "www.exemple",
+  "javascript:alert(1)",
+  "mailto:a",
+  "data:text/html",
+  "file:///etc",
+  "exemple.com",
+  "a.b.c.co.uk",
+  "chateau-fort.scot",
+  "musee.fr.",
+  "guide.example",
+  "Voir EXEMPLE.COM demain",
+];
+const SANS_URL = ["Château maison", "9 h 30 – 18 h", "20 £ adulte", "Réserver tôt.", "foo.commerce", "a.b", "M. Dupont", "fr", "com"];
+const TAILLE_REPONSE = 256 * 1024;
+
+describe("ia: contientUrl linéaire (revue de la PR 597, décision 0111 § 6)", () => {
+  it("URL et domaines toujours détectés, textes ordinaires admis, même verdict des deux copies", () => {
+    for (const texte of AVEC_URL) {
+      expect(contientUrl(texte), texte).toBe(true);
+      expect(originalCandidat.contientUrl(texte), texte).toBe(true);
+    }
+    for (const texte of SANS_URL) {
+      expect(contientUrl(texte), texte).toBe(false);
+      expect(originalCandidat.contientUrl(texte), texte).toBe(false);
+    }
+  });
+
+  it.each(["a-", "a.", "a", "a+", "a-a.", "1.a-"])("texte de 256 Ki en « %s » répété : contrôle en temps linéaire (texte entier avant la coupe)", (motif) => {
+    const texte = motif.repeat(Math.ceil(TAILLE_REPONSE / motif.length)).slice(0, TAILLE_REPONSE);
+    const debut = performance.now();
+    expect(contientUrl(texte)).toBe(false);
+    expect(originalCandidat.contientUrl(texte)).toBe(false);
+    expect(texteMaison(Number.MAX_SAFE_INTEGER).safeParse(texte).success).toBe(true);
+    expect(originalCandidat.texteMaison(Number.MAX_SAFE_INTEGER).safeParse(texte).success).toBe(true);
+    // Chemin complet : un nom presque aussi long que la réponse admise (`LONGUEUR_REPONSE_MAX`), contrôlé entier puis
+    // coupé à sa borne (le lieu est gardé).
+    expect(lu({ ...CANDIDAT, nom: texte.slice(0, TAILLE_REPONSE - 2048) })).toMatchObject({ refuses: 0, textesCoupes: 1 });
+    // Avant la réécriture : ~9 s mesurées pour 80 000 caractères, ~90 s extrapolées pour 256 Ki.
+    expect(performance.now() - debut).toBeLessThan(2000);
+  });
+});
+
 describe("ia: agent de recherche, champs d'enrichissement retirés (ticket 595)", () => {
   it("clé inconnue placeId : ignorée par l'agent aussi, jamais dans le candidat admis", async () => {
     const { candidats, compteurs } = await rejouer([{ ...CANDIDAT, placeId: `ChIJ${SENTINELLE}` }]);
@@ -264,5 +344,17 @@ describe("ia: agent de recherche, champs d'enrichissement retirés (ticket 595)"
     const { candidats, compteurs } = await rejouer([{ ...CANDIDAT, secteur: `Vieille\nville` }]);
     expect(candidats).toHaveLength(0);
     expect(compteurs).toMatchObject({ champsRetires: 1, qualite: { secteurInconnu: 1 }, sortiesRefusees: { recherche: 0 } });
+  });
+
+  it("secteur trop long coupé en un nom hors plan : le lieu est écarté par la règle du plan (secteur_inconnu)", async () => {
+    const { candidats, compteurs } = await rejouer([{ ...CANDIDAT, secteur: `Vieille ville ${"haute ".repeat(15)}` }]);
+    expect(candidats).toHaveLength(0);
+    expect(compteurs).toMatchObject({ champsRetires: 0, textesCoupes: 1, qualite: { secteurInconnu: 1 }, sortiesRefusees: { recherche: 0 } });
+  });
+
+  it("incontournable trop long coupé en un nom hors plan : le lieu est gardé comme lieu ordinaire du secteur", async () => {
+    const { candidats, compteurs } = await rejouer([{ ...CANDIDAT, incontournable: `Château ${"royal ".repeat(20)}` }]);
+    expect(candidats).toHaveLength(1);
+    expect(compteurs).toMatchObject({ champsRetires: 0, textesCoupes: 1, qualite: { incontournableSansCandidat: 1 } });
   });
 });

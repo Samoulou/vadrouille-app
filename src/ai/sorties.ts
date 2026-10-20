@@ -340,13 +340,26 @@ export const LONGUEURS_INFOS = { prix: LONGUEURS_TEXTE.prix, horaires: LONGUEURS
  */
 export const CHAMPS_ENRICHIS_TOLERANTS = ["secteur", "incontournable", "prix", "horaires", "conseil", "prixParPersonne", "dureeMinutes", "slotFit"] as const;
 
-/** Textes libres d'un candidat extrait : trop longs, ils sont coupés (`texteCoupe`), jamais refusés pour leur longueur. */
-const TEXTES_CANDIDAT = ["nom", "resume", "secteur", "incontournable", "prix", "horaires", "conseil"] as const;
+/**
+ * Textes libres d'un candidat extrait et leur longueur maximale : trop longs, ils sont coupés (`texteCoupe`), jamais
+ * refusés pour leur longueur.
+ */
+const TEXTES_CANDIDAT = {
+  nom: LONGUEURS_TEXTE.nom,
+  resume: LONGUEURS_TEXTE.resume,
+  secteur: LONGUEURS_PLAN.secteur,
+  incontournable: LONGUEURS_PLAN.incontournable,
+  prix: LONGUEURS_INFOS.prix,
+  horaires: LONGUEURS_INFOS.horaires,
+  conseil: LONGUEURS_INFOS.conseil,
+} as const;
 
 /**
  * Compte d'un candidat gardé : `retires`, champs tolérants présents dans l'élément brut (valeur autre que `undefined`)
- * mais retirés par le schéma, plus les clés inconnues ignorées ; `coupes`, textes gardés plus courts que leur valeur
- * brute. Ne compare que des présences et des longueurs, jamais un texte.
+ * mais retirés par le schéma, plus les clés inconnues ignorées (leur nombre n'est borné que par `LONGUEUR_REPONSE_MAX` :
+ * un compteur, sans autre effet) ; `coupes`, textes gardés dont la valeur brute dépassait leur longueur maximale (une
+ * valeur assez courte dont seules les espaces de fin tombent n'est pas comptée). Ne compare que des présences et des
+ * longueurs, jamais un texte.
  */
 function compteCandidat(brut: unknown, lu: CandidatExtrait): { retires: number; coupes: number } {
   if (typeof brut !== "object" || brut === null) return { retires: 0, coupes: 0 };
@@ -355,10 +368,9 @@ function compteCandidat(brut: unknown, lu: CandidatExtrait): { retires: number; 
   const connues = new Set(Object.keys(CandidatExtraitSchema.shape));
   const inconnues = [...present.keys()].filter((cle) => !connues.has(cle)).length;
   const retires = inconnues + CHAMPS_ENRICHIS_TOLERANTS.filter((champ) => present.get(champ) !== undefined && garde.get(champ) === undefined).length;
-  const coupes = TEXTES_CANDIDAT.filter((champ) => {
+  const coupes = Object.entries(TEXTES_CANDIDAT).filter(([champ, max]) => {
     const avant = present.get(champ);
-    const apres = garde.get(champ);
-    return typeof avant === "string" && typeof apres === "string" && apres.length < avant.length;
+    return typeof avant === "string" && avant.length > max && typeof garde.get(champ) === "string";
   }).length;
   return { retires, coupes };
 }
@@ -395,7 +407,10 @@ const TEXTE_SANS_BORNE = texteMaison(Number.MAX_SAFE_INTEGER);
  * Texte maison d'un candidat extrait (décision de Samuel du 2026-10-20, décision 0111) : trop long, il est **coupé** à
  * `max` (`couperTexte`) au lieu d'être refusé. Caractères interdits, balises et URL restent refusés, vérifiés sur le
  * texte **entier** avant la coupe (une coupe ne peut pas faire passer un domaine tronqué, « exemple.c »), puis de
- * nouveau sur le texte coupé (`texteMaison(max)`).
+ * nouveau sur le texte coupé (`texteMaison(max)`). Les motifs d'URL sont linéaires (`contientUrl`) : le contrôle du
+ * texte entier, borné seulement par `LONGUEUR_REPONSE_MAX`, ne bloque pas la boucle d'événements. Échec fermé : une coupe
+ * qui fait apparaître un domaine (« foo.commerce » coupé en « foo.com ») ou qui ne laisse rien (graphème plus long que
+ * `max`) est refusée par le second contrôle ; pour `nom` et `resume`, le lieu est alors écarté (décision 0111 § 3).
  */
 export function texteCoupe(max: number) {
   return z
@@ -432,14 +447,15 @@ export const CandidatExtraitSchema = z.object({
   incontournable: texteCoupe(LONGUEURS_PLAN.incontournable).nullable().optional().catch(undefined),
   /**
    * Infos pratiques tirées de la page source, réécrites en texte maison (P0S2-PO-21) ; absentes si la source ne les donne
-   * pas. Invalides (longueur, caractère interdit, URL) : retirées, jamais tronquées ni recopiées (ticket 595).
+   * pas. Trop longues : coupées ; caractère interdit, balise, URL : retirées, jamais recopiées (ticket 595, décision 0111).
    */
   prix: texteCoupe(LONGUEURS_INFOS.prix).optional().catch(undefined),
   horaires: texteCoupe(LONGUEURS_INFOS.horaires).optional().catch(undefined),
   conseil: texteCoupe(LONGUEURS_INFOS.conseil).optional().catch(undefined),
   /**
    * Créneaux auxquels le lieu convient selon le modèle de recherche (ticket 483, forme du `slotFit` de la notation) : sert
-   * seulement à compter les cibles de l'agent (`creneauCompte`), jamais gardé dans le candidat ; la notation reste seule
+   * seulement à compter les cibles de l'agent (`creneauCompte`) : rendu par ce schéma, il n'est jamais recopié dans le
+   * candidat de recherche (`CandidatRecherche`) ; la notation reste seule
    * juge des créneaux à la planification. Indication facultative : mal formée, elle est ignorée, le lieu n'est pas écarté.
    */
   slotFit: NotesSchema.shape.slotFit.optional().catch(undefined),
