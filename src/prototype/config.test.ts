@@ -224,14 +224,14 @@ describe("p0: configuration du mode réel (décision 0055, section 6)", () => {
   });
 });
 
-describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décisions 0063 et 0073)", () => {
+describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, décisions 0063, 0073 et 0093)", () => {
   const essai = () => lire("essai") as Record<string, unknown>;
 
-  it("fichier commité : mêmes plafonds par exécution que mode-reel.json (décision 0073), acceptés", () => {
+  it("fichier commité : mêmes plafonds par exécution que mode-reel.json (décision 0073) sauf le fusible de coût, 2 USD (0093 point 5), acceptés", () => {
     expect(essai()).toEqual({
       schema: 1,
       uniteQuotaRoutes: "elements",
-      coutUsd: 3,
+      coutUsd: 2,
       recherchesWeb: 40,
       pagesLues: 100,
       candidatsTrouves: 85,
@@ -244,11 +244,18 @@ describe("p0: configuration de l'essai d'intégration (P0S2-PO-12 amendé, déci
       coutsEstimesMicros: { requeteModele: 20_000, rechercheWeb: 40_000 },
     });
     expect(validerConfigEssai(essai())).toEqual({ ok: true, config: essai() });
-    // Chaque valeur commitée est exactement la borne : le fichier ne peut que descendre.
-    for (const [champ, borne] of Object.entries(BORNES_ESSAI)) expect(essai()[champ], champ).toBe(borne);
-    // Décision 0073 : fichier de l'essai identique à celui du mode réel, bornes égales aux plafonds commités du mode réel.
+    // Chaque valeur commitée est exactement la borne : le fichier ne peut que descendre. Seul `coutUsd` est sous sa
+    // borne (0093 point 5 : 2 USD d'IA pour l'essai, 3 USD de borne comme le mode réel, `BORNES_ESSAI` inchangé).
+    for (const [champ, borne] of Object.entries(BORNES_ESSAI)) {
+      if (champ === "coutUsd") expect(essai()[champ], champ).toBe(2);
+      else expect(essai()[champ], champ).toBe(borne);
+    }
+    expect(BORNES_ESSAI.coutUsd).toBe(3);
+    // Décision 0073 amendée par 0093 : fichier de l'essai identique à celui du mode réel hors `coutUsd` ; bornes égales
+    // aux plafonds commités du mode réel (qui reste à 3 USD).
     const reel = lire("mode-reel") as Record<string, unknown>;
-    expect(essai()).toEqual(reel);
+    expect({ ...essai(), coutUsd: reel.coutUsd }).toEqual(reel);
+    expect(reel.coutUsd).toBe(3);
     for (const [champ, borne] of Object.entries(BORNES_ESSAI)) expect(reel[champ], champ).toBe(borne);
   });
 

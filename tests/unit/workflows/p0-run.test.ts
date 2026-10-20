@@ -194,7 +194,7 @@ describe("p0Run : fabriques appelées dans chaque étape, une famille par étape
     await expect(deps.recherche.rechercher({ requete: "x" })).rejects.toMatchObject({ code: "cap_reached" });
     expect(recherche.rechercher).toHaveBeenCalledTimes(40);
     const plafonds = (d.composerP0Reel.mock.calls[0]?.[1] as { plafonds: { fournisseur: string; maxCoutMicros?: number }[] }).plafonds;
-    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(3_000_000);
+    expect(plafonds.find((p) => p.fournisseur === "modeles")?.maxCoutMicros).toBe(2_000_000);
   });
 
   it("coût des modèles déjà compté : l'étape ne dispose que du reste du plafond", async () => {

@@ -14,8 +14,9 @@ import {
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
 /**
- * Décompte des exécutions réelles (P0S2-PO-13 ; P0a2 : 2 B et 1 A par brief). Information seulement depuis la décision
- * 0071 : il ne refuse plus aucun lancement (`tests/unit/p0/lancement.test.ts`) ; `placeLibre` lit le tableau de la page.
+ * Décompte des exécutions réelles (P0a2 : 2 B et 1 A par brief). Information seulement depuis la décision 0071 : il ne
+ * refuse plus aucun lancement (`tests/unit/p0/lancement.test.ts`) ; `placeLibre` lit le tableau de la page. Depuis la
+ * décision 0093 (point 2, confirmée par Samuel le 2026-10-19), une exécution sans programme écrit ne compte jamais.
  */
 const placeLibre = (executions: Parameters<typeof decompte>[0], brief: string, variante: "A" | "B") =>
   decompte(executions, brief, variante).comptees < COMPTEES_MAX[variante];
@@ -32,19 +33,28 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     expect(placeLibre([], "edimbourg-1.json", "A")).toBe(true);
   });
 
-  it("toute fin compte (programme écrit, pipeline_failed, codes avant appel), et une exécution en cours compte", () => {
+  it("seuls comptent un programme écrit et une exécution en cours ; une exécution arrêtée ne compte jamais (0093, point 2)", () => {
     const executions = [
       executionSuivie(),
-      arretee("pipeline_failed"),
-      arretee("config_invalid"),
       executionSuivie({ statut: "en_cours", phase: "recherche", coutModelesMicros: 0, ecouleMs: 1, canaryOk: null }),
     ];
-    expect(decompte(executions, "edimbourg-1.json", "B")).toEqual({ comptees: 4, relances: 0 });
+    expect(decompte(executions, "edimbourg-1.json", "B")).toEqual({ comptees: 2, relances: 0 });
+    const arretees = [
+      arretee("pipeline_failed"),
+      arretee("config_invalid"),
+      arretee("cap_reached"),
+      arretee("upstream_unavailable"),
+      arretee("upstream_redirect"),
+      arretee("usage_unavailable"),
+      arretee("timeout"),
+    ];
+    expect(decompte(arretees, "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
+    expect(decompte([...executions, ...arretees], "edimbourg-1.json", "B")).toEqual({ comptees: 2, relances: 0 });
   });
 
-  it.each(CODES_EXTERNES_SUIVI)("une fin externe (%s) est une relance, au plus une ; la seconde compte", (code) => {
-    expect(decompte([arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 1 });
-    expect(decompte([arretee(code), arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 1, relances: 1 });
+  it.each(CODES_EXTERNES_SUIVI)("une fin externe (%s) sans programme n'est ni comptée ni relance, quel qu'en soit le nombre", (code) => {
+    expect(decompte([arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
+    expect(decompte([arretee(code), arretee(code), arretee(code)], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
   });
 
   it("par brief et variante : les autres briefs, l'autre variante et les essais ne comptent pas", () => {
@@ -58,15 +68,14 @@ describe("p0: décompte des exécutions (P0S2-PO-13)", () => {
     expect(decompte(executions, "edimbourg-1.json", "A")).toEqual({ comptees: 1, relances: 0 });
   });
 
-  it("B : deux comptées puis plus de place ; A : une comptée puis plus de place ; une relance ne consomme pas de place comptée", () => {
-    const b = [executionSuivie(), arretee("upstream_unavailable")];
+  it("B : deux comptées puis plus de place ; A : une comptée puis plus de place ; une exécution arrêtée ne prend jamais de place", () => {
+    const b = [executionSuivie(), arretee("upstream_unavailable"), arretee("pipeline_failed"), arretee("cap_reached")];
     expect(placeLibre(b, "edimbourg-1.json", "B")).toBe(true);
     expect(placeLibre([...b, executionSuivie()], "edimbourg-1.json", "B")).toBe(false);
     const a = [executionSuivie({ variante: "A" })];
     expect(placeLibre(a, "edimbourg-1.json", "A")).toBe(false);
-    expect(placeLibre([arretee("usage_unavailable", { variante: "A" })], "edimbourg-1.json", "A")).toBe(true);
     expect(placeLibre([arretee("usage_unavailable", { variante: "A" }), arretee("upstream_redirect", { variante: "A" })], "edimbourg-1.json", "A")).toBe(
-      false,
+      true,
     );
   });
 
@@ -129,6 +138,10 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
     expect(placeLibre([exclue0070, executionSuivie(), executionSuivie()], "edimbourg-1.json", "B")).toBe(false);
   });
 
+  it("depuis 0093, l'exécution de 0070 ne serait pas comptée même sans figurer dans la liste (le total ne dépend pas de la liste)", () => {
+    expect(decompte([exclue0070, exclue0070], "edimbourg-1.json", "B")).toEqual({ comptees: 0, relances: 0 });
+  });
+
   it.each([
     ["autre jour", { jourQuota: "2026-10-17" }],
     ["autre commit", { commitSha: "b".repeat(40) }],
@@ -137,10 +150,10 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
     ["autre variante", { variante: "A" as const }],
     ["programme écrit", { statut: "programme_ecrit" as const, codeArret: null }],
     ["en cours", { statut: "en_cours" as const, codeArret: null }],
-  ])("un seul champ différent (%s) : l'exécution compte", (_cas, champs) => {
+  ])("un seul champ différent (%s) : l'exécution n'est pas dans la liste ; elle ne compte que si elle n'est pas arrêtée", (_cas, champs) => {
     const execution = { ...exclue0070, ...champs };
     expect(estExclue(execution)).toBe(false);
-    expect(decompte([execution], execution.brief, execution.variante).comptees).toBe(1);
+    expect(decompte([execution], execution.brief, execution.variante).comptees).toBe(execution.statut === "arretee" ? 0 : 1);
   });
 
   it("un essai du même jour n'est pas visé (il ne compte déjà pas)", () => {
@@ -151,7 +164,7 @@ describe("p0: exécutions exclues du décompte (décision 0070)", () => {
 /**
  * Décision 0089 : les deux exécutions réelles rome-1/B de l'après-midi du 2026-10-18 (`wrun_41M57JCM3G50T1SSVCX1XG7HRT`
  * au commit `cfca0b5`, `wrun_41M57JWPHV50HNB1M3TH4D2140` au commit `efc0994`) sont exclues du décompte G0 ; l'exécution
- * réussie du matin reste comptée. Chaque entrée n'exclut qu'une exécution au plus.
+ * réussie du matin reste comptée. Depuis 0093 (point 2), toute exécution arrêtée est hors décompte.
  */
 describe("p0: exécutions exclues du décompte (décision 0089)", () => {
   const CFCA = "cfca0b58ccf67e4d10196adea296045ec98fdb61";
@@ -172,19 +185,14 @@ describe("p0: exécutions exclues du décompte (décision 0089)", () => {
     expect(placeLibre([apresMidi2, apresMidi1, matin, rome()], "rome-1.json", "B")).toBe(false);
   });
 
-  it("chaque entrée n'exclut qu'une exécution : une seconde exécution du même tuple compte", () => {
+  it("une seconde exécution arrêtée du même tuple ne compte pas non plus (0093 : toute exécution arrêtée est hors décompte)", () => {
     expect(decompte([apresMidi1, { ...apresMidi1, id: "22222222-2222-4222-8222-222222222222" }], "rome-1.json", "B")).toEqual({
-      comptees: 1,
+      comptees: 0,
       relances: 0,
     });
     expect(
       decompte([apresMidi1, apresMidi2, { ...apresMidi2, id: "33333333-3333-4333-8333-333333333333" }, matin], "rome-1.json", "B"),
-    ).toEqual({ comptees: 2, relances: 0 });
-  });
-
-  it("l'entrée de 0070 reste limitée à une exécution", () => {
-    const exclue0070 = arretee("pipeline_failed", { jourQuota: "2026-10-16", commitSha: "d61e9faefacf568ad39833e8ac611ba717e0fbdd" });
-    expect(decompte([exclue0070, exclue0070], "edimbourg-1.json", "B")).toEqual({ comptees: 1, relances: 0 });
+    ).toEqual({ comptees: 1, relances: 0 });
   });
 
   it.each([
@@ -199,8 +207,10 @@ describe("p0: exécutions exclues du décompte (décision 0089)", () => {
     for (const exclue of [apresMidi1, apresMidi2]) {
       const execution = { ...exclue, ...champs };
       expect(estExclue(execution)).toBe(false);
-      const attendu = execution.codeArret === "upstream_unavailable" ? { comptees: 0, relances: 1 } : { comptees: 1, relances: 0 };
-      expect(decompte([execution], execution.brief, execution.variante)).toEqual(attendu);
+      expect(decompte([execution], execution.brief, execution.variante)).toEqual({
+        comptees: execution.statut === "arretee" ? 0 : 1,
+        relances: 0,
+      });
     }
   });
 
@@ -212,7 +222,7 @@ describe("p0: exécutions exclues du décompte (décision 0089)", () => {
 
 /**
  * Décision 0091 : l'exécution réelle rome-1/B du soir du 2026-10-18 (`wrun_41M57YCVXJ50T41W3BH260MEP2`, commit `0d0bbaa`),
- * arrêtée par la limite quotidienne de Google Routes, est exclue du décompte G0. L'entrée n'exclut qu'une exécution au plus.
+ * arrêtée par la limite quotidienne de Google Routes, est exclue du décompte G0. Depuis 0093 (point 2), toute exécution arrêtée est hors décompte.
  */
 describe("p0: exécutions exclues du décompte (décision 0091)", () => {
   const CFCA = "cfca0b58ccf67e4d10196adea296045ec98fdb61";
@@ -233,14 +243,14 @@ describe("p0: exécutions exclues du décompte (décision 0091)", () => {
     expect(placeLibre([matin, apresMidi1, apresMidi2, soir, rome()], "rome-1.json", "B")).toBe(false);
   });
 
-  it("l'entrée n'exclut qu'une exécution : une seconde exécution du même tuple compte", () => {
+  it("une seconde exécution arrêtée du même tuple ne compte pas non plus (0093)", () => {
     expect(decompte([soir, { ...soir, id: "44444444-4444-4444-8444-444444444444" }], "rome-1.json", "B")).toEqual({
-      comptees: 1,
+      comptees: 0,
       relances: 0,
     });
     expect(
       decompte([matin, apresMidi1, apresMidi2, soir, { ...soir, id: "55555555-5555-4555-8555-555555555555" }], "rome-1.json", "B"),
-    ).toEqual({ comptees: 2, relances: 0 });
+    ).toEqual({ comptees: 1, relances: 0 });
   });
 
   it.each([
@@ -254,8 +264,10 @@ describe("p0: exécutions exclues du décompte (décision 0091)", () => {
   ])("un seul champ différent (%s) : l'exécution n'est pas exclue", (_cas, champs) => {
     const execution = { ...soir, ...champs };
     expect(estExclue(execution)).toBe(false);
-    const attendu = execution.codeArret === "upstream_unavailable" ? { comptees: 0, relances: 1 } : { comptees: 1, relances: 0 };
-    expect(decompte([execution], execution.brief, execution.variante)).toEqual(attendu);
+    expect(decompte([execution], execution.brief, execution.variante)).toEqual({
+      comptees: execution.statut === "arretee" ? 0 : 1,
+      relances: 0,
+    });
   });
 
   it("un essai d'intégration du même jour n'est pas visé (il ne compte déjà pas)", () => {
