@@ -121,7 +121,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
 
   // essai.json aligné sur mode-reel.json (0073) : 90 Text Search (gratuits), 90 fiches à 20 USD les 1 000 (1,80 USD) et
   // 840 éléments Routes à 5 USD les 1 000 (4,20 USD, 0088 § 13), au prix plein.
-  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 3 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
+  it("essai : plafonds d'essai.json, alignés sur le mode réel (0073) : 6,00 USD de Google, 2 USD de modèles ; orphelines comptées sur la durée du mode réel", () => {
     expect(lancementDuMode("essai")).toEqual({
       forfait: {
         nature: "execution",
@@ -130,7 +130,7 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
         routesRequetes: 30,
         routesElements: 840,
         coutGoogleMicros: 6_000_000,
-        coutModelesMicros: 3_000_000,
+        coutModelesMicros: 2_000_000,
       },
       regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: "elements", dureeMaxMs: 900_000 },
     });
