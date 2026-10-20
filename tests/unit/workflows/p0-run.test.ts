@@ -353,6 +353,8 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
       terminesIgnores: 1,
       finsAnormales: 1,
       candidatsRefuses: { source_not_in_results: 4, duplicate: 0, over_total: 0, invalid: 1 },
+      champsRetires: 4,
+      textesCoupes: 5,
       finsEcheance: 1,
       qualite: { secteursPlan: 6, incontournablesPlan: 10, incontournableSansCandidat: 2, candidatRegroupe: 1, secteurInconnu: 3 },
     };
@@ -381,6 +383,8 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         mustSeesWithoutCandidate: 2,
         candidatesGrouped: 1,
         sectorUnknown: 3,
+        fieldsRemoved: 4,
+        textsCut: 5,
       },
     ]);
     info.mockClear();

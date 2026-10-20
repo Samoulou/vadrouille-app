@@ -335,6 +335,15 @@ describe("module de journal", () => {
     },
   );
 
+  it.each(["fieldsRemoved", "textsCut"])("ticket 595 : %s, entier positif ou nul, admis sur p0.research_done ; négatif, chaîne, non-entier ou texte retirés", (champ) => {
+    const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.research_done", { [champ]: valeur }, "info")) as Record<string, unknown>;
+    expect(ligne(0)).toEqual({ level: "info", event: "p0.research_done", [champ]: 0 });
+    expect(ligne(7)).toEqual({ level: "info", event: "p0.research_done", [champ]: 7 });
+    for (const refusee of [-1, 1.5, "3", "horaires", null, Number.NaN]) {
+      expect(ligne(refusee), String(refusee)).toEqual({ level: "info", event: "p0.research_done", dropped: 1 });
+    }
+  });
+
   it("errorNameOf ne lit que error.name, jamais message, code ni cause", () => {
     expect(errorNameOf(new TypeError(SENTINELLE))).toBe("TypeError");
     expect(errorNameOf({ name: `a@exemple.test`, message: SENTINELLE })).toBeUndefined();

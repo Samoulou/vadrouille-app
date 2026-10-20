@@ -35,13 +35,18 @@ const CARACTERES_INTERDITS = /[\p{C}<>]/u;
 
 /** Formes d'URL refusées dans un texte libre (les URL ne vivent que dans `source`, validée à part). */
 const FORMES_URL = [
-  /[a-z][a-z0-9+.-]*:\/\//i,
+  /[a-z0-9+.-]:\/\//i,
   /\bwww\./i,
   /\b(?:javascript|data|mailto|file):/i,
-  /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|org|net|info|io|co|uk|scot|fr|ch|de|eu|gov|edu|app|dev|example)\b/i,
+  /[a-z0-9-]\.(?:com|org|net|info|io|co|uk|scot|fr|ch|de|eu|gov|edu|app|dev|example)\b/i,
 ];
 
-/** Vrai si le texte contient une URL ou un nom de domaine. */
+/**
+ * Vrai si le texte contient une URL ou un nom de domaine. Motifs de longueur bornée, donc linéaires (pas de répétition
+ * suivie d'un suffixe obligatoire, qui rendait l'essai quadratique sur « aaaa… », « a-a-… » ou « a.a.… » : revue de
+ * #597) ; chacun admet tout ce qu'admettait l'ancien motif (ce qui précède « :// » ou « .tld » n'est plus exigé en
+ * entier), la détection n'est donc jamais affaiblie.
+ */
 export function contientUrl(texte: string): boolean {
   return FORMES_URL.some((forme) => forme.test(texte));
 }
