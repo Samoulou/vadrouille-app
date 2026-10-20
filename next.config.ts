@@ -59,6 +59,13 @@ export const nextConfig: NextConfig = {
   // Décision 0005 : le build vérifie les types sans les tests (absents de l'image Docker).
   // `pnpm typecheck` garde le tsconfig.json complet.
   typescript: { tsconfigPath: "tsconfig.build.json" },
+  // Décision 0105 § 2 point 5 : les fixtures d'Édimbourg de la variante simulée sont lues à l'exécution (`node:fs`,
+  // `src/server/composition/fixtures-simulees.ts`), jamais importées. Sur Vercel (préversion), le traçage de fichiers les
+  // embarque pour les routes du workflow ; dans l'image Docker, `prototype/` est hors du contexte (`.dockerignore`) et ce
+  // réglage reste sans effet : la composition simulée n'y est jamais atteinte (production refusée avant tout chargement).
+  outputFileTracingIncludes: {
+    "/.well-known/workflow/**": ["./prototype/fixtures/**/edimbourg.json"],
+  },
   async headers() {
     return RESPONSE_HEADERS;
   },

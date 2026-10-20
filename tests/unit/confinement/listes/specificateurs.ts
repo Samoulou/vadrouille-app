@@ -43,6 +43,7 @@ const ZONES_DRIZZLE_B3B = [
   "src/tenancy/organisations.ts",
   "src/server/auth/index.ts",
   "src/server/with-org.ts",
+  "src/server/with-system-org.ts",
   "tests/db/with-org.test.ts",
   "tests/unit/auth/operations.test.ts",
 ];
@@ -147,6 +148,9 @@ const COMPOSITION_P0R3C =
 const COMPOSITION_B8B =
   "composition de la lecture des voyages (B8b, décision 0100 § 5) : câblage seul de la source de relectures, de la fabrique commune des " +
   "clients Google, de `withOrg` et du forfait de relecture ; verdict Sécurité : attendu (0100 § 7 points 4 et 5)";
+const COMPOSITION_B9C =
+  "composition de la génération (B9c, décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8) : câblage seul des capacités à types neutres, du forfait, " +
+  "des fixtures d'Édimbourg de la variante simulée et des modules de capacité de la variante réelle ; verdict Sécurité : attendu";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -388,7 +392,9 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   {
     fichier: "src/server/composition/clients-google.ts",
     specificateur: "@/server/usage/port",
-    noms: ["horlogeSysteme", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
+    // B9c (revue de la PR #563, bloquant 3) : l'enveloppe de réservation des clients injectés (`envelopperClientsGoogle`) réserve
+    // par le même port que les clients réels (`avecReservation`, `demandeDe`, délai de requête) ; verdict Sécurité attendu.
+    noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:AppelFacture", "type:ContexteAppel", "type:Horloge", "type:Plafond", "type:PortConsommation"],
     motif: COMPOSITION_B8B,
   },
   { fichier: "src/server/composition/lecture.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
@@ -399,9 +405,36 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:Horloge"], motif: COMPOSITION_B8B },
   { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/with-org", noms: ["executeurSql", "withOrg"], motif: COMPOSITION_B8B },
   { fichier: "src/server/env/relectures.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
+  // B9c (décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8 ; verdict Sécurité attendu) : composition de la génération, câblage seul.
+  // Les lignes que l'analyseur relève pour `generation.ts`, et rien d'autre : marqueur, types et fonctions pures de
+  // `src/server` et `src/domain`, et les cinq fixtures d'Édimbourg de la variante simulée (valeurs sentinelles).
+  { fichier: "src/server/composition/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/classement", noms: ["type:ParametresClassement"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/configuration", noms: ["type:ConfigurationMoteur"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/entrees", noms: ["type:CandidatMoteur", "type:NotesMoteur"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/relectures", noms: ["type:Relectures"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/domain/squelette", noms: ["type:JourSquelette"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/ia", noms: ["CONFIGURATION_IA"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/generation", noms: ["COUTS_ESTIMES_MICROS", "MARGE_FICHES"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/planification", noms: ["preparerPlanification"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/positions-ecriture", noms: ["ecrirePositionsAbsentes", "type:FabriquePortPositions", "type:ResultatEcriturePositions"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/forfait", noms: ["type:Forfait"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/port", noms: ["avecReservation", "DELAI_REQUETE_MS", "demandeDe", "horlogeSysteme", "type:ContexteAppel", "type:Fournisseur", "type:Horloge", "type:Plafond", "type:PortConsommation"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/usage/reservation", noms: ["type:ReglesUsage"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/generation.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B9C },
+  // Décision 0105 § 2 : les fixtures d'Édimbourg sont lues à l'exécution par un module séparé (aucun import de `prototype/`),
+  // atteint par `import()` dynamique depuis `generation.ts` après la barrière ; il refuse de lire sous `production`.
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:fs/promises", noms: ["readFile"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "node:path", noms: ["resolve"], motif: COMPOSITION_B9C },
+  // Mineur 7 de la revue du head `7b69742` : prédicat de déploiement partagé avec la barrière (fonction pure, aucune lecture d'environnement).
+  { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "@/server/config/generation", noms: ["deploiementTraiteCommeProduction"], motif: COMPOSITION_B9C },
+  { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
-  ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
+  ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
     fichier,
     specificateur: "server-only",
     noms: ["effet"],

@@ -18,6 +18,8 @@ import path from "node:path";
  *   `src/server/p0/acces.ts`, `src/server/p0/lancement.ts`) seulement ;
  * - `@/server/env/relectures` (B8b, décision 0100 § 5.3) : depuis la composition de la lecture
  *   (`src/server/composition/lecture.ts`) seulement ;
+ * - `@/server/env/generation` (B9c, décision 0081 B9-TL-8) : depuis la barrière des appels réels
+ *   (`src/server/generation/barriere.ts`) seulement ;
  * - tout autre module de `src/server/env/` : depuis `src/server/env/` seulement.
  * Les fichiers de `src/server/env/` (tests compris) importent les modules de leur dossier. La source est résolue
  * (alias `@/` ou chemin relatif, segments `.` et `..` normalisés) avant la comparaison ; toutes les formes de
@@ -47,6 +49,9 @@ export const IMPORTATEURS_ADMIS = new Map([
   // B8b (décision 0100 § 3.2 point 4 et § 5.3) : `RELECTURES_SOURCE` et `POSITIONS_ECRITURE_SUSPENDUE`, lues à l'appel par
   // la composition de la lecture seule ; aucune clé n'y est lue. Verdict Sécurité : attendu (0100 § 7 point 4).
   ["relectures", ["src/server/composition/lecture.ts"]],
+  // B9c (décision 0081 B9-TL-8) : déclarations de déploiement de la barrière des appels réels, lues à l'appel par la
+  // barrière seule ; aucune clé n'y est lue. Verdict Sécurité : attendu.
+  ["generation", ["src/server/generation/barriere.ts"]],
 ]);
 
 /** Module de `src/server/env/` visé par une source, ou `null` (chemin relatif au dépôt de l'importateur). */

@@ -1,9 +1,10 @@
 import "server-only";
 
+import { erreurGoogleDe } from "@/grounding/enveloppe-google";
 import type { ClientPlacesMvp, ClientRoutes } from "@/grounding/interfaces";
-import { createPlacesClient } from "@/grounding/places-client";
-import { createRoutesClient } from "@/grounding/routes-client";
-import { horlogeSysteme, type ContexteAppel, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
+import { COUT_ESTIME_MICROS, createPlacesClient, SKU_DETAILS, SKU_IDENTIFIANT, SKU_POSITION, SKU_TEXT_SEARCH } from "@/grounding/places-client";
+import { COUT_ELEMENT_MICROS, createRoutesClient, SKU_MATRICE } from "@/grounding/routes-client";
+import { avecReservation, DELAI_REQUETE_MS, demandeDe, horlogeSysteme, type AppelFacture, type ContexteAppel, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
 
 /**
  * Fabrique commune des clients Google (décision 0100 § 5.2, qui amende 0081 B9-TL-2 point 1) : **seul importateur des
@@ -40,4 +41,46 @@ export type ClientsGoogle = {
 export function creerClientsGoogle(options: OptionsClientsGoogle): ClientsGoogle {
   const commun = { usage: options.usage, contexte: options.contexte, plafonds: options.plafonds, horloge: options.horloge ?? horlogeSysteme };
   return { places: createPlacesClient(commun), routes: createRoutesClient(commun) };
+}
+
+/**
+ * Enveloppe de réservation pour des clients Google **injectés** (doubles de la variante simulée de la génération, B9c ;
+ * revue de la PR #563, bloquant 3) : chaque requête réserve son unité sur le même port, avec **les mêmes SKU, méthodes et
+ * coûts estimés que les clients réels**, qui sont importés des modules de capacité et jamais recopiés (le test
+ * `composition: l'enveloppe des doubles réserve comme les clients réels` en vérifie l'égalité). Un refus du port ou du
+ * registre lève l'erreur fermée du client réel (`erreurGoogleDe`), sans appeler le double. Ne lit ni environnement ni clé.
+ */
+export function envelopperClientsGoogle(bases: ClientsGoogle, options: OptionsClientsGoogle): ClientsGoogle {
+  const horloge = options.horloge ?? horlogeSysteme;
+  const appeler = async <T>(delai: number, appel: AppelFacture, operation: () => Promise<T>): Promise<T> => {
+    const issue = await avecReservation({ port: options.usage, horloge }, demandeDe(options.contexte(), appel, options.plafonds), delai, async (_signal, appele) => {
+      appele();
+      return { valeur: await operation(), coutReelMicros: null };
+    });
+    if (issue.ok) return issue.valeur;
+    throw erreurGoogleDe(issue);
+  };
+  const fiche = (sku: string, cout: number): AppelFacture => ({ fournisseur: "google", methode: "places_details", sku, unites: { requetes: 1, elements: 0 }, coutEstimeMicros: cout });
+  const places: ClientPlacesMvp = {
+    textSearch: (requete) =>
+      appeler(
+        DELAI_REQUETE_MS.places,
+        { fournisseur: "google", methode: "places_text_search", sku: SKU_TEXT_SEARCH, unites: { requetes: 1, elements: 0 }, coutEstimeMicros: COUT_ESTIME_MICROS.textSearch },
+        () => bases.places.textSearch(requete),
+      ),
+    details: (placeId) => appeler(DELAI_REQUETE_MS.places, fiche(SKU_DETAILS, COUT_ESTIME_MICROS.details), () => bases.places.details(placeId)),
+    position: (placeId) => appeler(DELAI_REQUETE_MS.places, fiche(SKU_POSITION, COUT_ESTIME_MICROS.position), () => bases.places.position(placeId)),
+    identifiant: (placeId) => appeler(DELAI_REQUETE_MS.places, fiche(SKU_IDENTIFIANT, COUT_ESTIME_MICROS.identifiant), () => bases.places.identifiant(placeId)),
+  };
+  const routes: ClientRoutes = {
+    matrice: (requete) => {
+      const elements = requete.origines.length * requete.destinations.length;
+      return appeler(
+        DELAI_REQUETE_MS.routes,
+        { fournisseur: "google", methode: "routes_matrix", sku: SKU_MATRICE, unites: { requetes: 1, elements }, coutEstimeMicros: elements * COUT_ELEMENT_MICROS },
+        () => bases.routes.matrice(requete),
+      );
+    },
+  };
+  return { places, routes };
 }
