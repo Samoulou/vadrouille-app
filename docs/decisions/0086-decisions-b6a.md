@@ -11,6 +11,8 @@ Date : 2026-10-18 · Décideur : Tech Lead · Ticket : #466 · Spécification : 
 - **0059 § 1**, colonne « Fichiers » de B6a : la suite de contrat commune vit dans `tests/support/`, pas dans `src/adapters/contract.suite.ts` (§ 1.5) ;
 - **0015 § 3** (« sélection de B6 dans la réserve ») et **0016 § 12** point 1 (« lieux déjà trouvés et ancrés par l'agent (B6) ») : § 3, questions 3 et 4.
 
+**§ 1.2 point 3 et § 3 (questions 9 et 11) précisés par 0100** (ticket #544, § 3.2, § 6) : `VoyageARelire` reçoit `contexte` et `portee` (et les champs de `stays` nécessaires) ; `estimated` est vrai si la valeur stockée ou la relecture le dit ; B8b résout un logement sans `place_id`.
+
 ## Contexte
 La spécification B6 renvoie au Tech Lead onze propositions et treize questions. 0059 § 1 en exige huit avant le code de B6a ; les autres (B6-TL-7, TL-8, TL-10) bloquent B6b et sont tranchées ici aussi, pour que le ticket de B6b ne les attende pas. Principe appliqué : **l'agent cherche, l'ancrage vérifie, le moteur planifie** ; l'assemblage d'un `Day` et d'une `Proposal` est écrit **une fois**, dans `src/domain`, et B8b ne fournit que les relectures (0059 § 5 point 2).
 

@@ -159,8 +159,9 @@ describe("p0: page de lancement", () => {
     expect(page.etat).toBe("ouverte");
     if (page.etat !== "ouverte") return;
     expect(page.modele.rapport?.criteres).toMatchObject({ A1: "oui", A2: "oui", A6: "oui", A9: "oui" });
+    // Décision 0093 (point 2) : l'exécution arrêtée (upstream_unavailable) n'est ni comptée ni relance.
     expect(page.modele.decompte).toEqual([
-      { brief: "edimbourg-1.json", variante: "B", comptees: 1, compteesMax: 2, relances: 1, relancesMax: 1 },
+      { brief: "edimbourg-1.json", variante: "B", comptees: 1, compteesMax: 2, relances: 0, relancesMax: 1 },
       { brief: "edimbourg-1.json", variante: "A", comptees: 0, compteesMax: 1, relances: 0, relancesMax: 1 },
       { brief: "edimbourg-2.json", variante: "B", comptees: 0, compteesMax: 2, relances: 0, relancesMax: 1 },
       { brief: "edimbourg-2.json", variante: "A", comptees: 0, compteesMax: 1, relances: 0, relancesMax: 1 },
