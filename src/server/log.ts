@@ -134,6 +134,13 @@ export type LogFields = {
   readonly mustSeesWithoutCandidate?: number;
   readonly candidatesGrouped?: number;
   readonly sectorUnknown?: number;
+  /**
+   * Champs facultatifs d'enrichissement retirés des candidats gardés de l'agent (ticket 595, décision 0111) : un nombre,
+   * jamais le nom du champ ni son texte.
+   */
+  readonly fieldsRemoved?: number;
+  /** Textes trop longs coupés dans les candidats gardés de l'agent (décision 0111) : un nombre, jamais le texte. */
+  readonly textsCut?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -531,6 +538,8 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["mustSeesWithoutCandidate", entierPositif],
   ["candidatesGrouped", entierPositif],
   ["sectorUnknown", entierPositif],
+  ["fieldsRemoved", entierPositif],
+  ["textsCut", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],

@@ -39,6 +39,16 @@ export type CompteursAgent = {
   finsAnormales: number;
   candidatsRefuses: { source_not_in_results: number; duplicate: number; over_total: number; invalid: number };
   /**
+   * Champs facultatifs d'enrichissement retirés de candidats extraits gardés (ticket 595, décision 0111 :
+   * `CHAMPS_ENRICHIS_TOLERANTS` de `src/ai/sorties.ts`). Un nombre, jamais le champ ni son texte.
+   */
+  champsRetires: number;
+  /**
+   * Textes trop longs coupés à leur longueur maximale dans des candidats extraits gardés (décision de Samuel du
+   * 2026-10-20, décision 0111). Un nombre, jamais le texte.
+   */
+  textesCoupes: number;
+  /**
    * Fins de la recherche sur l'échéance de l'étape (ticket 407) : `peutAppeler` a répondu non avant un appel ; la boucle
    * s'est terminée avec les candidats déjà admis. 0 ou 1.
    */
@@ -553,6 +563,8 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
     terminesIgnores: 0,
     finsAnormales: 0,
     candidatsRefuses: { source_not_in_results: 0, duplicate: 0, over_total: 0, invalid: 0 },
+    champsRetires: 0,
+    textesCoupes: 0,
     finsEcheance: 0,
     qualite: { secteursPlan: 0, incontournablesPlan: 0, incontournableSansCandidat: 0, candidatRegroupe: 0, secteurInconnu: 0 },
   };
@@ -744,6 +756,8 @@ export async function chercherCandidats(entree: EntreeModeles, dependances: Depe
     noterFin(reponse);
     const lecture = lireTour(reponse.texte);
     compteurs.sortiesRefusees.recherche += lecture.refuses;
+    compteurs.champsRetires += lecture.champsRetires ?? 0;
+    compteurs.textesCoupes += lecture.textesCoupes ?? 0;
     if (lecture.illisible === true) compteurs.sortiesIllisibles.recherche += 1;
     for (const extrait of lecture.valeur.candidats) accueillir(extrait);
     // Ticket 400 : `termine` avant toute recherche web est ignoré (aucune source ne peut encore être admise).

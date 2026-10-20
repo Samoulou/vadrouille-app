@@ -110,7 +110,7 @@ describe("p0: sorties des modèles validées par schéma strict", () => {
     expect(lireRaisons(JSON.stringify({ raisons: [raison("c_001", "Une raison maison.")] }), ids).valeur.size).toBe(1);
   });
 
-  it("tour de recherche : candidat au nom avec URL, catégorie inconnue, action inconnue : écartés et comptés", () => {
+  it("tour de recherche : candidat au nom avec URL, catégorie inconnue, action inconnue : écartés et comptés ; clé inconnue ignorée (décision 0111)", () => {
     const candidat = {
       nom: "Lieu",
       resume: "Résumé.",
@@ -128,8 +128,10 @@ describe("p0: sorties des modèles validées par schéma strict", () => {
       }),
     );
     expect(valeur.actions).toHaveLength(1);
-    expect(valeur.candidats).toHaveLength(1);
-    expect(refuses).toBe(4);
+    // Décision 0111 : la clé inconnue `placeId` est ignorée (jamais recopiée), le candidat gardé.
+    expect(valeur.candidats).toHaveLength(2);
+    expect(valeur.candidats[1]).not.toHaveProperty("placeId");
+    expect(refuses).toBe(3);
     // Ticket 400 : une réponse illisible ne termine pas la boucle de l'agent.
     expect(lireTour("{}")).toEqual({ valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true });
   });
