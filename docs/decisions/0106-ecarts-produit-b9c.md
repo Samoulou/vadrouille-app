@@ -32,7 +32,7 @@ Critère à ajouter à B9c : `aperçu: une idée par jour planifié` (base jetab
 
 ## 2. Événements sans heure : conforme, rien à implémenter en B9c
 
-La règle est déjà écrite et fusionnée : « un événement sans heure lue n'a pas d'occurrence » (0081 B9-TL-6 (g), B7-PO-10, question 13 (b) de B7). Le moteur ne place un événement qu'à une date et une heure lues ; en placer un sans heure serait inventer un horaire, ce que le cadrage (« zéro invention », 0011 point 5) interdit. L'écart signalé par B9c n'en est donc pas un par rapport à la spec : c'est la règle, vue du code.
+La règle est déjà écrite et fusionnée : « un événement sans heure lue n'a pas d'occurrence » (0081 B9-TL-6 (g), B7-PO-10, question 13 (b) de B7). Le moteur ne place un événement qu'à une date et une heure lues ; en placer un sans heure serait inventer un horaire, ce que le studio s'interdit (jamais une donnée inventée). L'écart signalé par B9c n'en est donc pas un par rapport à la spec : c'est la règle, vue du code.
 
 Report de l'amélioration éventuelle (montrer un événement « sans heure précise » dans la liste, hors programme) : **B9e relève**, sur l'essai réel de Samuel, combien d'événements trouvés sont écartés faute d'heure (compteur déjà demandé par B9-PO-11 pour la durée ; le relevé s'ajoute à la même note). Si le nombre le justifie, le PO rédige alors une tâche nommée **B9f — événements sans heure**, qui demandera une décision de contrat (donc du Tech Lead) ; sinon rien.
 
@@ -49,7 +49,7 @@ Précision (détail fonctionnel) : un voyage de deux jours ou moins, ou dont J1 
 ## 4. Repas avec options (B9-PO-5) : amender, une case par repas
 
 B9-PO-5 écrit « un repas avec options compte une case par option, comme le jeu simulé de F6, en attendant Q57 ». Cela ne s'implémente pas, pour deux raisons que B9c a vues justement :
-- `PreviewSlotsSchema` (`src/contracts/preview.ts`) **interdit** deux cases au même créneau (jour, heure) : plusieurs options d'un même repas sont, par construction, au même créneau ; le contrat et sa règle sont fixés par l'évolution E5 (0010 PO-6), et `src/contracts` ne se modifie que par une PR de contrat décidée par le Tech Lead (B9, périmètre, point 37) ;
+- `PreviewSlotsSchema` (`src/contracts/preview.ts`) **interdit** deux cases au même créneau (jour, heure) : plusieurs options d'un même repas sont, par construction, au même créneau ; le contrat et sa règle sont fixés par l'évolution E5 (0010 PO-6), et `src/contracts` ne se modifie que par une PR de contrat décidée par le Tech Lead (hors-périmètre de la spécification B9) ;
 - le moteur de B5 rend **un** repas par créneau (la meilleure option) ; les « options » n'existent que dans le jeu simulé de F6, qui est de la présentation, pas de la génération.
 
 Décision : **amendement de B9-PO-5** : l'aperçu compte **une case par repas** (l'option que le moteur retient), pas une case par option. Le reste de B9-PO-5 est inchangé (étapes `activity` et `meal`, ordre chronologique en commençant au jour 1, moins de 8 étapes ancrées : cases `noOption` à la suite, jamais un lieu non ancré). Le critère `aperçu: huit cases, jamais un lieu non ancré` (5 `proposal`, 3 `noOption`, `ready` = 5, `expected` = 8, ordre de B9-PO-5) est inchangé et sert de test.
