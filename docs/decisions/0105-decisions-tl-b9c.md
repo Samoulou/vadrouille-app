@@ -55,9 +55,24 @@ Q-B9c-1 est close : B9d n'est plus bloquée par elle.
 
 **4.2 Arrêt sans raison laissé dans la version 1 (mineur 17).** Accepté : `StopSnapshot.reason` est facultatif (`src/contracts/trip.ts`). Quand la rédaction des raisons échoue pour un lieu (après le retrait borné des candidats sans raison), l'arrêt reste dans la version 1 **sans `reason`** et **ne donne aucune case `proposal`** (la case exige sa raison et son lieu ancré) ; il n'est jamais inventé. À ajouter : un test (une raison absente pour un lieu → arrêt présent dans l'instantané sans `reason`, aucune case `proposal` pour lui, `incomplete`), et une phrase dans le commentaire d'`etapes.ts` près de `sansRaison`. Le même commentaire documente le mineur 17 de la revue (dédoublonnage de `c` avant la notation : un candidat gardé non noté laisse le lieu sans candidat éligible en `e`).
 
+## 5. « Surprends-moi » à l'étape e (demande de 0106 § 1) et B9-PO-5 amendé (0106 § 4)
+
+**5.1 Confirmé : l'idée du jour se construit à l'étape e, depuis les candidats ancrés, notés et non retenus, sans nouvelle colonne.** Tout y est déjà : `candidates` porte `place_id`, `fit`, `sources`, `category` ; `Day.surprise` (`SurpriseIdeaSchema`) est dans le `snapshot` JSON de `trip_versions` ; `raison` vit en mémoire, dans `CandidatIdee` (`src/domain/entrees.ts`). Aucune migration, aucun changement de `src/contracts`.
+
+Le piège est l'ordre : `ideeDuJour` est appelée **dans** `generer` (`idees` est une entrée du moteur), alors que les candidats « non retenus » ne se connaissent qu'après le plan, et que leur raison s'écrit après le plan. Pour garder « le moteur planifie » (aucun choix d'idée, de tri ou de plan dans la composition ni dans l'étape) :
+1. L'étape e appelle `generer` une première fois avec `idees: []`. Les candidats `place` ancrés, notés, du jour planifié (jours 1 et 2) et absents du plan sont les candidats d'idée ; l'étape en garde les **3 mieux notés par jour** au plus (borne en configuration de génération, pas dans le moteur).
+2. Leurs raisons sont demandées **dans le même appel de rédaction** que celles des étapes (un seul appel par lot, jamais un appel de plus ; seul le lot grossit de 6 lieux au plus). Même contrat de sortie, même validation, aucune donnée Google dans le prompt (maison seulement). Le coût d'un lot plus grand reste sous la réserve de l'étape e du forfait (`COUTS_ESTIMES_MICROS`) et sous les plafonds de 0083 : la PR le vérifie par un test sur la réserve, sans relever aucun plafond. Un candidat dont la raison manque n'est pas une idée.
+3. L'étape rappelle `generer` avec ces `idees` (fonction pure, sans appel). **Invariant testé** : les étapes du plan sont identiques à celles du premier passage ; si elles diffèrent, l'étape garde le premier passage (sans idée) et n'échoue pas. Le choix de l'idée, son filtre R1 et son exclusion restent ceux de `ideeDuJour`.
+4. Pas d'idée admissible, ou raisons manquantes : `Day.surprise` absent, jamais une erreur ni une raison d'échec ; jours 3 et suivants sans idée.
+5. L'état sérialisé ne reçoit rien de plus (section 1) : candidats et raisons restent dans l'étape.
+
+Tests exigés en plus du critère `aperçu: une idée par jour planifié` de 0106 : (a) invariant de l'étape 3 (plans égaux avec et sans idées, sur les doubles) ; (b) un seul appel de rédaction par lot (compteur du journal de prompts inchangé par rapport à un aperçu sans idées) ; (c) le `placeId` de l'idée n'est celui d'aucune étape du jour ; (d) le prompt de rédaction ne contient aucune clé Google.
+
+**5.2 B9-PO-5 amendé (une case par repas) : aucun contrat touché.** `PreviewSlotsSchema` (`src/contracts/preview.ts`) interdit déjà deux cases au même créneau ; une case par repas lui est conforme. L'amendement ne modifie que le texte de la spécification (B9-PO-5), pas `src/contracts`. Si Samuel répond à la question 57 par « une case par option », une PR de contrat décidée par le Tech Lead (créneau partagé) sera nécessaire, comme l'écrit 0106 ; elle n'est ni décidée ni préparée ici.
+
 ## Conséquences pour la PR #563
 
-Corrections attendues, sans autre décision : `etat.ts` (commentaire : la règle de la section 1 remplace « écart à 0081 »), chargeur de fixtures de la section 2 et extension de `dockerignore.test.ts`, garde de la section 3, description de la PR (section 4). Les bloquants 2, 3, 4 et 6 restent à corriger dans le code, et les écarts produit à 0106.
+Corrections attendues, sans autre décision (la section 5 s'y ajoute : idée du jour à l'étape e) : `etat.ts` (commentaire : la règle de la section 1 remplace « écart à 0081 »), chargeur de fixtures de la section 2 et extension de `dockerignore.test.ts`, garde de la section 3, description de la PR (section 4). Les bloquants 2, 3, 4 et 6 restent à corriger dans le code, et les écarts produit à 0106.
 
 ## Questions
 
