@@ -639,6 +639,8 @@ function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: 
             mustSeesWithoutCandidate: compteurs.qualite.incontournableSansCandidat,
             candidatesGrouped: compteurs.qualite.candidatRegroupe,
             sectorUnknown: compteurs.qualite.secteurInconnu,
+            fieldsRemoved: compteurs.champsRetires,
+            textsCut: compteurs.textesCoupes,
           }),
     },
     lieux === 0 || echec !== undefined ? "warn" : "info",
