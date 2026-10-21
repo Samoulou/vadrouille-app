@@ -7,7 +7,7 @@
 ## Toujours
 - Une tâche = une spécification = une branche `claude/<id>-<slug>` = une PR.
 - `pnpm verify` au vert avant d'ouvrir une PR.
-- Messages de commit préfixés par le rôle : `[front]`, `[back]`, `[data]`, `[ia]`, `[qa]`, `[ux]`, `[secu]`, `[release]`, `[ceo]`.
+- Messages de commit préfixés par le rôle : `[front]`, `[back]`, `[data]`, `[ia]`, `[qa]`, `[ux]`, `[secu]`, `[po]`, `[tl]`, `[release]`, `[ceo]`.
 - Interface : applique `docs/handovers/frontend.md` (tokens Ligne, vocabulaire, accessibilité).
 - Données : uniquement via `src/adapters` et les types de `src/contracts`.
 - `STATUS.md` et `QUESTIONS.md` ne sont modifiés que par la PR « chore: status » ; les autres PR listent leurs nouvelles questions dans leur description, et le CEO les reporte.
