@@ -7,12 +7,14 @@ import {
   CategorySchema,
   CHILDREN,
   CITY_NAME_LENGTH,
+  CommitmentSchema,
   DESTINATION_LENGTH,
   IsoDateSchema,
   MEAL_BUDGET_CHF,
   MobilityModeSchema,
   PaceSchema,
   STOP_KINDS,
+  TimeSchema,
   type LodgingRequest,
 } from "@/contracts";
 import { CANDIDAT_ID_PATTERN, LONGUEURS_TEXTE, texteMaison } from "@/ai/candidat";
@@ -164,3 +166,38 @@ export function versEntreeQuartier(demande: LodgingRequest): EntreeQuartier {
   if (ville === undefined) throw new RangeError("versEntreeQuartier : ville absente du brouillon");
   return { ville: ville.name, debut: ville.arrival, fin: suivante };
 }
+
+/**
+ * Entrée de l'étape `programme` du prototype (décision 0115 § 2 et § 3 étape 1 ; spécification P0-programme-par-ia § 0
+ * point 1) : **toutes les saisies du questionnaire** du brief de P0 (décision de Samuel du 2026-10-21) : destination et
+ * pays, dates et heures d'arrivée et de départ, voyageurs, rythme (libellé de P0), envies, déplacements, budget des
+ * repas, logements (texte saisi et nuits), billets à heure fixe et récit. Type distinct d'`EntreeModeles` (qui reste
+ * sans récit ni logement pour le MVP, B7-PO-1) ; construit par `src/server/p0/vers-couche-ia.ts` seul. **Aucun champ**
+ * pour une donnée Google (identifiant, nom, adresse, position, horaire, statut, durée, verdict) : schéma strict, une clé
+ * en trop est refusée avant toute requête.
+ */
+const texteBrief = (max: number) => z.string().trim().min(1).max(max);
+export const EntreeProgrammeSchema = z
+  .strictObject({
+    destination: texteBrief(80),
+    pays: texteBrief(60),
+    arrivee: IsoDateSchema,
+    depart: IsoDateSchema,
+    heureArrivee: TimeSchema,
+    heureDepart: TimeSchema,
+    voyageurs: z.strictObject({ adultes: z.number().int().min(1).max(9), enfants: z.number().int().min(0).max(9) }),
+    rythme: z.enum(["tranquille", "equilibre", "intense"]),
+    envies: z.array(CategorySchema).min(1).refine(sansDoublon, "envies sans doublon"),
+    deplacements: z.array(MobilityModeSchema).min(1).refine(sansDoublon, "déplacements sans doublon"),
+    budgetRepas: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    logements: z.array(z.strictObject({ texte: texteBrief(120), nuits: z.number().int().min(1).max(60) })).min(1).max(5),
+    engagements: z
+      .array(z.strictObject({ libelle: texteBrief(80), date: IsoDateSchema, heure: TimeSchema, type: CommitmentSchema }))
+      .max(10)
+      .optional(),
+    recit: texteBrief(1000).optional(),
+  })
+  .superRefine((entree, ctx) => {
+    if (entree.depart < entree.arrivee) ctx.addIssue({ code: "custom", path: ["depart"], message: "départ avant l'arrivée" });
+  });
+export type EntreeProgramme = z.infer<typeof EntreeProgrammeSchema>;

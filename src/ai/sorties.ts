@@ -586,3 +586,244 @@ export function lireQuartier(texte: string): Lecture<{ zone: ZoneProposee | null
   const logements = objet.logements === undefined ? { valeur: [], refuses: 0 } : elements(objet.logements, LogementSchema, MAX_SUGGESTED_LODGINGS);
   return { valeur: { zone: zone.data, logements: logements.valeur }, refuses: logements.refuses };
 }
+
+// --- Programme écrit par l'IA (décision 0115 ; verdict de la Sécurité 0117 § 1) ------------------------------------
+
+/** Natures d'un créneau du programme (liste fermée, spécification § 3 ; une nature invalide retire le créneau). */
+export const NATURES_CRENEAU = ["arrivee", "visite", "repas_midi", "repas_soir", "apero", "soiree", "pause", "depart"] as const;
+export type NatureCreneau = (typeof NATURES_CRENEAU)[number];
+
+/** Natures admises sans lieu (T1 proposé, 0117 § 1 point 4) : arrivée, départ, pause. */
+export const NATURES_SANS_LIEU: ReadonlySet<NatureCreneau> = new Set<NatureCreneau>(["arrivee", "depart", "pause"]);
+
+/**
+ * Bornes de quantité, techniques et non de qualité (0117 § 1 point 3) : au-delà, les éléments en trop sont ignorés et
+ * comptés, jamais un refus du programme.
+ */
+export const CRENEAUX_PAR_JOUR_MAX = 30;
+export const ELEMENTS_LISTE_PROGRAMME_MAX = 20;
+
+/** Heure `HH:MM` de 00:00 à 23:59. */
+const HEURE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+/** Textes d'un créneau et leur longueur de coupe (0117 § 1 point 2). */
+const TEXTES_CRENEAU = {
+  lieu: LONGUEURS_TEXTE.nom,
+  ville: LONGUEURS_TEXTE.secteur,
+  quartier: LONGUEURS_TEXTE.secteur,
+  pourquoi: LONGUEURS_TEXTE.pourquoi,
+  conseil: LONGUEURS_TEXTE.conseil,
+  prix: LONGUEURS_TEXTE.prix,
+  horaires: LONGUEURS_TEXTE.horaires,
+} as const;
+
+/** Champs facultatifs d'un créneau : invalides, retirés seuls (`.catch(undefined)`), le créneau gardé (modèle 0111). */
+const CHAMPS_FACULTATIFS_CRENEAU = ["fin", "lieu", "pourquoi", "ville", "quartier", "conseil", "prix", "horaires", "aReserver", "incontournable"] as const;
+
+/**
+ * Créneau écrit par l'IA. Tout texte passe par `texteCoupe` (contrôle du texte entier, coupe, recontrôle : 0111 § 3,
+ * 0117 § 1 point 1). Clés inconnues (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni
+ * recopiées (0117 § 1 point 5), et comptées dans `champsRetires`.
+ */
+const CreneauIaObjet = z.object({
+    debut: z.string().regex(HEURE),
+    fin: z.string().regex(HEURE).optional().catch(undefined),
+    nature: z.enum(NATURES_CRENEAU),
+    lieu: texteCoupe(TEXTES_CRENEAU.lieu).optional().catch(undefined),
+    ville: texteCoupe(TEXTES_CRENEAU.ville).optional().catch(undefined),
+    quartier: texteCoupe(TEXTES_CRENEAU.quartier).optional().catch(undefined),
+    pourquoi: texteCoupe(TEXTES_CRENEAU.pourquoi).optional().catch(undefined),
+    conseil: texteCoupe(TEXTES_CRENEAU.conseil).optional().catch(undefined),
+    prix: texteCoupe(TEXTES_CRENEAU.prix).optional().catch(undefined),
+    horaires: texteCoupe(TEXTES_CRENEAU.horaires).optional().catch(undefined),
+    aReserver: z.boolean().optional().catch(undefined),
+    incontournable: z.boolean().optional().catch(undefined),
+});
+export const CreneauIaSchema = CreneauIaObjet
+  .refine((creneau) => creneau.lieu !== undefined || NATURES_SANS_LIEU.has(creneau.nature), "lieu obligatoire pour cette nature")
+  .refine((creneau) => creneau.lieu === undefined || creneau.pourquoi !== undefined, "pourquoi obligatoire dès qu'il y a un lieu");
+export type CreneauIa = z.infer<typeof CreneauIaSchema>;
+
+export type JourIa = { readonly date: string; readonly titre?: string; readonly creneaux: readonly CreneauIa[] };
+export type ProgrammeIa = {
+  readonly titre?: string;
+  readonly jours: readonly JourIa[];
+  readonly bonsPlans: readonly string[];
+};
+
+/** Lecture du programme : la valeur (ou `null`, programme refusé) et les compteurs maison de 0117 § 4 (des nombres). */
+export type LectureProgramme = {
+  readonly valeur: ProgrammeIa | null;
+  readonly joursRetires: number;
+  readonly creneauxRetires: number;
+  readonly champsRetires: number;
+  readonly textesCoupes: number;
+  /** Vrai si la réponse n'est pas un objet JSON lisible (dans `LONGUEUR_REPONSE_MAX`). */
+  readonly illisible: boolean;
+};
+
+const objetBrut = (valeur: unknown): Record<string, unknown> | undefined =>
+  typeof valeur === "object" && valeur !== null && !Array.isArray(valeur) ? (valeur as Record<string, unknown>) : undefined;
+
+/** Texte brut plus long que `max` gardé (donc coupé) : compté, jamais recopié. */
+const coupe = (brut: unknown, garde: unknown, max: number) => typeof brut === "string" && brut.length > max && typeof garde === "string";
+
+/**
+ * Programme écrit par l'IA, lu **tolérant** (décision 0115 § 4.4, verdict 0117 § 1) :
+ * - réponse sans objet JSON lisible : `illisible`, `valeur: null` (l'appelant arrête `model_output_invalid`) ;
+ * - journée dont la date n'est pas une date du séjour (`sejour`), ou répète une date déjà lue : retirée, `joursRetires` ;
+ * - créneau sans heure valide, sans nature de la liste, sans `pourquoi`, ou sans `lieu` (hors arrivée, départ, pause) :
+ *   retiré, `creneauxRetires` ; au-delà de `CRENEAUX_PAR_JOUR_MAX` : ignorés et comptés de même ; une journée n'est
+ *   jamais retirée pour un créneau ;
+ * - champ facultatif invalide ou clé inconnue : retiré ou ignoré, `champsRetires` ; texte trop long : coupé,
+ *   `textesCoupes` ; bons plans au-delà de `ELEMENTS_LISTE_PROGRAMME_MAX` : ignorés,
+ *   `champsRetires` ;
+ * - aucune journée restante : `valeur: null`.
+ * Journées rangées par date ; l'ordre des créneaux est celui de l'IA, que `ordreEcrit` met ensuite en ordre écrit.
+ * Aucune règle de nombre de lieux, de durée, de distance ni de cohérence des horaires.
+ */
+export function lireProgramme(texte: string, sejour: { readonly arrivee: string; readonly depart: string }): LectureProgramme {
+  let joursRetires = 0;
+  let creneauxRetires = 0;
+  let champsRetires = 0;
+  let textesCoupes = 0;
+  const racineLue = objetJson(texte);
+  if (racineLue === undefined) return { valeur: null, joursRetires, creneauxRetires, champsRetires, textesCoupes, illisible: true };
+  // `alternative` et `aEmporter` sont retirés de la v1 (décision 0116 § 1.1) : ignorés comme toute clé inconnue.
+  const connuesRacine = new Set(["titre", "jours", "bonsPlans"]);
+  champsRetires += Object.keys(racineLue).filter((cle) => !connuesRacine.has(cle)).length;
+  const champsRacine = new Map(Object.entries(racineLue));
+
+  const titreRacine = (cle: string, max: number): string | undefined => {
+    const brut = champsRacine.get(cle);
+    if (brut === undefined) return undefined;
+    const lu = texteCoupe(max).safeParse(brut);
+    if (!lu.success) {
+      champsRetires += 1;
+      return undefined;
+    }
+    if (coupe(brut, lu.data, max)) textesCoupes += 1;
+    return lu.data;
+  };
+  const liste = (cle: string, max: number): string[] => {
+    const brut = champsRacine.get(cle);
+    if (brut === undefined) return [];
+    if (!Array.isArray(brut)) {
+      champsRetires += 1;
+      return [];
+    }
+    champsRetires += Math.max(0, brut.length - ELEMENTS_LISTE_PROGRAMME_MAX);
+    const gardes: string[] = [];
+    for (const element of brut.slice(0, ELEMENTS_LISTE_PROGRAMME_MAX)) {
+      const lu = texteCoupe(max).safeParse(element);
+      if (!lu.success) champsRetires += 1;
+      else {
+        if (coupe(element, lu.data, max)) textesCoupes += 1;
+        gardes.push(lu.data);
+      }
+    }
+    return gardes;
+  };
+
+  const titre = titreRacine("titre", LONGUEURS_TEXTE.titreProgramme);
+  const bonsPlans = liste("bonsPlans", LONGUEURS_TEXTE.bonPlan);
+
+  const joursBruts = Array.isArray(racineLue.jours) ? racineLue.jours : [];
+  if (!Array.isArray(racineLue.jours) && racineLue.jours !== undefined) champsRetires += 1;
+  const dates = new Set<string>();
+  const jours: JourIa[] = [];
+  for (const jourBrut of joursBruts) {
+    const objet = objetBrut(jourBrut);
+    const date = IsoDateSchema.safeParse(objet?.date);
+    if (objet === undefined || !date.success || date.data < sejour.arrivee || date.data > sejour.depart || dates.has(date.data)) {
+      joursRetires += 1;
+      continue;
+    }
+    dates.add(date.data);
+    champsRetires += Object.keys(objet).filter((cle) => !["date", "titre", "creneaux"].includes(cle)).length;
+    let titreJour: string | undefined;
+    if (objet.titre !== undefined) {
+      const lu = texteCoupe(LONGUEURS_TEXTE.titreJour).safeParse(objet.titre);
+      if (!lu.success) champsRetires += 1;
+      else {
+        if (coupe(objet.titre, lu.data, LONGUEURS_TEXTE.titreJour)) textesCoupes += 1;
+        titreJour = lu.data;
+      }
+    }
+    const creneauxBruts = Array.isArray(objet.creneaux) ? objet.creneaux : [];
+    if (!Array.isArray(objet.creneaux) && objet.creneaux !== undefined) champsRetires += 1;
+    creneauxRetires += Math.max(0, creneauxBruts.length - CRENEAUX_PAR_JOUR_MAX);
+    const creneaux: CreneauIa[] = [];
+    for (const creneauBrut of creneauxBruts.slice(0, CRENEAUX_PAR_JOUR_MAX)) {
+      const lu = CreneauIaSchema.safeParse(creneauBrut);
+      if (!lu.success) {
+        creneauxRetires += 1;
+        continue;
+      }
+      const present = objetBrut(creneauBrut) ?? {};
+      const connues = new Set(Object.keys(CreneauIaObjet.shape));
+      champsRetires += Object.keys(present).filter((cle) => !connues.has(cle)).length;
+      const lus = new Map(Object.entries(present));
+      const gardes = new Map(Object.entries(lu.data));
+      champsRetires += CHAMPS_FACULTATIFS_CRENEAU.filter((champ) => lus.get(champ) !== undefined && gardes.get(champ) === undefined).length;
+      textesCoupes += Object.entries(TEXTES_CRENEAU).filter(([champ, max]) => coupe(lus.get(champ), gardes.get(champ), max)).length;
+      creneaux.push(lu.data);
+    }
+    jours.push({ date: date.data, ...(titreJour === undefined ? {} : { titre: titreJour }), creneaux });
+  }
+  jours.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const valeur = jours.length === 0 ? null : { ...(titre === undefined ? {} : { titre }), jours, bonsPlans };
+  return { valeur, joursRetires, creneauxRetires, champsRetires, textesCoupes, illisible: false };
+}
+
+/**
+ * **Ordre écrit** du programme (décision 0116 § 1.7) : l'ordre de l'IA, puis un tri **stable** par `debut` (à heure égale,
+ * l'ordre de l'IA), jour par jour, appliqué **une seule fois** par l'appelant ; la vérification, les trajets et l'écran
+ * suivent cet ordre. Mise en ordre, jamais un contrôle : aucun créneau n'est retiré.
+ */
+export function ordreEcrit(programme: ProgrammeIa): ProgrammeIa {
+  return {
+    ...programme,
+    jours: programme.jours.map((jour) => ({
+      ...jour,
+      creneaux: jour.creneaux
+        .map((creneau, rang) => ({ creneau, rang }))
+        .sort((a, b) => (a.creneau.debut < b.creneau.debut ? -1 : a.creneau.debut > b.creneau.debut ? 1 : a.rang - b.rang))
+        .map(({ creneau }) => creneau),
+    })),
+  };
+}
+
+
+/**
+ * Lieux distincts d'un programme **déjà dans l'ordre écrit** (`ordreEcrit`), jours puis créneaux (décision 0116 § 4.3
+ * et § 4.5) : un
+ * lieu cité plusieurs fois (même `cleDeNom` du nom, même ville ou, sans ville, la destination) est vérifié une fois.
+ * `cleDe(jour, rang)` rend l'identifiant du lieu du créneau `rang` de la journée `jour`, ou `undefined`
+ * pour un créneau sans lieu. Arrivée et départ ne sont jamais vérifiés (0116 § 4.1).
+ * Lieu rendu : identifiant interne (`l_001`…), nom et ville de l'IA, contrôlés et coupés (0117 § 2 point 1). Le seul
+ * type nommé est `LieuProgramme` (`src/grounding/ancrage-zone.ts`) ; `src/ai` ne peut pas l'importer (graphe d'import,
+ * 0077 § 1 point 7), la forme littérale ci-dessous lui est vérifiée par le compilateur à l'appel de `p0Run`.
+ */
+export function lieuxDuProgramme(
+  programme: ProgrammeIa,
+  destination: string,
+): { readonly lieux: readonly { readonly id: string; readonly lieu: string; readonly ville?: string }[]; readonly cleDe: (jour: number, rang: number) => string | undefined } {
+  const parCle = new Map<string, string>();
+  const lieux: { id: string; lieu: string; ville?: string }[] = [];
+  const parCreneau = new Map<string, string>();
+  programme.jours.forEach((jour, indiceJour) => {
+    jour.creneaux.forEach((creneau, rang) => {
+      if (creneau.lieu === undefined || creneau.nature === "arrivee" || creneau.nature === "depart") return;
+      const cle = `${cleDeNom(creneau.lieu)}\u0000${cleDeNom(creneau.ville ?? destination)}`;
+      let id = parCle.get(cle);
+      if (id === undefined) {
+        id = `l_${String(lieux.length + 1).padStart(3, "0")}`;
+        parCle.set(cle, id);
+        lieux.push({ id, lieu: creneau.lieu, ...(creneau.ville === undefined ? {} : { ville: creneau.ville }) });
+      }
+      parCreneau.set(`${indiceJour}:${rang}`, id);
+    });
+  });
+  return { lieux, cleDe: (jour, rang) => parCreneau.get(`${jour}:${rang}`) };
+}

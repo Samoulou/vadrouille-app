@@ -5,6 +5,7 @@ import { ErreurModele, ETAPES_REQUETE, type ClientModeles, type EtapeRequete, ty
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
 import { CODES_ERREUR_IA } from "@/ai/erreurs";
 import { MODELE_ID_PATTERN } from "@/ai/reglages";
+import { requeteProgramme } from "@/ai/requetes";
 import {
   ATTRIBUTS_TRACE,
   COUT_MAX_MICROS,
@@ -114,6 +115,8 @@ const REPONSES: Record<EtapeRequete, string> = {
   raisons: JSON.stringify({
     raisons: [{ id: "c_001", raison: "Pour les musées.", detour: "Au centre." }],
   }),
+  // Étape du prototype seulement (décision 0115) : jamais appelée par la couche du MVP.
+  programme: JSON.stringify({ jours: [] }),
 };
 
 const clientDeBase = (
@@ -237,6 +240,28 @@ describe("traces: aucun prompt ni brief dans les attributs exportés", () => {
         },
       ],
     });
+
+    // Étape `programme` du prototype (décision 0116) : même client décoré, mêmes attributs fermés.
+    await modeles.envoyer(
+      requeteProgramme(
+        {
+          destination: `Édimbourg ${SENTINELLES[4]}`,
+          pays: "Royaume-Uni",
+          arrivee: "2026-11-23",
+          depart: "2026-11-26",
+          heureArrivee: "12:00",
+          heureDepart: "16:00",
+          voyageurs: { adultes: 2, enfants: 0 },
+          rythme: "equilibre",
+          envies: ["museum"],
+          deplacements: ["walk"],
+          logements: [{ texte: SENTINELLES[1], nuits: 3 }],
+          recit: SENTINELLES[0],
+        },
+        "test/modele",
+        { data_collection: "deny", zdr: true },
+      ),
+    );
 
     // Agent : étape `recherche` (client partagé), et recherche web décorée par la composition.
     const webScripte = rechercheScriptee([{ ...GUIDE, titre: SENTINELLES[2], extrait: SENTINELLES[2] }]);

@@ -1,4 +1,4 @@
-import type { Category, MobilityMode, Pace, StopKind } from "@/contracts";
+import type { Category, Commitment, MobilityMode, Pace, StopKind } from "@/contracts";
 import type { Brief, Rythme } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
 
@@ -185,5 +185,49 @@ export function lieuRetenuDepuisCandidat(candidat: Candidat): LieuRetenuP0 {
     sourceDomaine: new URL(candidat.source.url).hostname,
     ...(candidat.secteur === undefined ? {} : { secteur: candidat.secteur }),
     ...(candidat.incontournable === undefined ? {} : { incontournable: true as const }),
+  };
+}
+
+/** Forme d'`EntreeProgramme` (`src/ai/entrees.ts`) : toutes les saisies du brief de P0 (décision 0115 § 2). */
+export type EntreeProgrammeP0 = {
+  destination: string;
+  pays: string;
+  arrivee: string;
+  depart: string;
+  heureArrivee: string;
+  heureDepart: string;
+  voyageurs: { adultes: number; enfants: number };
+  rythme: Rythme;
+  envies: Category[];
+  deplacements: MobilityMode[];
+  budgetRepas?: 1 | 2 | 3;
+  logements: { texte: string; nuits: number }[];
+  engagements?: { libelle: string; date: string; heure: string; type: Commitment }[];
+  recit?: string;
+};
+
+/**
+ * Entrée du prompt `programme` depuis le brief de P0 (décision 0115 § 2 ; décision de Samuel du 2026-10-21 : l'IA reçoit
+ * **toutes** les saisies du questionnaire, récit et logement compris, **jamais une donnée Google**). Copie champ par
+ * champ : ni fuseau (aucun usage par le modèle), ni `schema`. Seul chemin de construction, pour `p0Run`.
+ */
+export function entreeProgrammeDepuisBrief(brief: Brief): EntreeProgrammeP0 {
+  return {
+    destination: brief.destination,
+    pays: brief.pays,
+    arrivee: brief.arrivee,
+    depart: brief.depart,
+    heureArrivee: brief.heureArrivee,
+    heureDepart: brief.heureDepart,
+    voyageurs: { adultes: brief.voyageurs.adultes, enfants: brief.voyageurs.enfants },
+    rythme: brief.rythme,
+    envies: [...brief.envies],
+    deplacements: [...brief.deplacements],
+    ...(brief.budgetRepas === undefined ? {} : { budgetRepas: brief.budgetRepas }),
+    logements: brief.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),
+    ...(brief.engagements === undefined
+      ? {}
+      : { engagements: brief.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
+    ...(brief.recit === undefined ? {} : { recit: brief.recit }),
   };
 }

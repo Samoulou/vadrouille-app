@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "cas": "Seuils du Product Owner (spécification P0-programme-par-ia § 5, A1 à A6), lus sur les plans de Samuel : mesures de la sortie, jamais des règles du prompt ni du code",
+  "finDuJourMin": "20:30",
+  "debutDuJourMax": "10:00",
+  "ecartMaxMinutes": 180,
+  "fenetreEcart": {
+    "debut": "09:00",
+    "fin": "20:00"
+  },
+  "delaiArriveeMinutes": 90,
+  "avanceDepartMinutes": 120,
+  "arriveeTardive": "18:00",
+  "repas": {
+    "midi": {
+      "debut": "12:00",
+      "fin": "14:30"
+    },
+    "soir": {
+      "debut": "18:30",
+      "fin": "21:30"
+    }
+  },
+  "apero": {
+    "motsCles": [
+      "apéro",
+      "apéritif",
+      "spritz",
+      "verre",
+      "pub",
+      "whisky"
+    ],
+    "envie": "tasting",
+    "partMin": 0.6667
+  },
+  "quartiersMaxParJour": 2,
+  "pourquoiPartMin": 1,
+  "conseilPartMin": 0.5,
+  "parCas": {
+    "rome-1": {
+      "apero": {
+        "partMin": 1,
+        "joursEntiersSeulement": true
+      },
+      "incontournables": {
+        "minimum": 5,
+        "attendus": [
+          [
+            "colisee",
+            "colosseo",
+            "colosseum"
+          ],
+          [
+            "forum romain",
+            "foro romano",
+            "roman forum"
+          ],
+          [
+            "pantheon"
+          ],
+          [
+            "fontaine de trevi",
+            "fontana di trevi",
+            "trevi"
+          ],
+          [
+            "musees du vatican",
+            "musei vaticani",
+            "vatican",
+            "saint-pierre",
+            "san pietro"
+          ]
+        ],
+        "aPart": [
+          [
+            "trastevere"
+          ]
+        ]
+      }
+    },
+    "edimbourg-1": {
+      "incontournables": {
+        "minimum": 4,
+        "attendus": [
+          [
+            "chateau d'edimbourg",
+            "edinburgh castle"
+          ],
+          [
+            "royal mile"
+          ],
+          [
+            "arthur's seat",
+            "arthurs seat"
+          ],
+          [
+            "distillerie",
+            "distillery"
+          ],
+          [
+            "sandy bell",
+            "whistle binkies",
+            "royal oak",
+            "pub a musique",
+            "folk"
+          ]
+        ],
+        "aPart": []
+      }
+    }
+  }
+}

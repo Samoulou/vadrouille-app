@@ -433,7 +433,8 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // P0r3c-3 (ticket 316, décision 0055, sections 3 et 7) : prompt et client réel de recherche web, rédaction des raisons ;
   // marqueur `server-only`. B7a (décision 0077 § 1 point 4) : l'interface de recherche web est déplacée dans
   // `src/ai/recherche-web.ts` ; l'exception de `src/research/recherche-web.ts` du client réel est retirée.
-  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons", "recherche-web-reelle"].map(
+  // Décision 0116 § 2 (lot 1 du programme par l'IA) : rédaction du programme, même régime que `rediger-raisons`.
+  ...["noter-candidats", "prompts/recherche-web", "rediger-programme", "rediger-raisons", "recherche-web-reelle"].map(
     (nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
   ),
   // B7a (ticket 423, décision 0077 § 1 et § 2) : nouveaux modules de la couche IA non chargés par `pnpm p0`, marqueur
@@ -484,8 +485,12 @@ function regleDe(fichier: string): Regle | undefined {
 
 function regleDeBase(fichier: string): Regle | undefined {
   if (MODULES_SERVEUR_P0.includes(fichier)) {
+    // Revue 1 de #632, bloquant 4 (lot 1 du programme par l'IA) : l'assemblage réutilise `rythmeVersPace` de
+    // l'adaptateur du moteur au lieu d'une copie. Arête unique entre deux modules de cette même liste, soumis à la même
+    // règle (aucune capacité nouvelle n'est atteinte).
+    const voisins = fichier === "src/server/p0/assemblage.ts" ? ["src/server/p0/vers-moteur.ts"] : [];
     return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts"].includes(c),
+      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...voisins].includes(c),
       externes: [],
     };
   }

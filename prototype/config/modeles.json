@@ -3,7 +3,8 @@
   "etapes": {
     "recherche": "deepseek/deepseek-v4.1-flash",
     "notation": "deepseek/deepseek-v4.1-flash",
-    "raisons": "deepseek/deepseek-v4.1-flash"
+    "raisons": "deepseek/deepseek-v4.1-flash",
+    "programme": "deepseek/deepseek-v4.1-flash"
   },
   "variantes": {
     "a": {
@@ -11,7 +12,8 @@
     }
   },
   "routage": {
-    "data_collection": "deny"
+    "data_collection": "deny",
+    "zdr": true
   },
   "rechercheWeb": {
     "moteur": "exa"

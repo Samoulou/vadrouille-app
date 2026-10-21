@@ -1002,5 +1002,343 @@
     "matchesWishes": true,
     "notForMeRisk": 4,
     "mustSee": false
+  },
+  "programme": {
+    "titre": "Édimbourg gourmand et historique",
+    "jours": [
+      {
+        "date": "2026-11-23",
+        "titre": "Vieille ville",
+        "creneaux": [
+          {
+            "debut": "12:00",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "13:30",
+            "nature": "repas_midi",
+            "fin": "14:30",
+            "lieu": "Taverne aux tourtes",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que taverne aux tourtes vaut le détour pour vous deux."
+          },
+          {
+            "debut": "15:00",
+            "nature": "visite",
+            "fin": "17:00",
+            "lieu": "Forteresse du rocher",
+            "quartier": "Vieille ville",
+            "incontournable": true,
+            "aReserver": true,
+            "conseil": "Réserve le créneau de 15 h.",
+            "pourquoi": "Parce que forteresse du rocher vaut le détour pour vous deux."
+          },
+          {
+            "debut": "17:30",
+            "nature": "apero",
+            "fin": "18:30",
+            "lieu": "Salle de dégustation de whiskies rares",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que salle de dégustation de whiskies rares vaut le détour pour vous deux."
+          },
+          {
+            "debut": "19:30",
+            "nature": "repas_soir",
+            "fin": "21:00",
+            "lieu": "Bistrot du port",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que bistrot du port vaut le détour pour vous deux."
+          },
+          {
+            "debut": "21:30",
+            "nature": "soiree",
+            "fin": "23:00",
+            "lieu": "Pub aux musiciens",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que pub aux musiciens vaut le détour pour vous deux."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-24",
+        "titre": "Grande rue et palais",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "nature": "visite",
+            "fin": "11:00",
+            "lieu": "Grande rue pavée de la vieille ville",
+            "quartier": "Vieille ville",
+            "incontournable": true,
+            "pourquoi": "Parce que grande rue pavée de la vieille ville vaut le détour pour vous deux."
+          },
+          {
+            "debut": "11:15",
+            "nature": "visite",
+            "fin": "12:30",
+            "lieu": "Palais au bout de la grande rue",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que palais au bout de la grande rue vaut le détour pour vous deux."
+          },
+          {
+            "debut": "12:45",
+            "nature": "repas_midi",
+            "fin": "13:45",
+            "lieu": "Cantine de la place du marché",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que cantine de la place du marché vaut le détour pour vous deux."
+          },
+          {
+            "debut": "14:00",
+            "nature": "visite",
+            "fin": "16:30",
+            "lieu": "Colline aux trois belvédères",
+            "quartier": "Quartier du parc",
+            "incontournable": true,
+            "pourquoi": "Parce que colline aux trois belvédères vaut le détour pour vous deux."
+          },
+          {
+            "debut": "16:45",
+            "nature": "pause"
+          },
+          {
+            "debut": "18:00",
+            "nature": "apero",
+            "fin": "19:00",
+            "lieu": "Brasserie artisanale du canal",
+            "quartier": "Quartier du parc",
+            "pourquoi": "Parce que brasserie artisanale du canal vaut le détour pour vous deux."
+          },
+          {
+            "debut": "19:30",
+            "nature": "repas_soir",
+            "fin": "21:30",
+            "lieu": "Restaurant gastronomique de la ville neuve",
+            "quartier": "Quartier du parc",
+            "aReserver": true,
+            "pourquoi": "Parce que restaurant gastronomique de la ville neuve vaut le détour pour vous deux."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-25",
+        "titre": "Excursion distillerie",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "nature": "visite",
+            "fin": "12:00",
+            "lieu": "Distillerie de la vallée accessible en train",
+            "ville": "Linlithgow",
+            "incontournable": true,
+            "pourquoi": "Parce que distillerie de la vallée accessible en train vaut le détour pour vous deux."
+          },
+          {
+            "debut": "12:30",
+            "nature": "repas_midi",
+            "fin": "13:30",
+            "lieu": "Café des fermiers",
+            "ville": "Linlithgow",
+            "pourquoi": "Parce que café des fermiers vaut le détour pour vous deux."
+          },
+          {
+            "debut": "14:30",
+            "nature": "visite",
+            "fin": "16:00",
+            "lieu": "Maison géorgienne restaurée",
+            "quartier": "Ville neuve",
+            "pourquoi": "Parce que maison géorgienne restaurée vaut le détour pour vous deux."
+          },
+          {
+            "debut": "16:30",
+            "nature": "visite",
+            "fin": "17:30",
+            "lieu": "Galerie des portraits",
+            "quartier": "Ville neuve",
+            "pourquoi": "Parce que galerie des portraits vaut le détour pour vous deux."
+          },
+          {
+            "debut": "18:00",
+            "nature": "apero",
+            "fin": "19:00",
+            "lieu": "Épicerie fine et comptoir à fromages",
+            "quartier": "Ville neuve",
+            "pourquoi": "Parce que épicerie fine et comptoir à fromages vaut le détour pour vous deux."
+          },
+          {
+            "debut": "19:30",
+            "nature": "repas_soir",
+            "fin": "21:00",
+            "lieu": "Brasserie de la gare",
+            "quartier": "Ville neuve",
+            "pourquoi": "Parce que brasserie de la gare vaut le détour pour vous deux."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-26",
+        "titre": "Port et rivière",
+        "creneaux": [
+          {
+            "debut": "10:00",
+            "nature": "visite",
+            "fin": "12:00",
+            "lieu": "Port ancien et ses quais",
+            "quartier": "Quartier du port",
+            "pourquoi": "Parce que port ancien et ses quais vaut le détour pour vous deux."
+          },
+          {
+            "debut": "12:15",
+            "nature": "repas_midi",
+            "fin": "13:15",
+            "lieu": "Fish and chips de la grande rue",
+            "quartier": "Quartier du port",
+            "pourquoi": "Parce que fish and chips de la grande rue vaut le détour pour vous deux."
+          },
+          {
+            "debut": "13:30",
+            "nature": "visite",
+            "fin": "15:30",
+            "lieu": "Sentier de la rivière jusqu'au village",
+            "quartier": "Village du moulin",
+            "pourquoi": "Parce que sentier de la rivière jusqu'au village vaut le détour pour vous deux."
+          },
+          {
+            "debut": "15:45",
+            "nature": "visite",
+            "fin": "16:45",
+            "lieu": "Hameau du moulin au fil de l'eau",
+            "quartier": "Village du moulin",
+            "pourquoi": "Parce que hameau du moulin au fil de l'eau vaut le détour pour vous deux."
+          },
+          {
+            "debut": "17:30",
+            "nature": "apero",
+            "fin": "18:30",
+            "lieu": "Comptoir introuvable du double",
+            "quartier": "Village du moulin",
+            "pourquoi": "Parce que comptoir introuvable du double vaut le détour pour vous deux."
+          },
+          {
+            "debut": "19:30",
+            "nature": "repas_soir",
+            "fin": "21:00",
+            "lieu": "Table du marché couvert",
+            "quartier": "Quartier du port",
+            "pourquoi": "Parce que table du marché couvert vaut le détour pour vous deux."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-27",
+        "titre": "Musées et souterrains",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "nature": "visite",
+            "fin": "11:30",
+            "lieu": "Musée national des collections",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que musée national des collections vaut le détour pour vous deux."
+          },
+          {
+            "debut": "11:45",
+            "nature": "visite",
+            "fin": "12:30",
+            "lieu": "Musée des écrivains",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que musée des écrivains vaut le détour pour vous deux."
+          },
+          {
+            "debut": "12:45",
+            "nature": "repas_midi",
+            "fin": "13:45",
+            "lieu": "Salon de thé des écrivains",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que salon de thé des écrivains vaut le détour pour vous deux."
+          },
+          {
+            "debut": "14:00",
+            "nature": "visite",
+            "fin": "15:00",
+            "lieu": "Cimetière des poètes",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que cimetière des poètes vaut le détour pour vous deux."
+          },
+          {
+            "debut": "15:30",
+            "nature": "visite",
+            "fin": "16:30",
+            "lieu": "Visite des souterrains",
+            "quartier": "Vieille ville",
+            "aReserver": true,
+            "pourquoi": "Parce que visite des souterrains vaut le détour pour vous deux."
+          },
+          {
+            "debut": "18:00",
+            "nature": "apero",
+            "fin": "19:00",
+            "lieu": "Salle de dégustation de whiskies rares",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que salle de dégustation de whiskies rares vaut le détour pour vous deux."
+          },
+          {
+            "debut": "19:30",
+            "nature": "repas_soir",
+            "fin": "21:00",
+            "lieu": "Taverne aux tourtes",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que taverne aux tourtes vaut le détour pour vous deux."
+          },
+          {
+            "debut": "21:30",
+            "nature": "soiree",
+            "fin": "23:30",
+            "lieu": "Concert de musique traditionnelle",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que concert de musique traditionnelle vaut le détour pour vous deux."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-28",
+        "titre": "Dernière balade",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "nature": "visite",
+            "fin": "11:00",
+            "lieu": "Jardins sous le rocher",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que jardins sous le rocher vaut le détour pour vous deux."
+          },
+          {
+            "debut": "11:15",
+            "nature": "visite",
+            "fin": "12:00",
+            "lieu": "Boutique de lainages anciens",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que boutique de lainages anciens vaut le détour pour vous deux."
+          },
+          {
+            "debut": "12:15",
+            "nature": "repas_midi",
+            "fin": "13:15",
+            "lieu": "Cantine de la place du marché",
+            "quartier": "Vieille ville",
+            "pourquoi": "Parce que cantine de la place du marché vaut le détour pour vous deux."
+          },
+          {
+            "debut": "16:00",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve la visite de la forteresse dès maintenant.",
+      "Prends le train du matin pour la distillerie.",
+      "Emporte un imperméable et de bonnes chaussures."
+    ]
   }
 }

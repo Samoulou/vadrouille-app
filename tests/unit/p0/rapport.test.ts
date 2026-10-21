@@ -9,7 +9,7 @@ import * as messages from "@/i18n/messages";
 import { CODES_ARRET } from "@/prototype/arret";
 import { decouperProgramme } from "@/prototype/decoupage";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
-import { CODES_PLAFOND, criteresDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { CODES_PLAFOND, criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -128,5 +128,39 @@ describe("p0: texte du rapport (« Copier le rapport »)", () => {
     expect(texte).toContain(`${t.issue} : ${t.issues.arretee}`);
     expect(texte).toContain(`${t.codeArret} : upstream_unavailable`);
     expect(texte.split("\n").at(-1)).toBe(`${t.dernierePurge} : ${t.aucunePurge}`);
+  });
+});
+
+describe("p0: rapport sans donnée Google (spécification P0-programme-par-ia, A12 et § 6 ; 0117 § 4)", () => {
+  it("rapport: étapesDuRapport(null) : non relevé sans programme, jamais zéro", () => {
+    // Exécution arrêtée sans programme écrit (contenu non lu) ou programme absent : `null` (« non relevé » sur la page),
+    // jamais `{ avecPlaceId: 0, sansPlaceId: 0 }`, qui dirait un programme vide.
+    expect(etapesDuRapport(null)).toBeNull();
+    expect(etapesDuRapport(undefined)).toBeNull();
+    expect(etapesDuRapport({})).toBeNull();
+    expect(etapesDuRapport("programme")).toBeNull();
+  });
+
+  it("p0: rapport sans donnée Google", () => {
+    const contenu = contenuValide();
+    const jours = (contenu.trip as { days: { items: { type: string; stop?: Record<string, unknown> }[] }[] }).days;
+    const etapes = jours.flatMap((j) => j.items).filter((ligne) => ligne.type === "stop");
+    // Une étape non vérifiée : écrite sans placeId (0116 § 5.1).
+    delete etapes[1]!.stop!.placeId;
+    const compte = etapesDuRapport(contenu);
+    // Nombres d'étapes avec et sans placeId, calculés à la lecture du programme stocké ; rien d'autre ne sort.
+    expect(compte).toEqual({ avecPlaceId: etapes.length - 1, sansPlaceId: 1 });
+    expect(Object.keys(compte ?? {}).sort()).toEqual(["avecPlaceId", "sansPlaceId"]);
+    expect(JSON.stringify(compte)).not.toContain(PREFIXE);
+    // Programme absent ou hors schéma : aucun nombre.
+    expect(etapesDuRapport(null)).toBeNull();
+    expect(etapesDuRapport({})).toBeNull();
+    // « Copier le rapport » ne les contient jamais : texteDuRapport ne les reçoit pas, et le texte ne porte aucun
+    // identifiant de lieu, aucun nom ni aucun nombre d'étapes.
+    expect(texteDuRapport.length).toBe(3);
+    const texte = texteDuRapport(executionSuivie(), criteresDuRapport(executionSuivie(), contenu), null);
+    expect(texte).not.toContain(PREFIXE);
+    for (const etape of etapes) expect(texte).not.toContain(String(etape.stop!.name));
+    expect(texte).not.toMatch(/placeId|avecPlaceId|sansPlaceId|unverified|verifi/i);
   });
 });

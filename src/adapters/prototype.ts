@@ -26,6 +26,7 @@ import {
   type ProgrammeReduit,
 } from "@/prototype/programme-reduit";
 
+import { avecBadgeALaLecture } from "./prototype-lecture";
 import type { AdapterContext, TripAdapter } from "./types";
 
 /**
@@ -227,7 +228,8 @@ async function durees(paires: readonly PaireRelecture[], { trajets, conserver }:
 
 /**
  * Recompose une journée : durées conservées ou relues (`estimated: false`), `null` pour une durée indisponible ;
- * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché).
+ * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché) ; badge
+ * « à confirmer » calculé à la lecture pour une étape sans `placeId` (`avecBadgeALaLecture` de `./prototype-lecture`, 0116 § 5.1).
  */
 async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
   const { programme } = servi;
@@ -236,7 +238,7 @@ async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur
   const minutes = await durees(paires, servi, relecteur);
   let suivant = 0;
   const items: DayLineItem[] = jour.items.map((ligne) => {
-    if (ligne.type !== "segment") return ligne;
+    if (ligne.type !== "segment") return avecBadgeALaLecture(ligne);
     const valeur = minutes[suivant] ?? null;
     suivant += 1;
     return { type: "segment", segment: { mode: ligne.segment.mode, minutes: valeur, estimated: false } };

@@ -31,6 +31,11 @@ export const LOG_EVENTS = [
   // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu. Depuis le ticket 407,
   // écrite aussi quand la recherche lève (`errorName`, `warn`), avec `deadlineStop` (fin sur l'échéance de l'étape).
   "p0.research_done",
+  // Décision 0116 § 4.4 et verdict 0117 § 4 : fin de l'étape `etapeProgramme` de `p0Run`, compteurs **maison** seulement
+  // (`days`, `slots`, `placesToVerify`, `daysRemoved`, `slotsRemoved`, `fieldsRemoved`, `textsCut`, `modelCalls`,
+  // `unverifiedForCap`), des nombres ; jamais un compteur de verdict de vérification (vérifiés, introuvables, fermés,
+  // hors zone), ni nom, ni texte, ni donnée Google. Écrite aussi quand l'étape lève (`errorName`, `warn`).
+  "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
   // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
@@ -146,6 +151,18 @@ export type LogFields = {
   readonly fieldsRemoved?: number;
   /** Textes trop longs coupés dans les candidats gardés de l'agent (décision 0111) : un nombre, jamais le texte. */
   readonly textsCut?: number;
+  /**
+   * Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : journées et créneaux lus, lieux
+   * distincts à vérifier, journées et créneaux retirés à la lecture, requêtes de modèle, lieux laissés sans vérification
+   * faute de part ou de temps. Entiers positifs ou nuls ; aucun ne dit l'issue d'une vérification.
+   */
+  readonly days?: number;
+  readonly slots?: number;
+  readonly placesToVerify?: number;
+  readonly daysRemoved?: number;
+  readonly slotsRemoved?: number;
+  readonly modelCalls?: number;
+  readonly unverifiedForCap?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -558,6 +575,13 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["sectorUnknown", entierPositif],
   ["fieldsRemoved", entierPositif],
   ["textsCut", entierPositif],
+  ["days", entierPositif],
+  ["slots", entierPositif],
+  ["placesToVerify", entierPositif],
+  ["daysRemoved", entierPositif],
+  ["slotsRemoved", entierPositif],
+  ["modelCalls", entierPositif],
+  ["unverifiedForCap", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],

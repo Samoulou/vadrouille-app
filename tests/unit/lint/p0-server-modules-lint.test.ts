@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  *    fichier hors des dossiers serveur, `db/`, `scripts/` et des tests, sous toutes les formes de chargement
  *    (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`) ; seul un bloc de la
  *    configuration la règle, aucun bloc plus bas ne la remplace ;
- * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés (26 depuis B7a, ticket 423) ; un 21e fichier sans
+ * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés (26 depuis B7a, ticket 423 ; 27 depuis le prompt `programme`, décision 0115) ; un 21e fichier sans
  *    `import "server-only"` est refusé.
  * Configuration réelle du projet.
  */
@@ -190,7 +190,8 @@ describe("src/ai, src/research et src/grounding restent hors du code client (000
  * Les modules de phase 0 exemptés de `src/ai`, `src/research` et `src/grounding` : les 20 de la fusion de main dans B1
  * (#188), puis B7a (ticket 423, décision 0077 § 1 points 3 et 4, § 3 point 1) : `src/research/recherche-web.ts` devient
  * `src/ai/recherche-web.ts`, et six modules chargés par `pnpm p0` s'ajoutent (copies tenues égales, prompts
- * `structuration` et `quartier`, `erreurs.ts`). Toute modification de la liste passe en revue.
+ * `structuration` et `quartier`, `erreurs.ts`) ; puis le prompt `programme` (décision 0115, chargé par `requetes.ts`).
+ * Toute modification de la liste passe en revue.
  */
 const EXEMPTED = [
   "src/ai/candidat.ts",
@@ -199,6 +200,7 @@ const EXEMPTED = [
   "src/ai/modeles.simule.ts",
   "src/ai/prompts/notation.ts",
   "src/ai/prompts/plan.ts",
+  "src/ai/prompts/programme.ts",
   "src/ai/prompts/quartier.ts",
   "src/ai/prompts/raisons.ts",
   "src/ai/prompts/recherche.ts",
@@ -232,12 +234,12 @@ function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   });
 }
 
-describe("exception de server-only : liste fermée de 26 fichiers (20 de B1, puis B7a)", () => {
+describe("exception de server-only : liste fermée de 27 fichiers (20 de B1, puis B7a, puis le prompt programme)", () => {
   const WITHOUT = "export const x = 1;\n";
 
-  it("la liste compte exactement 26 fichiers, tous présents dans le dépôt", () => {
-    expect(EXEMPTED).toHaveLength(26);
-    expect(new Set(EXEMPTED).size).toBe(26);
+  it("la liste compte exactement 27 fichiers, tous présents dans le dépôt", () => {
+    expect(EXEMPTED).toHaveLength(27);
+    expect(new Set(EXEMPTED).size).toBe(27);
     const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of EXEMPTED) expect(present, filePath).toContain(filePath);
   });

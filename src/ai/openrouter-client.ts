@@ -106,6 +106,18 @@ type EtatAppel = { appele: () => void; redirection: boolean; greffonWeb: Greffon
 /** Greffon `web` d'un appel de `rechercherWeb` : moteur fixé et nombre de résultats. */
 type GreffonWeb = { readonly moteur: MoteurGreffonWeb; readonly maxResultats: number };
 
+/**
+ * Requête `programme` (décision 0116 § 2 ; revue 1 de #632, mineur 9) : plafond de jetons de sortie (`max_tokens`) et
+ * coût estimé réservé, **constantes du code** propres à cette seule nature (les autres requêtes gardent
+ * `coutEstimeMicros` de la configuration, sans plafond de jetons). 32 000 jetons couvrent un séjour de 7 jours à
+ * 12 créneaux avec leurs textes (environ 128 Kio, sous `LONGUEUR_REPONSE_MAX`). Réservation : 32 000 jetons de sortie
+ * et 10 000 d'entrée au tarif ZDR le plus cher de `deepseek/deepseek-v4.1-flash` relevé le 2026-10-21 (2,40 USD et
+ * 0,60 USD le million), soit 0,083 USD arrondis à 0,09 USD : très en deçà du plafond de 3 USD par exécution (une
+ * requête, sans relance). Le coût réel est confirmé à la réponse, comme pour toute requête.
+ */
+export const JETONS_SORTIE_MAX_PROGRAMME = 32_000;
+export const COUT_ESTIME_PROGRAMME_MICROS = 90_000;
+
 const CorpsSchema = z.object({ provider: z.object({ data_collection: z.literal("deny") }), plugins: z.unknown().optional() });
 /** Seul greffon admis, et seulement pour `rechercherWeb` : `web`, son moteur fixé (littéral) et son nombre de résultats. */
 const GreffonsWebSchema = z.tuple([
@@ -122,6 +134,10 @@ type AppelModele = {
   readonly routage: RequeteModele["routage"];
   readonly messages: readonly Message[];
   readonly greffonWeb: GreffonWeb | null;
+  /** Délai de la requête (`DELAI_REQUETE_MS`) : `openrouterProgramme` pour la seule nature `programme` (0116 § 2.3). */
+  readonly delaiMs: number;
+  /** Requête de nature `programme` : plafond de jetons de sortie et coût estimé propres (`JETONS_SORTIE_MAX_PROGRAMME`). */
+  readonly programme: boolean;
 };
 
 /** Résultat brut d'un appel : texte, sources (citations d'adresses), coût et raison de fin (liste fermée). */
@@ -239,7 +255,8 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
     ) {
       throw new ErreurOpenRouter("invalid_request");
     }
-    const coutEstimeMicros = greffonWeb === null ? options.coutEstimeMicros : options.coutEstimeRechercheWebMicros;
+    const { programme } = requete;
+    const coutEstimeMicros = greffonWeb !== null ? options.coutEstimeRechercheWebMicros : programme ? COUT_ESTIME_PROGRAMME_MICROS : options.coutEstimeMicros;
     const systeme = requete.messages.filter((m) => m.role === "system").map((m) => m.contenu);
     const utilisateur = requete.messages.filter((m) => m.role === "user").map((m) => ({ role: "user" as const, content: m.contenu }));
     const modele = fournisseur.chat(requete.modele, {
@@ -255,7 +272,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
         { fournisseur: "modeles", methode: "chat", sku: requete.modele, unites: { requetes: 1, elements: 0 }, coutEstimeMicros },
         options.plafonds,
       ),
-      DELAI_REQUETE_MS.openrouter,
+      requete.delaiMs,
       async (signal, transportAppele) => {
         etat = { appele: transportAppele, redirection: false, greffonWeb };
         etats.set(signal, etat);
@@ -264,6 +281,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
             model: modele,
             ...(systeme.length > 0 ? { system: systeme.join("\n\n") } : {}),
             messages: utilisateur,
+            ...(programme ? { maxOutputTokens: JETONS_SORTIE_MAX_PROGRAMME } : {}),
             maxRetries: 0,
             abortSignal: signal,
             experimental_telemetry: { isEnabled: false },
@@ -297,11 +315,19 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
 
   return {
     async envoyer(requete: RequeteModele): Promise<ReponseModele> {
-      const { texte, coutUsd, fin, tokens } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
+      const { texte, coutUsd, fin, tokens } = await appeler({
+        modele: requete.modele,
+        routage: requete.routage,
+        messages: requete.messages,
+        greffonWeb: null,
+        // Décision 0116 § 2.3 : 300 s pour la seule requête `programme` (réponse longue), 120 s pour toute autre.
+        delaiMs: requete.etape === "programme" ? DELAI_REQUETE_MS.openrouterProgramme : DELAI_REQUETE_MS.openrouter,
+        programme: requete.etape === "programme",
+      });
       return { texte, coutUsd, fin, ...(tokens === undefined ? {} : { tokens }) };
     },
     async rechercherWeb(requete) {
-      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats } });
+      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats }, delaiMs: DELAI_REQUETE_MS.openrouter, programme: false });
       return { sources, coutUsd };
     },
   };

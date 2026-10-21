@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   CategorySchema,
-  ChecklistItemSchema,
   DaySchema,
   MealSchema,
   SegmentSchema,
@@ -47,7 +46,7 @@ export const EXCEPTIONS_REDUITES = ["toReserve", "unconfirmed"] as const;
 export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
 
 /** Longueurs maximales des textes écrits (spécification, « Sorties des modèles : schémas stricts »). */
-export const LONGUEURS = { nom: 80, raison: 280, detour: 280, libelle: 120 } as const;
+export const LONGUEURS = { nom: 80, raison: 280, detour: 280, libelle: 120, bonPlan: 200 } as const;
 
 /** Longueur maximale d'une URL de source (spécification, « URL source »). */
 export const URL_SOURCE_MAX = 2048;
@@ -125,6 +124,19 @@ export const JourReduitSchema = DaySchema.omit({ travelMinutes: true, items: tru
 });
 export type JourReduit = z.infer<typeof JourReduitSchema>;
 
+/**
+ * Ligne « À faire » réduite (décision 0116 § 6, verdict de la Sécurité 0117) : un bon plan de l'IA, texte maison déjà
+ * contrôlé (200 caractères au plus), avant le départ, non coché ; **jamais** de `bookingUrl` ni de `stopId`, et jamais
+ * sponsorisée (objet strict).
+ */
+export const ChecklistReduiteSchema = z.strictObject({
+  id: z.string().regex(/^bon-plan-\d{1,2}$/),
+  label: texte(LONGUEURS.bonPlan),
+  when: z.strictObject({ type: z.literal("beforeDeparture") }),
+  done: z.literal(false),
+  sponsored: z.literal(false),
+});
+
 export const VoyageReduitSchema = TripBaseSchema.omit({
   days: true,
   organizationId: true,
@@ -135,8 +147,8 @@ export const VoyageReduitSchema = TripBaseSchema.omit({
   id: z.string().regex(TRIP_ID_PATTERN, "identifiant de voyage conforme à TRIP_ID_PATTERN"),
   organizationId: z.literal(PROTOTYPE_ORG_ID),
   days: z.array(JourReduitSchema).min(1),
-  /** Le prototype ne produit aucune liste de préparatifs (donc aucun `bookingUrl`). */
-  checklist: z.array(ChecklistItemSchema).max(0),
+  /** Bons plans du programme écrit par l'IA (0116 § 6), au plus 20 ; aucun `bookingUrl`. */
+  checklist: z.array(ChecklistReduiteSchema).max(20),
   /** Tout le séjour est parcourable (spécification, « Sortie 1 »). */
   unlocked: z.literal(true),
 });
@@ -305,7 +317,8 @@ type ProgrammeDesPaires = {
  *   précède son étape dans la journée, ou le logement de départ du jour si l'étape n'est pas dans la ligne du jour
  *   (« depuis l'étape précédente (ou l'hôtel) »), jusqu'à son étape.
  *
- * `null` : un des deux lieux manque (étape sans `placeId`, jour sans terminus) ; aucune paire n'est alors devinée.
+ * `null` : un des deux lieux manque (jour sans terminus, terminus sans identifiant) ; aucune paire n'est alors devinée.
+ * Une étape sans `placeId` est sautée (décision 0116 § 5.1) : le segment relie les lieux avec identifiant qui l'entourent.
  */
 export interface PairesDuProgramme {
   readonly jours: ReadonlyMap<number, readonly (PaireTrajet | null)[]>;
@@ -317,7 +330,9 @@ type Terminus = z.infer<typeof TerminusReduitSchema>;
 /** Identifiant de lieu d'une ligne qui a une position (terminus, étape), `null` pour les autres lignes. */
 function lieuDe(ligne: LigneReduite, terminus: Terminus): string | undefined | null {
   if (ligne.type === "terminus") return ligne.role === "start" ? terminus.depart : terminus.arrivee;
-  if (ligne.type === "stop") return ligne.stop.placeId;
+  // Étape sans `placeId` (lieu « à confirmer », décision 0116 § 5.1) : sautée ; le trajet relie l'étape avec `placeId`
+  // précédente à la suivante, jamais vers ni depuis elle.
+  if (ligne.type === "stop") return ligne.stop.placeId ?? null;
   return null;
 }
 
@@ -330,8 +345,13 @@ function lieuAvant(jour: JourReduit, terminus: Terminus, index: number): string 
   return null;
 }
 
+/**
+ * Lieu qui suit la ligne `index`. Un segment **vers** une étape sans `placeId` est hors forme (l'écriture n'en pose
+ * jamais, décision 0116 § 5.1) : `null`, donc lieu manquant (`missing_place` à la lecture), jamais une paire devinée.
+ */
 function lieuApres(jour: JourReduit, terminus: Terminus, index: number): string | undefined | null {
   for (const ligne of jour.items.slice(index + 1)) {
+    if (ligne.type === "stop" && ligne.stop.placeId === undefined) return null;
     const lieu = lieuDe(ligne, terminus);
     if (lieu !== null) return lieu;
   }

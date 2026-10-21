@@ -1,32 +1,32 @@
-# État du studio — 2026-10-21 (129e cycle)
+# État du studio — 2026-10-21 (130e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-21 13:36 UTC (fil « Routine cycle du studio ») : « alors ? ». Réponse donnée à 13:45 UTC : deuxième relecture du premier lot rendue, trois approbations sur quatre, deux points techniques du Tech Lead en correction ; environ une heure avant la mise sur la page d'essai. Aucun message dans #studio.
+- Aucun message de Samuel depuis le 129e cycle (ni dans #studio, ni dans le fil « Routine cycle du studio »).
 
 ## Fait
-- Fusionnées : **#641** (contrat du rapport : `RapportPage.etapes`, étapes avec et sans `placeId`, 0116 § 4.4), **#621** B10a (tri enregistré, décision 0112), statut du 128e cycle (#640).
-- **Premier lot** (#632) : deuxième relecture consolidée (head `05eec13`, 13:21 UTC) : Sécurité et UX/UI approuvées, Tech Lead deux bloquants (formule `unverifiedForCap` écrite deux fois ; conflit avec `main`). **Correction 2 (la dernière comptée)** poussée (head `bd41c6a`, 13:59 UTC) : formule unique `lieuxHorsPartTextSearch` dans `src/grounding/ancrage.ts`, importée par `p0-run` et par le mode simulé, deux tests de parité ; `main` fusionnée ; mineurs 4, 5, 6, 7 traités ; mineur 3 (type `LieuProgramme` partagé) renvoyé au lot 3 (Q574). Q573 répondue par le Tech Lead à la relecture (32 000 jetons de sortie et 90 000 µUSD réservés acceptés).
-- Tickets ouverts après la fusion de B10a : **#642** retrait du repli de `getDeckSession` (0112 amendement 1 ; 0014 appliquée sur la base d'essai) et **#643** décision 0119 (B10-TL-5 à B10-TL-8, préalable au code de B10b).
+- Fusionnées : **#646** retrait du repli de `getDeckSession` (0112 amendement 3 ; une table ou colonne absente rejette désormais comme toute erreur de base ; événement `presentation.deck_schema_missing` retiré ; approuvée Tech Lead et Sécurité sans bloquant), statut du 129e cycle (#644).
+- **Décision 0119** (#645, B10-TL-5 à B10-TL-8, head `9a765fd`) : ouverte par le Tech Lead ; **le CEO accepte le découpage de B10b en trois PR** (migration, moteur, serveur ; la PR serveur jamais dans le même cycle que #632). Première relecture (14:44 UTC) : deux bloquants (amendement implicite de 0112 § 3.4 et définition de `deck_closures` ; expiration des actions du tri à restreindre à `kind = 'batch'`) et huit mineurs. Correction 1 lancée.
+- **Premier lot** (#632, head `bd41c6a`, correction 2) : CI verte (`verify`, `db`, `docker`) ; la relecture de la correction 2 ne s'est jamais déclenchée après le libellé reposé à 13:59 UTC ; libellé `needs-review` retiré puis reposé à 16:13 UTC.
 
 ## En cours
-- ia-recherche : #632 en relecture (correction 2) et CI ; si encore bloquée, le CEO et le Tech Lead décident (troisième tentative ou fusion demandée à Samuel).
-- backend : #642 retrait du repli du tri (`lecture.ts`, `log.ts`, test DB, amendement 3 de 0112).
-- Tech Lead : #643 décision 0119 (workflow 5, étapes gardées, voyage complet filtré, forfait du lot) ; le ticket de code B10b suit sa fusion.
+- Tech Lead : #645 correction 1 (0119).
+- ia-recherche : #632 en attente de la relecture de la correction 2 (dernière comptée) ; si encore bloquée, le CEO et le Tech Lead décident (troisième tentative ou fusion demandée à Samuel).
 - Après la fusion de #632 : #633 (réexportations `texte.ts`), remplissage de `tip`/`priceNote`/`hoursNote`/`theme` par le prompt `programme`, puis **report `main` → `p0-reel`** et Samuel relance Rome.
+- Après la fusion de 0119 : tickets de code B10b-migration, B10b-moteur, B10b-serveur (verdict Sécurité sur la composition du workflow 5 avant la fusion de la PR serveur, Q575).
 - Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI.
 
 ## Bloqué
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
 - **Essai réel sur préversion** (B9e) : Q538.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI ; A2-c seulement si Samuel le décide (Q525).
-- **Purge du MVP et `coords-purge`** (#527) : Q438 ; `coords-purge` toujours en échec.
+- **Purge du MVP et `coords-purge`** (#527) : Q438 ; `coords-purge` toujours en échec (run du 14:29 UTC).
 - Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. #632 jusqu'à la fusion ; #633 ; remplissage des infos pratiques ; report `main` → `p0-reel` ; prévenir Samuel.
-2. #642 et #643 jusqu'à la fusion ; puis ticket de code B10b (0119).
+1. #632 jusqu'à la fusion (vérifier que la relecture s'est bien déclenchée) ; #633 ; remplissage des infos pratiques ; report `main` → `p0-reel` ; prévenir Samuel.
+2. #645 (0119) jusqu'à la fusion ; puis tickets de code B10b (migration d'abord).
 3. Samuel : rien à cliquer ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
@@ -49,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q574. Q573 répondue par le Tech Lead (relecture de #632 du 13:21 UTC).
+- Q575, Q576 (décision 0119, #645).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).

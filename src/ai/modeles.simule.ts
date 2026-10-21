@@ -14,7 +14,8 @@ import { donneesDe } from "@/ai/requetes";
  *   défaut ; aucun autre identifiant ;
  * - raisons : une raison et une justification construites à partir du nom maison reçu ;
  * - structuration et quartier (B7a) : la réponse type si les fixtures en ont une, sinon un brief déduit vide et
- *   « aucune zone » (les fixtures de P0 n'en ont pas : `pnpm p0` n'appelle pas ces étapes).
+ *   « aucune zone » (les fixtures de P0 n'en ont pas : `pnpm p0` n'appelle pas ces étapes) ;
+ * - programme (décision 0115) : la réponse type `programme` des fixtures, sinon un programme sans journée.
  */
 
 export const FixturesModelesSchema = z.strictObject({
@@ -29,6 +30,8 @@ export const FixturesModelesSchema = z.strictObject({
   }),
   structuration: z.unknown().optional(),
   quartier: z.unknown().optional(),
+  /** Sortie type du prompt `programme` (décision 0115) ; absente : un programme vide, refusé par la lecture. */
+  programme: z.unknown().optional(),
 });
 export type FixturesModeles = z.infer<typeof FixturesModelesSchema>;
 
@@ -75,6 +78,8 @@ export function creerModelesSimules(fixtures: FixturesModeles): ClientModeles {
           return repondre(fixtures.structuration ?? { inferredFields: [] });
         case "quartier":
           return repondre(fixtures.quartier ?? { zone: null, logements: [] });
+        case "programme":
+          return repondre(fixtures.programme ?? { jours: [] });
         case "raisons": {
           const { lieux } = DonneesRaisonsSchema.parse(donnees);
           return repondre({

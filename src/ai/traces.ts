@@ -6,6 +6,7 @@ import { ETAPES_REQUETE, MAX_TOKENS, usdEnMicros, type ClientModeles, type Reque
 import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } from "@/ai/erreurs";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -34,7 +35,7 @@ import { MODELE_ID_PATTERN } from "@/ai/reglages";
  * Le module n'importe que `@/ai/*` et `zod`. Il n'est pas chargé par `pnpm p0` : `import "server-only"`.
  */
 
-/** Étapes tracées : les six étapes de modèle et la recherche web du fournisseur. Un appel de modèle ou de recherche web. */
+/** Étapes tracées : les étapes de modèle (dont `programme`, décision 0116) et la recherche web du fournisseur. Un appel de modèle ou de recherche web. */
 export const ETAPES_TRACE = [...ETAPES_REQUETE, "recherche_web"] as const;
 export type EtapeTrace = (typeof ETAPES_TRACE)[number];
 
@@ -47,6 +48,7 @@ export const PROMPTS_TRACE = [
   PROMPT_STRUCTURATION.id,
   PROMPT_QUARTIER.id,
   PROMPT_RECHERCHE_WEB.id,
+  PROMPT_PROGRAMME.id,
 ] as const;
 export type PromptTrace = (typeof PROMPTS_TRACE)[number];
 
