@@ -50,7 +50,7 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     const titre = screen.getByRole("heading", { level: 1 });
     expect(titre).toHaveTextContent("Lundi 31 août");
     const theme = container.querySelector("[data-part='theme-jour']");
-    expect(theme).toHaveTextContent("[Highlands]");
+    expect(theme).toHaveTextContent("[Highlands : Glencoe, Loch Ness et retour par Pitlochry en toute fin de journée]");
     expect(titre.nextElementSibling).toBe(theme);
     unmount();
     const brut = render(<JourneePanel day={{ ...day(3), theme: "<b>x</b>" }} routes={routes} />);

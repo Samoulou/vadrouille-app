@@ -321,6 +321,15 @@ describe("vues partagées: l'instantané partagé ne contient que les clés de l
     }
   });
 
+  it("partage: un voyage dont l'étape porte priceNote, hoursNote et tip ne les expose ni par la projection ni par la base (base)", async () => {
+    const shared = await readShared(a.valid);
+    const text = JSON.stringify(shared.version[0].snapshot);
+    // Sentinelles de SNAPSHOT (décision 0103, condition 1 ; titre libre du jour, décision 0116 § 6).
+    for (const sentinelle of ["tip", "priceNote", "hoursNote", "Arrive tôt", "Environ 20 GBP", "Fermé le lundi", "theme", "Old Town et Dean Village"]) {
+      expect(text, sentinelle).not.toContain(sentinelle);
+    }
+  });
+
   it("source.url : seulement une chaîne en https:// (javascript:, http:, autre type retirés)", async () => {
     const shared = await readShared(a.valid);
     const text = JSON.stringify(shared.version[0].snapshot);

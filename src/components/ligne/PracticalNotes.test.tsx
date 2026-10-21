@@ -14,7 +14,7 @@ describe("PracticalNotes (lot 1 bis, décision 0116 § 6)", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Infos pratiques" })).toBeInTheDocument();
     expect([...section.querySelectorAll("dt")].map((dt) => dt.textContent)).toEqual(["Conseil", "Prix", "Horaires"]);
     expect([...section.querySelectorAll("dd")].map((dd) => dd.textContent)).toEqual(Object.values(FACTS));
-    expect(container.querySelector("[data-part='mention-infos']")).toHaveTextContent("D'après l'IA, à confirmer sur place.");
+    expect(container.querySelector("[data-part='mention-infos']")).toHaveTextContent("Infos rédigées par notre outil, à confirmer sur place.");
     expect(container.textContent).not.toMatch(/[Vv]érifi/);
   });
 

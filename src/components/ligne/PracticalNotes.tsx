@@ -27,7 +27,9 @@ export function practicalNotesRows(facts: PracticalNotesProps["facts"]): { key: 
 /**
  * Infos pratiques d'une étape (conseil, prix, horaires), sous le « pourquoi ». Textes maison, affichés **en texte
  * brut** (nœuds texte React : jamais de lien, de Markdown ni de HTML ; décisions 0094 § 7 et 0103). Mention fixe
- * sous la liste (PPI-PO-5, forme provisoire, à confirmer par l'UX/UI). Sans aucune valeur : rien n'est rendu.
+ * sous la liste (PPI-PO-5, texte proposé par l'UX/UI en revue). Ces champs ne viennent que du programme rédigé par
+ * notre outil : la recherche web du MVP ne peut pas les porter (`CandidatTrouve` les refuse, décision 0103), la mention
+ * ne s'affiche donc jamais pour une info sourcée par `Stop.source`. Sans aucune valeur : rien n'est rendu.
  */
 export function PracticalNotes({ facts, headingLevel = 2, className }: PracticalNotesProps) {
   const id = useId();
@@ -43,7 +45,7 @@ export function PracticalNotes({ facts, headingLevel = 2, className }: Practical
         {rows.map((row) => (
           <div key={row.key} data-part={`info-${row.key}`} className="flex flex-col">
             <dt className="text-corps-s font-semibold text-ink-soft">{row.label}</dt>
-            <dd className="text-corps text-ink">{row.text}</dd>
+            <dd className="text-corps text-ink tabular-nums">{row.text}</dd>
           </div>
         ))}
       </dl>

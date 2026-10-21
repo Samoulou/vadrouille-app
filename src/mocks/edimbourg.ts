@@ -446,8 +446,8 @@ const days: Day[] = [
   {
     index: 3,
     date: "2026-08-31",
-    // Titre libre du jour (décision 0116 § 6, lot 1 bis).
-    theme: "[Highlands]",
+    // Titre libre du jour (décision 0116 § 6, lot 1 bis), long pour vérifier le retour à la ligne à 390 px.
+    theme: "[Highlands : Glencoe, Loch Ness et retour par Pitlochry en toute fin de journée]",
     items: [
       startAt("07:30", HOTEL),
       walk(15),

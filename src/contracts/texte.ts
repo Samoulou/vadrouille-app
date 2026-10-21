@@ -7,18 +7,28 @@ import { z } from "zod";
  *
  * Module feuille : il n'importe que `zod` (chargé sous Node nu par `pnpm p0`). **Transition** : `src/ai/candidat.ts`
  * et `src/prototype/candidat.ts` portent encore leurs propres définitions ; 0094 § 7 prévoit qu'ils réexportent
- * celles-ci. D'ici là, `tests/unit/p0/copies.test.ts` vérifie que les trois rendent le même verdict (table).
+ * celles-ci (ticket ia cité dans la PR #631). **Jusqu'à ce remplacement, ce module est plus strict que les deux
+ * copies** : il refuse en plus les domaines `.it`, `.va`, `.es`, `.pt`, `.nl` (0094 § 7), les séparateurs de ligne et
+ * de paragraphe (U+2028, U+2029), les points homoglyphes devant une extension (U+2024, U+FE52, U+FF0E, U+3002), et
+ * il retire les espaces de début et de fin avant de mesurer (`.trim()`). `tests/unit/p0/copies.test.ts` vérifie que
+ * les trois rendent le même verdict sur sa table, qui ne contient aucun de ces cas ; `texte.test.ts` couvre l'écart.
  */
 
-/** Caractères refusés : contrôle, invisibles, direction (catégorie Unicode C), et balises. */
-const CARACTERES_INTERDITS = /[\p{C}<>]/u;
+/** Caractères refusés : contrôle, invisibles, direction (catégorie Unicode C), séparateurs de ligne et de paragraphe, balises. */
+const CARACTERES_INTERDITS = /[\p{C}\u2028\u2029<>]/u;
 
-/** Formes d'URL refusées dans un texte libre (motifs de longueur bornée, donc linéaires ; égaux à `src/ai/candidat.ts`). */
+/** Point d'un nom de domaine, homoglyphes compris (point de conduite, petit point, point pleine chasse, point idéographique). */
+const POINT = "[.\\u2024\\uFE52\\uFF0E\\u3002]";
+
+/**
+ * Formes d'URL refusées dans un texte libre. Motifs de longueur bornée, donc linéaires. Liste fermée d'extensions : un
+ * nombre décimal (« 12.50 », « 9.30 ») ou une abréviation (« Dr. Martin ») n'est jamais pris pour un domaine.
+ */
 const FORMES_URL = [
   /[a-z0-9+.-]:\/\//i,
-  /\bwww\./i,
+  new RegExp(`\\bwww${POINT}`, "iu"),
   /\b(?:javascript|data|mailto|file):/i,
-  /[a-z0-9-]\.(?:com|org|net|info|io|co|uk|scot|fr|ch|de|eu|gov|edu|app|dev|example)\b/i,
+  new RegExp(`[a-z0-9-]${POINT}(?:com|org|net|info|io|co|uk|scot|fr|ch|de|eu|gov|edu|app|dev|example|it|va|es|pt|nl)\\b`, "iu"),
 ];
 
 /** Vrai si le texte contient une URL ou un nom de domaine. */
@@ -26,10 +36,14 @@ export function contientUrl(texte: string): boolean {
   return FORMES_URL.some((forme) => forme.test(texte));
 }
 
-/** Texte libre maison : une ligne, longueur bornée, Unicode imprimable, sans balise ni URL. */
+/**
+ * Texte libre maison : une ligne, longueur bornée, Unicode imprimable, sans balise ni URL. Les espaces de début et de
+ * fin sont retirés avant tout contrôle (la valeur lue est la valeur coupée) ; un texte fait d'espaces est refusé.
+ */
 export function texteMaison(max: number) {
   return z
     .string()
+    .trim()
     .min(1)
     .max(max)
     .refine((valeur) => valeur.trim().length > 0, "texte vide")
