@@ -26,6 +26,7 @@ import {
   type ProgrammeReduit,
 } from "@/prototype/programme-reduit";
 
+import { avecBadgeALaLecture } from "./prototype-lecture";
 import type { AdapterContext, TripAdapter } from "./types";
 
 /**
@@ -226,21 +227,9 @@ async function durees(paires: readonly PaireRelecture[], { trajets, conserver }:
 }
 
 /**
- * Badge « à confirmer » calculé à la lecture (décision 0116 § 5.1 ; 0011 § 5) : jamais écrit dans le programme. Posé
- * sur une étape sans `placeId` (fait stocké que 0011 S1 admet). La relecture des horaires à l'affichage (T8, badge d'une
- * étape avec `placeId` fermée le jour de son créneau) sort du lot 1 (future décision 0118).
- */
-function avecBadge(ligne: DayLineItem): DayLineItem {
-  if (ligne.type !== "stop") return ligne;
-  const { stop } = ligne;
-  if (stop.placeId !== undefined || stop.exceptions.includes("toConfirm")) return ligne;
-  return { type: "stop", stop: { ...stop, exceptions: [...stop.exceptions, "toConfirm"] } };
-}
-
-/**
  * Recompose une journée : durées conservées ou relues (`estimated: false`), `null` pour une durée indisponible ;
  * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché) ; badge
- * « à confirmer » calculé à la lecture pour une étape sans `placeId` (`avecBadge`, 0116 § 5.1).
+ * « à confirmer » calculé à la lecture pour une étape sans `placeId` (`avecBadgeALaLecture` de `./prototype-lecture`, 0116 § 5.1).
  */
 async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
   const { programme } = servi;
@@ -249,7 +238,7 @@ async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur
   const minutes = await durees(paires, servi, relecteur);
   let suivant = 0;
   const items: DayLineItem[] = jour.items.map((ligne) => {
-    if (ligne.type !== "segment") return avecBadge(ligne);
+    if (ligne.type !== "segment") return avecBadgeALaLecture(ligne);
     const valeur = minutes[suivant] ?? null;
     suivant += 1;
     return { type: "segment", segment: { mode: ligne.segment.mode, minutes: valeur, estimated: false } };

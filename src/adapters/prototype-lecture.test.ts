@@ -10,6 +10,7 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
 import { createPrototypeAdapterReel, type PaireRelecture, type RelecteurTrajets } from "./prototype";
 import {
+  avecBadgeALaLecture,
   createSourceProgrammesReels,
   EchecLectureProgrammes,
   PositionsManquantes,
@@ -568,5 +569,57 @@ describe("p0: temps relus conservés par la source des programmes réels (décis
     expect(ecritures(simule)).toEqual([]);
     await lu!.conserver!(new Map([[etrangere, 5], [cleTrajet(paire!), 12]]));
     expect(ecritures(simule).map((r) => r.valeurs)).toEqual([[PROGRAMME_ID, [paire!.mode], [paire!.origine], [paire!.destination], [12]]]);
+  });
+});
+
+describe("p0: badge « à confirmer » calculé à la lecture (décision 0116 § 5.1, lot 1)", () => {
+  it("prototype-lecture : étape sans placeId relue avec toConfirm, étape avec placeId sans", async () => {
+    // Contenu écrit : la deuxième étape du premier jour perd son `placeId` (et le trajet qui y mène, que la forme
+    // réduite n'admet pas vers une étape sans lieu) ; rien d'autre ne change, aucune exception n'est écrite.
+    const contenu = contenuEcrit() as { trip: { days: { items: Record<string, unknown>[] }[] } };
+    const items = contenu.trip.days[0]!.items;
+    const rang = items.findIndex((ligne) => (ligne.stop as { placeId?: string } | undefined)?.placeId === "SENTINELLE_PLACE_ID_2");
+    expect(rang).toBeGreaterThan(1);
+    const stop = { ...(items[rang]!.stop as Record<string, unknown>) };
+    delete stop.placeId;
+    contenu.trip.days[0]!.items = [...items.slice(0, rang - 1), { type: "stop", stop }, ...items.slice(rang + 1)];
+    const ecrit = JSON.stringify(contenu);
+    expect(ecrit).not.toContain("toConfirm");
+
+    const simule = poolSimule({ contenus: [contenu] });
+    const adapter = createPrototypeAdapterReel({ programmes: createSourceProgrammesReels({ pool: async () => simule.pool }), relecteurs: { trajets: relecteurFixe(9) } });
+    const trip = await adapter.getTrip(ctx, TRIP_ID);
+    expect(trip).not.toBeNull();
+    TripSchema.parse(trip);
+    const jour = await adapter.getDay(ctx, TRIP_ID, 1);
+    for (const lu of [trip!.days[0]!, jour!]) {
+      DaySchema.parse(lu);
+      const etapes = lu.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : []));
+      expect(etapes.length).toBeGreaterThan(1);
+      // Badge sur l'étape sans placeId, et sur elle seule ; aucune étape avec placeId badgée.
+      expect(etapes.map((etape) => etape.exceptions.includes("toConfirm"))).toEqual(etapes.map((etape) => etape.placeId === undefined));
+      expect(etapes.filter((etape) => etape.exceptions.includes("toConfirm"))).toHaveLength(1);
+    }
+    // Les autres jours (toutes leurs étapes ont un placeId) ne portent aucun badge.
+    expect(JSON.stringify(trip!.days.slice(1))).not.toContain("toConfirm");
+    // Rien d'écrit en base : seules des lectures (et l'encadrement de transaction) sont passées.
+    for (const { texte } of simule.requetes) expect(texte).not.toMatch(/^\s*(INSERT|UPDATE|DELETE)/i);
+    expect(simule.requetes.some(({ texte }) => texte === SQL_CONSERVER_TRAJETS)).toBe(false);
+    expect(JSON.stringify(contenu)).toBe(ecrit);
+
+    // Fonction pure : ni arrivée, ni départ, ni pause `free`, ni trajet ; étape avec placeId inchangée ; jamais en double.
+    const lignes = programmeComplet().trip.days[0]!.items as unknown as Parameters<typeof avecBadgeALaLecture>[0][];
+    for (const ligne of lignes) {
+      if (ligne.type !== "stop") expect(avecBadgeALaLecture(ligne)).toBe(ligne);
+      else expect(avecBadgeALaLecture(ligne)).toEqual(ligne);
+    }
+    const sansLieu = trip!.days[0]!.items.find((ligne) => ligne.type === "stop" && ligne.stop.placeId === undefined)!;
+    expect(avecBadgeALaLecture(sansLieu)).toBe(sansLieu);
+    // Limite de 2 badges tenue : un badge existant est gardé, toConfirm ajouté ; deux badges déjà portés, rien d'ajouté.
+    if (sansLieu.type !== "stop") throw new Error("étape attendue");
+    const avecUn = { type: "stop" as const, stop: { ...sansLieu.stop, exceptions: ["toReserve" as const] } };
+    expect(avecBadgeALaLecture(avecUn)).toEqual({ type: "stop", stop: { ...avecUn.stop, exceptions: ["toReserve", "toConfirm"] } });
+    const avecDeux = { type: "stop" as const, stop: { ...sansLieu.stop, exceptions: ["toReserve" as const, "unconfirmed" as const] } };
+    expect(avecBadgeALaLecture(avecDeux)).toBe(avecDeux);
   });
 });
