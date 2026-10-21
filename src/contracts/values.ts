@@ -22,6 +22,29 @@ export const CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant", 
  */
 export const PREFERENCE_REASONS = ["notMyStyle", "tooBusy", "tooExpensive", "tooFar", "other"] as const;
 
+/**
+ * Décisions sur une carte de la présentation (B10-PO-2 point 1 ; décision 0112 § 1.1) : « J'aime », « Pas pour moi »,
+ * et pour un repas « Je choisis », « Option suivante ». Source de `DeckDecisionSchema.decision`.
+ */
+export const DECK_DECISIONS = ["like", "dislike", "choose", "nextOption"] as const;
+export type DeckDecisionKind = (typeof DECK_DECISIONS)[number];
+
+/**
+ * Signaux de `preference_signals.signal` (handover back-end § 6), dans l'ordre de la contrainte `CHECK` de
+ * `0000_socle.sql` : les quatre décisions de carte, puis les réponses (`answerYes`, `answerNo`) et la réduction de
+ * trajet. Source de `PreferenceSignalSchema.signal` (décision 0112 § 1.5).
+ */
+export const PREFERENCE_SIGNALS = [...DECK_DECISIONS, "answerYes", "answerNo", "travelReduction"] as const;
+export type PreferenceSignalKind = (typeof PREFERENCE_SIGNALS)[number];
+
+/** Origines de `preference_signals.origin` (handover § 6). B10 n'écrit jamais `brief` (spécification B10). */
+export const PREFERENCE_SIGNAL_ORIGINS = ["gesture", "question", "brief"] as const;
+export type PreferenceSignalOrigin = (typeof PREFERENCE_SIGNAL_ORIGINS)[number];
+
+/** Statuts de `preference_signals.status` (handover § 6) : seuls `confirmed` et `inferred` produisent une préférence. */
+export const PREFERENCE_SIGNAL_STATUSES = ["confirmed", "inferred", "cancelled"] as const;
+export type PreferenceSignalStatus = (typeof PREFERENCE_SIGNAL_STATUSES)[number];
+
 /** Natures d'une étape (handover § 9). Source de `StopSchema.kind` (décision 0021 § 1.1). */
 export const STOP_KINDS = ["activity", "meal", "event"] as const;
 export type StopKind = (typeof STOP_KINDS)[number];
@@ -176,6 +199,9 @@ export const API_ERROR_CODES = [
   // B6b (décision 0086 § 2.2 point 3) : erreur inattendue d'une action sur un voyage, sans message de la base ; état
   // `error` du handover § 4. Ajouté à la fin, sans renommer ni réordonner.
   "internal",
+  // B10a (décision 0112 § 1.6 ; B10-PO-14) : écriture du tri refusée pendant un recalcul du voyage, `retryable` vrai ;
+  // état `generating` du handover § 4. Ajouté à la fin, sans renommer ni réordonner.
+  "generation_in_progress",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
