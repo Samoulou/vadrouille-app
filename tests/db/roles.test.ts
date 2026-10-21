@@ -54,7 +54,7 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
     ...Object.fromEntries(
-      ["trips", "briefs", "generation_runs", "research_runs", "candidates", "event_occurrences", "feedback", "preference_signals", "share_links"].map(
+      ["trips", "briefs", "generation_runs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],
       ),
     ),
@@ -62,6 +62,10 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     trip_versions: ["SELECT", "INSERT"],
     usage_ledger: ["SELECT", "INSERT"],
     proposals: ["SELECT", "INSERT"],
+    // B10a (migration 0014_tri_enregistre, décision 0112 § 3.1 et § 3.7) : `UPDATE` de table retiré, accordé par colonnes.
+    preference_signals: ["SELECT", "INSERT"],
+    deck_closures: ["SELECT", "INSERT"],
+    preference_prompts: ["SELECT", "INSERT"],
     billing: ["SELECT"],
     entitlements: ["SELECT"],
     organizations: ["SELECT"],
@@ -105,7 +109,13 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
 
 /** Droits par colonne attendus, en plus des droits de table. */
 const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, string[]>>> = {
-  vadrouille_app: { checkouts: { UPDATE: ["stripe_checkout_session_id"] } },
+  vadrouille_app: {
+    checkouts: { UPDATE: ["stripe_checkout_session_id"] },
+    // B10a (0112 § 3.1 et § 3.7) : colonnes d'annulation d'un signal ; état et réponse d'une question.
+    preference_signals: { UPDATE: ["cancel_request_id", "cancelled_at", "previous_status", "status"] },
+    preference_prompts: { UPDATE: ["answer_signal_id", "state", "updated_at"] },
+    deck_closures: { UPDATE: [] },
+  },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },
     organizations: { INSERT: ["created_at", "id", "kind", "name", "slug"] },
