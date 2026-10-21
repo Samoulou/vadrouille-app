@@ -201,6 +201,18 @@ describe("versions: une révision obsolète est refusée explicitement", () => {
   });
 });
 
+describe("versions: titre libre du jour (décision 0116 § 6)", () => {
+  it("un remplacement garde Day.theme du jour touché et des autres jours", () => {
+    const v2 = version2();
+    const avecTheme: TripSnapshot = { ...v2, days: v2.days.map((jour) => ({ ...jour, theme: `[Quartier ${jour.index}]` })) };
+    const cible = activiteDuJour(avecTheme, 2);
+    const v3 = reussi(
+      appliquerPatch(entree(avecTheme, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }]))),
+    );
+    for (const jour of v3.instantane.days) expect(jour.theme, `J${jour.index}`).toBe(`[Quartier ${jour.index}]`);
+  });
+});
+
 describe("versions: annuler crée une version identique", () => {
   it("replace → version 3, puis revert vers 2 → version 4 égale à la version 2 ; rien n'est supprimé ni modifié", () => {
     const v2 = version2();

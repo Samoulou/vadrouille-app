@@ -285,6 +285,23 @@ describe("p0: schéma strict de la forme réduite", () => {
     }
   });
 
+  it("infos pratiques et titre du jour (décision 0116 § 6, lot 1 bis) : portés par StopReduitSchema et JourReduitSchema, texte maison", () => {
+    const avecInfos = exemple();
+    const jour = avecInfos.trip.days[0]!;
+    jour.theme = "Old Town et Dean Village";
+    const etape = (jour.items[2] as { stop: ProgrammeReduit["proposals"][number]["stop"] }).stop;
+    etape.facts = { ...etape.facts, tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" };
+    const lu = ProgrammeReduitSchema.parse(avecInfos);
+    expect(lu.trip.days[0]!.theme).toBe("Old Town et Dean Village");
+    expect(StopReduitSchema.parse(etape).facts).toMatchObject({ tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" });
+    for (const valeur of ["<b>x</b>", "colosseo.it", "x".repeat(161)]) {
+      expect(StopReduitSchema.safeParse({ ...etape, facts: { tip: valeur } }).success, valeur).toBe(false);
+    }
+    expect(ProgrammeReduitSchema.safeParse({ ...avecInfos, trip: { ...avecInfos.trip, days: [{ ...jour, theme: "www.exemple.ch" }] } }).success).toBe(false);
+    // Rétrocompatible : le programme sans ces champs reste valide.
+    expect(ProgrammeReduitSchema.safeParse(exemple()).success).toBe(true);
+  });
+
   it("garde des clés qui restent un sous-ensemble des contrats", () => {
     const clesContrat = Object.keys(ProposalSchema.shape);
     for (const cle of Object.keys(PropositionReduiteSchema.shape)) expect(clesContrat, cle).toContain(cle);

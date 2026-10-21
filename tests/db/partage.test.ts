@@ -26,6 +26,8 @@ const SNAPSHOT = {
       index: 1,
       date: "2027-05-01",
       title: "calculé",
+      // Titre libre du jour (décision 0116 § 6) : hors de la liste blanche, jamais exposé.
+      theme: "Old Town et Dean Village",
       travelBudgetMinutes: 90,
       travelMinutes: 42,
       items: [
@@ -41,7 +43,8 @@ const SNAPSHOT = {
             end: "11:00",
             reason: "Tu aimes l'histoire",
             source: { label: "Site", url: "https://exemple.ch", checkedOn: "2026-10-01", rating: 4.8 },
-            facts: { durationMinutes: 90, area: "Old Town", openingHours: "9-17" },
+            // Infos pratiques (décision 0103, condition 1 de Q-L4a) : jamais exposées par la base.
+            facts: { durationMinutes: 90, area: "Old Town", openingHours: "9-17", tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" },
             exceptions: ["toConfirm", "verified", { nested: true }, "toReserve", "unconfirmed", "toReserve"],
             locked: false,
             verifiedAt: "2026-10-01",
@@ -315,6 +318,15 @@ describe("vues partagées: l'instantané partagé ne contient que les clés de l
     const text = JSON.stringify(shared.version[0].snapshot);
     for (const forbidden of ["Balmoral", "secret", "rating", "displayName", "location", "openingHours", "minutes\"", "verifiedAt", "polyline", "phone", "reviews", "title"]) {
       expect(text, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it("partage: un voyage dont l'étape porte priceNote, hoursNote et tip ne les expose ni par la projection ni par la base (base)", async () => {
+    const shared = await readShared(a.valid);
+    const text = JSON.stringify(shared.version[0].snapshot);
+    // Sentinelles de SNAPSHOT (décision 0103, condition 1 ; titre libre du jour, décision 0116 § 6).
+    for (const sentinelle of ["tip", "priceNote", "hoursNote", "Arrive tôt", "Environ 20 GBP", "Fermé le lundi", "theme", "Old Town et Dean Village"]) {
+      expect(text, sentinelle).not.toContain(sentinelle);
     }
   });
 

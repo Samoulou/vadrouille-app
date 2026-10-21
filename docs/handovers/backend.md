@@ -320,6 +320,9 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `StopFacts.durationMinutes` | stocké | Durée de visite estimée par notre recherche web (minutes, entier positif) ; jamais tirée de Google |
 | `StopFacts.costPerPerson` | stocké | Coût estimé par personne en CHF (0 = gratuit), issu de notre recherche web ; jamais un niveau de prix Google |
 | `StopFacts.area` | stocké | Secteur ou quartier, texte maison ; jamais l'adresse Google |
+| `StopFacts.tip` | stocké | Conseil pratique, texte maison facultatif (160, `texteMaison`), décisions 0094 § 7 et 0116 § 6 (lot 1 bis) ; absent de la vue partagée et de `candidates.facts` (0103) |
+| `StopFacts.priceNote` | stocké | Note de prix en texte, maison, facultative (60) ; jamais un niveau de prix Google ; mêmes règles que `StopFacts.tip` |
+| `StopFacts.hoursNote` | stocké | Note d'horaires en texte, maison, facultative (120) ; jamais les horaires d'une fiche Google ; mêmes règles que `StopFacts.tip` |
 | `Segment.mode` | stocké | Sortie du moteur |
 | `Segment.estimated` | stocké | Sortie du moteur : vrai quand la durée est une estimation du moteur |
 | `Source.label` | stocké | Nom de la source web |
@@ -346,6 +349,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Day.generating` | calculé | Serveur, à la lecture, depuis `generation_runs` |
 | `Day.travelBudgetMinutes` | stocké | Copie de la configuration PO-1 au moment de la planification, réduction comprise |
 | `Day.surprise` | stocké | Copie d'un candidat de la réserve choisi par la sélection (décision 0015 § 3), voir `SurpriseIdea.*` |
+| `Day.theme` | stocké | Titre libre du jour (quartiers), texte maison facultatif (80, `texteMaison`), décision 0116 § 6 (lot 1 bis) ; ne remplace pas le titre calculé depuis la date (E1) ; absent de la vue partagée |
 | `SurpriseIdea.id` | stocké | Identifiant du candidat |
 | `SurpriseIdea.placeId` | stocké | Identifiant de lieu Google |
 | `SurpriseIdea.name` | stocké | Règle de `Stop.name` |

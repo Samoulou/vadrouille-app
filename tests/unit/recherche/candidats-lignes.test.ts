@@ -282,6 +282,10 @@ describe("recherche: candidats maison prêts à écrire", () => {
     it("fuseau inconnu ou candidat hors schéma : refusé, jamais écrit", () => {
       expect(() => versLignes(concert("2026-11-24", "20:00", false), "Mars/Olympus")).toThrow(RangeError);
       expect(() => versLignes({ ...lieu, facts: { area: "Vieille ville" } }, "Europe/London")).toThrow();
+      // Infos pratiques (décision 0103, condition 2 de Q-L4a) : jamais dans `candidates.facts`.
+      for (const facts of [{ tip: "Arrive tôt" }, { priceNote: "Environ 20 GBP" }, { hoursNote: "Fermé le lundi" }]) {
+        expect(() => versLignes({ ...lieu, facts }, "Europe/London"), JSON.stringify(facts)).toThrow();
+      }
       expect(() =>
         versLignes(
           {
@@ -306,6 +310,9 @@ describe("recherche: candidats maison prêts à écrire", () => {
       durationMinutes?: number | undefined;
       costPerPerson?: number | undefined;
       area?: string | undefined;
+      tip?: string | undefined;
+      priceNote?: string | undefined;
+      hoursNote?: string | undefined;
     }>();
     expectTypeOf<keyof CandidatTrouve>().toEqualTypeOf<
       "kind" | "name" | "summary" | "category" | "typeEtape" | "aReserver" | "facts" | "sources" | "confidence" | "evenement"

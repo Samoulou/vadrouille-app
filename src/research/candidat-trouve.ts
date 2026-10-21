@@ -71,6 +71,14 @@ export const CandidatTrouveSchema = z
         path: ["facts", "area"],
         message: "aucun secteur (B7-PO-11)",
       });
+    // Infos pratiques : jamais dans `candidates.facts`, fermé sur `STOP_FACTS_KEYS` (décision 0103, condition 2 de Q-L4a).
+    const { tip, priceNote, hoursNote } = candidat.facts;
+    if (tip !== undefined || priceNote !== undefined || hoursNote !== undefined)
+      ctx.addIssue({
+        code: "custom",
+        path: ["facts"],
+        message: "aucune info pratique dans le candidat (décision 0103)",
+      });
     if (candidat.facts.costPerPerson !== undefined && candidat.facts.costPerPerson !== 0) {
       ctx.addIssue({
         code: "custom",
