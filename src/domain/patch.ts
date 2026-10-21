@@ -274,6 +274,8 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     events: origine.events,
     travelBudgetMinutes: origine.travelBudgetMinutes,
     ...(origine.surprise === undefined ? {} : { surprise: origine.surprise }),
+    // Titre libre du jour (décision 0116 § 6) : une révision le garde.
+    ...(origine.theme === undefined ? {} : { theme: origine.theme }),
   };
 }
 

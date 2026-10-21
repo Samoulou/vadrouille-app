@@ -120,5 +120,12 @@
     "budget": "Budget du jour : environ {montant} CHF par personne",
     "plus": "+",
     "moins": "−"
+  },
+  "infosPratiques": {
+    "titre": "Infos pratiques",
+    "conseil": "Conseil",
+    "prix": "Prix",
+    "horaires": "Horaires",
+    "mention": "Infos rédigées par notre outil, à confirmer sur place."
   }
 }

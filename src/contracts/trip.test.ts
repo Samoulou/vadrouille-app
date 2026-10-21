@@ -27,7 +27,8 @@ type HandoverWeekday = "lun." | "mar." | "mer." | "jeu." | "ven." | "sam." | "di
 type HandoverException = "toReserve" | "toConfirm" | "unconfirmed";
 interface HandoverSource { label: string; url: string }
 /** B2, E3 : faits structurés à la place du texte `meta`. */
-interface HandoverStopFacts { durationMinutes?: number; costPerPerson?: number; area?: string }
+/** `tip`, `priceNote`, `hoursNote` : ajouts signalés (décisions 0094 § 7 et 0116 § 6, lot 1 bis). */
+interface HandoverStopFacts { durationMinutes?: number; costPerPerson?: number; area?: string; tip?: string; priceNote?: string; hoursNote?: string }
 interface HandoverStop {
   id: string;
   kind: "activity" | "meal" | "event";
@@ -64,6 +65,8 @@ interface HandoverDay {
   travelBudgetMinutes: number;
   /** Ajout signalé (décision 0015, § 3), comme Trip.organizationId. */
   surprise?: HandoverSurpriseIdea;
+  /** Ajout signalé (décision 0116 § 6, lot 1 bis) : titre libre du jour. */
+  theme?: string;
 }
 /** Ajout signalé (décision 0015, § 3) : idée « Surprends-moi », hors handover § 9. */
 interface HandoverSurpriseIdea {

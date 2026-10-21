@@ -209,6 +209,21 @@ describe("p0: lecture des programmes réels (décisions 0074 et 0079)", () => {
     expect(relecteur.paires).toEqual([]);
   });
 
+  it("infos pratiques et titre du jour (décision 0116 § 6) : transmis tels quels par la lecture du programme", async () => {
+    const contenu = contenuEcrit() as ReturnType<typeof programmeComplet>;
+    const jour = contenu.trip.days.find((candidat) => candidat.index === 1)!;
+    jour.theme = "Old Town et Dean Village";
+    const ligne = jour.items.find((item) => item.type === "stop")!;
+    if (ligne.type !== "stop") throw new Error("étape attendue");
+    ligne.stop.facts = { ...ligne.stop.facts, tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" };
+    const simule = poolSimule({ contenus: [contenu] });
+    const adapter = createPrototypeAdapterReel({ programmes: createSourceProgrammesReels({ pool: async () => simule.pool }), relecteurs: { trajets: relecteurFixe() } });
+    const lu = DaySchema.parse(await adapter.getDay(ctx, TRIP_ID, 1));
+    expect(lu.theme).toBe("Old Town et Dean Village");
+    const etape = lu.items.find((item) => item.type === "stop" && item.stop.id === ligne.stop.id);
+    expect(etape?.type === "stop" && etape.stop.facts).toMatchObject({ tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" });
+  });
+
   it("programme réel servi avec sa carte et ses durées relues (une relecture par journée, jamais gardée)", async () => {
     const simule = poolSimule({ contenus: [contenuEcrit()] });
     const relecteur = relecteurFixe(27);
