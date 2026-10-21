@@ -430,7 +430,8 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
           configuration: entree.configuration,
           budgets: {
             textSearch: forfait.textSearchRequetes,
-            fiches: Math.max(0, forfait.placeDetailsRequetes - entree.villes.length),
+            // Positions comprises : la planification retire une fiche par ville qu'elle positionne (0113 § 4 point 3).
+            fiches: forfait.placeDetailsRequetes,
             routesRequetes: forfait.routesRequetes,
             routesElements: forfait.routesElements,
             marge: MARGE_FICHES,
