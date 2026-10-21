@@ -1,0 +1,51 @@
+# 0113 — Forfait par passage du voyage complet : répartition des parts, valeurs de test du profil `complet`, jour vide sans signal
+
+Statut : **acceptée**, **décision du Tech Lead** (répartition du forfait entre les étapes, valeurs de test, tests ; « Qui décide quoi » de `docs/CONTEXT.md`), définitive dès sa fusion, sans délai de veto (décision 0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Elle ne fixe **aucun montant réel** : les plafonds de production restent réservés à Samuel (`PLAFONDS_USAGE` vaut `null`, questions 4 et 5 de la spécification B9). Elle ne tranche pas la forme de `stopReason` (Sécurité, #607). Elle n'engage ni argent, ni compte externe, ni donnée personnelle, et ne supprime ni ne désactive aucun test.
+
+Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #608 · PR de mise en œuvre : #600 (fusionnée) · Défaut ouvert : #609 · Décisions liées : 0081 (B9-TL-3, B9-TL-12, B9-TL-13), 0087 § 1.3 et § 1.7, 0110 § 3
+
+Numérotation (relue le 2026-10-21 sur `main` `9b7282e`) : `main` porte 0001 à 0111 ; la PR #604, ouverte, porte 0112 ; aucune autre PR ouverte ne porte de décision au-delà.
+
+## Contexte
+
+Le workflow 4 (`generateFullTrip`, B9d) réserve **un forfait par passage** (profil `complet`, une réservation idempotente sous l'identifiant du passage) et doit le partager entre l'étape `a`, l'étape `l`, puis les étapes `b`, `c`, `d`, `e` de chaque jour. La première version de #600 (head `5654525`) divisait la part de `b` à `e` par le nombre de jours : le premier jour, qui introduit toutes les villes, n'avait que 1/N du forfait de recherche, et `floor(8 / N)` requêtes Routes tombaient à 0 dès 9 jours. La revue consolidée du 2026-10-20 23:23 UTC a fixé la répartition ci-dessous ; #600 l'applique et a été fusionnée. La revue du 2026-10-21 00:53 UTC demande que le Tech Lead l'écrive ici, et qu'il valide ou corrige l'élargissement du coût de modèles des valeurs de test du profil `complet` (mineur 1). La description de #600 pose trois questions au Tech Lead : cet élargissement, le Text Search de `c` trop court pour deux villes, et un voyage de dix jours qui va au bout sans étape.
+
+## Décision
+
+### 1. Répartition du forfait d'un passage (consigne la revue du 2026-10-20, appliquée par #600)
+
+1. **Parts des étapes inchangées** : `PARTS_FORFAIT` (`src/server/config/generation.ts`) découpe le forfait entier du passage entre les étapes, comme pour l'aperçu (`forfaitPartiel`, le dernier consommateur reçoit le reste de l'arrondi).
+2. **`a` et `l`** : leur part entière, une fois par passage.
+3. **`b`, `c` et `d`** : leur part est **répartie sur les villes que le passage introduit**. Le jour qui introduit une ville reçoit la part de cette ville. Un jour qui n'introduit aucune ville n'a rien à dépenser. `d` ne note que les candidats des villes introduites par son jour, sans quoi un jour sans part lancerait des appels.
+4. **`e`** : sa part est **répartie par jour** du passage (un jour par étape `e`).
+5. **Découpage cumulatif** (`partCumulee`, `src/server/generation/forfait-etape.ts`) : la part d'un jour est la différence des arrondis cumulés (`floor(v × jusqu'à / total) − floor(v × avant / total)`). La somme des parts des jours vaut exactement la part de l'étape : aucune unité n'est perdue à l'arrondi.
+6. **Unités de `b`, `c`, `d`** (`partDuPassage`, mineur 2 de la revue du 2026-10-21) : elles sont comptées par **plage de rangs de ville** (`plusHautIntroduit`). Les villes intermédiaires, que `b` cherche pour garder la correspondance par rang alors qu'aucun jour du passage ne les contient, comptent donc comme introduites. `c` et `d` ne travaillent que sur les villes du jour : la part d'une ville intermédiaire est réservée et jamais dépensée. C'est une sous-consommation, jamais un dépassement. **Accepté tel quel** : on unifiera le comptage si une autre étape a besoin du même découpage.
+
+### 2. Valeurs de test du profil `complet` : 600 000 micro-USD de modèles, validé
+
+1. **Gardé** : `coutModelesMicros: 600_000` pour le profil `complet` de `PLAFONDS_VARIANTE_SIMULEE` (`src/server/config/usage.ts`) et de `PLAFONDS_LARGES` (`tests/support/banc-apercu.ts`). Les autres valeurs du profil (60 Text Search, 40 fiches, 8 requêtes et 400 éléments Routes) sont inchangées.
+2. **Raison** : la part de `e` vaut 20 % des modèles, répartie par jour. Une rédaction réserve 20 000 micro-USD (`COUTS_ESTIMES_MICROS.requeteModele`). À 200 000, le voyage de référence (Édimbourg, six jours, quatre jours au complet) laisse 10 000 micro-USD par jour : `cap_reached` dès la première rédaction. À 600 000, chaque jour reçoit 30 000 micro-USD, soit une rédaction par jour à une ville. C'est le même élargissement que celui du profil `apercu` (50 000 dans `PLAFONDS_USAGE_TEST`, 600 000 dans les bancs et la variante simulée), pour la même raison : le bout en bout simulé d'Édimbourg doit tenir dans son forfait.
+3. **`PLAFONDS_USAGE_TEST` reste à 200 000** (`tests/support/plafonds-usage.ts`). Il sert de référence arithmétique aux tests unitaires de la réservation et des sommes globales (forfait `complet` de 3,00 USD au prix plein, documenté dans le fichier). Il ne sert pas au déroulé d'un voyage. Les deux jeux de valeurs ont des rôles distincts, comme pour l'aperçu. L'égalité entre le profil `complet` des bancs et celui de la variante simulée reste vérifiée (`tests/db/voyage-complet.test.ts`, test « profil complet par défaut »).
+4. **Domaine de validité, écrit pour ne pas être pris pour un dimensionnement** : avec ces valeurs, un voyage à une ville va au bout et tous ses jours sont planifiés jusqu'à **six jours** (quatre jours au complet). Au-delà, les Routes limitent les premières (§ 4), puis les fiches et la rédaction. Ces valeurs de test n'ont aucun lien avec les montants réels.
+
+### 3. Parts par défaut et voyage à deux villes : pas de changement de `PARTS_FORFAIT`
+
+1. **`PARTS_FORFAIT` est inchangé** pour le profil `complet` (et pour l'aperçu, qui partage la table).
+2. **Raison** : `c` a déjà 80 % des requêtes Text Search, `l` les 20 % restants, pour le contrôle du logement de chaque ville. Avec 60 requêtes, aucun pourcentage ne couvre deux villes des doubles d'Édimbourg (environ 35 candidats ancrés par ville au complet) : même à 100 %, `c` n'aurait que 30 requêtes par ville, et `l` n'aurait plus rien. Le manque vient du **total** du profil, pas de sa répartition.
+3. **Tests à plusieurs villes** : ils élargissent explicitement le total de Text Search du profil `complet` dans leurs propres plafonds de test (`PLAFONDS_TROIS_VILLES`, ×2), avec la raison écrite à côté. C'est la règle : les fixtures simulées sont celles d'une seule ville, et les valeurs par défaut de la variante simulée restent dimensionnées pour elles.
+4. **Montants réels** (question à Samuel, posée dans la PR de cette décision) : un forfait par passage fixe se partage entre les villes et les jours. Sa part par jour diminue quand le voyage s'allonge, alors que la consommation d'un jour ne diminue pas. Les montants réels du profil `complet` devront donc être fixés pour le plus long voyage et le plus grand nombre de villes admis. Sinon, il faudra un profil exprimé par jour et par ville (forfait = part fixe + part par jour × jours + part par ville × villes). **Recommandation du Tech Lead** : le profil par jour et par ville. Il touche au plafond par génération, donc à l'argent : il n'est pas tranché ici.
+5. **Hors de cette décision** : l'étape `e` qui lance une requête Text Search pour une ville sans logement alors que sa part Text Search est nulle (#605). Règle générale, qui s'applique à #605 : **toute consommation d'une étape doit être couverte par sa part**. #605 peut donner à `e` une part Text Search pour ces villes, prise sur une autre étape, **sans changer le total du profil**. La forme (pourcentage ou réserve d'une requête par ville sans logement) est un choix de mise en œuvre, validé en revue de #605.
+
+### 4. Voyage de dix jours sans étape : cause établie, défaut ouvert (#609)
+
+1. **Cause** (lecture du code et banc de base simulé, aucun appel réel ; constat chiffré dans #609) : une matrice Routes demande au moins une requête par mode (`capaciteMatrice`, `src/server/relecture/planification.ts`). Avec deux modes et une part de 1 requête par jour (8 requêtes sur 8 jours ; le découpage cumulatif en donne 1 à certains jours dès que le complet compte plus de 4 jours), la capacité du jour est nulle. La demande est alors bornée à 0, aucune fiche n'est lue, `planifier` rend `ok` sans candidat, et le jour est publié sans étape. La ligne finit `incomplete`, sans code, après la dépense de `b`, `c` et `d`.
+2. **Règle** : un jour dont la demande n'est pas nulle et dont la part ne permet pas sa consommation minimale (une matrice, la première série de fiches, une rédaction) **s'arrête en `cap_reached`**. Jamais un jour vide en silence. Les fiches suivent déjà cette règle (`premiereSerie > budgets.fiches`, comme P0). Les Routes doivent la suivre aussi. L'arrêt est fermé et visible (`failed`, versions déjà publiées gardées, B9-PO-8). Un jour vide en silence fait croire à un voyage prêt.
+3. **Correction connexe** : le budget de fiches de `e` (`placeDetailsRequetes − villes`) ne déduit que les villes que la planification positionne, c'est-à-dire celles d'un jour planifié, et non toutes les villes du complet.
+4. **Mise en œuvre** : ticket #609 (backend), avec ses tests en simulé. Cette PR ne change pas le code.
+
+## Conséquences
+
+- Aucun changement de code ni de valeur dans cette PR (documentation seule).
+- #609 met en œuvre le § 4. #605 applique la règle du § 3 point 5.
+- Les valeurs de test du profil `complet` sont validées pour le bout en bout simulé d'Édimbourg (§ 2). Elles ne dimensionnent pas les montants réels.
+- Question à Samuel (montants réels du profil `complet`, § 3 point 4) : à reporter par le CEO dans `QUESTIONS.md`, avec la question 4 de B9 déjà ouverte.
