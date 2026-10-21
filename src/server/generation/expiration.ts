@@ -2,7 +2,8 @@ import "server-only";
 
 import { EXPIRATION_EXECUTION_MS } from "@/server/config/generation";
 
-import { CODE_ETAPE_EXPIREE } from "./raison-echec";
+import { CODE_ETAPE_EXPIREE } from "./reessayables";
+import { echecCompletDeLigne, type EchecComplet } from "./voyage-complet";
 
 /**
  * Expiration d'une exécution figée (décision 0081 B9-TL-3 point 5) : toute exécution du voyage en `queued` ou en
@@ -25,12 +26,19 @@ const SQL_EXPIRATION = `UPDATE public.generation_runs
     AND phase IN ('queued', 'preparing')
     AND updated_at < $4::timestamptz
     AND NOT (kind = 'full' AND phase = 'queued' AND workflow_run_id IS NULL)
-  RETURNING id`;
+  RETURNING id, kind, trip_id, stop_reason, cardinality(person_retry_request_ids)::int AS reprises_personne, studio_retries`;
 
-/** Expire les exécutions figées du voyage ; rend les identifiants des lignes modifiées par cet appel. */
-export async function expirerExecutions(executeur: ExecuteurGeneration, organizationId: string, tripId: string, maintenantMs: number): Promise<string[]> {
+/**
+ * Ligne expirée par cet appel : son identifiant et, pour une ligne `full`, ce qu'il faut pour évaluer l'état bloqué (0087
+ * § 1.4 point 2 : l'expiration est un des écrivains de `generation.full_stuck` ; l'appelant l'écrit après la validation de sa
+ * transaction, `signalerSiBloquee`).
+ */
+export type ExecutionExpiree = { readonly id: string; readonly complet: EchecComplet | null };
+
+/** Expire les exécutions figées du voyage ; rend les lignes modifiées par cet appel. */
+export async function expirerExecutions(executeur: ExecuteurGeneration, organizationId: string, tripId: string, maintenantMs: number): Promise<ExecutionExpiree[]> {
   const maintenant = new Date(maintenantMs).toISOString();
   const seuil = new Date(maintenantMs - EXPIRATION_EXECUTION_MS).toISOString();
   const { rows } = await executeur.query(SQL_EXPIRATION, [organizationId, tripId, maintenant, seuil]);
-  return rows.map((ligne) => String(ligne.id));
+  return rows.map((ligne) => ({ id: String(ligne.id), complet: ligne.kind === "full" ? echecCompletDeLigne(ligne) : null }));
 }

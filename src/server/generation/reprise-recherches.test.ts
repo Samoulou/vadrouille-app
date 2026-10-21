@@ -11,7 +11,7 @@ import {
   reprendreRecherche,
   sourceDeReprise,
   type ExecuteurReprise,
-} from "./reprise";
+} from "./reprise-recherches";
 
 /**
  * B9c-suite (ticket #573 ; décisions 0106 § 5 et 0105 § 6) : reprise des recherches d'un essai précédent par « Réessayer ».

@@ -452,6 +452,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: SERVER_ONLY_P0R3C4,
   })),
+  // B9d (ticket 599) : workflow 4 `generateFullTrip`, pont sans capacité (étapes de `src/server/generation/etapes-complet.ts`).
+  // Verdict Sécurité : approuvé (revue consolidée de la PR 600, head `5654525`).
+  {
+    fichier: "src/workflows/voyage-complet.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow 4 du voyage complet, exigé par `ligne/require-server-only` ; B9d, ticket 599, décision 0087 § 1.3 ; verdict Sécurité : approuvé (PR 600)",
+  },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({
