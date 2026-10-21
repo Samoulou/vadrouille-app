@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { contientUrl as contientUrlCopie } from "@/ai/candidat";
+import { texteMaison as texteMaisonCopie } from "@/ai/candidat";
 import { lireProgramme } from "@/ai/sorties";
-import { LONGUEURS_CONTRAT, TripSchema, type Stop } from "@/contracts";
+import { LONGUEURS_CONTRAT, TripSchema, contientUrl, texteMaison, type Stop } from "@/contracts";
 import { BriefSchema } from "@/prototype/brief";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, type CreneauAssemble } from "@/server/p0/assemblage";
@@ -21,13 +21,26 @@ const SEJOUR = { arrivee: "2026-11-23", depart: "2026-11-25" };
 const lire = (valeur: unknown) => lireProgramme(JSON.stringify(valeur), SEJOUR);
 const visite = (extra: Record<string, unknown> = {}) => ({ debut: "10:00", nature: "visite", lieu: "Musée", pourquoi: "Parce que.", ...extra });
 
-/** Textes admis par la copie de `src/ai/candidat.ts` et refusés par la règle du contrat (écart décrit par `texte.ts`). */
-const REFUSES_PAR_LE_CONTRAT = ["Billets sur museo.it", "Ouvert de 9:00 à 18:00", "Voir musee．com", "Infos sur museo.es"];
+/**
+ * Textes refusés par la règle du contrat (`src/contracts/texte.ts`) que ne refusait pas l'ancienne copie de
+ * `src/ai/candidat.ts` (avant la PR 652) : domaines `.it`, `.va`, `.nl`, `.es`, séparateur de ligne U+2028, point pleine
+ * chasse U+FF0E. Les caractères invisibles sont écrits en échappement, pour être lisibles en revue.
+ */
+const REFUSES_PAR_LE_CONTRAT = [
+  "Billets sur museo.it",
+  "Voir museo.va",
+  "museo.nl",
+  "Infos sur museo.es",
+  "Ouvert\u2028de 9:00 à 18:00",
+  "Voir musee\uFF0Ecom",
+];
 
 describe("infos pratiques : lecture par la règle du contrat (0116 § 6, lot 1 bis)", () => {
-  it("infos pratiques : textes admis par la copie de src/ai mais refusés par le contrat (rappel de l'écart)", () => {
-    // Les cas du test suivant sont bien ceux que la copie laisse passer : seule la règle du contrat les arrête.
-    for (const texte of REFUSES_PAR_LE_CONTRAT.filter((t) => !t.includes(" "))) expect(contientUrlCopie(texte), texte).toBe(false);
+  it("infos pratiques : chaque texte de la table est refusé par la règle du contrat, celle de src/ai/candidat.ts", () => {
+    // Verdict direct du contrat sur chaque chaîne ; `src/ai/candidat.ts` réexporte la même fonction (ticket 633).
+    expect(texteMaisonCopie).toBe(texteMaison);
+    for (const texte of REFUSES_PAR_LE_CONTRAT) expect(texteMaison(LONGUEURS_CONTRAT.tip).safeParse(texte).success, texte).toBe(false);
+    expect(REFUSES_PAR_LE_CONTRAT.filter((texte) => contientUrl(texte))).toHaveLength(REFUSES_PAR_LE_CONTRAT.length - 1);
   });
 
   it("infos pratiques : conseil, prix, horaires ou titre du jour refusés par le contrat, champ seul retiré et compté", () => {

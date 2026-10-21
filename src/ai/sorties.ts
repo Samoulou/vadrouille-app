@@ -1,16 +1,7 @@
 import { z } from "zod";
 
 import { LONGUEURS_TEXTE, NotesSchema, TYPES_CRENEAU, texteMaison, type Notes } from "@/ai/candidat";
-import {
-  CategorySchema,
-  InferredBriefSchema,
-  IsoDateSchema,
-  MAX_SUGGESTED_LODGINGS,
-  STOP_KINDS,
-  TimeSchema,
-  texteMaison as texteMaisonContrat,
-  type InferredBrief,
-} from "@/contracts";
+import { CategorySchema, InferredBriefSchema, IsoDateSchema, MAX_SUGGESTED_LODGINGS, STOP_KINDS, TimeSchema, type InferredBrief } from "@/contracts";
 
 /**
  * Schémas stricts des sorties de modèles (spécification P0, « Sorties des modèles : schémas stricts »).
@@ -626,32 +617,16 @@ const TEXTES_CRENEAU = {
   horaires: LONGUEURS_TEXTE.horaires,
 } as const;
 
-/** Mêmes règles que `texteMaison` du contrat (`src/contracts/texte.ts`), sans borne de longueur. */
-const TEXTE_CONTRAT_SANS_BORNE = texteMaisonContrat(Number.MAX_SAFE_INTEGER);
-
-/**
- * Texte d'une info pratique ou du titre du jour, destiné au contrat (`StopFacts.tip`, `priceNote`, `hoursNote`,
- * `Day.theme` ; décision 0116 § 6, lot 1 bis) : `texteCoupe`, plus la règle du contrat, plus stricte que celle de
- * `src/ai/candidat.ts` tant que #633 n'a pas remplacé la copie (domaines `.it`, `.va`, `.es`, `.pt`, `.nl`,
- * séparateurs U+2028 et U+2029, points homoglyphes). Contrôlée sur le texte **entier** avant la coupe, puis sur le texte
- * coupé, comme `texteCoupe`. Refusé : le champ seul est retiré et compté (`champsRetires`), jamais le créneau.
- */
-function texteCoupeContrat(max: number) {
-  return z
-    .string()
-    .refine((valeur) => TEXTE_CONTRAT_SANS_BORNE.safeParse(valeur).success, "texte refusé par la règle du contrat avant la coupe")
-    .pipe(texteCoupe(max))
-    .pipe(texteMaisonContrat(max));
-}
-
 /** Champs facultatifs d'un créneau : invalides, retirés seuls (`.catch(undefined)`), le créneau gardé (modèle 0111). */
 const CHAMPS_FACULTATIFS_CRENEAU = ["fin", "lieu", "pourquoi", "ville", "quartier", "conseil", "prix", "horaires", "aReserver", "incontournable"] as const;
 
 /**
  * Créneau écrit par l'IA. Tout texte passe par `texteCoupe` (contrôle du texte entier, coupe, recontrôle : 0111 § 3,
- * 0117 § 1 point 1) ; `conseil`, `prix` et `horaires` passent en plus par la règle du contrat (`texteCoupeContrat`).
- * Clés inconnues (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni
- * recopiées (0117 § 1 point 5), et comptées dans `champsRetires`.
+ * 0117 § 1 point 1), donc par la règle du contrat (`texteMaison` de `src/contracts/texte.ts`, réexportée par
+ * `src/ai/candidat.ts` depuis la PR 652, ticket 633) : `conseil`, `prix`, `horaires` et le titre du jour vont aux
+ * champs du contrat (`StopFacts.tip`, `priceNote`, `hoursNote`, `Day.theme` ; 0116 § 6, lot 1 bis). Clés inconnues
+ * (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni recopiées (0117 § 1 point 5), et
+ * comptées dans `champsRetires`.
  */
 const CreneauIaObjet = z.object({
     debut: z.string().regex(HEURE),
@@ -661,9 +636,9 @@ const CreneauIaObjet = z.object({
     ville: texteCoupe(TEXTES_CRENEAU.ville).optional().catch(undefined),
     quartier: texteCoupe(TEXTES_CRENEAU.quartier).optional().catch(undefined),
     pourquoi: texteCoupe(TEXTES_CRENEAU.pourquoi).optional().catch(undefined),
-    conseil: texteCoupeContrat(TEXTES_CRENEAU.conseil).optional().catch(undefined),
-    prix: texteCoupeContrat(TEXTES_CRENEAU.prix).optional().catch(undefined),
-    horaires: texteCoupeContrat(TEXTES_CRENEAU.horaires).optional().catch(undefined),
+    conseil: texteCoupe(TEXTES_CRENEAU.conseil).optional().catch(undefined),
+    prix: texteCoupe(TEXTES_CRENEAU.prix).optional().catch(undefined),
+    horaires: texteCoupe(TEXTES_CRENEAU.horaires).optional().catch(undefined),
     aReserver: z.boolean().optional().catch(undefined),
     incontournable: z.boolean().optional().catch(undefined),
 });
@@ -771,7 +746,7 @@ export function lireProgramme(texte: string, sejour: { readonly arrivee: string;
     champsRetires += Object.keys(objet).filter((cle) => !["date", "titre", "creneaux"].includes(cle)).length;
     let titreJour: string | undefined;
     if (objet.titre !== undefined) {
-      const lu = texteCoupeContrat(LONGUEURS_TEXTE.titreJour).safeParse(objet.titre);
+      const lu = texteCoupe(LONGUEURS_TEXTE.titreJour).safeParse(objet.titre);
       if (!lu.success) champsRetires += 1;
       else {
         if (coupe(objet.titre, lu.data, LONGUEURS_TEXTE.titreJour)) textesCoupes += 1;
