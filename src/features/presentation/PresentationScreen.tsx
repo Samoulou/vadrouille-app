@@ -273,7 +273,6 @@ function Deck({
     const pending = state.undo;
     if (!pending) return;
     const restored = pending.snapshot.cards[pending.snapshot.index];
-    setRefus(null);
     dispatch({ type: "undo" });
     track({ name: "deck_undo", properties: { position: offset + pending.position } });
     if (pending.decision && restored) {
@@ -424,7 +423,7 @@ function Deck({
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} closed={closedAtLoad} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
+        <DeckEnd variant={endVariant} closed={closedAtLoad} daysKept={state.keptDays.length > 0} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />

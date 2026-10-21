@@ -346,7 +346,9 @@ describe("PresentationScreen", () => {
     expect(progress()).toHaveAccessibleName("Proposition 1 sur 7");
     await click("Tout garder pour le jour 3");
     await click("Tout garder pour le jour 4");
-    expect(screen.getByRole("heading", { name: "Tu as tout trié" })).toBeInTheDocument();
+    // Des jours gardés sans tri carte à carte : « Tu as fini ce tri. », jamais « Tu as tout trié » (revue UX/UI tardive).
+    expect(screen.getByRole("heading", { name: "Tu as fini ce tri." })).toBeInTheDocument();
+    expect(screen.queryByText("Tu as tout trié")).toBeNull();
     expect(screen.getByText("Jour 6 en préparation")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir le programme" })).toHaveAttribute("href", `/voyages/${edimbourgDebloque.id}`);
     expect(screen.queryByRole("link", { name: "Débloquer" })).toBeNull();

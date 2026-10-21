@@ -128,4 +128,14 @@ describe("DeckEnd", () => {
     expect(screen.getByRole("heading", { name: "Aucune proposition à trier" })).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });
+
+  it("jours gardés sans tri (« Tout garder pour le jour N ») : « Tu as fini ce tri. » en suite du tri, titres de l'aperçu et du paquet vide inchangés", () => {
+    const { rerender } = render(<DeckEnd variant="suite" tripId="t1" daysKept />);
+    expect(screen.getByRole("heading", { name: "Tu as fini ce tri." })).toBeInTheDocument();
+    expect(screen.queryByText("Tu as tout trié")).toBeNull();
+    rerender(<DeckEnd variant="apercu" tripId="t1" daysKept />);
+    expect(screen.getByRole("heading", { name: "Tu as vu tes premières propositions" })).toBeInTheDocument();
+    rerender(<DeckEnd variant="vide" tripId="t1" daysKept />);
+    expect(screen.getByRole("heading", { name: "Aucune proposition à trier" })).toBeInTheDocument();
+  });
 });
