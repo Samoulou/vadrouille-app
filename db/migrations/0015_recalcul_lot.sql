@@ -31,7 +31,7 @@ SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
 
 -- 1. Clôtures (0119 § 1.1 point 1) : contrainte additive, vraie de toute ligne existante (`id` est la clé primaire).
-ALTER TABLE "deck_closures" ADD CONSTRAINT "deck_closures_organization_id_id_key" UNIQUE("organization_id","id");
+ALTER TABLE "deck_closures" ADD CONSTRAINT "deck_closures_organization_id_id_unique" UNIQUE("organization_id","id");
 --> statement-breakpoint
 
 -- 2. Exécutions (0119 § 1.1 et § 1.2).

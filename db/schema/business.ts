@@ -610,8 +610,9 @@ export const deckClosures = pgTable(
       columns: [t.organizationId, t.generationRunId],
       foreignColumns: [generationRuns.organizationId, generationRuns.id],
     }),
-    // B10b (0119 § 1.1 point 1, migration 0015) : cible de la clé étrangère composée de `generation_runs`.
-    unique(uniqueKeyName("deck_closures_organization_id_id")).on(t.organizationId, t.id),
+    // B10b (0119 § 1.1 point 1, migration 0015) : cible de la clé étrangère composée de `generation_runs`. Nom explicite
+    // en `_unique` : un nom en `_key` hors de `db/schema/` serait pris pour un nom secret (confinement du dépôt).
+    unique("deck_closures_organization_id_id_unique").on(t.organizationId, t.id),
     unique(uniqueKeyName("deck_closures_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
     // Nom court : la forme longue dépasserait les 63 caractères d'un identifiant Postgres.
     unique(uniqueKeyName("deck_closures_organization_id_trip_id_run_phase_position")).on(

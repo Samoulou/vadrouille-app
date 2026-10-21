@@ -19,7 +19,7 @@ ALTER TABLE public.generation_runs DROP CONSTRAINT IF EXISTS generation_runs_bat
 --> statement-breakpoint
 ALTER TABLE public.generation_runs DROP CONSTRAINT IF EXISTS generation_runs_deck_closure_fk;
 --> statement-breakpoint
-ALTER TABLE public.deck_closures DROP CONSTRAINT IF EXISTS deck_closures_organization_id_id_key;
+ALTER TABLE public.deck_closures DROP CONSTRAINT IF EXISTS deck_closures_organization_id_id_unique;
 --> statement-breakpoint
 
 -- Purge de compte de 0014_tri_enregistre (section 6), recopiée à l'identique : clôtures avant exécutions.

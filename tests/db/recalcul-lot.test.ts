@@ -64,10 +64,10 @@ describe("recalcul par lot : migration appliquée (0119 § 1.1, § 1.2)", () => 
       { column_name: "deck_closure_id", data_type: "uuid", is_nullable: "YES" },
     ]);
     const contraintes = await app.query(
-      "SELECT conname, contype FROM pg_catalog.pg_constraint WHERE conname IN ('generation_runs_batch_check', 'generation_runs_deck_closure_fk', 'deck_closures_organization_id_id_key') ORDER BY conname",
+      "SELECT conname, contype FROM pg_catalog.pg_constraint WHERE conname IN ('generation_runs_batch_check', 'generation_runs_deck_closure_fk', 'deck_closures_organization_id_id_unique') ORDER BY conname",
     );
     expect(contraintes.rows).toEqual([
-      { conname: "deck_closures_organization_id_id_key", contype: "u" },
+      { conname: "deck_closures_organization_id_id_unique", contype: "u" },
       { conname: "generation_runs_batch_check", contype: "c" },
       { conname: "generation_runs_deck_closure_fk", contype: "f" },
     ]);
@@ -208,7 +208,7 @@ describe("recalcul par lot : retour arrière (0015_recalcul_lot.down.sql, base j
       await migrateur.query("COMMIT");
 
       const restes = await adminJ.query(
-        `SELECT conname AS nom FROM pg_catalog.pg_constraint WHERE conname IN ('generation_runs_batch_check', 'generation_runs_deck_closure_fk', 'deck_closures_organization_id_id_key')
+        `SELECT conname AS nom FROM pg_catalog.pg_constraint WHERE conname IN ('generation_runs_batch_check', 'generation_runs_deck_closure_fk', 'deck_closures_organization_id_id_unique')
          UNION ALL SELECT indexname FROM pg_catalog.pg_indexes WHERE indexname LIKE 'generation_runs_organization_id_trip_id_%' AND indexname NOT IN ('generation_runs_organization_id_trip_id_started_at_idx', 'generation_runs_organization_id_trip_id_request_id_idx', 'generation_runs_organization_id_trip_id_full_idx')`,
       );
       expect(restes.rows).toEqual([]);

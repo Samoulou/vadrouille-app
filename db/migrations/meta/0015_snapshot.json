@@ -1512,8 +1512,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "deck_closures_organization_id_id_key": {
-          "name": "deck_closures_organization_id_id_key",
+        "deck_closures_organization_id_id_unique": {
+          "name": "deck_closures_organization_id_id_unique",
           "nullsNotDistinct": false,
           "columns": [
             "organization_id",

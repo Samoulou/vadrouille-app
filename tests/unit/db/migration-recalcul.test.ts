@@ -62,7 +62,7 @@ describe("migration 0015 : ordre de la purge du compte (0119 § 5.2)", () => {
 
 describe("migration 0015 : contraintes (0119 § 1.1 et § 1.2)", () => {
   it("contrainte unique de deck_closures avant la clé étrangère qui la vise", () => {
-    const unique = SQL.indexOf('ADD CONSTRAINT "deck_closures_organization_id_id_key" UNIQUE("organization_id","id")');
+    const unique = SQL.indexOf('ADD CONSTRAINT "deck_closures_organization_id_id_unique" UNIQUE("organization_id","id")');
     const fk = SQL.indexOf('REFERENCES "public"."deck_closures"("organization_id","id")');
     expect(unique).toBeGreaterThan(-1);
     expect(fk).toBeGreaterThan(unique);
@@ -101,7 +101,7 @@ describe("migration 0015 : retour arrière", () => {
       "generation_runs_organization_id_trip_id_deck_closure_id_idx",
       "generation_runs_batch_check",
       "generation_runs_deck_closure_fk",
-      "deck_closures_organization_id_id_key",
+      "deck_closures_organization_id_id_unique",
     ]) {
       expect(instructions, nom).toMatch(new RegExp(`DROP (INDEX|CONSTRAINT) IF EXISTS (public\\.)?${nom};`));
     }
