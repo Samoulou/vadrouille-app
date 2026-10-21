@@ -56,22 +56,45 @@ export function forfaitPartiel(forfait: Forfait, etape: EtapeApercu): Forfait {
 
 /**
  * Forfait d'un passage du voyage complet (spécification B9d ; profil `complet`, B7-PO-5) : réservé sous l'identifiant du passage
- * (`identifiantForfait`, une réservation par passage, idempotente au rejeu), et la part des étapes `b` à `e` **divisée par le
- * nombre de jours** que l'exécution planifie (chaque jour a ses quatre étapes : leur somme reste dans le forfait).
+ * (`identifiantForfait`, une réservation par passage, idempotente au rejeu). Répartition de la part de chaque étape (décision
+ * du Tech Lead, revue consolidée de la PR 600 du 2026-10-20) :
+ * - `a` et `l` : leur part entière (`forfaitPartiel`), inchangée ;
+ * - `b`, `c` et `d` : leur part **répartie sur les villes que le passage introduit** (`part` : villes introduites par les jours
+ *   de rang inférieur, par ce jour, et par tout le passage). Le jour qui introduit une ville reçoit la part de cette ville ; un
+ *   jour qui n'en introduit aucune n'a rien à dépenser ;
+ * - `e` : sa part **répartie par jour** du passage (un jour par étape `e`).
+ * Le découpage est cumulatif (`partCumulee`) : la somme des parts des jours vaut exactement la part de l'étape.
  */
-export type ForfaitDuPassage = { readonly profil: "complet"; readonly identifiant: string; readonly jours: number };
+export type PartDuPassage = {
+  /** Unités (villes introduites, ou jours pour `e`) des jours de rang inférieur. */
+  readonly avant: number;
+  /** Unités de ce jour. */
+  readonly ici: number;
+  /** Unités de tout le passage. */
+  readonly total: number;
+};
 
-/** Part d'un jour du voyage complet : chaque ressource divisée par le nombre de jours, arrondie par défaut. */
-export function partDuJour(forfait: Forfait, jours: number): Forfait {
-  const n = Math.max(1, Math.floor(jours));
-  const diviser = (valeur: number) => Math.floor(valeur / n);
+export type ForfaitDuPassage = { readonly profil: "complet"; readonly identifiant: string; readonly part?: PartDuPassage };
+
+/** Part entière de `valeur` pour les unités `[avant, avant + ici)` parmi `total` : différence des arrondis cumulés. */
+export function partCumulee(valeur: number, part: PartDuPassage): number {
+  const total = Math.max(0, Math.floor(part.total));
+  if (total === 0) return 0;
+  const avant = Math.min(total, Math.max(0, Math.floor(part.avant)));
+  const jusqua = Math.min(total, avant + Math.max(0, Math.floor(part.ici)));
+  return Math.floor((valeur * jusqua) / total) - Math.floor((valeur * avant) / total);
+}
+
+/** Part d'un jour du voyage complet : chaque ressource de la part de l'étape découpée par `partCumulee`. */
+export function partDuJour(forfait: Forfait, part: PartDuPassage): Forfait {
+  const decouper = (valeur: number) => partCumulee(valeur, part);
   return {
     ...forfait,
-    textSearchRequetes: diviser(forfait.textSearchRequetes),
-    placeDetailsRequetes: diviser(forfait.placeDetailsRequetes),
-    routesRequetes: diviser(forfait.routesRequetes),
-    routesElements: diviser(forfait.routesElements),
-    coutModelesMicros: forfait.coutModelesMicros === null ? null : diviser(forfait.coutModelesMicros),
+    textSearchRequetes: decouper(forfait.textSearchRequetes),
+    placeDetailsRequetes: decouper(forfait.placeDetailsRequetes),
+    routesRequetes: decouper(forfait.routesRequetes),
+    routesElements: decouper(forfait.routesElements),
+    coutModelesMicros: forfait.coutModelesMicros === null ? null : decouper(forfait.coutModelesMicros),
   };
 }
 
@@ -85,7 +108,8 @@ export async function forfaitDeLEtape(
 ): Promise<ForfaitDeLEtape> {
   const profil = passage?.profil ?? "apercu";
   const cle = passage?.identifiant ?? contexte.generationRunId;
-  const ajuster = (entier: Forfait): Forfait => (passage !== undefined && ETAPES_DU_JOUR.has(etape) ? partDuJour(entier, passage.jours) : entier);
+  const part = passage?.part;
+  const ajuster = (entier: Forfait): Forfait => (part !== undefined && ETAPES_DU_JOUR.has(etape) ? partDuJour(entier, part) : entier);
   // Règles de la variante que la barrière vient de choisir (B9e point 2) : jamais les valeurs de test pour un appel réel.
   const regles = dependances.reglesPour(contexte.barriere);
   if (regles === null) throw new ArretEtape("usage_unavailable");

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ETOUFFEMENT_RECONCILIATION_MS } from "@/server/config/generation";
+import { ETOUFFEMENT_RECONCILIATION_MS, JOURS_PLANIFIES_APERCU } from "@/server/config/generation";
 import { lireDroitVoyage } from "@/server/payment/paiements";
 
 import { signalerSiBloquee } from "./blocage";
@@ -58,8 +58,8 @@ const SQL_RECLAMATION = `UPDATE public.generation_runs SET updated_at = $4::time
 const SQL_WORKFLOW = `UPDATE public.generation_runs SET workflow_run_id = $3
   WHERE organization_id = $1 AND id = $2 AND kind = 'full' AND workflow_run_id IS NULL`;
 
-/** Voyage de deux jours ou moins : rien à compléter (B9-PO-7). */
-const JOURS_SANS_COMPLEMENT = 2;
+/** Voyage dont l'aperçu planifie tous les jours (deux jours ou moins, B9-PO-7) : rien à compléter. */
+const JOURS_SANS_COMPLEMENT = Math.max(...JOURS_PLANIFIES_APERCU);
 
 const instantDe = (valeur: unknown): string => (valeur instanceof Date ? valeur.toISOString() : new Date(String(valeur)).toISOString());
 

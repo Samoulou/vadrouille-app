@@ -34,7 +34,7 @@ import {
   type CandidatLu,
 } from "./etapes";
 import { lireEtatComplet, type EtatComplet } from "./etat";
-import { forfaitDeLEtape, type ForfaitDeLEtape } from "./forfait-etape";
+import { forfaitDeLEtape, type ForfaitDeLEtape, type PartDuPassage } from "./forfait-etape";
 import { cloreCompletEnEchec, commencerEtapeComplet, echecCompletDeLigne, exigerGardeAuRang, gardeOuverteAuRang, type EchecComplet } from "./garde";
 import { lireVoyage, nuitsDuVoyage, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
 import { normaliser, SQL_CANDIDAT_REPRISE, SQL_CANDIDATS_SOURCE, SQL_OCCURRENCES_REPRISE } from "./reprise-recherches";
@@ -140,8 +140,15 @@ async function executerComplet(entree: unknown, etape: EtapeApercu, corps: (cont
   }
 }
 
-const SQL_CLOTURE_COMPLET = `UPDATE public.generation_runs SET phase = 'failed', stop_reason = $3, updated_at = $4::timestamptz, finished_at = $4::timestamptz
-  WHERE organization_id = $1 AND id = $2 AND phase IN ('queued', 'preparing') AND kind = 'full'
+/**
+ * Clôture sur erreur inattendue, **gardée par le rang** (revue de la PR 600, mineur 1) : la ligne n'est close que si elle est
+ * en `preparing` au rang de la dernière étape terminée par ce workflow (`$5`, l'étape suivante n'a pas pu s'ouvrir) ou à celui de
+ * l'étape qui a levé (`$5 + 1`). Un ancien workflow dont la ligne a expiré puis a été reprise (nouveau passage, `step_seq` remis
+ * à 0 puis rouvert) ne clôt donc pas le nouveau passage tant que celui-ci n'est pas exactement à ces rangs ; une ligne `queued`
+ * n'est jamais close ici (l'expiration s'en charge).
+ */
+export const SQL_CLOTURE_COMPLET = `UPDATE public.generation_runs SET phase = 'failed', stop_reason = $3, updated_at = $4::timestamptz, finished_at = $4::timestamptz
+  WHERE organization_id = $1 AND id = $2 AND phase = 'preparing' AND kind = 'full' AND step_seq IN ($5::int, $5::int + 1)
   RETURNING id, trip_id, stop_reason, cardinality(person_retry_request_ids)::int AS reprises_personne, studio_retries`;
 
 /** Clôture d'une exécution `full` dont une étape a levé une erreur inattendue (workflow, après les reprises de la file). */
@@ -152,7 +159,7 @@ export async function etapeClotureComplet(entree: unknown, code: unknown, depend
   let close: EchecComplet | null = null;
   try {
     const ligne = (
-      await dep.transaction(etat.organizationId, (tx) => executeurSql(tx).query(SQL_CLOTURE_COMPLET, [etat.organizationId, etat.generationRunId, ferme, new Date(dep.maintenant()).toISOString()]))
+      await dep.transaction(etat.organizationId, (tx) => executeurSql(tx).query(SQL_CLOTURE_COMPLET, [etat.organizationId, etat.generationRunId, ferme, new Date(dep.maintenant()).toISOString(), etat.rang]))
     ).rows[0];
     close = ligne === undefined ? null : echecCompletDeLigne(ligne);
   } catch {
@@ -194,7 +201,7 @@ export function villesDuJour(voyage: VoyageLu, villes: readonly VilleDeLApercu[]
   return villes.filter((ville) => ville.sejour.du <= date && ville.sejour.au >= date);
 }
 
-type Passage = {
+export type Passage = {
   readonly voyage: VoyageLu;
   readonly version: number;
   readonly instantane: TripSnapshot;
@@ -233,22 +240,48 @@ function jourDuRang(passage: Passage, i: number): { readonly jour: number; reado
   return { jour, villes, introduites: villes.filter((ville) => !avant.has(ville.rang)) };
 }
 
+/**
+ * Rang de ville le plus haut que les jours de rang `0` à `i` du passage ont introduit ; pour `i = -1`, le rang qui précède la
+ * première ville du passage (−1 si le passage n'a aucune ville). Les villes de rang `]plusHautIntroduit(i − 1), plusHautIntroduit(i)]`
+ * sont celles que le jour de rang `i` introduit : ses villes nouvelles, et les villes intermédiaires que son étape `b` cherche
+ * pour garder la correspondance par rang (une ville d'un jour qui n'est pas dans le passage).
+ */
+export function plusHautIntroduit(passage: Pick<Passage, "voyage" | "villes" | "jours">, i: number): number {
+  const rangs = (j: number) => villesDuJour(passage.voyage, passage.villes, j).map((v) => v.rang);
+  const tous = passage.jours.flatMap(rangs);
+  let plusHaut = tous.length === 0 ? -1 : Math.min(...tous) - 1;
+  for (const jour of passage.jours.slice(0, Math.max(0, i + 1))) plusHaut = Math.max(plusHaut, ...rangs(jour));
+  return plusHaut;
+}
+
+/**
+ * Part du passage de l'étape du jour de rang `i` (décision du Tech Lead, revue de la PR 600) : villes introduites pour `b`,
+ * `c` et `d` (un jour qui n'en introduit aucune n'a rien à dépenser), un jour pour `e`.
+ */
+export function partDuPassage(passage: Pick<Passage, "voyage" | "villes" | "jours">, i: number, etape: EtapeJour): PartDuPassage {
+  if (etape === "e") return { avant: i, ici: 1, total: passage.jours.length };
+  const base = plusHautIntroduit(passage, -1);
+  const avant = plusHautIntroduit(passage, i - 1);
+  return { avant: avant - base, ici: plusHautIntroduit(passage, i) - avant, total: plusHautIntroduit(passage, passage.jours.length - 1) - base };
+}
+
 const rangDuJourCourant = (contexte: ContexteComplet): number => {
   const position = etapeDuRang(contexte.rang);
   if (position === null) throw new ArretEtape("invalid_input");
   return position.i;
 };
 
-async function forfaitDuPassage(contexte: ContexteComplet, passage: Pick<Passage, "jours">): Promise<ForfaitDeLEtape> {
+async function forfaitDuPassage(contexte: ContexteComplet, passage: Pick<Passage, "voyage" | "villes" | "jours">): Promise<ForfaitDeLEtape> {
+  const position = etapeDuRang(contexte.rang);
   return forfaitDeLEtape(
     contexte.dep,
     { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere },
     contexte.etape,
-    { profil: "complet", identifiant: identifiantForfait(contexte.ligne), jours: passage.jours.length },
+    { profil: "complet", identifiant: identifiantForfait(contexte.ligne), ...(position === null ? {} : { part: partDuPassage(passage, position.i, position.etape) }) },
   );
 }
 
-async function ouvrir(contexte: ContexteComplet, passage: Pick<Passage, "jours">): Promise<{ readonly fabrique: FabriqueGeneration; readonly options: OptionsEtape }> {
+async function ouvrir(contexte: ContexteComplet, passage: Pick<Passage, "voyage" | "villes" | "jours">): Promise<{ readonly fabrique: FabriqueGeneration; readonly options: OptionsEtape }> {
   const forfait = await forfaitDuPassage(contexte, passage);
   const fabrique = await contexte.dep.composer(contexte.barriere);
   if (contexte.dep.reglesPour(contexte.barriere) === null) throw new ArretEtape("usage_unavailable");
@@ -366,8 +399,7 @@ export function etapeCompletRecherche(entree: unknown, dependances?: Dependances
     "b",
     async (contexte) => {
       const passage = await sql(contexte, (x) => lirePassage(x, contexte));
-      const { villes } = jourDuRang(passage, rangDuJourCourant(contexte));
-      const plusHaut = Math.max(-1, ...villes.map((v) => v.rang));
+      const plusHaut = plusHautIntroduit(passage, rangDuJourCourant(contexte));
       let capacite: CapaciteRecherche | null = null;
       for (const ville of passage.villes.filter((v) => v.rang <= plusHaut)) {
         const deja = Number((await sql(contexte, (x) => x.query(SQL_NOMBRE_RECHERCHES, [contexte.organizationId, contexte.generationRunId]))).rows[0]?.n ?? 0);
@@ -517,14 +549,17 @@ export function etapeCompletAncrage(entree: unknown, dependances?: DependancesGe
 
 // --- Étape d ---------------------------------------------------------------------------------------------------------------
 
-/** Étape `d` du jour de rang `i` (workflow 3) : notes des candidats ancrés des villes de ce jour qui n'en ont pas encore. */
+/**
+ * Étape `d` du jour de rang `i` (workflow 3) : notes des candidats ancrés des villes que ce jour **introduit** et qui n'en ont pas
+ * encore (la part de `d` est répartie sur les villes introduites : un jour qui n'en introduit aucune ne note rien).
+ */
 export function etapeCompletNotation(entree: unknown, dependances?: DependancesGeneration): Promise<EtatComplet> {
   return executerComplet(
     entree,
     "d",
     async (contexte) => {
       const passage = await sql(contexte, (x) => lirePassage(x, contexte));
-      const { villes } = jourDuRang(passage, rangDuJourCourant(contexte));
+      const { introduites: villes } = jourDuRang(passage, rangDuJourCourant(contexte));
       const rangs = new Set(villes.map((v) => v.rang));
       const aNoter = (await sql(contexte, (x) => lireCandidats(x, contexte))).filter(
         (c) => rangs.has(c.ville) && c.kind === "place" && c.placeId !== null && c.fit === null && (c.stopKind === "activity" || c.stopKind === "meal"),
@@ -700,9 +735,9 @@ type DonneesJour = {
 
 /**
  * Publication d'un jour, **une transaction** sous la garde de l'étape `e` (rejeu borné sans nouvel appel externe, comme
- * l'aperçu, 0081 B9-TL-3 point 4) : la dernière version relue dans la transaction, le jour remplacé s'il est toujours sans
- * étape, la version écrite par le module unique (`request_id` dérivé : un rejeu la reconnaît), les positions de ses lieux
- * quand la configuration l'autorise, puis `last_version` et, pour le dernier jour, la phase finale.
+ * l'aperçu, 0081 B9-TL-3 point 4) : la dernière version relue dans la transaction ; si le jour est toujours sans étape, il est
+ * remplacé et la version écrite par le module unique (`request_id` dérivé : un rejeu la reconnaît), avec les positions de ses
+ * lieux quand la configuration l'autorise ; sinon rien n'est écrit. Puis `last_version` et, pour le dernier jour, la phase finale.
  */
 async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Promise<void> {
   const { organizationId, generationRunId, tripId } = contexte;
@@ -713,12 +748,15 @@ async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Pro
         const x = executeurSql(tx);
         const instant = maintenant(contexte);
         if (!(await gardeOuverteAuRang(x, organizationId, generationRunId, contexte.rang, instant))) throw new ArretEtape("step_expired");
-        const { instantane } = await lireInstantane(x, organizationId, tripId);
+        const { version, instantane } = await lireInstantane(x, organizationId, tripId);
         const courant = instantane.days.find((jour) => jour.index === donnees.index);
         if (courant === undefined) throw new ArretEtape("invalid_input");
-        const suivant: TripSnapshot = sansEtape(courant) ? { days: instantane.days.map((jour) => (jour.index === donnees.index ? donnees.jour : jour)) } : instantane;
-        const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: suivant });
-        if (donnees.ecrirePositions !== undefined) {
+        // Jour planifié entre-temps (une modification de la personne, ou ce passage au rejeu) : aucune version écrite (revue de
+        // la PR 600, mineur 4) ; l'exécution avance sur la dernière version.
+        const ecrite = sansEtape(courant)
+          ? await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: { days: instantane.days.map((jour) => (jour.index === donnees.index ? donnees.jour : jour)) } })
+          : { version, creee: false, instantane };
+        if (sansEtape(courant) && donnees.ecrirePositions !== undefined) {
           const positions = await donnees.ecrirePositions(x);
           if (!positions.ok && positions.code === "base") {
             if (positions.retryable === true) throw new Error("positions");

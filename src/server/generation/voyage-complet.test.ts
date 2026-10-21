@@ -4,6 +4,9 @@ import type { TripSnapshot } from "@/contracts";
 
 import { lireArguments, reprendreParLeStudio } from "../../../scripts/reprise-studio";
 import { signalerSiBloquee } from "./blocage";
+import { partDuPassage, plusHautIntroduit, villesDuComplet, villesDuJour } from "./etapes-complet";
+import { partCumulee, partDuJour } from "./forfait-etape";
+import type { VoyageLu } from "./lecture";
 import { CODES_REESSAYABLES } from "./raison-echec";
 import { reprendreVoyageComplet, SQL_REPRISE_PERSONNE, SQL_REPRISE_STUDIO } from "./reprise";
 import {
@@ -154,5 +157,52 @@ describe("commande du studio (0087 § 1.6)", () => {
     await expect(reprendreParLeStudio(["--organisation", ORG, "--voyage", VOYAGE], { transaction: avec([{ id: ID }]), maintenant: () => 0 })).resolves.toBe("repris");
     await expect(reprendreParLeStudio(["--organisation", ORG, "--voyage", VOYAGE], { transaction: avec([]), maintenant: () => 0 })).resolves.toBe("rien_a_reprendre");
     expect(vues).toEqual([ORG, ORG]);
+  });
+});
+
+describe("voyage complet : forfait du passage (revue de la PR 600, bloquant 1)", () => {
+  const sejour = (ville: string, du: string, au: string) => ({ ville, du, au, logement: { kind: "none" as const }, placeId: null });
+  // Six jours (23 au 28) : Glasgow du 24 au 26, Inverness du 26 au 28 ; le voyage complet planifie J3 à J6.
+  const voyage = {
+    draft: { start: "2026-11-23", end: "2026-11-28" },
+    sejours: [sejour("Édimbourg", "2026-11-23", "2026-11-24"), sejour("Glasgow", "2026-11-24", "2026-11-26"), sejour("Inverness", "2026-11-26", "2026-11-28")],
+  } as unknown as VoyageLu;
+  const villes = villesDuComplet(voyage);
+
+  it("villes du complet et du jour : borne de fin comprise, un jour de changement a ses deux villes", () => {
+    expect(villes.map((v) => [v.rang, v.nom])).toEqual([
+      [0, "Glasgow"],
+      [1, "Inverness"],
+    ]);
+    expect(villesDuJour(voyage, villes, 3).map((v) => v.nom)).toEqual(["Glasgow"]);
+    expect(villesDuJour(voyage, villes, 4).map((v) => v.nom)).toEqual(["Glasgow", "Inverness"]);
+    expect(villesDuJour(voyage, villes, 6).map((v) => v.nom)).toEqual(["Inverness"]);
+  });
+
+  it("b, c, d : part répartie sur les villes que le passage introduit ; e : par jour ; a et l : inchangées", () => {
+    const passage = { voyage, villes, jours: [3, 4, 5, 6] };
+    expect([-1, 0, 1, 2, 3].map((i) => plusHautIntroduit(passage, i))).toEqual([-1, 0, 1, 1, 1]);
+    expect([0, 1, 2, 3].map((i) => partDuPassage(passage, i, "b"))).toEqual([
+      { avant: 0, ici: 1, total: 2 },
+      { avant: 1, ici: 1, total: 2 },
+      { avant: 2, ici: 0, total: 2 },
+      { avant: 2, ici: 0, total: 2 },
+    ]);
+    expect(partDuPassage(passage, 2, "e")).toEqual({ avant: 2, ici: 1, total: 4 });
+    // Reprise en cours de route (J3 publié) : le premier jour du passage introduit ses deux villes.
+    const reprise = { voyage, villes, jours: [4, 5, 6] };
+    expect(partDuPassage(reprise, 0, "c")).toEqual({ avant: 0, ici: 2, total: 2 });
+    expect(partDuPassage(reprise, 1, "d")).toEqual({ avant: 2, ici: 0, total: 2 });
+  });
+
+  it("découpage cumulatif : la somme des parts vaut la part de l'étape, jamais 0 pour toutes (8 routes sur 9 jours)", () => {
+    const parts = Array.from({ length: 9 }, (_, i) => partCumulee(8, { avant: i, ici: 1, total: 9 }));
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(8);
+    expect(parts.filter((p) => p > 0)).toHaveLength(8);
+    expect(partCumulee(10, { avant: 0, ici: 0, total: 2 })).toBe(0);
+    expect(partCumulee(10, { avant: 0, ici: 1, total: 0 })).toBe(0);
+    const forfait = { nature: "execution" as const, textSearchRequetes: 48, placeDetailsRequetes: 4, routesRequetes: 0, routesElements: 0, coutGoogleMicros: 0, coutModelesMicros: 120_000 };
+    expect(partDuJour(forfait, { avant: 0, ici: 1, total: 2 })).toEqual({ ...forfait, textSearchRequetes: 24, placeDetailsRequetes: 2, coutModelesMicros: 60_000 });
+    expect(partDuJour(forfait, { avant: 2, ici: 0, total: 2 })).toEqual({ ...forfait, textSearchRequetes: 0, placeDetailsRequetes: 0, coutModelesMicros: 0 });
   });
 });

@@ -9,7 +9,13 @@
 // réconciliation du déploiement démarre la ligne à la prochaine lecture d'état (derrière la barrière, sous le forfait et les
 // plafonds de toute exécution). Aucun plafond n'est contourné ni relevé ici. Imports : ces deux modules seulement (et, par
 // eux, l'accès à la base) ; aucun chemin vers la composition, `src/ai`, `src/research` ni `src/grounding` (0081 B9-TL-1
-// point 2). Verdict de la Sécurité attendu (0087 § 1.6 point 4).
+// point 2). Verdict de la Sécurité : approuvé (revue consolidée de la PR 600, head `5654525` ; 0087 § 1.6 point 4).
+//
+// Base visée : une base **locale ou de staging** seulement (adresse de `vadrouille_app` de l'environnement de la commande) ;
+// la garde de production de `db/connection.ts` (décision 0034) refuse toute connexion quand `VERCEL_ENV` ou `VADROUILLE_ENV`
+// vaut « production ».
+import { pathToFileURL } from "node:url";
+
 import { reprendreVoyageComplet, type ExecuteurReprise } from "../src/server/generation/reprise.ts";
 import { executeurSql, withSystemOrg } from "../src/server/with-system-org.ts";
 
@@ -58,7 +64,7 @@ function message(issue: IssueRepriseStudio): string {
   }
 }
 
-if (process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   reprendreParLeStudio(process.argv.slice(2))
     .then((issue) => {
       console.log(message(issue));

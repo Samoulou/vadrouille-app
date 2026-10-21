@@ -61,7 +61,8 @@ export const PROPRIETES_PROCESS = [
   { fichier: "scripts/test-db.mjs", propriete: "argv" },
   { fichier: "scripts/test-db.mjs", propriete: "exit" },
   // B9d (ticket 599 ; décision 0087 § 1.6) : commande de reprise du studio `pnpm reprise-studio`, arguments lus (deux
-  // identifiants internes) et code de sortie ; aucune lecture d'environnement. Verdict Sécurité à rendre (0087 § 1.6 point 4).
+  // identifiants internes) et code de sortie ; aucune lecture d'environnement. Verdict Sécurité : approuvé (revue consolidée
+  // de la PR 600, head `5654525`, 0087 § 1.6 point 4).
   { fichier: "scripts/reprise-studio.ts", propriete: "argv" },
   { fichier: "scripts/reprise-studio.ts", propriete: "exitCode" },
   // P0r1 (ticket 267 ; spécification P0c, section 9) : options de Node lues par la barrière de sortie. Verdict Sécurité à rendre.

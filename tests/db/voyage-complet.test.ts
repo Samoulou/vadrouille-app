@@ -1,9 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApiCreationAdapter } from "@/adapters/api-creation";
-import { composerSimuleeAvec, type FabriqueGeneration } from "@/server/composition/generation";
+import { createApiTripAdapter } from "@/adapters/api";
+import { INCONNU, type SourceRelectures } from "@/domain/relectures";
+import { composerSimuleeAvec, type CapaciteAncrage, type CapaciteRecherche, type FabriqueGeneration } from "@/server/composition/generation";
+import { EXPIRATION_EXECUTION_MS } from "@/server/config/generation";
 import type { DependancesGeneration } from "@/server/generation/dependances";
 import {
+  etapeClotureComplet,
   etapeCompletAncrage,
   etapeCompletDebut,
   etapeCompletLogement,
@@ -12,6 +16,7 @@ import {
   etapeCompletRecherche,
 } from "@/server/generation/etapes-complet";
 import { EtatCompletSchema, type EtatComplet } from "@/server/generation/etat";
+import { CODES_ARRET } from "@/server/generation/raison-echec";
 import { requestIdDeVersion } from "@/server/generation/voyage-complet";
 import { creerSuiteVoyageComplet, DemarrageVoyageCompletError } from "@/server/payment/suite-voyage-complet";
 import { reprendreParLeStudio } from "../../scripts/reprise-studio";
@@ -30,6 +35,7 @@ import {
 import { creerBaseApercu, type BaseApercu } from "./base-apercu";
 import { closeAll, createOrg, inTx, type DbClient, type Org } from "./helpers";
 import { executeurSql } from "@/server/with-org";
+import { PLAFONDS_VARIANTE_SIMULEE, type PlafondsUsage } from "@/server/config/usage";
 
 /**
  * B9d (ticket #599 ; spécification B9, B9d ; décisions 0081 B9-TL-12, 0087 § 1.2 à § 1.7) : voyage complet après déblocage,
@@ -60,28 +66,23 @@ const ECHEC_FOURNISSEUR = { ok: false, code: "upstream_unavailable", retryable: 
 const ETAPES_JOUR = [etapeCompletRecherche, etapeCompletAncrage, etapeCompletNotation, etapeCompletPlanification] as const;
 
 /**
- * Plafonds de test du voyage complet : ceux de l'aperçu (`PLAFONDS_LARGES`) et un profil `complet` assez large pour quatre
- * jours (la part des étapes b à e est divisée par le nombre de jours du passage). Valeurs de test, sans lien avec les montants
- * réels (réservés à Samuel).
+ * Plafonds de test du voyage complet : ceux des bancs (`PLAFONDS_LARGES`, profil `complet` de la variante simulée, sans
+ * élargissement), avec un cumul par organisation et par jour élargi : plusieurs passages par voyage et par jour (reprises),
+ * chacun réserve son forfait. Valeurs de test, sans lien avec les montants réels (réservés à Samuel).
  */
-const PLAFONDS_COMPLET = {
-  ...PLAFONDS_LARGES,
-  // Plusieurs passages par voyage et par jour (reprises) : cumul par organisation et par jour élargi d'autant.
-  parOrganisationJourMicros: 500_000_000,
-  generations: { ...PLAFONDS_LARGES.generations, complet: { coutModelesMicros: 2_400_000, placesTextSearch: 300, placesDetails: 300, routesRequetes: 100, routesElements: 1_200 } },
-};
+const PLAFONDS_COMPLET: PlafondsUsage = { ...PLAFONDS_LARGES, parOrganisationJourMicros: 500_000_000 };
 
-const dependances = (fabrique?: () => FabriqueGeneration): DependancesGeneration => ({
+const dependances = (fabrique?: () => FabriqueGeneration, plafonds: PlafondsUsage = PLAFONDS_COMPLET): DependancesGeneration => ({
   transaction: creerWithSystemOrgPourTests(base.db),
   horloge: creerHorlogeManuelle(MAINTENANT),
-  plafonds: PLAFONDS_COMPLET,
+  plafonds,
   barriere: { env: { VADROUILLE_ENV: "ci" } },
   reserverEnSimulee: true,
   ...(fabrique === undefined ? {} : { composition: fabrique }),
 });
 
 /** Planification qui échoue (erreur passagère du fournisseur) à partir de l'appel numéro `apres` (0 : dès le premier jour). */
-const planificationEnEchec = (apres = 0) => {
+const planificationEnEchec = (apres = 0, echec: { readonly ok: false; readonly code: string; readonly retryable: boolean } = ECHEC_FOURNISSEUR) => {
   let appels = 0;
   return () => {
     const fabrique = composerSimuleeAvec({ doubles: () => doublesEdimbourg() });
@@ -93,7 +94,7 @@ const planificationEnEchec = (apres = 0) => {
           ...finale,
           planifier: async (...args: Parameters<typeof finale.planifier>) => {
             appels += 1;
-            return appels > apres ? ECHEC_FOURNISSEUR : finale.planifier(...args);
+            return appels > apres ? (echec as typeof ECHEC_FOURNISSEUR) : finale.planifier(...args);
           },
         };
       },
@@ -145,13 +146,13 @@ const etapesDuJour = (version: Lignes["versions"][number], jour: number) =>
   version.snapshot.days.find((d) => d.index === jour)?.items.filter((i) => i.type === "stop").length ?? 0;
 
 /** Aperçu publié d'un voyage de six jours, puis droit `tripUnlocked` (écrit par l'administrateur, comme le ferait B4a). */
-async function voyageDebloque(org: Org) {
+async function voyageDebloque(org: Org, draft: Parameters<typeof demandeEdimbourg>[0] = {}, plafondsApercu: PlafondsUsage = PLAFONDS_COMPLET) {
   const outils = adaptateur();
-  const r = await outils.adapter.createTrip(contexteDe(org), demandeEdimbourg());
-  expect(r.ok).toBe(true);
+  const r = await outils.adapter.createTrip(contexteDe(org), demandeEdimbourg(draft));
+  expect(r).toMatchObject({ ok: true });
   const tripId = (r as { value: { tripId: string } }).value.tripId;
   const apercu = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT id FROM public.generation_runs WHERE trip_id = $1 AND kind = 'preview'", [tripId])).rows[0].id as string);
-  expect((await derouler({ generationRunId: apercu, organizationId: org.org, rang: 0 }, dependances())).arret).toBeUndefined();
+  expect((await derouler({ generationRunId: apercu, organizationId: org.org, rang: 0 }, dependances(undefined, plafondsApercu))).arret).toBeUndefined();
   await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
   return { ...outils, tripId };
 }
@@ -207,6 +208,20 @@ describe("voyage complet (B9d) : démarrage une fois par droit, un jour publié 
     expect(await outils.adapter.getFullTripStatus(contexteDe(org), tripId)).toEqual({ ok: true, value: { phase: apres.complet[0]!.phase, tripId } });
     expect(outils.demarrerVoyageComplet).toHaveBeenCalledTimes(1);
     expect((await lignes(org, tripId)).complet).toHaveLength(1);
+  }, 120_000);
+
+  it("profil complet par défaut (valeurs de test) : un voyage de six jours va au bout sans plafond atteint", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const { fin } = await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances(undefined, PLAFONDS_LARGES));
+    // Le profil `complet` des bancs est celui de la variante simulée (valeur par défaut), sans élargissement propre au test.
+    expect(PLAFONDS_LARGES.generations.complet).toEqual(PLAFONDS_VARIANTE_SIMULEE.generations.complet);
+    expect(fin.arret).toBeUndefined();
+    const apres = await lignes(org, tripId);
+    expect(["ready", "incomplete"]).toContain(apres.complet[0]!.phase);
+    expect(apres.versions.at(-1)!.snapshot.days.filter((d) => d.index >= 3 && d.items.some((i) => i.type === "stop")).length).toBeGreaterThan(0);
   }, 120_000);
 
   it("étape rejouée après sa fin : la garde l'arrête, aucune version en double", async () => {
@@ -351,5 +366,368 @@ describe("voyage complet (B9d) : reprises sans second paiement, plafond et comma
     // Après une reprise du studio, un nouvel échec est bloqué d'emblée : un seul nouvel événement.
     expect((await deroulerComplet(entree, dependances(planificationEnEchec()))).fin.arret).toBe("upstream_unavailable");
     expect(evenementsBloques(espion)).toBe(2);
+  }, 180_000);
+});
+
+// --- Revue consolidée de la PR 600 (bloquant 2) : critères de B9d sur le workflow 4 ------------------------------------
+
+type Journal = { recherches: string[]; ancrages: string[] };
+
+/** Doubles d'Édimbourg observés : villes cherchées et ancrées ; recherche refusée ou interrompue pour une ville donnée. */
+const observee =
+  (journal: Journal, options: { readonly echoue?: (ville: string) => boolean; readonly pendant?: (ville: string) => Promise<void> } = {}) =>
+  (): FabriqueGeneration => {
+    const fabrique = composerSimuleeAvec({ doubles: () => doublesEdimbourg() });
+    return {
+      ...fabrique,
+      recherche: (o): CapaciteRecherche => {
+        const capacite = fabrique.recherche(o);
+        return {
+          async rechercher(...args) {
+            journal.recherches.push(args[1].nom);
+            await options.pendant?.(args[1].nom);
+            if (options.echoue?.(args[1].nom) === true) return ECHEC_FOURNISSEUR;
+            return capacite.rechercher(...args);
+          },
+        };
+      },
+      ancrage: (o): CapaciteAncrage => {
+        const capacite = fabrique.ancrage(o);
+        return {
+          async ancrer(...args) {
+            journal.ancrages.push(args[1]);
+            return capacite.ancrer(...args);
+          },
+        };
+      },
+    };
+  };
+
+/**
+ * Glasgow arrive le 24 (deuxième ville de l'aperçu), Londres le 26 : le changement de ville tombe en J4, pendant le complet.
+ * Quartiers maison (centre et rayon fabriqués, posés sur la zone des fixtures d'Édimbourg des doubles ; aucune donnée Google) :
+ * la zone de ces villes se résout sans appel.
+ */
+const quartier = (areaId: string) => ({ kind: "suggestedArea" as const, areaId, name: "[Quartier maison]", center: { lat: 55.95, lng: -3.19 }, radiusM: 3000 });
+const TROIS_VILLES = {
+  otherCities: [
+    { name: "Glasgow", arrival: "2026-11-24", lodging: quartier("area_test_1") },
+    { name: "Londres", arrival: "2026-11-26", lodging: quartier("area_test_2") },
+  ],
+};
+
+/**
+ * Voyage de trois villes : les requêtes Text Search du profil `complet` doublées. La part de l'étape `c` (80 % de 60) répartie sur deux villes
+ * laisse 24 requêtes par ville, moins que les candidats d'une ville des doubles d'Édimbourg (écart signalé au Tech Lead dans la
+ * PR 600). Valeurs de test.
+ */
+const PLAFONDS_TROIS_VILLES: PlafondsUsage = {
+  ...PLAFONDS_COMPLET,
+  generations: {
+    ...PLAFONDS_COMPLET.generations,
+    complet: { ...PLAFONDS_COMPLET.generations.complet, placesTextSearch: PLAFONDS_COMPLET.generations.complet.placesTextSearch * 2 },
+  },
+};
+
+async function recherchesDe(org: Org, generationRunId: string) {
+  return inTx(app, { org: org.org, user: org.owner }, async (c) =>
+    (
+      await c.query(
+        `SELECT r.id, (SELECT count(*)::int FROM public.candidates k WHERE k.research_run_id = r.id) AS candidats,
+           (SELECT array_agg(lower(k.name) ORDER BY k.name) FROM public.candidates k WHERE k.research_run_id = r.id) AS noms
+         FROM public.research_runs r WHERE r.generation_run_id = $1 ORDER BY r.started_at, r.id`,
+        [generationRunId],
+      )
+    ).rows as { id: string; candidats: number; noms: string[] | null }[],
+  );
+}
+
+const ligneComplete = async (org: Org, tripId: string) =>
+  (await admin.query("SELECT * FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2 AND kind = 'full'", [org.org, tripId])).rows[0] as Record<string, unknown>;
+
+describe("voyage complet (B9d) : plusieurs villes, changement de ville pendant le complet", () => {
+  it("chaque ville est cherchée et ancrée par le jour qui l'introduit ; reprise en cours de route : seule la ville manquante est cherchée", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org, TROIS_VILLES, PLAFONDS_TROIS_VILLES);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const entree: EtatComplet = { generationRunId: ligne.id, organizationId: org.org, rang: 0 };
+    const apercu = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT id FROM public.generation_runs WHERE trip_id = $1 AND kind = 'preview'", [tripId])).rows[0].id as string);
+    const recherchesApercu = await recherchesDe(org, apercu);
+    expect(recherchesApercu).toHaveLength(2);
+
+    // Passage 0 : J3 (Glasgow) publié ; J4 introduit Londres, dont la recherche échoue.
+    const premier: Journal = { recherches: [], ancrages: [] };
+    const { fin } = await deroulerComplet(entree, dependances(observee(premier, { echoue: (ville) => ville === "Londres" }), PLAFONDS_TROIS_VILLES));
+    expect(fin.arret).toBe("upstream_unavailable");
+    expect(premier.recherches).toEqual(["Glasgow", "Londres"]);
+    expect(premier.ancrages).toEqual(["Glasgow"]);
+    const apresEchec = await lignes(org, tripId);
+    expect(apresEchec.versions.at(-1)!.request_id).toBe(requestIdDeVersion({ id: ligne.id, reprisesPersonne: 0, reprisesStudio: 0 }, 3));
+    expect(etapesDuJour(apresEchec.versions.at(-1)!, 3)).toBeGreaterThan(0);
+    const recherches0 = await recherchesDe(org, ligne.id);
+    expect(recherches0).toHaveLength(1);
+    // La ville de rang 0 du complet (Glasgow) reprend les candidats de la ville de rang 1 de l'aperçu (`rangDansLApercu`).
+    for (const nom of recherchesApercu[1]!.noms ?? []) expect(recherches0[0]!.noms).toContain(nom);
+
+    // Reprise : le passage 1 commence en J4, qui introduit Glasgow et Londres ; seule Londres est cherchée.
+    expect(await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).toEqual({ ok: true, value: { tripId } });
+    const second: Journal = { recherches: [], ancrages: [] };
+    const { fin: fin2 } = await deroulerComplet(entree, dependances(observee(second), PLAFONDS_TROIS_VILLES));
+    expect(fin2.arret).toBeUndefined();
+    expect(second.recherches).toEqual(["Londres"]);
+    expect(second.ancrages.length).toBeGreaterThan(0);
+    expect(second.ancrages.every((ville) => ville === "Glasgow" || ville === "Londres")).toBe(true);
+    // J5 et J6 n'introduisent aucune ville : aucun ancrage de plus que les villes introduites en J4.
+    expect(second.ancrages.length).toBeLessThanOrEqual(2);
+    expect(await recherchesDe(org, ligne.id)).toHaveLength(2);
+
+    const finales = await lignes(org, tripId);
+    const passage1 = finales.versions.slice(apresEchec.versions.length);
+    expect(passage1[0]!.request_id).toBe(requestIdDeVersion({ id: ligne.id, reprisesPersonne: 1, reprisesStudio: 0 }, 4));
+    // J3 (passage 0) et J1, J2 (aperçu) gardés.
+    for (const j of [1, 2, 3]) expect(finales.versions.at(-1)!.snapshot.days.find((d) => d.index === j)).toEqual(apresEchec.versions.at(-1)!.snapshot.days.find((d) => d.index === j));
+    expect(["ready", "incomplete"]).toContain(finales.complet[0]!.phase);
+  }, 180_000);
+
+  it("contrôle de rang : une recherche écrite entre-temps pour l'exécution arrête l'étape b sans rien écrire", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org, TROIS_VILLES, PLAFONDS_TROIS_VILLES);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const intrus = async (ville: string) => {
+      if (ville !== "Londres") return;
+      await admin.query(
+        `INSERT INTO public.research_runs (organization_id, trip_id, generation_run_id, queries, pages_read, duration_ms, cost_estimate_micros, errors, started_at, finished_at)
+         VALUES ($1, $2, $3, '{}', 0, 0, 0, '{}', now(), now())`,
+        [org.org, tripId, ligne.id],
+      );
+    };
+    const { fin } = await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances(observee({ recherches: [], ancrages: [] }, { pendant: intrus }), PLAFONDS_TROIS_VILLES));
+    expect(fin.arret).toBe("invalid_input");
+    const recherches = await recherchesDe(org, ligne.id);
+    // La recherche de Glasgow et l'intruse ; aucune ligne ni aucun candidat pour Londres.
+    expect(recherches).toHaveLength(2);
+    expect(recherches[1]!.candidats).toBe(0);
+    expect((await lignes(org, tripId)).complet[0]).toMatchObject({ phase: "failed", stop_reason: "invalid_input" });
+  }, 180_000);
+});
+
+describe("voyage complet (B9d) : plafonds, reprises refusées et lecture du voyage", () => {
+  /** Profil `complet` réduit à dix fiches : la planification du premier jour (J3, deux fiches) dépasse sa part (`cap_reached`). */
+  const PLAFONDS_DIX_FICHES: PlafondsUsage = {
+    ...PLAFONDS_COMPLET,
+    generations: { ...PLAFONDS_COMPLET.generations, complet: { ...PLAFONDS_COMPLET.generations.complet, placesDetails: 10 } },
+  };
+
+  it("plafond atteint au jour 3 d'un voyage de six jours : jours 1 et 2 gardés, aucun jour à moitié planifié ; reprise de la personne refusée sans écriture, reprise du studio arrêtée de même, compteur de la personne intact", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const avant = await lignes(org, tripId);
+    const ligne = avant.complet[0]!;
+    const espion = vi.spyOn(console, "log");
+    const entree: EtatComplet = { generationRunId: ligne.id, organizationId: org.org, rang: 0 };
+    const { fin } = await deroulerComplet(entree, dependances(undefined, PLAFONDS_DIX_FICHES));
+    expect(fin.arret).toBe("cap_reached");
+    expect(fin.rang).toBe(6);
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]).toMatchObject({ phase: "failed", stop_reason: "cap_reached" });
+    // Aucune version écrite : les jours 1 et 2 de l'aperçu sont intacts, les jours 3 à 6 restent sans étape.
+    expect(apres.versions).toEqual(avant.versions);
+    for (const j of [3, 4, 5, 6]) expect(etapesDuJour(apres.versions.at(-1)!, j)).toBe(0);
+    // Cause non réessayable : bloquée d'emblée (un événement), « Réessayer » refusé dès la première reprise, sans écriture.
+    expect(evenementsBloques(espion)).toBe(1);
+    expect(await adapter.getFullTripStatus(contexteDe(org), tripId)).toEqual({ ok: true, value: { phase: "failed", tripId, retryable: false } });
+    const figee = await ligneComplete(org, tripId);
+    expect(await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).toEqual({ ok: false, error: expect.objectContaining({ code: "validation_failed" }) });
+    expect(await ligneComplete(org, tripId)).toEqual(figee);
+
+    // Reprise du studio sous les mêmes plafonds : acceptée (aucune condition de cause), puis arrêtée comme pour la personne.
+    const transaction = <T>(organizationId: string, travail: (x: ReturnType<typeof executeurSql>) => Promise<T>) =>
+      creerWithSystemOrgPourTests(base.db)(organizationId, (tx) => travail(executeurSql(tx)));
+    expect(await reprendreParLeStudio(["--organisation", org.org, "--voyage", tripId], { transaction })).toBe("repris");
+    const { fin: fin2 } = await deroulerComplet(entree, dependances(undefined, PLAFONDS_DIX_FICHES));
+    expect(fin2.arret).toBe("cap_reached");
+    const reprise = (await lignes(org, tripId)).complet[0]!;
+    expect(reprise).toMatchObject({ phase: "failed", stop_reason: "cap_reached", studio_retries: 1, reprises: [] });
+    expect((await lignes(org, tripId)).versions).toEqual(avant.versions);
+    expect(evenementsBloques(espion)).toBe(2);
+    expect(await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).toEqual({ ok: false, error: expect.objectContaining({ code: "validation_failed" }) });
+    expect((await lignes(org, tripId)).complet[0]!.reprises).toEqual([]);
+  }, 180_000);
+
+  it("quota refusé au jour 4 : J3 publié et gardé, J4 à J6 sans étape (aucun jour à moitié planifié)", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const { fin } = await deroulerComplet(
+      { generationRunId: ligne.id, organizationId: org.org, rang: 0 },
+      dependances(planificationEnEchec(1, { ok: false, code: "daily_quota_insufficient", retryable: false })),
+    );
+    expect(fin.arret).toBe("daily_quota_insufficient");
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]).toMatchObject({ phase: "failed", stop_reason: "daily_quota_insufficient" });
+    const derniere = apres.versions.at(-1)!;
+    expect(derniere.request_id).toBe(requestIdDeVersion({ id: ligne.id, reprisesPersonne: 0, reprisesStudio: 0 }, 3));
+    expect(etapesDuJour(derniere, 3)).toBeGreaterThan(0);
+    for (const j of [4, 5, 6]) expect(etapesDuJour(derniere, j)).toBe(0);
+  }, 180_000);
+
+  it("« Réessayer » sans droit tripUnlocked : refusé, sans écriture", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    expect((await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances(planificationEnEchec()))).fin.arret).toBe("upstream_unavailable");
+    await admin.query("DELETE FROM public.entitlements WHERE organization_id = $1 AND trip_id = $2", [org.org, tripId]);
+    const figee = await ligneComplete(org, tripId);
+    expect(await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).toEqual({ ok: false, error: expect.objectContaining({ code: "validation_failed" }) });
+    expect(await ligneComplete(org, tripId)).toEqual(figee);
+  }, 180_000);
+
+  it("deux écrivains concurrents (clôture sur erreur inattendue et expiration step_expired) : une seule écriture, un seul generation.full_stuck", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId, avancer } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const deps = dependances();
+    const etat = await etapeCompletDebut({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, deps);
+    expect(etat.arret).toBeUndefined();
+    // Ligne déjà reprise par le studio : tout échec la bloque, quel que soit l'écrivain gagnant.
+    await admin.query("UPDATE public.generation_runs SET studio_retries = 1 WHERE id = $1", [ligne.id]);
+    const espion = vi.spyOn(console, "log");
+    avancer(EXPIRATION_EXECUTION_MS + 1);
+    await Promise.all([etapeClotureComplet(etat, "upstream_unavailable", deps), adapter.getFullTripStatus(contexteDe(org), tripId), etapeClotureComplet(etat, "upstream_unavailable", deps)]);
+    expect((await lignes(org, tripId)).complet[0]!.phase).toBe("failed");
+    expect(evenementsBloques(espion)).toBe(1);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    expect(evenementsBloques(espion)).toBe(1);
+  }, 180_000);
+
+  it("clôture gardée par le rang : un ancien workflow ne clôt pas le passage suivant", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const deps = dependances();
+    // Ancien workflow arrêté après l'étape c du premier jour (rang 4).
+    let ancien: EtatComplet = { generationRunId: ligne.id, organizationId: org.org, rang: 0 };
+    for (const etape of [etapeCompletDebut, etapeCompletLogement, etapeCompletRecherche, etapeCompletAncrage]) ancien = await etape(ancien, deps);
+    expect(ancien.rang).toBe(4);
+    // La ligne passe en failed puis est reprise : le nouveau passage est à l'étape a.
+    await admin.query("UPDATE public.generation_runs SET phase = 'failed', stop_reason = 'step_expired', finished_at = now() WHERE id = $1", [ligne.id]);
+    expect((await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).ok).toBe(true);
+    expect((await etapeCompletDebut({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, deps)).arret).toBeUndefined();
+    await etapeClotureComplet(ancien, "upstream_unavailable", deps);
+    expect((await lignes(org, tripId)).complet[0]!.phase).toBe("preparing");
+  }, 180_000);
+
+  it("Day.generating : vrai pour un jour sans étape pendant l'exécution, faux après la fin", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    // Relectures permissives (les lieux des doubles d'Édimbourg ne sont pas dans la table du double des voyages simulés).
+    const relectures: SourceRelectures = {
+      pour: async () => ({ ok: true, relectures: { validite: () => "valide", plages: () => INCONNU, duree: () => ({ minutes: 10, estimee: true }) } }),
+    };
+    const voyages = createApiTripAdapter({ relectures, withOrg });
+    const enPreparation = async () => ((await voyages.getTrip(contexteDe(org), tripId))?.days ?? []).map((d) => [d.index, d.generating]);
+    const deps = dependances();
+    let etat: EtatComplet = { generationRunId: ligne.id, organizationId: org.org, rang: 0 };
+    for (const etape of [etapeCompletDebut, etapeCompletLogement, ...ETAPES_JOUR]) etat = await etape(etat, deps);
+    expect(etat.arret).toBeUndefined();
+    // J3 publié, J4 à J6 encore sans étape : en préparation.
+    expect(await enPreparation()).toEqual([
+      [1, false],
+      [2, false],
+      [3, false],
+      [4, true],
+      [5, true],
+      [6, true],
+    ]);
+    // Les trois jours restants (J4 à J6) : le dernier clôt la ligne.
+    for (const etape of Array.from({ length: 3 }, () => ETAPES_JOUR).flat()) etat = await etape(etat, deps);
+    expect(etat.arret).toBeUndefined();
+    expect(["ready", "incomplete"]).toContain((await lignes(org, tripId)).complet[0]!.phase);
+    expect(await enPreparation()).toEqual([1, 2, 3, 4, 5, 6].map((j) => [j, false]));
+  }, 180_000);
+});
+
+/** Liste interdite du handover back-end § 8 (« workflows : aucune donnée Google dans l'état sérialisé »). */
+const CLES_INTERDITES = [
+  "rating", "userRatingCount", "openingHours", "regularOpeningHours", "currentOpeningHours", "businessStatus", "priceLevel",
+  "photos", "phone", "nationalPhoneNumber", "internationalPhoneNumber", "address", "formattedAddress", "displayName", "reviews",
+  "lat", "lng", "latitude", "longitude", "location", "viewport", "duration", "staticDuration", "distanceMeters", "polyline",
+];
+
+function toutesLesCles(valeur: unknown, cles: Set<string> = new Set()): Set<string> {
+  if (Array.isArray(valeur)) for (const v of valeur) toutesLesCles(v, cles);
+  else if (valeur !== null && typeof valeur === "object") {
+    for (const [cle, v] of Object.entries(valeur)) {
+      cles.add(cle);
+      toutesLesCles(v, cles);
+    }
+  }
+  return cles;
+}
+
+describe("workflows: aucune donnée Google dans l'état sérialisé (workflow 4)", () => {
+  const verifier = (etats: readonly EtatComplet[]) => {
+    for (const etat of etats) {
+      const serialise = JSON.parse(JSON.stringify(etat)) as unknown;
+      expect(EtatCompletSchema.safeParse(serialise).success).toBe(true);
+      const cles = toutesLesCles(serialise);
+      for (const cle of cles) expect(["generationRunId", "organizationId", "rang", "arret"]).toContain(cle);
+      for (const interdite of CLES_INTERDITES) expect(cles.has(interdite)).toBe(false);
+      if (etat.arret !== undefined) expect(CODES_ARRET as readonly string[]).toContain(etat.arret);
+    }
+  };
+
+  it("entrées et sorties de chaque étape, voie nominale et erreur de fournisseur dont le message porte un lieu et une adresse", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const entree: EtatComplet = { generationRunId: ligne.id, organizationId: org.org, rang: 0 };
+
+    // Erreur de fournisseur au deuxième jour : son message (nom de lieu, adresse) ne sort pas de l'étape.
+    const SENTINELLE = "Musée Sentinelle, 12 Royal Mile, Edinburgh EH1 1AA";
+    let appels = 0;
+    const fabrique = (): FabriqueGeneration => {
+      const f = composerSimuleeAvec({ doubles: () => doublesEdimbourg() });
+      return {
+        ...f,
+        finale: (o) => {
+          const finale = f.finale(o);
+          return {
+            ...finale,
+            planifier: async (...args: Parameters<typeof finale.planifier>) => {
+              appels += 1;
+              if (appels > 1) throw new Error(SENTINELLE);
+              return finale.planifier(...args);
+            },
+          };
+        },
+      };
+    };
+    const echec = await deroulerComplet(entree, dependances(fabrique));
+    expect(echec.fin.arret).toBeDefined();
+    verifier([entree, ...echec.sorties]);
+    expect(JSON.stringify(echec.sorties)).not.toContain("Sentinelle");
+    const stop = (await lignes(org, tripId)).complet[0]!.stop_reason;
+    expect(CODES_ARRET as readonly string[]).toContain(stop);
+    const erreurs = await admin.query("SELECT errors::text AS e FROM public.research_runs WHERE generation_run_id = $1", [ligne.id]);
+    for (const { e } of erreurs.rows) expect(String(e)).not.toContain("Sentinelle");
+
+    // Reprise (par le studio : la cause peut ne pas être réessayable), puis voie nominale jusqu'au dernier jour.
+    const transaction = <T>(organizationId: string, travail: (x: ReturnType<typeof executeurSql>) => Promise<T>) =>
+      creerWithSystemOrgPourTests(base.db)(organizationId, (tx) => travail(executeurSql(tx)));
+    expect(await reprendreParLeStudio(["--organisation", org.org, "--voyage", tripId], { transaction })).toBe("repris");
+    const nominale = await deroulerComplet(entree, dependances());
+    expect(nominale.fin.arret).toBeUndefined();
+    verifier([entree, ...nominale.sorties]);
   }, 180_000);
 });
