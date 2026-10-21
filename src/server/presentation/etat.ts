@@ -8,12 +8,16 @@ import { optionsDesRepas } from "@/domain/recomposition";
 /**
  * État du tri d'un voyage, lu dans la transaction d'une action ou d'une lecture (spécification B10, B10a ; décision 0112
  * § 3). Chaque requête porte `organization_id = $1`, lié au contexte de la session (double vérification avec la RLS).
- * Aucun nom de lieu n'est lu : des cases, seuls l'identifiant d'étape, la nature, la catégorie, le jour, l'heure, le
- * verrou et, pour l'écriture d'une décision, le candidat et le `placeId` (seul identifiant Google stocké).
+ * Le contenu des cases (`proposals.content`) est lu en entier pour être validé par `ProposalRecordSchema`, mais aucun nom
+ * de lieu n'est écrit, journalisé ni renvoyé : des cases, seuls l'identifiant d'étape, la nature, la catégorie, le jour,
+ * l'heure, le verrou et, pour l'écriture d'une décision, le candidat et le `placeId` (seul identifiant Google stocké)
+ * sont gardés.
  *
  * **Le tri courant** (0112 § 3.4) : voyage non débloqué, les cases `preview` de la dernière exécution `preview` ; voyage
  * débloqué, les propositions `deck` de la dernière exécution qui en a écrit (B10d ; aucune en B10a). Une carte est dans
- * un tri clos si une clôture de même exécution et de même phase couvre sa position.
+ * un tri clos si une clôture de même exécution et de même phase couvre sa position. **Au déblocage**, tant qu'aucune
+ * proposition `deck` n'existe, le tri courant est celui de l'aperçu, **clos à la lecture** (0112 § 3.4, B10-PO-4 point 3) :
+ * `closed` vrai, sans carte, sans écriture.
  */
 
 export type Executeur = { query(texte: string, valeurs?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
@@ -58,6 +62,8 @@ export type EtatDuTri = {
   readonly signaux: readonly SignalDuVoyage[];
   readonly questions: readonly QuestionDuVoyage[];
   readonly enRecalcul: boolean;
+  /** Voyage débloqué sans proposition `deck` : le tri de l'aperçu est clos à la lecture (0112 § 3.4). */
+  readonly closAuDeblocage: boolean;
 };
 
 // --- Requêtes (constantes ; paramètres liés) ------------------------------------------------------------------
@@ -191,7 +197,7 @@ export async function lireEtatDuTri(executeur: Executeur, org: string, tripId: s
   const signaux = (await executeur.query(SQL_SIGNAUX, [org, tripId])).rows.map(signalDe);
   const questions = (await executeur.query(SQL_QUESTIONS, [org, tripId])).rows.map(questionDe);
   const enRecalcul = (await executeur.query(SQL_EN_RECALCUL, [org, tripId])).rows[0]?.en_recalcul === true;
-  return { phase, execution, dernierePosition, cartes, tris: { closes }, signaux, questions, enRecalcul };
+  return { phase, execution, dernierePosition, cartes, tris: { closes }, signaux, questions, enRecalcul, closAuDeblocage: debloque && execution === null };
 }
 
 // --- Vues du tri -----------------------------------------------------------------------------------------
@@ -206,8 +212,12 @@ export function signauxDuTri(etat: EtatDuTri): SignalLu[] {
   return etat.signaux.filter((signal) => signal.proposition === null || lignes.has(signal.proposition));
 }
 
-/** Le tri courant est clos : il a des cartes, et toutes sont dans un tri clos. */
+/**
+ * Le tri courant est clos : tri de l'aperçu d'un voyage débloqué sans proposition `deck` (clos à la lecture, 0112 § 3.4),
+ * ou tri qui a des cartes, toutes dans un tri clos.
+ */
 export function triClos(etat: EtatDuTri): boolean {
+  if (etat.closAuDeblocage) return true;
   return etat.cartes.length > 0 && etat.cartes.every((carte) => etat.tris.closes.has(carte.id));
 }
 

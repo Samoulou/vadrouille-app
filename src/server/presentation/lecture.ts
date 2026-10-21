@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AdapterContext } from "@/adapters/types";
 import { DeckSessionSchema, type DeckSession } from "@/contracts";
+import { logEvent } from "@/server/log";
 import { identifiantLisible } from "@/server/voyages/conversion";
 import { echec } from "@/server/voyages/erreurs";
 import { transactionDeLecture } from "@/server/voyages/lecture";
@@ -12,11 +13,13 @@ import { EtatDuTriInvalide, lireEtatDuTri, sessionDuTri } from "./etat";
 /**
  * Lecture de l'état du tri pour l'écran (`TripAdapter.getDeckSession` de l'adaptateur `api` ; décision 0112 § 4 point 1)
  * : une transaction `withOrg` en lecture seule, sans verrou. Voyage inconnu ou d'une autre organisation : `null`. Toute
- * autre erreur rejette, en erreur fermée de la lecture (`output_invalid` ou `unavailable`, aucun repli silencieux vers la session locale), **sauf** l'absence du schéma du tri enregistré
- * (migration `0014_tri_enregistre` pas encore appliquée à la base : SQLSTATE `42P01` table absente, `42703` colonne
- * absente) : `null`, l'écran garde alors la session en mémoire de F6 comme sur `mock` et `prototype` (B10-PO-18), et les
- * actions du tri ne sont jamais appelées. Écart déclaré à 0112 § 4 point 1 (PR de B10a), retiré quand la migration est
- * appliquée partout.
+ * autre erreur rejette, en erreur fermée de la lecture (`output_invalid` ou `unavailable`, aucun repli silencieux vers la
+ * session locale), **sauf** l'absence du schéma du tri enregistré (migration `0014_tri_enregistre` pas encore appliquée à
+ * la base : SQLSTATE `42P01` table absente, `42703` colonne absente) : `null`, l'écran garde alors la session en mémoire
+ * de F6 comme sur `mock` et `prototype` (B10-PO-18), et les actions du tri ne sont jamais appelées. Ce repli est
+ * **journalisé** (`presentation.deck_schema_missing`, niveau `warn`, identifiant du voyage seul) : il n'est jamais muet.
+ * Écart à 0112 § 4 point 1 décidé par l'**amendement 1 de 0112** (portée, condition de retrait, perte des décisions en
+ * mémoire tant que 0014 n'est pas appliquée) ; retiré quand la migration est appliquée sur toutes les bases.
  */
 
 type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>) => Promise<T>;
@@ -50,7 +53,11 @@ export function creerLectureDuTri(dependances: { readonly withOrg?: FonctionWith
       return session === null ? null : DeckSessionSchema.parse(session);
     } catch (erreur) {
       const code = codeSql(erreur);
-      if (code !== undefined && SCHEMA_ABSENT.has(code)) return null;
+      if (code !== undefined && SCHEMA_ABSENT.has(code)) {
+        // Repli de l'amendement 1 de 0112 : visible dans le journal (code et message de la base jamais écrits).
+        logEvent("presentation.deck_schema_missing", { tripId }, "warn");
+        return null;
+      }
       // Erreur fermée de la lecture, journalisée avec l'identifiant du voyage seul (ni message ni pile de la base).
       throw erreur instanceof EtatDuTriInvalide ? echec("output_invalid", { tripId }) : echec("unavailable", { tripId }, "base");
     }

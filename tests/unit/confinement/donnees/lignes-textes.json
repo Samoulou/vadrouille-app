@@ -146,7 +146,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (B10a, ticket 618 ; spécification B10, B10a points 2 à 4 ; décision 0112 § 2 point 3), modèle accepté par 0040 D4 ; verdict Sécurité attendu à la revue de la PR"
+      "ecart": "ligne ordinaire de portée application (B10a, ticket 618 ; spécification B10, B10a points 2 à 4 ; décision 0112 § 2 point 3), modèle accepté par 0040 D4 ; verdict Sécurité : approuvé (revue de la PR #621)"
     },
     {
       "fichier": "src/adapters/prototype.test.ts",

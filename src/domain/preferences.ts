@@ -55,11 +55,17 @@ export function ordreDuPaquet<T extends CarteTriable>(cartes: readonly T[]): T[]
     .map(({ carte }) => carte);
 }
 
-/** Dernière option de son créneau parmi `cartes` : aucune autre option du même créneau d'index plus grand. */
-export function estDerniereOption(carte: CarteTriable, cartes: readonly CarteTriable[]): boolean {
+/**
+ * Dernière option de son créneau (F6-PO-7) : dans `paquet`, rangé dans l'ordre de F6-PO-1 (`ordreDuPaquet`), aucune carte
+ * du même créneau ne vient après elle. Règle unique de « Pas pour moi » plutôt qu'« Option suivante » : le navigateur la lit
+ * sur les cartes de son paquet (déjà dans cet ordre, autres options d'un créneau choisi retirées), le serveur sur
+ * `ordreDuPaquet` des cartes du tri (décision 0112 § 2 ; revue de la PR 621, mineur 14). Une carte absente du paquet
+ * (verrouillée) n'est jamais la dernière option.
+ */
+export function estDerniereOption(carte: CarteTriable, paquet: readonly CarteTriable[]): boolean {
   if (carte.kind !== "meal") return false;
-  const index = carte.option?.index ?? 0;
-  return !cartes.some((autre) => autre.id !== carte.id && memeCreneau(carte, autre) && (autre.option?.index ?? 0) > index);
+  const rang = paquet.findIndex((autre) => autre.id === carte.id);
+  return rang !== -1 && !paquet.slice(rang + 1).some((autre) => memeCreneau(carte, autre));
 }
 
 // --- Question de préférence (F6-PO-8, F6-PO-9, B10-PO-5) -------------------------------------------------------
@@ -116,7 +122,10 @@ export function categoriesArretees(signaux: readonly PreferenceSignal[]): Set<Ca
  * Paquet de reprise d'un tri ouvert (B10-PO-4 point 2) : les cartes sans décision active, moins les activités d'une
  * catégorie confirmée « on arrête », moins **toutes** les options d'un créneau de repas réglé (« Je choisis » actif sur
  * l'une, ou « Pas pour moi » actif sur la dernière), moins les cartes d'un tri clos ; dans l'ordre de F6-PO-1. Dans un
- * créneau non réglé, la première option sans décision vient en premier (ordre des options).
+ * créneau non réglé, **toutes** les options sans décision y restent, la première d'entre elles en premier (ordre des
+ * options). Le paquet de reprise ne fixe aucun ordre de décision : le serveur admet une décision sur n'importe quelle
+ * carte du paquet (par exemple l'option 3 d'un créneau dont l'option 1 n'a pas de décision, autre onglet ou requête
+ * forgée) ; seul l'écran présente les options dans l'ordre.
  */
 export function paquetDeReprise<T extends CarteTriable>(propositions: readonly T[], signaux: readonly PreferenceSignal[], tris: EtatDesTris): T[] {
   const decisions = new Map<string, PreferenceSignal>();

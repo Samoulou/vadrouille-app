@@ -118,8 +118,13 @@ describe("présentation: paquet de reprise (règle pure, B10-PO-4)", () => {
   });
 
   it("dernière option d'un créneau", () => {
-    expect(estDerniereOption(cartes[5]!, cartes)).toBe(true);
-    expect(estDerniereOption(cartes[3]!, cartes)).toBe(false);
-    expect(estDerniereOption(cartes[0]!, cartes)).toBe(false);
+    const paquet = ordreDuPaquet(cartes);
+    expect(estDerniereOption(cartes[5]!, paquet)).toBe(true);
+    expect(estDerniereOption(cartes[3]!, paquet)).toBe(false);
+    expect(estDerniereOption(cartes[0]!, paquet)).toBe(false);
+    // Options suivantes retirées du paquet (« Je choisis » ailleurs, carte verrouillée) : l'option restante est la dernière.
+    expect(estDerniereOption(cartes[4]!, paquet.filter((c) => c.id !== "r3"))).toBe(true);
+    // Carte absente du paquet : jamais la dernière option.
+    expect(estDerniereOption(cartes[5]!, paquet.filter((c) => c.id !== "r3"))).toBe(false);
   });
 });

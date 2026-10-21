@@ -11,7 +11,7 @@ import {
   type PreferencePrompt,
   type UndoDecisionResult,
 } from "@/contracts";
-import { estDerniereOption, paquetDeReprise, questionApres, type SignalLu } from "@/domain/preferences";
+import { estDerniereOption, ordreDuPaquet, paquetDeReprise, questionApres, type SignalLu } from "@/domain/preferences";
 import { executerActionVoyage, RefusAction, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
 
 import {
@@ -35,7 +35,8 @@ import {
  * contrôle du voyage dans l'organisation (cadre), **puis** verrou du tri du voyage (0112 § 3.6 et § 3.8 : jamais pris
  * pour un voyage d'une autre organisation), puis refus pendant un recalcul (`generation_in_progress`, 0112 § 1.6), puis
  * idempotence par `requestId`, puis contrôles et écritures. Tout refus (`RefusAction`) annule la transaction : **rien
- * n'est écrit**. Aucun nom de lieu n'est lu ni écrit ; seul le `placeId` de la case décidée l'est (B10a point 2). Les
+ * n'est écrit**. Le contenu des cases est lu pour être validé, mais aucun nom de lieu n'est écrit, journalisé ni renvoyé ;
+ * seul le `placeId` de la case décidée est écrit (B10a point 2). Les
  * journaux sont ceux du cadre (`voyages.action_failed` : nom de l'action, classe de l'erreur, voyage).
  */
 
@@ -54,7 +55,8 @@ const SQL_ANNULER_SIGNAL = `UPDATE public.preference_signals
   WHERE organization_id = $1 AND trip_id = $2 AND id = $3 AND status <> 'cancelled'`;
 
 const SQL_POSER_QUESTION = `INSERT INTO public.preference_prompts (organization_id, trip_id, kind, category, trigger_signal_id, state)
-  VALUES ($1, $2, 'category', $3, $4, 'open')`;
+  VALUES ($1, $2, 'category', $3, $4, 'open')
+  ON CONFLICT DO NOTHING RETURNING id`;
 
 const SQL_ETAT_QUESTION = `UPDATE public.preference_prompts SET state = $4, answer_signal_id = $5, updated_at = now()
   WHERE organization_id = $1 AND trip_id = $2 AND id = $3`;
@@ -87,7 +89,7 @@ const questionsPosees = (etat: EtatDuTri): PreferencePrompt[] => etat.questions.
 /** Décision de carte demandée → signal enregistré, selon la nature de la carte (B10-PO-2 point 1), sinon refus. */
 function decisionAdmise(carte: CarteDuTri, decision: string, cartes: readonly CarteDuTri[]): boolean {
   if (carte.kind === "activity") return decision === "like" || decision === "dislike";
-  const derniere = estDerniereOption(carte, cartes);
+  const derniere = estDerniereOption(carte, ordreDuPaquet(cartes));
   if (decision === "choose") return true;
   if (decision === "nextOption") return !derniere;
   if (decision === "dislike") return derniere;
@@ -104,17 +106,28 @@ function signalParRequete(etat: EtatDuTri, requestId: string): SignalDuVoyage | 
   return etat.signaux.find((signal) => signal.requestId === requestId);
 }
 
+/**
+ * `requestId` déjà servi à une annulation (`cancel_request_id`, 0112 § 3.1) : il ne désigne plus jamais une autre requête
+ * (décision, réponse ou autre annulation), sinon `validation_failed`.
+ */
+function annulationParRequete(etat: EtatDuTri, requestId: string): boolean {
+  return etat.signaux.some((signal) => signal.annulation === requestId);
+}
+
 export function deciderCarte(dependances: DependancesAction, entree: unknown) {
   return executerActionVoyage("decide-card", dependances, DeckDecisionSchema, entree, async (executeur, ctx, valeur): Promise<DeckDecisionResult> => {
     const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId };
     const etat = await ouvrir(contexte);
 
-    // Même `requestId` : même résultat, aucune seconde ligne ; contenu différent : refus.
+    // Même `requestId` : même résultat, aucune seconde ligne ; contenu différent : refus. Une décision rejouée après son
+    // annulation rend aussi `ok`, sans question (aucune n'est plus ouverte par elle) et avec les compteurs courants :
+    // la réponse décrit l'état, pas une nouvelle écriture (0112 § 1.2) ; la ligne reste `cancelled`.
     const deja = signalParRequete(etat, valeur.requestId);
     if (deja !== undefined) {
       if (deja.signal !== valeur.decision || deja.proposalId !== valeur.proposalId || deja.proposition === null) throw refus();
       return { prompt: questionOuverteDe(etat, deja), counts: compteurs(etat) };
     }
+    if (annulationParRequete(etat, valeur.requestId)) throw refus();
 
     // La carte doit être une carte du paquet de reprise du tri ouvert (B10-PO-4) : une seule case de cet identifiant,
     // non verrouillée, sans décision active, hors catégorie arrêtée et hors créneau réglé (B10-PO-2 point 4).
@@ -151,7 +164,10 @@ export function deciderCarte(dependances: DependancesAction, entree: unknown) {
     };
     const prompt = questionApres([...etat.signaux, decision], questionsPosees(etat), decision);
     if (prompt !== null && prompt.kind === "category") {
-      await executeur.query(SQL_POSER_QUESTION, [contexte.org, contexte.tripId, prompt.category, ligne]);
+      const posee = await executeur.query(SQL_POSER_QUESTION, [contexte.org, contexte.tripId, prompt.category, ligne]);
+      // Conflit d'unicité (question déjà posée pour la catégorie, ou déjà ouverte) : filet sous le verrou, refus sans
+      // écriture, jamais `internal` (0112 § 3.6).
+      if (posee.rows.length !== 1) throw refus();
     }
     return { prompt, counts: compteurs(await relire(contexte)) };
   });
@@ -178,8 +194,8 @@ export function annulerDecision(dependances: DependancesAction, entree: unknown)
     }
     // Seule la dernière décision du tri ouvert s'annule (B10-PO-6) ; un tri clos n'en a aucune.
     if (derniereDecision(etat)?.ligne !== decision.ligne) throw refus();
-    // Le `requestId` de l'annulation ne doit désigner aucune autre requête du voyage.
-    if (signalParRequete(etat, valeur.requestId) !== undefined) throw refus();
+    // Le `requestId` de l'annulation ne doit désigner aucune autre requête du voyage (décision, réponse, autre annulation).
+    if (signalParRequete(etat, valeur.requestId) !== undefined || annulationParRequete(etat, valeur.requestId)) throw refus();
 
     await executeur.query(SQL_ANNULER_SIGNAL, [contexte.org, contexte.tripId, decision.ligne, valeur.requestId]);
     // La question qu'elle a déclenchée est retirée, et sa réponse éventuelle annulée (B10-PO-5 point 4, B10-PO-6).
@@ -212,6 +228,7 @@ export function repondreQuestion(dependances: DependancesAction, entree: unknown
         if (deja.signal !== signal || deja.category !== categorie || deja.reason !== valeur.reason || deja.proposition !== null) throw refus();
         return { next: null, counts: compteurs(etat) };
       }
+      if (annulationParRequete(etat, valeur.requestId)) throw refus();
 
       // Seule la question ouverte du tri, posée par le serveur, accepte une réponse (B10-PO-5 point 3) ; la question de
       // distance n'est jamais posée avant B10f (B10-PO-16 point 5).

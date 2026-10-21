@@ -103,6 +103,19 @@ describe("lint: règles du tri partagées sans zod (B10a)", () => {
     expect(await messagesFor('import { x } from "../../domain/calculs";\nexport const y = x;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
   });
 
+  it("depuis src/features/presentation, @/server/actions/presentation s'importe ; un autre module de src/server est refusé (0112 § 2 point 4, 0020 § 11)", async () => {
+    const ACTIONS = "src/features/presentation/server-actions.ts";
+    expect(await messagesFor('import { decideCard } from "@/server/actions/presentation";\nexport const x = decideCard;\n', ACTIONS, IMPORTS)).toHaveLength(0);
+    for (const code of [
+      'import { deciderCarte } from "@/server/presentation/tri";\nexport const x = deciderCarte;\n',
+      'import { creerLectureDuTri } from "@/server/presentation/lecture";\nexport const x = creerLectureDuTri;\n',
+      'import { executerActionVoyage } from "@/server/voyages/actions";\nexport const x = executerActionVoyage;\n',
+      'import { x } from "../../server/presentation/etat";\nexport const y = x;\n',
+    ]) {
+      expect(await messagesFor(code, ACTIONS, IMPORTS), code).not.toHaveLength(0);
+    }
+  });
+
   it("les interdictions de 0016 § 3.1 tiennent toujours dans src/features", async () => {
     expect(await messagesFor('import { z } from "zod";\nexport const x = z;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
     expect(await messagesFor('import { PreferencePromptSchema } from "@/contracts";\nexport const x = PreferencePromptSchema;\n', ECRAN, IMPORTS)).not.toHaveLength(0);

@@ -1,5 +1,5 @@
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason, Proposal } from "@/contracts";
-import { memeCreneau, ordreDuPaquet } from "@/domain/preferences";
+import { estDerniereOption, memeCreneau, ordreDuPaquet } from "@/domain/preferences";
 
 /**
  * État du paquet de la présentation (spécification F6, décision 0013 § 3.2) : réducteur pur et
@@ -64,6 +64,12 @@ export function initDeck(proposals: readonly Proposal[]): DeckState {
 export type DeckEvent =
   | { type: "decide"; decision: Decision }
   | { type: "resolved"; prompt: PreferencePrompt | null }
+  /**
+   * Décision en attente non enregistrée par le tri enregistré (revue de la PR 621, bloquant 6). `keep` : la carte reste
+   * (recalcul en cours, B10-PO-14, ou échec) : l'état d'avant la décision revient, sans toast d'annulation. Sinon (carte
+   * déjà décidée ailleurs, B10-PO-2 point 4) : le paquet passe à la carte suivante, sans toast ni question.
+   */
+  | { type: "rejected"; keep: boolean }
   | { type: "answer"; prompt: PreferencePrompt; answer: PreferenceAnswer; next: PreferencePrompt | null }
   | { type: "dismissPrompt" }
   | { type: "keepDay" }
@@ -82,11 +88,13 @@ const coreOf = (state: DeckState): DeckCore => ({
 
 export const currentCard = (state: DeckState): Proposal | undefined => state.cards[state.index];
 
-/** Dernière option du créneau de la carte en cours (aucune option du même créneau après elle). */
+/**
+ * Dernière option du créneau de la carte en cours (aucune option du même créneau après elle dans le paquet). Règle de
+ * `@/domain/preferences` (`estDerniereOption`, décision 0112 § 2), la même que celle du serveur.
+ */
 export function isLastOption(state: DeckState): boolean {
   const card = currentCard(state);
-  if (!card || card.kind !== "meal") return false;
-  return !state.cards.slice(state.index + 1).some((other) => sameMealSlot(card, other));
+  return card !== undefined && estDerniereOption(card, state.cards);
 }
 
 export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
@@ -116,6 +124,10 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
     }
     case "resolved":
       return state.pending ? { ...state, pending: false, prompt: event.prompt } : state;
+    case "rejected":
+      if (!state.pending) return state;
+      if (event.keep && state.undo?.decision) return { ...state.undo.snapshot, pending: false, undo: null };
+      return { ...state, pending: false, prompt: null, undo: null };
     case "answer": {
       if (!state.prompt) return state;
       const { prompt } = event;

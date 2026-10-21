@@ -459,6 +459,79 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
     expect(actions.complete).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [false, "apercu"],
+    [true, "suite"],
+  ] as const)("tri clos à l'ouverture (débloqué : %s) : « Tu as fini ce tri… », jamais « Tu as tout trié »", (unlocked, variante) => {
+    setup({ unlocked, proposals: [], deck: session([], 0, { closed: true }), actions: actionsEspion().actions });
+    const fin = document.querySelector("[data-deck-end]");
+    expect(fin).toHaveAttribute("data-deck-end", variante);
+    expect(fin).toHaveAttribute("data-deck-closed");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Tu as fini ce tri. Le reste est gardé dans ton programme.");
+    expect(screen.queryByText("Tu as tout trié")).toBeNull();
+  });
+
+  it("la feuille rouverte au chargement, fermée sans réponse : le focus revient sur la carte", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsEspion().actions });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Fermer" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(card()));
+  });
+
+  /** Actions dont la décision (ou la réponse) n'est pas enregistrée, avec le refus donné. */
+  function actionsRefusees(refus: "recalcul" | "echec" | "dejaDecidee") {
+    return {
+      decide: vi.fn(async () => ({ prompt: null, refus })),
+      undo: vi.fn(async () => undefined),
+      answerPrompt: vi.fn(async () => ({ next: null, refus })),
+      complete: vi.fn(async () => undefined),
+    };
+  }
+  const annonce = () => document.querySelector("[data-announce]");
+
+  it.each([
+    ["recalcul", "generating", "Ça se prépare, réessaie dans un instant."],
+    ["echec", "error", "Ce choix n'a pas été enregistré. Réessaie."],
+  ] as const)("décision non enregistrée (%s) : la carte reste, bandeau %s annoncé, aucun toast d'annulation", async (refus, kind, texte) => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees(refus) });
+    const avant = cardName();
+    await click("J'aime");
+    expect(cardName()).toBe(avant);
+    expect(progress()).toHaveAccessibleName("Proposition 1 sur 8");
+    const bandeau = document.querySelector(`[data-kind='${kind}']`);
+    expect(bandeau).toHaveTextContent(texte);
+    expect(annonce()).toHaveTextContent(texte);
+    expect(annonce()).toHaveAttribute("role", "status");
+    expect(toast()).toBeNull();
+    // Un nouveau geste, refusé de même, le redit (le bandeau est effacé au geste, puis reposé) ; la carte ne bouge pas.
+    await click("J'aime");
+    expect(cardName()).toBe(avant);
+    expect(annonce()).toHaveTextContent(texte);
+  });
+
+  it("décision refusée parce que la carte est déjà décidée ailleurs : le paquet avance, sans bandeau ni toast", async () => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees("dejaDecidee") });
+    const avant = cardName();
+    await click("J'aime");
+    expect(cardName()).not.toBe(avant);
+    expect(document.querySelector("[data-kind='generating'], [data-kind='error']")).toBeNull();
+    expect(toast()).toBeNull();
+  });
+
+  it("réponse non enregistrée (recalcul) : la feuille se ferme, le paquet ne change pas, le bandeau le dit", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsRefusees("recalcul") });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Oui" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(progress()).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+    expect(annonce()).toHaveTextContent("Ça se prépare, réessaie dans un instant.");
+  });
+
   it("« Passer » clôt le tri enregistré", async () => {
     const { actions } = actionsEspion();
     setup({ deck: session(propositions.map((p) => p.id), 0), actions });

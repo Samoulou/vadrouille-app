@@ -21,13 +21,24 @@ export interface DeckDecisionInput {
   lastOption?: boolean;
 }
 
+/**
+ * Décision ou réponse **non enregistrée** par le tri enregistré (B10-PO-14, B10-PO-2 point 4 ; revue de la PR 621,
+ * bloquant 6) ; jamais rendue par la session locale :
+ * - `recalcul` : refus `generation_in_progress` (un recalcul du voyage est en cours) ; la carte reste, l'écran le dit ;
+ * - `echec` : réseau perdu ou erreur du serveur ; la carte reste, l'écran le dit ;
+ * - `dejaDecidee` : décision refusée `validation_failed` (carte déjà décidée ailleurs, tri clos dans un autre onglet) ;
+ *   l'écran passe à la carte suivante sans rien proposer d'annuler (B10-PO-2 point 4) ; pour une réponse, la question
+ *   n'est plus ouverte et la feuille se ferme.
+ */
+export type RefusDuTri = "recalcul" | "echec" | "dejaDecidee";
+
 export interface DeckActions {
-  /** Enregistre la décision et renvoie la question de préférence éventuelle. */
-  decide(input: DeckDecisionInput): Promise<{ prompt: PreferencePrompt | null }>;
+  /** Enregistre la décision et renvoie la question de préférence éventuelle, ou le refus qui l'a empêchée. */
+  decide(input: DeckDecisionInput): Promise<{ prompt: PreferencePrompt | null; refus?: RefusDuTri }>;
   /** Annule la dernière décision, y compris la réponse à la question qu'elle a déclenchée. */
   undo(input: { proposalId: string }): Promise<void>;
-  /** Enregistre la réponse et renvoie la question suivante éventuelle (distance). */
-  answerPrompt(prompt: PreferencePrompt, answer: PreferenceAnswer): Promise<{ next: PreferencePrompt | null }>;
+  /** Enregistre la réponse et renvoie la question suivante éventuelle (distance), ou le refus qui l'a empêchée. */
+  answerPrompt(prompt: PreferencePrompt, answer: PreferenceAnswer): Promise<{ next: PreferencePrompt | null; refus?: RefusDuTri }>;
   /**
    * Clôt le tri (« Passer » ou fin du paquet, B10-PO-4 point 3). Absente en local : la session en mémoire n'a pas de
    * tri à clore (F6-PO-15) ; l'implémentation serveur appelle `completeDeck` (B10a, décision 0112 § 1.4).

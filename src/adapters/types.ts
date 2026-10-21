@@ -72,7 +72,7 @@ export interface TripAdapter {
    * État du tri enregistré (spécification B10, B10a point 5 ; décision 0112 § 4 point 1). `mock` et `prototype` :
    * toujours `null` (l'écran garde la session en mémoire de F6, B10-PO-18). `api` : un `DeckSession` pour tout voyage
    * de l'organisation, même sans carte ; `null` pour un voyage inconnu ou d'une autre organisation, et tant que la
-   * migration du tri enregistré n'est pas appliquée à la base (écart déclaré de la PR de B10a).
+   * migration du tri enregistré n'est pas appliquée à la base (repli journalisé, amendement 1 de la décision 0112).
    */
   getDeckSession(ctx: AdapterContext, tripId: string): Promise<DeckSession | null>;
 }

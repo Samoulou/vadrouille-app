@@ -196,6 +196,37 @@ describe("présentation: une décision est enregistrée une fois par requestId",
     expect(refuse(await decider(tripId, "m1", "dislike", requestId))).toEqual(valide);
     expect(await nombre(a, "preference_signals", tripId)).toBe(1);
   });
+
+  it("décision rejouée après son annulation : ok, sans question, compteurs courants ; la ligne reste cancelled, aucune seconde ligne", async () => {
+    const tripId = await nouveauVoyage();
+    await decider(tripId, "m1", "dislike");
+    const declencheur = randomUUID();
+    const premiere = await decider(tripId, "m2", "dislike", declencheur);
+    expect(premiere.ok && premiere.value.prompt).toEqual({ kind: "category", category: "museum" });
+    expect((await annuler(tripId, declencheur)).ok).toBe(true);
+    const rejouee = await decider(tripId, "m2", "dislike", declencheur);
+    expect(rejouee.ok && rejouee.value).toEqual({ prompt: null, counts: { decided: 1, remaining: 8 } });
+    const signaux = await lignes(a, "preference_signals", tripId);
+    expect(signaux).toHaveLength(2);
+    expect(signaux.find((s) => s.request_id === declencheur)?.status).toBe("cancelled");
+  });
+
+  it("un requestId d'annulation ne sert plus ni à une décision, ni à une réponse, ni à une autre annulation", async () => {
+    const tripId = await nouveauVoyage();
+    const decision = randomUUID();
+    await decider(tripId, "m1", "like", decision);
+    const annulation = randomUUID();
+    expect((await annuler(tripId, decision, annulation)).ok).toBe(true);
+    const avant = await toutes(tripId);
+    expect(refuse(await decider(tripId, "n1", "like", annulation))).toEqual(valide);
+    await decider(tripId, "m1", "dislike");
+    const autre = randomUUID();
+    await decider(tripId, "m2", "dislike", autre);
+    expect(refuse(await repondre(tripId, "museum", "no", { requestId: annulation }))).toEqual(valide);
+    expect(refuse(await annuler(tripId, autre, annulation))).toEqual(valide);
+    expect(await nombre(a, "preference_signals", tripId)).toBe(avant.signaux + 2);
+    expect((await session(tripId)).openPrompt).toEqual({ kind: "category", category: "museum" });
+  });
 });
 
 describe("présentation: un voyage d'une autre organisation n'est jamais touché", () => {
@@ -333,10 +364,15 @@ describe("présentation: le tri reprend à la première carte non triée", () =>
     expect(refuse(await decider(tripId, "n2", "like"))).toEqual(valide);
   });
 
-  it("voyage débloqué : le tri de l'aperçu est clos à la lecture (aucune carte deck en B10a)", async () => {
+  it("voyage débloqué : le tri de l'aperçu est clos à la lecture (aucune carte deck en B10a), sans écriture", async () => {
     const tripId = await nouveauVoyage(a, { debloque: true });
-    expect(await session(tripId)).toEqual({ tripId, proposalIds: [], openPrompt: null, closed: false, counts: { decided: 0, remaining: 0 } });
+    const clos = { tripId, proposalIds: [], openPrompt: null, closed: true, counts: { decided: 0, remaining: 0 } };
+    expect(await session(tripId)).toEqual(clos);
     expect(refuse(await decider(tripId, "m1", "like"))).toEqual(valide);
+    // « Passer » sur un tri déjà clos (0112 § 3.4) : même réponse, aucune clôture écrite.
+    const fin = await clore(tripId);
+    expect(fin.ok && fin.value.deck).toEqual(clos);
+    expect(await toutes(tripId)).toEqual({ signaux: 0, questions: 0, clotures: 0 });
   });
 });
 
@@ -490,9 +526,13 @@ describe("présentation: même règle en local et sur le serveur (suite commune,
 
 describe("lecture de l'état du tri : schéma absent", () => {
   it("une table du tri absente (migration non appliquée) : null, la session reste locale ; une autre erreur rejette", async () => {
+    const journal: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void journal.push(args.map(String).join(" ")));
     const absente = Object.assign(new Error("relation absente"), { cause: { code: "42P01" } });
     const lecture = creerLectureDuTri({ withOrg: async () => Promise.reject(absente) });
     expect(await lecture(ctxA, "00000000-0000-4000-8000-000000000001")).toBeNull();
+    // Repli journalisé (amendement 1 de 0112) : identifiant du voyage seul, ni code ni message de la base.
+    expect(journal).toEqual([JSON.stringify({ level: "warn", event: "presentation.deck_schema_missing", tripId: "00000000-0000-4000-8000-000000000001" })]);
     const autre = creerLectureDuTri({ withOrg: async () => Promise.reject(Object.assign(new Error("panne"), { code: "08006" })) });
     await expect(autre(ctxA, "00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({ name: "LectureVoyageError", reason: "unavailable" });
   });
