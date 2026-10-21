@@ -405,6 +405,8 @@ export const proposals = pgTable(
       t.phase,
       t.position,
     ),
+    // B10a (décision 0112 § 3.2, migration 0014_tri_enregistre) : cible de la clé étrangère de `preference_signals`.
+    unique(uniqueKeyName("proposals_organization_id_id")).on(t.organizationId, t.id),
     index("proposals_organization_id_trip_id_phase_idx").on(t.organizationId, t.tripId, t.phase),
     check("proposals_phase_check", oneOf(t.phase, ["preview", "deck"])),
     check("proposals_slot_type_check", oneOf(t.slotType, ["proposal", "noOption"])),
@@ -472,6 +474,13 @@ export const feedback = pgTable(
   ],
 );
 
+/** Valeurs de `CATEGORIES` (`src/contracts/values.ts`), comparées par `tests/unit/db/migration-tri.test.ts`. */
+const SIGNAL_CATEGORIES = ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"] as const;
+/** Valeurs de `PREFERENCE_REASONS` (`src/contracts/values.ts`), comparées par le même test. */
+const SIGNAL_REASONS = ["notMyStyle", "tooBusy", "tooExpensive", "tooFar", "other"] as const;
+/** Décisions de carte (`DECK_DECISIONS`) : les seuls signaux rattachés à une proposition (décision 0112 § 3.3). */
+const CARD_SIGNALS = ["like", "dislike", "choose", "nextOption"] as const;
+
 export const preferenceSignals = pgTable(
   "preference_signals",
   {
@@ -487,6 +496,16 @@ export const preferenceSignals = pgTable(
     origin: text("origin").notNull(),
     status: text("status").notNull().default("confirmed"),
     createdAt: createdAt(),
+    /** B10a (0112 § 3.2) : ligne `proposals` de la carte décidée ; nulle pour une réponse et `travelReduction`. */
+    proposalId: uuid("proposal_id"),
+    /** B10a (0112 § 3.1) : statut d'avant l'annulation ou le retrait, non nul si et seulement si `cancelled`. */
+    previousStatus: text("previous_status"),
+    /** Heure de l'annulation (horloge de la base), non nulle si et seulement si `cancelled`. */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /** `requestId` de l'annulation ou du retrait, non nul si et seulement si `cancelled`. */
+    cancelRequestId: uuid("cancel_request_id"),
+    /** Ordre d'insertion (0112 § 3.6), attribué par la base après le verrou du tri. */
+    seq: bigint("seq", { mode: "number" }).notNull().generatedAlwaysAsIdentity(),
   },
   (t) => [
     tripFk("preference_signals_trip_fk", t),
@@ -495,14 +514,131 @@ export const preferenceSignals = pgTable(
       columns: [t.organizationId, t.candidateId],
       foreignColumns: [candidates.organizationId, candidates.id],
     }),
+    foreignKey({
+      name: "preference_signals_proposal_fk",
+      columns: [t.organizationId, t.proposalId],
+      foreignColumns: [proposals.organizationId, proposals.id],
+    }),
     unique(uniqueKeyName("preference_signals_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
+    unique(uniqueKeyName("preference_signals_organization_id_id")).on(t.organizationId, t.id),
     index("preference_signals_organization_id_trip_id_category_idx").on(t.organizationId, t.tripId, t.category),
+    // 0112 § 3.6 : une décision active par proposition (filet sous le verrou du tri).
+    uniqueIndex("preference_signals_active_decision_idx")
+      .on(t.organizationId, t.tripId, t.proposalId)
+      .where(sql`${t.proposalId} IS NOT NULL AND ${t.status} <> 'cancelled'`),
     check(
       "preference_signals_signal_check",
       oneOf(t.signal, ["like", "dislike", "choose", "nextOption", "answerYes", "answerNo", "travelReduction"]),
     ),
     check("preference_signals_origin_check", oneOf(t.origin, ["gesture", "question", "brief"])),
     check("preference_signals_status_check", oneOf(t.status, ["confirmed", "inferred", "cancelled"])),
+    // 0112 § 3.1 : colonnes d'annulation, toutes trois présentes si et seulement si le statut est `cancelled`.
+    check(
+      "preference_signals_cancellation_check",
+      sql`(${t.status} = 'cancelled') = (${t.previousStatus} IS NOT NULL) AND (${t.status} = 'cancelled') = (${t.cancelledAt} IS NOT NULL) AND (${t.status} = 'cancelled') = (${t.cancelRequestId} IS NOT NULL)`,
+    ),
+    check("preference_signals_previous_status_check", sql`${t.previousStatus} IS NULL OR ${oneOf(t.previousStatus, ["confirmed", "inferred"])}`),
+    // 0112 § 3.3 : formes admises d'un signal.
+    check("preference_signals_category_check", sql`${t.category} IS NULL OR ${oneOf(t.category, SIGNAL_CATEGORIES)}`),
+    check("preference_signals_reason_check", sql`${t.reason} IS NULL OR ${oneOf(t.reason, SIGNAL_REASONS)}`),
+    check(
+      "preference_signals_form_check",
+      sql`CASE
+        WHEN ${oneOf(t.signal, CARD_SIGNALS)} THEN ${t.origin} = 'gesture' AND ${t.category} IS NOT NULL AND ${t.proposalId} IS NOT NULL AND ${t.reason} IS NULL
+        WHEN ${t.signal} = 'answerYes' THEN ${t.origin} = 'question' AND ${t.category} IS NOT NULL AND ${t.proposalId} IS NULL
+        WHEN ${t.signal} = 'answerNo' THEN ${t.origin} = 'question' AND ${t.proposalId} IS NULL
+        WHEN ${t.signal} = 'travelReduction' THEN ${t.origin} = 'question' AND ${t.category} IS NULL AND ${t.proposalId} IS NULL AND ${t.reason} IS NULL
+        ELSE false
+      END`,
+    ),
+    check(
+      "preference_signals_card_place_check",
+      sql`${oneOf(t.signal, CARD_SIGNALS)} OR (${t.placeId} IS NULL AND ${t.candidateId} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * Clôtures d'un tri (B10a, décision 0112 § 3.4) : un tri est l'ensemble des cartes d'une exécution et d'une phase
+ * jusqu'à `through_position` ; une carte est dans un tri clos s'il existe une clôture de même exécution et de même
+ * phase dont `through_position` est au moins sa position. Ajout seulement pour `vadrouille_app`.
+ */
+export const deckClosures = pgTable(
+  "deck_closures",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    generationRunId: uuid("generation_run_id").notNull(),
+    phase: text("phase").notNull(),
+    throughPosition: integer("through_position").notNull(),
+    requestId: uuid("request_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tripFk("deck_closures_trip_fk", t),
+    foreignKey({
+      name: "deck_closures_generation_run_fk",
+      columns: [t.organizationId, t.generationRunId],
+      foreignColumns: [generationRuns.organizationId, generationRuns.id],
+    }),
+    unique(uniqueKeyName("deck_closures_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
+    // Nom court : la forme longue dépasserait les 63 caractères d'un identifiant Postgres.
+    unique(uniqueKeyName("deck_closures_organization_id_trip_id_run_phase_position")).on(
+      t.organizationId,
+      t.tripId,
+      t.generationRunId,
+      t.phase,
+      t.throughPosition,
+    ),
+    check("deck_closures_phase_check", oneOf(t.phase, ["preview", "deck"])),
+    check("deck_closures_through_position_check", sql`${t.throughPosition} >= 1`),
+  ],
+);
+
+/**
+ * Questions posées pendant le tri (B10a, décision 0112 § 3.5) : une par décision déclenchante ; une question de
+ * catégorie non retirée par voyage et par catégorie ; au plus une question ouverte par voyage.
+ */
+export const preferencePrompts = pgTable(
+  "preference_prompts",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    kind: text("kind").notNull(),
+    category: text("category"),
+    triggerSignalId: uuid("trigger_signal_id").notNull(),
+    state: text("state").notNull().default("open"),
+    answerSignalId: uuid("answer_signal_id"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    tripFk("preference_prompts_trip_fk", t),
+    foreignKey({
+      name: "preference_prompts_trigger_signal_fk",
+      columns: [t.organizationId, t.triggerSignalId],
+      foreignColumns: [preferenceSignals.organizationId, preferenceSignals.id],
+    }),
+    foreignKey({
+      name: "preference_prompts_answer_signal_fk",
+      columns: [t.organizationId, t.answerSignalId],
+      foreignColumns: [preferenceSignals.organizationId, preferenceSignals.id],
+    }),
+    unique(uniqueKeyName("preference_prompts_organization_id_trigger_signal_id")).on(t.organizationId, t.triggerSignalId),
+    unique(uniqueKeyName("preference_prompts_organization_id_answer_signal_id")).on(t.organizationId, t.answerSignalId),
+    uniqueIndex("preference_prompts_category_once_idx")
+      .on(t.organizationId, t.tripId, t.category)
+      .where(sql`${t.kind} = 'category' AND ${t.state} <> 'withdrawn'`),
+    uniqueIndex("preference_prompts_one_open_idx").on(t.organizationId, t.tripId).where(sql`${t.state} = 'open'`),
+    check("preference_prompts_kind_check", oneOf(t.kind, ["category", "distance"])),
+    check("preference_prompts_state_check", oneOf(t.state, ["open", "answered", "closed", "withdrawn"])),
+    check(
+      "preference_prompts_category_check",
+      sql`(${t.kind} = 'category') = (${t.category} IS NOT NULL) AND (${t.category} IS NULL OR ${oneOf(t.category, SIGNAL_CATEGORIES)})`,
+    ),
+    check("preference_prompts_answer_check", sql`(${t.state} = 'answered') = (${t.answerSignalId} IS NOT NULL)`),
   ],
 );
 

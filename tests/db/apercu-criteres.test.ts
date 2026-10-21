@@ -51,6 +51,8 @@ const dependances = (fabrique?: () => FabriqueGeneration, surcharge: Partial<Dep
   horloge: creerHorlogeManuelle(MAINTENANT),
   plafonds: PLAFONDS_LARGES,
   barriere: { env: { VADROUILLE_ENV: "ci" } },
+  // Bancs de la séquence de réservation : la variante simulée réserve aussi dans `usage_ledger` (décision 0110 § 3).
+  reserverEnSimulee: true,
   ...(fabrique === undefined ? {} : { composition: fabrique }),
   ...surcharge,
 });

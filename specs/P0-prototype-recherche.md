@@ -195,6 +195,7 @@ Chaque réponse d'un modèle (plan, candidats extraits, notes, raisons) est vali
 - **longueur** bornée de chaque texte (proposition : nom maison 80 caractères, résumé maison 300, raison et justification `detour` 280, requête de recherche 200) ;
 - **jeu de caractères** : lettres, chiffres, espaces et ponctuation usuelle (Unicode imprimable) ; refus des caractères de contrôle, des caractères invisibles ou de direction, des balises (`<`, `>`) ; **aucune URL** dans un texte libre (les URL ne vivent que dans `source`, validée à part) ;
 - un élément refusé est écarté et compté (`model_output_invalid` par étape), sans son contenu.
+- *Amendé pour le candidat extrait de l'étape de recherche par la décision 0111 (`docs/decisions/0111-champs-enrichis-tolerants.md`) : un texte trop long y est coupé à sa borne, un champ d'enrichissement invalide retiré seul et une clé inconnue ignorée, le lieu gardé ; le reste de cette section est inchangé.*
 
 
 

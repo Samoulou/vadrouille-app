@@ -352,16 +352,24 @@ describe("qualite: infos pratiques en mémoire (P0S2-PO-21)", () => {
     expect(prixParPersonneAdmis({ prix: "12 CHF, réservation conseillée", prixParPersonne: 12 })).toBe(12);
   });
 
-  it("un texte d'info pratique trop long ou avec une URL fait écarter le candidat (compté), jamais tronquer", async () => {
+  it("un texte d'info pratique trop long est coupé, avec une URL retiré seul (comptés), le candidat gardé (décision 0111)", async () => {
     const { candidats, compteurs } = await lancer("rome-1", (f) => {
       for (const candidat of candidatsFixture(f)) {
         if (candidat.nom === "Panthéon") candidat.conseil = "x".repeat(LONGUEURS_INFOS.conseil + 1);
         if (candidat.nom === "Palatin") candidat.horaires = "voir www.site-fabrique.example";
       }
     });
-    expect(candidats.map((candidat) => candidat.nom)).not.toContain("Panthéon");
-    expect(candidats.map((candidat) => candidat.nom)).not.toContain("Palatin");
-    expect(compteurs.sortiesRefusees.recherche).toBe(2);
+    const pantheon = candidats.find((candidat) => candidat.nom === "Panthéon");
+    const palatin = candidats.find((candidat) => candidat.nom === "Palatin");
+    expect(pantheon).toBeDefined();
+    expect(palatin).toBeDefined();
+    // Décision de Samuel du 2026-10-20 : trop long, le conseil est coupé à sa longueur maximale.
+    expect(pantheon?.conseil).toBe("x".repeat(LONGUEURS_INFOS.conseil));
+    expect(palatin).not.toHaveProperty("horaires");
+    expect(JSON.stringify(candidats)).not.toContain("site-fabrique");
+    expect(compteurs.champsRetires).toBe(1);
+    expect(compteurs.textesCoupes).toBe(1);
+    expect(compteurs.sortiesRefusees.recherche).toBe(0);
   });
 });
 

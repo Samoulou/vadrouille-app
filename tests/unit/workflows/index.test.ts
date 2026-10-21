@@ -5,7 +5,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GardeOuverte } from "@/server/p0/garde";
-import { demarrerApercu, getRun, P0RUN_COMPLET, REGION_WORKFLOWS, startWorkflow } from "@/workflows";
+import { demarrerApercu, demarrerVoyageComplet, getRun, P0RUN_COMPLET, REGION_WORKFLOWS, startWorkflow } from "@/workflows";
 
 /** Interface stable des workflows (décision 0009 point 2 ; décision 0063 points 5 et 10), SDK simulé. */
 
@@ -13,6 +13,7 @@ const d = vi.hoisted(() => ({ start: vi.fn(), getRun: vi.fn() }));
 vi.mock("workflow/api", () => ({ start: d.start, getRun: d.getRun }));
 vi.mock("@/workflows/p0-run", () => ({ p0Run: vi.fn() }));
 vi.mock("@/workflows/apercu", () => ({ generatePreview: vi.fn() }));
+vi.mock("@/workflows/voyage-complet", () => ({ generateFullTrip: vi.fn() }));
 /** Interrupteur simulé à faux : le refus reste prouvé alors que la valeur commitée est vraie (PR dédiée après P0r3d). */
 vi.mock("@/workflows/complet", () => ({ P0RUN_COMPLET: false }));
 
@@ -40,7 +41,9 @@ describe("src/workflows/index.ts", () => {
     expect(source).toContain("start(p0Run, [{ runId: garde.runId }], { region: REGION_WORKFLOWS })");
     // B9c : le second démarrage est celui de l'aperçu (`generatePreview`), région fra1 et état réduit aux identifiants.
     expect(source).toContain("start(generatePreview, [entree], { region: REGION_WORKFLOWS })");
-    expect(source.match(/\bstart\(/g)).toHaveLength(2);
+    // B9d : le troisième est celui du voyage complet (`generateFullTrip`), région fra1, état réduit aux identifiants.
+    expect(source).toContain("start(generateFullTrip, [entree], { region: REGION_WORKFLOWS })");
+    expect(source.match(/\bstart\(/g)).toHaveLength(3);
   });
 
   it("getRun : statut seul, ni entrée ni sortie relue", async () => {
@@ -67,5 +70,15 @@ describe("src/workflows/index.ts", () => {
     expect(await demarrerApercu(generationRunId, organizationId)).toEqual({ ok: false, code: "start_failed" });
     d.start.mockResolvedValueOnce({ runId: 42 });
     expect(await demarrerApercu(generationRunId, organizationId)).toEqual({ ok: false, code: "start_failed" });
+  });
+
+  it("demarrerVoyageComplet : entrée réduite aux identifiants et au rang 0, région fra1 ; une erreur du SDK ne sort que par un code", async () => {
+    const generationRunId = "11111111-1111-4111-8111-111111111111";
+    const organizationId = "22222222-2222-4222-8222-222222222222";
+    d.start.mockResolvedValueOnce({ runId: "wrun_10" });
+    expect(await demarrerVoyageComplet(generationRunId, organizationId)).toEqual({ ok: true, workflowRunId: "wrun_10" });
+    expect(d.start).toHaveBeenCalledWith(expect.anything(), [{ generationRunId, organizationId, rang: 0 }], { region: "fra1" });
+    d.start.mockRejectedValueOnce(new Error("message du SDK avec test_place_fuite"));
+    expect(await demarrerVoyageComplet(generationRunId, organizationId)).toEqual({ ok: false, code: "start_failed" });
   });
 });

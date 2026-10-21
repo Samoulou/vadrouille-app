@@ -4,11 +4,12 @@ import { getRun as runDuSdk, start } from "workflow/api";
 
 import type { GardeOuverte } from "@/server/p0/garde";
 
-import type { EtatEtape } from "@/server/generation/etat";
+import type { EtatComplet, EtatEtape } from "@/server/generation/etat";
 
 import { generatePreview } from "./apercu";
 import { P0RUN_COMPLET } from "./complet";
 import { p0Run } from "./p0-run";
+import { generateFullTrip } from "./voyage-complet";
 
 export { P0RUN_COMPLET };
 /** Pièces du lancement (P0r3d), lues dans le pont `p0-run.ts` : l'application n'importe pas `src/prototype` (0048 § 1). */
@@ -73,6 +74,24 @@ export async function demarrerApercu(generationRunId: string, organizationId: st
   let workflowRunId: unknown;
   try {
     const run = await start(generatePreview, [entree], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
+}
+
+/**
+ * Démarre `generateFullTrip` (B9d) pour la ligne `full` réservée (`queued`) par la réconciliation ou une reprise : entrée
+ * `{ generationRunId, organizationId, rang: 0 }` (`EtatCompletSchema`), région `fra1`. Aucune garde de P0 : la barrière de
+ * B9-TL-8 est vérifiée à l'entrée de chaque étape. Une erreur du SDK rend `start_failed`, jamais son message ; la ligne reste
+ * `queued` sans identifiant et la réconciliation la réclame de nouveau (0081 B9-TL-12 point 3).
+ */
+export async function demarrerVoyageComplet(generationRunId: string, organizationId: string): Promise<ResultatDemarrage> {
+  const entree: EtatComplet = { generationRunId, organizationId, rang: 0 };
+  let workflowRunId: unknown;
+  try {
+    const run = await start(generateFullTrip, [entree], { region: REGION_WORKFLOWS });
     workflowRunId = run.runId;
   } catch {
     return { ok: false, code: "start_failed" };

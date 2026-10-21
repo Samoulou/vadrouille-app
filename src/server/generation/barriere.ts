@@ -17,8 +17,9 @@ import { ecriturePositionsSuspendue, lireEnvGeneration } from "@/server/env/gene
  * - `simulee` : tout le reste (local, CI, préversion sans l'une des conditions) : doubles, jamais un appel réel.
  *
  * Le cookie d'accès (D19 de 0055, 0074 § 5) n'est pas lisible dans une étape de workflow : l'appelant injecte un crochet
- * qui le vérifie par le module de P0 ; **fermé par défaut** (B9e branche le réel, avec la session de démonstration, question
- * 6 de Samuel). L'environnement est un paramètre (lu par `@/server/env/generation` par défaut), jamais une clé ni un secret.
+ * qui le vérifie par le module de P0 ; **fermé par défaut**, et aucun appelant ne le fournit encore : B9e ne branche pas
+ * de crochet réel, la façon de vérifier l'accès dans une étape reste à décider (question de la PR #588 au Tech Lead et à la
+ * Sécurité ; session de démonstration, question 6 de Samuel). L'environnement est un paramètre (lu par `@/server/env/generation` par défaut), jamais une clé ni un secret.
  */
 
 export type EtatBarriere = "production" | "reelle" | "simulee";

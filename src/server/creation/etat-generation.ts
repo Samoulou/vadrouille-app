@@ -3,16 +3,18 @@ import "server-only";
 import type { AdapterContext } from "@/adapters/types";
 import { GenerationStatusSchema, fail, ok, type GenerationStatus, type Result } from "@/contracts";
 import { CASES_APERCU, JOURS_APERCU } from "@/server/config/generation";
-import { expirerExecutions } from "@/server/generation/expiration";
 import { echecDeCode } from "@/server/generation/raison-echec";
+import { reconcilierVoyageComplet } from "@/server/generation/reconciliation";
 
-import { contexteValide, executeurSql, identifiantVoyage, type Outils } from "./commun";
+import { contexteValide, executeurSql, identifiantVoyage, transactionDeSession, type Outils } from "./commun";
 
 /**
  * `getGenerationStatus(ctx, tripId)` (spécification B9, B9b point 5 ; B9-PO-12 ; décision 0081 B9-TL-3 point 5) :
  * 1. contexte de la session ; identifiant illisible, voyage inconnu ou d'une autre organisation → `not_found` (la RLS
  *    forcée ne rend que les lignes de l'organisation posée) ;
- * 2. expiration des exécutions figées du voyage (`expirerExecutions`, horloge injectée) ;
+ * 2. réconciliation du voyage complet (B9d ; 0081 B9-TL-12 point 3, avec étouffement de 60 s), qui applique d'abord
+ *    l'expiration des exécutions figées du voyage (`expirerExecutions`, horloge injectée) et écrit `generation.full_stuck`
+ *    pour une ligne `full` expirée et bloquée ; elle ne relance jamais une ligne `failed` ;
  * 3. dernière exécution `preview` ou `full` du voyage : `queued` et `preparing` → `preparing` ; `ready`, `incomplete` ;
  *    `failed` → `failed` avec la raison et `retryable` de `echecDeCode` ;
  * 4. propositions prêtes par jour de l'aperçu (cases `proposal` de la dernière exécution `preview`, J1 et J2), qui ne
@@ -42,10 +44,10 @@ export async function lireEtatGeneration(o: Outils, ctx: AdapterContext | null |
   const org = ctx.organizationId;
   let lu: Lu;
   try {
+    await reconcilierVoyageComplet(transactionDeSession(o, ctx), o.demarrerVoyageComplet, { organizationId: org, tripId, maintenant: o.maintenant(), etouffement: true });
     lu = await o.withOrg(ctx, async (tx): Promise<Lu> => {
       const sql = executeurSql(tx);
       if ((await sql.query(SQL_VOYAGE, [org, tripId])).rows.length === 0) return { type: "inconnu" };
-      await expirerExecutions(sql, org, tripId, o.maintenant());
       const derniere = (await sql.query(SQL_DERNIERE, [org, tripId])).rows[0];
       if (derniere === undefined) throw new Error("état : aucune exécution");
       const apercu = (await sql.query(SQL_APERCU, [org, tripId])).rows[0];

@@ -1,5 +1,5 @@
 import { CreatedTripSchema } from "@/contracts/creation";
-import { GenerationStatusSchema, fail, ok, type CreatedTrip, type GenerationStatus, type Result } from "@/contracts";
+import { FullTripStatusSchema, GenerationStatusSchema, fail, ok, type CreatedTrip, type FullTripStatus, type GenerationStatus, type Result } from "@/contracts";
 import { creerCasCreation, type DependancesCreation } from "@/server/creation";
 
 import type { CreationAdapter } from "./types";
@@ -8,8 +8,8 @@ import type { CreationAdapter } from "./types";
  * Adaptateur `api` de la création (spécification B9, B9b ; décision 0081 B9-TL-1 : `src/adapters/api-creation.ts`) :
  * `createTrip`, `retryGeneration` et `getGenerationStatus` appellent dans le même processus les cas d'usage de
  * `src/server/creation/` (aucun appel HTTP vers soi-même, handover § 11) et valident chaque sortie par son contrat.
- * `structureBrief` et `suggestLodging` (B9a) et `getFullTripStatus` (B9d) ne sont pas livrés par B9b : ils lèvent, et
- * l'action rend `provider_error`.
+ * `getFullTripStatus` (B9d) appelle de même son cas d'usage. `structureBrief` et `suggestLodging` (B9a) ne sont pas livrés
+ * par B9b : ils lèvent, et l'action rend `provider_error`.
  *
  * **Non branché** sur `getCreationAdapter()` dans B9b, comme `createApiTripAdapter` dans B6a : le branchement et sa
  * garde arrivent avec B6b et B9e (aucune génération réelle avant B9c). Dépendances : **tests seulement** (`withOrg` du
@@ -30,7 +30,6 @@ export function createApiCreationAdapter(options: OptionsAdaptateurCreationApi =
   return {
     structureBrief: nonLivre("structureBrief", "B9a"),
     suggestLodging: nonLivre("suggestLodging", "B9a"),
-    getFullTripStatus: nonLivre("getFullTripStatus", "B9d"),
     async createTrip(ctx, request): Promise<Result<CreatedTrip>> {
       return sortie(CreatedTripSchema, await cas.createTrip(ctx, request));
     },
@@ -39,6 +38,9 @@ export function createApiCreationAdapter(options: OptionsAdaptateurCreationApi =
     },
     async getGenerationStatus(ctx, tripId): Promise<Result<GenerationStatus>> {
       return sortie(GenerationStatusSchema, await cas.getGenerationStatus(ctx, tripId));
+    },
+    async getFullTripStatus(ctx, tripId): Promise<Result<FullTripStatus>> {
+      return sortie(FullTripStatusSchema, await cas.getFullTripStatus(ctx, tripId));
     },
   };
 }

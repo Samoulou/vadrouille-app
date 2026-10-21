@@ -29,6 +29,7 @@ import type { z } from "zod";
 import { destinationColor } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { modesAdmis } from "@/domain/generation";
+import { jourSansEtape } from "@/domain/jours-planifies";
 import { demandeDeRelectures, optionsDesRepas, recomposerJour, recomposerProposition, type JourALire } from "@/domain/recomposition";
 import {
   logementsDuJour,
@@ -272,7 +273,8 @@ async function lireEtat(executeur: ExecuteurLecture, ctx: AdapterContext, tripId
 
 // --- Recomposition --------------------------------------------------------------------------------------
 
-const sansEtape = (jour: DaySnapshot) => !jour.items.some((item) => item.type === "stop");
+/** Prédicat de 0086 § 1.7, partagé avec le voyage complet (`@/domain/jours-planifies`). */
+const sansEtape = (jour: DaySnapshot) => jourSansEtape(jour);
 
 /** Séjour de chaque nuit : un voyage dont une nuit n'a pas exactement un séjour est `stay_missing` (B6-PO-17). */
 function sejoursDe(etat: Etat, contexte: ContexteEchec): readonly SejourDeNuit[] {

@@ -20,7 +20,8 @@ const ROBOTS = { index: false, follow: false } as const;
 /** Titre du document : « {destination} · Préparation » (provisoire, UX/UI, F8-Q1). */
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { id } = await params;
-  // Sans session (`better-auth`) : titre par défaut ; seule la page redirige (`exigerSession`).
+  // Sans session (`better-auth`) : titre par défaut ; seule la page redirige (`exigerSession`). Sur `api`, pendant la
+  // génération (aucune version publiée), `getTrip` rend `null` : titre par défaut aussi, la page s'affiche quand même.
   const ctx = await contexteFacultatif();
   const trip = ctx === null ? null : await getTripReader().getTrip(ctx, id);
   return trip
@@ -34,16 +35,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 /**
- * `R5`, écran 5 « Propositions prêtes » (spécification F8, F8-PO-12 ; décision 0017 § 9). Composant serveur : le
- * voyage est lu dans le contexte de la requête : sans session (`better-auth`, B3c), `exigerSession` redirige vers
- * l'écran 4 ; voyage inconnu ou d'une autre organisation : 404. Puis l'avancement est lu par l'action
- * `getGenerationStatus` (état initial du rendu serveur ; le navigateur l'interroge ensuite toutes les secondes). Une erreur de lecture de l'avancement affiche la page d'erreur commune. Fermer l'onglet ou
- * recharger ne perd rien : l'état vient de l'adaptateur.
+ * `R5`, écran 5 « Propositions prêtes » (spécification F8, F8-PO-12 ; décision 0017 § 9). Composant serveur : sans
+ * session (`better-auth`, B3c), `exigerSession` redirige vers l'écran 4. Puis l'avancement est lu par l'action
+ * `getGenerationStatus` (état initial du rendu serveur ; le navigateur l'interroge ensuite toutes les secondes), qui
+ * vérifie aussi le voyage : inconnu ou d'une autre organisation, `not_found`, donc 404. Le voyage n'est **pas** lu par
+ * `getTrip` : sur l'adaptateur `api`, `getTrip` rend `null` tant qu'aucune version n'est publiée (B6-PO-2), donc pendant
+ * toute la génération, que cet écran sert justement à suivre (spécification B9, B9e ; revue de la PR 588, bloquant 2).
+ * Une erreur de lecture de l'avancement affiche la page d'erreur commune. Fermer l'onglet ou recharger ne perd rien :
+ * l'état vient de l'adaptateur.
  */
 export default async function PreparationPage({ params }: { params: Params }) {
   const { id } = await params;
-  const trip = await getTripReader().getTrip(await exigerSession(creationRoutes.preparation(id)), id);
-  if (!trip) notFound();
+  await exigerSession(creationRoutes.preparation(id));
   const status = await getGenerationStatus({ tripId: id });
   if (!status.ok) {
     if (status.error.code === "not_found") notFound();

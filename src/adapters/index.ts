@@ -2,6 +2,7 @@ import type { RevisionFixtures, Trip } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
+import { apiCreationAdapter } from "./api-creation-instance";
 import { apiTripAdapter } from "./api-instance";
 import { assertAuthAdapter } from "./auth-guard";
 import { betterAuthServerAdapter } from "./better-auth";
@@ -78,6 +79,8 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
  * normalisation que `getTripAdapter`, erreur pour une valeur inconnue). L'état simulé (lancements, issue de la
  * génération, horloge) vit dans la portée `options.scope` (portée par défaut sinon, § 10) ; `structureBrief` et
  * `suggestLodging` ne gardent rien. Les voyages sont lus par `getTripAdapter()` (voyage jamais lancé dans la portée).
+ * `api` (B9e) : garde `assertApiAdapter`, sans repli vers `mock`, puis l'adaptateur branché au démarrage par
+ * `src/instrumentation.ts` (`./api-creation-instance.ts`).
  */
 export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): CreationAdapter {
   const choice = adapterChoice(value);
@@ -92,7 +95,9 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
       });
     }
     case "api":
-      throw new Error("adaptateur api de création non implémenté (B9)");
+      // B9e : garde (`assertApiAdapter`), puis la création branchée au démarrage par `src/instrumentation.ts`
+      // (`./api-creation-instance.ts`) ; la portée de simulation ne sert pas (l'état vit en base).
+      return apiCreationAdapter();
     case "prototype":
       throw new Error("création indisponible avec l'adaptateur prototype (spécification P0)");
     default:
