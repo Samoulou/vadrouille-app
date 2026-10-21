@@ -165,6 +165,13 @@ describe("recomposition: jour (B6-PO-4 à B6-PO-8)", () => {
     expect(aPied.ok && aPied.valeur.travelMinutes).toBe(27);
   });
 
+  it("titre libre du jour (décision 0116 § 6) : relu tel quel depuis l'instantané, absent sans valeur", () => {
+    const avecTheme = recomposerJour({ ...j, theme: "[Old Town]" }, { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk", "transit"], verification: sansDate });
+    expect(avecTheme.ok && avecTheme.valeur.theme).toBe("[Old Town]");
+    const sans = recomposerJour(j, { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk", "transit"], verification: sansDate });
+    expect(sans.ok && "theme" in sans.valeur).toBe(false);
+  });
+
   it("une durée inconnue (segment ou trajet du jour) : travel_unknown", () => {
     const sansRetour = relectures([
       [L0, { lieu: A }, "walk", 7],

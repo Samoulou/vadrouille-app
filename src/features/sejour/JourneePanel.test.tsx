@@ -45,6 +45,22 @@ describe("JourneePanel : journée sans durée connue (décision 0074)", () => {
 });
 
 describe("JourneePanel (écran 12, F5-PO-5)", () => {
+  it("titre libre du jour (décision 0116 § 6) : sous le titre calculé, en texte brut ; absent sans valeur", () => {
+    const { container, unmount } = render(<JourneePanel day={day(3)} routes={routes} />);
+    const titre = screen.getByRole("heading", { level: 1 });
+    expect(titre).toHaveTextContent("Lundi 31 août");
+    const theme = container.querySelector("[data-part='theme-jour']");
+    expect(theme).toHaveTextContent("[Highlands : Glencoe, Loch Ness et retour par Pitlochry en toute fin de journée]");
+    expect(titre.nextElementSibling).toBe(theme);
+    unmount();
+    const brut = render(<JourneePanel day={{ ...day(3), theme: "<b>x</b>" }} routes={routes} />);
+    expect(brut.container.querySelector("[data-part='theme-jour'] b")).toBeNull();
+    expect(brut.container.querySelector("[data-part='theme-jour']")).toHaveTextContent("<b>x</b>");
+    brut.unmount();
+    const sans = render(<JourneePanel day={day(2)} routes={routes} />);
+    expect(sans.container.querySelector("[data-part='theme-jour']")).toBeNull();
+  });
+
   it("J2 : titre de niveau 1, ligne trajet et budget, ligne du jour, événements, « Surprends-moi », dans cet ordre", () => {
     const { container } = render(<JourneePanel day={day(2)} routes={routes} />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);

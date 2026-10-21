@@ -8,6 +8,7 @@ import {
   IsoDateSchema,
   OpenMealItemSchema,
   SegmentItemSchema,
+  StopFactsSchema,
   StopSchema,
   TerminusItemSchema,
   TripBaseSchema,
@@ -32,7 +33,9 @@ import { SHARED_EXCEPTIONS, SHARE_TOKEN_PATTERN } from "./values";
 export const SharedStopKeySchema = z.string().regex(/^[1-9]\d{0,2}$/);
 
 /** Étape partagée : nature, nom, heures et faits (`formatFaits`), exceptions limitées à « À confirmer » et « Non confirmé ». */
-export const SharedStopSchema = StopSchema.pick({ kind: true, name: true, start: true, end: true, facts: true }).extend({
+export const SharedStopSchema = StopSchema.pick({ kind: true, name: true, start: true, end: true }).extend({
+  /** Trois faits seulement : ni `tip`, ni `priceNote`, ni `hoursNote` (décision 0103, condition 1 ; exposer demande un verdict). */
+  facts: StopFactsSchema.pick({ durationMinutes: true, costPerPerson: true, area: true }),
   key: SharedStopKeySchema,
   exceptions: z.array(z.enum(SHARED_EXCEPTIONS)).max(2),
 });
