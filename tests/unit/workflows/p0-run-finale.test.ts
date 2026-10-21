@@ -428,7 +428,7 @@ describe("p0Run, etapeProgramme de bout en bout sur les doubles (décision 0116 
     expect(capture.matrices.some((m) => m.origines.includes(ferme) || m.destinations.includes(ferme))).toBe(false);
   });
 
-  it("p0: lieu fermé le jour du créneau, placeId gardé, à confirmer à la lecture par la relecture", async () => {
+  it("p0: lieu fermé le jour du créneau, placeId gardé, sans badge au lot 1 (aucune fiche relue à l'affichage)", async () => {
     const galerie = PLACE_ID_DE.get("Galerie des portraits") ?? "";
     // Aucune plage d'ouverture, aucun jour : la vérification ne lit pas les horaires (0116 § 4.4).
     retouches.details = async (placeId, fiche) => (placeId === galerie ? { ...(await fiche()), horaires: [] } : fiche());
