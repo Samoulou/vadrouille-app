@@ -9,6 +9,10 @@
   "progression": "Proposition {current} sur {total}",
   "progressionVisible": "{current} sur {total}",
   "generation": "Jour {n} en préparation",
+  "refus": {
+    "recalcul": "Ça se prépare, réessaie dans un instant.",
+    "echec": "Ce choix n'a pas été enregistré. Réessaie."
+  },
   "carte": {
     "photo": "Photo du lieu",
     "vers": "vers {time}",
@@ -80,6 +84,7 @@
     "apercu": "Tu as vu tes premières propositions",
     "suite": "Tu as tout trié",
     "vide": "Aucune proposition à trier",
+    "clos": "Tu as fini ce tri.",
     "debloquer": "Débloquer",
     "programme": "Voir le programme"
   },

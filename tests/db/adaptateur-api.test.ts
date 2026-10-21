@@ -200,6 +200,16 @@ describe("adaptateur api : suite de contrat et isolation", () => {
       voyages: [...idsA.values()],
       inconnu: "00000000-0000-4000-8000-000000000000",
       jourSansPosition: { tripId: idsA.get("mock_trip_lisbonne") ?? "", index: 1 },
+      // Tri enregistré (0112 § 4 point 1) : Lisbonne n'a aucune carte ; base en panne (SQLSTATE 08006) : la lecture rejette.
+      triEnregistre: {
+        voyageSansCarte: idsA.get("mock_trip_lisbonne") ?? "",
+        enPanne: createApiTripAdapter({
+          relectures: creerRelecturesVoyages(),
+          withOrg: async () => {
+            throw Object.assign(new Error("panne"), { code: "08006" });
+          },
+        }),
+      },
     });
   });
 

@@ -22,7 +22,7 @@ function poser(valeurs: Valeurs): void {
   vi.stubEnv("AUTH_ADAPTER", valeurs.AUTH_ADAPTER);
 }
 
-const METHODES = ["listTrips", "getTrip", "getDay", "listProposals", "listPreviewSlots", "getDayMap", "getTripMap"] as const;
+const METHODES = ["listTrips", "getTrip", "getDay", "listProposals", "listPreviewSlots", "getDayMap", "getTripMap", "getDeckSession"] as const;
 
 /** Fabrique de test : un adaptateur distinct par appel, qui retient le double reçu. */
 function fabriqueDeTest() {

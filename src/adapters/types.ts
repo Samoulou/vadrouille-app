@@ -9,6 +9,7 @@ import type {
   CreatedShareLink,
   Day,
   DayMap,
+  DeckSession,
   FullTripStatus,
   GenerationStatus,
   InferredBrief,
@@ -67,6 +68,13 @@ export interface TripAdapter {
   getDayMap(ctx: AdapterContext, tripId: string, index: number): Promise<DayMap | null>;
   /** Positions de tous les jours du voyage, pour la vue d'ensemble (écran 11). */
   getTripMap(ctx: AdapterContext, tripId: string): Promise<DayMap[]>;
+  /**
+   * État du tri enregistré (spécification B10, B10a point 5 ; décision 0112 § 4 point 1). `mock` et `prototype` :
+   * toujours `null` (l'écran garde la session en mémoire de F6, B10-PO-18). `api` : un `DeckSession` pour tout voyage
+   * de l'organisation, même sans carte ; `null` pour un voyage inconnu ou d'une autre organisation, et tant que la
+   * migration du tri enregistré n'est pas appliquée à la base (repli journalisé, amendement 1 de la décision 0112).
+   */
+  getDeckSession(ctx: AdapterContext, tripId: string): Promise<DeckSession | null>;
 }
 
 /**

@@ -346,7 +346,9 @@ describe("PresentationScreen", () => {
     expect(progress()).toHaveAccessibleName("Proposition 1 sur 7");
     await click("Tout garder pour le jour 3");
     await click("Tout garder pour le jour 4");
-    expect(screen.getByRole("heading", { name: "Tu as tout trié" })).toBeInTheDocument();
+    // Des jours gardés sans tri carte à carte : « Tu as fini ce tri. », jamais « Tu as tout trié » (revue UX/UI tardive).
+    expect(screen.getByRole("heading", { name: "Tu as fini ce tri." })).toBeInTheDocument();
+    expect(screen.queryByText("Tu as tout trié")).toBeNull();
     expect(screen.getByText("Jour 6 en préparation")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir le programme" })).toHaveAttribute("href", `/voyages/${edimbourgDebloque.id}`);
     expect(screen.queryByRole("link", { name: "Débloquer" })).toBeNull();
@@ -409,5 +411,216 @@ describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () =>
   it("la carte affiche le contexte composé depuis ses voisins", () => {
     setup();
     expect(card()).toHaveTextContent("Entre ton déjeuner et ton temps libre");
+  });
+});
+
+describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 4)", () => {
+  /** Actions injectées qui notent chaque appel (implémentation serveur remplacée). */
+  function actionsEspion() {
+    const appels: string[] = [];
+    const actions = {
+      decide: vi.fn(async (input: { decision: string; kind: string; lastOption?: boolean }) => {
+        appels.push(`decide:${input.kind}:${input.decision}:${input.lastOption === true ? "derniere" : "-"}`);
+        return { prompt: null };
+      }),
+      undo: vi.fn(async () => undefined),
+      answerPrompt: vi.fn(async () => ({ next: null })),
+      complete: vi.fn(async () => {
+        appels.push("complete");
+      }),
+    };
+    return { actions, appels };
+  }
+  const session = (proposalIds: string[], decided: number, extra: Partial<{ openPrompt: { kind: "category"; category: Category } | null; closed: boolean }> = {}) => ({
+    tripId: "mock_trip_edimbourg",
+    proposalIds,
+    openPrompt: null,
+    closed: false,
+    counts: { decided, remaining: proposalIds.length },
+    ...extra,
+  });
+
+  it("la progression part des cartes déjà décidées du tri ouvert", () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2), actions: actionsEspion().actions });
+    expect(progress()).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+    expect(progressText()).toHaveTextContent(new RegExp(`^3 sur ${reprise.length + 2}$`));
+  });
+
+  it("la question ouverte rouvre la feuille au chargement", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsEspion().actions });
+    expect(await screen.findByRole("dialog", { name: "On arrête les musées et monuments pour ce voyage ?" })).toBeInTheDocument();
+  });
+
+  it("tri clos : écran de fin de l'aperçu, aucune clôture de plus", async () => {
+    const { actions } = actionsEspion();
+    setup({ proposals: [], deck: session([], 0, { closed: true }), actions });
+    expect(document.querySelector("[data-deck-end]")).toHaveAttribute("data-deck-end", "apercu");
+    await flush();
+    expect(actions.complete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [false, "apercu", "Tu as vu tes premières propositions"],
+    [true, "suite", "Tu as fini ce tri."],
+  ] as const)("tri clos à l'ouverture (débloqué : %s) : titre de la variante %s, jamais « Tu as tout trié »", (unlocked, variante, titre) => {
+    setup({ unlocked, proposals: [], deck: session([], 0, { closed: true }), actions: actionsEspion().actions });
+    const fin = document.querySelector("[data-deck-end]");
+    expect(fin).toHaveAttribute("data-deck-end", variante);
+    expect(fin).toHaveAttribute("data-deck-closed");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(new RegExp(`^${titre.replace(".", "\\.")}$`));
+    expect(screen.queryByText("Tu as tout trié")).toBeNull();
+    // Rien ne dit qu'il reste des cartes non triées : la phrase « Le reste est gardé… » n'est pas affichée.
+    expect(screen.queryByText(/Le reste est gardé/)).toBeNull();
+  });
+
+  it("la feuille rouverte au chargement, fermée sans réponse : le focus revient sur la carte", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsEspion().actions });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Fermer" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(card()));
+  });
+
+  /** Actions dont la décision (ou la réponse) n'est pas enregistrée, avec le refus donné. */
+  it.each([
+    ["Oui", "Tu as fini ce tri."],
+    ["Non", "Tu as tout trié"],
+  ] as const)("suite du tri, réponse « %s » à une question de catégorie puis fin du paquet : « %s »", async (reponse, titre) => {
+    const cartes = [activity("n1", 1, "09:00", "nature"), activity("n2", 1, "11:00", "nature"), activity("m1", 1, "14:00", "museum")];
+    setup({
+      tripId: edimbourgDebloque.id,
+      unlocked: true,
+      proposals: cartes,
+      deck: session(cartes.map((c) => c.id), 0, { openPrompt: { kind: "category", category: "nature" } }),
+      actions: actionsEspion().actions,
+    });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: reponse }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // « Oui » retire les cartes « nature » restantes, qui n'ont pas été triées une à une (spécification B10, question 8).
+    while (document.querySelector("[data-part='carte']")) await click("J'aime");
+    expect(screen.getByRole("heading", { name: titre })).toBeInTheDocument();
+    if (reponse === "Oui") expect(screen.queryByText("Tu as tout trié")).toBeNull();
+  });
+
+  function actionsRefusees(refus: "recalcul" | "echec" | "dejaDecidee") {
+    return {
+      decide: vi.fn(async () => ({ prompt: null, refus })),
+      undo: vi.fn(async () => undefined),
+      answerPrompt: vi.fn(async (): Promise<{ next: null; refus?: typeof refus }> => ({ next: null, refus })),
+      complete: vi.fn(async () => undefined),
+    };
+  }
+  const annonce = () => document.querySelector("[data-announce]");
+
+  it.each([
+    ["recalcul", "generating", "Ça se prépare, réessaie dans un instant."],
+    ["echec", "error", "Ce choix n'a pas été enregistré. Réessaie."],
+  ] as const)("décision non enregistrée (%s) : la carte reste, bandeau %s annoncé, aucun toast d'annulation", async (refus, kind, texte) => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees(refus) });
+    const avant = cardName();
+    await click("J'aime");
+    expect(cardName()).toBe(avant);
+    expect(progress()).toHaveAccessibleName("Proposition 1 sur 8");
+    // Bandeau repéré par son texte, visible hors de la région d'annonce, du type attendu.
+    const bandeau = screen.getAllByText(texte).map((n) => n.closest("[data-kind]")).find((n) => n !== null);
+    expect(bandeau).toHaveAttribute("data-kind", kind);
+    expect(annonce()).toHaveTextContent(texte);
+    expect(annonce()).toHaveAttribute("role", "status");
+    expect(toast()).toBeNull();
+    expect(await axeViolations(document.body)).toEqual([]);
+    // Un nouveau geste, refusé de même, le redit (le bandeau est effacé au geste, puis reposé) ; la carte ne bouge pas.
+    await click("J'aime");
+    expect(cardName()).toBe(avant);
+    expect(annonce()).toHaveTextContent(texte);
+  });
+
+  it("décision refusée parce que la carte est déjà décidée ailleurs : le paquet avance, sans bandeau ni toast", async () => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees("dejaDecidee") });
+    const avant = cardName();
+    await click("J'aime");
+    expect(cardName()).not.toBe(avant);
+    expect(document.querySelector("[data-kind='generating'], [data-kind='error']")).toBeNull();
+    expect(toast()).toBeNull();
+  });
+
+  it("« Tout garder pour le jour » efface le bandeau d'un refus précédent", async () => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees("echec") });
+    await click("J'aime");
+    expect(screen.getAllByText("Ce choix n'a pas été enregistré. Réessaie.").length).toBeGreaterThan(0);
+    await click("Tout garder pour le jour 1");
+    expect(document.querySelector("[data-kind='error']")).toBeNull();
+  });
+
+  it.each([
+    ["recalcul", "generating", "Ça se prépare, réessaie dans un instant."],
+    ["echec", "error", "Ce choix n'a pas été enregistré. Réessaie."],
+  ] as const)("réponse non enregistrée (%s) : la feuille reste ouverte avec le bandeau %s ; une nouvelle réponse l'efface et s'enregistre", async (refus, kind, texte) => {
+    const reprise = propositions.slice(2);
+    const actions = actionsRefusees(refus);
+    actions.answerPrompt.mockImplementationOnce(async () => ({ next: null, refus })).mockImplementation(async () => ({ next: null }));
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Oui" }));
+    await flush();
+    // La feuille reste ouverte ; le bandeau est dans la feuille, annoncé ; le paquet ne change pas.
+    const ouverte = screen.getByRole("dialog");
+    const bandeau = within(ouverte).getByText(texte).closest("[data-kind]");
+    expect(bandeau).toHaveAttribute("data-kind", kind);
+    expect(bandeau).toHaveAttribute("role", kind === "error" ? "alert" : "status");
+    // Paquet inchangé (la barre est sous la feuille modale, donc masquée aux technologies d'assistance).
+    expect(screen.getByRole("progressbar", { hidden: true })).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+    expect(await axeViolations(ouverte)).toEqual([]);
+    // Nouvelle réponse : bandeau effacé, réponse enregistrée, feuille fermée.
+    fireEvent.click(within(ouverte).getByRole("button", { name: "Non" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByText(texte)).toBeNull();
+    expect(actions.answerPrompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("réponse refusée parce que la question n'est plus ouverte : la feuille se ferme, sans bandeau", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsRefusees("dejaDecidee") });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Oui" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.querySelector("[data-kind='generating'], [data-kind='error']")).toBeNull();
+    expect(progress()).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+  });
+
+  it("« Passer » clôt le tri enregistré", async () => {
+    const { actions } = actionsEspion();
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions });
+    const passer = screen.getByRole("link", { name: "Passer" });
+    passer.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(passer);
+    await flush();
+    expect(actions.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it("repas : la dernière option est signalée à l'action ; la fin du paquet clôt le tri une fois l'annulation expirée", async () => {
+    vi.useFakeTimers();
+    try {
+      const { actions, appels } = actionsEspion();
+      const repas = propositions.filter((p) => p.kind === "meal").slice(0, 2);
+      setup({ proposals: repas, deck: session(repas.map((p) => p.id), 0), actions });
+      await click("Option suivante");
+      await click("Pas pour moi");
+      expect(appels).toEqual(["decide:meal:dislike:-", "decide:meal:dislike:derniere"]);
+      expect(actions.complete).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+      expect(actions.complete).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

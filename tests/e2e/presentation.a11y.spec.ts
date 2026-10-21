@@ -77,7 +77,7 @@ test("presentation: aucune violation axe, écran 6b", async ({ page }) => {
   await openDeck(page, SUITE);
   await expectNoViolations(page);
   for (const day of [3, 4]) await press(page, `Tout garder pour le jour ${day}`);
-  await expect(page.getByRole("heading", { name: "Tu as tout trié" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tu as fini ce tri." })).toBeVisible();
   await expectNoViolations(page);
 });
 

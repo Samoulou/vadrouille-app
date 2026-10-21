@@ -419,6 +419,10 @@ function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
     async listPreviewSlots() {
       return [];
     },
+    /** Session de tri en mémoire de F6 (B10-PO-18) : aucun tri enregistré sur `prototype` (décision 0112 § 4 point 1). */
+    async getDeckSession() {
+      return null;
+    },
     async getDayMap(ctx, tripId, index) {
       const servi = await trouver(ctx, tripId);
       const jour = servi?.programme.trip.days.find((candidat) => candidat.index === index);

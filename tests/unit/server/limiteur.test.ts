@@ -416,6 +416,8 @@ describe("module de journal", () => {
       "payment.webhook_config_invalid",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
+      // B10a (amendement 1 de 0112) : repli de la lecture du tri sur la session locale, schéma absent (tripId seulement).
+      "presentation.deck_schema_missing",
       "log.unknown_event",
     ]);
   });
