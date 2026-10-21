@@ -127,6 +127,9 @@ export const BUSINESS_TABLES = [
   "event_occurrences",
   "feedback",
   "preference_signals",
+  // B10a (migration 0014_tri_enregistre, décision 0112 § 3.4 et § 3.5) : clôtures d'un tri et questions posées.
+  "deck_closures",
+  "preference_prompts",
   "preferences",
   "checklist_items",
   "share_links",
@@ -235,8 +238,20 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "preference_signals":
       return {
-        sql: "INSERT INTO preference_signals (organization_id, trip_id, request_id, signal, origin) VALUES ($1, $2, $3, 'like', 'gesture') RETURNING id",
+        // Forme d'une réponse « Oui » (décision 0112 § 3.3, migration 0014_tri_enregistre) : sans proposition.
+        sql: "INSERT INTO preference_signals (organization_id, trip_id, request_id, signal, origin, category) VALUES ($1, $2, $3, 'answerYes', 'question', 'museum') RETURNING id",
         params: [org, trip, randomUUID()],
+      };
+    case "deck_closures":
+      return {
+        sql: "INSERT INTO deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id) VALUES ($1, $2, $3, 'preview', $4, $5) RETURNING id",
+        params: [org, trip, generationRun, Math.floor(Math.random() * 1e9) + 1, randomUUID()],
+      };
+    case "preference_prompts":
+      return {
+        // Question de catégorie ouverte par le signal de l'organisation (une seule ouverte par voyage).
+        sql: "INSERT INTO preference_prompts (organization_id, trip_id, kind, category, trigger_signal_id) VALUES ($1, $2, 'category', 'museum', $3) RETURNING id",
+        params: [org, trip, ids.rows.preference_signals],
       };
     case "preferences":
       return {
@@ -303,7 +318,7 @@ export async function seedOrganization(auth: pg.Client, app: pg.Client): Promise
     seed.trip = await insert("trips");
     seed.generationRun = await insert("generation_runs");
     seed.researchRun = await insert("research_runs");
-    for (const table of ["briefs", "stays", "trip_commitments", "trip_versions", "proposals", "candidates", "event_occurrences", "feedback", "preference_signals", "preferences", "checklist_items", "share_links", "usage_ledger", "checkouts"] as const) {
+    for (const table of ["briefs", "stays", "trip_commitments", "trip_versions", "proposals", "candidates", "event_occurrences", "feedback", "preference_signals", "deck_closures", "preference_prompts", "preferences", "checklist_items", "share_links", "usage_ledger", "checkouts"] as const) {
       await insert(table);
     }
     await c.query("UPDATE trips SET current_version = (SELECT version FROM trip_versions WHERE id = $1) WHERE id = $2", [

@@ -2,6 +2,7 @@ import "server-only";
 
 import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
 import { API_ERROR_CODES } from "@/contracts/values";
+import { CODES_ARRET_JOURNAL_SANS_CLE } from "@/server/log-codes-arret";
 
 /**
  * Journal structuré du serveur (spécification B3, B3a point 7 ; décision 0050, B3-TL-7 ; 0051 point 6.1). Seul point
@@ -169,7 +170,7 @@ export type LogFields = {
   readonly organizationId?: string;
   /** Identifiant interne d'une exécution de génération (`uuid` de `generation_runs.id`, B9d, 0087 § 1.4 point 3). */
   readonly generationRunId?: string;
-  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`), jamais un message. */
+  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
   readonly stopReason?: string;
 };
 
@@ -487,11 +488,12 @@ export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
 ];
 const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
 /**
- * Forme du champ `stopReason` (B9d) : un code fermé de `generation_runs.stop_reason`, que seul l'écrivain de
- * `generation.full_stuck` passe, depuis la ligne lue en base (liste fermée par le `CHECK` de la migration 0012 et `CODES_ARRET`,
- * que ce module n'importe pas : `ligne/creation-imports`). Le journal n'en vérifie que la forme : minuscules et `_`, 40 au plus.
+ * Codes admis dans `stopReason` (B9d ; décision 0114) : liste fermée, celle de `CODES_ARRET` (`CHECK` de la migration 0012),
+ * lue dans le module feuille `src/server/log-codes-arret.ts` (ce module n'importe pas `src/server/generation/` : `ligne/creation-imports`)
+ * plus `CODE_CLE_ABSENTE`, pris de sa définition unique (exemption de 0077 § 3 point 1). Une valeur hors liste (ligne antérieure
+ * au `CHECK` `NOT VALID`, nom de lieu, texte libre) est retirée et comptée dans `dropped`, jamais écrite.
  */
-const CODE_ARRET_GENERATION = /^[a-z][a-z_]{0,39}$/;
+const CODES_ARRET_GENERATION: ReadonlySet<string> = new Set<string>([...CODES_ARRET_JOURNAL_SANS_CLE, CODE_CLE_ABSENTE]);
 /** Identifiant d'événement : forme simulée (B4-TL-10) ou forme de Stripe. */
 const ID_EVENEMENT_PAIEMENT = /^(evt_sim_[0-9a-f]{32}|evt_[A-Za-z0-9]{1,255})$/;
 const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
@@ -567,7 +569,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["checkoutId", (v) => chaine(v) && UUID.test(v)],
   ["organizationId", (v) => chaine(v) && UUID.test(v)],
   ["generationRunId", (v) => chaine(v) && UUID.test(v)],
-  ["stopReason", (v) => chaine(v) && CODE_ARRET_GENERATION.test(v)],
+  ["stopReason", (v) => chaine(v) && CODES_ARRET_GENERATION.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
