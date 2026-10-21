@@ -170,7 +170,7 @@ export type LogFields = {
   readonly organizationId?: string;
   /** Identifiant interne d'une exécution de génération (`uuid` de `generation_runs.id`, B9d, 0087 § 1.4 point 3). */
   readonly generationRunId?: string;
-  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0113), jamais un message. */
+  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
   readonly stopReason?: string;
 };
 
@@ -488,7 +488,7 @@ export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
 ];
 const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
 /**
- * Codes admis dans `stopReason` (B9d ; décision 0113) : liste fermée, celle de `CODES_ARRET` (`CHECK` de la migration 0012),
+ * Codes admis dans `stopReason` (B9d ; décision 0114) : liste fermée, celle de `CODES_ARRET` (`CHECK` de la migration 0012),
  * lue dans le module feuille `src/server/log-codes-arret.ts` (ce module n'importe pas `src/server/generation/` : `ligne/creation-imports`)
  * plus `CODE_CLE_ABSENTE`, pris de sa définition unique (exemption de 0077 § 3 point 1). Une valeur hors liste (ligne antérieure
  * au `CHECK` `NOT VALID`, nom de lieu, texte libre) est retirée et comptée dans `dropped`, jamais écrite.

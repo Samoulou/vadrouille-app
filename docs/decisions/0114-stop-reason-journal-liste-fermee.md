@@ -1,10 +1,10 @@
-# 0113 — `stopReason` du journal : liste fermée dans un module feuille, `missing_key` pris de sa définition unique
+# 0114 — `stopReason` du journal : liste fermée dans un module feuille, `missing_key` pris de sa définition unique
 
 Statut : **proposée**, définitive dès sa fusion (décision 0093) · **décision de la Sécurité** (forme d'un champ de journal et texte à suffixe `_KEY` du régime de confinement ; la revue de #600, mineur 5, lui réserve ce point : « pour `stopReason`, la décision de la Sécurité prévaut »), sans délai de veto ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Elle n'engage ni argent, ni compte externe, ni donnée personnelle, et ne supprime ni ne désactive aucun test.
 
 Date : 2026-10-21 · Décideur : Sécurité · Ticket : #607 · Décisions liées : 0077 § 3 point 1, 0081 B9-TL-6 (h), 0087 § 1.4, 0090 § 3 point 4 · Question : Q550
 
-Numérotation (relue le 2026-10-21 sur `main` `9b7282e`) : `main` porte 0001 à 0111 ; la PR ouverte #604 porte 0112 ; aucune autre PR ouverte ne porte un 0113.
+Numérotation (relue le 2026-10-21 sur `main` `aaac322`) : `main` porte 0001 à 0113 (0112 par #604, 0113 par #610) ; aucune PR ouverte ne porte un 0114.
 
 ## Contexte
 

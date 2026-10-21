@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Codes admis dans le champ `stopReason` du journal (`generation.full_stuck`, B9d ; décision 0113). Module feuille, sans
+ * Codes admis dans le champ `stopReason` du journal (`generation.full_stuck`, B9d ; décision 0114). Module feuille, sans
  * autre import que `server-only` : `src/server/log.ts` le lit sans atteindre `src/server/generation/`
  * (`ligne/creation-imports`), `@/ai/natures` ni l'ancrage.
  *

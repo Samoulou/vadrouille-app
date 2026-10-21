@@ -9,8 +9,8 @@ import { CODES_ARRET } from "@/server/generation/raison-echec";
 import { formatLogLine } from "@/server/log";
 import { CODES_ARRET_JOURNAL_SANS_CLE } from "@/server/log-codes-arret";
 
-/** Champ `stopReason` du journal (`generation.full_stuck`) : liste fermée (décision 0113). */
-describe("journal: stopReason en liste fermée (décision 0113)", () => {
+/** Champ `stopReason` du journal (`generation.full_stuck`) : liste fermée (décision 0114). */
+describe("journal: stopReason en liste fermée (décision 0114)", () => {
   const TRIP = "0b6f3c7e-6a1e-4c55-9f2d-3c1a2b4d5e6f";
   const ligne = (stopReason: unknown) =>
     JSON.parse(formatLogLine("generation.full_stuck", { tripId: TRIP, stopReason } as object, "warn")) as Record<string, unknown>;
