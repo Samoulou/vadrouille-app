@@ -1,35 +1,34 @@
-# État du studio — 2026-10-21 (123e cycle)
+# État du studio — 2026-10-21 (126e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 122e cycle (fil du projet et #studio).
-- Q545 résolue par le diagnostic (`/mnt/project-files/essai-reel/diagnostic-rome-2026-10-20.md`) : l'essai de Rome du 2026-10-20 est allé au bout à 21:09 UTC, voyage `proto_rome_20261020_1` affiché sur l'hôte `p0-reel` ; `p0Run` n'écrit aucune ligne de journal en cas de succès ; Samuel regardait probablement « Mes voyages » sur une autre préversion (simulée). Lien direct envoyé à Samuel.
+- 2026-10-21 06:49 UTC (fil « Routine cycle du studio ») : « Oui » à Q557 : le texte libre et le logement saisis partent au fournisseur de modèles (hors UE, requête `programme` en `zdr` et `data_collection: "deny"`, 0117 S5). Q557 répondue ; 0115 § 2 le cite.
 
 ## Fait
-- Fusionnées : **B9d** (#600, voyage complet après déblocage ; Tech Lead et Sécurité favorables après la correction 1), statut du 122e cycle (#601).
-- Report `main` → `p0-reel` ouvert (#602, avec #597 et B9d) : à fusionner par Samuel.
-- Préalables de B10a ouverts (#604, décision 0112 et contrats du tri enregistré).
-- Décisions du CEO sur 0112 : la migration de B10a passe avant son code ; la PR de code de B10a n'est pas ouverte dans le cycle de B9d (réglé, B9d fusionnée) ; la « clôture » de `completeDeck` entre dans B10a, sans nouveau découpage.
+- Fusionnées : **0115** et la spécification `specs/P0-programme-par-ia.md` (#623, après deux corrections) ; **0117** verdicts de la Sécurité S1 à S5 (#627) ; **0113 § 3 bis** part Text Search de l'étape `e` (#613) ; #611 aperçu à deux villes sans logement.
+- **0116** (#628) : trois revues bloquantes, toutes sur T8 (relecture des horaires à l'affichage) → découpage décidé par le CEO et le Tech Lead : T8 sort du lot 1 et ira dans la **décision 0118** (Tech Lead et Sécurité, après la question de coût à Samuel, Q564) ; troisième tentative de #628 en revue.
+- **Premier lot de la chaîne inversée** livré : PR #632 (ia-recherche, Closes #624 ; `needs-review` posée dès que 0116 est fusionnée). **Lot 1 bis** livré : PR #631 (frontend, `tip`, `priceNote`, `hoursNote`, `Day.theme`, composant d'infos pratiques), en correction 1.
+- Vérification faite par le CEO : le modèle `deepseek/deepseek-v4.1-flash` dispose de fournisseurs ZDR sur OpenRouter (33 points de terminaison, liste publique) ; aucune question à Samuel.
+- Statut du 125e cycle (#630).
 
 ## En cours
-- tech-lead : **préalables de B10a** (#604), correction 1.
-- tech-lead : décision du forfait du voyage complet (demandée par la revue de B9d) et valeurs de test du profil `complet`.
-- sécurité : liste fermée des `stopReason` (Q550).
-- backend : aperçu à deux villes dont la seconde n'a pas de logement, arrêté en `cap_reached` (défaut relevé par B9d).
+- tech-lead : #628 0116, troisième tentative (découpage T8 → 0118) en revue ; si encore bloquée, nouveau découpage ou remontée à Samuel.
+- frontend : #631 lot 1 bis, correction 1 (formes d'URL, `texte.test.ts`, restriction de `SharedStopSchema.facts`, mention UX).
+- backend : B10a #621, correction 2 (dernière : garder la feuille ouverte au refus) ; #609 (jour vide du voyage complet sans signal → `cap_reached`, fiches de `e` par ville positionnée), code.
+- Après la fusion de #628, #632 et #631 : petite PR ia pour remplir `tip`, `priceNote`, `hoursNote`, `theme` ; puis **report `main` → `p0-reel`** pour que Samuel relance Rome sur la chaîne inversée.
 
 ## Bloqué
-- **Relance de Rome** : après la fusion de #602 par Samuel (« Create a merge commit »).
-- **Migration 0013** (#593) : approuvée par le Tech Lead ; `owner-approved` de Samuel, puis `db-migrate` par Samuel (fusions gelées pendant le lancement).
-- **Code de B10a** : après #604, la migration de 0112 § 3.7 (rôle data) et son ajout à `MIGRATIONS_APPROUVEES` (`owner-approved` de Samuel).
+- **Migrations 0013 et 0014 sur la base d'essai** : #593 puis #620 (approuvées par le Tech Lead) attendent l'`owner-approved` de Samuel ; puis un seul `db-migrate` par Samuel (fusions gelées pendant le lancement).
+- **Badge « fermé ce jour-là » à l'affichage** (T8, future 0118) : Q564 à Samuel (coût d'une fiche par lieu et par journée affichée) ; recommandation : juger d'abord le premier essai.
 - **Essai réel sur préversion** (B9e) : Q538.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI ; A2-c seulement si Samuel le décide (Q525).
-- **Purge du MVP et `coords-purge`** (#527) : Q438 (encore en échec le 2026-10-20 23:53 UTC).
+- **Purge du MVP et `coords-purge`** (#527) : Q438.
 
 ## Prochain cycle
-1. #604 jusqu'à la fusion, puis migration de B10a (data).
-2. Décisions du forfait et de `stopReason`, correction de l'aperçu à deux villes.
-3. Samuel : fusionner #602 puis relancer Rome ; `owner-approved` sur #593 puis `db-migrate` ; Q538, Q542, Q551 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
+1. Fusionner 0116 (#628), puis #632 et #631 ; PR ia de remplissage des infos pratiques ; report `main` → `p0-reel` ; prévenir Samuel pour relancer Rome.
+2. Finir B10a #621 et #609 ; chore CEO : préfixe `[po]` dans `CLAUDE.md` et renvoi vers 0115 dans `docs/CONTEXT.md`.
+3. Samuel : `owner-approved` sur #593 puis #620 ; Q564 (facultative avant l'essai) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -51,7 +50,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q552 à Q554 ; Q545 répondue.
+- Q564 à Q570. Q557 répondue par Samuel (« Oui », 06:49 UTC) ; Q562 répondue par la Sécurité (oui, 0117 correction 1).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
