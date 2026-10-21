@@ -39,6 +39,10 @@ export const PLAFONDS_LARGES: PlafondsUsage = {
   generations: {
     ...PLAFONDS_USAGE_TEST.generations,
     apercu: { coutModelesMicros: 600_000, placesTextSearch: 30, placesDetails: 30, routesRequetes: 10, routesElements: 300 },
+    // Voyage complet (B9d, revue de la PR 600) : la part de l'étape `e` (20 % des modèles) est répartie par jour, et chaque jour
+    // rédige au moins une fois (20 000 micro-USD réservés par requête) ; 200 000 n'en laissent que 10 000 par jour à un voyage de
+    // six jours (quatre jours planifiés). Coût de modèles élargi comme celui de l'aperçu ; le reste du profil est inchangé.
+    complet: { ...PLAFONDS_USAGE_TEST.generations.complet, coutModelesMicros: 600_000 },
   },
 };
 

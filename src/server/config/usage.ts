@@ -140,7 +140,9 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
   schema: 1,
   generations: {
     apercu: { coutModelesMicros: 600_000, placesTextSearch: 30, placesDetails: 30, routesRequetes: 10, routesElements: 300 },
-    complet: { coutModelesMicros: 200_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
+    // Coût de modèles du voyage complet élargi comme celui de l'aperçu (revue de la PR 600) : un voyage simulé de six jours
+    // tient dans son forfait (part de `e` répartie par jour). Valeur de test, sans lien avec les montants réels.
+    complet: { coutModelesMicros: 600_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
     mini: { coutModelesMicros: 20_000, placesTextSearch: 6, placesDetails: 6, routesRequetes: 0, routesElements: 0 },
   },
   relecture: {

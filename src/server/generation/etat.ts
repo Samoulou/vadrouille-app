@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { JOURS_VOYAGE_COMPLET_MAX } from "@/server/config/generation";
+
 import { CODES_ARRET } from "./raison-echec";
 
 /**
@@ -29,4 +31,18 @@ export type EtatEtape = z.infer<typeof EtatEtapeSchema>;
 /** Entrée d'une étape : validée par son contrat strict (une clé en trop, ou absente, refuse l'étape sans rien lire). */
 export function lireEtat(valeur: unknown): EtatEtape {
   return EtatEtapeSchema.parse(valeur);
+}
+
+/**
+ * État sérialisé de `generateFullTrip` (workflow 4, spécification B9d ; décision 0105 § 1, même règle) : les mêmes quatre champs
+ * au plus. Seule la borne du rang change : `a` = 1, `l` = 2, puis `2 + 4 × i + k` pour le jour de rang `i` (0087 § 1.3 point 4).
+ */
+export const EtatCompletSchema = EtatEtapeSchema.extend({
+  rang: z.number().int().min(0).max(2 + 4 * JOURS_VOYAGE_COMPLET_MAX),
+});
+export type EtatComplet = z.infer<typeof EtatCompletSchema>;
+
+/** Entrée d'une étape du voyage complet, validée par son contrat strict. */
+export function lireEtatComplet(valeur: unknown): EtatComplet {
+  return EtatCompletSchema.parse(valeur);
 }

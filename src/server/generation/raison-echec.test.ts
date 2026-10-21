@@ -5,7 +5,7 @@ import { NATURES_ECHEC, natureEchec } from "@/ai/natures";
 import { GENERATION_FAILURE_REASONS, type GenerationFailureReason } from "@/contracts/values";
 import { CODES_ANCRAGE } from "@/grounding/resultat";
 
-import { CODES_ANCRAGE_SEULS, CODES_ARRET, CODE_ETAPE_EXPIREE, echecDeCode, raisonDeNature, relancable, type NatureArret } from "./raison-echec";
+import { CODES_ANCRAGE_SEULS, CODES_ARRET, CODES_REESSAYABLES, CODE_ETAPE_EXPIREE, echecDeCode, raisonDeNature, relancable, type NatureArret } from "./raison-echec";
 
 /** B9-PO-9 : nature → raison d'échec. */
 const ATTENDU: Record<NatureArret, GenerationFailureReason> = {
@@ -70,5 +70,10 @@ describe("génération: codes d'arrêt", () => {
   it("CODES_ARRET = codes de la couche IA ∪ codes de l'ancrage ∪ step_expired, sans doublon", () => {
     expect(new Set(CODES_ARRET).size).toBe(CODES_ARRET.length);
     expect([...CODES_ARRET].sort()).toEqual([...new Set<string>([...CODES_ERREUR_IA, ...CODES_ANCRAGE, CODE_ETAPE_EXPIREE])].sort());
+  });
+
+  it("CODES_REESSAYABLES (module feuille) = les codes d'arrêt que echecDeCode dit réessayables", () => {
+    expect([...CODES_REESSAYABLES].sort()).toEqual(CODES_ARRET.filter((code) => echecDeCode(code).retryable).sort());
+    expect(CODES_REESSAYABLES).toContain(CODE_ETAPE_EXPIREE);
   });
 });

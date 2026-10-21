@@ -4,6 +4,7 @@ import { authAdapterChoice, getAuthAdapter, getCreationAdapter, type AdapterCont
 import { getSimulationScope } from "@/adapters/simulation";
 import {
   BriefRequestSchema,
+  FullTripStatusSchema,
   GenerationStatusSchema,
   InferredBriefSchema,
   LodgingRequestSchema,
@@ -13,13 +14,14 @@ import {
   fail,
   ok,
   type CreatedTrip,
+  type FullTripStatus,
   type GenerationStatus,
   type InferredBrief,
   type LodgingSuggestion,
   type Result,
   type Session,
 } from "@/contracts";
-import { CreatedTripSchema, GenerationStatusRequestSchema, RetryGenerationRequestSchema } from "@/contracts/creation";
+import { CreatedTripSchema, FullTripStatusRequestSchema, GenerationStatusRequestSchema, RetryGenerationRequestSchema } from "@/contracts/creation";
 import type { ApiErrorCode } from "@/contracts/values";
 import { contexteFacultatif } from "@/features/compte/session";
 
@@ -210,5 +212,34 @@ export async function retryGeneration(input: unknown): Promise<Result<CreatedTri
   if (!result.ok && result.error.code === "active_preview_exists") return conflictOf(result.error);
   if (!result.ok) return fail(RETRY_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
   const output = CreatedTripSchema.safeParse(result.value);
+  return output.success && output.data.tripId === parsed.value.tripId ? ok(output.data) : fail("provider_error");
+}
+
+/**
+ * État du voyage complet (B9d ; décision 0087 § 1.5) : source des deux bandeaux `error` de Séjour et de 6b, interrogée toutes
+ * les 5 secondes tant que la phase est `preparing`. Même forme que `getGenerationStatus` : contexte de `contexteFacultatif()`
+ * (`unauthenticated` sans session, avant toute lecture de l'entrée), `parseInput` par `FullTripStatusRequestSchema`, appel de
+ * l'adaptateur, sortie validée par `FullTripStatusSchema` et du même voyage ; `not_found` transmis, toute autre erreur devient
+ * `provider_error`. Ne relance jamais rien. Aucun journal.
+ */
+export async function getFullTripStatus(input: unknown): Promise<Result<FullTripStatus>> {
+  let ctx: AdapterContext | null;
+  try {
+    ctx = await contexteFacultatif();
+  } catch {
+    return fail("provider_error");
+  }
+  if (ctx === null) return fail("unauthenticated");
+  const parsed = parseInput(FullTripStatusRequestSchema, input);
+  if (!parsed.ok) return parsed;
+  const scope = await getSimulationScope();
+  let result: Result<unknown>;
+  try {
+    result = await getCreationAdapter(undefined, { scope }).getFullTripStatus(ctx, parsed.value.tripId);
+  } catch {
+    return fail("provider_error");
+  }
+  if (!result.ok) return fail(result.error.code === "not_found" ? "not_found" : "provider_error");
+  const output = FullTripStatusSchema.safeParse(result.value);
   return output.success && output.data.tripId === parsed.value.tripId ? ok(output.data) : fail("provider_error");
 }

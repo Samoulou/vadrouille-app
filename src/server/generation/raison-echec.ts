@@ -4,6 +4,10 @@ import { CODES_ERREUR_IA, type CodeErreurIa } from "@/ai/erreurs";
 import { natureEchec, type NatureEchec } from "@/ai/natures";
 import type { GenerationFailureReason } from "@/contracts/values";
 
+import { CODE_ETAPE_EXPIREE, CODES_REESSAYABLES as REESSAYABLES_LITTERAUX } from "./reessayables";
+
+export { CODE_ETAPE_EXPIREE };
+
 /**
  * Conversion unique de `generation_runs.stop_reason` vers la raison d'échec de `GenerationStatus` et `retryable`
  * (spécification B9, B9b point 6 et B9-PO-9 ; décision 0081 B9-TL-6 (h) ; 0077 § 3 point 6). Construite sur
@@ -45,15 +49,13 @@ export const CODES_ANCRAGE_SEULS = [
   "lodging_unresolved",
 ] as const;
 
-/** Échéance d'une étape (B9-TL-3 point 5) : seul code propre à la génération. */
-export const CODE_ETAPE_EXPIREE = "step_expired";
 
 /** Codes fermés de `generation_runs.stop_reason` (même liste que le `CHECK` de la migration 0012). */
 export const CODES_ARRET = [...CODES_ERREUR_IA, ...CODES_ANCRAGE_SEULS, CODE_ETAPE_EXPIREE] as const;
 export type CodeArret = (typeof CODES_ARRET)[number];
 
 const CODES_IA: ReadonlySet<string> = new Set(CODES_ERREUR_IA);
-const REESSAYABLES: ReadonlySet<string> = new Set(["upstream_unavailable", "upstream_timeout", CODE_ETAPE_EXPIREE]);
+const REESSAYABLES: ReadonlySet<string> = new Set(REESSAYABLES_LITTERAUX);
 
 const estCodeIa = (code: string): code is CodeErreurIa => CODES_IA.has(code);
 
@@ -87,6 +89,13 @@ export function echecDeCode(code: string | null): Echec {
   }
   return { reason: "provider_error", retryable };
 }
+
+/**
+ * Codes d'arrêt réessayables (`retryable` vrai, module feuille `./reessayables.ts`) : la liste que `retryGeneration` passe à
+ * l'écriture conditionnelle de reprise du voyage complet (0087 § 1.3 point 1, jamais recopiée dans le SQL ni dans le module
+ * de reprise). Égale à `CODES_ARRET.filter((c) => echecDeCode(c).retryable)` (test de ce module).
+ */
+export const CODES_REESSAYABLES: readonly CodeArret[] = REESSAYABLES_LITTERAUX;
 
 /** Vrai si l'exécution `failed` de ce code peut être relancée par la personne (`retryGeneration`, B9-PO-9). */
 export function relancable(code: string | null): boolean {
