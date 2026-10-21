@@ -199,7 +199,14 @@ const j3Excursion: Stop = {
   name: "[Excursion guidée dans les Highlands]",
   start: "08:00",
   end: "20:00",
-  facts: { area: "[Glencoe et Loch Ness]", durationMinutes: 720 },
+  // Infos pratiques (décision 0116 § 6, lot 1 bis) : un exemple de chaque, en crochets comme tout contenu simulé.
+  facts: {
+    area: "[Glencoe et Loch Ness]",
+    durationMinutes: 720,
+    tip: "[Prends une veste imperméable : la météo change vite]",
+    priceNote: "[Environ 70 GBP par personne]",
+    hoursNote: "[Départ à 08:00, retour vers 20:00]",
+  },
   reason: "[Tu as demandé une journée dans les Highlands]",
   exceptions: ["toReserve"],
   locked: false,
@@ -439,6 +446,8 @@ const days: Day[] = [
   {
     index: 3,
     date: "2026-08-31",
+    // Titre libre du jour (décision 0116 § 6, lot 1 bis).
+    theme: "[Highlands]",
     items: [
       startAt("07:30", HOTEL),
       walk(15),

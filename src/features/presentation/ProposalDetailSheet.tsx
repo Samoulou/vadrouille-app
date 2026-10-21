@@ -4,6 +4,7 @@ import { useRef } from "react";
 
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
+import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal, Weekday } from "@/contracts";
 import { format } from "@/i18n";
@@ -89,6 +90,8 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
               {format(t.detail.verifie, { date: formatVerifiedAt(stop.verifiedAt) })}
             </p>
           ) : null}
+          {/* Infos pratiques (décision 0116 § 6) après la source et sa date : elles n'en viennent pas (PPI-PO-5). */}
+          <PracticalNotes facts={stop.facts} headingLevel={3} />
           <PlacesAttribution placesFromGoogle={placesFromGoogle} />
           <DialogClose asChild>
             <Button variant="secondary" className="w-full">

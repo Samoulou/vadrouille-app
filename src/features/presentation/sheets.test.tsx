@@ -96,6 +96,26 @@ describe("ProposalDetailSheet", () => {
     expect(formatVerifiedAt("2026-01-05")).toBe("5 janvier 2026");
   });
 
+  it("infos pratiques (décision 0116 § 6) : après le pourquoi et la source, titre de niveau 3 ; absentes sans valeur", async () => {
+    const avecInfos = {
+      ...distillerie,
+      stop: { ...distillerie.stop, facts: { ...distillerie.stop.facts, tip: "[Réserve la visite]", hoursNote: "[Fermé le lundi]" } },
+    };
+    const { rerender } = render(<ProposalDetailSheet proposal={avecInfos} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    const notes = within(dialog).getByRole("region", { name: "Infos pratiques" });
+    expect(within(notes).getByRole("heading", { level: 3 })).toBeInTheDocument();
+    expect(notes).toHaveTextContent("Conseil[Réserve la visite]");
+    expect(notes).toHaveTextContent("Horaires[Fermé le lundi]");
+    expect(notes).not.toHaveTextContent("Prix");
+    const texte = dialog.textContent ?? "";
+    expect(texte.indexOf(distillerie.stop.reason!)).toBeLessThan(texte.indexOf("Infos pratiques"));
+    expect(texte.indexOf("Informations vérifiées le")).toBeLessThan(texte.indexOf("Infos pratiques"));
+    expect(await axeViolations(document.body)).toEqual([]);
+    rerender(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
+    expect(within(screen.getByRole("dialog")).queryByRole("region", { name: "Infos pratiques" })).toBeNull();
+  });
+
   it("adaptateur prototype : mention « Données de lieux : Google » dans la feuille (écran 6)", () => {
     render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} placesFromGoogle />);
     const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });

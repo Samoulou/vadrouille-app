@@ -26,6 +26,8 @@ const SNAPSHOT = {
       index: 1,
       date: "2027-05-01",
       title: "calculé",
+      // Titre libre du jour (décision 0116 § 6) : hors de la liste blanche, jamais exposé.
+      theme: "Old Town et Dean Village",
       travelBudgetMinutes: 90,
       travelMinutes: 42,
       items: [
@@ -41,7 +43,8 @@ const SNAPSHOT = {
             end: "11:00",
             reason: "Tu aimes l'histoire",
             source: { label: "Site", url: "https://exemple.ch", checkedOn: "2026-10-01", rating: 4.8 },
-            facts: { durationMinutes: 90, area: "Old Town", openingHours: "9-17" },
+            // Infos pratiques (décision 0103, condition 1 de Q-L4a) : jamais exposées par la base.
+            facts: { durationMinutes: 90, area: "Old Town", openingHours: "9-17", tip: "Arrive tôt", priceNote: "Environ 20 GBP", hoursNote: "Fermé le lundi" },
             exceptions: ["toConfirm", "verified", { nested: true }, "toReserve", "unconfirmed", "toReserve"],
             locked: false,
             verifiedAt: "2026-10-01",

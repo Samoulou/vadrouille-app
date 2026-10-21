@@ -25,6 +25,7 @@ export {
   TripSchema,
   WeekdaySchema,
 } from "./trip";
+export { LONGUEURS_CONTRAT, contientUrl, texteMaison } from "./texte";
 export type {
   Change,
   ChecklistItem,
