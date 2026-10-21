@@ -239,4 +239,23 @@ describe("T8 : relecture des horaires à l'affichage (décision 0116 § 5.3)", (
     }
     expect(logEvent).not.toHaveBeenCalled();
   });
+
+  it("p0: toConfirm jamais stocké, calculé à la lecture", async () => {
+    const programme = programmeAvecEtapeSansLieu();
+    // Stocké : aucune étape ne porte toConfirm ; l'étape sans placeId n'a ni position ni trajet.
+    expect(JSON.stringify(programme)).not.toContain("toConfirm");
+    const sansLieu = programme.trip.days[0]!.items.find((ligne) => ligne.type === "stop" && ligne.stop.placeId === undefined);
+    expect(sansLieu).toBeDefined();
+    const rang = programme.trip.days[0]!.items.indexOf(sansLieu!);
+    expect(programme.trip.days[0]!.items[rang - 1]?.type).not.toBe("segment");
+    // Lu : badge sur l'étape sans placeId, aucun autre sans relecture des horaires ; le programme source reste intact.
+    const adaptateur = createPrototypeAdapter({
+      programmes: { ids: async () => [programme.trip.id], lire: async (id) => (id === programme.trip.id ? structuredClone(programme) : null) },
+      relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: paires.map(() => 7) }) } },
+    });
+    const voyage = await adaptateur.getTrip(ctx, programme.trip.id);
+    const badges = voyage!.days[0]!.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop.placeId === undefined, ligne.stop.exceptions.includes("toConfirm")] : []));
+    for (let i = 0; i < badges.length; i += 2) expect(badges[i + 1]).toBe(badges[i]);
+    expect(JSON.stringify(programme)).not.toContain("toConfirm");
+  });
 });
