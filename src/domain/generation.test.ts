@@ -348,6 +348,7 @@ describe("moteur: réparation par l'option suivante, sans modèle", () => {
       version: true,
       budgetTrajetReduit: true,
       jours: true,
+      conservees: true,
     } satisfies Record<keyof EntreeMoteur, true>;
     expect(Object.keys(cles).filter((cle) => /mod[eè]le|client|prompt|ia$/i.test(cle))).toEqual([]);
     expect(Object.keys(relectures()).sort()).toEqual(["duree", "plages", "validite"]);
@@ -725,5 +726,59 @@ describe("moteur: jours à planifier (B9-TL-13)", () => {
       end: "11:00",
       locked: true,
     });
+  });
+});
+
+describe("moteur: étapes conservées (0119 § 2.1, B10-TL-6)", () => {
+  // Version 3, J2 entier : la personne en écarte la première activité ; tout le reste du jour est conservé.
+  const v3 = reussi(generer(entree()));
+  const j2 = jourN(v3, 2);
+  const ecartee = etapes(j2).find((s) => s.kind === "activity" && s.commitment === undefined && !s.locked);
+  if (ecartee === undefined) throw new Error("jeu de test : aucune activité au J2");
+  const conservees = new Set(etapes(j2).flatMap((s) => (s.id === ecartee.id ? [] : [s.id])));
+  // R7 : les repas conservés sont « gardés » par leur identifiant d'étape (B5-PO-8).
+  const choix = new Map<string, EtatChoix>([...TOUS_CHOISIS, ...etapes(j2).map((s) => [s.id, "garde"] as const)]);
+  // Un incontournable existe : sans `conservees`, il prendrait la place d'une étape non verrouillée.
+  const meilleur = candidat("meilleur", "activity", { notes: { matchesWishes: true, notForMeRisk: 1, mustSee: true, slotFit: ["activity"] } });
+  const reserve = [meilleur, ...ACTIVITES, ...REPAS, ...SOIREES].filter((c) => c.placeId !== ecartee.placeId);
+  const sansEcartee = entree({ version: 4, choix, candidats: reserve });
+  const resultat = replanifierJour({ ...sansEcartee, conservees }, v3, 2);
+
+  it("une étape conservée garde son jour, son heure, son identifiant et reste non verrouillée", () => {
+    if (!resultat.ok) throw new Error(resultat.code);
+    const apres = etapes(resultat.jour);
+    for (const stop of etapes(j2)) if (conservees.has(stop.id)) expect(apres.find((s) => s.id === stop.id)).toEqual(stop);
+    expect(apres.filter((s) => conservees.has(s.id) && s.locked)).toEqual(etapes(j2).filter((s) => s.locked));
+    expect(resultat.rapport.filter((e) => estBloquante(e, [resultat.jour]))).toEqual([]);
+    expect(TripSnapshotSchema.safeParse({ days: [resultat.jour] }).success).toBe(true);
+  });
+
+  it("l'étape non conservée est remplacée depuis la réserve, sans reprendre un lieu conservé ni un lieu d'un autre jour", () => {
+    if (!resultat.ok) throw new Error(resultat.code);
+    const apres = etapes(resultat.jour);
+    expect(apres.some((s) => s.id === ecartee.id || s.placeId === ecartee.placeId)).toBe(false);
+    const nouvelles = apres.filter((s) => !conservees.has(s.id));
+    expect(nouvelles.length).toBeGreaterThan(0);
+    for (const stop of nouvelles) expect(stop.id).toMatch(/^v4-j2-\d+$/);
+    const lieux = etapes(resultat.jour).map((s) => s.placeId);
+    expect(new Set(lieux).size).toBe(lieux.length);
+    const ailleurs = new Set(v3.days.filter((d) => d.index !== 2).flatMap((d) => etapes(d).map((s) => s.placeId)));
+    for (const stop of nouvelles) expect(ailleurs.has(stop.placeId)).toBe(false);
+  });
+
+  it("sans conservees, ou vide : le comportement de B5 (seules les étapes verrouillées et les engagements restent)", () => {
+    const sans = replanifierJour(sansEcartee, v3, 2);
+    expect(replanifierJour({ ...sansEcartee, conservees: new Set() }, v3, 2)).toEqual(sans);
+    if (!sans.ok) throw new Error(sans.code);
+    // Le jeu de test n'est pas trivial : sans conservees, une étape non verrouillée du J2 n'est pas reprise telle quelle.
+    const libres = etapes(j2).filter((s) => conservees.has(s.id) && !s.locked && s.commitment === undefined);
+    expect(libres.some((stop) => !etapes(sans.jour).some((s) => s.id === stop.id))).toBe(true);
+  });
+
+  it("generer ignore conservees ; un jour de base non planifié aussi", () => {
+    expect(generer({ ...entree(), conservees })).toEqual(generer(entree()));
+    const apercu = reussi(generer(entree({ jours: [1, 2], version: 1 })));
+    const autre = new Set(["v1-j3-1", ...conservees]);
+    expect(replanifierJour({ ...entree({ version: 2 }), conservees: autre }, apercu, 3)).toEqual(replanifierJour(entree({ version: 2 }), apercu, 3));
   });
 });
