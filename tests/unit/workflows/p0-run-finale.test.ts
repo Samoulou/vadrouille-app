@@ -414,7 +414,7 @@ describe("p0Run, etapeProgramme de bout en bout sur les doubles (décision 0116 
     for (const etape of etapes) expect(etape.placeId).toBe(taverne);
   });
 
-  it("p0: lieu fermé définitivement, écrit sans placeId ni position, à confirmer à la lecture", async () => {
+  it("p0: lieu fermé définitivement, écrit sans placeId, sans position et sans toConfirm écrit", async () => {
     await etapeProgramme({ runId: RUN_ID });
     const ferme = PLACE_ID_DE.get("Maison géorgienne restaurée") ?? "";
     expect(capture.details).toContain(ferme);
