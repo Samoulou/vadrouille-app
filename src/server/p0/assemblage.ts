@@ -1,8 +1,10 @@
 import {
   DETOUR_THRESHOLD_MINUTES,
   DayMapSchema,
+  LONGUEURS_CONTRAT,
   ProposalSchema,
   TripSchema,
+  texteMaison,
   validateDayMap,
   type Day,
   type DayLineItem,
@@ -281,6 +283,10 @@ export type CreneauAssemble = {
   readonly lieu?: string;
   readonly quartier?: string;
   readonly pourquoi?: string;
+  /** Infos pratiques de l'IA (décision 0116 § 6, lot 1 bis) : `tip`, `priceNote`, `hoursNote` si la règle du contrat les admet. */
+  readonly conseil?: string;
+  readonly prix?: string;
+  readonly horaires?: string;
   readonly aReserver?: boolean;
   readonly placeId?: string;
 };
@@ -289,7 +295,7 @@ export type EntreeAssemblageIa = {
   tripId: string;
   brief: Brief;
   /** Journées lues, rangées par date ; créneaux **dans l'ordre écrit** (`ordreEcrit`, 0116 § 1.7), jamais retriés ici. */
-  jours: readonly { readonly date: string; readonly creneaux: readonly CreneauAssemble[] }[];
+  jours: readonly { readonly date: string; readonly titre?: string; readonly creneaux: readonly CreneauAssemble[] }[];
   /** Bons plans contrôlés (0117 § 1) : lignes « À faire » avant le départ (0116 § 6). */
   bonsPlans: readonly string[];
   /** Identifiant de chaque logement du brief, dans son ordre (logements vérifiés à l'ouverture de l'étape). */
@@ -307,6 +313,18 @@ const NATURES_REPAS: ReadonlySet<string> = new Set(["repas_midi", "repas_soir", 
 /** Fin du jour : le contrat n'admet pas d'heure au-delà (0116 § 1.7). */
 const FIN_DU_JOUR = "23:59";
 
+/**
+ * Texte de l'IA admis par la règle du contrat (`texteMaison`, `src/contracts/texte.ts`) à sa longueur, sinon `undefined` :
+ * un texte refusé laisse le champ vide, jamais une erreur (0116 § 6, lot 1 bis). Second contrôle : la lecture
+ * (`lireProgramme`) applique déjà la même règle ; celui-ci garde `TripSchema.parse` de toute entrée qui ne serait pas
+ * passée par elle.
+ */
+function texteAdmis(valeur: string | undefined, max: number): string | undefined {
+  if (valeur === undefined) return undefined;
+  const lu = texteMaison(max).safeParse(valeur);
+  return lu.success ? lu.data : undefined;
+}
+
 const minutesDe = (heure: string) => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
 
 /**
@@ -321,10 +339,13 @@ function finDeLEtape(debut: string, fin: string | undefined): string | undefined
 
 /**
  * Assemblage du programme écrit par l'IA en `Trip`, **sans replanifier** ni retirer (0115 § 3, 0116 § 1.6) :
- * - une journée par date lue, d'indice `date − arrivée + 1` ; `arrivee` et `depart` donnent l'heure des lignes
- *   `terminus` (logement de la nuit, libellé maison), jamais une étape ni une vérification (0116 § 4.1) ;
+ * - une journée par date lue, d'indice `date − arrivée + 1`, son titre en `Day.theme` (lot 1 bis, même règle) ;
+ *   `arrivee` et `depart` donnent l'heure des lignes `terminus` (logement de la nuit, libellé maison), jamais une étape
+ *   ni une vérification (0116 § 4.1) ;
  * - un créneau avec lieu devient une étape, dans l'ordre écrit : `meal` (midi, soir, apéro), `activity` (visite,
- *   soirée, pause avec lieu) ; nom, heures et `pourquoi` (`reason`) de l'IA, `quartier` en `facts.area`, badge
+ *   soirée, pause avec lieu) ; nom, heures et `pourquoi` (`reason`) de l'IA, `quartier` en `facts.area`, `conseil`,
+ *   `prix` et `horaires` en `facts.tip`, `facts.priceNote` et `facts.hoursNote` (0116 § 6, lot 1 bis ; texte refusé par
+ *   la règle du contrat : champ vide), badge
  *   `toReserve` si `aReserver` ; `placeId` seulement si le lieu est vérifié ; **jamais `toConfirm`** (calculé à la
  *   lecture, 0116 § 5.1) ;
  * - une pause sans lieu devient une ligne `free` : jusqu'à sa `fin` lue comme celle d'une étape (passant minuit :
@@ -405,6 +426,9 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       rang += 1;
       const kind: Stop["kind"] = NATURES_REPAS.has(creneau.nature) ? "meal" : "activity";
       const fin = finDeLEtape(creneau.debut, creneau.fin);
+      const tip = texteAdmis(creneau.conseil, LONGUEURS_CONTRAT.tip);
+      const priceNote = texteAdmis(creneau.prix, LONGUEURS_CONTRAT.priceNote);
+      const hoursNote = texteAdmis(creneau.horaires, LONGUEURS_CONTRAT.hoursNote);
       const stop: Stop = {
         id: `j${index}-${rang}`,
         kind,
@@ -415,6 +439,9 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
         facts: {
           ...(fin === undefined ? {} : { durationMinutes: minutesDe(fin) - minutesDe(creneau.debut) }),
           ...(creneau.quartier === undefined ? {} : { area: creneau.quartier }),
+          ...(tip === undefined ? {} : { tip }),
+          ...(priceNote === undefined ? {} : { priceNote }),
+          ...(hoursNote === undefined ? {} : { hoursNote }),
         },
         ...(creneau.pourquoi === undefined ? {} : { reason: creneau.pourquoi }),
         exceptions: creneau.aReserver === true ? ["toReserve"] : [],
@@ -443,9 +470,11 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
         locked: true,
         commitment: engagement.type,
       }));
+    const theme = texteAdmis(jour.titre, LONGUEURS_CONTRAT.theme);
     return {
       index,
       date: jour.date,
+      ...(theme === undefined ? {} : { theme }),
       items,
       events,
       generating: false,

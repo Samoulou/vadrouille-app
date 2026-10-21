@@ -45,6 +45,7 @@
             "quartier": "Colisée",
             "pourquoi": "Le cœur politique de la Rome antique, avec le même billet que le Colisée.",
             "conseil": "Entre par la via della Salara Vecchia pour éviter la file.",
+            "horaires": "9:00 à 19:15 en été",
             "incontournable": true
           },
           {
@@ -81,6 +82,7 @@
             "pourquoi": "La chapelle Sixtine et des siècles d'art, la grande visite de la journée.",
             "conseil": "Réserve le premier créneau du matin pour éviter la foule.",
             "prix": "20 €",
+            "horaires": "8:00 à 19:00, fermés le dimanche",
             "aReserver": true,
             "incontournable": true
           },
@@ -111,6 +113,8 @@
             "lieu": "Château Saint-Ange",
             "quartier": "Prati",
             "pourquoi": "Le mausolée devenu forteresse, avec une terrasse sur tout Rome.",
+            "prix": "16 €",
+            "horaires": "9:00 à 19:30, fermé le lundi",
             "incontournable": true
           },
           {
@@ -150,6 +154,8 @@
             "quartier": "Centro storico",
             "pourquoi": "Le temple antique le mieux conservé de Rome, avec sa coupole ouverte.",
             "conseil": "Réserve l'entrée en ligne, elle est payante.",
+            "prix": "5 €",
+            "horaires": "9:00 à 19:00",
             "aReserver": true,
             "incontournable": true
           },
@@ -196,7 +202,8 @@
             "lieu": "Galerie Doria Pamphilj",
             "quartier": "Centro storico",
             "pourquoi": "Une collection privée de chefs-d'œuvre dans un palais encore habité.",
-            "conseil": "L'audioguide est inclus, prends-le."
+            "conseil": "L'audioguide est inclus, prends-le.",
+            "prix": "16 €"
           },
           {
             "debut": "16:30",
@@ -204,7 +211,8 @@
             "nature": "pause",
             "lieu": "Giolitti",
             "quartier": "Centro storico",
-            "pourquoi": "Une glace dans l'un des plus vieux glaciers de Rome."
+            "pourquoi": "Une glace dans l'un des plus vieux glaciers de Rome.",
+            "prix": "3 à 5 € la glace"
           },
           {
             "debut": "18:00",
@@ -238,6 +246,7 @@
             "quartier": "Palatin",
             "pourquoi": "La colline des empereurs, avec la vue sur le Forum et le Circus Maximus.",
             "conseil": "Le billet du Colisée l'inclut s'il est encore valable.",
+            "horaires": "9:00 à 19:15",
             "incontournable": true
           },
           {
@@ -308,7 +317,8 @@
             "lieu": "Thermes de Caracalla",
             "quartier": "Aventin",
             "pourquoi": "Les immenses thermes impériaux, calmes le matin.",
-            "prix": "8 €"
+            "prix": "8 €",
+            "horaires": "9:00 à 19:15, fermés le lundi"
           },
           {
             "debut": "11:30",

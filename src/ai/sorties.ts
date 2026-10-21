@@ -622,8 +622,11 @@ const CHAMPS_FACULTATIFS_CRENEAU = ["fin", "lieu", "pourquoi", "ville", "quartie
 
 /**
  * Créneau écrit par l'IA. Tout texte passe par `texteCoupe` (contrôle du texte entier, coupe, recontrôle : 0111 § 3,
- * 0117 § 1 point 1). Clés inconnues (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni
- * recopiées (0117 § 1 point 5), et comptées dans `champsRetires`.
+ * 0117 § 1 point 1), donc par la règle du contrat (`texteMaison` de `src/contracts/texte.ts`, réexportée par
+ * `src/ai/candidat.ts` depuis la PR 652, ticket 633) : `conseil`, `prix`, `horaires` et le titre du jour vont aux
+ * champs du contrat (`StopFacts.tip`, `priceNote`, `hoursNote`, `Day.theme` ; 0116 § 6, lot 1 bis). Clés inconnues
+ * (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni recopiées (0117 § 1 point 5), et
+ * comptées dans `champsRetires`.
  */
 const CreneauIaObjet = z.object({
     debut: z.string().regex(HEURE),
