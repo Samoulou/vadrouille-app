@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import { contientUrl, texteMaison } from "./texte";
 
 /**
- * Règle de texte maison du contrat (décision 0094 § 7, revue de #631) : table propre à `src/contracts/texte.ts`, plus
- * stricte que les copies de `src/ai/candidat.ts` et `src/prototype/candidat.ts` jusqu'à leur remplacement par des
- * réexportations (la table commune reste dans `tests/unit/p0/copies.test.ts`).
+ * Règle de texte maison du contrat (décision 0094 § 7, revue de #631) : `src/contracts/texte.ts` en est l'unique
+ * définition ; `src/ai/candidat.ts` et `src/prototype/candidat.ts` la réexportent (ticket 633, test d'identité dans
+ * `tests/unit/p0/copies.test.ts`). La table qui comparait les anciennes copies est reprise ici (« table commune »).
  */
 
 const MAX = 160;
@@ -70,6 +70,31 @@ describe("contrats: texte maison (src/contracts/texte.ts)", () => {
   it("espaces de début et de fin retirés avant de mesurer ; la valeur lue est coupée", () => {
     expect(texteMaison(MAX).parse("  Arrive tôt  ")).toBe("Arrive tôt");
     expect(texteMaison(5).safeParse("  abcde  ").success).toBe(true);
+  });
+
+  // Table commune des anciennes copies (`tests/unit/p0/copies.test.ts` jusqu'au ticket 633), mêmes verdicts :
+  // [texte, longueur maximale, contientUrl, admis par texteMaison].
+  const COMMUNE: [string, number, boolean, boolean][] = [
+    ["Musée maison", 80, false, true],
+    ["", 80, false, false],
+    ["   ", 80, false, false],
+    ["x".repeat(80), 80, false, true],
+    ["x".repeat(81), 80, false, false],
+    ["ligne\u0007son", 80, false, false],
+    ["un <b>lieu</b>", 80, false, false],
+    ["voir https://exemple.org", 300, true, false],
+    ["voir www.exemple", 300, true, false],
+    ["voir exemple.com", 300, true, false],
+    ["mailto:a", 300, true, false],
+    ["javascript:alert(1)", 300, true, false],
+    ["texte\u200bcaché", 300, false, false],
+    ["droite\u202egauche", 300, false, false],
+    ["Café du Lac, 12 €", 300, false, true],
+    ["東京の美術館", 300, false, true],
+  ];
+  it.each(COMMUNE)("table commune : %j (max %d)", (texte, max, url, admis) => {
+    expect(contientUrl(texte)).toBe(url);
+    expect(texteMaison(max).safeParse(texte).success).toBe(admis);
   });
 
   it("linéaire : un long texte sans domaine se contrôle vite", () => {

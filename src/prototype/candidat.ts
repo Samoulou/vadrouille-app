@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { CategorySchema, IsoDateSchema, STOP_KINDS, TimeSchema } from "@/contracts";
+import { CategorySchema, IsoDateSchema, STOP_KINDS, TimeSchema, contientUrl, texteMaison } from "@/contracts";
 
 /**
  * Candidat trouvé par la recherche et ses notes (décision 0032, A3.1). Défini une seule fois, ici : la recherche
@@ -45,40 +45,13 @@ export const LONGUEURS_TEXTE = {
 /** Identifiant interne d'un candidat, attribué par le code (jamais par le modèle). */
 export const CANDIDAT_ID_PATTERN = /^c_\d{3}$/;
 
-/** Caractères refusés : contrôle, invisibles, direction (catégorie Unicode C), et balises. */
-const CARACTERES_INTERDITS = /[\p{C}<>]/u;
-
-/** Formes d'URL refusées dans un texte libre (les URL ne vivent que dans `source`, validée à part). */
-const FORMES_URL = [
-  /[a-z0-9+.-]:\/\//i,
-  /\bwww\./i,
-  /\b(?:javascript|data|mailto|file):/i,
-  /[a-z0-9-]\.(?:com|org|net|info|io|co|uk|scot|fr|ch|de|eu|gov|edu|app|dev|example)\b/i,
-];
-
 /**
- * Vrai si le texte contient une URL ou un nom de domaine. Motifs de longueur bornée, donc linéaires (pas de répétition
- * suivie d'un suffixe obligatoire, qui rendait l'essai quadratique sur « aaaa… », « a-a-… » ou « a.a.… » : revue de
- * #597) ; chacun admet tout ce qu'admettait l'ancien motif (ce qui précède « :// » ou « .tld » n'est plus exigé en
- * entier), la détection n'est donc jamais affaiblie.
+ * Règle de texte maison : **réexportée** de `src/contracts/texte.ts`, sa seule définition (décision 0094 § 7, amendement
+ * de 0077 § 1 point 3 ; ticket 633). Une ligne, Unicode imprimable, sans balise ni URL, espaces de début et de fin
+ * retirés avant la mesure. `tests/unit/p0/copies.test.ts` vérifie que c'est la même fonction ; la table de verdicts vit
+ * dans `src/contracts/texte.test.ts`.
  */
-export function contientUrl(texte: string): boolean {
-  return FORMES_URL.some((forme) => forme.test(texte));
-}
-
-/**
- * Texte libre maison : une ligne, longueur bornée, Unicode imprimable, sans balise ni URL. Un texte refusé fait
- * écarter l'élément qui le porte (compté `model_output_invalid`), jamais recopier.
- */
-export function texteMaison(max: number) {
-  return z
-    .string()
-    .min(1)
-    .max(max)
-    .refine((valeur) => valeur.trim().length > 0, "texte vide")
-    .refine((valeur) => !CARACTERES_INTERDITS.test(valeur), "caractère interdit")
-    .refine((valeur) => !contientUrl(valeur), "URL interdite dans un texte libre");
-}
+export { contientUrl, texteMaison };
 
 /** Date de source et d'événement. */
 const DateSchema = IsoDateSchema;

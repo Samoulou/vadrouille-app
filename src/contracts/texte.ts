@@ -5,13 +5,11 @@ import { z } from "zod";
  * borne les infos pratiques de l'étape (`StopFacts.tip`, `priceNote`, `hoursNote`) et le titre libre du jour
  * (`Day.theme`), écrits par notre recherche ou par le modèle (décision 0116 § 6, lot 1 bis), jamais tirés de Google.
  *
- * Module feuille : il n'importe que `zod` (chargé sous Node nu par `pnpm p0`). **Transition** : `src/ai/candidat.ts`
- * et `src/prototype/candidat.ts` portent encore leurs propres définitions ; 0094 § 7 prévoit qu'ils réexportent
- * celles-ci (ticket ia cité dans la PR #631). **Jusqu'à ce remplacement, ce module est plus strict que les deux
- * copies** : il refuse en plus les domaines `.it`, `.va`, `.es`, `.pt`, `.nl` (0094 § 7), les séparateurs de ligne et
- * de paragraphe (U+2028, U+2029), les points homoglyphes devant une extension (U+2024, U+FE52, U+FF0E, U+3002), et
- * il retire les espaces de début et de fin avant de mesurer (`.trim()`). `tests/unit/p0/copies.test.ts` vérifie que
- * les trois rendent le même verdict sur sa table, qui ne contient aucun de ces cas ; `texte.test.ts` couvre l'écart.
+ * Module feuille : il n'importe que `zod` (chargé sous Node nu par `pnpm p0`). **Unique définition** : `src/ai/candidat.ts`
+ * et `src/prototype/candidat.ts` la réexportent (0094 § 7, ticket 633) ; `tests/unit/p0/copies.test.ts` vérifie que
+ * c'est la même fonction. Par rapport aux anciennes copies, elle refuse en plus les domaines `.it`, `.va`, `.es`, `.pt`,
+ * `.nl`, les séparateurs de ligne et de paragraphe (U+2028, U+2029) et les points homoglyphes devant une extension
+ * (U+2024, U+FE52, U+FF0E, U+3002), et retire les espaces de début et de fin avant de mesurer (`.trim()`).
  */
 
 /** Caractères refusés : contrôle, invisibles, direction (catégorie Unicode C), séparateurs de ligne et de paragraphe, balises. */
