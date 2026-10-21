@@ -81,10 +81,6 @@ export const LOG_EVENTS = [
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
   "generation.full_stuck",
-  // B10a (amendement 1 de la décision 0112, demande de la Sécurité, revue de la PR 621 point 6) : lecture de l'état du tri
-  // repliée sur la session locale parce que le schéma du tri enregistré (migration 0014) est absent de la base. Niveau
-  // `warn` ; champ `tripId` seulement ; ni code ni message de la base.
-  "presentation.deck_schema_missing",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
