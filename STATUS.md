@@ -1,21 +1,21 @@
-# État du studio — 2026-10-21 (131e cycle)
+# État du studio — 2026-10-21 (132e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-21 16:31 UTC (fil « Routine cycle du studio ») : « 1 h pour relire ? » : réponse donnée (le signal de relecture de 13:59 UTC s'était perdu, relecture relancée à 16:13 UTC). À 18:15 UTC : Samuel prévenu que #632 est fusionnée et qu'une PR de report l'attend (#648).
+- Aucun message de Samuel depuis le 131e cycle. Le report `main` → `p0-reel` (#648) attend sa fusion (« Create a merge commit ») ; `p0-reel` est toujours à `63cd2a7`.
 
 ## Fait
-- **Premier lot fusionné** (#632, head `bd41c6a`, 16:20 UTC) : relecture de la correction 2 conforme (Tech Lead sans bloquant, Sécurité approuvée). L'IA écrit le programme complet, le code vérifie chaque lieu, badge « à confirmer » à la lecture, nombres d'étapes sur le rapport, mode simulé de `pnpm p0` sur la nouvelle chaîne. Mineurs restants : type `LieuProgramme` partagé reporté (Q574 répondue : report accepté, dette à lister dans la note de version), libellé du compteur (décision de forme 0093) à lister dans la note de version.
-- **Report `main` → `p0-reel`** : PR #648 ouverte (23 commits, `main` à `0d910fd`, fusion sans conflit ; `.github/workflows/db-migrate.yml` seul fichier de workflow, approbations 0013/0014 déjà appliquées ; aucune migration). Samuel la fusionne lui-même (« Create a merge commit ») puis relance Rome.
-- **Décision 0119** (#645) : correction 1 (`c304bca`) relue à 16:31 UTC : un bloquant introduit par la correction (« dernière exécution `preview` qui a écrit des cases » : faux, `SQL_EXECUTION_APERCU` prend la dernière `preview` sans condition) et trois mineurs. **Correction 2 (la dernière comptée)** lancée ; choix du CEO : même exécution que la lecture, « aucune case » traité comme « aperçu sans proposition ».
-- Statut du 130e cycle (#647) fusionné.
+- Fusionnées : **décision 0119** (#645, B10-TL-5 à B10-TL-8 : workflow 5 `batchRecompute`, entrée `conservees` du moteur, voyage complet filtré par les signaux, profil de forfait `lot` sans montant, interrupteur « recalcul à la fin de l'aperçu » fermé ; approuvée à la correction 2), **#652** (`texteMaison`/`contientUrl` réexportés depuis `src/contracts/texte.ts`, `.trim()` accepté par le Tech Lead), statut du 131e cycle (#649).
+- **Infos pratiques écrites par l'IA** (#651, head `8f36653`, ticket #650) : première relecture (18:40 UTC) : Sécurité approuvée (ligne de confinement inchangée, double application de la règle du contrat saine), Tech Lead un bloquant (un texte du test rangé à tort parmi les refusés) et cinq mineurs. Correction 1 lancée. Réponse du CEO : pas de compteur « infos complètes / incomplètes » au rapport avant le premier essai réel.
+- **B10b** : tickets de code ouverts à la fusion de 0119 : **#653** B10b-migration (data : colonnes `base_version` et `deck_closure_id`, index uniques, purge, migration 0015) et **#654** B10b-domaine (backend : entrée `conservees`, `src/domain/recalcul.ts`), lancés ensemble (aucun fichier commun). B10b-serveur suivra leur fusion et le verdict Sécurité (Q575).
+- Le corps de #648 est mis à jour : `main` a avancé à `dd0a52b` (#652, 0119, #649 embarqués ; toujours aucune migration).
 
 ## En cours
-- Tech Lead : #645 correction 2 (0119) ; si encore bloquée, le CEO et le Tech Lead décident (troisième tentative ou découpage).
-- ia-recherche : PR de remplissage de `tip`/`priceNote`/`hoursNote`/`theme` par le prompt `programme` (ticket à ouvrir par l'agent), puis #633 (réexportations `texte.ts`).
+- ia-recherche : #651 correction 1.
+- data : #653 B10b-migration. backend : #654 B10b-domaine.
 - Samuel : fusion de #648 puis essai de Rome sur la page d'essai ; le studio ne lance aucun essai.
-- Après la fusion de 0119 : tickets de code B10b-migration, B10b-moteur, B10b-serveur (verdict Sécurité Q575 avant la fusion de la PR serveur).
+- Après la fusion de #651 : second report `main` → `p0-reel` (conseils, prix, horaires, titre du jour remplis par l'IA).
 - Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI.
 
 ## Bloqué
@@ -26,8 +26,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. Lire le résultat de l'essai de Rome de Samuel s'il a eu lieu (journal de l'exécution, page d'essai) ; PR infos pratiques et #633 jusqu'à la fusion, puis second report `main` → `p0-reel`.
-2. #645 (0119) jusqu'à la fusion ; puis tickets de code B10b (migration d'abord).
+1. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport) ; #651 jusqu'à la fusion puis second report.
+2. #653 et #654 jusqu'à la fusion ; puis ticket B10b-serveur (après verdict Sécurité Q575).
 3. Samuel : fusionner #648 et relancer Rome ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
@@ -50,7 +50,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Aucune. Q574 répondue par le Tech Lead (relecture de #632 du 16:19 UTC : report accepté, dette à noter).
+- Q577, Q578 (#651, #652). Q576 (c) : 0119 ne met pas en œuvre la reprise d'un recalcul échoué en B10b.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
