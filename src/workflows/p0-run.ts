@@ -657,7 +657,11 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
         compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
         const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined) =>
-          programme.jours.map((jour, indiceJour) => ({ date: jour.date, creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })) }));
+          programme.jours.map((jour, indiceJour) => ({
+            date: jour.date,
+            ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+            creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })),
+          }));
         // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
         const requetesPrevues = Math.min(config.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
         reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;

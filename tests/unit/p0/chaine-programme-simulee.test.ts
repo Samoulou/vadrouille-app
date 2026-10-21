@@ -35,9 +35,11 @@ const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owne
  * fictif, aucune donnée Google), pour que rome-1 garde son statut de brief sans fixtures de lieux de l'ancienne chaîne
  * (`tests/unit/p0/borne-demande-du-jour.test.ts`).
  */
-function fixturesRome(): Fixtures {
+function fixturesRome(modifier: (programme: SortieRome) => void = () => undefined): Fixtures {
   const edimbourg = lireFixtures("edimbourg");
-  const modeles = FixturesModelesSchema.parse(JSON.parse(readFileSync(path.join(process.cwd(), "prototype/fixtures/modeles/rome.json"), "utf8")));
+  const brut = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/fixtures/modeles/rome.json"), "utf8")) as { programme: SortieRome };
+  modifier(brut.programme);
+  const modeles = FixturesModelesSchema.parse(brut);
   const brief = lireBrief("rome-1");
   const programme = lireProgramme(JSON.stringify(modeles.programme), { arrivee: brief.arrivee, depart: brief.depart }).valeur;
   if (programme === null) throw new Error("fixture rome illisible");
@@ -58,10 +60,19 @@ function fixturesRome(): Fixtures {
   return { ...edimbourg, modeles, places: FixturesPlacesSchema.parse({ lieux }) };
 }
 
-async function executerSimule(nomBrief: string, slug: string, plafondsModifies: Partial<ReturnType<typeof lireConfiguration>["plafonds"]> = {}) {
-  const fixtures = slug === "rome" ? fixturesRome() : lireFixtures(slug);
+/** Sortie simulée brute de rome-1, telle que le modèle la rendrait (avant toute lecture). */
+type SortieRome = { jours: { titre?: string; creneaux: Record<string, unknown>[] }[] };
+
+async function executerSimule(
+  nomBrief: string,
+  slug: string,
+  plafondsModifies: Partial<ReturnType<typeof lireConfiguration>["plafonds"]> = {},
+  fixturesDonnees?: Fixtures,
+) {
+  const fixtures = fixturesDonnees ?? (slug === "rome" ? fixturesRome() : lireFixtures(slug));
   const lignes: string[] = [];
   const appels: string[] = [];
+  const requetes: string[] = [];
   const modeles = creerModelesSimules(fixtures.modeles);
   const resultat = await executerProgramme({
     nomBrief,
@@ -76,14 +87,14 @@ async function executerSimule(nomBrief: string, slug: string, plafondsModifies: 
     journal: creerJournal((ligne) => void lignes.push(ligne), creerRedacteur([])),
     horloge: () => 0,
     clients: {
-      modeles: { envoyer: (requete) => (appels.push(requete.etape), modeles.envoyer(requete)) },
+      modeles: { envoyer: (requete) => (appels.push(requete.etape), requetes.push(JSON.stringify(requete)), modeles.envoyer(requete)) },
       recherche: creerRechercheSimulee(fixtures.recherche),
       lecteur: creerLecteurPages({ resoudre: creerResolveurSimule(fixtures.pages.dns), http: creerHttpSimule(fixtures.pages.pages) }),
       places: creerPlacesSimule(fixtures.places),
       routes: creerRoutesSimule(fixtures.routes),
     },
   });
-  return { resultat, lignes, appels };
+  return { resultat, lignes, appels, requetes };
 }
 
 describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
@@ -117,6 +128,73 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     const etapes = trip!.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : [])));
     expect(etapes.length).toBe(resultat.rapport.etapes.avecPlaceId + resultat.rapport.etapes.sansPlaceId);
     for (const etape of etapes) expect(etape.exceptions.includes("toConfirm")).toBe(etape.placeId === undefined);
+  });
+
+  it("p0: infos pratiques et titre du jour de l'IA écrits dans les étapes et les jours, puis affichés (rome-1, lot 1 bis)", async () => {
+    const { resultat, requetes } = await executerSimule("rome-1", "rome");
+    // Le prompt ne porte que le brief : aucune donnée des fiches Places (identifiant, nom, adresse, niveau de prix).
+    expect(requetes).toHaveLength(1);
+    expect(requetes[0]).not.toMatch(/SENTINELLE/);
+    const brief = lireBrief("rome-1");
+    const modeles = FixturesModelesSchema.parse(JSON.parse(readFileSync(path.join(process.cwd(), "prototype/fixtures/modeles/rome.json"), "utf8")));
+    const ecrit = ordreEcrit(lireProgramme(JSON.stringify(modeles.programme), { arrivee: brief.arrivee, depart: brief.depart }).valeur!);
+    const attendu = ecrit.jours.map((jour) => ({
+      theme: jour.titre,
+      etapes: jour.creneaux
+        .filter((creneau) => creneau.lieu !== undefined && creneau.nature !== "arrivee" && creneau.nature !== "depart")
+        .map((creneau) => ({ name: creneau.lieu, tip: creneau.conseil, priceNote: creneau.prix, hoursNote: creneau.horaires })),
+    }));
+    // La sortie simulée porte des conseils, des prix, des horaires et un titre par jour.
+    const toutes = attendu.flatMap((jour) => jour.etapes);
+    for (const champ of ["tip", "priceNote", "hoursNote"] as const) expect(toutes.some((etape) => etape[champ] !== undefined), champ).toBe(true);
+    expect(attendu.every((jour) => jour.theme !== undefined)).toBe(true);
+
+    const programme = ProgrammeReduitSchema.parse(resultat.programme);
+    const adaptateur = createPrototypeAdapter({
+      programmes: { ids: async () => [programme.trip.id], lire: async (id) => (id === programme.trip.id ? structuredClone(programme) : null) },
+      relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: paires.map(() => 9) }) } },
+    });
+    const trip = TripSchema.parse(await adaptateur.getTrip(ctx, programme.trip.id));
+    const affiche = trip.days.map((jour) => ({
+      theme: jour.theme,
+      etapes: jour.items.flatMap((ligne) =>
+        ligne.type === "stop" ? [{ name: ligne.stop.name, tip: ligne.stop.facts.tip, priceNote: ligne.stop.facts.priceNote, hoursNote: ligne.stop.facts.hoursNote }] : [],
+      ),
+    }));
+    expect(affiche).toEqual(attendu);
+    // Les fiches Places (nom, adresse, niveau de prix) n'atteignent ni le programme écrit ni les infos pratiques.
+    expect(JSON.stringify(programme)).not.toMatch(/SENTINELLE[-_](?:NOM|ADRESSE|NIVEAU)/);
+  });
+
+  it("p0: info pratique ou titre du jour refusés par la règle du contrat, champ vide, programme complet (rome-1)", async () => {
+    const fixtures = fixturesRome((sortie) => {
+      const premier = sortie.jours[0]!;
+      premier.titre = "Monti et le Colisée, voir colosseo.it";
+      const avecLieu = premier.creneaux.filter((creneau) => typeof creneau.lieu === "string");
+      avecLieu[0]!.conseil = "Commande sur fornoserpenti.it avant de venir.";
+      avecLieu[1]!.prix = "18 €\u2028(avec le Forum)";
+      avecLieu[2]!.horaires = "9:00 à 19:15, voir parcocolosseo\uFF0Ecom";
+    });
+    const { resultat } = await executerSimule("rome-1", "rome", {}, fixtures);
+    const reference = await executerSimule("rome-1", "rome");
+    expect(resultat.rapport.statut).toBe("complete");
+    // Quatre champs retirés seuls et comptés ; aucun créneau ni aucune journée retirés.
+    expect(resultat.rapport.programme.fieldsRemoved).toBe(reference.resultat.rapport.programme.fieldsRemoved + 4);
+    expect(resultat.rapport.programme.slotsRemoved).toBe(reference.resultat.rapport.programme.slotsRemoved);
+    expect(resultat.rapport.programme.days).toBe(reference.resultat.rapport.programme.days);
+    const programme = ProgrammeReduitSchema.parse(resultat.programme);
+    const [jour1, jour2] = programme.trip.days;
+    expect(jour1!.theme).toBeUndefined();
+    expect(jour2!.theme).toBe("Vatican et Prati");
+    const etapes = jour1!.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : []));
+    expect(etapes[0]!.facts.tip).toBeUndefined();
+    expect(etapes[0]!.facts.priceNote).toBe("8 à 12 € par personne");
+    expect(etapes[1]!.facts.priceNote).toBeUndefined();
+    expect(etapes[1]!.facts.tip).toBe("Réserve le créneau horaire en ligne, les billets partent vite.");
+    expect(etapes[2]!.facts.hoursNote).toBeUndefined();
+    expect(etapes[2]!.facts.tip).toBe("Entre par la via della Salara Vecchia pour éviter la file.");
+    // Rien du texte refusé n'est écrit.
+    expect(JSON.stringify(programme)).not.toMatch(/\.it\b|\u2028|\uFF0E/);
   });
 
   it("p0: mode simulé, lieu introuvable ou fermé définitivement écrit sans placeId (edimbourg-1)", async () => {

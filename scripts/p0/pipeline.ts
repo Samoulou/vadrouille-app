@@ -472,6 +472,7 @@ export async function executerProgramme(entree: EntreePipeline): Promise<Resulta
     }
     const jours = ecrit.jours.map((jour, indiceJour) => ({
       date: jour.date,
+      ...(jour.titre === undefined ? {} : { titre: jour.titre }),
       creneaux: jour.creneaux.map((creneau, rang) => {
         const cle = cleDe(indiceJour, rang);
         return { ...creneau, placeId: cle === undefined ? undefined : fiches.get(cle)?.placeId };
