@@ -1621,23 +1621,6 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
      */
     it.each([
       [
-        "admis : src/server/presentation → src/domain/preferences.ts (et un autre module de src/domain)",
-        { "src/server/presentation/etat.ts": [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"] },
-        "src/server/presentation/etat.ts",
-        [],
-      ],
-      [
-        "admis : src/features/presentation → src/server/actions/presentation.ts → cas d'usage → src/domain",
-        {
-          "src/features/presentation/server-actions.ts": ["src/server/actions/presentation.ts"],
-          "src/server/actions/presentation.ts": ["src/adapters/api-tri-instance.ts"],
-          "src/adapters/api-tri-instance.ts": ["src/server/presentation/tri.ts"],
-          "src/server/presentation/tri.ts": [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"],
-        },
-        "src/features/presentation/server-actions.ts",
-        [],
-      ],
-      [
         "refusé : src/features/presentation → src/server/actions/presentation.ts → src/ai (l'action n'est pas un terminal)",
         { "src/features/presentation/server-actions.ts": ["src/server/actions/presentation.ts"], "src/server/actions/presentation.ts": ["src/ai/couche.ts"] },
         "src/features/presentation/server-actions.ts",
@@ -1658,6 +1641,36 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     ] satisfies [string, Record<string, string[]>, string, string[]][])("B10a, arêtes de 0112 § 2 point 4 : %s", (_nom, aretes, depart, attendu) => {
       const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    /**
+     * Cas « admis » discriminants (revue de la PR 621, correction 2) : chaque graphe admis a un témoin qui ne diffère que
+     * par le nœud de src/server, remplacé par un nœud hors de src/server ; le témoin est refusé, donc l'admission vient
+     * bien de la règle « src/server atteint src/domain » et non d'un graphe sans violation possible.
+     */
+    it.each([
+      [
+        "src/server/presentation → src/domain/preferences.ts et src/domain/recomposition.ts",
+        "src/server/presentation/etat.ts",
+        "src/adapters/presentation-etat.ts",
+        (noeud: string): Record<string, string[]> => ({ [noeud]: [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"] }),
+        [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"],
+      ],
+      [
+        "écran → src/server/actions/presentation.ts → cas d'usage → src/domain",
+        "src/server/actions/presentation.ts",
+        "src/adapters/actions-presentation.ts",
+        (noeud: string): Record<string, string[]> => ({
+          "src/features/presentation/server-actions.ts": [noeud],
+          [noeud]: ["src/domain/recomposition.ts"],
+        }),
+        ["src/domain/recomposition.ts"],
+      ],
+    ] as const)("B10a, arête admise de 0112 § 2 point 4, et son témoin refusé : %s", (_nom, serveur, temoin, aretes, refuses) => {
+      const graphe = (table: Record<string, string[]>): Voisins => (fichier) => Object.entries(table).find(([nom]) => nom === fichier)?.[1] ?? [];
+      const depart = (noeud: string) => (noeud.startsWith("src/server/presentation/") || noeud.startsWith("src/adapters/presentation") ? noeud : "src/features/presentation/server-actions.ts");
+      expect(violationsApplication(depart(serveur), graphe(aretes(serveur)))).toEqual([]);
+      expect(violationsApplication(depart(temoin), graphe(aretes(temoin)))).toEqual([...refuses]);
     });
 
     it("B10a, arêtes réelles de 0112 § 2 point 4 : l'écran n'importe de src/server que des actions, et l'action du tri seulement depuis server-actions.ts", () => {

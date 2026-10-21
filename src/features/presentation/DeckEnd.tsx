@@ -18,9 +18,9 @@ export interface DeckEndProps {
   /** Titre, pour y placer le focus en fin de paquet (F6-PO-5). */
   titleRef?: Ref<HTMLHeadingElement>;
   /**
-   * Tri enregistré clos avant l'ouverture de l'écran (« Passer », fin du paquet, déblocage ; B10-PO-4 point 3) : titre
-   * « Tu as fini ce tri… » au lieu de « Tu as tout trié », faux quand des cartes ont été gardées sans être triées (texte
-   * provisoire UX/UI, spécification B10, question 8). Les boutons de la variante ne changent pas.
+   * Tri enregistré clos avant l'ouverture de l'écran (« Passer », fin du paquet, déblocage ; B10-PO-4 point 3). Suite du
+   * tri : « Tu as fini ce tri. » au lieu de « Tu as tout trié », faux quand des cartes ont été gardées sans être triées ;
+   * aperçu : son titre, inchangé (textes provisoires, spécification B10, question 8). Boutons de la variante inchangés.
    */
   closed?: boolean;
 }
@@ -42,7 +42,7 @@ export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = 
       className="flex flex-1 flex-col justify-center gap-6"
     >
       <h2 id="fin-titre" ref={titleRef} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
-        {closed ? t.clos : TITLES[variant]}
+        {closed && variant === "suite" ? t.clos : TITLES[variant]}
       </h2>
       <div className="flex flex-col gap-3">
         {variant === "apercu" && canUnlock ? (

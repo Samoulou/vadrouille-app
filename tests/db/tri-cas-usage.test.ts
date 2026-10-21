@@ -28,6 +28,7 @@ const db = createDatabase("vadrouille_app");
 const withOrg = creerWithOrg(db);
 let app: DbClient;
 let auth: DbClient;
+let admin: DbClient;
 let a: Org;
 let b: Org;
 let ctxA: AdapterContext;
@@ -153,6 +154,7 @@ const refuse = (resultat: { ok: boolean; error?: unknown }) => {
 beforeAll(async () => {
   app = await connect("app");
   auth = await connect("auth");
+  admin = await connect("admin");
   a = await createOrg(auth);
   b = await createOrg(auth);
   ctxA = contexte(a);
@@ -226,6 +228,35 @@ describe("présentation: une décision est enregistrée une fois par requestId",
     expect(refuse(await annuler(tripId, autre, annulation))).toEqual(valide);
     expect(await nombre(a, "preference_signals", tripId)).toBe(avant.signaux + 2);
     expect((await session(tripId)).openPrompt).toEqual({ kind: "category", category: "museum" });
+  });
+});
+
+describe("présentation: conflit à la pose d'une question (0112 § 3.6)", () => {
+  it("question de la catégorie posée entre la lecture et l'écriture (conflit de SQL_POSER_QUESTION) : validation_failed, rien n'est écrit", async () => {
+    const tripId = await nouveauVoyage();
+    await decider(tripId, "m1", "dislike");
+    const avant = await toutes(tripId);
+    // Course fabriquée : un déclencheur (administration, ce seul voyage, ce seul requestId) pose la question `museum`
+    // dès l'insertion du deuxième refus, avant que le cas d'usage ne la pose : l'INSERT … ON CONFLICT DO NOTHING ne rend
+    // aucune ligne. Retiré à la fin du test.
+    const declencheur = randomUUID();
+    const nom = `tri_conflit_${declencheur.replaceAll("-", "")}`;
+    await admin.query(`CREATE FUNCTION public.${nom}() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $f$
+      BEGIN
+        INSERT INTO public.preference_prompts (organization_id, trip_id, kind, category, trigger_signal_id, state)
+          VALUES (NEW.organization_id, NEW.trip_id, 'category', 'museum', NEW.id, 'closed');
+        RETURN NEW;
+      END $f$`);
+    await admin.query(`CREATE TRIGGER ${nom} AFTER INSERT ON public.preference_signals FOR EACH ROW
+      WHEN (NEW.trip_id = '${tripId}'::uuid AND NEW.request_id = '${declencheur}'::uuid) EXECUTE FUNCTION public.${nom}()`);
+    try {
+      expect(refuse(await decider(tripId, "m2", "dislike", declencheur))).toEqual(valide);
+    } finally {
+      await admin.query(`DROP TRIGGER IF EXISTS ${nom} ON public.preference_signals`);
+      await admin.query(`DROP FUNCTION IF EXISTS public.${nom}()`);
+    }
+    // Transaction annulée : ni le refus, ni la question du déclencheur ne sont écrits.
+    expect(await toutes(tripId)).toEqual(avant);
   });
 });
 

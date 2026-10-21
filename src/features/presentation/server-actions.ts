@@ -14,11 +14,16 @@ import type { DeckActions, RefusDuTri } from "./actions";
  * dans le navigateur.
  */
 
-/** Refus d'une action du tri : `generation_in_progress` → `recalcul` ; `validation_failed` → `dejaDecidee` ; sinon `echec`. */
-function refusDe(resultat: Result<unknown> | null): RefusDuTri {
+/**
+ * Refus d'une action du tri : `generation_in_progress` → `recalcul` ; `validation_failed` **sans** `field` (refus du cas
+ * d'usage : carte déjà décidée, hors du tri ouvert, question plus ouverte) → `dejaDecidee` ; `validation_failed` **avec**
+ * `field` (entrée refusée par `parseInput` avant toute lecture : rien ne dit que la carte est décidée) et tout autre code
+ * → `echec`, la carte reste.
+ */
+export function refusDe(resultat: Result<unknown> | null): RefusDuTri {
   if (resultat === null || resultat.ok) return "echec";
   if (resultat.error.code === "generation_in_progress") return "recalcul";
-  return resultat.error.code === "validation_failed" ? "dejaDecidee" : "echec";
+  return resultat.error.code === "validation_failed" && resultat.error.field === undefined ? "dejaDecidee" : "echec";
 }
 
 export function createServerDeckActions(tripId: string): DeckActions {

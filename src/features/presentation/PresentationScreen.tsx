@@ -170,6 +170,11 @@ function Deck({
    * Effacé au geste suivant.
    */
   const [refus, setRefus] = useState<Exclude<RefusDuTri, "dejaDecidee"> | null>(null);
+  /**
+   * Réponse à la question non enregistrée (recalcul, échec ; revue de la PR 621, correction 2) : la feuille reste ouverte
+   * et montre le refus dans un bandeau annoncé ; effacé à la réponse suivante ou à la fermeture de la feuille.
+   */
+  const [refusReponse, setRefusReponse] = useState<Exclude<RefusDuTri, "dejaDecidee"> | null>(null);
 
   const card = currentCard(state);
   const position = offset + state.index + 1;
@@ -258,6 +263,7 @@ function Deck({
 
   function keepDay() {
     if (!card || state.prompt || state.pending) return;
+    setRefus(null);
     dispatch({ type: "keepDay" });
     track({ name: "deck_skipped", properties: { position, scope: "day" } });
     requestFocus("keep");
@@ -267,6 +273,7 @@ function Deck({
     const pending = state.undo;
     if (!pending) return;
     const restored = pending.snapshot.cards[pending.snapshot.index];
+    setRefus(null);
     dispatch({ type: "undo" });
     track({ name: "deck_undo", properties: { position: offset + pending.position } });
     if (pending.decision && restored) {
@@ -280,6 +287,8 @@ function Deck({
     const prompt = state.prompt;
     if (!prompt || answeringRef.current === prompt) return;
     answeringRef.current = prompt;
+    setRefus(null);
+    setRefusReponse(null);
     const removed =
       prompt.kind === "category" && value.answer === "yes"
         ? state.cards.filter((c, i) => i >= state.index && c.kind === "activity" && c.category === prompt.category).length
@@ -294,11 +303,14 @@ function Deck({
     });
     void actions.answerPrompt(prompt, value).then(({ next, refus: motif }) => {
       answeringRef.current = null;
-      if (motif !== undefined) {
-        // Réponse non enregistrée : la feuille se ferme sans rien changer au paquet ; la question reste ouverte côté
-        // serveur (recalcul, échec) et revient au rechargement, ou n'est plus ouverte (déjà fermée ailleurs).
+      if (motif === "dejaDecidee") {
+        // La question n'est plus ouverte côté serveur (fermée ailleurs) : la feuille se ferme, le paquet ne change pas.
         dispatch({ type: "dismissPrompt" });
-        signalerRefus(motif);
+        return;
+      }
+      if (motif !== undefined) {
+        // Recalcul ou échec : rien n'est enregistré ; la feuille reste ouverte avec le refus, la personne peut réessayer.
+        setRefusReponse(motif);
         return;
       }
       dispatch({ type: "answer", prompt, answer: value, next });
@@ -422,7 +434,15 @@ function Deck({
           <PreferenceSheet
             prompt={state.prompt}
             onAnswer={answer}
-            onDismiss={() => dispatch({ type: "dismissPrompt" })}
+            refus={
+              refusReponse === null
+                ? null
+                : { kind: refusReponse === "recalcul" ? "generating" : "error", message: refusReponse === "recalcul" ? t.refus.recalcul : t.refus.echec }
+            }
+            onDismiss={() => {
+              setRefusReponse(null);
+              dispatch({ type: "dismissPrompt" });
+            }}
             onReturnFocus={returnFocus}
           />
         </Suspense>

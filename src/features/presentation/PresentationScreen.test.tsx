@@ -460,15 +460,17 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
   });
 
   it.each([
-    [false, "apercu"],
-    [true, "suite"],
-  ] as const)("tri clos à l'ouverture (débloqué : %s) : « Tu as fini ce tri… », jamais « Tu as tout trié »", (unlocked, variante) => {
+    [false, "apercu", "Tu as vu tes premières propositions"],
+    [true, "suite", "Tu as fini ce tri."],
+  ] as const)("tri clos à l'ouverture (débloqué : %s) : titre de la variante %s, jamais « Tu as tout trié »", (unlocked, variante, titre) => {
     setup({ unlocked, proposals: [], deck: session([], 0, { closed: true }), actions: actionsEspion().actions });
     const fin = document.querySelector("[data-deck-end]");
     expect(fin).toHaveAttribute("data-deck-end", variante);
     expect(fin).toHaveAttribute("data-deck-closed");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Tu as fini ce tri. Le reste est gardé dans ton programme.");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(new RegExp(`^${titre.replace(".", "\\.")}$`));
     expect(screen.queryByText("Tu as tout trié")).toBeNull();
+    // Rien ne dit qu'il reste des cartes non triées : la phrase « Le reste est gardé… » n'est pas affichée.
+    expect(screen.queryByText(/Le reste est gardé/)).toBeNull();
   });
 
   it("la feuille rouverte au chargement, fermée sans réponse : le focus revient sur la carte", async () => {
@@ -486,7 +488,7 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
     return {
       decide: vi.fn(async () => ({ prompt: null, refus })),
       undo: vi.fn(async () => undefined),
-      answerPrompt: vi.fn(async () => ({ next: null, refus })),
+      answerPrompt: vi.fn(async (): Promise<{ next: null; refus?: typeof refus }> => ({ next: null, refus })),
       complete: vi.fn(async () => undefined),
     };
   }
@@ -501,11 +503,13 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
     await click("J'aime");
     expect(cardName()).toBe(avant);
     expect(progress()).toHaveAccessibleName("Proposition 1 sur 8");
-    const bandeau = document.querySelector(`[data-kind='${kind}']`);
-    expect(bandeau).toHaveTextContent(texte);
+    // Bandeau repéré par son texte, visible hors de la région d'annonce, du type attendu.
+    const bandeau = screen.getAllByText(texte).map((n) => n.closest("[data-kind]")).find((n) => n !== null);
+    expect(bandeau).toHaveAttribute("data-kind", kind);
     expect(annonce()).toHaveTextContent(texte);
     expect(annonce()).toHaveAttribute("role", "status");
     expect(toast()).toBeNull();
+    expect(await axeViolations(document.body)).toEqual([]);
     // Un nouveau geste, refusé de même, le redit (le bandeau est effacé au geste, puis reposé) ; la carte ne bouge pas.
     await click("J'aime");
     expect(cardName()).toBe(avant);
@@ -521,15 +525,50 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
     expect(toast()).toBeNull();
   });
 
-  it("réponse non enregistrée (recalcul) : la feuille se ferme, le paquet ne change pas, le bandeau le dit", async () => {
+  it("« Tout garder pour le jour » efface le bandeau d'un refus précédent", async () => {
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions: actionsRefusees("echec") });
+    await click("J'aime");
+    expect(screen.getAllByText("Ce choix n'a pas été enregistré. Réessaie.").length).toBeGreaterThan(0);
+    await click("Tout garder pour le jour 1");
+    expect(document.querySelector("[data-kind='error']")).toBeNull();
+  });
+
+  it.each([
+    ["recalcul", "generating", "Ça se prépare, réessaie dans un instant."],
+    ["echec", "error", "Ce choix n'a pas été enregistré. Réessaie."],
+  ] as const)("réponse non enregistrée (%s) : la feuille reste ouverte avec le bandeau %s ; une nouvelle réponse l'efface et s'enregistre", async (refus, kind, texte) => {
     const reprise = propositions.slice(2);
-    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsRefusees("recalcul") });
+    const actions = actionsRefusees(refus);
+    actions.answerPrompt.mockImplementationOnce(async () => ({ next: null, refus })).mockImplementation(async () => ({ next: null }));
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: "Oui" }));
+    await flush();
+    // La feuille reste ouverte ; le bandeau est dans la feuille, annoncé ; le paquet ne change pas.
+    const ouverte = screen.getByRole("dialog");
+    const bandeau = within(ouverte).getByText(texte).closest("[data-kind]");
+    expect(bandeau).toHaveAttribute("data-kind", kind);
+    expect(bandeau).toHaveAttribute("role", kind === "error" ? "alert" : "status");
+    // Paquet inchangé (la barre est sous la feuille modale, donc masquée aux technologies d'assistance).
+    expect(screen.getByRole("progressbar", { hidden: true })).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+    expect(await axeViolations(ouverte)).toEqual([]);
+    // Nouvelle réponse : bandeau effacé, réponse enregistrée, feuille fermée.
+    fireEvent.click(within(ouverte).getByRole("button", { name: "Non" }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByText(texte)).toBeNull();
+    expect(actions.answerPrompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("réponse refusée parce que la question n'est plus ouverte : la feuille se ferme, sans bandeau", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsRefusees("dejaDecidee") });
     const feuille = await screen.findByRole("dialog");
     fireEvent.click(within(feuille).getByRole("button", { name: "Oui" }));
     await flush();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.querySelector("[data-kind='generating'], [data-kind='error']")).toBeNull();
     expect(progress()).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
-    expect(annonce()).toHaveTextContent("Ça se prépare, réessaie dans un instant.");
   });
 
   it("« Passer » clôt le tri enregistré", async () => {
