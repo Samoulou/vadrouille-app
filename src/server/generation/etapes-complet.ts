@@ -275,12 +275,16 @@ const rangDuJourCourant = (contexte: ContexteComplet): number => {
 /**
  * Réserve Text Search de l'étape `e` du passage (décision 0113 § 3 bis point 1) : chaque étape `e` positionne les villes de son
  * jour, donc une requête par ville `area` ou `none` **et par jour** ; `total` est la somme sur les jours du passage, `ici` la
- * réserve du jour de l'étape `e` en cours (0 pour les autres étapes). Même fonction pure que l'aperçu.
+ * réserve du jour de l'étape `e` en cours (0 pour les autres étapes), `besoinC` le besoin propre de `c`. Mêmes fonctions pures
+ * que l'aperçu.
  */
 export function reserveDeLEtape(passage: Pick<Passage, "voyage" | "villes" | "jours">, position: { readonly i: number; readonly etape: EtapeJour } | null): ReserveTextSearch {
   const { nuitsVille } = nuitsDuVoyage(passage.voyage, passage.villes);
   const jour = position !== null && position.etape === "e" ? (passage.jours[position.i] ?? null) : null;
-  return reserveDuPassage({ jours: passage.jours, nuitsVille, villes: passage.villes.map((ville) => ({ rang: ville.rang, logement: ville.sejour.logement })) }, jour);
+  const pourReserve = (ville: VilleDeLApercu) => ({ rang: ville.rang, logement: ville.sejour.logement });
+  // Besoin propre de `c` : les villes introduites par le passage, celles que `c` ancre (jours du passage, chacune une fois).
+  const introduites = passage.jours.flatMap((j) => villesDuJour(passage.voyage, passage.villes, j)).map(pourReserve);
+  return reserveDuPassage({ jours: passage.jours, nuitsVille, villes: passage.villes.map(pourReserve) }, jour, introduites);
 }
 
 async function forfaitDuPassage(contexte: ContexteComplet, passage: Pick<Passage, "voyage" | "villes" | "jours">): Promise<ForfaitDeLEtape> {

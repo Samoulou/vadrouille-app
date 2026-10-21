@@ -39,14 +39,23 @@ export function reserveTextSearchE(entree: EntreeReserve): number {
 }
 
 /**
+ * Besoin propre de `c` (0113 § 3 bis point 3) : son Text Search du nom de chaque ville `area` ou `none` qu'elle ancre
+ * (0087 § 2.3). `villes` : celles que `c` ancre (aperçu : villes de J1 et J2 ; voyage complet : villes introduites par le
+ * passage), chacune comptée une fois.
+ */
+export function besoinPropreDeC(villes: readonly VillePourReserve[]): number {
+  return new Set(villes.filter((ville) => DEMANDE_TEXT_SEARCH.has(ville.logement.kind)).map((ville) => ville.rang)).size;
+}
+
+/**
  * Réserve d'une exécution : `total` est retiré de la part Text Search de `c` **avant** sa répartition ; `ici` est la part
  * Text Search exacte de l'étape `e` en cours (aperçu : `total` ; voyage complet : la réserve de son jour, hors découpage
- * cumulatif, § 3 bis point 1).
+ * cumulatif, § 3 bis point 1) ; `besoinC` est le besoin propre de `c` : refus si `total + besoinC` dépasse la part de `c`.
  */
-export type ReserveTextSearch = { readonly total: number; readonly ici: number };
+export type ReserveTextSearch = { readonly total: number; readonly ici: number; readonly besoinC: number };
 
 /** Réserve du voyage complet : somme des réserves des jours du passage ; `ici` pour le jour `jour` (étape `e`), sinon 0. */
-export function reserveDuPassage(entree: EntreeReserve, jour: number | null): ReserveTextSearch {
+export function reserveDuPassage(entree: EntreeReserve, jour: number | null, villesDeC: readonly VillePourReserve[]): ReserveTextSearch {
   const parJour = (j: number) => reserveTextSearchE({ ...entree, jours: [j] });
-  return { total: entree.jours.reduce((somme, j) => somme + parJour(j), 0), ici: jour === null ? 0 : parJour(jour) };
+  return { total: entree.jours.reduce((somme, j) => somme + parJour(j), 0), ici: jour === null ? 0 : parJour(jour), besoinC: besoinPropreDeC(villesDeC) };
 }

@@ -152,16 +152,17 @@ describe("aperçu : deux villes, la seconde sans logement (valeurs par défaut d
     expect(lu.cases.some((c) => c.day === 2 && c.slot_type === "proposal")).toBe(true);
   });
 
-  it("refus : une réserve plus grande que la part de c donne cap_reached à l'étape a, avant tout appel", async () => {
-    // Deux villes à positionner (Édimbourg `area`, Glasgow `none`) : réserve de 2 ; profil réduit à 1 Text Search, dont la part
-    // de `c` vaut 1. Valeurs de test.
+  it("refus : réserve de e + besoin propre de c > part de c, la réserve seule tenant : cap_reached à l'étape a, avant tout appel", async () => {
+    // Édimbourg (`known`) puis Glasgow (`none`) : réserve de `e` = 1, besoin propre de `c` = 1 (Text Search du nom de Glasgow).
+    // Profil réduit à 1 Text Search, dont la part de `c` vaut 1 : la réserve seule tiendrait, pas avec le besoin de `c`.
+    // Valeurs de test.
     const plafonds: PlafondsUsage = {
       ...PLAFONDS_VARIANTE_SIMULEE,
       generations: { ...PLAFONDS_VARIANTE_SIMULEE.generations, apercu: { ...PLAFONDS_VARIANTE_SIMULEE.generations.apercu, placesTextSearch: 1 } },
     };
-    expect(partDe(1, PARTS_FORFAIT.textSearch, "c")).toBeLessThan(2);
+    expect(partDe(1, PARTS_FORFAIT.textSearch, "c")).toBe(1);
     const org = await createOrg(auth);
-    const { tripId, etat } = await lancer(org, { ...GLASGOW, lodging: { kind: "area", label: "Vieille ville" } });
+    const { tripId, etat } = await lancer(org);
     const compteurs = compteursVides();
     const fin = await derouler(etat, dependances(() => composerSimuleeAvec({ doubles: () => compterAppels(doublesEdimbourg(), compteurs) }), plafonds));
     expect(fin.arret).toBe("cap_reached");

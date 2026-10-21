@@ -32,7 +32,7 @@ import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtat, type EtatEtape } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape } from "./forfait-etape";
-import { reserveTextSearchE, type ReserveTextSearch } from "./reserve-text-search";
+import { besoinPropreDeC, reserveTextSearchE, type ReserveTextSearch } from "./reserve-text-search";
 import { cloreEnEchec, commencerEtape, exigerGarde } from "./garde";
 import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
 import { genererSansEchec } from "./programme";
@@ -176,8 +176,10 @@ async function lireVoyageOuArreter(contexte: Contexte, x: Executeur): Promise<{ 
  */
 function reserveDeLApercu(voyage: VoyageLu, jours: readonly number[], villes: readonly VilleDeLApercu[]): ReserveTextSearch {
   const { nuitsVille } = nuitsDuVoyage(voyage, villes);
-  const total = reserveTextSearchE({ jours, nuitsVille, villes: villes.map((ville) => ({ rang: ville.rang, logement: ville.sejour.logement })) });
-  return { total, ici: total };
+  const pourReserve = villes.map((ville) => ({ rang: ville.rang, logement: ville.sejour.logement }));
+  const total = reserveTextSearchE({ jours, nuitsVille, villes: pourReserve });
+  // Besoin propre de `c` : les villes de J1 et J2, celles que `c` ancre (0113 § 3 bis point 3).
+  return { total, ici: total, besoinC: besoinPropreDeC(pourReserve) };
 }
 
 /** Logement d'une ville prêt pour la zone : `placeId` vérifié (étape `l`) pour `known` et `suggestedLodging`, sinon le quartier. */

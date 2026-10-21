@@ -103,13 +103,14 @@ const ETAPES_DU_JOUR: ReadonlySet<EtapeApercu> = new Set(["b", "c", "d", "e"]);
 
 /**
  * Réserve Text Search de l'étape `e` (décision 0113 § 3 bis), appliquée au forfait partiel d'une étape :
- * - refus `cap_reached` si la part Text Search de `c` ne couvre pas la réserve (point 3), quelle que soit l'étape ;
+ * - refus `cap_reached` si la réserve de `e` plus le besoin propre de `c` dépasse la part Text Search de `c` (point 3),
+ *   quelle que soit l'étape (la première qui réserve le forfait s'arrête donc avant tout appel) ;
  * - `c` : sa part diminuée de la réserve **avant** sa répartition sur les villes introduites (point 2) ;
  * - `e` : exactement `ici` requêtes, hors découpage cumulatif (point 1).
  * Le total du profil et les pourcentages de `PARTS_FORFAIT` ne changent pas.
  */
 export function exigerReserve(entier: Forfait, reserve: ReserveTextSearch): void {
-  if (reserve.total > partDe(entier.textSearchRequetes, PARTS_FORFAIT.textSearch, "c")) throw new ArretEtape("cap_reached");
+  if (reserve.total + reserve.besoinC > partDe(entier.textSearchRequetes, PARTS_FORFAIT.textSearch, "c")) throw new ArretEtape("cap_reached");
 }
 
 export function partAvecReserve(entier: Forfait, etape: EtapeApercu, reserve: ReserveTextSearch, ajuster: (forfait: Forfait) => Forfait = (f) => f): Forfait {
@@ -125,7 +126,7 @@ export async function forfaitDeLEtape(
   contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
   etape: EtapeApercu,
   passage?: ForfaitDuPassage,
-  reserve: ReserveTextSearch = { total: 0, ici: 0 },
+  reserve: ReserveTextSearch = { total: 0, ici: 0, besoinC: 0 },
 ): Promise<ForfaitDeLEtape> {
   const profil = passage?.profil ?? "apercu";
   const cle = passage?.identifiant ?? contexte.generationRunId;
