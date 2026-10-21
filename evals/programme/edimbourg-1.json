@@ -1,0 +1,372 @@
+{
+  "schema": 1,
+  "id": "edimbourg-1",
+  "brief": "edimbourg-1",
+  "cas": "Sortie simulée du prompt programme v1 (lot 1 de la spécification P0-programme-par-ia), écrite à la main : noms usuels de l'IA, aucune donnée Google",
+  "sortie": {
+    "titre": "Édimbourg gourmand, à pied et en train",
+    "jours": [
+      {
+        "date": "2026-11-23",
+        "titre": "Vieille ville",
+        "creneaux": [
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "13:30",
+            "fin": "14:15",
+            "nature": "repas_midi",
+            "lieu": "Oink",
+            "quartier": "Vieille ville",
+            "pourquoi": "Un sandwich au porc rôti, rapide et très écossais.",
+            "conseil": "Prends la taille moyenne, elle suffit."
+          },
+          {
+            "debut": "14:30",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Château d'Édimbourg",
+            "quartier": "Vieille ville",
+            "pourquoi": "Le château domine la ville, c'est le premier incontournable.",
+            "conseil": "Réserve un créneau en ligne, c'est moins cher.",
+            "prix": "21 £",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "16:45",
+            "fin": "18:00",
+            "nature": "visite",
+            "lieu": "Royal Mile",
+            "quartier": "Vieille ville",
+            "pourquoi": "La grande rue pavée qui relie le château au palais, idéale pour flâner.",
+            "incontournable": true
+          },
+          {
+            "debut": "18:15",
+            "fin": "19:15",
+            "nature": "apero",
+            "lieu": "The Bow Bar",
+            "quartier": "Vieille ville",
+            "pourquoi": "Un pub à whiskies tout en bois pour goûter les boissons du coin.",
+            "conseil": "Demande une dégustation de trois single malts."
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "The Witchery by the Castle",
+            "quartier": "Vieille ville",
+            "pourquoi": "Un dîner écossais dans un décor gothique au pied du château.",
+            "conseil": "Réserve plusieurs semaines avant.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2026-11-24",
+        "titre": "Holyrood et Arthur's Seat",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Arthur's Seat",
+            "quartier": "Holyrood",
+            "pourquoi": "La colline volcanique au cœur de la ville, avec une vue sur toute la côte.",
+            "conseil": "Mets de bonnes chaussures, le sentier peut glisser.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "Hollyrood 9A",
+            "quartier": "Holyrood",
+            "pourquoi": "Burgers et bières artisanales au pied de la colline."
+          },
+          {
+            "debut": "13:45",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "Palais de Holyrood",
+            "quartier": "Holyrood",
+            "pourquoi": "La résidence royale en Écosse, au bout du Royal Mile.",
+            "conseil": "L'audioguide est inclus."
+          },
+          {
+            "debut": "16:00",
+            "fin": "17:00",
+            "nature": "visite",
+            "lieu": "Calton Hill",
+            "quartier": "Holyrood",
+            "pourquoi": "Le belvédère du coucher de soleil sur la ville.",
+            "conseil": "Monte vers 16:00 en novembre, le soleil se couche tôt."
+          },
+          {
+            "debut": "17:30",
+            "fin": "18:45",
+            "nature": "apero",
+            "lieu": "Sandy Bell's",
+            "quartier": "Vieille ville",
+            "pourquoi": "Le pub de musique folk le plus connu d'Édimbourg.",
+            "conseil": "Les sessions commencent en fin d'après-midi."
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Howies",
+            "quartier": "Vieille ville",
+            "pourquoi": "Une cuisine écossaise de saison, sans chichis."
+          },
+          {
+            "debut": "21:00",
+            "fin": "22:30",
+            "nature": "soiree",
+            "lieu": "Sandy Bell's",
+            "quartier": "Vieille ville",
+            "pourquoi": "Retour pour la session de musique du soir."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-25",
+        "titre": "Distillerie en train",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "13:00",
+            "nature": "visite",
+            "lieu": "Glenkinchie Distillery",
+            "ville": "Pencaitland",
+            "quartier": "Pencaitland",
+            "pourquoi": "La distillerie des Lowlands, accessible en train puis en bus, comme vous le vouliez.",
+            "conseil": "Réserve la visite avec dégustation.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "13:30",
+            "fin": "14:30",
+            "nature": "repas_midi",
+            "lieu": "The Old Clubhouse",
+            "ville": "Gullane",
+            "quartier": "Pencaitland",
+            "pourquoi": "Un pub de village pour déjeuner avant le retour."
+          },
+          {
+            "debut": "16:00",
+            "fin": "17:30",
+            "nature": "pause"
+          },
+          {
+            "debut": "17:45",
+            "fin": "18:45",
+            "nature": "apero",
+            "lieu": "Cask and Barrel",
+            "quartier": "Broughton",
+            "pourquoi": "Un pub à bières de Broughton avant le dîner."
+          },
+          {
+            "debut": "19:00",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "The Gardener's Cottage",
+            "quartier": "Broughton",
+            "pourquoi": "Un menu du marché dans une petite maison de jardinier.",
+            "conseil": "Réserve, il n'y a que deux tables communes.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2026-11-26",
+        "titre": "Leith",
+        "creneaux": [
+          {
+            "debut": "10:00",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "The Shore",
+            "quartier": "Leith",
+            "pourquoi": "Le vieux port de Leith, ses quais et ses façades.",
+            "conseil": "Viens à pied par le Water of Leith Walkway."
+          },
+          {
+            "debut": "11:45",
+            "fin": "13:00",
+            "nature": "visite",
+            "lieu": "Royal Yacht Britannia",
+            "quartier": "Leith",
+            "pourquoi": "Le yacht royal, une visite insolite.",
+            "prix": "19 £"
+          },
+          {
+            "debut": "13:15",
+            "fin": "14:15",
+            "nature": "repas_midi",
+            "lieu": "Fishers",
+            "quartier": "Leith",
+            "pourquoi": "Fruits de mer frais sur le port.",
+            "conseil": "Demande le plat du jour."
+          },
+          {
+            "debut": "14:30",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "Leith Distillery",
+            "quartier": "Leith",
+            "pourquoi": "Une jeune distillerie de whisky sur le port.",
+            "conseil": "Réserve la visite courte."
+          },
+          {
+            "debut": "16:00",
+            "fin": "17:30",
+            "nature": "pause"
+          },
+          {
+            "debut": "17:30",
+            "fin": "18:30",
+            "nature": "apero",
+            "lieu": "Nobles",
+            "quartier": "Leith",
+            "pourquoi": "Un bar victorien pour l'apéro."
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "The Kitchin",
+            "quartier": "Leith",
+            "pourquoi": "Une grande table écossaise, si le budget le permet.",
+            "conseil": "Réserve longtemps à l'avance.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2026-11-27",
+        "titre": "Vieille ville et Grassmarket",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "National Museum of Scotland",
+            "quartier": "Vieille ville",
+            "pourquoi": "Le musée qui raconte l'Écosse, un seul musée comme vous le souhaitiez.",
+            "conseil": "L'entrée est gratuite, monte sur la terrasse du toit."
+          },
+          {
+            "debut": "11:45",
+            "fin": "12:30",
+            "nature": "visite",
+            "lieu": "Greyfriars Kirkyard",
+            "quartier": "Vieille ville",
+            "pourquoi": "Le cimetière qui a inspiré bien des histoires."
+          },
+          {
+            "debut": "12:45",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Mums Great Comfort Food",
+            "quartier": "Vieille ville",
+            "pourquoi": "Cuisine réconfortante écossaise, idéale en novembre."
+          },
+          {
+            "debut": "14:00",
+            "fin": "14:45",
+            "nature": "visite",
+            "lieu": "Victoria Street",
+            "quartier": "Grassmarket",
+            "pourquoi": "La rue colorée en courbe qui descend vers le Grassmarket."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:15",
+            "nature": "visite",
+            "lieu": "The Real Mary King's Close",
+            "quartier": "Vieille ville",
+            "pourquoi": "Les ruelles souterraines du XVIIe siècle.",
+            "conseil": "Réserve, les visites sont guidées.",
+            "aReserver": true
+          },
+          {
+            "debut": "16:30",
+            "fin": "17:30",
+            "nature": "pause"
+          },
+          {
+            "debut": "17:30",
+            "fin": "18:30",
+            "nature": "apero",
+            "lieu": "The Last Drop",
+            "quartier": "Grassmarket",
+            "pourquoi": "Un pub du Grassmarket pour un dernier whisky."
+          },
+          {
+            "debut": "19:00",
+            "fin": "20:30",
+            "nature": "repas_soir",
+            "lieu": "Makars Gourmet Mash Bar",
+            "quartier": "Vieille ville",
+            "pourquoi": "Haggis et purée revisités.",
+            "conseil": "Réserve pour 19:00."
+          },
+          {
+            "debut": "21:00",
+            "fin": "23:00",
+            "nature": "soiree",
+            "lieu": "Whistle Binkies",
+            "quartier": "Vieille ville",
+            "pourquoi": "Un pub à musique live tous les soirs."
+          }
+        ]
+      },
+      {
+        "date": "2026-11-28",
+        "titre": "Ville neuve",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:45",
+            "nature": "visite",
+            "lieu": "Dean Village",
+            "quartier": "Ville neuve",
+            "pourquoi": "Le hameau du moulin au bord de l'eau, à dix minutes de Princes Street."
+          },
+          {
+            "debut": "11:00",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Scottish National Gallery",
+            "quartier": "Ville neuve",
+            "pourquoi": "Une heure pour les grands maîtres écossais.",
+            "conseil": "Entrée gratuite."
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "The Dome",
+            "quartier": "Ville neuve",
+            "pourquoi": "Un dernier déjeuner dans une ancienne banque majestueuse."
+          },
+          {
+            "debut": "14:00",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve le château et la distillerie dès maintenant.",
+      "Prends le train ScotRail du matin pour la distillerie.",
+      "Emporte un imperméable et de bonnes chaussures."
+    ]
+  }
+}

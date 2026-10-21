@@ -21,6 +21,8 @@ const REPONSES = {
   notation: JSON.stringify({ notes: [] }),
   raisons: JSON.stringify({ raisons: [] }),
   recherche: JSON.stringify({ actions: [], candidats: [], termine: true }),
+  // Étape du prototype seulement (décision 0115) : jamais appelée par la couche du MVP.
+  programme: JSON.stringify({ jours: [] }),
 } as const;
 const DEMANDE = { story: "Nous aimons marcher.", trip: { destination: "Édimbourg", start: "2026-11-23", end: "2026-11-26", otherCities: [] } };
 const CANDIDAT = { id: "c_001", nom: "Musée", resume: "Un musée.", categorie: "museum" as const, typeEtape: "activity" as const };

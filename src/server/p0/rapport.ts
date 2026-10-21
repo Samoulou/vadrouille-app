@@ -88,6 +88,32 @@ export function criteresDuRapport(execution: ExecutionSuivie, contenu: unknown):
   };
 }
 
+/** Nombre d'étapes avec et sans `placeId` du programme stocké (spécification P0-programme-par-ia § 6 ; 0117 § 4). */
+export type EtapesDuRapport = { readonly avecPlaceId: number; readonly sansPlaceId: number };
+
+/**
+ * Étapes avec et sans `placeId`, **calculées à chaque affichage** depuis le programme stocké (source unique), jamais
+ * écrites ni journalisées, et **jamais** dans le texte de « Copier le rapport » (`texteDuRapport` ne les reçoit pas,
+ * 0117 § 4) : aucun compteur du journal n'est rapproché d'elles. Seuls des nombres sortent : ni nom, ni `placeId`, ni
+ * motif. `null` : programme absent ou hors schéma. L'affichage sur la page attend un champ du contrat
+ * `RapportPage` (`src/contracts/prototype-suivi.ts`, hors du périmètre de ce lot).
+ */
+export function etapesDuRapport(contenu: unknown): EtapesDuRapport | null {
+  if (contenu === null) return null;
+  const programme = programmeControle(contenu);
+  if (programme === null) return null;
+  let avecPlaceId = 0;
+  let sansPlaceId = 0;
+  for (const jour of programme.trip.days) {
+    for (const ligne of jour.items) {
+      if (ligne.type !== "stop") continue;
+      if (ligne.stop.placeId === undefined) sansPlaceId += 1;
+      else avecPlaceId += 1;
+    }
+  }
+  return { avecPlaceId, sansPlaceId };
+}
+
 /** Texte de « Copier le rapport » : lignes fixes, valeurs de listes fermées et identifiants seulement. */
 export function texteDuRapport(execution: ExecutionSuivie, criteres: CriteresRapport, dernierePurge: string | null): string {
   const lignes = [

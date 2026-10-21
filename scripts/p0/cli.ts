@@ -11,7 +11,7 @@ import { creerRechercheSimulee } from "@/research/recherche-web.simule";
 
 import { DOSSIERS_PAR_DEFAUT, ecrireSortie, lireBrief, lireConfiguration, lireFixtures, prochainNumero, type Dossiers } from "./fichiers";
 import { codeErreur, creerJournal, creerRedacteur } from "./journal";
-import { executer } from "./pipeline";
+import { executerProgramme } from "./pipeline";
 
 /**
  * Commande `pnpm p0` (spécification P0, « Deux modes » ; décision 0032, A3.4).
@@ -74,7 +74,8 @@ export async function principal(argv: readonly string[], sorties: Sorties, optio
     const fixtures = lireFixtures(slug, dossiers);
     const numero = prochainNumero(`proto_${slug}_${dateExecution.replaceAll("-", "")}`, dossiers);
 
-    const { programme, rapport } = await executer({
+    // Décision 0116 § 7.2 : le mode simulé passe par la nouvelle chaîne (une sortie simulée du prompt `programme`).
+    const { programme, rapport } = await executerProgramme({
       nomBrief: valeurs.brief,
       brief,
       variante,

@@ -39,7 +39,7 @@ const texte = z.string().min(1).max(100);
  * Étapes qui admettent un réglage `zdr` : copie en dur de `ETAPES_REQUETE` (`src/ai/client.ts`) que ce module n'importe
  * pas ; le test `configuration ia: valeur absente, inconnue ou hors bornes refusée` vérifie l'égalité des deux listes.
  */
-export const ETAPES_ZDR = ["plan", "recherche", "notation", "raisons", "structuration", "quartier"] as const;
+export const ETAPES_ZDR = ["plan", "recherche", "notation", "raisons", "structuration", "quartier", "programme"] as const;
 /** Étapes de la couche IA (`ReglagesIa`), copie en dur contrôlée de la même façon. */
 export const ETAPES_REGLAGES = ["structuration", "quartier", "plan", "notation", "raisons"] as const;
 
@@ -75,9 +75,10 @@ const ProductionSchema = z.strictObject({
 /** Forme de `prototype/config/modeles.json` (lue comme des données ; le schéma de P0 reste dans `src/prototype/config.ts`). */
 const ModelesP0Schema = z.strictObject({
   schema: z.literal(1),
-  etapes: z.strictObject({ recherche: texte, notation: texte, raisons: texte }),
+  etapes: z.strictObject({ recherche: texte, notation: texte, raisons: texte, programme: texte }),
   variantes: z.strictObject({ a: z.strictObject({ notation: texte }) }),
-  routage: z.strictObject({ data_collection: z.literal("deny") }),
+  // `zdr: true` exigé (décision 0116 § 2.2, verdict S5 de 0117 § 5) : lu par la requête `programme` du prototype seul.
+  routage: z.strictObject({ data_collection: z.literal("deny"), zdr: z.literal(true) }),
   rechercheWeb: z.strictObject({ moteur: texte }),
 });
 

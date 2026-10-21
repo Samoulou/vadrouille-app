@@ -11,9 +11,10 @@ import { MODELE_ID_PATTERN, MOTEURS_RECHERCHE_WEB, type MoteurRechercheWeb, type
 
 /**
  * Étapes qui appellent un modèle, dans l'ordre du déroulement de P0, puis les deux étapes ajoutées par B7a
- * (`structuration` du brief et `quartier` conseillé, B7-PO-4).
+ * (`structuration` du brief et `quartier` conseillé, B7-PO-4), puis la rédaction du programme complet du prototype
+ * (`programme`, décision 0115 § 3 étape 1 ; `p0Run` et `pnpm p0` seulement, jamais la couche du MVP).
  */
-export const ETAPES_REQUETE = ["plan", "recherche", "notation", "raisons", "structuration", "quartier"] as const;
+export const ETAPES_REQUETE = ["plan", "recherche", "notation", "raisons", "structuration", "quartier", "programme"] as const;
 export type EtapeRequete = (typeof ETAPES_REQUETE)[number];
 
 /** Montant en dollars converti en micro-USD entiers (coût réel d'OpenRouter, mesures de `evals/`). */

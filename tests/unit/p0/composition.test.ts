@@ -9,6 +9,7 @@ import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { DEBUT_DONNEES } from "@/ai/requetes";
 import { lirePlan, lireTour, PLAN_VIDE, type PlanRecherche } from "@/ai/sorties";
 import type { EntreeNotation, NoterCandidats } from "@/ai/noter-candidats";
+import type { RedigerProgramme } from "@/ai/rediger-programme";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -18,9 +19,9 @@ import { ConfigRechercheSchema } from "@/prototype/config";
 import { exemptionDuPlan, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages } from "@/research/fetch-page";
 import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/ai/recherche-web";
-import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type OptionsComposition } from "@/server/composition/p0-reel";
+import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type CapacitesProgramme, type OptionsComposition } from "@/server/composition/p0-reel";
 import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
-import { entreeModelesDepuisBrief } from "@/server/p0/vers-couche-ia";
+import { entreeModelesDepuisBrief, entreeProgrammeDepuisBrief } from "@/server/p0/vers-couche-ia";
 
 import { creerHorlogeManuelle } from "../../support/horloge-manuelle";
 import { creerPortMemoire } from "../../support/port-consommation-memoire";
@@ -341,6 +342,17 @@ describe("p0: séparation des capacités de la composition (types)", () => {
     expectTypeOf<CapacitesEtapeFinale>().not.toHaveProperty("textSearch");
   });
 
+  // Décision 0116 § 3 : famille unique de `etapeProgramme`, ni client de modèles brut, ni recherche web, ni pages.
+  it("programme : redigerProgramme, textSearch, places (fiches), detailsLogement, routes ; ni modèles bruts, ni recherche web, ni pages", () => {
+    expectTypeOf<keyof CapacitesProgramme>().toEqualTypeOf<"redigerProgramme" | "textSearch" | "places" | "detailsLogement" | "routes">();
+    expectTypeOf<CapacitesProgramme["redigerProgramme"]>().toEqualTypeOf<RedigerProgramme>();
+    expectTypeOf<CapacitesProgramme["places"]>().toEqualTypeOf<Pick<ClientPlaces, "details">>();
+    expectTypeOf<CapacitesProgramme["routes"]>().toEqualTypeOf<ClientRoutes>();
+    expectTypeOf<CapacitesProgramme>().not.toHaveProperty("modeles");
+    expectTypeOf<CapacitesProgramme>().not.toHaveProperty("rechercheWeb");
+    expectTypeOf<CapacitesProgramme>().not.toHaveProperty("pages");
+  });
+
   it("notation des candidats : l'entrée est le brief et nos candidats, sans aucun champ pour une donnée Google", () => {
     // B7a (décision 0077 § 1 point 6) : types de production (`EntreeModeles`, `CandidatPourModele`) et `ComplementP0`
     // en champ distinct, passé par `p0Run` seulement.
@@ -407,7 +419,7 @@ afterEach(() => {
 
 type Appel = { url: string; init: RequestInit };
 
-function monter(reponses: (() => Promise<Response>)[]) {
+function monter(reponses: (() => Promise<Response>)[], routage: { data_collection: "deny"; zdr?: boolean } = { data_collection: "deny" }) {
   const appels: Appel[] = [];
   const fetchDouble = vi.fn(async (url: string, init: RequestInit) => {
     appels.push({ url, init });
@@ -424,10 +436,11 @@ function monter(reponses: (() => Promise<Response>)[]) {
     coutEstimeModelesMicros: 10_000,
     coutEstimeRechercheWebMicros: 20_000,
     modeles: {
-      routage: { data_collection: "deny" },
+      routage,
       rechercheWeb: { modele: "fournisseur/recherche-test", moteur: "exa", maxResultats: 3 },
       notation: { modele: "fournisseur/notation-test" },
       raisons: { modele: "fournisseur/raisons-test" },
+      programme: { modele: "fournisseur/programme-test" },
     },
     horloge,
   });
@@ -521,7 +534,7 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
       plafonds: [],
       coutEstimeModelesMicros: 1,
       coutEstimeRechercheWebMicros: 1,
-      modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "deepseek/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" } },
+      modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "deepseek/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" }, programme: { modele: "fournisseur/p" } },
     };
     expect(() => composerP0Reel(GARDE, options)).toThrow(RangeError);
     expect(() => composerP0Reel(GARDE, { ...options, modeles: { ...options.modeles, rechercheWeb: { modele: "openai/x", moteur: "exa", maxResultats: 3 } } })).toThrow(RangeError);
@@ -563,6 +576,41 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const notation = JSON.parse(String(appels[1]?.init.body)) as Record<string, unknown>;
     expect(notation.model).toBe("fournisseur/notation-test");
     expect(notation.plugins).toBeUndefined();
+  });
+
+  it("composition: zdr de la configuration réservé à la requête programme ; recherche web, notation et raisons sans zdr (0117 § 5.3)", async () => {
+    cles.google.present = true;
+    const reponses = [
+      async () => reponseModele({ content: '{"jours":[]}' }),
+      async () => reponseModele({ content: "texte" }),
+      async () => reponseModele({ content: '{"notes":[]}' }),
+      async () => reponseModele({ content: '{"raisons":[]}' }),
+    ];
+    const { composition, appels } = monter(reponses, { data_collection: "deny", zdr: true });
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    await composition.programme().redigerProgramme(entreeProgrammeDepuisBrief(brief));
+    await composition.agent().rechercheWeb.rechercher("musées Édimbourg");
+    const entree = entreeModelesDepuisBrief(brief);
+    await composition.etapeFinale().noterCandidats({ entree, lot: [] });
+    await composition.etapeFinale().redigerRaisons({ entree, retenus: [] });
+    const fournisseurs = appels.map((appel) => (JSON.parse(String(appel.init.body)) as { provider: unknown }).provider);
+    expect(fournisseurs).toEqual([{ data_collection: "deny", zdr: true }, { data_collection: "deny" }, { data_collection: "deny" }, { data_collection: "deny" }]);
+  });
+
+  // Décision 0116 § 2 et verdict S5 de 0117 : une requête `programme`, sans greffon, `zdr: true` et `data_collection: "deny"`.
+  it("programme : exactement ses capacités ; une requête programme sans recherche web, zdr et data_collection deny", async () => {
+    cles.google.present = true;
+    const { composition, appels } = monter([async () => reponseModele({ content: '{"jours":[]}' })]);
+    const programme = composition.programme();
+    expect(Object.keys(programme).sort()).toEqual(["detailsLogement", "places", "redigerProgramme", "routes", "textSearch"]);
+    expect(Object.keys(programme.places)).toEqual(["details"]);
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/rome-1.json"), "utf8")) as Brief;
+    await programme.redigerProgramme(entreeProgrammeDepuisBrief(brief));
+    expect(appels).toHaveLength(1);
+    const corps = JSON.parse(String(appels[0]?.init.body)) as Record<string, unknown>;
+    expect(corps.model).toBe("fournisseur/programme-test");
+    expect(corps.plugins).toBeUndefined();
+    expect(corps.provider).toEqual({ data_collection: "deny", zdr: true });
   });
 });
 
@@ -1003,7 +1051,7 @@ describe("p0: non-confusion des preuves de la garde (P0r4, décision 0079)", () 
     plafonds: [],
     coutEstimeModelesMicros: 1,
     coutEstimeRechercheWebMicros: 1,
-    modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "openai/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" } },
+    modeles: { routage: { data_collection: "deny" as const }, rechercheWeb: { modele: "openai/x", moteur: "native" as const, maxResultats: 3 }, notation: { modele: "fournisseur/n" }, raisons: { modele: "fournisseur/r" }, programme: { modele: "fournisseur/p" } },
   };
 
   it("une preuve de relecture n'ouvre pas une exécution (à l'exécution, sans aucun client construit)", () => {

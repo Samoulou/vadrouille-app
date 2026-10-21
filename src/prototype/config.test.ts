@@ -46,6 +46,8 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
       recherche: "deepseek/deepseek-v4.1-flash",
       notation: "deepseek/deepseek-v4.1-flash",
       raisons: "deepseek/deepseek-v4.1-flash",
+      // Décision 0116 § 2.2 : rédaction du programme, modèle de 0027 point 1, le même pour les deux variantes.
+      programme: "deepseek/deepseek-v4.1-flash",
     });
   });
 
@@ -99,6 +101,17 @@ describe("p0: configuration commitée (décision 0032, A2)", () => {
     const sans = structuredClone(brut().modeles) as Record<string, unknown>;
     delete sans.rechercheWeb;
     expect(ConfigModelesSchema.safeParse(sans).success).toBe(false);
+  });
+
+  // Décision 0116 § 2.2 (verdict S5 de 0117 § 5) : la requête `programme` part en `zdr`, échec fermé.
+  it("exige routage.zdr à true (décision 0116 § 2.2) ; absent, faux ou d'une autre forme : refusé", () => {
+    expect(brut().modeles).toMatchObject({ routage: { data_collection: "deny", zdr: true } });
+    for (const zdr of [undefined, false, "true", 1]) {
+      const config = structuredClone(brut().modeles) as { routage: Record<string, unknown> };
+      if (zdr === undefined) delete config.routage.zdr;
+      else config.routage.zdr = zdr;
+      expect(ConfigModelesSchema.safeParse(config).success, String(zdr)).toBe(false);
+    }
   });
 
   it("refuse une configuration de modèles sans data_collection deny", () => {
