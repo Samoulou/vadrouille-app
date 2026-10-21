@@ -99,6 +99,10 @@ export function withSimulatedUnlock(
       const view = await resolve(ctx, tripId);
       return dayMap(ctx, tripId, index, view);
     },
+    /** État du tri : celui de l'adaptateur de base (`null` sur `mock`, décision 0112 § 4 point 1). */
+    async getDeckSession(ctx, tripId) {
+      return base.getDeckSession(ctx, tripId);
+    },
     async getTripMap(ctx, tripId) {
       const view = await resolve(ctx, tripId);
       if (view.kind !== "counterpart") return base.getTripMap(ctx, tripId);

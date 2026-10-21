@@ -452,8 +452,8 @@ function sortie<T>(schema: z.ZodType<T>, valeur: unknown, contexte: ContexteEche
 
 // --- Cas d'usage ------------------------------------------------------------------------------------------
 
-/** Les sept lectures de `TripAdapter` sur la base (B6a point 1). */
-export function creerLectureVoyages(dependances: DependancesLecture): TripAdapter {
+/** Les sept lectures de `TripAdapter` sur la base (B6a point 1) ; l'état du tri est lu par `src/server/presentation/lecture.ts` (B10a). */
+export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripAdapter, "getDeckSession"> {
   const withOrg = dependances.withOrg ?? withOrgParDefaut;
   const source = dependances.relectures;
   const configuration = dependances.configuration ?? CONFIGURATION_MOTEUR;

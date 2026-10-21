@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { executerContratDeckActions } from "../../../tests/support/deck-actions-contrat";
+
 import { createLocalDeckActions } from "./actions";
 
 const dislike = (proposalId: string, category: "museum" | "nature" | "restaurant", kind: "activity" | "meal" = "activity") => ({
@@ -64,5 +66,20 @@ describe("actions locales : distance et annulation", () => {
     const after = actions.session();
     await actions.undo({ proposalId: "autre" });
     expect(actions.session()).toBe(after);
+  });
+});
+
+describe("présentation: même règle en local et sur le serveur (suite commune, décision 0112 § 4 point 4)", () => {
+  it("createLocalDeckActions : mêmes questions que le serveur", async () => {
+    const carte = (id: string, category: "museum" | "nature" | "walk" | "restaurant", kind: "activity" | "meal" = "activity") => ({ id, kind, category });
+    await executerContratDeckActions({
+      actions: createLocalDeckActions(),
+      cartes: {
+        musees: [carte("m1", "museum"), carte("m2", "museum"), carte("m3", "museum")],
+        natures: [carte("n1", "nature"), carte("n2", "nature")],
+        balade: carte("w1", "walk"),
+        repas: [carte("r1", "restaurant", "meal"), carte("r2", "restaurant", "meal")],
+      },
+    });
   });
 });

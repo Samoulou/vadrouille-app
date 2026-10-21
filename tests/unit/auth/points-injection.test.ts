@@ -34,6 +34,9 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   // B9e (spécification B9, B9e point 1) : même règle pour le branchement de la création `api`.
   brancherCreationVoyages: ["src/adapters/api-creation-instance.ts", "src/instrumentation.ts"],
   debrancherCreationVoyagesPourTests: ["src/adapters/api-creation-instance.ts"],
+  // B10a (décision 0112 § 2 point 3) : même règle pour le branchement du tri enregistré `api`.
+  brancherTriEnregistre: ["src/adapters/api-tri-instance.ts", "src/instrumentation.ts"],
+  debrancherTriEnregistrePourTests: ["src/adapters/api-tri-instance.ts"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];

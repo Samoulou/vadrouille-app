@@ -8,11 +8,8 @@ import {
   buildDeck,
   currentCard,
   deckReducer,
-  distancePromptFor,
-  emptySession,
   initDeck,
   isLastOption,
-  preferencePromptFor,
   resolveSwipe,
   swipeRotation,
   type DeckEvent,
@@ -97,6 +94,7 @@ describe("deckReducer", () => {
     });
     expect(ids(answered)).toEqual(["m1", "m2", "w1"]);
     expect(answered.answers).toHaveLength(1);
+    expect(answered.removedByAnswer).toBe(1);
     expect(run(answered, { type: "undo" })).toEqual(before);
   });
 
@@ -149,6 +147,7 @@ describe("deckReducer", () => {
     expect(open.prompt).toEqual(prompt);
     const no = run(open, { type: "answer", prompt, answer: { answer: "no" }, next: null });
     expect(no.cards).toEqual(open.cards);
+    expect(no.removedByAnswer).toBe(0);
     expect(no.prompt).toBeNull();
     const dismissed = run(open, { type: "dismissPrompt" });
     expect(dismissed.answers).toEqual([]);
@@ -191,43 +190,4 @@ describe("presentation: seuils et rotation du geste", () => {
     expect(swipeRotation(0, width)).toBe(0);
   });
 
-});
-
-describe("préférences: aucune généralisation sans réponse (règle pure)", () => {
-  const museum = { decision: "dislike", kind: "activity", category: "museum" } as const;
-
-  it("question au deuxième refus d'une même catégorie, une seule fois", () => {
-    const one = { ...emptySession(), dislikes: [{ proposalId: "a", category: "museum" as const }] };
-    expect(preferencePromptFor(one, museum)).toBeNull();
-    const two = { ...one, dislikes: [...one.dislikes, { proposalId: "b", category: "museum" as const }] };
-    expect(preferencePromptFor(two, museum)).toEqual({ kind: "category", category: "museum" });
-    expect(preferencePromptFor({ ...two, askedCategories: ["museum"] }, museum)).toBeNull();
-  });
-
-  it("les repas et les « J'aime » ne comptent pas ; deux nature puis un museum ne la déclenchent pas pour museum", () => {
-    const session = {
-      ...emptySession(),
-      dislikes: [
-        { proposalId: "n1", category: "nature" as const },
-        { proposalId: "n2", category: "nature" as const },
-        { proposalId: "m1", category: "museum" as const },
-      ],
-    };
-    expect(preferencePromptFor(session, museum)).toBeNull();
-    expect(preferencePromptFor(session, { ...museum, kind: "meal" })).toBeNull();
-    expect(preferencePromptFor(session, { ...museum, decision: "like" })).toBeNull();
-  });
-
-  it("distance après deux raisons « Trop loin », une seule fois", () => {
-    const session = {
-      ...emptySession(),
-      dislikes: [
-        { proposalId: "n", category: "nature" as const, reason: "tooFar" as const },
-        { proposalId: "m", category: "museum" as const, reason: "tooFar" as const },
-      ],
-    };
-    expect(distancePromptFor(session)).toEqual({ kind: "distance" });
-    expect(distancePromptFor({ ...session, distanceAsked: true })).toBeNull();
-    expect(distancePromptFor({ ...session, dislikes: session.dislikes.slice(1) })).toBeNull();
-  });
 });
