@@ -4,7 +4,7 @@ import { classer, type ParametresClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatMoteur, TypeCreneau } from "@/domain/entrees";
 import { demandeBornee, demandeDuJour, TYPES_SERIE } from "@/domain/demande-du-jour";
-import { INCONNU, logementsDuJour, type Relectures } from "@/domain/relectures";
+import { INCONNU, logementsDuJour, villeDeLArrivee, type Relectures } from "@/domain/relectures";
 import type { JourSquelette } from "@/domain/squelette";
 import { element, lire } from "@/domain/tables";
 import { margeRemplacement } from "@/grounding/fiches-finales";
@@ -25,7 +25,10 @@ import { versRelectures } from "@/server/relecture/relectures";
  * la seule composition de la génération (règle `ligne/relecture-imports`).
  *
  * Pour les jours à planifier **seulement** (moteur partiel, B9-TL-13) :
- * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville) ;
+ * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville).
+ *    Une ville `area` ou `none` demande un Text Search de son nom (0087 § 2.3), couvert par la réserve de l'étape `e`
+ *    (décision 0113 § 3 bis : une requête par ville `area` ou `none` positionnée). `budgets.textSearch` reste une **garde**
+ *    (§ 3 bis point 4) : une ville qui n'aurait pas de requête, si la réserve était mal calculée, ne déclenche aucun appel ;
  * 2. demande de chaque jour par type de créneau (un lieu par créneau qui tient dans la fenêtre du jour), bornée par la
  *    capacité de la matrice Routes du jour (volume du forfait réparti sur les jours et les modes) ;
  * 3. fiches de la première série de chaque ville et de chaque type, dans l'ordre du classement (sans coût de trajet,
@@ -49,6 +52,11 @@ export type VilleAPlanifier = {
 export type CandidatAPlanifier = CandidatMoteur & { readonly ville: number };
 
 export type BudgetsPlanification = {
+  /**
+   * Requêtes Text Search de la part de l'étape (sa réserve, décision 0113 § 3 bis), pour la zone des villes `area` et `none`
+   * (une par ville). Garde : une ville qui n'en a plus n'est pas positionnée et ne déclenche aucun appel.
+   */
+  readonly textSearch: number;
   /** Fiches disponibles pour les séries (après les positions des villes). */
   readonly fiches: number;
   readonly routesRequetes: number;
@@ -137,12 +145,18 @@ export async function preparerPlanification(entree: EntreePlanification, clients
   return capturer(async () => {
     const { jours, villes, budgets } = entree;
     const nombreDeNuits = entree.nuitsVille.length;
-    const villeDuJour = (jour: JourSquelette): number => entree.nuitsVille.at(jour.logementArrivee) ?? entree.nuitsVille.at(0) ?? 0;
+    const villeDuJour = (jour: JourSquelette): number => villeDeLArrivee(jour.logementArrivee, entree.nuitsVille);
 
     // 1. Zone et départ des villes dont un jour est planifié.
     const ancres = new Map<number, LogementAncre>();
+    let textSearchRestants = Math.max(0, budgets.textSearch);
     for (const ville of villes) {
       if (!jours.some((jour) => villeDuJour(jour) === ville.rang)) continue;
+      if (ville.logement.kind === "area" || ville.logement.kind === "none") {
+        // Garde (0113 § 3 bis point 4) : aucun Text Search sans requête dans la part, jamais un centre inventé.
+        if (textSearchRestants < 1) continue;
+        textSearchRestants -= 1;
+      }
       ancres.set(ville.rang, valeurOuEchec(await zoneEtDepart(ville.logement, ville.nom, clients.places)));
     }
 
