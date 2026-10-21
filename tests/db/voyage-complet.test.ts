@@ -18,7 +18,7 @@ import {
 import { EtatCompletSchema, type EtatComplet } from "@/server/generation/etat";
 import { CODES_ARRET } from "@/server/generation/raison-echec";
 import { partDe } from "@/server/generation/forfait-etape";
-import { RANG_COMPLET, requestIdDeVersion } from "@/server/generation/voyage-complet";
+import { RANG_COMPLET, rangDuJour, requestIdDeVersion } from "@/server/generation/voyage-complet";
 import { creerSuiteVoyageComplet, DemarrageVoyageCompletError } from "@/server/payment/suite-voyage-complet";
 import { reprendreParLeStudio } from "../../scripts/reprise-studio";
 
@@ -645,6 +645,61 @@ describe("voyage complet (B9d) : plafonds, reprises refusées et lecture du voya
     expect(evenementsBloques(espion)).toBe(2);
     expect(await adapter.retryGeneration(contexteDe(org), { tripId, requestId: crypto.randomUUID(), kind: "full" })).toEqual({ ok: false, error: expect.objectContaining({ code: "validation_failed" }) });
     expect((await lignes(org, tripId)).complet[0]!.reprises).toEqual([]);
+  }, 180_000);
+
+  it("part Routes du jour 4 sans matrice possible (une requête pour deux modes) : cap_reached, J3 publié et gardé, aucune version pour J4 (ticket 609)", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const avant = await lignes(org, tripId);
+    const ligne = avant.complet[0]!;
+    // Deux modes (marche et transports) : une matrice demande au moins deux requêtes. La part Routes de la deuxième étape `e`
+    // (J4) est réduite à une requête : capacité nulle alors que le jour attend des lieux. Valeur de test.
+    let appels = 0;
+    const routesJ4: number[] = [];
+    const fabrique = (): FabriqueGeneration => {
+      const base = composerSimuleeAvec({ doubles: () => doublesEdimbourg() });
+      return {
+        ...base,
+        finale: (o) => {
+          appels += 1;
+          if (appels !== 2) return base.finale(o);
+          const reduite = { ...o, forfait: { ...o.forfait, routesRequetes: 1 } };
+          const finale = base.finale(reduite);
+          return { ...finale, planifier: async (entree) => (routesJ4.push(reduite.forfait.routesRequetes), finale.planifier(entree)) };
+        },
+      };
+    };
+    const { fin } = await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances(fabrique));
+    expect(routesJ4).toEqual([1]);
+    expect(fin.arret).toBe("cap_reached");
+    expect(fin.rang).toBe(rangDuJour(1, "e"));
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]).toMatchObject({ phase: "failed", stop_reason: "cap_reached" });
+    // Une seule version de plus, celle de J3 : J4 n'en écrit aucune, jamais un jour publié vide en silence.
+    expect(apres.versions).toHaveLength(avant.versions.length + 1);
+    const derniere = apres.versions.at(-1)!;
+    expect(derniere.request_id).toBe(requestIdDeVersion({ id: ligne.id, reprisesPersonne: 0, reprisesStudio: 0 }, 3));
+    for (const j of [1, 2, 3]) expect(etapesDuJour(derniere, j)).toBeGreaterThan(0);
+    for (const j of [4, 5, 6]) expect(etapesDuJour(derniere, j)).toBe(0);
+  }, 180_000);
+
+  it("voyage de dix jours aux valeurs de test : une requête Routes par jour pour deux modes, cap_reached au jour 3 au lieu de jours vides (ticket 609)", async () => {
+    // Huit requêtes Routes du profil `complet` sur huit jours (J3 à J10) : une par jour, capacité nulle avec deux modes.
+    expect(PLAFONDS_COMPLET.generations.complet.routesRequetes).toBe(8);
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org, { end: "2026-12-02" });
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const avant = await lignes(org, tripId);
+    const ligne = avant.complet[0]!;
+    const { fin } = await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances());
+    expect(fin.arret).toBe("cap_reached");
+    expect(fin.rang).toBe(rangDuJour(0, "e"));
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]).toMatchObject({ phase: "failed", stop_reason: "cap_reached" });
+    // Aucune version écrite : J1 et J2 de l'aperçu gardés, J3 à J10 sans étape, et la ligne ne finit pas `ready`.
+    expect(apres.versions).toEqual(avant.versions);
+    for (const j of [1, 2]) expect(etapesDuJour(apres.versions.at(-1)!, j)).toBeGreaterThan(0);
   }, 180_000);
 
   it("quota refusé au jour 4 : J3 publié et gardé, J4 à J6 sans étape (aucun jour à moitié planifié)", async () => {
