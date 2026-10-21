@@ -39,7 +39,7 @@ const modele = (texte = "Rapport A"): ModeleLancementP0 => ({
   briefs: ["edimbourg-1.json", "edimbourg-2.json"],
   suivi: { executions: [execution()], dernierePurge: null },
   decompte: [{ brief: "edimbourg-1.json", variante: "B", comptees: 1, compteesMax: 2, relances: 0, relancesMax: 1 }],
-  rapport: { execution: execution(), criteres: { A1: "non", A2: "non", A3: "non", A4: "non", A5: "non", A6: "non", A7: "non_releve", A8: "non_releve", A9: "non_releve" }, texte },
+  rapport: { execution: execution(), criteres: { A1: "non", A2: "non", A3: "non", A4: "non", A5: "non", A6: "non", A7: "non_releve", A8: "non_releve", A9: "non_releve" }, texte, etapes: null },
 });
 
 const groupe = (nom: string) => screen.getByRole("radiogroup", { name: nom });
