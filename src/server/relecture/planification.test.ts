@@ -64,9 +64,14 @@ function compteurs() {
   const routesBase = creerRoutesSimule(FixturesRoutesSchema.parse(fixturesRoutes));
   const fiches: string[] = [];
   const positions: string[] = [];
+  const textSearch: string[] = [];
   const matrices: { origines: string[]; destinations: string[]; mode: string }[] = [];
   const places: ClientPlacesMvp = {
     ...base,
+    async textSearch(requete) {
+      textSearch.push(requete.texte);
+      return base.textSearch(requete);
+    },
     async details(placeId) {
       fiches.push(placeId);
       return base.details(placeId);
@@ -82,7 +87,7 @@ function compteurs() {
       return routesBase.matrice(requete);
     },
   };
-  return { places, routes, fiches, positions, matrices };
+  return { places, routes, fiches, positions, textSearch, matrices };
 }
 
 function entree(jours: EntreePlanification["jours"], budgets: Partial<EntreePlanification["budgets"]> = {}): EntreePlanification {
@@ -94,7 +99,7 @@ function entree(jours: EntreePlanification["jours"], budgets: Partial<EntreePlan
     modes: [...MODES],
     classement: { classement: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: 365, dateReference: "2026-10-20" },
     configuration: CONFIGURATION_MOTEUR,
-    budgets: { fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
+    budgets: { textSearch: 0, fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
   };
 }
 
@@ -177,5 +182,41 @@ describe("planification: jours non planifiés et budgets", () => {
     const issue = await preparerPlanification(entree(planifies), { places, routes: c.routes });
     expect(issue.ok).toBe(false);
     expect(JSON.stringify(issue)).not.toContain("test_place_fuite");
+  });
+});
+
+describe("planification: garde Text Search des villes area et none (décision 0113 § 3 bis point 4)", () => {
+  const planifies = squelette("2026-11-23", "2026-11-28", 5).filter((jour) => jour.index <= 2);
+  // J1 à Édimbourg (logement connu), J2 arrive à Glasgow (`none`) : la zone de Glasgow demande un Text Search de son nom.
+  const deuxVilles = (budgets: Partial<EntreePlanification["budgets"]>): EntreePlanification => ({
+    ...entree(planifies, budgets),
+    nuitsVille: [0, 1, 1, 1, 1],
+    villes: [
+      { rang: 0, nom: "Édimbourg", logement: { kind: "known", placeId: LOGEMENT } },
+      { rang: 1, nom: "Glasgow", logement: { kind: "none" } },
+    ],
+    candidats: CANDIDATS.map((c, rang) => ({ ...c, ville: rang % 2 })),
+  });
+
+  it("garde : sans requête Text Search dans le budget, aucun appel ne part pour la ville, jamais un centre inventé", async () => {
+    const c = compteurs();
+    const issue = await preparerPlanification(deuxVilles({ textSearch: 0 }), { places: c.places, routes: c.routes });
+    expect(issue.ok).toBe(true);
+    if (!issue.ok) return;
+    expect(c.textSearch).toEqual([]);
+    // Seule la position du logement d'Édimbourg est lue ; aucun lieu de Glasgow n'est relu ni rendu.
+    expect(c.positions).toEqual([LOGEMENT]);
+    const deGlasgow = new Set(CANDIDATS.filter((_, rang) => rang % 2 === 1).map((cand) => cand.placeId));
+    expect(c.fiches.some((placeId) => deGlasgow.has(placeId))).toBe(false);
+    expect(issue.valeur.candidats.some((cand) => deGlasgow.has(cand.placeId))).toBe(false);
+    expect(issue.valeur.candidats.length).toBeGreaterThan(0);
+  });
+
+  it("avec une requête dans la part : un seul Text Search, le nom de la ville", async () => {
+    const c = compteurs();
+    const issue = await preparerPlanification(deuxVilles({ textSearch: 1 }), { places: c.places, routes: c.routes });
+    expect(c.textSearch).toEqual(["Glasgow"]);
+    // Le double d'Édimbourg ne connaît pas Glasgow : résultat déterministe, la zone est introuvable.
+    expect(issue).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
   });
 });
