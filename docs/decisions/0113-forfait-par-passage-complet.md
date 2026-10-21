@@ -1,8 +1,8 @@
-# 0113 — Forfait par passage du voyage complet : répartition des parts, valeurs de test du profil `complet`, jour vide sans signal
+# 0113 — Forfait par passage du voyage complet : répartition des parts, valeurs de test du profil `complet`, part Text Search de l'étape `e`, jour vide sans signal
 
 Statut : **acceptée**, **décision du Tech Lead** (répartition du forfait entre les étapes, valeurs de test, tests ; « Qui décide quoi » de `docs/CONTEXT.md`), définitive dès sa fusion, sans délai de veto (décision 0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Elle ne fixe **aucun montant réel** : les plafonds de production restent réservés à Samuel (`PLAFONDS_USAGE` vaut `null`, questions 4 et 5 de la spécification B9). Elle ne tranche pas la forme de `stopReason` (Sécurité, #607). Elle n'engage ni argent, ni compte externe, ni donnée personnelle, et ne supprime ni ne désactive aucun test.
 
-Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #608 · PR de mise en œuvre : #600 (fusionnée) · Défaut ouvert : #609 · Décisions liées : 0081 (B9-TL-3, B9-TL-12, B9-TL-13), 0087 § 1.3 et § 1.7, 0110 § 3
+Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #608 · PR de mise en œuvre : #600 (fusionnée) · Défauts : #609, #605 (PR #611) · Décisions liées : 0081 (B9-TL-3, B9-TL-12, B9-TL-13), 0087 § 1.3, § 1.7, § 2.3 et § 2.7, 0110 § 3
 
 Numérotation (relue le 2026-10-21 sur `main` `9b7282e`) : `main` porte 0001 à 0111 ; la PR #604, ouverte, porte 0112 ; aucune autre PR ouverte ne porte de décision au-delà.
 
@@ -34,7 +34,19 @@ Le workflow 4 (`generateFullTrip`, B9d) réserve **un forfait par passage** (pro
 2. **Raison** : `c` a déjà 80 % des requêtes Text Search, `l` les 20 % restants, pour le contrôle du logement de chaque ville. Avec 60 requêtes, aucun pourcentage ne couvre deux villes des doubles d'Édimbourg (environ 35 candidats ancrés par ville au complet) : même à 100 %, `c` n'aurait que 30 requêtes par ville, et `l` n'aurait plus rien. Le manque vient du **total** du profil, pas de sa répartition.
 3. **Tests à plusieurs villes** : ils élargissent explicitement le total de Text Search du profil `complet` dans leurs propres plafonds de test (`PLAFONDS_TROIS_VILLES`, ×2), avec la raison écrite à côté. C'est la règle : les fixtures simulées sont celles d'une seule ville, et les valeurs par défaut de la variante simulée restent dimensionnées pour elles.
 4. **Montants réels** (question à Samuel, posée dans la PR de cette décision) : un forfait par passage fixe se partage entre les villes et les jours. Sa part par jour diminue quand le voyage s'allonge, alors que la consommation d'un jour ne diminue pas. Les montants réels du profil `complet` devront donc être fixés pour le plus long voyage et le plus grand nombre de villes admis. Sinon, il faudra un profil exprimé par jour et par ville (forfait = part fixe + part par jour × jours + part par ville × villes). **Recommandation du Tech Lead** : le profil par jour et par ville. Il touche au plafond par génération, donc à l'argent : il n'est pas tranché ici.
-5. **Hors de cette décision** : l'étape `e` qui lance une requête Text Search pour une ville sans logement alors que sa part Text Search est nulle (#605). Règle générale, qui s'applique à #605 : **toute consommation d'une étape doit être couverte par sa part**. #605 peut donner à `e` une part Text Search pour ces villes, prise sur une autre étape, **sans changer le total du profil**. La forme (pourcentage ou réserve d'une requête par ville sans logement) est un choix de mise en œuvre, validé en revue de #605.
+5. **Règle générale : toute consommation d'une étape est couverte par sa part.** Une étape qui appelle sans part échoue en `cap_reached`. Une étape qui renonce à l'appel laisse des jours vides. Les deux cas sont des défauts de répartition, pas de comportement.
+
+### 3 bis. Part Text Search de l'étape `e` : une réserve par ville `area` ou `none`, prise sur `c`
+
+Cause (#605, établie par #611, head `c70b5ac`) : l'étape `e` positionne la zone et le départ d'une ville `area` ou `none` par un Text Search de son nom (`zoneEtDepart`, 0087 § 2.3 et § 2.7 : au plus un Text Search par ville `area` ou `none` et par étape `c` et `e`). Or `PARTS_FORFAIT.textSearch = { l: 20, c: 80 }` ne lui donne rien. #611 évite l'appel sans part : l'aperçu va au bout, mais les jours de cette ville restent sans étape (`noOption`, `incomplete`). C'est le cas « renonce à l'appel » du § 3 point 5.
+
+1. **Réserve, pas pourcentage.** `e` reçoit une **réserve Text Search exacte** : **une requête par ville `area` ou `none` que l'étape positionne**, c'est-à-dire chaque ville `area` ou `none` d'un jour que l'étape planifie. Un pourcentage donnerait trop pour une ville `known` et parfois 0 sur un petit total, à l'arrondi.
+   - **Aperçu** : une requête par ville `area` ou `none` des jours J1 et J2, pour l'unique étape `e`.
+   - **Voyage complet** : l'étape `e` de chaque jour positionne les villes de ce jour, donc une ville qui couvre plusieurs jours est positionnée à chaque jour. La réserve du passage est la somme, sur les jours du passage, des villes `area` ou `none` de chaque jour. Chaque jour reçoit **exactement son nombre**, hors du découpage cumulatif du § 1 point 5 : la réserve est déjà comptée par jour.
+2. **Prise sur `c`, total inchangé.** La réserve est retirée de la part Text Search de `c` (80 %) **avant** la répartition de `c` sur les villes introduites (§ 1 point 3). La part de `l` et le total du profil ne changent pas. Les pourcentages de `PARTS_FORFAIT` restent `{ l: 20, c: 80 }` : la réserve est calculée à part, à partir du voyage (villes, logements, jours du passage), et non écrite dans la table.
+3. **Calcul et refus avant toute dépense.** La réserve est calculée à l'étape qui réserve le forfait (`a` du voyage complet, première étape de l'aperçu), sur le voyage relu, puis recalculée à l'identique par `c` et `e` (fonction pure, une seule pour les trois appelants). Si la part de `c` ne couvre pas la réserve, l'exécution s'arrête en `cap_reached` à cette étape, avant tout appel (même règle que le § 4).
+4. **Garde de #611 conservée.** Le budget Text Search passé à `preparerPlanification` (`budgets.textSearch`) reste une garde. Avec la réserve, il vaut exactement le nombre de villes à positionner, et l'appel part. Une ville qui n'aurait pas de requête, si la réserve était mal calculée, ne déclenche toujours aucun appel. La part Text Search de `c` ne change pas de nature : `c` y prend toujours son propre Text Search du nom de chaque ville `area` ou `none` (0087 § 2.3).
+5. **Mise en œuvre** : une PR backend après #611 (ou dans #611 si elle n'est pas encore fusionnée). Tests en simulé : aperçu Édimbourg (`known`) puis Glasgow (`none`) aux valeurs de la variante simulée, avec un seul Text Search de `e` et des étapes en J2. Voyage complet à deux villes, dont une `none` sur plusieurs jours : un Text Search par jour de cette ville, part de `c` réduite d'autant, total inchangé. Cas de refus : réserve plus grande que la part de `c`, `cap_reached` avant tout appel. Aucune valeur de `src/server/config/usage.ts` n'est modifiée.
 
 ### 4. Voyage de dix jours sans étape : cause établie, défaut ouvert (#609)
 
@@ -45,7 +57,7 @@ Le workflow 4 (`generateFullTrip`, B9d) réserve **un forfait par passage** (pro
 
 ## Conséquences
 
-- Aucun changement de code ni de valeur dans cette PR (documentation seule).
-- #609 met en œuvre le § 4. #605 applique la règle du § 3 point 5.
+- Aucun changement de code ni de valeur dans cette PR (documentation seule). `PARTS_FORFAIT` et `src/server/config/usage.ts` sont inchangés ; la réserve du § 3 bis est calculée à part.
+- #609 met en œuvre le § 4. Une PR backend, après #611 ou dans #611, met en œuvre le § 3 bis.
 - Les valeurs de test du profil `complet` sont validées pour le bout en bout simulé d'Édimbourg (§ 2). Elles ne dimensionnent pas les montants réels.
 - Question à Samuel (montants réels du profil `complet`, § 3 point 4) : à reporter par le CEO dans `QUESTIONS.md`, avec la question 4 de B9 déjà ouverte.
