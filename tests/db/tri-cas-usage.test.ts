@@ -556,14 +556,25 @@ describe("présentation: même règle en local et sur le serveur (suite commune,
 });
 
 describe("lecture de l'état du tri : schéma absent", () => {
-  it("une table du tri absente (migration non appliquée) : null, la session reste locale ; une autre erreur rejette", async () => {
+  it("une table du tri absente : la lecture rejette en erreur fermée, sans repli sur la session locale (0112 amendement 3)", async () => {
     const journal: string[] = [];
-    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void journal.push(args.map(String).join(" ")));
+    const capter = (...args: unknown[]) => void journal.push(args.map(String).join(" "));
+    vi.spyOn(console, "log").mockImplementation(capter);
+    vi.spyOn(console, "error").mockImplementation(capter);
     const absente = Object.assign(new Error("relation absente"), { cause: { code: "42P01" } });
     const lecture = creerLectureDuTri({ withOrg: async () => Promise.reject(absente) });
-    expect(await lecture(ctxA, "00000000-0000-4000-8000-000000000001")).toBeNull();
-    // Repli journalisé (amendement 1 de 0112) : identifiant du voyage seul, ni code ni message de la base.
-    expect(journal).toEqual([JSON.stringify({ level: "warn", event: "presentation.deck_schema_missing", tripId: "00000000-0000-4000-8000-000000000001" })]);
+    await expect(lecture(ctxA, "00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({ name: "LectureVoyageError", reason: "unavailable" });
+    const colonne = creerLectureDuTri({ withOrg: async () => Promise.reject(Object.assign(new Error("colonne absente"), { code: "42703" })) });
+    await expect(colonne(ctxA, "00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({ name: "LectureVoyageError", reason: "unavailable" });
+    // Plus d'événement de repli ; l'erreur fermée est journalisée avec l'identifiant du voyage seul, ni code ni message de la base.
+    const texte = journal.join("\n");
+    expect(texte).not.toContain("deck_schema_missing");
+    expect(texte).not.toContain("42P01");
+    expect(texte).not.toContain("relation absente");
+    expect(journal.map((ligne) => JSON.parse(ligne) as Record<string, unknown>)).toEqual([
+      expect.objectContaining({ level: "error", event: "voyages.read_failed", reason: "unavailable", tripId: "00000000-0000-4000-8000-000000000001" }),
+      expect.objectContaining({ level: "error", event: "voyages.read_failed", reason: "unavailable", tripId: "00000000-0000-4000-8000-000000000001" }),
+    ]);
     const autre = creerLectureDuTri({ withOrg: async () => Promise.reject(Object.assign(new Error("panne"), { code: "08006" })) });
     await expect(autre(ctxA, "00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({ name: "LectureVoyageError", reason: "unavailable" });
   });
