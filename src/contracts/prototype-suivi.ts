@@ -73,8 +73,24 @@ export type LigneDecompte = {
   readonly relancesMax: number;
 };
 
-/** Rapport de la dernière exécution finie (D24, S4) : critères et texte à copier, sans donnée Google. */
-export type RapportPage = { readonly execution: ExecutionSuivie; readonly criteres: CriteresRapport; readonly texte: string };
+/**
+ * Étapes du programme stocké avec et sans `placeId` (décision 0116 § 4.4 ; 0117 § 4 point 2 ; spécification
+ * P0-programme-par-ia § 6, A12) : deux nombres entiers positifs ou nuls, calculés à chaque affichage depuis le
+ * programme stocké, jamais écrits ni journalisés. Ni nom, ni `placeId`, ni motif.
+ */
+export type EtapesRapport = { readonly avecPlaceId: number; readonly sansPlaceId: number };
+
+/**
+ * Rapport de la dernière exécution finie (D24, S4) : critères et texte à copier, sans donnée Google.
+ * `etapes` : affiché sur la page seulement, **jamais** dans `texte` (« Copier le rapport », 0117 § 4) ; `null` : non
+ * relevé (exécution sans programme écrit, ou programme absent ou illisible).
+ */
+export type RapportPage = {
+  readonly execution: ExecutionSuivie;
+  readonly criteres: CriteresRapport;
+  readonly texte: string;
+  readonly etapes: EtapesRapport | null;
+};
 
 /** Modèle de la page de lancement, lu par le serveur page ouverte seulement. */
 export type ModeleLancementP0 = {

@@ -50,7 +50,8 @@ async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: 
     }
   }
   const criteres = criteresDuRapport(execution, contenu);
-  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge) };
+  // `etapes` : non relevé tant que le calcul à la lecture n'est pas câblé (lot 1 du programme par IA, PR #632).
+  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge), etapes: null };
 }
 
 /** Modèle du lancement : lu seulement si la page est ouverte. */
