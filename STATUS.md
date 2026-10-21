@@ -1,37 +1,33 @@
-# État du studio — 2026-10-21 (127e cycle)
+# État du studio — 2026-10-21 (128e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-21, vers 09:30 UTC (GitHub) : Samuel a posé `owner-approved` sur #593 (fusionnée, migration 0013 approuvée dans `db-migrate`) et sur #620 (migration 0014). 09:41 UTC (fil « Routine cycle du studio ») : « je dois faire quoi ? » → réponse : poser ces deux libellés ; rien d'autre ; le studio lui dira quand lancer `db-migrate`, une seule fois.
+- 2026-10-21 11:11 à 12:05 UTC (fil « Routine cycle du studio ») : « on est où ? », demande du code hexadécimal du workflow, « le workflow est run », « c'est en arrêt sur quoi ? », « toujours bloqué ? ». Réponses données à chaque fois. **Samuel a lancé `db-migrate`** (run 39590555572, commit `ff6735c`, 11:15 UTC) : succès, migrations **0013 et 0014 appliquées** sur la base d'essai (consigné sur #620).
 
 ## Fait
-- Fusionnées : **#635** (jours vides du voyage complet → `cap_reached`, fiches de `e` par ville positionnée, Closes #609) ; **#593** (approbation de 0013) ; note de version v2026.10.21-09 (#636) ; **#638** amendement 1 de `specs/P0-programme-par-ia.md` (badge « à confirmer » calculé à la lecture au lot 1, badge « fermé ce jour-là » renvoyé à 0118) ; statut du 126e cycle (#634).
-- **0116** (#628) : la troisième tentative (découpage T8) a reçu une 4e puis une 5e revue bloquante (07:51 et 10:22 UTC), toutes sur du texte lié au découpage ; décision du CEO avec le Tech Lead : achèvement du découpage en pushs bornés plutôt qu'un nouveau découpage (bloquant « module du badge » dû à une consigne du CEO, corrigée). Si encore bloquée : remontée à Samuel.
-- **Premier lot** (#632) : badge « à confirmer » posé à la lecture (`src/adapters/prototype.ts` via `prototype-lecture.ts`), `pairesDuProgramme` saute les étapes sans `placeId`, test ajouté ; `needs-review` dès que 0116 est fusionnée.
-- **Lot 1 bis** (#631) : correction 1 relue et approuvée par le Tech Lead, puis CI rouge (le titre du jour n'était pas relu depuis la base) corrigée sans migration (`recomposition.ts`, `patch.ts`) ; relecture relancée (le libellé `techlead-approved` tombe à chaque push).
-- **B10a** (#621) : correction 2 approuvée par le Tech Lead ; un bloquant tardif UX/UI (« Tu as tout trié » faux après « Tout garder ») en correction.
-- **#620** (migration 0014) : conflit avec `main` résolu par le CEO (fusion de `main`, approbations 0013 et 0014 réunies) ; relecture relancée, fusion automatique ensuite.
-- Docs CEO : préfixes `[po]` et `[tl]` dans `CLAUDE.md`, renvoi vers 0115 dans `docs/CONTEXT.md` (#637, en revue).
+- **0116** (#628) fusionnée après sept relectures (les quatre dernières sur le texte des paires de trajets et du module du badge, réécrit mot pour mot depuis le code de #632 ; décision CEO et Tech Lead : achever le découpage plutôt que redécouper). Le badge « à confirmer » est posé à la lecture par `recomposerJour` (`src/adapters/prototype.ts`) via `avecBadgeALaLecture` (`prototype-lecture.ts`) ; une étape qui porte déjà deux badges garde les siens (Q571 répondue).
+- Fusionnées aussi : **#631** lot 1 bis (conseil, prix, horaires, titre du jour ; CI corrigée sans migration), **#620** (approbation de 0014), **#637** (préfixes `[po]`/`[tl]`, renvoi 0115 dans CONTEXT.md), statut du 127e cycle (#639).
+- **Premier lot** (#632, head `eff976f`) : première relecture consolidée (12:01 UTC) : cinq bloquants du Tech Lead, un de la Sécurité (`unverifiedForCap` dépend du temps), ligne de confinement approuvée. Correction 1 lancée ; décision CEO : le compte des étapes avec et sans `placeId` sur la page de rapport passe par une petite PR de contrat séparée puis le câblage dans #632.
+- **B10a** (#621, head `08212ef`) : deux bloquants tardifs UX corrigés (« Tu as fini ce tri. » dès qu'un jour est gardé ou que des cartes sont retirées par une réponse) ; approuvée par le Tech Lead, fusion automatique dès la CI.
 
 ## En cours
-- tech-lead : #628 0116, correction de la 5e revue (module du badge, `pairesDuProgramme`, mineurs).
-- backend : #621 B10a, bloquant tardif UX.
-- En revue : #631 lot 1 bis, #620 migration 0014, #637 docs CEO. #632 attend 0116.
-- Après la fusion de #628, #632 et #631 : PR ia #633 (réexportations `texte.ts`, écart de sévérité des sorties) et remplissage de `tip`/`priceNote`/`hoursNote`/`theme` ; puis **report `main` → `p0-reel`** pour que Samuel relance Rome.
+- ia-recherche : #632 correction 1 (mode simulé de `pnpm p0` sur la nouvelle chaîne + sortie simulée `programme` de rome-1, `unverifiedForCap` avant la boucle, réutilisation de `joursEntre`/`logementsDuJour`/`rythmeVersPace`, tests 0116 § 8.3, clé `zdr` propre à `programme`, plafond de jetons de sortie) et PR de contrat du rapport.
+- Après la fusion de #632 : #633 (réexportations `texte.ts`), remplissage de `tip`/`priceNote`/`hoursNote`/`theme` par le prompt `programme`, puis **report `main` → `p0-reel`** et Samuel relance Rome.
+- Après la fusion de #621 : ticket B10b ; ticket de retrait du repli de B10a (0112 amendement 1, 0014 appliquée).
+- Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI.
 
 ## Bloqué
-- **`db-migrate` sur la base d'essai** : dès que #620 est fusionnée, Samuel lance le workflow une seule fois (0013 et 0014) ; fusions gelées pendant le lancement. Puis retrait du repli de B10a (0112, amendement 1) à suivre ici.
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
 - **Essai réel sur préversion** (B9e) : Q538.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI ; A2-c seulement si Samuel le décide (Q525).
-- **Purge du MVP et `coords-purge`** (#527) : Q438 ; `coords-purge` toujours en échec (note de version).
-- Incohérence connue : 0117 (fusionnée) dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
+- **Purge du MVP et `coords-purge`** (#527) : Q438 ; `coords-purge` toujours en échec.
+- Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. Fusionner 0116 (#628), puis #632 (poser `needs-review`) et #631 ; #633 ; report `main` → `p0-reel` ; prévenir Samuel pour relancer Rome.
-2. #620 fusionnée → dire à Samuel de lancer `db-migrate` (un clic) ; finir B10a #621 ; B10b ensuite.
-3. Samuel : `db-migrate` quand le studio le dit ; Q564 (facultative avant l'essai) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
+1. #632 correction 1 et PR de contrat jusqu'à la fusion ; #633 ; remplissage des infos pratiques ; report `main` → `p0-reel` ; prévenir Samuel.
+2. #621 fusionnée → tickets B10b et retrait du repli.
+3. Samuel : rien à cliquer ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -53,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q571. Q565 et Q566 restent ouvertes (#631 approuvée par le Tech Lead sous réserve de la CI) ; Q570 ouverte.
+- Q572, Q573. Q571 répondue par le Tech Lead (0116 § 5.1 : les badges déjà écrits l'emportent).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
