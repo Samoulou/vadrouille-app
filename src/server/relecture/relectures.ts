@@ -1,6 +1,7 @@
 import "server-only";
 
 import { INCONNU, type Duree, type Inconnu, type ModeTrajet, type Plage, type Point, type Relectures, type Validite } from "@/domain/relectures";
+import { plagesDeFiche } from "@/domain/plages-fiche";
 import type { IssueFiche } from "@/grounding/fiches";
 import type { TableTrajets } from "@/grounding/trajets";
 
@@ -37,18 +38,6 @@ export type EntreeRelectures = {
   readonly logementsParNuit: readonly (string | null)[];
 };
 
-const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/** Jour de la semaine d'une date AAAA-MM-JJ (0 = dimanche), ou `null` si la date est invalide. */
-function jourDeLaSemaine(date: string): number | null {
-  const lu = DATE.exec(date);
-  if (lu === null) return null;
-  const [annee, mois, jour] = [Number(lu[1]), Number(lu[2]), Number(lu[3])];
-  const instant = new Date(Date.UTC(annee, mois - 1, jour));
-  if (instant.getUTCFullYear() !== annee || instant.getUTCMonth() !== mois - 1 || instant.getUTCDate() !== jour) return null;
-  return instant.getUTCDay();
-}
-
 export function versRelectures(entree: EntreeRelectures): Relectures {
   const issues = new Map<string, IssueFiche>();
   for (const fiche of entree.fiches) if (!issues.has(fiche.placeId)) issues.set(fiche.placeId, fiche);
@@ -64,15 +53,8 @@ export function versRelectures(entree: EntreeRelectures): Relectures {
       return issue.statut === "CLOSED_PERMANENTLY" ? "ferme_definitivement" : "valide";
     },
     plages(placeId: string, date: string): readonly Plage[] | Inconnu {
-      const issue = issues.get(placeId);
-      if (issue === undefined || issue.issue === "introuvable" || issue.statut === "CLOSED_PERMANENTLY") return INCONNU;
-      if (issue.statut === "CLOSED_TEMPORARILY") return usage === "planification" ? [] : INCONNU;
-      if (issue.horaires === null) return INCONNU;
-      const jour = jourDeLaSemaine(date);
-      if (jour === null) return INCONNU;
-      return issue.horaires
-        .filter((plage) => plage.jour === jour)
-        .map((plage) => ({ debut: plage.debut, fin: plage.finLendemain === undefined ? plage.fin : Math.min(1440 + plage.finLendemain, 2880) }));
+      // Calcul extrait sans changement dans `@/domain/plages-fiche` (partagé avec la relecture des horaires, 0116 § 5.3).
+      return plagesDeFiche(issues.get(placeId), date, usage);
     },
     duree(depuis: Point, vers: Point, mode: ModeTrajet): Duree | Inconnu {
       const de = placeIdDe(depuis);

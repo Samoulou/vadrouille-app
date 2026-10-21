@@ -20,7 +20,22 @@ export type TypeCreneau = (typeof TYPES_CRENEAU)[number];
  * candidat enrichi (décision 0094 § 1 point 2 : écrites ici une seule fois pour `src/ai`, d'où `LONGUEURS_PLAN` et
  * `LONGUEURS_INFOS` de `sorties.ts` sont dérivées).
  */
-export const LONGUEURS_TEXTE = { nom: 80, resume: 300, raison: 280, requete: 200, secteur: 60, incontournable: 80, prix: 60, horaires: 120, conseil: 160 } as const;
+export const LONGUEURS_TEXTE = {
+  nom: 80,
+  resume: 300,
+  raison: 280,
+  requete: 200,
+  secteur: 60,
+  incontournable: 80,
+  prix: 60,
+  horaires: 120,
+  conseil: 160,
+  // Programme écrit par l'IA (décision 0117 § 1 point 2 ; `pourquoi` à 280, borne de `Stop.reason`, décision 0116 § 1.2).
+  pourquoi: 280,
+  bonPlan: 200,
+  titreJour: 80,
+  titreProgramme: 120,
+} as const;
 
 /** Identifiant interne d'un candidat, attribué par le code (jamais par le modèle). */
 export const CANDIDAT_ID_PATTERN = /^c_\d{3}$/;

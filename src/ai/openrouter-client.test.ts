@@ -355,6 +355,29 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
     expect(await issue).toBe("upstream_timeout");
     expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
   });
+
+  // Décision 0116 § 2.3 (amende 0046 D13 point 5 pour la seule nature `programme`).
+  it("programme: délai de la requête programme à 300 s, autres délais inchangés", async () => {
+    const pendante = (appels: () => readonly Appel[]) => () =>
+      new Promise<Response>((_resolve, rejeter) => {
+        const signal = appels()[0]?.init.signal;
+        signal?.addEventListener("abort", () => rejeter(new DOMException("abandon", "AbortError")), { once: true });
+      });
+    const programme: ReturnType<typeof monter> = monter([pendante(() => programme.appels)]);
+    const issue = codeDe(programme.client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 } })));
+    await programme.horloge.avancer(299_999);
+    expect(programme.port.lignes.map((l) => l.etat)).toEqual(["reservee"]);
+    await programme.horloge.avancer(1);
+    expect(await issue).toBe("upstream_timeout");
+    expect(programme.port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+    // Toute autre nature garde 120 s.
+    const autre: ReturnType<typeof monter> = monter([pendante(() => autre.appels)]);
+    const issueAutre = codeDe(autre.client.envoyer(requete({ etape: "notation" })));
+    await autre.horloge.avancer(119_999);
+    expect(autre.port.lignes.map((l) => l.etat)).toEqual(["reservee"]);
+    await autre.horloge.avancer(1);
+    expect(await issueAutre).toBe("upstream_timeout");
+  });
 });
 
 describe("p0: fournisseur explicite (statique)", () => {

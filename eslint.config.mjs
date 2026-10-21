@@ -596,6 +596,8 @@ export default defineConfig([
       "src/ai/modeles.simule.ts",
       "src/ai/prompts/notation.ts",
       "src/ai/prompts/plan.ts",
+      // Décision 0115 : prompt `programme`, chargé par `requetes.ts` (même justification que les autres prompts).
+      "src/ai/prompts/programme.ts",
       "src/ai/prompts/raisons.ts",
       "src/ai/prompts/recherche.ts",
       "src/ai/requetes.ts",

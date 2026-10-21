@@ -63,12 +63,18 @@ export const ConfigModelesSchema = z
     recherche: ModeleIdSchema,
     notation: ModeleIdSchema,
     raisons: ModeleIdSchema,
+    /** Rédaction du programme complet (décision 0116 § 2.2 : modèle de 0027 point 1, le même pour les deux variantes). */
+    programme: ModeleIdSchema,
   }),
   variantes: z.strictObject({
     /** La variante A ne peut changer que le modèle de notation : garanti par la forme. */
     a: z.strictObject({ notation: ModeleIdSchema }),
   }),
-  routage: RoutageSchema,
+  /**
+   * Routage de la configuration du prototype : `zdr: true` **exigé** (décision 0116 § 2.2, verdict S5 de 0117 § 5) ; la
+   * requête `programme` part en `zdr` et `data_collection: "deny"`, échec fermé sans second appel.
+   */
+  routage: RoutageSchema.extend({ zdr: z.literal(true) }),
   /** Recherche web du fournisseur (modèle de l'étape `recherche`) : moteur fixé, cohérent avec ce modèle. */
   rechercheWeb: z.strictObject({ moteur: z.enum(MOTEURS_RECHERCHE_WEB) }),
   })

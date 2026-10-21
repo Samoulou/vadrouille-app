@@ -122,6 +122,8 @@ type AppelModele = {
   readonly routage: RequeteModele["routage"];
   readonly messages: readonly Message[];
   readonly greffonWeb: GreffonWeb | null;
+  /** Délai de la requête (`DELAI_REQUETE_MS`) : `openrouterProgramme` pour la seule nature `programme` (0116 § 2.3). */
+  readonly delaiMs: number;
 };
 
 /** Résultat brut d'un appel : texte, sources (citations d'adresses), coût et raison de fin (liste fermée). */
@@ -255,7 +257,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
         { fournisseur: "modeles", methode: "chat", sku: requete.modele, unites: { requetes: 1, elements: 0 }, coutEstimeMicros },
         options.plafonds,
       ),
-      DELAI_REQUETE_MS.openrouter,
+      requete.delaiMs,
       async (signal, transportAppele) => {
         etat = { appele: transportAppele, redirection: false, greffonWeb };
         etats.set(signal, etat);
@@ -297,11 +299,18 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
 
   return {
     async envoyer(requete: RequeteModele): Promise<ReponseModele> {
-      const { texte, coutUsd, fin, tokens } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: null });
+      const { texte, coutUsd, fin, tokens } = await appeler({
+        modele: requete.modele,
+        routage: requete.routage,
+        messages: requete.messages,
+        greffonWeb: null,
+        // Décision 0116 § 2.3 : 300 s pour la seule requête `programme` (réponse longue), 120 s pour toute autre.
+        delaiMs: requete.etape === "programme" ? DELAI_REQUETE_MS.openrouterProgramme : DELAI_REQUETE_MS.openrouter,
+      });
       return { texte, coutUsd, fin, ...(tokens === undefined ? {} : { tokens }) };
     },
     async rechercherWeb(requete) {
-      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats } });
+      const { sources, coutUsd } = await appeler({ modele: requete.modele, routage: requete.routage, messages: requete.messages, greffonWeb: { moteur: requete.moteur, maxResultats: requete.maxResultats }, delaiMs: DELAI_REQUETE_MS.openrouter });
       return { sources, coutUsd };
     },
   };

@@ -4,6 +4,7 @@ import type { ClientModeles } from "@/ai/client";
 import { createOpenRouterClient } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { creerNoterCandidats, type NoterCandidats } from "@/ai/noter-candidats";
+import { creerRedigerProgramme, type RedigerProgramme } from "@/ai/rediger-programme";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -35,7 +36,10 @@ import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, typ
  *   - `ancrage()` : `textSearch` et `detailsLogement` seulement, rien d'autre de Places, aucun modèle ;
  *   - `etapeFinale()` : fiches Place Details, Routes, `noterCandidats` et `redigerRaisons` (jamais le client de modèles
  *     brut, ni la recherche web, ni les pages), et `detailsLogement` (logements du brief seulement : leurs identifiants
- *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5).
+ *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5) ;
+ *   - `programme()` (décision 0116 § 3, seule famille appelée par `p0Run` depuis le lot 1 du programme écrit par l'IA) :
+ *     `redigerProgramme` (une requête `programme`, jamais le client brut ni la recherche web), `textSearch`, fiches
+ *     Place Details, `detailsLogement` et Routes. Les trois familles précédentes restent pour leurs tests (0116 § 7).
  * - **Port de consommation** : chaque client reçoit le port et les plafonds du mode (réservation avant chaque appel) ;
  *   le contexte de chaque appel porte l'exécution de la garde et les périodes du fournisseur (D20), calculées à l'appel.
  */
@@ -52,6 +56,8 @@ export type ReglagesModeles = {
   readonly notation: { readonly modele: string };
   /** Modèle de la rédaction des raisons (étape `raisons`). */
   readonly raisons: { readonly modele: string };
+  /** Modèle de la rédaction du programme (étape de requête `programme`, décision 0116 § 2.2). */
+  readonly programme: { readonly modele: string };
 };
 
 export type OptionsComposition = {
@@ -90,10 +96,24 @@ export type CapacitesEtapeFinale = {
   readonly redigerRaisons: RedigerRaisons;
 };
 
+/**
+ * Capacités de l'étape `etapeProgramme` (décision 0116 § 3 et § 4) : rédaction du programme (une requête `programme`),
+ * Text Search restreint à la zone (masque `id`), fiches Place Details, fiche des logements du brief et Routes. Ni client
+ * de modèles brut, ni recherche web, ni lecture de pages.
+ */
+export type CapacitesProgramme = {
+  readonly redigerProgramme: RedigerProgramme;
+  readonly textSearch: CapacitesAncrage["textSearch"];
+  readonly places: Pick<ClientPlaces, "details">;
+  readonly detailsLogement: CapacitesAncrage["detailsLogement"];
+  readonly routes: ClientRoutes;
+};
+
 export type CompositionP0Reel = {
   readonly agent: () => CapacitesAgent;
   readonly ancrage: () => CapacitesAncrage;
   readonly etapeFinale: () => CapacitesEtapeFinale;
+  readonly programme: () => CapacitesProgramme;
 };
 
 /**
@@ -150,6 +170,18 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
         redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: options.modeles.routage }),
       };
     },
+    programme() {
+      const places = createPlacesClient(google);
+      const { textSearch, detailsLogement } = capacitesAncrage(places);
+      // `creerRedigerProgramme` pose `zdr: true` et `data_collection: "deny"` (verdict S5 de 0117, 0116 § 2.2).
+      return {
+        redigerProgramme: creerRedigerProgramme(modeles(), { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+        textSearch,
+        places: { details: (placeId) => places.details(placeId) },
+        detailsLogement,
+        routes: createRoutesClient(google),
+      };
+    },
   };
 }
 
@@ -171,6 +203,21 @@ export function composerRelecture(garde: GardeRelecture, options: OptionsRelectu
   const horloge = options.horloge ?? horlogeSysteme;
   const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
   return { routes: createRoutesClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge }) };
+}
+
+/**
+ * Relecture des **horaires** d'une Journée (décision 0116 § 5.3, T8 ; admise par 0117) : la seule fiche Place Details,
+ * rien d'autre (ni Text Search, ni Routes, ni modèle). Même garde de relecture que `composerRelecture` (barrière, purge
+ * et forfait de relecture réservé) ; chaque appel porte la nature `relecture`, sans exécution, et le registre en mémoire
+ * du forfait le borne à la part `details` (`PLAFONDS_RELECTURE.placesDetails`, aucune valeur relevée). Les fiches restent
+ * en mémoire de `src/server/p0/relecture.ts` : seul le badge en sort.
+ */
+export function composerRelectureHoraires(garde: GardeRelecture, options: OptionsRelecture): { readonly places: Pick<ClientPlaces, "details"> } {
+  if (garde.relecture !== true || "runId" in garde) throw new RangeError("composition : garde de relecture attendue");
+  const horloge = options.horloge ?? horlogeSysteme;
+  const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
+  const places = createPlacesClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge });
+  return { places: { details: (placeId) => places.details(placeId) } };
 }
 
 /**

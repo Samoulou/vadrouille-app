@@ -199,21 +199,10 @@ export function relecturesDepuisAncrages(
 }
 
 /**
- * Rangs des jours dont le lieu est **fermé pendant toute la fenêtre** (correction 1 de la PR #490, regroupement par
- * jour) : ses plages d'ouverture de la date sont connues et aucune ne recouvre `[debut, fin]` du jour. Horaires
- * inconnus : aucun jour (aucune contrainte, B5-PO-5).
+ * Rangs des jours dont le lieu est fermé pendant toute la fenêtre : extrait sans changement de comportement dans
+ * `@/domain/plages-fiche` (décision 0116 § 5.3, partagé avec la relecture des horaires du prototype), réexporté ici.
  */
-export function joursDeFermeture(
-  relectures: Pick<Relectures, "plages">,
-  placeId: string,
-  jours: readonly { readonly date: string; readonly debut: number; readonly fin: number }[],
-): number[] {
-  return jours.flatMap((jour, rang) => {
-    const plages = relectures.plages(placeId, jour.date);
-    if (plages === INCONNU) return [];
-    return plages.some((plage) => plage.debut < jour.fin && jour.debut < plage.fin) ? [] : [rang];
-  });
-}
+export { joursDeFermeture } from "@/domain/plages-fiche";
 
 /** Six compteurs du rapport de P0 (`scripts/p0/rapport.ts`) ; R3, R7 et R10 y sont « sans objet ». */
 export type ViolationsP0 = { R1: number; R2: number; R4: number; R5: number; R6: number; R8: number };

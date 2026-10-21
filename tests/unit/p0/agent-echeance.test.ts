@@ -135,6 +135,16 @@ describe("ia: agent de recherche, fin propre à l'échéance de l'étape (ticket
     expect(etat?.candidats).toBe(candidats);
   });
 
+  // Déplacé de `tests/unit/workflows/p0-run.test.ts` (« ticket 407 : l'agent reçoit la vérification d'échéance de l'étape
+  // et un observateur de son état ») par la décision 0116 § 8.2 : `p0Run` n'appelle plus l'agent ; la propriété de
+  // l'agent est vérifiée ici, sur `chercherCandidats` directement.
+  it("ticket 407 : l'agent reçoit la vérification d'échéance de l'étape et un observateur de son état", async () => {
+    const { journal, etat } = await rejouer([PLAN, tour({ candidats: [candidat("Musée maison")], termine: true })], () => true);
+    expect(journal.filter((ligne) => ligne.startsWith("oui:")).length).toBeGreaterThan(0);
+    expect(journal.indexOf("oui:modele")).toBeLessThan(journal.indexOf("modele"));
+    expect(etat).toBeDefined();
+  });
+
   it("sans vérification (mode simulé, scripts/p0) : aucune fin sur échéance", async () => {
     const reponses = [PLAN, tour({ actions: [RECHERCHER] }), tour({ candidats: [candidat("Musée maison")], termine: true })];
     const { compteurs, candidats } = await chercherCandidatsP0(brief, {

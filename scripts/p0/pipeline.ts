@@ -349,7 +349,8 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       notation: PROMPT_NOTATION.version,
       raisons: PROMPT_RAISONS.version,
     },
-    modeles: choisis,
+    // Le mode simulé garde la chaîne du lot 0 (recherche, notation, raisons) : le modèle `programme` (0116) n'y figure pas.
+    modeles: { recherche: choisis.recherche, notation: choisis.notation, raisons: choisis.raisons },
     ...(RoutageSchema.safeParse(configuration.modeles.routage).success ? { routage: { ...configuration.modeles.routage } } : {}),
     fichiersConfig: { modeles: CONFIG_SCHEMA, recherche: CONFIG_SCHEMA, classement: CONFIG_SCHEMA, plafonds: CONFIG_SCHEMA },
     notes: {

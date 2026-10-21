@@ -78,11 +78,23 @@ export type RaisonRelecture = (typeof RAISONS_RELECTURE)[number];
 export type ReponseRelecture = { ok: true; minutes: number[] } | { ok: false; raison: RaisonRelecture };
 
 /**
+ * Réponse de la relecture des horaires d'une Journée (décision 0116 § 5.3, T8) : pour chaque `placeId` demandé, dans
+ * l'ordre, `true` si l'étape doit porter le badge « à confirmer » (lieu fermé définitivement, ou fermé toute la journée
+ * de la date). **Seul ce booléen sort** du relecteur : ni statut, ni horaire, ni plage (0011 § 5, 0117).
+ */
+export type ReponseHoraires = { ok: true; aConfirmer: boolean[] } | { ok: false; raison: RaisonRelecture };
+
+/**
  * Relecteur des durées de trajet : une requête par journée affichée (matrice de Routes dans la spécification
  * suivante). `minutes` est rendu dans l'ordre des paires.
+ *
+ * `relireHoraires` (facultatif, décision 0116 § 5.3) : une fiche par `placeId` distinct des étapes du jour, sous la même
+ * barrière et le même forfait de relecture que les trajets ; absent, refusé ou en échec : la page est rendue **sans
+ * badge horaire** (jamais un badge inventé).
  */
 export interface RelecteurTrajets {
   relireJournee(paires: readonly PaireRelecture[]): Promise<ReponseRelecture>;
+  relireHoraires?(placeIds: readonly string[], date: string): Promise<ReponseHoraires>;
 }
 
 /** Source des programmes : l'index du chargeur (`createProgrammeLoader`) ou un double de test. */
@@ -226,8 +238,41 @@ async function durees(paires: readonly PaireRelecture[], { trajets, conserver }:
 }
 
 /**
+ * `placeId` des étapes du jour fermées d'après la relecture des horaires (décision 0116 § 5.3) : une demande par
+ * Journée, `placeId` distincts, dans l'ordre des étapes. Vide si aucun relecteur d'horaires, refus, échec ou réponse
+ * hors contrat (longueur, valeur) : aucun badge horaire, jamais un badge inventé. Rien n'est gardé entre deux requêtes.
+ */
+async function fermesDuJour(relecteur: RelecteurTrajets, jour: JourReduit): Promise<ReadonlySet<string>> {
+  const placeIds = [...new Set(jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop.placeId !== undefined ? [ligne.stop.placeId] : [])))];
+  if (placeIds.length === 0 || relecteur.relireHoraires === undefined) return new Set();
+  let reponse: ReponseHoraires;
+  try {
+    reponse = await relecteur.relireHoraires(placeIds, jour.date);
+  } catch {
+    return new Set();
+  }
+  if (!reponse.ok || !Array.isArray(reponse.aConfirmer) || reponse.aConfirmer.length !== placeIds.length || reponse.aConfirmer.some((valeur) => typeof valeur !== "boolean")) {
+    return new Set();
+  }
+  return new Set(placeIds.filter((_, rang) => reponse.ok && reponse.aConfirmer[rang] === true));
+}
+
+/**
+ * Badge « à confirmer » calculé à la lecture (décision 0116 § 5.1 et § 5.3 ; 0011 § 5) : jamais écrit dans le
+ * programme. Posé sur une étape sans `placeId`, ou dont le lieu est fermé d'après la relecture des horaires.
+ */
+function avecBadge(ligne: DayLineItem, fermes: ReadonlySet<string>): DayLineItem {
+  if (ligne.type !== "stop") return ligne;
+  const { stop } = ligne;
+  const aConfirmer = stop.placeId === undefined || fermes.has(stop.placeId);
+  if (!aConfirmer || stop.exceptions.includes("toConfirm")) return ligne;
+  return { type: "stop", stop: { ...stop, exceptions: [...stop.exceptions, "toConfirm"] } };
+}
+
+/**
  * Recompose une journée : durées conservées ou relues (`estimated: false`), `null` pour une durée indisponible ;
- * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché).
+ * `travelMinutes` = somme des segments, `null` s'il manque une durée (le total n'est pas affiché) ; badge
+ * « à confirmer » calculé à la lecture (`avecBadge`, 0116 § 5.3).
  */
 async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur: RelecteurTrajets): Promise<Day> {
   const { programme } = servi;
@@ -235,8 +280,9 @@ async function recomposerJour(servi: ProgrammeServi, jour: JourReduit, relecteur
   const paires = (pairesDuProgramme(programme).jours.get(jour.index) ?? []).map(exiger);
   const minutes = await durees(paires, servi, relecteur);
   let suivant = 0;
+  const fermes = await fermesDuJour(relecteur, jour);
   const items: DayLineItem[] = jour.items.map((ligne) => {
-    if (ligne.type !== "segment") return ligne;
+    if (ligne.type !== "segment") return avecBadge(ligne, fermes);
     const valeur = minutes[suivant] ?? null;
     suivant += 1;
     return { type: "segment", segment: { mode: ligne.segment.mode, minutes: valeur, estimated: false } };

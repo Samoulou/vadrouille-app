@@ -130,8 +130,13 @@ export interface PortConsommation {
 /** Délai d'une opération du port : constante du code des clients (D13 point 5 ; 2 000 ms au plus). */
 export const DELAI_PORT_MS = 2_000;
 
-/** Délais par requête (D13 point 5), posés par l'enveloppe de chaque client. Constantes, jamais une configuration. */
-export const DELAI_REQUETE_MS = { openrouter: 120_000, places: 10_000, routes: 10_000 } as const;
+/**
+ * Délais par requête (D13 point 5), posés par l'enveloppe de chaque client. Constantes, jamais une configuration.
+ * `openrouterProgramme` : requête de modèle de nature `programme` seulement (rédaction du programme complet du prototype, réponse
+ * longue ; décision 0116 § 2.3, qui amende D13 point 5 pour cette seule nature) ; toute autre requête de modèle garde
+ * `openrouter`.
+ */
+export const DELAI_REQUETE_MS = { openrouter: 120_000, openrouterProgramme: 300_000, places: 10_000, routes: 10_000 } as const;
 
 /** Horloge injectée : instant courant et minuterie annulable. */
 export type Horloge = {

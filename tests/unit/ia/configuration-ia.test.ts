@@ -145,8 +145,8 @@ describe("configuration ia: valeur absente, inconnue ou hors bornes refusée", (
     expect(() => charge(avec(ia(), ["zdr", "structuration"], "oui"))).toThrow();
   });
 
-  it("le schéma accepte exactement les six clés zdr de ETAPES_ZDR (clés réelles, pas la copie)", () => {
-    expect(ETAPES_ZDR).toHaveLength(6);
+  it("le schéma accepte exactement les sept clés zdr de ETAPES_ZDR (clés réelles, pas la copie)", () => {
+    expect(ETAPES_ZDR).toHaveLength(7);
     for (const etape of ETAPES_ZDR) expect(() => charge(avec(ia(), ["zdr", etape], true)), etape).not.toThrow();
   });
 
@@ -157,16 +157,20 @@ describe("configuration ia: valeur absente, inconnue ou hors bornes refusée", (
 
   it("les copies en dur de ia.ts sont exactement ETAPES_REQUETE (contrôle de la copie)", () => {
     expect([...ETAPES_ZDR].sort()).toEqual([...ETAPES_REQUETE].sort());
-    // Les cinq réglages de la couche IA : toutes les étapes de modèle sauf `recherche` (réglage propre à l'agent).
-    expect([...ETAPES_REGLAGES].sort()).toEqual(ETAPES_REQUETE.filter((etape) => etape !== "recherche").sort());
+    // Les cinq réglages de la couche IA : toutes les étapes de modèle sauf `recherche` (réglage propre à l'agent) et
+    // `programme` (rédaction du programme du prototype, `p0Run` et `pnpm p0` seulement, décision 0115 § 5.5).
+    expect([...ETAPES_REGLAGES].sort()).toEqual(ETAPES_REQUETE.filter((etape) => etape !== "recherche" && etape !== "programme").sort());
     expect(Object.keys(CONFIGURATION_IA.reglages).sort()).toEqual([...ETAPES_REGLAGES].sort());
   });
 
-  it("routage.data_collection autre que deny, ou absent, est refusé", () => {
-    for (const routage of [{ data_collection: "allow" }, {}, { data_collection: "deny", zdr: true }]) {
-      expect(() => charge(ia(), avec(modeles(), ["routage"], routage))).toThrow();
+  // Décision 0116 § 2.2 (verdict S5 de 0117) : `modeles.json` porte `routage.zdr: true`, exigé ; avant elle, tout `zdr`
+  // y était refusé. Les cas de refus de `data_collection` sont inchangés.
+  it("routage.data_collection autre que deny, ou absent, est refusé ; routage.zdr exigé à true (décision 0116 § 2.2)", () => {
+    for (const routage of [{ data_collection: "allow", zdr: true }, { zdr: true }, {}, { data_collection: "deny" }, { data_collection: "deny", zdr: false }, { data_collection: "deny", zdr: "true" }]) {
+      expect(() => charge(ia(), avec(modeles(), ["routage"], routage)), JSON.stringify(routage)).toThrow();
     }
     expect(() => charge(ia(), sans(modeles(), ["routage"]))).toThrow();
+    expect(() => charge(ia(), avec(modeles(), ["routage"], { data_collection: "deny", zdr: true }))).not.toThrow();
   });
 
   it("types : la configuration chargée est assignable aux types de src/ai et src/research", () => {
