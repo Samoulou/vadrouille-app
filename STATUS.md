@@ -1,35 +1,33 @@
-# État du studio — 2026-10-21 (123e cycle)
+# État du studio — 2026-10-21 (125e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 122e cycle (fil du projet et #studio).
-- Q545 résolue par le diagnostic (`/mnt/project-files/essai-reel/diagnostic-rome-2026-10-20.md`) : l'essai de Rome du 2026-10-20 est allé au bout à 21:09 UTC, voyage `proto_rome_20261020_1` affiché sur l'hôte `p0-reel` ; `p0Run` n'écrit aucune ligne de journal en cas de succès ; Samuel regardait probablement « Mes voyages » sur une autre préversion (simulée). Lien direct envoyé à Samuel.
+- 2026-10-21 05:26 à 05:52 UTC (fil « Routine cycle du studio ») : Samuel, déçu du dernier essai de Rome (pas de repas, journées finies à 15 h, pas de Trevi), **décide d'inverser la génération du prototype** : « Oui on va inverser, qui peut le plus qui peut le moins on laisse la liberté et on restreindra au besoin » (05:47), confirme que l'IA reçoit toutes les saisies du questionnaire (05:51), donne le feu vert au plan (05:52 : « Ok go tu peux lancer le plan »). Décision 0115 (#623). Son plan Édimbourg (PDF) rejoint `/mnt/project-files/essai-reel/exemples/`.
 
 ## Fait
-- Fusionnées : **B9d** (#600, voyage complet après déblocage ; Tech Lead et Sécurité favorables après la correction 1), statut du 122e cycle (#601).
-- Report `main` → `p0-reel` ouvert (#602, avec #597 et B9d) : à fusionner par Samuel.
-- Préalables de B10a ouverts (#604, décision 0112 et contrats du tri enregistré).
-- Décisions du CEO sur 0112 : la migration de B10a passe avant son code ; la PR de code de B10a n'est pas ouverte dans le cycle de B9d (réglé, B9d fusionnée) ; la « clôture » de `completeDeck` entre dans B10a, sans nouveau découpage.
+- Décision de Samuel écrite : **0115** (l'IA écrit le programme complet, le code vérifie chaque lieu sur Google) et spécification `specs/P0-programme-par-ia.md` (#623, en correction 1) ; **0116** réponses du Tech Lead T1 à T7 (#628, en correction 1) ; **0117** verdicts de la Sécurité S1 à S4 (#627, correction 1 à venir). Ordre de fusion : #623, #628, #627.
+- Gelée : #500 (amendement 3 de P0-suite-2) ; les questions 3 à 5 de cet amendement sont sans objet pour le prototype.
+- Statut du 124e cycle (#617).
 
 ## En cours
-- tech-lead : **préalables de B10a** (#604), correction 1.
-- tech-lead : décision du forfait du voyage complet (demandée par la revue de B9d) et valeurs de test du profil `complet`.
-- sécurité : liste fermée des `stopReason` (Q550).
-- backend : aperçu à deux villes dont la seconde n'a pas de logement, arrêté en `cap_reached` (défaut relevé par B9d).
+- ia-recherche : **premier lot de la chaîne inversée** (prototype `p0Run` : prompt `programme`, vérification Google lieu par lieu, trajets, écriture), code.
+- frontend : **lot 1 bis** : `tip`, `priceNote`, `hoursNote` et `Day.theme` dans les contrats et à l'écran.
+- product-owner : #623 correction 1 ; tech-lead : #628 correction 1 ; puis sécurité : #627 correction 1.
+- En attente d'un fil libre (au plus 4) : B10a #621 correction 1 (Tech Lead et UX/UI), #611 correction 2 (dernière), #613 correction 2 (dernière).
 
 ## Bloqué
-- **Relance de Rome** : après la fusion de #602 par Samuel (« Create a merge commit »).
-- **Migration 0013** (#593) : approuvée par le Tech Lead ; `owner-approved` de Samuel, puis `db-migrate` par Samuel (fusions gelées pendant le lancement).
-- **Code de B10a** : après #604, la migration de 0112 § 3.7 (rôle data) et son ajout à `MIGRATIONS_APPROUVEES` (`owner-approved` de Samuel).
+- **Confirmation de Samuel (Q557)** : texte libre et logement envoyés au fournisseur de modèles hors UE pour écrire le programme (sa demande du 05:51 UTC ; d'ici là, briefs d'essai commités seulement).
+- **Migrations 0013 et 0014 sur la base d'essai** : #593 puis #620 (approuvées par le Tech Lead) attendent l'`owner-approved` de Samuel ; puis un seul `db-migrate` par Samuel (fusions gelées pendant le lancement).
+- **Longs voyages aux jours vides** (#609) : après #611 ; mécanisme à revoir si le MVP est inversé à son tour.
 - **Essai réel sur préversion** (B9e) : Q538.
 - **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI ; A2-c seulement si Samuel le décide (Q525).
-- **Purge du MVP et `coords-purge`** (#527) : Q438 (encore en échec le 2026-10-20 23:53 UTC).
+- **Purge du MVP et `coords-purge`** (#527) : Q438.
 
 ## Prochain cycle
-1. #604 jusqu'à la fusion, puis migration de B10a (data).
-2. Décisions du forfait et de `stopReason`, correction de l'aperçu à deux villes.
-3. Samuel : fusionner #602 puis relancer Rome ; `owner-approved` sur #593 puis `db-migrate` ; Q538, Q542, Q551 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
+1. Fusionner 0115, 0116, 0117 ; premier lot et lot 1 bis jusqu'à la revue ; puis report `main` → `p0-reel` pour que Samuel relance Rome sur la chaîne inversée.
+2. Reprendre B10a #621, #611 et #613 dès qu'un fil se libère.
+3. Samuel : Q557 (oui/non) ; `owner-approved` sur #593 puis #620 ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -51,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q552 à Q554 ; Q545 répondue.
+- Q557 à Q563.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
