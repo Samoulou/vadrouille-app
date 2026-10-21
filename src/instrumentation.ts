@@ -34,6 +34,11 @@
  * vérifiée à chaque `getCreationAdapter("api")`, et la barrière des appels réels (B9-TL-8) à l'entrée de chaque étape de la
  * génération. Un échec du branchement est journalisé (`voyages.action_failed`, action `branchement-creation`) sans arrêter
  * le serveur : chaque action de création rend `provider_error`.
+ *
+ * B10a (spécification B10, B10a points 2 à 4 ; décision 0112 § 2 point 3, sur le modèle de B9e) : environnement valide et
+ * `DATA_ADAPTER=api`, les cas d'usage du tri enregistré (`src/server/presentation/tri.ts`) sont branchés sur
+ * `src/adapters/api-tri-instance.ts`. Rien n'est lu ni connecté ici. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-tri`) sans arrêter le serveur : chaque action du tri rend `internal`.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -47,6 +52,7 @@ export async function register(): Promise<void> {
       await brancherConnexion(logEvent, errorNameOf);
       await brancherLectureApi(logEvent, errorNameOf);
       await brancherCreationApi(logEvent, errorNameOf);
+      await brancherTriApi(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -125,5 +131,22 @@ async function brancherCreationApi(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-creation", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche les cas d'usage du tri enregistré sur l'adaptateur `api` (spécification B10, B10a ; décision 0112 § 2 point 3). */
+async function brancherTriApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherTriEnregistre } = await import("@/adapters/api-tri-instance");
+    const { annulerDecision, cloreTri, deciderCarte, repondreQuestion } = await import("@/server/presentation/tri");
+    brancherTriEnregistre({ decideCard: deciderCarte, undoDecision: annulerDecision, answerPreferencePrompt: repondreQuestion, completeDeck: cloreTri });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-tri", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }

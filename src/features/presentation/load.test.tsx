@@ -59,7 +59,9 @@ describe("presentation: ordre et filtrage du paquet", () => {
 describe("loadPresentation : projection des jours (B2-PO-14)", () => {
   it("presentation: les données de l'écran ne transmettent ni placeId ni voyage complet", async () => {
     const data = (await loadPresentation(createMockTripAdapter(), ownCtx, EDIMBOURG_TRIP_ID))!;
-    expect(Object.keys(data).sort()).toEqual(["days", "generatingDays", "noOptionSlots", "proposals", "tripId", "unlocked"]);
+    expect(Object.keys(data).sort()).toEqual(["days", "deck", "generatingDays", "noOptionSlots", "proposals", "tripId", "unlocked"]);
+    // `mock` : aucun tri enregistré (session en mémoire de F6, B10-PO-18).
+    expect(data.deck).toBeNull();
     expect(data.days).toHaveLength(edimbourg.days.length);
     for (const day of data.days) {
       expect(Object.keys(day).sort()).toEqual(["date", "index", "stops"]);
@@ -71,6 +73,27 @@ describe("loadPresentation : projection des jours (B2-PO-14)", () => {
     expect(projection).not.toContain("placeId");
     expect(projection).not.toContain("checklist");
     expect(projection).not.toContain("organizationId");
+  });
+});
+
+describe("presentation: tri enregistré (B10a point 5, décision 0112 § 4 point 2)", () => {
+  it("deck non nul : les cartes sont les propositions réduites aux proposalIds, dans leur ordre", async () => {
+    const base = createMockTripAdapter();
+    const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal.id] : []));
+    const reprise = [cartes[3]!, cartes[2]!, "inconnue"];
+    const deck = { tripId: EDIMBOURG_TRIP_ID, proposalIds: reprise, openPrompt: { kind: "category" as const, category: "museum" as const }, closed: false, counts: { decided: 2, remaining: 3 } };
+    const adapter = { ...base, getDeckSession: async () => deck };
+    const data = (await loadPresentation(adapter, ownCtx, EDIMBOURG_TRIP_ID))!;
+    expect(data.deck).toEqual(deck);
+    expect(data.proposals.map((p) => p.id)).toEqual([cartes[3], cartes[2]]);
+  });
+
+  it("tri clos : aucune carte", async () => {
+    const base = createMockTripAdapter();
+    const deck = { tripId: EDIMBOURG_TRIP_ID, proposalIds: [], openPrompt: null, closed: true, counts: { decided: 0, remaining: 0 } };
+    const data = (await loadPresentation({ ...base, getDeckSession: async () => deck }, ownCtx, EDIMBOURG_TRIP_ID))!;
+    expect(data.proposals).toEqual([]);
+    expect(data.deck?.closed).toBe(true);
   });
 });
 

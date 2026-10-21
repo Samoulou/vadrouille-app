@@ -121,6 +121,15 @@ const F11C_FILES = [
   "src/features/etats/**/*.{js,jsx,ts,tsx}",
 ];
 
+/**
+ * B10a (décision 0112 § 2 point 2, amendement de 0016 § 3.1 règle 4) : depuis le code chargé par le navigateur, seul
+ * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`.
+ */
+const CLIENT_DOMAIN_PATTERN = {
+  regex: "^(@/domain/(?!preferences$)|(\\.{1,2}/)+(.*/)?domain/(?!preferences$))",
+  message: "Depuis le code chargé par le navigateur, seul @/domain/preferences s'importe de src/domain (décision 0112 § 2 point 2).",
+};
+
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
 function restrictedImports(...patterns) {
   return { "no-restricted-imports": ["error", { patterns }] };
@@ -137,7 +146,7 @@ function clientImports(...patterns) {
     "no-restricted-imports": "off",
     "@typescript-eslint/no-restricted-imports": [
       "error",
-      { paths: [ZOD_PATH, CONTRACTS_PATH], patterns: [...patterns, CONTRACTS_MODULES_PATTERN] },
+      { paths: [ZOD_PATH, CONTRACTS_PATH], patterns: [...patterns, CONTRACTS_MODULES_PATTERN, CLIENT_DOMAIN_PATTERN] },
     ],
   };
 }
@@ -829,6 +838,31 @@ export default defineConfig([
   {
     files: ["src/domain/**/*.test.ts"],
     rules: domainSansEntreeSortie(true),
+  },
+  {
+    // B10a (décision 0112 § 2 point 2) : `src/domain/preferences.ts`, chargé par le navigateur, n'importe que des types de
+    // @/contracts et des valeurs de @/contracts/values : ni zod, ni zod/mini, ni valeur de @/contracts, ni autre module de
+    // src/domain. La règle « sans entrée-sortie » du bloc précédent continue de s'appliquer (autres règles inchangées).
+    files: ["src/domain/preferences.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!@/contracts(/values)?$)",
+              message: "src/domain/preferences.ts : types de @/contracts et valeurs de @/contracts/values seulement (décision 0112 § 2 point 2).",
+            },
+          ],
+        },
+      ],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ ...CONTRACTS_PATH, message: "src/domain/preferences.ts : types seulement depuis @/contracts (décision 0112 § 2 point 2)." }],
+        },
+      ],
+    },
   },
   {
     // La règle elle-même et ses tests contiennent des couleurs en dur par construction.

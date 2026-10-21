@@ -411,3 +411,80 @@ describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () =>
     expect(card()).toHaveTextContent("Entre ton déjeuner et ton temps libre");
   });
 });
+
+describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 4)", () => {
+  /** Actions injectées qui notent chaque appel (implémentation serveur remplacée). */
+  function actionsEspion() {
+    const appels: string[] = [];
+    const actions = {
+      decide: vi.fn(async (input: { decision: string; kind: string; lastOption?: boolean }) => {
+        appels.push(`decide:${input.kind}:${input.decision}:${input.lastOption === true ? "derniere" : "-"}`);
+        return { prompt: null };
+      }),
+      undo: vi.fn(async () => undefined),
+      answerPrompt: vi.fn(async () => ({ next: null })),
+      complete: vi.fn(async () => {
+        appels.push("complete");
+      }),
+    };
+    return { actions, appels };
+  }
+  const session = (proposalIds: string[], decided: number, extra: Partial<{ openPrompt: { kind: "category"; category: Category } | null; closed: boolean }> = {}) => ({
+    tripId: "mock_trip_edimbourg",
+    proposalIds,
+    openPrompt: null,
+    closed: false,
+    counts: { decided, remaining: proposalIds.length },
+    ...extra,
+  });
+
+  it("la progression part des cartes déjà décidées du tri ouvert", () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2), actions: actionsEspion().actions });
+    expect(progress()).toHaveAccessibleName(`Proposition 3 sur ${reprise.length + 2}`);
+    expect(progressText()).toHaveTextContent(new RegExp(`^3 sur ${reprise.length + 2}$`));
+  });
+
+  it("la question ouverte rouvre la feuille au chargement", async () => {
+    const reprise = propositions.slice(2);
+    setup({ proposals: reprise, deck: session(reprise.map((p) => p.id), 2, { openPrompt: { kind: "category", category: "museum" } }), actions: actionsEspion().actions });
+    expect(await screen.findByRole("dialog", { name: "On arrête les musées et monuments pour ce voyage ?" })).toBeInTheDocument();
+  });
+
+  it("tri clos : écran de fin de l'aperçu, aucune clôture de plus", async () => {
+    const { actions } = actionsEspion();
+    setup({ proposals: [], deck: session([], 0, { closed: true }), actions });
+    expect(document.querySelector("[data-deck-end]")).toHaveAttribute("data-deck-end", "apercu");
+    await flush();
+    expect(actions.complete).not.toHaveBeenCalled();
+  });
+
+  it("« Passer » clôt le tri enregistré", async () => {
+    const { actions } = actionsEspion();
+    setup({ deck: session(propositions.map((p) => p.id), 0), actions });
+    const passer = screen.getByRole("link", { name: "Passer" });
+    passer.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(passer);
+    await flush();
+    expect(actions.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it("repas : la dernière option est signalée à l'action ; la fin du paquet clôt le tri une fois l'annulation expirée", async () => {
+    vi.useFakeTimers();
+    try {
+      const { actions, appels } = actionsEspion();
+      const repas = propositions.filter((p) => p.kind === "meal").slice(0, 2);
+      setup({ proposals: repas, deck: session(repas.map((p) => p.id), 0), actions });
+      await click("Option suivante");
+      await click("Pas pour moi");
+      expect(appels).toEqual(["decide:meal:dislike:-", "decide:meal:dislike:derniere"]);
+      expect(actions.complete).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+      expect(actions.complete).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

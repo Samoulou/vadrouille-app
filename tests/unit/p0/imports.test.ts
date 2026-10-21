@@ -773,6 +773,8 @@ const MODULE_SOURCE_LECTURE = "src/server/relecture/source.ts";
 const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/interfaces.ts", "src/grounding/trajets.ts"];
 /** Double de relectures (B6a, décision 0086 § 1.2 point 4). */
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
+/** B10a (décision 0112 § 2) : règles du tri, importées par l'écran de présentation. */
+const PREFERENCES_DOMAINE = "src/domain/preferences.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -863,6 +865,21 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: "src/server/generation/codes.ts",
     horsArete: "src/server/x.ts",
+  },
+  {
+    // B10a (décision 0112 § 2 points 2 et 4) : les règles du tri (`src/domain/preferences.ts`, sans `zod`, types de
+    // `@/contracts` et valeurs de `@/contracts/values` seulement, aucun autre module de src/domain : lint de 0112 § 2
+    // point 2) sont importées par l'écran de présentation, qui ne les recopie pas (0013 § 3.2). Les deux autres arêtes
+    // nommées par 0112 § 2 point 4 (`src/server/presentation` → `src/domain/preferences`, `src/features/presentation` →
+    // `src/server/actions/presentation`) ne franchissent pas cette frontière (src/server atteint src/domain ; l'arrêt aux
+    // modules de src/server vaut pour src/features) : la seconde est exercée par « clé côté serveur seulement » (l'action
+    // n'atteint les cas d'usage que par le branchement de `src/adapters/api-tri-instance.ts`).
+    nom: "B10a : src/features/presentation → src/domain/preferences.ts",
+    de: (chemin) => chemin.startsWith("src/features/presentation/"),
+    vers: [PREFERENCES_DOMAINE],
+    typeSeulement: false,
+    exemple: "src/features/presentation/deck.ts",
+    horsArete: "src/features/sejour/load.ts",
   },
 ];
 
@@ -1541,7 +1558,10 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       expect(horsServeur(DOUBLE_RELECTURES, voisinsReels)).toEqual([TYPES_RELECTURES_DOUBLE]);
       expect(violationsApplication(DOUBLE_RELECTURES, voisinsReels)).toEqual([]);
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
-      const importeurs = application.filter((f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/")));
+      // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
+      const importeurs = application.filter(
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/"))),
+      );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });
 

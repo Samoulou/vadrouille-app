@@ -159,6 +159,10 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
       const entry = find(ctx, tripId);
       return entry ? dayMapOf(entry, index) : null;
     },
+    /** Session de tri en mémoire de F6 (B10-PO-18) : aucun tri enregistré sur `mock` (décision 0112 § 4 point 1). */
+    async getDeckSession() {
+      return null;
+    },
     async getTripMap(ctx, tripId) {
       const entry = find(ctx, tripId);
       if (!entry) {

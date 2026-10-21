@@ -65,8 +65,27 @@ vi.mock("@/adapters/api-creation", () => ({
   },
 }));
 
+// B10a : branchement du tri enregistré `api` (doubles : aucun cas d'usage réel, aucune base).
+const brancherTri = vi.fn();
+const casDuTri = { deciderCarte: vi.fn(), annulerDecision: vi.fn(), repondreQuestion: vi.fn(), cloreTri: vi.fn() };
+let echecTri: Error | null = null;
+vi.mock("@/adapters/api-tri-instance", () => ({
+  brancherTriEnregistre: (tri: unknown) => brancherTri(tri),
+}));
+vi.mock("@/server/presentation/tri", () => ({
+  get deciderCarte() {
+    if (echecTri) throw echecTri;
+    return casDuTri.deciderCarte;
+  },
+  annulerDecision: casDuTri.annulerDecision,
+  repondreQuestion: casDuTri.repondreQuestion,
+  cloreTri: casDuTri.cloreTri,
+}));
+
 beforeEach(() => {
   vi.resetModules();
+  brancherTri.mockClear();
+  echecTri = null;
   logEvent.mockClear();
   brancher.mockClear();
   brancherApi.mockClear();
@@ -190,6 +209,39 @@ describe("instrumentation : branchement de la création api (spécification B9, 
     expect(brancherCreation).not.toHaveBeenCalled();
     expect(brancherApi).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-creation", errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement du tri enregistré api (spécification B10, B10a ; décision 0112 § 2 point 3)", () => {
+  it("DATA_ADAPTER=api : les quatre cas d'usage du tri sont branchés, rien n'est appelé au démarrage", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await register();
+    expect(brancherTri).toHaveBeenCalledTimes(1);
+    expect(brancherTri).toHaveBeenCalledWith({
+      decideCard: casDuTri.deciderCarte,
+      undoDecision: casDuTri.annulerDecision,
+      answerPreferencePrompt: casDuTri.repondreQuestion,
+      completeDeck: casDuTri.cloreTri,
+    });
+    for (const cas of Object.values(casDuTri)) expect(cas).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "prototype"])("DATA_ADAPTER=%j : tri enregistré non branché", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", valeur);
+    await register();
+    expect(brancherTri).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement-tri) avec le seul nom d'erreur, lecture et création toujours branchées", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    echecTri = Object.assign(new TypeError("secret du module"), { cause: "secret" });
+    await register();
+    expect(brancherTri).not.toHaveBeenCalled();
+    expect(brancherApi).toHaveBeenCalledTimes(1);
+    expect(brancherCreation).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-tri", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });

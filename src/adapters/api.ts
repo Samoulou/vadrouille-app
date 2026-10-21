@@ -1,11 +1,13 @@
 import {
   DayMapSchema,
   DaySchema,
+  DeckSessionSchema,
   PreviewSlotsSchema,
   ProposalSchema,
   TripSchema,
   TripSummarySchema,
 } from "@/contracts";
+import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 
 import type { TripAdapter } from "./types";
@@ -25,6 +27,7 @@ export type OptionsAdaptateurApi = DependancesLecture;
 
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
+  const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
@@ -49,6 +52,10 @@ export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter
     },
     async getTripMap(ctx, tripId) {
       return DayMapSchema.array().parse(await lecture.getTripMap(ctx, tripId));
+    },
+    async getDeckSession(ctx, tripId) {
+      const session = await getDeckSession(ctx, tripId);
+      return session === null ? null : DeckSessionSchema.parse(session);
     },
   };
 }

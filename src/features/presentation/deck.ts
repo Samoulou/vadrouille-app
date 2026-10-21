@@ -1,4 +1,5 @@
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason, Proposal } from "@/contracts";
+import { memeCreneau, ordreDuPaquet } from "@/domain/preferences";
 
 /**
  * État du paquet de la présentation (spécification F6, décision 0013 § 3.2) : réducteur pur et
@@ -11,36 +12,15 @@ export type Gesture = "swipe" | "button" | "key";
 
 // --- Paquet -------------------------------------------------------------------
 
-const toMinutes = (time: string) => {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-};
-
-/** Même créneau de repas : même jour, même heure (F6-PO-7). */
-export function sameMealSlot(a: Proposal, b: Proposal): boolean {
-  return a.kind === "meal" && b.kind === "meal" && a.day === b.day && a.time === b.time;
-}
+/** Même créneau de repas : même jour, même heure (F6-PO-7). Règle de `@/domain/preferences` (décision 0112 § 2). */
+export const sameMealSlot: (a: Proposal, b: Proposal) => boolean = memeCreneau;
 
 /**
  * Cartes du paquet (F6-PO-1) : sans étape verrouillée, tri stable par jour puis heure, options d'un
- * même créneau de repas par `option.index`.
+ * même créneau de repas par `option.index`. Règle de `@/domain/preferences` (`ordreDuPaquet`, décision 0112 § 2).
  */
 export function buildDeck(proposals: readonly Proposal[]): Proposal[] {
-  return proposals
-    .filter((proposal) => !proposal.stop.locked)
-    .map((proposal, order) => ({ proposal, order }))
-    .sort((a, b) => {
-      const byDay = a.proposal.day - b.proposal.day;
-      if (byDay !== 0) return byDay;
-      const byTime = toMinutes(a.proposal.time) - toMinutes(b.proposal.time);
-      if (byTime !== 0) return byTime;
-      if (sameMealSlot(a.proposal, b.proposal)) {
-        const byOption = (a.proposal.option?.index ?? 0) - (b.proposal.option?.index ?? 0);
-        if (byOption !== 0) return byOption;
-      }
-      return a.order - b.order;
-    })
-    .map(({ proposal }) => proposal);
+  return ordreDuPaquet(proposals);
 }
 
 /** Message du toast d'annulation (F6-PO-6). */
@@ -214,9 +194,12 @@ export function swipeRotation(dx: number, width: number): number {
   return Math.sign(dx) * MAX_ROTATION * ratio;
 }
 
-// --- Question de préférence (F6-PO-8, F6-PO-9) -------------------------------------
+// --- Session de la question de préférence (F6-PO-8, F6-PO-9) ------------------------------
 
-/** Session de tri côté « moteur » : refus d'activités, questions déjà posées. */
+/**
+ * Session de tri en mémoire (`mock`, `prototype`) : refus d'activités, questions déjà posées. Les règles de la question
+ * sont celles de `@/domain/preferences` (`questionApres`, `questionDeDistance`), appelées par `createLocalDeckActions`.
+ */
 export interface PreferenceSession {
   dislikes: { proposalId: string; category: Category; reason?: PreferenceReason }[];
   askedCategories: Category[];
@@ -224,25 +207,3 @@ export interface PreferenceSession {
 }
 
 export const emptySession = (): PreferenceSession => ({ dislikes: [], askedCategories: [], distanceAsked: false });
-
-/**
- * Question à poser après une décision, la session incluant déjà cette décision : deuxième
- * « Pas pour moi » sur une activité de même catégorie, une question par catégorie ; les repas ne
- * comptent pas.
- */
-export function preferencePromptFor(
-  session: PreferenceSession,
-  decided: { decision: Decision; kind: Proposal["kind"]; category: Category },
-): PreferencePrompt | null {
-  if (decided.decision !== "dislike" || decided.kind !== "activity") return null;
-  if (session.askedCategories.includes(decided.category)) return null;
-  const count = session.dislikes.filter((dislike) => dislike.category === decided.category).length;
-  return count >= 2 ? { kind: "category", category: decided.category } : null;
-}
-
-/** Question de distance : deux refus avec la raison « Trop loin », une seule fois par session. */
-export function distancePromptFor(session: PreferenceSession): PreferencePrompt | null {
-  if (session.distanceAsked) return null;
-  const tooFar = session.dislikes.filter((dislike) => dislike.reason === "tooFar").length;
-  return tooFar >= 2 ? { kind: "distance" } : null;
-}

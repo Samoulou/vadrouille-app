@@ -1,5 +1,5 @@
 import type { AdapterContext, TripAdapter } from "@/adapters";
-import type { PreviewSlot, Proposal, Trip } from "@/contracts";
+import type { DeckSession, PreviewSlot, Proposal, Trip } from "@/contracts";
 
 /**
  * Jour du voyage tel que l'écran le reçoit (B2-PO-14) : de quoi composer le jour de la semaine (depuis `date`) et le
@@ -29,6 +29,11 @@ export interface PresentationData {
   days: PresentationDay[];
   /** Créneaux `noOption` de l'aperçu, dans l'ordre des cases ; toujours vide pour un voyage débloqué. */
   noOptionSlots: NoOptionSlot[];
+  /**
+   * État du tri enregistré (adaptateur `api`, B10a point 5 ; décision 0112 § 4 point 2) ; `null` sur `mock` et
+   * `prototype` (session en mémoire de F6). Non nul, `proposals` est déjà réduit au paquet de reprise, dans son ordre.
+   */
+  deck: DeckSession | null;
 }
 
 /** Projection d'un jour : étapes de la ligne et événements, `{ id, name }` seulement. */
@@ -55,7 +60,9 @@ function fromPreview(slots: readonly PreviewSlot[]): Pick<PresentationData, "pro
  * Données de l'écran de présentation, lues par l'adaptateur dans le contexte d'organisation de la
  * requête ; `null` si le voyage est inconnu ou appartient à une autre organisation (404). Voyage non débloqué
  * (écran 6) : l'aperçu (`listPreviewSlots`, B2-PO-9) ; voyage débloqué (6b) : `listProposals`. Le filtrage des
- * étapes verrouillées et l'ordre du paquet sont faits par `buildDeck`. Projection construite côté serveur.
+ * étapes verrouillées et l'ordre du paquet sont faits par `buildDeck`. Projection construite côté serveur. Tri
+ * enregistré (`getDeckSession` non nul) : les cartes sont les propositions lues réduites aux `proposalIds` du paquet de
+ * reprise, dans leur ordre (décision 0112 § 4 point 2).
  */
 export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext, tripId: string): Promise<PresentationData | null> {
   const trip = await adapter.getTrip(ctx, tripId);
@@ -65,12 +72,15 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
   const { proposals, noOptionSlots } = trip.unlocked
     ? { proposals: await adapter.listProposals(ctx, tripId), noOptionSlots: [] }
     : fromPreview(await adapter.listPreviewSlots(ctx, tripId));
+  const deck = await adapter.getDeckSession(ctx, tripId);
+  const parId = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   return {
     tripId: trip.id,
     unlocked: trip.unlocked,
     generatingDays: trip.days.filter((day) => day.generating).map((day) => day.index),
-    proposals,
+    proposals: deck === null ? proposals : deck.proposalIds.flatMap((id) => parId.get(id) ?? []),
     days: trip.days.map(presentationDay),
     noOptionSlots,
+    deck,
   };
 }
