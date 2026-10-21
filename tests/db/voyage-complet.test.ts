@@ -4,7 +4,7 @@ import { createApiCreationAdapter } from "@/adapters/api-creation";
 import { createApiTripAdapter } from "@/adapters/api";
 import { INCONNU, type SourceRelectures } from "@/domain/relectures";
 import { composerSimuleeAvec, type CapaciteAncrage, type CapaciteRecherche, type FabriqueGeneration } from "@/server/composition/generation";
-import { EXPIRATION_EXECUTION_MS } from "@/server/config/generation";
+import { EXPIRATION_EXECUTION_MS, PARTS_FORFAIT } from "@/server/config/generation";
 import type { DependancesGeneration } from "@/server/generation/dependances";
 import {
   etapeClotureComplet,
@@ -17,6 +17,7 @@ import {
 } from "@/server/generation/etapes-complet";
 import { EtatCompletSchema, type EtatComplet } from "@/server/generation/etat";
 import { CODES_ARRET } from "@/server/generation/raison-echec";
+import { partDe } from "@/server/generation/forfait-etape";
 import { requestIdDeVersion } from "@/server/generation/voyage-complet";
 import { creerSuiteVoyageComplet, DemarrageVoyageCompletError } from "@/server/payment/suite-voyage-complet";
 import { reprendreParLeStudio } from "../../scripts/reprise-studio";
@@ -146,13 +147,13 @@ const etapesDuJour = (version: Lignes["versions"][number], jour: number) =>
   version.snapshot.days.find((d) => d.index === jour)?.items.filter((i) => i.type === "stop").length ?? 0;
 
 /** Aperçu publié d'un voyage de six jours, puis droit `tripUnlocked` (écrit par l'administrateur, comme le ferait B4a). */
-async function voyageDebloque(org: Org, draft: Parameters<typeof demandeEdimbourg>[0] = {}, plafondsApercu: PlafondsUsage = PLAFONDS_COMPLET) {
+async function voyageDebloque(org: Org, draft: Parameters<typeof demandeEdimbourg>[0] = {}, plafondsApercu: PlafondsUsage = PLAFONDS_COMPLET, fabrique?: () => FabriqueGeneration) {
   const outils = adaptateur();
   const r = await outils.adapter.createTrip(contexteDe(org), demandeEdimbourg(draft));
   expect(r).toMatchObject({ ok: true });
   const tripId = (r as { value: { tripId: string } }).value.tripId;
   const apercu = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT id FROM public.generation_runs WHERE trip_id = $1 AND kind = 'preview'", [tripId])).rows[0].id as string);
-  expect((await derouler({ generationRunId: apercu, organizationId: org.org, rang: 0 }, dependances(undefined, plafondsApercu))).arret).toBeUndefined();
+  expect((await derouler({ generationRunId: apercu, organizationId: org.org, rang: 0 }, dependances(fabrique, plafondsApercu))).arret).toBeUndefined();
   await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
   return { ...outils, tripId };
 }
@@ -510,6 +511,60 @@ describe("voyage complet (B9d) : plusieurs villes, changement de ville pendant l
     expect(recherches).toHaveLength(2);
     expect(recherches[1]!.candidats).toBe(0);
     expect((await lignes(org, tripId)).complet[0]).toMatchObject({ phase: "failed", stop_reason: "invalid_input" });
+  }, 180_000);
+});
+
+/**
+ * Réserve Text Search de l'étape `e` (décision 0113 § 3 bis, ticket #605) : Glasgow (`none`) de J2 à la fin, donc la ville
+ * des quatre jours du complet. Chaque étape `e` positionne Glasgow par un Text Search de son nom : une requête par jour, prise
+ * sur la part de `c` avant sa répartition. Text Search du profil doublés comme pour les autres tests à plusieurs villes
+ * (0113 § 3 point 3) ; le reste du profil est celui des bancs.
+ */
+describe("voyage complet : ville sans logement sur plusieurs jours, réserve Text Search de l'étape e", () => {
+  it("un Text Search de e par jour de la ville none, part de c réduite d'autant, total inchangé", async () => {
+    const org = await createOrg(auth);
+    const draft = { otherCities: [{ name: "Glasgow", arrival: "2026-11-24", lodging: { kind: "none" as const } }] };
+    // Les fixtures d'Édimbourg ne résolvent aucun nom de ville : « Glasgow » correspond, dans le double seulement, à une entrée
+    // maison des fixtures (valeur sentinelle, aucune donnée Google).
+    const doubles = (journal?: string[]) => () => {
+      const d = doublesEdimbourg();
+      return {
+        ...d,
+        places: {
+          ...d.places,
+          textSearch: (requete: Parameters<typeof d.places.textSearch>[0]) => {
+            journal?.push(requete.texte);
+            return d.places.textSearch(requete.texte === "Glasgow" ? { ...requete, texte: "Vieille ville d'Édimbourg (Old Town)" } : requete);
+          },
+        },
+      };
+    };
+    const { adapter, tripId } = await voyageDebloque(org, draft, PLAFONDS_TROIS_VILLES, () => composerSimuleeAvec({ doubles: doubles() }));
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const ligne = (await lignes(org, tripId)).complet[0]!;
+    const partsC: number[] = [];
+    const partsE: number[] = [];
+    const textSearchE: string[] = [];
+    const fabrique = (): FabriqueGeneration => {
+      const base = composerSimuleeAvec({ doubles: doubles() });
+      const comptee = composerSimuleeAvec({ doubles: doubles(textSearchE) });
+      return {
+        ...base,
+        ancrage: (o) => (partsC.push(o.forfait.textSearchRequetes), base.ancrage(o)),
+        finale: (o) => (partsE.push(o.forfait.textSearchRequetes), comptee.finale(o)),
+      };
+    };
+    const { fin } = await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances(fabrique, PLAFONDS_TROIS_VILLES));
+    expect(fin.arret).toBeUndefined();
+    // Quatre jours au complet (J3 à J6), tous à Glasgow : une requête exacte par étape `e`, un Text Search de son nom chacune.
+    expect(partsE).toEqual([1, 1, 1, 1]);
+    expect(textSearchE).toEqual(["Glasgow", "Glasgow", "Glasgow", "Glasgow"]);
+    // Part de `c` : celle de `PARTS_FORFAIT` moins la réserve du passage (4), répartie sur les villes introduites.
+    const total = PLAFONDS_TROIS_VILLES.generations.complet.placesTextSearch;
+    expect(partsC.reduce((a, b) => a + b, 0)).toBe(partDe(total, PARTS_FORFAIT.textSearch, "c") - 4);
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]!.stop_reason).toBeNull();
+    for (const jour of [3, 4, 5, 6]) expect(etapesDuJour(apres.versions.at(-1)!, jour)).toBeGreaterThan(0);
   }, 180_000);
 });
 

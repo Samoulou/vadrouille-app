@@ -32,6 +32,7 @@ import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtat, type EtatEtape } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape } from "./forfait-etape";
+import { reserveTextSearchE, type ReserveTextSearch } from "./reserve-text-search";
 import { cloreEnEchec, commencerEtape, exigerGarde } from "./garde";
 import { lireVoyage, nuitsDuVoyage, villesDeLApercu, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
 import { genererSansEchec } from "./programme";
@@ -148,8 +149,8 @@ function optionsEtape(contexte: Contexte, forfait: ForfaitDeLEtape): OptionsEtap
   };
 }
 
-async function ouvrirCapacites(contexte: Contexte): Promise<{ readonly fabrique: FabriqueGeneration; readonly forfait: ForfaitDeLEtape; readonly options: OptionsEtape }> {
-  const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, contexte.etape);
+async function ouvrirCapacites(contexte: Contexte, reserve?: ReserveTextSearch): Promise<{ readonly fabrique: FabriqueGeneration; readonly forfait: ForfaitDeLEtape; readonly options: OptionsEtape }> {
+  const forfait = await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, contexte.etape, undefined, reserve);
   const fabrique = await contexte.dep.composer(contexte.barriere);
   return { fabrique, forfait, options: optionsEtape(contexte, forfait) };
 }
@@ -160,13 +161,23 @@ function joursPlanifies(voyage: VoyageLu): number[] {
   return JOURS_PLANIFIES_APERCU.filter((jour) => jour <= nombre);
 }
 
-async function lireVoyageOuArreter(contexte: Contexte, x: Executeur): Promise<{ voyage: VoyageLu; jours: number[]; villes: VilleDeLApercu[] }> {
+async function lireVoyageOuArreter(contexte: Contexte, x: Executeur): Promise<{ voyage: VoyageLu; jours: number[]; villes: VilleDeLApercu[]; reserve: ReserveTextSearch }> {
   const voyage = await lireVoyage(x, contexte.organizationId, contexte.tripId);
   if (voyage === null) throw new ArretEtape("invalid_input");
   const jours = joursPlanifies(voyage);
   const villes = villesDeLApercu(voyage, jours);
   if (jours.length === 0 || villes.length === 0) throw new ArretEtape("invalid_input");
-  return { voyage, jours, villes };
+  return { voyage, jours, villes, reserve: reserveDeLApercu(voyage, jours, villes) };
+}
+
+/**
+ * Réserve Text Search de l'étape `e` de l'aperçu (décision 0113 § 3 bis point 1) : une requête par ville `area` ou `none` de
+ * J1 et J2, pour l'unique étape `e`. Calculée par `a` (refus avant toute dépense), puis à l'identique par `c` et `e`.
+ */
+function reserveDeLApercu(voyage: VoyageLu, jours: readonly number[], villes: readonly VilleDeLApercu[]): ReserveTextSearch {
+  const { nuitsVille } = nuitsDuVoyage(voyage, villes);
+  const total = reserveTextSearchE({ jours, nuitsVille, villes: villes.map((ville) => ({ rang: ville.rang, logement: ville.sejour.logement })) });
+  return { total, ici: total };
 }
 
 /** Logement d'une ville prêt pour la zone : `placeId` vérifié (étape `l`) pour `known` et `suggestedLodging`, sinon le quartier. */
@@ -251,8 +262,8 @@ export function etapeBrief(entree: unknown, dependances?: DependancesGeneration)
     entree,
     "a",
     async (contexte) => {
-      await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
-      await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, "a");
+      const { reserve } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
+      await forfaitDeLEtape(contexte.dep, { organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere }, "a", undefined, reserve);
     },
     dependances,
   );
@@ -426,10 +437,10 @@ export function etapeAncrage(entree: unknown, dependances?: DependancesGeneratio
     entree,
     "c",
     async (contexte) => {
-      const { villes } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
+      const { villes, reserve } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
       const candidats = (await sql(contexte, (x) => lireCandidats(x, contexte))).filter((candidat) => candidat.kind === "place");
       if (candidats.length === 0) return;
-      const { fabrique, options } = await ouvrirCapacites(contexte);
+      const { fabrique, options } = await ouvrirCapacites(contexte, reserve);
       const capacite: CapaciteAncrage = fabrique.ancrage(options);
       const resolus = new Map<string, string>();
       const traites: string[] = [];
@@ -595,12 +606,12 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
     entree,
     "e",
     async (contexte) => {
-      const { voyage, jours, villes } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
+      const { voyage, jours, villes, reserve } = await sql(contexte, (x) => lireVoyageOuArreter(contexte, x));
       const lus = await sql(contexte, async (x) => ({
         candidats: await lireCandidats(x, contexte),
         occurrences: (await x.query(SQL_OCCURRENCES, [contexte.organizationId, contexte.tripId])).rows,
       }));
-      const { fabrique, options } = await ouvrirCapacites(contexte);
+      const { fabrique, options } = await ouvrirCapacites(contexte, reserve);
       const capacite: CapaciteFinale = fabrique.finale(options);
 
       // Instant pris **avant** l'appel des fiches qui rendent les positions (0060 § 1.3 point 2 : jamais après la réponse).

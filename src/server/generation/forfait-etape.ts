@@ -10,6 +10,7 @@ import { executeurSql } from "@/server/with-org";
 import type { EtatBarriere } from "./barriere";
 import { ArretEtape } from "./codes";
 import type { DependancesResolues } from "./dependances";
+import type { ReserveTextSearch } from "./reserve-text-search";
 
 /**
  * Forfait de l'aperçu et part de chaque étape (décision 0081 B9-TL-3 points 1 (5) et 5 ; spécification B9c point 2).
@@ -100,11 +101,31 @@ export function partDuJour(forfait: Forfait, part: PartDuPassage): Forfait {
 
 const ETAPES_DU_JOUR: ReadonlySet<EtapeApercu> = new Set(["b", "c", "d", "e"]);
 
+/**
+ * Réserve Text Search de l'étape `e` (décision 0113 § 3 bis), appliquée au forfait partiel d'une étape :
+ * - refus `cap_reached` si la part Text Search de `c` ne couvre pas la réserve (point 3), quelle que soit l'étape ;
+ * - `c` : sa part diminuée de la réserve **avant** sa répartition sur les villes introduites (point 2) ;
+ * - `e` : exactement `ici` requêtes, hors découpage cumulatif (point 1).
+ * Le total du profil et les pourcentages de `PARTS_FORFAIT` ne changent pas.
+ */
+export function exigerReserve(entier: Forfait, reserve: ReserveTextSearch): void {
+  if (reserve.total > partDe(entier.textSearchRequetes, PARTS_FORFAIT.textSearch, "c")) throw new ArretEtape("cap_reached");
+}
+
+export function partAvecReserve(entier: Forfait, etape: EtapeApercu, reserve: ReserveTextSearch, ajuster: (forfait: Forfait) => Forfait = (f) => f): Forfait {
+  exigerReserve(entier, reserve);
+  const partiel = forfaitPartiel(entier, etape);
+  if (etape === "c") return ajuster({ ...partiel, textSearchRequetes: partiel.textSearchRequetes - reserve.total });
+  if (etape === "e") return { ...ajuster(partiel), textSearchRequetes: reserve.ici };
+  return ajuster(partiel);
+}
+
 export async function forfaitDeLEtape(
   dependances: DependancesResolues,
   contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
   etape: EtapeApercu,
   passage?: ForfaitDuPassage,
+  reserve: ReserveTextSearch = { total: 0, ici: 0 },
 ): Promise<ForfaitDeLEtape> {
   const profil = passage?.profil ?? "apercu";
   const cle = passage?.identifiant ?? contexte.generationRunId;
@@ -120,19 +141,25 @@ export async function forfaitDeLEtape(
     } catch {
       throw new ArretEtape("usage_unavailable");
     }
-    return forfaitEnMemoire(entier, etape, contexte.generationRunId, dependances, ajuster);
+    return forfaitEnMemoire(entier, etape, contexte.generationRunId, dependances, ajuster, reserve);
   }
-  const reserve = await reserverForfait(
+  // Refus avant la réservation, donc avant toute dépense (0113 § 3 bis point 3) : forfait du profil calculé en mémoire.
+  try {
+    exigerReserve(forfaitDuProfil(regles.plafonds, regles.table, profil), reserve);
+  } catch (erreur) {
+    if (erreur instanceof ArretEtape) throw erreur;
+  }
+  const reservation = await reserverForfait(
     (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
     { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: cle, profil },
     regles,
   );
-  if (!reserve.ok) throw new ArretEtape(reserve.code);
-  return forfaitEnMemoire(reserve.forfait, etape, contexte.generationRunId, dependances, ajuster);
+  if (!reservation.ok) throw new ArretEtape(reservation.code);
+  return forfaitEnMemoire(reservation.forfait, etape, contexte.generationRunId, dependances, ajuster, reserve);
 }
 
-function forfaitEnMemoire(entier: Forfait, etape: EtapeApercu, generationRunId: string, dependances: DependancesResolues, ajuster: (forfait: Forfait) => Forfait = (f) => f): ForfaitDeLEtape {
-  const forfait = ajuster(forfaitPartiel(entier, etape));
+function forfaitEnMemoire(entier: Forfait, etape: EtapeApercu, generationRunId: string, dependances: DependancesResolues, ajuster: (forfait: Forfait) => Forfait, reserve: ReserveTextSearch): ForfaitDeLEtape {
+  const forfait = partAvecReserve(entier, etape, reserve, ajuster);
   const registre = creerRegistreForfait(forfait, generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

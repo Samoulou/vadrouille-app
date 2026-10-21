@@ -99,7 +99,7 @@ function entree(jours: EntreePlanification["jours"], budgets: Partial<EntreePlan
     modes: [...MODES],
     classement: { classement: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: 365, dateReference: "2026-10-20" },
     configuration: CONFIGURATION_MOTEUR,
-    budgets: { fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
+    budgets: { textSearch: 0, fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
   };
 }
 
@@ -185,7 +185,7 @@ describe("planification: jours non planifiés et budgets", () => {
   });
 });
 
-describe("planification: ville sans logement et part Text Search de l'étape (défaut relevé en B9d, PR 600)", () => {
+describe("planification: garde Text Search des villes area et none (décision 0113 § 3 bis point 4)", () => {
   const planifies = squelette("2026-11-23", "2026-11-28", 5).filter((jour) => jour.index <= 2);
   // J1 à Édimbourg (logement connu), J2 arrive à Glasgow (`none`) : la zone de Glasgow demande un Text Search de son nom.
   const deuxVilles = (budgets: Partial<EntreePlanification["budgets"]>): EntreePlanification => ({
@@ -198,7 +198,7 @@ describe("planification: ville sans logement et part Text Search de l'étape (d�
     candidats: CANDIDATS.map((c, rang) => ({ ...c, ville: rang % 2 })),
   });
 
-  it("sans requête Text Search dans la part : aucun appel, aucun arrêt, la ville reste sans zone ni lieu", async () => {
+  it("garde : sans requête Text Search dans le budget, aucun appel ne part pour la ville, jamais un centre inventé", async () => {
     const c = compteurs();
     const issue = await preparerPlanification(deuxVilles({ textSearch: 0 }), { places: c.places, routes: c.routes });
     expect(issue.ok).toBe(true);
@@ -216,7 +216,7 @@ describe("planification: ville sans logement et part Text Search de l'étape (d�
     const c = compteurs();
     const issue = await preparerPlanification(deuxVilles({ textSearch: 1 }), { places: c.places, routes: c.routes });
     expect(c.textSearch).toEqual(["Glasgow"]);
-    // Le double d'Édimbourg ne connaît pas Glasgow : la zone est introuvable (`lodging_unresolved`), comme avant cette PR.
-    if (!issue.ok) expect(issue.code).toBe("lodging_unresolved");
+    // Le double d'Édimbourg ne connaît pas Glasgow : résultat déterministe, la zone est introuvable.
+    expect(issue).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
   });
 });
