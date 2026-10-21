@@ -146,35 +146,13 @@ describe("p0: copies de src/prototype tenues égales", () => {
     expectTypeOf<copieRecherche.ClasseSource>().toEqualTypeOf<originalCandidat.ClasseSource>();
   });
 
-  describe("contientUrl et texteMaison (src/ai/candidat.ts) : même verdict (table)", () => {
-    const table: [string, number][] = [
-      ["Musée maison", 80],
-      ["", 80],
-      ["   ", 80],
-      ["x".repeat(80), 80],
-      ["x".repeat(81), 80],
-      ["ligne\u0007son", 80],
-      ["un <b>lieu</b>", 80],
-      ["voir https://exemple.org", 300],
-      ["voir www.exemple", 300],
-      ["voir exemple.com", 300],
-      ["mailto:a", 300],
-      ["javascript:alert(1)", 300],
-      ["texte\u200bcaché", 300],
-      ["droite\u202egauche", 300],
-      ["Café du Lac, 12 €", 300],
-      ["東京の美術館", 300],
-    ];
-    for (const [texte, max] of table) {
-      it(JSON.stringify(texte), () => {
-        expect(copieIa.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
-        expect(copieIa.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
-        // `src/contracts/texte.ts` (décision 0094 § 7, lot 1 bis de 0116) : même verdict, en attendant que les deux
-        // candidats le réexportent.
-        expect(texteContrat.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
-        expect(texteContrat.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
-      });
-    }
+  it("contientUrl et texteMaison : src/ai/candidat.ts et src/prototype/candidat.ts réexportent l'unique définition de src/contracts/texte.ts", () => {
+    // Décision 0094 § 7 (ticket 633) : plus de copie, la même fonction partout ; la table de verdicts qui comparait les
+    // copies vit désormais dans `src/contracts/texte.test.ts`, contre cette seule définition.
+    expect(copieIa.contientUrl).toBe(texteContrat.contientUrl);
+    expect(copieIa.texteMaison).toBe(texteContrat.texteMaison);
+    expect(originalCandidat.contientUrl).toBe(texteContrat.contientUrl);
+    expect(originalCandidat.texteMaison).toBe(texteContrat.texteMaison);
   });
 
   describe("NotesSchema et Notes (src/ai/candidat.ts) : même verdict (table)", () => {
