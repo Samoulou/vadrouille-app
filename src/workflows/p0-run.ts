@@ -7,7 +7,7 @@ import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireExecution } from "@
 import { MAX_RESULTATS_WEB } from "@/ai/client";
 import { lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
 import type { ExecutionEnCours, PhaseTravail } from "@/contracts/prototype-travail";
-import { ancrerLogementsDuSejour, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
+import { ancrerLogementsDuSejour, lieuxHorsPartTextSearch, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
 import { blocsDeTrajets, creerCadence, planRoutes, trajetsConsecutifs } from "@/grounding/budget-routes";
 import type { Position } from "@/prototype/ancrage";
 import { CODES_ARRET, codePersiste, type CodeArret } from "@/prototype/arret";
@@ -653,6 +653,8 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         const idsLogements = logements.map((logement) => logement.placeId);
         const { lieux, cleDe } = lieuxDuProgramme(programme, brief.destination);
         compteurs.placesToVerify = lieux.length;
+        // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
+        compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
         const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined) =>
           programme.jours.map((jour, indiceJour) => ({ date: jour.date, creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })) }));
         // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
@@ -660,13 +662,15 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;
         const controle: ControleAppel = async (methode) => {
           const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
+          // Marge de ticket 407 reprise (justifiée, revue 1 mineur 8) : le registre refait ce contrôle quelques ms plus
+          // tard ; sans elle, un appel admis ici serait refusé par le registre (pipeline_failed) au lieu d'arrêter la
+          // vérification et d'écrire les lieux restants sans `placeId` (0116 § 3.5).
           if (Date.now() + delaiDeLAppel(methodeGoogle) + MARGE_VERIFICATION_AGENT_MS > contexte.echeance - reserveTrajetsMs) return "temps";
           const consomme = await registre.consumption(null, { methode: methodeGoogle });
           const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
           return consomme.requetes + 1 > plafond ? "part" : "ok";
         };
         const issue = await verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle);
-        compteurs.unverifiedForCap = issue.nonEnvoyesFautePart;
 
         // 3. Trajets entre points consécutifs avec identifiant (ordre écrit), sous la part Routes et l'échéance seule.
         noterPhase("planification");

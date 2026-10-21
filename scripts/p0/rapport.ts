@@ -78,3 +78,41 @@ export const RapportSchema = z.strictObject({
   reglesSansObjet: z.array(z.enum(["R3", "R7", "R10"])),
 });
 export type Rapport = z.infer<typeof RapportSchema>;
+
+/**
+ * Rapport du mode simulé par la **nouvelle chaîne** (`executerProgramme` ; spécification P0-programme-par-ia § 1
+ * point 7, décision 0116 § 7.2). Compteurs et identifiants internes seulement, comme le schéma 1 : compteurs maison de
+ * la lecture du programme (mêmes noms que la ligne fermée `p0.programme_written`, 0117 § 4), nombres d'étapes avec et
+ * sans `placeId` ; aucun nom, aucun `placeId`, aucun motif. Strict à tous les niveaux.
+ */
+export const RapportProgrammeSchema = z.strictObject({
+  schema: z.literal(2),
+  chaine: z.literal("programme"),
+  variante: z.enum(["a", "b"]),
+  brief: z.string().regex(/^[a-z0-9-]{1,32}$/),
+  tripId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  dateExecution: z.iso.date(),
+  mode: z.literal("simule"),
+  statut: z.enum(["complete", "stopped", "failed"]),
+  raisonArret: z.enum(CODES_JOURNAL).optional(),
+  compteurAtteint: RapportSchema.shape.compteurAtteint,
+  prompts: z.strictObject({ programme: n }),
+  modeles: z.strictObject({ programme: z.string() }),
+  routage: z.strictObject({ data_collection: z.literal("deny"), zdr: z.literal(true) }),
+  elapsedMs: z.strictObject({ total: n }),
+  coutUsd: z.strictObject({ modeles: usd, total: usd }),
+  google: z.strictObject({ placesTextSearchIdsOnly: n, placesDetails: n, routesRequetes: n, routesElements: n }),
+  programme: z.strictObject({
+    days: n,
+    slots: n,
+    placesToVerify: n,
+    daysRemoved: n,
+    slotsRemoved: n,
+    fieldsRemoved: n,
+    textsCut: n,
+    modelCalls: n,
+    unverifiedForCap: n,
+  }),
+  etapes: z.strictObject({ avecPlaceId: n, sansPlaceId: n }),
+});
+export type RapportProgramme = z.infer<typeof RapportProgrammeSchema>;

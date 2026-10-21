@@ -10,10 +10,12 @@ import { creerModelesSimules } from "@/ai/modeles.simule";
 import { creerRedigerProgramme } from "@/ai/rediger-programme";
 import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { PhaseTravail } from "@/contracts/prototype-travail";
-import { capacitesAncrage } from "@/grounding/ancrage-zone";
+import { capacitesAncrage, lieuxHorsPartTextSearch } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes, RequeteMatrice, RequeteTextSearch } from "@/grounding/interfaces";
+import { RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
+import { zoneDuSejour } from "@/grounding/zone";
 import { SQL_TRAJET } from "@/adapters/prototype-ecriture";
 import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme } from "@/prototype/programme-reduit";
 import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, type PortConsommation } from "@/server/usage/port";
@@ -196,6 +198,8 @@ type OptionsSimulees = {
 type Retouches = {
   details?: (placeId: string, fiche: () => Promise<Awaited<ReturnType<ClientPlaces["details"]>>>) => Promise<Awaited<ReturnType<ClientPlaces["details"]>>>;
   routes?: ClientRoutes;
+  /** Réponse de Text Search remplacée (la requête est capturée et facturée comme les autres). */
+  textSearch?: (requete: Parameters<ClientPlaces["textSearch"]>[0], reponse: () => ReturnType<ClientPlaces["textSearch"]>) => ReturnType<ClientPlaces["textSearch"]>;
 };
 let retouches: Retouches = {};
 
@@ -244,7 +248,7 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
       facture(google("places_text_search"), async () => {
         capture.textSearch.push(structuredClone(requete));
         capture.ordre.push("textSearch");
-        return placesSimule.textSearch(requete);
+        return retouches.textSearch === undefined ? placesSimule.textSearch(requete) : retouches.textSearch(requete, () => placesSimule.textSearch(requete));
       }),
     details: (placeId) =>
       facture(google("places_details"), async () => {
@@ -753,6 +757,109 @@ describe("p0Run, etapeProgramme : plafonds et arrêts", () => {
     expect(fin).toMatchObject({ level: "info", placesToVerify: LIEUX_FIXTURE.length, unverifiedForCap: LIEUX_FIXTURE.length - 17 });
     // Les lieux non envoyés sont écrits sans placeId ; les dix-sept premiers de l'ordre écrit ont été cherchés.
     expect(capture.textSearch.slice(1).map((r) => r.texte.split(", ")[0])).toEqual(LIEUX_FIXTURE.slice(0, 17).map((lieu) => lieu.lieu));
+  });
+
+  it("journal: compteurs indépendants de l'ancrage", async () => {
+    // Même sortie de l'IA, horloge fixe, même part Text Search (essai, 18 requêtes : un logement, dix-sept lieux) ;
+    // seul change ce que rend Google : tous les lieux trouvés (fiches lues, la part de fiches peut couper d'abord), puis
+    // aucun (aucune fiche). La ligne `p0.programme_written` est identique champ par champ (0117 § 4, revue 1 point 3).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const journal = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const ligneFinale = () => journal.mock.calls.map((appel) => JSON.parse(String(appel[0])) as Record<string, unknown>).find((ligne) => ligne.event === "p0.programme_written");
+    const executer = async (aucunTrouve: boolean) => {
+      reinitialiser();
+      journal.mockClear();
+      vi.setSystemTime(Date.parse("2026-10-15T10:00:00Z"));
+      d.etat.mode = "essai";
+      d.essai = { ...ESSAI, placesTextSearch: 18, placesDetails: 4 };
+      let rang = 0;
+      // Première requête : le logement (toujours trouvé) ; ensuite, les lieux de l'IA.
+      if (aucunTrouve) retouches.textSearch = async (_requete, reponse) => (rang++ === 0 ? reponse() : { placeIds: [] });
+      await etapeProgramme({ runId: RUN_ID });
+      expect(d.etat.statut).toBe("programme_ecrit");
+      return { ligne: ligneFinale(), fiches: capture.details.length, avecPlaceId: etapesEcrites().filter((stop) => stop.placeId !== undefined).length };
+    };
+    try {
+      const tous = await executer(false);
+      const aucun = await executer(true);
+      // Les deux exécutions diffèrent bien côté Google.
+      expect(tous.avecPlaceId).toBeGreaterThan(0);
+      expect(aucun.avecPlaceId).toBe(0);
+      expect(tous.fiches).toBeGreaterThan(aucun.fiches);
+      expect(tous.ligne).toBeDefined();
+      expect(Object.keys(aucun.ligne ?? {}).sort()).toEqual(Object.keys(tous.ligne ?? {}).sort());
+      for (const [champ, valeur] of Object.entries(tous.ligne ?? {})) expect(aucun.ligne?.[champ], champ).toEqual(valeur);
+      // Calculé avant la boucle : lieux − (part Text Search − logements).
+      expect(tous.ligne).toMatchObject({ placesToVerify: LIEUX_FIXTURE.length, unverifiedForCap: Math.max(0, LIEUX_FIXTURE.length - 17) });
+    } finally {
+      journal.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("p0: programmeTimeBudgetHit absent du journal tant que la liste fermée ne l'admet pas", async () => {
+    // Échéance qui coupe la vérification (même scénario que « échéance proche ») : l'indicateur n'est jamais écrit
+    // (0117 § 4 ; revue 1, Q9 : gardé pour plus tard, il relève de la Sécurité).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const sorties: string[] = [];
+    const journal = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void sorties.push(args.map(String).join(" ")));
+    try {
+      vi.setSystemTime(Date.parse("2026-10-15T10:00:00Z"));
+      latences = { modele: 600_000, places: 15_000, routes: 2_000 };
+      await etapeProgramme({ runId: RUN_ID });
+      expect(etapesEcrites().some((stop) => stop.placeId === undefined)).toBe(true);
+    } finally {
+      journal.mockRestore();
+      vi.useRealTimers();
+    }
+    expect(sorties.length).toBeGreaterThan(0);
+    for (const ligne of sorties) expect(ligne).not.toMatch(/programmeTimeBudgetHit|TimeBudget/i);
+    const fin = sorties.map((ligne) => JSON.parse(ligne) as Record<string, unknown>).find((ligne) => ligne.event === "p0.programme_written");
+    expect(fin).toBeDefined();
+    expect(fin).not.toHaveProperty("programmeTimeBudgetHit");
+  });
+
+  it("vérification: requête des seuls lieu et ville, zone restreinte, aucun autre champ de l'IA", async () => {
+    await etapeProgramme({ runId: RUN_ID });
+    const [logement, ...lieux] = capture.textSearch;
+    expect(logement).toBeDefined();
+    // Zone : rectangle autour du logement (0117 § 2), le même pour chaque lieu ; jamais de biais avec la restriction.
+    const positionLogement = programmeEcrit().positions.get(LOGEMENT);
+    expect(positionLogement).toBeDefined();
+    const zone = zoneDuSejour([{ lat: positionLogement![0], lng: positionLogement![1] }], RAYON_BIAIS_METRES);
+    expect(lieux).toHaveLength(LIEUX_FIXTURE.length);
+    lieux.forEach((requete, rang) => {
+      const lieu = LIEUX_FIXTURE.at(rang)!;
+      expect(Object.keys(requete).sort()).toEqual(["biais", "restriction", "texte"]);
+      expect(requete.biais).toBeNull();
+      expect(requete.restriction).toEqual(zone);
+      // Texte : « <lieu>, <ville> » (ou la destination du brief), rien d'autre.
+      expect(requete.texte).toBe(`${lieu.lieu}, ${lieu.ville ?? "Édimbourg"}`);
+    });
+    // Aucun autre champ de la sortie de l'IA dans une requête : quartier, pourquoi, conseil, prix, horaires, titres, bons plans.
+    const programme = fixtures.modeles.programme as { titre: string; jours: { titre?: string; creneaux: Record<string, unknown>[] }[]; bonsPlans?: unknown[] };
+    const autres = new Set<string>([programme.titre, ...JSON.stringify(programme.bonsPlans ?? []).match(/"[^"]{8,}"/g)?.map((t) => t.slice(1, -1)) ?? []]);
+    for (const jour of programme.jours) {
+      if (jour.titre !== undefined) autres.add(jour.titre);
+      for (const creneau of jour.creneaux) {
+        for (const champ of ["quartier", "pourquoi", "conseil", "prix", "horaires", "alternative"]) {
+          const valeur = creneau[champ];
+          if (typeof valeur === "string" && valeur.length > 0) autres.add(valeur);
+        }
+      }
+    }
+    expect(autres.size).toBeGreaterThan(3);
+    for (const requete of lieux) {
+      const [nom] = requete.texte.split(", ");
+      for (const texte of autres) if (texte !== nom && texte !== "Édimbourg") expect(requete.texte, texte).not.toContain(texte);
+    }
+  });
+
+  it("p0: unverifiedForCap calculé avant la boucle : max(0, lieux − (part Text Search − logements))", () => {
+    expect(lieuxHorsPartTextSearch(20, 18, 1)).toBe(3);
+    expect(lieuxHorsPartTextSearch(10, 18, 1)).toBe(0);
+    expect(lieuxHorsPartTextSearch(5, 2, 3)).toBe(5);
+    expect(lieuxHorsPartTextSearch(0, 0, 0)).toBe(0);
   });
 
   it("p0: un appel d'ancrage par lieu, part et échéance contrôlées avant chaque appel", async () => {

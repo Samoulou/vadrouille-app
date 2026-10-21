@@ -12,6 +12,7 @@ import { decouperProgramme } from "@/prototype/decoupage";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
 import { lancerExecutionP0Action } from "@/server/actions/p0-lancement";
 import { valeurCookieAcces } from "@/server/p0/acces";
+import { format } from "@/i18n";
 import { pageExecutionsP0 } from "@/server/p0/page-acces";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -187,6 +188,28 @@ describe("p0: page de lancement", () => {
     expect(html).toContain(t.rapport.titreSection);
     expect(html).toContain(html$(t.suivi.codesArret.upstream_unavailable));
     expect(html).toContain(html$(t.suivi.moinsDUneMinute));
+    expect(d.requetes).not.toContain(SQL_CONTENU);
+  });
+
+  it("rapport: étapes avec et sans placeId affichées sur la page, jamais dans « Copier le rapport » ; non relevé sans programme", async () => {
+    d.lignes = [ligne({})];
+    const page = await pageExecutionsP0();
+    if (page.etat !== "ouverte") throw new Error("page non ouverte");
+    const etapes = page.modele.rapport?.etapes;
+    expect(etapes).not.toBeNull();
+    expect(Object.keys(etapes ?? {}).sort()).toEqual(["avecPlaceId", "sansPlaceId"]);
+    expect((etapes?.avecPlaceId ?? 0) + (etapes?.sansPlaceId ?? 0)).toBeGreaterThan(0);
+    const libelle = format(t.rapport.etapes, { avec: etapes?.avecPlaceId ?? -1, sans: etapes?.sansPlaceId ?? -1 });
+    expect(renderToString(await ExecutionsPage())).toContain(html$(libelle));
+    // Le texte copié ne reçoit pas ces nombres (0117 § 4) : aucune ligne d'étapes.
+    expect(page.modele.rapport?.texte).not.toContain(t.rapport.etapes.split(" :")[0]!);
+    // Exécution arrêtée sans programme : non relevé, aucune lecture du contenu.
+    d.lignes = [ligne({ status: "arretee", stop_code: "upstream_unavailable", canary_ok: null })];
+    d.requetes.length = 0;
+    const arretee = await pageExecutionsP0();
+    if (arretee.etat !== "ouverte") throw new Error("page non ouverte");
+    expect(arretee.modele.rapport?.etapes).toBeNull();
+    expect(renderToString(await ExecutionsPage())).toContain(html$(t.rapport.etapesNonRelevees));
     expect(d.requetes).not.toContain(SQL_CONTENU);
   });
 

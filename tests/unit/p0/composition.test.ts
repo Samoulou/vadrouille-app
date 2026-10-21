@@ -419,7 +419,7 @@ afterEach(() => {
 
 type Appel = { url: string; init: RequestInit };
 
-function monter(reponses: (() => Promise<Response>)[]) {
+function monter(reponses: (() => Promise<Response>)[], routage: { data_collection: "deny"; zdr?: boolean } = { data_collection: "deny" }) {
   const appels: Appel[] = [];
   const fetchDouble = vi.fn(async (url: string, init: RequestInit) => {
     appels.push({ url, init });
@@ -436,7 +436,7 @@ function monter(reponses: (() => Promise<Response>)[]) {
     coutEstimeModelesMicros: 10_000,
     coutEstimeRechercheWebMicros: 20_000,
     modeles: {
-      routage: { data_collection: "deny" },
+      routage,
       rechercheWeb: { modele: "fournisseur/recherche-test", moteur: "exa", maxResultats: 3 },
       notation: { modele: "fournisseur/notation-test" },
       raisons: { modele: "fournisseur/raisons-test" },
@@ -576,6 +576,25 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const notation = JSON.parse(String(appels[1]?.init.body)) as Record<string, unknown>;
     expect(notation.model).toBe("fournisseur/notation-test");
     expect(notation.plugins).toBeUndefined();
+  });
+
+  it("composition: zdr de la configuration réservé à la requête programme ; recherche web, notation et raisons sans zdr (0117 § 5.3)", async () => {
+    cles.google.present = true;
+    const reponses = [
+      async () => reponseModele({ content: '{"jours":[]}' }),
+      async () => reponseModele({ content: "texte" }),
+      async () => reponseModele({ content: '{"notes":[]}' }),
+      async () => reponseModele({ content: '{"raisons":[]}' }),
+    ];
+    const { composition, appels } = monter(reponses, { data_collection: "deny", zdr: true });
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    await composition.programme().redigerProgramme(entreeProgrammeDepuisBrief(brief));
+    await composition.agent().rechercheWeb.rechercher("musées Édimbourg");
+    const entree = entreeModelesDepuisBrief(brief);
+    await composition.etapeFinale().noterCandidats({ entree, lot: [] });
+    await composition.etapeFinale().redigerRaisons({ entree, retenus: [] });
+    const fournisseurs = appels.map((appel) => (JSON.parse(String(appel.init.body)) as { provider: unknown }).provider);
+    expect(fournisseurs).toEqual([{ data_collection: "deny", zdr: true }, { data_collection: "deny" }, { data_collection: "deny" }, { data_collection: "deny" }]);
   });
 
   // Décision 0116 § 2 et verdict S5 de 0117 : une requête `programme`, sans greffon, `zdr: true` et `data_collection: "deny"`.

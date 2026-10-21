@@ -105,6 +105,8 @@
       "titreSection": "Rapport de la dernière exécution",
       "texteAria": "Texte du rapport",
       "copier": "Copier le rapport",
+      "etapes": "Étapes avec lieu vérifié : {avec} · à confirmer : {sans}",
+      "etapesNonRelevees": "Étapes avec lieu vérifié : non relevé",
       "copie": "Rapport copié.",
       "copieImpossible": "Copie impossible : sélectionne le texte et copie-le à la main.",
       "titre": "Rapport d'exécution du prototype",

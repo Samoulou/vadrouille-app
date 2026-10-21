@@ -132,6 +132,15 @@ describe("p0: texte du rapport (« Copier le rapport »)", () => {
 });
 
 describe("p0: rapport sans donnée Google (spécification P0-programme-par-ia, A12 et § 6 ; 0117 § 4)", () => {
+  it("rapport: étapesDuRapport(null) : non relevé sans programme, jamais zéro", () => {
+    // Exécution arrêtée sans programme écrit (contenu non lu) ou programme absent : `null` (« non relevé » sur la page),
+    // jamais `{ avecPlaceId: 0, sansPlaceId: 0 }`, qui dirait un programme vide.
+    expect(etapesDuRapport(null)).toBeNull();
+    expect(etapesDuRapport(undefined)).toBeNull();
+    expect(etapesDuRapport({})).toBeNull();
+    expect(etapesDuRapport("programme")).toBeNull();
+  });
+
   it("p0: rapport sans donnée Google", () => {
     const contenu = contenuValide();
     const jours = (contenu.trip as { days: { items: { type: string; stop?: Record<string, unknown> }[] }[] }).days;

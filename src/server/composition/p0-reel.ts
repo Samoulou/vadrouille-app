@@ -145,13 +145,16 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
       horloge,
     });
   const google = { usage: options.usage, contexte: contexte("google"), plafonds: options.plafonds, horloge };
+  // `zdr` (0116 § 2.2) ne vaut que pour la requête `programme` (0117 § 5.3) : les autres requêtes (recherche web,
+  // notation, raisons de l'ancienne chaîne) reçoivent le routage sans lui (revue 1 de #632, mineur 7).
+  const routageHorsProgramme = { data_collection: options.modeles.routage.data_collection };
 
   return {
     agent() {
       const client = modeles();
       return {
         modeles: { envoyer: (requete) => client.envoyer(requete) },
-        rechercheWeb: creerRechercheWebReelle(client.rechercherWeb, { ...options.modeles.rechercheWeb, routage: options.modeles.routage }),
+        rechercheWeb: creerRechercheWebReelle(client.rechercherWeb, { ...options.modeles.rechercheWeb, routage: routageHorsProgramme }),
         pages: creerLecteurPages(createUndiciTransport()),
       };
     },
@@ -166,8 +169,8 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
         places: { details: (placeId) => places.details(placeId) },
         routes: createRoutesClient(google),
         detailsLogement: capacitesAncrage(places).detailsLogement,
-        noterCandidats: creerNoterCandidats(client, { modele: options.modeles.notation.modele, routage: options.modeles.routage }),
-        redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: options.modeles.routage }),
+        noterCandidats: creerNoterCandidats(client, { modele: options.modeles.notation.modele, routage: routageHorsProgramme }),
+        redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: routageHorsProgramme }),
       };
     },
     programme() {

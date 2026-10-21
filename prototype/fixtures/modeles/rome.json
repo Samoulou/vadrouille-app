@@ -1,0 +1,352 @@
+{
+  "coutParRequeteUsd": 0.002,
+  "plan": {
+    "secteurs": []
+  },
+  "recherche": [],
+  "notes": {},
+  "notesParDefaut": {
+    "matchesWishes": true,
+    "notForMeRisk": 4,
+    "mustSee": false
+  },
+  "programme": {
+    "titre": "Rome antique, carbonara et apéro, quatre jours à pied",
+    "jours": [
+      {
+        "date": "2027-05-04",
+        "titre": "Monti et le Colisée",
+        "creneaux": [
+          {
+            "debut": "12:00",
+            "fin": "13:00",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "13:30",
+            "fin": "14:15",
+            "nature": "repas_midi",
+            "lieu": "Antico Forno ai Serpenti",
+            "quartier": "Monti",
+            "pourquoi": "Un panini rapide dans votre quartier, parfait pour enchaîner sur les visites.",
+            "conseil": "Prends-le à emporter, il y a peu de places assises.",
+            "prix": "8 à 12 € par personne"
+          },
+          {
+            "debut": "14:30",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Colisée",
+            "quartier": "Colisée",
+            "pourquoi": "Le symbole de la Rome antique, à dix minutes de votre logement.",
+            "conseil": "Réserve le créneau horaire en ligne, les billets partent vite.",
+            "prix": "18 € (avec le Forum et le Palatin)",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "16:45",
+            "fin": "18:15",
+            "nature": "visite",
+            "lieu": "Forum romain",
+            "quartier": "Colisée",
+            "pourquoi": "Le cœur politique de la Rome antique, avec le même billet que le Colisée.",
+            "conseil": "Entre par la via della Salara Vecchia pour éviter la file.",
+            "incontournable": true
+          },
+          {
+            "debut": "18:45",
+            "fin": "19:45",
+            "nature": "apero",
+            "lieu": "Ai Tre Scalini",
+            "quartier": "Monti",
+            "pourquoi": "Un bar à vin de quartier pour l'apéro avant le dîner, comme vous l'aimez.",
+            "conseil": "Arrive avant 19:00 pour avoir une table dehors."
+          },
+          {
+            "debut": "20:15",
+            "fin": "22:00",
+            "nature": "repas_soir",
+            "lieu": "Trattoria Vecchia Roma",
+            "quartier": "Monti",
+            "pourquoi": "Une première carbonara dans une trattoria familiale de Monti.",
+            "conseil": "Réserve pour 20:15.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2027-05-05",
+        "titre": "Vatican et Prati",
+        "creneaux": [
+          {
+            "debut": "08:30",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Musées du Vatican",
+            "quartier": "Vatican",
+            "pourquoi": "La chapelle Sixtine et des siècles d'art, la grande visite de la journée.",
+            "conseil": "Réserve le premier créneau du matin pour éviter la foule.",
+            "prix": "20 €",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:00",
+            "nature": "repas_midi",
+            "lieu": "Pizzarium",
+            "quartier": "Prati",
+            "pourquoi": "Des parts de pizza à emporter, rapides et réputées, juste à côté du Vatican.",
+            "conseil": "Mange debout ou sur un banc, l'endroit est minuscule."
+          },
+          {
+            "debut": "13:15",
+            "fin": "15:00",
+            "nature": "visite",
+            "lieu": "Basilique Saint-Pierre",
+            "quartier": "Vatican",
+            "pourquoi": "La plus grande basilique du monde, avec la montée à la coupole.",
+            "conseil": "Tenue couvrant épaules et genoux exigée.",
+            "horaires": "7:00 à 19:00",
+            "incontournable": true
+          },
+          {
+            "debut": "15:30",
+            "fin": "17:00",
+            "nature": "visite",
+            "lieu": "Château Saint-Ange",
+            "quartier": "Prati",
+            "pourquoi": "Le mausolée devenu forteresse, avec une terrasse sur tout Rome.",
+            "incontournable": true
+          },
+          {
+            "debut": "17:00",
+            "fin": "18:15",
+            "nature": "pause"
+          },
+          {
+            "debut": "18:30",
+            "fin": "19:30",
+            "nature": "apero",
+            "lieu": "Il Sorpasso",
+            "quartier": "Prati",
+            "pourquoi": "Un spritz et quelques assiettes à partager dans un bistrot animé de Prati."
+          },
+          {
+            "debut": "20:00",
+            "fin": "22:00",
+            "nature": "repas_soir",
+            "lieu": "Settembrini",
+            "quartier": "Prati",
+            "pourquoi": "Une cuisine romaine soignée, la carbonara y est une référence.",
+            "conseil": "Réserve deux jours avant.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2027-05-06",
+        "titre": "Centre historique et Trevi",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "10:00",
+            "nature": "visite",
+            "lieu": "Panthéon",
+            "quartier": "Centro storico",
+            "pourquoi": "Le temple antique le mieux conservé de Rome, avec sa coupole ouverte.",
+            "conseil": "Réserve l'entrée en ligne, elle est payante.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "10:15",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Place Navone",
+            "quartier": "Centro storico",
+            "pourquoi": "La grande place baroque bâtie sur un stade romain.",
+            "incontournable": true
+          },
+          {
+            "debut": "11:30",
+            "fin": "12:15",
+            "nature": "visite",
+            "lieu": "Fontaine de Trevi",
+            "quartier": "Trevi",
+            "pourquoi": "La fontaine la plus célèbre de Rome, impossible à manquer.",
+            "conseil": "Va-y avant midi, l'après-midi elle est noire de monde.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Supplizio",
+            "quartier": "Centro storico",
+            "pourquoi": "Des supplì frits à emporter, la street food romaine par excellence."
+          },
+          {
+            "debut": "13:30",
+            "fin": "14:30",
+            "nature": "visite",
+            "lieu": "Place d'Espagne",
+            "quartier": "Trevi",
+            "pourquoi": "Le grand escalier et la via Condotti, à deux pas de Trevi.",
+            "incontournable": true
+          },
+          {
+            "debut": "14:45",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Galerie Doria Pamphilj",
+            "quartier": "Centro storico",
+            "pourquoi": "Une collection privée de chefs-d'œuvre dans un palais encore habité.",
+            "conseil": "L'audioguide est inclus, prends-le."
+          },
+          {
+            "debut": "16:30",
+            "fin": "17:15",
+            "nature": "pause",
+            "lieu": "Giolitti",
+            "quartier": "Centro storico",
+            "pourquoi": "Une glace dans l'un des plus vieux glaciers de Rome."
+          },
+          {
+            "debut": "18:00",
+            "fin": "19:30",
+            "nature": "apero",
+            "lieu": "Bar del Fico",
+            "quartier": "Centro storico",
+            "pourquoi": "L'apéro des Romains derrière la place Navone."
+          },
+          {
+            "debut": "20:00",
+            "fin": "22:00",
+            "nature": "repas_soir",
+            "lieu": "Roscioli",
+            "quartier": "Centro storico",
+            "pourquoi": "Épicerie fine et restaurant, l'une des carbonara les plus connues de la ville.",
+            "conseil": "Réserve au moins une semaine avant.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2027-05-07",
+        "titre": "Palatin et Trastevere",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "Palatin",
+            "quartier": "Palatin",
+            "pourquoi": "La colline des empereurs, avec la vue sur le Forum et le Circus Maximus.",
+            "conseil": "Le billet du Colisée l'inclut s'il est encore valable.",
+            "incontournable": true
+          },
+          {
+            "debut": "11:45",
+            "fin": "12:15",
+            "nature": "visite",
+            "lieu": "Bouche de la Vérité",
+            "quartier": "Palatin",
+            "pourquoi": "Le masque antique de la légende, sur le chemin du Trastevere."
+          },
+          {
+            "debut": "12:45",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "Trapizzino Trastevere",
+            "quartier": "Trastevere",
+            "pourquoi": "Le trapizzino, une poche de pizza farcie, à manger en marchant."
+          },
+          {
+            "debut": "13:45",
+            "fin": "14:30",
+            "nature": "visite",
+            "lieu": "Basilique Sainte-Marie-du-Trastevere",
+            "quartier": "Trastevere",
+            "pourquoi": "Les mosaïques dorées de l'une des plus anciennes églises de Rome."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Janicule",
+            "quartier": "Trastevere",
+            "pourquoi": "La promenade sur la colline avec le plus beau panorama de Rome.",
+            "conseil": "Monte à pied par la via Garibaldi."
+          },
+          {
+            "debut": "16:30",
+            "fin": "18:00",
+            "nature": "pause"
+          },
+          {
+            "debut": "18:30",
+            "fin": "19:30",
+            "nature": "apero",
+            "lieu": "Freni e Frizioni",
+            "quartier": "Trastevere",
+            "pourquoi": "L'apéro dînatoire le plus animé du Trastevere."
+          },
+          {
+            "debut": "20:00",
+            "fin": "22:00",
+            "nature": "repas_soir",
+            "lieu": "Da Enzo al 29",
+            "quartier": "Trastevere",
+            "pourquoi": "Une petite trattoria réputée pour sa carbonara et ses artichauts.",
+            "conseil": "Pas de réservation : viens à l'ouverture."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-08",
+        "titre": "Aventin et Testaccio",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Thermes de Caracalla",
+            "quartier": "Aventin",
+            "pourquoi": "Les immenses thermes impériaux, calmes le matin.",
+            "prix": "8 €"
+          },
+          {
+            "debut": "11:30",
+            "fin": "12:15",
+            "nature": "visite",
+            "lieu": "Jardin des Orangers",
+            "quartier": "Aventin",
+            "pourquoi": "Un jardin avec une vue sur Saint-Pierre, et le trou de serrure voisin.",
+            "conseil": "Jette un œil par la serrure des Chevaliers de Malte, à deux pas."
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Felice a Testaccio",
+            "quartier": "Testaccio",
+            "pourquoi": "Un dernier repas romain dans le quartier populaire de Testaccio.",
+            "conseil": "Réserve, la salle se remplit vite.",
+            "aReserver": true
+          },
+          {
+            "debut": "14:00",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve dès maintenant le Colisée et les musées du Vatican.",
+      "Achète des billets de bus et de métro valables 48 h.",
+      "Prévois une tenue couvrant épaules et genoux pour Saint-Pierre."
+    ]
+  }
+}

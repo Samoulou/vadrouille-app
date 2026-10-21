@@ -794,8 +794,6 @@ export function ordreEcrit(programme: ProgrammeIa): ProgrammeIa {
   };
 }
 
-/** Lieu distinct à vérifier : identifiant interne (`l_001`…), nom et ville de l'IA, contrôlés et coupés (0117 § 2 point 1). */
-export type LieuDuProgramme = { readonly id: string; readonly lieu: string; readonly ville?: string };
 
 /**
  * Lieux distincts d'un programme **déjà dans l'ordre écrit** (`ordreEcrit`), jours puis créneaux (décision 0116 § 4.3
@@ -803,13 +801,16 @@ export type LieuDuProgramme = { readonly id: string; readonly lieu: string; read
  * lieu cité plusieurs fois (même `cleDeNom` du nom, même ville ou, sans ville, la destination) est vérifié une fois.
  * `cleDe(jour, rang)` rend l'identifiant du lieu du créneau `rang` de la journée `jour`, ou `undefined`
  * pour un créneau sans lieu. Arrivée et départ ne sont jamais vérifiés (0116 § 4.1).
+ * Lieu rendu : identifiant interne (`l_001`…), nom et ville de l'IA, contrôlés et coupés (0117 § 2 point 1). Le seul
+ * type nommé est `LieuProgramme` (`src/grounding/ancrage-zone.ts`) ; `src/ai` ne peut pas l'importer (graphe d'import,
+ * 0077 § 1 point 7), la forme littérale ci-dessous lui est vérifiée par le compilateur à l'appel de `p0Run`.
  */
 export function lieuxDuProgramme(
   programme: ProgrammeIa,
   destination: string,
-): { readonly lieux: readonly LieuDuProgramme[]; readonly cleDe: (jour: number, rang: number) => string | undefined } {
+): { readonly lieux: readonly { readonly id: string; readonly lieu: string; readonly ville?: string }[]; readonly cleDe: (jour: number, rang: number) => string | undefined } {
   const parCle = new Map<string, string>();
-  const lieux: LieuDuProgramme[] = [];
+  const lieux: { id: string; lieu: string; ville?: string }[] = [];
   const parCreneau = new Map<string, string>();
   programme.jours.forEach((jour, indiceJour) => {
     jour.creneaux.forEach((creneau, rang) => {

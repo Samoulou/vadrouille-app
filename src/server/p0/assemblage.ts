@@ -7,7 +7,6 @@ import {
   type Day,
   type DayLineItem,
   type DayMap,
-  type Pace,
   type Proposal,
   type Segment,
   type Stop,
@@ -19,12 +18,14 @@ import { destinationColor, optionDeRepas } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { Nuit } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
+import { logementsDuJour } from "@/domain/relectures";
 import { element } from "@/domain/tables";
-import { arrondi5, versHeure } from "@/domain/temps";
+import { arrondi5, joursEntre, versHeure } from "@/domain/temps";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+import { rythmeVersPace } from "@/server/p0/vers-moteur";
 
 /**
  * Assemblage du programme complet de P0, en mémoire (spécification P0, « Sortie 1 »), puis validation par
@@ -307,7 +308,6 @@ const NATURES_REPAS: ReadonlySet<string> = new Set(["repas_midi", "repas_soir", 
 const FIN_DU_JOUR = "23:59";
 
 const minutesDe = (heure: string) => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
-const joursEntre = (debut: string, fin: string) => Math.round((Date.parse(`${fin}T00:00:00Z`) - Date.parse(`${debut}T00:00:00Z`)) / 86_400_000);
 
 /**
  * Fin d'une étape (0116 § 1.7) : `fin` postérieure à `debut` gardée ; `fin` antérieure ou égale à `debut` lue comme
@@ -337,11 +337,15 @@ function finDeLEtape(debut: string, fin: string | undefined): string | undefined
  * - bons plans en lignes « À faire » avant le départ, sans `bookingUrl`, `sponsored: false` (0116 § 6, 0117) ;
  * - aucune proposition au lot 1 (l'alternative nommée par l'IA est au lot 2, 0116 § 5.2).
  */
-/** Logement de départ et d'arrivée du jour `index` (1 = J1) : nuit précédente et nuit du jour, bornées au séjour. */
-function logementsDuJour(brief: Brief, logements: readonly string[], index: number) {
+/**
+ * Logement de départ et d'arrivée du jour `index` (1 = J1) : règle unique `logementsDuJour` (`src/domain/relectures.ts`,
+ * 0045 § 2.2 ; jour `index − 1`), nuits du brief dans l'ordre.
+ */
+function logementsDeLaJournee(brief: Brief, logements: readonly string[], index: number) {
   const nuits = brief.logements.flatMap((logement, rang) => Array.from({ length: logement.nuits }, () => ({ texte: logement.texte, placeId: logements.at(rang) ?? "" })));
-  const nuit = (rang: number) => nuits.at(Math.max(0, Math.min(rang, nuits.length - 1))) ?? { texte: "Logement", placeId: "" };
-  return { depart: nuit(index - 2 < 0 ? 0 : index - 2), arrivee: nuit(index - 1) };
+  const { depart, arrivee } = logementsDuJour(index - 1, nuits.length);
+  const nuit = (rang: number) => nuits.at(rang) ?? { texte: "Logement", placeId: "" };
+  return { depart: nuit(depart), arrivee: nuit(arrivee) };
 }
 
 /**
@@ -351,7 +355,7 @@ function logementsDuJour(brief: Brief, logements: readonly string[], index: numb
  */
 export function pointsDeTrajet(entree: Pick<EntreeAssemblageIa, "brief" | "jours" | "logements">): string[][] {
   return entree.jours.map((jour) => {
-    const { depart, arrivee } = logementsDuJour(entree.brief, entree.logements, joursEntre(entree.brief.arrivee, jour.date) + 1);
+    const { depart, arrivee } = logementsDeLaJournee(entree.brief, entree.logements, joursEntre(entree.brief.arrivee, jour.date) + 1);
     const etapes = jour.creneaux.flatMap((creneau) =>
       creneau.nature === "arrivee" || creneau.nature === "depart" || creneau.lieu === undefined || creneau.placeId === undefined ? [] : [creneau.placeId],
     );
@@ -366,7 +370,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
 
   const days: Day[] = entree.jours.map((jour) => {
     const index = joursEntre(brief.arrivee, jour.date) + 1;
-    const { depart: logementDepart, arrivee: logementArrivee } = logementsDuJour(brief, entree.logements, index);
+    const { depart: logementDepart, arrivee: logementArrivee } = logementsDeLaJournee(brief, entree.logements, index);
     const arrivee = jour.creneaux.find((creneau) => creneau.nature === "arrivee");
     const depart = jour.creneaux.find((creneau) => creneau.nature === "depart");
     const contenu = jour.creneaux.filter((creneau) => creneau.nature !== "arrivee" && creneau.nature !== "depart");
@@ -446,7 +450,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       events,
       generating: false,
       travelMinutes,
-      travelBudgetMinutes: budgetTrajetDuJour(paceDeRythme(brief.rythme), entree.configuration, false),
+      travelBudgetMinutes: budgetTrajetDuJour(rythmeVersPace(brief.rythme), entree.configuration, false),
     };
   });
 
@@ -467,6 +471,3 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
   return { trip, proposals: [], justifications: new Map(), terminus };
 }
 
-function paceDeRythme(rythme: Brief["rythme"]): Pace {
-  return rythme === "tranquille" ? "relaxed" : rythme === "intense" ? "intense" : "balanced";
-}

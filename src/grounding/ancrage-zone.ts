@@ -88,15 +88,20 @@ export async function ancrerCandidatsDansZone(
 /** Lieu distinct du programme écrit par l'IA (décision 0115) : identifiant interne, nom et ville **contrôlés** (0117 § 1). */
 export type LieuProgramme = { readonly id: string; readonly lieu: string; readonly ville?: string };
 
-/** Issue de la vérification, en mémoire seulement (0011 § 2) : fiches gardées par identifiant interne, compteur de part. */
+/**
+ * Lieux qui ne seront pas envoyés à Text Search faute de **part** (`unverifiedForCap`, 0117 § 4 ; 0116 § 3.5),
+ * calculés **avant** la boucle de vérification, des seuls nombres de lieux, de la part Text Search de l'exécution et
+ * des logements (une recherche chacun) : `max(0, lieux − (part − logements))`. Indépendant de l'horloge et des
+ * réponses de Google ; les lieux sautés faute de temps ou de part de fiches ne sont pas comptés.
+ */
+export function lieuxHorsPartTextSearch(nombreLieux: number, partTextSearch: number, logements: number): number {
+  return Math.max(0, nombreLieux - Math.max(0, partTextSearch - logements));
+}
+
+/** Issue de la vérification, en mémoire seulement (0011 § 2) : fiches gardées par identifiant interne. */
 export type IssueVerification = {
   /** Lieux vérifiés : identifiant trouvé dans la zone, fiche lue, pas fermé définitivement, position dans la zone. */
   readonly fiches: ReadonlyMap<string, AncrageResolu>;
-  /**
-   * Lieux non envoyés à Text Search faute de **part Text Search** (`unverifiedForCap`, 0117 § 4, 0116 § 3.5) ; les lieux
-   * sautés faute de temps ou de part de fiches ne sont pas comptés (ce serait un compte d'ancrage).
-   */
-  readonly nonEnvoyesFautePart: number;
 };
 
 /**
@@ -116,7 +121,7 @@ export type ControleAppel = (methode: "textSearch" | "fiche") => Promise<"ok" | 
  *    tombe dans la zone. Les horaires ne sont **pas** évalués ici (0116 § 4.4) : un lieu fermé le jour du créneau garde
  *    son identifiant, son badge vient de la relecture des horaires à l'affichage (0116 § 5.3).
  * `controle` est appelé avant chaque appel : non tenu, la boucle s'arrête et les lieux restants ne sont pas vérifiés
- * (écrits sans `placeId`) ; seuls ceux arrêtés par la part Text Search sont comptés. Jamais un arrêt de l'exécution pour
+ * (écrits sans `placeId`) ; aucun compte n'en sort (`unverifiedForCap` vient de `lieuxHorsPartTextSearch`). Jamais un arrêt de l'exécution pour
  * cette cause (PPI-PO-4, 0116 § 3.5). Toute erreur d'un appel (refus du registre compris) est propagée.
  * Aucun verdict, motif ni donnée Google ne sort de cette fonction, hors des fiches gardées en mémoire.
  */
@@ -129,13 +134,8 @@ export async function verifierLieuxDuProgramme(
 ): Promise<IssueVerification> {
   const fiches = new Map<string, AncrageResolu>();
   const lues = new Map<string, AncrageResolu | null>();
-  let nonEnvoyes = 0;
-  for (const [rang, lieu] of lieux.entries()) {
-    const avantRecherche = await controle("textSearch");
-    if (avantRecherche !== "ok") {
-      if (avantRecherche === "part") nonEnvoyes = lieux.length - rang;
-      break;
-    }
+  for (const lieu of lieux) {
+    if ((await controle("textSearch")) !== "ok") break;
     const ancrage = (await ancrerCandidatsDansZone([{ id: lieu.id, nom: lieu.lieu }], lieu.ville ?? destination, capacites, zone)).get(lieu.id);
     if (ancrage === undefined || !ancrage.resolu) continue;
     let fiche = lues.get(ancrage.placeId);
@@ -146,5 +146,5 @@ export async function verifierLieuxDuProgramme(
     }
     if (fiche !== undefined && fiche !== null && fiche.statut !== "ferme_definitivement" && dansZone(fiche.position, zone)) fiches.set(lieu.id, fiche);
   }
-  return { fiches, nonEnvoyesFautePart: nonEnvoyes };
+  return { fiches };
 }

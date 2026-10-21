@@ -7,7 +7,7 @@ import type { ExecutionSuivie, LigneDecompte, ModeleLancementP0, RapportPage, Su
 import { etatPageAcces, NOM_COOKIE_ACCES, type EtatPageAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { COMPTEES_MAX, decompte, RELANCES_MAX } from "@/server/p0/decompte";
-import { criteresDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
 import { NOMS_BRIEFS } from "@/workflows";
 
 /**
@@ -50,8 +50,9 @@ async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: 
     }
   }
   const criteres = criteresDuRapport(execution, contenu);
-  // `etapes` : non relevé tant que le calcul à la lecture n'est pas câblé (lot 1 du programme par IA, PR #632).
-  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge), etapes: null };
+  // Étapes avec et sans `placeId` : calculées à chaque affichage depuis le programme stocké (0116 § 4.4, 0117 § 4),
+  // `null` sans programme écrit ; jamais dans le texte de « Copier le rapport » (`texteDuRapport` ne les reçoit pas).
+  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge), etapes: etapesDuRapport(contenu) };
 }
 
 /** Modèle du lancement : lu seulement si la page est ouverte. */

@@ -485,8 +485,12 @@ function regleDe(fichier: string): Regle | undefined {
 
 function regleDeBase(fichier: string): Regle | undefined {
   if (MODULES_SERVEUR_P0.includes(fichier)) {
+    // Revue 1 de #632, bloquant 4 (lot 1 du programme par l'IA) : l'assemblage réutilise `rythmeVersPace` de
+    // l'adaptateur du moteur au lieu d'une copie. Arête unique entre deux modules de cette même liste, soumis à la même
+    // règle (aucune capacité nouvelle n'est atteinte).
+    const voisins = fichier === "src/server/p0/assemblage.ts" ? ["src/server/p0/vers-moteur.ts"] : [];
     return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts"].includes(c),
+      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...voisins].includes(c),
       externes: [],
     };
   }
