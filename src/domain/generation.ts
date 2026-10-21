@@ -524,6 +524,11 @@ export function generer(entree: EntreeMoteur): ResultatGeneration {
  * les autres créneaux sont replanifiés depuis la réserve, sans reprendre un lieu déjà présent ailleurs dans le
  * voyage. Événements et idée du jour sont repris tels quels. R3 est contrôlée contre l'instantané de base.
  *
+ * Étapes conservées (`entree.conservees`, décision 0119 § 2.1, recalcul de B10b) : elles sont des blocs fixes comme les
+ * étapes verrouillées, à leur heure et avec leur identifiant, rendues telles qu'elles étaient (`locked` inchangé : jamais
+ * un verrou que la personne n'a pas posé) ; leur lieu n'est pas repris par un candidat. La place libérée par une étape
+ * non conservée est remplie dans les créneaux restants.
+ *
  * Jour de base non planifié (B9-PO-6 ; 0081 § B9-TL-13, voyage complet de B9d) : il est planifié comme par
  * `generer` — engagements de sa date posés et verrouillés (B5-PO-12), puis événements et idée du jour (B5-PO-16),
  * sans reprendre un lieu ni une idée déjà présents dans le voyage.
@@ -545,10 +550,14 @@ export function replanifierJour(entree: EntreeMoteur, base: TripSnapshot, index:
   );
   if (jourBase === undefined || squeletteDuJour === undefined) throw new RangeError("moteur : jour hors du séjour");
 
+  // Étape gardée telle quelle : verrouillée, engagement, ou conservée par l'appelant (0119 § 2.1) sur un jour planifié.
+  const conservees = nonPlanifie ? undefined : entree.conservees;
+  const gardee = (stop: StopSnapshot) => stop.locked || stop.commitment !== undefined || conservees?.has(stop.id) === true;
+
   let jour: JourSquelette = squeletteDuJour;
   if (!nonPlanifie) {
     const blocs: BlocFixe[] = jourBase.items
-      .flatMap((item) => (item.type === "stop" && (item.stop.locked || item.stop.commitment !== undefined) ? [item.stop] : []))
+      .flatMap((item) => (item.type === "stop" && gardee(item.stop) ? [item.stop] : []))
       .map((stop) => ({ id: stop.id, stop: sansIdentifiant(stop), debut: versMinutes(stop.start), fin: finOccupee(stop, entree.configuration) }))
       .sort((a, b) => a.debut - b.debut);
     jour = {
@@ -562,7 +571,7 @@ export function replanifierJour(entree: EntreeMoteur, base: TripSnapshot, index:
   const lieux = new Set<string>();
   for (const autre of base.days) {
     const etapes = autre.items.flatMap((item) => (item.type === "stop" ? [item.stop] : []));
-    const gardees = autre.index === index ? etapes.filter((stop) => stop.locked || stop.commitment !== undefined) : etapes;
+    const gardees = autre.index === index ? etapes.filter(gardee) : etapes;
     for (const stop of [...gardees, ...autre.events]) if (stop.placeId !== undefined) lieux.add(stop.placeId);
     if (autre.surprise?.placeId !== undefined) lieux.add(autre.surprise.placeId);
   }
