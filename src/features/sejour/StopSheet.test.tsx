@@ -50,6 +50,29 @@ describe("fiche: fonctions pures", () => {
 });
 
 describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
+  it("infos pratiques (décision 0116 § 6) : sous le pourquoi, avant les actions, en texte brut ; « À confirmer » gardé", () => {
+    const { container } = renderFiche(3, "j3-excursion-highlands", { exceptions: ["toConfirm"] });
+    const notes = screen.getByRole("region", { name: "Infos pratiques" });
+    expect(notes).toHaveTextContent("Conseil[Prends une veste imperméable : la météo change vite]");
+    expect(notes).toHaveTextContent("Prix[Environ 70 GBP par personne]");
+    expect(notes).toHaveTextContent("Horaires[Départ à 08:00, retour vers 20:00]");
+    const ordre = [...container.querySelectorAll("[data-part]")].map((node) => node.getAttribute("data-part"));
+    expect(ordre.indexOf("raison-simple")).toBeLessThan(ordre.indexOf("infos-pratiques"));
+    expect(ordre.indexOf("infos-pratiques")).toBeLessThan(ordre.indexOf("actions"));
+    expect(screen.getByText("À confirmer")).toBeInTheDocument();
+  });
+
+  it("infos pratiques : une balise s'affiche telle quelle, sans élément b (0094 § 8, contourne le schéma exprès)", () => {
+    const { container } = renderFiche(3, "j3-excursion-highlands", { facts: { tip: "<b>x</b>" } });
+    expect(container.querySelector("[data-part='infos-pratiques'] b")).toBeNull();
+    expect(screen.getByText("<b>x</b>")).toBeInTheDocument();
+  });
+
+  it("sans infos pratiques : aucune section", () => {
+    renderFiche(2, "j2-dean-village");
+    expect(screen.queryByRole("region", { name: "Infos pratiques" })).toBeNull();
+  });
+
   it("Dean Village : titre de niveau 1, moment, faits, « Pour y aller », raison en texte simple sans ReasonBlock, actions", () => {
     const { container } = renderFiche(2, "j2-dean-village");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);

@@ -8,6 +8,7 @@ import {
   refineEventKind,
   refineNoCommitment,
 } from "./refinements";
+import { LONGUEURS_CONTRAT, texteMaison } from "./texte";
 import { STOP_KINDS, TRIP_ID_PATTERN, WEEKDAYS } from "./values";
 
 /**
@@ -93,6 +94,17 @@ export const StopFactsSchema = z.strictObject({
    * (décision 0016 § 4.3).
    */
   area: z.string().min(1).max(60).optional(),
+  /*
+   * Infos pratiques (décision 0094 § 7 ; décision 0116 § 6, lot 1 bis) : texte maison facultatif, une ligne, sans
+   * balise ni URL (`texteMaison`), jamais un texte Google. Affichées en texte brut, jamais en lien ni en HTML ;
+   * absentes de la vue partagée (décision 0103) et de `candidates.facts` (`STOP_FACTS_KEYS` inchangé).
+   */
+  /** Conseil pratique (« Réserve le créneau de 9 h »). */
+  tip: texteMaison(LONGUEURS_CONTRAT.tip).optional(),
+  /** Note de prix en texte (« Environ 18 EUR, gratuit le premier dimanche ») ; le montant chiffré reste `costPerPerson`. */
+  priceNote: texteMaison(LONGUEURS_CONTRAT.priceNote).optional(),
+  /** Note d'horaires en texte (« Fermé le lundi ») ; jamais les horaires d'une fiche Google. */
+  hoursNote: texteMaison(LONGUEURS_CONTRAT.hoursNote).optional(),
 });
 export type StopFacts = z.infer<typeof StopFactsSchema>;
 
@@ -196,6 +208,11 @@ export const DaySchema = z.strictObject({
   travelBudgetMinutes: MinutesSchema,
   /** Idée « Surprends-moi » du jour, facultative (décision 0015 § 3) : ajout au handover § 9, signalé. */
   surprise: SurpriseIdeaSchema.optional(),
+  /**
+   * Titre libre du jour (« Colisée et Monti »), texte maison facultatif (décision 0116 § 6, lot 1 bis) : il s'affiche
+   * sous le titre calculé depuis la date, qu'il ne remplace pas (E1). Absent de la vue partagée (liste blanche).
+   */
+  theme: texteMaison(LONGUEURS_CONTRAT.theme).optional(),
 });
 export type Day = z.infer<typeof DaySchema>;
 

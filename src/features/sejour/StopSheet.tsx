@@ -7,6 +7,7 @@ import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { IconButton } from "@/components/ligne/IconButton";
 import { IconCroix } from "@/components/ligne/icons";
+import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
@@ -133,6 +134,8 @@ export function StopSheet({
           {stop.reason}
         </p>
       ) : null}
+
+      <PracticalNotes facts={stop.facts} />
 
       {inProgramme ? (
         <section aria-label={t.actions} data-part="actions" className="flex flex-wrap gap-3">

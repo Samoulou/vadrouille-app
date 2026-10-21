@@ -28,6 +28,7 @@ export { DestinationPlate, type DestinationPlateProps } from "./DestinationPlate
 export { IconButton, iconButtonClassName, type IconButtonProps } from "./IconButton";
 export { IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconPlus, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
+export { PracticalNotes, practicalNotesRows, type PracticalNotesProps } from "./PracticalNotes";
 export { ReasonBlock, type ReasonBlockProps } from "./ReasonBlock";
 export { Sheet, type SheetProps } from "./Sheet";
 export {

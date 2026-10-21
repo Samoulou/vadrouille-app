@@ -2,6 +2,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as copieIa from "@/ai/candidat";
+import * as texteContrat from "@/contracts/texte";
 import type { CandidatPourModele } from "@/ai/entrees";
 import * as reglagesIa from "@/ai/reglages";
 import { urlSourceValide as urlSourceValideR1 } from "@/domain/validation";
@@ -114,6 +115,11 @@ describe("p0: copies de src/prototype tenues égales", () => {
     expectTypeOf<copieIa.TypeCreneau>().toEqualTypeOf<originalCandidat.TypeCreneau>();
   });
 
+  it("LONGUEURS_CONTRAT (src/contracts/texte.ts) : conseil, prix et horaires égaux à LONGUEURS_TEXTE", () => {
+    const { conseil, prix, horaires } = copieIa.LONGUEURS_TEXTE;
+    expect(texteContrat.LONGUEURS_CONTRAT).toMatchObject({ tip: conseil, priceNote: prix, hoursNote: horaires });
+  });
+
   it("LONGUEURS_TEXTE (src/ai/candidat.ts)", () => {
     expect(copieIa.LONGUEURS_TEXTE).toEqual(originalCandidat.LONGUEURS_TEXTE);
     expectTypeOf<typeof copieIa.LONGUEURS_TEXTE>().toEqualTypeOf<typeof originalCandidat.LONGUEURS_TEXTE>();
@@ -163,6 +169,10 @@ describe("p0: copies de src/prototype tenues égales", () => {
       it(JSON.stringify(texte), () => {
         expect(copieIa.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
         expect(copieIa.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
+        // `src/contracts/texte.ts` (décision 0094 § 7, lot 1 bis de 0116) : même verdict, en attendant que les deux
+        // candidats le réexportent.
+        expect(texteContrat.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
+        expect(texteContrat.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
       });
     }
   });

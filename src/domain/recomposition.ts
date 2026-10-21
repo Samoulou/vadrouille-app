@@ -223,6 +223,8 @@ export function recomposerJour(
       travelMinutes,
       travelBudgetMinutes: jour.travelBudgetMinutes,
       ...(surprise === undefined ? {} : { surprise }),
+      // Titre libre du jour (décision 0116 § 6) : porté par l'instantané, relu tel quel.
+      ...(jour.theme === undefined ? {} : { theme: jour.theme }),
     },
   };
 }
