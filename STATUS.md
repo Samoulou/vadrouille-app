@@ -1,21 +1,19 @@
-# État du studio — 2026-10-21 (132e cycle)
+# État du studio — 2026-10-21 (133e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 131e cycle. Le report `main` → `p0-reel` (#648) attend sa fusion (« Create a merge commit ») ; `p0-reel` est toujours à `63cd2a7`.
+- Aucun message de Samuel depuis le 132e cycle. Le report `main` → `p0-reel` (#648) attend toujours sa fusion (« Create a merge commit ») ; `p0-reel` est à `63cd2a7`. Son corps est mis à jour (22:15 UTC) : `main` à `fd45254` embarque désormais aussi les infos pratiques (#651) et B10b-domaine (#656) ; une seule fusion couvre les deux lots.
 
 ## Fait
-- Fusionnées : **décision 0119** (#645, B10-TL-5 à B10-TL-8 : workflow 5 `batchRecompute`, entrée `conservees` du moteur, voyage complet filtré par les signaux, profil de forfait `lot` sans montant, interrupteur « recalcul à la fin de l'aperçu » fermé ; approuvée à la correction 2), **#652** (`texteMaison`/`contientUrl` réexportés depuis `src/contracts/texte.ts`, `.trim()` accepté par le Tech Lead), statut du 131e cycle (#649).
-- **Infos pratiques écrites par l'IA** (#651, head `8f36653`, ticket #650) : première relecture (18:40 UTC) : Sécurité approuvée (ligne de confinement inchangée, double application de la règle du contrat saine), Tech Lead un bloquant (un texte du test rangé à tort parmi les refusés) et cinq mineurs. Correction 1 lancée. Réponse du CEO : pas de compteur « infos complètes / incomplètes » au rapport avant le premier essai réel.
-- **B10b** : tickets de code ouverts à la fusion de 0119 : **#653** B10b-migration (data : colonnes `base_version` et `deck_closure_id`, index uniques, purge, migration 0015) et **#654** B10b-domaine (backend : entrée `conservees`, `src/domain/recalcul.ts`), lancés ensemble (aucun fichier commun). B10b-serveur suivra leur fusion et le verdict Sécurité (Q575).
-- Le corps de #648 est mis à jour : `main` a avancé à `dd0a52b` (#652, 0119, #649 embarqués ; toujours aucune migration).
+- Fusionnées : **infos pratiques écrites par l'IA** (#651, ticket #650 ; correction 1 approuvée : conseil, prix, horaires et titre du jour remplis depuis le programme de l'IA, via `texteMaison` ; prix des fixtures indicatifs), **B10b-domaine** (#656, ticket #654 ; approuvée à la première relecture : entrée `conservees` de `replanifierJour`, `src/domain/recalcul.ts`, 17 tests ; aucun contrat ni serveur touché), note de version v2026.10.21-21 (#658, routine Release), statut du 132e cycle (#655).
+- **B10b-migration** (#657, ticket #653, head `e80346c`) : approuvée à la première relecture par le Tech Lead et la Sécurité (migration 0015 : `base_version`, `deck_closure_id`, `CHECK`, clé étrangère composée, deux index uniques partiels, purge réordonnée, `SELECT (kind)` à la purge ; migration inverse partielle ; trois tests adaptés, aucun désactivé) mais **CI rouge** : le test de confinement prend le nom de contrainte `deck_closures_organization_id_id_key` pour un nom de secret. Correction de CI en cours (renommage sans suffixe `_key`, mineurs 1 à 3 de la relecture traités dans le même push). L'application de 0015 à la base d'essai passera par une PR `MIGRATIONS_APPROUVEES` séparée (`owner-approved` de Samuel), après vérification qu'aucune ligne `kind = 'batch'` n'existe sur la base d'essai (mineur 5).
+- **Décision 0120** (ticket #659, Sécurité) lancée : verdict Sécurité sur le workflow 5 (0119 § 1.9, Q575), restriction de l'`UPDATE` sur les nouvelles colonnes (Q583), confinement de B10b-serveur. Elle bloque la fusion de B10b-serveur, pas son démarrage.
 
 ## En cours
-- ia-recherche : #651 correction 1.
-- data : #653 B10b-migration. backend : #654 B10b-domaine.
+- data : correction de CI de #657. Sécurité : décision 0120 (#659).
 - Samuel : fusion de #648 puis essai de Rome sur la page d'essai ; le studio ne lance aucun essai.
-- Après la fusion de #651 : second report `main` → `p0-reel` (conseils, prix, horaires, titre du jour remplis par l'IA).
+- Prochaine tâche de code : **B10b-serveur** (backend) dès la fusion de #657 ; sa fusion attend 0120 (Q575) et la réponse à Q582 (nombre réel d'options d'un créneau).
 - Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI.
 
 ## Bloqué
@@ -26,9 +24,10 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport) ; #651 jusqu'à la fusion puis second report.
-2. #653 et #654 jusqu'à la fusion ; puis ticket B10b-serveur (après verdict Sécurité Q575).
-3. Samuel : fusionner #648 et relancer Rome ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
+1. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport).
+2. #657 jusqu'à la fusion (relecture relancée après la correction de CI) ; puis ticket et fil **B10b-serveur** (backend ; jamais dans le même cycle qu'une PR touchant `src/workflows/index.ts`, `src/server/composition/generation.ts`, les listes de confinement, `imports.test.ts`, `etapes-complet.ts`, `usage.ts`) et PR `[data]` d'approbation de 0015 (`MIGRATIONS_APPROUVEES`, `owner-approved` de Samuel).
+3. 0120 (#659) jusqu'à la fusion ; ticket « créneau imposé pour un candidat » (condition 3 de la relecture de #656).
+4. Samuel : fusionner #648 et relancer Rome ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -50,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q577, Q578 (#651, #652). Q576 (c) : 0119 ne met pas en œuvre la reprise d'un recalcul échoué en B10b.
+- Q579 à Q582 (#656, Tech Lead ; Q579 à Q581 répondues à la relecture), Q583 (#657, Sécurité et Tech Lead, portée par 0120), Q584 (#656 mineur 5, Tech Lead et Product Owner). Q575 : en cours d'écriture (0120, #659).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
