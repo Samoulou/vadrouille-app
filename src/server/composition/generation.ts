@@ -138,7 +138,14 @@ export interface CapaciteLogement {
 }
 
 export interface CapaciteRecherche {
-  rechercher(brief: Brief, ville: VilleApercu, dejaTrouves: readonly string[], fuseau: string): Promise<ResultatCapacite<{ readonly lignes: readonly LignesRecherche[]; readonly bilan: BilanRecherche }>>;
+  /** `profil` : bornes de la recherche (B7-PO-5) ; `apercu` par défaut, `complet` pour le voyage complet (B9d). */
+  rechercher(
+    brief: Brief,
+    ville: VilleApercu,
+    dejaTrouves: readonly string[],
+    fuseau: string,
+    profil?: "apercu" | "complet",
+  ): Promise<ResultatCapacite<{ readonly lignes: readonly LignesRecherche[]; readonly bilan: BilanRecherche }>>;
 }
 
 export interface CapaciteAncrage {
@@ -358,8 +365,8 @@ function capaciteRecherche(modeles: ClientModeles, rechercheWeb: ClientRecherche
   const ia = creerCoucheIa({ modeles, reglages: CONFIGURATION_IA.reglages, ...(traces === undefined ? {} : { traces }) });
   const recherche = creerRecherche({ ia, modeles, rechercheWeb, lecteur, configuration: configurationRecherche(), horloge: () => horloge.maintenant() });
   return {
-    async rechercher(brief, ville, dejaTrouves, fuseau) {
-      const issue = await recherche.rechercher({ entree: entreeModelesDeVille(brief, ville), ...(dejaTrouves.length === 0 ? {} : { dejaTrouves: [...dejaTrouves] }) }, "apercu");
+    async rechercher(brief, ville, dejaTrouves, fuseau, profil = "apercu") {
+      const issue = await recherche.rechercher({ entree: entreeModelesDeVille(brief, ville), ...(dejaTrouves.length === 0 ? {} : { dejaTrouves: [...dejaTrouves] }) }, profil);
       if (!issue.ok) return echecDeCode(issue.code, issue.retryable);
       const { candidats, bilan } = issue.valeur;
       return {

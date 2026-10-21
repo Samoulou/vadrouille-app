@@ -214,6 +214,9 @@ async function sequence(executeur: ExecuteurUsage, ecriture: Ecriture, regles: R
       const lues = existantes.map((l) => empreinte(l.provider, l.sku, l.units, l.cost_estimate_micros)).sort();
       const attendues = lignes.map((l) => empreinte(l.provider, l.sku, l.units, l.costEstimateMicros)).sort();
       if (lues.length === attendues.length && lues.every((v, i) => v === attendues[i])) return;
+      // Forfait déjà réservé, différent (configuration changée en cours d'exécution) : erreur rendue `usage_unavailable` par
+      // `reserver` (échec fermé), épinglée par « reprise : même generationRunId… » de `reservation.test.ts`. La variante
+      // simulée ne réserve pas dans `usage_ledger` (0110 § 3) : un changement de variante en cours ne passe plus par ici.
       throw new Error("usage: forfait déjà réservé, différent");
     }
   }

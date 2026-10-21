@@ -38,6 +38,10 @@ export const ApiErrorSchema = z
     if (conflict && error.retryable !== true) {
       ctx.addIssue({ code: "custom", message: "version_conflict : retryable vaut true", path: ["retryable"] });
     }
+    // B10a (décision 0112 § 1.6, B10-PO-14) : la personne réessaie une fois le recalcul fini.
+    if (error.code === "generation_in_progress" && error.retryable !== true) {
+      ctx.addIssue({ code: "custom", message: "generation_in_progress : retryable vaut true", path: ["retryable"] });
+    }
     if ((error.code === "active_preview_exists") !== (error.activeTripId !== undefined)) {
       ctx.addIssue({
         code: "custom",

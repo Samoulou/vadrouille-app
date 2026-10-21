@@ -4,9 +4,10 @@ import { PARTS_FORFAIT, RANG_ETAPE, type EtapeApercu } from "@/server/config/gen
 import type { Forfait } from "@/server/usage/forfait";
 import type { Plafond } from "@/server/usage/port";
 import { creerRegistreForfait, type RegistreForfait } from "@/server/usage/registre";
-import { plafondsDuForfait, reserverForfait } from "@/server/usage/reservation";
+import { forfaitDuProfil, plafondsDuForfait, reserverForfait } from "@/server/usage/reservation";
 import { executeurSql } from "@/server/with-org";
 
+import type { EtatBarriere } from "./barriere";
 import { ArretEtape } from "./codes";
 import type { DependancesResolues } from "./dependances";
 
@@ -18,6 +19,9 @@ import type { DependancesResolues } from "./dependances";
  *   jour, ou plafonds absents : `usage_unavailable`), l'étape s'arrête sur le code de refus, avant toute composition.
  * - **Part de l'étape** (`PARTS_FORFAIT`) : un forfait partiel et un registre **en mémoire** par étape, qui borne ses appels.
  *   Le dernier consommateur de chaque ressource reçoit le reste de l'arrondi, si bien que les parts somment au forfait.
+ * - **Variante simulée** (décision 0110 § 3) : forfait du profil calculé en mémoire, **sans réservation** ni ligne dans
+ *   `usage_ledger` (aucun fournisseur n'est appelé, et ces lignes s'ajouteraient aux cumuls lus par la variante réelle),
+ *   sauf `reserverEnSimulee` (bancs de la base). Le registre en mémoire borne les doubles de la même façon.
  */
 
 export type ForfaitDeLEtape = {
@@ -50,20 +54,85 @@ export function forfaitPartiel(forfait: Forfait, etape: EtapeApercu): Forfait {
   };
 }
 
+/**
+ * Forfait d'un passage du voyage complet (spécification B9d ; profil `complet`, B7-PO-5) : réservé sous l'identifiant du passage
+ * (`identifiantForfait`, une réservation par passage, idempotente au rejeu). Répartition de la part de chaque étape (décision
+ * du Tech Lead, revue consolidée de la PR 600 du 2026-10-20) :
+ * - `a` et `l` : leur part entière (`forfaitPartiel`), inchangée ;
+ * - `b`, `c` et `d` : leur part **répartie sur les villes que le passage introduit** (`part` : villes introduites par les jours
+ *   de rang inférieur, par ce jour, et par tout le passage). Le jour qui introduit une ville reçoit la part de cette ville ; un
+ *   jour qui n'en introduit aucune n'a rien à dépenser ;
+ * - `e` : sa part **répartie par jour** du passage (un jour par étape `e`).
+ * Le découpage est cumulatif (`partCumulee`) : la somme des parts des jours vaut exactement la part de l'étape.
+ */
+export type PartDuPassage = {
+  /** Unités (villes introduites, ou jours pour `e`) des jours de rang inférieur. */
+  readonly avant: number;
+  /** Unités de ce jour. */
+  readonly ici: number;
+  /** Unités de tout le passage. */
+  readonly total: number;
+};
+
+export type ForfaitDuPassage = { readonly profil: "complet"; readonly identifiant: string; readonly part?: PartDuPassage };
+
+/** Part entière de `valeur` pour les unités `[avant, avant + ici)` parmi `total` : différence des arrondis cumulés. */
+export function partCumulee(valeur: number, part: PartDuPassage): number {
+  const total = Math.max(0, Math.floor(part.total));
+  if (total === 0) return 0;
+  const avant = Math.min(total, Math.max(0, Math.floor(part.avant)));
+  const jusqua = Math.min(total, avant + Math.max(0, Math.floor(part.ici)));
+  return Math.floor((valeur * jusqua) / total) - Math.floor((valeur * avant) / total);
+}
+
+/** Part d'un jour du voyage complet : chaque ressource de la part de l'étape découpée par `partCumulee`. */
+export function partDuJour(forfait: Forfait, part: PartDuPassage): Forfait {
+  const decouper = (valeur: number) => partCumulee(valeur, part);
+  return {
+    ...forfait,
+    textSearchRequetes: decouper(forfait.textSearchRequetes),
+    placeDetailsRequetes: decouper(forfait.placeDetailsRequetes),
+    routesRequetes: decouper(forfait.routesRequetes),
+    routesElements: decouper(forfait.routesElements),
+    coutModelesMicros: forfait.coutModelesMicros === null ? null : decouper(forfait.coutModelesMicros),
+  };
+}
+
+const ETAPES_DU_JOUR: ReadonlySet<EtapeApercu> = new Set(["b", "c", "d", "e"]);
+
 export async function forfaitDeLEtape(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string },
+  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
   etape: EtapeApercu,
+  passage?: ForfaitDuPassage,
 ): Promise<ForfaitDeLEtape> {
-  if (dependances.regles === null) throw new ArretEtape("usage_unavailable");
-  const regles = dependances.regles;
+  const profil = passage?.profil ?? "apercu";
+  const cle = passage?.identifiant ?? contexte.generationRunId;
+  const part = passage?.part;
+  const ajuster = (entier: Forfait): Forfait => (part !== undefined && ETAPES_DU_JOUR.has(etape) ? partDuJour(entier, part) : entier);
+  // Règles de la variante que la barrière vient de choisir (B9e point 2) : jamais les valeurs de test pour un appel réel.
+  const regles = dependances.reglesPour(contexte.barriere);
+  if (regles === null) throw new ArretEtape("usage_unavailable");
+  if (contexte.barriere === "simulee" && !dependances.reserverEnSimulee) {
+    let entier: Forfait;
+    try {
+      entier = forfaitDuProfil(regles.plafonds, regles.table, profil);
+    } catch {
+      throw new ArretEtape("usage_unavailable");
+    }
+    return forfaitEnMemoire(entier, etape, contexte.generationRunId, dependances, ajuster);
+  }
   const reserve = await reserverForfait(
     (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
-    { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, profil: "apercu" },
+    { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: cle, profil },
     regles,
   );
   if (!reserve.ok) throw new ArretEtape(reserve.code);
-  const forfait = forfaitPartiel(reserve.forfait, etape);
-  const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
+  return forfaitEnMemoire(reserve.forfait, etape, contexte.generationRunId, dependances, ajuster);
+}
+
+function forfaitEnMemoire(entier: Forfait, etape: EtapeApercu, generationRunId: string, dependances: DependancesResolues, ajuster: (forfait: Forfait) => Forfait = (f) => f): ForfaitDeLEtape {
+  const forfait = ajuster(forfaitPartiel(entier, etape));
+  const registre = creerRegistreForfait(forfait, generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

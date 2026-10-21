@@ -34,8 +34,16 @@ beforeAll(async () => {
 
 afterAll(closeAll);
 
-/** Mise à jour sans changement de valeur : seule la colonne que `vadrouille_app` peut modifier sur `checkouts`. */
-const neutralSet = (table: string) => (table === "checkouts" ? "stripe_checkout_session_id = stripe_checkout_session_id" : "organization_id = organization_id");
+/**
+ * Mise à jour sans changement de valeur, sur une colonne que `vadrouille_app` peut modifier quand son `UPDATE` est
+ * limité à des colonnes : `checkouts`, `preference_signals` et `preference_prompts` (migration 0014_tri_enregistre).
+ */
+const NEUTRAL_SET = new Map<string, string>([
+  ["checkouts", "stripe_checkout_session_id = stripe_checkout_session_id"],
+  ["preference_signals", "status = status"],
+  ["preference_prompts", "state = state"],
+]);
+const neutralSet = (table: string) => NEUTRAL_SET.get(table) ?? "organization_id = organization_id";
 
 describe("isolation: une organisation ne lit ni ne modifie les voyages d'une autre", () => {
   const ctxA = () => ({ org: a.org, user: a.owner });

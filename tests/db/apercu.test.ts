@@ -56,6 +56,8 @@ function dependances(surcharge: Partial<DependancesGeneration> = {}, fabrique?: 
     horloge: creerHorlogeManuelle(MAINTENANT),
     plafonds: PLAFONDS_LARGES,
     barriere: { env: { VADROUILLE_ENV: "ci" } },
+    // Bancs de la séquence de réservation : la variante simulée réserve aussi dans `usage_ledger` (décision 0110 § 3).
+    reserverEnSimulee: true,
     ...(fabrique === undefined ? {} : { composition: fabrique }),
     ...surcharge,
   };
@@ -399,6 +401,21 @@ describe("aperçu : cases, publication et forfait", () => {
     expect(["cap_reached", "envelope_reached"]).toContain(fin.arret);
     expect(compositions).toBe(0);
     expect((await dernierRun(org, tripId)).phase).toBe("failed");
+  });
+
+  it("variante simulée par défaut : forfait en mémoire, aucune ligne dans usage_ledger, sommes lues par la variante réelle inchangées (0110 § 3)", async () => {
+    const org = await nouvelleOrg();
+    const { tripId, etat } = await lancer(org);
+    const lire = () =>
+      inTx(app, { org: org.org, user: org.owner }, async (c) => ({
+        sommes: (await c.query("SELECT * FROM public.usage_forfait_totals()")).rows[0],
+        lignes: (await c.query("SELECT count(*)::int AS n FROM public.usage_ledger")).rows[0].n as number,
+      }));
+    const avant = await lire();
+    const fin = await derouler(etat, dependances({ reserverEnSimulee: false }));
+    expect(fin.arret).toBeUndefined();
+    expect(await nombre(org, "proposals", tripId)).toBe(8);
+    expect(await lire()).toEqual(avant);
   });
 
   it("plafonds absents (production) : usage_unavailable, aucune composition", async () => {

@@ -7,7 +7,9 @@ import { CategorySchema, InferredBriefSchema, IsoDateSchema, MAX_SUGGESTED_LODGI
  * Schémas stricts des sorties de modèles (spécification P0, « Sorties des modèles : schémas stricts »).
  * Chaque élément est validé à part : un élément refusé est écarté et compté (`model_output_invalid` par étape),
  * sans son contenu. Une réponse qui n'est pas un objet JSON est refusée en entier (comptée une fois, `illisible`).
- * Les identifiants acceptés sont seulement ceux de la requête.
+ * Les identifiants acceptés sont seulement ceux de la requête. Exception (ticket 595, décision 0111) : un champ facultatif
+ * d'enrichissement invalide d'un candidat extrait (`CHAMPS_ENRICHIS_TOLERANTS`) est retiré seul, une clé inconnue
+ * ignorée et un texte trop long coupé (`texteCoupe`, décision de Samuel du 2026-10-20) : le lieu est gardé.
  *
  * Habillage toléré (ticket 400) : un modèle rend souvent son objet JSON dans un bloc de code Markdown (```json … ```),
  * précédé d'une phrase ou d'un raisonnement (`<think>…</think>`). L'objet est alors cherché dans cet habillage
@@ -18,6 +20,16 @@ import { CategorySchema, InferredBriefSchema, IsoDateSchema, MAX_SUGGESTED_LODGI
 export type Lecture<T> = {
   valeur: T;
   refuses: number;
+  /**
+   * Champs facultatifs retirés d'éléments gardés (ticket 595, `lireTour` seulement) : un champ d'enrichissement invalide
+   * est retiré, l'élément reste. Un nombre, jamais le champ ni son texte.
+   */
+  champsRetires?: number;
+  /**
+   * Textes trop longs coupés à leur longueur maximale dans des éléments gardés (décision de Samuel du 2026-10-20,
+   * décision 0111, `lireTour` seulement). Un nombre, jamais le texte.
+   */
+  textesCoupes?: number;
   /** Vrai si la réponse entière a été refusée (aucun objet JSON de la forme attendue). */
   illisible?: boolean;
 };
@@ -93,15 +105,20 @@ function objetJson(texte: string): Record<string, unknown> | undefined {
   return undefined;
 }
 
-/** Valide chaque élément d'un tableau, borne sa longueur, compte les refus. */
-function elements<T>(brut: unknown, schema: z.ZodType<T>, max: number): Lecture<T[]> {
+/**
+ * Valide chaque élément d'un tableau, borne sa longueur, compte les refus. `garde` (facultatif) est appelé pour chaque
+ * élément gardé, avec l'élément brut et sa forme validée (ticket 595 : compte des champs retirés et des textes coupés).
+ */
+function elements<T>(brut: unknown, schema: z.ZodType<T>, max: number, garde?: (element: unknown, lu: T) => void): Lecture<T[]> {
   if (!Array.isArray(brut)) return { valeur: [], refuses: 1 };
   let refuses = Math.max(0, brut.length - max);
   const valeur: T[] = [];
   for (const element of brut.slice(0, max)) {
     const resultat = schema.safeParse(element);
-    if (resultat.success) valeur.push(resultat.data);
-    else refuses += 1;
+    if (resultat.success) {
+      valeur.push(resultat.data);
+      garde?.(element, resultat.data);
+    } else refuses += 1;
   }
   return { valeur, refuses };
 }
@@ -315,29 +332,130 @@ export type Action = z.infer<typeof ActionSchema>;
 /** Longueurs des infos pratiques d'un lieu (P0S2-PO-21), dérivées de `LONGUEURS_TEXTE` (décision 0094 § 1 point 2). */
 export const LONGUEURS_INFOS = { prix: LONGUEURS_TEXTE.prix, horaires: LONGUEURS_TEXTE.horaires, conseil: LONGUEURS_TEXTE.conseil } as const;
 
-/** Candidat tel que l'extrait le modèle ; l'identifiant et la classe de source sont posés par le code. */
-export const CandidatExtraitSchema = z.strictObject({
-  nom: texteMaison(LONGUEURS_TEXTE.nom),
-  resume: texteMaison(LONGUEURS_TEXTE.resume),
+/**
+ * Champs facultatifs d'enrichissement d'un candidat extrait (ticket 595, amendement Tech Lead 0111) : une valeur invalide
+ * (caractère interdit, balise, URL ou domaine, texte vide, nombre hors bornes, forme inattendue) est **retirée**, le lieu
+ * est gardé ; jamais corrigée ni recopiée (un texte seulement trop long est coupé, `texteCoupe`). Les champs
+ * obligatoires et `evenement` invalides font toujours écarter le lieu.
+ */
+export const CHAMPS_ENRICHIS_TOLERANTS = ["secteur", "incontournable", "prix", "horaires", "conseil", "prixParPersonne", "dureeMinutes", "slotFit"] as const;
+
+/**
+ * Textes libres d'un candidat extrait et leur longueur maximale : trop longs, ils sont coupés (`texteCoupe`), jamais
+ * refusés pour leur longueur.
+ */
+const TEXTES_CANDIDAT = {
+  nom: LONGUEURS_TEXTE.nom,
+  resume: LONGUEURS_TEXTE.resume,
+  secteur: LONGUEURS_PLAN.secteur,
+  incontournable: LONGUEURS_PLAN.incontournable,
+  prix: LONGUEURS_INFOS.prix,
+  horaires: LONGUEURS_INFOS.horaires,
+  conseil: LONGUEURS_INFOS.conseil,
+} as const;
+
+/**
+ * Compte d'un candidat gardé : `retires`, champs tolérants présents dans l'élément brut (valeur autre que `undefined`)
+ * mais retirés par le schéma, plus les clés inconnues ignorées (leur nombre n'est borné que par `LONGUEUR_REPONSE_MAX` :
+ * un compteur, sans autre effet) ; `coupes`, textes gardés dont la valeur brute dépassait leur longueur maximale (une
+ * valeur assez courte dont seules les espaces de fin tombent n'est pas comptée). Ne compare que des présences et des
+ * longueurs, jamais un texte.
+ */
+function compteCandidat(brut: unknown, lu: CandidatExtrait): { retires: number; coupes: number } {
+  if (typeof brut !== "object" || brut === null) return { retires: 0, coupes: 0 };
+  const present = new Map(Object.entries(brut));
+  const garde = new Map(Object.entries(lu));
+  const connues = new Set(Object.keys(CandidatExtraitSchema.shape));
+  const inconnues = [...present.keys()].filter((cle) => !connues.has(cle)).length;
+  const retires = inconnues + CHAMPS_ENRICHIS_TOLERANTS.filter((champ) => present.get(champ) !== undefined && garde.get(champ) === undefined).length;
+  const coupes = Object.entries(TEXTES_CANDIDAT).filter(([champ, max]) => {
+    const avant = present.get(champ);
+    return typeof avant === "string" && avant.length > max && typeof garde.get(champ) === "string";
+  }).length;
+  return { retires, coupes };
+}
+
+const DECOUPAGE = new Intl.Segmenter("fr", { granularity: "grapheme" });
+const ESPACE = /\s/u;
+
+/**
+ * Coupe un texte à `max` unités (la longueur de `String.length`, celle que `texteMaison` borne), sans couper un
+ * caractère (graphème : paire de substitution, lettre et ses marques), de préférence sur une fin de mot : la dernière
+ * espace de la coupe si elle laisse au moins la moitié de `max`. Espaces de fin retirées. Texte assez court : rendu tel
+ * quel. Décision de Samuel du 2026-10-20 (décision 0111). Fonction pure.
+ */
+export function couperTexte(texte: string, max: number): string {
+  if (texte.length <= max) return texte;
+  let coupe = "";
+  for (const { segment } of DECOUPAGE.segment(texte)) {
+    if (coupe.length + segment.length > max) break;
+    coupe += segment;
+  }
+  const suivant = texte.charAt(coupe.length);
+  if (!ESPACE.test(suivant)) {
+    let fin = coupe.length - 1;
+    while (fin >= 0 && !ESPACE.test(coupe.charAt(fin))) fin -= 1;
+    if (fin >= max / 2) coupe = coupe.slice(0, fin);
+  }
+  return coupe.trimEnd();
+}
+
+/** Mêmes règles que `texteMaison` (caractères interdits, balises, URL), sans borne de longueur. */
+const TEXTE_SANS_BORNE = texteMaison(Number.MAX_SAFE_INTEGER);
+
+/**
+ * Texte maison d'un candidat extrait (décision de Samuel du 2026-10-20, décision 0111) : trop long, il est **coupé** à
+ * `max` (`couperTexte`) au lieu d'être refusé. Caractères interdits, balises et URL restent refusés, vérifiés sur le
+ * texte **entier** avant la coupe (une coupe ne peut pas faire passer un domaine tronqué, « exemple.c »), puis de
+ * nouveau sur le texte coupé (`texteMaison(max)`). Les motifs d'URL sont linéaires (`contientUrl`) : le contrôle du
+ * texte entier, borné seulement par `LONGUEUR_REPONSE_MAX`, ne bloque pas la boucle d'événements. Échec fermé : une coupe
+ * qui fait apparaître un domaine (« foo.commerce » coupé en « foo.com ») ou qui ne laisse rien (graphème plus long que
+ * `max`) est refusée par le second contrôle ; pour `nom` et `resume`, le lieu est alors écarté (décision 0111 § 3).
+ */
+export function texteCoupe(max: number) {
+  return z
+    .string()
+    .refine((valeur) => TEXTE_SANS_BORNE.safeParse(valeur).success, "texte refusé avant la coupe")
+    .transform((valeur) => couperTexte(valeur, max))
+    .pipe(texteMaison(max));
+}
+
+/**
+ * Candidat tel que l'extrait le modèle ; l'identifiant et la classe de source sont posés par le code. Champs
+ * `CHAMPS_ENRICHIS_TOLERANTS` : invalides, retirés (`.catch(undefined)`), le lieu gardé (ticket 595). Textes trop
+ * longs, nom et résumé compris : coupés (`texteCoupe`), jamais refusés pour leur longueur (décision 0111). Clés inconnues
+ * (un `placeId` proposé par le modèle, par exemple) : **ignorées**, jamais recopiées (objet `z.object`, qui les retire de
+ * la sortie), et comptées dans `champsRetires`. `evenement` reste un objet strict.
+ */
+export const CandidatExtraitSchema = z.object({
+  nom: texteCoupe(LONGUEURS_TEXTE.nom),
+  resume: texteCoupe(LONGUEURS_TEXTE.resume),
   categorie: CategorySchema,
   typeEtape: z.enum(STOP_KINDS),
   sourceUrl: z.string().min(1).max(2048),
   sourceDate: IsoDateSchema,
   evenement: z.strictObject({ date: IsoDateSchema, heure: TimeSchema.optional() }).optional(),
   aReserver: z.boolean(),
-  prixParPersonne: z.number().finite().nonnegative().max(1000).optional(),
-  dureeMinutes: z.number().int().min(15).max(600).optional(),
-  /** Secteur du plan où se trouve le lieu (P0S2-PO-20) ; `null` admis pour un événement seulement (contrôlé par l'agent). */
-  secteur: texteMaison(LONGUEURS_PLAN.secteur).nullable().optional(),
-  /** Nom de l'incontournable du plan que ce lieu est, du même secteur ; sinon `null` (P0S2-PO-20). */
-  incontournable: texteMaison(LONGUEURS_PLAN.incontournable).nullable().optional(),
-  /** Infos pratiques tirées de la page source, réécrites en texte maison (P0S2-PO-21) ; absentes si la source ne les donne pas. */
-  prix: texteMaison(LONGUEURS_INFOS.prix).optional(),
-  horaires: texteMaison(LONGUEURS_INFOS.horaires).optional(),
-  conseil: texteMaison(LONGUEURS_INFOS.conseil).optional(),
+  prixParPersonne: z.number().finite().nonnegative().max(1000).optional().catch(undefined),
+  dureeMinutes: z.number().int().min(15).max(600).optional().catch(undefined),
+  /**
+   * Secteur du plan où se trouve le lieu (P0S2-PO-20) ; `null` admis pour un événement seulement (contrôlé par l'agent).
+   * Invalide : retiré, et l'agent écarte alors un lieu (`secteur_inconnu`) comme un secteur absent.
+   */
+  secteur: texteCoupe(LONGUEURS_PLAN.secteur).nullable().optional().catch(undefined),
+  /** Nom de l'incontournable du plan que ce lieu est, du même secteur ; sinon `null` (P0S2-PO-20). Invalide : retiré. */
+  incontournable: texteCoupe(LONGUEURS_PLAN.incontournable).nullable().optional().catch(undefined),
+  /**
+   * Infos pratiques tirées de la page source, réécrites en texte maison (P0S2-PO-21) ; absentes si la source ne les donne
+   * pas. Trop longues : coupées ; caractère interdit, balise, URL : retirées, jamais recopiées (ticket 595, décision 0111).
+   */
+  prix: texteCoupe(LONGUEURS_INFOS.prix).optional().catch(undefined),
+  horaires: texteCoupe(LONGUEURS_INFOS.horaires).optional().catch(undefined),
+  conseil: texteCoupe(LONGUEURS_INFOS.conseil).optional().catch(undefined),
   /**
    * Créneaux auxquels le lieu convient selon le modèle de recherche (ticket 483, forme du `slotFit` de la notation) : sert
-   * seulement à compter les cibles de l'agent (`creneauCompte`), jamais gardé dans le candidat ; la notation reste seule
+   * seulement à compter les cibles de l'agent (`creneauCompte`) : rendu par ce schéma, il n'est jamais recopié dans le
+   * candidat de recherche (`CandidatRecherche`) ; la notation reste seule
    * juge des créneaux à la planification. Indication facultative : mal formée, elle est ignorée, le lieu n'est pas écarté.
    */
   slotFit: NotesSchema.shape.slotFit.optional().catch(undefined),
@@ -356,10 +474,19 @@ export function lireTour(texte: string): Lecture<TourRecherche> {
     return { valeur: { actions: [], candidats: [], termine: false }, refuses: 1, illisible: true };
   }
   const actions = objet.actions === undefined ? { valeur: [], refuses: 0 } : elements(objet.actions, ActionSchema, 10);
-  const candidats = objet.candidats === undefined ? { valeur: [], refuses: 0 } : elements(objet.candidats, CandidatExtraitSchema, 30);
+  let champsRetires = 0;
+  let textesCoupes = 0;
+  const compter = (brut: unknown, lu: CandidatExtrait) => {
+    const { retires, coupes } = compteCandidat(brut, lu);
+    champsRetires += retires;
+    textesCoupes += coupes;
+  };
+  const candidats = objet.candidats === undefined ? { valeur: [], refuses: 0 } : elements(objet.candidats, CandidatExtraitSchema, 30, compter);
   return {
     valeur: { actions: actions.valeur, candidats: candidats.valeur, termine: objet.termine },
     refuses: actions.refuses + candidats.refuses,
+    champsRetires,
+    textesCoupes,
   };
 }
 

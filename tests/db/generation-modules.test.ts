@@ -97,7 +97,7 @@ describe("versions: src/server/versions/ecrire.ts", () => {
     const run = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT id FROM public.generation_runs WHERE trip_id = $1", [tripId])).rows[0].id as string);
     await derouler(
       { generationRunId: run, organizationId: org.org, rang: 0 },
-      { transaction: creerWithSystemOrgPourTests(db), horloge: creerHorlogeManuelle(MAINTENANT), plafonds: PLAFONDS_LARGES, barriere: { env: { VADROUILLE_ENV: "ci" } }, composition: () => composerSimuleeAvec({ doubles: doublesEdimbourg }) },
+      { transaction: creerWithSystemOrgPourTests(db), horloge: creerHorlogeManuelle(MAINTENANT), plafonds: PLAFONDS_LARGES, barriere: { env: { VADROUILLE_ENV: "ci" } }, reserverEnSimulee: true, composition: () => composerSimuleeAvec({ doubles: doublesEdimbourg }) },
     );
     const snapshot = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT snapshot FROM public.trip_versions WHERE trip_id = $1", [tripId])).rows[0].snapshot as unknown);
     return snapshot;

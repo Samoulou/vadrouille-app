@@ -110,3 +110,22 @@ export const ECRITURE_POSITIONS_AUTORISEE = false;
  * composition reste simulée. B9e la lie à sa réponse.
  */
 export const ECRITURE_PROGRAMMES_REELS_AUTORISEE = false;
+
+/**
+ * Reprises d'un voyage complet par la personne (B9-PO-17 point 3 ; décision 0087 § 1.2) : l'échec initial, puis **3**
+ * reprises au plus. Valeur de configuration passée en paramètre à l'écriture conditionnelle de reprise, jamais une constante
+ * de la base.
+ */
+export const MAX_REPRISES_PERSONNE = 3;
+
+/**
+ * Étouffement de la réconciliation du voyage complet (0081 B9-TL-12 point 3) : depuis une lecture d'état, une ligne `full`
+ * restée `queued` sans `workflow_run_id` n'est réclamée et redémarrée que si elle n'a pas été touchée depuis 60 secondes.
+ */
+export const ETOUFFEMENT_RECONCILIATION_MS = 60_000;
+
+/**
+ * Borne du rang `step_seq` d'une exécution `full` (0087 § 1.3 point 4 : `2 + 4 × i + k`) : jours planifiés par une exécution
+ * au plus. Garde de l'état sérialisé seulement (aucun voyage du MVP n'en approche : 5 à 10 jours, cadrage).
+ */
+export const JOURS_VOYAGE_COMPLET_MAX = 60;

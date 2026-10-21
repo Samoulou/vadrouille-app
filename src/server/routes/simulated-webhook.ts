@@ -7,6 +7,7 @@ import type { DependancesPaiement } from "@/server/payment/dependances";
 import { analyserEvenement } from "@/server/payment/evenement";
 import { formeSimulee } from "@/server/payment/formes";
 import { ENTETE_SIGNATURE, verifier } from "@/server/payment/signature";
+import { creerSuiteVoyageComplet } from "@/server/payment/suite-voyage-complet";
 import { handlePaymentEvent } from "@/server/payment/webhook";
 import { withOrg } from "@/server/with-org";
 
@@ -93,7 +94,8 @@ export type OptionsWebhookSimule = {
 
 /** Dépendances par défaut : client de `vadrouille_app` (lève si sa variable manque), `withOrg`, horloge système. */
 function dependancesParDefaut(): DependancesPaiement {
-  return { database: createDatabase("vadrouille_app"), withOrg, maintenant: () => Date.now() };
+  // Suite de B9d : le voyage complet est créé et démarré par la réconciliation, dans le contexte système de l'organisation.
+  return { database: createDatabase("vadrouille_app"), withOrg, maintenant: () => Date.now(), suite: creerSuiteVoyageComplet() };
 }
 
 export function creerWebhookSimule(options: OptionsWebhookSimule = {}): (request: Request) => Promise<Response> {

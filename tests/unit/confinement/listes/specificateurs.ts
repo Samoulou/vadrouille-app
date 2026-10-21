@@ -148,6 +148,10 @@ const COMPOSITION_P0R3C =
 const COMPOSITION_B8B =
   "composition de la lecture des voyages (B8b, décision 0100 § 5) : câblage seul de la source de relectures, de la fabrique commune des " +
   "clients Google, de `withOrg` et du forfait de relecture ; verdict Sécurité : attendu (0100 § 7 points 4 et 5)";
+const COMPOSITION_B9E =
+  "composition de la lecture des voyages, complétée par B9e (spécification B9, B9e point 3 ; décisions 0081 B9-TL-2, 0100 § 5.3 amendée par 0110 § 1, et 0105 § 2) : source simulée des voyages générés, " +
+  "doubles des fixtures d'Édimbourg enveloppés dans le registre du forfait, en mémoire (0110 § 3), forfait sur les valeurs de test de la variante simulée, " +
+  "`local` et `ci` seulement ; verdict Sécurité : approuvé (revue consolidée de la PR 588)";
 const COMPOSITION_B9C =
   "composition de la génération (B9c, décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8) : câblage seul des capacités à types neutres, du forfait, " +
   "des fixtures d'Édimbourg de la variante simulée et des modules de capacité de la variante réelle ; verdict Sécurité : attendu";
@@ -406,8 +410,8 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif: COMPOSITION_B8B,
   },
   { fichier: "src/server/composition/lecture.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B8B },
-  { fichier: "src/server/composition/lecture.ts", specificateur: "@/domain/relectures", noms: ["type:SourceRelectures"], motif: COMPOSITION_B8B },
-  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/config/usage", noms: ["type:PlafondsUsage"], motif: COMPOSITION_B8B },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/domain/relectures", noms: ["type:DemandeRelectures", "type:SourceRelectures", "type:VoyageARelire"], motif: COMPOSITION_B9E },
+  { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_VARIANTE_SIMULEE", "type:PlafondsUsage"], motif: COMPOSITION_B9E },
   { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/regles", noms: ["reglesDeLecture"], motif: COMPOSITION_B8B },
   { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/relecture/source", noms: ["creerSourceRelectures", "type:DependancesSource"], motif: COMPOSITION_B8B },
   { fichier: "src/server/composition/lecture.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:Horloge"], motif: COMPOSITION_B8B },
@@ -448,6 +452,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: SERVER_ONLY_P0R3C4,
   })),
+  // B9d (ticket 599) : workflow 4 `generateFullTrip`, pont sans capacité (étapes de `src/server/generation/etapes-complet.ts`).
+  // Verdict Sécurité : approuvé (revue consolidée de la PR 600, head `5654525`).
+  {
+    fichier: "src/workflows/voyage-complet.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow 4 du voyage complet, exigé par `ligne/require-server-only` ; B9d, ticket 599, décision 0087 § 1.3 ; verdict Sécurité : approuvé (PR 600)",
+  },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({

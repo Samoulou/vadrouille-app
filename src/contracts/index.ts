@@ -114,8 +114,38 @@ export {
 export type { DayMap, MapPoint, MapPointRef } from "./map";
 export { CategorySchema } from "./category";
 export type { Category } from "./category";
-export { PreferenceAnswerSchema, PreferencePromptSchema, PreferenceReasonSchema } from "./deck";
-export type { PreferenceAnswer, PreferencePrompt, PreferenceReason } from "./deck";
+export {
+  CompleteDeckRequestSchema,
+  CompleteDeckResultSchema,
+  DeckCountsSchema,
+  DeckDecisionResultSchema,
+  DeckDecisionSchema,
+  DeckSessionSchema,
+  PreferenceAnswerRequestSchema,
+  PreferenceAnswerResultSchema,
+  PreferenceAnswerSchema,
+  PreferencePromptSchema,
+  PreferenceReasonSchema,
+  PreferenceSignalSchema,
+  UndoDecisionRequestSchema,
+  UndoDecisionResultSchema,
+} from "./deck";
+export type {
+  CompleteDeckRequest,
+  CompleteDeckResult,
+  DeckCounts,
+  DeckDecision,
+  DeckDecisionResult,
+  DeckSession,
+  PreferenceAnswer,
+  PreferenceAnswerRequest,
+  PreferenceAnswerResult,
+  PreferencePrompt,
+  PreferenceReason,
+  PreferenceSignal,
+  UndoDecisionRequest,
+  UndoDecisionResult,
+} from "./deck";
 export {
   AppPathSchema,
   CheckoutIdSchema,

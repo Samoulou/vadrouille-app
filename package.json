@@ -16,6 +16,7 @@
     "test:db": "node scripts/test-db.mjs",
     "db:generate": "node --conditions=react-server node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --conditions=react-server --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON db/migrate.ts",
+    "reprise-studio": "node --conditions=react-server --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/reprise-studio.ts",
     "test:a11y": "playwright test --project=a11y",
     "test:e2e": "playwright test --project=e2e",
     "test:prototype-cache": "playwright test --project=prototype-cache --no-deps --workers=1",

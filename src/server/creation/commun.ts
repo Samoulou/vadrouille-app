@@ -4,7 +4,9 @@ import type { AdapterContext } from "@/adapters/types";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
-import { demarrerApercuReel, type DemarrerApercu } from "./demarrage";
+import type { DemarrerVoyageComplet, TransactionReconciliation } from "@/server/generation/reconciliation";
+
+import { demarrerApercuReel, demarrerVoyageCompletReel, type DemarrerApercu } from "./demarrage";
 
 /**
  * Dépendances et outils communs des cas d'usage de la création (spécification B9, B9b ; décision 0081 B9-TL-1 :
@@ -21,12 +23,15 @@ export interface DependancesCreation {
   readonly maintenant?: () => number;
   /** Démarrage du workflow 1 ; `generatePreview` par défaut (B9c), un double sans appel (`demarrerApercuSansAppel`) dans les tests. */
   readonly demarrerApercu?: DemarrerApercu;
+  /** Démarrage du workflow 4 (B9d) ; `generateFullTrip` par défaut, un double sans appel dans les tests. */
+  readonly demarrerVoyageComplet?: DemarrerVoyageComplet;
 }
 
 export interface Outils {
   readonly withOrg: FonctionWithOrg;
   readonly maintenant: () => number;
   readonly demarrerApercu: DemarrerApercu;
+  readonly demarrerVoyageComplet: DemarrerVoyageComplet;
 }
 
 export function outils(dependances: DependancesCreation): Outils {
@@ -34,7 +39,13 @@ export function outils(dependances: DependancesCreation): Outils {
     withOrg: dependances.withOrg ?? withOrgParDefaut,
     maintenant: dependances.maintenant ?? Date.now,
     demarrerApercu: dependances.demarrerApercu ?? demarrerApercuReel,
+    demarrerVoyageComplet: dependances.demarrerVoyageComplet ?? demarrerVoyageCompletReel,
   };
+}
+
+/** Transaction de la session pour la réconciliation (contexte de la personne, B9-TL-12 point 3). */
+export function transactionDeSession(o: Outils, ctx: AdapterContext): TransactionReconciliation {
+  return (travail) => o.withOrg(ctx, (tx) => travail(executeurSql(tx)));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

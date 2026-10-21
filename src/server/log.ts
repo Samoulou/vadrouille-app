@@ -2,6 +2,7 @@ import "server-only";
 
 import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
 import { API_ERROR_CODES } from "@/contracts/values";
+import { CODES_ARRET_JOURNAL_SANS_CLE } from "@/server/log-codes-arret";
 
 /**
  * Journal structuré du serveur (spécification B3, B3a point 7 ; décision 0050, B3-TL-7 ; 0051 point 6.1). Seul point
@@ -76,6 +77,10 @@ export const LOG_EVENTS = [
   "payment.alert",
   "payment.followup_failed",
   "payment.webhook_config_invalid",
+  // B9d (spécification B9, B9-PO-17 points 3 et 4 ; décision 0087 § 1.4) : un voyage complet entre en état bloqué (reprise par
+  // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
+  // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
+  "generation.full_stuck",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -134,6 +139,13 @@ export type LogFields = {
   readonly mustSeesWithoutCandidate?: number;
   readonly candidatesGrouped?: number;
   readonly sectorUnknown?: number;
+  /**
+   * Champs facultatifs d'enrichissement retirés des candidats gardés de l'agent (ticket 595, décision 0111) : un nombre,
+   * jamais le nom du champ ni son texte.
+   */
+  readonly fieldsRemoved?: number;
+  /** Textes trop longs coupés dans les candidats gardés de l'agent (décision 0111) : un nombre, jamais le texte. */
+  readonly textsCut?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -154,6 +166,12 @@ export type LogFields = {
   readonly alertCode?: string;
   /** Identifiant interne d'un paiement (`uuid` de `checkouts.id`), jamais l'identifiant public ni celui du prestataire. */
   readonly checkoutId?: string;
+  /** Identifiant interne d'une organisation (`uuid`) : argument de la commande de reprise du studio (B9d, 0087 § 1.6). */
+  readonly organizationId?: string;
+  /** Identifiant interne d'une exécution de génération (`uuid` de `generation_runs.id`, B9d, 0087 § 1.4 point 3). */
+  readonly generationRunId?: string;
+  /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
+  readonly stopReason?: string;
 };
 
 /**
@@ -469,6 +487,13 @@ export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
   "other",
 ];
 const TYPES_EVENEMENT_PAIEMENT: ReadonlySet<string> = new Set(LOG_PAYMENT_EVENT_TYPES);
+/**
+ * Codes admis dans `stopReason` (B9d ; décision 0114) : liste fermée, celle de `CODES_ARRET` (`CHECK` de la migration 0012),
+ * lue dans le module feuille `src/server/log-codes-arret.ts` (ce module n'importe pas `src/server/generation/` : `ligne/creation-imports`)
+ * plus `CODE_CLE_ABSENTE`, pris de sa définition unique (exemption de 0077 § 3 point 1). Une valeur hors liste (ligne antérieure
+ * au `CHECK` `NOT VALID`, nom de lieu, texte libre) est retirée et comptée dans `dropped`, jamais écrite.
+ */
+const CODES_ARRET_GENERATION: ReadonlySet<string> = new Set<string>([...CODES_ARRET_JOURNAL_SANS_CLE, CODE_CLE_ABSENTE]);
 /** Identifiant d'événement : forme simulée (B4-TL-10) ou forme de Stripe. */
 const ID_EVENEMENT_PAIEMENT = /^(evt_sim_[0-9a-f]{32}|evt_[A-Za-z0-9]{1,255})$/;
 const PHASES_ETAPE: ReadonlySet<string> = new Set<string>(LOG_STEP_PHASES);
@@ -531,6 +556,8 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["mustSeesWithoutCandidate", entierPositif],
   ["candidatesGrouped", entierPositif],
   ["sectorUnknown", entierPositif],
+  ["fieldsRemoved", entierPositif],
+  ["textsCut", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],
@@ -540,6 +567,9 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["eventType", (v) => chaine(v) && TYPES_EVENEMENT_PAIEMENT.has(v)],
   ["alertCode", (v) => chaine(v) && CODES_ALERTE.has(v)],
   ["checkoutId", (v) => chaine(v) && UUID.test(v)],
+  ["organizationId", (v) => chaine(v) && UUID.test(v)],
+  ["generationRunId", (v) => chaine(v) && UUID.test(v)],
+  ["stopReason", (v) => chaine(v) && CODES_ARRET_GENERATION.has(v)],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
