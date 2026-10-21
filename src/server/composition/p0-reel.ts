@@ -206,21 +206,6 @@ export function composerRelecture(garde: GardeRelecture, options: OptionsRelectu
 }
 
 /**
- * Relecture des **horaires** d'une Journée (décision 0116 § 5.3, T8 ; admise par 0117) : la seule fiche Place Details,
- * rien d'autre (ni Text Search, ni Routes, ni modèle). Même garde de relecture que `composerRelecture` (barrière, purge
- * et forfait de relecture réservé) ; chaque appel porte la nature `relecture`, sans exécution, et le registre en mémoire
- * du forfait le borne à la part `details` (`PLAFONDS_RELECTURE.placesDetails`, aucune valeur relevée). Les fiches restent
- * en mémoire de `src/server/p0/relecture.ts` : seul le badge en sort.
- */
-export function composerRelectureHoraires(garde: GardeRelecture, options: OptionsRelecture): { readonly places: Pick<ClientPlaces, "details"> } {
-  if (garde.relecture !== true || "runId" in garde) throw new RangeError("composition : garde de relecture attendue");
-  const horloge = options.horloge ?? horlogeSysteme;
-  const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
-  const places = createPlacesClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge });
-  return { places: { details: (placeId) => places.details(placeId) } };
-}
-
-/**
  * Cadence des relectures Routes (P0r4 ; bloquant 2 de la revue du head `e79fbed`) : fenêtre glissante d'une minute de
  * `creerCadence`, `maxParMinute` éléments au plus, minuterie réelle. **Câble seulement** : l'instance unique par
  * processus (3 000 éléments par minute, Q330) est gardée par `src/server/p0/relecture.ts` (`cadenceRelecture`).

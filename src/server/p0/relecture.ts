@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-import type { PaireRelecture, RaisonRelecture, RelecteurTrajets, ReponseHoraires } from "@/adapters/prototype";
+import type { PaireRelecture, RaisonRelecture, RelecteurTrajets, ReponseRelecture } from "@/adapters/prototype";
 import { NOM_COOKIE_ACCES, type DependancesAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { ouvrirGardeRelecture, type GardeRelecture } from "@/server/p0/garde";
@@ -10,8 +10,7 @@ import { errorNameOf, logEvent } from "@/server/log";
 import { QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait } from "@/server/usage/forfait";
 import { reserverRelecture, type PoolSql, type ReglesForfait } from "@/server/usage/neon";
 import { horlogeSysteme, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
-import type { composerRelecture, composerRelectureHoraires, creerCadenceRelecture } from "@/server/composition/p0-reel";
-import { aConfirmerALaLecture, type FicheRelue } from "@/domain/plages-fiche";
+import type { composerRelecture, creerCadenceRelecture } from "@/server/composition/p0-reel";
 import { creerRegistreForfait } from "@/server/usage/registre";
 
 /**
@@ -43,9 +42,6 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  * avec un nom fermé seulement (`PurgeAncienne`, `PlafondAtteint`, `ReservationImpossible`, ou le nom de l'erreur du
  * client : `ErreurClientGoogle`), jamais une durée, un identifiant de lieu ni un message.
  */
-
-/** Client des fiches d'une relecture des horaires tel que la composition le rend (`details` seul, 0116 § 5.3). */
-export type ClientFiches = ReturnType<typeof composerRelectureHoraires>["places"];
 
 /** Client Routes tel que la composition le rend (`ClientRoutes` : durées en secondes, `null` sans itinéraire). */
 export type ClientMatrice = ReturnType<typeof composerRelecture>["routes"];
@@ -88,17 +84,12 @@ export type DependancesRelecteur = DependancesAcces & {
   readonly relecture?: () => Promise<{ readonly forfait: Forfait; readonly regles: ReglesForfait } | null>;
   /** Client Routes d'une relecture (par défaut : `composerRelecture` de la composition du mode réel). */
   readonly routes?: (garde: GardeRelecture, usage: PortConsommation, plafonds: readonly Plafond[]) => Promise<ClientMatrice>;
-  /**
-   * Badges horaires d'une relecture (par défaut : `composerRelectureHoraires` de la composition du mode réel, fiches
-   * Place Details en mémoire ; décision 0116 § 5.3).
-   */
-  readonly horaires?: (garde: GardeRelecture, usage: PortConsommation, plafonds: readonly Plafond[]) => Promise<ClientFiches>;
   /** Cadence des éléments Routes (par défaut : `cadenceRelecture()`, unique par processus, 3 000 éléments par minute). */
   readonly cadence?: () => Promise<CadenceRelecture>;
   readonly horloge?: Horloge;
 };
 
-const refus = (raison: RaisonRelecture): { ok: false; raison: RaisonRelecture } => ({ ok: false, raison });
+const refus = (raison: RaisonRelecture): ReponseRelecture => ({ ok: false, raison });
 
 async function purgeRecente(pool: PoolSql): Promise<boolean> {
   const client = await pool.connect();
@@ -119,26 +110,6 @@ const codeDe = (erreur: unknown): string | undefined => {
 const plafondsDu = (forfait: Forfait): Plafond[] => [
   { portee: "execution", fournisseur: "google", methode: "routes_matrix", maxRequetes: forfait.routesRequetes, maxElements: forfait.routesElements },
 ];
-
-/**
- * Fiche d'un lieu, en mémoire : statut et horaires seulement (rien d'autre n'est recopié) ; `undefined` si le lieu est
- * introuvable (`place_not_found`, aucun badge) ; toute autre erreur est levée (refus de la relecture).
- */
-async function ficheRelue(client: ClientFiches, placeId: string): Promise<FicheRelue | undefined> {
-  try {
-    const { statut, horaires } = await client.details(placeId);
-    return { ...(statut === undefined ? {} : { statut }), horaires };
-  } catch (erreur) {
-    if (codeDe(erreur) === "place_not_found") return undefined;
-    throw erreur;
-  }
-}
-
-/** Plafond de la part `details` du forfait de relecture (relecture des horaires, 0116 § 5.3). */
-const plafondsFichesDu = (forfait: Forfait): Plafond[] => [
-  { portee: "execution", fournisseur: "google", methode: "places_details", maxRequetes: forfait.placeDetailsRequetes, maxElements: 0 },
-];
-
 
 /**
  * Durées des paires : une requête par (mode, origine), un élément par destination distincte. Chaque requête attend sa
@@ -187,100 +158,50 @@ export function creerRelecteurReel(dependances: DependancesRelecteur = {}): Rele
       const { composerRelecture } = await import("@/server/composition/p0-reel");
       return composerRelecture(garde, { usage, plafonds, horloge }).routes;
     });
-  const horaires =
-    dependances.horaires ??
-    (async (garde: GardeRelecture, usage: PortConsommation, plafonds: readonly Plafond[]) => {
-      const { composerRelectureHoraires } = await import("@/server/composition/p0-reel");
-      return composerRelectureHoraires(garde, { usage, plafonds, horloge }).places;
-    });
   const cadence = dependances.cadence ?? cadenceRelecture;
-
-  type Reglage = { readonly forfait: Forfait; readonly regles: ReglesForfait };
-  type Ouverture = { ok: true; garde: GardeRelecture; forfait: Forfait } | { ok: false; refus: { ok: false; raison: RaisonRelecture } };
-
-  /**
-   * Barrière commune aux deux relectures (trajets et horaires), dans l'ordre de l'en-tête : cookie, garde du mode réel,
-   * purge de moins de 24 h, réservation du forfait de relecture. `avantGarde` : contrôle sans connexion, sans réservation
-   * ni journal (part du forfait trop petite) ; refus silencieux.
-   */
-  async function ouvrir(avantGarde?: (forfait: Forfait) => boolean): Promise<Ouverture> {
-    let reglage: Reglage | null = null;
-    let cookie: string | undefined;
-    try {
-      cookie = await lireCookie();
-    } catch {
-      // Hors portée de requête (`cookies()` lève) : refus fermé, sans connexion ni journal.
-      return { ok: false, refus: { ok: false, raison: "unavailable" } };
-    }
-    if (avantGarde !== undefined) {
-      // Lecture de configuration seulement (aucune connexion, aucune réservation) : part épuisée, refus silencieux.
-      const lu = await relecture();
-      if (lu === null) return { ok: false, refus: { ok: false, raison: "unavailable" } };
-      if (!avantGarde(lu.forfait)) return { ok: false, refus: { ok: false, raison: "quota_reached" } };
-    }
-    const garde = await ouvrirGardeRelecture({
-      env: dependances.env,
-      execArgv: dependances.execArgv,
-      maintenant: dependances.maintenant,
-      cookie,
-      async reserver() {
-        reglage = await relecture();
-        if (reglage === null) return { ok: false, code: "usage_unavailable" };
-        const ouvert = pool();
-        if (!(await purgeRecente(ouvert))) return { ok: false, code: "purge_stale" };
-        return reserverRelecture(ouvert, reglage.forfait, reglage.regles);
-      },
-    });
-    if (!garde.ok) {
-      // Garde fermée ou cookie absent : rien n'est journalisé (comme la lecture) ; refus après la garde : un nom fermé.
-      if (garde.code === "purge_stale") logEvent("p0.read_unavailable", { errorName: "PurgeAncienne" }, "warn");
-      else if (PLAFONDS_ATTEINTS.has(garde.code)) logEvent("p0.read_unavailable", { errorName: "PlafondAtteint" }, "warn");
-      else if (garde.code === "usage_unavailable" || garde.code === "daily_quota_insufficient") {
-        logEvent("p0.read_unavailable", { errorName: "ReservationImpossible" }, "warn");
-      }
-      return { ok: false, refus: { ok: false, raison: PLAFONDS_ATTEINTS.has(garde.code) ? "quota_reached" : "unavailable" } };
-    }
-    return { ok: true, garde: garde.garde, forfait: (reglage as Reglage | null)!.forfait };
-  }
 
   return {
     async relireJournee(paires) {
       if (paires.length === 0) return { ok: true, minutes: [] };
-      const ouverte = await ouvrir();
-      if (!ouverte.ok) return ouverte.refus;
-      const { forfait } = ouverte;
+      let reglage: Awaited<ReturnType<NonNullable<DependancesRelecteur["relecture"]>>> = null;
+      let cookie: string | undefined;
+      try {
+        cookie = await lireCookie();
+      } catch {
+        // Hors portée de requête (`cookies()` lève) : refus fermé, sans connexion ni journal.
+        return refus("unavailable");
+      }
+      const garde = await ouvrirGardeRelecture({
+        env: dependances.env,
+        execArgv: dependances.execArgv,
+        maintenant: dependances.maintenant,
+        cookie,
+        async reserver() {
+          reglage = await relecture();
+          if (reglage === null) return { ok: false, code: "usage_unavailable" };
+          const ouvert = pool();
+          if (!(await purgeRecente(ouvert))) return { ok: false, code: "purge_stale" };
+          return reserverRelecture(ouvert, reglage.forfait, reglage.regles);
+        },
+      });
+      if (!garde.ok) {
+        // Garde fermée ou cookie absent : rien n'est journalisé (comme la lecture) ; refus après la garde : un nom fermé.
+        if (garde.code === "purge_stale") logEvent("p0.read_unavailable", { errorName: "PurgeAncienne" }, "warn");
+        else if (PLAFONDS_ATTEINTS.has(garde.code)) logEvent("p0.read_unavailable", { errorName: "PlafondAtteint" }, "warn");
+        else if (garde.code === "usage_unavailable" || garde.code === "daily_quota_insufficient") {
+          logEvent("p0.read_unavailable", { errorName: "ReservationImpossible" }, "warn");
+        }
+        return refus(PLAFONDS_ATTEINTS.has(garde.code) ? "quota_reached" : "unavailable");
+      }
+      const { forfait } = reglage!;
       try {
         const registre = creerRegistreForfait(forfait, null, horloge);
-        const client = await routes(ouverte.garde, registre, plafondsDu(forfait));
+        const client = await routes(garde.garde, registre, plafondsDu(forfait));
         return { ok: true, minutes: await relirePaires(client, await cadence(), paires) };
       } catch (erreur) {
         const code = codeDe(erreur);
         if (code !== undefined && PLAFONDS_ATTEINTS.has(code)) return refus("quota_reached");
         logEvent("p0.read_unavailable", { errorName: errorNameOf(erreur) }, "warn");
-        return refus("unavailable");
-      }
-    },
-    /**
-     * Relecture des horaires d'une Journée (décision 0116 § 5.3, T8) : une fiche par `placeId` distinct, en mémoire,
-     * jamais écrite, journalisée, mise en cache ni envoyée à un modèle ; seul le badge en sort. Même barrière et même
-     * réservation que les trajets, sur la part `details` du forfait de relecture (`PLAFONDS_RELECTURE.placesDetails`,
-     * aucune valeur relevée) : une part plus petite que le nombre de lieux refuse **avant** la garde, sans connexion, sans
-     * réservation ni journal ; un échec rend la page sans badge horaire, sans aucune ligne de journal (ni identifiant, ni
-     * statut, ni horaire).
-     */
-    async relireHoraires(placeIds, date): Promise<ReponseHoraires> {
-      const distincts = [...new Set(placeIds)];
-      if (distincts.length === 0) return { ok: true, aConfirmer: [] };
-      const ouverte = await ouvrir((forfait) => forfait.placeDetailsRequetes >= distincts.length);
-      if (!ouverte.ok) return ouverte.refus;
-      try {
-        const registre = creerRegistreForfait(ouverte.forfait, null, horloge);
-        const client = await horaires(ouverte.garde, registre, plafondsFichesDu(ouverte.forfait));
-        const parLieu = new Map<string, boolean>();
-        // Une fiche par placeId distinct, l'une après l'autre ; au premier échec, aucun appel de plus (refus).
-        for (const placeId of distincts) parLieu.set(placeId, aConfirmerALaLecture(await ficheRelue(client, placeId), date));
-        return { ok: true, aConfirmer: placeIds.map((placeId) => parLieu.get(placeId) === true) };
-      } catch {
         return refus("unavailable");
       }
     },
