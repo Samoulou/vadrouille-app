@@ -429,6 +429,7 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
           classement: entree.classement,
           configuration: entree.configuration,
           budgets: {
+            textSearch: forfait.textSearchRequetes,
             fiches: Math.max(0, forfait.placeDetailsRequetes - entree.villes.length),
             routesRequetes: forfait.routesRequetes,
             routesElements: forfait.routesElements,

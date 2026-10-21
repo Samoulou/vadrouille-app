@@ -25,7 +25,10 @@ import { versRelectures } from "@/server/relecture/relectures";
  * la seule composition de la génération (règle `ligne/relecture-imports`).
  *
  * Pour les jours à planifier **seulement** (moteur partiel, B9-TL-13) :
- * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville) ;
+ * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville).
+ *    Une ville `area` ou `none` demande un Text Search de son nom (0087 § 2.3) : sans requête Text Search dans la part de
+ *    l'étape (`budgets.textSearch`), aucun appel ne part et la ville reste **sans zone ni départ** (0100 § 6.2 : trajets
+ *    de ses nuits `inconnu`, aucun lieu de ses jours relu ni planifié), au lieu d'un arrêt `cap_reached` ;
  * 2. demande de chaque jour par type de créneau (un lieu par créneau qui tient dans la fenêtre du jour), bornée par la
  *    capacité de la matrice Routes du jour (volume du forfait réparti sur les jours et les modes) ;
  * 3. fiches de la première série de chaque ville et de chaque type, dans l'ordre du classement (sans coût de trajet,
@@ -49,6 +52,11 @@ export type VilleAPlanifier = {
 export type CandidatAPlanifier = CandidatMoteur & { readonly ville: number };
 
 export type BudgetsPlanification = {
+  /**
+   * Requêtes Text Search de la part de l'étape, pour la zone des villes `area` et `none` (une par ville). Une ville qui n'en
+   * a plus n'est pas positionnée (aucun appel). Absent : non borné ici (le registre de l'étape borne toujours les appels).
+   */
+  readonly textSearch?: number;
   /** Fiches disponibles pour les séries (après les positions des villes). */
   readonly fiches: number;
   readonly routesRequetes: number;
@@ -141,8 +149,14 @@ export async function preparerPlanification(entree: EntreePlanification, clients
 
     // 1. Zone et départ des villes dont un jour est planifié.
     const ancres = new Map<number, LogementAncre>();
+    let textSearchRestants = budgets.textSearch ?? Number.POSITIVE_INFINITY;
     for (const ville of villes) {
       if (!jours.some((jour) => villeDuJour(jour) === ville.rang)) continue;
+      if (ville.logement.kind === "area" || ville.logement.kind === "none") {
+        // Aucun Text Search sans part : la ville reste sans zone ni départ, jamais un centre inventé.
+        if (textSearchRestants < 1) continue;
+        textSearchRestants -= 1;
+      }
       ancres.set(ville.rang, valeurOuEchec(await zoneEtDepart(ville.logement, ville.nom, clients.places)));
     }
 
