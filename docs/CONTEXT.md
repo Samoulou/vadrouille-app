@@ -15,7 +15,7 @@ Cible du MVP : couples francophones (Suisse romande) préparant 5 à 10 jours en
 5. Rien ne change sans aperçu des effets ; toute modification est annulable 5 secondes.
 
 ## Principes techniques
-1. L'agent cherche, l'ancrage vérifie, le moteur planifie.
+1. L'agent cherche, l'ancrage vérifie, le moteur planifie (chaîne du MVP). Pour le prototype `p0Run`, depuis la décision 0115 (Samuel, 2026-10-21) : **l'IA écrit le programme complet, le code vérifie chaque lieu sur Google** (`specs/P0-programme-par-ia.md`, décisions 0116 et 0117) ; le MVP garde sa chaîne jusqu'au jugement de Samuel sur le premier essai (0115 § 5.5).
 2. Aucune donnée Google dans un prompt ; seul l'identifiant de lieu est stocké ; données de lieux Google seulement sur la carte Google ou avec attribution.
 3. Contrats partagés dans `src/contracts` ; multi-organisation dès le schéma.
 4. TypeScript de bout en bout, Next.js, Tailwind v4 avec les tokens Ligne, Postgres en région UE, Vercel.
