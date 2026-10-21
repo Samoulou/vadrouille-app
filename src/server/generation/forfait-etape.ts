@@ -135,21 +135,17 @@ export async function forfaitDeLEtape(
   // Règles de la variante que la barrière vient de choisir (B9e point 2) : jamais les valeurs de test pour un appel réel.
   const regles = dependances.reglesPour(contexte.barriere);
   if (regles === null) throw new ArretEtape("usage_unavailable");
-  if (contexte.barriere === "simulee" && !dependances.reserverEnSimulee) {
-    let entier: Forfait;
-    try {
-      entier = forfaitDuProfil(regles.plafonds, regles.table, profil);
-    } catch {
-      throw new ArretEtape("usage_unavailable");
-    }
-    return forfaitEnMemoire(entier, etape, contexte.generationRunId, dependances, ajuster, reserve);
-  }
-  // Refus avant la réservation, donc avant toute dépense (0113 § 3 bis point 3) : forfait du profil calculé en mémoire.
+  // Forfait du profil, calculé une fois : plafonds invalides, `usage_unavailable` (le code que `reserverForfait` rendrait).
+  let entier: Forfait;
   try {
-    exigerReserve(forfaitDuProfil(regles.plafonds, regles.table, profil), reserve);
-  } catch (erreur) {
-    if (erreur instanceof ArretEtape) throw erreur;
+    entier = forfaitDuProfil(regles.plafonds, regles.table, profil);
+  } catch {
+    throw new ArretEtape("usage_unavailable");
   }
+  // Refus avant la réservation, donc avant toute dépense (0113 § 3 bis point 3) ; aucune autre erreur n'est avalée.
+  exigerReserve(entier, reserve);
+  if (contexte.barriere === "simulee" && !dependances.reserverEnSimulee) return forfaitEnMemoire(entier, etape, contexte.generationRunId, dependances, ajuster, reserve);
+  // `reserverForfait` dérive le même forfait des mêmes règles (fonction pure) : la part de l'étape part du forfait réservé.
   const reservation = await reserverForfait(
     (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
     { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: cle, profil },

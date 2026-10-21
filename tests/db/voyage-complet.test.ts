@@ -18,7 +18,7 @@ import {
 import { EtatCompletSchema, type EtatComplet } from "@/server/generation/etat";
 import { CODES_ARRET } from "@/server/generation/raison-echec";
 import { partDe } from "@/server/generation/forfait-etape";
-import { requestIdDeVersion } from "@/server/generation/voyage-complet";
+import { RANG_COMPLET, requestIdDeVersion } from "@/server/generation/voyage-complet";
 import { creerSuiteVoyageComplet, DemarrageVoyageCompletError } from "@/server/payment/suite-voyage-complet";
 import { reprendreParLeStudio } from "../../scripts/reprise-studio";
 
@@ -33,6 +33,7 @@ import {
   derouler,
   doublesEdimbourg,
 } from "../support/banc-apercu";
+import { compterAppels, compteursVides } from "../support/compteur-appels";
 import { creerBaseApercu, type BaseApercu } from "./base-apercu";
 import { closeAll, createOrg, inTx, type DbClient, type Org } from "./helpers";
 import { executeurSql } from "@/server/with-org";
@@ -521,24 +522,25 @@ describe("voyage complet (B9d) : plusieurs villes, changement de ville pendant l
  * (0113 § 3 point 3) ; le reste du profil est celui des bancs.
  */
 describe("voyage complet : ville sans logement sur plusieurs jours, réserve Text Search de l'étape e", () => {
+  const draft = { otherCities: [{ name: "Glasgow", arrival: "2026-11-24", lodging: { kind: "none" as const } }] };
+  // Les fixtures d'Édimbourg ne résolvent aucun nom de ville : « Glasgow » correspond, dans le double seulement, à une entrée
+  // maison des fixtures (valeur sentinelle, aucune donnée Google).
+  const doubles = (journal?: string[]) => () => {
+    const d = doublesEdimbourg();
+    return {
+      ...d,
+      places: {
+        ...d.places,
+        textSearch: (requete: Parameters<typeof d.places.textSearch>[0]) => {
+          journal?.push(requete.texte);
+          return d.places.textSearch(requete.texte === "Glasgow" ? { ...requete, texte: "Vieille ville d'Édimbourg (Old Town)" } : requete);
+        },
+      },
+    };
+  };
+
   it("un Text Search de e par jour de la ville none, part de c réduite d'autant, total inchangé", async () => {
     const org = await createOrg(auth);
-    const draft = { otherCities: [{ name: "Glasgow", arrival: "2026-11-24", lodging: { kind: "none" as const } }] };
-    // Les fixtures d'Édimbourg ne résolvent aucun nom de ville : « Glasgow » correspond, dans le double seulement, à une entrée
-    // maison des fixtures (valeur sentinelle, aucune donnée Google).
-    const doubles = (journal?: string[]) => () => {
-      const d = doublesEdimbourg();
-      return {
-        ...d,
-        places: {
-          ...d.places,
-          textSearch: (requete: Parameters<typeof d.places.textSearch>[0]) => {
-            journal?.push(requete.texte);
-            return d.places.textSearch(requete.texte === "Glasgow" ? { ...requete, texte: "Vieille ville d'Édimbourg (Old Town)" } : requete);
-          },
-        },
-      };
-    };
     const { adapter, tripId } = await voyageDebloque(org, draft, PLAFONDS_TROIS_VILLES, () => composerSimuleeAvec({ doubles: doubles() }));
     await adapter.getFullTripStatus(contexteDe(org), tripId);
     const ligne = (await lignes(org, tripId)).complet[0]!;
@@ -565,6 +567,39 @@ describe("voyage complet : ville sans logement sur plusieurs jours, réserve Tex
     const apres = await lignes(org, tripId);
     expect(apres.complet[0]!.stop_reason).toBeNull();
     for (const jour of [3, 4, 5, 6]) expect(etapesDuJour(apres.versions.at(-1)!, jour)).toBeGreaterThan(0);
+  }, 180_000);
+
+  it("refus : réserve de e (4) + besoin propre de c (1) > part de c (4), la réserve seule tenant : cap_reached à l'étape a, avant tout appel ni réservation", async () => {
+    // Réserve du passage : Glasgow (`none`) sur les quatre jours du complet, une requête par jour = 4. Besoin propre de `c` :
+    // le Text Search du nom de Glasgow, seule ville introduite par le passage = 1 (0113 § 3 bis point 3). Profil `complet`
+    // réduit à 5 Text Search : la part de `l` vaut 1, celle de `c` 4 ; la réserve seule tiendrait, pas avec le besoin de `c`.
+    // Valeurs de test.
+    const PLAFONDS_REFUS: PlafondsUsage = {
+      ...PLAFONDS_COMPLET,
+      generations: { ...PLAFONDS_COMPLET.generations, complet: { ...PLAFONDS_COMPLET.generations.complet, placesTextSearch: 5 } },
+    };
+    expect(partDe(5, PARTS_FORFAIT.textSearch, "c")).toBe(4);
+    const org = await createOrg(auth);
+    // Aperçu aux plafonds des autres tests à plusieurs villes : seul le profil `complet` du passage est réduit.
+    const { adapter, tripId } = await voyageDebloque(org, draft, PLAFONDS_TROIS_VILLES, () => composerSimuleeAvec({ doubles: doubles() }));
+    await adapter.getFullTripStatus(contexteDe(org), tripId);
+    const avant = await lignes(org, tripId);
+    const ligne = avant.complet[0]!;
+    const registre = async () => inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT count(*)::int AS n FROM public.usage_ledger")).rows[0].n as number);
+    const registreAvant = await registre();
+    const compteurs = compteursVides();
+    const { fin } = await deroulerComplet(
+      { generationRunId: ligne.id, organizationId: org.org, rang: 0 },
+      dependances(() => composerSimuleeAvec({ doubles: () => compterAppels(doubles()(), compteurs) }), PLAFONDS_REFUS),
+    );
+    expect(fin.arret).toBe("cap_reached");
+    expect(fin.rang).toBe(RANG_COMPLET.a);
+    // Aucun appel d'aucun fournisseur (ni `l`, ni `b`), aucune réservation du forfait du passage, aucune version publiée.
+    expect(compteurs).toEqual(compteursVides());
+    expect(await registre()).toBe(registreAvant);
+    const apres = await lignes(org, tripId);
+    expect(apres.complet[0]).toMatchObject({ phase: "failed", stop_reason: "cap_reached" });
+    expect(apres.versions).toEqual(avant.versions);
   }, 180_000);
 });
 

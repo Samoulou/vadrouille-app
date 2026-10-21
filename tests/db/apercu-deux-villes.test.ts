@@ -152,6 +152,43 @@ describe("aperçu : deux villes, la seconde sans logement (valeurs par défaut d
     expect(lu.cases.some((c) => c.day === 2 && c.slot_type === "proposal")).toBe(true);
   });
 
+  it("c sans candidat place : c ne s'ouvre pas et ne cherche rien ; e positionne quand même Glasgow par sa réserve (un Text Search)", async () => {
+    // La recherche ne rend aucun candidat : `c` s'arrête avant d'ouvrir sa capacité (aucun forfait, aucun Text Search). La
+    // réserve de `e` ne dépend que du voyage (villes, logements, jours), pas des candidats : elle vaut toujours 1.
+    const org = await createOrg(auth);
+    const { tripId, etat } = await lancer(org);
+    const enE = { textSearch: 0 };
+    let ouverturesC = 0;
+    let partE: number | undefined;
+    const fabrique = (): FabriqueGeneration => {
+      const base = composerSimuleeAvec({ doubles: doublesComptes({ textSearch: 0 }) });
+      const comptee = composerSimuleeAvec({ doubles: doublesComptes(enE) });
+      return {
+        ...base,
+        recherche: (o) => {
+          const capacite = base.recherche(o);
+          return {
+            async rechercher(...args) {
+              const issue = await capacite.rechercher(...args);
+              return issue.ok ? { ...issue, valeur: { ...issue.valeur, lignes: [] } } : issue;
+            },
+          };
+        },
+        ancrage: (o) => ((ouverturesC += 1), base.ancrage(o)),
+        finale: (o) => ((partE = o.forfait.textSearchRequetes), comptee.finale(o)),
+      };
+    };
+    const fin = await derouler(etat, dependances(fabrique));
+    expect(fin.arret).toBeUndefined();
+    expect(ouverturesC).toBe(0);
+    expect(partE).toBe(1);
+    expect(enE.textSearch).toBe(1);
+    const lu = await lignes(org, tripId);
+    // Aucun lieu à planifier : cases `noOption`, jamais un échec (B9-PO-9).
+    expect(lu.run).toMatchObject({ phase: "incomplete", stop_reason: null });
+    expect(lu.versions).toHaveLength(1);
+  });
+
   it("refus : réserve de e + besoin propre de c > part de c, la réserve seule tenant : cap_reached à l'étape a, avant tout appel", async () => {
     // Édimbourg (`known`) puis Glasgow (`none`) : réserve de `e` = 1, besoin propre de `c` = 1 (Text Search du nom de Glasgow).
     // Profil réduit à 1 Text Search, dont la part de `c` vaut 1 : la réserve seule tiendrait, pas avec le besoin de `c`.

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { villeDeLArrivee } from "@/domain/relectures";
+import { squeletteAvecEngagements } from "@/domain/squelette";
 import { PARTS_FORFAIT } from "@/server/config/generation";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import type { Forfait } from "@/server/usage/forfait";
 
 import { ArretEtape } from "./codes";
@@ -24,6 +27,19 @@ describe("réserve Text Search de l'étape e : villes positionnées", () => {
   it("ville d'un jour : sa nuit d'arrivée (règle de preparerPlanification)", () => {
     expect([1, 2, 3, 6].map((jour) => villeDuJour(jour, nuitsVille))).toEqual([0, 1, 1, 1]);
     expect(villeDuJour(1, [])).toBe(0);
+  });
+
+  it("ville d'un jour : la même que preparerPlanification sur le squelette du voyage (villeDeLArrivee, logementArrivee)", () => {
+    const jours = squeletteAvecEngagements({
+      voyage: { start: "2026-11-23", end: "2026-11-28" },
+      pace: "balanced",
+      nombreDeNuits: nuitsVille.length,
+      engagements: [],
+      configuration: CONFIGURATION_MOTEUR,
+      budgetTrajetReduit: false,
+    });
+    expect(jours.map((jour) => jour.index)).toEqual([1, 2, 3, 4, 5, 6]);
+    for (const jour of jours) expect(villeDuJour(jour.index, nuitsVille)).toBe(villeDeLArrivee(jour.logementArrivee, nuitsVille));
   });
 
   it("aperçu : une requête par ville area ou none de J1 et J2, aucune pour un logement connu", () => {

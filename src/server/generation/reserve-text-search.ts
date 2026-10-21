@@ -1,6 +1,6 @@
 import "server-only";
 
-import { logementsDuJour } from "@/domain/relectures";
+import { logementsDuJour, villeDeLArrivee } from "@/domain/relectures";
 
 /**
  * Réserve Text Search de l'étape `e` (décision 0113 § 3 bis) : **une requête par ville `area` ou `none` que l'étape
@@ -9,7 +9,7 @@ import { logementsDuJour } from "@/domain/relectures";
  * qui la recalculent à l'identique (§ 3 bis point 3).
  *
  * Ville d'un jour : celle de sa nuit d'arrivée (`logementsDuJour`, `logementArrivee` du squelette), à défaut celle de la
- * première nuit, la règle même de `preparerPlanification` (`src/server/relecture/planification.ts`), dont le budget
+ * première nuit, la règle même de `preparerPlanification` (`villeDeLArrivee`, `src/domain/relectures.ts`, partagée), dont le budget
  * `textSearch` reste la garde (§ 3 bis point 4). Le type d'origine du logement fait foi : après l'étape `l`, un logement
  * `known` ou `suggestedLodging` a son `placeId` (sinon `lodging_unresolved`) et ne demande aucun Text Search.
  */
@@ -26,10 +26,9 @@ export type EntreeReserve = {
 
 const DEMANDE_TEXT_SEARCH: ReadonlySet<string> = new Set(["area", "none"]);
 
-/** Ville d'un jour, comme `preparerPlanification` : nuit d'arrivée, à défaut la première nuit, à défaut le rang 0. */
+/** Ville d'un jour (1 = J1) : la règle de `preparerPlanification` (`villeDeLArrivee`), sur la nuit d'arrivée du squelette. */
 export function villeDuJour(jour: number, nuitsVille: readonly number[]): number {
-  const { arrivee } = logementsDuJour(jour - 1, nuitsVille.length);
-  return nuitsVille.at(arrivee) ?? nuitsVille.at(0) ?? 0;
+  return villeDeLArrivee(logementsDuJour(jour - 1, nuitsVille.length).arrivee, nuitsVille);
 }
 
 /** Nombre de requêtes Text Search de l'étape `e` qui planifie `jours` : une par ville `area` ou `none` de ces jours. */
