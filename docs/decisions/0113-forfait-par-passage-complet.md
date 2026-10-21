@@ -2,7 +2,9 @@
 
 Statut : **acceptée**, **décision du Tech Lead** (répartition du forfait entre les étapes, valeurs de test, tests ; « Qui décide quoi » de `docs/CONTEXT.md`), définitive dès sa fusion, sans délai de veto (décision 0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Elle ne fixe **aucun montant réel** : les plafonds de production restent réservés à Samuel (`PLAFONDS_USAGE` vaut `null`, questions 4 et 5 de la spécification B9). Elle ne tranche pas la forme de `stopReason` (Sécurité, #607). Elle n'engage ni argent, ni compte externe, ni donnée personnelle, et ne supprime ni ne désactive aucun test.
 
-Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #608 · PR de mise en œuvre : #600 (fusionnée) · Défauts : #609, #605 (PR #611) · Décisions liées : 0081 (B9-TL-3, B9-TL-12, B9-TL-13), 0087 § 1.3, § 1.7, § 2.3 et § 2.7, 0110 § 3
+**Complément** (§ 3 bis, 2026-10-21, ticket #612) : ajouté après la fusion de #610, en réponse à la question de #611. Définitif dès la fusion de sa propre PR. Il ne modifie ni les § 1 à § 4, ni aucun montant.
+
+Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #608, #612 · PR de mise en œuvre : #600 (fusionnée) · Défauts : #609, #605 (PR #611) · Décisions liées : 0081 (B9-TL-3, B9-TL-12, B9-TL-13), 0087 § 1.3, § 1.7, § 2.3 et § 2.7, 0110 § 3
 
 Numérotation (relue le 2026-10-21 sur `main` `9b7282e`) : `main` porte 0001 à 0111 ; la PR #604, ouverte, porte 0112 ; aucune autre PR ouverte ne porte de décision au-delà.
 
