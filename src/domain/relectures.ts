@@ -79,6 +79,15 @@ export function logementsDuJour(jour: number, nombreDeNuits: number): { depart: 
   return { depart: Math.min(Math.max(jour - 1, 0), derniere), arrivee: Math.min(Math.max(jour, 0), derniere) };
 }
 
+/**
+ * Rang de ville d'un jour : celle de sa nuit d'arrivée (`logementArrivee` du squelette, `logementsDuJour`), à défaut celle de
+ * la première nuit, à défaut le rang 0. Règle unique de la planification (`preparerPlanification`) et de la réserve Text
+ * Search de l'étape `e` (décision 0113 § 3 bis), qui doivent compter les mêmes villes.
+ */
+export function villeDeLArrivee(nuitArrivee: number, nuitsVille: readonly number[]): number {
+  return nuitsVille.at(nuitArrivee) ?? nuitsVille.at(0) ?? 0;
+}
+
 // --- Port de relectures de la lecture des voyages (décision 0086 § 1.2 point 3 ; spécification B6, B6-TL-2 (c)) ---
 //
 // Déclarations de type seules, sans entrée-sortie : le port est implémenté côté serveur (B8b, Places et Routes) ou par
