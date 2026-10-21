@@ -35,6 +35,11 @@ export interface DeckCore {
   decisions: { proposalId: string; decision: Decision }[];
   /** Jours gardés en bloc par « Tout garder pour le jour N ». */
   keptDays: number[];
+  /**
+   * Cartes retirées du paquet par une réponse « Oui » à une question de catégorie (F6-PO-8), sans avoir été triées une à
+   * une (titre de fin de la suite du tri, spécification B10, question 8).
+   */
+  removedByAnswer: number;
   /** Réponses aux questions de préférence de la session (F6-PO-9). */
   answers: { prompt: PreferencePrompt; answer: PreferenceAnswer }[];
   /** Question ouverte (feuille de l'écran 7), `null` sinon. */
@@ -54,6 +59,7 @@ export function initDeck(proposals: readonly Proposal[]): DeckState {
     index: 0,
     decisions: [],
     keptDays: [],
+    removedByAnswer: 0,
     answers: [],
     prompt: null,
     pending: false,
@@ -81,6 +87,7 @@ const coreOf = (state: DeckState): DeckCore => ({
   index: state.index,
   decisions: state.decisions,
   keptDays: state.keptDays,
+  removedByAnswer: state.removedByAnswer,
   answers: state.answers,
   prompt: state.prompt,
   pending: state.pending,
@@ -141,6 +148,7 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
       return {
         ...state,
         cards,
+        removedByAnswer: state.removedByAnswer + (state.cards.length - cards.length),
         answers: [...state.answers, { prompt, answer: event.answer }],
         prompt: event.next,
       };

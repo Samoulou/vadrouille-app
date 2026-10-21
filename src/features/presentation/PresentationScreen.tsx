@@ -423,7 +423,7 @@ function Deck({
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} closed={closedAtLoad} daysKept={state.keptDays.length > 0} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
+        <DeckEnd variant={endVariant} closed={closedAtLoad} notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />

@@ -94,6 +94,7 @@ describe("deckReducer", () => {
     });
     expect(ids(answered)).toEqual(["m1", "m2", "w1"]);
     expect(answered.answers).toHaveLength(1);
+    expect(answered.removedByAnswer).toBe(1);
     expect(run(answered, { type: "undo" })).toEqual(before);
   });
 
@@ -146,6 +147,7 @@ describe("deckReducer", () => {
     expect(open.prompt).toEqual(prompt);
     const no = run(open, { type: "answer", prompt, answer: { answer: "no" }, next: null });
     expect(no.cards).toEqual(open.cards);
+    expect(no.removedByAnswer).toBe(0);
     expect(no.prompt).toBeNull();
     const dismissed = run(open, { type: "dismissPrompt" });
     expect(dismissed.answers).toEqual([]);

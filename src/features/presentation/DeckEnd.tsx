@@ -24,11 +24,12 @@ export interface DeckEndProps {
    */
   closed?: boolean;
   /**
-   * Au moins un jour gardé par « Tout garder pour le jour N » dans la session : des cartes n'ont pas été triées. Suite
-   * du tri : « Tu as fini ce tri. », comme pour un tri clos (revue UX/UI tardive de la PR 621, spécification B10,
-   * question 8). Aperçu et paquet vide : titre inchangé.
+   * Des cartes de la session n'ont pas été triées une à une : au moins un jour gardé par « Tout garder pour le jour N »,
+   * ou des cartes retirées par une réponse « Oui » à une question de catégorie. Suite du tri : « Tu as fini ce tri. »,
+   * comme pour un tri clos (revues UX/UI tardives de la PR 621, spécification B10, question 8). Aperçu et paquet vide :
+   * titre inchangé.
    */
-  daysKept?: boolean;
+  notAllSorted?: boolean;
 }
 
 const TITLES: Record<DeckEndVariant, string> = { apercu: t.apercu, suite: t.suite, vide: t.vide };
@@ -38,7 +39,7 @@ const TITLES: Record<DeckEndVariant, string> = { apercu: t.apercu, suite: t.suit
  * programme », sans prix (Q2) ; suite du tri et paquet vide : « Voir le programme ». Sans paiement simulé
  * disponible, « Débloquer » n'est pas rendu et le reste est inchangé (F9-PO-19).
  */
-export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = false, daysKept = false }: DeckEndProps) {
+export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = false, notAllSorted = false }: DeckEndProps) {
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
   return (
     <section
@@ -48,7 +49,7 @@ export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = 
       className="flex flex-1 flex-col justify-center gap-6"
     >
       <h2 id="fin-titre" ref={titleRef} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
-        {(closed || daysKept) && variant === "suite" ? t.clos : TITLES[variant]}
+        {(closed || notAllSorted) && variant === "suite" ? t.clos : TITLES[variant]}
       </h2>
       <div className="flex flex-col gap-3">
         {variant === "apercu" && canUnlock ? (

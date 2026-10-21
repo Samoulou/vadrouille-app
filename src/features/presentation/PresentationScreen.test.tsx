@@ -486,6 +486,28 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
   });
 
   /** Actions dont la décision (ou la réponse) n'est pas enregistrée, avec le refus donné. */
+  it.each([
+    ["Oui", "Tu as fini ce tri."],
+    ["Non", "Tu as tout trié"],
+  ] as const)("suite du tri, réponse « %s » à une question de catégorie puis fin du paquet : « %s »", async (reponse, titre) => {
+    const cartes = [activity("n1", 1, "09:00", "nature"), activity("n2", 1, "11:00", "nature"), activity("m1", 1, "14:00", "museum")];
+    setup({
+      tripId: edimbourgDebloque.id,
+      unlocked: true,
+      proposals: cartes,
+      deck: session(cartes.map((c) => c.id), 0, { openPrompt: { kind: "category", category: "nature" } }),
+      actions: actionsEspion().actions,
+    });
+    const feuille = await screen.findByRole("dialog");
+    fireEvent.click(within(feuille).getByRole("button", { name: reponse }));
+    await flush();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // « Oui » retire les cartes « nature » restantes, qui n'ont pas été triées une à une (spécification B10, question 8).
+    while (document.querySelector("[data-part='carte']")) await click("J'aime");
+    expect(screen.getByRole("heading", { name: titre })).toBeInTheDocument();
+    if (reponse === "Oui") expect(screen.queryByText("Tu as tout trié")).toBeNull();
+  });
+
   function actionsRefusees(refus: "recalcul" | "echec" | "dejaDecidee") {
     return {
       decide: vi.fn(async () => ({ prompt: null, refus })),
