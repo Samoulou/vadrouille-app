@@ -379,10 +379,28 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
         await q(
           `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
            VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
-          // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
-          [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, 100 - rang, run.finished],
+          // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`). Une ligne `batch`
+          // est d'abord écrite en `mini`, puis rattachée à sa clôture (voir plus bas).
+          [org.org, tripId, run.kind === "batch" ? "mini" : run.kind, run.finished ? "ready" : "preparing", courante, 100 - rang, run.finished],
         )
       ).rows[0]?.id as string;
+      if (run.kind === "batch") {
+        // Migration 0015_recalcul_lot (décision 0119 § 1.1 point 1) : une ligne `batch` a une version de base et une
+        // clôture. Clôture de phase `deck` sur la ligne elle-même, pour n'en écrire aucune autre : la lecture du tri ne
+        // lit que les clôtures de l'exécution `preview` et de sa phase (`SQL_CLOTURE`), elle reste donc inchangée.
+        const clotureId = (
+          await q(
+            "INSERT INTO deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id) VALUES ($1, $2, $3, 'deck', 1, gen_random_uuid()) RETURNING id",
+            [org.org, tripId, runId],
+          )
+        ).rows[0]?.id as string;
+        await q("UPDATE generation_runs SET kind = 'batch', base_version = $1, deck_closure_id = $2 WHERE organization_id = $3 AND id = $4", [
+          courante ?? 0,
+          clotureId,
+          org.org,
+          runId,
+        ]);
+      }
       for (const ligne of run.propositions) {
         await q(
           "INSERT INTO proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, content) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
