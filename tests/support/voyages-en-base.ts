@@ -124,6 +124,7 @@ function jourConverti(trip: Trip, index: number): DaySnapshot {
     events: day.events.map(evenementConverti),
     travelBudgetMinutes: day.travelBudgetMinutes,
     ...(surprise === undefined ? {} : { surprise }),
+    ...(day.theme === undefined ? {} : { theme: day.theme }),
   };
 }
 
