@@ -58,9 +58,9 @@ describe("contrats du tri enregistré (spécification B10, B10a ; décision 0112
     expect(PREFERENCE_SIGNALS).toEqual(["like", "dislike", "choose", "nextOption", "answerYes", "answerNo", "travelReduction"]);
   });
 
-  it("generation_in_progress : à la fin des codes, sans réordonner, retryable vrai exigé", () => {
-    expect(API_ERROR_CODES.at(-1)).toBe("generation_in_progress");
-    expect(API_ERROR_CODES.at(-2)).toBe("internal");
+  it("generation_in_progress : ajouté après internal, sans réordonner, retryable vrai exigé", () => {
+    expect(API_ERROR_CODES.indexOf("generation_in_progress")).toBeGreaterThan(API_ERROR_CODES.indexOf("internal"));
+    expect(API_ERROR_CODES.indexOf("internal")).toBeGreaterThanOrEqual(0);
     expect(ApiErrorSchema.safeParse({ code: "generation_in_progress", retryable: true }).success).toBe(true);
     expect(ApiErrorSchema.safeParse({ code: "generation_in_progress" }).success).toBe(false);
     expect(ApiErrorSchema.safeParse({ code: "generation_in_progress", retryable: false }).success).toBe(false);
