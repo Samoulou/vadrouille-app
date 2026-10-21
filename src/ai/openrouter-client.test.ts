@@ -380,6 +380,30 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
   });
 });
 
+describe("programme: requête zdr (verdict S5 de 0117, décision 0116 § 2.2)", () => {
+  it.each([
+    ["404 (aucun fournisseur zdr)", 404, "upstream_error"],
+    ["400", 400, "upstream_error"],
+    ["503", 503, "upstream_unavailable"],
+  ] as [string, number, string][])("programme: requête programme en zdr, refus du fournisseur sans second appel, code fermé (%s)", async (_nom, statut, code) => {
+    const refus = async () => new Response('{"error":{"message":"SENTINELLE-FOURNISSEUR No endpoints found matching your data policy"}}', { status: statut });
+    const { client, appels, port } = monter([refus, refus, refus]);
+    let erreur: unknown;
+    try {
+      await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    } catch (e) {
+      erreur = e;
+    }
+    // Un seul appel, jamais un second sans zdr ni vers un autre fournisseur ; code fermé, aucun message du fournisseur.
+    expect(appels).toHaveLength(1);
+    const corps = JSON.parse(String(appels[0]!.init.body)) as { provider?: Record<string, unknown> };
+    expect(corps.provider).toMatchObject({ data_collection: "deny", zdr: true });
+    expect((erreur as ErreurOpenRouter).code).toBe(code);
+    expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+    expect(`${(erreur as Error).message} ${JSON.stringify(erreur)}`).not.toContain("SENTINELLE-FOURNISSEUR");
+  });
+});
+
 describe("p0: fournisseur explicite (statique)", () => {
   const source = readFileSync(import.meta.filename.replace(/\.test\.ts$/, ".ts"), "utf8");
 
