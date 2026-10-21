@@ -88,15 +88,6 @@ export async function ancrerCandidatsDansZone(
 /** Lieu distinct du programme écrit par l'IA (décision 0115) : identifiant interne, nom et ville **contrôlés** (0117 § 1). */
 export type LieuProgramme = { readonly id: string; readonly lieu: string; readonly ville?: string };
 
-/**
- * Lieux qui ne seront pas envoyés à Text Search faute de **part** (`unverifiedForCap`, 0117 § 4 ; 0116 § 3.5),
- * calculés **avant** la boucle de vérification, des seuls nombres de lieux, de la part Text Search de l'exécution et
- * des logements (une recherche chacun) : `max(0, lieux − (part − logements))`. Indépendant de l'horloge et des
- * réponses de Google ; les lieux sautés faute de temps ou de part de fiches ne sont pas comptés.
- */
-export function lieuxHorsPartTextSearch(nombreLieux: number, partTextSearch: number, logements: number): number {
-  return Math.max(0, nombreLieux - Math.max(0, partTextSearch - logements));
-}
 
 /** Issue de la vérification, en mémoire seulement (0011 § 2) : fiches gardées par identifiant interne. */
 export type IssueVerification = {
@@ -121,7 +112,7 @@ export type ControleAppel = (methode: "textSearch" | "fiche") => Promise<"ok" | 
  *    tombe dans la zone. Les horaires ne sont **pas** évalués ici (0116 § 4.4) : un lieu fermé le jour du créneau garde
  *    son identifiant, son badge vient de la relecture des horaires à l'affichage (0116 § 5.3).
  * `controle` est appelé avant chaque appel : non tenu, la boucle s'arrête et les lieux restants ne sont pas vérifiés
- * (écrits sans `placeId`) ; aucun compte n'en sort (`unverifiedForCap` vient de `lieuxHorsPartTextSearch`). Jamais un arrêt de l'exécution pour
+ * (écrits sans `placeId`) ; aucun compte n'en sort (`unverifiedForCap` vient de `lieuxHorsPartTextSearch`, `src/grounding/ancrage.ts`). Jamais un arrêt de l'exécution pour
  * cette cause (PPI-PO-4, 0116 § 3.5). Toute erreur d'un appel (refus du registre compris) est propagée.
  * Aucun verdict, motif ni donnée Google ne sort de cette fonction, hors des fiches gardées en mémoire.
  */

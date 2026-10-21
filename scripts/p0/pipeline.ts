@@ -9,7 +9,7 @@ import { lieuxDuProgramme, lireNotes, lireProgramme, lireRaisons, ordreEcrit } f
 import { identifiantVoyage } from "@/domain/identifiant";
 import { planifier } from "@/domain/planification";
 import { squelette } from "@/domain/squelette";
-import { ancrerCandidats, ancrerLogements, ficheOuNull, matriceTrajets, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
+import { ancrerCandidats, ancrerLogements, ficheOuNull, lieuxHorsPartTextSearch, matriceTrajets, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
 import { estAncre, type Ancrage, type AncrageResolu, type Position, type Trajets } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
@@ -404,8 +404,6 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
 
 export type ResultatPipelineProgramme = { programme?: ProgrammeReduit; rapport: RapportProgramme };
 
-/** Lieux non envoyés à Text Search faute de part : `max(0, lieux − (part − logements))`, avant la boucle (0117 § 4). */
-const lieuxHorsPart = (lieux: number, part: number, logements: number) => Math.max(0, lieux - Math.max(0, part - logements));
 
 /**
  * Mode simulé de `pnpm p0` par la **nouvelle chaîne** (spécification P0-programme-par-ia § 1 point 7 ; décision 0116
@@ -451,10 +449,12 @@ export async function executerProgramme(entree: EntreePipeline): Promise<Resulta
 
     // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit.
     const logements = await ancrerLogements(brief, places);
-    const premier = logements[0] as AncrageResolu;
+    // Revue 2 de la PR 632, mineur 4 : un brief sans logement s'arrête en erreur explicite, jamais un biais inventé.
+    const premier = logements.at(0);
+    if (premier === undefined) throw Object.assign(new Error("lodging_unresolved"), { code: "lodging_unresolved" });
     const { lieux, cleDe } = lieuxDuProgramme(ecrit, brief.destination);
     lecture.placesToVerify = lieux.length;
-    lecture.unverifiedForCap = lieuxHorsPart(lieux.length, configuration.plafonds.placesTextSearch, brief.logements.length);
+    lecture.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, configuration.plafonds.placesTextSearch, brief.logements.length);
     const fiches = new Map<string, AncrageResolu>();
     const lues = new Map<string, AncrageResolu | null>();
     try {

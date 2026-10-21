@@ -7,7 +7,8 @@ import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireExecution } from "@
 import { MAX_RESULTATS_WEB } from "@/ai/client";
 import { lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
 import type { ExecutionEnCours, PhaseTravail } from "@/contracts/prototype-travail";
-import { ancrerLogementsDuSejour, lieuxHorsPartTextSearch, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
+import { lieuxHorsPartTextSearch } from "@/grounding/ancrage";
+import { ancrerLogementsDuSejour, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
 import { blocsDeTrajets, creerCadence, planRoutes, trajetsConsecutifs } from "@/grounding/budget-routes";
 import type { Position } from "@/prototype/ancrage";
 import { CODES_ARRET, codePersiste, type CodeArret } from "@/prototype/arret";

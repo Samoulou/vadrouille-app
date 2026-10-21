@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import { createPrototypeAdapter } from "@/adapters/prototype";
 import { creerModelesSimules, FixturesModelesSchema } from "@/ai/modeles.simule";
 import { TripSchema } from "@/contracts";
-import { lieuxDuProgramme, lireProgramme } from "@/ai/sorties";
+import { lieuxDuProgramme, lireProgramme, ordreEcrit } from "@/ai/sorties";
+import { lieuxHorsPartTextSearch } from "@/grounding/ancrage";
 import { creerPlacesSimule, FixturesPlacesSchema } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { ProgrammeReduitSchema, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
@@ -57,7 +58,7 @@ function fixturesRome(): Fixtures {
   return { ...edimbourg, modeles, places: FixturesPlacesSchema.parse({ lieux }) };
 }
 
-async function executerSimule(nomBrief: string, slug: string) {
+async function executerSimule(nomBrief: string, slug: string, plafondsModifies: Partial<ReturnType<typeof lireConfiguration>["plafonds"]> = {}) {
   const fixtures = slug === "rome" ? fixturesRome() : lireFixtures(slug);
   const lignes: string[] = [];
   const appels: string[] = [];
@@ -66,7 +67,10 @@ async function executerSimule(nomBrief: string, slug: string) {
     nomBrief,
     brief: lireBrief(nomBrief),
     variante: "b",
-    configuration: lireConfiguration(),
+    configuration: (() => {
+      const configuration = lireConfiguration();
+      return { ...configuration, plafonds: { ...configuration.plafonds, ...plafondsModifies } };
+    })(),
     dateExecution: "2026-10-12",
     numero: 1,
     journal: creerJournal((ligne) => void lignes.push(ligne), creerRedacteur([])),
@@ -120,5 +124,34 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     expect(resultat.rapport.etapes.sansPlaceId).toBeGreaterThan(0);
     const sansLieu = resultat.programme!.trip.days.flatMap((jour) => jour.items).filter((ligne) => ligne.type === "stop" && ligne.stop.placeId === undefined);
     expect(sansLieu).toHaveLength(resultat.rapport.etapes.sansPlaceId);
+  });
+
+  it("p0: unverifiedForCap du mode simulé, même règle que p0Run (parité, part Text Search de 18)", async () => {
+    // Mêmes entrées que « p0: unverifiedForCap compte seulement les lieux non envoyés faute de part Text Search »
+    // (`tests/unit/workflows/p0-run-finale.test.ts`) : edimbourg-1, 18 requêtes, un logement ; p0Run y écrit lieux − 17.
+    const { resultat } = await executerSimule("edimbourg-1", "edimbourg", { placesTextSearch: 18 });
+    const fixtures = lireFixtures("edimbourg");
+    const brief = lireBrief("edimbourg-1");
+    const programme = ordreEcrit(lireProgramme(JSON.stringify(fixtures.modeles.programme), { arrivee: brief.arrivee, depart: brief.depart }).valeur!);
+    const lieux = lieuxDuProgramme(programme, brief.destination).lieux.length;
+    expect(lieux).toBeGreaterThan(17);
+    expect(resultat.rapport.statut).toBe("complete");
+    expect(resultat.rapport.programme.placesToVerify).toBe(lieux);
+    expect(resultat.rapport.programme.unverifiedForCap).toBe(lieux - 17);
+    expect(resultat.rapport.programme.unverifiedForCap).toBe(lieuxHorsPartTextSearch(lieux, 18, brief.logements.length));
+    // Programme entier écrit ; les lieux non envoyés le sont sans placeId.
+    expect(resultat.rapport.etapes.sansPlaceId).toBeGreaterThanOrEqual(lieux - 17);
+  });
+
+  it("p0: une seule définition de la règle unverifiedForCap, importée par p0Run et par le mode simulé", () => {
+    const source = (fichier: string) => readFileSync(path.join(process.cwd(), fichier), "utf8");
+    const definitions = ["src/grounding/ancrage.ts", "src/grounding/ancrage-zone.ts", "src/workflows/p0-run.ts", "scripts/p0/pipeline.ts"].filter((fichier) =>
+      /function lieuxHorsPartTextSearch|Math\.max\(0,\s*\w+\s*-\s*Math\.max\(0,/.test(source(fichier)),
+    );
+    expect(definitions).toEqual(["src/grounding/ancrage.ts"]);
+    for (const fichier of ["src/workflows/p0-run.ts", "scripts/p0/pipeline.ts"]) {
+      expect(source(fichier), fichier).toMatch(/import \{[^}]*\blieuxHorsPartTextSearch\b[^}]*\} from "@\/grounding\/ancrage";/);
+      expect(source(fichier), fichier).toMatch(/unverifiedForCap = lieuxHorsPartTextSearch\(/);
+    }
   });
 });

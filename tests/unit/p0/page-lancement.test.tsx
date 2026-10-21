@@ -203,6 +203,10 @@ describe("p0: page de lancement", () => {
     expect(renderToString(await ExecutionsPage())).toContain(html$(libelle));
     // Le texte copié ne reçoit pas ces nombres (0117 § 4) : aucune ligne d'étapes.
     expect(page.modele.rapport?.texte).not.toContain(t.rapport.etapes.split(" :")[0]!);
+    // Revue 2 de la PR 632, mineur 5 : ni le libellé rempli, ni ses valeurs, ni la forme « non relevé » des étapes.
+    expect(page.modele.rapport?.texte).not.toContain(libelle);
+    expect(page.modele.rapport?.texte).not.toContain(t.rapport.etapesNonRelevees);
+    expect(page.modele.rapport?.texte.split("\n").some((ligne) => ligne.includes(String(etapes?.avecPlaceId)) && ligne.includes(String(etapes?.sansPlaceId)) && /tapes/.test(ligne))).toBe(false);
     // Exécution arrêtée sans programme : non relevé, aucune lecture du contenu.
     d.lignes = [ligne({ status: "arretee", stop_code: "upstream_unavailable", canary_ok: null })];
     d.requetes.length = 0;
