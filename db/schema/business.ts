@@ -20,6 +20,7 @@ import {
   uniqueIndex,
   uuid,
   type AnyPgColumn,
+  type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
 
 import {
@@ -260,9 +261,24 @@ export const generationRuns = pgTable(
     personRetryRequestIds: uuid("person_retry_request_ids").array().notNull().default(sql`'{}'::uuid[]`),
     /** Reprises par le studio (ligne `full` seulement, 0087 § 1.2). */
     studioRetries: integer("studio_retries").notNull().default(0),
+    /**
+     * B10b (décision 0119 § 1.1, migration 0015) : `trips.current_version` lue dans la transaction qui crée la ligne
+     * `batch` ; non nulle si et seulement si `kind = 'batch'`.
+     */
+    baseVersion: integer("base_version"),
+    /** B10b (0119 § 1.1) : clôture du tri qui a déclenché le recalcul ; non nulle si et seulement si `kind = 'batch'`. */
+    deckClosureId: uuid("deck_closure_id"),
   },
-  (t) => [
+  // Type de retour écrit : sans lui, la référence circulaire à `deckClosures` rendrait les deux tables `any` (TS7022).
+  (t): PgTableExtraConfigValue[] => [
     tripFk("generation_runs_trip_fk", t),
+    // B10b (0119 § 1.1) : clé étrangère composée vers `deck_closures (organization_id, id)`. Référence circulaire
+    // (une clôture vise une exécution) : résolue à la lecture du schéma, `deckClosures` étant déclarée plus bas.
+    foreignKey({
+      name: "generation_runs_deck_closure_fk",
+      columns: [t.organizationId, t.deckClosureId],
+      foreignColumns: [deckClosures.organizationId, deckClosures.id],
+    }),
     unique(uniqueKeyName("generation_runs_organization_id_id")).on(t.organizationId, t.id),
     index("generation_runs_organization_id_trip_id_started_at_idx").on(t.organizationId, t.tripId, t.startedAt),
     uniqueIndex("generation_runs_organization_id_trip_id_request_id_idx")
@@ -281,6 +297,18 @@ export const generationRuns = pgTable(
       "generation_runs_retries_full_check",
       sql`${t.kind} = 'full' OR (cardinality(${t.personRetryRequestIds}) = 0 AND ${t.studioRetries} = 0)`,
     ),
+    // B10b (0119 § 1.1 point 1) : version de base et clôture présentes si et seulement si la ligne est un recalcul.
+    check(
+      "generation_runs_batch_check",
+      sql`(${t.kind} = 'batch') = (${t.baseVersion} IS NOT NULL) AND (${t.kind} = 'batch') = (${t.deckClosureId} IS NOT NULL)`,
+    ),
+    // B10b (0119 § 1.2 point 1) : au plus un recalcul par tri clos ; au plus un recalcul en cours par voyage.
+    uniqueIndex("generation_runs_organization_id_trip_id_deck_closure_id_idx")
+      .on(t.organizationId, t.tripId, t.deckClosureId)
+      .where(sql`${t.kind} = 'batch'`),
+    uniqueIndex("generation_runs_organization_id_trip_id_batch_active_idx")
+      .on(t.organizationId, t.tripId)
+      .where(sql`${t.kind} = 'batch' AND ${t.finishedAt} IS NULL`),
   ],
 );
 
@@ -582,6 +610,9 @@ export const deckClosures = pgTable(
       columns: [t.organizationId, t.generationRunId],
       foreignColumns: [generationRuns.organizationId, generationRuns.id],
     }),
+    // B10b (0119 § 1.1 point 1, migration 0015) : cible de la clé étrangère composée de `generation_runs`. Nom explicite
+    // en `_unique` : un nom en `_key` hors de `db/schema/` serait pris pour un nom secret (confinement du dépôt).
+    unique("deck_closures_organization_id_id_unique").on(t.organizationId, t.id),
     unique(uniqueKeyName("deck_closures_organization_id_trip_id_request_id")).on(t.organizationId, t.tripId, t.requestId),
     // Nom court : la forme longue dépasserait les 63 caractères d'un identifiant Postgres.
     unique(uniqueKeyName("deck_closures_organization_id_trip_id_run_phase_position")).on(

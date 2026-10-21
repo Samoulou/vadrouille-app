@@ -527,11 +527,15 @@ describe("présentation: aucune donnée Google ni nom dans les signaux", () => {
 describe("présentation: décision refusée pendant un recalcul", () => {
   it("exécution batch en cours : generation_in_progress (retryable), rien d'écrit ; les lectures restent possibles", async () => {
     const tripId = await nouveauVoyage(a, { batchEnCours: true });
+    // Migration 0015_recalcul_lot (0119 § 1.1) : la ligne `batch` du jeu vise sa clôture, écrite par
+    // `tests/support/voyages-en-base.ts` ; rien d'autre n'est écrit ensuite.
+    const avant = await toutes(tripId);
+    expect(avant).toEqual({ signaux: 0, questions: 0, clotures: 1 });
     expect(refuse(await decider(tripId, "m1", "like"))).toEqual({ code: "generation_in_progress", retryable: true });
     expect(refuse(await repondre(tripId, "museum", "yes"))).toEqual({ code: "generation_in_progress", retryable: true });
     expect(refuse(await clore(tripId))).toEqual({ code: "generation_in_progress", retryable: true });
     expect(refuse(await annuler(tripId, randomUUID()))).toEqual({ code: "generation_in_progress", retryable: true });
-    expect(await toutes(tripId)).toEqual({ signaux: 0, questions: 0, clotures: 0 });
+    expect(await toutes(tripId)).toEqual(avant);
     expect((await session(tripId)).proposalIds).toHaveLength(9);
   });
 });

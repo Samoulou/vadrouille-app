@@ -143,6 +143,8 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     memberships: { SELECT: ["organization_id", "role", "user_id"] },
     organizations: { SELECT: ["deletion_requested_at", "id"], UPDATE: ["deletion_requested_at"] },
     ...Object.fromEntries(PURGED_TABLES.map((t) => [t, { SELECT: ["organization_id"] }])),
+    // B10b (migration 0015_recalcul_lot, décision 0119 § 5.2) : `kind` lue pour vider les lignes `batch` avant les clôtures.
+    generation_runs: { SELECT: ["kind", "organization_id"] },
   },
 };
 
