@@ -28,7 +28,13 @@ import {
 /** Journées lues pour l'aperçu : la première, puis le début de la deuxième (D4). */
 export const JOURS_APERCU = 2;
 
-/** Catégorie d'une proposition tirée d'une étape : le programme écrit n'en garde aucune (texte maison, jamais Google). */
+/**
+ * Catégorie **de repli** d'une proposition tirée d'une étape (décision 0124 § 5) : le programme écrit n'en garde aucune
+ * (texte maison, jamais Google). Conséquences assumées : toutes les activités d'un voyage d'essai comptent comme
+ * « heritage » et tous les repas comme « restaurant » dans la mesure du tri (console) — la répartition par catégorie
+ * n'y veut rien dire ; aucune question de catégorie n'est posée (`questions: false`). Le lot 4 ne doit jamais relire ces
+ * catégories comme des préférences : il les remplace par la catégorie écrite avec le programme.
+ */
 const CATEGORIE_REPAS: Category = "restaurant";
 const CATEGORIE_ACTIVITE: Category = "heritage";
 

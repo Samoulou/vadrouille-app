@@ -68,7 +68,9 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
  */
 export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
   const { trip, routes, actions, placesFromGoogle, unlockHref } = useTripShell();
-  const verrouilles = joursADebloquer(trip);
+  // Journées « À débloquer » seulement avec un lien de déblocage (voyage non débloqué, routes `/voyages`, paiement simulé
+  // disponible) : sans lui, la liste ne montre que les journées servies, comme avant.
+  const verrouilles = unlockHref ? joursADebloquer(trip) : [];
   // Lien « Aujourd'hui · Jour {n} » (F10-PO-7) : aux dates du voyage, à la date de la destination, calculée dans
   // le navigateur après le montage ; seulement avec la base `/voyages` (pas de page `R15` de développement).
   // Décalage assumé : aux dates du voyage, le lien apparaît après le montage et pousse le panneau d'une hauteur
@@ -206,10 +208,18 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           {verrouilles.map((day) => (
             <li key={`verrouille-${day.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
               <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
-                <DayBadge day={day.index} size="sm" disabled />
+                {/* Pastille réduite non active, sans « complet » (réservé à Déplacer) ; le nom lu est « Jour 3, à débloquer ». */}
+                <span aria-hidden="true">
+                  <DayBadge day={day.index} size="sm" />
+                </span>
                 <span className="flex min-w-0 flex-col">
+                  <span className="sr-only" data-part="nom-jour-a-debloquer">
+                    {format(ts.jourParJour.nomADebloquer, { day: day.index })}
+                  </span>
                   <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
-                  <span className="text-corps-s text-ink-soft">{ts.jourParJour.aDebloquer}</span>
+                  <span aria-hidden="true" className="text-corps-s text-ink-soft">
+                    {ts.jourParJour.aDebloquer}
+                  </span>
                 </span>
               </span>
             </li>

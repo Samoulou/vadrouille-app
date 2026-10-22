@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PreviewSlotsSchema, TripSchema, type Day, type DayLineItem, type Stop } from "@/contracts";
-import { PROTOTYPE_ORG_ID, ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesDuProgramme, PROTOTYPE_ORG_ID, ProgrammeReduitSchema, type ProgrammeReduit } from "@/prototype/programme-reduit";
 
 import { createPrototypeAdapter, type LecteurDeblocage, type PaireRelecture, type SourceProgrammes } from "./prototype";
 import { JOURS_APERCU, propositionsDesJours, selectionApercu, voyageNonDebloque } from "./prototype-parcours";
@@ -139,12 +139,40 @@ describe("essai: adaptateur prototype sur un programme sans propositions", () =>
     expect(await adapter.getDayMap(ctx, ESSAI_ID, 3)).toBeNull();
     expect((await adapter.getTripMap(ctx, ESSAI_ID)).map((m) => m.dayIndex)).toEqual([1, 2]);
     const [resume] = await adapter.listTrips(ctx);
+    // Compteurs de « Mes voyages » sur le programme entier (décision 0124 § 6) : trois journées annoncées.
     expect(resume).toMatchObject({ id: ESSAI_ID, unlocked: false, dayCount: 3 });
-    // Aucune journée retirée n'est relue (aucun appel de plus que la lecture du voyage débloqué).
-    const relues = new Set(r.appels.flat().map((paire) => JSON.stringify(paire)));
-    const { r: complet, adapter: debloque } = adaptateur(async () => true);
-    await debloque.getTrip(ctx, ESSAI_ID);
-    expect(relues.size).toBeLessThanOrEqual(new Set(complet.appels.flat().map((paire) => JSON.stringify(paire))).size);
+    expect(r.appels.length).toBeGreaterThan(0);
+  });
+
+  /** Clés des paires d'une journée du programme (lieux manquants exclus), dans l'ordre de la ligne. */
+  const clesDuJour = (index: number): string[] =>
+    (pairesDuProgramme(programmeEssai()).jours.get(index) ?? []).flatMap((paire) => (paire ? [cleTrajet(paire)] : []));
+
+  it.each([
+    ["getTrip", (a: ReturnType<typeof adaptateur>["adapter"]) => a.getTrip(ctx, ESSAI_ID)],
+    ["listPreviewSlots", (a: ReturnType<typeof adaptateur>["adapter"]) => a.listPreviewSlots(ctx, ESSAI_ID)],
+    ["listProposals", (a: ReturnType<typeof adaptateur>["adapter"]) => a.listProposals(ctx, ESSAI_ID)],
+  ])("avant le déblocage, %s relit exactement les paires des journées 1 et 2, une requête par journée, aucune de la journée 3", async (_nom, lire) => {
+    // Les lieux de la journée 3 sont propres à elle (SENTINELLE_PLACE_ID_8 à 11) : une de ses paires relue se verrait.
+    const j3 = new Set(clesDuJour(3));
+    expect(j3.size).toBeGreaterThan(0);
+    for (const cle of [...clesDuJour(1), ...clesDuJour(2)]) expect(j3.has(cle)).toBe(false);
+    const { adapter, r } = adaptateur();
+    await lire(adapter);
+    expect(r.appels.map((appel) => appel.map(cleTrajet))).toEqual([clesDuJour(1), clesDuJour(2)]);
+  });
+
+  it("après le déblocage, getTrip relit les trois journées, une requête chacune", async () => {
+    const { adapter, r } = adaptateur(async () => true);
+    await adapter.getTrip(ctx, ESSAI_ID);
+    expect(r.appels.map((appel) => appel.map(cleTrajet))).toEqual([clesDuJour(1), clesDuJour(2), clesDuJour(3)]);
+  });
+
+  it("indicateur du voyage d'essai (`isTrialTrip`) : vrai pour le programme sans propositions, faux hors organisation ou inconnu", async () => {
+    const { adapter } = adaptateur();
+    expect(await adapter.isTrialTrip?.(ctx, ESSAI_ID)).toBe(true);
+    expect(await adapter.isTrialTrip?.({ ...ctx, organizationId: "org_autre" }, ESSAI_ID)).toBe(false);
+    expect(await adapter.isTrialTrip?.(ctx, "proto_inconnu_1")).toBe(false);
   });
 
   it("après le déblocage : toutes les journées, aperçu vide, suite du tri avec les étapes hors des premières propositions", async () => {
@@ -174,6 +202,8 @@ describe("essai: adaptateur prototype sur un programme sans propositions", () =>
     const { adapter } = adaptateur(async () => false, test);
     const trip = await adapter.getTrip(ctx, test.trip.id);
     expect(trip?.unlocked).toBe(true);
+    // Seul prédicat du parcours (décision 0124 § 4) : pas un voyage d'essai, l'écran garde ses questions.
+    expect(await adapter.isTrialTrip?.(ctx, test.trip.id)).toBe(false);
     expect(await adapter.listPreviewSlots(ctx, test.trip.id)).toEqual([]);
     expect((await adapter.listProposals(ctx, test.trip.id)).length).toBe(test.proposals.length);
   });

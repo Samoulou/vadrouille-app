@@ -300,7 +300,7 @@
             "stop": {
               "id": "j3-a1",
               "kind": "activity",
-              "placeId": "SENTINELLE_PLACE_ID_1",
+              "placeId": "SENTINELLE_PLACE_ID_8",
               "name": "[Lieu d'essai 7]",
               "start": "12:30",
               "end": "14:00",
@@ -329,7 +329,7 @@
             "stop": {
               "id": "j3-dejeuner",
               "kind": "meal",
-              "placeId": "SENTINELLE_PLACE_ID_2",
+              "placeId": "SENTINELLE_PLACE_ID_9",
               "name": "[Table d'essai 8]",
               "start": "14:15",
               "end": "15:15",
@@ -355,7 +355,7 @@
             "stop": {
               "id": "j3-a2",
               "kind": "activity",
-              "placeId": "SENTINELLE_PLACE_ID_3",
+              "placeId": "SENTINELLE_PLACE_ID_10",
               "name": "[Lieu d'essai 9]",
               "start": "16:00",
               "end": "17:30",
@@ -390,7 +390,7 @@
             "stop": {
               "id": "j3-diner",
               "kind": "meal",
-              "placeId": "SENTINELLE_PLACE_ID_4",
+              "placeId": "SENTINELLE_PLACE_ID_11",
               "name": "[Table d'essai 10]",
               "start": "19:15",
               "end": "20:45",
@@ -454,6 +454,22 @@
     },
     "SENTINELLE_PLACE_ID_7": {
       "lat": 55.9593123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_8": {
+      "lat": 55.9493123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_9": {
+      "lat": 55.9483123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_10": {
+      "lat": 55.9473123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_11": {
+      "lat": 55.9463123,
       "lng": -3.1943123
     },
     "SENTINELLE_PLACE_ID_LOGEMENT": {

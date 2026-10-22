@@ -69,6 +69,7 @@
       },
       "enPreparation": "En préparation",
       "aDebloquer": "À débloquer",
+      "nomADebloquer": "Jour {day}, à débloquer",
       "debloquer": "Débloquer"
     }
   },

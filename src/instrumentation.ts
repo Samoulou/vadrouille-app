@@ -88,7 +88,7 @@ async function brancherLecturePrototype(
     const { deblocagesEssaiParCookie } = await import("@/server/essai/deblocage");
     brancherDeblocagesEssai(deblocagesEssaiParCookie);
   } catch (error) {
-    logEvent("p0.read_unavailable", { errorName: errorNameOf(error) }, "error");
+    logEvent("essai.unlock_unavailable", { errorName: errorNameOf(error) }, "error");
   }
 }
 

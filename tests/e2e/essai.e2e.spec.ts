@@ -74,6 +74,11 @@ test("essai: avant le déblocage, seules les journées des premières propositio
   await expect(joursADebloquer(page)).toHaveCount(1);
   await expect(joursADebloquer(page)).toContainText("Mercredi 12 mai");
   await expect(joursADebloquer(page)).toContainText("À débloquer");
+  // Pastille sans « complet » (réservé à Déplacer), nom lu « Jour 3, à débloquer » (décision 0124 § 7).
+  await expect(joursADebloquer(page)).not.toContainText("complet");
+  await expect(joursADebloquer(page).locator("[data-part='nom-jour-a-debloquer']")).toHaveText("Jour 3, à débloquer");
+  await expect(joursADebloquer(page).getByText("Jour 3, à débloquer", { exact: true })).toHaveClass(/sr-only/);
+  expect(await joursADebloquer(page).locator("a, button, [role='link']").count()).toBe(0);
   await expect(page.locator("a[data-part='debloquer']")).toHaveAttribute("href", ESSAI_R9);
   expect((await request.get(`${ESSAI_URL}${ESSAI_R11}/jour/3`)).status()).toBe(404);
   expect((await request.get(`${ESSAI_URL}${ESSAI_R11}/jour/2`)).status()).toBe(200);

@@ -140,6 +140,18 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     expect(brancherDeblocages).toHaveBeenCalledWith(deblocagesEssaiParCookie);
   });
 
+  it("échec du branchement des déblocages : essai.unlock_unavailable (événement distinct), lecture réelle gardée", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    brancherDeblocages.mockImplementationOnce(() => {
+      throw new RangeError("secret du cookie");
+    });
+    await register();
+    expect(brancher).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("essai.unlock_unavailable", { errorName: "RangeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+
   it.each([undefined, "", "mock", "api"])("DATA_ADAPTER=%j : rien n'est branché", async (valeur) => {
     vi.stubEnv("DATA_ADAPTER", valeur);
     await register();

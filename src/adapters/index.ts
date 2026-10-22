@@ -209,6 +209,19 @@ export function getTripReader(options: { scope?: SimulationScope } = {}): TripAd
 }
 
 /**
+ * Voyage d'essai (spécification E2E-essai, lot 1 ; décision 0124 § 4) : indicateur décidé par l'adaptateur
+ * (`TripAdapter.isTrialTrip`), seul prédicat que lisent les écrans. Adaptateur sans la méthode (`mock`, `api`) ou
+ * lecture qui lève : `false` (parcours habituel).
+ */
+export async function isTrialTrip(adapter: TripAdapter, ctx: AdapterContext, tripId: string): Promise<boolean> {
+  try {
+    return (await adapter.isTrialTrip?.(ctx, tripId)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Retient le déblocage simulé d'un voyage d'essai (spécification E2E-essai, lot 1) après un paiement simulé réussi :
  * cookie signé de l'essai, écrit par une action serveur seulement. Sans effet hors adaptateur `prototype`, paiement
  * simulé indisponible ou cookie non branché (garde du mode réel fermée). Ne lève jamais.

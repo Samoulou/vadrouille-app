@@ -403,6 +403,11 @@ interface SourceServie {
 /**
  * Voyage d'essai (spécification E2E-essai, lot 1) : programme écrit par `p0Run`, sans proposition enregistrée. Il suit
  * le parcours de l'app (D4) ; un programme qui porte ses propositions (programmes de test) est servi comme avant.
+ *
+ * Règle **provisoire** (décision 0124 § 4) : déduite de la forme du programme faute d'indicateur écrit. Seul prédicat
+ * du parcours : les écrans le lisent par `isTrialTrip` (jamais `isPrototypeAdapter()`). Le lot 4 la remplace par un
+ * indicateur explicite écrit avec le programme ; d'ici là, un programme d'essai qui porterait des propositions serait
+ * servi comme un programme de test.
  */
 function enParcours(servi: ProgrammeServi): boolean {
   return servi.programme.proposals.length === 0;
@@ -498,6 +503,11 @@ function creerAdapter({ lister, lire, relecteur, deblocage = JAMAIS_DEBLOQUE }: 
       const parcours = await etat(ctx, servi);
       if (parcours === null || parcours.debloque) return [];
       return PreviewSlotsSchema.parse((await propositionsDuParcours(servi, parcours)).map((proposal) => ({ type: "proposal", proposal })));
+    },
+    /** Voyage d'essai (`enParcours`, décision 0124 § 4) : le seul indicateur que lisent les écrans. */
+    async isTrialTrip(ctx, tripId) {
+      const servi = await trouver(ctx, tripId);
+      return servi !== null && enParcours(servi);
     },
     /** Session de tri en mémoire de F6 (B10-PO-18) : aucun tri enregistré sur `prototype` (décision 0112 § 4 point 1). */
     async getDeckSession() {

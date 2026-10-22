@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { getRevisionFixtures, isPrototypeAdapter, paymentAvailable, shareButtonVisible } from "@/adapters";
-import { unlockRoutes } from "@/features/presentation/routes";
 import { contexteFacultatif } from "@/features/compte/session";
+import { unlockRoutes } from "@/features/presentation/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 

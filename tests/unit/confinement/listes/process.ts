@@ -230,8 +230,8 @@ export const LECTURES_ENV = [
 export const ENV_ENTIER = [
   { fichier: "playwright.config.ts", formes: ["propriete-env:e2ePort"] },
   // Ticket 691 (spécification E2E-essai, lot 1) : `paymentAvailable` passe aussi son `env` à `prototypeAdapterAllowed`
-  // (paiement simulé d'un voyage d'essai, liste blanche de `prototype`, jamais en production). Verdict Sécurité : demandé
-  // dans la relecture de la PR du lot 1.
+  // (paiement simulé d'un voyage d'essai, liste blanche de `prototype`, jamais en production). Verdict Sécurité : approuvé,
+  // PR #696, b5c86d3 (décision 0124 § 1).
   {
     fichier: "src/adapters/payment-guard.ts",
     formes: [
