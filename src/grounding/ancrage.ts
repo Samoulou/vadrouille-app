@@ -135,3 +135,15 @@ export async function matriceTrajets(placeIds: readonly string[], mode: ModeRout
   const minutes = await minutesDeTrajets(ids, ids, mode, routes);
   return (depuis, vers) => (depuis === vers ? 0 : minutes.get(cleTrajet(depuis, vers)));
 }
+
+/**
+ * Lieux qui ne seront pas envoyés à Text Search faute de **part** (`unverifiedForCap`, 0117 § 4 ; 0116 § 3.5),
+ * calculés **avant** la boucle de vérification, des seuls nombres de lieux, de la part Text Search de l'exécution et
+ * des logements (une recherche chacun) : `max(0, lieux − (part − logements))`. Indépendant de l'horloge et des
+ * réponses de Google ; les lieux sautés faute de temps ou de part de fiches ne sont pas comptés. **Règle unique** de
+ * `p0Run` (`etapeProgramme`) et du mode simulé de `pnpm p0` (`executerProgramme`) : module sans `server-only`, que le
+ * script peut charger (revue 2 de la PR 632, bloquant 1).
+ */
+export function lieuxHorsPartTextSearch(nombreLieux: number, partTextSearch: number, logements: number): number {
+  return Math.max(0, nombreLieux - Math.max(0, partTextSearch - logements));
+}

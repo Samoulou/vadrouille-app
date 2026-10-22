@@ -121,4 +121,20 @@ describe("p0: délai par requête et réservation libérée", () => {
     expect((await registre.reserve(demande())).ok).toBe(true);
     expect(await registre.reserve(demande())).toEqual({ ok: false, code: "cap_reached" });
   });
+
+  // Décision 0116 § 2.3 : la requête de modèle `programme` a son propre délai (300 s), les autres délais sont inchangés.
+  it("requête programme : délai de 300 s, abandonnée et comptée au-delà ; autres délais inchangés", async () => {
+    expect(DELAI_REQUETE_MS).toEqual({ openrouter: 120_000, openrouterProgramme: 300_000, places: 10_000, routes: 10_000 });
+    const { registre, horloge, dependances } = monter();
+    const chat = demande({ fournisseur: "modeles", methode: "chat", sku: "modele", coutEstimeMicros: 1_000 });
+    const issue = avecReservation(dependances, chat, DELAI_REQUETE_MS.openrouterProgramme, (_signal, appele) => {
+      appele();
+      return new Promise<never>(() => undefined);
+    });
+    await horloge.avancer(DELAI_REQUETE_MS.openrouter);
+    expect(registre.comptees()).toBe(1);
+    await horloge.avancer(DELAI_REQUETE_MS.openrouterProgramme - DELAI_REQUETE_MS.openrouter);
+    expect(await issue).toEqual({ ok: false, code: "upstream_timeout" });
+    expect(await registre.consumption(null, { methode: "chat" })).toEqual({ requetes: 1, elements: 0, coutMicros: 1_000 });
+  });
 });

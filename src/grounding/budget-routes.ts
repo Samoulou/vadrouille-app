@@ -194,3 +194,73 @@ export function routesDuSejour(routes: ClientRoutes, plan: PlanRoutes, cadence: 
     consommation: () => ({ elements: total.elements, requetes: total.requetes }),
   };
 }
+
+/** Plus grand nombre d'éléments d'une requête de trajets consécutifs (blocs d'origines et de destinations voisines). */
+export const ELEMENTS_BLOC_CONSECUTIFS = 16;
+
+/**
+ * Requêtes de trajets consécutifs d'un programme (décision 0116 § 3.3) : paires distinctes de points consécutifs
+ * définis de chaque chaîne, groupées dans l'ordre en blocs de `ELEMENTS_BLOC_CONSECUTIFS` éléments au plus. Seule
+ * règle de groupement, partagée par `trajetsConsecutifs` et par la réserve de trajets de l'échéance (0116 § 3.5).
+ */
+export function blocsDeTrajets(chaines: readonly (readonly (string | undefined)[])[]): { readonly origines: string[]; readonly destinations: string[] }[] {
+  const paires: [string, string][] = [];
+  const vues = new Set<string>();
+  for (const chaine of chaines) {
+    for (let rang = 1; rang < chaine.length; rang += 1) {
+      const depuis = chaine.at(rang - 1);
+      const vers = chaine.at(rang);
+      if (depuis === undefined || vers === undefined || depuis === vers || vues.has(cleTrajet(depuis, vers))) continue;
+      vues.add(cleTrajet(depuis, vers));
+      paires.push([depuis, vers]);
+    }
+  }
+  const blocs: { origines: string[]; destinations: string[] }[] = [];
+  for (const [depuis, vers] of paires) {
+    const courant = blocs.at(-1);
+    const origines = courant === undefined ? [] : [...new Set([...courant.origines, depuis])];
+    const destinations = courant === undefined ? [] : [...new Set([...courant.destinations, vers])];
+    if (courant !== undefined && origines.length * destinations.length <= ELEMENTS_BLOC_CONSECUTIFS) {
+      courant.origines = origines;
+      courant.destinations = destinations;
+    } else blocs.push({ origines: [depuis], destinations: [vers] });
+  }
+  return blocs;
+}
+
+/**
+ * Temps de trajet entre **points consécutifs vérifiés** du programme écrit par l'IA (décision 0115 § 3 étape 3 ;
+ * décision 0116 § 3.3 et § 3.5 ; 0092 inchangée). `chaines` : pour chaque jour, les points dans l'ordre de la journée
+ * (logement de départ, étapes, logement d'arrivée), `undefined` pour une étape non vérifiée : une paire n'est demandée
+ * que si ses deux points sont des identifiants (jamais vers ni depuis un lieu « à confirmer », critère A8).
+ *
+ * Paires distinctes groupées dans l'ordre en requêtes de `ELEMENTS_BLOC_CONSECUTIFS` éléments au plus (origines ×
+ * destinations), sous les plafonds de l'exécution (`plafonds`) et la cadence par minute ; plafond atteint, ou appel
+ * refusé faute de temps (`cap_reached`) : les paires restantes restent **sans durée** (`undefined`, puis `null` à
+ * l'affichage, 0092 § 4), jamais inventées et sans arrêt. Toute autre erreur est propagée. Durées en mémoire seulement.
+ */
+export async function trajetsConsecutifs(
+  routes: ClientRoutes,
+  chaines: readonly (readonly (string | undefined)[])[],
+  mode: ModeRoutes,
+  plafonds: PlafondsRoutes,
+  cadence: Cadence,
+): Promise<Trajets> {
+  const blocs = blocsDeTrajets(chaines);
+  const minutes = new Map<string, number>();
+  const total = { elements: 0, requetes: 0 };
+  for (const bloc of blocs) {
+    const elements = bloc.origines.length * bloc.destinations.length;
+    if (total.requetes + 1 > plafonds.requetes || total.elements + elements > plafonds.elements) break;
+    try {
+      await cadence.reserver(elements);
+      total.requetes += 1;
+      total.elements += elements;
+      for (const [cle, valeur] of await minutesDeTrajets(bloc.origines, bloc.destinations, mode, routes)) minutes.set(cle, valeur);
+    } catch (erreur) {
+      if ((erreur as { code?: unknown } | null)?.code !== "cap_reached") throw erreur;
+      break;
+    }
+  }
+  return (depuis, vers) => (depuis === vers ? 0 : minutes.get(cleTrajet(depuis, vers)));
+}

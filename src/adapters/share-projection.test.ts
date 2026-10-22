@@ -143,6 +143,26 @@ describe("projectSharedTrip", () => {
   });
 });
 
+describe("partage: infos pratiques et titre du jour (décisions 0103 et 0116 § 6)", () => {
+  it("partage: un voyage dont l'étape porte priceNote, hoursNote et tip ne les expose ni par la projection ni par la base (projection)", () => {
+    const INFOS = { tip: "[Conseil sentinelle]", priceNote: "[Prix sentinelle]", hoursNote: "[Horaires sentinelle]" };
+    const avecInfos: Trip = {
+      ...trip,
+      days: trip.days.map((day) => ({
+        ...day,
+        theme: "[Titre sentinelle]",
+        items: day.items.map((item) => (item.type === "stop" ? { ...item, stop: { ...item.stop, facts: { ...item.stop.facts, ...INFOS } } } : item)),
+        events: day.events.map((event) => ({ ...event, facts: { ...event.facts, ...INFOS } })),
+      })),
+    };
+    const projete = projectSharedTrip(avecInfos);
+    const texte = JSON.stringify(projete);
+    for (const sentinelle of [...Object.values(INFOS), "[Titre sentinelle]"]) expect(texte).not.toContain(sentinelle);
+    expect([...keyPaths(projete)].filter((path) => !ALLOWED.has(path))).toEqual([]);
+    expect(SharedTripSchema.safeParse(projete).success).toBe(true);
+  });
+});
+
 describe("points de carte (F10-TL-14)", () => {
   it("étapes seulement, chacune désignée par sa clé locale au jour ; aucun terminus", () => {
     for (const day of trip.days) {

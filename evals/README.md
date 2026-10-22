@@ -11,6 +11,7 @@ Spécification `specs/B7-couche-ia-recherche.md`, B7c point 4 et décision de pr
 | `simule/` | Doubles fabriqués à la main pour les cas qui n'ont pas de jeu dans `prototype/fixtures/` (destination peu couverte). |
 | `qualite/` | Cas de qualité du programme (amendement 3 de la suite 2 de P0, P0S2-PO-28, partie recherche), type `qualite` : Rome et Naxos, avec leurs catégories et leurs incontournables attendus. |
 | `simule/qualite-*` | Doubles des cas `qualite/` (modèles, recherche, pages) et leurs `bornes.json` (cibles par créneau, total de candidats, tours et âge maximal des sources). |
+| `programme/` | Lot 1 du programme par l'IA (spécification P0-programme-par-ia § 5, décision 0116 § 8.4) : sorties simulées du prompt `programme` pour rome-1 et edimbourg-1, et `config.json`, seuils du Product Owner (A1 à A6) et incontournables attendus, mesurés par `tests/unit/evals/programme.test.ts`. Mesures de la sortie, jamais des règles du prompt ni du code. |
 | `resultats/` | Mesures commitées, pour comparer les versions de prompts et de modèles. `simule.json` : mesures du mode simulé, vérifiées par le test. |
 
 Chaque cas a la forme de `CasEvaluationSchema` (`src/research/evaluation.ts`) : la demande de structuration, l'entrée des autres étapes, le jeu de doubles du mode simulé et les attentes maison (catégories, incontournables par nom maison).

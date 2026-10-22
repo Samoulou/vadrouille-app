@@ -1,9 +1,10 @@
 import type { EtapeRequete, Message, RequeteModele } from "@/ai/client";
 import type { TypeCreneau } from "@/ai/candidat";
 import type { ComplementP0 } from "@/ai/complement-p0";
-import type { CandidatPourModele, EntreeModeles, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
+import type { CandidatPourModele, EntreeModeles, EntreeProgramme, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -238,5 +239,34 @@ export function requeteQuartier(entree: EntreeQuartier, resultats: readonly Resu
     debut: entree.debut,
     fin: entree.fin,
     resultats: resultats.map((resultat) => ({ url: resultat.url, titre: resultat.titre, extrait: resultat.extrait })),
+  });
+}
+
+/**
+ * Programme complet du prototype (prompt `programme` v1, décision 0115 § 3 étape 1) : le brief entier en **projection**
+ * champ par champ (`EntreeProgramme`, toutes les saisies du questionnaire, récit et logement compris) ; aucun autre champ
+ * d'un objet reçu n'atteint le prompt, et aucun champ n'existe pour une donnée Google (0011). Une seule requête, sans
+ * outil ni recherche web (verdict 0117 § 1).
+ */
+export function requeteProgramme(entree: EntreeProgramme, modele: string, routage: Routage): RequeteModele {
+  return requete("programme", PROMPT_PROGRAMME, modele, routage, {
+    brief: {
+      destination: entree.destination,
+      pays: entree.pays,
+      arrivee: entree.arrivee,
+      heureArrivee: entree.heureArrivee,
+      depart: entree.depart,
+      heureDepart: entree.heureDepart,
+      voyageurs: { adultes: entree.voyageurs.adultes, enfants: entree.voyageurs.enfants },
+      rythme: entree.rythme,
+      envies: [...entree.envies],
+      deplacements: [...entree.deplacements],
+      ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
+      logements: entree.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),
+      ...(entree.engagements === undefined
+        ? {}
+        : { engagements: entree.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
+      ...(entree.recit === undefined ? {} : { recit: entree.recit }),
+    },
   });
 }

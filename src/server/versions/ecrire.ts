@@ -67,3 +67,19 @@ export async function ecrireVersion(executeur: ExecuteurVersions, demande: Deman
   await executeur.query(SQL_COURANTE, [demande.organizationId, demande.tripId, version]);
   return { version, creee: true, instantane };
 }
+
+/**
+ * Verrou des versions d'un voyage (décision 0119 § 1.6 point 1 ; verdict 0120 S3) : verrou consultatif **de transaction** sur
+ * la clé `'vadrouille:versions:' || trip_id`, défini ici seulement (aucune copie de la chaîne de clé ailleurs). Pris au début
+ * de toute transaction qui relit la dernière version pour en écrire une (publication d'un jour du workflow 4, publication du
+ * workflow 5, puis écritures de B11), **après** la garde de l'étape (exécution relue dans l'organisation) : aucun verrou n'est
+ * pris pour le voyage d'une autre organisation. Ordre unique : verrou du tri, puis verrou des versions, jamais l'inverse ;
+ * aucun appel externe tant qu'il est tenu.
+ */
+export const SQL_VERROU_VERSIONS = "SELECT pg_advisory_xact_lock(hashtextextended('vadrouille:versions:' || $1::text, 0))";
+
+/** Prend le verrou des versions du voyage dans la transaction de l'appelant (relâché à sa fin). */
+export async function verrouillerVersions(executeur: ExecuteurVersions, tripId: string): Promise<void> {
+  if (!UUID.test(tripId)) throw new RangeError("versions: identifiant illisible");
+  await executeur.query(SQL_VERROU_VERSIONS, [tripId]);
+}

@@ -102,6 +102,7 @@ describe("chaque champ exclu est refusé (un cas par champ)", () => {
     ["travelMinutes", 85],
     ["travelBudgetMinutes", 120],
     ["surprise", { name: "x" }],
+    ["theme", "Old Town et Dean Village"],
   ])("jour : %s", (key, value) => {
     expect(SharedDaySchema.safeParse({ ...day2, [key]: value }).success).toBe(false);
   });
@@ -126,6 +127,15 @@ describe("chaque champ exclu est refusé (un cas par champ)", () => {
     ["locked", false],
   ])("événement : %s", (key, value) => {
     expect(SharedEventSchema.safeParse({ ...event, [key]: value }).success).toBe(false);
+  });
+
+  it.each([
+    ["tip", "Arrive tôt"],
+    ["priceNote", "Environ 20 GBP"],
+    ["hoursNote", "Fermé le lundi"],
+  ])("faits d'une étape ou d'un événement : %s refusé (décision 0103, condition 1)", (key, value) => {
+    expect(SharedStopSchema.safeParse({ ...stop.stop, facts: { ...stop.stop.facts, [key]: value } }).success).toBe(false);
+    expect(SharedEventSchema.safeParse({ ...event, facts: { ...event.facts, [key]: value } }).success).toBe(false);
   });
 
   it("exception « À réserver » refusée, dans une étape comme dans un événement", () => {

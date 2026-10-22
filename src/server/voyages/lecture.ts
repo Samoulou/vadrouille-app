@@ -42,6 +42,7 @@ import {
 } from "@/domain/relectures";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { EchecPositions, lirePositions } from "@/server/positions/lecture";
+import { SQL_DEBLOQUE } from "@/server/presentation/etat";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
 import { datesDeVerification, elementAFaire, identifiantLisible, mobiliteDepuisColonne, nombreDeNuits, sejoursParNuit, type VersionDeChaine } from "./conversion";
@@ -120,9 +121,6 @@ const SQL_MOBILITE = "SELECT mobility FROM public.briefs WHERE organization_id =
 
 const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
-
-const SQL_DEBLOQUE = `SELECT EXISTS (SELECT 1 FROM public.entitlements WHERE organization_id = $1 AND trip_id = $2
-  AND kind = 'tripUnlocked') AS debloque`;
 
 /** Ordre : `id` (aucune colonne d'ordre dans `checklist_items` ; question au rôle data, PR de B6a). */
 const SQL_A_FAIRE = `SELECT id, label, moment, done, booking_url, sponsored, stop_id
@@ -452,8 +450,8 @@ function sortie<T>(schema: z.ZodType<T>, valeur: unknown, contexte: ContexteEche
 
 // --- Cas d'usage ------------------------------------------------------------------------------------------
 
-/** Les sept lectures de `TripAdapter` sur la base (B6a point 1). */
-export function creerLectureVoyages(dependances: DependancesLecture): TripAdapter {
+/** Les sept lectures de `TripAdapter` sur la base (B6a point 1) ; l'état du tri est lu par `src/server/presentation/lecture.ts` (B10a). */
+export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripAdapter, "getDeckSession"> {
   const withOrg = dependances.withOrg ?? withOrgParDefaut;
   const source = dependances.relectures;
   const configuration = dependances.configuration ?? CONFIGURATION_MOTEUR;

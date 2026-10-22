@@ -2,6 +2,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as copieIa from "@/ai/candidat";
+import * as texteContrat from "@/contracts/texte";
 import type { CandidatPourModele } from "@/ai/entrees";
 import * as reglagesIa from "@/ai/reglages";
 import { urlSourceValide as urlSourceValideR1 } from "@/domain/validation";
@@ -114,6 +115,11 @@ describe("p0: copies de src/prototype tenues égales", () => {
     expectTypeOf<copieIa.TypeCreneau>().toEqualTypeOf<originalCandidat.TypeCreneau>();
   });
 
+  it("LONGUEURS_CONTRAT (src/contracts/texte.ts) : conseil, prix et horaires égaux à LONGUEURS_TEXTE", () => {
+    const { conseil, prix, horaires } = copieIa.LONGUEURS_TEXTE;
+    expect(texteContrat.LONGUEURS_CONTRAT).toMatchObject({ tip: conseil, priceNote: prix, hoursNote: horaires });
+  });
+
   it("LONGUEURS_TEXTE (src/ai/candidat.ts)", () => {
     expect(copieIa.LONGUEURS_TEXTE).toEqual(originalCandidat.LONGUEURS_TEXTE);
     expectTypeOf<typeof copieIa.LONGUEURS_TEXTE>().toEqualTypeOf<typeof originalCandidat.LONGUEURS_TEXTE>();
@@ -140,31 +146,13 @@ describe("p0: copies de src/prototype tenues égales", () => {
     expectTypeOf<copieRecherche.ClasseSource>().toEqualTypeOf<originalCandidat.ClasseSource>();
   });
 
-  describe("contientUrl et texteMaison (src/ai/candidat.ts) : même verdict (table)", () => {
-    const table: [string, number][] = [
-      ["Musée maison", 80],
-      ["", 80],
-      ["   ", 80],
-      ["x".repeat(80), 80],
-      ["x".repeat(81), 80],
-      ["ligne\u0007son", 80],
-      ["un <b>lieu</b>", 80],
-      ["voir https://exemple.org", 300],
-      ["voir www.exemple", 300],
-      ["voir exemple.com", 300],
-      ["mailto:a", 300],
-      ["javascript:alert(1)", 300],
-      ["texte\u200bcaché", 300],
-      ["droite\u202egauche", 300],
-      ["Café du Lac, 12 €", 300],
-      ["東京の美術館", 300],
-    ];
-    for (const [texte, max] of table) {
-      it(JSON.stringify(texte), () => {
-        expect(copieIa.contientUrl(texte)).toBe(originalCandidat.contientUrl(texte));
-        expect(copieIa.texteMaison(max).safeParse(texte).success).toBe(originalCandidat.texteMaison(max).safeParse(texte).success);
-      });
-    }
+  it("contientUrl et texteMaison : src/ai/candidat.ts et src/prototype/candidat.ts réexportent l'unique définition de src/contracts/texte.ts", () => {
+    // Décision 0094 § 7 (ticket 633) : plus de copie, la même fonction partout ; la table de verdicts qui comparait les
+    // copies vit désormais dans `src/contracts/texte.test.ts`, contre cette seule définition.
+    expect(copieIa.contientUrl).toBe(texteContrat.contientUrl);
+    expect(copieIa.texteMaison).toBe(texteContrat.texteMaison);
+    expect(originalCandidat.contientUrl).toBe(texteContrat.contientUrl);
+    expect(originalCandidat.texteMaison).toBe(texteContrat.texteMaison);
   });
 
   describe("NotesSchema et Notes (src/ai/candidat.ts) : même verdict (table)", () => {

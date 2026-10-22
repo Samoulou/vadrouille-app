@@ -4,11 +4,12 @@ import { getRun as runDuSdk, start } from "workflow/api";
 
 import type { GardeOuverte } from "@/server/p0/garde";
 
-import type { EtatComplet, EtatEtape } from "@/server/generation/etat";
+import type { EtatComplet, EtatEtape, EtatLot } from "@/server/generation/etat";
 
 import { generatePreview } from "./apercu";
 import { P0RUN_COMPLET } from "./complet";
 import { p0Run } from "./p0-run";
+import { batchRecompute } from "./recalcul";
 import { generateFullTrip } from "./voyage-complet";
 
 export { P0RUN_COMPLET };
@@ -92,6 +93,25 @@ export async function demarrerVoyageComplet(generationRunId: string, organizatio
   let workflowRunId: unknown;
   try {
     const run = await start(generateFullTrip, [entree], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
+}
+
+/**
+ * Démarre `batchRecompute` (workflow 5, B10b ; décision 0119 § 1.5 point 1) pour la ligne `batch` créée (`queued`) par
+ * `completeDeck` ou la suite du déblocage, **après** la validation de la transaction qui l'a créée : entrée `{ generationRunId,
+ * organizationId, rang: 0 }` (`EtatLotSchema`), l'organisation étant celle de la ligne (jamais d'une entrée, 0105 § 1 point 3),
+ * région `fra1`. Aucune garde de P0 : la barrière de B9-TL-8 est vérifiée à l'entrée de chaque étape. Une erreur du SDK rend
+ * `start_failed`, jamais son message ; l'appelant clôt aussitôt la ligne en `failed` (0119 § 1.3 point 5).
+ */
+export async function demarrerRecalcul(generationRunId: string, organizationId: string): Promise<ResultatDemarrage> {
+  const entree: EtatLot = { generationRunId, organizationId, rang: 0 };
+  let workflowRunId: unknown;
+  try {
+    const run = await start(batchRecompute, [entree], { region: REGION_WORKFLOWS });
     workflowRunId = run.runId;
   } catch {
     return { ok: false, code: "start_failed" };

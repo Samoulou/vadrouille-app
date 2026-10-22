@@ -4,6 +4,7 @@ import type { ClientModeles } from "@/ai/client";
 import { createOpenRouterClient } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { creerNoterCandidats, type NoterCandidats } from "@/ai/noter-candidats";
+import { creerRedigerProgramme, type RedigerProgramme } from "@/ai/rediger-programme";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -35,7 +36,10 @@ import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, typ
  *   - `ancrage()` : `textSearch` et `detailsLogement` seulement, rien d'autre de Places, aucun modèle ;
  *   - `etapeFinale()` : fiches Place Details, Routes, `noterCandidats` et `redigerRaisons` (jamais le client de modèles
  *     brut, ni la recherche web, ni les pages), et `detailsLogement` (logements du brief seulement : leurs identifiants
- *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5).
+ *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5) ;
+ *   - `programme()` (décision 0116 § 3, seule famille appelée par `p0Run` depuis le lot 1 du programme écrit par l'IA) :
+ *     `redigerProgramme` (une requête `programme`, jamais le client brut ni la recherche web), `textSearch`, fiches
+ *     Place Details, `detailsLogement` et Routes. Les trois familles précédentes restent pour leurs tests (0116 § 7).
  * - **Port de consommation** : chaque client reçoit le port et les plafonds du mode (réservation avant chaque appel) ;
  *   le contexte de chaque appel porte l'exécution de la garde et les périodes du fournisseur (D20), calculées à l'appel.
  */
@@ -52,6 +56,8 @@ export type ReglagesModeles = {
   readonly notation: { readonly modele: string };
   /** Modèle de la rédaction des raisons (étape `raisons`). */
   readonly raisons: { readonly modele: string };
+  /** Modèle de la rédaction du programme (étape de requête `programme`, décision 0116 § 2.2). */
+  readonly programme: { readonly modele: string };
 };
 
 export type OptionsComposition = {
@@ -90,10 +96,24 @@ export type CapacitesEtapeFinale = {
   readonly redigerRaisons: RedigerRaisons;
 };
 
+/**
+ * Capacités de l'étape `etapeProgramme` (décision 0116 § 3 et § 4) : rédaction du programme (une requête `programme`),
+ * Text Search restreint à la zone (masque `id`), fiches Place Details, fiche des logements du brief et Routes. Ni client
+ * de modèles brut, ni recherche web, ni lecture de pages.
+ */
+export type CapacitesProgramme = {
+  readonly redigerProgramme: RedigerProgramme;
+  readonly textSearch: CapacitesAncrage["textSearch"];
+  readonly places: Pick<ClientPlaces, "details">;
+  readonly detailsLogement: CapacitesAncrage["detailsLogement"];
+  readonly routes: ClientRoutes;
+};
+
 export type CompositionP0Reel = {
   readonly agent: () => CapacitesAgent;
   readonly ancrage: () => CapacitesAncrage;
   readonly etapeFinale: () => CapacitesEtapeFinale;
+  readonly programme: () => CapacitesProgramme;
 };
 
 /**
@@ -125,13 +145,16 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
       horloge,
     });
   const google = { usage: options.usage, contexte: contexte("google"), plafonds: options.plafonds, horloge };
+  // `zdr` (0116 § 2.2) ne vaut que pour la requête `programme` (0117 § 5.3) : les autres requêtes (recherche web,
+  // notation, raisons de l'ancienne chaîne) reçoivent le routage sans lui (revue 1 de #632, mineur 7).
+  const routageHorsProgramme = { data_collection: options.modeles.routage.data_collection };
 
   return {
     agent() {
       const client = modeles();
       return {
         modeles: { envoyer: (requete) => client.envoyer(requete) },
-        rechercheWeb: creerRechercheWebReelle(client.rechercherWeb, { ...options.modeles.rechercheWeb, routage: options.modeles.routage }),
+        rechercheWeb: creerRechercheWebReelle(client.rechercherWeb, { ...options.modeles.rechercheWeb, routage: routageHorsProgramme }),
         pages: creerLecteurPages(createUndiciTransport()),
       };
     },
@@ -146,8 +169,20 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
         places: { details: (placeId) => places.details(placeId) },
         routes: createRoutesClient(google),
         detailsLogement: capacitesAncrage(places).detailsLogement,
-        noterCandidats: creerNoterCandidats(client, { modele: options.modeles.notation.modele, routage: options.modeles.routage }),
-        redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: options.modeles.routage }),
+        noterCandidats: creerNoterCandidats(client, { modele: options.modeles.notation.modele, routage: routageHorsProgramme }),
+        redigerRaisons: creerRedigerRaisons(client, { modele: options.modeles.raisons.modele, routage: routageHorsProgramme }),
+      };
+    },
+    programme() {
+      const places = createPlacesClient(google);
+      const { textSearch, detailsLogement } = capacitesAncrage(places);
+      // `creerRedigerProgramme` pose `zdr: true` et `data_collection: "deny"` (verdict S5 de 0117, 0116 § 2.2).
+      return {
+        redigerProgramme: creerRedigerProgramme(modeles(), { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+        textSearch,
+        places: { details: (placeId) => places.details(placeId) },
+        detailsLogement,
+        routes: createRoutesClient(google),
       };
     },
   };

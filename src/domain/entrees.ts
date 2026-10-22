@@ -116,4 +116,12 @@ export type EntreeMoteur = {
    * autres jours sont rendus non planifiés (B9-PO-6 : termini de logement seuls). Ignoré par `replanifierJour`.
    */
   jours?: readonly number[];
+  /**
+   * Étapes conservées d'un jour planifié (décision 0119 § 2.1, B10-TL-6 ; amendement de B5) : identifiants d'étapes du
+   * jour de base que `replanifierJour` garde comme **blocs fixes** (même jour, même heure, même identifiant, comme une
+   * étape verrouillée ou un engagement), **sans** leur donner `locked` dans le jour rendu ; leur lieu est exclu des
+   * candidats du jour. Lue par `replanifierJour` seul, pour un jour de base planifié ; ignorée par `generer` (comme
+   * `jours` l'est par `replanifierJour`) et pour un jour de base non planifié. Absente : comportement de B5 et de B9.
+   */
+  conservees?: ReadonlySet<string>;
 };

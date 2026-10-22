@@ -320,6 +320,9 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `StopFacts.durationMinutes` | stocké | Durée de visite estimée par notre recherche web (minutes, entier positif) ; jamais tirée de Google |
 | `StopFacts.costPerPerson` | stocké | Coût estimé par personne en CHF (0 = gratuit), issu de notre recherche web ; jamais un niveau de prix Google |
 | `StopFacts.area` | stocké | Secteur ou quartier, texte maison ; jamais l'adresse Google |
+| `StopFacts.tip` | stocké | Conseil pratique, texte maison facultatif (160, `texteMaison`), décisions 0094 § 7 et 0116 § 6 (lot 1 bis) ; absent de la vue partagée et de `candidates.facts` (0103) |
+| `StopFacts.priceNote` | stocké | Note de prix en texte, maison, facultative (60) ; jamais un niveau de prix Google ; mêmes règles que `StopFacts.tip` |
+| `StopFacts.hoursNote` | stocké | Note d'horaires en texte, maison, facultative (120) ; jamais les horaires d'une fiche Google ; mêmes règles que `StopFacts.tip` |
 | `Segment.mode` | stocké | Sortie du moteur |
 | `Segment.estimated` | stocké | Sortie du moteur : vrai quand la durée est une estimation du moteur |
 | `Source.label` | stocké | Nom de la source web |
@@ -346,6 +349,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Day.generating` | calculé | Serveur, à la lecture, depuis `generation_runs` |
 | `Day.travelBudgetMinutes` | stocké | Copie de la configuration PO-1 au moment de la planification, réduction comprise |
 | `Day.surprise` | stocké | Copie d'un candidat de la réserve choisi par la sélection (décision 0015 § 3), voir `SurpriseIdea.*` |
+| `Day.theme` | stocké | Titre libre du jour (quartiers), texte maison facultatif (80, `texteMaison`), décision 0116 § 6 (lot 1 bis) ; ne remplace pas le titre calculé depuis la date (E1) ; absent de la vue partagée |
 | `SurpriseIdea.id` | stocké | Identifiant du candidat |
 | `SurpriseIdea.placeId` | stocké | Identifiant de lieu Google |
 | `SurpriseIdea.name` | stocké | Règle de `Stop.name` |
@@ -720,6 +724,16 @@ Décision 0009. Pour chaque étape, les tableaux donnent : type (déterministe, 
 Les workflows 1 à 5 (aperçu, ancrage, planification et validation, voyage complet, recalcul par lot et révision unitaire) sont fixés dans la **« Partie Q5 », § 8**, et leurs règles de données dans la **décision 0011** (points 3, 4 et 7) : ancrage en mémoire avec le `placeId` pour seule trace, réparation déterministe sans appel de modèle, plan en mémoire publié dans une seule étape. Le workflow 6 (paiement) est fixé ci-dessous.
 
 **Arrêt sur plafond ou quota.** Un quota atteint arrête le workflow et conserve le dernier programme valide (test de sortie du cadrage § 9). **Extension signalée** de ce test : le même comportement vaut pour un plafond de coût atteint (plafonds vérifiés avant chaque appel, cadrage § 6.9 et § 9 « Plafonds applicatifs »), et aucune version partielle n'est publiée. L'état publié devient `failed` avec la raison (`cost_cap_reached` ou `quota_reached`) et `retryable` (forme de `GenerationStatus`, décision 0017 § 2.4). « Aucune version partielle » signifie : aucune version contenant un jour à moitié planifié ou qui échoue à la validation. Test nommé `workflows: plafond ou quota atteint conserve le dernier programme valide` (§ 10, tâche B9).
+
+### 5. Recalcul d'un tri (`batchRecompute`, B10b ; décisions 0119 § 1 et 0120)
+Une ligne `generation_runs` de `kind = 'batch'` par tri clos (`base_version`, `deck_closure_id`), créée sous le verrou du tri par `completeDeck` (`src/server/presentation/tri.ts`) ou par le second travail de la suite du déblocage (`src/server/payment/suite-voyage-complet.ts`, `src/server/generation/lot.ts`), démarrée **après** la validation (`demarrerRecalcul`, `src/workflows/index.ts`) ; démarrage échoué : ligne close aussitôt en `failed`. Pont `src/workflows/recalcul.ts`, étapes `src/server/generation/etapes-lot.ts`, état `EtatLotSchema` (identifiants et rang seulement).
+
+| Étape | Type | Entrée → sortie | Données Google | Plafond | Relances | Idempotence | État publié |
+|---|---|---|---|---|---|---|---|
+| `a` (rang 1) | déterministe | `EtatLot` → `EtatLot` ; jours touchés (`joursTouches`, version de base et signaux du tri clos relus), réserve Text Search de `e`, forfait `lot` réservé | non | refus `cap_reached` avant la réservation | 2 | garde `step_seq` (rejeu de `a`) ; forfait par identifiant d'exécution | `preparing`, ou `ready` sans version si aucun jour touché |
+| `e` (rang 2) | appel externe et IA | `EtatLot` → `EtatLot` ; réserve filtrée (`reserveFiltree`), relecture (`CapaciteFinale.planifier`), `replanifierJour` des seuls jours touchés (étapes conservées, repas choisis), raisons des seuls remplaçants (une requête `raisons` par ville), **une** version sous le verrou des versions | oui (relectures en mémoire, jamais renvoyées) | forfait `lot` entier à `e` | 0 | `request_id` de la ligne sur la version ; rejeu borné de la transaction de publication sans appel | `ready` (version publiée) ou `failed` avec sa raison |
+
+Le voyage complet (workflow 4) filtre sa réserve par les signaux actifs (`src/server/generation/signaux.ts`) et publie sous le même verrou des versions (`verrouillerVersions`, `src/server/versions/ecrire.ts`) ; ordre : verrou du tri, puis verrou des versions. `RECALCUL_FIN_APERCU` (`src/server/config/recalcul.ts`) reste `false` et `PLAFONDS_USAGE` reste `null` : aucun recalcul réel.
 
 ### 6. Paiement en mode test (`handlePaymentEvent`)
 | Étape | Type | Entrée → sortie | Données Google | Plafond | Relances | Idempotence | État publié |

@@ -55,7 +55,7 @@ export function debrancherLectureVoyagesPourTests(): void {
 /** Table du double (valeurs du jeu simulé, aucune valeur relue), construite une fois à la demande. */
 let table: TableRelectures | undefined;
 
-const METHODES = ["listTrips", "getTrip", "getDay", "listProposals", "listPreviewSlots", "getDayMap", "getTripMap"] as const satisfies readonly (keyof TripAdapter)[];
+const METHODES = ["listTrips", "getTrip", "getDay", "listProposals", "listPreviewSlots", "getDayMap", "getTripMap", "getDeckSession"] as const satisfies readonly (keyof TripAdapter)[];
 
 /** Adaptateur non branché : chaque méthode rejette sans rien lire (jamais une lecture de `mock`). */
 function adaptateurNonBranche(): TripAdapter {

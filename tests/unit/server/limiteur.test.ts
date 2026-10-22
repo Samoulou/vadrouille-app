@@ -344,6 +344,27 @@ describe("module de journal", () => {
     }
   });
 
+  // Décision 0116 § 4.4 et verdict 0117 § 4 : compteurs maison de `p0.programme_written`, des entiers positifs ou nuls.
+  it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap"])(
+    "décision 0116 : %s, entier positif ou nul, admis sur p0.programme_written ; négatif, chaîne, non-entier ou nom retirés",
+    (champ) => {
+      const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { [champ]: valeur }, "info")) as Record<string, unknown>;
+      expect(ligne(0)).toEqual({ level: "info", event: "p0.programme_written", [champ]: 0 });
+      expect(ligne(12)).toEqual({ level: "info", event: "p0.programme_written", [champ]: 12 });
+      for (const refusee of [-1, 1.5, "3", "Colisée", null, Number.NaN]) {
+        expect(ligne(refusee), String(refusee)).toEqual({ level: "info", event: "p0.programme_written", dropped: 1 });
+      }
+    },
+  );
+
+  // Verdict 0117 § 4 : aucun compteur de verdict de vérification n'est admis par le journal.
+  it("journal: aucun compteur de verdict (verifies, introuvables, fermes, horsZone retirés)", () => {
+    const ligne = JSON.parse(
+      formatLogLine("p0.programme_written", { days: 3, verified: 4, verifies: 4, introuvables: 1, notFound: 1, fermes: 1, closed: 1, horsZone: 1, outOfZone: 1 }, "info"),
+    ) as Record<string, unknown>;
+    expect(ligne).toEqual({ level: "info", event: "p0.programme_written", days: 3, dropped: 8 });
+  });
+
   it("errorNameOf ne lit que error.name, jamais message, code ni cause", () => {
     expect(errorNameOf(new TypeError(SENTINELLE))).toBe("TypeError");
     expect(errorNameOf({ name: `a@exemple.test`, message: SENTINELLE })).toBeUndefined();
@@ -369,6 +390,8 @@ describe("module de journal", () => {
       "p0.guard_closed",
       // Ticket 400 : fin de la recherche de p0Run, compteurs de l'agent seulement (des nombres).
       "p0.research_done",
+      // Décision 0116 § 4.4 et 0117 § 4 : fin de etapeProgramme, compteurs maison seulement (des nombres).
+      "p0.programme_written",
       // Décision 0074 : branchement de la lecture des programmes réels impossible, nom d'erreur seulement.
       "p0.read_unavailable",
       // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
@@ -393,6 +416,11 @@ describe("module de journal", () => {
       "payment.webhook_config_invalid",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
+      // B10b (décision 0119 § 1.3 ; verdict 0120 S1 point 1 et S7) : recalcul d'un tri, identifiants internes, nom d'erreur et
+      // nombre de jours touchés seulement.
+      "recalcul.not_created",
+      "recalcul.start_failed",
+      "recalcul.unlock_failed",
       "log.unknown_event",
     ]);
   });

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RequeteModele } from "@/ai/client";
-import { createOpenRouterClient, ErreurOpenRouter, ORIGINE_MODELES, type OptionsOpenRouter } from "@/ai/openrouter-client";
+import { COUT_ESTIME_PROGRAMME_MICROS, createOpenRouterClient, ErreurOpenRouter, JETONS_SORTIE_MAX_PROGRAMME, ORIGINE_MODELES, type OptionsOpenRouter } from "@/ai/openrouter-client";
 import { CODE_CLE_ABSENTE, CODES_ERREUR_OPENROUTER } from "@/ai/erreurs";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
@@ -354,6 +354,69 @@ describe("p0: réservation avant chaque requête (client de modèles)", () => {
     await horloge.avancer(1);
     expect(await issue).toBe("upstream_timeout");
     expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+  });
+
+  // Décision 0116 § 2.3 (amende 0046 D13 point 5 pour la seule nature `programme`).
+  it("programme: délai de la requête programme à 300 s, autres délais inchangés", async () => {
+    const pendante = (appels: () => readonly Appel[]) => () =>
+      new Promise<Response>((_resolve, rejeter) => {
+        const signal = appels()[0]?.init.signal;
+        signal?.addEventListener("abort", () => rejeter(new DOMException("abandon", "AbortError")), { once: true });
+      });
+    const programme: ReturnType<typeof monter> = monter([pendante(() => programme.appels)]);
+    const issue = codeDe(programme.client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 } })));
+    await programme.horloge.avancer(299_999);
+    expect(programme.port.lignes.map((l) => l.etat)).toEqual(["reservee"]);
+    await programme.horloge.avancer(1);
+    expect(await issue).toBe("upstream_timeout");
+    expect(programme.port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+    // Toute autre nature garde 120 s.
+    const autre: ReturnType<typeof monter> = monter([pendante(() => autre.appels)]);
+    const issueAutre = codeDe(autre.client.envoyer(requete({ etape: "notation" })));
+    await autre.horloge.avancer(119_999);
+    expect(autre.port.lignes.map((l) => l.etat)).toEqual(["reservee"]);
+    await autre.horloge.avancer(1);
+    expect(await issueAutre).toBe("upstream_timeout");
+  });
+});
+
+describe("programme: requête zdr (verdict S5 de 0117, décision 0116 § 2.2)", () => {
+  it.each([
+    ["404 (aucun fournisseur zdr)", 404, "upstream_error"],
+    ["400", 400, "upstream_error"],
+    ["503", 503, "upstream_unavailable"],
+  ] as [string, number, string][])("programme: requête programme en zdr, refus du fournisseur sans second appel, code fermé (%s)", async (_nom, statut, code) => {
+    const refus = async () => new Response('{"error":{"message":"SENTINELLE-FOURNISSEUR No endpoints found matching your data policy"}}', { status: statut });
+    const { client, appels, port } = monter([refus, refus, refus]);
+    let erreur: unknown;
+    try {
+      await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    } catch (e) {
+      erreur = e;
+    }
+    // Un seul appel, jamais un second sans zdr ni vers un autre fournisseur ; code fermé, aucun message du fournisseur.
+    expect(appels).toHaveLength(1);
+    const corps = JSON.parse(String(appels[0]!.init.body)) as { provider?: Record<string, unknown> };
+    expect(corps.provider).toMatchObject({ data_collection: "deny", zdr: true });
+    expect((erreur as ErreurOpenRouter).code).toBe(code);
+    expect(port.lignes.map((l) => l.etat)).toEqual(["abandonnee"]);
+    expect(`${(erreur as Error).message} ${JSON.stringify(erreur)}`).not.toContain("SENTINELLE-FOURNISSEUR");
+  });
+});
+
+describe("programme: plafond de jetons de sortie et réservation (revue 1 de la PR 632, mineur 9)", () => {
+  it("programme: max_tokens et coût estimé propres à la requête programme ; autres requêtes inchangées", async () => {
+    const { client, appels, port } = monter([async () => reponseOk(0.02), async () => reponseOk(0.001)]);
+    await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    await client.envoyer(requete());
+    const corps = appels.map((appel) => JSON.parse(String(appel.init.body)) as { max_tokens?: number });
+    expect(corps[0]?.max_tokens).toBe(JETONS_SORTIE_MAX_PROGRAMME);
+    expect(corps[1]?.max_tokens).toBeUndefined();
+    expect(port.lignes.map((l) => l.demande.coutEstimeMicros)).toEqual([COUT_ESTIME_PROGRAMME_MICROS, 10_000]);
+    expect(JETONS_SORTIE_MAX_PROGRAMME).toBe(32_000);
+    // Sous le plafond de 3 USD par exécution, avec une seule requête programme.
+    expect(COUT_ESTIME_PROGRAMME_MICROS).toBe(90_000);
+    expect(COUT_ESTIME_PROGRAMME_MICROS).toBeLessThan(3_000_000);
   });
 });
 

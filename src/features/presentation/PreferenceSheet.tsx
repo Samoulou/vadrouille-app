@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { Chip } from "@/components/ligne/Chip";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason } from "@/contracts";
 import { PREFERENCE_REASONS } from "@/contracts/values";
@@ -33,13 +34,18 @@ export interface PreferenceSheetProps {
   onDismiss: () => void;
   /** Rend le focus au paquet à la fermeture. */
   onReturnFocus: () => void;
+  /**
+   * Réponse non enregistrée (tri enregistré : recalcul ou échec) : bandeau dans la feuille, annoncé (`role="status"` ou
+   * `alert`, 0012) ; la feuille reste ouverte pour réessayer. Absent ou `null` : aucun bandeau.
+   */
+  refus?: { kind: "generating" | "error"; message: string } | null;
 }
 
 /**
  * Écran 7 « Confirmer une préférence » : feuille modale, raison facultative (une seule `Chip` à la
  * fois), « Oui » et « Non ». Mise en page provisoire (F6-Q1).
  */
-export function PreferenceSheet({ prompt, onAnswer, onDismiss, onReturnFocus }: PreferenceSheetProps) {
+export function PreferenceSheet({ prompt, onAnswer, onDismiss, onReturnFocus, refus = null }: PreferenceSheetProps) {
   return (
     <Dialog open={prompt !== null} onOpenChange={(open) => (open ? undefined : onDismiss())}>
       {prompt ? (
@@ -48,6 +54,7 @@ export function PreferenceSheet({ prompt, onAnswer, onDismiss, onReturnFocus }: 
           prompt={prompt}
           onAnswer={onAnswer}
           onReturnFocus={onReturnFocus}
+          refus={refus}
         />
       ) : null}
     </Dialog>
@@ -58,10 +65,12 @@ function PromptContent({
   prompt,
   onAnswer,
   onReturnFocus,
+  refus,
 }: {
   prompt: PreferencePrompt;
   onAnswer: (answer: PreferenceAnswer) => void;
   onReturnFocus: () => void;
+  refus: { kind: "generating" | "error"; message: string } | null;
 }) {
   const [reason, setReason] = useState<PreferenceReason | undefined>(undefined);
   const title = useRef<HTMLHeadingElement>(null);
@@ -83,6 +92,7 @@ function PromptContent({
       <DialogTitle ref={title} tabIndex={-1} className="text-section font-extrabold text-ink">
         {promptTitle(prompt)}
       </DialogTitle>
+      {refus ? <StatusBanner kind={refus.kind} message={refus.message} /> : null}
       {prompt.kind === "category" ? (
         <div role="group" aria-labelledby="question-raison" className="flex flex-col gap-2">
           <p id="question-raison" className="text-corps-s text-ink-soft">

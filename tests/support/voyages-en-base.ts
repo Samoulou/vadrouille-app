@@ -124,6 +124,7 @@ function jourConverti(trip: Trip, index: number): DaySnapshot {
     events: day.events.map(evenementConverti),
     travelBudgetMinutes: day.travelBudgetMinutes,
     ...(surprise === undefined ? {} : { surprise }),
+    ...(day.theme === undefined ? {} : { theme: day.theme }),
   };
 }
 
@@ -329,6 +330,45 @@ async function simulerSejourSansNuit(admin: ExecuteurTest, stayId: string, toDat
   }
 }
 
+type Requete = (texte: string, valeurs?: readonly unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+
+/**
+ * Ligne `batch` du jeu (migration 0015_recalcul_lot, décision 0119 § 1.1) : une version de base et la clôture du tri
+ * qui l'a déclenchée, écrite d'abord. Comme en production (0119 § 1.1 point 3), la clôture vise l'exécution `preview`
+ * du voyage ; elle est de phase `deck`, si bien que la lecture du tri (`SQL_CLOTURE`, clôtures de l'exécution `preview`
+ * **et de sa phase**) reste celle d'un tri ouvert, comme avant 0015. Un voyage du jeu sans exécution `preview` (en
+ * préparation, sans proposition) reçoit une exécution `mini` close, que nulle lecture ne regarde, pour porter la
+ * clôture. Ordre de la purge (0119 § 5.2) : la ligne `batch`, puis la clôture, puis les autres exécutions.
+ */
+async function ecrireLot(
+  q: Requete,
+  org: string,
+  tripId: string,
+  options: { apercu: string | null; versionDeBase: number; derniereVersion: number | null; debut: number; terminee: boolean },
+): Promise<string> {
+  const cible =
+    options.apercu ??
+    ((
+      await q(
+        "INSERT INTO generation_runs (organization_id, trip_id, kind, phase, started_at, finished_at) VALUES ($1, $2, 'mini', 'ready', now() - make_interval(mins => $3::integer), now()) RETURNING id",
+        [org, tripId, options.debut + 1],
+      )
+    ).rows[0]?.id as string);
+  const cloture = (
+    await q(
+      "INSERT INTO deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id) VALUES ($1, $2, $3, 'deck', 1, gen_random_uuid()) RETURNING id",
+      [org, tripId, cible],
+    )
+  ).rows[0]?.id as string;
+  return (
+    await q(
+      `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, base_version, deck_closure_id, started_at, finished_at)
+       VALUES ($1, $2, 'batch', $3, $4, $5, $6, now() - make_interval(mins => $7::integer), CASE WHEN $8::boolean THEN now() END) RETURNING id`,
+      [org, tripId, options.terminee ? "ready" : "preparing", options.derniereVersion, options.versionDeBase, cloture, options.debut, options.terminee],
+    )
+  ).rows[0]?.id as string;
+}
+
 /**
  * Écrit un voyage pour l'organisation ; rend l'`uuid` du voyage. Un voyage sans fuseau (`timeZone: null`) ou avec une
  * ligne `stays` sans nuit exige la connexion d'administration (`admin`, voir `simulerFuseauNul` et
@@ -373,15 +413,22 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
         [org.org, tripId, item.stopId ?? null, item.label, JSON.stringify(item.moment), item.bookingUrl ?? null, item.sponsored, item.done],
       );
     }
+    // Dernière exécution `preview` écrite : cible de la clôture d'une ligne `batch` (voir `ecrireLot`).
+    let derniereApercu: string | null = null;
     for (const [rang, run] of donnees.runs.entries()) {
-      const runId = (
-        await q(
-          `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
-           VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
-          // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
-          [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, 100 - rang, run.finished],
-        )
-      ).rows[0]?.id as string;
+      const debut = 100 - rang;
+      const runId: string =
+        run.kind === "batch"
+          ? await ecrireLot(q, org.org, tripId, { apercu: derniereApercu, versionDeBase: courante ?? 0, derniereVersion: courante, debut, terminee: run.finished })
+          : ((
+              await q(
+                `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
+                 VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
+                // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
+                [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, debut, run.finished],
+              )
+            ).rows[0]?.id as string);
+      if (run.kind === "preview") derniereApercu = runId;
       for (const ligne of run.propositions) {
         await q(
           "INSERT INTO proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, content) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",

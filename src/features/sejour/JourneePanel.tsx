@@ -24,8 +24,8 @@ export interface JourneePanelProps {
 }
 
 /**
- * Contenu du panneau de l'écran 12 « Journée », dans l'ordre de F5-PO-5 : titre du jour (niveau 1) et
- * ligne trajet/budget, bandeaux (préparation, trajet), ligne du jour, « Événements du jour »,
+ * Contenu du panneau de l'écran 12 « Journée », dans l'ordre de F5-PO-5 : titre du jour (niveau 1), titre libre
+ * du jour s'il existe (`Day.theme`, décision 0116 § 6) et ligne trajet/budget, bandeaux (préparation, trajet), ligne du jour, « Événements du jour »,
  * « Surprends-moi », mention d'attribution. Un jour en préparation n'affiche que son bandeau et ses événements.
  */
 export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE, highlightedStopIds }: JourneePanelProps) {
@@ -43,6 +43,12 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
         >
           {formatTitreJour(day.date)}
         </h1>
+        {/* Titre libre du jour (décision 0116 § 6, lot 1 bis) : texte maison brut, sous le titre calculé depuis la date. */}
+        {day.theme ? (
+          <p data-part="theme-jour" className="text-corps font-bold text-ink-2">
+            {day.theme}
+          </p>
+        ) : null}
         {travelLine === null ? null : (
           <p data-part="trajet-budget" className="text-corps-s text-ink-soft tabular-nums">
             {travelLine}

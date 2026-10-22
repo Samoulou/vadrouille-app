@@ -1,5 +1,6 @@
 import "server-only";
 
+import { LectureIllisible } from "./illisible";
 import { CODES_ARRET, type CodeArret } from "./raison-echec";
 
 /**
@@ -25,6 +26,9 @@ export class ArretEtape extends Error {
     this.name = "ArretEtape";
   }
 }
+
+/** Vrai pour un arrêt à code fermé attendu : `ArretEtape`, ou lecture illisible (`invalid_input`, module feuille `illisible.ts`). */
+export const estArret = (erreur: unknown): erreur is ArretEtape | LectureIllisible => erreur instanceof ArretEtape || erreur instanceof LectureIllisible;
 
 /** Code fermé d'une erreur levée : celui d'un `ArretEtape` ou d'une erreur qui porte un `code` fermé, sinon `upstream_error`. */
 export function codeDeErreur(erreur: unknown): CodeArret {

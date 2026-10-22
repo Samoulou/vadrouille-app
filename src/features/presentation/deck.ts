@@ -1,4 +1,5 @@
 import type { Category, PreferenceAnswer, PreferencePrompt, PreferenceReason, Proposal } from "@/contracts";
+import { estDerniereOption, memeCreneau, ordreDuPaquet } from "@/domain/preferences";
 
 /**
  * État du paquet de la présentation (spécification F6, décision 0013 § 3.2) : réducteur pur et
@@ -11,36 +12,15 @@ export type Gesture = "swipe" | "button" | "key";
 
 // --- Paquet -------------------------------------------------------------------
 
-const toMinutes = (time: string) => {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-};
-
-/** Même créneau de repas : même jour, même heure (F6-PO-7). */
-export function sameMealSlot(a: Proposal, b: Proposal): boolean {
-  return a.kind === "meal" && b.kind === "meal" && a.day === b.day && a.time === b.time;
-}
+/** Même créneau de repas : même jour, même heure (F6-PO-7). Règle de `@/domain/preferences` (décision 0112 § 2). */
+export const sameMealSlot: (a: Proposal, b: Proposal) => boolean = memeCreneau;
 
 /**
  * Cartes du paquet (F6-PO-1) : sans étape verrouillée, tri stable par jour puis heure, options d'un
- * même créneau de repas par `option.index`.
+ * même créneau de repas par `option.index`. Règle de `@/domain/preferences` (`ordreDuPaquet`, décision 0112 § 2).
  */
 export function buildDeck(proposals: readonly Proposal[]): Proposal[] {
-  return proposals
-    .filter((proposal) => !proposal.stop.locked)
-    .map((proposal, order) => ({ proposal, order }))
-    .sort((a, b) => {
-      const byDay = a.proposal.day - b.proposal.day;
-      if (byDay !== 0) return byDay;
-      const byTime = toMinutes(a.proposal.time) - toMinutes(b.proposal.time);
-      if (byTime !== 0) return byTime;
-      if (sameMealSlot(a.proposal, b.proposal)) {
-        const byOption = (a.proposal.option?.index ?? 0) - (b.proposal.option?.index ?? 0);
-        if (byOption !== 0) return byOption;
-      }
-      return a.order - b.order;
-    })
-    .map(({ proposal }) => proposal);
+  return ordreDuPaquet(proposals);
 }
 
 /** Message du toast d'annulation (F6-PO-6). */
@@ -55,6 +35,11 @@ export interface DeckCore {
   decisions: { proposalId: string; decision: Decision }[];
   /** Jours gardés en bloc par « Tout garder pour le jour N ». */
   keptDays: number[];
+  /**
+   * Cartes retirées du paquet par une réponse « Oui » à une question de catégorie (F6-PO-8), sans avoir été triées une à
+   * une (titre de fin de la suite du tri, spécification B10, question 8).
+   */
+  removedByAnswer: number;
   /** Réponses aux questions de préférence de la session (F6-PO-9). */
   answers: { prompt: PreferencePrompt; answer: PreferenceAnswer }[];
   /** Question ouverte (feuille de l'écran 7), `null` sinon. */
@@ -74,6 +59,7 @@ export function initDeck(proposals: readonly Proposal[]): DeckState {
     index: 0,
     decisions: [],
     keptDays: [],
+    removedByAnswer: 0,
     answers: [],
     prompt: null,
     pending: false,
@@ -84,6 +70,12 @@ export function initDeck(proposals: readonly Proposal[]): DeckState {
 export type DeckEvent =
   | { type: "decide"; decision: Decision }
   | { type: "resolved"; prompt: PreferencePrompt | null }
+  /**
+   * Décision en attente non enregistrée par le tri enregistré (revue de la PR 621, bloquant 6). `keep` : la carte reste
+   * (recalcul en cours, B10-PO-14, ou échec) : l'état d'avant la décision revient, sans toast d'annulation. Sinon (carte
+   * déjà décidée ailleurs, B10-PO-2 point 4) : le paquet passe à la carte suivante, sans toast ni question.
+   */
+  | { type: "rejected"; keep: boolean }
   | { type: "answer"; prompt: PreferencePrompt; answer: PreferenceAnswer; next: PreferencePrompt | null }
   | { type: "dismissPrompt" }
   | { type: "keepDay" }
@@ -95,6 +87,7 @@ const coreOf = (state: DeckState): DeckCore => ({
   index: state.index,
   decisions: state.decisions,
   keptDays: state.keptDays,
+  removedByAnswer: state.removedByAnswer,
   answers: state.answers,
   prompt: state.prompt,
   pending: state.pending,
@@ -102,11 +95,13 @@ const coreOf = (state: DeckState): DeckCore => ({
 
 export const currentCard = (state: DeckState): Proposal | undefined => state.cards[state.index];
 
-/** Dernière option du créneau de la carte en cours (aucune option du même créneau après elle). */
+/**
+ * Dernière option du créneau de la carte en cours (aucune option du même créneau après elle dans le paquet). Règle de
+ * `@/domain/preferences` (`estDerniereOption`, décision 0112 § 2), la même que celle du serveur.
+ */
 export function isLastOption(state: DeckState): boolean {
   const card = currentCard(state);
-  if (!card || card.kind !== "meal") return false;
-  return !state.cards.slice(state.index + 1).some((other) => sameMealSlot(card, other));
+  return card !== undefined && estDerniereOption(card, state.cards);
 }
 
 export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
@@ -136,6 +131,10 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
     }
     case "resolved":
       return state.pending ? { ...state, pending: false, prompt: event.prompt } : state;
+    case "rejected":
+      if (!state.pending) return state;
+      if (event.keep && state.undo?.decision) return { ...state.undo.snapshot, pending: false, undo: null };
+      return { ...state, pending: false, prompt: null, undo: null };
     case "answer": {
       if (!state.prompt) return state;
       const { prompt } = event;
@@ -149,6 +148,7 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
       return {
         ...state,
         cards,
+        removedByAnswer: state.removedByAnswer + (state.cards.length - cards.length),
         answers: [...state.answers, { prompt, answer: event.answer }],
         prompt: event.next,
       };
@@ -214,9 +214,12 @@ export function swipeRotation(dx: number, width: number): number {
   return Math.sign(dx) * MAX_ROTATION * ratio;
 }
 
-// --- Question de préférence (F6-PO-8, F6-PO-9) -------------------------------------
+// --- Session de la question de préférence (F6-PO-8, F6-PO-9) ------------------------------
 
-/** Session de tri côté « moteur » : refus d'activités, questions déjà posées. */
+/**
+ * Session de tri en mémoire (`mock`, `prototype`) : refus d'activités, questions déjà posées. Les règles de la question
+ * sont celles de `@/domain/preferences` (`questionApres`, `questionDeDistance`), appelées par `createLocalDeckActions`.
+ */
 export interface PreferenceSession {
   dislikes: { proposalId: string; category: Category; reason?: PreferenceReason }[];
   askedCategories: Category[];
@@ -224,25 +227,3 @@ export interface PreferenceSession {
 }
 
 export const emptySession = (): PreferenceSession => ({ dislikes: [], askedCategories: [], distanceAsked: false });
-
-/**
- * Question à poser après une décision, la session incluant déjà cette décision : deuxième
- * « Pas pour moi » sur une activité de même catégorie, une question par catégorie ; les repas ne
- * comptent pas.
- */
-export function preferencePromptFor(
-  session: PreferenceSession,
-  decided: { decision: Decision; kind: Proposal["kind"]; category: Category },
-): PreferencePrompt | null {
-  if (decided.decision !== "dislike" || decided.kind !== "activity") return null;
-  if (session.askedCategories.includes(decided.category)) return null;
-  const count = session.dislikes.filter((dislike) => dislike.category === decided.category).length;
-  return count >= 2 ? { kind: "category", category: decided.category } : null;
-}
-
-/** Question de distance : deux refus avec la raison « Trop loin », une seule fois par session. */
-export function distancePromptFor(session: PreferenceSession): PreferencePrompt | null {
-  if (session.distanceAsked) return null;
-  const tooFar = session.dislikes.filter((dislike) => dislike.reason === "tooFar").length;
-  return tooFar >= 2 ? { kind: "distance" } : null;
-}

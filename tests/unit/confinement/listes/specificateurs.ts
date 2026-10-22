@@ -215,6 +215,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; P0r3c-3 (ticket 316), décision 0055, sections 3 et 7 ; verdict Sécurité : approuvé sur le head `59878f0` (PR 326)",
   })),
+  // Ticket 624 (décisions 0115, 0116 § 2 et 0117 S5) : rédaction du programme par l'IA, même régime que
+  // `rediger-raisons.ts`. Verdict Sécurité : approuvé sur le head `05eec13` (PR 632).
+  {
+    fichier: "src/ai/rediger-programme.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; ticket 624, décisions 0115 et 0116 § 2 ; verdict Sécurité : approuvé sur le head `05eec13` (PR 632)",
+  },
   // P0r3c-5 (ticket 352) : capacité de notation de l'étape finale (réponse 1 du Tech Lead à la revue de la PR 348 ;
   // amendement A3 de 0055 § 3 point 5). Verdict Sécurité demandé dans la PR du ticket 352.
   {
@@ -459,6 +469,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     specificateur: "server-only",
     noms: ["effet"],
     motif: "marqueur `server-only` (sans capacité) du workflow 4 du voyage complet, exigé par `ligne/require-server-only` ; B9d, ticket 599, décision 0087 § 1.3 ; verdict Sécurité : approuvé (PR 600)",
+  },
+  {
+    fichier: "src/workflows/recalcul.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow 5 `batchRecompute`, exigé par `ligne/require-server-only` ; B10b-serveur, ticket 662, décision 0119 § 1.8 ; verdict Sécurité 0120 S9 point 1",
   },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.

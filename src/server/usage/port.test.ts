@@ -80,9 +80,9 @@ describe("p0: port de consommation, états d'une réservation (D13)", () => {
     expect(horloge.enAttente()).toBe(0);
   });
 
-  it("délais : 2 000 ms pour le port ; 120 s, 10 s et 10 s par requête", () => {
+  it("délais : 2 000 ms pour le port ; 120 s, 300 s (programme, 0116 § 2.3), 10 s et 10 s par requête", () => {
     expect(DELAI_PORT_MS).toBe(2_000);
-    expect(DELAI_REQUETE_MS).toEqual({ openrouter: 120_000, places: 10_000, routes: 10_000 });
+    expect(DELAI_REQUETE_MS).toEqual({ openrouter: 120_000, openrouterProgramme: 300_000, places: 10_000, routes: 10_000 });
   });
 });
 

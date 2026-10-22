@@ -316,6 +316,12 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
           <div role="region" aria-label={t.rapport.texteAria} tabIndex={0} className="overflow-x-auto rounded-control bg-muted p-4">
             <pre className="text-corps-s whitespace-pre-wrap text-ink tabular-nums">{rapport.texte}</pre>
           </div>
+          {/* Étapes avec et sans lieu vérifié : sur la page seulement, jamais dans le texte copié (0117 § 4). */}
+          <p className="text-corps-s text-ink tabular-nums">
+            {rapport.etapes === null
+              ? t.rapport.etapesNonRelevees
+              : format(t.rapport.etapes, { avec: rapport.etapes.avecPlaceId, sans: rapport.etapes.sansPlaceId })}
+          </p>
           <Button type="button" variant="secondary" className="w-full" onClick={() => void copier(rapport.texte)}>
             {t.rapport.copier}
           </Button>

@@ -4,7 +4,7 @@ import { classer, type ParametresClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatMoteur, TypeCreneau } from "@/domain/entrees";
 import { demandeBornee, demandeDuJour, TYPES_SERIE } from "@/domain/demande-du-jour";
-import { INCONNU, logementsDuJour, type Relectures } from "@/domain/relectures";
+import { INCONNU, logementsDuJour, villeDeLArrivee, type Relectures } from "@/domain/relectures";
 import type { JourSquelette } from "@/domain/squelette";
 import { element, lire } from "@/domain/tables";
 import { margeRemplacement } from "@/grounding/fiches-finales";
@@ -25,11 +25,17 @@ import { versRelectures } from "@/server/relecture/relectures";
  * la seule composition de la génération (règle `ligne/relecture-imports`).
  *
  * Pour les jours à planifier **seulement** (moteur partiel, B9-TL-13) :
- * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville) ;
+ * 1. zone et départ de chaque ville dont un jour est planifié (`zoneEtDepart` : au plus une fiche de position par ville).
+ *    Une ville `area` ou `none` demande un Text Search de son nom (0087 § 2.3), couvert par la réserve de l'étape `e`
+ *    (décision 0113 § 3 bis : une requête par ville `area` ou `none` positionnée). `budgets.textSearch` reste une **garde**
+ *    (§ 3 bis point 4) : une ville qui n'aurait pas de requête, si la réserve était mal calculée, ne déclenche aucun appel ;
  * 2. demande de chaque jour par type de créneau (un lieu par créneau qui tient dans la fenêtre du jour), bornée par la
- *    capacité de la matrice Routes du jour (volume du forfait réparti sur les jours et les modes) ;
+ *    capacité de la matrice Routes du jour (volume du forfait réparti sur les jours et les modes). Un jour qui attend un lieu
+ *    alors que sa capacité est nulle s'arrête en `cap_reached` (décision 0113 § 4 point 2), comme une première série qui ne
+ *    tient pas dans le budget de fiches : jamais un jour vide en silence ;
  * 3. fiches de la première série de chaque ville et de chaque type, dans l'ordre du classement (sans coût de trajet,
- *    aucune position n'étant connue avant la fiche), avec la marge de remplacement et sous le budget de fiches ;
+ *    aucune position n'étant connue avant la fiche), avec la marge de remplacement et sous le budget de fiches, moins une
+ *    fiche par ville positionnée à l'étape 1 (décision 0113 § 4 point 3) ;
  * 4. regroupement par jour à vol d'oiseau (jours de fermeture compris), puis **une matrice Routes par jour** sur les
  *    seuls points du jour (logements et lieux de son groupe) : aucun appel de fiche ni de trajet pour un lieu qui
  *    n'appartient qu'aux jours non planifiés ;
@@ -49,7 +55,15 @@ export type VilleAPlanifier = {
 export type CandidatAPlanifier = CandidatMoteur & { readonly ville: number };
 
 export type BudgetsPlanification = {
-  /** Fiches disponibles pour les séries (après les positions des villes). */
+  /**
+   * Requêtes Text Search de la part de l'étape (sa réserve, décision 0113 § 3 bis), pour la zone des villes `area` et `none`
+   * (une par ville). Garde : une ville qui n'en a plus n'est pas positionnée et ne déclenche aucun appel.
+   */
+  readonly textSearch: number;
+  /**
+   * Fiches de l'étape, positions des villes comprises : la planification en retire une par ville qu'elle positionne (villes
+   * d'un jour planifié, `villesPositionnees`), jamais une par ville du voyage ou du passage (décision 0113 § 4 point 3).
+   */
   readonly fiches: number;
   readonly routesRequetes: number;
   readonly routesElements: number;
@@ -103,6 +117,23 @@ export function capaciteMatrice(jours: number, modes: number, budget: { readonly
   return n;
 }
 
+/** Jours planifiés, ville de chaque nuit et villes candidates, tels que les reçoit la planification. */
+export type VillesEtJours<V extends { readonly rang: number }> = {
+  readonly jours: readonly JourSquelette[];
+  readonly nuitsVille: readonly number[];
+  readonly villes: readonly V[];
+};
+
+/**
+ * Villes que la planification positionne (étape 1) : celles dont un jour est planifié, la ville d'un jour étant celle de sa
+ * nuit d'arrivée (`villeDeLArrivee`). Chacune coûte au plus une fiche de position (`zoneEtDepart`) : le budget de fiches des
+ * séries ne déduit que celles-ci, jamais toutes les villes du voyage ou du passage (décision 0113 § 4 point 3).
+ */
+export function villesPositionnees<V extends { readonly rang: number }>(entree: VillesEtJours<V>): V[] {
+  const rangs = new Set(entree.jours.map((jour) => villeDeLArrivee(jour.logementArrivee, entree.nuitsVille)));
+  return entree.villes.filter((ville) => rangs.has(ville.rang));
+}
+
 /** Candidat admis pour un type de créneau (mêmes règles que le planificateur). */
 function admis(candidat: CandidatMoteur, type: TypeCreneau): boolean {
   if (!candidat.notes.slotFit.includes(type)) return false;
@@ -135,20 +166,29 @@ function unir(tables: readonly TableTrajets[]): TableTrajets {
 
 export async function preparerPlanification(entree: EntreePlanification, clients: ClientsPlanification): Promise<ResultatAncrage<SortiePlanification>> {
   return capturer(async () => {
-    const { jours, villes, budgets } = entree;
+    const { jours, budgets } = entree;
     const nombreDeNuits = entree.nuitsVille.length;
-    const villeDuJour = (jour: JourSquelette): number => entree.nuitsVille.at(jour.logementArrivee) ?? entree.nuitsVille.at(0) ?? 0;
+    const villeDuJour = (jour: JourSquelette): number => villeDeLArrivee(jour.logementArrivee, entree.nuitsVille);
 
     // 1. Zone et départ des villes dont un jour est planifié.
     const ancres = new Map<number, LogementAncre>();
-    for (const ville of villes) {
-      if (!jours.some((jour) => villeDuJour(jour) === ville.rang)) continue;
+    let textSearchRestants = Math.max(0, budgets.textSearch);
+    // Un jour qui attend au moins un lieu alors que la part Routes n'admet aucune matrice (capacité nulle, par exemple une
+    // requête pour deux modes) s'arrête en `cap_reached` avant tout appel : jamais un jour vide en silence (0113 § 4 point 2).
+    const demandesBrutes = jours.map((jour) => demandeDuJour(jour, entree.configuration));
+    const capaciteTotale = capaciteMatrice(jours.length, entree.modes.length, budgets);
+    const attendUnLieu = (rang: number): boolean => TYPES.some((type) => lire(element(demandesBrutes, rang) ?? { activity: 0, meal: 0, evening: 0 }, type) > 0);
+    if (capaciteTotale === 0 && jours.some((_, rang) => attendUnLieu(rang))) throw new ErreurClientGoogle("cap_reached");
+    for (const ville of villesPositionnees(entree)) {
+      if (ville.logement.kind === "area" || ville.logement.kind === "none") {
+        // Garde (0113 § 3 bis point 4) : aucun Text Search sans requête dans la part, jamais un centre inventé.
+        if (textSearchRestants < 1) continue;
+        textSearchRestants -= 1;
+      }
       ancres.set(ville.rang, valeurOuEchec(await zoneEtDepart(ville.logement, ville.nom, clients.places)));
     }
 
     // 2. Demandes et capacités : une matrice par jour qui attend au moins un lieu.
-    const demandesBrutes = jours.map((jour) => demandeDuJour(jour, entree.configuration));
-    const capaciteTotale = capaciteMatrice(jours.length, entree.modes.length, budgets);
     const pointsLogement = (jour: JourSquelette): PointTrajet[] => {
       const { depart, arrivee } = logementsDuJour(jour.index - 1, nombreDeNuits);
       const points = new Map<string, PointTrajet>();
@@ -159,6 +199,8 @@ export async function preparerPlanification(entree: EntreePlanification, clients
       return [...points.values()];
     };
     const capacites = jours.map((jour) => Math.max(0, capaciteTotale - pointsLogement(jour).length));
+    // Même règle après les logements : la matrice d'un jour qui attend un lieu doit en admettre au moins un.
+    if (jours.some((_, rang) => attendUnLieu(rang) && (element(capacites, rang) ?? 0) === 0)) throw new ErreurClientGoogle("cap_reached");
     const demandes = demandesBrutes.map((demande, rang) => demandeBornee(demande, element(capacites, rang) ?? 0));
 
     // 3. Fiches : par ville et par type, dans l'ordre du classement.
@@ -172,9 +214,10 @@ export async function preparerPlanification(entree: EntreePlanification, clients
     const premiereSerie = series.reduce((somme, serie) => somme + serie.n, 0);
     // Comme P0 (`premiereSerie > budgetFiches` : refus sans programme) : une première série qui ne tient pas dans le budget de
     // fiches n'est pas lue en partie, elle est refusée avant toute fiche (`cap_reached`, jamais un lieu inventé).
-    if (premiereSerie > Math.max(0, budgets.fiches)) throw new ErreurClientGoogle("cap_reached");
+    const fiches = Math.max(0, budgets.fiches - ancres.size);
+    if (premiereSerie > fiches) throw new ErreurClientGoogle("cap_reached");
     const marge = margeRemplacement(premiereSerie, budgets.marge);
-    let restant = Math.min(Math.max(0, budgets.fiches), premiereSerie + marge);
+    let restant = Math.min(fiches, premiereSerie + marge);
     let aVenir = premiereSerie;
     const lus = new Set<string>();
     const retenus: { readonly id: string; readonly ville: number; readonly type: TypeCreneau; readonly fiche: FicheChargee }[] = [];

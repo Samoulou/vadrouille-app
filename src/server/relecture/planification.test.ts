@@ -14,7 +14,7 @@ import { demandeBornee, demandeDuJour } from "@/server/p0/vers-moteur";
 
 import fixturesPlaces from "../../../prototype/fixtures/places/edimbourg.json";
 import fixturesRoutes from "../../../prototype/fixtures/routes/edimbourg.json";
-import { preparerPlanification, type EntreePlanification } from "./planification";
+import { capaciteMatrice, preparerPlanification, villesPositionnees, type EntreePlanification } from "./planification";
 
 /**
  * `preparerPlanification` (étape `e` de l'aperçu ; revue de la PR #563, bloquants 4 et 7) : jours non planifiés, budgets,
@@ -64,9 +64,14 @@ function compteurs() {
   const routesBase = creerRoutesSimule(FixturesRoutesSchema.parse(fixturesRoutes));
   const fiches: string[] = [];
   const positions: string[] = [];
+  const textSearch: string[] = [];
   const matrices: { origines: string[]; destinations: string[]; mode: string }[] = [];
   const places: ClientPlacesMvp = {
     ...base,
+    async textSearch(requete) {
+      textSearch.push(requete.texte);
+      return base.textSearch(requete);
+    },
     async details(placeId) {
       fiches.push(placeId);
       return base.details(placeId);
@@ -82,7 +87,7 @@ function compteurs() {
       return routesBase.matrice(requete);
     },
   };
-  return { places, routes, fiches, positions, matrices };
+  return { places, routes, fiches, positions, textSearch, matrices };
 }
 
 function entree(jours: EntreePlanification["jours"], budgets: Partial<EntreePlanification["budgets"]> = {}): EntreePlanification {
@@ -94,7 +99,7 @@ function entree(jours: EntreePlanification["jours"], budgets: Partial<EntreePlan
     modes: [...MODES],
     classement: { classement: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: 365, dateReference: "2026-10-20" },
     configuration: CONFIGURATION_MOTEUR,
-    budgets: { fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
+    budgets: { textSearch: 0, fiches: 40, routesRequetes: 40, routesElements: 2_000, marge: MARGE_FICHES, ...budgets },
   };
 }
 
@@ -150,15 +155,20 @@ describe("planification: jours non planifiés et budgets", () => {
     // Un budget juste suffisant lit la première série et sa marge, pas davantage.
     const demande = planifies.reduce((somme, jour) => somme + Object.values(demandeDuJour(jour, CONFIGURATION_MOTEUR)).reduce((a, b) => a + b, 0), 0);
     const juste = compteurs();
-    const lue = await preparerPlanification(entree(planifies, { fiches: demande }), { places: juste.places, routes: juste.routes });
+    // Le budget de l'étape comprend la position de la ville (une fiche, 0113 § 4 point 3).
+    const lue = await preparerPlanification(entree(planifies, { fiches: demande + 1 }), { places: juste.places, routes: juste.routes });
     expect(lue.ok).toBe(true);
     expect(juste.fiches.length).toBeLessThanOrEqual(demande);
+    const unDeMoins = compteurs();
+    expect(await preparerPlanification(entree(planifies, { fiches: demande }), { places: unDeMoins.places, routes: unDeMoins.routes })).toMatchObject({ ok: false, code: "cap_reached" });
+    expect(unDeMoins.fiches).toHaveLength(0);
 
     const sansRoutes = compteurs();
     const refus = await preparerPlanification(entree(planifies, { routesElements: 0, routesRequetes: 0 }), { places: sansRoutes.places, routes: sansRoutes.routes });
-    // Aucune place dans la matrice : aucune demande, donc aucun lieu et aucune requête Routes.
+    // Aucune place dans la matrice alors que les jours attendent des lieux : `cap_reached` (décision 0113 § 4), aucun appel.
+    expect(refus).toEqual({ ok: false, code: "cap_reached", retryable: false });
     expect(sansRoutes.matrices).toHaveLength(0);
-    if (refus.ok) expect(refus.valeur.candidats).toHaveLength(0);
+    expect(sansRoutes.fiches).toHaveLength(0);
   });
 
   it("les positions rendues sont celles des fiches lues, jamais d'un lieu non lu", async () => {
@@ -177,5 +187,114 @@ describe("planification: jours non planifiés et budgets", () => {
     const issue = await preparerPlanification(entree(planifies), { places, routes: c.routes });
     expect(issue.ok).toBe(false);
     expect(JSON.stringify(issue)).not.toContain("test_place_fuite");
+  });
+});
+
+describe("planification: garde Text Search des villes area et none (décision 0113 § 3 bis point 4)", () => {
+  const planifies = squelette("2026-11-23", "2026-11-28", 5).filter((jour) => jour.index <= 2);
+  // J1 à Édimbourg (logement connu), J2 arrive à Glasgow (`none`) : la zone de Glasgow demande un Text Search de son nom.
+  const deuxVilles = (budgets: Partial<EntreePlanification["budgets"]>): EntreePlanification => ({
+    ...entree(planifies, budgets),
+    nuitsVille: [0, 1, 1, 1, 1],
+    villes: [
+      { rang: 0, nom: "Édimbourg", logement: { kind: "known", placeId: LOGEMENT } },
+      { rang: 1, nom: "Glasgow", logement: { kind: "none" } },
+    ],
+    candidats: CANDIDATS.map((c, rang) => ({ ...c, ville: rang % 2 })),
+  });
+
+  it("garde : sans requête Text Search dans le budget, aucun appel ne part pour la ville, jamais un centre inventé", async () => {
+    const c = compteurs();
+    const issue = await preparerPlanification(deuxVilles({ textSearch: 0 }), { places: c.places, routes: c.routes });
+    expect(issue.ok).toBe(true);
+    if (!issue.ok) return;
+    expect(c.textSearch).toEqual([]);
+    // Seule la position du logement d'Édimbourg est lue ; aucun lieu de Glasgow n'est relu ni rendu.
+    expect(c.positions).toEqual([LOGEMENT]);
+    const deGlasgow = new Set(CANDIDATS.filter((_, rang) => rang % 2 === 1).map((cand) => cand.placeId));
+    expect(c.fiches.some((placeId) => deGlasgow.has(placeId))).toBe(false);
+    expect(issue.valeur.candidats.some((cand) => deGlasgow.has(cand.placeId))).toBe(false);
+    expect(issue.valeur.candidats.length).toBeGreaterThan(0);
+  });
+
+  it("avec une requête dans la part : un seul Text Search, le nom de la ville", async () => {
+    const c = compteurs();
+    const issue = await preparerPlanification(deuxVilles({ textSearch: 1 }), { places: c.places, routes: c.routes });
+    expect(c.textSearch).toEqual(["Glasgow"]);
+    // Le double d'Édimbourg ne connaît pas Glasgow : résultat déterministe, la zone est introuvable.
+    expect(issue).toEqual({ ok: false, code: "lodging_unresolved", retryable: false });
+  });
+});
+
+describe("planification: jour sans matrice possible (décision 0113 § 4, ticket 609)", () => {
+  const sixJours = squelette("2026-11-23", "2026-11-28", 5);
+  const unJour = sixJours.filter((jour) => jour.index === 3);
+
+  it("une requête Routes pour deux modes : capacité nulle, cap_reached avant toute position, fiche ou matrice", async () => {
+    expect(capaciteMatrice(1, MODES.length, { routesRequetes: 1, routesElements: 50 })).toBe(0);
+    const c = compteurs();
+    const issue = await preparerPlanification(entree(unJour, { routesRequetes: 1, routesElements: 50 }), { places: c.places, routes: c.routes });
+    expect(issue).toEqual({ ok: false, code: "cap_reached", retryable: false });
+    expect(c.positions).toEqual([]);
+    expect(c.fiches).toEqual([]);
+    expect(c.textSearch).toEqual([]);
+    expect(c.matrices).toEqual([]);
+  });
+
+  it("capacité entièrement prise par le logement du jour : cap_reached avant toute fiche ou matrice", async () => {
+    // Un mode, une requête et un élément : la matrice admet un point, celui du logement ; aucun lieu n'y tient.
+    expect(capaciteMatrice(1, 1, { routesRequetes: 1, routesElements: 1 })).toBe(1);
+    const c = compteurs();
+    const issue = await preparerPlanification(
+      { ...entree(unJour, { routesRequetes: 1, routesElements: 1 }), modes: ["walk"] },
+      { places: c.places, routes: c.routes },
+    );
+    expect(issue).toEqual({ ok: false, code: "cap_reached", retryable: false });
+    expect(c.fiches).toEqual([]);
+    expect(c.matrices).toEqual([]);
+  });
+
+  it("deux requêtes pour deux modes : le jour est planifié (aucun changement quand la part suffit)", async () => {
+    const c = compteurs();
+    const issue = await preparerPlanification(entree(unJour, { routesRequetes: 2, routesElements: 100 }), { places: c.places, routes: c.routes });
+    expect(issue.ok).toBe(true);
+    if (!issue.ok) return;
+    expect(issue.valeur.candidats.length).toBeGreaterThan(0);
+    expect(c.matrices.length).toBeGreaterThan(0);
+  });
+});
+
+describe("planification: budget de fiches à deux villes (décision 0113 § 4 point 3, ticket 609)", () => {
+  const sixJours = squelette("2026-11-23", "2026-11-28", 5);
+  const villes = [
+    { rang: 0, nom: "Édimbourg", logement: { kind: "known" as const, placeId: LOGEMENT } },
+    // Logement de Glasgow : une valeur sentinelle des fixtures, pour que sa position se lise dans le double.
+    { rang: 1, nom: "Glasgow", logement: { kind: "known" as const, placeId: placeIdDe(20) } },
+  ];
+  // Deux nuits à Édimbourg, trois à Glasgow : J1 et J2 arrivent à Édimbourg, J3 à J6 à Glasgow.
+  const nuitsVille = [0, 0, 1, 1, 1];
+  const jour = (index: number) => sixJours.filter((j) => j.index === index);
+
+  it("villes positionnées : celles d'un jour planifié, jamais toutes les villes du passage", () => {
+    expect(villesPositionnees({ jours: jour(4), nuitsVille, villes }).map((v) => v.nom)).toEqual(["Glasgow"]);
+    expect(villesPositionnees({ jours: jour(1), nuitsVille, villes }).map((v) => v.nom)).toEqual(["Édimbourg"]);
+    expect(villesPositionnees({ jours: [...jour(1), ...jour(4)], nuitsVille, villes })).toHaveLength(2);
+  });
+
+  it("un jour d'une ville sur deux : une seule fiche de position déduite, la première série tient avec demande + 1", async () => {
+    const jours = jour(1);
+    const demande = Object.values(demandeDuJour(jours[0]!, CONFIGURATION_MOTEUR)).reduce((a, b) => a + b, 0);
+    expect(demande).toBeGreaterThan(0);
+    const c = compteurs();
+    // Avant le ticket 609, les deux villes du passage étaient déduites : la première série ne tenait pas (`cap_reached`).
+    const issue = await preparerPlanification({ ...entree(jours, { fiches: demande + 1 }), nuitsVille, villes }, { places: c.places, routes: c.routes });
+    expect(issue.ok).toBe(true);
+    expect(c.positions).toEqual([LOGEMENT]);
+    expect(c.fiches.length).toBeLessThanOrEqual(demande);
+    // Deux jours, un par ville : deux positions, deux fiches déduites.
+    const deux = compteurs();
+    const deuxJours = [...jour(1), ...jour(4)];
+    const demandeDeux = deuxJours.reduce((somme, j) => somme + Object.values(demandeDuJour(j, CONFIGURATION_MOTEUR)).reduce((a, b) => a + b, 0), 0);
+    expect(await preparerPlanification({ ...entree(deuxJours, { fiches: demandeDeux + 1 }), nuitsVille, villes }, { places: deux.places, routes: deux.routes })).toMatchObject({ ok: false, code: "cap_reached" });
   });
 });

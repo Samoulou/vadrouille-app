@@ -69,3 +69,56 @@ describe("règle react/jsx-no-literals sur les fichiers de F6", () => {
     expect(messages).toHaveLength(0);
   });
 });
+
+/**
+ * B10a (décision 0112 § 2 point 2, amendement de 0016 § 3.1 règle 4) : `src/domain/preferences.ts` n'importe que des types de
+ * @/contracts et des valeurs de @/contracts/values ; depuis src/features, seul @/domain/preferences s'importe de src/domain.
+ */
+describe("lint: règles du tri partagées sans zod (B10a)", () => {
+  const IMPORTS = ["no-restricted-imports", "@typescript-eslint/no-restricted-imports"];
+  const PREFERENCES = "src/domain/preferences.ts";
+  const ECRAN = "src/features/presentation/Exemple.ts";
+
+  it.each([
+    'import type { PreferencePrompt } from "@/contracts";\nexport type X = PreferencePrompt;\n',
+    'import { CATEGORIES } from "@/contracts/values";\nexport const x = CATEGORIES;\n',
+  ])("accepté dans src/domain/preferences.ts : %s", async (code) => {
+    expect(await messagesFor(code, PREFERENCES, IMPORTS)).toHaveLength(0);
+  });
+
+  it.each([
+    'import { z } from "zod";\nexport const x = z;\n',
+    'import { z } from "zod/mini";\nexport const x = z;\n',
+    'import { PreferencePromptSchema } from "@/contracts";\nexport const x = PreferencePromptSchema;\n',
+    'import { DeckSessionSchema } from "@/contracts/deck";\nexport const x = DeckSessionSchema;\n',
+    'import { classer } from "@/domain/classement";\nexport const x = classer;\n',
+    'import { x } from "./calculs";\nexport const y = x;\n',
+  ])("refusé dans src/domain/preferences.ts : %s", async (code) => {
+    expect(await messagesFor(code, PREFERENCES, IMPORTS)).not.toHaveLength(0);
+  });
+
+  it("depuis src/features, @/domain/preferences s'importe ; un autre module de src/domain est refusé", async () => {
+    expect(await messagesFor('import { ordreDuPaquet } from "@/domain/preferences";\nexport const x = ordreDuPaquet;\n', ECRAN, IMPORTS)).toHaveLength(0);
+    expect(await messagesFor('import { classer } from "@/domain/classement";\nexport const x = classer;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+    expect(await messagesFor('import { x } from "../../domain/calculs";\nexport const y = x;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+  });
+
+  it("depuis src/features/presentation, @/server/actions/presentation s'importe ; un autre module de src/server est refusé (0112 § 2 point 4, 0020 § 11)", async () => {
+    const ACTIONS = "src/features/presentation/server-actions.ts";
+    expect(await messagesFor('import { decideCard } from "@/server/actions/presentation";\nexport const x = decideCard;\n', ACTIONS, IMPORTS)).toHaveLength(0);
+    for (const code of [
+      'import { deciderCarte } from "@/server/presentation/tri";\nexport const x = deciderCarte;\n',
+      'import { creerLectureDuTri } from "@/server/presentation/lecture";\nexport const x = creerLectureDuTri;\n',
+      'import { executerActionVoyage } from "@/server/voyages/actions";\nexport const x = executerActionVoyage;\n',
+      'import { x } from "../../server/presentation/etat";\nexport const y = x;\n',
+    ]) {
+      expect(await messagesFor(code, ACTIONS, IMPORTS), code).not.toHaveLength(0);
+    }
+  });
+
+  it("les interdictions de 0016 § 3.1 tiennent toujours dans src/features", async () => {
+    expect(await messagesFor('import { z } from "zod";\nexport const x = z;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+    expect(await messagesFor('import { PreferencePromptSchema } from "@/contracts";\nexport const x = PreferencePromptSchema;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+    expect(await messagesFor('import type { PreferencePrompt } from "@/contracts";\nexport type X = PreferencePrompt;\n', ECRAN, IMPORTS)).toHaveLength(0);
+  });
+});

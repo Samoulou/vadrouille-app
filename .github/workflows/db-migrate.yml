@@ -106,6 +106,8 @@ jobs:
             "0010_usage_forfait 78adfbeedf665e62f7da2e2b0d5f43b3c2fdfc837f5a06f9399fbb58d228bfa0"
             "0011_trajets_prototype 9b71af4cd968128ec3696027e6a0592d8489cddc9eaf4c329cf1f6e188107280"
             "0012_creation_voyage 56d9d03e7b0f76c99d276c3586284aaee3ee0f7737645dc3b08e3436f60f5faf"
+            "0013_secteurs_prototype 2d9704d887148efb7a679d6ed0b126a8cdcad81b932617f51e60496238b48963"
+            "0014_tri_enregistre 0fc7b497a023c71d5bce285961745e6a095aad157198f593241a2a56ee1d1088"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.

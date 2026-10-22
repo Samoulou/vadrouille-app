@@ -37,6 +37,17 @@ export const RANG_ETAPE: Readonly<Record<EtapeApercu, number>> = { a: 1, l: 2, b
 export const MAX_RETRIES_ETAPE: Readonly<Record<EtapeApercu, number>> = { a: 2, l: 0, b: 0, c: 0, d: 0, e: 0 };
 
 /**
+ * Étapes du lot `batchRecompute` (workflow 5, décision 0119 § 1.4 point 1) : `a` (jours touchés, forfait) et `e` (relecture,
+ * planification des jours touchés, raisons, publication), sur les noms d'étape existants (`step` admet `a` et `e`). Tables
+ * propres au lot, distinctes de celles de l'aperçu (où `e` vaut 6) : rang fixé ici, jamais calculé par le workflow.
+ */
+export const ETAPES_LOT = ["a", "e"] as const;
+export type EtapeLot = (typeof ETAPES_LOT)[number];
+export const RANG_LOT: Readonly<Record<EtapeLot, number>> = { a: 1, e: 2 };
+/** `maxRetries` du lot (0119 § 1.4 point 1) : `a` est déterministe et sans appel ; `e` rejouée repaierait. */
+export const MAX_RETRIES_LOT: Readonly<Record<EtapeLot, number>> = { a: 2, e: 0 };
+
+/**
  * Part du forfait de l'aperçu qui revient à chaque étape, en pourcentage (valeurs de départ du Tech Lead, B9-TL-3
  * point 5). Pour chaque ressource, les parts des étapes qui la consomment font 100 ; la dernière étape reçoit le reste
  * de l'arrondi. Un registre en mémoire par étape est borné par sa part.

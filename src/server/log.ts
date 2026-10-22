@@ -31,6 +31,11 @@ export const LOG_EVENTS = [
   // modèle, ni requête, ni URL, ni donnée Google) ; niveau `warn` si aucun candidat n'est retenu. Depuis le ticket 407,
   // écrite aussi quand la recherche lève (`errorName`, `warn`), avec `deadlineStop` (fin sur l'échéance de l'étape).
   "p0.research_done",
+  // Décision 0116 § 4.4 et verdict 0117 § 4 : fin de l'étape `etapeProgramme` de `p0Run`, compteurs **maison** seulement
+  // (`days`, `slots`, `placesToVerify`, `daysRemoved`, `slotsRemoved`, `fieldsRemoved`, `textsCut`, `modelCalls`,
+  // `unverifiedForCap`), des nombres ; jamais un compteur de verdict de vérification (vérifiés, introuvables, fermés,
+  // hors zone), ni nom, ni texte, ni donnée Google. Écrite aussi quand l'étape lève (`errorName`, `warn`).
+  "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
   // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
@@ -81,6 +86,17 @@ export const LOG_EVENTS = [
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
   "generation.full_stuck",
+  // B10b (spécification B10 ; décision 0119 § 1.3 points 4 et 5 ; verdict Sécurité 0120 S1 point 1 et S7) : recalcul d'un tri
+  // (workflow 5). `recalcul.not_created` : ligne `batch` attendue absente après `ON CONFLICT DO NOTHING` (collision sur l'index
+  // des `request_id`, ou sur l'index « une exécution en cours par voyage »), ou lecture illisible dans `completeDeck` (la
+  // clôture est gardée), aucun démarrage ; `recalcul.start_failed` : démarrage du SDK échoué, ligne close aussitôt en `failed` ;
+  // `recalcul.unlock_failed` : second travail de la suite du déblocage en échec, attrapé (le voyage complet n'est pas touché).
+  // Niveau `warn` ; champs `organizationId`, `tripId`, `generationRunId` (identifiants internes), `errorName` et `days` (nombre
+  // de jours touchés, fonction des seuls signaux du tri et de la version de base) ; aucun nom, `placeId`, catégorie, raison,
+  // texte de question, durée ni compteur qui dépende de Google.
+  "recalcul.not_created",
+  "recalcul.start_failed",
+  "recalcul.unlock_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -146,6 +162,18 @@ export type LogFields = {
   readonly fieldsRemoved?: number;
   /** Textes trop longs coupés dans les candidats gardés de l'agent (décision 0111) : un nombre, jamais le texte. */
   readonly textsCut?: number;
+  /**
+   * Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : journées et créneaux lus, lieux
+   * distincts à vérifier, journées et créneaux retirés à la lecture, requêtes de modèle, lieux laissés sans vérification
+   * faute de part ou de temps. Entiers positifs ou nuls ; aucun ne dit l'issue d'une vérification.
+   */
+  readonly days?: number;
+  readonly slots?: number;
+  readonly placesToVerify?: number;
+  readonly daysRemoved?: number;
+  readonly slotsRemoved?: number;
+  readonly modelCalls?: number;
+  readonly unverifiedForCap?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -558,6 +586,13 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["sectorUnknown", entierPositif],
   ["fieldsRemoved", entierPositif],
   ["textsCut", entierPositif],
+  ["days", entierPositif],
+  ["slots", entierPositif],
+  ["placesToVerify", entierPositif],
+  ["daysRemoved", entierPositif],
+  ["slotsRemoved", entierPositif],
+  ["modelCalls", entierPositif],
+  ["unverifiedForCap", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],

@@ -134,7 +134,7 @@ describe("p0: aucun identifiant de modèle en dur hors de la configuration", () 
       ...configBase,
       modeles: {
         ...configBase.modeles,
-        etapes: { recherche: "test/recherche-x", notation: "test/notation-y", raisons: "test/raisons-z" },
+        etapes: { recherche: "test/recherche-x", notation: "test/notation-y", raisons: "test/raisons-z", programme: "test/programme-w" },
       },
     };
     const { capture } = await executerCapture({ configuration });

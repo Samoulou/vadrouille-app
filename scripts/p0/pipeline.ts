@@ -1,16 +1,17 @@
 import { avecGardeDataCollection, type ClientModeles } from "@/ai/client";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
-import { requeteNotation, requeteRaisons } from "@/ai/requetes";
-import { lireNotes, lireRaisons } from "@/ai/sorties";
+import { requeteNotation, requeteProgramme, requeteRaisons } from "@/ai/requetes";
+import { lieuxDuProgramme, lireNotes, lireProgramme, lireRaisons, ordreEcrit } from "@/ai/sorties";
 import { identifiantVoyage } from "@/domain/identifiant";
 import { planifier } from "@/domain/planification";
 import { squelette } from "@/domain/squelette";
-import { ancrerCandidats, ancrerLogements, matriceTrajets } from "@/grounding/ancrage";
+import { ancrerCandidats, ancrerLogements, ficheOuNull, lieuxHorsPartTextSearch, matriceTrajets, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
-import { estAncre, type Ancrage, type AncrageResolu, type Position } from "@/prototype/ancrage";
+import { estAncre, type Ancrage, type AncrageResolu, type Position, type Trajets } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat, CandidatNote } from "@/prototype/candidat";
 import { CONFIG_SCHEMA, modelesDeLaVariante, RoutageSchema, type Variante } from "@/prototype/config";
@@ -20,13 +21,14 @@ import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
 
-import { assembler, type Raison } from "@/server/p0/assemblage";
+import { assembler, assemblerProgrammeIa, pointsDeTrajet, type Raison } from "@/server/p0/assemblage";
 import {
   bornesDepuisDemande,
   candidatPourModele,
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
   entreeModelesDepuisBrief,
+  entreeProgrammeDepuisBrief,
   lieuRetenuDepuisCandidat,
 } from "@/server/p0/vers-couche-ia";
 import type { Configuration } from "./fichiers";
@@ -41,7 +43,7 @@ import {
   plafonnerRoutes,
 } from "./plafonds";
 import { lireSiPresent } from "@/domain/tables";
-import { RapportSchema, type Rapport } from "./rapport";
+import { RapportProgrammeSchema, RapportSchema, type Rapport, type RapportProgramme } from "./rapport";
 import {
   briefDepuisBrief,
   candidatVersMoteur,
@@ -349,7 +351,8 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
       notation: PROMPT_NOTATION.version,
       raisons: PROMPT_RAISONS.version,
     },
-    modeles: choisis,
+    // Le mode simulé garde la chaîne du lot 0 (recherche, notation, raisons) : le modèle `programme` (0116) n'y figure pas.
+    modeles: { recherche: choisis.recherche, notation: choisis.notation, raisons: choisis.raisons },
     ...(RoutageSchema.safeParse(configuration.modeles.routage).success ? { routage: { ...configuration.modeles.routage } } : {}),
     fichiersConfig: { modeles: CONFIG_SCHEMA, recherche: CONFIG_SCHEMA, classement: CONFIG_SCHEMA, plafonds: CONFIG_SCHEMA },
     notes: {
@@ -395,6 +398,146 @@ export async function executer(entree: EntreePipeline): Promise<ResultatPipeline
     partSourcesLocalesOuIndependantes: candidats.length === 0 ? 0 : locales / candidats.length,
     violations,
     reglesSansObjet: ["R3", "R7", "R10"],
+  });
+  return programme === undefined ? { rapport } : { programme, rapport };
+}
+
+export type ResultatPipelineProgramme = { programme?: ProgrammeReduit; rapport: RapportProgramme };
+
+
+/**
+ * Mode simulé de `pnpm p0` par la **nouvelle chaîne** (spécification P0-programme-par-ia § 1 point 7 ; décision 0116
+ * § 7.2) : même suite que `etapeProgramme` de `p0Run`, sur les doubles des fixtures, sans aucun appel réel.
+ * 1. une requête `programme` (`requeteProgramme`, `zdr` et `data_collection: "deny"`), lue par `lireProgramme` puis
+ *    mise en ordre écrit (`ordreEcrit`) ; illisible : arrêt `programme_invalid`, rien d'écrit ;
+ * 2. logements (`ancrerLogements`), puis un Text Search et une fiche par lieu distinct (`lieuxDuProgramme`), dans
+ *    l'ordre écrit, biais sur le premier logement (comportement du mode simulé, `RequeteTextSearch.restriction`
+ *    absente) ; lieu introuvable ou fermé définitivement : écrit sans `placeId`. Part Text Search ou de fiches
+ *    épuisée : la vérification s'arrête et les lieux restants sont écrits sans `placeId` (jamais un arrêt) ;
+ * 3. trajets entre points consécutifs de chaque jour (`pointsDeTrajet`, `matriceTrajets` par jour) ;
+ * 4. assemblage sans replanification (`assemblerProgrammeIa`), réduction (`reduireProgramme`).
+ * Le rapport ne porte que des compteurs (schéma 2) : aucune donnée Google, aucun nom de lieu.
+ * L'ancienne chaîne (`executer`) est gardée au lot 1 (0116 § 7.1) et reste couverte par ses tests.
+ */
+export async function executerProgramme(entree: EntreePipeline): Promise<ResultatPipelineProgramme> {
+  const { brief, configuration, journal, horloge } = entree;
+  const compteurs = new Compteurs(configuration.plafonds, horloge);
+  const debut = horloge();
+  const modeles = plafonnerModeles(avecGardeDataCollection(entree.clients.modeles), compteurs);
+  const places = plafonnerPlaces(entree.clients.places, compteurs);
+  const routes = plafonnerRoutes(entree.clients.routes, compteurs);
+  const choisis = modelesDeLaVariante(configuration.modeles, entree.variante);
+  const tripId = identifiantVoyage(brief.destination, entree.dateExecution, entree.numero);
+  const lecture = { days: 0, slots: 0, placesToVerify: 0, daysRemoved: 0, slotsRemoved: 0, fieldsRemoved: 0, textsCut: 0, modelCalls: 0, unverifiedForCap: 0 };
+  let etapes = { avecPlaceId: 0, sansPlaceId: 0 };
+  let programme: ProgrammeReduit | undefined;
+  let statut: RapportProgramme["statut"] = "complete";
+  let raisonArret: RapportProgramme["raisonArret"];
+  let compteurAtteint: RapportProgramme["compteurAtteint"];
+
+  journal.ecrire("run_started");
+  try {
+    // 1. Rédaction : une requête, sans outil ; `zdr` et `data_collection: "deny"` comme la composition réelle (0117 § 5).
+    lecture.modelCalls += 1;
+    const reponse = await modeles.envoyer(requeteProgramme(entreeProgrammeDepuisBrief(brief), choisis.programme, { data_collection: "deny", zdr: true }));
+    const lu = lireProgramme(reponse.texte, { arrivee: brief.arrivee, depart: brief.depart });
+    Object.assign(lecture, { daysRemoved: lu.joursRetires, slotsRemoved: lu.creneauxRetires, fieldsRemoved: lu.champsRetires, textsCut: lu.textesCoupes });
+    if (lu.valeur === null) throw Object.assign(new Error("programme_invalid"), { code: "programme_invalid" });
+    const ecrit = ordreEcrit(lu.valeur);
+    lecture.days = ecrit.jours.length;
+    lecture.slots = ecrit.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
+
+    // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit.
+    const logements = await ancrerLogements(brief, places);
+    // Revue 2 de la PR 632, mineur 4 : un brief sans logement s'arrête en erreur explicite, jamais un biais inventé.
+    const premier = logements.at(0);
+    if (premier === undefined) throw Object.assign(new Error("lodging_unresolved"), { code: "lodging_unresolved" });
+    const { lieux, cleDe } = lieuxDuProgramme(ecrit, brief.destination);
+    lecture.placesToVerify = lieux.length;
+    lecture.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, configuration.plafonds.placesTextSearch, brief.logements.length);
+    const fiches = new Map<string, AncrageResolu>();
+    const lues = new Map<string, AncrageResolu | null>();
+    try {
+      for (const lieu of lieux) {
+        const { placeIds } = await places.textSearch({ texte: `${lieu.lieu}, ${lieu.ville ?? brief.destination}`, biais: { ...premier.position, rayonMetres: RAYON_BIAIS_METRES } });
+        const placeId = placeIds.at(0);
+        if (placeId === undefined) continue;
+        if (!lues.has(placeId)) lues.set(placeId, await ficheOuNull(placeId, places));
+        const fiche = lues.get(placeId);
+        if (fiche !== undefined && fiche !== null && fiche.statut !== "ferme_definitivement") fiches.set(lieu.id, fiche);
+      }
+    } catch (erreur) {
+      // Part épuisée : vérification arrêtée, lieux restants sans `placeId`, programme entier écrit (0116 § 3.5).
+      if (!(erreur instanceof PlafondAtteint) || (erreur.compteur !== "placesTextSearch" && erreur.compteur !== "placesDetails")) throw erreur;
+    }
+    const jours = ecrit.jours.map((jour, indiceJour) => ({
+      date: jour.date,
+      ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+      creneaux: jour.creneaux.map((creneau, rang) => {
+        const cle = cleDe(indiceJour, rang);
+        return { ...creneau, placeId: cle === undefined ? undefined : fiches.get(cle)?.placeId };
+      }),
+    }));
+    journal.ecrire("grounding_done", { ancres: fiches.size, nonRetenus: lieux.length - fiches.size });
+
+    // 3. Trajets entre points consécutifs de chaque jour (une matrice par jour, en mémoire).
+    const idsLogements = logements.map((logement) => logement.placeId);
+    const mode = modeDeTrajet(brief);
+    const tables: Trajets[] = [];
+    for (const points of pointsDeTrajet({ brief, logements: idsLogements, jours })) if (points.length > 1) tables.push(await matriceTrajets(points, mode, routes));
+    const trajets = (depuis: string, vers: string) => tables.map((table) => table(depuis, vers)).find((minutes) => minutes !== undefined);
+    journal.ecrire("planning_done", { jours: jours.length });
+
+    // 4. Assemblage sans replanification, réduction.
+    const complet = assemblerProgrammeIa({ tripId, brief, jours, bonsPlans: ecrit.bonsPlans, logements: idsLogements, configuration: configuration.moteur, mode, trajets });
+    const positions = new Map<string, Position>([...logements, ...fiches.values()].map((ancrage) => [ancrage.placeId, ancrage.position]));
+    programme = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
+    for (const jour of programme.trip.days) {
+      for (const ligne of jour.items) {
+        if (ligne.type !== "stop") continue;
+        if (ligne.stop.placeId === undefined) etapes = { ...etapes, sansPlaceId: etapes.sansPlaceId + 1 };
+        else etapes = { ...etapes, avecPlaceId: etapes.avecPlaceId + 1 };
+      }
+    }
+    journal.ecrire("validation_done", { ...etapes });
+  } catch (erreur) {
+    programme = undefined;
+    if (erreur instanceof PlafondAtteint) {
+      statut = "stopped";
+      raisonArret = erreur.code;
+      compteurAtteint = erreur.compteur;
+    } else {
+      statut = "failed";
+      raisonArret = codeErreur(erreur);
+    }
+    journal.ecrire(raisonArret);
+  }
+
+  const { registre } = compteurs;
+  const rapport = RapportProgrammeSchema.parse({
+    schema: 2,
+    chaine: "programme",
+    variante: entree.variante,
+    brief: entree.nomBrief,
+    tripId,
+    dateExecution: entree.dateExecution,
+    mode: "simule",
+    statut,
+    ...(raisonArret === undefined ? {} : { raisonArret }),
+    ...(compteurAtteint === undefined ? {} : { compteurAtteint }),
+    prompts: { programme: PROMPT_PROGRAMME.version },
+    modeles: { programme: choisis.programme },
+    routage: { data_collection: "deny", zdr: true },
+    elapsedMs: { total: Math.max(0, Math.round(horloge() - debut)) },
+    coutUsd: { modeles: registre.cout.modeles, total: registre.cout.modeles },
+    google: {
+      placesTextSearchIdsOnly: registre.utilise.placesTextSearch,
+      placesDetails: registre.utilise.placesDetails,
+      routesRequetes: registre.utilise.routesRequetes,
+      routesElements: registre.utilise.routesElements,
+    },
+    programme: lecture,
+    etapes,
   });
   return programme === undefined ? { rapport } : { programme, rapport };
 }

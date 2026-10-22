@@ -120,6 +120,8 @@ describe("aperçu (critères) : plafond atteint à chaque étape, aucun appel ap
       nom: "c : ancrage",
       rang: 4,
       apercu: { placesTextSearch: 8 },
+      // Parts Text Search de `l` et `c` (la réserve de `e`, décision 0113 § 3 bis, est prise sur `c` : nulle ici, Édimbourg a
+      // un logement connu, donc la somme des trois parts reste celle de `l` et `c`).
       appelsMax: (c) => expect(c.places).toBeLessThanOrEqual(partDe(8, PARTS_FORFAIT.textSearch, "l") + partDe(8, PARTS_FORFAIT.textSearch, "c") + 2),
     },
     {

@@ -23,12 +23,12 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
+import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
-import { createLocalDeckActions, type DeckActions } from "./actions";
+import { createLocalDeckActions, type DeckActions, type RefusDuTri } from "./actions";
 import { formatContexte, noOptionMessage } from "./contexte";
 import {
   currentCard,
@@ -41,6 +41,7 @@ import {
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
 import type { NoOptionSlot, PresentationDay } from "./load";
+import { createServerDeckActions } from "./server-actions";
 
 /**
  * Chargement différé (décision 0024 § 1, T14) de ce que le premier rendu n'affiche pas : les deux feuilles, avec
@@ -86,9 +87,16 @@ export interface PresentationScreenProps {
   recorder?: EventRecorder;
   /**
    * Actions de décision (décision 0013, § 3.2). Implémentation locale en mémoire par défaut : une
-   * fonction ne traverse pas la frontière serveur/client ; en B10, la page passera des Server Actions.
+   * fonction ne traverse pas la frontière serveur/client. Sans `actions` : implémentation serveur si `deck` est non
+   * nul (tri enregistré, décision 0112 § 4 point 3), locale sinon.
    */
   actions?: DeckActions;
+  /**
+   * État du tri enregistré (adaptateur `api`, B10a point 5) : `proposals` est alors le paquet de reprise ; la question
+   * ouverte rouvre la feuille ; un tri clos montre l'écran de fin ; la progression part des cartes déjà décidées du tri
+   * ouvert (F6-PO-16). `null` ou absent : session en mémoire de F6 (`mock`, `prototype`).
+   */
+  deck?: DeckSession | null;
 }
 
 /**
@@ -137,10 +145,15 @@ function Deck({
   canUnlock = true,
   placesFromGoogle = false,
   actions: injected,
+  deck = null,
   track,
 }: DeckProps) {
-  const [state, dispatch] = useReducer(deckReducer, proposals, initDeck);
-  const [actions] = useState<DeckActions>(() => injected ?? createLocalDeckActions());
+  const [state, dispatch] = useReducer(deckReducer, proposals, (initial) => ({ ...initDeck(initial), prompt: deck?.openPrompt ?? null }));
+  const [actions] = useState<DeckActions>(() => injected ?? (deck ? createServerDeckActions(tripId) : createLocalDeckActions()));
+  /** Cartes du tri ouvert déjà décidées avant ce chargement (tri enregistré) : la progression part d'elles (F6-PO-16). */
+  const offset = deck?.counts.decided ?? 0;
+  /** Tri clos par cette instance (« Passer » ou fin du paquet) : une seule clôture. */
+  const completedRef = useRef(deck?.closed ?? false);
   const [detail, setDetail] = useState<Proposal | null>(null);
   const dayOf = (index: number) => days.find((day) => day.index === index);
   const [announcement, setAnnouncement] = useState("");
@@ -151,9 +164,21 @@ function Deck({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   /** Question dont la réponse est en cours d'envoi : un second appui sur « Oui » ou « Non » est ignoré. */
   const answeringRef = useRef<PreferencePrompt | null>(null);
+  /**
+   * Dernière décision ou réponse non enregistrée par le tri enregistré, carte gardée (B10-PO-14 ; revue de la PR 621,
+   * bloquant 6) : bandeau `generating` (recalcul) ou `error` (échec), annoncé par la région `role="status"` de l'écran.
+   * Effacé au geste suivant.
+   */
+  const [refus, setRefus] = useState<Exclude<RefusDuTri, "dejaDecidee"> | null>(null);
+  /**
+   * Réponse à la question non enregistrée (recalcul, échec ; revue de la PR 621, correction 2) : la feuille reste ouverte
+   * et montre le refus dans un bandeau annoncé ; effacé à la réponse suivante ou à la fermeture de la feuille.
+   */
+  const [refusReponse, setRefusReponse] = useState<Exclude<RefusDuTri, "dejaDecidee"> | null>(null);
 
   const card = currentCard(state);
-  const position = state.index + 1;
+  const position = offset + state.index + 1;
+  const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
 
   // Focus après une action (F6-PO-5) : carte suivante, ou titre de fin en fin de paquet.
@@ -172,9 +197,18 @@ function Deck({
     setFocusRequest((previous) => ({ target, serial: (previous?.serial ?? 0) + 1 }));
   }, []);
 
+  /** Montre et annonce un refus du tri enregistré qui garde la carte (ou la question) en place. */
+  function signalerRefus(motif: RefusDuTri) {
+    if (motif === "dejaDecidee") return;
+    setRefus(motif);
+    setAnnouncement(motif === "recalcul" ? t.refus.recalcul : t.refus.echec);
+  }
+
   function decide(decision: Decision, gesture: Gesture, from: FocusTarget) {
     if (!card || state.prompt || state.pending) return;
     returnFocusRef.current = from === "card" ? null : (document.activeElement as HTMLElement | null);
+    setRefus(null);
+    setAnnouncement("");
     dispatch({ type: "decide", decision });
     // Durée inconnue (`minutes: null`, prototype, décision 0092 § 4 point 3) : `travel_minutes` n'est pas envoyé,
     // jamais 0. Sans `travelFromPrevious`, 0 comme avant (comportement de F6, inchangé).
@@ -192,12 +226,44 @@ function Deck({
     });
     requestFocus(from);
     void actions
-      .decide({ proposalId: card.id, kind: card.kind, category: card.category, decision })
-      .then(({ prompt }) => dispatch({ type: "resolved", prompt }));
+      .decide({ proposalId: card.id, kind: card.kind, category: card.category, decision, lastOption: isLastOption(state) })
+      .then(({ prompt, refus: motif }) => {
+        if (motif === undefined) {
+          dispatch({ type: "resolved", prompt });
+          return;
+        }
+        // Rien n'est enregistré : la carte reste (recalcul, échec) ou le paquet avance (déjà décidée), sans toast.
+        dispatch({ type: "rejected", keep: motif !== "dejaDecidee" });
+        signalerRefus(motif);
+        if (motif !== "dejaDecidee") requestFocus("card");
+      });
+  }
+
+  /** Clôt le tri enregistré, une fois (B10-PO-4 point 3) ; sans tri enregistré, rien. */
+  function complete(): Promise<void> {
+    if (!actions.complete || completedRef.current) return Promise.resolve();
+    completedRef.current = true;
+    return actions.complete().catch(() => {});
+  }
+
+  // Fin du paquet devenue définitive (plus d'annulation possible, aucune question ouverte) : le tri est clos.
+  useEffect(() => {
+    if (card || state.prompt || state.pending || state.undo || (offset === 0 && state.decisions.length + state.keptDays.length === 0)) return;
+    void complete();
+    // `complete` ne dépend que de `actions`, fixé au montage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, state.prompt, state.pending, state.undo, offset, state.decisions.length, state.keptDays.length]);
+
+  function passer() {
+    track({ name: "deck_skipped", properties: { position, scope: "all" } });
+    // Tri enregistré : « Passer » clôt le tri (B10-PO-4 point 3). La requête part avant la navigation du lien, qui ne
+    // l'interrompt pas ; elle est idempotente et le tri se relit clos au retour.
+    void complete();
   }
 
   function keepDay() {
     if (!card || state.prompt || state.pending) return;
+    setRefus(null);
     dispatch({ type: "keepDay" });
     track({ name: "deck_skipped", properties: { position, scope: "day" } });
     requestFocus("keep");
@@ -208,7 +274,7 @@ function Deck({
     if (!pending) return;
     const restored = pending.snapshot.cards[pending.snapshot.index];
     dispatch({ type: "undo" });
-    track({ name: "deck_undo", properties: { position: pending.position } });
+    track({ name: "deck_undo", properties: { position: offset + pending.position } });
     if (pending.decision && restored) {
       void actions.undo({ proposalId: restored.id });
     }
@@ -220,6 +286,8 @@ function Deck({
     const prompt = state.prompt;
     if (!prompt || answeringRef.current === prompt) return;
     answeringRef.current = prompt;
+    setRefus(null);
+    setRefusReponse(null);
     const removed =
       prompt.kind === "category" && value.answer === "yes"
         ? state.cards.filter((c, i) => i >= state.index && c.kind === "activity" && c.category === prompt.category).length
@@ -232,8 +300,18 @@ function Deck({
         ...(value.reason ? { reason: EVENT_REASON[value.reason] } : {}),
       },
     });
-    void actions.answerPrompt(prompt, value).then(({ next }) => {
+    void actions.answerPrompt(prompt, value).then(({ next, refus: motif }) => {
       answeringRef.current = null;
+      if (motif === "dejaDecidee") {
+        // La question n'est plus ouverte côté serveur (fermée ailleurs) : la feuille se ferme, le paquet ne change pas.
+        dispatch({ type: "dismissPrompt" });
+        return;
+      }
+      if (motif !== undefined) {
+        // Recalcul ou échec : rien n'est enregistré ; la feuille reste ouverte avec le refus, la personne peut réessayer.
+        setRefusReponse(motif);
+        return;
+      }
       dispatch({ type: "answer", prompt, answer: value, next });
       if (removed > 0) {
         setAnnouncement(removed === 1 ? t.question.retiree : format(t.question.retirees, { nombre: removed }));
@@ -262,7 +340,9 @@ function Deck({
     decide(event.key === "ArrowRight" ? "like" : "dislike", "key", target === cardRef.current ? "card" : "keep");
   }
 
-  const endVariant: DeckEndVariant = state.cards.length === 0 ? "vide" : unlocked ? "suite" : "apercu";
+  const endVariant: DeckEndVariant = total === 0 && !deck?.closed ? "vide" : unlocked ? "suite" : "apercu";
+  /** Tri clos à l'ouverture (« Passer », fin du paquet ou déblocage) : titre propre, les cartes non triées sont gardées. */
+  const closedAtLoad = deck?.closed === true;
   const showToast = state.undo !== null && state.prompt === null && !state.pending;
   // Un seul toast, dans une région montée en permanence sous le paquet (F6-Q1, place provisoire : Q68).
   const toast =
@@ -288,6 +368,15 @@ function Deck({
       {noOptionSlots.length > 0 ? (
         <StatusBanner kind="noOption" message={noOptionMessage(noOptionSlots)} className="shrink-0" />
       ) : null}
+      {/* Refus du tri enregistré : annoncé par la région `role="status"` ci-dessous (bandeau sans rôle propre, 0018). */}
+      {refus ? (
+        <StatusBanner
+          kind={refus === "recalcul" ? "generating" : "error"}
+          message={refus === "recalcul" ? t.refus.recalcul : t.refus.echec}
+          announce={false}
+          className="shrink-0"
+        />
+      ) : null}
       <p role="status" className="sr-only" data-announce="">
         {announcement}
       </p>
@@ -302,15 +391,15 @@ function Deck({
           <div className="col-start-1 row-start-1 flex items-center gap-3">
             <DeckProgress
               current={position}
-              total={state.cards.length}
-              label={format(t.progression, { current: position, total: state.cards.length })}
-              text={format(t.progressionVisible, { current: position, total: state.cards.length })}
+              total={total}
+              label={format(t.progression, { current: position, total })}
+              text={format(t.progressionVisible, { current: position, total })}
             />
             <Button asChild variant="text" size="sm" className="min-w-(--touch-target) font-semibold">
               <Link
                 href={programme}
                 prefetch={false}
-                onClick={() => track({ name: "deck_skipped", properties: { position, scope: "all" } })}
+                onClick={passer}
               >
                 {t.passer}
               </Link>
@@ -334,7 +423,7 @@ function Deck({
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
+        <DeckEnd variant={endVariant} closed={closedAtLoad} notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
@@ -344,7 +433,15 @@ function Deck({
           <PreferenceSheet
             prompt={state.prompt}
             onAnswer={answer}
-            onDismiss={() => dispatch({ type: "dismissPrompt" })}
+            refus={
+              refusReponse === null
+                ? null
+                : { kind: refusReponse === "recalcul" ? "generating" : "error", message: refusReponse === "recalcul" ? t.refus.recalcul : t.refus.echec }
+            }
+            onDismiss={() => {
+              setRefusReponse(null);
+              dispatch({ type: "dismissPrompt" });
+            }}
             onReturnFocus={returnFocus}
           />
         </Suspense>

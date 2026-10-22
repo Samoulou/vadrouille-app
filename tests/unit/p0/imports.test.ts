@@ -433,7 +433,8 @@ const EXCEPTIONS_P0R1 = new Map<string, { externes: ReadonlyMap<string, string>;
   // P0r3c-3 (ticket 316, décision 0055, sections 3 et 7) : prompt et client réel de recherche web, rédaction des raisons ;
   // marqueur `server-only`. B7a (décision 0077 § 1 point 4) : l'interface de recherche web est déplacée dans
   // `src/ai/recherche-web.ts` ; l'exception de `src/research/recherche-web.ts` du client réel est retirée.
-  ...["noter-candidats", "prompts/recherche-web", "rediger-raisons", "recherche-web-reelle"].map(
+  // Décision 0116 § 2 (lot 1 du programme par l'IA) : rédaction du programme, même régime que `rediger-raisons`.
+  ...["noter-candidats", "prompts/recherche-web", "rediger-programme", "rediger-raisons", "recherche-web-reelle"].map(
     (nom) => [`src/ai/${nom}.ts`, { externes: new Map([["server-only", SERVER_ONLY]]), projet: [] }] as const,
   ),
   // B7a (ticket 423, décision 0077 § 1 et § 2) : nouveaux modules de la couche IA non chargés par `pnpm p0`, marqueur
@@ -484,8 +485,12 @@ function regleDe(fichier: string): Regle | undefined {
 
 function regleDeBase(fichier: string): Regle | undefined {
   if (MODULES_SERVEUR_P0.includes(fichier)) {
+    // Revue 1 de #632, bloquant 4 (lot 1 du programme par l'IA) : l'assemblage réutilise `rythmeVersPace` de
+    // l'adaptateur du moteur au lieu d'une copie. Arête unique entre deux modules de cette même liste, soumis à la même
+    // règle (aucune capacité nouvelle n'est atteinte).
+    const voisins = fichier === "src/server/p0/assemblage.ts" ? ["src/server/p0/vers-moteur.ts"] : [];
     return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts"].includes(c),
+      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...voisins].includes(c),
       externes: [],
     };
   }
@@ -773,6 +778,8 @@ const MODULE_SOURCE_LECTURE = "src/server/relecture/source.ts";
 const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", "src/grounding/interfaces.ts", "src/grounding/trajets.ts"];
 /** Double de relectures (B6a, décision 0086 § 1.2 point 4). */
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
+/** B10a (décision 0112 § 2) : règles du tri, importées par l'écran de présentation. */
+const PREFERENCES_DOMAINE = "src/domain/preferences.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -863,6 +870,21 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: "src/server/generation/codes.ts",
     horsArete: "src/server/x.ts",
+  },
+  {
+    // B10a (décision 0112 § 2 points 2 et 4) : les règles du tri (`src/domain/preferences.ts`, sans `zod`, types de
+    // `@/contracts` et valeurs de `@/contracts/values` seulement, aucun autre module de src/domain : lint de 0112 § 2
+    // point 2) sont importées par l'écran de présentation, qui ne les recopie pas (0013 § 3.2). Les deux autres arêtes
+    // nommées par 0112 § 2 point 4 (`src/server/presentation` → `src/domain/preferences`, `src/features/presentation` →
+    // `src/server/actions/presentation`) ne franchissent pas cette frontière (src/server atteint src/domain ; l'arrêt aux
+    // modules de src/server vaut pour src/features) : la seconde est exercée par « clé côté serveur seulement » (l'action
+    // n'atteint les cas d'usage que par le branchement de `src/adapters/api-tri-instance.ts`).
+    nom: "B10a : src/features/presentation → src/domain/preferences.ts",
+    de: (chemin) => chemin.startsWith("src/features/presentation/"),
+    vers: [PREFERENCES_DOMAINE],
+    typeSeulement: false,
+    exemple: "src/features/presentation/deck.ts",
+    horsArete: "src/features/sejour/load.ts",
   },
 ];
 
@@ -1541,7 +1563,10 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       expect(horsServeur(DOUBLE_RELECTURES, voisinsReels)).toEqual([TYPES_RELECTURES_DOUBLE]);
       expect(violationsApplication(DOUBLE_RELECTURES, voisinsReels)).toEqual([]);
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
-      const importeurs = application.filter((f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/")));
+      // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
+      const importeurs = application.filter(
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/"))),
+      );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });
 
@@ -1588,6 +1613,118 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
     ] satisfies [string, Record<string, string[]>, string, string[]][])("B9b, terminal de la conversion des codes (0081 B9-TL-1 point 2) : %s", (_nom, aretes, depart, attendu) => {
       const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    /**
+     * B10a (décision 0112 § 2 point 4 ; revue de la PR 621, bloquant 5) : les deux autres arêtes nommées par 0112
+     * (`src/server/presentation` → `src/domain/preferences.ts`, `src/features/presentation` →
+     * `src/server/actions/presentation.ts`) ne sont pas des lignes d'`ARETES_ADMISES` : elles ne franchissent pas la
+     * frontière de 0048 § 1 (src/server atteint src/domain ; hors de src/server, le contrôle de src/domain s'arrête aux
+     * modules de src/server), et une ligne les retirerait du graphe, ce qui arrêterait aussi le contrôle de
+     * `interditPartout` à l'action. Leurs cas fabriqués sont ici (amendement 2 de 0112) ; le refus d'un import de src/server
+     * hors des actions depuis l'écran est la règle ESLint de 0020 § 11 (`tests/unit/lint/presentation-lint.test.ts`).
+     */
+    it.each([
+      [
+        "refusé : src/features/presentation → src/server/actions/presentation.ts → src/ai (l'action n'est pas un terminal)",
+        { "src/features/presentation/server-actions.ts": ["src/server/actions/presentation.ts"], "src/server/actions/presentation.ts": ["src/ai/couche.ts"] },
+        "src/features/presentation/server-actions.ts",
+        ["src/ai/couche.ts"],
+      ],
+      [
+        "refusé : src/features/presentation → src/domain/recomposition.ts (seul preferences.ts)",
+        { "src/features/presentation/deck.ts": [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"] },
+        "src/features/presentation/deck.ts",
+        ["src/domain/recomposition.ts"],
+      ],
+      [
+        "refusé : src/adapters → src/domain/preferences.ts (arête réservée à src/features/presentation)",
+        { "src/adapters/x.ts": [PREFERENCES_DOMAINE] },
+        "src/adapters/x.ts",
+        [PREFERENCES_DOMAINE],
+      ],
+    ] satisfies [string, Record<string, string[]>, string, string[]][])("B10a, arêtes de 0112 § 2 point 4 : %s", (_nom, aretes, depart, attendu) => {
+      const graphe: Voisins = (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
+      expect(violationsApplication(depart, graphe)).toEqual(attendu);
+    });
+
+    /**
+     * Cas « admis » discriminants (revue de la PR 621, correction 2) : chaque graphe admis a un témoin qui ne diffère que
+     * par le nœud de src/server, remplacé par un nœud hors de src/server ; le témoin est refusé, donc l'admission vient
+     * bien de la règle « src/server atteint src/domain » et non d'un graphe sans violation possible.
+     */
+    it.each([
+      [
+        "src/server/presentation → src/domain/preferences.ts et src/domain/recomposition.ts",
+        "src/server/presentation/etat.ts",
+        "src/adapters/presentation-etat.ts",
+        (noeud: string): Record<string, string[]> => ({ [noeud]: [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"] }),
+        [PREFERENCES_DOMAINE, "src/domain/recomposition.ts"],
+      ],
+      [
+        "écran → src/server/actions/presentation.ts → cas d'usage → src/domain",
+        "src/server/actions/presentation.ts",
+        "src/adapters/actions-presentation.ts",
+        (noeud: string): Record<string, string[]> => ({
+          "src/features/presentation/server-actions.ts": [noeud],
+          [noeud]: ["src/domain/recomposition.ts"],
+        }),
+        ["src/domain/recomposition.ts"],
+      ],
+    ] as const)("B10a, arête admise de 0112 § 2 point 4, et son témoin refusé : %s", (_nom, serveur, temoin, aretes, refuses) => {
+      const graphe = (table: Record<string, string[]>): Voisins => (fichier) => Object.entries(table).find(([nom]) => nom === fichier)?.[1] ?? [];
+      const depart = (noeud: string) => (noeud.startsWith("src/server/presentation/") || noeud.startsWith("src/adapters/presentation") ? noeud : "src/features/presentation/server-actions.ts");
+      expect(violationsApplication(depart(serveur), graphe(aretes(serveur)))).toEqual([]);
+      expect(violationsApplication(depart(temoin), graphe(aretes(temoin)))).toEqual([...refuses]);
+    });
+
+    it("B10a, arêtes réelles de 0112 § 2 point 4 : l'écran n'importe de src/server que des actions, et l'action du tri seulement depuis server-actions.ts", () => {
+      const versServeur = application
+        .filter((f) => !estTest(f) && f.startsWith("src/features/presentation/"))
+        .flatMap((f) => voisinsReels(f).filter((c) => c.startsWith("src/server/")).map((c) => [f, c] as const));
+      expect(versServeur.filter(([, c]) => !c.startsWith("src/server/actions/"))).toEqual([]);
+      expect(versServeur.filter(([, c]) => c === "src/server/actions/presentation.ts").map(([f]) => f)).toEqual(["src/features/presentation/server-actions.ts"]);
+    });
+
+    /**
+     * Critère `présentation: même règle en local et sur le serveur` (décision 0112 § 2 point 5 ; revue de la PR 621,
+     * bloquant 4) : `src/features/presentation/deck.ts` et `src/server/presentation/` importent la règle de
+     * `@/domain/preferences`, et aucun fichier de `src/features` ne définit `questionApres` ni `paquetDeReprise`.
+     */
+    it("B10a, règle unique du tri : deck.ts et src/server/presentation importent @/domain/preferences ; src/features ne la redéfinit pas", () => {
+      const importeDomaine = (fichier: string) => voisinsReels(fichier).includes(PREFERENCES_DOMAINE);
+      expect(importeDomaine("src/features/presentation/deck.ts")).toBe(true);
+      const serveur = application.filter((f) => !estTest(f) && f.startsWith("src/server/presentation/"));
+      expect(serveur.length).toBeGreaterThan(0);
+      expect(serveur.filter((f) => !importeDomaine(f))).toEqual(["src/server/presentation/lecture.ts"]);
+      // Les deux modules qui appliquent les règles (cas d'usage et état) les importent nommément.
+      for (const [fichier, noms] of [
+        ["src/server/presentation/tri.ts", ["questionApres", "paquetDeReprise"]],
+        ["src/server/presentation/etat.ts", ["paquetDeReprise"]],
+        ["src/features/presentation/actions.ts", ["questionApres"]],
+      ] as const) {
+        const { imports } = analyser(fichier, readFileSync(path.join(RACINE, fichier), "utf8"));
+        const depuisDomaine = imports.filter(({ specificateur }) => specificateur === "@/domain/preferences").map(({ forme }) => forme).join("\n");
+        for (const nom of noms) expect(depuisDomaine, `${fichier} : ${nom}`).toMatch(new RegExp(`\\b${nom}\\b`));
+      }
+      // Aucune définition (fonction, constante, méthode, propriété) de ces noms dans src/features.
+      const definitions = application
+        .filter((f) => f.startsWith("src/features/"))
+        .flatMap((f) => {
+          const sf = ts.createSourceFile(f, readFileSync(path.join(RACINE, f), "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+          const trouves: string[] = [];
+          const visiter = (noeud: ts.Node) => {
+            const nom =
+              ts.isFunctionDeclaration(noeud) || ts.isVariableDeclaration(noeud) || ts.isMethodDeclaration(noeud) || ts.isPropertyAssignment(noeud) || ts.isPropertyDeclaration(noeud)
+                ? noeud.name
+                : undefined;
+            if (nom !== undefined && ts.isIdentifier(nom) && (nom.text === "questionApres" || nom.text === "paquetDeReprise")) trouves.push(`${f} : ${nom.text}`);
+            ts.forEachChild(noeud, visiter);
+          };
+          visiter(sf);
+          return trouves;
+        });
+      expect(definitions).toEqual([]);
     });
 
     it.each(ARETES_ADMISES.map((arete) => [arete.nom, arete] as const))("B9c-graphe, arête admise exacte et exercée par ses cas fabriqués (0081 B9-TL-1 point 4) : %s", (_nom, arete) => {
@@ -1760,10 +1897,11 @@ function importsExecutesDe(fichier: string, source: string): string[] {
 }
 
 /**
- * Seuls imports exécutés admis dans le terminal `src/workflows/index.ts` : `./apercu` (B9c, workflow 1) et `./voyage-complet`
- * (B9d, workflow 4, même forme : un pont de `"use step"` vers `src/server/generation/`, jamais dans un paquet client).
+ * Seuls imports exécutés admis dans le terminal `src/workflows/index.ts` : `./apercu` (B9c, workflow 1), `./voyage-complet`
+ * (B9d, workflow 4) et `./recalcul` (B10b, workflow 5, décision 0119 § 1.8), même forme : un pont de `"use step"` vers
+ * `src/server/generation/`, jamais dans un paquet client.
  */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./voyage-complet"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./recalcul", "./voyage-complet"];
 
 /**
  * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
@@ -2018,7 +2156,7 @@ describe("p0: clé côté serveur seulement", () => {
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
     expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./voyage-complet", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

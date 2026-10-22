@@ -3,18 +3,16 @@ import "server-only";
 import { FatalError } from "workflow";
 
 import { ecrireProgramme } from "@/adapters/prototype-ecriture";
-import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireCandidats, lireExecution, remplacerCandidats } from "@/adapters/prototype-travail";
-import { MAX_RESULTATS_WEB, type ReponseModele } from "@/ai/client";
-import { lireNotes, lireRaisons } from "@/ai/sorties";
-import type { ExecutionEnCours, LigneCandidat, PhaseTravail } from "@/contracts/prototype-travail";
-import { ancrerCandidatsDansZone, ancrerLogementsDuSejour } from "@/grounding/ancrage-zone";
-import { creerCadence, ErreurBudgetRoutes, planRoutes, routesDuSejour } from "@/grounding/budget-routes";
-import { fichesEtapeFinale, margeRemplacement } from "@/grounding/fiches-finales";
-import { regrouperParJour } from "@/grounding/zone";
-import type { AncrageResolu, Position, Trajets } from "@/prototype/ancrage";
+import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireExecution } from "@/adapters/prototype-travail";
+import { MAX_RESULTATS_WEB } from "@/ai/client";
+import { lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
+import type { ExecutionEnCours, PhaseTravail } from "@/contracts/prototype-travail";
+import { lieuxHorsPartTextSearch } from "@/grounding/ancrage";
+import { ancrerLogementsDuSejour, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
+import { blocsDeTrajets, creerCadence, planRoutes, trajetsConsecutifs } from "@/grounding/budget-routes";
+import type { Position } from "@/prototype/ancrage";
 import { CODES_ARRET, codePersiste, type CodeArret } from "@/prototype/arret";
 import { BriefSchema, type Brief } from "@/prototype/brief";
-import { CandidatSchema, type Candidat, type CandidatNote } from "@/prototype/candidat";
 import {
   ConfigModelesSchema,
   ConfigRechercheSchema,
@@ -30,45 +28,19 @@ import {
 import { decouperProgramme } from "@/prototype/decoupage";
 import { trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
-import { chercherCandidats, tempsPourAppel, type CompteursAgent, type EtatAgent } from "@/research/agent";
-import { DELAI_MAX_MS, type LecteurPages } from "@/research/fetch-page";
-import { PlafondAgentAtteint } from "@/research/plafonds-agent";
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
-import { assembler, type Raison } from "@/server/p0/assemblage";
+import { assemblerProgrammeIa, pointsDeTrajet } from "@/server/p0/assemblage";
 import {
   bornesDepuisConfig,
   bornesDepuisDemande,
   type BornesRechercheP0,
-  candidatPourModele,
-  complementDepuisBrief,
-  donneesProtegeesDepuisBrief,
-  entreeModelesDepuisBrief,
-  lieuRetenuDepuisCandidat,
+  entreeProgrammeDepuisBrief,
 } from "@/server/p0/vers-couche-ia";
 import { poolPrototype } from "@/server/p0/base";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
-import {
-  classementParType,
-  identifiantDuVoyage,
-  joursDuSejour,
-  lireClassement,
-  planifierLeJour,
-} from "@/server/p0/moteur-final";
-import {
-  briefDepuisBrief,
-  candidatVersMoteur,
-  demandesDuSejour,
-  engagementsDepuisBrief,
-  evenementVersMoteur,
-  joursDeFermeture,
-  modeDeTrajet,
-  nuitsDepuisBrief,
-  relecturesDepuisAncrages,
-  TYPES_SERIE,
-  type TypeSerie,
-  violationsP0,
-} from "@/server/p0/vers-moteur";
+import { identifiantDuVoyage, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
+import { briefDepuisBrief, demandesDuSejour, engagementsDepuisBrief, modeDeTrajet, nuitsDepuisBrief } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 import { forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type PlafondsRelecture, type SkusForfait } from "@/server/usage/forfait";
 import type { PoolSql, ReglesForfait } from "@/server/usage/neon";
@@ -106,8 +78,8 @@ import configRechercheEssai from "../../prototype/config/recherche-essai.json";
  * 2. **garde d'idempotence** (mineur 6 de la revue du head `608ee99`, PR 348 ; 0063, amendement P0r3c-5) : la phase de
  *    l'étape n'est écrite que si la phase en base est celle qui la précède (`ecrirePhase`) ; une étape redistribuée par
  *    la file après expiration s'arrête là (`pipeline_failed`), avant toute composition, sans repayer ses appels ;
- * 3. **fabriques appelées dans l'étape** : `composerP0Reel` puis la seule famille de l'étape (`agent()`, `ancrage()` ou
- *    `etapeFinale()`) ; aucun client, registre ni composition en cache de module, aucun objet ne traverse la frontière
+ * 3. **fabriques appelées dans l'étape** : `composerP0Reel` puis la seule famille de l'étape (`programme()` depuis la
+ *    décision 0116 § 3 : `etapeProgramme` est la seule étape de travail) ; aucun client, registre ni composition en cache de module, aucun objet ne traverse la frontière
  *    sérialisée (réponse 4 de la Sécurité, PR 326) ;
  * 4. **état sérialisé réduit à l'identifiant d'exécution** (0009 point 3, 0011 § 3, 0052 § 1.5) : entrée et sortie de
  *    chaque étape, et du workflow, sont `{ runId }` (clôture : `{ runId, code }`) ; brief, candidats et `placeId` sont
@@ -155,7 +127,8 @@ export const LIMITE_FONCTION_MS = 800_000;
 /**
  * Ancienneté maximale d'une exécution pour la garde de chaque étape (`verifierGardeEtape`) et seuil de clôture des
  * exécutions orphelines (`neon.ts`, plus 5 min) : trois étapes, chacune au plus à la limite de fonction de la plateforme
- * (`maxRetries = 0`), soit 40 min (décision 0102 § 6). **Valeur proposée, en attente de Samuel (question 2)** : ce n'est
+ * (`maxRetries = 0`), soit 40 min (décision 0102 § 6). Inchangée par la décision 0116 (une étape de travail et la
+ * clôture) : aucune valeur n'est changée au lot 1. **Valeur proposée, en attente de Samuel (question 2)** : ce n'est
  * pas un fusible de coût, mais une exécution dont les étapes seraient séparées par de longs délais de file verrait sa
  * prochaine étape refusée par la garde. Dérivée de 0075, non choisie (l'ancien `dureeMs` de 900 s ne s'applique plus).
  * Une constante, pour la changer d'un seul endroit.
@@ -347,7 +320,8 @@ const reperesDesLogements = (brief: Brief) => brief.logements.map((_, rang) => `
  * l'exécution peut trouver (borne de forme de 300, jamais atteinte) et ancrer (Text Search : `placesTextSearch − 2 × logements`, une requête
  * par logement à l'ancrage et une à l'étape finale) ; en **essai**, le profil fixe de `recherche-essai.json` (décision
  * 0073 point 4, réservée à Samuel, inchangée). `null` : plafond nul ou négatif, aucun candidat ancrable, l'exécution
- * s'arrête (`briefTientDansLeMode` refuse ce brief au lancement ; `etapeRecherche` s'arrête avant tout appel).
+ * s'arrête (`briefTientDansLeMode` refuse ce brief au lancement). Contrôle **du lancement** seulement depuis la décision
+ * 0116 (l'agent de recherche n'est plus appelé par `p0Run`) : inchangé au lot 1, question au Tech Lead dans la PR.
  */
 function bornesDeLaRecherche(mode: ExecutionEnCours["mode"], config: ConfigModeReel, recherche: ConfigRecherche, brief: Brief): BornesRechercheP0 | null {
   if (mode !== "reel") return bornesDepuisConfig(recherche);
@@ -357,7 +331,7 @@ function bornesDeLaRecherche(mode: ExecutionEnCours["mode"], config: ConfigModeR
 
 /**
  * **Réservé aux tests** (mineur 4 de la revue de la PR #490 : aucun appelant de production) : bornes de la recherche
- * d'un brief commité dans un mode, par le même chemin que `etapeRecherche` ; `null` si brief ou configuration refusés,
+ * d'un brief commité dans un mode, par le même chemin que le contrôle du lancement ; `null` si brief ou configuration refusés,
  * ou plafond de recherche nul.
  */
 export function bornesRechercheDuBriefPourTests(mode: ExecutionEnCours["mode"], nom: string): BornesRechercheP0 | null {
@@ -418,13 +392,11 @@ function configurationAgent(mode: ExecutionEnCours["mode"], config: ConfigModeRe
 }
 
 /**
- * Part du forfait de l'exécution qui revient à une étape (0046, D13 point 3 : une méthode répartie par configuration ;
- * répartition de 0063 point 9, amendée par P0r3c-5) : à l'ancrage, Text Search sauf une requête par logement et une fiche
- * par logement ; à l'étape finale, une requête Text Search par logement, le reste des fiches et tout Routes.
+ * Part du forfait de l'exécution qui revient à une étape (0046, D13 point 3). Depuis la décision 0116 § 3.5, la seule
+ * étape de travail (`etapeProgramme`) reçoit le forfait entier ; la part des lieux de l'IA est ce qu'il reste après les
+ * logements (une recherche et une fiche chacun).
  */
 type PartEtape = { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
-
-const SANS_GOOGLE: PartEtape = { textSearch: 0, details: 0, routesRequetes: 0, routesElements: 0 };
 
 function forfaitDeLEtape(config: ConfigModeReel, execution: ExecutionEnCours, part: PartEtape): Forfait {
   const resteModeles = Math.max(0, Math.round(config.coutUsd * 1_000_000) - execution.coutModelesMicros);
@@ -477,7 +449,8 @@ async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<Contexte
 
 /** Délai complet d'un appel réservé : requête du client et opérations du port qui l'entourent (D13 point 5). */
 function delaiDeLAppel(methode: DemandeReservation["methode"]): number {
-  const requete = methode === "chat" ? DELAI_REQUETE_MS.openrouter : methode === "routes_matrix" ? DELAI_REQUETE_MS.routes : DELAI_REQUETE_MS.places;
+  // Décision 0116 § 2.3 : la seule requête de modèle de `p0Run` est la requête `programme` (300 s).
+  const requete = methode === "chat" ? DELAI_REQUETE_MS.openrouterProgramme : methode === "routes_matrix" ? DELAI_REQUETE_MS.routes : DELAI_REQUETE_MS.places;
   return requete + 2 * DELAI_PORT_MS;
 }
 
@@ -485,23 +458,13 @@ function delaiDeLAppel(methode: DemandeReservation["methode"]): number {
  * Registre de l'étape : forfait de l'étape, et refus `cap_reached` sans appel de toute réservation dont le délai
  * complet ne tient pas avant l'échéance (tous les appels payants passent par une réservation, D13).
  */
-function registreDeLEtape(forfait: Forfait, contexte: ContexteEtape): RegistreForfait {
+function registreDeLEtape(forfait: Forfait, contexte: ContexteEtape, reserve: (methode: DemandeReservation["methode"]) => number = () => 0): RegistreForfait {
   const registre = creerRegistreForfait(forfait, contexte.garde.runId, { maintenant: () => Date.now() });
   return {
     ...registre,
     async reserve(demande) {
-      if (Date.now() + delaiDeLAppel(demande.methode) > contexte.echeance) return { ok: false, code: "cap_reached" };
+      if (Date.now() + delaiDeLAppel(demande.methode) > contexte.echeance - reserve(demande.methode)) return { ok: false, code: "cap_reached" };
       return registre.reserve(demande);
-    },
-  };
-}
-
-/** Lecture des pages sous l'échéance (lectures gratuites, sans réservation) : `cap_reached` sans lecture sinon. */
-function lecteurSousEcheance(lecteur: LecteurPages, echeance: number): LecteurPages {
-  return {
-    async lire(url, autorisees) {
-      if (Date.now() + DELAI_MAX_MS > echeance) throw new PlafondAgentAtteint();
-      return lecteur.lire(url, autorisees);
     },
   };
 }
@@ -519,6 +482,7 @@ function composer(contexte: ContexteEtape, forfait: Forfait, registre: RegistreF
       rechercheWeb: { modele: choisis.recherche, moteur: modeles.rechercheWeb.moteur, maxResultats: MAX_RESULTATS_WEB },
       notation: { modele: choisis.notation },
       raisons: { modele: choisis.raisons },
+      programme: { modele: choisis.programme },
     },
   });
 }
@@ -590,388 +554,175 @@ async function etape(
   }
 }
 
-/** Candidats relus de la table de travail, validés (`CandidatSchema`, clé égale à l'identifiant) ; sinon `pipeline_failed`. */
-function candidatsRelus(lignes: readonly LigneCandidat[]): { readonly candidat: Candidat; readonly placeId: string | null }[] {
-  return lignes.map((ligne) => {
-    const lu = CandidatSchema.safeParse(ligne.candidat);
-    if (!lu.success || lu.data.id !== ligne.cle) throw new ArretEtape("pipeline_failed");
-    return { candidat: lu.data, placeId: ligne.placeId };
-  });
-}
+/**
+ * Code interne d'un programme illisible ou sans journée lisible (décision 0116 § 3.4) : déjà dans les listes fermées du
+ * journal ; persisté `pipeline_failed` par `codePersiste` (S4). Aucun code nouveau.
+ */
+export const CODE_PROGRAMME_ILLISIBLE = "model_output_invalid";
 
-/** Code interne d'une recherche sans aucun lieu (ticket 400) ; persisté `pipeline_failed` par `codePersiste` (S4). */
-export const CODE_RECHERCHE_VIDE = "research_empty";
+/** Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : des nombres, aucun verdict. */
+type CompteursProgramme = {
+  days: number;
+  slots: number;
+  placesToVerify: number;
+  daysRemoved: number;
+  slotsRemoved: number;
+  fieldsRemoved: number;
+  textsCut: number;
+  modelCalls: number;
+  unverifiedForCap: number;
+};
 
 /**
- * Ligne de journal fermée de fin de recherche (ticket 400) : compteurs de l'agent seulement, des nombres (ni texte du
- * modèle, ni requête, ni URL, ni donnée Google) ; `warn` si aucun lieu n'est retenu. Écrite aussi quand la recherche
- * lève (ticket 407) : compteurs et candidats admis jusque-là, nom de l'erreur (`errorName`, jamais son message), `warn`.
+ * Ligne de journal fermée de fin d'étape (`p0.programme_written`) : compteurs maison seulement (sortie de l'IA, nos
+ * plafonds), jamais un compteur de verdict de vérification, un nom ni une donnée Google. Écrite aussi quand l'étape lève
+ * (nom de l'erreur, jamais son message ; `warn`).
  */
-function journaliserRecherche(compteurs: CompteursAgent | undefined, candidats: readonly Candidat[], echec?: { readonly erreur: unknown }): void {
-  const refuses = compteurs?.candidatsRefuses;
-  const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
+function journaliserProgramme(compteurs: CompteursProgramme, echec?: { readonly erreur: unknown }): void {
   const nomErreur = echec === undefined ? undefined : errorNameOf(echec.erreur);
-  logEvent(
-    "p0.research_done",
-    {
-      // `candidates` compte tout, événements compris ; `places`, les lieux seuls, qui décident du niveau et de l'arrêt
-      // (mineur 2 du head `cd614d4` : une exécution vide peut avoir `candidates > 0` quand elle n'a trouvé que des
-      // événements).
-      candidates: candidats.length,
-      places: lieux,
-      ...(nomErreur === undefined ? {} : { errorName: nomErreur }),
-      ...(compteurs === undefined
-        ? {}
-        : {
-            turns: compteurs.tours,
-            searches: compteurs.recherches,
-            pagesRead: compteurs.pagesLues,
-            candidatesRefused: (refuses?.source_not_in_results ?? 0) + (refuses?.duplicate ?? 0) + (refuses?.over_total ?? 0) + (refuses?.invalid ?? 0),
-            planRefused: compteurs.sortiesRefusees.plan,
-            planUnreadable: compteurs.sortiesIllisibles.plan,
-            turnRefused: compteurs.sortiesRefusees.recherche,
-            turnUnreadable: compteurs.sortiesIllisibles.recherche,
-            finishIgnored: compteurs.terminesIgnores,
-            finishAbnormal: compteurs.finsAnormales,
-            deadlineStop: compteurs.finsEcheance,
-            sectors: compteurs.qualite.secteursPlan,
-            mustSees: compteurs.qualite.incontournablesPlan,
-            mustSeesWithoutCandidate: compteurs.qualite.incontournableSansCandidat,
-            candidatesGrouped: compteurs.qualite.candidatRegroupe,
-            sectorUnknown: compteurs.qualite.secteurInconnu,
-            fieldsRemoved: compteurs.champsRetires,
-            textsCut: compteurs.textesCoupes,
-          }),
-    },
-    lieux === 0 || echec !== undefined ? "warn" : "info",
-  );
+  logEvent("p0.programme_written", { ...compteurs, ...(nomErreur === undefined ? {} : { errorName: nomErreur }) }, echec === undefined ? "info" : "warn");
 }
 
-/** Étape de recherche (plan, recherche web, lecture des pages) : candidats écrits dans la table de travail. */
-export async function etapeRecherche(entree: EtatP0Run): Promise<EtatP0Run> {
-  "use step";
-  return etape(entree.runId, "recherche", async (contexte, marquerAppels) => {
-    const { modeles, recherche } = configurationAgent(contexte.execution.mode, contexte.config);
-    // Ticket 483 : cibles de l'exécution comptée calculées depuis la demande du séjour ; plafond de recherche nul : arrêt
-    // avant tout appel (mineur 10 de la revue de la PR #490).
-    const bornes = bornesDeLaRecherche(contexte.execution.mode, contexte.config, recherche, contexte.brief);
-    if (bornes === null) throw new ArretEtape("pipeline_failed");
-    const forfait = forfaitDeLEtape(contexte.config, contexte.execution, SANS_GOOGLE);
-    const registre = registreDeLEtape(forfait, contexte);
-    const composition = composer(contexte, forfait, registre, modeles);
-    const { routage } = modeles;
-    const choisis = modelesDeLaVariante(modeles, contexte.execution.variante === "A" ? "a" : "b");
-    const agent = composition.agent();
-    marquerAppels();
-    await memoireDuCout(contexte, registre).terminer(async () => {
-      // Ticket 407 : état vivant de l'agent, pour journaliser ses compteurs même si la recherche lève.
-      let etat: EtatAgent | undefined;
-      let trouve: Awaited<ReturnType<typeof chercherCandidats>>;
-      try {
-        // Types de production de la couche IA (`vers-couche-ia.ts`, décision 0077 § 1 point 5) ; récit et logements de
-        // P0 par `ComplementP0`, pour P0 seulement (B7-PO-1).
-        trouve = await chercherCandidats(entreeModelesDepuisBrief(contexte.brief), {
-          modeles: agent.modeles,
-          modele: choisis.recherche,
-          routage,
-          recherche: agent.rechercheWeb,
-          lecteur: lecteurSousEcheance(agent.pages, contexte.echeance),
-          bornes,
-          complement: complementDepuisBrief(contexte.brief),
-          protegees: donneesProtegeesDepuisBrief(contexte.brief),
-          // Ticket 407 : plus le temps d'un appel avant l'échéance de l'étape, la recherche se termine proprement. Même
-          // délai complet que `registreDeLEtape` (modèle et recherche web : méthode `chat`) et `lecteurSousEcheance`.
-          peutAppeler: tempsPourAppel(contexte.echeance, { modele: delaiDeLAppel("chat"), page: DELAI_MAX_MS, marge: MARGE_VERIFICATION_AGENT_MS }),
-          observer: (vivant) => {
-            etat = vivant;
-          },
-        });
-      } catch (erreur) {
-        journaliserRecherche(etat?.compteurs, etat?.candidats ?? [], { erreur });
-        throw erreur;
-      }
-      const { candidats, compteurs } = trouve;
-      const lieux = candidats.filter((candidat) => candidat.typeEtape !== "event").length;
-      journaliserRecherche(compteurs, candidats);
-      // Ticket 400 : aucun lieu trouvé (les événements seuls ne font pas de programme) : arrêt ici, avant l'ancrage et
-      // l'étape finale, qui paieraient leurs appels pour rien. Code interne `research_empty`, persisté `pipeline_failed`
-      // (S4) ; la ligne `p0.research_done` du journal en donne les compteurs.
-      if (lieux === 0) throw new ArretEtape(codePersiste(CODE_RECHERCHE_VIDE, true));
-      await remplacerCandidats(poolPrototype(), contexte.garde.runId, candidats.map((candidat) => ({ cle: candidat.id, candidat, placeId: null })));
-    });
-  });
-}
-etapeRecherche.maxRetries = 0;
-
-/**
- * Étape d'ancrage (0055 § 6 point 3) : logements (une fiche chacun, zone du séjour), puis candidats par Text Search
- * « IDs only » restreint à la zone, sans fiche. Gardés : candidats résolus (avec leur `placeId`) et événements non
- * résolus (sans `placeId`, R1) ; les autres sont supprimés. Positions des logements : en mémoire, perdues avec l'étape.
- */
-export async function etapeAncrage(entree: EtatP0Run): Promise<EtatP0Run> {
-  "use step";
-  return etape(entree.runId, "ancrage", async (contexte, marquerAppels) => {
-    const { modeles } = configurationAgent(contexte.execution.mode, contexte.config);
-    const candidats = candidatsRelus(await lireCandidats(poolPrototype(), contexte.garde.runId)).map((relu) => relu.candidat);
-    const logements = contexte.brief.logements.length;
-    // Une requête Text Search par logement est laissée à l'étape finale, qui relit la fiche des logements (0063,
-    // amendement P0r3c-5).
-    const forfait = forfaitDeLEtape(contexte.config, contexte.execution, {
-      ...SANS_GOOGLE,
-      textSearch: contexte.config.placesTextSearch - logements,
-      details: logements,
-    });
-    const registre = registreDeLEtape(forfait, contexte);
-    const { textSearch, detailsLogement } = composer(contexte, forfait, registre, modeles).ancrage();
-    marquerAppels();
-    const { zone } = await ancrerLogementsDuSejour(contexte.brief, { detailsLogement });
-    const ancrages = await ancrerCandidatsDansZone(candidats, contexte.brief.destination, { textSearch }, zone);
-    const gardees: LigneCandidat[] = candidats.flatMap((candidat): LigneCandidat[] => {
-      const ancrage = ancrages.get(candidat.id);
-      if (ancrage?.resolu) return [{ cle: candidat.id, candidat, placeId: ancrage.placeId }];
-      return candidat.typeEtape === "event" ? [{ cle: candidat.id, candidat, placeId: null }] : [];
-    });
-    await remplacerCandidats(poolPrototype(), contexte.garde.runId, gardees);
-  });
-}
-etapeAncrage.maxRetries = 0;
-
-function enLots<T>(valeurs: readonly T[], taille: number): T[][] {
-  const lots: T[][] = [];
-  for (let indice = 0; indice < valeurs.length; indice += taille) lots.push(valeurs.slice(indice, indice + taille));
-  return lots;
+/** Configuration des modèles du prototype (`modeles.json`), validée ; refusée : `config_invalid` (avant tout appel). */
+function configurationModeles(): ConfigModeles {
+  const modeles = ConfigModelesSchema.safeParse(configModeles);
+  if (!modeles.success) throw new ArretEtape("config_invalid");
+  return modeles.data;
 }
 
 /**
- * Appels de modèle d'une série de lots, partis ensemble (marge de durée : un aller-retour de modèle au lieu d'un par lot),
- * chacun réservé avant son départ ; tous attendus avant de rendre, la première erreur ensuite levée.
+ * Étape unique de travail de `p0Run` (décision 0116 § 3 ; décision 0115 § 3 ; spécification `P0-programme-par-ia` § 0),
+ * dans cet ordre, le programme de l'IA, les identifiants, les fiches et les durées restant **en mémoire** jusqu'à
+ * l'écriture (0011 § 3 et § 7, 0052 § 1.1) :
+ * 1. phase `recherche` : **rédaction**, une requête `programme` (brief entier, jamais une donnée Google ; `zdr`, 300 s),
+ *    puis lecture tolérante (`lireProgramme`, 0117 § 1) ; aucune journée lisible : `model_output_invalid` ; puis **ordre
+ *    écrit** (`ordreEcrit`, tri stable par `debut`, une seule fois, avant toute vérification, 0116 § 1.7) ; coût des
+ *    modèles écrit (plus aucun appel de modèle ensuite) ;
+ * 2. phase `ancrage` : logements (une recherche et une fiche chacun, zone du séjour), puis **vérification** des lieux
+ *    distincts dans l'ordre écrit (`verifierLieuxDuProgramme`, un appel d'ancrage par lieu) ; part et échéance contrôlées
+ *    **avant chaque appel**, l'échéance moins la **réserve de trajets** (requêtes Routes prévues × 10 s, 0116 § 3.5) ;
+ *    non tenu : lieux restants sans `placeId`, programme entier écrit ; rien n'est écrit dans cette phase ;
+ * 3. repère `planification` (journal seulement : `ecrirePhase` exige la phase précédente de `PHASES`, et `notation` n'est
+ *    plus écrite) : **trajets** entre points consécutifs avec identifiant de chaque jour (`pointsDeTrajet`), sous la part
+ *    Routes et l'échéance ; manque : trajets sans durée, jamais inventés (0092 § 4) ;
+ * 4. repère `ecriture` : assemblage sans replanification (`assemblerProgrammeIa`, jamais `toConfirm`), réduction, et
+ *    écriture du programme, des positions (logements et lieux vérifiés) et des temps de 0092, ensemble ou pas du tout.
+ * Journal : `p0.programme_written` (compteurs maison), aussi en cas d'erreur.
  */
-async function parLots<T>(lots: readonly T[], appel: (lot: T) => Promise<ReponseModele>): Promise<ReponseModele[]> {
-  const issues = await Promise.allSettled(lots.map(appel));
-  const reponses: ReponseModele[] = [];
-  for (const issue of issues) {
-    if (issue.status === "rejected") throw issue.reason;
-    reponses.push(issue.value);
-  }
-  return reponses;
-}
-
-/**
- * Étape finale (0011 § 7 ligne « e » : classement à écriture dans une seule étape, le plan restant en mémoire ; 0055
- * § 6 points 1, 3 et 4 ; 0052 § 1 ; 0063 point 10 et son amendement P0r3c-5), dans cet ordre :
- * 1. **notation** des candidats résolus (pas des événements), par lots, par `noterCandidats` (nos descriptions
- *    seulement), **avant les fiches** ; les notes restent en mémoire ;
- * 2. **logements** relus par `detailsLogement` (une requête Text Search et une fiche chacun : leurs identifiants ne
- *    passent pas entre étapes) ; zone du séjour ; squelette ; plan Routes (part du jour, `n` lieux par matrice) ;
- * 3. **première série** : par jour, un lieu par créneau et l'idée, bornée par la matrice du jour ; **fiches** dans
- *    l'ordre du classement de chaque type, avec la marge de remplacement, au plus `placesDetails − 2 × logements` ;
- *    fermé, introuvable ou hors zone : remplacé par le suivant ;
- * 4. **regroupement par jour** à vol d'oiseau, **une matrice Routes par jour**, planification de chaque jour par le
- *    moteur sur les seuls lieux de son groupe ; événements sans `placeId` (aucun lieu sans fiche de cette étape) ;
- * 5. **raisons** des lieux retenus, par `redigerRaisons` ; coût des modèles écrit (plus aucun appel de modèle ensuite) ;
- * 6. **validation** R1 à R10 en mémoire : une violation, aucun programme ; réduction ;
- * 7. **écriture** du programme, de ses positions, celles des fiches de cette étape (0052 § 1.1 et § 1.3), et des temps
- *    de trajet sur lesquels le moteur a planifié, pour les seules paires de `pairesDuProgramme` (décision 0092 § 4),
- *    ensemble ou pas du tout ; l'exécution passe à `programme_ecrit`.
- * Aucune réponse Place Details ni Routes n'entre dans un prompt, un journal ou la sortie de l'étape (0052 § 1.4).
- */
-export async function etapeFinale(entree: EtatP0Run): Promise<EtatP0Run> {
+export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
   "use step";
-  return etape(entree.runId, "notation", async (contexte, marquerAppels, noterPhase) => {
+  return etape(entree.runId, "recherche", async (contexte, marquerAppels, noterPhase) => {
     const { brief, config, execution, garde } = contexte;
-    /** Phase écrite en base, puis notée pour le journal d'arrêt (ticket 493). */
     const passerA = async (phase: PhaseTravail) => {
       await ecrirePhase(poolPrototype(), garde.runId, phase);
       noterPhase(phase);
     };
-    const { modeles, recherche } = configurationAgent(execution.mode, config);
-    const classement = lireClassement(configClassement);
-    if (classement === undefined) throw new ArretEtape("config_invalid");
-    const relus = candidatsRelus(await lireCandidats(poolPrototype(), garde.runId));
-    const nombreLogements = brief.logements.length;
+    const modeles = configurationModeles();
+    // Forfait entier de l'exécution (0116 § 3.5) : la part des lieux de l'IA est ce qui reste après les logements.
     const forfait = forfaitDeLEtape(config, execution, {
-      textSearch: nombreLogements,
-      details: config.placesDetails - nombreLogements,
+      textSearch: config.placesTextSearch,
+      details: config.placesDetails,
       routesRequetes: config.routesRequetes,
       routesElements: config.routesElements,
     });
-    const registre = registreDeLEtape(forfait, contexte);
-    const finale = composer(contexte, forfait, registre, modeles).etapeFinale();
+    // Réserve de trajets (0116 § 3.5) : posée pendant la vérification seulement, retirée avant les trajets.
+    let reserveTrajetsMs = 0;
+    const registre = registreDeLEtape(forfait, contexte, (methode) => (methode === "places_text_search" || methode === "places_details" ? reserveTrajetsMs : 0));
+    const capacites = composer(contexte, forfait, registre, modeles).programme();
     marquerAppels();
+    const compteurs: CompteursProgramme = { days: 0, slots: 0, placesToVerify: 0, daysRemoved: 0, slotsRemoved: 0, fieldsRemoved: 0, textsCut: 0, modelCalls: 0, unverifiedForCap: 0 };
     const cout = memoireDuCout(contexte, registre);
-    await cout.terminer(async () => {
-      // Types de production de la couche IA (`vers-couche-ia.ts`, 0077 § 1 point 5) ; `ComplementP0` pour P0 seulement.
-      const entreeIa = entreeModelesDepuisBrief(brief);
-      const complement = complementDepuisBrief(brief);
-      // 1. Notation, avant les fiches.
-      const lieux = relus.filter((relu) => relu.candidat.typeEtape !== "event" && relu.placeId !== null);
-      const lotsNotation = enLots(
-        lieux.map((relu) => relu.candidat),
-        recherche.tailleLotNotation,
-      );
-      const notes = new Map<string, CandidatNote["notes"]>();
-      (await parLots(lotsNotation, (lot) => finale.noterCandidats({ entree: entreeIa, lot: lot.map(candidatPourModele), complement }))).forEach((reponse, rang) => {
-        const ids = new Set((lotsNotation[rang] ?? []).map((candidat) => candidat.id));
-        for (const [id, note] of lireNotes(reponse.texte, ids).valeur) notes.set(id, note);
-      });
-      const notees: CandidatNote[] = lieux.flatMap((relu) => {
-        const note = notes.get(relu.candidat.id);
-        return note === undefined ? [] : [{ ...relu.candidat, notes: note }];
-      });
-      const noteDe = new Map(notees.map((candidat) => [candidat.id, candidat]));
-      const placeIdDe = new Map(lieux.flatMap((relu) => (relu.placeId === null ? [] : [[relu.candidat.id, relu.placeId] as const])));
-      const parametres = { classement, ageSourceMaxJours: recherche.ageSourceMaxJours, dateReference: execution.jourQuota };
-      const classements = classementParType(
-        notees.map((candidat) => candidatVersMoteur(candidat, undefined)),
-        parametres,
-      );
+    try {
+      await cout.terminer(async () => {
+        // 1. Rédaction et lecture tolérante ; ordre écrit fixé une fois, avant toute vérification.
+        compteurs.modelCalls += 1;
+        const reponse = await capacites.redigerProgramme(entreeProgrammeDepuisBrief(brief));
+        await cout.ecrire();
+        const lecture = lireProgramme(reponse.texte, { arrivee: brief.arrivee, depart: brief.depart });
+        compteurs.daysRemoved = lecture.joursRetires;
+        compteurs.slotsRemoved = lecture.creneauxRetires;
+        compteurs.fieldsRemoved = lecture.champsRetires;
+        compteurs.textsCut = lecture.textesCoupes;
+        if (lecture.valeur === null) throw new ArretEtape(codePersiste(CODE_PROGRAMME_ILLISIBLE, true));
+        const programme = ordreEcrit(lecture.valeur);
+        compteurs.days = programme.jours.length;
+        compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
 
-      // 2. Logements, zone, squelette, plan Routes.
-      await passerA("planification");
-      // Même fonction qu'à l'ancrage (une fiche par logement, zone du séjour), sur la capacité de l'étape finale.
-      const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: finale.detailsLogement });
-      const { nuits, briefMoteur, voyage, jours, plan, logementsDuJour, capacites, demandes, serie, premiereSerie, budgetFiches } = dimensionsDuSejour(
-        brief,
-        config,
-        logements.map((logement) => logement.placeId),
-      );
-      if (!plan.tient) throw new ErreurBudgetRoutes();
+        // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit, part et échéance contrôlées avant chaque appel.
+        await passerA("ancrage");
+        const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: capacites.detailsLogement });
+        const idsLogements = logements.map((logement) => logement.placeId);
+        const { lieux, cleDe } = lieuxDuProgramme(programme, brief.destination);
+        compteurs.placesToVerify = lieux.length;
+        // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
+        compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
+        const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined) =>
+          programme.jours.map((jour, indiceJour) => ({
+            date: jour.date,
+            ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+            creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })),
+          }));
+        // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
+        const requetesPrevues = Math.min(config.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
+        reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;
+        const controle: ControleAppel = async (methode) => {
+          const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
+          // Marge de ticket 407 reprise (justifiée, revue 1 mineur 8) : le registre refait ce contrôle quelques ms plus
+          // tard ; sans elle, un appel admis ici serait refusé par le registre (pipeline_failed) au lieu d'arrêter la
+          // vérification et d'écrire les lieux restants sans `placeId` (0116 § 3.5).
+          if (Date.now() + delaiDeLAppel(methodeGoogle) + MARGE_VERIFICATION_AGENT_MS > contexte.echeance - reserveTrajetsMs) return "temps";
+          const consomme = await registre.consumption(null, { methode: methodeGoogle });
+          const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
+          return consomme.requetes + 1 > plafond ? "part" : "ok";
+        };
+        const issue = await verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle);
 
-      // 3. Première série et fiches, type par type, dans l'ordre du classement.
-      noterPhase("fiches");
-      // Série plus grande que le plafond des fiches : arrêt sans programme (plafond, persisté `pipeline_failed`).
-      if (premiereSerie > budgetFiches) throw new ArretEtape("pipeline_failed");
-      const marge = margeRemplacement(premiereSerie, { minimum: config.fiches.margeMinimum, part: config.fiches.margePart });
-      let restant = Math.min(budgetFiches, premiereSerie + marge);
-      let aVenir = premiereSerie;
-      const retenus: { readonly id: string; readonly type: TypeSerie; readonly ancrage: AncrageResolu }[] = [];
-      // Lieux dont la fiche a déjà été lue (retenus ou écartés) : jamais relus pour un autre type, jamais deux fois au
-      // programme (deux candidats du même lieu : le mieux classé seul).
-      const lus = new Set<string>();
-      for (const type of TYPES_SERIE) {
-        aVenir -= serie[type];
-        const ordre: { readonly id: string; readonly placeId: string }[] = [];
-        const dansOrdre = new Set<string>();
-        for (const candidat of classements[type]) {
-          const placeId = placeIdDe.get(candidat.id);
-          if (placeId === undefined || lus.has(placeId) || dansOrdre.has(placeId)) continue;
-          dansOrdre.add(placeId);
-          ordre.push({ id: candidat.id, placeId });
-        }
-        const issue = await fichesEtapeFinale(ordre, finale.places, zone, { premiereSerie: serie[type], marge: restant - serie[type] - aVenir });
-        restant -= issue.fiches;
-        // `fichesEtapeFinale` lit les lieux dans l'ordre donné, un `placeId` distinct par fiche : les `fiches` premiers.
-        for (const lieu of ordre.slice(0, issue.fiches)) lus.add(lieu.placeId);
-        for (const lieu of issue.retenus) retenus.push({ id: lieu.id, type, ancrage: lieu.ancrage });
-      }
-
-      // 4. Regroupement par jour, une matrice Routes par jour, planification.
-      noterPhase("routes");
-      // Jours de fermeture (correction 1 de la PR #490) : un lieu dont aucune plage d'ouverture ne recouvre la fenêtre
-      // d'un jour n'est mis ce jour-là qu'en dernier recours. Horaires lus sur les fiches, en mémoire, jamais dans un prompt.
-      const horaires = relecturesDepuisAncrages(new Map(retenus.map((lieu) => [lieu.ancrage.placeId, lieu.ancrage])), nuits, () => undefined);
-      const groupes = regrouperParJour(
-        retenus.map((lieu) => ({ id: lieu.id, type: lieu.type, position: lieu.ancrage.position, fermeLes: joursDeFermeture(horaires, lieu.ancrage.placeId, jours) })),
-        // Demandes déjà bornées par la capacité du jour (`demandeBornee`, seul ordre de service : décision 0088 § 8).
-        jours.map((_, rang) => ({ demande: demandes[rang] ?? { activity: 0, meal: 0, evening: 0 }, capacite: capacites[rang] ?? 0 })),
-      );
-      const ficheDe = new Map(retenus.map((lieu) => [lieu.id, lieu.ancrage]));
-      const mode = modeDeTrajet(brief);
-      const cadence = creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, {
-        maintenant: () => Date.now(),
-        attendre: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-      });
-      const sejour = routesDuSejour(finale.routes, plan, cadence);
-      const matrices: Trajets[] = [];
-      for (const [rang, groupe] of groupes.entries()) {
-        const placeIds = [...(logementsDuJour[rang] ?? []), ...groupe.flatMap((id) => ficheDe.get(id)?.placeId ?? [])];
-        matrices.push(await sejour.matriceDuJour(rang, placeIds, mode));
-      }
-      const trajets: Trajets = (depuis, vers) => {
-        for (const matrice of matrices) {
-          const minutes = matrice(depuis, vers);
-          if (minutes !== undefined) return minutes;
-        }
-        return undefined;
-      };
-      noterPhase("moteur");
-      const ancragesParPlace = new Map<string, AncrageResolu>();
-      for (const ancrage of [...logements, ...retenus.map((lieu) => lieu.ancrage)]) ancragesParPlace.set(ancrage.placeId, ancrage);
-      const relectures = relecturesDepuisAncrages(ancragesParPlace, nuits, trajets);
-      const evenements = relus.flatMap((relu) => (relu.candidat.typeEtape === "event" ? (evenementVersMoteur(relu.candidat, undefined) ?? []) : []));
-      const planifies = jours.map((jour, rang) =>
-        planifierLeJour({
-          jour,
-          candidats: (groupes[rang] ?? []).flatMap((id) => {
-            const candidat = noteDe.get(id);
-            const ancrage = ficheDe.get(id);
-            return candidat === undefined || ancrage === undefined ? [] : [candidatVersMoteur(candidat, ancrage)];
-          }),
-          evenements,
-          relectures,
+        // 3. Trajets entre points consécutifs avec identifiant (ordre écrit), sous la part Routes et l'échéance seule.
+        noterPhase("planification");
+        reserveTrajetsMs = 0;
+        const jours = joursAvec((jour, rang) => {
+          const cle = cleDe(jour, rang);
+          return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
+        });
+        const mode = modeDeTrajet(brief);
+        const cadence = creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, {
+          maintenant: () => Date.now(),
+          attendre: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        });
+        const trajets = await trajetsConsecutifs(
+          capacites.routes,
+          pointsDeTrajet({ brief, logements: idsLogements, jours }),
           mode,
-          parametres,
+          { requetes: config.routesRequetes, elements: config.routesElements },
+          cadence,
+        );
+
+        // 4. Assemblage sans replanification, réduction et écriture, ensemble ou pas du tout.
+        noterPhase("ecriture");
+        const complet = assemblerProgrammeIa({
+          tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
+          brief,
+          jours,
+          bonsPlans: programme.bonsPlans,
+          logements: idsLogements,
           configuration: CONFIGURATION_MOTEUR,
-          voyage,
-        }),
-      );
-
-      // 5. Raisons des lieux retenus ; coût des modèles écrit, plus aucun appel de modèle ensuite.
-      await passerA("raisons");
-      const idsRetenus = new Set<string>();
-      for (const jour of planifies) {
-        for (const etapePlanifiee of jour.etapes) idsRetenus.add(etapePlanifiee.candidatId);
-        if (jour.idee !== undefined) idsRetenus.add(jour.idee.candidatId);
-        for (const evenement of jour.evenements) idsRetenus.add(evenement.candidatId);
-      }
-      const parId = new Map(relus.map((relu) => [relu.candidat.id, relu.candidat]));
-      const lotsRaisons = enLots(
-        [...idsRetenus].flatMap((id) => parId.get(id) ?? []),
-        recherche.tailleLotNotation,
-      );
-      const raisons = new Map<string, Raison>();
-      (await parLots(lotsRaisons, (lot) => finale.redigerRaisons({ entree: entreeIa, retenus: lot.map((candidat) => lieuRetenuDepuisCandidat(candidat)), complement }))).forEach((reponse, rang) => {
-        const ids = new Set((lotsRaisons[rang] ?? []).map((candidat) => candidat.id));
-        for (const [id, raison] of lireRaisons(reponse.texte, ids).valeur) raisons.set(id, raison);
+          mode,
+          trajets,
+        });
+        const positions = new Map<string, Position>([...logements, ...issue.fiches.values()].map((ancrage) => [ancrage.placeId, ancrage.position]));
+        const reduit = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
+        const decoupe = decouperProgramme(reduit);
+        const conserves = trajetsAConserver(decoupe.contenu, mode, (paire) => trajets(paire.origine, paire.destination));
+        await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, mode, trajets: conserves }, poolPrototype());
       });
-      await cout.ecrire();
-
-      // 6. Assemblage et validation complète en mémoire ; une violation : aucun programme.
-      await passerA("validation");
-      const positions = new Map<string, Position>([...ancragesParPlace].map(([placeId, ancrage]) => [placeId, ancrage.position]));
-      const complet = assembler({
-        tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
-        brief,
-        nuits,
-        configuration: CONFIGURATION_MOTEUR,
-        jours: planifies,
-        candidats: parId,
-        raisons,
-        mode,
-        positions,
-      });
-      const violations = violationsP0(complet.trip.days, {
-        brief,
-        briefMoteur,
-        nuits,
-        relectures,
-        configuration: CONFIGURATION_MOTEUR,
-        planifies,
-        candidats: parId,
-      });
-      if (Object.values(violations).some((nombre) => nombre > 0)) throw new ArretEtape("pipeline_failed");
-      const programme = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
-
-      // 7. Écriture : positions des fiches de cette étape, programme et temps du moteur (0092), ensemble ou pas du tout.
-      await passerA("ecriture");
-      const decoupe = decouperProgramme(programme);
-      // Temps de la matrice de cette étape (`trajets`, celle du moteur), dans le mode unique de l'exécution ; aucune autre requête.
-      const conserves = trajetsAConserver(decoupe.contenu, mode, (paire) => trajets(paire.origine, paire.destination));
-      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, mode, trajets: conserves }, poolPrototype());
-    });
+    } catch (erreur) {
+      journaliserProgramme(compteurs, { erreur });
+      throw erreur;
+    }
+    journaliserProgramme(compteurs);
   });
 }
-etapeFinale.maxRetries = 0;
+etapeProgramme.maxRetries = 0;
 
 /**
  * Clôture d'une exécution arrêtée (garde revérifiée) : candidats supprimés, `arretee` et code persisté (S4). Garde
@@ -992,16 +743,14 @@ export async function etapeClore(entree: EtatP0Run & { readonly code: CodeArret 
 etapeClore.maxRetries = 0;
 
 /**
- * Workflow : recherche, ancrage, étape finale (programme écrit). Toute étape arrêtée clôt l'exécution avec son code
+ * Workflow (décision 0116 § 3.1) : `etapeProgramme` (programme écrit), puis `etapeClore` seulement en cas d'arrêt. Toute étape arrêtée clôt l'exécution avec son code
  * persisté ; la sortie est l'identifiant d'exécution seul.
  */
 export async function p0Run(entree: EtatP0Run): Promise<EtatP0Run> {
   "use workflow";
   const runId = entree.runId;
   try {
-    await etapeRecherche({ runId });
-    await etapeAncrage({ runId });
-    await etapeFinale({ runId });
+    await etapeProgramme({ runId });
   } catch (erreur) {
     const code = (erreur as { message?: unknown } | null)?.message;
     await etapeClore({ runId, code: estCodeArret(code) ? code : "pipeline_failed" });

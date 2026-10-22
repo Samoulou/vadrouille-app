@@ -75,6 +75,8 @@ const REPONSES: Record<EtapeRequete, string> = {
       { id: "c_002", raison: "Pour marcher.", detour: "Près du logement." },
     ],
   }),
+  // Étape du prototype seulement (décision 0115) : jamais appelée par la couche du MVP.
+  programme: JSON.stringify({ jours: [] }),
 };
 
 function monter(reponse: (etape: EtapeRequete) => ReponseModele | Promise<ReponseModele> = (etape) => ({ texte: REPONSES[etape], coutUsd: 0 })) {
