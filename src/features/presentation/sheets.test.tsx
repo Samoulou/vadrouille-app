@@ -73,6 +73,31 @@ describe("PreferenceSheet", () => {
 describe("ProposalDetailSheet", () => {
   const distillerie = propositions.find((p) => p.id === "prop-j5-distillerie")!;
 
+  // Lot 2a (spécification § 11.4, A21 ; PPI-PO-8) : ligne `t.detail.source` et lien du site, aucune date de vérification.
+  it("ProposalDetailSheet: lien du site sans date", () => {
+    const { verifiedAt: _date, ...stop } = distillerie.stop;
+    void _date;
+    const proposal = { ...distillerie, stop: { ...stop, source: { label: "colosseo.it", url: "https://colosseo.it/" } } };
+    render(<ProposalDetailSheet proposal={proposal} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    const lien = within(dialog).getByRole("link", { name: "colosseo.it" });
+    expect(lien).toHaveAttribute("href", "https://colosseo.it/");
+    expect(lien).toHaveAttribute("target", "_blank");
+    expect(lien).toHaveAttribute("rel", "noopener noreferrer");
+    expect(lien.parentElement?.textContent).toBe(`${messages.presentation.detail.source}colosseo.it`);
+    expect(dialog).not.toHaveTextContent(/vérifiées le|consultée le/);
+  });
+
+  it("ProposalDetailSheet: sans site, aucune ligne de source", () => {
+    const { source: _source, verifiedAt: _date, ...stop } = distillerie.stop;
+    void _source;
+    void _date;
+    render(<ProposalDetailSheet proposal={{ ...distillerie, stop }} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    expect(within(dialog).queryByRole("link")).toBeNull();
+    expect(dialog).not.toHaveTextContent(messages.presentation.detail.source.trim());
+  });
+
   it("lecture seule : nom, moment, métadonnées, justification, source, date de vérification, « Fermer »", () => {
     const onClose = vi.fn();
     render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={onClose} onReturnFocus={() => {}} />);

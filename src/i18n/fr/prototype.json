@@ -107,6 +107,9 @@
       "copier": "Copier le rapport",
       "etapes": "Étapes avec lieu vérifié : {avec} · à confirmer : {sans}",
       "etapesNonRelevees": "Étapes avec lieu vérifié : non relevé",
+      "etapesAvecSite": "Étapes avec site : {n}",
+      "etapesAvecSiteNonRelevees": "Étapes avec site : non relevé",
+      "liensSites": "Liens vers les sites affichés",
       "copie": "Rapport copié.",
       "copieImpossible": "Copie impossible : sélectionne le texte et copie-le à la main.",
       "titre": "Rapport d'exécution du prototype",
@@ -127,7 +130,7 @@
       "codeArret": "Code d'arrêt",
       "criteres": {
         "A1": "programme valide",
-        "A2": "étapes de lieu avec identifiant et source",
+        "A2": "étapes de lieu avec identifiant",
         "A3": "événements dans les dates et sourcés",
         "A4": "horaires, trajets, logement et rythme",
         "A5": "aucun trou",

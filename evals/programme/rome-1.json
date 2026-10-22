@@ -2,7 +2,11 @@
   "schema": 1,
   "id": "rome-1",
   "brief": "rome-1",
-  "cas": "Sortie simulée du prompt programme v1 (lot 1 de la spécification P0-programme-par-ia), écrite à la main : noms usuels de l'IA, aucune donnée Google",
+  "cas": "Sortie simulée du prompt programme v2 (lot 1 et lot 2a de la spécification P0-programme-par-ia), écrite à la main : noms usuels de l'IA, aucune donnée Google ; champ site écrit à la main (adresses plausibles et cas refusés à la forme), jamais vérifié ici",
+  "attendu": {
+    "sitesProposes": 4,
+    "sitesFormeInvalide": 4
+  },
   "sortie": {
     "titre": "Rome antique, carbonara et apéro, quatre jours à pied",
     "jours": [
@@ -35,7 +39,8 @@
             "conseil": "Réserve le créneau horaire en ligne, les billets partent vite.",
             "prix": "18 € (avec le Forum et le Palatin)",
             "aReserver": true,
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://colosseo.it/"
           },
           {
             "debut": "16:45",
@@ -46,7 +51,8 @@
             "pourquoi": "Le cœur politique de la Rome antique, avec le même billet que le Colisée.",
             "conseil": "Entre par la via della Salara Vecchia pour éviter la file.",
             "horaires": "9:00 à 19:15 en été",
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://colosseo.it/"
           },
           {
             "debut": "18:45",
@@ -84,7 +90,8 @@
             "prix": "20 €",
             "horaires": "8:00 à 19:00, fermés le dimanche",
             "aReserver": true,
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://www.museivaticani.va/content/museivaticani/fr.html?lang=fr#visite"
           },
           {
             "debut": "12:15",
@@ -115,7 +122,8 @@
             "pourquoi": "Le mausolée devenu forteresse, avec une terrasse sur tout Rome.",
             "prix": "16 €",
             "horaires": "9:00 à 19:30, fermé le lundi",
-            "incontournable": true
+            "incontournable": true,
+            "site": "http://castelsantangelo.beniculturali.it/"
           },
           {
             "debut": "17:00",
@@ -157,7 +165,8 @@
             "prix": "5 €",
             "horaires": "9:00 à 19:00",
             "aReserver": true,
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://www.google.it/search?q=pantheon"
           },
           {
             "debut": "10:15",
@@ -203,7 +212,8 @@
             "quartier": "Centro storico",
             "pourquoi": "Une collection privée de chefs-d'œuvre dans un palais encore habité.",
             "conseil": "L'audioguide est inclus, prends-le.",
-            "prix": "16 €"
+            "prix": "16 €",
+            "site": "https://www.doriapamphilj.it/"
           },
           {
             "debut": "16:30",
@@ -212,7 +222,8 @@
             "lieu": "Giolitti",
             "quartier": "Centro storico",
             "pourquoi": "Une glace dans l'un des plus vieux glaciers de Rome.",
-            "prix": "3 à 5 € la glace"
+            "prix": "3 à 5 € la glace",
+            "site": "https://www.giolitti.it:8443/"
           },
           {
             "debut": "18:00",
@@ -230,7 +241,8 @@
             "quartier": "Centro storico",
             "pourquoi": "Épicerie fine et restaurant, l'une des carbonara les plus connues de la ville.",
             "conseil": "Réserve au moins une semaine avant.",
-            "aReserver": true
+            "aReserver": true,
+            "site": "https://www.salumeriaroscioli.com/"
           }
         ]
       },
@@ -247,7 +259,8 @@
             "pourquoi": "La colline des empereurs, avec la vue sur le Forum et le Circus Maximus.",
             "conseil": "Le billet du Colisée l'inclut s'il est encore valable.",
             "horaires": "9:00 à 19:15",
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://colosseo.it"
           },
           {
             "debut": "11:45",
@@ -318,7 +331,8 @@
             "quartier": "Aventin",
             "pourquoi": "Les immenses thermes impériaux, calmes le matin.",
             "prix": "8 €",
-            "horaires": "9:00 à 19:15, fermés le lundi"
+            "horaires": "9:00 à 19:15, fermés le lundi",
+            "site": "https://203.0.113.5/"
           },
           {
             "debut": "11:30",

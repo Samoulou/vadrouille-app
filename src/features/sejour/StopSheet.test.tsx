@@ -113,6 +113,25 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
     expect(screen.getByText("À confirmer")).toBeInTheDocument();
   });
 
+  // Lot 2a (spécification § 11.4, A21 ; PPI-PO-8) : site vérifié écrit sans `verifiedAt`, lien sans date de consultation.
+  it("StopSheet: lien du site sans date de consultation", () => {
+    const { container } = renderFiche(5, "j5-distillerie", { source: { label: "colosseo.it", url: "https://colosseo.it/" }, verifiedAt: undefined });
+    expect(screen.getByText("Pourquoi pour toi")).toBeInTheDocument();
+    const lien = screen.getByRole("link", { name: "Source\u00a0: colosseo.it" });
+    expect(lien).toHaveAttribute("href", "https://colosseo.it/");
+    expect(lien).toHaveAttribute("target", "_blank");
+    expect(lien).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByText(/Source consultée le/)).toBeNull();
+    expect(container).not.toHaveTextContent(/consultée|vérifiée? le/i);
+  });
+
+  it("StopSheet: étape sans site gardé : raison seule, aucun lien", () => {
+    const { container } = renderFiche(5, "j5-distillerie", { source: undefined, verifiedAt: undefined });
+    expect(container.querySelector("[data-part='raison-simple']")).not.toBeNull();
+    expect(screen.queryByRole("link", { name: /Source/ })).toBeNull();
+    expect(screen.queryByText(/Source consultée le/)).toBeNull();
+  });
+
   it("étape sans raison ni source : ni bloc ni texte", () => {
     const { container } = renderFiche(2, "j2-dean-village", { reason: undefined });
     expect(container.querySelector("[data-part='raison']")).toBeNull();

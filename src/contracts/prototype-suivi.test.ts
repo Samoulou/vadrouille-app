@@ -18,6 +18,8 @@ describe("contrat: rapport du prototype, étapes avec et sans placeId", () => {
     expect(Object.keys(etapes).sort()).toEqual(["avecPlaceId", "sansPlaceId"]);
     // Le texte à copier reste une chaîne distincte : `etapes` n'en fait pas partie.
     expectTypeOf<RapportPage["texte"]>().toEqualTypeOf<string>();
-    expectTypeOf<keyof RapportPage>().toEqualTypeOf<"execution" | "criteres" | "texte" | "etapes">();
+    // Lot 2a (spécification § 11.4, A24 ; 0122 § 2.3) : nombre d'étapes avec site, sur la page seulement.
+    expectTypeOf<keyof RapportPage>().toEqualTypeOf<"execution" | "criteres" | "texte" | "etapes" | "etapesAvecSite">();
+    expectTypeOf<RapportPage["etapesAvecSite"]>().toEqualTypeOf<number | null | undefined>();
   });
 });

@@ -26,7 +26,7 @@ import { arrondi5, joursEntre, versHeure } from "@/domain/temps";
 import type { Position } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
-import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+import { LONGUEURS, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { rythmeVersPace } from "@/server/p0/vers-moteur";
 
 /**
@@ -289,6 +289,11 @@ export type CreneauAssemble = {
   readonly horaires?: string;
   readonly aReserver?: boolean;
   readonly placeId?: string;
+  /**
+   * Adresse réduite du site **vérifié** (lot 2a, § 11.3 ; 0121 § 3.5) : posée par l'appelant seulement si la vérification
+   * a répondu 2xx ; jamais l'adresse brute de l'IA ni une adresse de redirection (PPI-PO-7).
+   */
+  readonly site?: string;
 };
 
 export type EntreeAssemblageIa = {
@@ -328,6 +333,24 @@ function texteAdmis(valeur: string | undefined, max: number): string | undefined
 const minutesDe = (heure: string) => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
 
 /**
+ * Source d'une étape depuis son site vérifié (§ 11.4 ; 0122 § 1 condition 14 et § 2.2 point 2) : `url` = adresse
+ * réduite de l'IA, `label` = nom d'hôte calculé par le code, `www.` retiré **en tête seulement**, forme ASCII rendue par
+ * `URL` (punycode pour un IDN, jamais reconverti), coupé à `LONGUEURS.libelle`. Aucune date. Adresse illisible : aucune
+ * source.
+ */
+export function sourceDuSite(site: string | undefined): Stop["source"] {
+  if (site === undefined) return undefined;
+  let hote: string;
+  try {
+    hote = new URL(site).hostname;
+  } catch {
+    return undefined;
+  }
+  const label = (hote.startsWith("www.") ? hote.slice(4) : hote).slice(0, LONGUEURS.libelle);
+  return label === "" ? undefined : { label, url: site };
+}
+
+/**
  * Fin d'une étape (0116 § 1.7) : `fin` postérieure à `debut` gardée ; `fin` antérieure ou égale à `debut` lue comme
  * passant minuit, **bornée à 23:59** ; absente (ou `debut` déjà à 23:59), pas de fin.
  */
@@ -347,7 +370,7 @@ function finDeLEtape(debut: string, fin: string | undefined): string | undefined
  *   `prix` et `horaires` en `facts.tip`, `facts.priceNote` et `facts.hoursNote` (0116 § 6, lot 1 bis ; texte refusé par
  *   la règle du contrat : champ vide), badge
  *   `toReserve` si `aReserver` ; `placeId` seulement si le lieu est vérifié ; **jamais `toConfirm`** (calculé à la
- *   lecture, 0116 § 5.1) ;
+ *   lecture, 0116 § 5.1) ; `source` seulement si le créneau porte un site vérifié (lot 2a, `sourceDuSite`) ;
  * - une pause sans lieu devient une ligne `free` : jusqu'à sa `fin` lue comme celle d'une étape (passant minuit :
  *   23:59) ; sans `fin`, jusqu'au `debut` du créneau suivant de l'ordre écrit, sinon 23:59 (0116 § 1.8) ; aucun
  *   créneau n'est retiré ici ;
@@ -429,6 +452,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       const tip = texteAdmis(creneau.conseil, LONGUEURS_CONTRAT.tip);
       const priceNote = texteAdmis(creneau.prix, LONGUEURS_CONTRAT.priceNote);
       const hoursNote = texteAdmis(creneau.horaires, LONGUEURS_CONTRAT.hoursNote);
+      const source = sourceDuSite(creneau.site);
       const stop: Stop = {
         id: `j${index}-${rang}`,
         kind,
@@ -444,6 +468,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
           ...(hoursNote === undefined ? {} : { hoursNote }),
         },
         ...(creneau.pourquoi === undefined ? {} : { reason: creneau.pourquoi }),
+        ...(source === undefined ? {} : { source }),
         exceptions: creneau.aReserver === true ? ["toReserve"] : [],
         locked: false,
       };

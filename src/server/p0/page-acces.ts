@@ -7,7 +7,7 @@ import type { ExecutionSuivie, LigneDecompte, ModeleLancementP0, RapportPage, Su
 import { etatPageAcces, NOM_COOKIE_ACCES, type EtatPageAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { COMPTEES_MAX, decompte, RELANCES_MAX } from "@/server/p0/decompte";
-import { criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { criteresDuRapport, etapesAvecSiteDuRapport, etapesDuRapport, liensSitesDuRapport, texteDuRapport } from "@/server/p0/rapport";
 import { NOMS_BRIEFS } from "@/workflows";
 
 /**
@@ -52,7 +52,15 @@ async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: 
   const criteres = criteresDuRapport(execution, contenu);
   // Étapes avec et sans `placeId` : calculées à chaque affichage depuis le programme stocké (0116 § 4.4, 0117 § 4),
   // `null` sans programme écrit ; jamais dans le texte de « Copier le rapport » (`texteDuRapport` ne les reçoit pas).
-  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge), etapes: etapesDuRapport(contenu) };
+  // Lot 2a : ligne oui ou non « liens vers les sites affichés » (source seule) dans le texte copié ; nombre d'étapes avec
+  // site sur la page seulement (0122 § 2.3).
+  return {
+    execution,
+    criteres,
+    texte: texteDuRapport(execution, criteres, dernierePurge, liensSitesDuRapport(execution, contenu)),
+    etapes: etapesDuRapport(contenu),
+    etapesAvecSite: execution.statut === "programme_ecrit" ? etapesAvecSiteDuRapport(contenu) : null,
+  };
 }
 
 /** Modèle du lancement : lu seulement si la page est ouverte. */

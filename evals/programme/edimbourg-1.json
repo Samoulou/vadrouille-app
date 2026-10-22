@@ -2,7 +2,11 @@
   "schema": 1,
   "id": "edimbourg-1",
   "brief": "edimbourg-1",
-  "cas": "Sortie simulée du prompt programme v1 (lot 1 de la spécification P0-programme-par-ia), écrite à la main : noms usuels de l'IA, aucune donnée Google",
+  "cas": "Sortie simulée du prompt programme v2 (lot 1 et lot 2a de la spécification P0-programme-par-ia), écrite à la main : noms usuels de l'IA, aucune donnée Google ; champ site écrit à la main (adresses plausibles et cas refusés à la forme), jamais vérifié ici",
+  "attendu": {
+    "sitesProposes": 5,
+    "sitesFormeInvalide": 4
+  },
   "sortie": {
     "titre": "Édimbourg gourmand, à pied et en train",
     "jours": [
@@ -34,7 +38,8 @@
             "conseil": "Réserve un créneau en ligne, c'est moins cher.",
             "prix": "21 £",
             "aReserver": true,
-            "incontournable": true
+            "incontournable": true,
+            "site": "https://www.edinburghcastle.scot/"
           },
           {
             "debut": "16:45",
@@ -95,7 +100,8 @@
             "lieu": "Palais de Holyrood",
             "quartier": "Holyrood",
             "pourquoi": "La résidence royale en Écosse, au bout du Royal Mile.",
-            "conseil": "L'audioguide est inclus."
+            "conseil": "L'audioguide est inclus.",
+            "site": "https://www.rct.uk/visit/palace-of-holyroodhouse"
           },
           {
             "debut": "16:00",
@@ -113,7 +119,8 @@
             "lieu": "Sandy Bell's",
             "quartier": "Vieille ville",
             "pourquoi": "Le pub de musique folk le plus connu d'Édimbourg.",
-            "conseil": "Les sessions commencent en fin d'après-midi."
+            "conseil": "Les sessions commencent en fin d'après-midi.",
+            "site": "https://sandybells/"
           },
           {
             "debut": "19:30",
@@ -129,7 +136,8 @@
             "nature": "soiree",
             "lieu": "Sandy Bell's",
             "quartier": "Vieille ville",
-            "pourquoi": "Retour pour la session de musique du soir."
+            "pourquoi": "Retour pour la session de musique du soir.",
+            "site": "https://sandybells/"
           }
         ]
       },
@@ -147,7 +155,8 @@
             "pourquoi": "La distillerie des Lowlands, accessible en train puis en bus, comme vous le vouliez.",
             "conseil": "Réserve la visite avec dégustation.",
             "aReserver": true,
-            "incontournable": true
+            "incontournable": true,
+            "site": "http://www.glenkinchie.com/"
           },
           {
             "debut": "13:30",
@@ -203,7 +212,8 @@
             "lieu": "Royal Yacht Britannia",
             "quartier": "Leith",
             "pourquoi": "Le yacht royal, une visite insolite.",
-            "prix": "19 £"
+            "prix": "19 £",
+            "site": "https://www.royalyachtbritannia.co.uk/"
           },
           {
             "debut": "13:15",
@@ -259,7 +269,8 @@
             "lieu": "National Museum of Scotland",
             "quartier": "Vieille ville",
             "pourquoi": "Le musée qui raconte l'Écosse, un seul musée comme vous le souhaitiez.",
-            "conseil": "L'entrée est gratuite, monte sur la terrasse du toit."
+            "conseil": "L'entrée est gratuite, monte sur la terrasse du toit.",
+            "site": "https://www.nms.ac.uk/national-museum-of-scotland?utm_source=programme#top"
           },
           {
             "debut": "11:45",
@@ -293,7 +304,8 @@
             "quartier": "Vieille ville",
             "pourquoi": "Les ruelles souterraines du XVIIe siècle.",
             "conseil": "Réserve, les visites sont guidées.",
-            "aReserver": true
+            "aReserver": true,
+            "site": "https://goo.gl/exemple"
           },
           {
             "debut": "16:30",
@@ -346,7 +358,8 @@
             "lieu": "Scottish National Gallery",
             "quartier": "Ville neuve",
             "pourquoi": "Une heure pour les grands maîtres écossais.",
-            "conseil": "Entrée gratuite."
+            "conseil": "Entrée gratuite.",
+            "site": "https://www.nationalgalleries.org/"
           },
           {
             "debut": "12:15",

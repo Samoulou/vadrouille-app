@@ -354,6 +354,11 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
+        // Lot 2a (0121 § 2.3, § 4.3) : aucun site proposé, aucun soumis.
+        sitesProposed: 0,
+        sitesChecked: 0,
+        sitesRemoved: 0,
+        sitesUnchecked: 0,
       },
     ]);
     const texte = JSON.stringify(lignes);
@@ -381,6 +386,10 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
+        sitesProposed: 0,
+        sitesChecked: 0,
+        sitesRemoved: 0,
+        sitesUnchecked: 0,
         errorName: "ErreurOpenRouter",
       },
     ]);

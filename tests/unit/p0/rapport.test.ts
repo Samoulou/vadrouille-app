@@ -9,7 +9,7 @@ import * as messages from "@/i18n/messages";
 import { CODES_ARRET } from "@/prototype/arret";
 import { decouperProgramme } from "@/prototype/decoupage";
 import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
-import { CODES_PLAFOND, criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { CODES_PLAFOND, criteresDuRapport, etapesAvecSiteDuRapport, etapesDuRapport, liensSitesDuRapport, texteDuRapport } from "@/server/p0/rapport";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -51,12 +51,17 @@ describe("p0: critères du rapport", () => {
     }
   });
 
-  it("A2 : une étape de lieu sans source est « non », A1 et A6 restent oui", () => {
+  // Lot 2a (amendement 3 de la spécification, PPI-PO-12 ; 0122 § 2.3 point 2) : A2 ne porte plus que sur le `placeId`.
+  // Ce test, qui exigeait « non » pour une étape sans source, porte désormais l'absence de `placeId` (même étape) ; la
+  // source n'y entre plus (voir « rapport: A2 sur le seul placeId »).
+  it("A2 : une étape de lieu sans placeId est « non », A1 et A6 restent oui ; sans source, A2 reste oui", () => {
     const contenu = contenuValide();
     const jours = (contenu.trip as { days: { items: { type: string; stop?: Record<string, unknown> }[] }[] }).days;
     const etape = jours.flatMap((j) => j.items).find((ligne) => ligne.type === "stop");
     expect(etape?.stop?.source).toBeDefined();
     delete etape!.stop!.source;
+    expect(criteresDuRapport(executionSuivie(), contenu)).toMatchObject({ A1: "oui", A2: "oui", A6: "oui" });
+    delete etape!.stop!.placeId;
     const criteres = criteresDuRapport(executionSuivie(), contenu);
     expect(criteres).toMatchObject({ A1: "oui", A2: "non", A6: "oui" });
   });
@@ -115,7 +120,8 @@ describe("p0: texte du rapport (« Copier le rapport »)", () => {
     expect(lignes).toContain(`A1 ${t.criteres.A1} : ${t.valeurs.oui}`);
     expect(lignes.at(-1)).toBe(`${t.dernierePurge} : 2026-10-14T03:00:00Z`);
     expect(lignes.some((l) => l.startsWith(t.codeArret))).toBe(false);
-    expect(lignes).toHaveLength(7 + CRITERES.length + 1);
+    // Lot 2a : une ligne « liens vers les sites affichés » après les critères (PPI-PO-12).
+    expect(lignes).toHaveLength(7 + CRITERES.length + 1 + 1);
     // Ni identifiant ni texte du programme (le contenu n'entre pas dans le texte), ni USD, ni durée.
     expect(texte).not.toContain(PREFIXE);
     expect(texte).not.toContain("[Lieu de test");
@@ -162,5 +168,62 @@ describe("p0: rapport sans donnée Google (spécification P0-programme-par-ia, A
     expect(texte).not.toContain(PREFIXE);
     for (const etape of etapes) expect(texte).not.toContain(String(etape.stop!.name));
     expect(texte).not.toMatch(/placeId|avecPlaceId|sansPlaceId|unverified|verifi/i);
+  });
+});
+
+describe("p0: rapport, lot 2a (spécification § 11.4, A24 ; amendement 3, PPI-PO-12 ; verdict 0122 § 2.3)", () => {
+  type Ligne = { type: string; stop?: Record<string, unknown> };
+  const etapesDe = (contenu: Record<string, unknown>) =>
+    (contenu.trip as { days: { items: Ligne[] }[] }).days.flatMap((jour) => jour.items).filter((ligne) => ligne.type === "stop");
+
+  it("rapport: A2 sur le seul placeId", () => {
+    // Toutes les étapes avec placeId et aucune avec source : A2 « oui », ligne des sites « non ».
+    const contenu = contenuValide();
+    for (const etape of etapesDe(contenu)) delete etape.stop!.source;
+    const execution = executionSuivie();
+    expect(criteresDuRapport(execution, contenu).A2).toBe("oui");
+    expect(liensSitesDuRapport(execution, contenu)).toBe("non");
+    // Une étape avec source et sans placeId : A2 « non », ligne des sites « oui » ; jamais combinées.
+    const melange = contenuValide();
+    const [premiere, ...autres] = etapesDe(melange);
+    for (const etape of autres) delete etape.stop!.source;
+    delete premiere!.stop!.placeId;
+    expect(criteresDuRapport(execution, melange).A2).toBe("non");
+    expect(liensSitesDuRapport(execution, melange)).toBe("oui");
+  });
+
+  it("rapport: étapes avec site à la lecture, texte copié en oui ou non", () => {
+    const contenu = contenuValide();
+    const etapes = etapesDe(contenu);
+    for (const etape of etapes.slice(1)) delete etape.stop!.source;
+    const execution = executionSuivie();
+    // Sur la page : nombre d'étapes avec source, calculé à la lecture du programme stocké.
+    expect(etapesAvecSiteDuRapport(contenu)).toBe(1);
+    expect(etapesAvecSiteDuRapport(contenuValide())).toBe(etapes.length);
+    // Texte copié : une ligne oui ou non, sans nombre, sans hôte ni adresse, sans compteur du journal.
+    const texte = texteDuRapport(execution, criteresDuRapport(execution, contenu), null, liensSitesDuRapport(execution, contenu));
+    const ligne = texte.split("\n").find((l) => l.startsWith(t.liensSites));
+    expect(ligne).toBe(`${t.liensSites} : ${t.valeurs.oui}`);
+    expect(ligne).not.toMatch(/\d/);
+    const source = etapes[0]!.stop!.source as { label: string; url: string };
+    expect(texte).not.toContain(source.label);
+    expect(texte).not.toContain(source.url);
+    expect(texte).not.toMatch(/sites(Proposed|Checked|Removed|Unchecked)|placeId/);
+    expect(texte).not.toContain(t.etapesAvecSite.split(" :")[0]!);
+    // La ligne des sites ne lit que `source` : retirer tous les placeId ne la change pas.
+    for (const etape of etapes) delete etape.stop!.placeId;
+    expect(liensSitesDuRapport(execution, contenu)).toBe("oui");
+  });
+
+  it("rapport: ligne des sites non relevée sans programme", () => {
+    expect(liensSitesDuRapport(executionSuivie(), null)).toBe("non_releve");
+    expect(liensSitesDuRapport(executionSuivie(), {})).toBe("non_releve");
+    expect(liensSitesDuRapport(executionSuivie(), { ...contenuValide(), positions: {} })).toBe("non_releve");
+    expect(liensSitesDuRapport(arretee("upstream_unavailable"), contenuValide())).toBe("non_releve");
+    expect(etapesAvecSiteDuRapport(null)).toBeNull();
+    expect(etapesAvecSiteDuRapport({})).toBeNull();
+    // Par défaut (aucune valeur passée) : « non relevé », jamais « non ».
+    const texte = texteDuRapport(arretee("upstream_unavailable"), criteresDuRapport(arretee("upstream_unavailable"), null), null);
+    expect(texte).toContain(`${t.liensSites} : ${t.valeurs.non_releve}`);
   });
 });

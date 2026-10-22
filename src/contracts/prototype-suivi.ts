@@ -90,6 +90,12 @@ export type RapportPage = {
   readonly criteres: CriteresRapport;
   readonly texte: string;
   readonly etapes: EtapesRapport | null;
+  /**
+   * Lot 2a (la spécification P0-programme-par-ia § 11.4, A24 ; verdict 0122 § 2.3) : nombre d'étapes avec site (`source`) du
+   * programme stocké, calculé à l'affichage ; sur la page seulement, jamais dans `texte` ; `null` : non relevé.
+   * Facultatif : absent, la ligne n'est pas affichée.
+   */
+  readonly etapesAvecSite?: number | null;
 };
 
 /** Modèle de la page de lancement, lu par le serveur page ouverte seulement. */

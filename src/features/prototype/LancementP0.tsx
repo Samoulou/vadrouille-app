@@ -322,6 +322,12 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
               ? t.rapport.etapesNonRelevees
               : format(t.rapport.etapes, { avec: rapport.etapes.avecPlaceId, sans: rapport.etapes.sansPlaceId })}
           </p>
+          {/* Étapes avec site (lot 2a) : sur la page seulement, jamais dans le texte copié (0122 § 2.3). */}
+          {rapport.etapesAvecSite === undefined ? null : (
+            <p className="text-corps-s text-ink tabular-nums">
+              {rapport.etapesAvecSite === null ? t.rapport.etapesAvecSiteNonRelevees : format(t.rapport.etapesAvecSite, { n: rapport.etapesAvecSite })}
+            </p>
+          )}
           <Button type="button" variant="secondary" className="w-full" onClick={() => void copier(rapport.texte)}>
             {t.rapport.copier}
           </Button>

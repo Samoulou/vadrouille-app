@@ -26,6 +26,10 @@ import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme
  *   plafond (`CODES_PLAFOND`) ; « non relevé » sinon (cause externe ou autre arrêt : rien ne montre un dépassement).
  *   Sous S4, un plafond atteint en cours d'exécution est écrit `pipeline_failed` (`codePersiste`) : tant que S4
  *   n'écrit pas ces codes, une exécution arrêtée rend « non relevé ».
+ * - Lot 2a (amendement 3 de la spécification P0-programme-par-ia § 11.4, PPI-PO-12 ; verdict 0122 § 2.3) : A2 ne porte plus
+ *   que sur le `placeId` ; une ligne distincte « liens vers les sites affichés » (`liensSites`), oui ou non sans nombre,
+ *   ne lit que `source` ; aucune ligne ne lit à la fois `placeId` et `source`. Le nombre d'étapes avec site est sur la
+ *   page seulement (`etapesAvecSite`), jamais dans le texte copié ; aucun compteur `sites*` du journal n'est lu ici.
  */
 
 const t = messages.prototype.lancement.rapport;
@@ -41,11 +45,14 @@ function programmeControle(contenu: unknown): ProgrammeEcrit | null {
   return lu.success ? lu.data : null;
 }
 
-/** A2 (R1) : chaque étape de lieu, et l'idée « Surprends-moi », a un `placeId` et une source ; un événement a sa source. */
-function etapesDeLieuSourcees(programme: ProgrammeEcrit): boolean {
+/**
+ * A2 (R1), séparé au lot 2a (amendement 3, PPI-PO-12 ; 0122 § 2.3 point 2) : chaque étape de lieu, et l'idée
+ * « Surprends-moi », a un `placeId` ; un événement a sa source. La `source` d'une étape n'y entre plus.
+ */
+function etapesDeLieuAvecIdentifiant(programme: ProgrammeEcrit): boolean {
   return programme.trip.days.every(
     (jour) =>
-      jour.items.every((ligne) => ligne.type !== "stop" || (ligne.stop.placeId !== undefined && ligne.stop.source !== undefined)) &&
+      jour.items.every((ligne) => ligne.type !== "stop" || ligne.stop.placeId !== undefined) &&
       jour.events.every((evenement) => evenement.source !== undefined) &&
       (jour.surprise === undefined || jour.surprise.placeId !== undefined),
   );
@@ -72,7 +79,7 @@ export function criteresDuRapport(execution: ExecutionSuivie, contenu: unknown):
   } else if (ecrit) {
     const programme = programmeControle(contenu);
     a1 = oui(programme !== null);
-    a2 = oui(programme !== null && etapesDeLieuSourcees(programme));
+    a2 = oui(programme !== null && etapesDeLieuAvecIdentifiant(programme));
     a6 = oui(programme !== null && propositionsAncrees(programme));
   }
   return {
@@ -114,8 +121,39 @@ export function etapesDuRapport(contenu: unknown): EtapesDuRapport | null {
   return { avecPlaceId, sansPlaceId };
 }
 
-/** Texte de « Copier le rapport » : lignes fixes, valeurs de listes fermées et identifiants seulement. */
-export function texteDuRapport(execution: ExecutionSuivie, criteres: CriteresRapport, dernierePurge: string | null): string {
+/** Étapes (lignes `stop`) du programme stocké qui ont une `source` : lecture de `source` seule, jamais de `placeId`. */
+function etapesAvecSource(programme: ProgrammeEcrit): number {
+  return programme.trip.days.reduce((total, jour) => total + jour.items.filter((ligne) => ligne.type === "stop" && ligne.stop.source !== undefined).length, 0);
+}
+
+/**
+ * Ligne « liens vers les sites affichés » du texte copié (lot 2a ; PPI-PO-12 ; 0122 § 2.3) : « oui » si au moins une
+ * étape du programme stocké a une `source`, « non » si le programme stocké est lisible et qu'aucune n'en a, « non
+ * relevé » sans programme écrit, contenu purgé ou hors schéma (jamais « non »). Fonction du seul programme stocké,
+ * calculée à l'affichage ; jamais combinée avec `placeId`, aucun nombre.
+ */
+export function liensSitesDuRapport(execution: ExecutionSuivie, contenu: unknown): ValeurCritere {
+  if (execution.statut !== "programme_ecrit" || contenu === null) return "non_releve";
+  const programme = programmeControle(contenu);
+  return programme === null ? "non_releve" : oui(etapesAvecSource(programme) > 0);
+}
+
+/**
+ * Nombre d'étapes avec site (lignes `stop` avec `source`) du programme stocké, **sur la page seulement** (§ 11.4, A24 ;
+ * 0122 § 2.3 conditions 1, 3 et 4) : calculé à chaque affichage, jamais écrit, jamais dans le texte copié ; `null` :
+ * programme absent ou hors schéma (« non relevé »).
+ */
+export function etapesAvecSiteDuRapport(contenu: unknown): number | null {
+  if (contenu === null) return null;
+  const programme = programmeControle(contenu);
+  return programme === null ? null : etapesAvecSource(programme);
+}
+
+/**
+ * Texte de « Copier le rapport » : lignes fixes, valeurs de listes fermées et identifiants seulement. `liensSites`
+ * (lot 2a) : valeur oui ou non de `liensSitesDuRapport`, placée après les critères A1 à A9 ; jamais un nombre.
+ */
+export function texteDuRapport(execution: ExecutionSuivie, criteres: CriteresRapport, dernierePurge: string | null, liensSites: ValeurCritere = "non_releve"): string {
   const lignes = [
     t.titre,
     `${t.mode} : ${t.modes[execution.mode]}`,
@@ -126,6 +164,7 @@ export function texteDuRapport(execution: ExecutionSuivie, criteres: CriteresRap
     `${t.issue} : ${execution.statut === "programme_ecrit" ? t.issues.programme_ecrit : t.issues.arretee}`,
     ...(execution.codeArret === null ? [] : [`${t.codeArret} : ${execution.codeArret}`]),
     ...CRITERES.map((critere) => `${critere} ${t.criteres[critere]} : ${t.valeurs[criteres[critere]]}`),
+    `${t.liensSites} : ${t.valeurs[liensSites]}`,
     `${t.dernierePurge} : ${dernierePurge ?? t.aucunePurge}`,
   ];
   return lignes.join("\n");

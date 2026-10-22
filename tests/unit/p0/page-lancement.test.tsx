@@ -217,6 +217,27 @@ describe("p0: page de lancement", () => {
     expect(d.requetes).not.toContain(SQL_CONTENU);
   });
 
+  it("rapport: étapes avec site sur la page, ligne oui ou non sans nombre dans « Copier le rapport » (lot 2a, A24)", async () => {
+    d.lignes = [ligne({})];
+    const page = await pageExecutionsP0();
+    if (page.etat !== "ouverte") throw new Error("page non ouverte");
+    const avecSite = page.modele.rapport?.etapesAvecSite;
+    expect(typeof avecSite).toBe("number");
+    const libelle = format(t.rapport.etapesAvecSite, { n: avecSite ?? -1 });
+    expect(renderToString(await ExecutionsPage())).toContain(html$(libelle));
+    const texte = page.modele.rapport?.texte ?? "";
+    expect(texte).not.toContain(libelle);
+    expect(texte).not.toContain(t.rapport.etapesAvecSite.split(" :")[0]!);
+    expect(texte.split("\n").filter((l) => l.startsWith(t.rapport.liensSites))).toEqual([`${t.rapport.liensSites} : ${(avecSite ?? 0) > 0 ? t.rapport.valeurs.oui : t.rapport.valeurs.non}`]);
+    // Exécution arrêtée : non relevé sur la page et dans le texte.
+    d.lignes = [ligne({ status: "arretee", stop_code: "upstream_unavailable", canary_ok: null })];
+    const arretee = await pageExecutionsP0();
+    if (arretee.etat !== "ouverte") throw new Error("page non ouverte");
+    expect(arretee.modele.rapport?.etapesAvecSite).toBeNull();
+    expect(arretee.modele.rapport?.texte).toContain(`${t.rapport.liensSites} : ${t.rapport.valeurs.non_releve}`);
+    expect(renderToString(await ExecutionsPage())).toContain(html$(t.rapport.etapesAvecSiteNonRelevees));
+  });
+
   it("base injoignable : suivi indisponible, formulaire conservé", async () => {
     d.panne = true;
     const html = renderToString(await ExecutionsPage());

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -34,9 +35,14 @@ const EMPREINTES: Record<string, Record<number, string>> = {
   structuration: { 1: "e9d62fe8ce071a2c0a3f3b97dd595408eca3f62dd288e84fbcdc76aee13433be" },
   quartier: { 1: "a7d2edb04621223aa702be9058f92cadbd509aa4b3eb99e7f5bea9db7e25355b" },
   "recherche-web": { 2: "5d9657a1e8e78be1e3cfac7dacc9ce26f3667225f3ff5188158a3fe94f7fff49" },
+  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`).
+  programme: {
+    1: "7f3ac2bcbebf9331d2038fd558d4b8b2b5649fb978b5ca27c82e8b2fd0feea76",
+    2: "236e304ba393a2d4504310f1898eadedda0487e638d558a0ee115d4526c30b80",
+  },
 };
 
-const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB];
+const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB, PROMPT_PROGRAMME];
 const empreinte = (texte: string) => createHash("sha256").update(texte, "utf8").digest("hex");
 
 describe("prompts: versionnés", () => {
@@ -51,6 +57,21 @@ describe("prompts: versionnés", () => {
     expect(Object.keys(EMPREINTES).sort()).toEqual(PROMPTS.map((p) => p.id).sort());
     expect(PROMPT_STRUCTURATION.version).toBe(1);
     expect(PROMPT_QUARTIER.version).toBe(1);
+  });
+
+  it("programme: prompt v2 demande le site officiel, sans donnée Google (A13)", () => {
+    expect(PROMPT_PROGRAMME.version).toBe(2);
+    const texte = PROMPT_PROGRAMME.texte;
+    // Le champ `site` est demandé, facultatif, pour le site officiel, en https sans paramètres.
+    expect(texte).toContain('"site" (facultatif)');
+    expect(texte).toMatch(/site officiel/);
+    expect(texte).toMatch(/https complète, sans paramètres/);
+    expect(texte).toMatch(/Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers/);
+    expect(texte).toMatch(/site 300/);
+    // Seule adresse admise : `site` ; aucune adresse d'exemple réelle ni aucune donnée Google dans le texte.
+    expect(texte).toMatch(/la seule adresse admise est le champ/);
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id/i);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {
