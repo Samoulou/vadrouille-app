@@ -117,10 +117,10 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     expect(JSON.stringify(programme)).not.toContain("toConfirm");
 
     // Affichage : le programme écrit est servi par l'adaptateur du prototype, badge « à confirmer » calculé à la lecture.
-    const adaptateur = createPrototypeAdapter({
-      programmes: { ids: async () => [programme.trip.id], lire: async (id) => (id === programme.trip.id ? structuredClone(programme) : null) },
-      relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: paires.map(() => 9) }) } },
-    });
+    // Voyage d'essai débloqué (spécification E2E-essai, lot 1) : toutes ses journées.
+    const source = { ids: async () => [programme.trip.id], lire: async (id: string) => (id === programme.trip.id ? structuredClone(programme) : null) };
+    const relecteurs = { trajets: { relireJournee: async (paires: readonly unknown[]) => ({ ok: true as const, minutes: paires.map(() => 9) }) } };
+    const adaptateur = createPrototypeAdapter({ programmes: source, relecteurs, deblocage: async () => true });
     const trip = await adaptateur.getTrip(ctx, programme.trip.id);
     expect(trip).not.toBeNull();
     TripSchema.parse(trip);
@@ -128,6 +128,18 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     const etapes = trip!.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : [])));
     expect(etapes.length).toBe(resultat.rapport.etapes.avecPlaceId + resultat.rapport.etapes.sansPlaceId);
     for (const etape of etapes) expect(etape.exceptions.includes("toConfirm")).toBe(etape.placeId === undefined);
+
+    // Avant le déblocage (D4) : voyage non débloqué, premières propositions (8 étapes au plus, jour 1 puis jour 2, dans
+    // l'ordre du programme), seules leurs journées lisibles.
+    const verrouille = createPrototypeAdapter({ programmes: source, relecteurs });
+    const apercu = await verrouille.getTrip(ctx, programme.trip.id);
+    expect(apercu?.unlocked).toBe(false);
+    const cases = await verrouille.listPreviewSlots(ctx, programme.trip.id);
+    expect(cases.length).toBeGreaterThan(0);
+    expect(cases.length).toBeLessThanOrEqual(8);
+    const ordre = trip!.days.filter((jour) => jour.index <= 2).flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop.commitment === undefined ? [ligne.stop.id] : [])));
+    expect(cases.map((c) => (c.type === "proposal" ? c.proposal.id : ""))).toEqual(ordre.slice(0, 8));
+    expect(apercu!.days.map((jour) => jour.index)).toEqual([...new Set(cases.map((c) => (c.type === "proposal" ? c.proposal.day : 0)))]);
   });
 
   it("p0: infos pratiques et titre du jour de l'IA écrits dans les étapes et les jours, puis affichés (rome-1, lot 1 bis)", async () => {
@@ -153,6 +165,8 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     const adaptateur = createPrototypeAdapter({
       programmes: { ids: async () => [programme.trip.id], lire: async (id) => (id === programme.trip.id ? structuredClone(programme) : null) },
       relecteurs: { trajets: { relireJournee: async (paires) => ({ ok: true, minutes: paires.map(() => 9) }) } },
+      // Voyage d'essai débloqué (spécification E2E-essai, lot 1) : toutes ses journées.
+      deblocage: async () => true,
     });
     const trip = TripSchema.parse(await adaptateur.getTrip(ctx, programme.trip.id));
     const affiche = trip.days.map((jour) => ({

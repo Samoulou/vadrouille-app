@@ -59,7 +59,7 @@ describe("presentation: ordre et filtrage du paquet", () => {
 describe("loadPresentation : projection des jours (B2-PO-14)", () => {
   it("presentation: les données de l'écran ne transmettent ni placeId ni voyage complet", async () => {
     const data = (await loadPresentation(createMockTripAdapter(), ownCtx, EDIMBOURG_TRIP_ID))!;
-    expect(Object.keys(data).sort()).toEqual(["days", "deck", "generatingDays", "noOptionSlots", "proposals", "tripId", "unlocked"]);
+    expect(Object.keys(data).sort()).toEqual(["days", "deck", "essai", "generatingDays", "noOptionSlots", "proposals", "tripId", "unlocked"]);
     // `mock` : aucun tri enregistré (session en mémoire de F6, B10-PO-18).
     expect(data.deck).toBeNull();
     expect(data.days).toHaveLength(edimbourg.days.length);

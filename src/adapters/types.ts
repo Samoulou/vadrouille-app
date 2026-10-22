@@ -75,6 +75,12 @@ export interface TripAdapter {
    * migration du tri enregistré n'est pas appliquée à la base (repli journalisé, amendement 1 de la décision 0112).
    */
   getDeckSession(ctx: AdapterContext, tripId: string): Promise<DeckSession | null>;
+  /**
+   * Voyage d'essai (spécification E2E-essai, lot 1 ; décision 0124 § 4) : `true` seulement pour un voyage de
+   * l'organisation qui suit le parcours d'essai (tri sans question, choix sans effet sur le programme, journées
+   * « À débloquer »). Facultatif : absent (`mock`, `api`), il vaut `false` ; lu par `isTrialTrip` de `@/adapters`.
+   */
+  isTrialTrip?(ctx: AdapterContext, tripId: string): Promise<boolean>;
 }
 
 /**

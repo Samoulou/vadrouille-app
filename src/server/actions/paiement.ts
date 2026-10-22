@@ -7,6 +7,8 @@ import {
   getPaymentSimulator,
   getSimulationScope,
   paymentAvailable,
+  retenirDeblocageEssai,
+  type AdapterContext,
 } from "@/adapters";
 import { contexteFacultatif } from "@/features/compte/session";
 import {
@@ -33,9 +35,13 @@ import { parseInput } from "../parse-input";
  * Aucun journal : ni montant ni identifiant de paiement.
  */
 
-/** Le voyage vient d'être débloqué : invalide le cache du routeur client pour toutes ses pages (0020 § 3). */
-function revalidateIfUnlocked(result: Result<CheckoutStatus>): void {
+/**
+ * Le voyage vient d'être débloqué : invalide le cache du routeur client pour toutes ses pages (0020 § 3) ; voyage d'essai
+ * (adaptateur `prototype`, spécification E2E-essai, lot 1) : le déblocage est aussi retenu par le cookie signé de l'essai.
+ */
+async function revalidateIfUnlocked(ctx: AdapterContext, result: Result<CheckoutStatus>): Promise<void> {
   if (result.ok && (result.value.status === "succeeded" || result.value.status === "duplicate")) {
+    await retenirDeblocageEssai(ctx, result.value.tripId);
     revalidatePath(tripRoutes("/voyages", result.value.tripId).sejour(), "layout");
   }
 }
@@ -61,7 +67,7 @@ export async function simulateCheckoutOutcome(input: unknown): Promise<Result<Ch
   const simulator = getPaymentSimulator({ scope });
   if (!simulator) return fail("not_found");
   const result = await simulator.simulateOutcome(ctx, parsed.value.checkoutId, parsed.value.outcome);
-  revalidateIfUnlocked(result);
+  await revalidateIfUnlocked(ctx, result);
   return result;
 }
 
@@ -73,6 +79,6 @@ export async function getCheckoutStatus(input: unknown): Promise<Result<Checkout
   if (!parsed.ok) return parsed;
   const scope = await getSimulationScope();
   const result = await getPaymentAdapter({ scope }).getCheckoutStatus(ctx, parsed.value.checkoutId);
-  revalidateIfUnlocked(result);
+  await revalidateIfUnlocked(ctx, result);
   return result;
 }

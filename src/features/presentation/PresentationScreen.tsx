@@ -81,6 +81,12 @@ export interface PresentationScreenProps {
   canUnlock?: boolean;
   /** Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0) ; absente par défaut. */
   placesFromGoogle?: boolean;
+  /**
+   * Voyage d'essai (adaptateur `prototype`, spécification E2E-essai, lot 1 ; D4) : le tri reste en mémoire, sans question
+   * de préférence (le programme n'écrit pas de catégorie), et la fin du tri dit que les choix ne changent pas encore le
+   * programme. Faux par défaut.
+   */
+  essai?: boolean;
   /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3). */
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
@@ -144,12 +150,13 @@ function Deck({
   noOptionSlots = [],
   canUnlock = true,
   placesFromGoogle = false,
+  essai = false,
   actions: injected,
   deck = null,
   track,
 }: DeckProps) {
   const [state, dispatch] = useReducer(deckReducer, proposals, (initial) => ({ ...initDeck(initial), prompt: deck?.openPrompt ?? null }));
-  const [actions] = useState<DeckActions>(() => injected ?? (deck ? createServerDeckActions(tripId) : createLocalDeckActions()));
+  const [actions] = useState<DeckActions>(() => injected ?? (deck ? createServerDeckActions(tripId) : createLocalDeckActions({ questions: !essai })));
   /** Cartes du tri ouvert déjà décidées avant ce chargement (tri enregistré) : la progression part d'elles (F6-PO-16). */
   const offset = deck?.counts.decided ?? 0;
   /** Tri clos par cette instance (« Passer » ou fin du paquet) : une seule clôture. */
@@ -423,7 +430,7 @@ function Deck({
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} closed={closedAtLoad} notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0} tripId={tripId} canUnlock={canUnlock} titleRef={endTitleRef} />
+        <DeckEnd variant={endVariant} closed={closedAtLoad} notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0} tripId={tripId} canUnlock={canUnlock} choixSansEffet={essai && endVariant !== "vide"} titleRef={endTitleRef} />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
