@@ -23,7 +23,7 @@ import { cloreTri, deciderCarte, repondreQuestion, type DependancesTri } from "@
 import { SQL_VERROU_VERSIONS } from "@/server/versions/ecrire";
 import type { OrgTransaction } from "@/server/with-org";
 
-import { MAINTENANT, PLAFONDS_LARGES, contexteDe, creerHorlogeManuelle, creerWithOrg, creerWithSystemOrgPourTests, demandeEdimbourg, derouler, doublesEdimbourg } from "../support/banc-apercu";
+import { ETAPES, MAINTENANT, PLAFONDS_LARGES, contexteDe, creerHorlogeManuelle, creerWithOrg, creerWithSystemOrgPourTests, demandeEdimbourg, derouler, doublesEdimbourg } from "../support/banc-apercu";
 import { journalDePrompts } from "../support/journal-prompts";
 import { avecSentinellesGoogle, sentinellesPresentes } from "../support/sentinelles-google";
 import { creerBaseApercu, type BaseApercu } from "./base-apercu";
@@ -109,14 +109,25 @@ const triDe = (org: Org, options: { demarrer?: Demarreur; ouvert?: boolean; main
   recalculFinApercu: options.ouvert ?? false,
 });
 
-/** Aperçu publié d'un voyage de six jours (non débloqué). */
-async function apercuPublie(org: Org): Promise<string> {
+/**
+ * Aperçu publié d'un voyage de six jours (non débloqué). `avantPlanification` : appelé entre la notation et la planification de
+ * l'aperçu (étape `e`), sur le voyage, pour un test qui doit fixer ses candidats avant tout classement.
+ */
+async function apercuPublie(org: Org, avantPlanification?: (tripId: string) => Promise<void>): Promise<string> {
   const adapter = createApiCreationAdapter({ withOrg, maintenant: () => MAINTENANT, demarrerApercu: vi.fn(async () => null), demarrerVoyageComplet: vi.fn(async () => null) });
   const r = await adapter.createTrip(contexteDe(org), demandeEdimbourg());
   expect(r).toMatchObject({ ok: true });
   const tripId = (r as { value: { tripId: string } }).value.tripId;
   const apercu = await inTx(app, { org: org.org, user: org.owner }, async (c) => (await c.query("SELECT id FROM public.generation_runs WHERE trip_id = $1 AND kind = 'preview'", [tripId])).rows[0].id as string);
-  expect((await derouler({ generationRunId: apercu, organizationId: org.org, rang: 0 }, dependances())).arret).toBeUndefined();
+  const entree = { generationRunId: apercu, organizationId: org.org, rang: 0 };
+  if (avantPlanification === undefined) {
+    expect((await derouler(entree, dependances())).arret).toBeUndefined();
+    return tripId;
+  }
+  const notee = await derouler(entree, dependances(), ETAPES.length - 1);
+  expect(notee.arret).toBeUndefined();
+  await avantPlanification(tripId);
+  expect((await ETAPES[ETAPES.length - 1](notee, dependances())).arret).toBeUndefined();
   return tripId;
 }
 
@@ -192,8 +203,8 @@ const journalTexte = (...espions: { mock: { calls: unknown[][] } }[]) => JSON.st
  * Voyage débloqué après un tri de l'aperçu : décisions (`trier`), droit, suite du déblocage (clôture de l'aperçu, ligne `batch`
  * démarrée par l'espion, ligne `full` démarrée par l'espion).
  */
-async function trieEtDebloque(org: Org, trier: (tripId: string) => Promise<void>) {
-  const tripId = await apercuPublie(org);
+async function trieEtDebloque(org: Org, trier: (tripId: string) => Promise<void>, avantPlanification?: (tripId: string) => Promise<void>) {
+  const tripId = await apercuPublie(org, avantPlanification);
   await trier(tripId);
   const entitlementId = await debloquer(org, tripId);
   const demarrerRecalcul = espionLot();
@@ -313,6 +324,33 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
     for (const lieu of lieux(publiee)) expect(ancres.has(lieu), lieu).toBe(true);
   }, 180_000);
 
+  /**
+   * Le classement départage deux candidats de même score par leur identifiant (`classer`, ordre total) : tiré au hasard par la
+   * base, il ferait varier les remplaçants d'un voyage à l'autre. Pour comparer deux voyages octet pour octet, les identifiants
+   * des candidats sont réécrits (superutilisateur du banc, avant la planification de l'aperçu) dans l'ordre de leur nom, propre à chaque
+   * organisation ; les références (`proposals`, `event_occurrences`) suivent. Jeu de test seulement.
+   */
+  const idsOrdonnesParNom = async (tripId: string) => {
+    await admin.query("BEGIN");
+    try {
+      await admin.query("SET LOCAL session_replication_role = replica");
+      await admin.query(
+        `CREATE TEMP TABLE correspondance ON COMMIT DROP AS
+           SELECT id AS ancien, (lpad(to_hex(row_number() OVER (ORDER BY name, place_id)::int), 8, '0') || '-' || substr(md5(organization_id::text || name), 1, 4) || '-4' ||
+             substr(md5(organization_id::text || name), 5, 3) || '-8' || substr(md5(organization_id::text || name), 8, 3) || '-' || substr(md5(organization_id::text || name), 11, 12))::uuid AS nouveau
+           FROM public.candidates WHERE trip_id = $1`,
+        [tripId],
+      );
+      await admin.query("UPDATE public.candidates c SET id = m.nouveau FROM correspondance m WHERE c.id = m.ancien");
+      await admin.query("UPDATE public.proposals p SET candidate_id = m.nouveau FROM correspondance m WHERE p.candidate_id = m.ancien");
+      await admin.query("UPDATE public.event_occurrences o SET candidate_id = m.nouveau FROM correspondance m WHERE o.candidate_id = m.ancien");
+      await admin.query("COMMIT");
+    } catch (erreur) {
+      await admin.query("ROLLBACK");
+      throw erreur;
+    }
+  };
+
   it("recalcul: aucune préférence dans un prompt (octet pour octet) ; prompts: aucune donnée Google dans la requête raisons du lot (canari)", async () => {
     // Mêmes remplaçants des deux côtés : deux refus walk au jour 1 ; le second voyage y ajoute une réponse « Non » avec sa raison
     // et un « J'aime » au jour 2 (aucun ne touche de jour).
@@ -325,7 +363,7 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
           expect((await repondre(org, id, "walk", "no", "notMyStyle")).ok).toBe(true);
           expect((await decider(org, id, "v1-j2-2", "like")).ok).toBe(true);
         }
-      });
+      }, idsOrdonnesParNom);
       const decores: ReturnType<typeof avecSentinellesGoogle>[] = [];
       const journaux: ReturnType<typeof journalDePrompts>[] = [];
       const fabrique = () =>
@@ -336,7 +374,17 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
             decores.push(s);
             const j = journalDePrompts(d.modeles);
             journaux.push(j);
-            return { ...d, places: { ...d.places, textSearch: s.places.textSearch, details: s.places.details }, routes: s.routes, modeles: j.client };
+            // Même décor que `apercu-revue.test.ts` : le niveau de prix reste celui du double (il décide de l'admission d'un repas ou
+            // d'une dégustation au budget du brief) ; toutes les autres valeurs de la fiche sont des sentinelles.
+            const places = {
+              ...d.places,
+              textSearch: s.places.textSearch,
+              async details(placeId: string) {
+                const [decore, brut] = await Promise.all([s.places.details(placeId), d.places.details(placeId)]);
+                return { ...decore, niveauPrix: brut.niveauPrix };
+              },
+            };
+            return { ...d, places, routes: s.routes, modeles: j.client };
           },
         });
       expect((await deroulerLot(entreeDuLot(org, avant), dependances(fabrique))).fin.arret).toBeUndefined();
