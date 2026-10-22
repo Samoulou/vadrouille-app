@@ -1,18 +1,20 @@
-# État du studio — 2026-10-22 (137e cycle)
+# État du studio — 2026-10-22 (138e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 135e cycle (dernier message : 2026-10-21 16:31 UTC). Deux gestes l'attendent, dans l'ordre recommandé : le libellé `owner-approved` sur #666 (après vérification de l'absence de ligne `kind = 'batch'` sur la base d'essai), puis un run `db-migrate` (`sha_attendu` = tête de `main`) ; ensuite la fusion de #648 (« Create a merge commit », puis relancer Rome). Correction du 136e cycle : #667 n'avait pas besoin d'`owner-approved` (0035 ne vise que `.github/workflows/`, pas `src/workflows/` ; Q592 close).
+- Fil « Routine cycle du studio », 2026-10-22 : 07:29 UTC « j'ai tout fait il manque que la migration non ? » (il a fusionné #648 à 07:28 et #666 à 07:29 ; réponse : oui, `db-migrate` avec `sha_attendu` = `507d36a…`) ; 07:40 « c'est fait » (run 39741509189 vérifié : `Appliquée : 0015_recalcul_lot`, les quatorze autres déjà présentes) ; 07:49 demande du lien « Mes voyages » (donné) ; 07:51 « c'est beaucoup mieux, combien d'activités pour 5 jours ? quel niveau d'intensité ? » (réponse : 43 créneaux sur 5 jours, repas compris ; brief `rome-1` au rythme `equilibre` ; aucun nombre imposé) ; 07:59 « il va falloir gérer la quantité, chargé pour certaines personnes, je vais analyser » et « avant on avait le site web de l'activité dans le détail » → Q558 (recherche web) répondue de fait : oui pour le lien ; ticket #671 ouvert.
 
 ## Fait
-- **B10b-serveur** (#667) **fusionnée** à 04:20 UTC par la fusion automatique (Tech Lead et Sécurité approuvés, CI verte après une relance unique : `docker` et `db` avaient échoué sur le téléchargement des polices Google pendant `next build`, service externe hors du diff ; commentaire sur la PR). `main` = `d402de2`. **B10b est entièrement fusionnée** (migration, moteur, serveur) ; son activation réelle reste fermée (`RECALCUL_FIN_APERCU = false`, forfait `lot` nul) tant que la migration de restriction de l'`UPDATE` (0120 S8) n'est pas faite.
-- Statut du 136e cycle (#669) fusionné.
-- Vérifié pour le report #648, qui embarque maintenant le serveur B10b : aucune lecture des colonnes de 0015 sur le chemin de l'aperçu, du tri et du voyage complet ; une seule écriture les nomme, la création de la ligne `batch` à la clôture du tri d'un voyage **débloqué** (`src/server/presentation/tri.ts`, `ouvrirLotApresCloture`), qui échouerait sur la base d'essai tant que 0015 n'est pas appliquée. D'où l'ordre recommandé ci-dessus : 0015 d'abord, report ensuite (ou report d'abord sans utiliser « Débloquer » avant la migration). Corps de #648 mis à jour.
+- **Premier essai réel de la chaîne inversée** : Rome relancée par Samuel à 07:48 UTC sur `p0-reel` (`eaced27`, report #648 fusionné par lui) : `p0.programme_written` jours 5, créneaux 43, lieux à vérifier 37, rien retiré, un seul appel modèle ; aucune erreur ni avertissement dans les journaux Vercel (06:40 à 08:10 UTC). Jugement de Samuel : « beaucoup mieux ». Deux retours : densité à régler (il analyse d'abord), site web de l'activité disparu (perte de `Stop.source` avec le retrait de la recherche web au lot 1).
+- **Migration 0015 appliquée sur la base d'essai** par Samuel (run `db-migrate` 39741509189, 07:35 UTC, succès) après la fusion de #666 (`main` = `507d36a`). B10b est complète code et base ; activation réelle toujours fermée (0120 S8).
+- Statut du 137e cycle (#670) fusionné.
 
 ## En cours
-- Samuel : `owner-approved` sur #666, `db-migrate`, fusion de #648 puis essai de Rome ; le studio ne lance aucun essai.
-- Aucun fil de code en cours. Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI ; la migration de restriction de l'`UPDATE` (0120 S8, Q586) attend la fusion de #666 (jamais deux PR de migration dans le même cycle) ; #664 attend le premier essai réel ; B10c/B10d attendent le premier essai du tri réel.
+- **#671 `[po]` Lot 2a — site web de l'activité** : amendement de `specs/P0-programme-par-ia.md` (fil product-owner, branche `claude/671-site-web-activite`). Recommandation CEO : l'IA propose le site officiel (`https`), le code vérifie que l'adresse répond avant affichage, `Stop.source` inchangé côté interface, aucune donnée Google. Code `[ia]` dans un ticket séparé après fusion.
+- **#672 `[data]` Migration 0016** — restriction de l'`UPDATE` de `vadrouille_app` sur `generation_runs` (0120 S8, Q585, Q586 ; fil data, branche `claude/672-migration-0016-restriction-update`). La ligne `MIGRATIONS_APPROUVEES` viendra dans une PR de workflow à part (`owner-approved`), jamais le même cycle qu'une autre migration.
+- Samuel : analyse de la densité du programme (Q595) ; le studio ne lance aucun essai.
+- Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519, décision UX/UI), #664 et B10c/B10d (premier essai du tri réel).
 
 ## Bloqué
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
@@ -22,10 +24,10 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. Si #666 est fusionnée : dire à Samuel de lancer `db-migrate` une fois (`sha_attendu` = tête de `main`) ; au cycle suivant, ticket `[data]` de la migration de restriction de l'`UPDATE` (0120 S8, Q585, Q586).
-2. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport) ; corriger ce qu'il révèle en priorité.
-3. Note de version : la routine « Release » de 09:52 UTC couvre #667 (B10b-serveur) ; vérifier qu'elle mentionne 0120 et l'interrupteur fermé.
-4. Samuel : #666 puis `db-migrate`, puis #648 ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
+1. Relire #671 et #672 (corrections si `changes-requested`). Après la fusion de #672 : ticket de la ligne `MIGRATIONS_APPROUVEES` 0016 (`owner-approved` de Samuel), au cycle suivant. Après la fusion de #671 : ticket `[ia]` du code du lot 2a (site web), hors du cycle d'une autre PR touchant `src/ai/prompts/programme.ts` ou `src/server/p0/`.
+2. Densité du programme : attendre l'analyse de Samuel (Q595) ; préparer, si demandé, un réglage par le rythme du brief ou la consigne du prompt `programme`.
+3. Note de version : la routine « Release » du 22 octobre 07:54 UTC s'est terminée sans nouvelle étiquette ; vérifier au cycle suivant qu'une note couvre #667 et #666.
+4. Samuel : Q595 (densité, à son rythme) ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 (reste prix/horaires) à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -47,7 +49,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q594 (ordre migration 0015 / report #648, Samuel). Q592 close : sans objet.
+- Q595 (densité du programme, Samuel). Répondues : Q586 (ticket #672 ouvert), Q594 (réglée par les faits : migration appliquée à 07:35, essai relancé après), Q558 (oui pour le site web ; prix/horaires restent ouverts).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
