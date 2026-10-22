@@ -15,7 +15,7 @@ import { estDerniereOption, ordreDuPaquet, paquetDeReprise, questionApres, type 
 import { RECALCUL_FIN_APERCU } from "@/server/config/recalcul";
 import { demarrerRecalculReel } from "@/server/generation/demarrage";
 import { expirerLots } from "@/server/generation/expiration";
-import { demarrerLot, ouvrirLotDuTri, signalerLotNonCree, type DemarrerRecalcul, type IssueLot } from "@/server/generation/lot";
+import { demarrerLot, ouvrirLotApresCloture, signalerLotNonCree, type DemarrerRecalcul, type IssueLot } from "@/server/generation/lot";
 import { executerActionVoyage, RefusAction, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
 import { executeurSql, withOrg as withOrgParDefaut } from "@/server/with-org";
 
@@ -295,7 +295,7 @@ export async function cloreTri(dependances: DependancesTri, entree: unknown) {
     const close = (await executeur.query(SQL_CLORE, [contexte.org, contexte.tripId, etat.execution, etat.phase, etat.dernierePosition, valeur.requestId])).rows[0]?.id;
     await executeur.query(SQL_FERMER_QUESTION_OUVERTE, [contexte.org, contexte.tripId]);
     if (typeof close === "string" && (etat.phase === "deck" || recalculOuvert)) {
-      const issue = await ouvrirLotDuTri(executeur, { organizationId: contexte.org, tripId: contexte.tripId, clotureId: close, maintenant: maintenant() });
+      const issue = await ouvrirLotApresCloture(executeur, { organizationId: contexte.org, tripId: contexte.tripId, clotureId: close, maintenant: maintenant() });
       suivi.lot = { issue, organizationId: contexte.org, tripId: contexte.tripId, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
     }
     return { deck: sessionDuTri(await relire(contexte), valeur.tripId) };

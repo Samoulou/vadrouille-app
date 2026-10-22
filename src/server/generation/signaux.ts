@@ -7,6 +7,7 @@ import { optionsDesRepas } from "@/domain/recomposition";
 import { SQL_CASES } from "@/server/presentation/etat";
 
 import { LectureIllisible } from "./illisible";
+import type { ExecuteurLecture } from "./lecture";
 
 /**
  * Lecture des signaux de préférence par la génération (spécification B10, B10b points 3 et 4 ; décision 0119 § 1.1 point 3,
@@ -20,8 +21,6 @@ import { LectureIllisible } from "./illisible";
  * catégorie, le jour, l'heure, l'identifiant d'étape, le candidat et le `placeId` (seul identifiant Google stocké) sont gardés :
  * aucun nom de lieu ne sort de ce module. Rien n'est écrit.
  */
-
-export type ExecuteurSignaux = { query(texte: string, valeurs?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
 
 const SQL_SIGNAUX_ACTIFS = `SELECT id, signal, category, origin, status, reason, candidate_id, place_id, proposal_id
   FROM public.preference_signals WHERE organization_id = $1 AND trip_id = $2 AND status <> 'cancelled' ORDER BY seq`;
@@ -77,7 +76,7 @@ function signalDe(ligne: Record<string, unknown>): SignalLuDuRecalcul {
  * Signaux **actifs** du voyage (`status <> 'cancelled'`), dans l'ordre d'écriture : filtre de la réserve (B10-PO-10 point 1).
  * Le workflow 4 les lit dans la même transaction que ses candidats, avant la planification du jour (B10-PO-12).
  */
-export async function lireSignauxActifs(x: ExecuteurSignaux, organizationId: string, tripId: string): Promise<SignalLuDuRecalcul[]> {
+export async function lireSignauxActifs(x: ExecuteurLecture, organizationId: string, tripId: string): Promise<SignalLuDuRecalcul[]> {
   return (await x.query(SQL_SIGNAUX_ACTIFS, [organizationId, tripId])).rows.map(signalDe);
 }
 
@@ -96,7 +95,7 @@ export type TriClosLu = TriDuRecalcul & {
  * **Nombre réel d'options** d'un créneau de repas (Q582) : compté sur **toutes** les cases de l'exécution et de la phase (pas
  * seulement celles de ce tri ni le plus grand rang observé), et passé au domaine dans `option.total`.
  */
-export async function lireTriClos(x: ExecuteurSignaux, organizationId: string, tripId: string, clotureId: string): Promise<TriClosLu> {
+export async function lireTriClos(x: ExecuteurLecture, organizationId: string, tripId: string, clotureId: string): Promise<TriClosLu> {
   const cloture = (await x.query(SQL_CLOTURE, [organizationId, tripId, clotureId])).rows[0];
   if (cloture === undefined) throw invalide();
   const jusqua = Number(cloture.through_position);

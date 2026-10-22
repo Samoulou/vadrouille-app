@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { COUTS_ESTIMES_MICROS } from "@/server/config/generation";
 import { RECALCUL_FIN_APERCU } from "@/server/config/recalcul";
@@ -16,7 +16,7 @@ import { EtatLotSchema } from "./etat";
 import { reserveDuLot, villesDuLot } from "./etapes-lot";
 import { forfaitDuLot } from "./forfait-etape";
 import type { VoyageLu } from "./lecture";
-import { ESPACE_NOMS_LOT, requestIdClotureApercu, requestIdDuLot } from "./lot";
+import { ESPACE_NOMS_LOT, ouvrirLotApresCloture, requestIdClotureApercu, requestIdDuLot, signalerLotNonCree } from "./lot";
 import { ESPACE_NOMS_VOYAGE_COMPLET, uuidV5 } from "./voyage-complet";
 
 /**
@@ -45,7 +45,10 @@ describe("recalcul: interrupteur et profil `lot` (0119 § 4)", () => {
   it("forfait du lot (variante simulée, en mémoire) : entier à e ; une requête `raisons` à la réserve exacte passe, une seconde est refusée", async () => {
     const dep = resoudre({ plafonds: PLAFONDS_VARIANTE_SIMULEE });
     const forfait = await forfaitDuLot(dep, { organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere: "simulee" }, 0);
-    expect(forfait.forfait).toEqual(forfaitDuProfil(PLAFONDS_VARIANTE_SIMULEE, dep.reglesPour("simulee")?.table ?? (undefined as never), "lot"));
+    const profil = forfaitDuProfil(PLAFONDS_VARIANTE_SIMULEE, dep.reglesPour("simulee")?.table ?? (undefined as never), "lot");
+    // Part Text Search bornée à la réserve de `e` (ici 0 : une ville `known`) ; le reste est le profil entier.
+    expect(forfait.forfait).toEqual({ ...profil, textSearchRequetes: 0 });
+    expect((await forfaitDuLot(dep, { organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere: "simulee" }, 3)).forfait.textSearchRequetes).toBe(3);
     expect(forfait.forfait.coutModelesMicros).toBe(COUTS_ESTIMES_MICROS.requeteModele);
     const contexte: ContexteAppel = { nature: "execution", executionId: RUN, periodes: { jour: { du: 0, au: 1 }, mois: { du: 0, au: 1 } } };
     const demande = demandeDe(contexte, { fournisseur: "modeles", methode: "chat", sku: "m", unites: { requetes: 1, elements: 0 }, coutEstimeMicros: COUTS_ESTIMES_MICROS.requeteModele }, forfait.plafonds);
@@ -126,5 +129,34 @@ describe("recalcul: état sérialisé et journal (0120 S5 point 1, S7)", () => {
     const fuite = ligne("recalcul.unlock_failed", { organizationId: ORG, placeId: "ChIJ_SENTINELLE", category: "museum", nom: "Lieu SENTINELLE", message: "SENTINELLE", errorName: "Nom SENTINELLE" });
     expect(JSON.stringify(fuite)).not.toMatch(/SENTINELLE|museum/);
     expect(fuite.dropped).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("recalcul: lecture illisible dans completeDeck (revue de la PR 667, mineur 2)", () => {
+  const executeur = (snapshot: unknown) => ({
+    async query(texte: string) {
+      if (texte.includes("SELECT current_version FROM public.trips")) return { rows: [{ current_version: 1 }] };
+      if (texte.includes("FROM public.trip_versions")) return { rows: [{ version: 1, snapshot }] };
+      throw new Error("panne de base");
+    },
+  });
+  const cible = { organizationId: ORG, tripId: TRIP, clotureId: CLOTURE, maintenant: 0 };
+
+  it("version de base illisible : `illisible`, sans écriture ni erreur (la clôture de l'action est gardée), journal à code fermé", async () => {
+    const x = executeur({ days: "SENTINELLE_INSTANTANE_ILLISIBLE" });
+    const espion = vi.spyOn(x, "query");
+    expect(await ouvrirLotApresCloture(x, cible)).toEqual({ statut: "illisible" });
+    expect(espion.mock.calls.some(([texte]) => /INSERT|UPDATE/.test(String(texte)))).toBe(false);
+    const avertissements = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    signalerLotNonCree(ORG, TRIP, { statut: "illisible" });
+    const journal = avertissements.mock.calls.map((appel) => String(appel[0])).join("\n");
+    avertissements.mockRestore();
+    expect(journal).toContain("recalcul.not_created");
+    expect(journal).toContain("LectureIllisible");
+    expect(journal).not.toContain("SENTINELLE");
+  });
+
+  it("toute autre erreur remonte (l'action échoue sans rien écrire)", async () => {
+    await expect(ouvrirLotApresCloture(executeur({ days: [] }), cible)).rejects.toThrow("panne de base");
   });
 });

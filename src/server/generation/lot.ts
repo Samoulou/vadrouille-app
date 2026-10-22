@@ -4,7 +4,8 @@ import { joursTouches } from "@/domain/recalcul";
 import { logEvent } from "@/server/log";
 import { SQL_CASES, SQL_DEBLOQUE, SQL_EXECUTION_APERCU, SQL_VERROU_TRI } from "@/server/presentation/etat";
 
-import { lireVersion } from "./lecture";
+import { LectureIllisible } from "./illisible";
+import { lireVersion, type ExecuteurLecture } from "./lecture";
 import { lireTriClos } from "./signaux";
 import { uuidV5 } from "./voyage-complet";
 
@@ -23,8 +24,6 @@ import { uuidV5 } from "./voyage-complet";
  * - Après l'`INSERT`, aucune requête de ce module ni du workflow n'écrit `base_version`, `deck_closure_id`, `kind`,
  *   `organization_id`, `trip_id` ni `request_id` (S1 point 4).
  */
-
-export type ExecuteurLot = { query(texte: string, valeurs?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
 
 /**
  * Espace de noms constant des identifiants dérivés du lot (0119 § 1.1 point 4, à côté de `ESPACE_NOMS_VOYAGE_COMPLET`) : fixé
@@ -58,7 +57,8 @@ export type IssueLot =
   | { readonly statut: "aucun" }
   | { readonly statut: "cree"; readonly generationRunId: string; readonly jours: number }
   | { readonly statut: "existant"; readonly generationRunId: string }
-  | { readonly statut: "collision"; readonly jours: number };
+  | { readonly statut: "collision"; readonly jours: number }
+  | { readonly statut: "illisible" };
 
 /**
  * Crée la ligne `batch` du tri clos `clotureId` si au moins un signal de ce tri touche un jour planifié de la version de base
@@ -66,7 +66,7 @@ export type IssueLot =
  * la ligne déjà là (`existant` : rejeu, aucun second démarrage), ou rien.
  */
 export async function ouvrirLotDuTri(
-  x: ExecuteurLot,
+  x: ExecuteurLecture,
   cible: { readonly organizationId: string; readonly tripId: string; readonly clotureId: string; readonly maintenant: number },
 ): Promise<IssueLot> {
   const { organizationId, tripId, clotureId } = cible;
@@ -84,13 +84,32 @@ export async function ouvrirLotDuTri(
   return { statut: "collision", jours };
 }
 
-/** Journal d'une ligne attendue absente (collision de `request_id`, ou autre recalcul en cours) : identifiants et entier seulement. */
+/**
+ * Variante de `ouvrirLotDuTri` pour `completeDeck` (revue de la PR 667, mineur 2) : une lecture illisible (version de base ou
+ * case du tri invalide, `LectureIllisible`) ne doit pas annuler la transaction de l'action, qui porte la clôture du tri (B10a).
+ * Elle rend `illisible` : aucune ligne, aucun démarrage, journal `recalcul.not_created` après la validation. Toute autre erreur
+ * remonte (l'action échoue, rien n'est écrit). La suite du déblocage garde `ouvrirLotDuTri` : son erreur est attrapée par la suite.
+ */
+export async function ouvrirLotApresCloture(x: ExecuteurLecture, cible: Parameters<typeof ouvrirLotDuTri>[1]): Promise<IssueLot> {
+  try {
+    return await ouvrirLotDuTri(x, cible);
+  } catch (erreur) {
+    if (erreur instanceof LectureIllisible) return { statut: "illisible" };
+    throw erreur;
+  }
+}
+
+/**
+ * Journal d'une ligne attendue absente : collision (l'`INSERT` n'a rien écrit et la ligne de ce tri n'existe pas : index des
+ * `request_id`, ou index « une exécution en cours par voyage ») ou lecture illisible. Identifiants, nom d'erreur et entier seulement.
+ */
 export function signalerLotNonCree(organizationId: string, tripId: string, issue: IssueLot): void {
   if (issue.statut === "collision") logEvent("recalcul.not_created", { organizationId, tripId, days: issue.jours }, "warn");
+  if (issue.statut === "illisible") logEvent("recalcul.not_created", { organizationId, tripId, errorName: "LectureIllisible" }, "warn");
 }
 
 /** Transaction de l'appelant après la validation (contexte de la personne ou contexte système de l'organisation). */
-export type TransactionLot = <T>(travail: (x: ExecuteurLot) => Promise<T>) => Promise<T>;
+export type TransactionLot = <T>(travail: (x: ExecuteurLecture) => Promise<T>) => Promise<T>;
 
 const SQL_WORKFLOW_LOT = `UPDATE public.generation_runs SET workflow_run_id = $3
   WHERE organization_id = $1 AND id = $2 AND kind = 'batch' AND workflow_run_id IS NULL`;

@@ -196,6 +196,9 @@ export async function forfaitDuLot(
     if (!reservation.ok) throw new ArretEtape(reservation.code);
     forfait = reservation.forfait;
   }
+  // Part Text Search de `e` bornée à sa réserve (0113 § 3 bis ; revue de la PR 667, mineur 10) : le registre de l'étape n'admet
+  // que les requêtes que la réserve a comptées, jamais tout le profil.
+  forfait = { ...forfait, textSearchRequetes: Math.min(forfait.textSearchRequetes, reserveE) };
   const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

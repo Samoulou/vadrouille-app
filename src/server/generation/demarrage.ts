@@ -28,6 +28,3 @@ export const demarrerRecalculReel: DemarrerRecalcul = async (generationRunId, or
   const issue = await demarrerRecalcul(generationRunId, organizationId);
   return issue.ok ? issue.workflowRunId : null;
 };
-
-/** Double sans appel du workflow 5 : ne démarre rien (la ligne est close aussitôt en `failed` par l'appelant). */
-export const demarrerRecalculSansAppel: DemarrerRecalcul = async () => null;

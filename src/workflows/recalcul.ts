@@ -11,8 +11,8 @@ import type { EtatLot } from "@/server/generation/etat";
  *
  * - **État sérialisé** : `{ generationRunId, organizationId, rang }` plus, après un arrêt, le code fermé (`EtatLotSchema`) ;
  *   ni jour, ni signal, ni catégorie, ni `placeId`, ni candidat.
- * - **Fin** : une étape qui trouve la ligne déjà finie (`ready` : aucun jour touché, ou version publiée) rend son entrée
- *   inchangée ; le workflow s'arrête alors sans rien écrire.
+ * - **Fin** : `a` sans jour touché finit la ligne (`ready`, sans version ni réservation) et rend son entrée inchangée ; une
+ *   étape qui trouve la ligne déjà finie (`ready`) la rend aussi inchangée. Le workflow s'arrête alors sans rien de plus.
  * - **Reprises de la file** : `maxRetries` 2 pour `a` (déterministe, sans appel), 0 pour `e` (une étape rejouée repaierait).
  * - **Arrêt** : une étape arrêtée a clos l'exécution en `failed` ; une erreur inattendue la clôt sur `upstream_unavailable`.
  */

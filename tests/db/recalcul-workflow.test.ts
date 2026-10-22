@@ -328,29 +328,25 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
 
   /**
    * Le classement départage deux candidats de même score par leur identifiant (`classer`, ordre total) : tiré au hasard par la
-   * base, il ferait varier les remplaçants d'un voyage à l'autre. Pour comparer deux voyages octet pour octet, les identifiants
-   * des candidats sont réécrits (superutilisateur du banc, avant la planification de l'aperçu) dans l'ordre de leur nom, propre à chaque
-   * organisation ; les références (`proposals`, `event_occurrences`) suivent. Jeu de test seulement.
+   * base, il ferait varier les remplaçants d'un voyage à l'autre. Pour comparer deux voyages octet pour octet, chaque candidat de
+   * l'aperçu reçoit un identifiant **fixe**, ordonné par nom (préfixe de rang) et propre à l'organisation, **juste après son
+   * insertion** par les étapes de recherche et avant la planification de l'aperçu : aucune ligne ne le référence encore
+   * (`proposals`, `preference_signals` et `event_occurrences` sont vides pour ce voyage, vérifié ici), donc un simple `UPDATE`,
+   * sans désactiver aucune contrainte. Jeu de test seulement.
    */
   const idsOrdonnesParNom = async (tripId: string) => {
-    await admin.query("BEGIN");
-    try {
-      await admin.query("SET LOCAL session_replication_role = replica");
-      await admin.query(
-        `CREATE TEMP TABLE correspondance ON COMMIT DROP AS
-           SELECT id AS ancien, (lpad(to_hex(row_number() OVER (ORDER BY name, place_id)::int), 8, '0') || '-' || substr(md5(organization_id::text || name), 1, 4) || '-4' ||
-             substr(md5(organization_id::text || name), 5, 3) || '-8' || substr(md5(organization_id::text || name), 8, 3) || '-' || substr(md5(organization_id::text || name), 11, 12))::uuid AS nouveau
-           FROM public.candidates WHERE trip_id = $1`,
-        [tripId],
-      );
-      await admin.query("UPDATE public.candidates c SET id = m.nouveau FROM correspondance m WHERE c.id = m.ancien");
-      await admin.query("UPDATE public.proposals p SET candidate_id = m.nouveau FROM correspondance m WHERE p.candidate_id = m.ancien");
-      await admin.query("UPDATE public.event_occurrences o SET candidate_id = m.nouveau FROM correspondance m WHERE o.candidate_id = m.ancien");
-      await admin.query("COMMIT");
-    } catch (erreur) {
-      await admin.query("ROLLBACK");
-      throw erreur;
+    for (const table of ["proposals", "preference_signals", "event_occurrences"]) {
+      const n = (await admin.query(`SELECT count(*)::int AS n FROM public.${table} WHERE trip_id = $1 AND candidate_id IS NOT NULL`, [tripId])).rows[0].n as number;
+      expect(n, table).toBe(0);
     }
+    await admin.query(
+      `WITH m AS (
+         SELECT id AS ancien, (lpad(to_hex(row_number() OVER (ORDER BY name, place_id)::int), 8, '0') || '-' || substr(md5(organization_id::text || name), 1, 4) || '-4' ||
+           substr(md5(organization_id::text || name), 5, 3) || '-8' || substr(md5(organization_id::text || name), 8, 3) || '-' || substr(md5(organization_id::text || name), 11, 12))::uuid AS nouveau
+         FROM public.candidates WHERE trip_id = $1)
+       UPDATE public.candidates c SET id = m.nouveau FROM m WHERE c.id = m.ancien`,
+      [tripId],
+    );
   };
 
   it("recalcul: aucune préférence dans un prompt (octet pour octet) ; prompts: aucune donnée Google dans la requête raisons du lot (canari)", async () => {
@@ -367,6 +363,8 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
         }
       }, idsOrdonnesParNom);
       const decores: ReturnType<typeof avecSentinellesGoogle>[] = [];
+      // Fiches relues par l'étape `e` du lot, telles que les doubles décorés les ont rendues (circulation du canari).
+      const rendues: unknown[] = [];
       const journaux: ReturnType<typeof journalDePrompts>[] = [];
       const fabrique = () =>
         composerSimuleeAvec({
@@ -383,14 +381,16 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
               textSearch: s.places.textSearch,
               async details(placeId: string) {
                 const [decore, brut] = await Promise.all([s.places.details(placeId), d.places.details(placeId)]);
-                return { ...decore, niveauPrix: brut.niveauPrix };
+                const fiche = { ...decore, niveauPrix: brut.niveauPrix };
+                rendues.push(fiche);
+                return fiche;
               },
             };
             return { ...d, places, routes: s.routes, modeles: j.client };
           },
         });
       expect((await deroulerLot(entreeDuLot(org, avant), dependances(fabrique))).fin.arret).toBeUndefined();
-      return { requetes: journaux.flatMap((j) => j.requetes), valeurs: new Set(decores.flatMap((d) => [...d.valeurs])), signaux: (await lignes(org, tripId)).signaux };
+      return { requetes: journaux.flatMap((j) => j.requetes), valeurs: new Set(decores.flatMap((d) => [...d.valeurs])), rendues, signaux: (await lignes(org, tripId)).signaux };
     };
     const a = await journal(false);
     const b = await journal(true);
@@ -403,6 +403,12 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
     for (const interdit of ["notMyStyle", "tooFar", "dislike", "answerNo", "answerYes", "SENTINELLE_PLACE_ID"]) expect(texte(b)).not.toContain(interdit);
     // Canari : les doubles Google ont rendu leurs valeurs sentinelles (relectures du lot) ; aucune n'entre dans la requête.
     expect(a.valeurs.size).toBeGreaterThan(5);
+    // Le canari mord (revue de la PR 667, mineur 1) : le lot a relu des fiches, et leurs valeurs sentinelles ont circulé dans
+    // l'étape `e` (fiches rendues au moteur par la relecture) ; leur absence de la requête n'est donc pas fortuite.
+    for (const r of [a, b]) {
+      expect(r.rendues.length).toBeGreaterThan(0);
+      expect(sentinellesPresentes(JSON.stringify(r.rendues), { valeurs: r.valeurs }).length).toBeGreaterThan(0);
+    }
     expect(sentinellesPresentes(texte(a), { valeurs: a.valeurs })).toEqual([]);
     expect(sentinellesPresentes(texte(b), { valeurs: b.valeurs })).toEqual([]);
   }, 240_000);

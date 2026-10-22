@@ -1,9 +1,9 @@
 import "server-only";
 
 import type { DaySnapshot, TripSnapshot } from "@/contracts";
-import type { EntreeMoteur } from "@/domain/entrees";
+import type { CandidatMoteur, EntreeMoteur } from "@/domain/entrees";
 import { modesAdmis, replanifierJour } from "@/domain/generation";
-import { entreeDuJour, joursTouches, planDuJour, reserveFiltree, type PlanDuJour, type PropositionDuRecalcul } from "@/domain/recalcul";
+import { entreeDuJour, joursTouches, planDuJour, reserveFiltree, type PlanDuJour, type PropositionDuRecalcul, type SignalDuRecalcul, type TriDuRecalcul } from "@/domain/recalcul";
 import type { CapaciteFinale, ExecuteurPublication, FabriqueGeneration, OptionsEtape } from "@/server/composition/generation";
 import { DUREE_ETAPE_MS, JOURS_PLANIFIES_APERCU, RANG_LOT, TENTATIVES_PUBLICATION, type EtapeLot } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
@@ -47,7 +47,8 @@ import { lireSignauxActifs, lireTriClos, type SignalLuDuRecalcul, type TriClosLu
  * fiche ni aucun signal n'entre dans l'état ; les fiches relues restent en mémoire et ne survivent pas à `e` (0120 S4 point 3).
  */
 
-type Executeur = ExecuteurLecture & { query(texte: string, valeurs?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
+/** Exécuteur des lectures du lot : le même type que les lectures de la génération (`lecture.ts`, `signaux.ts`, `lot.ts`). */
+type Executeur = ExecuteurLecture;
 
 type ContexteLot = {
   readonly dep: DependancesResolues;
@@ -75,10 +76,10 @@ function rangSuivant(etat: EtatLot, etape: EtapeLot): number | null {
 
 /**
  * Gabarit des étapes du lot : garde (ligne `batch`, rang de l'étape), barrière, corps, clôture en échec sur un code fermé. Une
- * ligne déjà finie (`ready`) rend l'entrée **inchangée** : le workflow s'arrête sans rien écrire. Ligne absente dans
+ * ligne déjà finie (`ready`), ou finie par le corps (`a` sans jour touché), rend l'entrée **inchangée** : le workflow s'arrête. Ligne absente dans
  * l'organisation de l'état, d'un autre `kind`, ou refusée par la garde : `step_expired`, sans écriture (0120 S1 point 3).
  */
-async function executerLot(entree: unknown, etape: EtapeLot, corps: (contexte: ContexteLot) => Promise<void>, dependances?: DependancesGeneration): Promise<EtatLot> {
+async function executerLot(entree: unknown, etape: EtapeLot, corps: (contexte: ContexteLot) => Promise<void | "finie">, dependances?: DependancesGeneration): Promise<EtatLot> {
   const etat = lireEtatLot(entree);
   if (etat.arret !== undefined) return etat;
   const rang = rangSuivant(etat, etape);
@@ -92,7 +93,8 @@ async function executerLot(entree: unknown, etape: EtapeLot, corps: (contexte: C
   try {
     const barriere = await dep.barriere();
     if (barriere === "production") throw new ArretEtape("production_refused");
-    await corps({ ...commun, barriere });
+    // Ligne finie par le corps (`a` sans jour touché : `ready` sans version) : l'entrée est rendue inchangée, le workflow s'arrête.
+    if ((await corps({ ...commun, barriere })) === "finie") return etat;
     return { generationRunId, organizationId, rang };
   } catch (erreur) {
     if (etape === "a" && !estArret(erreur)) throw erreur;
@@ -220,7 +222,7 @@ export function etapeLotDebut(entree: unknown, dependances?: DependancesGenerati
           const fin = await x.query(SQL_FIN_LOT, [contexte.organizationId, contexte.generationRunId, contexte.rang, null, maintenant(contexte).toISOString()]);
           if (fin.rows.length === 0) throw new ArretEtape("step_expired");
         });
-        return;
+        return "finie";
       }
       await forfait(contexte, lot);
     },
@@ -231,7 +233,7 @@ export function etapeLotDebut(entree: unknown, dependances?: DependancesGenerati
 // --- Étape e ---------------------------------------------------------------------------------------------------------------
 
 /** Ce que l'étape `e` a préparé pour un jour touché : son plan, son entrée du moteur, le jour planifié et ses remplaçants. */
-type JourDuLot = {
+export type JourDuLot = {
   readonly index: number;
   readonly plan: PlanDuJour;
   /** Entrée du moteur du jour (version à recaler sous le verrou), sans `version` définitive. */
@@ -251,6 +253,73 @@ function planifierJour(entree: EntreeMoteur, base: TripSnapshot, index: number):
 /** Étapes nouvelles d'un jour planifié : toutes celles qui ne sont pas conservées du jour de base (les remplaçants). */
 const nouvelles = (jour: DaySnapshot, plan: PlanDuJour): Set<string> =>
   new Set(jour.items.flatMap((item) => (item.type === "stop" && !plan.conservees.has(item.stop.id) ? [item.stop.id] : [])));
+
+/** Candidat lu et sa forme pour le moteur (`eligibles`). */
+export type EligibleLot = { readonly lu: CandidatLu; readonly moteur: CandidatMoteur & { readonly ville: number } };
+
+/**
+ * Repas choisis du tri (B10-PO-10 point 3) : pour chaque case de repas qui porte un « Je choisis » actif de ce tri, le candidat
+ * de l'option, pris dans sa **proposition** (`proposals.candidate_id`, sinon son `placeId`), jamais dans la réserve.
+ */
+export function repasChoisisDuTri(tri: TriClosLu, tous: readonly EligibleLot[]): Map<string, EligibleLot> {
+  const parId = new Map(tous.map((e) => [e.lu.id, e] as const));
+  const parLieu = new Map(tous.flatMap((e) => (e.moteur.placeId === undefined ? [] : [[e.moteur.placeId, e] as const])));
+  const choisies = new Set(tri.signaux.flatMap((s) => (s.signal === "choose" && s.status !== "cancelled" && s.proposalId !== undefined ? [s.proposalId] : [])));
+  const choisis = new Map<string, EligibleLot>();
+  for (const proposition of tri.propositions) {
+    if (proposition.kind !== "meal" || !choisies.has(proposition.id)) continue;
+    const candidat = tri.candidats.get(proposition.id);
+    const trouve = (candidat === undefined ? undefined : parId.get(candidat)) ?? (proposition.placeId === undefined ? undefined : parLieu.get(proposition.placeId));
+    if (trouve !== undefined) choisis.set(proposition.id, trouve);
+  }
+  return choisis;
+}
+
+/**
+ * Tri passé au domaine : chaque option choisie porte son candidat, **relu** quand la relecture l'a admis, sinon tel que lu en
+ * base. Un candidat non relu n'a pas de relecture `valide` : le moteur ne l'admet pas et pose `openMeal` (B10-PO-10 point 3).
+ */
+export function triAvecChoisis(tri: TriClosLu, choisis: ReadonlyMap<string, EligibleLot>, relus: readonly CandidatMoteur[]): TriDuRecalcul {
+  const parId = new Map(relus.map((c) => [c.id, c] as const));
+  const propositions: PropositionDuRecalcul[] = tri.propositions.map((p) => {
+    const e = choisis.get(p.id);
+    return e === undefined ? p : { ...p, candidat: parId.get(e.moteur.id) ?? e.moteur };
+  });
+  return { ...tri, propositions };
+}
+
+/**
+ * Plan de chaque jour touché, jours croissants, sur la **dernière** version mise à jour au fil des jours (un lieu, une fois) :
+ * `planDuJour` sur le jour de base, `entreeDuJour` (réserve filtrée par les signaux actifs, repas choisis, `conservees`), puis
+ * `replanifierJour` (repli sur les seules étapes conservées). Pur : aucun appel, aucune lecture.
+ */
+export function planifierJoursDuLot(entree: {
+  readonly base: TripSnapshot;
+  readonly derniere: { readonly version: number; readonly instantane: TripSnapshot };
+  readonly aPlanifier: readonly number[];
+  readonly tri: TriDuRecalcul;
+  readonly signaux: readonly SignalDuRecalcul[];
+  /** Entrée du moteur sans le plan du jour, pour la version `version`. */
+  readonly entree: (version: number) => EntreeMoteur;
+}): JourDuLot[] {
+  let courant = entree.derniere.instantane;
+  const jours: JourDuLot[] = [];
+  for (const index of entree.aPlanifier) {
+    const jourBase = entree.base.days.find((jour) => jour.index === index);
+    if (jourBase === undefined) throw new ArretEtape("invalid_input");
+    const plan = planDuJour(jourBase, entree.tri);
+    const entreeDe = (version: number) => entreeDuJour(entree.entree(version), plan, entree.signaux);
+    const jour = planifierJour(entreeDe(entree.derniere.version + 1), courant, index);
+    courant = { ...courant, days: courant.days.map((d) => (d.index === index ? jour : d)) };
+    jours.push({ index, plan, entree: entreeDe, jour });
+  }
+  return jours;
+}
+
+/** Remplaçants des jours planifiés : étapes nouvelles (non conservées) dont le lieu est celui d'un candidat connu. */
+export function remplacantsDuLot(jours: readonly JourDuLot[], parPlaceId: ReadonlyMap<string, CandidatLu>): CandidatLu[] {
+  return jours.flatMap(({ jour, plan }) => candidatsDuJour(jour, parPlaceId, nouvelles(jour, plan)));
+}
 
 /**
  * Étape `e` (rang 2) : relecture et planification des seuls jours touchés, raisons des seuls remplaçants, publication d'**une**
@@ -298,17 +367,7 @@ export function etapeLotPlanification(entree: unknown, dependances?: Dependances
       const dansLesJours = tous.filter(({ moteur }) => rangs.has(moteur.ville) && (moteur.placeId === undefined || !ailleurs.has(moteur.placeId)));
       const admis = new Set(reserveFiltree(dansLesJours.map(({ moteur }) => moteur), lot.signaux).map((c) => c.id));
       const retenables = dansLesJours.filter(({ moteur }) => admis.has(moteur.id));
-      // Repas choisis (B10-PO-10 point 3) : le candidat de l'option, pris dans sa proposition (jamais dans la réserve).
-      const parId = new Map(tous.map((e) => [e.lu.id, e] as const));
-      const parLieu = new Map(tous.flatMap((e) => (e.moteur.placeId === undefined ? [] : [[e.moteur.placeId, e] as const])));
-      const choisis = new Map<string, (typeof tous)[number]>();
-      const choisies = new Set(lot.tri.signaux.flatMap((s) => (s.signal === "choose" && s.status !== "cancelled" && s.proposalId !== undefined ? [s.proposalId] : [])));
-      for (const proposition of lot.tri.propositions) {
-        if (proposition.kind !== "meal" || !choisies.has(proposition.id)) continue;
-        const candidat = lot.tri.candidats.get(proposition.id);
-        const trouve = (candidat === undefined ? undefined : parId.get(candidat)) ?? (proposition.placeId === undefined ? undefined : parLieu.get(proposition.placeId));
-        if (trouve !== undefined) choisis.set(proposition.id, trouve);
-      }
+      const choisis = repasChoisisDuTri(lot.tri, tous);
       const aRelire = [...retenables];
       for (const e of choisis.values()) if (!aRelire.some((r) => r.lu.id === e.lu.id)) aRelire.push(e);
 
@@ -323,12 +382,7 @@ export function etapeLotPlanification(entree: unknown, dependances?: Dependances
       });
       if (!planification.ok) throw new ArretEtape(planification.code);
 
-      const relus = new Map(planification.valeur.candidats.map((c) => [c.id, c] as const));
-      const propositions: PropositionDuRecalcul[] = lot.tri.propositions.map((p) => {
-        const e = choisis.get(p.id);
-        return e === undefined ? p : { ...p, candidat: relus.get(e.moteur.id) ?? e.moteur };
-      });
-      const tri = { ...lot.tri, propositions };
+      const tri = triAvecChoisis(lot.tri, choisis, planification.valeur.candidats);
       const reserve = planification.valeur.candidats.filter((c) => admis.has(c.id));
       const contexteMoteur: Omit<ContexteMoteur, "version"> = {
         voyage,
@@ -338,24 +392,19 @@ export function etapeLotPlanification(entree: unknown, dependances?: Dependances
         dateReference,
       };
 
-      // Plan de chaque jour touché, jours croissants, sur la dernière version mise à jour au fil des jours (un lieu, une fois).
-      let courant = derniere.instantane;
-      const jours: JourDuLot[] = [];
-      for (const index of aPlanifier) {
-        const jourBase = lot.base.days.find((jour) => jour.index === index);
-        if (jourBase === undefined) throw new ArretEtape("invalid_input");
-        const plan = planDuJour(jourBase, tri);
-        const entreeDe = (version: number) => entreeDuJour(entreeMoteur({ ...contexteMoteur, version }, reserve), plan, lot.signaux);
-        const jour = planifierJour(entreeDe(derniere.version + 1), courant, index);
-        courant = { ...courant, days: courant.days.map((d) => (d.index === index ? jour : d)) };
-        jours.push({ index, plan, entree: entreeDe, jour });
-      }
+      const jours = planifierJoursDuLot({
+        base: lot.base,
+        derniere,
+        aPlanifier,
+        tri,
+        signaux: lot.signaux,
+        entree: (version) => entreeMoteur({ ...contexteMoteur, version }, reserve),
+      });
 
       // Raisons des seuls remplaçants (B10-PO-11) : une passe, une requête `raisons` par ville qui en a au moins un.
       const parPlaceId = new Map(aRelire.flatMap(({ lu, moteur }) => (moteur.placeId === undefined ? [] : [[moteur.placeId, lu] as const])));
       const raisons = new Map<string, string>();
-      const remplacants = jours.flatMap(({ jour, plan }) => candidatsDuJour(jour, parPlaceId, nouvelles(jour, plan)));
-      await passeDeRaisons(capacite, voyage.brief, villes, remplacants, raisons, new Set());
+      await passeDeRaisons(capacite, voyage.brief, villes, remplacantsDuLot(jours, parPlaceId), raisons, new Set());
       for (const j of jours) j.jour = avecRaisons(j.jour, parPlaceId, raisons, nouvelles(j.jour, j.plan));
 
       const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
