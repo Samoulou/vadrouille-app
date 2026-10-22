@@ -127,7 +127,9 @@ async function apercuPublie(org: Org, avantPlanification?: (tripId: string) => P
   const notee = await derouler(entree, dependances(), ETAPES.length - 1);
   expect(notee.arret).toBeUndefined();
   await avantPlanification(tripId);
-  expect((await ETAPES[ETAPES.length - 1](notee, dependances())).arret).toBeUndefined();
+  const planification = ETAPES.at(-1);
+  if (planification === undefined) throw new Error("banc : aucune étape");
+  expect((await planification(notee, dependances())).arret).toBeUndefined();
   return tripId;
 }
 
