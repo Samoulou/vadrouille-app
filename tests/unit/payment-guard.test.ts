@@ -91,6 +91,33 @@ describe("paymentAvailable", () => {
   });
 });
 
+describe("paymentAvailable avec l'adaptateur prototype (spécification E2E-essai, lot 1)", () => {
+  it.each([
+    [{ DATA_ADAPTER: "prototype", VERCEL_ENV: "preview", NODE_ENV: "production" }],
+    [{ DATA_ADAPTER: "prototype", NODE_ENV: "test" }],
+    [{ DATA_ADAPTER: "prototype", NODE_ENV: "production", VADROUILLE_PROTOTYPE: "1", CI: "true", VADROUILLE_ENV: "ci" }],
+  ] as [NodeJS.ProcessEnv][])("vrai dans la liste blanche de prototype, sans drapeau de démonstration : %j", (env) => {
+    expect(paymentAvailable(env)).toBe(true);
+  });
+
+  it.each([
+    // Production : toujours fermé, quels que soient les autres drapeaux.
+    [{ DATA_ADAPTER: "prototype", VERCEL_ENV: "production", NODE_ENV: "test", VADROUILLE_DEMO_PAYMENT: "1" }],
+    [{ DATA_ADAPTER: "prototype", VADROUILLE_ENV: "production", NODE_ENV: "test" }],
+    [{ DATA_ADAPTER: "prototype", VERCEL_ENV: " Production ", NODE_ENV: "development" }],
+    // Hors liste blanche de prototype (le drapeau de démonstration n'ouvre que `mock`).
+    [{ DATA_ADAPTER: "prototype", NODE_ENV: "production", VADROUILLE_DEMO_PAYMENT: "1" }],
+    [{ DATA_ADAPTER: "prototype", NODE_ENV: "production", VADROUILLE_PROTOTYPE: "1" }],
+    [{ DATA_ADAPTER: "prototype", VADROUILLE_ENV: "staging", NODE_ENV: "test" }],
+    // Vrai prestataire : jamais.
+    [{ DATA_ADAPTER: "prototype", PAYMENT_ADAPTER: "stripe", NODE_ENV: "test" }],
+    // Production pour mock aussi (inchangé).
+    [{ NODE_ENV: "test", VERCEL_ENV: "production" }],
+  ] as [NodeJS.ProcessEnv][])("faux : %j", (env) => {
+    expect(paymentAvailable(env)).toBe(false);
+  });
+});
+
 describe("filets de sécurité", () => {
   it("getPaymentAdapter lève une erreur si le paiement est indisponible ; getPaymentSimulator renvoie null", async () => {
     const actual = await vi.importActual<typeof import("@/adapters")>("@/adapters");

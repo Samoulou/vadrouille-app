@@ -217,3 +217,24 @@ describe("suggestLodging", () => {
     }
   });
 });
+
+describe("site d'essai : structureBrief et suggestLodging fermés sans appel (E2E-essai, lot 2, critère 3 ; D2)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("adaptateur prototype : aucune lecture de l'adaptateur de création, donc aucun appel de modèle ni de Google", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    // Client simulé : il compterait tout appel s'il était atteint.
+    const structureSimule = vi.fn(async () => ({ ok: true, value: MOCK_INFERRED_BRIEF }));
+    const suggestSimule = vi.fn(async () => ({ ok: true, value: MOCK_LODGING_SUGGESTION }));
+    vi.mocked(adapters.getCreationAdapter).mockReturnValue({ structureBrief: structureSimule, suggestLodging: suggestSimule } as never);
+    expect(await structureBrief(REQUEST)).toEqual(fail("no_option"));
+    expect(await suggestLodging({ draft: MOCK_DEMO_TRIP_DRAFT, city: 0 })).toEqual(fail("no_option"));
+    // Entrée invalide : même réponse, rien n'est lu.
+    expect(await structureBrief({ story: 1 })).toEqual(fail("no_option"));
+    expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
+    expect(structureSimule).not.toHaveBeenCalled();
+    expect(suggestSimule).not.toHaveBeenCalled();
+  });
+});

@@ -1,19 +1,4 @@
 {
-  "prototype": {
-    "titre": "Prototype",
-    "mention": "Programme produit par le prototype de recherche. Données de lieux : Google.",
-    "voyage": "Voyage : {destination}",
-    "liens": {
-      "presentation": {
-        "libelle": "Tes propositions",
-        "precision": "J'aime / Pas pour moi"
-      },
-      "sejour": {
-        "libelle": "Séjour",
-        "precision": "Le programme jour par jour"
-      }
-    }
-  },
   "demo": {
     "titre": "Démonstration",
     "mention": "Données simulées. Les lieux entre crochets ne sont pas vérifiés.",
@@ -45,5 +30,6 @@
       }
     }
   },
-  "creer": "Créer un voyage"
+  "creer": "Créer un voyage",
+  "mesVoyages": "Mes voyages"
 }

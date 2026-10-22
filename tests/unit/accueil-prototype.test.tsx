@@ -1,15 +1,15 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as adapters from "@/adapters";
 import { createPrototypeAdapter, type SourceProgrammes } from "@/adapters/prototype";
 import { createProgrammeLoader } from "@/adapters/prototype-loader";
 import HomePage from "@/app/page";
-import { presentationRoute } from "@/features/presentation/routes";
-import { tripRoutes } from "@/features/sejour/routes";
+import { creationRoutes } from "@/features/creation/routes";
+import { mesVoyagesRoute } from "@/features/sejour/routes";
 import * as messages from "@/i18n/messages";
 import { createRelecteurSimule } from "@/mocks/prototype-relecteur";
 
@@ -18,16 +18,18 @@ vi.mock("@/adapters", async (importOriginal) => {
   return { ...actual, getTripAdapter: vi.fn(actual.getTripAdapter) };
 });
 
-/** Spécification P0, P0-PO-11 : section « Prototype » de la page d'accueil, en mode prototype seulement. */
+/**
+ * Spécification E2E-essai, lot 2 (une seule app) : la section « Prototype » de P0-PO-11 est retirée de l'accueil ; sur
+ * le site d'essai, « Créer un voyage » puis « Mes voyages », sans lecture des programmes depuis l'accueil.
+ */
 
-const t = messages.accueil.prototype;
 const TRIP_ID = "proto_test_20261012_1";
 const DOSSIER_TEST = realpathSync(join(process.cwd(), "prototype", "programmes-test"));
 
 function avecProgrammes(programmes: SourceProgrammes) {
-  vi.mocked(adapters.getTripAdapter).mockReturnValue(
-    createPrototypeAdapter({ programmes, relecteurs: { trajets: createRelecteurSimule() } }),
-  );
+  const adapter = createPrototypeAdapter({ programmes, relecteurs: { trajets: createRelecteurSimule() } });
+  vi.mocked(adapters.getTripAdapter).mockReturnValue(adapter);
+  return adapter;
 }
 
 beforeEach(() => {
@@ -39,52 +41,44 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("accueil : section « Prototype »", () => {
-  it("titre, mention d'attribution, un lien vers la présentation et un vers le Séjour par voyage ; pas de « Démonstration »", async () => {
-    avecProgrammes(createProgrammeLoader({ dossier: DOSSIER_TEST }));
+describe("accueil : site d'essai, une seule app", () => {
+  it("aucune section « Prototype » ni « Démonstration » ; « Créer un voyage » puis « Mes voyages », sans lire les voyages", async () => {
+    const adapter = avecProgrammes(createProgrammeLoader({ dossier: DOSSIER_TEST }));
+    const listTrips = vi.spyOn(adapter, "listTrips");
     render(await HomePage());
-    const section = screen.getByRole("region", { name: t.titre });
-    expect(within(section).getByRole("heading", { level: 2, name: "Prototype" })).toBeInTheDocument();
-    expect(
-      within(section).getByText("Programme produit par le prototype de recherche. Données de lieux : Google."),
-    ).toBeInTheDocument();
-    expect(within(section).getByText("Voyage : Ville de test")).toBeInTheDocument();
-    expect(
-      within(section)
-        .getAllByRole("link")
-        .map((link) => link.getAttribute("href")),
-    ).toEqual([presentationRoute(TRIP_ID), tripRoutes("/voyages", TRIP_ID).sejour()]);
-    // Noms accessibles reliés au voyage : distincts quand plusieurs voyages sont listés.
-    expect(within(section).getByRole("link", { name: "Tes propositions J'aime / Pas pour moi Voyage : Ville de test" })).toHaveAttribute(
-      "href",
-      presentationRoute(TRIP_ID),
-    );
-    expect(within(section).getByRole("link", { name: "Séjour Le programme jour par jour Voyage : Ville de test" })).toHaveAttribute(
-      "href",
-      tripRoutes("/voyages", TRIP_ID).sejour(),
-    );
+    expect(screen.queryByRole("region", { name: "Prototype" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Voyage : Ville de test")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute()]);
+    expect(screen.getByRole("link", { name: messages.accueil.creer })).toHaveAttribute("href", creationRoutes.nouveau({ essai: true }));
+    expect(screen.getByRole("link", { name: messages.accueil.mesVoyages })).toHaveAttribute("href", mesVoyagesRoute());
+    expect(listTrips).not.toHaveBeenCalled();
+    // Garde nommée (`siteEssaiAutorise`) : l'adaptateur n'est pas construit depuis l'accueil.
+    expect(adapters.getTripAdapter).not.toHaveBeenCalled();
   });
 
-  it("adaptateurs: répertoire de programmes vide ou absent, section Prototype absente sans erreur", async () => {
+  it("répertoire de programmes absent : même accueil, sans erreur", async () => {
     avecProgrammes(createProgrammeLoader({ dossier: join(DOSSIER_TEST, "absent") }));
     render(await HomePage());
-    expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
-    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
-    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute()]);
   });
 
-  it("aucune section avec l'adaptateur mock", async () => {
+  it("adaptateur mock : ni section « Prototype » ni lien secondaire « Mes voyages » hors de la démonstration", async () => {
     vi.stubEnv("DATA_ADAPTER", "mock");
     vi.mocked(adapters.getTripAdapter).mockImplementation((await vi.importActual<typeof import("@/adapters")>("@/adapters")).getTripAdapter);
     render(await HomePage());
     expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
+    const demo = screen.getByRole("region", { name: messages.accueil.demo.titre });
+    const horsDemo = screen.getAllByRole("link").filter((link) => !demo.contains(link));
+    expect(horsDemo.map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau()]);
   });
 
   it.each([["VERCEL_ENV"], ["VADROUILLE_ENV"]])("%s=production : la page lève (erreur 500), aucune section", async (name) => {
     vi.stubEnv(name, "production");
     vi.stubEnv("VADROUILLE_PROTOTYPE", "1");
     vi.stubEnv("CI", "true");
+    vi.mocked(adapters.getTripAdapter).mockImplementation((await vi.importActual<typeof import("@/adapters")>("@/adapters")).getTripAdapter);
     await expect(HomePage()).rejects.toThrow(/adaptateur prototype refusé/);
   });
 

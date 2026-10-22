@@ -2,6 +2,7 @@ import {
   DayMapSchema,
   DaySchema,
   DETOUR_THRESHOLD_MINUTES,
+  PreviewSlotsSchema,
   ProposalSchema,
   TRIP_ID_PATTERN,
   TripSchema,
@@ -27,6 +28,7 @@ import {
 } from "@/prototype/programme-reduit";
 
 import { avecBadgeALaLecture } from "./prototype-lecture";
+import { propositionsDesJours, selectionApercu, voyageNonDebloque, type SelectionApercu } from "./prototype-parcours";
 import type { AdapterContext, TripAdapter } from "./types";
 
 /**
@@ -97,7 +99,17 @@ export interface SourceProgrammes {
 export interface PrototypeAdapterOptions {
   programmes: SourceProgrammes;
   relecteurs: { trajets: RelecteurTrajets };
+  /** Déblocage simulé d'un voyage d'essai (spécification E2E-essai, lot 1) ; absent : jamais débloqué. */
+  deblocage?: LecteurDeblocage;
 }
+
+/**
+ * Voyage d'essai débloqué par le paiement simulé (spécification E2E-essai, lot 1 ; décision D4), lu à chaque appel
+ * dans la requête courante (droit simulé de la portée, cookie signé de l'essai). Ne doit jamais lever : `false`.
+ */
+export type LecteurDeblocage = (ctx: AdapterContext, tripId: string) => Promise<boolean>;
+
+const JAMAIS_DEBLOQUE: LecteurDeblocage = async () => false;
 
 /**
  * Source des programmes **réels** : contenus lus en base et recomposés avec leurs positions (`ProgrammeReduitSchema`,
@@ -321,7 +333,7 @@ function carteDuJour({ programme, positions: table }: ProgrammeServi, jour: Jour
 }
 
 /** Résumé d'un voyage du prototype, sans relecture (aucune durée dans `TripSummary`). */
-function resume(programme: ProgrammeEcrit): TripSummary {
+function resume(programme: ProgrammeEcrit, unlocked: boolean = programme.trip.unlocked): TripSummary {
   const { trip } = programme;
   return TripSummarySchema.parse({
     id: trip.id,
@@ -331,13 +343,13 @@ function resume(programme: ProgrammeEcrit): TripSummary {
     end: trip.end,
     timeZone: trip.timeZone,
     travellers: trip.travellers,
-    unlocked: trip.unlocked,
+    unlocked,
     toReserveCount: countToReserve(trip.checklist),
     dayCount: trip.days.length,
   });
 }
 
-export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdapterOptions): TripAdapter {
+export function createPrototypeAdapter({ programmes, relecteurs, deblocage }: PrototypeAdapterOptions): TripAdapter {
   return creerAdapter({
     async lister() {
       const servis: ProgrammeServi[] = [];
@@ -352,6 +364,7 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
       return programme ? { programme, positions: programme.positions, trajets: AUCUN_TRAJET } : null;
     },
     relecteur: relecteurs.trajets,
+    deblocage,
   });
 }
 
@@ -360,7 +373,15 @@ export function createPrototypeAdapter({ programmes, relecteurs }: PrototypeAdap
  * avec leurs positions (carte Google) et leurs temps conservés ; seules les paires sans temps conservé sont relues par le
  * relecteur injecté, puis conservées par la source après une relecture réussie (0109) (Routes réel, payant, réservé et plafonné : `src/server/p0/relecture.ts`). « Mes voyages » lit tous les programmes en une seule lecture (`lister`).
  */
-export function createPrototypeAdapterReel({ programmes, relecteurs }: { programmes: SourceProgrammesReels; relecteurs: { trajets: RelecteurTrajets } }): TripAdapter {
+export function createPrototypeAdapterReel({
+  programmes,
+  relecteurs,
+  deblocage,
+}: {
+  programmes: SourceProgrammesReels;
+  relecteurs: { trajets: RelecteurTrajets };
+  deblocage?: LecteurDeblocage;
+}): TripAdapter {
   return creerAdapter({
     lister: async () => (await programmes.lister()).map(({ programme, trajets, conserver }) => ({ programme, positions: programme.positions, trajets, conserver })),
     async lire(tripId) {
@@ -368,6 +389,7 @@ export function createPrototypeAdapterReel({ programmes, relecteurs }: { program
       return lu ? { programme: lu.programme, positions: lu.programme.positions, trajets: lu.trajets, conserver: lu.conserver } : null;
     },
     relecteur: relecteurs.trajets,
+    deblocage,
   });
 }
 
@@ -375,9 +397,29 @@ interface SourceServie {
   lister(): Promise<ProgrammeServi[]>;
   lire(tripId: string): Promise<ProgrammeServi | null>;
   relecteur: RelecteurTrajets;
+  deblocage?: LecteurDeblocage;
 }
 
-function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
+/**
+ * Voyage d'essai (spécification E2E-essai, lot 1) : programme écrit par `p0Run`, sans proposition enregistrée. Il suit
+ * le parcours de l'app (D4) ; un programme qui porte ses propositions (programmes de test) est servi comme avant.
+ *
+ * Règle **provisoire** (décision 0124 § 4) : déduite de la forme du programme faute d'indicateur écrit. Seul prédicat
+ * du parcours : les écrans le lisent par `isTrialTrip` (jamais `isPrototypeAdapter()`). Le lot 4 la remplace par un
+ * indicateur explicite écrit avec le programme ; d'ici là, un programme d'essai qui porterait des propositions serait
+ * servi comme un programme de test.
+ */
+function enParcours(servi: ProgrammeServi): boolean {
+  return servi.programme.proposals.length === 0;
+}
+
+/** État d'un voyage d'essai pour la requête : débloqué ou non, et son aperçu (journées lisibles). */
+interface EtatParcours {
+  readonly debloque: boolean;
+  readonly apercu: SelectionApercu;
+}
+
+function creerAdapter({ lister, lire, relecteur, deblocage = JAMAIS_DEBLOQUE }: SourceServie): TripAdapter {
   /** Programme de l'organisation du contexte ; `null` pour un identifiant mal formé, inconnu ou d'une autre organisation. */
   const trouver = async (ctx: AdapterContext, tripId: string): Promise<ProgrammeServi | null> => {
     if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId)) return null;
@@ -386,38 +428,86 @@ function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
     return servi;
   };
 
-  const voyage = async (servi: ProgrammeServi): Promise<Trip> => {
+  /** Droit lu sans jamais faire échouer la page : un lecteur qui lève vaut « non débloqué ». */
+  const estDebloque = async (ctx: AdapterContext, tripId: string): Promise<boolean> => {
+    try {
+      return (await deblocage(ctx, tripId)) === true;
+    } catch {
+      return false;
+    }
+  };
+
+  /** `null` hors parcours d'essai (programme servi comme avant). */
+  const etat = async (ctx: AdapterContext, servi: ProgrammeServi): Promise<EtatParcours | null> => {
+    if (!enParcours(servi)) return null;
+    return { debloque: await estDebloque(ctx, servi.programme.trip.id), apercu: selectionApercu(servi.programme.trip.days) };
+  };
+
+  /** Journées servies : toutes, sauf pour un voyage d'essai non débloqué (journées de l'aperçu seulement). */
+  const joursServis = (servi: ProgrammeServi, parcours: EtatParcours | null): JourReduit[] =>
+    parcours === null || parcours.debloque ? servi.programme.trip.days : servi.programme.trip.days.filter((jour) => parcours.apercu.jours.has(jour.index));
+
+  const recomposerJours = async (servi: ProgrammeServi, jours: readonly JourReduit[]): Promise<Day[]> => {
     const days: Day[] = [];
     // Une requête par journée (paires manquantes seulement), dans l'ordre ; rien en mémoire entre deux requêtes (0109 : relues conservées par la source).
-    for (const jour of servi.programme.trip.days) days.push(await recomposerJour(servi, jour, relecteur));
+    for (const jour of jours) days.push(await recomposerJour(servi, jour, relecteur));
+    return days;
+  };
+
+  const voyage = async (servi: ProgrammeServi, parcours: EtatParcours | null): Promise<Trip> => {
+    const days = await recomposerJours(servi, joursServis(servi, parcours));
+    if (parcours !== null && !parcours.debloque) return voyageNonDebloque({ ...servi.programme.trip, days }, days);
     return TripSchema.parse({ ...servi.programme.trip, days });
+  };
+
+  /** Propositions d'un voyage d'essai : l'aperçu avant le déblocage, la suite du tri (étapes hors aperçu) après. */
+  const propositionsDuParcours = async (servi: ProgrammeServi, parcours: EtatParcours): Promise<Proposal[]> => {
+    const apercu = new Set(parcours.apercu.etapes);
+    const days = await recomposerJours(servi, joursServis(servi, parcours));
+    return propositionsDesJours(days, (stopId) => (parcours.debloque ? !apercu.has(stopId) : apercu.has(stopId)));
   };
 
   return {
     async listTrips(ctx) {
-      return (await lister())
-        .filter(({ programme }) => programme.trip.organizationId === ctx.organizationId)
-        .map(({ programme }) => resume(programme));
+      const servis = (await lister()).filter(({ programme }) => programme.trip.organizationId === ctx.organizationId);
+      const resumes: TripSummary[] = [];
+      for (const servi of servis) {
+        resumes.push(enParcours(servi) ? resume(servi.programme, await estDebloque(ctx, servi.programme.trip.id)) : resume(servi.programme));
+      }
+      return resumes;
     },
     async getTrip(ctx, tripId) {
       const servi = await trouver(ctx, tripId);
-      return servi ? voyage(servi) : null;
+      return servi ? voyage(servi, await etat(ctx, servi)) : null;
     },
     async getDay(ctx, tripId, index) {
       const servi = await trouver(ctx, tripId);
-      const jour = servi?.programme.trip.days.find((candidat) => candidat.index === index);
-      return servi && jour ? recomposerJour(servi, jour, relecteur) : null;
+      if (!servi) return null;
+      const jour = joursServis(servi, await etat(ctx, servi)).find((candidat) => candidat.index === index);
+      return jour ? recomposerJour(servi, jour, relecteur) : null;
     },
     async listProposals(ctx, tripId) {
       const servi = await trouver(ctx, tripId);
-      return servi ? recomposerPropositions(servi, relecteur) : [];
+      if (!servi) return [];
+      const parcours = await etat(ctx, servi);
+      return parcours === null ? recomposerPropositions(servi, relecteur) : propositionsDuParcours(servi, parcours);
     },
     /**
-     * Les voyages du prototype sont toujours débloqués (`unlocked: true`, forme réduite) : la présentation lit
-     * `listProposals`, jamais l'aperçu. Liste vide (B2, évolution E7).
+     * Aperçu (écran 6, B2 évolution E7) : seulement pour un voyage d'essai non débloqué, tiré du programme à la lecture
+     * (`selectionApercu`, 8 étapes au plus). Programme qui porte ses propositions, ou voyage débloqué : liste vide (la
+     * présentation lit `listProposals`).
      */
-    async listPreviewSlots() {
-      return [];
+    async listPreviewSlots(ctx, tripId) {
+      const servi = await trouver(ctx, tripId);
+      if (!servi) return [];
+      const parcours = await etat(ctx, servi);
+      if (parcours === null || parcours.debloque) return [];
+      return PreviewSlotsSchema.parse((await propositionsDuParcours(servi, parcours)).map((proposal) => ({ type: "proposal", proposal })));
+    },
+    /** Voyage d'essai (`enParcours`, décision 0124 § 4) : le seul indicateur que lisent les écrans. */
+    async isTrialTrip(ctx, tripId) {
+      const servi = await trouver(ctx, tripId);
+      return servi !== null && enParcours(servi);
     },
     /** Session de tri en mémoire de F6 (B10-PO-18) : aucun tri enregistré sur `prototype` (décision 0112 § 4 point 1). */
     async getDeckSession() {
@@ -425,13 +515,14 @@ function creerAdapter({ lister, lire, relecteur }: SourceServie): TripAdapter {
     },
     async getDayMap(ctx, tripId, index) {
       const servi = await trouver(ctx, tripId);
-      const jour = servi?.programme.trip.days.find((candidat) => candidat.index === index);
-      return servi && jour ? carteDuJour(servi, jour) : null;
+      if (!servi) return null;
+      const jour = joursServis(servi, await etat(ctx, servi)).find((candidat) => candidat.index === index);
+      return jour ? carteDuJour(servi, jour) : null;
     },
     async getTripMap(ctx, tripId) {
       const servi = await trouver(ctx, tripId);
       if (!servi) return [];
-      return servi.programme.trip.days.flatMap((jour) => {
+      return joursServis(servi, await etat(ctx, servi)).flatMap((jour) => {
         const carte = carteDuJour(servi, jour);
         return carte ? [carte] : [];
       });

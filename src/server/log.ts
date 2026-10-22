@@ -40,6 +40,9 @@ export const LOG_EVENTS = [
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
+  // Décision 0124 § 2 (spécification E2E-essai, lot 1) : branchement du cookie de déblocage de l'essai impossible au
+  // démarrage ; `errorName` seulement (ni cookie, ni clé, ni identifiant de voyage). Seul le droit simulé de la portée reste.
+  "essai.unlock_unavailable",
   // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
   // l'implémentation désactivée du port, journal de Better Auth (niveau seulement, jamais le message ni ses
   // arguments), échec d'une opération de la liste blanche et de la purge technique (`action` et `errorName`

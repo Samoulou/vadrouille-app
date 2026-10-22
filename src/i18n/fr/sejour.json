@@ -67,7 +67,10 @@
         "un": "1 étape",
         "plusieurs": "{n} étapes"
       },
-      "enPreparation": "En préparation"
+      "enPreparation": "En préparation",
+      "aDebloquer": "À débloquer",
+      "nomADebloquer": "Jour {day}, à débloquer",
+      "debloquer": "Débloquer"
     }
   },
   "aujourdhui": {

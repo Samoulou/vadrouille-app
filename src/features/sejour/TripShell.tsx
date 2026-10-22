@@ -138,6 +138,8 @@ export interface TripShellValue {
   missingNoticeDay: number | null;
   /** Données de lieux Google affichées (adaptateur `prototype`) : mention « Données de lieux : Google » hors carte. */
   placesFromGoogle: boolean;
+  /** Adresse de l'écran 9 « Débloquer » pour un voyage non débloqué, paiement simulé disponible ; sinon `null`. */
+  unlockHref: string | null;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
 }
@@ -199,6 +201,11 @@ export interface TripShellProps {
    * débloqué, partage disponible et pas terminé, base `/voyages`) ; absent par défaut.
    */
   shareable?: boolean;
+  /**
+   * Adresse de l'écran 9 « Débloquer » (spécification E2E-essai, lot 1) : décidée côté serveur par la mise en page
+   * (voyage non débloqué, paiement simulé disponible, base `/voyages`) ; absente par défaut.
+   */
+  unlockHref?: string | null;
   children: ReactNode;
 }
 
@@ -219,6 +226,7 @@ export function TripShell({
   revisionFixtures = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
   shareable = false,
+  unlockHref = null,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -474,6 +482,7 @@ export function TripShell({
       missingNoticeDay,
       reportMissingEtape,
       placesFromGoogle,
+      unlockHref,
     }),
     [
       routes,
@@ -498,6 +507,7 @@ export function TripShell({
       missingNoticeDay,
       reportMissingEtape,
       placesFromGoogle,
+      unlockHref,
     ],
   );
 
