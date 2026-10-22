@@ -1,20 +1,22 @@
-# État du studio — 2026-10-22 (138e cycle)
+# État du studio — 2026-10-22 (139e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Fil « Routine cycle du studio », 2026-10-22 : 07:29 UTC « j'ai tout fait il manque que la migration non ? » (il a fusionné #648 à 07:28 et #666 à 07:29 ; réponse : oui, `db-migrate` avec `sha_attendu` = `507d36a…`) ; 07:40 « c'est fait » (run 39741509189 vérifié : `Appliquée : 0015_recalcul_lot`, les quatorze autres déjà présentes) ; 07:49 demande du lien « Mes voyages » (donné) ; 07:51 « c'est beaucoup mieux, combien d'activités pour 5 jours ? quel niveau d'intensité ? » (réponse : 43 créneaux sur 5 jours, repas compris ; brief `rome-1` au rythme `equilibre` ; aucun nombre imposé) ; 07:59 « il va falloir gérer la quantité, chargé pour certaines personnes, je vais analyser » et « avant on avait le site web de l'activité dans le détail » → Q558 (recherche web) répondue de fait : oui pour le lien ; ticket #671 ouvert.
+- Aucun nouveau message depuis le 138e cycle (dernier : 2026-10-22 07:59 UTC, densité et site web). Son analyse de la densité (Q595) est attendue sans urgence.
 
 ## Fait
-- **Premier essai réel de la chaîne inversée** : Rome relancée par Samuel à 07:48 UTC sur `p0-reel` (`eaced27`, report #648 fusionné par lui) : `p0.programme_written` jours 5, créneaux 43, lieux à vérifier 37, rien retiré, un seul appel modèle ; aucune erreur ni avertissement dans les journaux Vercel (06:40 à 08:10 UTC). Jugement de Samuel : « beaucoup mieux ». Deux retours : densité à régler (il analyse d'abord), site web de l'activité disparu (perte de `Stop.source` avec le retrait de la recherche web au lot 1).
-- **Migration 0015 appliquée sur la base d'essai** par Samuel (run `db-migrate` 39741509189, 07:35 UTC, succès) après la fusion de #666 (`main` = `507d36a`). B10b est complète code et base ; activation réelle toujours fermée (0120 S8).
-- Statut du 137e cycle (#670) fusionné.
+- **Migration 0016** (#675, restriction de l'`UPDATE` de `vadrouille_app` sur `generation_runs`, 0120 S8) **fusionnée** à 08:56 UTC : Tech Lead approuvé, Sécurité accordé (G1 à G6), CI `db` verte. Dix colonnes accordées (celles des 26 `UPDATE` de `src/`), huit figées dont `base_version` et `deck_closure_id`. Q585 répondue oui par le Tech Lead (exclusion étendue, `id` compris). Garde-fou : `tests/support/releve-generation-runs.ts` fait échouer toute PR qui écrirait une colonne non accordée sans migration de droits.
+- **Note de version v2026.10.22-09** (#676, routine Release) fusionnée à 09:55 UTC : couvre B10b-serveur (#667), l'approbation 0015 (#666) et le report #648.
+- **Spécification du lot 2a** (site web de l'activité, #674) : première relecture, Tech Lead `changes-requested` (2 bloquants : relations entre compteurs, description de `ProposalDetailSheet` ; 8 mineurs) ; correction 1 lancée.
+- Statut du 138e cycle (#673) fusionné.
 
 ## En cours
-- **#671 `[po]` Lot 2a — site web de l'activité** : amendement de `specs/P0-programme-par-ia.md` (fil product-owner, branche `claude/671-site-web-activite`). Recommandation CEO : l'IA propose le site officiel (`https`), le code vérifie que l'adresse répond avant affichage, `Stop.source` inchangé côté interface, aucune donnée Google. Code `[ia]` dans un ticket séparé après fusion.
-- **#672 `[data]` Migration 0016** — restriction de l'`UPDATE` de `vadrouille_app` sur `generation_runs` (0120 S8, Q585, Q586 ; fil data, branche `claude/672-migration-0016-restriction-update`). La ligne `MIGRATIONS_APPROUVEES` viendra dans une PR de workflow à part (`owner-approved`), jamais le même cycle qu'une autre migration.
-- Samuel : analyse de la densité du programme (Q595) ; le studio ne lance aucun essai.
-- Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519, décision UX/UI), #664 et B10c/B10d (premier essai du tri réel).
+- **#674 `[po]` lot 2a** : correction 1 (comptée) en cours.
+- **#677 `[data]` approbation de 0016** dans `db-migrate` (branche `claude/677-approbation-0016`) : PR de workflow, `owner-approved` de Samuel après `techlead-approved` ; puis un run `db-migrate`.
+- **#678 `[tl]` décision 0121** : réponses T9 à T11 du lot 2a et consignation de Q585 (branche `claude/678-decision-0121`).
+- **#679 `[secu]` décision 0122** : verdict S6 (requête sortante bornée depuis `p0Run`) et S7 (compteurs `sites*`, adresse de l'IA dans `Stop.source`) (branche `claude/679-decision-0122`). Le code `[ia]` du lot 2a attend #674, 0121 et 0122 fusionnées.
+- Quatre fils en parallèle (plafond atteint). Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519, UX/UI), #664 et B10c/B10d (premier essai du tri réel), densité (Q595).
 
 ## Bloqué
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
@@ -24,10 +26,10 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
 
 ## Prochain cycle
-1. Relire #671 et #672 (corrections si `changes-requested`). Après la fusion de #672 : ticket de la ligne `MIGRATIONS_APPROUVEES` 0016 (`owner-approved` de Samuel), au cycle suivant. Après la fusion de #671 : ticket `[ia]` du code du lot 2a (site web), hors du cycle d'une autre PR touchant `src/ai/prompts/programme.ts` ou `src/server/p0/`.
-2. Densité du programme : attendre l'analyse de Samuel (Q595) ; préparer, si demandé, un réglage par le rythme du brief ou la consigne du prompt `programme`.
-3. Note de version : la routine « Release » du 22 octobre 07:54 UTC s'est terminée sans nouvelle étiquette ; vérifier au cycle suivant qu'une note couvre #667 et #666.
-4. Samuel : Q595 (densité, à son rythme) ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 (reste prix/horaires) à Q561.
+1. Relire #674 (corr. 1), #677, #678, #679 ; corrections si demandées (max deux par tâche). Quand #677 est `techlead-approved` : demander à Samuel l'`owner-approved`, puis le run `db-migrate` (`sha_attendu` = tête de `main`).
+2. Quand #674, 0121 et 0122 sont fusionnées : ticket `[ia]` du code du lot 2a (prompt `programme` v2, vérification des adresses, `Stop.source`), hors du cycle d'une autre PR touchant `src/ai/prompts/programme.ts` ou `src/server/p0/`.
+3. Densité du programme : attendre l'analyse de Samuel (Q595).
+4. Samuel : Q595 (densité, à son rythme) ; `owner-approved` sur #677 quand demandé ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 (reste prix/horaires) à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -49,7 +51,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q595 (densité du programme, Samuel). Répondues : Q586 (ticket #672 ouvert), Q594 (réglée par les faits : migration appliquée à 07:35, essai relancé après), Q558 (oui pour le site web ; prix/horaires restent ouverts).
+- Q596 (Tech Lead, garde-fou du relevé des `UPDATE`), Q597 (CEO, ligne « étapes avec site » dans le texte copié : avis Sécurité via 0122). Répondues : Q585 (oui, Tech Lead, relecture de #675 ; décision 0121 à consigner).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
