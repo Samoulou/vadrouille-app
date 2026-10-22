@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRevisionFixtures, isPrototypeAdapter, shareButtonVisible } from "@/adapters";
+import { getRevisionFixtures, isPrototypeAdapter, paymentAvailable, shareButtonVisible } from "@/adapters";
+import { unlockRoutes } from "@/features/presentation/routes";
 import { contexteFacultatif } from "@/features/compte/session";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -36,6 +37,8 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   const revisionFixtures = await getRevisionFixtures(ctx, tripId);
   // Bouton « Partager » (F10c) : routes `/voyages` seulement, voyage débloqué, partage disponible et pas terminé.
   const shareable = base === "/voyages" && (await shareButtonVisible(data.trip));
+  // « Débloquer » depuis le Séjour (spécification E2E-essai, lot 1) : routes `/voyages`, voyage non débloqué, paiement simulé disponible.
+  const unlockHref = base === "/voyages" && !data.trip.unlocked && paymentAvailable() ? unlockRoutes(data.trip.id).debloquer() : null;
   return (
     <TripShell
       trip={data.trip}
@@ -44,6 +47,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
       placesFromGoogle={isPrototypeAdapter()}
       revisionFixtures={revisionFixtures}
       shareable={shareable}
+      unlockHref={unlockHref}
     >
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>

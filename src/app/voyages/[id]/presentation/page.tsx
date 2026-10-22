@@ -36,6 +36,7 @@ export default async function PresentationPage({ params }: { params: Promise<{ i
       {...data}
       canUnlock={paymentAvailable()}
       placesFromGoogle={isPrototypeAdapter()}
+      essai={isPrototypeAdapter()}
       recorderKind={devPagesEnabled() ? "console" : "none"}
     />
   );

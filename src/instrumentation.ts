@@ -11,7 +11,8 @@
  *
  * Décisions 0074 et 0079 : environnement valide et adaptateur `prototype`, la barrière de la lecture des programmes
  * réels (`src/server/p0/lecture-programmes.ts`) et le relecteur Routes réel (`src/server/p0/relecture.ts`, même
- * barrière, vérifiée à chaque relecture) sont branchés sur l'adaptateur. Elle ne lit rien ici : chaque lecture la
+ * barrière, vérifiée à chaque relecture) sont branchés sur l'adaptateur, ainsi que les déblocages simulés de l'essai
+ * retenus par cookie signé (`src/server/essai/deblocage.ts`, spécification E2E-essai, lot 1). Elle ne lit rien ici : chaque lecture la
  * vérifie (garde du mode réel et cookie d'accès), et elle reste fermée hors de la préversion de `p0-reel`. Un échec du
  * branchement est journalisé sans arrêter le serveur : la liste reste vide, comme sans barrière.
  *
@@ -76,6 +77,16 @@ async function brancherLecturePrototype(
     const { poolLectureProgrammes } = await import("@/server/p0/lecture-programmes");
     const { creerRelecteurReel } = await import("@/server/p0/relecture");
     brancherLectureProgrammesReels(() => poolLectureProgrammes(), creerRelecteurReel());
+  } catch (error) {
+    logEvent("p0.read_unavailable", { errorName: errorNameOf(error) }, "error");
+    return;
+  }
+  try {
+    // Spécification E2E-essai, lot 1 : déblocage simulé d'un voyage d'essai retenu par cookie signé (clé tirée du code
+    // d'accès, garde du mode réel ouverte seulement ; rien n'est lu ici). Échec : seul le droit simulé de la portée reste.
+    const { brancherDeblocagesEssai } = await import("@/adapters/prototype-instance");
+    const { deblocagesEssaiParCookie } = await import("@/server/essai/deblocage");
+    brancherDeblocagesEssai(deblocagesEssaiParCookie);
   } catch (error) {
     logEvent("p0.read_unavailable", { errorName: errorNameOf(error) }, "error");
   }

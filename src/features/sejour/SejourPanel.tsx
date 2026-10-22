@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
+import { Button } from "@/components/ligne/Button";
 import { ChecklistRow } from "@/components/ligne/ChecklistRow";
 import { Counter } from "@/components/ligne/Counter";
 import { DayBadge } from "@/components/ligne/DayBadge";
@@ -16,7 +17,7 @@ import { currentDayIndex } from "@/features/voyage/today";
 import { useClientNow } from "@/features/voyage/use-client-now";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { formatTitreJour } from "@/lib/dates";
+import { accessUntil, formatTitreJour } from "@/lib/dates";
 
 import { EventLines, eventRange } from "./EventLines";
 import { useSejourOrigin } from "./SejourOrigin";
@@ -41,6 +42,24 @@ function counterLabel(remaining: number): string {
 }
 
 /**
+ * Journées du séjour absentes du voyage servi (spécification E2E-essai, lot 1) : un voyage d'essai non débloqué ne sert
+ * que les journées de ses premières propositions. Chaque date du séjour (du départ au retour, sur le calendrier) qui
+ * n'est pas une journée servie, avec son numéro de jour ; vide pour un voyage débloqué.
+ */
+export function joursADebloquer(trip: { unlocked: boolean; start: string; end: string; days: readonly { date: string }[] }): { index: number; date: string }[] {
+  if (trip.unlocked || trip.end < trip.start) return [];
+  const servies = new Set(trip.days.map((day) => day.date));
+  const jours: { index: number; date: string }[] = [];
+  // Borne de sécurité : un séjour du prototype dure 15 jours au plus (D1).
+  for (let rang = 0; rang < 31; rang += 1) {
+    const date = accessUntil(trip.start, rang);
+    if (date > trip.end) break;
+    if (!servies.has(date)) jours.push({ index: rang + 1, date });
+  }
+  return jours;
+}
+
+/**
  * Contenu du panneau de l'écran 11 « Séjour » (spécification F5, F5-PO-3), dans cet ordre : plaque de la
  * destination (titre de niveau 1), budget, « À faire avant de partir », « Pendant ton séjour », « Jour par
  * jour ». Le voyage vient du contexte de `TripShell` : les lignes cochées y sont conservées d'un onglet à
@@ -48,7 +67,8 @@ function counterLabel(remaining: number): string {
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
 export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
-  const { trip, routes, actions, placesFromGoogle } = useTripShell();
+  const { trip, routes, actions, placesFromGoogle, unlockHref } = useTripShell();
+  const verrouilles = joursADebloquer(trip);
   // Lien « Aujourd'hui · Jour {n} » (F10-PO-7) : aux dates du voyage, à la date de la destination, calculée dans
   // le navigateur après le montage ; seulement avec la base `/voyages` (pas de page `R15` de développement).
   // Décalage assumé : aux dates du voyage, le lien apparaît après le montage et pousse le panneau d'une hauteur
@@ -183,7 +203,25 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
               </Link>
             </li>
           ))}
+          {verrouilles.map((day) => (
+            <li key={`verrouille-${day.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
+              <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
+                <DayBadge day={day.index} size="sm" disabled />
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
+                  <span className="text-corps-s text-ink-soft">{ts.jourParJour.aDebloquer}</span>
+                </span>
+              </span>
+            </li>
+          ))}
         </ul>
+        {verrouilles.length > 0 && unlockHref ? (
+          <Button asChild className="mt-2 self-start">
+            <Link href={unlockHref} prefetch={false} data-part="debloquer">
+              {ts.jourParJour.debloquer}
+            </Link>
+          </Button>
+        ) : null}
       </section>
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />

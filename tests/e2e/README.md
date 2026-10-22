@@ -44,6 +44,13 @@ port du premier + 1 000, `PROTOTYPE_URL` de `prototype-helpers.ts`), lancé avec
 `VADROUILLE_PROTOTYPE=1`, `CI=true` et `VADROUILLE_PROTOTYPE_DIR` sur `prototype/programmes-test/` (programme fabriqué à la
 main, valeurs sentinelles, relecteur simulé). Aucune requête vers Google.
 
+## Voyage d'essai (spécification E2E-essai, lot 1)
+`essai.e2e.spec.ts` et `essai.a11y.spec.ts` visent un **sixième serveur** sur le même build (port du premier + 5 000,
+`ESSAI_URL` de `essai-helpers.ts`), en mode prototype sur `prototype/programmes-essai/` : un programme fabriqué à la main
+**sans propositions enregistrées** (forme écrite par `p0Run`), servi comme un voyage de l'app non débloqué (premières
+propositions, tri, déblocage simulé, journées). Paiement simulé ouvert par la liste blanche de `prototype`, portée de
+simulation par test (`R-sim`). Aucune requête vers Google ni vers un autre hôte.
+
 ## Service workers (F10b, F10-TL-6)
 `playwright.config.ts` bloque les service workers par défaut (`use.serviceWorkers: "block"`) et pose
 `PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1`, pour que les requêtes du service worker passent par `context.route` (blocage

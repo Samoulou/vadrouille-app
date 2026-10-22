@@ -69,9 +69,10 @@ function questionsDe(session: PreferenceSession): PreferencePrompt[] {
 /**
  * Implémentation locale, en mémoire (`mock`, `prototype` : session de F6, B10-PO-18) : la règle de la question est
  * celle de `@/domain/preferences` (`questionApres`, `questionDeDistance`), la même que le serveur (décision 0112 § 2).
- * Une seule décision annulable.
+ * Une seule décision annulable. `questions: false` (voyage d'essai, spécification E2E-essai, lot 1) : aucune question de
+ * préférence, les refus restent notés en mémoire.
  */
-export function createLocalDeckActions(): DeckActions & { session(): PreferenceSession } {
+export function createLocalDeckActions({ questions = true }: { questions?: boolean } = {}): DeckActions & { session(): PreferenceSession } {
   let session = emptySession();
   let lastDecision: { proposalId: string; before: PreferenceSession } | null = null;
 
@@ -86,6 +87,8 @@ export function createLocalDeckActions(): DeckActions & { session(): PreferenceS
         ...session,
         dislikes: [...session.dislikes, { proposalId: input.proposalId, category: input.category }],
       };
+      // Voyage d'essai (spécification E2E-essai, lot 1) : catégories non écrites par le programme, aucune question.
+      if (!questions) return { prompt: null };
       const signaux = signauxDe(session);
       const decision = signaux[signaux.length - 1];
       const prompt = decision === undefined ? null : questionApres(signaux, questionsDe(session), decision);

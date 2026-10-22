@@ -11,9 +11,9 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { prototypeTripAdapter } from "./prototype-instance";
+import { deblocagesEssai, prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
-import { adapterChoice, paymentAvailable } from "./payment-guard";
+import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
@@ -181,11 +181,34 @@ export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): 
 export function getTripReader(options: { scope?: SimulationScope } = {}): TripAdapter {
   const base = getTripAdapter();
   if (!paymentAvailable()) return base;
+  if (isPrototypeAdapter()) {
+    // Voyage d'essai (spécification E2E-essai, lot 1) : débloqué par le droit simulé de la portée, ou par le cookie signé
+    // de l'essai (préversion seulement, garde du mode réel ouverte) ; l'adaptateur sert alors toutes ses journées.
+    return prototypeTripAdapter(process.env, async (ctx, tripId) => {
+      const scope = options.scope ?? (await getSimulationScope());
+      if ((await mockPaymentFor(scope).getEntitlement(ctx, tripId)).unlocked) return true;
+      return (await deblocagesEssai()?.lire(ctx))?.has(tripId) === true;
+    });
+  }
   return withSimulatedUnlock(
     base,
     async (ctx, tripId) => mockPaymentFor(options.scope ?? (await getSimulationScope())).getEntitlement(ctx, tripId),
     counterpartOf,
   );
+}
+
+/**
+ * Retient le déblocage simulé d'un voyage d'essai (spécification E2E-essai, lot 1) après un paiement simulé réussi :
+ * cookie signé de l'essai, écrit par une action serveur seulement. Sans effet hors adaptateur `prototype`, paiement
+ * simulé indisponible ou cookie non branché (garde du mode réel fermée). Ne lève jamais.
+ */
+export async function retenirDeblocageEssai(ctx: AdapterContext, tripId: string): Promise<void> {
+  if (!isPrototypeAdapter() || !paymentAvailable()) return;
+  try {
+    await deblocagesEssai()?.retenir(ctx, tripId);
+  } catch {
+    // Cookie non écrit : le droit simulé de la portée reste ; la page n'échoue pas.
+  }
 }
 
 /**
