@@ -336,7 +336,7 @@ describe("recalcul (B10b) : le programme suit le tri", () => {
             decores.push(s);
             const j = journalDePrompts(d.modeles);
             journaux.push(j);
-            return { ...d, places: s.places, routes: s.routes, modeles: j.client };
+            return { ...d, places: { ...d.places, textSearch: s.places.textSearch, details: s.places.details }, routes: s.routes, modeles: j.client };
           },
         });
       expect((await deroulerLot(entreeDuLot(org, avant), dependances(fabrique))).fin.arret).toBeUndefined();
@@ -440,6 +440,39 @@ describe("recalcul (B10b) : une exécution par tri clos, rien avant le déblocag
     const cloture = clos.clotures[0]!.id;
     expect(lot(apres)).toMatchObject({ deck_closure_id: cloture, base_version: 1, request_id: requestIdDuLot(cloture) });
     expect(demarrerRecalcul).toHaveBeenCalledTimes(1);
+  }, 180_000);
+  it("suite du déblocage, aperçu sans proposition (0119 § 1.3 point 3, 0120 S2 point 5) : ni clôture ni exécution, sans case ou quand la dernière exécution preview n'en a écrit aucune", async () => {
+    // 1. Exécution `preview` sans aucune case.
+    const org = await createOrg(auth);
+    const tripId = await apercuPublie(org);
+    await admin.query("DELETE FROM public.proposals WHERE organization_id = $1 AND trip_id = $2", [org.org, tripId]);
+    const entitlementId = await debloquer(org, tripId);
+    const demarrerRecalcul = espionLot();
+    const demarrer = espionComplet();
+    await suite({ demarrer, demarrerRecalcul })({ entitlementId, tripId, organizationId: org.org });
+    const sans = await lignes(org, tripId);
+    expect(sans.clotures).toEqual([]);
+    expect(sans.lots).toEqual([]);
+    expect(demarrerRecalcul).not.toHaveBeenCalled();
+    // Le voyage complet démarre quand même.
+    expect(demarrer).toHaveBeenCalledTimes(1);
+
+    // 2. Une exécution plus ancienne a écrit des cases (et une décision), la dernière `preview` aucune : même règle que la lecture.
+    const autre = await createOrg(auth);
+    const voyage = await apercuPublie(autre);
+    expect((await decider(autre, voyage, "v1-j1-1", "dislike")).ok).toBe(true);
+    await admin.query(
+      `INSERT INTO public.generation_runs (organization_id, trip_id, kind, phase, started_at, updated_at, finished_at)
+       VALUES ($1, $2, 'preview', 'failed', now() + interval '1 hour', now() + interval '1 hour', now() + interval '1 hour')`,
+      [autre.org, voyage],
+    );
+    const droit = await debloquer(autre, voyage);
+    const relance = espionLot();
+    await suite({ demarrerRecalcul: relance })({ entitlementId: droit, tripId: voyage, organizationId: autre.org });
+    const recente = await lignes(autre, voyage);
+    expect(recente.clotures).toEqual([]);
+    expect(recente.lots).toEqual([]);
+    expect(relance).not.toHaveBeenCalled();
   }, 180_000);
 });
 
@@ -557,10 +590,12 @@ describe("recalcul (B10b) : déblocage sans perte, collision et organisation (01
 
 describe("recalcul (B10b) : arrêts, expiration et rejeu (critères communs rejoués sur le workflow 5)", () => {
   it("workflows: plafond ou quota atteint conserve le dernier programme valide (étapes a et e)", async () => {
+    const FICHES_COMPTEES: PlafondsUsage = { ...PLAFONDS, generations: { ...PLAFONDS.generations, lot: { ...PLAFONDS.generations.lot, placesDetails: 1 } } };
     const cas: { readonly nom: string; readonly a: PlafondsUsage; readonly e: PlafondsUsage; readonly rang: number }[] = [
       { nom: "plafond de l'organisation à l'étape a", a: { ...PLAFONDS, parOrganisationJourMicros: 1 }, e: PLAFONDS, rang: 1 },
       { nom: "quota à l'étape a", a: { ...PLAFONDS, limites: { ...PLAFONDS.limites, quotaJourParMethode: 1 } }, e: PLAFONDS, rang: 1 },
-      { nom: "plafond du lot à l'étape e", a: PLAFONDS, e: { ...PLAFONDS, generations: { ...PLAFONDS.generations, lot: { ...PLAFONDS.generations.lot, placesDetails: 1 } } }, rang: 2 },
+      // Même forfait réservé à `a` et retrouvé à `e` (réservation idempotente par exécution) : la part de fiches s'épuise à `e`.
+      { nom: "plafond du lot à l'étape e", a: FICHES_COMPTEES, e: FICHES_COMPTEES, rang: 2 },
     ];
     const codes: string[] = [];
     for (const c of cas) {

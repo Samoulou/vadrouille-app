@@ -122,7 +122,6 @@ const SQL_MOBILITE = "SELECT mobility FROM public.briefs WHERE organization_id =
 const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
 
-
 /** Ordre : `id` (aucune colonne d'ordre dans `checklist_items` ; question au rôle data, PR de B6a). */
 const SQL_A_FAIRE = `SELECT id, label, moment, done, booking_url, sponsored, stop_id
   FROM public.checklist_items WHERE organization_id = $1 AND trip_id = $2 ORDER BY id`;

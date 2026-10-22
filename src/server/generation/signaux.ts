@@ -4,6 +4,7 @@ import { ProposalRecordSchema, type Category } from "@/contracts";
 import { CATEGORIES, PREFERENCE_REASONS, PREFERENCE_SIGNAL_ORIGINS, PREFERENCE_SIGNAL_STATUSES, PREFERENCE_SIGNALS } from "@/contracts/values";
 import type { PropositionDuRecalcul, SignalDuRecalcul, TriDuRecalcul } from "@/domain/recalcul";
 import { optionsDesRepas } from "@/domain/recomposition";
+import { SQL_CASES } from "@/server/presentation/etat";
 
 import { LectureIllisible } from "./illisible";
 
@@ -34,9 +35,6 @@ const SQL_CLOTURE = `SELECT c.generation_run_id, c.phase, c.through_position,
       WHERE p.organization_id = c.organization_id AND p.trip_id = c.trip_id AND p.generation_run_id = c.generation_run_id
         AND p.phase = c.phase AND p.through_position < c.through_position) AS precedente
   FROM public.deck_closures c WHERE c.organization_id = $1 AND c.trip_id = $2 AND c.id = $3`;
-
-const SQL_CASES_DE_L_EXECUTION = `SELECT id, position, slot_type, day, time, kind, candidate_id, content FROM public.proposals
-  WHERE organization_id = $1 AND trip_id = $2 AND generation_run_id = $3 AND phase = $4 ORDER BY position`;
 
 /** Catégorie de chaque lieu ancré du voyage (étape d'un jour sans case : catégorie arrêtée, `TriDuRecalcul.categories`). */
 const SQL_CATEGORIES = `SELECT DISTINCT ON (place_id) place_id, category FROM public.candidates
@@ -103,7 +101,7 @@ export async function lireTriClos(x: ExecuteurSignaux, organizationId: string, t
   if (cloture === undefined) throw invalide();
   const jusqua = Number(cloture.through_position);
   const depuis = cloture.precedente === null || cloture.precedente === undefined ? 0 : Number(cloture.precedente);
-  const lignes = (await x.query(SQL_CASES_DE_L_EXECUTION, [organizationId, tripId, texte(cloture.generation_run_id), texte(cloture.phase)])).rows.filter(
+  const lignes = (await x.query(SQL_CASES, [organizationId, tripId, texte(cloture.generation_run_id), texte(cloture.phase)])).rows.filter(
     (ligne) => ligne.slot_type === "proposal",
   );
   const records = lignes.map((ligne) => {

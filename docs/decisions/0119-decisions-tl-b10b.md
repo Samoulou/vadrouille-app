@@ -238,6 +238,7 @@ B10b-migration et B10b-domaine n'ont aucun fichier commun : elles peuvent partag
 - Si le relevé réel (après le premier essai de Samuel, B10-PO-17) montre que le workflow 5 dépasse 60 secondes, ou qu'une seule étape `e` approche l'échéance d'une fonction (0075). On séparerait alors relecture et publication en deux étapes.
 - Si la recherche du workflow 4 dépense de façon notable pour des candidats écartés à `e` (§ 3 point 4).
 - Si « trier à deux » entre dans le périmètre (verrou du tri, une exécution en cours par voyage).
+- **Limite connue du moteur** (relecture de #656, Q581 ; ajoutée par la PR B10b-serveur, ticket #662) : quand un même jour a un créneau de repas rouvert (« Pas pour moi » sur la dernière option) **et** un repas choisi sur une autre option d'un autre créneau, `replanifierJour` peut poser le repas choisi à l'heure du créneau rouvert, le créneau de son option restant « pas encore choisi » : `choix` ne lie pas un candidat à un créneau. Comportement épinglé par le test « Q581 » de `src/domain/recalcul.test.ts` ; la cible (le repas choisi garde le créneau de son option) est l'`it.todo` voisin et le ticket #664 « créneau imposé pour un candidat ».
 - Si B11 écrit des versions par un autre chemin que le module unique, ou sans le verrou des versions (§ 1.6 point 1).
 - Si Samuel répond aux questions 3 ou 4 : PR de montants (profil `lot` de `PLAFONDS_USAGE`), PR d'ouverture de `RECALCUL_FIN_APERCU`.
 

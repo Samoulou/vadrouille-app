@@ -396,7 +396,7 @@ describe("recalcul: cas fixés par B10b-serveur (Q581, Q582, Q584)", () => {
     candidat: c,
   });
 
-  it("Q581 (limite acceptée, 0119 « Quand revoir », ticket #664) : créneau rouvert et repas choisi sur une autre option le même jour — le moteur pose le repas choisi dans le créneau rouvert", () => {
+  it("Q581 (limite acceptée, 0119 « Quand revoir », ticket n° 664) : créneau rouvert et repas choisi sur une autre option le même jour — le moteur pose le repas choisi dans le créneau rouvert", () => {
     // Dîner placé refusé (créneau réglé sans choix, rouvert) ; déjeuner libre dont l'option 2 est choisie.
     const dej1 = optionDejeuner(1, candidat("dej1", "meal"), 2);
     const dej2 = optionDejeuner(2, OPTION_DEJ_2, 2);
@@ -412,7 +412,7 @@ describe("recalcul: cas fixés par B10b-serveur (Q581, Q582, Q584)", () => {
     expect(lieuxDe(jour).has(DINER.placeId)).toBe(false);
   });
 
-  it.todo("Q581, cible du ticket #664 « créneau imposé pour un candidat » : le repas choisi garde le créneau de son option (déjeuner), le créneau rouvert reste « pas encore choisi »");
+  it.todo("Q581, cible du ticket n° 664 « créneau imposé pour un candidat » : le repas choisi garde le créneau de son option (déjeuner), le créneau rouvert reste « pas encore choisi »");
 
   it("Q584 : « Pas pour moi » sur l'option placée qui n'est pas la dernière — repas retiré, créneau non rouvert, repas « pas encore choisi »", () => {
     const options = optionsDiner();
