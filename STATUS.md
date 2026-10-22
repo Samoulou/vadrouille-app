@@ -1,32 +1,33 @@
-# État du studio — 2026-10-22 (144e cycle)
+# État du studio — 2026-10-22 (145e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-22 19:45 UTC (fil) : « Comment ? » : réponse en clair : « Créer un voyage », écrans 1 à 3, tri et déblocage simulé sont prêts dans l'app ; mise à jour du site d'essai ce soir puis un lien ; le lancement de la vraie génération vient après le site web des activités.
-- Aucun message de Samuel dans #studio depuis le 143e cycle.
+- Aucun message de Samuel depuis le 144e cycle (dernier : « Comment ? », 19:45 UTC, traité).
 
 ## Fait
-- **Amendement 3 de `specs/P0-programme-par-ia.md`** fusionné (#686, 18:37 UTC) : critère A2 du rapport sur les seuls `placeId`, page du rapport sans changement de `src/contracts`, test A2 remplacé sous 0122 § 2.3 et PPI-PO-12.
-- **Statut du 143e cycle** (#698) fusionné.
-- **#694** : suite de la correction 1 poussée (`5e90aac` : test de la borne raccourcie par l'échéance, A22, renvois aux décisions) ; relecture relancée après la fusion de #686.
-- **#688** : bloquant tardif corrigé (`64ef212` : 0019 § 3.2 point 5 et étape 3 de R2 listés, requalification bornée hors CI rouge et contrats).
+- **Lot 2a fusionné** (#694, 20:14 UTC) : un nouvel essai remet le lien vers le site officiel de l'activité dans le détail de l'étape, après vérification que le site répond (0121, 0122, amendement 3).
+- **Décision 0123** (règles allégées, décision de Samuel) fusionnée (#688, 20:13 UTC).
+- **Note de version v2026.10.22-21** (#700) et statut du 144e cycle (#699) fusionnés.
+- **Report vers le site d'essai ouvert** (#701, `main` à `d9df20c` vers `p0-reel`) : saisie (lot 2), premières propositions, tri et déblocage simulé (lot 1), site web de l'activité (lot 2a). Fusion par Samuel (« Create a merge commit ») ; migration 0016 déjà appliquée, aucun run `db-migrate`.
+- **Lot 3 lancé** (ticket #702, branche `claude/702-e2e-lot-3`) : le formulaire de l'app lance `p0Run` sur le brief saisi et mène à l'écran 5. Décision 0125 réservée pour son contrat.
 
 ## En cours
-- **#694 `[ia]` lot 2a** : en relecture sur `5e90aac` ; son seul bloquant était la fusion de #686.
-- **#688 `[ceo]` décision 0123** : en relecture.
+- **Lot 3** (#702) : en cours de code ; migration du schéma `prototype`, puis `owner-approved` et run `db-migrate` par Samuel.
+- **#701 `[release]`** : attend la fusion de Samuel, puis un lien de test lui sera envoyé.
 - Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595).
 
 ## Bloqué
-- **Lots 3 et 5** : après la fusion de #694 (mêmes fichiers `src/server/p0/` et `src/workflows/p0-run.ts`).
+- **Lot 5** (« à éviter » transmis à l'IA) : après le lot 3 (il étend sa conversion).
 - **Lot 4** : après le lot 3.
 - **Ancienne chaîne en préversion** : Q538, Q551, Q556 sans objet pour le test de bout en bout ; à revoir pour le MVP.
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** (#527) : Q438.
 
 ## Prochain cycle
-1. Dès la fusion de #694 : lot 3 (le formulaire lance `p0Run` sur le brief saisi ; migration `prototype` avec `owner-approved` de Samuel puis un run) et lot 5.
-2. Mise à jour du site d'essai (`p0-reel`) par la routine Release de 21:52 UTC : lots 1 et 2 ; envoyer à Samuel un seul lien après sa fusion.
-3. Point pour le Tech Lead : `next build` affiche une recommandation de mise à jour de sécurité de Next.js (signalée par #686 et #694 ; aucun agent n'a mis à jour).
+1. Après la fusion de #701 : envoyer à Samuel un seul lien pour tester « Créer un voyage », les écrans 1 à 3, le tri et le déblocage simulé, et relancer Rome pour voir le site web.
+2. Relire la PR du lot 3 dès qu'elle est ouverte ; demander à Samuel l'`owner-approved` puis le run `db-migrate`.
+3. Lots 4 et 5 après le lot 3.
+4. Point pour le Tech Lead : `next build` affiche une recommandation de mise à jour de sécurité de Next.js.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
