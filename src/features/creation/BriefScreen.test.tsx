@@ -373,3 +373,38 @@ describe("BriefScreen : vérification", () => {
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau");
   });
 });
+
+describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () => {
+  function renderEssai(initial: DraftState = ready()) {
+    return render(
+      <DraftProvider initial={initial}>
+        <BriefScreen recorder={recorder} essai />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  it("« Préparer mon brief » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
+    const { container } = renderEssai();
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining("Sur le site d'essai, ton récit est gardé tel quel"));
+    fireEvent.change(story(), { target: { value: STORY } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    });
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(latest?.stage).toBe("review");
+    expect(latest?.story).toBe(STORY);
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+    expect(screen.queryByText("Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.")).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("récit trop court : même erreur au champ, aucun appel", () => {
+    renderEssai();
+    fireEvent.change(story(), { target: { value: "Trop court." } });
+    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(story()).toHaveAttribute("aria-invalid", "true");
+    expect(latest?.stage).toBe("story");
+  });
+});

@@ -167,3 +167,29 @@ describe("LodgingScreen : suggestion", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(t.echec));
   });
 });
+
+describe("LodgingScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () => {
+  function renderEssai(initial: DraftState = draftForLodging(MOCK_DEMO_TRIP_DRAFT)) {
+    return render(
+      <DraftProvider initial={initial}>
+        <LodgingScreen essai />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  it("aucune demande, aucun bandeau ni carte : une phrase et « Continuer sans logement » ; axe", async () => {
+    const { container } = renderEssai();
+    expect(screenStatus()).toHaveTextContent(
+      "Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre de Édimbourg.",
+    );
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+    expect(container.querySelector("[data-part='squelette']")).toBeNull();
+    expect(container.querySelector("[data-area-map]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: t.continuerSansLogement }));
+    expect(latest?.lodgingChoices).toEqual({ destination: { kind: "none" } });
+    expect(router.push).toHaveBeenCalledWith("/connexion?suite=%2Fvoyages%2Fnouveau%2Flancer");
+    expect(suggestLodging).not.toHaveBeenCalled();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});

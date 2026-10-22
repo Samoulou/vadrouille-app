@@ -10,10 +10,7 @@ import {
 } from "@/adapters";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
-import type { TripSummary } from "@/contracts";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
-import { contexteFacultatif } from "@/features/compte/session";
-import { PrototypeSection } from "@/features/accueil/PrototypeSection";
 import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
@@ -47,10 +44,9 @@ function demoLinks(): DemoLink[] {
  * Page d'accueil : nom, promesse et « Créer un voyage » (`Button` `primary` en pleine largeur, lien vers l'écran 1
  * `/voyages/nouveau` ; demande de Samuel transmise par le CEO, ticket #259), quel que soit l'adaptateur. Avec
  * l'adaptateur `mock` seulement, section « Démonstration » vers les parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
- * Avec l'adaptateur `prototype` seulement, section « Prototype » (spécification P0, P0-PO-11) : un voyage par
- * programme du dossier, absente sans programme ; hors liste blanche de l'adaptateur `prototype`, `contexteFacultatif()`
- * relance l'erreur de `getRequestContext()` (erreur 500) ; avec `AUTH_ADAPTER=better-auth` et sans session, il rend
- * `null` et la section est absente (aucune redirection depuis l'accueil).
+ * Site d'essai (adaptateur `prototype`) : une seule app (spécification E2E-essai, lot 2) ; la section « Prototype » de
+ * P0-PO-11 est retirée et ses voyages se lisent dans « Mes voyages », lien secondaire sous « Créer un voyage ». Hors
+ * liste blanche de l'adaptateur `prototype`, la page lève (erreur 500), comme avant.
  */
 export default async function HomePage() {
   let demo: { destination?: string } | null = null;
@@ -58,12 +54,9 @@ export default async function HomePage() {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);
     demo = { destination: trip?.destination };
   }
-  let prototype: TripSummary[] = [];
-  if (isPrototypeAdapter()) {
-    // Sans session (`better-auth`, B3c) : aucune section « Prototype ».
-    const ctx = await contexteFacultatif();
-    prototype = ctx === null ? [] : await getTripAdapter().listTrips(ctx);
-  }
+  // Garde de l'adaptateur `prototype` (liste blanche, décision 0032 § A4.2) : lève hors de la préversion, sans rien lire.
+  const essai = isPrototypeAdapter();
+  if (essai) getTripAdapter();
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">
       <h1 className="text-destination font-extrabold tracking-[-0.02em] text-ink">{PRODUCT_NAME}</h1>
@@ -76,10 +69,10 @@ export default async function HomePage() {
           <DemoSection destination={demo.destination} links={demoLinks()} />
         </div>
       ) : null}
-      {prototype.length > 0 ? (
-        <div className="mt-6">
-          <PrototypeSection trips={prototype} />
-        </div>
+      {essai ? (
+        <Button asChild variant="secondary" className="w-full">
+          <Link href={mesVoyagesRoute()}>{messages.accueil.mesVoyages}</Link>
+        </Button>
       ) : null}
     </main>
   );

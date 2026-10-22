@@ -356,7 +356,6 @@ describe("adaptateurs: prototype sans cache", () => {
   // rendue statiquement à la construction sans aucune donnée (`force-static`, F10-TL-4).
   const SANS_EXPORT = [
     "src/app/(creation)/layout.tsx",
-    "src/app/(creation)/voyages/nouveau/page.tsx",
     "src/app/hors-ligne/page.tsx",
     "src/app/layout.tsx",
     "src/app/voyages/layout.tsx",

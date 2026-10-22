@@ -28,7 +28,17 @@ const BOUTON_EN_COURS = "aria-disabled:cursor-not-allowed aria-disabled:bg-muted
  *   présentes dès l'affichage, vides ; accepté, le focus passe au titre ; refusé, l'erreur est reliée au champ
  *   (`aria-invalid`, `aria-describedby`) et le focus revient au champ.
  */
-export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
+export interface SaisieCodeAccesProps {
+  ouverte: boolean;
+  /**
+   * Saisie dans le parcours de création (spécification E2E-essai, lot 2, D3) : titre et aide propres, rendue sans
+   * `<main>` dans le cadre de l'écran appelant (`CreationShell`) ; `surAcces` est appelée une fois l'accès accepté.
+   * Absente : page `/prototype/executions`, inchangée.
+   */
+  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void };
+}
+
+export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
   const [etat, envoyer, enCours] = useActionState(saisirCodeAccesP0, ETAT_INITIAL);
   // Posé à l'envoi, avant que `enCours` ne soit rendu : bloque aussi un second envoi dans le même instant.
   const envoiEnVol = useRef(false);
@@ -37,11 +47,14 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
   const acces = ouverte || etat.statut === "accepte";
   const erreur = etat.statut === "invalid_code" || etat.statut === "too_many_attempts" || etat.statut === "erreur" ? t.erreurs[etat.statut] : null;
 
+  const surAcces = parcours?.surAcces;
   useEffect(() => {
     envoiEnVol.current = false;
-    if (etat.statut === "accepte") titre.current?.focus();
-    else if (etat.statut !== "attente") champ.current?.focus();
-  }, [etat]);
+    if (etat.statut === "accepte") {
+      titre.current?.focus();
+      surAcces?.();
+    } else if (etat.statut !== "attente") champ.current?.focus();
+  }, [etat, surAcces]);
 
   const surEnvoi = (evenement: FormEvent<HTMLFormElement>) => {
     if (envoiEnVol.current || enCours) {
@@ -51,17 +64,17 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
     envoiEnVol.current = true;
   };
 
-  return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
+  const contenu = (
+    <>
       <h1 ref={titre} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
-        {t.titre}
+        {parcours?.titre ?? t.titre}
       </h1>
       <p role="status" className={acces ? "text-corps text-ink" : EMPTY_LIVE_REGION_CLASS}>
         {acces ? t.ouverte : null}
       </p>
       {acces ? null : (
         <form action={envoyer} onSubmit={surEnvoi} className="flex flex-col gap-6">
-          <p className="text-corps text-ink-soft">{t.aide}</p>
+          <p className="text-corps text-ink-soft">{parcours?.aide ?? t.aide}</p>
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor={CHAMP_ID}>{t.libelle}</FieldLabel>
             <input
@@ -84,6 +97,8 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
           </Button>
         </form>
       )}
-    </main>
+    </>
   );
+  if (parcours) return contenu;
+  return <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">{contenu}</main>;
 }

@@ -36,7 +36,7 @@ import {
   TextField,
 } from "./fields";
 import { creationRoutes } from "./routes";
-import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
+import { cityRanges, ESSAI_JOURS_MAX, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
 const e1 = t.ecran1;
@@ -56,11 +56,18 @@ function messageFor(field: string, code: FieldError): string {
   const last = field.split(".").pop() ?? field;
   const inCity = field.startsWith("otherCities.");
   const inCommitment = field.startsWith("commitments.");
-  if (field === "destination") return code === "length" ? length(DESTINATION_LENGTH) : err.destination;
+  if (field === "destination") {
+    return code === "length" ? length(DESTINATION_LENGTH) : code === "unknownCity" ? err.villeInconnue : err.destination;
+  }
   if (field === "start") return code === "past" ? err.arriveePassee : err.arrivee;
-  if (field === "end") return code === "endBeforeStart" ? err.departAvantArrivee : err.depart;
+  if (field === "end") {
+    if (code === "tooLong") return format(err.tropLong, { max: ESSAI_JOURS_MAX });
+    return code === "endBeforeStart" ? err.departAvantArrivee : err.depart;
+  }
   if (last === "lodging") return err.logement;
-  if (inCity && last === "name") return code === "length" ? length(CITY_NAME_LENGTH) : err.villeNom;
+  if (inCity && last === "name") {
+    return code === "length" ? length(CITY_NAME_LENGTH) : code === "singleCity" ? err.uneSeuleVille : err.villeNom;
+  }
   if (inCity && last === "arrival") {
     return code === "cityOrder" ? err.villeOrdre : code === "cityBeforeEnd" ? err.villeAvantDepart : err.villeArrivee;
   }
@@ -71,12 +78,20 @@ function messageFor(field: string, code: FieldError): string {
   return err.fin;
 }
 
+export interface CreateTripFormProps {
+  /**
+   * Site d'essai (adaptateur `prototype`, valeur serveur lue par la page ; spécification E2E-essai, lot 2, critère 2) :
+   * une seule ville, connue de la table des fuseaux, 15 jours au plus, refusés au champ.
+   */
+  essai?: boolean;
+}
+
 /**
  * Écran 1 « Créer le voyage » (`R1`, F8-PO-3 ; rendus et textes provisoires, décision 0018 § 15). Aucun appel
  * serveur : « Continuer » valide, garde la saisie dans le brouillon et mène à l'écran 2. Destination, logement,
  * villes et engagements sont saisis en texte libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm() {
+export function CreateTripForm({ essai = false }: CreateTripFormProps = {}) {
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const { trip } = state;
@@ -115,7 +130,7 @@ export function CreateTripForm() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso());
+    const found = validateTrip(trip, todayIso(), { essai });
     setErrors(found);
     const first = found[0];
     if (first) {

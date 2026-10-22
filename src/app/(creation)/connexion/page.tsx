@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { getAuthAdapter } from "@/adapters";
+import { getAuthAdapter, isPrototypeAdapter } from "@/adapters";
 import { SignInForm } from "@/features/compte/SignInForm";
 import { normaliserSuite } from "@/features/compte/suite";
 import { creationRoutes } from "@/features/creation/routes";
@@ -27,10 +27,14 @@ type SearchParams = Record<string, string | string[] | undefined>;
  * F8c : appelée par la création (`suite` = `R-lancer`) alors qu'une session existe dans la portée de la requête,
  * l'adresse est remplacée par `R-lancer` (une personne déjà connectée saute l'écran 4, F8-PO-2 ; `redirect` d'un
  * composant serveur remplace l'entrée d'historique). Le brouillon, dans le layout du groupe `(creation)`, est conservé.
+ *
+ * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, D3) : le code d'accès tient lieu de compte,
+ * demandé par `R-lancer` lui-même ; appelée par la création, la page mène à `R-lancer` sans lire l'adaptateur `auth`.
  */
 export default async function ConnexionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const raw = (await searchParams).suite;
   const suite = normaliserSuite(Array.isArray(raw) ? raw[0] : raw);
+  if (suite === creationRoutes.lancer() && isPrototypeAdapter()) redirect(suite);
   const adapter = getAuthAdapter();
   if (suite === creationRoutes.lancer() && (await hasSession())) redirect(suite);
   return <SignInForm suite={suite} codeTtlMs={adapter.config.codeTtlMs} authMode={adapter.mode} />;

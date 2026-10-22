@@ -29,8 +29,11 @@ const SECTION_TITLE_CLASS = "text-section font-extrabold text-ink";
  * paramètre). Sans brief validé ni ville à loger (rechargement, accès direct), l'adresse est remplacée par `R1`, qui
  * annonce « Ton brouillon n'a pas été conservé. ». « Retour » mène à l'écran 3 de la ville précédente sans
  * logement, sinon à l'écran 2 (état « Vérification »).
+ *
+ * Site d'essai (`essai`, adaptateur `prototype`, valeur serveur lue par la page ; spécification E2E-essai, lot 2,
+ * critère 1, et D2) : aucune suggestion demandée, aucun bandeau ; une phrase et « Continuer sans logement ».
  */
-export function LodgingScreen() {
+export function LodgingScreen({ essai = false }: { essai?: boolean } = {}) {
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const city = state.lodgingCity;
@@ -73,6 +76,7 @@ export function LodgingScreen() {
         city={city}
         name={name}
         focusTitle={moved}
+        essai={essai}
         request={() => suggestLodging({ draft: toTripDraft(state.trip, state.lodgingChoices), city })}
         onChoose={choose}
       />
@@ -84,18 +88,20 @@ type Status =
   | { kind: "loading" }
   | { kind: "ready"; suggestion: LodgingSuggestion }
   | { kind: "noOption" }
-  | { kind: "failed" };
+  | { kind: "failed" }
+  | { kind: "essai" };
 
 interface LodgingCityProps {
   city: number;
   name: string;
   focusTitle: boolean;
+  essai: boolean;
   request: () => ReturnType<typeof suggestLodging>;
   onChoose: (choice: LodgingChoice) => void;
 }
 
-function LodgingCity({ name, focusTitle, request, onChoose }: LodgingCityProps) {
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
+function LodgingCity({ name, focusTitle, essai, request, onChoose }: LodgingCityProps) {
+  const [status, setStatus] = useState<Status>(essai ? { kind: "essai" } : { kind: "loading" });
   const titleRef = useRef<HTMLHeadingElement>(null);
   // Numéro de la demande en cours : une réponse arrivée après une nouvelle demande ou le démontage est ignorée.
   const attempt = useRef(0);
@@ -125,15 +131,26 @@ function LodgingCity({ name, focusTitle, request, onChoose }: LodgingCityProps) 
   }
 
   useEffect(() => {
+    // Site d'essai (D2) : aucune demande.
+    if (essai) return;
     // Une demande à l'arrivée sur la ville (état initial « attente ») ; « Réessayer » la relance.
     attempt.current += 1;
     void fetchSuggestion(attempt.current);
     return () => {
       attempt.current += 1;
     };
+    // Au montage de la ville seulement ; `essai` est une valeur serveur, fixe pour l'écran.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const statusText = status.kind === "loading" ? t.attente : status.kind === "noOption" ? t.aucunQuartier : null;
+  const statusText =
+    status.kind === "loading"
+      ? t.attente
+      : status.kind === "noOption"
+        ? t.aucunQuartier
+        : status.kind === "essai"
+          ? format(t.essai, { ville: name })
+          : null;
   const withoutLodging = () => onChoose({ kind: "none" });
 
   return (
@@ -165,7 +182,7 @@ function LodgingCity({ name, focusTitle, request, onChoose }: LodgingCityProps) 
           />
         ) : null}
       </div>
-      {status.kind === "noOption" ? (
+      {status.kind === "noOption" || status.kind === "essai" ? (
         <Button variant="secondary" className="w-full" onClick={withoutLodging}>
           {t.continuerSansLogement}
         </Button>

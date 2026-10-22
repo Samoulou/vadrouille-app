@@ -16,6 +16,8 @@ export interface BriefScreenProps {
   /** Enregistreur des mesures (`brief_completed`) : console en développement et en test, aucun en production. */
   recorderKind?: RecorderKind;
   recorder?: EventRecorder;
+  /** Site d'essai (adaptateur `prototype`, valeur serveur ; E2E-essai, lot 2) : récit sans structuration (D2). */
+  essai?: boolean;
 }
 
 /**
@@ -23,16 +25,16 @@ export interface BriefScreenProps {
  * brouillon validé à l'écran 1 (rechargement, accès direct), l'adresse est remplacée par `R1`, qui annonce
  * « Ton brouillon n'a pas été conservé. ». « Retour » mène à l'écran 1, saisies conservées.
  */
-export function BriefScreen({ recorderKind = "none", recorder }: BriefScreenProps) {
+export function BriefScreen({ recorderKind = "none", recorder, essai = false }: BriefScreenProps) {
   const chosen = useMemo(() => recorder ?? recorderFor(recorderKind), [recorder, recorderKind]);
   return (
     <AnalyticsProvider recorder={chosen}>
-      <BriefContent />
+      <BriefContent essai={essai} />
     </AnalyticsProvider>
   );
 }
 
-function BriefContent() {
+function BriefContent({ essai }: { essai: boolean }) {
   const router = useRouter();
   const { state, dispatch } = useDraft();
   // Le titre de l'état affiché reçoit le focus après un changement d'état, jamais au premier affichage.
@@ -50,7 +52,7 @@ function BriefContent() {
 
   return (
     <CreationShell backHref={creationRoutes.nouveau()}>
-      {state.stage === "story" ? <BriefStory {...stage} /> : <BriefReview {...stage} />}
+      {state.stage === "story" ? <BriefStory {...stage} essai={essai} /> : <BriefReview {...stage} />}
     </CreationShell>
   );
 }
