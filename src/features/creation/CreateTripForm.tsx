@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { Button } from "@/components/ligne/Button";
 import { SegmentedControl } from "@/components/ligne/SegmentedControl";
@@ -15,6 +15,7 @@ import {
   KNOWN_LODGING_LENGTH,
   MAX_CITIES,
   MAX_COMMITMENTS,
+  PROTOTYPE_STAY_DAYS_MAX,
   type CommitmentKind,
 } from "@/contracts/values";
 import { formatDateCourte } from "@/features/voyage/plate";
@@ -35,7 +36,7 @@ import {
   focusField,
   TextField,
 } from "./fields";
-import { creationRoutes } from "./routes";
+import { creationRoutes, ESSAI_PARAM } from "./routes";
 import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
@@ -56,11 +57,18 @@ function messageFor(field: string, code: FieldError): string {
   const last = field.split(".").pop() ?? field;
   const inCity = field.startsWith("otherCities.");
   const inCommitment = field.startsWith("commitments.");
-  if (field === "destination") return code === "length" ? length(DESTINATION_LENGTH) : err.destination;
+  if (field === "destination") {
+    return code === "length" ? length(DESTINATION_LENGTH) : code === "unknownCity" ? err.villeInconnue : err.destination;
+  }
   if (field === "start") return code === "past" ? err.arriveePassee : err.arrivee;
-  if (field === "end") return code === "endBeforeStart" ? err.departAvantArrivee : err.depart;
+  if (field === "end") {
+    if (code === "tooLong") return format(err.tropLong, { max: PROTOTYPE_STAY_DAYS_MAX });
+    return code === "endBeforeStart" ? err.departAvantArrivee : err.depart;
+  }
   if (last === "lodging") return err.logement;
-  if (inCity && last === "name") return code === "length" ? length(CITY_NAME_LENGTH) : err.villeNom;
+  if (inCity && last === "name") {
+    return code === "length" ? length(CITY_NAME_LENGTH) : code === "singleCity" ? err.uneSeuleVille : err.villeNom;
+  }
   if (inCity && last === "arrival") {
     return code === "cityOrder" ? err.villeOrdre : code === "cityBeforeEnd" ? err.villeAvantDepart : err.villeArrivee;
   }
@@ -71,12 +79,33 @@ function messageFor(field: string, code: FieldError): string {
   return err.fin;
 }
 
+export interface CreateTripFormProps {
+  /**
+   * Site d'essai (spécification E2E-essai, lot 2, critère 2) : une seule ville, connue de la table des fuseaux, 15 jours
+   * au plus, refusés au champ ; « Autres villes » n'est pas proposé. Absent : lu dans l'adresse (`?site=essai`, voir
+   * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
+   */
+  essai?: boolean;
+}
+
+const sansAbonnement = () => () => {};
+/** `site=essai` dans l'adresse, lu après l'hydratation (faux au prérendu : même HTML pour tous les adaptateurs). */
+function useEssaiDepuisAdresse(): boolean {
+  return useSyncExternalStore(
+    sansAbonnement,
+    () => new URLSearchParams(window.location.search).get(ESSAI_PARAM) === "essai",
+    () => false,
+  );
+}
+
 /**
  * Écran 1 « Créer le voyage » (`R1`, F8-PO-3 ; rendus et textes provisoires, décision 0018 § 15). Aucun appel
  * serveur : « Continuer » valide, garde la saisie dans le brouillon et mène à l'écran 2. Destination, logement,
  * villes et engagements sont saisis en texte libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm() {
+export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
+  const essaiAdresse = useEssaiDepuisAdresse();
+  const essai = essaiProp ?? essaiAdresse;
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const { trip } = state;
@@ -115,7 +144,7 @@ export function CreateTripForm() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso());
+    const found = validateTrip(trip, todayIso(), { essai });
     setErrors(found);
     const first = found[0];
     if (first) {
@@ -205,93 +234,97 @@ export function CreateTripForm() {
         </FieldRow>
         {lodgingFields(trip.lodging, 0, "lodging")}
 
-        <section aria-labelledby="villes-titre" aria-describedby="villes-aide" className="flex flex-col gap-3">
-          <h2 id="villes-titre" className="text-section font-extrabold text-ink">
-            {e1.villes.titre}
-          </h2>
-          <FieldHelp id="villes-aide">{e1.villes.aide}</FieldHelp>
-          {trip.otherCities.map((city, index) => {
-            const base = `otherCities.${index}`;
-            const title = city.name.trim() || format(e1.villes.ville, { n: index + 2 });
-            return (
-              <section
-                key={city.key}
-                aria-labelledby={`${fieldId(base)}-titre`}
-                className="flex flex-col gap-3 rounded-block border border-outline bg-raised p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 id={`${fieldId(base)}-titre`} className="min-w-0 pt-2.5 text-arret font-bold break-words text-ink">
-                    {title}
-                  </h3>
-                  <Button
-                    variant="text"
-                    size="sm"
-                    aria-label={format(e1.retirerNom, { nom: title })}
-                    onClick={() => {
-                      dispatch({ type: "removeCity", index });
-                      setErrors([]);
-                      requestAnimationFrame(() => addCityButton.current?.focus());
-                    }}
-                  >
-                    {e1.retirer}
-                  </Button>
-                </div>
-                <TextField
-                  field={`${base}.name`}
-                  label={e1.villes.nom}
-                  value={city.name}
-                  maxLength={CITY_NAME_LENGTH.max}
-                  onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
-                  error={errorOf(`${base}.name`)}
-                />
-                <TextField
-                  field={`${base}.arrival`}
-                  type="date"
-                  label={e1.villes.arrivee}
-                  value={city.arrival}
-                  onChange={(arrival) => dispatch({ type: "city", index, patch: { arrival } })}
-                  error={errorOf(`${base}.arrival`)}
-                />
-                {lodgingFields(city.lodging, index + 1, `${base}.lodging`)}
-              </section>
-            );
-          })}
-          {ranges ? (
-            <div className="flex flex-col gap-1">
-              <p id="villes-recapitulatif" className="text-corps-s font-bold text-ink">
-                {e1.villes.recapitulatif}
+        {/* Site d'essai : une seule ville, « Autres villes » n'est pas proposé (une ville déjà saisie reste, pour être retirée). */}
+        {essai && trip.otherCities.length === 0 ? null : (
+          <section aria-labelledby="villes-titre" aria-describedby="villes-aide" className="flex flex-col gap-3">
+            <h2 id="villes-titre" className="text-section font-extrabold text-ink">
+              {e1.villes.titre}
+            </h2>
+            <FieldHelp id="villes-aide">{e1.villes.aide}</FieldHelp>
+            {trip.otherCities.map((city, index) => {
+              const base = `otherCities.${index}`;
+              const title = city.name.trim() || format(e1.villes.ville, { n: index + 2 });
+              return (
+                <section
+                  key={city.key}
+                  aria-labelledby={`${fieldId(base)}-titre`}
+                  className="flex flex-col gap-3 rounded-block border border-outline bg-raised p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 id={`${fieldId(base)}-titre`} className="min-w-0 pt-2.5 text-arret font-bold break-words text-ink">
+                      {title}
+                    </h3>
+                    <Button
+                      variant="text"
+                      size="sm"
+                      aria-label={format(e1.retirerNom, { nom: title })}
+                      onClick={() => {
+                        dispatch({ type: "removeCity", index });
+                        setErrors([]);
+                        // Site d'essai : la section disparaît avec la dernière ville ; le focus va alors au champ « Départ ».
+                        requestAnimationFrame(() => (addCityButton.current ? addCityButton.current.focus() : focusField("end")));
+                      }}
+                    >
+                      {e1.retirer}
+                    </Button>
+                  </div>
+                  <TextField
+                    field={`${base}.name`}
+                    label={e1.villes.nom}
+                    value={city.name}
+                    maxLength={CITY_NAME_LENGTH.max}
+                    onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
+                    error={errorOf(`${base}.name`)}
+                  />
+                  <TextField
+                    field={`${base}.arrival`}
+                    type="date"
+                    label={e1.villes.arrivee}
+                    value={city.arrival}
+                    onChange={(arrival) => dispatch({ type: "city", index, patch: { arrival } })}
+                    error={errorOf(`${base}.arrival`)}
+                  />
+                  {lodgingFields(city.lodging, index + 1, `${base}.lodging`)}
+                </section>
+              );
+            })}
+            {ranges ? (
+              <div className="flex flex-col gap-1">
+                <p id="villes-recapitulatif" className="text-corps-s font-bold text-ink">
+                  {e1.villes.recapitulatif}
+                </p>
+                <ul aria-labelledby="villes-recapitulatif" className="flex flex-col gap-1">
+                  {ranges.map((range, index) => (
+                    <li key={index} className="text-corps-s text-ink-soft tabular-nums">
+                      {format(e1.villes.plage, { nom: range.name, debut: formatDateCourte(range.start), fin: formatDateCourte(range.end) })}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <Button
+              ref={addCityButton}
+              variant="secondary"
+              size="sm"
+              className={ADD_BUTTON_CLASS}
+              aria-disabled={citiesFull || undefined}
+              aria-describedby={describedBy(citiesFull && "villes-maximum")}
+              onClick={() => {
+                if (citiesFull) return;
+                focusAfterAdd.current = `otherCities.${trip.otherCities.length}.name`;
+                dispatch({ type: "addCity" });
+              }}
+            >
+              <IconPlus className="size-(--ligne-icone-petite)" />
+              {e1.villes.ajouter}
+            </Button>
+            {citiesFull ? (
+              <p id="villes-maximum" className="text-legende text-ink-soft">
+                {format(e1.villes.maximum, { max: MAX_CITIES })}
               </p>
-              <ul aria-labelledby="villes-recapitulatif" className="flex flex-col gap-1">
-                {ranges.map((range, index) => (
-                  <li key={index} className="text-corps-s text-ink-soft tabular-nums">
-                    {format(e1.villes.plage, { nom: range.name, debut: formatDateCourte(range.start), fin: formatDateCourte(range.end) })}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <Button
-            ref={addCityButton}
-            variant="secondary"
-            size="sm"
-            className={ADD_BUTTON_CLASS}
-            aria-disabled={citiesFull || undefined}
-            aria-describedby={describedBy(citiesFull && "villes-maximum")}
-            onClick={() => {
-              if (citiesFull) return;
-              focusAfterAdd.current = `otherCities.${trip.otherCities.length}.name`;
-              dispatch({ type: "addCity" });
-            }}
-          >
-            <IconPlus className="size-(--ligne-icone-petite)" />
-            {e1.villes.ajouter}
-          </Button>
-          {citiesFull ? (
-            <p id="villes-maximum" className="text-legende text-ink-soft">
-              {format(e1.villes.maximum, { max: MAX_CITIES })}
-            </p>
-          ) : null}
-        </section>
+            ) : null}
+          </section>
+        )}
 
         <section aria-labelledby="engagements-titre" aria-describedby="engagements-aide" className="flex flex-col gap-3">
           <h2 id="engagements-titre" className="text-section font-extrabold text-ink">

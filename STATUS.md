@@ -1,36 +1,43 @@
-# État du studio — 2026-10-22 (140e cycle)
+# État du studio — 2026-10-22 (141e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-22 11:42 UTC (fil) : « done » : `owner-approved` posé sur #681, fusionnée à 11:41 UTC.
-- 2026-10-22 11:51 UTC (fil) : « migration done » : run `db-migrate` 39773388536 (11:48 UTC, `sha_attendu` = `ce414b2`) vert, « Appliquée : 0016_restriction_update_generation_runs », 0000 à 0015 déjà appliquées. Rien d'autre ne lui est demandé. Son analyse de la densité (Q595) reste attendue sans urgence.
+- 2026-10-22 12:52 UTC (fil) : « c'est bon? » : oui, migration 0016 appliquée, rien à faire.
+- 12:57 UTC : « après les site web il va falloir qu'on se concentre vraiment sur l'objectif, brancher de bout en bout l'app […] du brief de mon voyage au résultat final » : ticket #687 (spécification du parcours de bout en bout), priorité absolue.
+- 13:06 UTC : « vadrouille doit devenir 1 seul app qui part "Créer un voyage" […] tout doit se connecter » : une seule app ; la page `/prototype/executions` et les briefs figés sortent de son parcours ; la chaîne inversée tourne derrière le formulaire.
+- 13:07 UTC : « on tourne en rond […] » : le CEO a reconnu l'excès de documents (lot 2a : quatre PR de documents, aucune ligne du code du site web) et proposé d'alléger les règles.
+- 13:08 UTC (carte) : « Oui, alléger » : décision 0123 (#688).
+- Carte posée à 13:25 UTC, sans réponse : les révisions après « Pas pour moi » comptent-elles dans le fusible de 2 USD (Q601, recommandation : oui) ? Ne bloque que le lot 4.
 
 ## Fait
-- **Spécification du lot 2a** (site web de l'activité, #674) **fusionnée** à 10:20 UTC après la correction 1 (§ 11, amendement 2 : champ `site` du prompt `programme` v2, vérification bornée, compteurs `sites*`, critères A13 à A24).
-- **Approbation de la migration 0016** dans `db-migrate` (#681, ticket #677) : Tech Lead approuvé sans bloquant, `owner-approved` de Samuel, fusionnée à 11:41 UTC ; **migration 0016 appliquée sur la base** à 11:48 UTC par Samuel. La restriction de l'`UPDATE` de `vadrouille_app` sur `generation_runs` (0120 S8, Q585) est en vigueur. Le recalcul réel (`RECALCUL_FIN_APERCU`, forfait du lot) reste fermé : son ouverture est une décision à part.
-- **Décision 0121** (Tech Lead, #683, ticket #678) ouverte : Q585 consignée, T9 (vérification des adresses dans `etapeProgramme`, phase ancrage, en mémoire seulement, compteurs sur `p0.programme_written`, `GET` seul), T10 (garde unique dans `fetch-page.ts`, module `src/server/p0/sites.ts`), T11 (prompt `programme` v2, jeu d'évaluation, `prompts-versionnes.test.ts`). Première relecture : 1 bloquant (source du signal « barrière de sortie fermée »), 5 mineurs ; correction 1 lancée avec la décision du CEO : `creerVerificateurStatut` expose l'état « barrière fermée », `src/research` reste le seul importateur d'`egress`, aucune règle d'import ne change.
-- **Décision 0122** (Sécurité, #682, ticket #679) ouverte : S6 approuvé sous 14 conditions (forme de l'adresse, hôtes Google refusés à chaque saut, requête constante sans cookie, corps jamais décodé, 3 redirections, plafonds 80/8/5 s/60 s en constantes, origine `programme()` seulement, aucune adresse dans le journal) ; S7 : compteurs `sites*` en liste fermée, seul le champ `site` est une voie d'adresse de l'IA, ligne oui/non du texte copié admise (Q597). Première relecture : 4 bloquants (prémisses périmées, `HEAD`, critère A2, formulation 2.2.1), 7 mineurs ; correction 1 lancée avec les décisions du CEO : `GET` seul ; A2 à séparer par le Product Owner avant le code (`placeId` seul ; ligne « sites » seule).
-- Statut du 139e cycle (#680) fusionné. Purge `p0-purge` : dernier run vert (11:53 UTC).
+- **Décision 0121** (Tech Lead, lot 2a) fusionnée (#683, `f6e9db8`, 12:32 UTC).
+- **Statut du 140e cycle** (#685) fusionné.
+- **Spécification du parcours de bout en bout** (#690, `specs/E2E-essai-bout-en-bout.md`) : une seule app sur le site d'essai, écrans servis par l'adaptateur `prototype`, génération par la chaîne inversée. Trous relevés : récit perdu au lancement, création qui lève sur `prototype`, briefs figés (`NOMS_BRIEFS`), écrans 2, 3 et 5 en erreur, pas d'aperçu ni de tri utile (voyage écrit déjà débloqué), déblocage simulé en 404. Cinq lots : 1 propositions, tri, déblocage simulé ; 2 saisie sans erreur ; 3 le formulaire lance `p0Run` (après #694) ; 4 « Pas pour moi » réécrit par l'IA ; 5 « à éviter » transmis à l'IA.
+- **Code du lot 2a** (#694, ticket #689) ouvert : prompt `programme` v2, vérification des sites, `Stop.source`, compteurs, A2 sur le `placeId` seul.
+- **Lot 2** (#693, ticket #692) ouvert : accueil sans section « Prototype », écrans 1 à 3 sans appel ni bandeau, code d'accès dans le parcours.
+- Place disque de la machine de travail libérée (17 Go).
 
 ## En cours
-- **#683 `[tl]` décision 0121** : correction 1 (comptée) en cours.
-- **#682 `[secu]` décision 0122** : correction 1 (comptée) en cours ; fusion avec ou après 0121.
-- **#684 `[po]` amendement 3 du § 11** (branche `claude/684-amendement-3`) : A2 séparé et définition de la ligne « sites », § 11.9 (moment d'écriture de `p0.programme_written`), barrière fermée = `sitesUnchecked`, A18/A23 (zéro octet admis), requête et fragment retirés, renvoi § 11.4, `GET` seul ; fusion après 0121 et 0122.
-- Trois fils en parallèle. Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519, UX/UI), #664 et B10c/B10d (premier essai du tri réel), densité (Q595).
+- **#694 `[ia]` lot 2a** : en relecture (Sécurité consultée, 14 conditions de 0122 en critères d'acceptation).
+- **#693 `[front]` lot 2** : correction 1 (comptée ; 5 bloquants Tech Lead : prérendu de l'écran 1, garde-fous `SANS_EXPORT` et manifeste, limite de 15 jours en double, appel à effet de bord ; Sécurité approuvée, UX/UI approuvée avec réserves).
+- **Lot 1** (ticket #691, branche `claude/691-e2e-lot-1`) : en cours de code.
+- **#690 `[po]` spécification bout en bout** : correction 1 poussée (`368b5ec`), en relecture.
+- **#688 `[ceo]` décision 0123** : correction 1 poussée (`1643958`) ; en relecture.
+- **#682 `[secu]` 0122** : correction 2 (dernière ; prémisse périmée après la fusion de 0121).
+- **#686 `[po]` amendement 3** : correction 1 en cours (4 bloquants) ; ses points sont déjà des critères d'acceptation de #694 (0123 point 6).
+- Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595).
 
 ## Bloqué
-- **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
-- **Essai réel sur préversion** (B9e) : Q538.
-- **0093** : tâche C après Q518 et Q519 ; A2-b après la décision UX/UI ; A2-c seulement si Samuel le décide (Q525).
-- **Purge du MVP et `coords-purge`** (#527) : Q438 ; `coords-purge` toujours en échec.
-- Incohérence connue : 0117 dit Q557 « en attente » ; la Sécurité la reprend avec 0118.
+- **Lot 4** : Q601 (Samuel, carte posée).
+- **Ancienne chaîne en préversion** : Q538, Q551, Q556 sans objet pour le test de bout en bout (la chaîne inversée la remplace sur le site d'essai) ; à revoir pour le MVP.
+- **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** (#527) : Q438.
 
 ## Prochain cycle
-1. Relire #683 (corr. 1), #682 (corr. 1), #684 ; corrections si demandées (max deux par tâche ; au-delà, CEO + Tech Lead : troisième tentative ou découpage).
-2. Quand 0121, 0122 et l'amendement 3 sont fusionnés : ticket `[ia]` du code du lot 2a (prompt `programme` v2, `fetch-page.ts` statut seulement, `src/server/p0/sites.ts`, `Stop.source`), hors du cycle d'une autre PR touchant `src/ai/prompts/programme.ts` ou `src/server/p0/`.
-3. Densité du programme : attendre l'analyse de Samuel (Q595).
-4. Samuel : rien d'attendu pour le lot 2a ; Q595 (densité, à son rythme) ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 (reste prix/horaires) à Q561.
+1. Relire #694, #693 (corr. 1), #690 (corr. 1), #688 (corr. 1), #682 (corr. 2) ; relire #686 (corr. 1).
+2. Dès la fusion de #694 : lot 3 (le formulaire lance `p0Run` sur le brief saisi ; migration `prototype` avec `owner-approved` de Samuel puis un run).
+3. Lot 5 après #694 ; lot 4 après le lot 3 et Q601.
+4. Dire à Samuel ce qu'il peut tester à chaque fusion.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -52,7 +59,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q598 (Product Owner, amendement 3 : critère A2 séparé et définition de la ligne « sites », ticket #684), Q599 (Product Owner, écart A18/A23 : lecture de zéro octet admise ?), Q600 (Tech Lead et Sécurité, information : signal « barrière de sortie fermée » exposé par `creerVerificateurStatut`, décision du CEO à consigner dans 0121 et 0122). Répondues : Q596 (oui, 0121 § 1), Q597 (oui, 0122 S7 c : ligne oui/non sans nombre). Réglée : la suite de Q594 (0016 appliquée, 11:48 UTC).
+- Q601 (Samuel, fusible des révisions du lot 4). Sans objet pour le test de bout en bout : Q538, Q551, Q556 (restent ouvertes pour le MVP).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
