@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { TripSnapshotSchema, type DaySnapshot, type TripSnapshot } from "@/contracts";
 import type { EntreeMoteur } from "@/domain/entrees";
-import { BRANCHE_APPELS_REELS, ECRITURE_POSITIONS_AUTORISEE, ECRITURE_PROGRAMMES_REELS_AUTORISEE, PARTS_FORFAIT, RANG_ETAPE, ETAPES_APERCU, JOURS_PLANIFIES_APERCU, MAX_RETRIES_ETAPE } from "@/server/config/generation";
+import { BRANCHE_APPELS_REELS, ECRITURE_POSITIONS_AUTORISEE, ECRITURE_PROGRAMMES_REELS_AUTORISEE, PARTS_FORFAIT, RANG_ETAPE, ETAPES_APERCU, ETAPES_LOT, JOURS_PLANIFIES_APERCU, MAX_RETRIES_ETAPE, MAX_RETRIES_LOT, RANG_LOT } from "@/server/config/generation";
 import { PLAFONDS_USAGE } from "@/server/config/usage";
 
 import { PLAFONDS_USAGE_TEST } from "../../../tests/support/plafonds-usage";
@@ -71,6 +71,14 @@ describe("génération: étapes et nouvel essai", () => {
     expect(ETAPES_APERCU.map((e) => RANG_ETAPE[e])).toEqual([1, 2, 3, 4, 5, 6]);
     expect(MAX_RETRIES_ETAPE.a).toBe(2);
     for (const e of ETAPES_APERCU.filter((x) => x !== "a")) expect(MAX_RETRIES_ETAPE[e]).toBe(0);
+  });
+
+  it("lot (workflow 5, 0119 § 1.4 point 1) : a au rang 1 et e au rang 2, tables propres ; maxRetries 2 pour a, 0 pour e", () => {
+    expect(ETAPES_LOT).toEqual(["a", "e"]);
+    expect(RANG_LOT).toEqual({ a: 1, e: 2 });
+    expect(MAX_RETRIES_LOT).toEqual({ a: 2, e: 0 });
+    // Distinctes des tables de l'aperçu, où `e` vaut 6.
+    expect(RANG_ETAPE.e).toBe(6);
   });
 });
 

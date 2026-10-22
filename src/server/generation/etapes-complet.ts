@@ -1,20 +1,19 @@
 import "server-only";
 
-import { TripSnapshotSchema, type DaySnapshot, type TripSnapshot } from "@/contracts";
-import type { CandidatMoteur, EntreeMoteur } from "@/domain/entrees";
+import type { DaySnapshot, TripSnapshot } from "@/contracts";
+import type { CandidatMoteur } from "@/domain/entrees";
 import { modesAdmis, replanifierJour } from "@/domain/generation";
-import { squeletteAvecEngagements } from "@/domain/squelette";
+import { reserveFiltree } from "@/domain/recalcul";
 import { ajouterJours, joursEntre } from "@/domain/temps";
-import { AGE_SOURCE_MAX_JOURS_APERCU, type CapaciteFinale, type CapaciteRecherche, type ExecuteurPublication, type FabriqueGeneration, type LieuARedige, type OptionsEtape } from "@/server/composition/generation";
-import { CONFIGURATION_CLASSEMENT } from "@/server/config/classement";
+import type { CapaciteFinale, CapaciteRecherche, ExecuteurPublication, FabriqueGeneration, OptionsEtape } from "@/server/composition/generation";
 import { DUREE_ETAPE_MS, JOURS_PLANIFIES_APERCU, TENTATIVES_PUBLICATION, type EtapeApercu } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { DELAI_PORT_MS } from "@/server/usage/port";
-import { ecrireVersion } from "@/server/versions/ecrire";
+import { ecrireVersion, verrouillerVersions } from "@/server/versions/ecrire";
 import { executeurSql } from "@/server/with-org";
 
 import { signalerSiBloquee } from "./blocage";
-import { ArretEtape, codeDeErreur, codeFerme } from "./codes";
+import { ArretEtape, codeDeErreur, codeFerme, estArret } from "./codes";
 import type { EtatBarriere } from "./barriere";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
@@ -31,13 +30,14 @@ import {
   SQL_OCCURRENCE,
   SQL_OCCURRENCES,
   SQL_PLACE_SEJOUR,
-  type CandidatLu,
 } from "./etapes";
 import { lireEtatComplet, type EtatComplet } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape, type PartDuPassage } from "./forfait-etape";
 import { reserveDuPassage, type ReserveTextSearch } from "./reserve-text-search";
 import { cloreCompletEnEchec, commencerEtapeComplet, echecCompletDeLigne, exigerGardeAuRang, gardeOuverteAuRang, type EchecComplet } from "./garde";
-import { lireVoyage, nuitsDuVoyage, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
+import { lireInstantane, lireVoyage, nuitsDuVoyage, type ExecuteurLecture, type VilleDeLApercu, type VoyageLu } from "./lecture";
+import { avecRaisons, candidatsDuJour, classementDe, entreeMoteur, lieuxAilleurs, lieuxDuJour, passeDeRaisons, squeletteDesJours } from "./planification-jour";
+import { lireSignauxActifs } from "./signaux";
 import { normaliser, SQL_CANDIDAT_REPRISE, SQL_CANDIDATS_SOURCE, SQL_OCCURRENCES_REPRISE } from "./reprise-recherches";
 import { etapeDuRang, identifiantForfait, joursDuPassage, RANG_COMPLET, rangDuJour, requestIdDeVersion, sansEtape, type EtapeJour } from "./voyage-complet";
 
@@ -128,8 +128,8 @@ async function executerComplet(entree: unknown, etape: EtapeApercu, corps: (cont
     await corps({ ...commun, barriere });
     return { generationRunId, organizationId, rang };
   } catch (erreur) {
-    if (etape === "a" && !(erreur instanceof ArretEtape)) throw erreur;
-    const code = erreur instanceof ArretEtape ? erreur.code : codeDeErreur(erreur);
+    if (etape === "a" && !estArret(erreur)) throw erreur;
+    const code = codeDeErreur(erreur);
     let close: EchecComplet | null = null;
     try {
       close = await sql(commun, (x) => cloreCompletEnEchec(x, organizationId, generationRunId, rang, code, new Date(dep.maintenant())));
@@ -172,9 +172,6 @@ export async function etapeClotureComplet(entree: unknown, code: unknown, depend
 
 // --- Lecture du passage ----------------------------------------------------------------------------------------------------
 
-const SQL_VERSION_COURANTE = `SELECT v.version, v.snapshot FROM public.trips t
-  JOIN public.trip_versions v ON v.organization_id = t.organization_id AND v.trip_id = t.id AND v.version = t.current_version
-  WHERE t.organization_id = $1 AND t.id = $2`;
 const SQL_PUBLIEES = `SELECT request_id::text AS request_id FROM public.trip_versions
   WHERE organization_id = $1 AND trip_id = $2 AND request_id = ANY($3::uuid[])`;
 
@@ -209,15 +206,6 @@ export type Passage = {
   readonly jours: readonly number[];
   readonly villes: readonly VilleDeLApercu[];
 };
-
-async function lireInstantane(x: Executeur, organizationId: string, tripId: string): Promise<{ version: number; instantane: TripSnapshot }> {
-  const ligne = (await x.query(SQL_VERSION_COURANTE, [organizationId, tripId])).rows[0];
-  if (ligne === undefined) throw new ArretEtape("invalid_input");
-  const brut = typeof ligne.snapshot === "string" ? JSON.parse(ligne.snapshot) : ligne.snapshot;
-  const lu = TripSnapshotSchema.safeParse(brut);
-  if (!lu.success) throw new ArretEtape("invalid_input");
-  return { version: Number(ligne.version), instantane: lu.data };
-}
 
 async function lirePassage(x: Executeur, contexte: ContexteComplet): Promise<Passage> {
   const voyage = await lireVoyage(x, contexte.organizationId, contexte.tripId);
@@ -607,24 +595,17 @@ export function etapeCompletNotation(entree: unknown, dependances?: DependancesG
 
 // --- Étape e ---------------------------------------------------------------------------------------------------------------
 
-/** Lieux de l'instantané hors du jour `index` (étapes, événements, idées) : jamais repris pour ce jour (un lieu, une fois). */
-function lieuxAilleurs(instantane: TripSnapshot, index: number): Set<string> {
-  const lieux = new Set<string>();
-  for (const jour of instantane.days) {
-    if (jour.index === index) continue;
-    for (const item of jour.items) if (item.type === "stop" && item.stop.placeId !== undefined) lieux.add(item.stop.placeId);
-    for (const evenement of jour.events) if (evenement.placeId !== undefined) lieux.add(evenement.placeId);
-    if (jour.surprise?.placeId !== undefined) lieux.add(jour.surprise.placeId);
-  }
-  return lieux;
-}
-
 /**
  * Étape `e` du jour de rang `i` : relectures Google de **ce jour seulement** (fiches de ses lieux, une matrice Routes ; aucun
  * appel pour un autre jour, B9-TL-13), `replanifierJour` sur la dernière version (repli sans candidat ni événement si aucun
  * programme ne tient : le jour reste sans étape, jamais un échec), raisons des lieux retenus (une seconde passe replanifie sans
- * les lieux restés sans raison), puis **une transaction de publication** : la dernière version relue sous la garde, ce jour
- * remplacé, une version écrite (`request_id` dérivé, 0087 § 1.7), et, pour le dernier jour, la fin de l'exécution.
+ * les lieux restés sans raison), puis **une transaction de publication** : la dernière version relue sous la garde et le verrou
+ * des versions, ce jour remplacé, une version écrite (`request_id` dérivé, 0087 § 1.7), et, pour le dernier jour, la fin.
+ *
+ * **Réserve filtrée** (B10b, décision 0119 § 3, B10-PO-12) : les signaux actifs du voyage sont lus dans la **même transaction**
+ * que les candidats, avant la planification ; les candidats retenables passent par `reserveFiltree` avant `planifier`, si bien
+ * qu'aucune relecture n'est demandée pour un lieu refusé ni pour une activité d'une catégorie arrêtée. Construction de l'entrée
+ * du moteur et passe de raisons : module commun `planification-jour.ts` (0119 § 1.5 point 2).
  */
 export function etapeCompletPlanification(entree: unknown, dependances?: DependancesGeneration): Promise<EtatComplet> {
   return executerComplet(
@@ -638,6 +619,7 @@ export function etapeCompletPlanification(entree: unknown, dependances?: Dependa
       const lus = await sql(contexte, async (x) => ({
         candidats: await lireCandidats(x, contexte),
         occurrences: (await x.query(SQL_OCCURRENCES, [contexte.organizationId, contexte.tripId])).rows,
+        signaux: await lireSignauxActifs(x, contexte.organizationId, contexte.tripId),
       }));
       const { fabrique, options } = await ouvrir(contexte, passage);
       const capacite: CapaciteFinale = fabrique.finale(options);
@@ -645,58 +627,28 @@ export function etapeCompletPlanification(entree: unknown, dependances?: Dependa
       const obtenuesA = contexte.dep.maintenant();
       const dateReference = dateDansFuseau(obtenuesA, voyage.timeZone);
       const { nuits, nuitsVille } = nuitsDuVoyage(voyage, passage.villes);
-      const squelette = squeletteAvecEngagements({
-        voyage: { start: voyage.draft.start, end: voyage.draft.end },
-        pace: voyage.brief.pace,
-        nombreDeNuits: nuits.length,
-        engagements: voyage.draft.commitments,
-        configuration: CONFIGURATION_MOTEUR,
-        budgetTrajetReduit: false,
-      }).filter((jour) => jour.index === index);
-      const classement = { classement: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: AGE_SOURCE_MAX_JOURS_APERCU, dateReference };
-      const ailleurs = lieuxAilleurs(instantane, index);
+      const ailleurs = lieuxAilleurs(instantane, new Set([index]));
       const rangs = new Set(villes.map((v) => v.rang));
-      const retenables = eligibles(lus.candidats).filter(({ moteur }) => rangs.has(moteur.ville) && (moteur.placeId === undefined || !ailleurs.has(moteur.placeId)));
+      const dansLeJour = eligibles(lus.candidats).filter(({ moteur }) => rangs.has(moteur.ville) && (moteur.placeId === undefined || !ailleurs.has(moteur.placeId)));
+      const admis = new Set(reserveFiltree(dansLeJour.map(({ moteur }) => moteur), lus.signaux).map((c) => c.id));
+      const retenables = dansLeJour.filter(({ moteur }) => admis.has(moteur.id));
       const planification = await capacite.planifier({
-        jours: squelette,
+        jours: squeletteDesJours(voyage, nuits.length, new Set([index])),
         nuitsVille,
         villes: passage.villes.map((ville) => ({ rang: ville.rang, nom: ville.nom, logement: logementVille(ville) })),
         candidats: retenables.map(({ moteur }) => moteur),
         modes: [...modesAdmis(voyage.brief.mobility)],
-        classement,
+        classement: classementDe(dateReference),
         configuration: CONFIGURATION_MOTEUR,
       });
       if (!planification.ok) throw new ArretEtape(planification.code);
 
       const parPlaceId = new Map(retenables.flatMap(({ lu, moteur }) => (moteur.placeId === undefined ? [] : [[moteur.placeId, lu] as const])));
-      const evenements = evenementsDe(lus.candidats, lus.occurrences);
-      const entreeMoteur = (candidats: readonly CandidatMoteur[], avecEvenements = true): EntreeMoteur => ({
-        voyage: {
-          destination: voyage.draft.destination,
-          start: voyage.draft.start,
-          end: voyage.draft.end,
-          timeZone: voyage.timeZone,
-          travellers: { adults: voyage.brief.travellers.adults, children: voyage.brief.travellers.children },
-        },
-        brief: voyage.brief,
-        nuits,
-        engagements: voyage.draft.commitments,
-        candidats,
-        evenements: avecEvenements ? evenements : [],
-        idees: [],
-        choix: new Map(),
-        configuration: CONFIGURATION_MOTEUR,
-        classement: { formule: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: AGE_SOURCE_MAX_JOURS_APERCU },
-        relectures: planification.valeur.relectures,
-        porteeR1: { evenementsSansLieu: "admis" as const },
-        dateReference,
-        version: passage.version + 1,
-        budgetTrajetReduit: false,
-      });
-      const planifier = (candidats: readonly CandidatMoteur[]): DaySnapshot => {
-        const plein = replanifierJour(entreeMoteur(candidats), instantane, index);
+      const moteur = { voyage, nuits, evenements: evenementsDe(lus.candidats, lus.occurrences), relectures: planification.valeur.relectures, dateReference };
+      const planifier = (candidats: readonly CandidatMoteur[], base: TripSnapshot, version: number): DaySnapshot => {
+        const plein = replanifierJour(entreeMoteur({ ...moteur, version }, candidats), base, index);
         if (plein.ok) return plein.jour;
-        const vide = replanifierJour(entreeMoteur([], false), instantane, index);
+        const vide = replanifierJour(entreeMoteur({ ...moteur, version }, [], false), base, index);
         if (vide.ok) return vide.jour;
         throw new ArretEtape("invalid_input");
       };
@@ -704,39 +656,31 @@ export function etapeCompletPlanification(entree: unknown, dependances?: Dependa
       const raisons = new Map<string, string>();
       const essayes = new Set<string>();
       let candidats: readonly CandidatMoteur[] = planification.valeur.candidats;
-      let jour = planifier(candidats);
+      let jour = planifier(candidats, instantane, passage.version + 1);
       for (let passe = 1; passe <= 2; passe += 1) {
-        const etapes = jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined && parPlaceId.has(item.stop.placeId) ? [parPlaceId.get(item.stop.placeId) as CandidatLu] : []));
-        for (const ville of villes) {
-          const lieux: LieuARedige[] = etapes
-            .filter((c) => c.ville === ville.rang && !raisons.has(c.id) && !essayes.has(c.id))
-            .map((c) => ({ id: c.id, nom: c.nom, resume: c.resume, categorie: c.categorie, typeEtape: c.stopKind === "meal" ? "meal" : "activity", sourceUrl: c.sources.find((s) => s.url !== "")?.url }));
-          if (lieux.length === 0) continue;
-          const issue = await capacite.rediger(voyage.brief, { rang: ville.rang, nom: ville.nom, arrivee: ville.arrivee, depart: ville.depart }, lieux);
-          if (!issue.ok) throw new ArretEtape(issue.code);
-          for (const lieu of lieux) essayes.add(lieu.id);
-          for (const [id, raison] of issue.valeur) raisons.set(id, raison.raison);
-        }
+        const etapes = candidatsDuJour(jour, parPlaceId);
+        await passeDeRaisons(capacite, voyage.brief, villes, etapes, raisons, essayes);
         const sansRaison = new Set(etapes.filter((c) => !raisons.has(c.id)).map((c) => c.id));
         if (sansRaison.size === 0 || passe === 2) break;
         candidats = candidats.filter((c) => !sansRaison.has(c.id));
-        jour = planifier(candidats);
+        jour = planifier(candidats, instantane, passage.version + 1);
       }
-      const avecRaisons: DaySnapshot = {
-        ...jour,
-        items: jour.items.map((item) => {
-          if (item.type !== "stop" || item.stop.placeId === undefined) return item;
-          const lu = parPlaceId.get(item.stop.placeId);
-          const raison = lu === undefined ? undefined : raisons.get(lu.id);
-          return raison === undefined ? item : { ...item, stop: { ...item.stop, reason: raison } };
-        }),
-      };
 
-      const publies = new Set(avecRaisons.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : [])));
+      // Replanification **sous le verrou des versions**, pure (candidats et relectures en mémoire, aucun appel externe), si un
+      // lieu du jour a été publié ailleurs entre-temps par une autre exécution (0119 § 1.6 point 3). Une étape devenue nouvelle
+      // reste sans raison (B10-PO-11).
+      const sousLeVerrou = (derniere: TripSnapshot, version: number): DaySnapshot => avecRaisons(planifier(candidats, derniere, version + 1), parPlaceId, raisons);
       const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
-        ? (executeur: ExecuteurPublication) => planification.valeur.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
+        ? (executeur: ExecuteurPublication, publies: ReadonlySet<string>) => planification.valeur.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
         : undefined;
-      await publierJour(contexte, { jour: avecRaisons, index, dernier: i === passage.jours.length - 1, jours: passage.jours, ...(ecrirePositions === undefined ? {} : { ecrirePositions }) });
+      await publierJour(contexte, {
+        jour: avecRaisons(jour, parPlaceId, raisons),
+        index,
+        dernier: i === passage.jours.length - 1,
+        jours: passage.jours,
+        replanifier: sousLeVerrou,
+        ...(ecrirePositions === undefined ? {} : { ecrirePositions }),
+      });
     },
     dependances,
   );
@@ -747,14 +691,18 @@ type DonneesJour = {
   readonly index: number;
   readonly dernier: boolean;
   readonly jours: readonly number[];
-  readonly ecrirePositions?: (executeur: ExecuteurPublication) => Promise<{ readonly ok: boolean; readonly code?: string; readonly retryable?: boolean }>;
+  /** Replanification pure du jour contre la dernière version (sous le verrou), si un de ses lieux y figure déjà ailleurs. */
+  readonly replanifier: (derniere: TripSnapshot, version: number) => DaySnapshot;
+  readonly ecrirePositions?: (executeur: ExecuteurPublication, publies: ReadonlySet<string>) => Promise<{ readonly ok: boolean; readonly code?: string; readonly retryable?: boolean }>;
 };
 
 /**
  * Publication d'un jour, **une transaction** sous la garde de l'étape `e` (rejeu borné sans nouvel appel externe, comme
- * l'aperçu, 0081 B9-TL-3 point 4) : la dernière version relue dans la transaction ; si le jour est toujours sans étape, il est
- * remplacé et la version écrite par le module unique (`request_id` dérivé : un rejeu la reconnaît), avec les positions de ses
- * lieux quand la configuration l'autorise ; sinon rien n'est écrit. Puis `last_version` et, pour le dernier jour, la phase finale.
+ * l'aperçu, 0081 B9-TL-3 point 4) : garde, puis **verrou des versions** du voyage (0119 § 1.6 point 1 : sérialise avec le
+ * workflow 5), puis la dernière version relue ; si le jour est toujours sans étape, il est remplacé (replanifié sous le verrou,
+ * sans appel, si un de ses lieux a été publié ailleurs entre-temps : aucun lieu deux fois, 0119 § 1.6 point 3) et la version
+ * écrite par le module unique (`request_id` dérivé : un rejeu la reconnaît), avec les positions de ses lieux quand la
+ * configuration l'autorise ; sinon rien n'est écrit. Puis `last_version` et, pour le dernier jour, la phase finale.
  */
 async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Promise<void> {
   const { organizationId, generationRunId, tripId } = contexte;
@@ -765,16 +713,22 @@ async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Pro
         const x = executeurSql(tx);
         const instant = maintenant(contexte);
         if (!(await gardeOuverteAuRang(x, organizationId, generationRunId, contexte.rang, instant))) throw new ArretEtape("step_expired");
+        await verrouillerVersions(x, tripId);
         const { version, instantane } = await lireInstantane(x, organizationId, tripId);
         const courant = instantane.days.find((jour) => jour.index === donnees.index);
         if (courant === undefined) throw new ArretEtape("invalid_input");
         // Jour planifié entre-temps (une modification de la personne, ou ce passage au rejeu) : aucune version écrite (revue de
         // la PR 600, mineur 4) ; l'exécution avance sur la dernière version.
+        let publie = donnees.jour;
+        if (sansEtape(courant)) {
+          const ailleurs = lieuxAilleurs(instantane, new Set([donnees.index]));
+          if (lieuxDuJour(publie).some((lieu) => ailleurs.has(lieu))) publie = donnees.replanifier(instantane, version);
+        }
         const ecrite = sansEtape(courant)
-          ? await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: { days: instantane.days.map((jour) => (jour.index === donnees.index ? donnees.jour : jour)) } })
+          ? await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: { days: instantane.days.map((jour) => (jour.index === donnees.index ? publie : jour)) } })
           : { version, creee: false, instantane };
         if (sansEtape(courant) && donnees.ecrirePositions !== undefined) {
-          const positions = await donnees.ecrirePositions(x);
+          const positions = await donnees.ecrirePositions(x, new Set(lieuxDuJour(publie)));
           if (!positions.ok && positions.code === "base") {
             if (positions.retryable === true) throw new Error("positions");
             throw new ArretEtape("upstream_error");
@@ -787,7 +741,7 @@ async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Pro
       });
       return;
     } catch (erreur) {
-      if (erreur instanceof ArretEtape) throw erreur;
+      if (estArret(erreur)) throw erreur;
       if (contexte.dep.maintenant() + DELAI_PORT_MS >= contexte.echeance) break;
     }
   }

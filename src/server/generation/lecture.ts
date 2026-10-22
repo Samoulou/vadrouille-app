@@ -1,9 +1,11 @@
 import "server-only";
 
-import type { Brief, Category, Lodging, TripCommitment, TripDraft } from "@/contracts";
+import { TripSnapshotSchema, type Brief, type Category, type Lodging, type TripCommitment, type TripDraft, type TripSnapshot } from "@/contracts";
 import type { BriefField, CommitmentKind, MobilityMode, Pace } from "@/contracts/values";
 import type { Nuit } from "@/domain/entrees";
 import { ajouterJours, joursEntre } from "@/domain/temps";
+
+import { LectureIllisible } from "./illisible";
 
 /**
  * Lecture de ce que l'aperçu a besoin du voyage, **par l'étape** (décision 0081 B9-TL-3 point 1 : brouillon, brief et logements
@@ -161,4 +163,32 @@ export function nuitsDuVoyage(voyage: VoyageLu, villes: readonly VilleDeLApercu[
     nuitsVille.push(villes.find((v) => v.sejour === sejour)?.rang ?? -1);
   }
   return { nuits, nuitsVille };
+}
+
+// --- Versions du programme -------------------------------------------------------------------------------------------------
+
+const SQL_VERSION_COURANTE = `SELECT v.version, v.snapshot FROM public.trips t
+  JOIN public.trip_versions v ON v.organization_id = t.organization_id AND v.trip_id = t.id AND v.version = t.current_version
+  WHERE t.organization_id = $1 AND t.id = $2`;
+const SQL_VERSION = `SELECT version, snapshot FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND version = $3`;
+
+function versionLue(ligne: Record<string, unknown> | undefined): { version: number; instantane: TripSnapshot } {
+  if (ligne === undefined) throw new LectureIllisible();
+  const brut = typeof ligne.snapshot === "string" ? JSON.parse(ligne.snapshot) : ligne.snapshot;
+  const lu = TripSnapshotSchema.safeParse(brut);
+  if (!lu.success) throw new LectureIllisible();
+  return { version: Number(ligne.version), instantane: lu.data };
+}
+
+/**
+ * Dernière version du voyage (`trips.current_version`), validée par `TripSnapshotSchema` ; absente ou illisible :
+ * `invalid_input`. Lue par le voyage complet (workflow 4) et par le lot (workflow 5), dans leurs transactions.
+ */
+export async function lireInstantane(x: ExecuteurLecture, organizationId: string, tripId: string): Promise<{ version: number; instantane: TripSnapshot }> {
+  return versionLue((await x.query(SQL_VERSION_COURANTE, [organizationId, tripId])).rows[0]);
+}
+
+/** Version `version` du voyage (version de base d'un lot, 0119 § 1.1 point 2), validée ; absente ou illisible : `invalid_input`. */
+export async function lireVersion(x: ExecuteurLecture, organizationId: string, tripId: string, version: number): Promise<{ version: number; instantane: TripSnapshot }> {
+  return versionLue((await x.query(SQL_VERSION, [organizationId, tripId, version])).rows[0]);
 }

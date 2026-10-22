@@ -46,3 +46,19 @@ export type EtatComplet = z.infer<typeof EtatCompletSchema>;
 export function lireEtatComplet(valeur: unknown): EtatComplet {
   return EtatCompletSchema.parse(valeur);
 }
+
+/**
+ * État sérialisé de `batchRecompute` (workflow 5, spécification B10b ; décision 0119 § 1.4 point 3, verdict 0120 S5 point 1) : le
+ * même `z.strictObject` que `EtatEtapeSchema` (0105 § 1), rang borné à 2 (`a` = 1, `e` = 2, `RANG_LOT`). Ni jour, ni signal, ni
+ * catégorie, ni raison, ni `placeId`, ni candidat, ni compteur : les jours touchés sont recalculés par chaque étape, depuis la
+ * version de base et la clôture de la ligne.
+ */
+export const EtatLotSchema = EtatEtapeSchema.extend({
+  rang: z.number().int().min(0).max(2),
+});
+export type EtatLot = z.infer<typeof EtatLotSchema>;
+
+/** Entrée d'une étape du lot, validée par son contrat strict. */
+export function lireEtatLot(valeur: unknown): EtatLot {
+  return EtatLotSchema.parse(valeur);
+}

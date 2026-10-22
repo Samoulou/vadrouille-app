@@ -42,3 +42,25 @@ export async function expirerExecutions(executeur: ExecuteurGeneration, organiza
   const { rows } = await executeur.query(SQL_EXPIRATION, [organizationId, tripId, maintenant, seuil]);
   return rows.map((ligne) => ({ id: String(ligne.id), complet: ligne.kind === "full" ? echecCompletDeLigne(ligne) : null }));
 }
+
+/**
+ * Expiration des seules exécutions `batch` figées du voyage (décision 0119 § 1.4 point 5 ; verdict 0120 S6) : même seuil
+ * (`EXPIRATION_EXECUTION_MS`) et même écriture conditionnelle que `SQL_EXPIRATION`, **filtrée sur `kind = 'batch'`**, l'organisation
+ * et le voyage. Appelée par les quatre actions du tri, sous le verrou du tri, dans la transaction de l'action (contexte de la
+ * personne), **avant** le contrôle `generation_in_progress`. Une exécution `full` ou `preview` figée n'est jamais touchée ici :
+ * elle reste expirée par son propre chemin (`expirerExecutions`, avec son journal). L'appelant n'expose ni l'identifiant ni le
+ * code de la ligne expirée.
+ */
+const SQL_EXPIRATION_LOT = `UPDATE public.generation_runs
+  SET phase = 'failed', stop_reason = '${CODE_ETAPE_EXPIREE}', updated_at = $3::timestamptz, finished_at = $3::timestamptz
+  WHERE organization_id = $1 AND trip_id = $2 AND kind = 'batch'
+    AND phase IN ('queued', 'preparing')
+    AND updated_at < $4::timestamptz
+  RETURNING id`;
+
+/** Expire les exécutions `batch` figées du voyage ; rend le nombre de lignes modifiées par cet appel. */
+export async function expirerLots(executeur: ExecuteurGeneration, organizationId: string, tripId: string, maintenantMs: number): Promise<number> {
+  const maintenant = new Date(maintenantMs).toISOString();
+  const seuil = new Date(maintenantMs - EXPIRATION_EXECUTION_MS).toISOString();
+  return (await executeur.query(SQL_EXPIRATION_LOT, [organizationId, tripId, maintenant, seuil])).rows.length;
+}

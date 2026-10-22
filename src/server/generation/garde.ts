@@ -140,3 +140,57 @@ export async function cloreCompletEnEchec(executeur: ExecuteurGarde, organizatio
   const ligne = rows[0];
   return ligne === undefined ? null : echecCompletDeLigne(ligne);
 }
+
+// --- Lot (workflow 5, B10b) ----------------------------------------------------------------------------------------------
+
+/**
+ * Début d'une étape de `batchRecompute` (décision 0119 § 1.4 point 1 ; 0081 B9-TL-3 point 2) : **nouvelles requêtes filtrées sur
+ * `kind = 'batch'`** (celles de l'aperçu filtrent `preview`, celles du voyage complet `full`, et ne servent jamais au lot), même
+ * garde `step_seq`, exception de rejeu de `a` inchangée. Rend le voyage, la version de base et la clôture de la ligne, lus dans
+ * la même écriture (0120 S1 points 2 et 3 : jamais reçus d'une entrée).
+ */
+const SQL_DEBUT_LOT = `UPDATE public.generation_runs SET step = $3, step_seq = $4, phase = 'preparing', updated_at = $5::timestamptz
+  WHERE organization_id = $1 AND id = $2 AND phase IN ('queued', 'preparing') AND kind = 'batch'
+    AND step_seq = $4 - 1
+  RETURNING trip_id, base_version, deck_closure_id, request_id`;
+
+const SQL_DEBUT_LOT_A = `UPDATE public.generation_runs SET step = $3, step_seq = $4, phase = 'preparing', updated_at = $5::timestamptz
+  WHERE organization_id = $1 AND id = $2 AND phase IN ('queued', 'preparing') AND kind = 'batch'
+    AND step_seq IN (0, 1) AND (step_seq = 0 OR step = 'a')
+  RETURNING trip_id, base_version, deck_closure_id, request_id`;
+
+const SQL_PHASE_LOT = `SELECT phase FROM public.generation_runs WHERE organization_id = $1 AND id = $2 AND kind = 'batch'`;
+
+/** Exécution `batch` ouverte par une étape : voyage, version de base, clôture et `request_id` de la ligne. */
+export type ExecutionLotOuverte = { readonly tripId: string; readonly baseVersion: number; readonly clotureId: string; readonly requestId: string };
+
+/**
+ * Commence une étape du lot : l'exécution ouverte, `"finie"` si la ligne est déjà `ready` (rien à faire), ou `null` si la garde
+ * la refuse (ligne absente dans l'organisation, autre `kind`, étape déjà commencée, exécution arrêtée ou expirée : rien écrit).
+ */
+export async function commencerEtapeLot(
+  executeur: ExecuteurGarde,
+  organizationId: string,
+  generationRunId: string,
+  etape: "a" | "e",
+  rang: number,
+  instant: Date,
+): Promise<ExecutionLotOuverte | "finie" | null> {
+  const { rows } = await executeur.query(etape === "a" ? SQL_DEBUT_LOT_A : SQL_DEBUT_LOT, [organizationId, generationRunId, etape, rang, instant.toISOString()]);
+  const ligne = rows[0];
+  if (ligne === undefined) {
+    const phase = (await executeur.query(SQL_PHASE_LOT, [organizationId, generationRunId])).rows[0]?.phase;
+    return phase === "ready" ? "finie" : null;
+  }
+  if (ligne.base_version === null || ligne.deck_closure_id === null || ligne.request_id === null) return null;
+  return { tripId: String(ligne.trip_id), baseVersion: Number(ligne.base_version), clotureId: String(ligne.deck_closure_id), requestId: String(ligne.request_id) };
+}
+
+const SQL_ECHEC_LOT = `UPDATE public.generation_runs SET phase = 'failed', stop_reason = $4, updated_at = $5::timestamptz, finished_at = $5::timestamptz
+  WHERE organization_id = $1 AND id = $2 AND step_seq = $3 AND phase = 'preparing' AND kind = 'batch' RETURNING id`;
+
+/** Clôt l'exécution `batch` en `failed` sur un code fermé, si elle est toujours au rang de l'étape ; aucune version n'est écrite. */
+export async function cloreLotEnEchec(executeur: ExecuteurGarde, organizationId: string, generationRunId: string, rang: number, code: CodeArret | string, instant: Date): Promise<boolean> {
+  const { rows } = await executeur.query(SQL_ECHEC_LOT, [organizationId, generationRunId, rang, codeFerme(code), instant.toISOString()]);
+  return rows.length > 0;
+}

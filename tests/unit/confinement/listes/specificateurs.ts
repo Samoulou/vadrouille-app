@@ -470,6 +470,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: "marqueur `server-only` (sans capacité) du workflow 4 du voyage complet, exigé par `ligne/require-server-only` ; B9d, ticket 599, décision 0087 § 1.3 ; verdict Sécurité : approuvé (PR 600)",
   },
+  {
+    fichier: "src/workflows/recalcul.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow 5 `batchRecompute`, exigé par `ligne/require-server-only` ; B10b-serveur, ticket 662, décision 0119 § 1.8 ; verdict Sécurité 0120 S9 point 1",
+  },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({

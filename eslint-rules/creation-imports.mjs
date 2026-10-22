@@ -9,8 +9,11 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  * `tests/`) sont admis partout, comme pour `ligne/relecture-imports`.
  * - `@/server/composition/generation` : `src/server/creation/`, `src/server/generation/` ;
  * - `@/server/generation/*` : `src/server/generation/`, `src/server/creation/`, `src/server/payment/` (suite de B4a),
- *   `src/workflows/apercu.ts`, `src/workflows/voyage-complet.ts`, `src/workflows/index.ts` ; `@/server/generation/reprise`
- *   seul : aussi `scripts/reprise-studio.ts` (commande de reprise du studio, 0087 § 1.6 point 3) ;
+ *   `src/workflows/apercu.ts`, `src/workflows/voyage-complet.ts`, `src/workflows/recalcul.ts` (pont du workflow 5, B10b,
+ *   0119 § 1.8 et 0120 S9 point 2), `src/workflows/index.ts`, et le seul fichier `src/server/presentation/tri.ts`
+ *   (`completeDeck` crée la ligne `batch` et démarre le workflow 5, 0119 § 1.3 point 2 : importateur **non prévu** par 0119
+ *   § 1.8, dit dans la description de la PR B10b-serveur et soumis à la revue de la Sécurité, 0120 S9 point 3) ;
+ *   `@/server/generation/reprise` seul : aussi `scripts/reprise-studio.ts` (commande de reprise du studio, 0087 § 1.6 point 3) ;
  * - `@/server/creation/*` : `src/server/creation/`, `src/server/actions/creation.ts` et, par dérogation (0101 § 1), le seul
  *   `src/adapters/api-creation.ts` ;
  * - `@/server/with-system-org` : `src/server/payment/`, `src/server/generation/`, `scripts/reprise-studio.ts` (0087 § 1.6).
@@ -38,7 +41,9 @@ export const IMPORTATEURS_GENERATION = [
   "src/server/payment/",
   "src/workflows/apercu.ts",
   "src/workflows/voyage-complet.ts",
+  "src/workflows/recalcul.ts",
   "src/workflows/index.ts",
+  "src/server/presentation/tri.ts",
 ];
 export const IMPORTATEURS_REPRISE = [COMMANDE_REPRISE];
 export const IMPORTATEURS_CREATION = ["src/server/creation/", "src/server/actions/creation.ts", "src/adapters/api-creation.ts"];
@@ -67,7 +72,7 @@ export const creationImports = {
     schema: [],
     messages: {
       forbidden:
-        "Importateurs nommés (décisions 0081 B9-TL-1 point 3 et 0101 § 4) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,index}.ts, src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
+        "Importateurs nommés (décisions 0081 B9-TL-1 point 3 et 0101 § 4) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,recalcul,index}.ts, src/server/presentation/tri.ts, src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
     },
   },
   create(context) {

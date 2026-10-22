@@ -74,8 +74,12 @@ const ProfilRelectureSchema = z.strictObject({
 
 export const PlafondsUsageSchema = z.strictObject({
   schema: z.literal(1),
-  /** Profils de génération (B7-PO-5) : `apercu` (workflow 1), `complet` (workflow 4), `mini` (workflow 5). */
-  generations: z.strictObject({ apercu: ProfilGenerationSchema, complet: ProfilGenerationSchema, mini: ProfilGenerationSchema }),
+  /**
+   * Profils de génération (B7-PO-5) : `apercu` (workflow 1), `complet` (workflow 4), `mini` (mini-recherche, B11) et `lot`
+   * (recalcul des jours touchés par un tri, workflow 5 `batchRecompute`, décision 0119 § 4.1 : aucune recherche, des requêtes
+   * Routes ; plafond d'un recalcul, question 3 de la spécification B10, à Samuel).
+   */
+  generations: z.strictObject({ apercu: ProfilGenerationSchema, complet: ProfilGenerationSchema, mini: ProfilGenerationSchema, lot: ProfilGenerationSchema }),
   /** Relectures (0100 § 1.3) : `jour` (un jour, une présentation : `getDay`, `listProposals`, `listPreviewSlots`) et `voyage` (`getTrip`). */
   relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
   /** Actions sans compte (B7-TL-10, 0081 B9-TL-4 point 3). */
@@ -144,6 +148,10 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
     // tient dans son forfait (part de `e` répartie par jour). Valeur de test, sans lien avec les montants réels.
     complet: { coutModelesMicros: 600_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
     mini: { coutModelesMicros: 20_000, placesTextSearch: 6, placesDetails: 6, routesRequetes: 0, routesElements: 0 },
+    // Recalcul d'un tri (0119 § 4.1 point 3) : six jours, deux jours touchés, une ville. Une requête `raisons` (20 000 micro-USD,
+    // réserve exacte), deux relectures d'un jour (2 × 20 fiches), la part de deux jours du profil `complet` en Routes (2 × 2
+    // requêtes, 2 × 100 éléments), au plus deux villes `area` ou `none` par jour touché. Valeurs de test, pas des montants.
+    lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

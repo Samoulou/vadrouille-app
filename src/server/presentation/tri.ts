@@ -12,7 +12,12 @@ import {
   type UndoDecisionResult,
 } from "@/contracts";
 import { estDerniereOption, ordreDuPaquet, paquetDeReprise, questionApres, type SignalLu } from "@/domain/preferences";
+import { RECALCUL_FIN_APERCU } from "@/server/config/recalcul";
+import { demarrerRecalculReel } from "@/server/generation/demarrage";
+import { expirerLots } from "@/server/generation/expiration";
+import { demarrerLot, ouvrirLotDuTri, signalerLotNonCree, type DemarrerRecalcul, type IssueLot } from "@/server/generation/lot";
 import { executerActionVoyage, RefusAction, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
+import { executeurSql, withOrg as withOrgParDefaut } from "@/server/with-org";
 
 import {
   compteurs,
@@ -38,6 +43,12 @@ import {
  * n'est écrit**. Le contenu des cases est lu pour être validé, mais aucun nom de lieu n'est écrit, journalisé ni renvoyé ;
  * seul le `placeId` de la case décidée est écrit (B10a point 2). Les
  * journaux sont ceux du cadre (`voyages.action_failed` : nom de l'action, classe de l'erreur, voyage).
+ *
+ * B10b (décision 0119 § 1.3 point 2 et § 1.4 point 5 ; verdict 0120 S3 et S6) : sous le verrou du tri, chaque action expire
+ * d'abord les seules exécutions `batch` figées du voyage (`expirerLots`, 20 minutes), **avant** le contrôle
+ * `generation_in_progress` ; `completeDeck` crée la ligne `batch` du tri qu'elle clôt (voyage débloqué, ou interrupteur
+ * `RECALCUL_FIN_APERCU` ouvert) quand un signal de ce tri touche un jour planifié de la version de base, et démarre le
+ * workflow 5 **après** la validation de sa transaction (aucun appel externe sous le verrou).
  */
 
 const SQL_INSERER_DECISION = `INSERT INTO public.preference_signals
@@ -65,17 +76,34 @@ const SQL_FERMER_QUESTION_OUVERTE = `UPDATE public.preference_prompts SET state 
   WHERE organization_id = $1 AND trip_id = $2 AND state = 'open'`;
 
 const SQL_CLORE = `INSERT INTO public.deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id)
-  VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`;
+  VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING RETURNING id`;
 
 const SQL_CLOTURE_PAR_REQUETE = "SELECT 1 AS present FROM public.deck_closures WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3";
 
 const refus = () => new RefusAction("validation_failed");
 
-type Contexte = { readonly executeur: ExecuteurAction; readonly org: string; readonly tripId: string };
+/**
+ * Dépendances des cas d'usage du tri : celles du cadre, plus (**tests seulement**) le démarreur du workflow 5
+ * (`demarrerRecalculReel` par défaut), la valeur simulée de l'interrupteur (`RECALCUL_FIN_APERCU` par défaut) et l'horloge.
+ */
+export type DependancesTri = DependancesAction & {
+  readonly demarrerRecalcul?: DemarrerRecalcul;
+  readonly recalculFinApercu?: boolean;
+  readonly maintenant?: () => number;
+};
 
-/** Verrou du tri, puis état ; refus pendant un recalcul du voyage (B10-PO-14). */
+type Contexte = { readonly executeur: ExecuteurAction; readonly org: string; readonly tripId: string; readonly maintenant: () => number };
+
+const horloge = (dependances: DependancesTri): (() => number) => dependances.maintenant ?? Date.now;
+
+/**
+ * Verrou du tri, puis expiration des seules exécutions `batch` figées du voyage (0119 § 1.4 point 5, 0120 S6 : jamais
+ * `SQL_EXPIRATION` sans filtre), puis état ; refus pendant un recalcul du voyage (B10-PO-14). La réponse n'expose rien de
+ * la ligne expirée.
+ */
 async function ouvrir(contexte: Contexte): Promise<EtatDuTri> {
   await contexte.executeur.query(SQL_VERROU_TRI, [contexte.tripId]);
+  await expirerLots(contexte.executeur, contexte.org, contexte.tripId, contexte.maintenant());
   const etat = await lireEtatDuTri(contexte.executeur, contexte.org, contexte.tripId);
   if (etat.enRecalcul) throw new RefusAction("generation_in_progress");
   return etat;
@@ -114,9 +142,9 @@ function annulationParRequete(etat: EtatDuTri, requestId: string): boolean {
   return etat.signaux.some((signal) => signal.annulation === requestId);
 }
 
-export function deciderCarte(dependances: DependancesAction, entree: unknown) {
+export function deciderCarte(dependances: DependancesTri, entree: unknown) {
   return executerActionVoyage("decide-card", dependances, DeckDecisionSchema, entree, async (executeur, ctx, valeur): Promise<DeckDecisionResult> => {
-    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId };
+    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId, maintenant: horloge(dependances) };
     const etat = await ouvrir(contexte);
 
     // Même `requestId` : même résultat, aucune seconde ligne ; contenu différent : refus. Une décision rejouée après son
@@ -181,9 +209,9 @@ function derniereDecision(etat: EtatDuTri): SignalDuVoyage | undefined {
     .reduce<SignalDuVoyage | undefined>((max, signal) => (max === undefined || signal.seq > max.seq ? signal : max), undefined);
 }
 
-export function annulerDecision(dependances: DependancesAction, entree: unknown) {
+export function annulerDecision(dependances: DependancesTri, entree: unknown) {
   return executerActionVoyage("undo-decision", dependances, UndoDecisionRequestSchema, entree, async (executeur, ctx, valeur): Promise<UndoDecisionResult> => {
-    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId };
+    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId, maintenant: horloge(dependances) };
     const etat = await ouvrir(contexte);
     const decision = signalParRequete(etat, valeur.decisionRequestId);
     if (decision === undefined || decision.proposition === null) throw refus();
@@ -211,14 +239,14 @@ export function annulerDecision(dependances: DependancesAction, entree: unknown)
 const memeQuestion = (a: PreferencePrompt, b: PreferencePrompt) =>
   a.kind === b.kind && (a.kind === "distance" || (b.kind === "category" && a.category === b.category));
 
-export function repondreQuestion(dependances: DependancesAction, entree: unknown) {
+export function repondreQuestion(dependances: DependancesTri, entree: unknown) {
   return executerActionVoyage(
     "answer-preference-prompt",
     dependances,
     PreferenceAnswerRequestSchema,
     entree,
     async (executeur, ctx, valeur): Promise<PreferenceAnswerResult> => {
-      const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId };
+      const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId, maintenant: horloge(dependances) };
       const etat = await ouvrir(contexte);
       const signal = valeur.answer === "yes" ? "answerYes" : "answerNo";
       const categorie = valeur.prompt.kind === "category" ? valeur.prompt.category : null;
@@ -244,15 +272,46 @@ export function repondreQuestion(dependances: DependancesAction, entree: unknown
   );
 }
 
-export function cloreTri(dependances: DependancesAction, entree: unknown) {
-  return executerActionVoyage("complete-deck", dependances, CompleteDeckRequestSchema, entree, async (executeur, ctx, valeur): Promise<CompleteDeckResult> => {
-    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId };
+type LotACommencer = { readonly issue: IssueLot; readonly organizationId: string; readonly tripId: string; readonly ctx: { readonly organizationId: string; readonly userId: string } };
+
+/**
+ * `completeDeck` : clôture du tri ouvert (B10a) puis, dans la même transaction et sous le même verrou, la ligne `batch` de ce
+ * tri (0119 § 1.3 point 2) si le voyage est débloqué (phase `deck`) ou si l'interrupteur est ouvert (voyage non débloqué) ;
+ * interrupteur fermé sur un voyage non débloqué : la clôture seule, ni exécution ni version (`recalcul: rien avant le
+ * déblocage`). Le workflow 5 n'est démarré qu'**après** la validation, pour la seule ligne que cet appel a créée (un rejeu ne
+ * démarre rien).
+ */
+export async function cloreTri(dependances: DependancesTri, entree: unknown) {
+  const recalculOuvert = dependances.recalculFinApercu ?? RECALCUL_FIN_APERCU;
+  const maintenant = horloge(dependances);
+  const suivi: { lot: LotACommencer | null } = { lot: null };
+  const resultat = await executerActionVoyage("complete-deck", dependances, CompleteDeckRequestSchema, entree, async (executeur, ctx, valeur): Promise<CompleteDeckResult> => {
+    suivi.lot = null;
+    const contexte = { executeur, org: ctx.organizationId, tripId: valeur.tripId, maintenant };
     const etat = await ouvrir(contexte);
     const rejouee = (await executeur.query(SQL_CLOTURE_PAR_REQUETE, [contexte.org, contexte.tripId, valeur.requestId])).rows.length > 0;
     // Clôture rejouée, tri déjà clos (autre onglet) ou sans carte : même réponse, sans écriture (0112 § 3.4).
     if (rejouee || etat.execution === null || etat.cartes.length === 0 || triClos(etat)) return { deck: sessionDuTri(etat, valeur.tripId) };
-    await executeur.query(SQL_CLORE, [contexte.org, contexte.tripId, etat.execution, etat.phase, etat.dernierePosition, valeur.requestId]);
+    const close = (await executeur.query(SQL_CLORE, [contexte.org, contexte.tripId, etat.execution, etat.phase, etat.dernierePosition, valeur.requestId])).rows[0]?.id;
     await executeur.query(SQL_FERMER_QUESTION_OUVERTE, [contexte.org, contexte.tripId]);
+    if (typeof close === "string" && (etat.phase === "deck" || recalculOuvert)) {
+      const issue = await ouvrirLotDuTri(executeur, { organizationId: contexte.org, tripId: contexte.tripId, clotureId: close, maintenant: maintenant() });
+      suivi.lot = { issue, organizationId: contexte.org, tripId: contexte.tripId, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
+    }
     return { deck: sessionDuTri(await relire(contexte), valeur.tripId) };
   });
+  const lot = suivi.lot;
+  if (resultat.ok && lot !== null) {
+    // Après la validation : journal d'une ligne attendue absente, puis démarrage de la ligne créée par cet appel.
+    signalerLotNonCree(lot.organizationId, lot.tripId, lot.issue);
+    if (lot.issue.statut === "cree") {
+      const withOrg = dependances.withOrg ?? withOrgParDefaut;
+      await demarrerLot(
+        (travail) => withOrg(lot.ctx, (tx) => travail(executeurSql(tx))),
+        dependances.demarrerRecalcul ?? demarrerRecalculReel,
+        { organizationId: lot.organizationId, tripId: lot.tripId, generationRunId: lot.issue.generationRunId, maintenant },
+      );
+    }
+  }
+  return resultat;
 }

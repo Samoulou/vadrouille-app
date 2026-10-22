@@ -10,6 +10,7 @@ import type { PlafondsUsage } from "@/server/config/usage";
  * - aperçu : 0,05 USD de modèles + 10 fiches (0,20) + 100 éléments (0,50) = 0,75 USD ;
  * - complet : 0,20 + 40 fiches (0,80) + 400 éléments (2,00) = 3,00 USD ;
  * - mini : 0,02 + 6 fiches (0,12) + 0 élément = 0,14 USD ;
+ * - lot : 0,02 + 40 fiches (0,80) + 200 éléments (1,00) = 1,82 USD ;
  * - relecture d'un jour (profil `relecture`, valeurs de départ de 0100 § 1.4) : 20 fiches (0,40) + 24 éléments (0,12) =
  *   0,52 USD ; relecture d'un voyage (`relectureVoyage`) : 100 fiches (2,00) + 240 éléments (1,20) = 3,20 USD ;
  * - `structureBrief` : 0,01 USD ; `suggestLodging` : 0,02 USD (Text Search à 0).
@@ -20,6 +21,8 @@ export const PLAFONDS_USAGE_TEST: PlafondsUsage = {
     apercu: { coutModelesMicros: 50_000, placesTextSearch: 20, placesDetails: 10, routesRequetes: 2, routesElements: 100 },
     complet: { coutModelesMicros: 200_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
     mini: { coutModelesMicros: 20_000, placesTextSearch: 6, placesDetails: 6, routesRequetes: 0, routesElements: 0 },
+    // Recalcul d'un tri (B10b, décision 0119 § 4.1 point 3) : six jours, deux jours touchés, une ville.
+    lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },
