@@ -1,6 +1,6 @@
 # E2E-essai — Une seule app, de « Créer un voyage » au programme jour par jour, sur le site d'essai
 
-Rédaction : Product Owner · Date : 2026-10-22 · Ticket : #687 · `main` relu : `f6e9db8` · Règle de forme : décision 0123 (spécification courte, puis le code ; verdicts du Tech Lead et de la Sécurité dans la relecture de chaque PR) · Références : 0011, 0027, 0092, 0093, 0115, 0117, 0119 ; `specs/P0-programme-par-ia.md` ; `docs/handovers/frontend.md` § 6, § 10, § 11.
+Rédaction : Product Owner · Date : 2026-10-22 · Ticket : #687 · `main` relu : `f6e9db8` · Règle de forme : décision 0123 de Samuel (spécification courte, puis le code ; verdicts du Tech Lead et de la Sécurité dans la relecture de chaque PR), prise sur la carte de décision du 2026-10-22 à 13:08 UTC (message `cmsg_0174CRqum9q8GNfZHmNHcYvRRjpwasQiVFDU4nPRjDCqse`), texte porté par la PR #688 (`docs/decisions/0123-regles-allegees-bout-en-bout.md`, en cours de correction) · Références : 0011, 0027, 0092, 0093, 0115, 0117, 0119 ; `specs/P0-programme-par-ia.md` ; `docs/handovers/frontend.md` § 6, § 10, § 11.
 
 **Demande de Samuel** (2026-10-22 12:57 et 13:06 UTC) : tester l'app de bout en bout, « du brief de mon voyage au résultat final » ; « vadrouille doit devenir 1 seul app qui part "Créer un voyage" […] tout doit se connecter ».
 
@@ -57,12 +57,12 @@ Chaque lot est **une PR** et change quelque chose que Samuel peut cliquer. Les l
 - **Objectif** : un voyage d'essai déjà écrit s'ouvre comme un voyage de l'app non débloqué : premières propositions, « J'aime / Pas pour moi », « Débloquer » avec paiement simulé, puis Séjour et Journées complets.
 - **Fichiers** : `src/adapters/prototype.ts` (voyage lu `unlocked: false` tant que non débloqué ; `listPreviewSlots` et `listProposals` tirés du programme stocké à la lecture), `src/adapters/payment-guard.ts` et `src/adapters/index.ts` (paiement simulé admis avec `prototype` sur le site d'essai, jamais en production), `src/app/voyages/[id]/debloquer/*`, `src/app/voyages/[id]/presentation/page.tsx`, `src/features/presentation/*` (texte de fin du tri, D4), `src/i18n/fr/*`, tests unitaires, e2e 390 × 844, axe.
 - **Critères** :
-  1. Avant déblocage : `getTrip` rend `unlocked: false` ; l'aperçu compte **8 étapes au plus**, la première journée puis le début de la deuxième, dans l'ordre du programme (cadrage D11) ; seuls ses jours sont lisibles, les autres sont présentés comme à débloquer.
+  1. Avant déblocage : `getTrip` rend `unlocked: false` ; l'aperçu compte **8 étapes au plus**, la première journée puis le début de la deuxième, dans l'ordre du programme (cadrage D11 ; composition des cases de B9-PO-5, `specs/B9-generation.md` l. 196, et décision 0106) ; seuls ses jours sont lisibles, les autres sont présentés comme à débloquer.
   2. « J'aime / Pas pour moi » trie en mémoire (F6) ; la fin du tri dit que les choix ne changent pas encore le programme (D4).
   3. Le paiement simulé n'appelle aucun prestataire ni n'envoie d'e-mail ; après lui, `unlocked: true`, toutes les journées, et l'état survit à un rechargement.
   4. `paymentAvailable` reste faux en production et hors de la liste blanche de `prototype` (test).
   5. Rien d'écrit en base sur la lecture ; aucun appel Google ni IA de plus que la lecture actuelle.
-- **Points à trancher dans la relecture du code** : où garder l'état « débloqué » (cookie de l'essai, ou table `prototype` avec migration) — proposition : cookie signé lié au code d'accès, sans migration ; branchement de `withSimulatedUnlock` (`src/adapters/mock-unlock.ts`) sur `prototype` ; verdict de la Sécurité sur le paiement simulé hors `mock`.
+- **Points à trancher dans la relecture du code** : où garder l'état « débloqué » (cookie de l'essai, ou table `prototype` avec migration) — proposition : cookie signé lié au code d'accès, sans migration ; branchement de `withSimulatedUnlock` (`src/adapters/mock-unlock.ts`) sur `prototype` ; verdict de la Sécurité sur le paiement simulé hors `mock`. **À livrer dans la même PR** : un amendement écrit de la décision 0020 § 2.3 (garde du paiement simulé, `src/adapters/payment-guard.ts` l. 39) qui admet le paiement simulé avec l'adaptateur `prototype` sur le site d'essai, et jamais en production.
 - **À tester par Samuel** : ouvrir un voyage de Rome dans « Mes voyages », voir tes premières propositions, trier, toucher « Débloquer », payer en simulé, puis lire toutes les journées.
 
 ### Lot 2 — La saisie sans détour sur le site d'essai (front ; peut partir maintenant)
@@ -74,7 +74,7 @@ Chaque lot est **une PR** et change quelque chose que Samuel peut cliquer. Les l
   3. `structureBrief` et `suggestLodging` sur `prototype` : zéro appel de modèle et de Google (client simulé).
   4. Sans cookie d'accès valide, `R-lancer` mène à la saisie du code puis revient, brouillon gardé (D3).
   5. Tant que le lot 3 n'est pas fusionné, `R-lancer` affiche « Le lancement depuis l'app arrive bientôt » au lieu d'une erreur.
-- **Points à trancher dans la relecture** : libellés et place de la saisie du code (UX/UI).
+- **Points à trancher dans la relecture** : libellés et place de la saisie du code (UX/UI) ; **verdict de la Sécurité** sur le code d'accès dans le parcours (cookie `__Host-p0_acces`, retour au lancement par un chemin interne fixe, aucune redirection ouverte), rendu dans la relecture de la PR du lot 2 (#693).
 - **À tester par Samuel** : de l'accueil, « Créer un voyage », remplir les écrans 1 à 3 sans message d'erreur ni détour, jusqu'au lancement.
 
 ### Lot 3 — Mon brief lance le programme (data, back, front ; après #689)
@@ -87,7 +87,9 @@ Chaque lot est **une PR** et change quelque chose que Samuel peut cliquer. Les l
   4. La requête `programme` reçoit le récit entre les bornes de données, `zdr: true` (0117 S5) ; test canari « aucune donnée Google dans le prompt » vert avec un brief saisi.
   5. Écran 5 : `en_cours` → en préparation ; `programme_ecrit` → prêt, « Voir mes propositions » et « Passer, voir le programme » ; `arretee` → échec, « Réessayer » (une exécution sans programme ne compte jamais, 0093 point 2) ; autre organisation ou inconnu → `not_found`.
   6. Les essais `rome-1` depuis `/prototype/executions` marchent comme avant.
-- **Points à trancher dans la relecture** : forme du brief saisi (table liée ou colonne) ; identifiant du voyage connu au lancement (aujourd'hui calculé à l'écriture, `p0-run.ts` l. 703) ; correspondance phases → `GenerationStatus` ; verdict de la Sécurité sur le stockage du récit de Samuel (la règle « briefs commités seulement » de 0115 et 0117 § 5 point 3 devient « brief saisi sous code d'accès, site d'essai ») et sur les noms de l'IA envoyés à Text Search avec un récit réel (0117 § 2).
+  7. Le contrat modifié (`src/contracts/creation.ts`, récit porté par `TripRequest`) reste compatible avec les adaptateurs `mock` et `api` : leurs tests de création passent sans changement de comportement (récit facultatif, ignoré par eux).
+- **Application de la migration** : par le workflow `db-migrate`, avec l'`owner-approved` de Samuel sur la ligne de `MIGRATIONS_APPROUVEES` (0035 ; 0093 point 7 et 0121 § 1 point 2 selon leur état à la fusion), puis l'exécution du workflow lancée par Samuel ; le lot 3 n'est testable qu'après.
+- **Points à trancher dans la relecture** : forme du brief saisi (table liée ou colonne) ; identifiant du voyage connu au lancement (aujourd'hui calculé à l'écriture, `p0-run.ts` l. 703) ; correspondance phases → `GenerationStatus` ; verdict de la Sécurité sur le stockage du récit de Samuel (la règle « briefs commités seulement » de 0115 et 0117 § 5 point 3 devient « brief saisi sous code d'accès, site d'essai ») et sur les noms de l'IA envoyés à Text Search avec un récit réel (0117 § 2) ; envoi du récit saisi au fournisseur de modèles avec `zdr: true` et `data_collection: "deny"`, dans le cadre de la confirmation de Samuel Q557 (0115 § 2, 0117 S5).
 - **À tester par Samuel** : saisir ton propre voyage, lancer, suivre l'écran 5, puis ouvrir tes premières propositions et ton programme.
 
 ### Lot 4 — « Pas pour moi » change le programme (ia, back ; après le lot 3)
