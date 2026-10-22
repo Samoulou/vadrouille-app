@@ -1,19 +1,18 @@
-# État du studio — 2026-10-22 (135e cycle)
+# État du studio — 2026-10-22 (136e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 134e cycle. Deux gestes l'attendent : la fusion de #648 (« Create a merge commit », puis relancer Rome ; `p0-reel` toujours à `63cd2a7`) et le libellé `owner-approved` sur #666 (après vérification, sur la base d'essai, que `generation_runs` n'a aucune ligne `kind = 'batch'`). Demandés dans le fil le 2026-10-22 à 01:15 UTC.
+- Aucun message de Samuel depuis le 135e cycle. Trois gestes l'attendent, dans l'ordre : la fusion de #648 (« Create a merge commit », puis relancer Rome ; `p0-reel` toujours à `63cd2a7`), le libellé `owner-approved` sur #666 (après vérification de l'absence de ligne `kind = 'batch'` sur la base d'essai), puis le libellé `owner-approved` sur #667 (B10b-serveur, `src/workflows/` touché, 0035). Demandés dans le fil le 2026-10-22 à 04:15 UTC.
 
 ## Fait
-- **B10b-serveur** livrée : PR **#667** (ticket #662, head `cf001a4`, reprise après un redémarrage du conteneur qui a interrompu le premier agent sans rien perdre) : workflow 5 `batchRecompute`, `completeDeck`, suite du déblocage, verrous, workflow 4 filtré, profil `lot`, interrupteur fermé, journal en liste fermée, `SQL_EXECUTION_APERCU`, `SQL_CASES` et `SQL_DEBLOQUE` exportées une seule fois depuis `etat.ts`, 0119 « Quand revoir » (Q581, #664), `docs/handovers/backend.md` § 8. Mesure B10-PO-17 : 775 ms en simulé (six jours dont deux touchés). Première relecture : **Sécurité approuvée** (S1 à S9 tenues ; `tri.ts` admis comme importateur nommé de `@/server/generation/*`, canari dans `tests/db` admis), **Tech Lead : un bloquant** (critères 4 et 5 de la spécification B10 sans test serveur : repas choisi sur une autre option, repas refusé sur la dernière option, relecture refusée, comptage `option.total`) et douze mineurs. Correction 1 lancée (comptée). Réponses du Tech Lead : Q582 (le nombre de cases `proposals` suffit en phase 0, à revoir à B10d), départage de `classer` inchangé (ordre total par `id`), Q587 (la question ouverte est déjà masquée par `questionOuverte` dès que la carte est dans un tri clos). Fusion : `owner-approved` de Samuel (touche `src/workflows/`, 0035).
-- **Approbation de 0015** : PR **#666** (ticket #663) `techlead-approved` ; attend `owner-approved` de Samuel.
-- Statut du 134e cycle (#665) fusionné.
+- **B10b-serveur** (#667, head `d80a07d`) : correction 1 approuvée par le Tech Lead et la Sécurité (aucun bloquant, aucun bloquant tardif) : `src/server/generation/lot-repas.test.ts` couvre les critères 4 et 5 de la spécification B10 (repas choisi sur une autre option, repas refusé sur la dernière option, relecture refusée, comptage `option.total`) ; les onze mineurs sont corrigés ; 0119 « Quand revoir » reçoit trois lignes (Q582, départage de `classer`, question ouverte masquée par `questionOuverte`). **B10b est complète** : il ne manque que l'`owner-approved` de Samuel sur #667 et la CI verte. Trois mineurs restants : arête `voyages` → `presentation` à acter dans 0119 (Q593), test de l'étape `e` complète à B10c, cas `.ts` du lint.
+- #666 (approbation de 0015) toujours `techlead-approved`, attend `owner-approved`.
+- Statut du 135e cycle (#668) fusionné.
 
 ## En cours
-- backend : #667 correction 1.
-- Samuel : `owner-approved` sur #666 ; fusion de #648 puis essai de Rome ; le studio ne lance aucun essai.
-- Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI. La migration de restriction de l'`UPDATE` (0120 S8, Q586) suivra la fusion de #666, hors de tout autre cycle de migration.
+- Samuel : fusion de #648 puis essai de Rome ; `owner-approved` sur #666 puis #667 ; le studio ne lance aucun essai.
+- Aucun fil de code en cours. Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI ; la migration de restriction de l'`UPDATE` (0120 S8, Q586) attend la fusion de #666 ; #664 attend le premier essai réel.
 
 ## Bloqué
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
@@ -24,9 +23,9 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## Prochain cycle
 1. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport).
-2. #667 jusqu'à `techlead-approved` (au plus une correction 2), puis demander à Samuel `owner-approved` ; si #666 a reçu `owner-approved` et est fusionnée : dire à Samuel de lancer `db-migrate` une fois (`sha_attendu` = tête de `main`).
-3. Après la fusion de #666 : ticket `[data]` de la migration de restriction de l'`UPDATE` (0120 S8, Q585, Q586).
-4. Samuel : `owner-approved` sur #666 ; fusionner #648 et relancer Rome ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
+2. Si #666 est fusionnée : dire à Samuel de lancer `db-migrate` une fois (`sha_attendu` = tête de `main`) ; puis ticket `[data]` de la migration de restriction de l'`UPDATE` (0120 S8, Q585, Q586).
+3. Si #667 est fusionnée : report `main` → `p0-reel` suivant (après le `db-migrate` de 0015, car le serveur B10b lit les nouvelles colonnes) ; tickets de suite B10c/B10d selon la spécification B10.
+4. Samuel : #648, `owner-approved` sur #666 et #667 ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -48,7 +47,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q588 à Q592 (#667). Q582 et Q587 : répondues par le Tech Lead (relecture de #667). Q584 : couverte par le domaine et la lecture serveur (#667).
+- Q593 (#667, mineur 1 de la dernière relecture). Q588, Q589 : tenues à la correction 1.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
