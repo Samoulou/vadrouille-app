@@ -1,20 +1,18 @@
-# État du studio — 2026-10-21 (133e cycle)
+# État du studio — 2026-10-22 (134e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 132e cycle. Le report `main` → `p0-reel` (#648) attend toujours sa fusion (« Create a merge commit ») ; `p0-reel` est à `63cd2a7`. Son corps est mis à jour (22:15 UTC) : `main` à `fd45254` embarque désormais aussi les infos pratiques (#651) et B10b-domaine (#656) ; une seule fusion couvre les deux lots.
+- Aucun message de Samuel depuis le 133e cycle. Le report `main` → `p0-reel` (#648) attend toujours sa fusion (« Create a merge commit ») ; `p0-reel` est à `63cd2a7`. Corps mis à jour (00:20 UTC) : `main` à `772b3d6` contient maintenant la migration 0015 **non appliquée** (inerte : aucun code de `main` ne lit les nouvelles colonnes, requêtes à colonnes explicites) ; rien de plus à faire pour l'essai de Rome.
 
 ## Fait
-- Fusionnées : **infos pratiques écrites par l'IA** (#651, ticket #650 ; correction 1 approuvée : conseil, prix, horaires et titre du jour remplis depuis le programme de l'IA, via `texteMaison` ; prix des fixtures indicatifs), **B10b-domaine** (#656, ticket #654 ; approuvée à la première relecture : entrée `conservees` de `replanifierJour`, `src/domain/recalcul.ts`, 17 tests ; aucun contrat ni serveur touché), note de version v2026.10.21-21 (#658, routine Release), statut du 132e cycle (#655).
-- **B10b-migration** (#657, ticket #653, head `e80346c`) : approuvée à la première relecture par le Tech Lead et la Sécurité (migration 0015 : `base_version`, `deck_closure_id`, `CHECK`, clé étrangère composée, deux index uniques partiels, purge réordonnée, `SELECT (kind)` à la purge ; migration inverse partielle ; trois tests adaptés, aucun désactivé) mais **CI rouge** : le test de confinement prend le nom de contrainte `deck_closures_organization_id_id_key` pour un nom de secret. Correction de CI en cours (renommage sans suffixe `_key`, mineurs 1 à 3 de la relecture traités dans le même push). L'application de 0015 à la base d'essai passera par une PR `MIGRATIONS_APPROUVEES` séparée (`owner-approved` de Samuel), après vérification qu'aucune ligne `kind = 'batch'` n'existe sur la base d'essai (mineur 5).
-- **Décision 0120** (ticket #659, Sécurité) lancée : verdict Sécurité sur le workflow 5 (0119 § 1.9, Q575), restriction de l'`UPDATE` sur les nouvelles colonnes (Q583), confinement de B10b-serveur. Elle bloque la fusion de B10b-serveur, pas son démarrage.
+- Fusionnées : **B10b-migration** (#657, ticket #653 ; correction de CI : la contrainte unique renommée `deck_closures_organization_id_id_unique`, le test de confinement prenant le suffixe `_key` pour un nom de secret ; mineurs 1 à 4 traités, dont la clôture du jeu de test rattachée à l'exécution `preview` et l'aide `ecrireLot`), **décision 0120** (#661, ticket #659 : verdict Sécurité sur le workflow 5, S1 à S9 approuvés avec conditions ; S8 : restriction de l'`UPDATE` de `vadrouille_app` sur `base_version` et `deck_closure_id` par une migration ultérieure du rôle data, exigée avant toute PR qui rend un recalcul réel possible, non bloquante pour B10b-serveur ; S9 : une seule ligne de confinement), statut du 133e cycle (#660).
+- Tickets ouverts : **#662 B10b-serveur** (backend : workflow 5, suite du déblocage, verrous, workflow 4 filtré, profil `lot`, interrupteur, journal ; conditions 0120 point par point ; Q578, Q581, Q582, Q584 inclus), **#663 approbation de 0015** dans `db-migrate` (data ; `owner-approved` de Samuel ; avant : vérifier l'absence de ligne `kind = 'batch'` sur la base d'essai), **#664 créneau imposé pour un candidat** (backlog, après le premier essai réel).
 
 ## En cours
-- data : correction de CI de #657. Sécurité : décision 0120 (#659).
+- backend : #662 B10b-serveur. data : #663 approbation de 0015.
 - Samuel : fusion de #648 puis essai de Rome sur la page d'essai ; le studio ne lance aucun essai.
-- Prochaine tâche de code : **B10b-serveur** (backend) dès la fusion de #657 ; sa fusion attend 0120 (Q575) et la réponse à Q582 (nombre réel d'options d'un créneau).
-- Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI.
+- Aucune autre tâche prête : #527 attend Q438, #583 attend Q538, #500 gelée, #534/#547 attendent Q518-Q519 et la décision UX/UI. La migration de restriction de l'`UPDATE` (0120 S8) suivra dans un cycle ultérieur, jamais avec une autre migration.
 
 ## Bloqué
 - **Badge « fermé ce jour-là »** (T8, future 0118) : Q564 à Samuel ; recommandation : juger d'abord le premier essai.
@@ -25,8 +23,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## Prochain cycle
 1. Si #648 est fusionnée : lire le résultat de l'essai de Rome (journal de l'exécution, rapport).
-2. #657 jusqu'à la fusion (relecture relancée après la correction de CI) ; puis ticket et fil **B10b-serveur** (backend ; jamais dans le même cycle qu'une PR touchant `src/workflows/index.ts`, `src/server/composition/generation.ts`, les listes de confinement, `imports.test.ts`, `etapes-complet.ts`, `usage.ts`) et PR `[data]` d'approbation de 0015 (`MIGRATIONS_APPROUVEES`, `owner-approved` de Samuel).
-3. 0120 (#659) jusqu'à la fusion ; ticket « créneau imposé pour un candidat » (condition 3 de la relecture de #656).
+2. #662 B10b-serveur jusqu'à la PR puis la relecture (fusion après verdict Sécurité et Q582) ; #663 jusqu'à `techlead-approved`, puis demander à Samuel `owner-approved` et le `db-migrate` (une fois, `sha_attendu` = tête de `main`).
+3. Ticket `[data]` de la migration de restriction de l'`UPDATE` (0120 S8, Q585, Q586) : cycle suivant la fusion de #663, hors de tout autre cycle de migration.
 4. Samuel : fusionner #648 et relancer Rome ; Q564 (facultative) ; Q538, Q542, Q551, Q556 ; Q506, Q518 à Q520, Q525, Q527 (3), Q529 ; facultatives Q558 à Q561.
 
 ## Décisions attendues de Samuel
@@ -49,7 +47,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q579 à Q582 (#656, Tech Lead ; Q579 à Q581 répondues à la relecture), Q583 (#657, Sécurité et Tech Lead, portée par 0120), Q584 (#656 mineur 5, Tech Lead et Product Owner). Q575 : en cours d'écriture (0120, #659).
+- Q585 à Q587 (décision 0120, #661). Q575 : répondue (0120). Q583 : répondue (0120 S8).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
