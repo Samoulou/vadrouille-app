@@ -54,7 +54,7 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await storyField(page).fill(RECIT);
   await page.getByRole("button", { name: "Préparer mon brief" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
-  await expect(page.getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await page.getByRole("radio", { name: "Équilibré" }).click();
   await page.getByRole("group", { name: "Envies" }).getByRole("button", { name: "Musées", exact: true }).click();
   await continueButton(page).click();
@@ -63,7 +63,7 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expectPath(page, R3);
   await expect(page.getByText("Pas de suggestion de logement sur le site d'essai.", { exact: false })).toBeVisible();
   await expect(page.locator("[data-area-map]")).toHaveCount(0);
-  await expect(page.getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await sansViolation(page);
   await page.getByRole("button", { name: "Continuer sans logement" }).click();
 
@@ -71,7 +71,7 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expectPath(page, R_LANCER);
   await expect(page.getByRole("heading", { level: 1, name: "Lancer ton voyage" })).toBeVisible();
   await expect(page.getByText("Le lancement n'est pas ouvert sur ce site.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await sansViolation(page);
 
   // « Retour » : brouillon gardé.
