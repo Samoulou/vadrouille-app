@@ -8,8 +8,10 @@ import {
   DESTINATION_LENGTH,
   KNOWN_LODGING_LENGTH,
   MEAL_BUDGET_CHF,
+  PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
+import { fuseauDeVille } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -28,7 +30,11 @@ export type FieldError =
   | "cityBeforeEnd"
   | "outOfTrip"
   | "endTime"
-  | "range";
+  | "range"
+  // Site d'essai (spécification E2E-essai, lot 2, D1) : ville absente de la table des fuseaux, seconde ville, séjour trop long.
+  | "unknownCity"
+  | "singleCity"
+  | "tooLong";
 
 /** Erreur d'un champ ; `field` est aussi la base de l'identifiant du champ dans la page. */
 export interface FormError {
@@ -68,25 +74,50 @@ export function isDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+/** Jours entre deux dates valides `AAAA-MM-JJ`. */
+function joursEntre(start: string, end: string): number {
+  return (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000;
+}
+
+export interface ValidateTripOptions {
+  /**
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, connue
+   * de la table des fuseaux (`fuseauDeVille`, aucune donnée Google), et `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la
+   * borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois dans `@/contracts/values`. Refus au champ.
+   */
+  essai?: boolean;
+}
+
 /** Erreurs de l'écran 1, dans l'ordre d'affichage des champs (le focus va sur la première). */
-export function validateTrip(trip: TripForm, today: string): FormError[] {
+export function validateTrip(trip: TripForm, today: string, options: ValidateTripOptions = {}): FormError[] {
   const errors: FormError[] = [];
   const push = (field: string, code: FieldError | null) => {
     if (code) errors.push({ field, code });
   };
 
-  push("destination", textError(trip.destination, DESTINATION_LENGTH));
+  const essai = options.essai === true;
+  const destinationError = textError(trip.destination, DESTINATION_LENGTH);
+  push("destination", destinationError ?? (essai && fuseauDeVille(trip.destination) === null ? "unknownCity" : null));
   const start = isDate(trip.start) ? trip.start : null;
   const end = isDate(trip.end) ? trip.end : null;
   push("start", start === null ? "required" : start < today ? "past" : null);
-  push("end", end === null ? "required" : start !== null && end <= start ? "endBeforeStart" : null);
+  push(
+    "end",
+    end === null
+      ? "required"
+      : start !== null && end <= start
+        ? "endBeforeStart"
+        : essai && start !== null && joursEntre(start, end) > PROTOTYPE_STAY_DAYS_MAX - 1
+          ? "tooLong"
+          : null,
+  );
   const datesValid = start !== null && end !== null && start < end;
   errors.push(...lodgingErrors(trip.lodging, "lodging"));
 
   let previous = start;
   trip.otherCities.forEach((city, index) => {
     const base = `otherCities.${index}`;
-    push(`${base}.name`, textError(city.name, CITY_NAME_LENGTH));
+    push(`${base}.name`, essai ? "singleCity" : textError(city.name, CITY_NAME_LENGTH));
     if (!isDate(city.arrival)) {
       push(`${base}.arrival`, "required");
     } else if (datesValid) {

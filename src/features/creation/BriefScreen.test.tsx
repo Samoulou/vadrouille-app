@@ -373,3 +373,53 @@ describe("BriefScreen : vérification", () => {
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau");
   });
 });
+
+describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () => {
+  function renderEssai(initial: DraftState = ready()) {
+    return render(
+      <DraftProvider initial={initial}>
+        <BriefScreen recorder={recorder} essai />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  it("« Vérifier mon brief » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
+    const { container } = renderEssai();
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining("Sur le site d'essai, ton récit est conservé tel quel"));
+    fireEvent.change(story(), { target: { value: STORY } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+    });
+    expect(screen.queryByRole("button", { name: "Préparer mon brief" })).not.toBeInTheDocument();
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(latest?.stage).toBe("review");
+    expect(latest?.story).toBe(STORY);
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+    expect(screen.queryByText("Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.")).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("récit trop court : même erreur au champ, aucun appel", () => {
+    renderEssai();
+    fireEvent.change(story(), { target: { value: "Trop court." } });
+    fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(story()).toHaveAttribute("aria-invalid", "true");
+    expect(latest?.stage).toBe("story");
+  });
+
+  it("écran 1 hors des règles du site d'essai (adresse saisie sans site=essai) : retour à l'écran 1 du site d'essai", async () => {
+    const base = ready();
+    renderEssai({ ...base, trip: { ...base.trip, destination: "Tombouctou" } });
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/voyages/nouveau?site=essai"));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(latest?.tripReady).toBe(true);
+  });
+
+  it("« Retour » mène à l'écran 1 du site d'essai", () => {
+    renderEssai();
+    fireEvent.click(screen.getByRole("button", { name: "Retour" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau?site=essai");
+  });
+});

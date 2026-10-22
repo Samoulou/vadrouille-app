@@ -84,11 +84,18 @@ const relecteurReel: RelecteurTrajets = {
   relireJournee: async (paires) => (await holder[INSTANCE_KEY]?.relecteur?.relireJournee(paires)) ?? { ok: false, raison: "unavailable" },
 };
 
+const REFUS_HORS_LISTE = "adaptateur prototype refusé : environnement hors liste blanche (production ou non autorisé)";
+
 /** Lève une erreur explicite hors liste blanche : jamais de repli silencieux vers `mock`. */
 export function assertPrototypeAllowed(env: NodeJS.ProcessEnv): void {
   if (!prototypeAdapterAllowed(env)) {
-    throw new Error("adaptateur prototype refusé : environnement hors liste blanche (production ou non autorisé)");
+    throw new Error(REFUS_HORS_LISTE);
   }
+}
+
+/** Même garde, sur l'environnement du processus (`siteEssaiAutorise`, accueil du site d'essai). */
+export function assertPrototypeAllowedOnProcess(): void {
+  if (!prototypeAdapterAllowed()) throw new Error(REFUS_HORS_LISTE);
 }
 
 /**
