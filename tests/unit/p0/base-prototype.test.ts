@@ -260,6 +260,8 @@ describe("ci: garde du dépôt (identifiants de lieu Google, coordonnées, URL d
   const COORDONNEES_ADMISES = [
     "prototype/fixtures/places/edimbourg.json",
     "prototype/programmes-test/proto_test_20261012_1.json",
+    // Ticket 691 (spécification E2E-essai, lot 1) : copie des positions fictives du programme de test ci-dessus.
+    "prototype/programmes-essai/proto_essai_20271010_1.json",
     "src/components/carte/AreaMap.test.tsx",
     "src/components/carte/simulated-model.test.ts",
     "src/grounding/places-client.test.ts",

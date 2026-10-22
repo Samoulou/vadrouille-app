@@ -1,4 +1,4 @@
-import type { AdapterContext, TripAdapter } from "@/adapters";
+import { isTrialTrip, type AdapterContext, type TripAdapter } from "@/adapters";
 import type { DeckSession, PreviewSlot, Proposal, Trip } from "@/contracts";
 
 /**
@@ -34,6 +34,11 @@ export interface PresentationData {
    * `prototype` (session en mémoire de F6). Non nul, `proposals` est déjà réduit au paquet de reprise, dans son ordre.
    */
   deck: DeckSession | null;
+  /**
+   * Voyage d'essai, décidé par l'adaptateur (`isTrialTrip`, décision 0124 § 4) : tri sans question, phrase « choix sans
+   * effet » à la fin du tri. `false` pour tout programme qui porte ses propositions, sur tout adaptateur.
+   */
+  essai: boolean;
 }
 
 /** Projection d'un jour : étapes de la ligne et événements, `{ id, name }` seulement. */
@@ -82,5 +87,6 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
     days: trip.days.map(presentationDay),
     noOptionSlots,
     deck,
+    essai: await isTrialTrip(adapter, ctx, tripId),
   };
 }

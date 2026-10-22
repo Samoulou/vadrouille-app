@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder, type MemoryRecorder } from "@/analytics/track";
 import type { Trip } from "@/contracts";
-import { edimbourg } from "@/mocks/edimbourg";
+import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
@@ -27,9 +27,9 @@ beforeEach(() => {
   recorder = createMemoryRecorder();
 });
 
-function renderSejour(trip: Trip = edimbourg) {
+function renderSejour(trip: Trip = edimbourg, unlockHref: string | null = null) {
   return render(
-    <TripShell trip={trip} maps={[]} base="/voyages">
+    <TripShell trip={trip} maps={[]} base="/voyages" unlockHref={unlockHref}>
       <SejourOriginProvider>
         <SejourPanel recorder={recorder} />
       </SejourOriginProvider>
@@ -236,5 +236,44 @@ describe("SejourPanel : lien « Aujourd'hui · Jour {n} » (F10-PO-7, C16)", () 
   it("base /dev/voyages : pas de lien (pas de page R15 de développement)", () => {
     renderAt("2026-08-30T10:40:00+01:00", "/dev/voyages");
     expect(within(panel()).queryByRole("link", { name: /^Aujourd'hui/ })).toBeNull();
+  });
+});
+
+describe("SejourPanel : journées « À débloquer » (spécification E2E-essai, lot 1 ; décision 0124 § 7)", () => {
+  // Voyage mock non débloqué qui ne sert que ses deux premières journées (forme d'un voyage d'essai avant déblocage).
+  const partiel: Trip = { ...edimbourg, unlocked: false, days: edimbourg.days.slice(0, 2) };
+  const jourParJour = () => section("Jour par jour");
+
+  it("avec un lien de déblocage : une ligne par journée absente, pastille sans « complet », nom « Jour 3, à débloquer », bouton", async () => {
+    const { container } = renderSejour(partiel, "/voyages/x/debloquer");
+    const lignes = [...container.querySelectorAll("[data-part='jour-a-debloquer']")];
+    expect(lignes).toHaveLength(edimbourg.days.length - 2);
+    expect(lignes[0]).toHaveTextContent("Jour 3, à débloquer");
+    for (const ligne of lignes) {
+      expect(ligne).not.toHaveTextContent(/complet/);
+      expect(ligne.querySelector("a, button")).toBeNull();
+    }
+    expect(within(jourParJour()).getByText("Jour 3, à débloquer")).toHaveClass("sr-only");
+    const bouton = within(jourParJour()).getByRole("link", { name: "Débloquer" });
+    expect(bouton).toHaveAttribute("href", "/voyages/x/debloquer");
+    expect(within(jourParJour()).getAllByRole("link").filter((lien) => lien.getAttribute("data-part") === "jour")).toHaveLength(2);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("sans lien de déblocage : ni ligne « À débloquer » ni bouton, seulement les journées servies", () => {
+    const { container } = renderSejour(partiel, null);
+    expect(container.querySelector("[data-part='jour-a-debloquer']")).toBeNull();
+    expect(container.querySelector("[data-part='debloquer']")).toBeNull();
+    expect(within(jourParJour()).queryByText(/débloquer/i)).toBeNull();
+  });
+
+  it("voyage débloqué (journées partielles) ou voyage complet : aucune ligne « À débloquer », même avec un lien", () => {
+    const { container, unmount } = renderSejour({ ...edimbourgDebloque, days: edimbourgDebloque.days.slice(0, 2) }, "/voyages/x/debloquer");
+    expect(container.querySelector("[data-part='jour-a-debloquer']")).toBeNull();
+    expect(container.querySelector("[data-part='debloquer']")).toBeNull();
+    unmount();
+    renderSejour(edimbourg, "/voyages/x/debloquer");
+    expect(document.querySelector("[data-part='jour-a-debloquer']")).toBeNull();
+    expect(document.querySelector("[data-part='debloquer']")).toBeNull();
   });
 });

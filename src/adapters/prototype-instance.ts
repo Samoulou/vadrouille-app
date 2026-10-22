@@ -2,10 +2,10 @@ import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-relecteur";
 import type { PoolSql } from "@/server/usage/neon";
 
-import { createPrototypeAdapter, createPrototypeAdapterReel, type RelecteurTrajets } from "./prototype";
+import { createPrototypeAdapter, createPrototypeAdapterReel, type LecteurDeblocage, type RelecteurTrajets } from "./prototype";
 import { createSourceProgrammesReels } from "./prototype-lecture";
 import { createProgrammeLoader } from "./prototype-loader";
-import type { TripAdapter } from "./types";
+import type { AdapterContext, TripAdapter } from "./types";
 
 /**
  * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6 ; décisions 0074 et 0079) :
@@ -29,8 +29,21 @@ import type { TripAdapter } from "./types";
 /** Barrière de la lecture réelle : pool si elle est ouverte pour la requête courante, sinon `null`. */
 export type BarriereLectureProgrammes = () => Promise<PoolSql | null>;
 
+/**
+ * Déblocages simulés retenus pour l'essai (spécification E2E-essai, lot 1) : cookie signé par une clé tirée du code
+ * d'accès (`src/server/essai/deblocage.ts`), branché au démarrage par `src/instrumentation.ts`. Ce module n'en lit ni la
+ * clé ni le cookie. Non branché (tests, fichiers de programmes, garde fermée) : aucun déblocage retenu par cookie.
+ */
+export interface DeblocagesEssai {
+  /** Voyages débloqués de la requête courante ; ensemble vide sur toute erreur. */
+  lire(ctx: AdapterContext): Promise<ReadonlySet<string>>;
+  /** Retient un voyage débloqué (action serveur seulement : écrit un cookie) ; sans effet si la clé est absente. */
+  retenir(ctx: AdapterContext, tripId: string): Promise<void>;
+}
+
 interface Instance {
-  adapter: TripAdapter;
+  /** Adaptateur de la requête : la source (index, relecteur) est partagée, seul le lecteur du déblocage change. */
+  fabrique: (deblocage?: LecteurDeblocage) => TripAdapter;
   relecteur: RelecteurSimule;
 }
 
@@ -39,6 +52,7 @@ interface Etat {
   instance?: Instance;
   barriere?: BarriereLectureProgrammes;
   relecteur?: RelecteurTrajets;
+  deblocages?: DeblocagesEssai;
 }
 
 const INSTANCE_KEY = Symbol.for("vadrouille.prototype");
@@ -50,6 +64,16 @@ const holder = globalThis as typeof globalThis & { [INSTANCE_KEY]?: Etat };
  */
 export function brancherLectureProgrammesReels(barriere: BarriereLectureProgrammes, relecteur: RelecteurTrajets): void {
   holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], barriere, relecteur };
+}
+
+/** Branche les déblocages de l'essai retenus par cookie (appelé une fois, au démarrage, par `src/instrumentation.ts`). */
+export function brancherDeblocagesEssai(deblocages: DeblocagesEssai): void {
+  holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], deblocages };
+}
+
+/** Déblocages de l'essai branchés, ou `null` (aucun cookie lu ni écrit). */
+export function deblocagesEssai(): DeblocagesEssai | null {
+  return holder[INSTANCE_KEY]?.deblocages ?? null;
 }
 
 /** Barrière lue à chaque lecture ; non branchée : `null` (aucune connexion, aucun programme). */
@@ -74,19 +98,29 @@ export function assertPrototypeAllowedOnProcess(): void {
   if (!prototypeAdapterAllowed()) throw new Error(REFUS_HORS_LISTE);
 }
 
-export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env): TripAdapter {
+/**
+ * Adaptateur `prototype`. `deblocage` (spécification E2E-essai, lot 1) : lecteur du déblocage simulé d'un voyage d'essai
+ * pour la requête courante (`getTripReader()`) ; absent, un voyage d'essai est servi non débloqué.
+ */
+export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env, deblocage?: LecteurDeblocage): TripAdapter {
   assertPrototypeAllowed(env);
   const etat = holder[INSTANCE_KEY] ?? {};
   if (!etat.instance) {
     const dossier = env.VADROUILLE_PROTOTYPE_DIR?.trim();
     const relecteur = createRelecteurSimule();
-    const adapter = dossier
-      ? createPrototypeAdapter({ programmes: createProgrammeLoader({ dossier }), relecteurs: { trajets: relecteur } })
-      : createPrototypeAdapterReel({ programmes: createSourceProgrammesReels({ pool: poolLectureProgrammes }), relecteurs: { trajets: relecteurReel } });
-    etat.instance = { adapter, relecteur };
+    const fabrique = dossier
+      ? (() => {
+          const programmes = createProgrammeLoader({ dossier });
+          return (lecteur?: LecteurDeblocage) => createPrototypeAdapter({ programmes, relecteurs: { trajets: relecteur }, deblocage: lecteur });
+        })()
+      : (() => {
+          const programmes = createSourceProgrammesReels({ pool: poolLectureProgrammes });
+          return (lecteur?: LecteurDeblocage) => createPrototypeAdapterReel({ programmes, relecteurs: { trajets: relecteurReel }, deblocage: lecteur });
+        })();
+    etat.instance = { fabrique, relecteur };
     holder[INSTANCE_KEY] = etat;
   }
-  return etat.instance.adapter;
+  return etat.instance.fabrique(deblocage);
 }
 
 /**
