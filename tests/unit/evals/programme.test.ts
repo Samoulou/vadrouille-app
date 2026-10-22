@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import { lireProgramme, ordreEcrit, type CreneauIa, type JourIa, type ProgrammeIa } from "@/ai/sorties";
 import { BriefSchema, type Brief } from "@/prototype/brief";
+import { reduireSite } from "@/research/fetch-page";
+import { sitesDuProgramme } from "@/server/p0/sites";
 
 /**
  * Jeu d'évaluation hors réseau du lot 1 du programme par l'IA (spécification P0-programme-par-ia § 5, critères A1 à A6 ;
@@ -165,6 +167,26 @@ describe("evals: programme par l'IA, sorties simulées de rome-1 et edimbourg-1 
       expect(lieux.length, cas.id).toBeGreaterThan(0);
       expect(lieux.filter((creneau) => creneau.pourquoi !== undefined).length / lieux.length, cas.id).toBeGreaterThanOrEqual(CONFIG.pourquoiPartMin);
       expect(lieux.filter((creneau) => creneau.conseil !== undefined).length / lieux.length, cas.id).toBeGreaterThanOrEqual(CONFIG.conseilPartMin);
+    }
+  });
+
+  it("evals: sites proposés lus et réduits, aucune donnée Google (lot 2a, A13 et A14 ; 0121 § 4.2)", () => {
+    for (const id of CAS) {
+      const { programme } = charger(id);
+      const fichier = lireJson(`evals/programme/${id}.json`) as { cas: string; attendu: { sitesProposes: number; sitesFormeInvalide: number } };
+      expect(fichier.cas, id).toContain("prompt programme v2");
+      const sites = sitesDuProgramme(programme, reduireSite);
+      expect({ sitesProposes: sites.adresses.length, sitesFormeInvalide: sites.formesRefusees }, id).toEqual(fichier.attendu);
+      expect(new Set(sites.adresses).size, id).toBe(sites.adresses.length);
+      for (const adresse of sites.adresses) {
+        expect(adresse, id).toMatch(/^https:\/\/[^/?#]+\.[^/?#]+\//);
+        expect(adresse, id).not.toMatch(/[?#]/);
+        expect(adresse, id).not.toMatch(/google|goo\.gl|g\.page|g\.co\//i);
+      }
+      // Le jeu porte des cas refusés à la forme et au moins un site cité par plusieurs créneaux (dédoublonnage).
+      expect(sites.formesRefusees, id).toBeGreaterThan(0);
+      const cites = programme.jours.flatMap((jour, j) => jour.creneaux.map((_, rang) => sites.adresseDe(j, rang))).filter((a) => a !== undefined);
+      if (id === "rome-1") expect(cites.length, id).toBeGreaterThan(sites.adresses.length);
     }
   });
 

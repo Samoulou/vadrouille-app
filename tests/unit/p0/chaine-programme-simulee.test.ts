@@ -142,6 +142,18 @@ describe("p0: mode simulé par la nouvelle chaîne (0116 § 7.2)", () => {
     expect(apercu!.days.map((jour) => jour.index)).toEqual([...new Set(cases.map((c) => (c.type === "proposal" ? c.proposal.day : 0)))]);
   });
 
+  it("p0: mode simulé (pnpm p0) : aucun site vérifié, aucune source écrite, aucun appel de vérification (lot 2a, 0121 § 3.6)", async () => {
+    const fixtures = fixturesRome((programme) => {
+      for (const jour of programme.jours) for (const creneau of jour.creneaux) if (typeof creneau.lieu === "string") creneau.site = "https://site-officiel.example.org/";
+    });
+    const { resultat } = await executerSimule("rome-1", "rome", {}, fixtures);
+    const programme = ProgrammeReduitSchema.parse(resultat.programme);
+    const etapes = programme.trip.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : [])));
+    expect(etapes.length).toBeGreaterThan(0);
+    expect(etapes.every((etape) => etape.source === undefined)).toBe(true);
+    expect(JSON.stringify(resultat)).not.toContain("site-officiel.example.org");
+  });
+
   it("p0: infos pratiques et titre du jour de l'IA écrits dans les étapes et les jours, puis affichés (rome-1, lot 1 bis)", async () => {
     const { resultat, requetes } = await executerSimule("rome-1", "rome");
     // Le prompt ne porte que le brief : aucune donnée des fiches Places (identifiant, nom, adresse, niveau de prix).

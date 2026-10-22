@@ -28,6 +28,7 @@ import {
 import { decouperProgramme } from "@/prototype/decoupage";
 import { trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
+import { reduireSite } from "@/research/fetch-page";
 import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, pointsDeTrajet } from "@/server/p0/assemblage";
@@ -38,6 +39,7 @@ import {
   entreeProgrammeDepuisBrief,
 } from "@/server/p0/vers-couche-ia";
 import { poolPrototype } from "@/server/p0/base";
+import { avecSiteGarde, compteursNonSoumis, sitesDuProgramme, verifierSites, SITES_DUREE_MAX_MS, type CompteursSites, type ResultatSites } from "@/server/p0/sites";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
 import { identifiantDuVoyage, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
 import { briefDepuisBrief, demandesDuSejour, engagementsDepuisBrief, modeDeTrajet, nuitsDepuisBrief } from "@/server/p0/vers-moteur";
@@ -560,7 +562,10 @@ async function etape(
  */
 export const CODE_PROGRAMME_ILLISIBLE = "model_output_invalid";
 
-/** Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : des nombres, aucun verdict. */
+/**
+ * Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : des nombres, aucun verdict.
+ * Lot 2a (0121 § 2.3, 0122 § 2.1) : `sites*`, sortie de l'IA et nos propres requêtes vers des hôtes non Google.
+ */
 type CompteursProgramme = {
   days: number;
   slots: number;
@@ -571,7 +576,7 @@ type CompteursProgramme = {
   textsCut: number;
   modelCalls: number;
   unverifiedForCap: number;
-};
+} & CompteursSites;
 
 /**
  * Ligne de journal fermée de fin d'étape (`p0.programme_written`) : compteurs maison seulement (sortie de l'IA, nos
@@ -601,7 +606,9 @@ function configurationModeles(): ConfigModeles {
  * 2. phase `ancrage` : logements (une recherche et une fiche chacun, zone du séjour), puis **vérification** des lieux
  *    distincts dans l'ordre écrit (`verifierLieuxDuProgramme`, un appel d'ancrage par lieu) ; part et échéance contrôlées
  *    **avant chaque appel**, l'échéance moins la **réserve de trajets** (requêtes Routes prévues × 10 s, 0116 § 3.5) ;
- *    non tenu : lieux restants sans `placeId`, programme entier écrit ; rien n'est écrit dans cette phase ;
+ *    non tenu : lieux restants sans `placeId`, programme entier écrit ; en parallèle, **vérification des sites**
+ *    proposés par l'IA (lot 2a, `verifierSites`, 0121 § 2), adresses en mémoire seulement ; rien n'est écrit dans cette
+ *    phase ;
  * 3. repère `planification` (journal seulement : `ecrirePhase` exige la phase précédente de `PHASES`, et `notation` n'est
  *    plus écrite) : **trajets** entre points consécutifs avec identifiant de chaque jour (`pointsDeTrajet`), sous la part
  *    Routes et l'échéance ; manque : trajets sans durée, jamais inventés (0092 § 4) ;
@@ -630,7 +637,18 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
     const registre = registreDeLEtape(forfait, contexte, (methode) => (methode === "places_text_search" || methode === "places_details" ? reserveTrajetsMs : 0));
     const capacites = composer(contexte, forfait, registre, modeles).programme();
     marquerAppels();
-    const compteurs: CompteursProgramme = { days: 0, slots: 0, placesToVerify: 0, daysRemoved: 0, slotsRemoved: 0, fieldsRemoved: 0, textsCut: 0, modelCalls: 0, unverifiedForCap: 0 };
+    const compteurs: CompteursProgramme = {
+      days: 0,
+      slots: 0,
+      placesToVerify: 0,
+      daysRemoved: 0,
+      slotsRemoved: 0,
+      fieldsRemoved: 0,
+      textsCut: 0,
+      modelCalls: 0,
+      unverifiedForCap: 0,
+      ...compteursNonSoumis(0),
+    };
     const cout = memoireDuCout(contexte, registre);
     try {
       await cout.terminer(async () => {
@@ -647,6 +665,11 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         const programme = ordreEcrit(lecture.valeur);
         compteurs.days = programme.jours.length;
         compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
+        // Sites proposés (lot 2a, 0121 § 2.1 point 1) : adresses réduites distinctes en ordre écrit, en mémoire seulement ;
+        // une forme refusée est un champ retiré (§ 11.3 point 1).
+        const sites = sitesDuProgramme(programme, reduireSite);
+        compteurs.fieldsRemoved += sites.formesRefusees;
+        Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
 
         // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit, part et échéance contrôlées avant chaque appel.
         await passerA("ancrage");
@@ -656,11 +679,12 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         compteurs.placesToVerify = lieux.length;
         // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
         compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
-        const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined) =>
+        // Le `site` lu ne passe jamais tel quel : seule l'adresse réduite gardée est remise au créneau (0121 § 2.1 point 3).
+        const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined, gardees: ReadonlySet<string> = new Set()) =>
           programme.jours.map((jour, indiceJour) => ({
             date: jour.date,
             ...(jour.titre === undefined ? {} : { titre: jour.titre }),
-            creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })),
+            creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), gardees), placeId: placeIdDe(indiceJour, rang) })),
           }));
         // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
         const requetesPrevues = Math.min(config.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
@@ -675,7 +699,26 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
           const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
           return consomme.requetes + 1 > plafond ? "part" : "ok";
         };
-        const issue = await verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle);
+        // Sites (lot 2a, 0121 § 2.1 points 2 et 4) : en parallèle de la vérification des lieux, sans donnée commune
+        // (PPI-PO-10) ; borne : 60 s, jamais au-delà de l'échéance moins la réserve de trajets. Si la vérification des
+        // lieux lève, les vérifications de sites en cours sont abandonnées et attendues avant de journaliser.
+        const abandonSites = new AbortController();
+        const debutSites = Date.now();
+        const verificationSites = verifierSites(sites.adresses, capacites.verifierSite, {
+          limite: Math.min(debutSites + SITES_DUREE_MAX_MS, contexte.echeance - reserveTrajetsMs),
+          maintenant: () => Date.now(),
+          signal: abandonSites.signal,
+        });
+        const verificationLieux = verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle).catch((erreur: unknown) => {
+          abandonSites.abort();
+          throw erreur;
+        });
+        const [issueLieux, issueSites] = await Promise.allSettled([verificationLieux, verificationSites]);
+        const resultatSites: ResultatSites =
+          issueSites.status === "fulfilled" ? issueSites.value : { gardees: new Set(), compteurs: compteursNonSoumis(sites.adresses.length) };
+        Object.assign(compteurs, resultatSites.compteurs);
+        if (issueLieux.status === "rejected") throw issueLieux.reason;
+        const issue = issueLieux.value;
 
         // 3. Trajets entre points consécutifs avec identifiant (ordre écrit), sous la part Routes et l'échéance seule.
         noterPhase("planification");
@@ -683,7 +726,7 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         const jours = joursAvec((jour, rang) => {
           const cle = cleDe(jour, rang);
           return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
-        });
+        }, resultatSites.gardees);
         const mode = modeDeTrajet(brief);
         const cadence = creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, {
           maintenant: () => Date.now(),

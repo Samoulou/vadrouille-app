@@ -618,15 +618,30 @@ const TEXTES_CRENEAU = {
 } as const;
 
 /** Champs facultatifs d'un créneau : invalides, retirés seuls (`.catch(undefined)`), le créneau gardé (modèle 0111). */
-const CHAMPS_FACULTATIFS_CRENEAU = ["fin", "lieu", "pourquoi", "ville", "quartier", "conseil", "prix", "horaires", "aReserver", "incontournable"] as const;
+const CHAMPS_FACULTATIFS_CRENEAU = ["fin", "lieu", "pourquoi", "ville", "quartier", "conseil", "prix", "horaires", "aReserver", "incontournable", "site"] as const;
+
+/**
+ * Longueur maximale de l'adresse `site` lue **brute** (décision 0121 § 3.3) : la forme (https, hôte public non Google,
+ * réduction, 300 caractères après réduction) est contrôlée ensuite par `reduireSite` (`src/research/fetch-page.ts`),
+ * que `src/ai` n'importe pas ; une seule analyse d'adresse.
+ */
+export const SITE_BRUT_MAX = 2_048;
+
+/** Natures dont le créneau ne devient jamais une étape (lignes `terminus`) : `site` y est ignoré (0122 § 2.2 point 1). */
+const NATURES_TERMINUS: ReadonlySet<NatureCreneau> = new Set<NatureCreneau>(["arrivee", "depart"]);
 
 /**
  * Créneau écrit par l'IA. Tout texte passe par `texteCoupe` (contrôle du texte entier, coupe, recontrôle : 0111 § 3,
  * 0117 § 1 point 1), donc par la règle du contrat (`texteMaison` de `src/contracts/texte.ts`, réexportée par
  * `src/ai/candidat.ts` depuis la PR 652, ticket 633) : `conseil`, `prix`, `horaires` et le titre du jour vont aux
  * champs du contrat (`StopFacts.tip`, `priceNote`, `hoursNote`, `Day.theme` ; 0116 § 6, lot 1 bis). Clés inconnues
- * (`placeId`, `url`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni recopiées (0117 § 1 point 5), et
- * comptées dans `champsRetires`.
+ * (`placeId`, `url`, `source`, `website`, `lat`…) : ignorées (`z.object` les retire), jamais lues ni recopiées (0117
+ * § 1 point 5), et comptées dans `champsRetires`.
+ *
+ * Seule exception (lot 2a, 0117 § 1 point 5 amendé par 0122 § 2.2) : le champ nommé `site`, lu comme une **chaîne
+ * brute** de `SITE_BRUT_MAX` caractères au plus, sur un créneau avec `lieu` qui devient une étape (ni arrivée ni
+ * départ) ; sinon retiré et compté. Jamais écrit tel quel : la forme et la réduction sont celles de `reduireSite`, la
+ * vérification celle de `src/server/p0/sites.ts`. `contientUrl` reste entier pour tous les autres textes (A15).
  */
 const CreneauIaObjet = z.object({
     debut: z.string().regex(HEURE),
@@ -641,6 +656,7 @@ const CreneauIaObjet = z.object({
     horaires: texteCoupe(TEXTES_CRENEAU.horaires).optional().catch(undefined),
     aReserver: z.boolean().optional().catch(undefined),
     incontournable: z.boolean().optional().catch(undefined),
+    site: z.string().min(1).max(SITE_BRUT_MAX).optional().catch(undefined),
 });
 export const CreneauIaSchema = CreneauIaObjet
   .refine((creneau) => creneau.lieu !== undefined || NATURES_SANS_LIEU.has(creneau.nature), "lieu obligatoire pour cette nature")
@@ -766,11 +782,14 @@ export function lireProgramme(texte: string, sejour: { readonly arrivee: string;
       const present = objetBrut(creneauBrut) ?? {};
       const connues = new Set(Object.keys(CreneauIaObjet.shape));
       champsRetires += Object.keys(present).filter((cle) => !connues.has(cle)).length;
+      // `site` hors d'un créneau d'étape (sans lieu, arrivée, départ) : retiré, compté ci-dessous (0122 § 2.2 point 1).
+      const creneau: CreneauIa = { ...lu.data };
+      if (creneau.site !== undefined && (creneau.lieu === undefined || NATURES_TERMINUS.has(creneau.nature))) delete creneau.site;
       const lus = new Map(Object.entries(present));
-      const gardes = new Map(Object.entries(lu.data));
+      const gardes = new Map(Object.entries(creneau));
       champsRetires += CHAMPS_FACULTATIFS_CRENEAU.filter((champ) => lus.get(champ) !== undefined && gardes.get(champ) === undefined).length;
       textesCoupes += Object.entries(TEXTES_CRENEAU).filter(([champ, max]) => coupe(lus.get(champ), gardes.get(champ), max)).length;
-      creneaux.push(lu.data);
+      creneaux.push(creneau);
     }
     jours.push({ date: date.data, ...(titreJour === undefined ? {} : { titre: titreJour }), creneaux });
   }

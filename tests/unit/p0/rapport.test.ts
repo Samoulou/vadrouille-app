@@ -8,8 +8,16 @@ import { CRITERES } from "@/contracts/prototype-suivi";
 import * as messages from "@/i18n/messages";
 import { CODES_ARRET } from "@/prototype/arret";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
-import { CODES_PLAFOND, criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { ProgrammeEcritSchema, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import {
+  CODES_PLAFOND,
+  criteresDuRapport,
+  etapesAvecSiteDuRapport,
+  etapesDeLieuAvecIdentifiant,
+  etapesDuRapport,
+  liensSitesDuRapport,
+  texteDuRapport,
+} from "@/server/p0/rapport";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -51,12 +59,20 @@ describe("p0: critères du rapport", () => {
     }
   });
 
-  it("A2 : une étape de lieu sans source est « non », A1 et A6 restent oui", () => {
+  // Attente changée au lot 2a, sur décision écrite : 0122 § 2.3 condition 2 — « La Sécurité exige que le
+  // Product Owner sépare A2 avant la PR de code : A2 porte sur le `placeId` seul, et ne lit que les `placeId` des étapes
+  // et de l'idée « Surprends-moi » » — et `specs/P0-programme-par-ia.md` § 11.4 et PPI-PO-12 (amendement 3) :
+  // « Ni la `source` d'une étape, ni celle d'un événement n'y entrent plus ». Ce test, qui exigeait « non » pour une
+  // étape sans source, garde la même étape : sans source, A2 reste « oui » ; sans `placeId`, A2 devient « non » (A24 :
+  // « « non » dès qu'une étape n'a pas de `placeId` »). Voir aussi « rapport: critère A2 sur les seuls placeId ».
+  it("A2 : une étape de lieu sans placeId est « non », A1 et A6 restent oui ; sans source, A2 reste oui", () => {
     const contenu = contenuValide();
     const jours = (contenu.trip as { days: { items: { type: string; stop?: Record<string, unknown> }[] }[] }).days;
     const etape = jours.flatMap((j) => j.items).find((ligne) => ligne.type === "stop");
     expect(etape?.stop?.source).toBeDefined();
     delete etape!.stop!.source;
+    expect(criteresDuRapport(executionSuivie(), contenu)).toMatchObject({ A1: "oui", A2: "oui", A6: "oui" });
+    delete etape!.stop!.placeId;
     const criteres = criteresDuRapport(executionSuivie(), contenu);
     expect(criteres).toMatchObject({ A1: "oui", A2: "non", A6: "oui" });
   });
@@ -115,7 +131,8 @@ describe("p0: texte du rapport (« Copier le rapport »)", () => {
     expect(lignes).toContain(`A1 ${t.criteres.A1} : ${t.valeurs.oui}`);
     expect(lignes.at(-1)).toBe(`${t.dernierePurge} : 2026-10-14T03:00:00Z`);
     expect(lignes.some((l) => l.startsWith(t.codeArret))).toBe(false);
-    expect(lignes).toHaveLength(7 + CRITERES.length + 1);
+    // Lot 2a : une ligne « liens vers les sites affichés » après les critères (PPI-PO-12).
+    expect(lignes).toHaveLength(7 + CRITERES.length + 1 + 1);
     // Ni identifiant ni texte du programme (le contenu n'entre pas dans le texte), ni USD, ni durée.
     expect(texte).not.toContain(PREFIXE);
     expect(texte).not.toContain("[Lieu de test");
@@ -162,5 +179,76 @@ describe("p0: rapport sans donnée Google (spécification P0-programme-par-ia, A
     expect(texte).not.toContain(PREFIXE);
     for (const etape of etapes) expect(texte).not.toContain(String(etape.stop!.name));
     expect(texte).not.toMatch(/placeId|avecPlaceId|sansPlaceId|unverified|verifi/i);
+  });
+});
+
+describe("p0: rapport, lot 2a (spécification § 11.4, A24 ; amendement 3, PPI-PO-12 ; verdict 0122 § 2.3)", () => {
+  type Ligne = { type: string; stop?: Record<string, unknown> };
+  const etapesDe = (contenu: Record<string, unknown>) =>
+    (contenu.trip as { days: { items: Ligne[] }[] }).days.flatMap((jour) => jour.items).filter((ligne) => ligne.type === "stop");
+
+  // Nom de la spécification (`specs/P0-programme-par-ia.md` A24, amendement 3).
+  it("rapport: critère A2 sur les seuls placeId", () => {
+    // Toutes les étapes avec placeId et aucune avec source : A2 « oui », ligne des sites « non ».
+    const contenu = contenuValide();
+    for (const etape of etapesDe(contenu)) delete etape.stop!.source;
+    const execution = executionSuivie();
+    expect(criteresDuRapport(execution, contenu).A2).toBe("oui");
+    expect(liensSitesDuRapport(execution, contenu)).toBe("non");
+    // Une étape avec source et sans placeId : A2 « non », ligne des sites « oui » ; jamais combinées.
+    const melange = contenuValide();
+    const [premiere, ...autres] = etapesDe(melange);
+    for (const etape of autres) delete etape.stop!.source;
+    delete premiere!.stop!.placeId;
+    expect(criteresDuRapport(execution, melange).A2).toBe("non");
+    expect(liensSitesDuRapport(execution, melange)).toBe("oui");
+    // A24 : « oui » pour un programme dont toutes les étapes et l'idée ont un `placeId`, aucune étape une `source` « et un
+    // événement sans source ». Le schéma du programme écrit exige la source d'un événement (un tel programme échoue au
+    // critère A1, « non ») : le cas est donc prouvé sur la fonction du critère, après lecture par le schéma.
+    const lu = ProgrammeEcritSchema.parse(contenu);
+    const evenements = lu.trip.days.flatMap((jour) => jour.events);
+    expect(evenements.length).toBeGreaterThan(0);
+    for (const evenement of evenements) delete (evenement as { source?: unknown }).source;
+    expect(etapesDeLieuAvecIdentifiant(lu)).toBe(true);
+    // L'idée « Surprends-moi », quand elle existe, compte : sans `placeId`, le critère devient « non ».
+    const avecIdee = lu.trip.days.find((jour) => jour.surprise !== undefined);
+    expect(avecIdee?.surprise?.placeId).toBeDefined();
+    delete (avecIdee!.surprise as { placeId?: unknown }).placeId;
+    expect(etapesDeLieuAvecIdentifiant(lu)).toBe(false);
+  });
+
+  it("rapport: étapes avec site à la lecture, texte copié en oui ou non", () => {
+    const contenu = contenuValide();
+    const etapes = etapesDe(contenu);
+    for (const etape of etapes.slice(1)) delete etape.stop!.source;
+    const execution = executionSuivie();
+    // Sur la page : nombre d'étapes avec source, calculé à la lecture du programme stocké.
+    expect(etapesAvecSiteDuRapport(contenu)).toBe(1);
+    expect(etapesAvecSiteDuRapport(contenuValide())).toBe(etapes.length);
+    // Texte copié : une ligne oui ou non, sans nombre, sans hôte ni adresse, sans compteur du journal.
+    const texte = texteDuRapport(execution, criteresDuRapport(execution, contenu), null, liensSitesDuRapport(execution, contenu));
+    const ligne = texte.split("\n").find((l) => l.startsWith(t.liensSites));
+    expect(ligne).toBe(`${t.liensSites} : ${t.valeurs.oui}`);
+    expect(ligne).not.toMatch(/\d/);
+    const source = etapes[0]!.stop!.source as { label: string; url: string };
+    expect(texte).not.toContain(source.label);
+    expect(texte).not.toContain(source.url);
+    expect(texte).not.toMatch(/sites(Proposed|Checked|Removed|Unchecked)|placeId/);
+    expect(texte).not.toContain(t.etapesAvecSite.split(" :")[0]!);
+    // La ligne des sites ne lit que `source` : retirer tous les placeId ne la change pas.
+    for (const etape of etapes) delete etape.stop!.placeId;
+    expect(liensSitesDuRapport(execution, contenu)).toBe("oui");
+  });
+
+  it("rapport: ligne des sites non relevée sans programme", () => {
+    expect(liensSitesDuRapport(executionSuivie(), null)).toBe("non_releve");
+    expect(liensSitesDuRapport(executionSuivie(), {})).toBe("non_releve");
+    expect(liensSitesDuRapport(executionSuivie(), { ...contenuValide(), positions: {} })).toBe("non_releve");
+    expect(liensSitesDuRapport(arretee("upstream_unavailable"), contenuValide())).toBe("non_releve");
+    expect(etapesAvecSiteDuRapport(null)).toBeNull();
+    expect(etapesAvecSiteDuRapport({})).toBeNull();
+    // Par défaut (aucune valeur passée) : « non relevé », jamais « non ».
+    const texte = texteDuRapport(arretee("upstream_unavailable"), criteresDuRapport(arretee("upstream_unavailable"), null), null);
+    expect(texte).toContain(`${t.liensSites} : ${t.valeurs.non_releve}`);
   });
 });

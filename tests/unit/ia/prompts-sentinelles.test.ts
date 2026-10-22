@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import type { ClientModeles, EtapeRequete } from "@/ai/client";
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
 import { versEntreeQuartier, type EntreeModeles } from "@/ai/entrees";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
+import { creerRedigerProgramme } from "@/ai/rediger-programme";
 import type { LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
-import { candidatPourModele, entreeModelesDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
+import { candidatPourModele, entreeModelesDepuisBrief, entreeProgrammeDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
 
 import { journalDePrompts } from "../../support/journal-prompts";
 import { avecSentinellesGoogle, sentinellesPresentes } from "../../support/sentinelles-google";
@@ -93,5 +95,38 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
 
     expect(journal.requetes.map((requete) => requete.etape)).toEqual(["structuration", "quartier", "plan", "notation", "raisons"]);
     for (const requete of journal.requetes) expect(sentinellesPresentes(JSON.stringify(requete), sentinelles), requete.etape).toEqual([]);
+  });
+
+  // A13 (`specs/P0-programme-par-ia.md` § 11.6, amendement 2 ; 0121 § 5 ; 0122 § 3 : « le prompt `programme` v2 ne reçoit
+  // toujours que le brief ») : la requête `programme` v2 envoyée par la capacité de `p0Run` ne porte aucune valeur rendue
+  // par les clients Google, même appelés avant elle ; une entrée à clé Google glissée est refusée sans requête.
+  it("programme: prompt v2 demande le site officiel, sans donnée Google (A13) : requête journalisée sans sentinelle", async () => {
+    const { brief, fixtures } = charger();
+    const sentinelles = avecSentinellesGoogle({ places: creerPlacesSimule(fixtures.places), routes: creerRoutesSimule(fixtures.routes) });
+    for (const lieu of Object.values(fixtures.places.lieux)) await sentinelles.places.details(lieu.placeId);
+    expect(sentinelles.valeurs.size).toBeGreaterThan(5);
+
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: "{}", coutUsd: 0 }) };
+    const journal = journalDePrompts(modeles);
+    const rediger = creerRedigerProgramme(journal.client, { modele: "test/programme", routage: ROUTAGE });
+    await rediger(entreeProgrammeDepuisBrief(brief));
+
+    expect(journal.requetes).toHaveLength(1);
+    const [requete] = journal.requetes;
+    expect(requete?.prompt).toEqual({ id: "programme", version: 2 });
+    expect(PROMPT_PROGRAMME.version).toBe(2);
+    expect(journal.texte()).toContain('\\"site\\" (facultatif)');
+    expect(sentinellesPresentes(journal.texte(), sentinelles)).toEqual([]);
+    for (const cle of ["placeId", "place_id", "websiteUri", "lat", "lng"]) {
+      expect(journal.texte(), cle).not.toContain(`"${cle}"`);
+      expect(journal.texte(), cle).not.toContain(`\\"${cle}\\"`);
+    }
+
+    // Une donnée Google glissée dans l'entrée (clé en trop) : refusée par le schéma strict, aucune requête de plus.
+    const placeId = Object.values(fixtures.places.lieux)[0]?.placeId;
+    expect(placeId).toBeDefined();
+    const glissee = { ...entreeProgrammeDepuisBrief(brief), placeId } as Parameters<typeof rediger>[0];
+    await expect(rediger(glissee)).rejects.toBeInstanceOf(RangeError);
+    expect(journal.requetes).toHaveLength(1);
   });
 });

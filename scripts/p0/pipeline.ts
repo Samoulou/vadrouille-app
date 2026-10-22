@@ -475,7 +475,11 @@ export async function executerProgramme(entree: EntreePipeline): Promise<Resulta
       ...(jour.titre === undefined ? {} : { titre: jour.titre }),
       creneaux: jour.creneaux.map((creneau, rang) => {
         const cle = cleDe(indiceJour, rang);
-        return { ...creneau, placeId: cle === undefined ? undefined : fiches.get(cle)?.placeId };
+        // Lot 2a (décision 0121 § 3.6) : `pnpm p0` ne vérifie aucun site ; le `site` lu n'atteint jamais l'assemblage,
+        // aucune `source` n'est écrite.
+        const sansSite = { ...creneau };
+        delete sansSite.site;
+        return { ...sansSite, placeId: cle === undefined ? undefined : fiches.get(cle)?.placeId };
       }),
     }));
     journal.ecrire("grounding_done", { ancres: fiches.size, nonRetenus: lieux.length - fiches.size });
