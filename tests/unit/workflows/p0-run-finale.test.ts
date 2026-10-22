@@ -19,7 +19,8 @@ import { zoneDuSejour } from "@/grounding/zone";
 import { SQL_TRAJET } from "@/adapters/prototype-ecriture";
 import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme, ProgrammeEcritSchema } from "@/prototype/programme-reduit";
 import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, type PortConsommation } from "@/server/usage/port";
-import type { VerificateurSites } from "@/server/p0/sites";
+import { DELAI_SITE_MS, MARGE_SITE_MS, SITES_DUREE_MAX_MS, type VerificateurSites } from "@/server/p0/sites";
+import { DELAI_REQUETE_MS } from "@/server/usage/port";
 import { DUREE_MAX_EXECUTION_MS, etapeProgramme, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Run } from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
@@ -1259,6 +1260,50 @@ describe("p0Run, etapeProgramme : sites de l'activité (lot 2a, spécification �
     expect(etapesEcrites().every((stop) => stop.source === undefined)).toBe(true);
     const fin = lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written");
     expect(fin).toMatchObject({ sitesProposed: 5, sitesChecked: 0, sitesRemoved: 0, sitesUnchecked: 5 });
+  });
+
+  // A19 (`specs/P0-programme-par-ia.md` § 11.3 point 5 et A19, amendement 3) ; 0121 § 2.1 : borne des sites
+  // `limiteSites = min(début + 60 s, échéance − réserve des trajets)`, calculée une fois au lancement ; une adresse n'est
+  // soumise que si `maintenant + 5 s + marge` tient avant elle. Rédaction de 600 s + T ms, logement (Text Search et
+  // fiche) à 15 s chacun : la vérification commence à 630 s + T ; échéance 770 s ; réserve de trajets 10 × 10 s (Routes
+  // prévues d'edimbourg-1 au mode réel) ; borne = 670 s < 630 s + T + 60 s. À T = 34 000 ms, 664 s + 5 s + 1 s = 670 s
+  // tient encore (toutes soumises) ; à T = 34 001 ms, plus rien (toutes `sitesUnchecked`), alors que la borne des 60 s
+  // seule les aurait admises. Programme entier écrit dans les deux cas.
+  it("p0: échéance proche, vérification des sites raccourcie, programme entier écrit", async () => {
+    const T0 = Date.parse("2026-10-15T10:00:00Z");
+    const reserve = 10 * DELAI_REQUETE_MS.routes;
+    const echeance = LIMITE_FONCTION_MS - MARGE_FIN_ETAPE_MS;
+    // Rang exact de l'épreuve : la borne de l'échéance est la plus courte, et la limite tombe sur la dernière milliseconde.
+    expect(echeance - reserve).toBeLessThan(630_000 + 34_000 + SITES_DUREE_MAX_MS);
+    expect(630_000 + 34_000 + DELAI_SITE_MS + MARGE_SITE_MS).toBe(echeance - reserve);
+    const lancer = async (redactionMs: number) => {
+      reinitialiser();
+      avecSites();
+      verificateurSites = { barriereFermee: false, verifier: async () => ({ ok: true }) };
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const journal = capturerJournal();
+      try {
+        vi.setSystemTime(T0);
+        latences = { modele: redactionMs, places: 15_000, routes: 2_000 };
+        expect(await etapeProgramme({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+      } finally {
+        journal.mockRestore();
+        vi.useRealTimers();
+      }
+      expect(d.etat.statut).toBe("programme_ecrit");
+      return lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written") as Record<string, number>;
+    };
+
+    const tient = await lancer(600_000 + 34_000);
+    expect(sitesSoumis).toHaveLength(5);
+    expect(tient).toMatchObject({ sitesProposed: 5, sitesChecked: 5, sitesRemoved: 0, sitesUnchecked: 0 });
+    expect(etapesEcrites().filter((stop) => stop.source !== undefined).length).toBeGreaterThan(0);
+
+    const raccourcie = await lancer(600_000 + 34_001);
+    expect(sitesSoumis).toEqual([]);
+    expect(raccourcie).toMatchObject({ sitesProposed: 5, sitesChecked: 0, sitesRemoved: 0, sitesUnchecked: 5 });
+    expect(etapesEcrites().every((stop) => stop.source === undefined)).toBe(true);
+    expect(etapesEcrites().length).toBeGreaterThan(0);
   });
 
   it("sites: erreur de la vérification des lieux : vérifications de sites abandonnées et attendues, relations vraies dans la ligne d'échec", async () => {

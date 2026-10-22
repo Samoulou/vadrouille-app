@@ -332,10 +332,30 @@ describe("sites: requête bornée (A16 à A18, A23 ; 0122 § 1 conditions 5 à 1
     expect(creerVerificateurStatut(banc().dependances).barriereFermee).toBe(false);
   });
 
-  it("sites: erreur du transport sans adresse ni message dans le résultat", async () => {
+  // Nom de 0122 (« Tests attendus ») : message d'erreur à sentinelle d'adresse, absent du journal et des traces (§ 1
+  // condition 12), et du résultat.
+  it("sites: erreur du transport sans adresse dans le journal", async () => {
     const SENTINELLE = "SENTINELLE-ADRESSE-site-officiel.example.org/secret";
-    const b = banc({ http: async () => Promise.reject(new Error(SENTINELLE)) });
-    const resultat = await creerVerificateurStatut(b.dependances).verifier(SITE);
+    const b = banc({ http: async () => Promise.reject(Object.assign(new Error(SENTINELLE), { cause: SENTINELLE, code: SENTINELLE })) });
+    const sorties = [
+      vi.spyOn(console, "log").mockImplementation(() => undefined),
+      vi.spyOn(console, "info").mockImplementation(() => undefined),
+      vi.spyOn(console, "warn").mockImplementation(() => undefined),
+      vi.spyOn(console, "error").mockImplementation(() => undefined),
+      vi.spyOn(console, "debug").mockImplementation(() => undefined),
+      vi.spyOn(console, "trace").mockImplementation(() => undefined),
+    ];
+    let resultat: Awaited<ReturnType<ReturnType<typeof creerVerificateurStatut>["verifier"]>>;
+    try {
+      resultat = await creerVerificateurStatut(b.dependances).verifier(SITE);
+      const ecrit = JSON.stringify(sorties.flatMap((espion) => espion.mock.calls));
+      expect(ecrit).not.toContain("SENTINELLE");
+      expect(ecrit).not.toContain(new URL(SITE).hostname);
+      // Le module n'écrit rien : aucun journal ni trace, quel que soit le niveau.
+      for (const espion of sorties) expect(espion).not.toHaveBeenCalled();
+    } finally {
+      for (const espion of sorties) espion.mockRestore();
+    }
     expect(resultat).toEqual({ ok: false });
     expect(Object.keys(resultat)).toEqual(["ok"]);
     expect(JSON.stringify(resultat)).not.toContain("SENTINELLE");

@@ -29,7 +29,7 @@ export async function etatPageExecutionsP0(): Promise<EtatPageAcces> {
 
 /**
  * `etapesAvecSite` (lot 2a) : nombre d'étapes avec site du programme stocké de la dernière exécution finie, **sur la page
- * seulement** (amendement 3 de `specs/P0-programme-par-ia.md`, § 11.4 et A24, PR #686 ; 0122 § 2.3, PR #682), passé à
+ * seulement** (`specs/P0-programme-par-ia.md` § 11.4 et A24, amendement 3 ; 0122 § 2.3 conditions 1, 3 et 4), passé à
  * côté du modèle et non dans le contrat `RapportPage` : le § 11.4 dit « Aucune modification de `src/contracts` ».
  * `null` : non relevé (aucune exécution finie, exécution arrêtée, programme purgé ou hors schéma).
  */

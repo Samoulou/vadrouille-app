@@ -26,7 +26,7 @@ import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme
  *   plafond (`CODES_PLAFOND`) ; « non relevé » sinon (cause externe ou autre arrêt : rien ne montre un dépassement).
  *   Sous S4, un plafond atteint en cours d'exécution est écrit `pipeline_failed` (`codePersiste`) : tant que S4
  *   n'écrit pas ces codes, une exécution arrêtée rend « non relevé ».
- * - Lot 2a (amendement 3 de `specs/P0-programme-par-ia.md`, § 11.4 et PPI-PO-12, PR #686 ; verdict 0122 § 2.3, PR #682) :
+ * - Lot 2a (`specs/P0-programme-par-ia.md` § 11.4 et PPI-PO-12, amendement 3 ; verdict 0122 § 2.3) :
  *   le critère A2 ne lit plus que les `placeId` des étapes et de l'idée (ni la `source` d'une étape, ni celle d'un
  *   événement) ; une ligne distincte « liens vers les sites affichés » (`liensSites`), oui ou non sans nombre, ne lit que
  *   la `source` des étapes ; « Aucune ligne du texte copié ne lit à la fois le `placeId` et la `source` d'une étape »
@@ -49,7 +49,7 @@ function programmeControle(contenu: unknown): ProgrammeEcrit | null {
 
 /**
  * Critère A2 du rapport (R1), séparé au lot 2a : il « ne lit que les `placeId` des étapes et de l'idée « Surprends-moi » »
- * (0122 § 2.3 condition 2). Amendement 3 de `specs/P0-programme-par-ia.md` (§ 11.4, PPI-PO-12 ; PR #686) : « oui » si
+ * (0122 § 2.3 condition 2). `specs/P0-programme-par-ia.md` § 11.4 et PPI-PO-12 (amendement 3) : « oui » si
  * chaque ligne `stop` du programme stocké a un `placeId` et si l'idée « Surprends-moi », quand elle existe, a un
  * `placeId` » ; « Ni la `source` d'une étape, ni celle d'un événement n'y entrent plus : la source des événements reste
  * couverte par le critère A3 du rapport ».

@@ -365,9 +365,10 @@ export const ENTETES_STATUT: Readonly<Record<string, string>> = Object.freeze({
 
 /**
  * Suffixes non publics refusés (0122 § 1 condition 3, défense en profondeur : l'adresse résolue reste le contrôle
- * décisif). Comparés à la dernière ou aux deux dernières étiquettes du nom d'hôte normalisé. Les six derniers (`lan`,
- * `corp`, `intranet`, `private`, `localdomain`, `home`) sont un resserrement demandé par la revue Sécurité de #694
- * (correction 1, mineur) : noms d'usage interne courants, aucun domaine de premier niveau public.
+ * décisif). Comparés à la dernière ou aux deux dernières étiquettes du nom d'hôte normalisé. Les neuf premiers sont la
+ * liste de 0122 § 1 condition 3 ; les six derniers (`lan`, `corp`, `intranet`, `private`, `localdomain`, `home`) sont un
+ * resserrement (noms d'usage interne courants, aucun domaine de premier niveau public) demandé par la revue Sécurité du
+ * lot 2a, qui le juge : la règle « ajout sans nouveau verdict » de 0122 § 1 condition 4 ne vise que la liste Google.
  */
 export const SUFFIXES_NON_PUBLICS: readonly string[] = [
   "localhost",

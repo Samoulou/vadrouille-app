@@ -59,9 +59,9 @@ describe("p0: critères du rapport", () => {
     }
   });
 
-  // Attente changée au lot 2a, sur décision écrite : 0122 § 2.3 condition 2 (PR #682) — « La Sécurité exige que le
+  // Attente changée au lot 2a, sur décision écrite : 0122 § 2.3 condition 2 — « La Sécurité exige que le
   // Product Owner sépare A2 avant la PR de code : A2 porte sur le `placeId` seul, et ne lit que les `placeId` des étapes
-  // et de l'idée « Surprends-moi » » — et amendement 3 de `specs/P0-programme-par-ia.md` (PR #686), § 11.4 et PPI-PO-12 :
+  // et de l'idée « Surprends-moi » » — et `specs/P0-programme-par-ia.md` § 11.4 et PPI-PO-12 (amendement 3) :
   // « Ni la `source` d'une étape, ni celle d'un événement n'y entrent plus ». Ce test, qui exigeait « non » pour une
   // étape sans source, garde la même étape : sans source, A2 reste « oui » ; sans `placeId`, A2 devient « non » (A24 :
   // « « non » dès qu'une étape n'a pas de `placeId` »). Voir aussi « rapport: critère A2 sur les seuls placeId ».
@@ -187,7 +187,7 @@ describe("p0: rapport, lot 2a (spécification § 11.4, A24 ; amendement 3, PPI-P
   const etapesDe = (contenu: Record<string, unknown>) =>
     (contenu.trip as { days: { items: Ligne[] }[] }).days.flatMap((jour) => jour.items).filter((ligne) => ligne.type === "stop");
 
-  // Nom de la spécification (A24, amendement 3 de `specs/P0-programme-par-ia.md`, PR #686).
+  // Nom de la spécification (`specs/P0-programme-par-ia.md` A24, amendement 3).
   it("rapport: critère A2 sur les seuls placeId", () => {
     // Toutes les étapes avec placeId et aucune avec source : A2 « oui », ligne des sites « non ».
     const contenu = contenuValide();
