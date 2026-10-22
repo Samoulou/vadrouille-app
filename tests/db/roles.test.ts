@@ -372,7 +372,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       }
       // Schéma prototype (0046) : aucune politique ne vise vadrouille_owner, même avec le contexte d'org_prototype.
       await migrator.query("SELECT set_config('app.organization_id', $1, true)", [PROTOTYPE_ORG_ID]);
-      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs"]) {
+      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs", "run_briefs"]) {
         expect(Number((await migrator.query(`SELECT count(*) AS n FROM prototype.${table}`)).rows[0].n), `prototype.${table}`).toBe(0);
       }
       await migrator.query("RESET ROLE");
@@ -461,7 +461,8 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
   // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
   // `run_secteurs` : plan de secteurs d'une exécution (décision 0094 § 1 point 5, migration 0013_secteurs_prototype).
-  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "run_secteurs", "runs", "trajets"];
+  // `run_briefs` : brief saisi dans l'app d'une exécution (décision 0125 § 1, migration 0017_brief_saisi_prototype).
+  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_briefs", "run_candidates", "run_secteurs", "runs", "trajets"];
   const EXPECTED_PROTOTYPE: Record<string, Record<string, string[]>> = {
     vadrouille_prototype: {
       runs: ["SELECT"],
@@ -472,6 +473,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_candidates: ["SELECT", "DELETE"],
       // Sans UPDATE : remplacé par suppression puis insertion (0103, question 1).
       run_secteurs: ["SELECT", "DELETE"],
+      // Ni UPDATE ni DELETE : écrit une fois avec l'exécution, supprimé par la purge seulement (0125 § 1).
+      run_briefs: ["SELECT"],
       purges: ["SELECT"],
       // Ni UPDATE ni DELETE (0092 § 3).
       trajets: ["SELECT"],
@@ -482,6 +485,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: ["DELETE"],
       run_candidates: ["DELETE"],
       run_secteurs: ["DELETE"],
+      run_briefs: ["DELETE"],
       purges: ["INSERT", "DELETE"],
       trajets: ["DELETE"],
     },
@@ -511,6 +515,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_candidates: { INSERT: ["candidat", "cle", "place_id", "run_id"], UPDATE: [] },
       // Sans id, organization_id ni expires_at, posés par le déclencheur (0103, question 1).
       run_secteurs: { INSERT: ["run_id", "secteurs"], UPDATE: [] },
+      // Sans id, organization_id ni expires_at, posés par le déclencheur (0125 § 1).
+      run_briefs: { INSERT: ["brief", "request_id", "run_id"], UPDATE: [] },
       purges: { INSERT: [], UPDATE: [] },
       // Sans id, organization_id ni expires_at, posés par le déclencheur (0092 § 3).
       trajets: { INSERT: ["destination", "minutes", "mode", "origine", "programme_id"], UPDATE: [] },
@@ -521,6 +527,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { SELECT: ["expires_at"] },
       run_candidates: { SELECT: ["expires_at"] },
       run_secteurs: { SELECT: ["expires_at"] },
+      run_briefs: { SELECT: ["expires_at"] },
       purges: { SELECT: ["purged_at"] },
       runs: { SELECT: [] },
       forfaits: { SELECT: [] },
@@ -536,6 +543,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { SELECT: [] },
       run_candidates: { SELECT: [] },
       run_secteurs: { SELECT: [] },
+      run_briefs: { SELECT: [] },
       purges: { SELECT: [] },
       trajets: { SELECT: [] },
     },
