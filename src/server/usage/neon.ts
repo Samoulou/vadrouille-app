@@ -1,5 +1,6 @@
 import "server-only";
 
+import { BRIEF_SAISI } from "@/contracts/prototype-travail";
 import { refusDuForfait, type Forfait, type LimitesForfait, type SommesForfaits, type UniteQuotaRoutes } from "@/server/usage/forfait";
 import type { CodeRefusUsage } from "@/server/usage/port";
 
@@ -50,14 +51,26 @@ export type ReglesForfait = {
 
 export type DemandeExecution = {
   readonly mode: "reel" | "essai";
-  /** Nom de fichier de `prototype/briefs/`. */
+  /** Nom de fichier de `prototype/briefs/`, ou `BRIEF_SAISI` avec `briefSaisi` (décision 0125 § 1). */
   readonly brief: string;
   readonly variant: "A" | "B";
   readonly commitSha: string;
   readonly forfait: Forfait;
+  /**
+   * Brief saisi dans l'app (spécification E2E-essai, lot 3 ; décision 0125 § 1) : écrit dans `prototype.run_briefs` dans la
+   * transaction de la réservation, avec la clé d'idempotence du lancement. Exigé si et seulement si `brief` vaut
+   * `BRIEF_SAISI` (la base le refuse sinon : `runs_brief_check`, déclencheurs de `run_briefs`).
+   */
+  readonly briefSaisi?: { readonly requestId: string; readonly contenu: unknown };
 };
 
-export type ResultatLancement = { readonly ok: true; readonly runId: string } | { readonly ok: false; readonly code: CodeRefusUsage };
+/**
+ * Réservation réussie. `existante` (lancement depuis l'app seulement, décision 0125 § 2) : une exécution porte déjà la clé
+ * d'idempotence du lancement ; rien n'est écrit, et l'appelant ne redémarre pas son workflow.
+ */
+export type ResultatLancement =
+  | { readonly ok: true; readonly runId: string; readonly existante?: true }
+  | { readonly ok: false; readonly code: CodeRefusUsage };
 export type ResultatRelecture = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusUsage };
 
 const nombre = (valeur: unknown): number => {
@@ -91,6 +104,12 @@ FROM bornes AS b LEFT JOIN prototype.forfaits AS f ON TRUE
 GROUP BY b.jour, b.mois_google, b.mois_utc`;
 
 const SQL_INSERER_RUN = `INSERT INTO prototype.runs (mode, brief, variant, commit_sha) VALUES ($1, $2, $3, $4) RETURNING id`;
+
+export { BRIEF_SAISI };
+
+/** Exécution déjà lancée avec cette clé d'idempotence (décision 0125 § 2), lue sous le verrou de la réservation. */
+const SQL_RUN_DU_LANCEMENT = "SELECT run_id FROM prototype.run_briefs WHERE request_id = $1::uuid";
+const SQL_INSERER_BRIEF = "INSERT INTO prototype.run_briefs (run_id, request_id, brief) VALUES ($1::uuid, $2::uuid, $3::jsonb)";
 
 const SQL_INSERER_FORFAIT = `INSERT INTO prototype.forfaits
   (nature, run_id, text_search_requests, place_details_requests, routes_requests, routes_elements, google_cost_micros, models_cost_micros)
@@ -175,20 +194,30 @@ const valeursForfait = (forfait: Forfait, runId: string | null) => [
  */
 export async function reserverExecution(pool: PoolSql, demande: DemandeExecution, regles: ReglesForfait): Promise<ResultatLancement> {
   if (demande.forfait.nature !== "execution") return { ok: false, code: "usage_unavailable" };
+  const saisi = demande.briefSaisi;
+  if ((saisi !== undefined) !== (demande.brief === BRIEF_SAISI)) return { ok: false, code: "usage_unavailable" };
   const resultat = await reserver(
     pool,
     demande.forfait,
     regles,
     async () => null,
-    async (client) => {
+    async (client): Promise<{ runId: string; existante?: true }> => {
+      if (saisi !== undefined) {
+        // Idempotence du lancement depuis l'app (décision 0125 § 2) : sous le verrou de la réservation, une clé déjà
+        // écrite rend son exécution, sans rien écrire (aucun second forfait, aucun second workflow).
+        const deja = (await client.query(SQL_RUN_DU_LANCEMENT, [saisi.requestId])).rows[0]?.run_id;
+        if (typeof deja === "string") return { runId: deja, existante: true };
+      }
       const { rows } = await client.query(SQL_INSERER_RUN, [demande.mode, demande.brief, demande.variant, demande.commitSha]);
       const runId = rows[0]?.id;
       if (typeof runId !== "string") throw new Error("forfait: exécution non créée");
       await client.query(SQL_INSERER_FORFAIT, valeursForfait(demande.forfait, runId));
+      if (saisi !== undefined) await client.query(SQL_INSERER_BRIEF, [runId, saisi.requestId, JSON.stringify(saisi.contenu)]);
       return { runId };
     },
   );
-  return "refus" in resultat ? { ok: false, code: resultat.refus } : { ok: true, runId: resultat.runId };
+  if ("refus" in resultat) return { ok: false, code: resultat.refus };
+  return resultat.existante ? { ok: true, runId: resultat.runId, existante: true } : { ok: true, runId: resultat.runId };
 }
 
 /** Début d'une relecture : forfait de relecture réservé (aucune ligne `runs`). */

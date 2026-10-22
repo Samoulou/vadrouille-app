@@ -555,6 +555,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `TripRequest.requestId` | stocké | `trips.request_id` (idempotence de `createTrip` par organisation, B9b point 3) |
 | `TripRequest.draft` | stocké | Voir `TripDraft.*` ; écrit par `createTrip` dans une seule transaction (B9b point 2) |
 | `TripRequest.brief` | stocké | Voir `Brief.*` ; `briefs`, version 1 (B9-PO-1) |
+| `TripRequest.story` | stocké | Facultatif (décision 0125 § 1) : adaptateur `prototype` seulement, dans le brief saisi de `prototype.run_briefs` (`recit`), purgé avec le programme (29 jours) ; envoyé tel quel au fournisseur de modèles avec `zdr` (Q557) ; ignoré par `mock` et `api` |
 | `TripDraft.destination` | stocké | `trips.destination`, saisie par la personne |
 | `TripDraft.start` | stocké | `trips.start_date` ; « arrivée au plus tôt aujourd'hui » revérifiée par `createTrip` dans le fuseau du voyage |
 | `TripDraft.end` | stocké | `trips.end_date` |

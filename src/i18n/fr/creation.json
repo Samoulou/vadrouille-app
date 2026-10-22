@@ -186,7 +186,9 @@
         "titre": "Ton code d'accès",
         "aide": "Sur le site d'essai, le code d'accès remplace la connexion. Il ouvre l'accès pour 12 heures dans ce navigateur. Ton brouillon est conservé."
       },
-      "bientot": "Le lancement depuis l'app arrive bientôt. Ton brouillon est conservé dans cet onglet.",
+      "recit": "Ton récit contient une adresse e-mail ou un numéro de téléphone. Retire-les, puis lance à nouveau. Ton brouillon est conservé.",
+      "modifierRecit": "Modifier mon récit",
+      "plafond": "Le plafond des essais est atteint pour le moment. Ton brouillon est conservé dans cet onglet.",
       "accesOuvert": "Accès ouvert pour 12 heures dans ce navigateur.",
       "ferme": "Le lancement n'est pas ouvert sur ce site. Ton brouillon est conservé dans cet onglet. Ouvre le site d'essai depuis le lien qu'on t'a donné."
     }

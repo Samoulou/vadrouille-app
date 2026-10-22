@@ -5,6 +5,7 @@ import { createMemoryRecorder, type MemoryRecorder } from "@/analytics/track";
 import { fail, ok, type GenerationStatus } from "@/contracts";
 import * as messages from "@/i18n/messages";
 import { MOCK_GENERATION_STEP_MS, mockGenerationStatus, type MockGenerationOutcome } from "@/mocks/creation-edimbourg";
+import { relancerVoyageEssai } from "@/server/actions/creation";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
@@ -14,7 +15,7 @@ import { PreparationView } from "./PreparationView";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
-vi.mock("@/server/actions/creation", () => ({ getGenerationStatus: vi.fn() }));
+vi.mock("@/server/actions/creation", () => ({ getGenerationStatus: vi.fn(), relancerVoyageEssai: vi.fn() }));
 
 /** Écran 5 « Propositions prêtes » (F8-PO-12, F8-PO-19, F8-PO-20 ; 0017 § 9 ; 0018 § 19). */
 
@@ -55,6 +56,8 @@ beforeEach(() => {
   server = at(0);
   fetchStatus = vi.fn<FetchStatus>(async () => ok(server));
   router.push.mockClear();
+  router.replace.mockClear();
+  vi.mocked(relancerVoyageEssai).mockReset();
 });
 
 afterEach(() => {
@@ -246,6 +249,53 @@ describe("PreparationView : bandeaux", () => {
     unmount();
     await poll(at(1));
     expect(fetchStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("PreparationView : site d'essai (E2E-essai, lot 3 ; décision 0125 § 4)", () => {
+  const ESSAI = "proto_rome_0123456789abcdef0123456789abcdef";
+  const NOUVEAU = "proto_rome_fedcba9876543210fedcba9876543210";
+  const echec: GenerationStatus = { phase: "failed", tripId: ESSAI, days: [{ index: 1, state: "preparing", readyStops: 0 }], expected: 8, ready: 0, reason: "provider_error", retryable: true };
+
+  it("exécution arrêtée : « Réessayer » relance le brief sous un nouveau voyage, un seul requestId, puis l'écran 5 du nouveau", async () => {
+    vi.mocked(relancerVoyageEssai).mockResolvedValue(ok({ tripId: NOUVEAU }));
+    render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} essai />);
+    const alert = document.querySelector("main [role='alert']") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(relancerVoyageEssai).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(relancerVoyageEssai).mock.calls[0]?.[0]).toMatchObject({ tripId: ESSAI });
+    expect(router.replace).toHaveBeenCalledWith(`/voyages/${NOUVEAU}/preparation`);
+    expect(fetchStatus).not.toHaveBeenCalled();
+  });
+
+  it("relance refusée : le bandeau reste, « Réessayer » réutilise le même requestId", async () => {
+    vi.mocked(relancerVoyageEssai).mockResolvedValue(fail("provider_error"));
+    render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} essai />);
+    const alert = document.querySelector("main [role='alert']") as HTMLElement;
+    for (let essai = 0; essai < 2; essai += 1) {
+      await act(async () => {
+        fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    }
+    expect(alert).toHaveTextContent(t.interrompue);
+    const [premier, second] = vi.mocked(relancerVoyageEssai).mock.calls.map((call) => (call[0] as { requestId: string }).requestId);
+    expect(second).toBe(premier);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("hors site d'essai : « Réessayer » ne relance jamais un voyage", async () => {
+    render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} />);
+    const alert = document.querySelector("main [role='alert']") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(relancerVoyageEssai).not.toHaveBeenCalled();
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
   });
 });
 

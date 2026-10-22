@@ -3,10 +3,10 @@ import "server-only";
 import { FatalError } from "workflow";
 
 import { ecrireProgramme } from "@/adapters/prototype-ecriture";
-import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireExecution } from "@/adapters/prototype-travail";
+import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireBriefSaisi, lireExecution } from "@/adapters/prototype-travail";
 import { MAX_RESULTATS_WEB } from "@/ai/client";
 import { lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
-import type { ExecutionEnCours, PhaseTravail } from "@/contracts/prototype-travail";
+import { BRIEF_SAISI, type ExecutionEnCours, type PhaseTravail } from "@/contracts/prototype-travail";
 import { lieuxHorsPartTextSearch } from "@/grounding/ancrage";
 import { ancrerLogementsDuSejour, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
 import { blocsDeTrajets, creerCadence, planRoutes, trajetsConsecutifs } from "@/grounding/budget-routes";
@@ -41,7 +41,8 @@ import {
 import { poolPrototype } from "@/server/p0/base";
 import { avecSiteGarde, compteursNonSoumis, sitesDuProgramme, verifierSites, SITES_DUREE_MAX_MS, type CompteursSites, type ResultatSites } from "@/server/p0/sites";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
-import { identifiantDuVoyage, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
+import type { BriefEssai } from "@/server/p0/depuis-formulaire";
+import { identifiantDuVoyage, identifiantDuVoyageSaisi, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
 import { briefDepuisBrief, demandesDuSejour, engagementsDepuisBrief, modeDeTrajet, nuitsDepuisBrief } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 import { forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type PlafondsRelecture, type SkusForfait } from "@/server/usage/forfait";
@@ -190,6 +191,49 @@ function briefDe(nom: string): Brief {
   const lu = brut === undefined ? undefined : BriefSchema.safeParse(brut);
   if (lu === undefined || !lu.success) throw new ArretEtape("brief_invalid");
   return lu.data;
+}
+
+/**
+ * Forme du brief converti du formulaire (`src/server/p0/depuis-formulaire.ts`, décision 0125 § 3) tenue égale à celle de
+ * `BriefSchema` : mêmes clés, et tout brief valide a la forme recopiée (contrôle de type seul, aucune valeur).
+ */
+type MemesCles<A, B> = [Exclude<keyof A, keyof B>, Exclude<keyof B, keyof A>] extends [never, never] ? true : false;
+const FORME_BRIEF_ESSAI: MemesCles<Brief, BriefEssai> = true;
+const briefVersForme = (brief: Brief): BriefEssai => brief;
+void FORME_BRIEF_ESSAI;
+void briefVersForme;
+
+/** Champ du formulaire de l'app qui porte chaque clé du brief saisi refusée par `BriefSchema` (décision 0125 § 3). */
+const CHAMP_DU_FORMULAIRE: Readonly<Partial<Record<string, string>>> = {
+  destination: "draft.destination",
+  arrivee: "draft.start",
+  depart: "draft.end",
+  logements: "draft.lodging",
+  engagements: "draft.commitments",
+  recit: "story",
+};
+
+/** Brief saisi validé, ou le champ du formulaire refusé (absent si le refus ne vient d'aucun champ saisi). */
+export type BriefSaisiValide = { readonly ok: true; readonly brief: Brief } | { readonly ok: false; readonly champ?: string };
+
+/**
+ * Brief saisi dans l'app (spécification E2E-essai, lot 3 ; décision 0125 § 3), validé par `BriefSchema` comme un brief
+ * commité : au lancement, avant toute réservation, puis dans l'étape. Un refus ne rend que le chemin du champ (jamais la
+ * valeur ni le message, qui pourraient citer le récit) : un e-mail ou un téléphone dans le récit rend `story`.
+ */
+export function validerBriefSaisi(brut: unknown): BriefSaisiValide {
+  const lu = BriefSchema.safeParse(brut);
+  if (lu.success) return { ok: true, brief: lu.data };
+  const cle = lu.error.issues[0]?.path[0];
+  const champ = typeof cle === "string" ? CHAMP_DU_FORMULAIRE[cle] : undefined;
+  return champ === undefined ? { ok: false } : { ok: false, champ };
+}
+
+/** Brief saisi relu par l'étape : refusé, `brief_invalid` (avant tout appel), comme un fichier refusé. */
+function briefSaisiDe(brut: unknown): Brief {
+  const lu = validerBriefSaisi(brut);
+  if (!lu.ok) throw new ArretEtape("brief_invalid");
+  return lu.brief;
 }
 
 /** Brief admis et valide (`BriefSchema`) : contrôlé au lancement, avant toute réservation (P0r3d). */
@@ -352,8 +396,19 @@ export function bornesRechercheDuBriefPourTests(mode: ExecutionEnCours["mode"], 
  */
 export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string): boolean {
   try {
+    return briefSaisiTientDansLeMode(mode, briefDe(nom));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Même contrôle pour un brief déjà validé (brief saisi dans l'app, décision 0125 § 3 ; même garde que
+ * `/prototype/executions`) : plan Routes, première série et plafond de recherche du mode.
+ */
+export function briefSaisiTientDansLeMode(mode: ExecutionEnCours["mode"], brief: Brief): boolean {
+  try {
     if (mode !== "reel" && mode !== "essai") return false;
-    const brief = briefDe(nom);
     const config = configurationDuMode(mode);
     // Repères distincts par logement (aucun identifiant de lieu n'existe avant l'ancrage). Limite connue (mineur 9 du
     // head `cd614d4`) : si deux logements du brief s'ancraient au même lieu, l'étape finale verrait un seul logement les
@@ -443,7 +498,8 @@ async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<Contexte
   const debut = Date.now();
   const execution = await lireExecution(poolPrototype(), ouverte.garde.runId);
   const config = configurationDuMode(execution.mode);
-  const brief = briefDe(execution.brief);
+  // Brief saisi dans l'app (décision 0125 § 1) : relu en base et validé comme un fichier ; sinon, le fichier commité.
+  const brief = execution.brief === BRIEF_SAISI ? briefSaisiDe(await lireBriefSaisi(poolPrototype(), ouverte.garde.runId)) : briefDe(execution.brief);
   await ecrirePhase(poolPrototype(), ouverte.garde.runId, phase);
   const echeance = debut + LIMITE_FONCTION_MS - MARGE_FIN_ETAPE_MS;
   return { garde: ouverte.garde, execution, config, brief, echeance };
@@ -743,7 +799,11 @@ export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
         // 4. Assemblage sans replanification, réduction et écriture, ensemble ou pas du tout.
         noterPhase("ecriture");
         const complet = assemblerProgrammeIa({
-          tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
+          // Brief saisi : identifiant connu dès le lancement, celui que suit l'écran 5 (décision 0125 § 2).
+          tripId:
+            execution.brief === BRIEF_SAISI
+              ? identifiantDuVoyageSaisi(brief.destination, garde.runId)
+              : identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
           brief,
           jours,
           bonsPlans: programme.bonsPlans,

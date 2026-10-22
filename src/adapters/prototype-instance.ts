@@ -3,9 +3,10 @@ import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-r
 import type { PoolSql } from "@/server/usage/neon";
 
 import { createPrototypeAdapter, createPrototypeAdapterReel, type LecteurDeblocage, type RelecteurTrajets } from "./prototype";
+import { createPrototypeCreationAdapter, type PortCreationEssai } from "./prototype-creation";
 import { createSourceProgrammesReels } from "./prototype-lecture";
 import { createProgrammeLoader } from "./prototype-loader";
-import type { AdapterContext, TripAdapter } from "./types";
+import type { AdapterContext, CreationAdapter, TripAdapter } from "./types";
 
 /**
  * Adaptateur `prototype` de l'application (décision 0032 § A4 et § A6.6 ; décisions 0074 et 0079) :
@@ -53,6 +54,7 @@ interface Etat {
   barriere?: BarriereLectureProgrammes;
   relecteur?: RelecteurTrajets;
   deblocages?: DeblocagesEssai;
+  creation?: PortCreationEssai;
 }
 
 const INSTANCE_KEY = Symbol.for("vadrouille.prototype");
@@ -69,6 +71,23 @@ export function brancherLectureProgrammesReels(barriere: BarriereLectureProgramm
 /** Branche les déblocages de l'essai retenus par cookie (appelé une fois, au démarrage, par `src/instrumentation.ts`). */
 export function brancherDeblocagesEssai(deblocages: DeblocagesEssai): void {
   holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], deblocages };
+}
+
+/**
+ * Branche la création d'un voyage d'essai depuis l'app (spécification E2E-essai, lot 3 ; appelé une fois, au démarrage,
+ * par `src/instrumentation.ts` : `src/server/p0/creation-essai.ts`). Ce module n'en lit ni la base ni le cookie.
+ */
+export function brancherCreationEssai(creation: PortCreationEssai): void {
+  holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], creation };
+}
+
+/**
+ * Création de l'adaptateur `prototype` (décision 0125 § 4), sous la même liste blanche que la lecture : lancement de
+ * `p0Run` sur le brief saisi et avancement, par le port branché au démarrage (non branché : rien n'est lancé).
+ */
+export function prototypeCreationAdapter(): CreationAdapter {
+  assertPrototypeAllowedOnProcess();
+  return createPrototypeCreationAdapter({ port: () => holder[INSTANCE_KEY]?.creation ?? null, trips: () => prototypeTripAdapter() });
 }
 
 /** Déblocages de l'essai branchés, ou `null` (aucun cookie lu ni écrit). */

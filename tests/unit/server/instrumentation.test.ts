@@ -25,7 +25,12 @@ vi.mock("@/server/log", () => ({
 vi.mock("@/adapters/prototype-instance", () => ({
   brancherLectureProgrammesReels: (barriere: unknown, relecteur: unknown) => brancher(barriere, relecteur),
   brancherDeblocagesEssai: (deblocages: unknown) => brancherDeblocages(deblocages),
+  brancherCreationEssai: (port: unknown) => brancherCreationEssai(port),
 }));
+// Spécification E2E-essai, lot 3 : création d'un voyage d'essai (double : aucune base, aucun cookie, aucun lancement).
+const brancherCreationEssai = vi.fn();
+const creationEssai = { lancer: vi.fn(), relancer: vi.fn(), etat: vi.fn() };
+vi.mock("@/server/p0/creation-essai", () => ({ creationEssai }));
 // Spécification E2E-essai, lot 1 : déblocages de l'essai retenus par cookie (double : aucune clé, aucun cookie).
 const brancherDeblocages = vi.fn();
 const deblocagesEssaiParCookie = { lire: vi.fn(), retenir: vi.fn() };
@@ -101,6 +106,7 @@ beforeEach(() => {
   createApiCreationAdapter.mockClear();
   echecCreation = null;
   poolLectureProgrammes.mockClear();
+  brancherCreationEssai.mockClear();
   echecBarriere = null;
   vi.stubEnv("NEXT_RUNTIME", "nodejs");
 });
@@ -150,6 +156,26 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     expect(logEvent).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("essai.unlock_unavailable", { errorName: "RangeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+
+  it("DATA_ADAPTER=prototype : création d'un voyage d'essai branchée (spécification E2E-essai, lot 3)", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    await register();
+    expect(brancherCreationEssai).toHaveBeenCalledTimes(1);
+    expect(brancherCreationEssai).toHaveBeenCalledWith(creationEssai);
+  });
+
+  it("échec du branchement de la création : essai.creation_unavailable (nom d'erreur seulement), lecture réelle gardée", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    brancherCreationEssai.mockImplementationOnce(() => {
+      throw new TypeError("brief de Rome");
+    });
+    await register();
+    expect(brancher).toHaveBeenCalledTimes(1);
+    expect(brancherDeblocages).toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("essai.creation_unavailable", { errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("Rome");
   });
 
   it.each([undefined, "", "mock", "api"])("DATA_ADAPTER=%j : rien n'est branché", async (valeur) => {

@@ -90,6 +90,15 @@ async function brancherLecturePrototype(
   } catch (error) {
     logEvent("essai.unlock_unavailable", { errorName: errorNameOf(error) }, "error");
   }
+  try {
+    // Spécification E2E-essai, lot 3 : création d'un voyage d'essai depuis l'app (lancement de `p0Run` sur le brief saisi,
+    // même garde que `/prototype/executions`, et avancement). Rien n'est lu ici. Échec : la création rend `provider_error`.
+    const { brancherCreationEssai } = await import("@/adapters/prototype-instance");
+    const { creationEssai } = await import("@/server/p0/creation-essai");
+    brancherCreationEssai(creationEssai);
+  } catch (error) {
+    logEvent("essai.creation_unavailable", { errorName: errorNameOf(error) }, "error");
+  }
 }
 
 /** Branche la connexion réelle sur l'adaptateur `better-auth` (spécification B3, B3c point 1). */

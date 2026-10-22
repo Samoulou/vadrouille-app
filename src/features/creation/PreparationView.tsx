@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
@@ -14,10 +15,11 @@ import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import { getGenerationStatus } from "@/server/actions/creation";
+import { getGenerationStatus, relancerVoyageEssai } from "@/server/actions/creation";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { EMPTY_LIVE_REGION_CLASS } from "./fields";
+import { creationRoutes } from "./routes";
 import { isPreviewReady, missingMessage, newlyReadyDays, readyCounter, useGenerationStatus, type FetchStatus } from "./generation";
 import { takePreviewReady } from "./launch-timing";
 
@@ -34,6 +36,12 @@ export interface PreparationViewProps {
   recorder?: EventRecorder;
   /** Lecture de l'avancement (tests) ; l'action `getGenerationStatus` par défaut. */
   fetchStatus?: FetchStatus;
+  /**
+   * Site d'essai (adaptateur `prototype`, valeur serveur ; spécification E2E-essai, lot 3 ; décision 0125 § 4) : sur un
+   * échec (exécution arrêtée), « Réessayer » relance le brief saisi sous un **nouveau** voyage (`relancerVoyageEssai`),
+   * puis l'adresse est remplacée par l'écran 5 du nouveau voyage. Ailleurs, « Réessayer » reprend l'interrogation.
+   */
+  essai?: boolean;
 }
 
 /**
@@ -50,8 +58,12 @@ export interface PreparationViewProps {
  *   validation de la mesure est chargée à ce moment (`createLazyTrack`), hors du JavaScript initial.
  * Aucun nom de lieu : les arrêts sont des anneaux sans numéro (F8-PO-12).
  */
-export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction }: PreparationViewProps) {
+export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction, essai = false }: PreparationViewProps) {
+  const router = useRouter();
   const { status, interrupted, retry } = useGenerationStatus(tripId, initial, fetchStatus);
+  // Relance d'un voyage d'essai : un `requestId` par écran (double appui : une seule exécution réservée).
+  const relanceId = useRef<string | null>(null);
+  const [relance, setRelance] = useState(false);
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
   const [announcements, setAnnouncements] = useState<string[]>([]);
   const previous = useRef(initial);
@@ -85,7 +97,27 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
   function retryWithFocus() {
     // Le bandeau (et le bouton) disparaît pendant la reprise : le focus va au titre (WCAG 2.4.3).
     title.current?.focus();
+    if (essai && failed !== null && !interrupted) {
+      void relancer();
+      return;
+    }
     retry();
+  }
+
+  async function relancer() {
+    if (relance) return;
+    setRelance(true);
+    relanceId.current ??= crypto.randomUUID();
+    try {
+      const result = await relancerVoyageEssai({ tripId, requestId: relanceId.current });
+      if (result.ok) {
+        router.replace(creationRoutes.preparation(result.value.tripId));
+        return;
+      }
+    } catch {
+      // Erreur réseau ou serveur : le bandeau d'échec reste, « Réessayer » aussi.
+    }
+    setRelance(false);
   }
 
   return (
@@ -126,7 +158,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
             message={t.interrompue}
             action={
               canRetry ? (
-                <Button variant="secondary" size="sm" onClick={retryWithFocus}>
+                <Button variant="secondary" size="sm" onClick={retryWithFocus} disabled={relance}>
                   {t.reessayer}
                 </Button>
               ) : (

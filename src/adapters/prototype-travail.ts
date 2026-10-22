@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CodeEchecTravail, ContenuSecteurs, ExecutionEnCours, LigneCandidat, PhaseTravail } from "@/contracts/prototype-travail";
+import { BRIEF_SAISI, type CodeEchecTravail, type ContenuSecteurs, type ExecutionEnCours, type LigneCandidat, type PhaseTravail } from "@/contracts/prototype-travail";
 import { PLACE_ID_PATTERN, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -171,6 +171,26 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
       throw new EchecTravail("base");
     }
     return { mode, brief, variante: variant, coutModelesMicros: cout, jourQuota, numeroDuJour: numero };
+  });
+}
+
+/** Brief saisi d'une exécution `en_cours` lancée depuis l'app (`prototype.run_briefs`, décision 0125 § 1). */
+const SQL_BRIEF_SAISI = `SELECT b.brief FROM prototype.run_briefs AS b
+JOIN prototype.runs AS r ON r.id = b.run_id
+WHERE b.run_id = $1::uuid AND r.status = 'en_cours' AND r.brief = $2`;
+
+/**
+ * Brief saisi d'une exécution `en_cours` lancée depuis l'app (spécification E2E-essai, lot 3 ; décision 0125 § 1) : le
+ * contenu tel qu'écrit au lancement, **non validé ici** (l'étape le valide par `BriefSchema`, comme un brief commité) ;
+ * `execution_absente` si l'exécution n'est pas en cours, n'est pas `saisi` ou si son brief a expiré. Le contenu n'est
+ * jamais journalisé (erreurs réduites à un code fermé).
+ */
+export async function lireBriefSaisi(pool: PoolSql, runId: string): Promise<unknown> {
+  const id = runIdControle(runId);
+  return transaction(pool, async (client) => {
+    const ligne = (await client.query(SQL_BRIEF_SAISI, [id, BRIEF_SAISI])).rows[0];
+    if (ligne === undefined) throw new EchecTravail("execution_absente");
+    return ligne.brief as unknown;
   });
 }
 

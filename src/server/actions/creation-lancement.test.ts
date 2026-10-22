@@ -120,6 +120,14 @@ describe("createTrip : lancement", () => {
     expect(explicitScope(scopeName.value).creation.launches.size).toBe(1);
   });
 
+  it("récit facultatif (E2E-essai, lot 3, critère 7 ; décision 0125 § 1) : accepté par le contrat, ignoré par mock", async () => {
+    await signIn();
+    const story = "On aime les ruelles médiévales et les pubs où l'on joue de la musique.";
+    expect(await createTrip({ ...REQUEST, story })).toEqual({ ok: true, value: { tripId: "mock_trip_edimbourg" } });
+    expect(explicitScope(scopeName.value).creation.launches.size).toBe(1);
+    expect(await createTrip({ ...REQUEST, story: "court" })).toEqual(fail("validation_failed", "story"));
+  });
+
   it("nouveau requestId pendant la génération : active_preview_exists avec le voyage en préparation", async () => {
     await signIn();
     await createTrip(REQUEST);

@@ -9,7 +9,7 @@ import { PROTOTYPE_URL } from "./prototype-helpers";
 /**
  * Spécification E2E-essai, lot 2 : la saisie sans détour sur le site d'essai, sur le build de production servi en
  * mode prototype (390 × 844). Garde du mode réel fermée sur ce serveur de test (aucun réglage `p0-reel`) : `R-lancer`
- * annonce que le lancement n'est pas ouvert, sans erreur ; la saisie du code et « arrive bientôt » sont couverts par
+ * annonce que le lancement n'est pas ouvert, sans erreur ; la saisie du code et le lancement (lot 3) sont couverts par
  * les tests unitaires (`LaunchEssai.test.tsx`). Aucune requête vers Google, aucun appel de modèle.
  */
 
