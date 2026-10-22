@@ -36,12 +36,15 @@ afterAll(closeAll);
 
 /**
  * Mise à jour sans changement de valeur, sur une colonne que `vadrouille_app` peut modifier quand son `UPDATE` est
- * limité à des colonnes : `checkouts`, `preference_signals` et `preference_prompts` (migration 0014_tri_enregistre).
+ * limité à des colonnes : `checkouts`, `preference_signals` et `preference_prompts` (migration 0014_tri_enregistre),
+ * `generation_runs` (migration 0016_restriction_update_generation_runs, décision 0120 S8) : la mise à jour croisée reste
+ * éprouvée par la RLS (aucune ligne touchée), pas par un refus de droit.
  */
 const NEUTRAL_SET = new Map<string, string>([
   ["checkouts", "stripe_checkout_session_id = stripe_checkout_session_id"],
   ["preference_signals", "status = status"],
   ["preference_prompts", "state = state"],
+  ["generation_runs", "updated_at = updated_at"],
 ]);
 const neutralSet = (table: string) => NEUTRAL_SET.get(table) ?? "organization_id = organization_id";
 

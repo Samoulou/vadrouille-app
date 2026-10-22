@@ -113,6 +113,13 @@
       "when": 1792614074220,
       "tag": "0015_recalcul_lot",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792657083820,
+      "tag": "0016_restriction_update_generation_runs",
+      "breakpoints": true
     }
   ]
 }
