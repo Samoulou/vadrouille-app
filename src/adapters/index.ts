@@ -11,7 +11,7 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { prototypeTripAdapter } from "./prototype-instance";
+import { assertPrototypeAllowedOnProcess, prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
@@ -50,6 +50,17 @@ export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype
  */
 export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
   return adapterChoice(value) === "mock";
+}
+
+/**
+ * Garde du site d'essai (spécification E2E-essai, lot 2), pour une page qui n'a rien à lire : faux avec `mock` et `api` ;
+ * avec `prototype`, vrai dans la liste blanche (`prototypeAdapterAllowed`, décision 0032 § A4.2), sinon lève la même
+ * erreur que `getTripAdapter()` (erreur 500), sans construire l'adaptateur ni rien lire.
+ */
+export function siteEssaiAutorise(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  if (adapterChoice(value) !== "prototype") return false;
+  assertPrototypeAllowedOnProcess();
+  return true;
 }
 
 /**

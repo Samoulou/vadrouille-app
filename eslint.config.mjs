@@ -63,11 +63,13 @@ const SERVER_ROUTE_PATTERN = {
  * `src/app/prototype/executions/page.tsx` (composant serveur), qui lit l'état de la garde par
  * `@/server/p0/page-acces`, module ordinaire : exporté d'une action (`"use server"`), cet état serait appelable par
  * n'importe quel client. Tout autre module de `src/server` hors actions reste refusé, dans cette page comme ailleurs.
+ * Spécification E2E-essai, lot 2 (D3) : même exception pour `R-lancer` (`src/app/(creation)/voyages/nouveau/lancer/page.tsx`),
+ * qui lit le même état pour demander le code d'accès dans le parcours de création du site d'essai.
  */
 const SERVER_PATTERN_PAGE_P0 = {
   regex: "^(@/server/(?!actions/[^/]+$|p0/page-acces$)|(\\.{1,2}/)+(.*/)?server/(?!actions/[^/]+$))",
   message:
-    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) ; la page /prototype/executions admet en plus @/server/p0/page-acces (P0r3b).",
+    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) ; les pages /prototype/executions et R-lancer admettent en plus @/server/p0/page-acces (P0r3b ; E2E-essai, lot 2).",
 };
 
 /**
@@ -759,6 +761,12 @@ export default defineConfig([
     files: ["src/app/(creation)/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
+    // E2E-essai, lot 2 (D3) : `R-lancer` lit l'état de la garde du site d'essai par `@/server/p0/page-acces`, comme
+    // `/prototype/executions` (SERVER_PATTERN_PAGE_P0) ; les autres interdits du bloc précédent tiennent.
+    files: ["src/app/(creation)/voyages/nouveau/lancer/page.tsx"],
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN_PAGE_P0, SIMULATION_PATTERN),
   },
   {
     // F8a : ni récit, ni destination, ni email dans un journal (spécification F8, « Données personnelles »).
