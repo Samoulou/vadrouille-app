@@ -42,18 +42,15 @@ import { parseInput } from "../parse-input";
  */
 const STRUCTURE_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["rate_limited", "cost_cap_reached", "provider_error"]);
 
-/**
+/*
  * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, décision D2) : ni structuration du récit ni
  * suggestion de logement. Les deux actions sont fermées **avant** toute lecture de l'entrée et tout appel à
- * l'adaptateur : aucun appel de modèle ni de Google. L'interface du site d'essai ne les appelle pas ; cette garde
- * couvre un appel direct.
+ * l'adaptateur (`isPrototypeAdapter()`) : aucun appel de modèle ni de Google. Elles répondent `no_option` (rien à
+ * proposer ici), jamais une panne. L'interface du site d'essai ne les appelle pas ; cette garde couvre un appel direct.
  */
-function essaiFerme(): boolean {
-  return isPrototypeAdapter();
-}
 
 export async function structureBrief(input: unknown): Promise<Result<InferredBrief>> {
-  if (essaiFerme()) return fail("provider_error");
+  if (isPrototypeAdapter()) return fail("no_option");
   const parsed = parseInput(BriefRequestSchema, input);
   if (!parsed.ok) return parsed;
   let result: Result<unknown>;
@@ -77,7 +74,7 @@ const LODGING_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["no_opt
  */
 export async function suggestLodging(input: unknown): Promise<Result<LodgingSuggestion>> {
   // Site d'essai (D2) : « aucun quartier à proposer », sans appel ; l'écran 3 propose « Continuer sans logement ».
-  if (essaiFerme()) return fail("no_option");
+  if (isPrototypeAdapter()) return fail("no_option");
   const parsed = parseInput(LodgingRequestSchema, input);
   if (!parsed.ok) return parsed;
   let result: Result<unknown>;

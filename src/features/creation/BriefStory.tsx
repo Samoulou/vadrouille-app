@@ -166,7 +166,7 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
           aria-disabled={pending || undefined}
           onClick={prepare}
         >
-          {r.preparer}
+          {essai ? r.verifier : r.preparer}
         </Button>
         <p role="status" className={pending ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
           {pending ? r.attente : null}

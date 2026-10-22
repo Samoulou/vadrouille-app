@@ -51,8 +51,9 @@ export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
   useEffect(() => {
     envoiEnVol.current = false;
     if (etat.statut === "accepte") {
-      titre.current?.focus();
-      surAcces?.();
+      // Dans le parcours, l'écran appelant démonte la saisie et focalise son propre titre : un seul focus.
+      if (surAcces) surAcces();
+      else titre.current?.focus();
     } else if (etat.statut !== "attente") champ.current?.focus();
   }, [etat, surAcces]);
 

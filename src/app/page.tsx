@@ -5,8 +5,8 @@ import {
   MOCK_DEMO_UNLOCKED_TRIP,
   getTripAdapter,
   isMockAdapter,
-  isPrototypeAdapter,
   paymentAvailable,
+  siteEssaiAutorise,
 } from "@/adapters";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
@@ -54,15 +54,14 @@ export default async function HomePage() {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);
     demo = { destination: trip?.destination };
   }
-  // Garde de l'adaptateur `prototype` (liste blanche, décision 0032 § A4.2) : lève hors de la préversion, sans rien lire.
-  const essai = isPrototypeAdapter();
-  if (essai) getTripAdapter();
+  // Site d'essai : garde explicite de la liste blanche (décision 0032 § A4.2), qui lève hors de la préversion sans rien lire.
+  const essai = siteEssaiAutorise();
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">
       <h1 className="text-destination font-extrabold tracking-[-0.02em] text-ink">{PRODUCT_NAME}</h1>
       <p className="text-corps text-ink-soft">{messages.produit.promesse}</p>
       <Button asChild className="mt-6 w-full">
-        <Link href={creationRoutes.nouveau()}>{messages.accueil.creer}</Link>
+        <Link href={creationRoutes.nouveau({ essai })}>{messages.accueil.creer}</Link>
       </Button>
       {demo ? (
         <div className="mt-6">

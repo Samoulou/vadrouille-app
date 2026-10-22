@@ -74,9 +74,9 @@
       "dateHorsVoyage": "La date doit être comprise dans les dates du voyage.",
       "debut": "Indique l'heure de début.",
       "fin": "L'heure de fin doit suivre l'heure de début.",
-      "villeInconnue": "Ville inconnue du site d'essai. Écris une grande ville d'Europe, par exemple Rome ou Lisbonne.",
+      "villeInconnue": "Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.",
       "uneSeuleVille": "Une seule ville sur le site d'essai : retire cette ville.",
-      "tropLong": "{max} jours au plus sur le site d'essai."
+      "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée."
     }
   },
   "ecran2": {
@@ -85,12 +85,13 @@
       "aide": "Qui part, ce qui te fait envie, ce que tu préfères éviter, ton budget pour les repas.",
       "compteur": "{n} sur {max} caractères",
       "preparer": "Préparer mon brief",
+      "verifier": "Vérifier mon brief",
       "remplirMoiMeme": "Remplir moi-même",
       "attente": "On prépare ton brief…",
       "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
       "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
       "reessayer": "Réessayer",
-      "essai": "Sur le site d'essai, ton récit est gardé tel quel : tu remplis toi-même la vérification."
+      "essai": "Sur le site d'essai, ton récit est conservé tel quel pour ton programme ; tu complètes toi-même la vérification."
     },
     "verification": {
       "titre": "Vérifie ton brief",
@@ -170,7 +171,7 @@
     "echec": "Impossible de chercher un quartier pour le moment.",
     "reessayer": "Réessayer",
     "continuerSansLogement": "Continuer sans logement",
-    "essai": "Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre de {ville}."
+    "essai": "Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre-ville."
   },
   "lancement": {
     "titre": "On crée ton voyage",
@@ -180,13 +181,14 @@
     "echec": "Impossible de créer ton voyage pour le moment. Ton brouillon est conservé.",
     "reessayer": "Réessayer",
     "essai": {
-      "titre": "Lancer ton voyage",
+      "titre": "Ton brouillon est prêt",
       "acces": {
         "titre": "Ton code d'accès",
         "aide": "Sur le site d'essai, le code d'accès remplace la connexion. Il ouvre l'accès pour 12 heures dans ce navigateur. Ton brouillon est conservé."
       },
       "bientot": "Le lancement depuis l'app arrive bientôt. Ton brouillon est conservé dans cet onglet.",
-      "ferme": "Le lancement n'est pas ouvert sur ce site. Ton brouillon est conservé dans cet onglet."
+      "accesOuvert": "Accès ouvert pour 12 heures dans ce navigateur.",
+      "ferme": "Le lancement n'est pas ouvert sur ce site. Ton brouillon est conservé dans cet onglet. Ouvre le site d'essai depuis le lien qu'on t'a donné."
     }
   },
   "ecran5": {

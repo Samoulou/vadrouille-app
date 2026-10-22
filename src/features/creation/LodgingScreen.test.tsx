@@ -180,9 +180,7 @@ describe("LodgingScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () 
 
   it("aucune demande, aucun bandeau ni carte : une phrase et « Continuer sans logement » ; axe", async () => {
     const { container } = renderEssai();
-    expect(screenStatus()).toHaveTextContent(
-      "Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre de Édimbourg.",
-    );
+    expect(screenStatus()).toHaveTextContent("Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre-ville.");
     expect(screen.getByRole("alert")).toBeEmptyDOMElement();
     expect(container.querySelector("[data-part='squelette']")).toBeNull();
     expect(container.querySelector("[data-area-map]")).toBeNull();

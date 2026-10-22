@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CategorySchema, CommitmentSchema, IsoDateSchema, TimeSchema, TimeZoneSchema } from "@/contracts";
+import { PROTOTYPE_STAY_DAYS_MAX } from "@/contracts/values";
 
 /**
  * Brief du prototype (spécification P0, P0-PO-2) : un fichier par voyage dans `prototype/briefs/`, commité.
@@ -82,8 +83,9 @@ export const BriefSchema = z
       ctx.addIssue({ code: "custom", message: "départ avant l'arrivée", path: ["depart"] });
     }
     const jours = (Date.parse(`${brief.depart}T00:00:00Z`) - Date.parse(`${brief.arrivee}T00:00:00Z`)) / 86_400_000;
-    if (jours > 14) {
-      ctx.addIssue({ code: "custom", message: "séjour de 15 jours au plus", path: ["depart"] });
+    // Borne unique, relue par l'écran 1 du site d'essai (`src/features/creation/validation.ts`).
+    if (jours > PROTOTYPE_STAY_DAYS_MAX - 1) {
+      ctx.addIssue({ code: "custom", message: `séjour de ${PROTOTYPE_STAY_DAYS_MAX} jours au plus`, path: ["depart"] });
     }
     const nuits = brief.logements.reduce((total, logement) => total + logement.nuits, 0);
     if (nuits !== jours) {

@@ -44,9 +44,9 @@ export function LodgingScreen({ essai = false }: { essai?: boolean } = {}) {
   useEffect(() => {
     if (!valid) {
       dispatch({ type: "lost" });
-      router.replace(creationRoutes.nouveau());
+      router.replace(creationRoutes.nouveau({ essai }));
     }
-  }, [valid, dispatch, router]);
+  }, [valid, essai, dispatch, router]);
 
   if (!valid || city === null) return null;
 
@@ -139,9 +139,8 @@ function LodgingCity({ name, focusTitle, essai, request, onChoose }: LodgingCity
     return () => {
       attempt.current += 1;
     };
-    // Au montage de la ville seulement ; `essai` est une valeur serveur, fixe pour l'écran.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Au montage de la ville seulement : `essai` est une valeur serveur, fixe pour l'écran.
+  }, [essai]);
 
   const statusText =
     status.kind === "loading"
@@ -149,7 +148,7 @@ function LodgingCity({ name, focusTitle, essai, request, onChoose }: LodgingCity
       : status.kind === "noOption"
         ? t.aucunQuartier
         : status.kind === "essai"
-          ? format(t.essai, { ville: name })
+          ? t.essai
           : null;
   const withoutLodging = () => onChoose({ kind: "none" });
 

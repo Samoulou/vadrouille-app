@@ -11,6 +11,10 @@ import { BriefStory } from "./BriefStory";
 import { CreationShell } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { creationRoutes } from "./routes";
+import { todayIso, validateTrip, type FieldError } from "./validation";
+
+/** Règles propres au site d'essai (écran 1, D1). */
+const ESSAI_CODES: ReadonlySet<FieldError> = new Set<FieldError>(["unknownCity", "singleCity", "tooLong"]);
 
 export interface BriefScreenProps {
   /** Enregistreur des mesures (`brief_completed`) : console en développement et en test, aucun en production. */
@@ -41,17 +45,25 @@ function BriefContent({ essai }: { essai: boolean }) {
   const [focusTitle, setFocusTitle] = useState(false);
   const stage = { focusTitle, onStageChange: () => setFocusTitle(true) };
 
+  // Site d'essai : l'écran 1, prérendu, lit `site=essai` dans l'adresse ; arrivé sans (adresse saisie à la main), un
+  // écran 1 hors des règles du site d'essai y est renvoyé, saisie gardée, avant tout récit.
+  const horsEssai =
+    essai && state.tripReady && validateTrip(state.trip, todayIso(), { essai: true }).some((error) => ESSAI_CODES.has(error.code));
+  const valid = state.tripReady && !horsEssai;
+
   useEffect(() => {
     if (!state.tripReady) {
       dispatch({ type: "lost" });
-      router.replace(creationRoutes.nouveau());
+      router.replace(creationRoutes.nouveau({ essai }));
+    } else if (horsEssai) {
+      router.replace(creationRoutes.nouveau({ essai: true }));
     }
-  }, [state.tripReady, dispatch, router]);
+  }, [state.tripReady, horsEssai, essai, dispatch, router]);
 
-  if (!state.tripReady) return null;
+  if (!valid) return null;
 
   return (
-    <CreationShell backHref={creationRoutes.nouveau()}>
+    <CreationShell backHref={creationRoutes.nouveau({ essai })}>
       {state.stage === "story" ? <BriefStory {...stage} essai={essai} /> : <BriefReview {...stage} />}
     </CreationShell>
   );

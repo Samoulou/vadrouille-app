@@ -38,21 +38,23 @@ async function sansViolation(page: import("@playwright/test").Page) {
 test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'erreur ni détour", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Créer un voyage" }).click();
-  await expectPath(page, R1);
+  // Écran 1 prérendu (décision 0032 § A6.2) : le site d'essai lui est dit par l'adresse.
+  await expect(page).toHaveURL(`${R1}?site=essai`);
+  await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);
 
   // Écran 1 : une ville hors table est refusée au champ ; Rome est admise.
   await fillTrip(page, { ...ROME, destination: "Atlantide" });
   await continueButton(page).click();
   await expect(field(page, "Destination")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByText("Ville inconnue du site d'essai.", { exact: false })).toBeVisible();
-  await expectPath(page, R1);
+  await expect(page.getByText("Cette ville n'est pas encore disponible sur le site d'essai.", { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(`${R1}?site=essai`);
   await field(page, "Destination").fill(ROME.destination);
   await continueButton(page).click();
   await expectPath(page, R2);
 
   // Écran 2 : le bouton principal mène à la vérification, récit gardé, sans bandeau.
   await storyField(page).fill(RECIT);
-  await page.getByRole("button", { name: "Préparer mon brief" }).click();
+  await page.getByRole("button", { name: "Vérifier mon brief" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
   await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await page.getByRole("radio", { name: "Équilibré" }).click();
@@ -69,7 +71,7 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
 
   // `R-lancer` atteint sans l'écran 4 ; garde fermée sur ce serveur : annonce, jamais une erreur.
   await expectPath(page, R_LANCER);
-  await expect(page.getByRole("heading", { level: 1, name: "Lancer ton voyage" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ton brouillon est prêt" })).toBeVisible();
   await expect(page.getByText("Le lancement n'est pas ouvert sur ce site.", { exact: false })).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await sansViolation(page);
@@ -79,13 +81,13 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expectPath(page, R3);
 });
 
-test("site d'essai : une seconde ville est refusée au champ de la ville", async ({ page }) => {
+test("site d'essai : écran 1 ouvert sans site=essai, un écran 1 hors règles est renvoyé par l'écran 2, saisie gardée", async ({ page }) => {
   await page.goto(R1);
-  await fillTrip(page, ROME);
-  await page.getByRole("button", { name: "Ajouter une ville" }).click();
-  await field(page, "Nom de la ville").fill("Florence");
+  await fillTrip(page, { ...ROME, destination: "Atlantide" });
   await continueButton(page).click();
-  await expect(page.getByText("Une seule ville sur le site d'essai : retire cette ville.")).toBeVisible();
-  await expectPath(page, R1);
+  await expect(page).toHaveURL(`${R1}?site=essai`);
+  await expect(field(page, "Destination")).toHaveValue("Atlantide");
+  await continueButton(page).click();
+  await expect(field(page, "Destination")).toHaveAttribute("aria-invalid", "true");
   await sansViolation(page);
 });

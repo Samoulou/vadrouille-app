@@ -229,10 +229,10 @@ describe("site d'essai : structureBrief et suggestLodging fermés sans appel (E2
     const structureSimule = vi.fn(async () => ({ ok: true, value: MOCK_INFERRED_BRIEF }));
     const suggestSimule = vi.fn(async () => ({ ok: true, value: MOCK_LODGING_SUGGESTION }));
     vi.mocked(adapters.getCreationAdapter).mockReturnValue({ structureBrief: structureSimule, suggestLodging: suggestSimule } as never);
-    expect(await structureBrief(REQUEST)).toEqual(fail("provider_error"));
+    expect(await structureBrief(REQUEST)).toEqual(fail("no_option"));
     expect(await suggestLodging({ draft: MOCK_DEMO_TRIP_DRAFT, city: 0 })).toEqual(fail("no_option"));
     // Entrée invalide : même réponse, rien n'est lu.
-    expect(await structureBrief({ story: 1 })).toEqual(fail("provider_error"));
+    expect(await structureBrief({ story: 1 })).toEqual(fail("no_option"));
     expect(adapters.getCreationAdapter).not.toHaveBeenCalled();
     expect(structureSimule).not.toHaveBeenCalled();
     expect(suggestSimule).not.toHaveBeenCalled();

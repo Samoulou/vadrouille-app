@@ -8,6 +8,7 @@ import {
   DESTINATION_LENGTH,
   KNOWN_LODGING_LENGTH,
   MEAL_BUDGET_CHF,
+  PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
 import { fuseauDeVille } from "@/lib/fuseaux";
@@ -73,9 +74,6 @@ export function isDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
-/** Site d'essai (D1) : 15 jours au plus, comme `BriefSchema` (`src/prototype/brief.ts`) : départ au plus 14 jours après l'arrivée. */
-export const ESSAI_JOURS_MAX = 15;
-
 /** Jours entre deux dates valides `AAAA-MM-JJ`. */
 function joursEntre(start: string, end: string): number {
   return (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000;
@@ -84,7 +82,8 @@ function joursEntre(start: string, end: string): number {
 export interface ValidateTripOptions {
   /**
    * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, connue
-   * de la table des fuseaux (`fuseauDeVille`, aucune donnée Google), et 15 jours au plus. Refus au champ.
+   * de la table des fuseaux (`fuseauDeVille`, aucune donnée Google), et `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la
+   * borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois dans `@/contracts/values`. Refus au champ.
    */
   essai?: boolean;
 }
@@ -108,7 +107,7 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
       ? "required"
       : start !== null && end <= start
         ? "endBeforeStart"
-        : essai && start !== null && joursEntre(start, end) > ESSAI_JOURS_MAX - 1
+        : essai && start !== null && joursEntre(start, end) > PROTOTYPE_STAY_DAYS_MAX - 1
           ? "tooLong"
           : null,
   );

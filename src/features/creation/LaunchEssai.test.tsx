@@ -62,7 +62,7 @@ beforeEach(() => {
 describe("LaunchEssai", () => {
   it("sans brouillon complet : écran 1, brouillon perdu annoncé ; ni saisie ni lancement", async () => {
     renderStep("saisie", initialDraft());
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/voyages/nouveau"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/voyages/nouveau?site=essai"));
     expect(latest?.lostNotice).toBe(true);
     expect(screen.queryByLabelText(acces.libelle)).toBeNull();
     expect(createTrip).not.toHaveBeenCalled();
@@ -90,6 +90,8 @@ describe("LaunchEssai", () => {
     });
     const titre = await screen.findByRole("heading", { level: 1, name: t.titre });
     expect(screen.getByText(t.bientot)).toBeInTheDocument();
+    // Annonce dans une région montée dès l'affichage (la saisie, démontée, ne l'annonce plus) ; un seul focus, le titre.
+    expect(screen.getByText(t.accesOuvert)).toHaveAttribute("role", "status");
     await waitFor(() => expect(titre).toHaveFocus());
     expect(latest?.trip).toEqual(COMPLETE.trip);
     expect(latest?.lodgingChoices).toEqual(COMPLETE.lodgingChoices);
@@ -110,7 +112,8 @@ describe("LaunchEssai", () => {
   it("accès ouvert : « Le lancement depuis l'app arrive bientôt », sans erreur ni appel ; axe", async () => {
     const { container } = renderStep("ouverte");
     expect(screen.getByRole("heading", { level: 1, name: t.titre })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(t.bientot);
+    expect(screen.getByText(t.bientot).closest("[role='status']")).not.toBeNull();
+    expect(screen.queryByText(t.accesOuvert)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByLabelText(acces.libelle)).toBeNull();
     expect(createTrip).not.toHaveBeenCalled();
@@ -120,7 +123,7 @@ describe("LaunchEssai", () => {
 
   it("garde fermée : le lancement n'est pas ouvert sur ce site, sans saisie", () => {
     renderStep("fermee");
-    expect(screen.getByRole("status")).toHaveTextContent(t.ferme);
+    expect(screen.getByText(t.ferme).closest("[role='status']")).not.toBeNull();
     expect(screen.queryByLabelText(acces.libelle)).toBeNull();
     expect(createTrip).not.toHaveBeenCalled();
   });

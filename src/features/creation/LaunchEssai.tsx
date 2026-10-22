@@ -10,6 +10,7 @@ import * as messages from "@/i18n/messages";
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { draftComplete } from "./draft";
+import { EMPTY_LIVE_REGION_CLASS } from "./fields";
 import { creationRoutes } from "./routes";
 
 const t = messages.creation.lancement.essai;
@@ -37,14 +38,15 @@ export function LaunchEssai({ acces: accesInitial }: LaunchEssaiProps) {
   const { state, dispatch } = useDraft();
   const complete = draftComplete(state);
   const [acces, setAcces] = useState<AccesEssai>(accesInitial);
-  // Le titre reçoit le focus au retour de la saisie du code (WCAG 2.4.3), jamais au premier affichage.
+  // Le titre reçoit le focus au retour de la saisie du code (WCAG 2.4.3), jamais au premier affichage ; la région
+  // `status` ci-dessous, montée dès l'affichage, annonce alors l'accès ouvert (la saisie, démontée, ne le peut plus).
   const [retour, setRetour] = useState(false);
   const title = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (!complete) {
       dispatch({ type: "lost" });
-      router.replace(creationRoutes.nouveau());
+      router.replace(creationRoutes.nouveau({ essai: true }));
     }
     // Au montage seulement, comme `LaunchStep` : le brouillon ne change pas sur cette étape.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,9 +77,14 @@ export function LaunchEssai({ acces: accesInitial }: LaunchEssaiProps) {
           <h1 ref={title} tabIndex={-1} className={TITLE_CLASS}>
             {t.titre}
           </h1>
+          {/* `noOption` (bloc `muted`, rôle `status`) : rien à proposer ici pour l'instant, jamais une erreur ; le lot 3
+              remplacera ce bandeau par le lancement. */}
           <StatusBanner kind="noOption" message={acces === "ouverte" ? t.bientot : t.ferme} />
         </>
       )}
+      <p role="status" className={retour ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
+        {retour ? t.accesOuvert : null}
+      </p>
     </CreationShell>
   );
 }

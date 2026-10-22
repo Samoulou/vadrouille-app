@@ -32,7 +32,7 @@ test("parcours prototype : accueil sans section « Prototype », « Mes voyages 
   await expect(prototypeSection(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Prototype" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Démonstration" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveAttribute("href", "/voyages/nouveau");
+  await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveAttribute("href", "/voyages/nouveau?site=essai");
 
   await page.getByRole("link", { name: "Mes voyages" }).click();
   await expect(page).toHaveURL("/voyages");
@@ -102,9 +102,14 @@ test("les routes du prototype ne sont pas prérendues : manifeste de build incha
     dynamicRoutes: Record<string, unknown>;
   };
   // Mêmes routes prérendues qu'avant P0b1 (aucune page servie par un adaptateur), plus la page de repli hors ligne
-  // et le manifeste de F10b, construits sans aucune donnée (F10-TL-4, F10-TL-9). L'écran 1 (`/voyages/nouveau`) lit
-  // l'adaptateur depuis E2E-essai, lot 2 (une ville de la table sur le site d'essai) : il n'est plus prérendu.
-  expect(Object.keys(manifest.routes).sort()).toEqual(["/_global-error", "/_not-found", "/hors-ligne", "/manifest.webmanifest"]);
+  // et le manifeste de F10b, construits sans aucune donnée (F10-TL-4, F10-TL-9).
+  expect(Object.keys(manifest.routes).sort()).toEqual([
+    "/_global-error",
+    "/_not-found",
+    "/hors-ligne",
+    "/manifest.webmanifest",
+    "/voyages/nouveau",
+  ]);
   expect(Object.keys(manifest.dynamicRoutes)).toEqual([]);
 });
 
