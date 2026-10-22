@@ -416,6 +416,11 @@ describe("module de journal", () => {
       "payment.webhook_config_invalid",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
+      // B10b (décision 0119 § 1.3 ; verdict 0120 S1 point 1 et S7) : recalcul d'un tri, identifiants internes, nom d'erreur et
+      // nombre de jours touchés seulement.
+      "recalcul.not_created",
+      "recalcul.start_failed",
+      "recalcul.unlock_failed",
       "log.unknown_event",
     ]);
   });

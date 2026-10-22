@@ -33,7 +33,9 @@ export type SignalDuRecalcul = PreferenceSignal & { readonly candidatId?: string
 /**
  * Proposition (case) d'un tri telle que le recalcul la lit : colonnes de `proposals` et, de son contenu, l'identifiant et
  * le lieu de l'étape proposée. `candidat` : le candidat de l'option, construit par la lecture serveur pour un repas
- * choisi (B10-PO-10 point 3) ; `option` : rang de l'option dans son créneau de repas (absent : option unique).
+ * choisi (B10-PO-10 point 3) ; `option` : rang de l'option dans son créneau de repas (absent : option unique) et, quand la
+ * lecture serveur le fournit, `total`, le **nombre réel d'options** du créneau (Q582 : compté sur toutes les cases de
+ * l'exécution, pas seulement celles du tri), préféré au plus grand rang observé pour dire quelle option est la dernière.
  */
 export type PropositionDuRecalcul = {
   readonly id: string;
@@ -41,7 +43,7 @@ export type PropositionDuRecalcul = {
   readonly category: Category;
   readonly day: number;
   readonly time: string;
-  readonly option?: { readonly index: number };
+  readonly option?: { readonly index: number; readonly total?: number };
   readonly stopId?: string;
   readonly placeId?: string;
   readonly candidat?: CandidatMoteur;
@@ -103,8 +105,9 @@ const rangOption = (proposition: PropositionDuRecalcul) => proposition.option?.i
 
 /**
  * Créneaux de repas réglés par les signaux du tri : « Je choisis » actif sur une option (`choisi`), sinon « Pas pour
- * moi » actif sur la dernière option du créneau (`sansChoix`, F6-PO-7 ; dernière : aucune option de rang supérieur parmi
- * les propositions du tri). Même règle que `paquetDeReprise` (`preferences.ts`).
+ * moi » actif sur la dernière option du créneau (`sansChoix`, F6-PO-7). Dernière : le rang égal au nombre réel d'options
+ * (`option.total`) quand la lecture le fournit (Q582), sinon aucune option de rang supérieur parmi les propositions du tri.
+ * Même règle que `paquetDeReprise` (`preferences.ts`).
  */
 function creneauxRegles(tri: TriDuRecalcul): EtatDuCreneau[] {
   const decisions = new Map<string, SignalDuRecalcul>();
@@ -122,7 +125,7 @@ function creneauxRegles(tri: TriDuRecalcul): EtatDuCreneau[] {
       regles.push({ creneau, etat: "choisi", option: choisie });
       continue;
     }
-    const derniere = Math.max(...creneau.options.map(rangOption));
+    const derniere = Math.max(...creneau.options.map((option) => option.option?.total ?? rangOption(option)));
     const refusee = creneau.options.some((option) => rangOption(option) === derniere && decisions.get(option.id)?.signal === "dislike");
     if (refusee) regles.push({ creneau, etat: "sansChoix" });
   }

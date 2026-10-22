@@ -725,6 +725,16 @@ Les workflows 1 à 5 (aperçu, ancrage, planification et validation, voyage comp
 
 **Arrêt sur plafond ou quota.** Un quota atteint arrête le workflow et conserve le dernier programme valide (test de sortie du cadrage § 9). **Extension signalée** de ce test : le même comportement vaut pour un plafond de coût atteint (plafonds vérifiés avant chaque appel, cadrage § 6.9 et § 9 « Plafonds applicatifs »), et aucune version partielle n'est publiée. L'état publié devient `failed` avec la raison (`cost_cap_reached` ou `quota_reached`) et `retryable` (forme de `GenerationStatus`, décision 0017 § 2.4). « Aucune version partielle » signifie : aucune version contenant un jour à moitié planifié ou qui échoue à la validation. Test nommé `workflows: plafond ou quota atteint conserve le dernier programme valide` (§ 10, tâche B9).
 
+### 5. Recalcul d'un tri (`batchRecompute`, B10b ; décisions 0119 § 1 et 0120)
+Une ligne `generation_runs` de `kind = 'batch'` par tri clos (`base_version`, `deck_closure_id`), créée sous le verrou du tri par `completeDeck` (`src/server/presentation/tri.ts`) ou par le second travail de la suite du déblocage (`src/server/payment/suite-voyage-complet.ts`, `src/server/generation/lot.ts`), démarrée **après** la validation (`demarrerRecalcul`, `src/workflows/index.ts`) ; démarrage échoué : ligne close aussitôt en `failed`. Pont `src/workflows/recalcul.ts`, étapes `src/server/generation/etapes-lot.ts`, état `EtatLotSchema` (identifiants et rang seulement).
+
+| Étape | Type | Entrée → sortie | Données Google | Plafond | Relances | Idempotence | État publié |
+|---|---|---|---|---|---|---|---|
+| `a` (rang 1) | déterministe | `EtatLot` → `EtatLot` ; jours touchés (`joursTouches`, version de base et signaux du tri clos relus), réserve Text Search de `e`, forfait `lot` réservé | non | refus `cap_reached` avant la réservation | 2 | garde `step_seq` (rejeu de `a`) ; forfait par identifiant d'exécution | `preparing`, ou `ready` sans version si aucun jour touché |
+| `e` (rang 2) | appel externe et IA | `EtatLot` → `EtatLot` ; réserve filtrée (`reserveFiltree`), relecture (`CapaciteFinale.planifier`), `replanifierJour` des seuls jours touchés (étapes conservées, repas choisis), raisons des seuls remplaçants (une requête `raisons` par ville), **une** version sous le verrou des versions | oui (relectures en mémoire, jamais renvoyées) | forfait `lot` entier à `e` | 0 | `request_id` de la ligne sur la version ; rejeu borné de la transaction de publication sans appel | `ready` (version publiée) ou `failed` avec sa raison |
+
+Le voyage complet (workflow 4) filtre sa réserve par les signaux actifs (`src/server/generation/signaux.ts`) et publie sous le même verrou des versions (`verrouillerVersions`, `src/server/versions/ecrire.ts`) ; ordre : verrou du tri, puis verrou des versions. `RECALCUL_FIN_APERCU` (`src/server/config/recalcul.ts`) reste `false` et `PLAFONDS_USAGE` reste `null` : aucun recalcul réel.
+
 ### 6. Paiement en mode test (`handlePaymentEvent`)
 | Étape | Type | Entrée → sortie | Données Google | Plafond | Relances | Idempotence | État publié |
 |---|---|---|---|---|---|---|---|

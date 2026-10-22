@@ -86,6 +86,17 @@ export const LOG_EVENTS = [
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
   "generation.full_stuck",
+  // B10b (spécification B10 ; décision 0119 § 1.3 points 4 et 5 ; verdict Sécurité 0120 S1 point 1 et S7) : recalcul d'un tri
+  // (workflow 5). `recalcul.not_created` : ligne `batch` attendue absente après `ON CONFLICT DO NOTHING` (collision sur l'index
+  // des `request_id`, ou sur l'index « une exécution en cours par voyage »), ou lecture illisible dans `completeDeck` (la
+  // clôture est gardée), aucun démarrage ; `recalcul.start_failed` : démarrage du SDK échoué, ligne close aussitôt en `failed` ;
+  // `recalcul.unlock_failed` : second travail de la suite du déblocage en échec, attrapé (le voyage complet n'est pas touché).
+  // Niveau `warn` ; champs `organizationId`, `tripId`, `generationRunId` (identifiants internes), `errorName` et `days` (nombre
+  // de jours touchés, fonction des seuls signaux du tri et de la version de base) ; aucun nom, `placeId`, catégorie, raison,
+  // texte de question, durée ni compteur qui dépende de Google.
+  "recalcul.not_created",
+  "recalcul.start_failed",
+  "recalcul.unlock_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];

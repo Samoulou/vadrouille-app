@@ -71,10 +71,18 @@ export type EtatDuTri = {
 /** Verrou du tri d'un voyage (0112 § 3.6), pris après le contrôle du voyage dans l'organisation. */
 export const SQL_VERROU_TRI = "SELECT pg_advisory_xact_lock(hashtextextended('vadrouille:tri:' || $1::text, 0))";
 
-const SQL_DEBLOQUE = `SELECT EXISTS (SELECT 1 FROM public.entitlements WHERE organization_id = $1 AND trip_id = $2
+/**
+ * Droit `tripUnlocked` du voyage : **requête unique** du déblocage, lue par l'état du tri, par la lecture des voyages
+ * (`src/server/voyages/lecture.ts`) et par la suite du déblocage (0120 S2 point 1, Q578) ; importée, jamais recopiée.
+ */
+export const SQL_DEBLOQUE = `SELECT EXISTS (SELECT 1 FROM public.entitlements WHERE organization_id = $1 AND trip_id = $2
   AND kind = 'tripUnlocked') AS debloque`;
 
-const SQL_EXECUTION_APERCU = `SELECT g.id FROM public.generation_runs g WHERE g.organization_id = $1 AND g.trip_id = $2 AND g.kind = 'preview'
+/**
+ * Dernière exécution `preview` du voyage, **sans condition sur les cases** (0119 § 1.3 point 3) : la même pour la lecture du
+ * tri et pour la suite du déblocage qui écrit la clôture de l'aperçu (0120 S2 point 2, Q578) ; importée, jamais recopiée.
+ */
+export const SQL_EXECUTION_APERCU = `SELECT g.id FROM public.generation_runs g WHERE g.organization_id = $1 AND g.trip_id = $2 AND g.kind = 'preview'
   ORDER BY g.started_at DESC, g.id DESC LIMIT 1`;
 
 const SQL_EXECUTION_DECK = `SELECT q.generation_run_id AS id FROM public.proposals q
@@ -82,7 +90,8 @@ const SQL_EXECUTION_DECK = `SELECT q.generation_run_id AS id FROM public.proposa
   WHERE q.organization_id = $1 AND q.trip_id = $2 AND q.phase = 'deck'
   ORDER BY g.started_at DESC, g.id DESC LIMIT 1`;
 
-const SQL_CASES = `SELECT p.id, p.position, p.slot_type, p.day, p.time, p.kind, p.candidate_id, p.content FROM public.proposals p
+/** Cases d'une exécution et d'une phase, par position (`noOption` comprises) ; lues aussi par la suite du déblocage (0120 S2 point 2). */
+export const SQL_CASES = `SELECT p.id, p.position, p.slot_type, p.day, p.time, p.kind, p.candidate_id, p.content FROM public.proposals p
   WHERE p.organization_id = $1 AND p.trip_id = $2 AND p.generation_run_id = $3 AND p.phase = $4 ORDER BY p.position`;
 
 const SQL_CLOTURE = `SELECT COALESCE(max(through_position), 0)::int AS jusqua FROM public.deck_closures

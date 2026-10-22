@@ -1,5 +1,7 @@
 # 0112 — B10a « Tri enregistré » : contrat (B10-TL-1), emplacements (B10-TL-2), écriture de `preference_signals` (B10-TL-3), branchement de l'écran (B10-TL-4)
 
+**§ 3.4, puce « Au déblocage », amendée par 0119** (rubrique « Amendements d'autres décisions », ticket #643 ; mise en œuvre par B10b-serveur, ticket #662) : la suite du déblocage écrit la clôture du tri de l'aperçu quand elle manque ; la règle de lecture reste.
+
 Statut : **décision déléguée** du Tech Lead (architecture, schéma, outillage et tests : « Qui décide quoi » de `docs/CONTEXT.md`), à lister dans la note de version suivante (rubrique « Décisions prises par le studio ») ; définitive dès sa fusion, sans délai de veto (décision 0093) ; Samuel peut la remettre en cause à tout moment. Elle n'engage ni argent, ni compte externe, ni donnée personnelle hors UE ; elle ne crée aucune donnée personnelle nouvelle (les signaux sont les goûts du voyage déjà prévus par le handover § 6, B10-PO-19) ; elle ne supprime ni ne désactive aucun test. **Verdict Sécurité demandé** à la revue sur l'écriture des goûts par une action (§ 3, question 7 de la spécification) : il bloque la fusion de la PR de code de B10a, pas celle-ci.
 
 Date : 2026-10-21 · Décideur : Tech Lead · Ticket : #603 · Spécification : `specs/B10-propositions-preferences.md` (#586, ticket #584), section « Propositions au Tech Lead », B10-TL-1 à B10-TL-4 · Décisions liées : 0013 § 3.2, 0016 § 3.1, 0017 § 4, 0020 § 11, 0045 § 3, 0081 (B9-TL-1), 0086 § 2.2, 0093, 0108

@@ -379,3 +379,69 @@ describe("recalcul: remplacement par le moteur (B10-PO-10 points 2 et 3)", () =>
     expect(lieuxDe(jour).has(DINER.placeId)).toBe(false);
   });
 });
+
+describe("recalcul: cas fixés par B10b-serveur (Q581, Q582, Q584)", () => {
+  const dejeuner = J2.items.find((i) => i.type === "openMeal" && i.meal === "lunch");
+  if (dejeuner === undefined || dejeuner.type !== "openMeal") throw new Error("jeu de test : J2 sans déjeuner libre");
+  const OPTION_DEJ_2 = candidat("dej2", "meal");
+  const optionDejeuner = (rang: number, c: CandidatMoteur, total?: number): PropositionDuRecalcul => ({
+    id: `case-dej-${rang}`,
+    kind: "meal",
+    category: "restaurant",
+    day: 2,
+    time: dejeuner.time,
+    option: total === undefined ? { index: rang } : { index: rang, total },
+    stopId: `deck-dej-${rang}`,
+    ...(c.placeId === undefined ? {} : { placeId: c.placeId }),
+    candidat: c,
+  });
+
+  it("Q581 (limite acceptée, 0119 « Quand revoir », ticket n° 664) : créneau rouvert et repas choisi sur une autre option le même jour — le moteur pose le repas choisi dans le créneau rouvert", () => {
+    // Dîner placé refusé (créneau réglé sans choix, rouvert) ; déjeuner libre dont l'option 2 est choisie.
+    const dej1 = optionDejeuner(1, candidat("dej1", "meal"), 2);
+    const dej2 = optionDejeuner(2, OPTION_DEJ_2, 2);
+    const tri: TriDuRecalcul = { signaux: [signal(caseDe(DINER), "dislike"), signal(dej1, "nextOption"), signal(dej2, "choose")], propositions: [...CASES, dej1, dej2] };
+    const { plan, jour } = recalculer(tri, 2);
+    expect(plan.creneauxARouvrir).toEqual([{ day: 2, time: DINER.start }]);
+    expect(plan.repasChoisis).toEqual([OPTION_DEJ_2]);
+    // Comportement épinglé : le repas choisi pour le déjeuner prend l'heure du dîner rouvert ; le déjeuner reste libre.
+    const pose = etapes(jour).find((s) => s.placeId === OPTION_DEJ_2.placeId);
+    expect(pose?.start).toBe(DINER.start);
+    expect(jour.items.some((i) => i.type === "openMeal" && i.meal === "lunch")).toBe(true);
+    expect(jour.items.some((i) => i.type === "openMeal" && i.meal === "dinner")).toBe(false);
+    expect(lieuxDe(jour).has(DINER.placeId)).toBe(false);
+  });
+
+  it.todo("Q581, cible du ticket n° 664 « créneau imposé pour un candidat » : le repas choisi garde le créneau de son option (déjeuner), le créneau rouvert reste « pas encore choisi »");
+
+  it("Q584 : « Pas pour moi » sur l'option placée qui n'est pas la dernière — repas retiré, créneau non rouvert, repas « pas encore choisi »", () => {
+    const options = optionsDiner();
+    const [option1] = options;
+    if (option1 === undefined) throw new Error("jeu de test");
+    const avecOptions = [...CASES.filter((c) => c.stopId !== DINER.id), ...options];
+    const tri: TriDuRecalcul = { signaux: [signal(option1, "dislike")], propositions: avecOptions };
+    expect(joursTouches(BASE, tri)).toEqual([2]);
+    const { plan, jour } = recalculer(tri, 2, { candidats: [...RESERVE, OPTION_2, OPTION_3] });
+    expect(plan.retirees).toEqual([DINER.id]);
+    expect(plan.creneauxARouvrir).toEqual([]);
+    expect(plan.repasChoisis).toEqual([]);
+    expect(lieuxDe(jour).has(DINER.placeId)).toBe(false);
+    expect(jour.items.some((i) => i.type === "openMeal" && i.meal === "dinner")).toBe(true);
+  });
+
+  it("Q582 : nombre réel d'options du créneau (`option.total`, lu par le serveur) préféré au plus grand rang observé", () => {
+    const options = optionsDiner();
+    const [option1, option2] = options;
+    if (option1 === undefined || option2 === undefined) throw new Error("jeu de test");
+    // Le tri n'a montré que les options 1 et 2 ; « Pas pour moi » sur l'option 2.
+    const vues = (total?: number) => [...CASES.filter((c) => c.stopId !== DINER.id), ...[option1, option2].map((o) => ({ ...o, option: total === undefined ? { index: o.option?.index ?? 1 } : { index: o.option?.index ?? 1, total } }))];
+    const signaux = [signal(option1, "nextOption"), signal(option2, "dislike")];
+    // Sans le total : l'option 2 est prise pour la dernière, le créneau est réglé sans choix et rouvert.
+    expect(planDuJour(J2, { signaux, propositions: vues() }).creneauxARouvrir).toEqual([{ day: 2, time: DINER.start }]);
+    // Avec le total réel (3) : l'option 2 n'est pas la dernière, le créneau n'est pas réglé, aucun jour touché.
+    expect(planDuJour(J2, { signaux, propositions: vues(3) }).creneauxARouvrir).toEqual([]);
+    expect(joursTouches(BASE, { signaux, propositions: vues(3) })).toEqual([]);
+    // Total égal au rang : dernière option, même règle que sans total.
+    expect(planDuJour(J2, { signaux, propositions: vues(2) }).creneauxARouvrir).toEqual([{ day: 2, time: DINER.start }]);
+  });
+});

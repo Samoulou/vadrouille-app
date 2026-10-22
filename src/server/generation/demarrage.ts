@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { DemarrerRecalcul } from "./lot";
 import type { DemarrerVoyageComplet } from "./reconciliation";
 
 /**
@@ -16,3 +17,14 @@ export const demarrerVoyageCompletReel: DemarrerVoyageComplet = async (generatio
 
 /** Double sans appel du workflow 4 : ne démarre rien (la ligne reste `queued` sans identifiant). */
 export const demarrerVoyageCompletSansAppel: DemarrerVoyageComplet = async () => null;
+
+/**
+ * Démarrage réel du workflow 5 (`batchRecompute`, B10b ; décision 0119 § 1.5 point 1) par l'interface des workflows, même forme
+ * que `demarrerVoyageCompletReel`. Appelé **après** la validation de la transaction qui a créé la ligne `batch` (0119 § 1.3
+ * point 2). Un refus ou une erreur de démarrage rend `null` : l'appelant clôt aussitôt la ligne en `failed` (§ 1.3 point 5).
+ */
+export const demarrerRecalculReel: DemarrerRecalcul = async (generationRunId, organizationId) => {
+  const { demarrerRecalcul } = await import("@/workflows");
+  const issue = await demarrerRecalcul(generationRunId, organizationId);
+  return issue.ok ? issue.workflowRunId : null;
+};

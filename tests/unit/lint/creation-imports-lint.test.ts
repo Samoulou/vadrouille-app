@@ -48,6 +48,19 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/workflows/complet.ts", GENERATION],
     ["src/workflows/p0-run.ts", GENERATION],
     ["src/server/voyages/lecture.ts", GENERATION],
+    // B10b : seul `tri.ts` de src/server/presentation est nommé (0119 § 1.3 point 2) ; ses voisins restent refusés.
+    ["src/server/presentation/etat.ts", GENERATION],
+    ["src/server/presentation/tri-autre.ts", GENERATION],
+    ["src/server/presentation/tri.ts/x.ts", GENERATION],
+    ["src/workflows/recalcul-autre.ts", GENERATION],
+    // `tri.ts` : les seuls modules lot, expiration et demarrage (revue de la PR 667, mineurs 3 et 4).
+    ["src/server/presentation/tri.ts", GENERATION],
+    ["src/server/presentation/tri.ts", REPRISE],
+    ["src/server/presentation/tri.ts", "@/server/generation/etapes-lot"],
+    ["src/server/presentation/tri.ts", "@/server/generation/lot-autre"],
+    ["src/server/presentation/tri.ts", CREATION],
+    ["src/server/presentation/tri.ts", `${CREATION}/commun`],
+    ["src/server/presentation/tri.ts", COMPOSITION],
     ["src/features/creation/exemple.ts", GENERATION],
     ["scripts/reprise-studio.ts", GENERATION],
     ["scripts/autre.ts", REPRISE],
@@ -67,6 +80,8 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/server/creation/exemple.ts", SYSTEME],
     ["src/server/actions/creation.ts", SYSTEME],
     ["src/workflows/voyage-complet.ts", SYSTEME],
+    ["src/workflows/recalcul.ts", SYSTEME],
+    ["src/server/presentation/tri.ts", SYSTEME],
     ["scripts/autre.ts", SYSTEME],
   ])("%s : chargement de %s signalé sous toutes ses formes", async (fichier, source) => {
     for (const code of formes(source)) expect(await signalements(code, fichier), code).not.toHaveLength(0);
@@ -80,6 +95,12 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     // @/server/generation/*
     ["src/workflows/apercu.ts", GENERATION],
     ["src/workflows/voyage-complet.ts", GENERATION],
+    // B10b : pont du workflow 5 (0119 § 1.8, 0120 S9 point 2) et `completeDeck` (0119 § 1.3 point 2 ; 0120 S9 point 3).
+    ["src/workflows/recalcul.ts", GENERATION],
+    ["src/workflows/recalcul.ts", "@/server/generation/etapes-lot"],
+    ["src/server/presentation/tri.ts", "@/server/generation/lot"],
+    ["src/server/presentation/tri.ts", "@/server/generation/expiration"],
+    ["src/server/presentation/tri.ts", "@/server/generation/demarrage"],
     ["src/workflows/index.ts", GENERATION],
     ["src/server/creation/nouvel-essai.ts", "@/server/generation/raison-echec"],
     ["src/server/generation/exemple.ts", "./raison-echec"],
