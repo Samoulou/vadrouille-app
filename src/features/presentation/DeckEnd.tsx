@@ -30,6 +30,11 @@ export interface DeckEndProps {
    * titre inchangé.
    */
   notAllSorted?: boolean;
+  /**
+   * Voyage d'essai (spécification E2E-essai, lot 1 ; D4) : une phrase sous le titre dit que les choix du tri ne changent
+   * pas encore le programme. Faux par défaut.
+   */
+  choixSansEffet?: boolean;
 }
 
 const TITLES: Record<DeckEndVariant, string> = { apercu: t.apercu, suite: t.suite, vide: t.vide };
@@ -39,7 +44,7 @@ const TITLES: Record<DeckEndVariant, string> = { apercu: t.apercu, suite: t.suit
  * programme », sans prix (Q2) ; suite du tri et paquet vide : « Voir le programme ». Sans paiement simulé
  * disponible, « Débloquer » n'est pas rendu et le reste est inchangé (F9-PO-19).
  */
-export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = false, notAllSorted = false }: DeckEndProps) {
+export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = false, notAllSorted = false, choixSansEffet = false }: DeckEndProps) {
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
   return (
     <section
@@ -51,6 +56,11 @@ export function DeckEnd({ variant, tripId, canUnlock = true, titleRef, closed = 
       <h2 id="fin-titre" ref={titleRef} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
         {(closed || notAllSorted) && variant === "suite" ? t.clos : TITLES[variant]}
       </h2>
+      {choixSansEffet ? (
+        <p data-part="choix-sans-effet" className="text-corps text-ink-2">
+          {t.choixSansEffet}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3">
         {variant === "apercu" && canUnlock ? (
           <Button asChild>

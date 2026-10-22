@@ -1,0 +1,497 @@
+{
+  "schema": 1,
+  "trip": {
+    "id": "proto_essai_20271010_1",
+    "organizationId": "5e1f0000-0000-4000-8000-000000000001",
+    "destination": "Ville d'essai",
+    "destinationColor": "granit",
+    "start": "2027-05-10",
+    "end": "2027-05-12",
+    "timeZone": "Europe/London",
+    "travellers": {
+      "adults": 2,
+      "children": 0
+    },
+    "days": [
+      {
+        "index": 1,
+        "date": "2027-05-10",
+        "weekday": "lun.",
+        "items": [
+          {
+            "type": "terminus",
+            "role": "start",
+            "time": "12:00",
+            "label": "[Logement de test]"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j1-a1",
+              "kind": "activity",
+              "placeId": "SENTINELLE_PLACE_ID_1",
+              "name": "[Lieu de test 1]",
+              "start": "12:30",
+              "end": "14:00",
+              "facts": {
+                "durationMinutes": 90,
+                "costPerPerson": 0
+              },
+              "reason": "Raison maison de test : promenade citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-1"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j1-dejeuner",
+              "kind": "meal",
+              "placeId": "SENTINELLE_PLACE_ID_2",
+              "name": "[Table de test 2]",
+              "start": "14:15",
+              "end": "15:15",
+              "facts": {},
+              "reason": "Raison maison de test : cuisine locale citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-2"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "transit",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j1-a2",
+              "kind": "activity",
+              "placeId": "SENTINELLE_PLACE_ID_3",
+              "name": "[Lieu de test 3]",
+              "start": "16:00",
+              "end": "17:30",
+              "facts": {
+                "durationMinutes": 90
+              },
+              "reason": "Raison maison de test : visite citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-3"
+              },
+              "exceptions": [
+                "toReserve"
+              ],
+              "locked": false
+            }
+          },
+          {
+            "type": "free",
+            "from": "17:30",
+            "to": "19:00"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j1-diner",
+              "kind": "meal",
+              "placeId": "SENTINELLE_PLACE_ID_4",
+              "name": "[Table de test 4]",
+              "start": "19:15",
+              "end": "20:45",
+              "facts": {},
+              "reason": "Raison maison de test : table du soir citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-4"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "terminus",
+            "role": "end",
+            "time": "21:00",
+            "label": "[Logement de test]"
+          }
+        ],
+        "events": [],
+        "generating": false,
+        "travelBudgetMinutes": 90
+      },
+      {
+        "index": 2,
+        "date": "2027-05-11",
+        "weekday": "mar.",
+        "items": [
+          {
+            "type": "terminus",
+            "role": "start",
+            "time": "09:00",
+            "label": "[Logement de test]"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j2-a1",
+              "kind": "activity",
+              "placeId": "SENTINELLE_PLACE_ID_5",
+              "name": "[Lieu de test 5]",
+              "start": "09:30",
+              "end": "11:30",
+              "facts": {
+                "durationMinutes": 120
+              },
+              "reason": "Raison maison de test : point de vue cité par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-5"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j2-dejeuner",
+              "kind": "meal",
+              "placeId": "SENTINELLE_PLACE_ID_6",
+              "name": "[Table de test 6]",
+              "start": "12:00",
+              "end": "13:00",
+              "facts": {},
+              "reason": "Raison maison de test : marché cité par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-6"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "free",
+            "from": "13:00",
+            "to": "17:45"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "terminus",
+            "role": "end",
+            "time": "18:00",
+            "label": "[Logement de test]"
+          }
+        ],
+        "events": [
+          {
+            "id": "j2-evenement",
+            "kind": "event",
+            "name": "[Événement de test]",
+            "start": "20:00",
+            "end": "22:00",
+            "facts": {},
+            "reason": "Raison maison de test : événement annoncé par la source.",
+            "source": {
+              "label": "exemple.org",
+              "url": "https://exemple.org/evenement"
+            },
+            "exceptions": [
+              "unconfirmed"
+            ],
+            "locked": false
+          }
+        ],
+        "generating": false,
+        "travelBudgetMinutes": 90,
+        "surprise": {
+          "id": "j2-surprise",
+          "placeId": "SENTINELLE_PLACE_ID_7",
+          "name": "[Idée de test 7]",
+          "facts": {
+            "durationMinutes": 60
+          },
+          "reason": "Raison maison de test : idée citée par la source.",
+          "source": {
+            "label": "exemple.org",
+            "url": "https://exemple.org/idee-7"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "date": "2027-05-12",
+        "weekday": "mer.",
+        "items": [
+          {
+            "type": "terminus",
+            "role": "start",
+            "time": "12:00",
+            "label": "[Logement de test]"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j3-a1",
+              "kind": "activity",
+              "placeId": "SENTINELLE_PLACE_ID_8",
+              "name": "[Lieu d'essai 7]",
+              "start": "12:30",
+              "end": "14:00",
+              "facts": {
+                "durationMinutes": 90,
+                "costPerPerson": 0
+              },
+              "reason": "Raison maison de test : promenade citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-1"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j3-dejeuner",
+              "kind": "meal",
+              "placeId": "SENTINELLE_PLACE_ID_9",
+              "name": "[Table d'essai 8]",
+              "start": "14:15",
+              "end": "15:15",
+              "facts": {},
+              "reason": "Raison maison de test : cuisine locale citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-2"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "transit",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j3-a2",
+              "kind": "activity",
+              "placeId": "SENTINELLE_PLACE_ID_10",
+              "name": "[Lieu d'essai 9]",
+              "start": "16:00",
+              "end": "17:30",
+              "facts": {
+                "durationMinutes": 90
+              },
+              "reason": "Raison maison de test : visite citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-3"
+              },
+              "exceptions": [
+                "toReserve"
+              ],
+              "locked": false
+            }
+          },
+          {
+            "type": "free",
+            "from": "17:30",
+            "to": "19:00"
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "stop",
+            "stop": {
+              "id": "j3-diner",
+              "kind": "meal",
+              "placeId": "SENTINELLE_PLACE_ID_11",
+              "name": "[Table d'essai 10]",
+              "start": "19:15",
+              "end": "20:45",
+              "facts": {},
+              "reason": "Raison maison de test : table du soir citée par la source.",
+              "source": {
+                "label": "exemple.org",
+                "url": "https://exemple.org/lieu-4"
+              },
+              "exceptions": [],
+              "locked": false
+            }
+          },
+          {
+            "type": "segment",
+            "segment": {
+              "mode": "walk",
+              "estimated": false
+            }
+          },
+          {
+            "type": "terminus",
+            "role": "end",
+            "time": "21:00",
+            "label": "[Logement de test]"
+          }
+        ],
+        "events": [],
+        "generating": false,
+        "travelBudgetMinutes": 90
+      }
+    ],
+    "checklist": [],
+    "unlocked": true
+  },
+  "proposals": [],
+  "positions": {
+    "SENTINELLE_PLACE_ID_1": {
+      "lat": 55.9533123,
+      "lng": -3.1883123
+    },
+    "SENTINELLE_PLACE_ID_2": {
+      "lat": 55.9543123,
+      "lng": -3.1893123
+    },
+    "SENTINELLE_PLACE_ID_3": {
+      "lat": 55.9553123,
+      "lng": -3.1903123
+    },
+    "SENTINELLE_PLACE_ID_4": {
+      "lat": 55.9563123,
+      "lng": -3.1913123
+    },
+    "SENTINELLE_PLACE_ID_5": {
+      "lat": 55.9573123,
+      "lng": -3.1923123
+    },
+    "SENTINELLE_PLACE_ID_6": {
+      "lat": 55.9583123,
+      "lng": -3.1933123
+    },
+    "SENTINELLE_PLACE_ID_7": {
+      "lat": 55.9593123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_8": {
+      "lat": 55.9493123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_9": {
+      "lat": 55.9483123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_10": {
+      "lat": 55.9473123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_11": {
+      "lat": 55.9463123,
+      "lng": -3.1943123
+    },
+    "SENTINELLE_PLACE_ID_LOGEMENT": {
+      "lat": 55.9603123,
+      "lng": -3.1953123
+    }
+  },
+  "terminus": [
+    {
+      "jour": 1,
+      "depart": "SENTINELLE_PLACE_ID_LOGEMENT",
+      "arrivee": "SENTINELLE_PLACE_ID_LOGEMENT"
+    },
+    {
+      "jour": 2,
+      "depart": "SENTINELLE_PLACE_ID_LOGEMENT",
+      "arrivee": "SENTINELLE_PLACE_ID_LOGEMENT"
+    },
+    {
+      "jour": 3,
+      "depart": "SENTINELLE_PLACE_ID_LOGEMENT",
+      "arrivee": "SENTINELLE_PLACE_ID_LOGEMENT"
+    }
+  ]
+}

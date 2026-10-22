@@ -85,6 +85,7 @@
     "suite": "Tu as tout trié",
     "vide": "Aucune proposition à trier",
     "clos": "Tu as fini ce tri.",
+    "choixSansEffet": "Voyage d'essai : tes choix ne changent pas encore ton programme.",
     "debloquer": "Débloquer",
     "programme": "Voir le programme"
   },
