@@ -20,12 +20,14 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
 
 let app: DbClient;
 let auth: DbClient;
+let admin: DbClient;
 let a: SeedIds;
 let b: SeedIds;
 
 beforeAll(async () => {
   app = await connect("app");
   auth = await connect("auth");
+  admin = await connect("admin");
   a = await seedOrganization(auth, app);
   b = await seedOrganization(auth, app);
 });
@@ -83,7 +85,7 @@ describe("recalcul par lot : migration appliquée (0119 § 1.1, § 1.2)", () => 
 
 describe("recalcul par lot : version de base et clôture si et seulement si batch (0119 § 1.1 point 1)", () => {
   it("batch avec les deux colonnes admis ; batch sans l'une d'elles refusé ; hors batch, l'une d'elles refusée", async () => {
-    await inTx(app, ctx(a), async (c) => {
+    const lot = await inTx(app, ctx(a), async (c) => {
       await fermerLots(c, a);
       const k = await cloture(c, a);
       expect((await attempt(c, INSERT_EXECUTION, [a.org, a.trip, "batch", "queued", 1, k, null])).code, "batch complet").toBeUndefined();
@@ -100,12 +102,24 @@ describe("recalcul par lot : version de base et clôture si et seulement si batc
         expect((await attempt(c, INSERT_EXECUTION, [a.org, a.trip, ...valeurs])).code, nom).toBe("23514");
       }
       expect((await attempt(c, INSERT_EXECUTION, [a.org, a.trip, "preview", "preparing", null, null, null])).code, "preview sans les deux").toBeUndefined();
-      // Une ligne batch ne perd jamais sa version de base ni sa clôture, et une autre ligne ne devient pas batch.
-      const lot = (await c.query(INSERT_EXECUTION, [a.org, a.trip, "batch", "queued", 2, await cloture(c, a), null])).rows[0].id as string;
-      expect((await attempt(c, "UPDATE generation_runs SET base_version = NULL WHERE id = $1", [lot])).code).toBe("23514");
-      expect((await attempt(c, "UPDATE generation_runs SET kind = 'preview' WHERE id = $1", [lot])).code).toBe("23514");
-      expect((await attempt(c, "UPDATE generation_runs SET kind = 'batch' WHERE id = $1", [a.generationRun])).code).toBe("23514");
+      return (await c.query(INSERT_EXECUTION, [a.org, a.trip, "batch", "queued", 2, await cloture(c, a), null])).rows[0].id as string;
     });
+    // Une ligne batch ne perd jamais sa version de base ni sa clôture, et une autre ligne ne devient pas batch :
+    // `vadrouille_app` n'a plus le droit d'écrire ces colonnes (migration 0016, décision 0120 S8, `42501`) ; la `CHECK`
+    // de 0015 tient aussi pour un rôle qui l'aurait (administration de la base de test, transaction annulée).
+    await inTx(app, ctx(a), async (c) => {
+      expect((await attempt(c, "UPDATE generation_runs SET base_version = NULL WHERE id = $1", [lot])).code).toBe("42501");
+      expect((await attempt(c, "UPDATE generation_runs SET kind = 'preview' WHERE id = $1", [lot])).code).toBe("42501");
+      expect((await attempt(c, "UPDATE generation_runs SET kind = 'batch' WHERE id = $1", [a.generationRun])).code).toBe("42501");
+    });
+    await admin.query("BEGIN");
+    try {
+      expect((await attempt(admin, "UPDATE generation_runs SET base_version = NULL WHERE id = $1", [lot])).code).toBe("23514");
+      expect((await attempt(admin, "UPDATE generation_runs SET kind = 'preview' WHERE id = $1", [lot])).code).toBe("23514");
+      expect((await attempt(admin, "UPDATE generation_runs SET kind = 'batch' WHERE id = $1", [a.generationRun])).code).toBe("23514");
+    } finally {
+      await admin.query("ROLLBACK");
+    }
   });
 
   it("une ligne batch ne vise jamais la clôture d'une autre organisation, ni une clôture absente (clé étrangère composée)", async () => {

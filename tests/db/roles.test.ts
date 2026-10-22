@@ -54,10 +54,12 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
     ...Object.fromEntries(
-      ["trips", "briefs", "generation_runs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
+      ["trips", "briefs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],
       ),
     ),
+    // Migration 0016_restriction_update_generation_runs (décision 0120 S8) : `UPDATE` de table retiré, accordé par colonnes.
+    generation_runs: ["SELECT", "INSERT"],
     checkouts: ["SELECT", "INSERT"],
     trip_versions: ["SELECT", "INSERT"],
     usage_ledger: ["SELECT", "INSERT"],
@@ -115,6 +117,11 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     preference_signals: { UPDATE: ["cancel_request_id", "cancelled_at", "previous_status", "status"] },
     preference_prompts: { UPDATE: ["answer_signal_id", "state", "updated_at"] },
     deck_closures: { UPDATE: [] },
+    // 0120 S8 (migration 0016) : colonnes écrites par les `UPDATE` de `src/` ; ni `base_version`, ni `deck_closure_id`,
+    // ni `kind`, `organization_id`, `trip_id`, `request_id`, `started_at` ou `id`.
+    generation_runs: {
+      UPDATE: ["finished_at", "last_version", "person_retry_request_ids", "phase", "step", "step_seq", "stop_reason", "studio_retries", "updated_at", "workflow_run_id"],
+    },
   },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },

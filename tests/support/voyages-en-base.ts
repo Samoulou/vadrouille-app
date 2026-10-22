@@ -334,7 +334,10 @@ type Requete = (texte: string, valeurs?: readonly unknown[]) => Promise<{ rows: 
 
 /**
  * Ligne `batch` du jeu (migration 0015_recalcul_lot, décision 0119 § 1.1) : une version de base et la clôture du tri
- * qui l'a déclenchée, écrite d'abord. Comme en production (0119 § 1.1 point 3), la clôture vise l'exécution `preview`
+ * qui l'a déclenchée, écrite d'abord, puis la ligne par un seul `INSERT` qui porte `kind`, `base_version` et
+ * `deck_closure_id` (la `CHECK` de 0015 est immédiate, et la migration 0016 retire à `vadrouille_app` l'`UPDATE` de ces
+ * colonnes, décision 0120 S8 : ne jamais écrire une autre ligne puis la passer en `batch`). Comme en production (0119
+ * § 1.1 point 3), la clôture vise l'exécution `preview`
  * du voyage ; elle est de phase `deck`, si bien que la lecture du tri (`SQL_CLOTURE`, clôtures de l'exécution `preview`
  * **et de sa phase**) reste celle d'un tri ouvert, comme avant 0015. Un voyage du jeu sans exécution `preview` (en
  * préparation, sans proposition) reçoit une exécution `mini` close, que nulle lecture ne regarde, pour porter la
@@ -413,28 +416,41 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
         [org.org, tripId, item.stopId ?? null, item.label, JSON.stringify(item.moment), item.bookingUrl ?? null, item.sponsored, item.done],
       );
     }
-    // Dernière exécution `preview` écrite : cible de la clôture d'une ligne `batch` (voir `ecrireLot`).
-    let derniereApercu: string | null = null;
-    for (const [rang, run] of donnees.runs.entries()) {
-      const debut = 100 - rang;
-      const runId: string =
-        run.kind === "batch"
-          ? await ecrireLot(q, org.org, tripId, { apercu: derniereApercu, versionDeBase: courante ?? 0, derniereVersion: courante, debut, terminee: run.finished })
-          : ((
-              await q(
-                `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
-                 VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
-                // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
-                [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, debut, run.finished],
-              )
-            ).rows[0]?.id as string);
-      if (run.kind === "preview") derniereApercu = runId;
-      for (const ligne of run.propositions) {
+    const ecrirePropositions = async (runId: string, propositions: readonly LigneProposition[]) => {
+      for (const ligne of propositions) {
         await q(
           "INSERT INTO proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, content) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
           [org.org, tripId, runId, ligne.phase, ligne.position, ligne.slotType, ligne.day, ligne.time, ligne.kind, ligne.content === null ? null : JSON.stringify(ligne.content)],
         );
       }
+    };
+    // Deux passes : les exécutions hors `batch` d'abord, puis les lignes `batch`, chacune par un seul `INSERT` (voir
+    // `ecrireLot` : aucun `UPDATE` de `kind`, `base_version` ni `deck_closure_id`, refusé à `vadrouille_app` depuis la
+    // migration 0016, décision 0120 S8). Leur clôture vise ainsi la dernière exécution `preview` du voyage (début le plus
+    // récent, comme `SQL_EXECUTION_APERCU`), quel que soit l'ordre de `donnees.runs` (revue de #657, mineur 3 de la
+    // seconde revue). `started_at` suit le rang dans `donnees.runs`, pas l'ordre d'écriture.
+    let derniereApercu: string | null = null;
+    const lots: { readonly rang: number; readonly run: DonneesVoyage["runs"][number] }[] = [];
+    for (const [rang, run] of donnees.runs.entries()) {
+      if (run.kind === "batch") {
+        lots.push({ rang, run });
+        continue;
+      }
+      const runId = (
+        await q(
+          `INSERT INTO generation_runs (organization_id, trip_id, kind, phase, last_version, started_at, finished_at)
+           VALUES ($1, $2, $3, $4, $5, now() - make_interval(mins => $6::integer), CASE WHEN $7::boolean THEN now() END) RETURNING id`,
+          // Phases fermées depuis B9b (migration 0012_creation_voyage : `generation_runs_phase_check`).
+          [org.org, tripId, run.kind, run.finished ? "ready" : "preparing", courante, 100 - rang, run.finished],
+        )
+      ).rows[0]?.id as string;
+      // Rang croissant, début de plus en plus récent : la dernière `preview` écrite est la plus récente.
+      if (run.kind === "preview") derniereApercu = runId;
+      await ecrirePropositions(runId, run.propositions);
+    }
+    for (const { rang, run } of lots) {
+      const runId = await ecrireLot(q, org.org, tripId, { apercu: derniereApercu, versionDeBase: courante ?? 0, derniereVersion: courante, debut: 100 - rang, terminee: run.finished });
+      await ecrirePropositions(runId, run.propositions);
     }
     for (const { placeId, lat, lng } of donnees.coordonnees) await q("SELECT public.store_place_coordinates($1, $2, $3)", [placeId, lat, lng]);
     if (donnees.entitlements.length > 0) {
