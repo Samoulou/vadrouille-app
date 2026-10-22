@@ -26,10 +26,12 @@ import { ProgrammeEcritSchema, type ProgrammeEcrit } from "@/prototype/programme
  *   plafond (`CODES_PLAFOND`) ; « non relevé » sinon (cause externe ou autre arrêt : rien ne montre un dépassement).
  *   Sous S4, un plafond atteint en cours d'exécution est écrit `pipeline_failed` (`codePersiste`) : tant que S4
  *   n'écrit pas ces codes, une exécution arrêtée rend « non relevé ».
- * - Lot 2a (amendement 3 de la spécification P0-programme-par-ia § 11.4, PPI-PO-12 ; verdict 0122 § 2.3) : A2 ne porte plus
- *   que sur le `placeId` ; une ligne distincte « liens vers les sites affichés » (`liensSites`), oui ou non sans nombre,
- *   ne lit que `source` ; aucune ligne ne lit à la fois `placeId` et `source`. Le nombre d'étapes avec site est sur la
- *   page seulement (`etapesAvecSite`), jamais dans le texte copié ; aucun compteur `sites*` du journal n'est lu ici.
+ * - Lot 2a (amendement 3 de `specs/P0-programme-par-ia.md`, § 11.4 et PPI-PO-12, PR #686 ; verdict 0122 § 2.3, PR #682) :
+ *   le critère A2 ne lit plus que les `placeId` des étapes et de l'idée (ni la `source` d'une étape, ni celle d'un
+ *   événement) ; une ligne distincte « liens vers les sites affichés » (`liensSites`), oui ou non sans nombre, ne lit que
+ *   la `source` des étapes ; « Aucune ligne du texte copié ne lit à la fois le `placeId` et la `source` d'une étape »
+ *   (0122 § 2.3 condition 2). Le nombre d'étapes avec site est sur la page seulement (`etapesAvecSiteDuRapport`, passé
+ *   hors du contrat `RapportPage`), jamais dans le texte copié ; aucun compteur `sites*` du journal n'est lu ici.
  */
 
 const t = messages.prototype.lancement.rapport;
@@ -46,14 +48,16 @@ function programmeControle(contenu: unknown): ProgrammeEcrit | null {
 }
 
 /**
- * A2 (R1), séparé au lot 2a (amendement 3, PPI-PO-12 ; 0122 § 2.3 point 2) : chaque étape de lieu, et l'idée
- * « Surprends-moi », a un `placeId` ; un événement a sa source. La `source` d'une étape n'y entre plus.
+ * Critère A2 du rapport (R1), séparé au lot 2a : il « ne lit que les `placeId` des étapes et de l'idée « Surprends-moi » »
+ * (0122 § 2.3 condition 2). Amendement 3 de `specs/P0-programme-par-ia.md` (§ 11.4, PPI-PO-12 ; PR #686) : « oui » si
+ * chaque ligne `stop` du programme stocké a un `placeId` et si l'idée « Surprends-moi », quand elle existe, a un
+ * `placeId` » ; « Ni la `source` d'une étape, ni celle d'un événement n'y entrent plus : la source des événements reste
+ * couverte par le critère A3 du rapport ».
  */
-function etapesDeLieuAvecIdentifiant(programme: ProgrammeEcrit): boolean {
+export function etapesDeLieuAvecIdentifiant(programme: ProgrammeEcrit): boolean {
   return programme.trip.days.every(
     (jour) =>
       jour.items.every((ligne) => ligne.type !== "stop" || ligne.stop.placeId !== undefined) &&
-      jour.events.every((evenement) => evenement.source !== undefined) &&
       (jour.surprise === undefined || jour.surprise.placeId !== undefined),
   );
 }

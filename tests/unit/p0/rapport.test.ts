@@ -8,8 +8,16 @@ import { CRITERES } from "@/contracts/prototype-suivi";
 import * as messages from "@/i18n/messages";
 import { CODES_ARRET } from "@/prototype/arret";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { ProgrammeReduitSchema } from "@/prototype/programme-reduit";
-import { CODES_PLAFOND, criteresDuRapport, etapesAvecSiteDuRapport, etapesDuRapport, liensSitesDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { ProgrammeEcritSchema, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import {
+  CODES_PLAFOND,
+  criteresDuRapport,
+  etapesAvecSiteDuRapport,
+  etapesDeLieuAvecIdentifiant,
+  etapesDuRapport,
+  liensSitesDuRapport,
+  texteDuRapport,
+} from "@/server/p0/rapport";
 
 import { arretee, executionSuivie } from "./suivi-fabrique";
 
@@ -51,9 +59,12 @@ describe("p0: critères du rapport", () => {
     }
   });
 
-  // Lot 2a (amendement 3 de la spécification, PPI-PO-12 ; 0122 § 2.3 point 2) : A2 ne porte plus que sur le `placeId`.
-  // Ce test, qui exigeait « non » pour une étape sans source, porte désormais l'absence de `placeId` (même étape) ; la
-  // source n'y entre plus (voir « rapport: A2 sur le seul placeId »).
+  // Attente changée au lot 2a, sur décision écrite : 0122 § 2.3 condition 2 (PR #682) — « La Sécurité exige que le
+  // Product Owner sépare A2 avant la PR de code : A2 porte sur le `placeId` seul, et ne lit que les `placeId` des étapes
+  // et de l'idée « Surprends-moi » » — et amendement 3 de `specs/P0-programme-par-ia.md` (PR #686), § 11.4 et PPI-PO-12 :
+  // « Ni la `source` d'une étape, ni celle d'un événement n'y entrent plus ». Ce test, qui exigeait « non » pour une
+  // étape sans source, garde la même étape : sans source, A2 reste « oui » ; sans `placeId`, A2 devient « non » (A24 :
+  // « « non » dès qu'une étape n'a pas de `placeId` »). Voir aussi « rapport: critère A2 sur les seuls placeId ».
   it("A2 : une étape de lieu sans placeId est « non », A1 et A6 restent oui ; sans source, A2 reste oui", () => {
     const contenu = contenuValide();
     const jours = (contenu.trip as { days: { items: { type: string; stop?: Record<string, unknown> }[] }[] }).days;
@@ -176,7 +187,8 @@ describe("p0: rapport, lot 2a (spécification § 11.4, A24 ; amendement 3, PPI-P
   const etapesDe = (contenu: Record<string, unknown>) =>
     (contenu.trip as { days: { items: Ligne[] }[] }).days.flatMap((jour) => jour.items).filter((ligne) => ligne.type === "stop");
 
-  it("rapport: A2 sur le seul placeId", () => {
+  // Nom de la spécification (A24, amendement 3 de `specs/P0-programme-par-ia.md`, PR #686).
+  it("rapport: critère A2 sur les seuls placeId", () => {
     // Toutes les étapes avec placeId et aucune avec source : A2 « oui », ligne des sites « non ».
     const contenu = contenuValide();
     for (const etape of etapesDe(contenu)) delete etape.stop!.source;
@@ -190,6 +202,19 @@ describe("p0: rapport, lot 2a (spécification § 11.4, A24 ; amendement 3, PPI-P
     delete premiere!.stop!.placeId;
     expect(criteresDuRapport(execution, melange).A2).toBe("non");
     expect(liensSitesDuRapport(execution, melange)).toBe("oui");
+    // A24 : « oui » pour un programme dont toutes les étapes et l'idée ont un `placeId`, aucune étape une `source` « et un
+    // événement sans source ». Le schéma du programme écrit exige la source d'un événement (un tel programme échoue au
+    // critère A1, « non ») : le cas est donc prouvé sur la fonction du critère, après lecture par le schéma.
+    const lu = ProgrammeEcritSchema.parse(contenu);
+    const evenements = lu.trip.days.flatMap((jour) => jour.events);
+    expect(evenements.length).toBeGreaterThan(0);
+    for (const evenement of evenements) delete (evenement as { source?: unknown }).source;
+    expect(etapesDeLieuAvecIdentifiant(lu)).toBe(true);
+    // L'idée « Surprends-moi », quand elle existe, compte : sans `placeId`, le critère devient « non ».
+    const avecIdee = lu.trip.days.find((jour) => jour.surprise !== undefined);
+    expect(avecIdee?.surprise?.placeId).toBeDefined();
+    delete (avecIdee!.surprise as { placeId?: unknown }).placeId;
+    expect(etapesDeLieuAvecIdentifiant(lu)).toBe(false);
   });
 
   it("rapport: étapes avec site à la lecture, texte copié en oui ou non", () => {

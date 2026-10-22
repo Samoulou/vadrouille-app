@@ -432,8 +432,8 @@ export const LIGNES_CAPACITE = [
     fichier: "src/research/undici-transport.ts",
     portee: "application",
     usage:
-      "transport réel de la lecture des pages (P0r1), injecté dans `fetch-page.ts` et branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063), dont le démarrage, permis depuis `P0RUN_COMPLET` à vrai (PR 367), reste refusé à chaque lancement tant que la garde est fermée ou que le verrou S8 n'est pas levé : un `Agent` " +
-      "par saut dont `connect.lookup` rend l'adresse vérifiée, résolveur réel `lookup` (`all: true`). Justification côté serveur : " +
+      "transport réel de la lecture des pages (P0r1) et de la vérification de statut des sites de `p0Run` (lot 2a, décision 0121 § 3.7 ; verdict 0122 § 1 condition 13 : texte d'usage seul, capacités et `nombre: 1` inchangés), injecté dans `fetch-page.ts`, seul appelant de sa `CoucheHttp` (`lire` et `creerVerificateurStatut`), et branché au seul workflow `p0Run` par la composition du mode réel (D18 ; P0r3c-4, décision 0063 ; famille `programme()` pour la vérification de statut), dont le démarrage, permis depuis `P0RUN_COMPLET` à vrai (PR 367), reste refusé à chaque lancement tant que la garde est fermée ou que le verrou S8 n'est pas levé : un `Agent` " +
+      "par saut dont `connect.lookup` rend l'adresse vérifiée, résolveur réel `lookup` (`all: true`), méthode `GET` fixe pour les deux usages. Justification côté serveur : " +
       "module `server-only`, importé par ses tests et par la composition du mode réel (fermeture `fermeture-module-p0r1`)",
     capacites: [
       { capacite: "module:undici", formes: ["Agent"], nombre: 1 },

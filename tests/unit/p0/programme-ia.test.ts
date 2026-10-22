@@ -8,8 +8,9 @@ import type { DayLineItem } from "@/contracts";
 import { CRENEAUX_PAR_JOUR_MAX, ELEMENTS_LISTE_PROGRAMME_MAX, lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
 import { LONGUEURS_TEXTE } from "@/ai/candidat";
 import { BriefSchema } from "@/prototype/brief";
+import { reduireSite } from "@/research/fetch-page";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
-import { assemblerProgrammeIa, pointsDeTrajet, type CreneauAssemble } from "@/server/p0/assemblage";
+import { assemblerProgrammeIa, pointsDeTrajet, sourceDuSite, type CreneauAssemble } from "@/server/p0/assemblage";
 
 /**
  * Programme par l'IA, lot 1 (décisions 0115, 0116 § 1 et § 4 ; verdict Sécurité 0117 § 1) : lecture tolérante de la
@@ -324,5 +325,41 @@ describe("programme: lot 2a, source écrite depuis le site vérifié (A21 ; 0122
     expect(premier!.source?.label).toHaveLength(120);
     expect(premier!.source?.url).toBe(long);
     expect(second!.source).toBeUndefined();
+  });
+
+  // Revue consolidée de #694 (correction 1, mineur) : cas IDN explicite. 0122 § 1 condition 14 : « un hôte IDN est affiché
+  // en punycode (`xn--…`, forme rendue par `URL`), jamais reconverti en Unicode ».
+  it("p0: hôte IDN écrit en Unicode par l'IA : adresse réduite et libellé en punycode, jamais en Unicode", () => {
+    const reduite = reduireSite("https://www.müsee.example.org/salle?x=1#plan");
+    expect(reduite).toBe("https://www.xn--msee-0ra.example.org/salle");
+    const [musee] = etapes([{ debut: "10:00", nature: "visite", lieu: "Musée", pourquoi: "Parce que.", site: reduite }]);
+    expect(musee!.source).toEqual({ label: "xn--msee-0ra.example.org", url: "https://www.xn--msee-0ra.example.org/salle" });
+    expect(JSON.stringify(musee)).not.toContain("müsee");
+    expect(sourceDuSite("https://xn--msee-0ra.example.org/")?.label).toBe("xn--msee-0ra.example.org");
+  });
+
+  // Revue consolidée de #694 (correction 1, mineur UX : `StopSheet` n'affiche le lien qu'avec une raison). Le § 11.4 de
+  // `specs/P0-programme-par-ia.md` exclut toute modification de `StopSheet` au lot 2a ; ce test prouve que le cas n'existe
+  // pas dans un programme de `p0Run` : un créneau avec `lieu` exige `pourquoi`, et `site` n'est lu que sur un tel créneau.
+  it("p0: aucune étape de p0Run avec site et sans raison (pourquoi obligatoire dès qu'il y a un lieu)", () => {
+    const lecture = lire({
+      jours: [
+        {
+          date: "2026-11-23",
+          creneaux: [
+            { debut: "10:00", nature: "visite", lieu: "Musée", site: "https://musee.example.org/" },
+            { debut: "11:00", nature: "pause", lieu: "Jardin", site: "https://jardin.example.org/" },
+            visite("12:00", "Galerie", { site: "https://galerie.example.org/", pourquoi: "" }),
+            visite("14:00", "Halle", { site: "https://halle.example.org/" }),
+          ],
+        },
+      ],
+    });
+    const creneaux = lecture.valeur!.jours[0]!.creneaux;
+    expect(creneaux.map((creneau) => creneau.lieu)).toEqual(["Halle"]);
+    for (const creneau of creneaux) if (creneau.site !== undefined) expect(creneau.pourquoi).toBeTruthy();
+    const stops = etapes(creneaux.map((creneau) => ({ ...creneau, site: reduireSite(creneau.site) })) as CreneauAssemble[]);
+    for (const stop of stops) if (stop.source !== undefined) expect(stop.reason).toBeTruthy();
+    expect(stops.some((stop) => stop.source !== undefined)).toBe(true);
   });
 });

@@ -114,6 +114,13 @@ describe("sites: forme de l'adresse proposée par l'IA (A14 ; 0122 § 1 conditio
   it("sites: hôte d'une seule étiquette et suffixe non public refusés sans résolution", async () => {
     const refuses = ["https://intranet/", ...SUFFIXES_NON_PUBLICS.map((suffixe) => `https://machine.${suffixe}/`), "https://localhost/"];
     for (const brut of refuses) expect(reduireSite(brut), brut).toBeUndefined();
+    // Resserrement de la correction 1 de #694 (mineur Sécurité) : suffixes d'usage interne.
+    for (const suffixe of ["lan", "corp", "intranet", "private", "localdomain", "home"]) {
+      expect(SUFFIXES_NON_PUBLICS, suffixe).toContain(suffixe);
+      expect(reduireSite(`https://nas.${suffixe}/`), suffixe).toBeUndefined();
+    }
+    // Un nom public dont une étiquette intérieure porte ces mots reste admis (seules les dernières étiquettes comptent).
+    expect(reduireSite("https://home.example.org/")).toBe("https://home.example.org/");
     // Le vérificateur refait le contrôle : rien n'est résolu ni demandé.
     for (const brut of refuses) {
       const { resultat, resolutions, requetes } = await verifier(brut, { dns: { intranet: [PUBLIQUE], localhost: [PUBLIQUE] } });
@@ -142,6 +149,10 @@ describe("sites: forme de l'adresse proposée par l'IA (A14 ; 0122 § 1 conditio
     expect(estHoteGoogle("maps.google.com")).toBe(true);
     expect(estHoteGoogle("goo.gl")).toBe(true);
     expect(estHoteGoogle("sub.g.page")).toBe(true);
+    // Resserrement de la correction 1 de #694 (mineur Sécurité) : services de Google ajoutés, sous-domaines compris.
+    for (const hote of ["cafe.business.site", "app.page.link", "www.youtube.com", "m.youtube.com", "youtu.be"]) expect(estHoteGoogle(hote), hote).toBe(true);
+    // Jamais par sous-chaîne : un domaine qui finit par les mêmes lettres sans point reste admis.
+    for (const hote of ["notyoutube.com", "mybusiness.site.example.org", "homepage.link.example.org"]) expect(estHoteGoogle(hote), hote).toBe(false);
     // Comparaison par étiquette ou par suffixe précédé d'un point, jamais par sous-chaîne.
     expect(estHoteGoogle("notgoogle.com")).toBe(false);
     expect(estHoteGoogle("mygoo.gl.example.org")).toBe(false);

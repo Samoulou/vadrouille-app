@@ -1,10 +1,14 @@
 // @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { lireProgramme, ordreEcrit } from "@/ai/sorties";
-import { reduireSite } from "@/research/fetch-page";
+import { DELAI_STATUT_MS, reduireSite } from "@/research/fetch-page";
 import {
   avecSiteGarde,
+  DELAI_SITE_MS,
   SITES_DUREE_MAX_MS,
   SITES_MAX,
   SITES_SIMULTANES,
@@ -193,5 +197,46 @@ describe("sites: aucune réponse stockée ni journalisée (A22)", () => {
     expect(refuse).not.toHaveProperty("site");
     expect(refuse).toEqual({ debut: "10:00", nature: "visite", lieu: "Musée", pourquoi: "Voir." });
     expect(avecSiteGarde(creneau, undefined, new Set([reduite]))).not.toHaveProperty("site");
+  });
+});
+
+/**
+ * Un seul émetteur (0121 § 3.7 : « `fetch-page.ts` reste le seul module qui appelle une `CoucheHttp` ; un test du lot le
+ * vérifie (aucun autre fichier de `src/` n'importe le type `CoucheHttp` hors des transports, des doubles simulés et de la
+ * composition) » ; 0122 § 1 condition 13). Lecture du texte des sources, hors fichiers de test.
+ */
+describe("sites: fetch-page.ts seul appelant d'une CoucheHttp (0121 § 3.7)", () => {
+  const RACINE = path.join(process.cwd(), "src");
+  const sources = (dossier: string): string[] =>
+    readdirSync(dossier, { withFileTypes: true }).flatMap((entree) => {
+      const chemin = path.join(dossier, entree.name);
+      if (entree.isDirectory()) return sources(chemin);
+      return /\.(ts|tsx)$/.test(entree.name) && !/\.test\.(ts|tsx)$/.test(entree.name) ? [chemin] : [];
+    });
+  /** Seuls admis : le module de la garde, le transport réel, le double simulé, la composition du mode réel. */
+  const ADMIS = ["src/research/fetch-page.ts", "src/research/undici-transport.ts", "src/research/pages.simule.ts", "src/server/composition/p0-reel.ts"];
+
+  it("aucun autre fichier de src/ ne nomme le type CoucheHttp", () => {
+    const fichiers = sources(RACINE).map((chemin) => path.relative(process.cwd(), chemin).split(path.sep).join("/"));
+    expect(fichiers).toContain("src/research/fetch-page.ts");
+    const citant = fichiers.filter((fichier) => /\bCoucheHttp\b/.test(readFileSync(path.join(process.cwd(), fichier), "utf8")));
+    expect(citant).toContain("src/research/fetch-page.ts");
+    expect(citant.filter((fichier) => !ADMIS.includes(fichier))).toEqual([]);
+  });
+
+  it("le transport et le double ne font que fournir la couche ; seul fetch-page.ts l'appelle (champ `http` des dépendances)", () => {
+    // L'appel passe par le champ `http` de `DependancesLecteur` : seul `fetch-page.ts` le lit (`dependances.http(`).
+    const fichiers = sources(RACINE).map((chemin) => path.relative(process.cwd(), chemin).split(path.sep).join("/"));
+    const appelants = fichiers.filter((fichier) => /\b(?:dependances|deps)\.http\s*\(/.test(readFileSync(path.join(process.cwd(), fichier), "utf8")));
+    expect(appelants).toEqual(["src/research/fetch-page.ts"]);
+  });
+});
+
+// Revue consolidée de #694 (correction 1, mineur) : `DELAI_SITE_MS` (orchestration, qui n'importe pas `fetch-page.ts`)
+// reprend `DELAI_STATUT_MS` (point d'entrée) ; 0122 § 1 condition 10 : 5 s par adresse, abaissable, jamais relevé sans verdict.
+describe("sites: délai de l'orchestration égal au délai du point d'entrée", () => {
+  it("DELAI_SITE_MS = DELAI_STATUT_MS = 5 s", () => {
+    expect(DELAI_SITE_MS).toBe(DELAI_STATUT_MS);
+    expect(DELAI_STATUT_MS).toBeLessThanOrEqual(5_000);
   });
 });

@@ -221,7 +221,9 @@ describe("p0: page de lancement", () => {
     d.lignes = [ligne({})];
     const page = await pageExecutionsP0();
     if (page.etat !== "ouverte") throw new Error("page non ouverte");
-    const avecSite = page.modele.rapport?.etapesAvecSite;
+    // Hors du contrat `RapportPage` (§ 11.4 : « Aucune modification de `src/contracts` ») : à côté du modèle.
+    expect(Object.keys(page.modele.rapport ?? {})).not.toContain("etapesAvecSite");
+    const avecSite = page.etapesAvecSite;
     expect(typeof avecSite).toBe("number");
     const libelle = format(t.rapport.etapesAvecSite, { n: avecSite ?? -1 });
     expect(renderToString(await ExecutionsPage())).toContain(html$(libelle));
@@ -233,7 +235,7 @@ describe("p0: page de lancement", () => {
     d.lignes = [ligne({ status: "arretee", stop_code: "upstream_unavailable", canary_ok: null })];
     const arretee = await pageExecutionsP0();
     if (arretee.etat !== "ouverte") throw new Error("page non ouverte");
-    expect(arretee.modele.rapport?.etapesAvecSite).toBeNull();
+    expect(arretee.etapesAvecSite).toBeNull();
     expect(arretee.modele.rapport?.texte).toContain(`${t.rapport.liensSites} : ${t.rapport.valeurs.non_releve}`);
     expect(renderToString(await ExecutionsPage())).toContain(html$(t.rapport.etapesAvecSiteNonRelevees));
   });

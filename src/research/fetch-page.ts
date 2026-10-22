@@ -2,8 +2,9 @@ import { extraireTexte, nettoyer, TEXTE_MAX } from "@/research/extract-text";
 import { adresseAutorisee, estIpLitterale } from "@/research/ip-guard";
 
 /**
- * Seul module de lecture des pages web (spécification P0, « Lecture des pages web : garde contre les requêtes
- * détournées » ; décision 0032, A3 et A7). Les URL sont des **données non fiables**.
+ * Seul module de lecture des pages web et de vérification de statut des sites de `p0Run` (spécification P0, « Lecture des
+ * pages web : garde contre les requêtes détournées » ; décision 0032, A3 et A7 ; lot 2a : 0121 § 3.7, seul appelant
+ * d'une `CoucheHttp`). Les URL sont des **données non fiables**.
  *
  * Dans P0a1, le résolveur DNS et la couche HTTP sont **injectés** (doubles seulement) : aucune couche réseau
  * réelle n'est livrée. Le module ne lit aucune variable d'environnement (les variables de proxy sont donc
@@ -364,17 +365,50 @@ export const ENTETES_STATUT: Readonly<Record<string, string>> = Object.freeze({
 
 /**
  * Suffixes non publics refusés (0122 § 1 condition 3, défense en profondeur : l'adresse résolue reste le contrôle
- * décisif). Comparés à la dernière ou aux deux dernières étiquettes du nom d'hôte normalisé.
+ * décisif). Comparés à la dernière ou aux deux dernières étiquettes du nom d'hôte normalisé. Les six derniers (`lan`,
+ * `corp`, `intranet`, `private`, `localdomain`, `home`) sont un resserrement demandé par la revue Sécurité de #694
+ * (correction 1, mineur) : noms d'usage interne courants, aucun domaine de premier niveau public.
  */
-export const SUFFIXES_NON_PUBLICS: readonly string[] = ["localhost", "local", "internal", "home.arpa", "arpa", "test", "invalid", "example", "onion"];
+export const SUFFIXES_NON_PUBLICS: readonly string[] = [
+  "localhost",
+  "local",
+  "internal",
+  "home.arpa",
+  "arpa",
+  "test",
+  "invalid",
+  "example",
+  "onion",
+  "lan",
+  "corp",
+  "intranet",
+  "private",
+  "localdomain",
+  "home",
+];
 
 /**
  * Hôtes Google refusés, **liste fermée tenue par la Sécurité** (0122 § 1 condition 4) : toute étiquette qui commence
  * par `PREFIXE_ETIQUETTE_GOOGLE` (dont l'étiquette égale), et ces domaines avec leurs sous-domaines (égalité ou suffixe
- * précédé d'un point, jamais une sous-chaîne). Un ajout est un resserrement ; un retrait demande un verdict.
+ * précédé d'un point, jamais une sous-chaîne). Un ajout est un resserrement ; un retrait demande un verdict. Les quatre
+ * derniers (`business.site`, `page.link`, `youtube.com`, `youtu.be`, services de Google) sont un resserrement demandé
+ * par la revue Sécurité de #694 (correction 1, mineur ; 0122 § 1 condition 4 : « peut ajouter un hôte sans nouveau
+ * verdict »).
  */
 export const PREFIXE_ETIQUETTE_GOOGLE = "google";
-export const DOMAINES_GOOGLE: readonly string[] = ["gstatic.com", "ggpht.com", "goo.gl", "goo.gle", "g.page", "g.co", "withgoogle.com"];
+export const DOMAINES_GOOGLE: readonly string[] = [
+  "gstatic.com",
+  "ggpht.com",
+  "goo.gl",
+  "goo.gle",
+  "g.page",
+  "g.co",
+  "withgoogle.com",
+  "business.site",
+  "page.link",
+  "youtube.com",
+  "youtu.be",
+];
 
 /** Nom d'hôte normalisé (minuscules, ASCII, sans point final) d'un domaine Google (0122 § 1 condition 4). */
 export function estHoteGoogle(hote: string): boolean {
