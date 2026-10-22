@@ -220,3 +220,33 @@ describe("validateBrief (vérification)", () => {
     expect(brief).toMatchObject({ pace: "intense", mealBudgetPerPerson: 40, inferredFields: ["travellers", "wishes", "mobility"] });
   });
 });
+
+describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () => {
+  const ROME: TripForm = { ...TRIP, destination: "Rome", start: "2026-08-29", end: "2026-09-03" };
+  const essai = { essai: true };
+
+  it("Rome, une seule ville, 5 nuits : admis ; casse et accents ignorés", () => {
+    expect(validateTrip(ROME, TODAY, essai)).toEqual([]);
+    expect(validateTrip({ ...ROME, destination: "  ÉDIMBOURG " }, TODAY, essai)).toEqual([]);
+  });
+
+  it("ville absente de la table : refus au champ destination ; destination vide reste « required »", () => {
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, essai)).toEqual([{ field: "destination", code: "unknownCity" }]);
+    expect(validateTrip({ ...ROME, destination: "" }, TODAY, essai)).toContainEqual({ field: "destination", code: "required" });
+  });
+
+  it("une autre ville : refus au champ de son nom", () => {
+    const deux: TripForm = {
+      ...ROME,
+      otherCities: [{ key: "c1", name: "Florence", arrival: "2026-09-01", lodging: { answer: "none", label: "" } }],
+    };
+    expect(validateTrip(deux, TODAY, essai)).toEqual([{ field: "otherCities.0.name", code: "singleCity" }]);
+    expect(validateTrip(deux, TODAY)).toEqual([]);
+  });
+
+  it("15 jours au plus (départ au plus 14 jours après l'arrivée), comme `BriefSchema`", () => {
+    expect(validateTrip({ ...ROME, end: "2026-09-12" }, TODAY, essai)).toEqual([]);
+    expect(validateTrip({ ...ROME, end: "2026-09-13" }, TODAY, essai)).toEqual([{ field: "end", code: "tooLong" }]);
+    expect(validateTrip({ ...ROME, end: "2026-09-13" }, TODAY)).toEqual([]);
+  });
+});

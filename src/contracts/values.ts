@@ -227,6 +227,11 @@ export const AREA_LENGTH = { min: 2, max: 80 } as const;
 export const COMMITMENT_LABEL_LENGTH = { min: 2, max: 80 } as const;
 /** Récit de l'écran 2 (plafond provisoire, F8-Q9). */
 export const STORY_LENGTH = { min: 20, max: 1000 } as const;
+/**
+ * Séjour d'un brief du prototype, en jours, arrivée et départ compris : `BriefSchema` (`src/prototype/brief.ts`) refuse
+ * au-delà, et l'écran 1 du site d'essai le refuse au champ (spécification E2E-essai, lot 2, D1).
+ */
+export const PROTOTYPE_STAY_DAYS_MAX = 15;
 /** Villes en tout, destination comprise (provisoire, F8-PO-3). */
 export const MAX_CITIES = 4;
 /** Engagements déjà pris (provisoire, F8-PO-3). */

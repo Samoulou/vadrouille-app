@@ -189,3 +189,77 @@ describe("CreateTripForm", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Ton brouillon n'a pas été conservé. Recommence à partir de la destination.");
   });
 });
+
+describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () => {
+  function renderEssai() {
+    return render(
+      <DraftProvider>
+        <CreateTripForm essai />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  function remplir(destination: string, depart = "2026-09-03") {
+    change("Destination", destination);
+    change("Arrivée", "2026-08-29");
+    change("Départ", depart);
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+  }
+
+  it("ville hors de la table des fuseaux : refus au champ, message relié, focus ; aucune navigation", async () => {
+    const { container } = renderEssai();
+    remplir("Atlantide");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    const destination = screen.getByLabelText("Destination", { exact: true });
+    expect(destination).toHaveAttribute("aria-invalid", "true");
+    expect(destination).toHaveAccessibleDescription("Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.");
+    await waitFor(() => expect(destination).toHaveFocus());
+    expect(router.push).not.toHaveBeenCalled();
+    expect(latest?.tripReady).toBe(false);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("une seule ville : « Autres villes » et « Ajouter une ville » ne sont pas proposés", () => {
+    renderEssai();
+    expect(screen.queryByRole("heading", { name: "Autres villes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ajouter une ville" })).not.toBeInTheDocument();
+    remplir("Rome");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("page prérendue : le site d'essai est lu dans l'adresse (?site=essai)", () => {
+    window.history.pushState({}, "", "/voyages/nouveau?site=essai");
+    try {
+      renderForm();
+      expect(screen.queryByRole("button", { name: "Ajouter une ville" })).not.toBeInTheDocument();
+      remplir("Atlantide");
+      fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+      expect(screen.getByLabelText("Destination", { exact: true })).toHaveAttribute("aria-invalid", "true");
+      expect(router.push).not.toHaveBeenCalled();
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("plus de 15 jours : refus au départ ; Rome sur 15 jours : écran 2", () => {
+    renderEssai();
+    remplir("Rome", "2026-09-13");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(screen.getByLabelText("Départ", { exact: true })).toHaveAccessibleDescription(
+      "15 jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée.",
+    );
+    change("Départ", "2026-09-12");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("hors du site d'essai : une ville hors table reste admise par l'écran 1, « Ajouter une ville » proposé", () => {
+    renderForm();
+    expect(screen.getByRole("button", { name: "Ajouter une ville" })).toBeInTheDocument();
+    remplir("Atlantide");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+});

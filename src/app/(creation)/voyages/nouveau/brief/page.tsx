@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { BriefScreen } from "@/features/creation/BriefScreen";
 import * as messages from "@/i18n/messages";
@@ -14,8 +15,9 @@ export const metadata: Metadata = {
 
 /**
  * `R2`, écran 2 « Brief raconté puis vérifié » (spécification F8). Mesures : console en développement et dans les
- * tests sur le build de production (pages de développement actives), aucun enregistrement en production.
+ * tests sur le build de production (pages de développement actives), aucun enregistrement en production. Sur le site
+ * d'essai (adaptateur `prototype`), le récit n'est pas structuré (spécification E2E-essai, lot 2, D2).
  */
 export default function BriefPage() {
-  return <BriefScreen recorderKind={devPagesEnabled() ? "console" : "none"} />;
+  return <BriefScreen recorderKind={devPagesEnabled() ? "console" : "none"} essai={isPrototypeAdapter()} />;
 }

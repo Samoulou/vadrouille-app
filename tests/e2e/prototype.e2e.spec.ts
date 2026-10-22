@@ -26,20 +26,22 @@ test.afterEach(() => {
   expect(googleRequests).toEqual([]);
 });
 
-test("parcours prototype : accueil, section « Prototype », présentation, Séjour, Jour 1", async ({ page }) => {
+test("parcours prototype : accueil sans section « Prototype », « Mes voyages », présentation, Séjour, Jour 1", async ({ page }) => {
+  // Spécification E2E-essai, lot 2 : une seule app ; les voyages d'essai se lisent dans « Mes voyages ».
   await page.goto("/");
-  const section = prototypeSection(page);
-  await expect(section.getByRole("heading", { level: 2, name: "Prototype" })).toBeVisible();
-  await expect(section).toContainText(`Programme produit par le prototype de recherche. ${ATTRIBUTION}.`);
+  await expect(prototypeSection(page)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Prototype" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Démonstration" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveAttribute("href", "/voyages/nouveau?site=essai");
 
-  await section.getByRole("link", { name: /^Tes propositions/ }).click();
-  await expect(page).toHaveURL(`/voyages/${PROTOTYPE_TRIP}/presentation`);
+  await page.getByRole("link", { name: "Mes voyages" }).click();
+  await expect(page).toHaveURL("/voyages");
+  await expect(page.getByText("Ville de test").first()).toBeVisible();
+
+  await page.goto(`/voyages/${PROTOTYPE_TRIP}/presentation`);
   await expect(page.getByText("[Lieu de test 1]").first()).toBeVisible();
 
-  await page.goto("/");
-  await prototypeSection(page).getByRole("link", { name: /^Séjour/ }).click();
-  await expect(page).toHaveURL(`/voyages/${PROTOTYPE_TRIP}`);
+  await page.goto(`/voyages/${PROTOTYPE_TRIP}`);
   await expect(page.getByText("Ville de test").first()).toBeVisible();
 
   await page.locator("a[data-part='jour']").first().click();
