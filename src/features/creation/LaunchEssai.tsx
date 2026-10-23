@@ -30,7 +30,7 @@ export interface LaunchEssaiProps {
   acces: AccesEssai;
 }
 
-type Lancement = { kind: "idle" } | { kind: "pending" } | { kind: "failed" } | { kind: "story" } | { kind: "cap" };
+type Lancement = { kind: "idle" } | { kind: "pending" } | { kind: "failed" } | { kind: "story" } | { kind: "champ"; ecran: "voyage" | "brief" } | { kind: "cap" };
 
 /** Récit transmis tel quel (D2) s'il tient dans les bornes du contrat ; sinon rien (le récit est facultatif). */
 function recitDuBrouillon(story: string): string | undefined {
@@ -48,7 +48,8 @@ function recitDuBrouillon(story: string): string | undefined {
  *   vérification, le récit et un `requestId` créé une seule fois par brouillon (idempotence : double appui,
  *   « Réessayer », retour du navigateur ; la base ne réserve qu'une exécution par `requestId`). À la réussite, l'adresse
  *   est **remplacée** par l'écran 5. Cookie expiré entre-temps (`unauthenticated`) : la saisie du code revient. Récit
- *   refusé (e-mail ou téléphone, champ `story`) : bandeau et « Modifier mon récit » (écran 2, état « Récit ») ; plafond
+ *   refusé (e-mail ou téléphone, champ `story`) : bandeau et « Revenir à mon récit » (écran 2, état « Récit », valeurs
+ *   gardées) ; autre champ refusé : bandeau et « Corriger mon voyage » (écran du champ), sans « Réessayer » ; plafond
  *   atteint : bandeau sans « Réessayer » ; autre erreur : bandeau et « Réessayer ».
  * - Garde fermée (hors préversion de `p0-reel`) : le lancement n'est pas ouvert sur ce site, sans appel.
  */
@@ -99,6 +100,12 @@ export function LaunchEssai({ acces: accesInitial }: LaunchEssaiProps) {
     }
     if (result?.error.code === "validation_failed" && result.error.field === "story") {
       setLancement({ kind: "story" });
+      return;
+    }
+    // Autre champ refusé (date d'arrivée passée, ville, durée…) : « Réessayer » ne pourrait pas réussir ; on renvoie à
+    // l'écran qui porte le champ (écran 1 pour `draft.*`, écran 2 sinon), brouillon gardé.
+    if (result?.error.code === "validation_failed") {
+      setLancement({ kind: "champ", ecran: result.error.field?.startsWith("draft.") === false ? "brief" : "voyage" });
       return;
     }
     setLancement({ kind: result?.error.code === "cost_cap_reached" ? "cap" : "failed" });
@@ -154,7 +161,11 @@ export function LaunchEssai({ acces: accesInitial }: LaunchEssaiProps) {
     router.push(creationRoutes.brief());
   }
 
-  const enEchec = lancement.kind === "failed" || lancement.kind === "story" || lancement.kind === "cap";
+  function corriger(ecran: "voyage" | "brief") {
+    router.push(ecran === "voyage" ? creationRoutes.nouveau({ essai: true }) : creationRoutes.brief());
+  }
+
+  const enEchec = lancement.kind === "failed" || lancement.kind === "story" || lancement.kind === "champ" || lancement.kind === "cap";
   const enAttente = lancement.kind === "pending";
 
   return (
@@ -193,7 +204,19 @@ export function LaunchEssai({ acces: accesInitial }: LaunchEssaiProps) {
             message={e.recit}
             action={
               <Button variant="secondary" size="sm" onClick={modifierRecit}>
-                {e.modifierRecit}
+                {messages.creation.ecran2.verification.revenirRecit}
+              </Button>
+            }
+          />
+        ) : null}
+        {lancement.kind === "champ" ? (
+          <StatusBanner
+            kind="error"
+            announce={false}
+            message={e.champ}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => corriger(lancement.ecran)}>
+                {e.corrigerVoyage}
               </Button>
             }
           />

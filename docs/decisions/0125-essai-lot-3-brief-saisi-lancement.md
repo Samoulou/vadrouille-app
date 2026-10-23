@@ -1,6 +1,8 @@
 # 0125 — Bout en bout, lot 3 : le brief saisi dans l'app lance `p0Run` (brief lié à l'exécution, identifiant du voyage connu au lancement, phases vers `GenerationStatus`, récit porté par `TripRequest`)
 
-Statut : **proposée** par le rôle back-end (ticket #702), décision déléguée du **Tech Lead** (architecture, contrats, tests : « Qui décide quoi » de `docs/CONTEXT.md`), **à valider en revue** par le Tech Lead ; définitive à sa fusion, sans délai de veto (décision 0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Elle ne supprime ni ne désactive aucun test. Elle ne tranche rien de réservé à Samuel : l'envoi du récit saisi au fournisseur de modèles repose sur sa confirmation de Q557 (« Oui », 2026-10-21 06:49 UTC) ; l'application de la migration reste à son `owner-approved` (0035). Deux points attendent le **verdict de la Sécurité** (§ 6).
+Statut : **acceptée** sur l'architecture et le contrat par le **Tech Lead** (décision déléguée : architecture, contrats, tests, « Qui décide quoi » de `docs/CONTEXT.md` ; revue consolidée de la PR #704, head `e2e314d`), proposée par le rôle back-end (ticket #702) ; **définitive à sa fusion**, sans délai de veto (décision 0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Le **verdict de la Sécurité** sur le stockage du brief saisi est consigné au § 6 tel que la revue le formule. Elle ne supprime ni ne désactive aucun test. Elle ne tranche rien de réservé à Samuel : l'envoi du récit et du logement saisis au fournisseur de modèles repose sur sa confirmation de Q557 (« Oui », 2026-10-21 06:49 UTC), dont l'étendue exacte est citée au § 6 ; l'envoi du logement saisi à Text Search n'y est pas couvert et reste une question pour lui ; l'application de la migration reste à son `owner-approved` (0035).
+
+**Correction 1** (revue consolidée de la PR #704, head `e2e314d`) : verdict de la Sécurité et limite d'audience (§ 6), étendue de Q557 (§ 6), absence d'agent de recherche web prouvée par un test (§ 6), information des personnes avant la saisie (§ 6), relance de l'écran 5 annoncée et ses échecs (§ 4), clé d'idempotence lue avant le forfait et voyage d'origine au rejeu (§ 2), ordre de la relance (§ 2), limites connues (§ 7).
 
 Date : 2026-10-22 · Décideur : Tech Lead (proposée par back-end) · Ticket : #702 · Spécification : `specs/E2E-essai-bout-en-bout.md`, lot 3, « Points à trancher dans la relecture » · Décisions liées : 0011, 0035, 0046 (D16, S1 à S3), 0055 (§ 8), 0063, 0071, 0092, 0093, 0094, 0115, 0116, 0117 (§ 2, § 5, S5), 0124
 
@@ -56,7 +58,8 @@ Forme :
   8. démarrage.
 
   Jusqu'au point 5 compris, aucune connexion à la base. Nature `essai` (fusible de 2 USD, 0093), variante `A`.
-- **Idempotence** : par `requestId`, une clé par brouillon, créée une fois par l'étape. Sous le verrou de la réservation, une clé déjà écrite rend son exécution (`existante`) : rien n'est écrit, et le workflow **n'est pas redémarré**, car un second démarrage clorait le premier. Double appui, « Réessayer » après une réponse perdue et retour du navigateur rendent donc le même voyage.
+- **Idempotence** : par `requestId`, une clé par brouillon, créée une fois par l'étape. Sous le verrou de la réservation et **avant tout contrôle de forfait** (un rejeu au bord d'un plafond n'est jamais refusé), une clé déjà écrite rend son exécution (`existante`) et la destination de **son** brief : rien n'est écrit, le workflow **n'est pas redémarré** (un second démarrage clorait le premier), et le voyage rendu est celui d'origine, même si le brouillon a changé depuis. Double appui, « Réessayer » après une réponse perdue et retour du navigateur rendent donc le même voyage.
+- **Relance** (`relancerBriefSaisi`) : le brief vient de la base, une connexion est donc nécessaire ; ordre : garde, `P0RUN_COMPLET`, mode et commit, **verrou S8**, lecture du brief de l'exécution arrêtée, `BriefSchema`, plafonds du mode, réservation sous une nouvelle clé, démarrage.
 - **Identifiant du voyage** : `proto_<slug>_<uuid de l'exécution sans tirets>` (`identifiantVoyageSaisi`, 63 caractères au plus). Il est connu dès la réservation et stable, et n'a pas de course sur le rang du jour. L'étape l'écrit pour une exécution `saisi` ; les essais de `/prototype/executions` gardent `proto_<slug>_<AAAAMMJJ>_<n>`. `lireIdentifiantVoyageSaisi` ne lit que la forme à 32 chiffres hexadécimaux.
 - **Pas de session sur le site d'essai** (D3) : le code d'accès tient lieu de compte.
   - `createTrip` saute le contrôle de session quand l'adaptateur est `prototype`, garde `parseInput` et le contrôle de la date d'arrivée, puis passe le contexte `org_prototype`.
@@ -96,7 +99,9 @@ Refus, chacun sur son champ et avant toute réservation :
 - `relancerBriefSaisi` passe par la même garde que le lancement ;
 - l'action dédiée `relancerVoyageEssai` est fermée hors `prototype`. Contrairement à `retryGeneration`, elle rend un autre `tripId` ;
 - l'écran 5 remplace alors l'adresse par celle du nouveau voyage ;
-- son `requestId` est créé une fois par écran, donc un double appui ne réserve qu'une exécution.
+- son `requestId` est créé une fois par écran, donc un double appui ne réserve qu'une exécution ;
+- pendant la relance, le bandeau d'échec disparaît, le titre redevient « On prépare tes premières propositions », le focus va au titre et une région `role="status"` annonce « On relance la préparation de ton voyage… » ;
+- échec de la relance : bandeau d'erreur avec son message (plafond atteint : texte du lancement ; autre erreur ou réseau : « Impossible de relancer la préparation pour le moment ») et « Réessayer » ; accès expiré (`unauthenticated`) : la saisie du code s'affiche dans l'écran, puis la relance repart une fois le code accepté.
 
 L'ancienne chaîne (aperçu, voyage complet, recalcul) n'est jamais atteinte (D6) : `getFullTripStatus` rend `none`.
 
@@ -111,17 +116,32 @@ L'ancienne chaîne (aperçu, voyage complet, recalcul) n'est jamais atteinte (D6
 
 ## 6. Données personnelles et sécurité
 
-- **Récit envoyé au fournisseur de modèles** : le récit saisi part tel quel dans la requête `programme`, entre les bornes de données, avec `zdr: true` et `data_collection: "deny"` (0117 S5). C'est le cadre de la confirmation de Samuel à Q557. Il n'entre dans aucun journal, aucune trace et aucun rapport : le lancement et l'étape ne journalisent que des codes et des nombres.
-- **Aucune donnée Google** n'entre dans le brief, la base de cette table ou un prompt. Un test canari tourne avec un brief saisi.
-- **À rendre par la Sécurité** :
-  1. le **stockage** du récit et du brief de Samuel dans `run_briefs`, 29 jours, sous le code d'accès du site d'essai : la règle « briefs commités seulement » de 0115 et 0117 § 5 point 3 devient « brief saisi sous code d'accès, site d'essai » ;
-  2. les **noms de lieux proposés par l'IA** envoyés à Text Search quand le brief vient d'un récit réel (0117 § 2). La requête reste celle de 0117 : nom du lieu et ville seulement, jamais le récit.
+- **Verdict de la Sécurité** (revue consolidée de la PR #704, head `e2e314d`) : aucune faille de RLS, de droits, de secret ou de journalisation. La règle « briefs commités seulement » de 0115 et 0117 § 5 point 3 **devient « brief saisi sous code d'accès, site d'essai »**. **Limite d'audience** : ce régime ne vaut que pour le site d'essai, ouvert par le code d'accès partagé du mode réel (Samuel et les personnes à qui il le donne). **Toute ouverture publique** (sans code d'accès, ou hors du site d'essai) **relève d'une nouvelle décision**.
+- **Étendue exacte du « Oui » de Q557** (`QUESTIONS.md`, Q557, qui cite la demande de Samuel du 2026-10-21 05:51 UTC, 0115 § 2 et `specs/P0-programme-par-ia.md` § 0) : « pour écrire le programme, le texte libre et le logement saisis partent au fournisseur de modèles (hors UE) », avec `zdr: true` et `data_collection: "deny"` pour la requête `programme` (0117 S5). Ce « Oui » couvre donc l'envoi du **récit et du logement saisis au fournisseur de modèles**, dans la seule requête `programme`. Il **ne dit rien** de l'envoi du texte du **logement saisi à Google Text Search** (ancrage du logement, requête « logement, ville »). Ce point est **posé à Samuel** dans la PR #704, il n'est pas tranché ici.
+- **Aucun agent de recherche web** : `p0Run` n'appelle pas l'agent de recherche web, ni pour un brief commité, ni pour un brief saisi (0116). La seule requête de modèle est `programme`, sans greffon web. Test : « aucun appel de l'agent de recherche web pour un brief saisi » (`tests/unit/workflows/p0-run-finale.test.ts`, qui vérifie que seule la capacité `programme` de la composition est lue).
+- **Information des personnes, avant la saisie** :
+  - l'aide du récit (écran 2, `ecran2.recit.essai`) dit que le récit et le logement sont envoyés tels quels au fournisseur d'IA, conservés 29 jours puis supprimés, et qu'il ne faut y mettre ni e-mail, ni numéro de téléphone, ni adresse privée ;
+  - l'aide du champ du logement (écran 1, `ecran1.logement.aideEssai`, site d'essai seulement) demande un nom d'hôtel ou un quartier, pas une adresse privée.
+
+  Texte proposé par back-end, **à valider par l'UX** en revue.
+- Le récit n'entre dans aucun journal, aucune trace et aucun rapport : le lancement et l'étape ne journalisent que des codes et des nombres.
+- **Aucune donnée Google** n'entre dans le brief, dans `run_briefs` ou dans un prompt. Un test canari tourne avec un brief saisi.
+- **Encore attendu de la Sécurité** : les noms de lieux proposés par l'IA et envoyés à Text Search quand le brief vient d'un récit réel (0117 § 2). La requête reste celle de 0117 : nom du lieu et ville seulement, jamais le récit.
 
 ## 7. Limites connues
 
-- Une clé d'idempotence n'est plus visible après l'expiration de son brief (29 jours). Une relance de la même clé au-delà se heurte alors à l'unicité et rend `usage_unavailable`, ce qui est sans effet pratique : le brouillon de l'onglet ne vit pas 29 jours.
-- Si le cookie d'accès (12 heures) expire pendant que l'écran 5 suit la préparation, la lecture de l'état rend `not_found`, et un rechargement affiche une 404. La correction (redemander le code sur l'écran 5) relève de l'UX ; c'est une question ouverte.
-- Un brief saisi d'une exécution arrêtée reste relançable par « Réessayer » tant qu'il n'a pas expiré.
+- **Expiration de la clé** : une clé d'idempotence n'est plus visible après l'expiration de son brief (29 jours). Une relance de la même clé au-delà se heurte alors à l'unicité et rend `usage_unavailable`. C'est sans effet pratique : le brouillon de l'onglet ne vit pas 29 jours.
+- **Démarrage refusé après la réservation** (`demarrage_impossible`) :
+  - l'exécution réservée est close ;
+  - « Réessayer » sur `R-lancer` rejoue la même clé et rend `existante`, c'est-à-dire le voyage d'origine, arrêté, sans rien redémarrer ;
+  - l'écran 5 montre alors l'échec, et son « Réessayer » relance le brief sous un nouveau voyage.
+
+  Aucun appel payant n'est perdu.
+- **Isolation** : la RLS isole l'organisation `org_prototype`, pas les personnes. Toute personne qui a le code d'accès peut rejouer un `requestId`, lire l'état d'un voyage d'essai ou relancer un voyage arrêté dont elle connaît l'identifiant. C'est acceptable avec un code partagé (limite d'audience du § 6).
+- **Pas de suppression à la demande** avant les 29 jours. À signaler à l'UX et au juridique avant toute ouverture publique (question de la PR).
+- **Cookie d'accès expiré pendant le suivi** : si le cookie (12 heures) expire pendant que l'écran 5 suit la préparation, la lecture de l'état rend `not_found`, et un rechargement affiche une 404. Seule la relance redemande le code. Redemander le code pendant le suivi relève de l'UX ; c'est une question ouverte.
+- **Relance possible jusqu'à l'expiration** : le brief saisi d'une exécution arrêtée reste relançable par « Réessayer » tant qu'il n'a pas expiré.
+- **Contrôle par la base** : la contrainte ne ferme que les clés du premier niveau, et `pg_column_size` mesure l'octet stocké, éventuellement compressé. La forme imbriquée et la longueur des textes relèvent de `BriefSchema`, contrôlé avant toute écriture.
 
 ## 8. Tests
 
@@ -141,7 +161,8 @@ L'ancienne chaîne (aperçu, voyage complet, recalcul) n'est jamais atteinte (D6
   - récit dans la requête `programme` avec `zdr` et `data_collection: "deny"` ;
   - canari « aucune donnée Google dans le prompt » avec un brief saisi ;
   - brief refusé : `brief_invalid` avant tout appel.
-- `src/server/actions/creation-essai.test.ts` et `creation-lancement.test.ts` (critère 7, récit facultatif ignoré par `mock`).
+- `src/server/actions/creation-essai.test.ts` et `creation-lancement.test.ts` (critère 7, récit facultatif ignoré par `mock`) ; `tests/db/creation.test.ts` (critère 7, récit ignoré par `api`).
+- `tests/unit/workflows/p0-run-finale.test.ts` : aucun agent de recherche web pour un brief saisi.
 - Interface : `LaunchEssai.test.tsx`, `PreparationView.test.tsx`, `tests/unit/server/instrumentation.test.ts`.
 
 **Base** (`tests/db/brief-saisi-prototype.test.ts`, critère 2)

@@ -1368,6 +1368,32 @@ describe("p0Run sur un brief saisi dans l'app (E2E-essai, lot 3, critère 4 ; d�
     expect(contenu).toContain(RECIT);
   });
 
+  it("aucun appel de l'agent de recherche web pour un brief saisi (revue de la PR 704, Sécurité 3) : seule la capacité programme est lue, une requête programme sans greffon web", async () => {
+    const lues: string[] = [];
+    d.composerP0Reel.mockImplementation((garde: unknown, options: OptionsSimulees) => {
+      const composition = compositionSimulee(garde, options);
+      return {
+        agent: () => {
+          lues.push("agent");
+          throw new Error("l'agent de recherche web ne doit pas être composé pour un brief saisi");
+        },
+        ancrage: () => {
+          lues.push("ancrage");
+          throw new Error("l'ancrage ne doit pas être composé pour un brief saisi");
+        },
+        etapeFinale: () => {
+          lues.push("etapeFinale");
+          throw new Error("l'étape finale ne doit pas être composé pour un brief saisi");
+        },
+        programme: () => (lues.push("programme"), composition.programme()),
+      };
+    });
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(new Set(lues)).toEqual(new Set(["programme"]));
+    expect(capture.requetes.map((requete) => requete.etape)).toEqual(["programme"]);
+    expect(capture.requetes[0]).not.toHaveProperty("greffonWeb");
+  });
+
   it("canari : aucune donnée Google dans le prompt avec un brief saisi", async () => {
     await etapeProgramme({ runId: RUN_ID });
     const prompts = JSON.stringify(capture.requetes);

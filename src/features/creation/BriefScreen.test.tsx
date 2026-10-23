@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder, type MemoryRecorder } from "@/analytics/track";
 import { fail, ok } from "@/contracts";
+import * as messages from "@/i18n/messages";
 import { MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
 import { structureBrief } from "@/server/actions/creation";
 
@@ -386,7 +387,9 @@ describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () =>
 
   it("« Vérifier mon brief » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
     const { container } = renderEssai();
-    expect(story()).toHaveAccessibleDescription(expect.stringContaining("Sur le site d'essai, ton récit est conservé tel quel"));
+    // Information avant la saisie (décision 0125 § 6) : envoi au fournisseur d'IA, 29 jours, ni e-mail ni téléphone ni adresse.
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essai));
+    expect(messages.creation.ecran2.recit.essai).toMatch(/fournisseur d'IA.*29 jours.*e-mail.*téléphone.*adresse privée/);
     fireEvent.change(story(), { target: { value: STORY } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));

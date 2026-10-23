@@ -209,6 +209,8 @@ export async function lancerBriefSaisi(demande: DemandeLancementSaisi, dependanc
         lancement.regles,
       );
       existante = reservation.ok && reservation.existante === true;
+      // Rejeu d'une clé (revue de la PR #704, mineur Sécurité 7) : le voyage d'origine, celui de la destination de son brief.
+      if (reservation.ok && reservation.existante === true && reservation.destination !== undefined) destination = reservation.destination;
       return reservation;
     },
   });
@@ -250,11 +252,13 @@ export async function relancerBriefSaisi(demande: DemandeRelanceSaisi, dependanc
       const lancement = lancementDuMode(MODE_LANCEMENT_APP);
       const commitSha = commitDuDeploiement(dependances.env);
       if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
+      // Relance : le brief vient de la base, une connexion est donc nécessaire ; le verrou S8 est contrôlé d'abord (revue
+      // de la PR #704, mineur TL 3), puis le brief arrêté est lu, revalidé et contrôlé sur les plafonds du mode.
       const pool = dependances.pool();
+      if (!(await verrouS8Leve(pool))) return refus("real_mode_unavailable");
       const valide = validerBriefSaisi(await dependances.briefArrete(pool, demande.tripId));
       if (!valide.ok) return refus("entree_invalide");
       if (!briefSaisiTientDansLeMode(MODE_LANCEMENT_APP, valide.brief)) return refus("brief_hors_plafonds");
-      if (!(await verrouS8Leve(pool))) return refus("real_mode_unavailable");
       destination = valide.brief.destination;
       const reservation = await reserverExecution(
         pool,
@@ -269,6 +273,8 @@ export async function relancerBriefSaisi(demande: DemandeRelanceSaisi, dependanc
         lancement.regles,
       );
       existante = reservation.ok && reservation.existante === true;
+      // Rejeu d'une clé (revue de la PR #704, mineur Sécurité 7) : le voyage d'origine, celui de la destination de son brief.
+      if (reservation.ok && reservation.existante === true && reservation.destination !== undefined) destination = reservation.destination;
       return reservation;
     },
   });

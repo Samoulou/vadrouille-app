@@ -149,13 +149,31 @@ describe("LaunchEssai", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("récit refusé : bandeau et « Modifier mon récit » vers l'écran 2, état « Récit »", async () => {
+  it("récit refusé : bandeau et « Revenir à mon récit » vers l'écran 2, état « Récit », récit et vérification gardés", async () => {
     vi.mocked(createTrip).mockResolvedValue({ ok: false, error: { code: "validation_failed", field: "story" } });
-    renderStep("ouverte");
+    const recit = "Écrivez-moi à personne@example.com pour tout le séjour.";
+    renderStep("ouverte", { ...COMPLETE, story: recit });
     expect(await screen.findByText(t.recit)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: t.modifierRecit }));
+    expect(screen.queryByRole("button", { name: l.reessayer })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: messages.creation.ecran2.verification.revenirRecit }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
     expect(latest?.stage).toBe("story");
+    expect(latest?.story).toBe(recit);
+    expect(latest?.brief).toEqual(COMPLETE.brief);
+    expect(latest?.trip).toEqual(COMPLETE.trip);
+  });
+
+  it.each([
+    ["draft.start", "/voyages/nouveau?site=essai"],
+    ["draft.destination", "/voyages/nouveau?site=essai"],
+    ["brief.wishes", "/voyages/nouveau/brief"],
+  ])("autre champ refusé (%s) : « Corriger mon voyage » vers l'écran du champ, sans « Réessayer »", async (field, route) => {
+    vi.mocked(createTrip).mockResolvedValue({ ok: false, error: { code: "validation_failed", field } });
+    renderStep("ouverte");
+    expect(await screen.findByText(t.champ)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: l.reessayer })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: t.corrigerVoyage }));
+    expect(router.push).toHaveBeenCalledWith(route);
   });
 
   it("plafond atteint : bandeau sans « Réessayer »", async () => {

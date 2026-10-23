@@ -170,9 +170,10 @@ describe("p0: lancement d'un brief saisi depuis l'app (E2E-essai, lot 3)", () =>
     expect(d.reserver).not.toHaveBeenCalled();
   });
 
-  it("même requestId : exécution existante rendue, jamais redémarrée", async () => {
-    d.reservation = { ok: true, runId: RUN, existante: true };
-    expect(await lancer()).toEqual({ statut: "lancee", tripId: TRIP });
+  it("même requestId : exécution existante rendue sous le voyage d'origine (destination de son brief), jamais redémarrée", async () => {
+    d.reservation = { ok: true, runId: RUN, existante: true, destination: "Lisbonne" };
+    // Brouillon modifié depuis (Rome) : le voyage rendu reste celui de la clé (mineur Sécurité 7 de la revue de #704).
+    expect(await lancer()).toEqual({ statut: "lancee", tripId: "proto_lisbonne_44444444444444448444444444444444" });
     expect(d.start).not.toHaveBeenCalled();
   });
 
@@ -200,9 +201,18 @@ describe("p0: « Réessayer » d'un voyage de l'app arrêté (E2E-essai, lot 3, 
     d.reservation = { ok: true, runId: NOUVEAU };
     const issue = await relancerBriefSaisi({ tripId: TRIP, requestId: "22222222-2222-4222-8222-222222222222" }, { cookie: cookieValide(), pool: () => pool, briefArrete });
     expect(issue).toEqual({ statut: "lancee", tripId: "proto_rome_55555555555545558555555555555555" });
+    // Verrou S8 contrôlé avant la lecture du brief arrêté (mineur TL 3 de la revue de #704).
+    expect(d.journal.indexOf("s8")).toBeLessThan(d.journal.indexOf("valider"));
     expect(briefArrete).toHaveBeenCalledWith(pool, TRIP);
     const [, execution] = d.reserver.mock.calls[0] as [unknown, Record<string, unknown>];
     expect(execution).toMatchObject({ mode: "essai", brief: "saisi", briefSaisi: { requestId: "22222222-2222-4222-8222-222222222222" } });
+  });
+
+  it("verrou S8 fermé : real_mode_unavailable sans lire le brief arrêté", async () => {
+    d.verrouLeve = false;
+    briefArrete.mockClear();
+    expect(await relancerBriefSaisi({ tripId: TRIP, requestId: DEMANDE.requestId }, { cookie: cookieValide(), pool: () => pool, briefArrete })).toEqual({ statut: "real_mode_unavailable" });
+    expect(briefArrete).not.toHaveBeenCalled();
   });
 
   it("aucun brief arrêté (inconnu, en cours, écrit) : entree_invalide, rien n'est réservé ; cookie absent : sans lecture", async () => {

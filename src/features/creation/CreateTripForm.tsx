@@ -184,6 +184,8 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
             key={lodging.answer}
             field={labelField}
             label={lodging.answer === "known" ? e1.logement.nomAdresse : e1.logement.quartier}
+            // Site d'essai (décision 0125 § 6) : le texte du logement part au fournisseur d'IA ; pas d'adresse privée.
+            help={essai ? e1.logement.aideEssai : undefined}
             value={lodging.label}
             maxLength={lodging.answer === "known" ? KNOWN_LODGING_LENGTH.max : AREA_LENGTH.max}
             onChange={(label) => dispatch({ type: "lodging", city, patch: { label } })}

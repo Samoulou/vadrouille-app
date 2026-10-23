@@ -69,7 +69,7 @@ export type DemandeExecution = {
  * d'idempotence du lancement ; rien n'est écrit, et l'appelant ne redémarre pas son workflow.
  */
 export type ResultatLancement =
-  | { readonly ok: true; readonly runId: string; readonly existante?: true }
+  | { readonly ok: true; readonly runId: string; readonly existante?: true; readonly destination?: string }
   | { readonly ok: false; readonly code: CodeRefusUsage };
 export type ResultatRelecture = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusUsage };
 
@@ -108,7 +108,7 @@ const SQL_INSERER_RUN = `INSERT INTO prototype.runs (mode, brief, variant, commi
 export { BRIEF_SAISI };
 
 /** Exécution déjà lancée avec cette clé d'idempotence (décision 0125 § 2), lue sous le verrou de la réservation. */
-const SQL_RUN_DU_LANCEMENT = "SELECT run_id FROM prototype.run_briefs WHERE request_id = $1::uuid";
+const SQL_RUN_DU_LANCEMENT = "SELECT run_id, brief ->> 'destination' AS destination FROM prototype.run_briefs WHERE request_id = $1::uuid";
 const SQL_INSERER_BRIEF = "INSERT INTO prototype.run_briefs (run_id, request_id, brief) VALUES ($1::uuid, $2::uuid, $3::jsonb)";
 
 const SQL_INSERER_FORFAIT = `INSERT INTO prototype.forfaits
@@ -144,6 +144,12 @@ async function reserver<T>(
   regles: ReglesForfait,
   avant: (client: ClientSql) => Promise<CodeRefusUsage | null>,
   inserer: (client: ClientSql) => Promise<T>,
+  /**
+   * Réservation déjà faite (clé d'idempotence d'un lancement depuis l'app, décision 0125 § 2) : lue sous le verrou,
+   * **avant** tout contrôle de forfait ; trouvée, elle est rendue sans rien écrire ni refuser (revue de la PR #704,
+   * mineur TL 2 : un rejeu au bord d'un plafond n'est jamais refusé).
+   */
+  deja: (client: ClientSql) => Promise<T | null> = async () => null,
 ): Promise<T | Refus> {
   let client: ClientSql;
   try {
@@ -157,6 +163,12 @@ async function reserver<T>(
     enTransaction = true;
     await client.query("SELECT pg_catalog.set_config('app.organization_id', $1, true)", [ORGANISATION_PROTOTYPE]);
     await client.query("SELECT pg_catalog.pg_advisory_xact_lock($1)", [CLE_VERROU_FORFAIT]);
+    const existante = await deja(client);
+    if (existante !== null) {
+      await client.query("COMMIT");
+      enTransaction = false;
+      return existante;
+    }
     await client.query(SQL_ORPHELINES, [regles.dureeMaxMs + MARGE_ORPHELINE_MS]);
     const prealable = await avant(client);
     const refus = prealable ?? refusDuForfait(lireSommes((await client.query(SQL_SOMMES)).rows[0]), forfait, regles.limites, regles.uniteQuotaRoutes);
@@ -201,13 +213,7 @@ export async function reserverExecution(pool: PoolSql, demande: DemandeExecution
     demande.forfait,
     regles,
     async () => null,
-    async (client): Promise<{ runId: string; existante?: true }> => {
-      if (saisi !== undefined) {
-        // Idempotence du lancement depuis l'app (décision 0125 § 2) : sous le verrou de la réservation, une clé déjà
-        // écrite rend son exécution, sans rien écrire (aucun second forfait, aucun second workflow).
-        const deja = (await client.query(SQL_RUN_DU_LANCEMENT, [saisi.requestId])).rows[0]?.run_id;
-        if (typeof deja === "string") return { runId: deja, existante: true };
-      }
+    async (client): Promise<{ runId: string; existante?: true; destination?: string }> => {
       const { rows } = await client.query(SQL_INSERER_RUN, [demande.mode, demande.brief, demande.variant, demande.commitSha]);
       const runId = rows[0]?.id;
       if (typeof runId !== "string") throw new Error("forfait: exécution non créée");
@@ -215,9 +221,19 @@ export async function reserverExecution(pool: PoolSql, demande: DemandeExecution
       if (saisi !== undefined) await client.query(SQL_INSERER_BRIEF, [runId, saisi.requestId, JSON.stringify(saisi.contenu)]);
       return { runId };
     },
+    // Idempotence du lancement depuis l'app (décision 0125 § 2) : sous le verrou, avant le contrôle du forfait, une clé
+    // déjà écrite rend son exécution et la destination de **son** brief (le voyage d'origine), sans rien écrire.
+    async (client) => {
+      if (saisi === undefined) return null;
+      const ligne = (await client.query(SQL_RUN_DU_LANCEMENT, [saisi.requestId])).rows[0];
+      if (typeof ligne?.run_id !== "string" || typeof ligne.destination !== "string") return null;
+      return { runId: ligne.run_id, existante: true as const, destination: ligne.destination };
+    },
   );
   if ("refus" in resultat) return { ok: false, code: resultat.refus };
-  return resultat.existante ? { ok: true, runId: resultat.runId, existante: true } : { ok: true, runId: resultat.runId };
+  return resultat.existante && resultat.destination !== undefined
+    ? { ok: true, runId: resultat.runId, existante: true, destination: resultat.destination }
+    : { ok: true, runId: resultat.runId };
 }
 
 /** Début d'une relecture : forfait de relecture réservé (aucune ligne `runs`). */

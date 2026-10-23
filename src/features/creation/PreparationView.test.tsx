@@ -6,6 +6,7 @@ import { fail, ok, type GenerationStatus } from "@/contracts";
 import * as messages from "@/i18n/messages";
 import { MOCK_GENERATION_STEP_MS, mockGenerationStatus, type MockGenerationOutcome } from "@/mocks/creation-edimbourg";
 import { relancerVoyageEssai } from "@/server/actions/creation";
+import { saisirCodeAccesP0 } from "@/server/actions/p0-acces";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
@@ -16,6 +17,7 @@ import { PreparationView } from "./PreparationView";
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/server/actions/creation", () => ({ getGenerationStatus: vi.fn(), relancerVoyageEssai: vi.fn() }));
+vi.mock("@/server/actions/p0-acces", () => ({ saisirCodeAccesP0: vi.fn() }));
 
 /** Écran 5 « Propositions prêtes » (F8-PO-12, F8-PO-19, F8-PO-20 ; 0017 § 9 ; 0018 § 19). */
 
@@ -253,47 +255,80 @@ describe("PreparationView : bandeaux", () => {
 });
 
 describe("PreparationView : site d'essai (E2E-essai, lot 3 ; décision 0125 § 4)", () => {
-  const ESSAI = "proto_rome_0123456789abcdef0123456789abcdef";
+  const ESSAI = "proto_rome_0123abcd45674890a123456789abcdef";
   const NOUVEAU = "proto_rome_fedcba9876543210fedcba9876543210";
   const echec: GenerationStatus = { phase: "failed", tripId: ESSAI, days: [{ index: 1, state: "preparing", readyStops: 0 }], expected: 8, ready: 0, reason: "provider_error", retryable: true };
-
-  it("exécution arrêtée : « Réessayer » relance le brief sous un nouveau voyage, un seul requestId, puis l'écran 5 du nouveau", async () => {
-    vi.mocked(relancerVoyageEssai).mockResolvedValue(ok({ tripId: NOUVEAU }));
-    render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} essai />);
-    const alert = document.querySelector("main [role='alert']") as HTMLElement;
+  const e = t.essai;
+  const alerte = () => document.querySelector("main [role='alert']") as HTMLElement;
+  const renderEssai = () => render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} essai />);
+  async function reessayer() {
     await act(async () => {
-      fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
+      fireEvent.click(within(alerte()).getByRole("button", { name: t.reessayer }));
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(relancerVoyageEssai).toHaveBeenCalledTimes(1);
+  }
+
+  it("relance annoncée (role=status), titre de la préparation, bandeau retiré ; puis l'écran 5 du nouveau voyage", async () => {
+    let fin: (valeur: unknown) => void = () => undefined;
+    vi.mocked(relancerVoyageEssai).mockReturnValue(new Promise((resolve) => (fin = resolve)) as never);
+    renderEssai();
+    await reessayer();
+    expect(screen.getByText(e.relance)).toHaveAttribute("role", "status");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(t.titre);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+    expect(alerte()).toBeEmptyDOMElement();
     expect(vi.mocked(relancerVoyageEssai).mock.calls[0]?.[0]).toMatchObject({ tripId: ESSAI });
+    await act(async () => {
+      fin(ok({ tripId: NOUVEAU }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(router.replace).toHaveBeenCalledWith(`/voyages/${NOUVEAU}/preparation`);
     expect(fetchStatus).not.toHaveBeenCalled();
   });
 
-  it("relance refusée : le bandeau reste, « Réessayer » réutilise le même requestId", async () => {
-    vi.mocked(relancerVoyageEssai).mockResolvedValue(fail("provider_error"));
-    render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} essai />);
-    const alert = document.querySelector("main [role='alert']") as HTMLElement;
-    for (let essai = 0; essai < 2; essai += 1) {
-      await act(async () => {
-        fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
-        await vi.advanceTimersByTimeAsync(0);
-      });
-    }
-    expect(alert).toHaveTextContent(t.interrompue);
+  it.each([
+    ["provider_error", () => fail("provider_error"), e.relanceEchec],
+    ["not_found", () => fail("not_found"), e.relanceEchec],
+    ["cost_cap_reached", () => fail("cost_cap_reached"), messages.creation.lancement.essai.plafond],
+  ])("relance refusée (%s) : message propre dans l'alerte, « Réessayer » rejoue le même requestId", async (_cas, refus, message) => {
+    vi.mocked(relancerVoyageEssai).mockResolvedValue(refus() as never);
+    const { container } = renderEssai();
+    await reessayer();
+    expect(alerte()).toHaveTextContent(message);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(t.titreInterrompu);
+    await reessayer();
     const [premier, second] = vi.mocked(relancerVoyageEssai).mock.calls.map((call) => (call[0] as { requestId: string }).requestId);
     expect(second).toBe(premier);
     expect(router.replace).not.toHaveBeenCalled();
+    expect(await axeWithRealTimers(container)).toEqual([]);
+  });
+
+  it("erreur réseau : message de la relance", async () => {
+    vi.mocked(relancerVoyageEssai).mockRejectedValue(new Error("réseau"));
+    renderEssai();
+    await reessayer();
+    expect(alerte()).toHaveTextContent(e.relanceEchec);
+  });
+
+  it("accès expiré (unauthenticated) : saisie du code dans l'écran, puis relance une fois le code accepté", async () => {
+    vi.mocked(relancerVoyageEssai).mockResolvedValueOnce(fail("unauthenticated")).mockResolvedValueOnce(ok({ tripId: NOUVEAU }));
+    vi.mocked(saisirCodeAccesP0).mockResolvedValue({ statut: "accepte" });
+    renderEssai();
+    await reessayer();
+    expect(screen.getByRole("heading", { level: 1, name: e.acces.titre })).toBeInTheDocument();
+    expect(screen.getByText(e.acces.aide)).toBeInTheDocument();
+    const champ = screen.getByLabelText(messages.prototype.acces.libelle);
+    await act(async () => {
+      fireEvent.submit(champ.closest("form") as HTMLFormElement);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(relancerVoyageEssai).toHaveBeenCalledTimes(2);
+    expect(router.replace).toHaveBeenCalledWith(`/voyages/${NOUVEAU}/preparation`);
   });
 
   it("hors site d'essai : « Réessayer » ne relance jamais un voyage", async () => {
     render(<PreparationView tripId={ESSAI} initial={echec} fetchStatus={fetchStatus} />);
-    const alert = document.querySelector("main [role='alert']") as HTMLElement;
-    await act(async () => {
-      fireEvent.click(within(alert).getByRole("button", { name: t.reessayer }));
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await reessayer();
     expect(relancerVoyageEssai).not.toHaveBeenCalled();
     expect(fetchStatus).toHaveBeenCalledTimes(1);
   });
