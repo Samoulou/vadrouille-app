@@ -1391,7 +1391,8 @@ describe("p0Run sur un brief saisi dans l'app (E2E-essai, lot 3, critère 4 ; d�
     expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
     expect(new Set(lues)).toEqual(new Set(["programme"]));
     expect(capture.requetes.map((requete) => requete.etape)).toEqual(["programme"]);
-    expect(capture.requetes[0]).not.toHaveProperty("greffonWeb");
+    // Requête de modèle sans aucun champ de recherche web (ni `plugins` ni greffon) : ses clés sont exactement celles de `RequeteModele`.
+    expect(Object.keys(capture.requetes[0] ?? {}).sort()).toEqual(["etape", "messages", "modele", "prompt", "routage"]);
   });
 
   it("canari : aucune donnée Google dans le prompt avec un brief saisi", async () => {

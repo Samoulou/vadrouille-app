@@ -224,6 +224,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     renderEssai();
     fireEvent.click(within(lodging()).getByRole("radio", { name: "Oui" }));
     expect(screen.getByLabelText("Nom ou adresse du logement")).toHaveAccessibleDescription(expect.stringContaining("pas une adresse privée"));
+    // Durée de conservation et données interdites (revue consolidée de #704, mineur Sécurité 4).
+    expect(screen.getByLabelText("Nom ou adresse du logement")).toHaveAccessibleDescription(expect.stringMatching(/conservé 29 jours.*ni e-mail ni numéro de téléphone/));
   });
 
   it("une seule ville : « Autres villes » et « Ajouter une ville » ne sont pas proposés", () => {

@@ -116,10 +116,14 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
         {r.titre}
       </h1>
       <div className="flex flex-col gap-2">
-        <p id={helpId(STORY_ID)} className="text-corps-s text-ink-soft">
-          {r.aide}
-          {essai ? ` ${r.essai}` : null}
-        </p>
+        {/* Site d'essai : l'envoi et la conservation, puis la vérification dans un second paragraphe (une idée par paragraphe). */}
+        <div id={helpId(STORY_ID)} className="flex flex-col gap-2 text-corps-s text-ink-soft">
+          <p>
+            {r.aide}
+            {essai ? ` ${r.essai}` : null}
+          </p>
+          {essai ? <p>{r.essaiVerification}</p> : null}
+        </div>
         <textarea
           ref={areaRef}
           id={STORY_ID}

@@ -389,7 +389,8 @@ describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () =>
     const { container } = renderEssai();
     // Information avant la saisie (décision 0125 § 6) : envoi au fournisseur d'IA, 29 jours, ni e-mail ni téléphone ni adresse.
     expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essai));
-    expect(messages.creation.ecran2.recit.essai).toMatch(/fournisseur d'IA.*29 jours.*e-mail.*téléphone.*adresse privée/);
+    expect(messages.creation.ecran2.recit.essai).toMatch(/fournisseur d'IA \(hors UE\).*29 jours.*e-mail.*téléphone.*adresse privée/);
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essaiVerification));
     fireEvent.change(story(), { target: { value: STORY } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
