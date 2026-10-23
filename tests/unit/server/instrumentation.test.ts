@@ -26,7 +26,12 @@ vi.mock("@/adapters/prototype-instance", () => ({
   brancherLectureProgrammesReels: (barriere: unknown, relecteur: unknown) => brancher(barriere, relecteur),
   brancherDeblocagesEssai: (deblocages: unknown) => brancherDeblocages(deblocages),
   brancherCreationEssai: (port: unknown) => brancherCreationEssai(port),
+  brancherPhotosEssai: (photos: unknown) => brancherPhotosEssai(photos),
 }));
+// Décision 0128 : photos du tri d'un voyage d'essai (double : aucune base, aucun cookie, aucun appel Google).
+const brancherPhotosEssai = vi.fn();
+const photosEssai = { photo: vi.fn() };
+vi.mock("@/server/p0/photos", () => ({ creerPhotosEssai: () => photosEssai }));
 // Spécification E2E-essai, lot 3 : création d'un voyage d'essai (double : aucune base, aucun cookie, aucun lancement).
 const brancherCreationEssai = vi.fn();
 const creationEssai = { lancer: vi.fn(), relancer: vi.fn(), etat: vi.fn() };
@@ -107,6 +112,7 @@ beforeEach(() => {
   echecCreation = null;
   poolLectureProgrammes.mockClear();
   brancherCreationEssai.mockClear();
+  brancherPhotosEssai.mockClear();
   echecBarriere = null;
   vi.stubEnv("NEXT_RUNTIME", "nodejs");
 });
@@ -163,6 +169,27 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     await register();
     expect(brancherCreationEssai).toHaveBeenCalledTimes(1);
     expect(brancherCreationEssai).toHaveBeenCalledWith(creationEssai);
+  });
+
+  it("DATA_ADAPTER=prototype : photos du tri branchées (décision 0128)", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    await register();
+    expect(brancherPhotosEssai).toHaveBeenCalledTimes(1);
+    expect(brancherPhotosEssai).toHaveBeenCalledWith(photosEssai);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement des photos : essai.photo_unavailable (nom d'erreur seulement), lecture réelle et création gardées", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    brancherPhotosEssai.mockImplementationOnce(() => {
+      throw new TypeError("clé SENTINELLE");
+    });
+    await register();
+    expect(brancher).toHaveBeenCalledTimes(1);
+    expect(brancherCreationEssai).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("essai.photo_unavailable", { errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("SENTINELLE");
   });
 
   it("échec du branchement de la création : essai.creation_unavailable (nom d'erreur seulement), lecture réelle gardée", async () => {

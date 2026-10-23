@@ -3,7 +3,17 @@ import "server-only";
 import { z } from "zod";
 
 import { envoyerGoogle, ErreurClientGoogle, erreurGoogleDe, PLACE_ID_GOOGLE, type RequeteGoogle, type Transport } from "@/grounding/enveloppe-google";
-import { ErreurAncrage, type ClientPlacesMvp, type Coordonnees, type DetailsLieu, type RectangleZone, type RequeteTextSearch } from "@/grounding/interfaces";
+import {
+  ErreurAncrage,
+  type AuteurPhotoLieu,
+  type ClientPhotosLieu,
+  type ClientPlacesMvp,
+  type Coordonnees,
+  type DetailsLieu,
+  type PhotoLieu,
+  type RectangleZone,
+  type RequeteTextSearch,
+} from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
   avecReservation,
@@ -56,8 +66,24 @@ export const SKU_POSITION = "places_details_essentials";
 /** SKU de `id` seul : « Place Details Essentials (IDs Only) », sans plafond gratuit (relevé le 2026-10-17). */
 export const SKU_IDENTIFIANT = "places_details_essentials_ids_only";
 
+/**
+ * Photos du tri (décision 0128) : la liste des photos d'un lieu par une fiche au seul masque `photos`, SKU le moins cher
+ * qui le contient (« Place Details Essentials (IDs Only) », sans plafond gratuit ni prix : table de données de Places,
+ * relevée le 2026-10-23), puis le média d'une photo (« Places API Place Details Photos », 7 USD les 1 000, 1 000
+ * gratuites par mois : page de tarifs relevée le 2026-10-23).
+ */
+export const MASQUE_PHOTOS = "photos";
+export const SKU_PHOTOS = "places_details_essentials_ids_only";
+/** Masque de la réponse du média (`skipHttpRedirect=true`) : l'adresse de l'image seule. */
+export const MASQUE_MEDIA_PHOTO = "photoUri";
+export const SKU_MEDIA_PHOTO = "places_details_photos";
+/** Largeur demandée au média : bornes de Google (1 à 4 800 px). */
+export const LARGEUR_PHOTO_MAX_GOOGLE = 4800;
+/** Photos lues au plus dans la fiche (la première valide est prise ; Google en rend 10 au plus). */
+const PHOTOS_LUES_MAX = 10;
+
 /** Coûts estimés par requête, en micro-USD, au prix plein (Q329) : table `prototype/config/prix-google.json`. */
-export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0 } as const;
+export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0, photos: 0, mediaPhoto: 7_000 } as const;
 
 /** Identifiant de lieu Google : jamais interpolé dans un chemin sans ce contrôle. */
 const PLACE_ID = PLACE_ID_GOOGLE;
@@ -135,6 +161,53 @@ const PositionSchema = z.object({
 });
 const IdentifiantSchema = z.object({ id: z.string().regex(PLACE_ID) });
 
+/** Nom de ressource d'une photo du lieu demandé (`places/<placeId>/photos/<référence>`) ; jamais gardé. */
+const REFERENCE_PHOTO = /^[A-Za-z0-9_-]{1,1024}$/;
+
+const PhotosSchema = z.object({
+  photos: z
+    .array(
+      z.object({
+        name: z.string().max(1400),
+        authorAttributions: z.array(z.object({ displayName: z.string().optional(), uri: z.string().optional() })).max(10).optional(),
+        googleMapsUri: z.string().max(2048).optional(),
+      }),
+    )
+    .optional(),
+});
+const MediaPhotoSchema = z.object({ photoUri: z.string().max(4096) });
+
+/** Adresse `https` sans identifiants ni port, dont l'hôte est `suffixe` ou l'un de ses sous-domaines ; sinon `undefined`. */
+function adresseSure(brut: string | undefined, suffixes: readonly string[]): string | undefined {
+  if (brut === undefined) return undefined;
+  let url: URL;
+  try {
+    url = new URL(brut);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.port !== "") return undefined;
+  const hote = url.hostname.toLowerCase();
+  return suffixes.some((suffixe) => hote === suffixe || hote.endsWith(`.${suffixe}`)) ? url.href : undefined;
+}
+
+/** Hôtes de l'image (`photoUri`) et des liens d'attribution (profil de l'auteur, photo sur Google Maps). */
+const HOTES_IMAGE = ["googleusercontent.com"] as const;
+const HOTES_LIENS = ["google.com", "goo.gl"] as const;
+/** Longueur d'un nom d'auteur affiché ; au-delà, l'auteur est écarté (jamais un nom tronqué). */
+const NOM_AUTEUR_MAX = 120;
+
+function auteursDe(attributions: readonly { displayName?: string; uri?: string }[] | undefined): AuteurPhotoLieu[] {
+  const auteurs: AuteurPhotoLieu[] = [];
+  for (const { displayName, uri } of attributions ?? []) {
+    const nom = displayName?.trim() ?? "";
+    if (nom === "" || nom.length > NOM_AUTEUR_MAX) continue;
+    const lien = adresseSure(uri, HOTES_LIENS);
+    auteurs.push(lien === undefined ? { nom } : { nom, lien });
+  }
+  return auteurs;
+}
+
 /** Fiche introuvable (0085 § 2 point c) : le seul `upstream_not_found` devient `place_not_found`, comme le double. */
 async function sansIntrouvable<T>(appel: () => Promise<T>): Promise<T> {
   try {
@@ -144,6 +217,17 @@ async function sansIntrouvable<T>(appel: () => Promise<T>): Promise<T> {
     throw erreur;
   }
 }
+
+/**
+ * Noyau d'appel (réservation auprès du port, enveloppe, clé) de chaque client construit par `createPlacesClient`, lu par
+ * `createPlacesPhotosClient` seul : les photos partagent la clé, la barrière et le transport par défaut (le `fetch` global
+ * n'est nommé qu'à la signature de `createPlacesClient`, règle de confinement).
+ */
+type Noyau = {
+  readonly appeler: (requete: RequeteGoogle, reservation: DemandeReservation) => Promise<unknown>;
+  readonly demande: (methode: DemandeReservation["methode"], sku: string, coutEstimeMicros: number) => DemandeReservation;
+};
+const NOYAUX = new WeakMap<ClientPlacesMvp, Noyau>();
 
 export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp {
   const cle = lireCleGoogle(options.environnement, options.execArgv);
@@ -163,7 +247,7 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
     throw erreurGoogleDe(issue);
   }
 
-  return {
+  const client: ClientPlacesMvp = {
     async textSearch(requete: RequeteTextSearch) {
       const corps: Record<string, unknown> = { textQuery: requete.texte, pageSize: 5 };
       if (requete.restriction !== undefined) {
@@ -229,6 +313,60 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
       const lu = IdentifiantSchema.safeParse(brut);
       if (!lu.success) throw new ErreurClientGoogle("invalid_response");
       return { placeId: lu.data.id };
+    },
+  };
+  NOYAUX.set(client, { appeler, demande });
+  return client;
+}
+
+/**
+ * Client des photos du tri (décision 0128) : construit par la composition seule (`composerPhotos`), derrière la garde
+ * de relecture et le forfait réservé ; la clé reste côté serveur, dans l'en-tête de l'enveloppe. Deux requêtes au plus
+ * par lieu, chacune réservée auprès du port : la fiche au masque `photos` (SKU « IDs Only »), puis, s'il y a une photo
+ * du lieu, son média avec `skipHttpRedirect=true` (réponse JSON, jamais une redirection suivie). Le nom de ressource de
+ * la photo ne sort pas de cette fonction ; seule l'adresse de l'image (hôte `googleusercontent.com`) et les
+ * attributions sont rendues. Fiche sans photo : `null`, sans second appel.
+ */
+export function createPlacesPhotosClient(options: OptionsPlaces, transport?: Transport): ClientPhotosLieu {
+  // Même construction que le client Places (barrière, clé, transport par défaut) ; seule sa méthode `photo` sort.
+  const noyau = NOYAUX.get(createPlacesClient(options, transport));
+  if (noyau === undefined) throw new ErreurClientGoogle("invalid_request");
+  const { appeler } = noyau;
+  const demande = (sku: string, coutEstimeMicros: number) => noyau.demande("places_details", sku, coutEstimeMicros);
+
+  return {
+    async photo(placeId: string, largeurMaxPx: number): Promise<PhotoLieu | null> {
+      if (!PLACE_ID.test(placeId) || !Number.isSafeInteger(largeurMaxPx) || largeurMaxPx < 1 || largeurMaxPx > LARGEUR_PHOTO_MAX_GOOGLE) {
+        throw new ErreurClientGoogle("invalid_request");
+      }
+      const fiche = PhotosSchema.safeParse(
+        await sansIntrouvable(() =>
+          appeler(
+            { chemin: `/v1/places/${placeId}`, methode: "GET", masque: MASQUE_PHOTOS, introuvableSur404: true },
+            demande(SKU_PHOTOS, COUT_ESTIME_MICROS.photos),
+          ),
+        ),
+      );
+      if (!fiche.success) throw new ErreurClientGoogle("invalid_response");
+      const prefixe = `places/${placeId}/photos/`;
+      const choisie = (fiche.data.photos ?? [])
+        .slice(0, PHOTOS_LUES_MAX)
+        .find((photo) => photo.name.startsWith(prefixe) && REFERENCE_PHOTO.test(photo.name.slice(prefixe.length)));
+      if (choisie === undefined) return null;
+      const media = MediaPhotoSchema.safeParse(
+        await appeler(
+          {
+            chemin: `/v1/${choisie.name}/media?maxWidthPx=${String(largeurMaxPx)}&skipHttpRedirect=true`,
+            methode: "GET",
+            masque: MASQUE_MEDIA_PHOTO,
+          },
+          demande(SKU_MEDIA_PHOTO, COUT_ESTIME_MICROS.mediaPhoto),
+        ),
+      );
+      const uri = media.success ? adresseSure(media.data.photoUri, HOTES_IMAGE) : undefined;
+      if (uri === undefined) throw new ErreurClientGoogle("invalid_response");
+      const lienGoogleMaps = adresseSure(choisie.googleMapsUri, HOTES_LIENS);
+      return { uri, auteurs: auteursDe(choisie.authorAttributions), ...(lienGoogleMaps === undefined ? {} : { lienGoogleMaps }) };
     },
   };
 }

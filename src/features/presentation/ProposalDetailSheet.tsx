@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal, Weekday } from "@/contracts";
+import type { PlacePhoto } from "@/contracts/photo";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
@@ -35,13 +36,18 @@ export interface ProposalDetailSheetProps {
    * modale recouvre celle du pied du paquet. Absente par défaut.
    */
   placesFromGoogle?: boolean;
+  /**
+   * Photo du lieu (voyage d'essai, décision 0128), la même que celle de la carte : affichée en grand avec l'attribution
+   * complète exigée par Google (auteurs, liens vers leur profil, photo sur Google Maps). Absente ou `null` : rien.
+   */
+  photo?: PlacePhoto | null;
 }
 
 /**
  * Détail d'une proposition (F6-PO-12, provisoire UX/UI) : feuille modale en lecture seule ; aucune
  * décision ne s'y prend. Quand `ReasonBlock` existera (F5), le détail l'utilisera.
  */
-export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus, placesFromGoogle = false }: ProposalDetailSheetProps) {
+export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus, placesFromGoogle = false, photo = null }: ProposalDetailSheetProps) {
   const title = useRef<HTMLHeadingElement>(null);
   const stop = proposal?.stop;
   const faits = stop ? formatFaits(stop.facts) : "";
@@ -60,6 +66,7 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
             onReturnFocus();
           }}
         >
+          {photo ? <PhotoDetail photo={photo} name={stop.name} /> : null}
           <div className="flex flex-col gap-1">
             <p className="text-corps-s text-ink-soft tabular-nums">
               {weekday
@@ -101,5 +108,56 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
         </DialogSheet>
       ) : null}
     </Dialog>
+  );
+}
+
+const LIEN = "font-semibold text-ink underline underline-offset-2";
+
+/**
+ * Photo du détail (décision 0128) : « Photo : <auteur> · voir sur Google Maps », chaque auteur lié à son profil s'il est
+ * connu, et la photo source sur Google Maps (conditions de Places API : créditer l'auteur, accès à la photo source).
+ * Image en échec : la photo et son crédit disparaissent, sans message.
+ */
+function PhotoDetail({ photo, name }: { photo: PlacePhoto; name: string }) {
+  const [enEchec, setEnEchec] = useState(false);
+  if (enEchec) return null;
+  return (
+    <figure data-part="photo" className="flex flex-col gap-2">
+      <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-block bg-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element -- image de Google servie telle quelle, ni optimisée ni gardée par Next.js (décision 0128) */}
+        <img
+          src={photo.url}
+          alt={format(t.carte.photoAlt, { name })}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setEnEchec(true)}
+          className="absolute inset-0 size-full object-cover"
+        />
+      </span>
+      <figcaption data-part="credit" className="text-legende text-ink-2">
+        {t.detail.photoPar}
+        {photo.authors.map((author, rang) => (
+          <span key={`${rang}-${author.name}`}>
+            {rang > 0 ? ", " : null}
+            {author.profileUrl ? (
+              <a href={author.profileUrl} target="_blank" rel="noopener noreferrer" className={LIEN}>
+                {author.name}
+              </a>
+            ) : (
+              author.name
+            )}
+          </span>
+        ))}
+        {photo.authors.length > 0 ? " · " : null}
+        {photo.mapsUrl ? (
+          <a href={photo.mapsUrl} target="_blank" rel="noopener noreferrer" className={LIEN}>
+            {t.detail.photoGoogleMaps}
+          </a>
+        ) : (
+          t.detail.photoGoogle
+        )}
+      </figcaption>
+    </figure>
   );
 }

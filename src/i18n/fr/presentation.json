@@ -15,6 +15,9 @@
   },
   "carte": {
     "photo": "Photo du lieu",
+    "photoAlt": "Photo de {name}",
+    "photoCredit": "Photo : {authors} · Google Maps",
+    "photoCreditGoogle": "Photo : Google Maps",
     "vers": "vers {time}",
     "detail": "Voir le détail de {name}",
     "option": "option {index} sur {total}"
@@ -63,6 +66,9 @@
     "moment": "Jour {day}, {weekday}, vers {time}",
     "momentSansJour": "Jour {day}, vers {time}",
     "source": "Source : ",
+    "photoPar": "Photo : ",
+    "photoGoogleMaps": "voir sur Google Maps",
+    "photoGoogle": "Google Maps",
     "verifie": "Informations vérifiées le {date}",
     "mois": [
       "janvier",

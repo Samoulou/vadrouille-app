@@ -88,6 +88,34 @@ describe("ProposalDetailSheet", () => {
     expect(dialog).not.toHaveTextContent(/vérifiées le|consultée le/);
   });
 
+  // Décision 0128 : photo du lieu en grand, attribution complète (profil de l'auteur, photo sur Google Maps).
+  it("ProposalDetailSheet: photo avec auteurs liés à leur profil et « voir sur Google Maps »", async () => {
+    const photo = {
+      url: "https://lh3.googleusercontent.com/place-photos/test",
+      authors: [{ name: "Ana", profileUrl: "https://maps.google.com/maps/contrib/1" }, { name: "Luís" }],
+      mapsUrl: "https://www.google.com/maps/photo",
+    };
+    const { baseElement } = render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} photo={photo} />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    expect(within(dialog).getByRole("img", { name: `Photo de ${distillerie.stop.name}` })).toHaveAttribute("src", photo.url);
+    const auteur = within(dialog).getByRole("link", { name: "Ana" });
+    expect(auteur).toHaveAttribute("href", "https://maps.google.com/maps/contrib/1");
+    expect(auteur).toHaveAttribute("rel", "noopener noreferrer");
+    expect(within(dialog).getByRole("link", { name: "voir sur Google Maps" })).toHaveAttribute("href", photo.mapsUrl);
+    expect(within(dialog).queryByRole("link", { name: "Luís" })).toBeNull();
+    expect(dialog.querySelector("figcaption")?.textContent).toBe(`${messages.presentation.detail.photoPar}Ana, Luís · voir sur Google Maps`);
+    expect(await axeViolations(baseElement)).toEqual([]);
+  });
+
+  it("ProposalDetailSheet: photo sans lien Google Maps ni auteur : « Photo : Google Maps » ; image en échec : rien", () => {
+    const photo = { url: "https://lh3.googleusercontent.com/place-photos/test", authors: [] };
+    render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} photo={photo} />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    expect(dialog.querySelector("figcaption")?.textContent).toBe(`${messages.presentation.detail.photoPar}Google Maps`);
+    fireEvent.error(dialog.querySelector("img")!);
+    expect(dialog.querySelector("figure")).toBeNull();
+  });
+
   it("ProposalDetailSheet: sans site, aucune ligne de source", () => {
     const { source: _source, verifiedAt: _date, ...stop } = distillerie.stop;
     void _source;

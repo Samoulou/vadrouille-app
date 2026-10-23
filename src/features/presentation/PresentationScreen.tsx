@@ -42,6 +42,7 @@ import {
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
 import type { NoOptionSlot, PresentationDay } from "./load";
+import { usePhotoLieu } from "./photo";
 import { choixDuTri, demanderRevision as demanderRevisionServeur, type DemanderRevision } from "./revision";
 import { createServerDeckActions } from "./server-actions";
 
@@ -201,6 +202,10 @@ function Deck({
   const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
+  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, données de lieux Google), puis celle du détail
+  // ouvert, servie par la même demande de la page.
+  const photoCarte = usePhotoLieu(card?.stop.placeId, placesFromGoogle);
+  const photoDetail = usePhotoLieu(detail?.stop.placeId, placesFromGoogle);
   const position = offset + state.index + 1;
   const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
@@ -457,6 +462,7 @@ function Deck({
           <DeckCard
             className="contents"
             proposal={card}
+            photo={photoCarte}
             context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
             isLastOption={isLastOption(state)}
             cardRef={cardRef}
@@ -524,6 +530,7 @@ function Deck({
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
             placesFromGoogle={placesFromGoogle}
+            photo={photoDetail}
           />
         </Suspense>
       ) : null}

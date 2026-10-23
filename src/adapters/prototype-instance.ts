@@ -1,5 +1,6 @@
 import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-relecteur";
+import type { PlacePhoto } from "@/contracts/photo";
 import type { PoolSql } from "@/server/usage/neon";
 
 import { createPrototypeAdapter, createPrototypeAdapterReel, type LecteurDeblocage, type RelecteurTrajets } from "./prototype";
@@ -42,6 +43,14 @@ export interface DeblocagesEssai {
   retenir(ctx: AdapterContext, tripId: string): Promise<void>;
 }
 
+/**
+ * Photos des cartes du tri d'un voyage d'essai (décision 0128) : `src/server/p0/photos.ts`, branché au démarrage par
+ * `src/instrumentation.ts`. Ce module n'en lit ni la base, ni le cookie, ni la clé. Non branché : aucune photo.
+ */
+export interface PhotosEssaiBranchees {
+  photo(placeId: string): Promise<PlacePhoto | null>;
+}
+
 interface Instance {
   /** Adaptateur de la requête : la source (index, relecteur) est partagée, seul le lecteur du déblocage change. */
   fabrique: (deblocage?: LecteurDeblocage) => TripAdapter;
@@ -55,6 +64,7 @@ interface Etat {
   relecteur?: RelecteurTrajets;
   deblocages?: DeblocagesEssai;
   creation?: PortCreationEssai;
+  photos?: PhotosEssaiBranchees;
 }
 
 const INSTANCE_KEY = Symbol.for("vadrouille.prototype");
@@ -98,6 +108,16 @@ export function revisionEssai(): PortCreationEssai["reviser"] | null {
   assertPrototypeAllowedOnProcess();
   const port = holder[INSTANCE_KEY]?.creation;
   return port ? (demande) => port.reviser(demande) : null;
+}
+
+/** Branche les photos du tri d'un voyage d'essai (décision 0128 ; appelé une fois, au démarrage, par `src/instrumentation.ts`). */
+export function brancherPhotosEssai(photos: PhotosEssaiBranchees): void {
+  holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], photos };
+}
+
+/** Photos branchées, ou `null` (aucune photo, aucun appel). */
+export function photosEssai(): PhotosEssaiBranchees | null {
+  return holder[INSTANCE_KEY]?.photos ?? null;
 }
 
 /** Déblocages de l'essai branchés, ou `null` (aucun cookie lu ni écrit). */

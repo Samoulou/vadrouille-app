@@ -6,7 +6,9 @@ import { propositions } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { DeckCard, deckCardTag } from "./DeckCard";
+import type { PlacePhoto } from "@/contracts/photo";
+
+import { creditPhoto, DeckCard, deckCardTag } from "./DeckCard";
 
 const byId = (id: string) => propositions.find((p) => p.id === id)!;
 const chateau = byId("prop-j1-chateau");
@@ -53,6 +55,43 @@ describe("DeckCard", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.innerHTML).not.toContain("example.org/photo.jpg");
     expect(within(card).getByText("Photo du lieu")).toBeInTheDocument();
+  });
+
+  // Décision 0128 : photo du lieu (voyage d'essai), chargée à la demande par l'écran et passée à la carte.
+  const PHOTO: PlacePhoto = {
+    url: "https://lh3.googleusercontent.com/place-photos/test",
+    authors: [{ name: "Ana", profileUrl: "https://maps.google.com/maps/contrib/1" }, { name: "Luís" }],
+    mapsUrl: "https://www.google.com/maps/photo",
+  };
+
+  it("DeckCard: photo du lieu dans la même boîte, crédit « Photo : auteurs · Google Maps » annoncé, aucun lien dans la carte", async () => {
+    const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
+    const { container } = render(<DeckCard proposal={chateau} context={CONTEXTE} photo={PHOTO} {...handlers} />);
+    const card = screen.getByRole("button", { name: `Voir le détail de ${chateau.stop.name}` });
+    const image = card.querySelector("img")!;
+    expect(image).toHaveAttribute("src", PHOTO.url);
+    expect(image).toHaveAttribute("alt", `Photo de ${chateau.stop.name}`);
+    expect(image).toHaveAttribute("loading", "lazy");
+    expect(image).toHaveAttribute("referrerpolicy", "no-referrer");
+    const credit = within(card).getByText("Photo : Ana, Luís · Google Maps");
+    expect(card.getAttribute("aria-describedby")?.split(" ")).toContain(credit.id);
+    expect(within(card).queryByText("Photo du lieu")).toBeNull();
+    expect(card.querySelector("a")).toBeNull();
+    // Même boîte que l'emplacement (hauteur fixe du jeton) : aucun saut de mise en page.
+    expect(container.querySelector("[data-part=photo]")?.className).toContain("h-(--ligne-deck-photo)");
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("DeckCard: crédit sans auteur nommé : « Photo : Google Maps »", () => {
+    expect(creditPhoto({ url: PHOTO.url, authors: [] })).toBe("Photo\u00a0: Google Maps");
+  });
+
+  it("DeckCard: image en échec : l'emplacement « Photo du lieu » revient, sans message", () => {
+    const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
+    const { container } = render(<DeckCard proposal={chateau} photo={PHOTO} {...handlers} />);
+    fireEvent.error(container.querySelector("img")!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("Photo du lieu")).toBeInTheDocument();
   });
 
   it("DeckCard: trajet sans durée (minutes: null, décisions 0092 et 0095 § 4) : ni trajet ni détour, ni dans le rendu ni dans aria-describedby", () => {

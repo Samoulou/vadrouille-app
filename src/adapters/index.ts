@@ -1,3 +1,4 @@
+import type { PlacePhoto } from "@/contracts/photo";
 import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
@@ -12,7 +13,7 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
+import { assertPrototypeAllowedOnProcess, deblocagesEssai, photosEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
@@ -275,6 +276,24 @@ export async function reviserProgrammeEssai(ctx: AdapterContext, demande: TrialR
     return { status: STATUT_REVISION.get(statut) ?? "unavailable" };
   } catch {
     return { status: "unavailable" };
+  }
+}
+
+/** Identifiant de lieu admis pour une photo : même forme que `PLACE_ID_GOOGLE` (`src/grounding/enveloppe-google.ts`). */
+const PLACE_ID_PHOTO = /^[A-Za-z0-9_-]{1,256}$/;
+
+/**
+ * Photo d'une carte du tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23 15:23 UTC), chargée à la
+ * demande par les photos branchées sur l'adaptateur `prototype` (`src/server/p0/photos.ts` : garde du mode réel, cookie
+ * d'accès, forfait réservé). Hors adaptateur `prototype`, hors organisation de l'essai, identifiant mal formé ou photos
+ * non branchées : `null`, aucun appel. Ne lève jamais ; rien n'est stocké.
+ */
+export async function photoLieuEssai(ctx: AdapterContext, placeId: string): Promise<PlacePhoto | null> {
+  if (!isPrototypeAdapter() || ctx.organizationId !== PROTOTYPE_ORG_ID || !PLACE_ID_PHOTO.test(placeId)) return null;
+  try {
+    return (await photosEssai()?.photo(placeId)) ?? null;
+  } catch {
+    return null;
   }
 }
 
