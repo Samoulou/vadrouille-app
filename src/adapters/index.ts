@@ -11,7 +11,7 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeTripAdapter } from "./prototype-instance";
+import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeCreationAdapter, prototypeTripAdapter } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
@@ -91,7 +91,8 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
  * génération, horloge) vit dans la portée `options.scope` (portée par défaut sinon, § 10) ; `structureBrief` et
  * `suggestLodging` ne gardent rien. Les voyages sont lus par `getTripAdapter()` (voyage jamais lancé dans la portée).
  * `api` (B9e) : garde `assertApiAdapter`, sans repli vers `mock`, puis l'adaptateur branché au démarrage par
- * `src/instrumentation.ts` (`./api-creation-instance.ts`).
+ * `src/instrumentation.ts` (`./api-creation-instance.ts`). `prototype` (site d'essai, lot 3 de E2E-essai) : liste blanche,
+ * puis la création d'un voyage d'essai (`./prototype-creation.ts`).
  */
 export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): CreationAdapter {
   const choice = adapterChoice(value);
@@ -110,7 +111,9 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
       // (`./api-creation-instance.ts`) ; la portée de simulation ne sert pas (l'état vit en base).
       return apiCreationAdapter();
     case "prototype":
-      throw new Error("création indisponible avec l'adaptateur prototype (spécification P0)");
+      // Spécification E2E-essai, lot 3 (décision 0125 § 4) : lancement de `p0Run` sur le brief saisi et avancement, par
+      // le port branché au démarrage ; même liste blanche que la lecture (erreur hors liste blanche, jamais de repli).
+      return prototypeCreationAdapter();
     default:
       throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api, prototype)`);
   }

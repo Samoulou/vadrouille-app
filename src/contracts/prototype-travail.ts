@@ -12,10 +12,17 @@
 export const MODES_EXECUTION = ["reel", "essai"] as const;
 export type ModeExecution = (typeof MODES_EXECUTION)[number];
 
+/**
+ * Marqueur d'une exécution lancée depuis l'app sur un brief saisi (spécification E2E-essai, lot 3 ; décision 0125 § 1) :
+ * valeur de `prototype.runs.brief` à la place d'un nom de fichier (`runs_brief_check`) ; le brief lui-même est dans
+ * `prototype.run_briefs`, relu par l'étape (`lireBriefSaisi`).
+ */
+export const BRIEF_SAISI = "saisi";
+
 /** Exécution en cours, relue par une étape : jamais de donnée Google ni de texte libre. */
 export type ExecutionEnCours = {
   readonly mode: ModeExecution;
-  /** Nom de fichier de `prototype/briefs/` (`CHECK` de `prototype.runs.brief`). */
+  /** Nom de fichier de `prototype/briefs/`, ou `BRIEF_SAISI` (`CHECK` de `prototype.runs.brief`, décision 0125 § 1). */
   readonly brief: string;
   readonly variante: "A" | "B";
   /** Coût des modèles déjà compté par les étapes précédentes, en micro-USD (arrondi au cent supérieur, D24). */

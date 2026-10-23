@@ -14,7 +14,19 @@ import { generateFullTrip } from "./voyage-complet";
 
 export { P0RUN_COMPLET };
 /** Pièces du lancement (P0r3d), lues dans le pont `p0-run.ts` : l'application n'importe pas `src/prototype` (0048 § 1). */
-export { briefLancable, briefTientDansLeMode, cloreExecutionNonDemarree, lancementDuMode, NOMS_BRIEFS, relectureDuMode, verrouS8Leve, type LancementDuMode } from "./p0-run";
+export {
+  briefLancable,
+  briefSaisiTientDansLeMode,
+  briefTientDansLeMode,
+  cloreExecutionNonDemarree,
+  lancementDuMode,
+  NOMS_BRIEFS,
+  relectureDuMode,
+  validerBriefSaisi,
+  verrouS8Leve,
+  type BriefSaisiValide,
+  type LancementDuMode,
+} from "./p0-run";
 
 /**
  * Interface stable des workflows (décision 0009 point 2) : le reste du code ne connaît que ce module, jamais le paquet

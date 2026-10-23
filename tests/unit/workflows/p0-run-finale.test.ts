@@ -21,6 +21,7 @@ import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme, Pr
 import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, type PortConsommation } from "@/server/usage/port";
 import { DELAI_SITE_MS, MARGE_SITE_MS, SITES_DUREE_MAX_MS, type VerificateurSites } from "@/server/p0/sites";
 import { DELAI_REQUETE_MS } from "@/server/usage/port";
+import { identifiantVoyageSaisi } from "@/domain/identifiant";
 import { DUREE_MAX_EXECUTION_MS, etapeProgramme, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Run } from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
@@ -69,6 +70,9 @@ const d = vi.hoisted(() => ({
     avanceALaLectureMs: 0,
   },
   requetesSql: [] as { texte: string; valeurs: readonly unknown[] | undefined }[],
+  /** Brief saisi servi par `lireBriefSaisi` (E2E-essai, lot 3) et exécutions dont il a été lu. */
+  briefSaisi: null as unknown,
+  briefSaisiLus: [] as string[],
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
@@ -154,6 +158,11 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
     ecrireCoutModeles: async (_pool: unknown, _runId: string, micros: number) => {
       enCours();
       d.etat.cout = Math.max(d.etat.cout, Math.ceil(micros / 10_000) * 10_000);
+    },
+    lireBriefSaisi: async (_pool: unknown, runId: string) => {
+      enCours();
+      d.briefSaisiLus.push(runId);
+      return structuredClone(d.briefSaisi);
     },
     cloreExecution: async (_pool: unknown, _runId: string, code: string) => {
       if (d.etat.statut !== "en_cours") return;
@@ -307,6 +316,8 @@ function reinitialiser(): void {
   d.programme = structuredClone(fixtures.modeles.programme);
   Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0 });
   d.requetesSql.length = 0;
+  d.briefSaisi = null;
+  d.briefSaisiLus.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
   d.tablePresente = true;
@@ -1328,5 +1339,72 @@ describe("p0Run, etapeProgramme : sites de l'activité (lot 2a, spécification �
     // En cours à l'abandon : vérifiées et refusées, jamais gardées.
     expect(fin!.sitesRemoved).toBe(fin!.sitesChecked);
     expect(JSON.stringify(fin)).not.toContain(SENTINELLE_ERREUR);
+  });
+});
+
+describe("p0Run sur un brief saisi dans l'app (E2E-essai, lot 3, critère 4 ; décision 0125 § 3)", () => {
+  const BRIEF_FICHIER = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/briefs/edimbourg-1.json"), "utf8")) as Record<string, unknown>;
+  const RECIT = "Récit saisi dans l'app : on aime les ruelles médiévales et les pubs où l'on joue de la musique.";
+
+  beforeEach(() => {
+    d.etat.mode = "essai";
+    d.etat.brief = "saisi";
+    d.briefSaisi = { ...BRIEF_FICHIER, recit: RECIT };
+  });
+
+  it("brief lu en base pour cette exécution ; programme écrit sous l'identifiant connu au lancement", async () => {
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.briefSaisiLus.length).toBeGreaterThan(0);
+    expect(new Set(d.briefSaisiLus)).toEqual(new Set([RUN_ID]));
+    expect((programmeEcrit().contenu as { trip: { id: string } }).trip.id).toBe(identifiantVoyageSaisi("Édimbourg", RUN_ID));
+  });
+
+  it("requête programme : le récit saisi entre les bornes de données, zdr et data_collection deny (0117 S5, Q557)", async () => {
+    await etapeProgramme({ runId: RUN_ID });
+    expect(capture.requetes).toHaveLength(1);
+    expect(capture.requetes[0]).toMatchObject({ etape: "programme", routage: { data_collection: "deny", zdr: true } });
+    const contenu = capture.requetes[0]?.messages.map((message) => message.contenu).join("\n") ?? "";
+    expect(contenu).toContain(RECIT);
+  });
+
+  it("aucun appel de l'agent de recherche web pour un brief saisi (revue de la PR 704, Sécurité 3) : seule la capacité programme est lue, une requête programme sans greffon web", async () => {
+    const lues: string[] = [];
+    d.composerP0Reel.mockImplementation((garde: unknown, options: OptionsSimulees) => {
+      const composition = compositionSimulee(garde, options);
+      return {
+        agent: () => {
+          lues.push("agent");
+          throw new Error("l'agent de recherche web ne doit pas être composé pour un brief saisi");
+        },
+        ancrage: () => {
+          lues.push("ancrage");
+          throw new Error("l'ancrage ne doit pas être composé pour un brief saisi");
+        },
+        etapeFinale: () => {
+          lues.push("etapeFinale");
+          throw new Error("l'étape finale ne doit pas être composé pour un brief saisi");
+        },
+        programme: () => (lues.push("programme"), composition.programme()),
+      };
+    });
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(new Set(lues)).toEqual(new Set(["programme"]));
+    expect(capture.requetes.map((requete) => requete.etape)).toEqual(["programme"]);
+    expect(capture.requetes[0]).not.toHaveProperty("greffonWeb");
+  });
+
+  it("canari : aucune donnée Google dans le prompt avec un brief saisi", async () => {
+    await etapeProgramme({ runId: RUN_ID });
+    const prompts = JSON.stringify(capture.requetes);
+    for (const valeur of [...IDS_GOOGLE, ...AUTRES_GOOGLE]) expect(prompts).not.toContain(valeur);
+    expect(capture.details.length).toBeGreaterThan(1);
+  });
+
+  it("brief saisi refusé par BriefSchema (e-mail dans le récit) : brief_invalid avant toute composition et tout appel", async () => {
+    d.briefSaisi = { ...BRIEF_FICHIER, recit: "Écrivez-moi à personne@example.com pour tout le séjour." };
+    await refus(etapeProgramme({ runId: RUN_ID }));
+    expect(d.composerP0Reel).not.toHaveBeenCalled();
+    expect(capture.requetes).toHaveLength(0);
   });
 });

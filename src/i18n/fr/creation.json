@@ -22,7 +22,8 @@
         "none": "Pas encore"
       },
       "nomAdresse": "Nom ou adresse du logement",
-      "quartier": "Quartier"
+      "quartier": "Quartier",
+      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée : il est envoyé au fournisseur d'IA avec ton brief."
     },
     "villes": {
       "titre": "Autres villes",
@@ -91,7 +92,7 @@
       "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
       "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
       "reessayer": "Réessayer",
-      "essai": "Sur le site d'essai, ton récit est conservé tel quel pour ton programme ; tu complètes toi-même la vérification."
+      "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés tels quels au fournisseur d'IA qui écrit ton programme, puis conservés 29 jours et supprimés. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée. Tu complètes toi-même la vérification."
     },
     "verification": {
       "titre": "Vérifie ton brief",
@@ -186,7 +187,10 @@
         "titre": "Ton code d'accès",
         "aide": "Sur le site d'essai, le code d'accès remplace la connexion. Il ouvre l'accès pour 12 heures dans ce navigateur. Ton brouillon est conservé."
       },
-      "bientot": "Le lancement depuis l'app arrive bientôt. Ton brouillon est conservé dans cet onglet.",
+      "recit": "Ton récit contient une adresse e-mail ou un numéro de téléphone. Retire-les, puis reprends ton brief. Ton brouillon est conservé.",
+      "champ": "Une information de ton voyage n'est pas acceptée sur le site d'essai. Corrige-la, puis reprends ton brief. Ton brouillon est conservé.",
+      "corrigerVoyage": "Corriger mon voyage",
+      "plafond": "Le plafond des essais est atteint. Réessaie plus tard ; ton brouillon est conservé dans cet onglet.",
       "accesOuvert": "Accès ouvert pour 12 heures dans ce navigateur.",
       "ferme": "Le lancement n'est pas ouvert sur ce site. Ton brouillon est conservé dans cet onglet. Ouvre le site d'essai depuis le lien qu'on t'a donné."
     }
@@ -211,6 +215,14 @@
     "reessayer": "Réessayer",
     "voirMesVoyages": "Voir mes voyages",
     "voirPropositions": "Voir mes propositions",
-    "passer": "Passer, voir le programme"
+    "passer": "Passer, voir le programme",
+    "essai": {
+      "relance": "On relance la préparation de ton voyage…",
+      "relanceEchec": "Impossible de relancer la préparation pour le moment. Réessaie dans un instant.",
+      "acces": {
+        "titre": "Ton code d'accès",
+        "aide": "Ton accès au site d'essai a expiré. Saisis ton code pour relancer la préparation de ton voyage."
+      }
+    }
   }
 }

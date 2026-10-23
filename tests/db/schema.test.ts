@@ -32,10 +32,11 @@ describe("schéma", () => {
       `SELECT relnamespace::regnamespace::text || '.' || relname AS relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class
        WHERE relnamespace IN ('public'::regnamespace, 'prototype'::regnamespace) AND relkind IN ('r', 'p') ORDER BY relname`,
     );
-    // Neuf tables du schéma prototype : les sept de 0046, `trajets` (décision 0092, migration 0011_trajets_prototype) et
-    // `run_secteurs` (décision 0094 § 1 point 5, migration 0013_secteurs_prototype).
-    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 9);
-    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(9);
+    // Dix tables du schéma prototype : les sept de 0046, `trajets` (décision 0092, migration 0011_trajets_prototype),
+    // `run_secteurs` (décision 0094 § 1 point 5, migration 0013_secteurs_prototype) et `run_briefs` (décision 0125 § 1,
+    // migration 0017_brief_saisi_prototype).
+    expect(rows.length).toBeGreaterThanOrEqual(BUSINESS_TABLES.length + 10);
+    expect(rows.filter((r) => r.relname.startsWith("prototype.")).length).toBe(10);
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
     }

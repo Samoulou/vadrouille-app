@@ -409,6 +409,8 @@ describe("module de journal", () => {
       "p0.read_unavailable",
       // Décision 0124 § 2 : branchement du cookie de déblocage de l'essai impossible, nom d'erreur seulement.
       "essai.unlock_unavailable",
+      // Décision 0125 § 2 : branchement de la création d'un voyage d'essai impossible, nom d'erreur seulement.
+      "essai.creation_unavailable",
       // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
       "email.address_refused",
       "email.transport_disabled",

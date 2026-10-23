@@ -1,5 +1,6 @@
 import "server-only";
 
+import { BRIEF_SAISI } from "@/contracts/prototype-travail";
 import { refusDuForfait, type Forfait, type LimitesForfait, type SommesForfaits, type UniteQuotaRoutes } from "@/server/usage/forfait";
 import type { CodeRefusUsage } from "@/server/usage/port";
 
@@ -50,14 +51,26 @@ export type ReglesForfait = {
 
 export type DemandeExecution = {
   readonly mode: "reel" | "essai";
-  /** Nom de fichier de `prototype/briefs/`. */
+  /** Nom de fichier de `prototype/briefs/`, ou `BRIEF_SAISI` avec `briefSaisi` (décision 0125 § 1). */
   readonly brief: string;
   readonly variant: "A" | "B";
   readonly commitSha: string;
   readonly forfait: Forfait;
+  /**
+   * Brief saisi dans l'app (spécification E2E-essai, lot 3 ; décision 0125 § 1) : écrit dans `prototype.run_briefs` dans la
+   * transaction de la réservation, avec la clé d'idempotence du lancement. Exigé si et seulement si `brief` vaut
+   * `BRIEF_SAISI` (la base le refuse sinon : `runs_brief_check`, déclencheurs de `run_briefs`).
+   */
+  readonly briefSaisi?: { readonly requestId: string; readonly contenu: unknown };
 };
 
-export type ResultatLancement = { readonly ok: true; readonly runId: string } | { readonly ok: false; readonly code: CodeRefusUsage };
+/**
+ * Réservation réussie. `existante` (lancement depuis l'app seulement, décision 0125 § 2) : une exécution porte déjà la clé
+ * d'idempotence du lancement ; rien n'est écrit, et l'appelant ne redémarre pas son workflow.
+ */
+export type ResultatLancement =
+  | { readonly ok: true; readonly runId: string; readonly existante?: true; readonly destination?: string }
+  | { readonly ok: false; readonly code: CodeRefusUsage };
 export type ResultatRelecture = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusUsage };
 
 const nombre = (valeur: unknown): number => {
@@ -92,6 +105,12 @@ GROUP BY b.jour, b.mois_google, b.mois_utc`;
 
 const SQL_INSERER_RUN = `INSERT INTO prototype.runs (mode, brief, variant, commit_sha) VALUES ($1, $2, $3, $4) RETURNING id`;
 
+export { BRIEF_SAISI };
+
+/** Exécution déjà lancée avec cette clé d'idempotence (décision 0125 § 2), lue sous le verrou de la réservation. */
+const SQL_RUN_DU_LANCEMENT = "SELECT run_id, brief ->> 'destination' AS destination FROM prototype.run_briefs WHERE request_id = $1::uuid";
+const SQL_INSERER_BRIEF = "INSERT INTO prototype.run_briefs (run_id, request_id, brief) VALUES ($1::uuid, $2::uuid, $3::jsonb)";
+
 const SQL_INSERER_FORFAIT = `INSERT INTO prototype.forfaits
   (nature, run_id, text_search_requests, place_details_requests, routes_requests, routes_elements, google_cost_micros, models_cost_micros)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
@@ -125,6 +144,12 @@ async function reserver<T>(
   regles: ReglesForfait,
   avant: (client: ClientSql) => Promise<CodeRefusUsage | null>,
   inserer: (client: ClientSql) => Promise<T>,
+  /**
+   * Réservation déjà faite (clé d'idempotence d'un lancement depuis l'app, décision 0125 § 2) : lue sous le verrou,
+   * **avant** tout contrôle de forfait ; trouvée, elle est rendue sans rien écrire ni refuser (revue de la PR #704,
+   * mineur TL 2 : un rejeu au bord d'un plafond n'est jamais refusé).
+   */
+  deja: (client: ClientSql) => Promise<T | null> = async () => null,
 ): Promise<T | Refus> {
   let client: ClientSql;
   try {
@@ -138,6 +163,12 @@ async function reserver<T>(
     enTransaction = true;
     await client.query("SELECT pg_catalog.set_config('app.organization_id', $1, true)", [ORGANISATION_PROTOTYPE]);
     await client.query("SELECT pg_catalog.pg_advisory_xact_lock($1)", [CLE_VERROU_FORFAIT]);
+    const existante = await deja(client);
+    if (existante !== null) {
+      await client.query("COMMIT");
+      enTransaction = false;
+      return existante;
+    }
     await client.query(SQL_ORPHELINES, [regles.dureeMaxMs + MARGE_ORPHELINE_MS]);
     const prealable = await avant(client);
     const refus = prealable ?? refusDuForfait(lireSommes((await client.query(SQL_SOMMES)).rows[0]), forfait, regles.limites, regles.uniteQuotaRoutes);
@@ -175,20 +206,34 @@ const valeursForfait = (forfait: Forfait, runId: string | null) => [
  */
 export async function reserverExecution(pool: PoolSql, demande: DemandeExecution, regles: ReglesForfait): Promise<ResultatLancement> {
   if (demande.forfait.nature !== "execution") return { ok: false, code: "usage_unavailable" };
+  const saisi = demande.briefSaisi;
+  if ((saisi !== undefined) !== (demande.brief === BRIEF_SAISI)) return { ok: false, code: "usage_unavailable" };
   const resultat = await reserver(
     pool,
     demande.forfait,
     regles,
     async () => null,
-    async (client) => {
+    async (client): Promise<{ runId: string; existante?: true; destination?: string }> => {
       const { rows } = await client.query(SQL_INSERER_RUN, [demande.mode, demande.brief, demande.variant, demande.commitSha]);
       const runId = rows[0]?.id;
       if (typeof runId !== "string") throw new Error("forfait: exécution non créée");
       await client.query(SQL_INSERER_FORFAIT, valeursForfait(demande.forfait, runId));
+      if (saisi !== undefined) await client.query(SQL_INSERER_BRIEF, [runId, saisi.requestId, JSON.stringify(saisi.contenu)]);
       return { runId };
     },
+    // Idempotence du lancement depuis l'app (décision 0125 § 2) : sous le verrou, avant le contrôle du forfait, une clé
+    // déjà écrite rend son exécution et la destination de **son** brief (le voyage d'origine), sans rien écrire.
+    async (client) => {
+      if (saisi === undefined) return null;
+      const ligne = (await client.query(SQL_RUN_DU_LANCEMENT, [saisi.requestId])).rows[0];
+      if (typeof ligne?.run_id !== "string" || typeof ligne.destination !== "string") return null;
+      return { runId: ligne.run_id, existante: true as const, destination: ligne.destination };
+    },
   );
-  return "refus" in resultat ? { ok: false, code: resultat.refus } : { ok: true, runId: resultat.runId };
+  if ("refus" in resultat) return { ok: false, code: resultat.refus };
+  return resultat.existante && resultat.destination !== undefined
+    ? { ok: true, runId: resultat.runId, existante: true, destination: resultat.destination }
+    : { ok: true, runId: resultat.runId };
 }
 
 /** Début d'une relecture : forfait de relecture réservé (aucune ligne `runs`). */

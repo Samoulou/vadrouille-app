@@ -9,7 +9,7 @@ import type { BriefField, CommitmentKind, MobilityMode, Pace } from "@/contracts
  * Une ligne `stays` par ville (destination d'abord), de l'arrivée à l'arrivée suivante (borne exclusive, B9-TL-6 (f)) ;
  * le type de logement d'origine (`lodging_kind`) et les valeurs maison de la suggestion retenue sont gardés tels
  * quels. Seul identifiant Google écrit : le `placeId` d'un logement suggéré (`stays.place_id`, CLAUDE.md, 0011) ;
- * aucune autre donnée Google n'entre dans ces lignes. Le récit n'est pas dans `TripRequest` : `briefs.story` reste nul.
+ * aucune autre donnée Google n'entre dans ces lignes. `TripRequest.story` (facultatif, site d'essai seulement, décision 0125 § 5) n'est jamais écrit ici : `briefs.story` reste nul.
  */
 
 export interface LigneSejour {

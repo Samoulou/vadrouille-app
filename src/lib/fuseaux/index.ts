@@ -1,3 +1,4 @@
+import PAYS from "./pays.json";
 import VILLES from "./villes.json";
 
 /**
@@ -9,6 +10,13 @@ import VILLES from "./villes.json";
  */
 
 const TABLE: ReadonlyMap<string, string> = new Map(Object.entries(VILLES as Record<string, string>));
+
+/**
+ * Table maison ville → pays (spécification E2E-essai, lot 3, décision D1 : jamais Google, jamais demandé à la personne),
+ * mêmes clés que la table des fuseaux (test d'égalité) ; nom du pays en français, comme le champ `pays` d'un brief du
+ * prototype (`prototype/briefs/`).
+ */
+const PAYS_PAR_VILLE: ReadonlyMap<string, string> = new Map(Object.entries(PAYS as Record<string, string>));
 
 const QUART_D_HEURE_MS = 15 * 60_000;
 const JOUR_MS = 86_400_000;
@@ -64,6 +72,16 @@ export function fuseauReconnu(zone: string): boolean {
 export function fuseauDeVille(nom: string): string | null {
   const zone = TABLE.get(cleVille(nom));
   return zone !== undefined && fuseauReconnu(zone) ? zone : null;
+}
+
+/** Pays d'une ville de la table (nom français, table maison), ou `null` pour une ville inconnue. */
+export function paysDeVille(nom: string): string | null {
+  return PAYS_PAR_VILLE.get(cleVille(nom)) ?? null;
+}
+
+/** Clés de la table des pays (tests). */
+export function villesAvecPays(): readonly string[] {
+  return [...PAYS_PAR_VILLE.keys()];
 }
 
 /** Décalage UTC du fuseau à l'instant donné, en minutes (à la seconde près). */

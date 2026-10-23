@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
@@ -10,18 +11,27 @@ import { DayBadge } from "@/components/ligne/DayBadge";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { GenerationStatus } from "@/contracts";
 import { presentationRoute } from "@/features/presentation/routes";
+import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import { getGenerationStatus } from "@/server/actions/creation";
+import { getGenerationStatus, relancerVoyageEssai } from "@/server/actions/creation";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { EMPTY_LIVE_REGION_CLASS } from "./fields";
+import { creationRoutes } from "./routes";
 import { isPreviewReady, missingMessage, newlyReadyDays, readyCounter, useGenerationStatus, type FetchStatus } from "./generation";
 import { takePreviewReady } from "./launch-timing";
 
 const t = messages.creation.ecran5;
+const e = t.essai;
+
+/**
+ * Relance d'un voyage d'essai (décision 0125 § 4) : en cours (annoncée, titre de la préparation), en échec avec son
+ * message, ou accès expiré (saisie du code dans l'écran, puis relance).
+ */
+type Relance = { kind: "idle" } | { kind: "pending" } | { kind: "echec"; message: string } | { kind: "code" };
 
 const fetchFromAction: FetchStatus = (tripId) => getGenerationStatus({ tripId });
 
@@ -34,6 +44,12 @@ export interface PreparationViewProps {
   recorder?: EventRecorder;
   /** Lecture de l'avancement (tests) ; l'action `getGenerationStatus` par défaut. */
   fetchStatus?: FetchStatus;
+  /**
+   * Site d'essai (adaptateur `prototype`, valeur serveur ; spécification E2E-essai, lot 3 ; décision 0125 § 4) : sur un
+   * échec (exécution arrêtée), « Réessayer » relance le brief saisi sous un **nouveau** voyage (`relancerVoyageEssai`),
+   * puis l'adresse est remplacée par l'écran 5 du nouveau voyage. Ailleurs, « Réessayer » reprend l'interrogation.
+   */
+  essai?: boolean;
 }
 
 /**
@@ -50,8 +66,15 @@ export interface PreparationViewProps {
  *   validation de la mesure est chargée à ce moment (`createLazyTrack`), hors du JavaScript initial.
  * Aucun nom de lieu : les arrêts sont des anneaux sans numéro (F8-PO-12).
  */
-export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction }: PreparationViewProps) {
+export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction, essai = false }: PreparationViewProps) {
+  const router = useRouter();
   const { status, interrupted, retry } = useGenerationStatus(tripId, initial, fetchStatus);
+  // Relance d'un voyage d'essai : un `requestId` par écran (double appui : une seule exécution réservée).
+  const relanceId = useRef<string | null>(null);
+  const relanceEnVol = useRef(false);
+  const [relance, setRelance] = useState<Relance>({ kind: "idle" });
+  // Retour de la saisie du code : le titre de l'écran reçoit le focus (un seul focus, WCAG 2.4.3).
+  const [retourAcces, setRetourAcces] = useState(false);
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
   const [announcements, setAnnouncements] = useState<string[]>([]);
   const previous = useRef(initial);
@@ -77,15 +100,65 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
     track({ name: "preview_ready", properties }).catch(() => undefined);
   }, [ready, tripId, track]);
 
+  useEffect(() => {
+    if (retourAcces) title.current?.focus();
+  }, [retourAcces]);
+
   const failed = status.phase === "failed" ? status : null;
-  const showError = failed !== null || interrupted;
+  const enRelance = relance.kind === "pending";
+  const showError = (failed !== null || interrupted) && !enRelance;
   const canRetry = interrupted || (failed?.retryable ?? false);
   const routes = tripRoutes("/voyages", tripId);
 
   function retryWithFocus() {
     // Le bandeau (et le bouton) disparaît pendant la reprise : le focus va au titre (WCAG 2.4.3).
     title.current?.focus();
+    if (essai && failed !== null && !interrupted) {
+      setRelance({ kind: "pending" });
+      void relancer();
+      return;
+    }
     retry();
+  }
+
+  /** Relance du brief saisi ; l'appelant a déjà affiché l'attente. Chaque échec a son message (WCAG 4.1.3). */
+  async function relancer() {
+    if (relanceEnVol.current) return;
+    relanceEnVol.current = true;
+    relanceId.current ??= crypto.randomUUID();
+    let code: string | null = null;
+    try {
+      const result = await relancerVoyageEssai({ tripId, requestId: relanceId.current });
+      if (result.ok) {
+        router.replace(creationRoutes.preparation(result.value.tripId));
+        return;
+      }
+      code = result.error.code;
+    } catch {
+      // Erreur réseau ou serveur : message générique de la relance.
+    } finally {
+      relanceEnVol.current = false;
+    }
+    if (code === "unauthenticated") {
+      setRetourAcces(false);
+      setRelance({ kind: "code" });
+      return;
+    }
+    setRelance({ kind: "echec", message: code === "cost_cap_reached" ? messages.creation.lancement.essai.plafond : e.relanceEchec });
+  }
+
+  function surAcces() {
+    setRelance({ kind: "pending" });
+    setRetourAcces(true);
+    void relancer();
+  }
+
+  if (relance.kind === "code") {
+    return (
+      <CreationShell backHref={mesVoyagesRoute()}>
+        <SaisieCodeAcces ouverte={false} parcours={{ titre: e.acces.titre, aide: e.acces.aide, surAcces }} />
+      </CreationShell>
+    );
   }
 
   return (
@@ -113,6 +186,10 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
           <p key={index}>{message}</p>
         ))}
       </div>
+      {/* Relance d'un voyage d'essai : annoncée dès l'appui, région présente dès l'affichage (décision 0125 § 4). */}
+      <p role="status" className={enRelance ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
+        {enRelance ? e.relance : null}
+      </p>
       <div role="status" className={status.phase === "incomplete" ? undefined : EMPTY_LIVE_REGION_CLASS}>
         {status.phase === "incomplete" ? (
           <StatusBanner kind="noOption" announce={false} message={missingMessage(status.expected - status.ready)} />
@@ -123,7 +200,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
           <StatusBanner
             kind="error"
             announce={false}
-            message={t.interrompue}
+            message={relance.kind === "echec" ? relance.message : t.interrompue}
             action={
               canRetry ? (
                 <Button variant="secondary" size="sm" onClick={retryWithFocus}>

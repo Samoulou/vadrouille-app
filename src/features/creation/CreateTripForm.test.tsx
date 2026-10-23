@@ -220,6 +220,12 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it("logement saisi : aide « pas d'adresse privée » reliée au champ (décision 0125 § 6) ; absente hors du site d'essai", () => {
+    renderEssai();
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Oui" }));
+    expect(screen.getByLabelText("Nom ou adresse du logement")).toHaveAccessibleDescription(expect.stringContaining("pas une adresse privée"));
+  });
+
   it("une seule ville : « Autres villes » et « Ajouter une ville » ne sont pas proposés", () => {
     renderEssai();
     expect(screen.queryByRole("heading", { name: "Autres villes" })).not.toBeInTheDocument();
