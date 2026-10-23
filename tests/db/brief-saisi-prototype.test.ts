@@ -36,7 +36,7 @@ const BRIEF = {
   recit: "On aime la Rome antique.",
 };
 /** Clés de premier niveau de `BriefSchema` (`src/prototype/brief.ts`), celles que la contrainte admet. */
-const CLES_BRIEF = ["schema", "destination", "pays", "fuseau", "arrivee", "depart", "heureArrivee", "heureDepart", "voyageurs", "rythme", "envies", "deplacements", "budgetRepas", "logements", "engagements", "recit"];
+const CLES_BRIEF = ["schema", "destination", "pays", "fuseau", "arrivee", "depart", "heureArrivee", "heureDepart", "voyageurs", "rythme", "envies", "aEviter", "deplacements", "budgetRepas", "logements", "engagements", "recit"];
 
 const FORFAIT: Forfait = {
   nature: "execution",
@@ -134,7 +134,8 @@ describe("p0: brief saisi, une exécution porte un fichier ou un brief saisi (01
       ] as const) {
         expect((await inserer(await executionSaisi(), contenu)).code, libelle).toBe("23514");
       }
-      const toutes = { ...BRIEF, budgetRepas: 2, engagements: [] };
+      // `aEviter` admise depuis 0018_brief_saisi_a_eviter (E2E-essai, lot 5).
+      const toutes = { ...BRIEF, budgetRepas: 2, engagements: [], aEviter: ["nightlife"] };
       expect(Object.keys(toutes).sort()).toEqual([...CLES_BRIEF].sort());
       const run = await executionSaisi();
       expect((await inserer(run, toutes)).code).toBeUndefined();

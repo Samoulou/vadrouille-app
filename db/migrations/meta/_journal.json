@@ -127,6 +127,13 @@
       "when": 1792747083820,
       "tag": "0017_brief_saisi_prototype",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792833483820,
+      "tag": "0018_brief_saisi_a_eviter",
+      "breakpoints": true
     }
   ]
 }
