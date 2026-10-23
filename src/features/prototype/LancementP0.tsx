@@ -130,7 +130,7 @@ function Execution({ execution }: { execution: ExecutionSuivie }) {
  *   premier d'entre eux (`groupRef`). Autre issue : le focus reste sur le bouton.
  * - « Actualiser » relit la page côté serveur (`router.refresh()`) sans perdre l'état du formulaire ni le message.
  */
-export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
+export function LancementP0({ modele, etapesAvecSite }: { modele: ModeleLancementP0; etapesAvecSite?: number | null }) {
   const [etat, envoyer, enCours] = useActionState(lancerAvecChoix, ETAT_INITIAL);
   const router = useRouter();
   const envoiEnVol = useRef(false);
@@ -316,12 +316,20 @@ export function LancementP0({ modele }: { modele: ModeleLancementP0 }) {
           <div role="region" aria-label={t.rapport.texteAria} tabIndex={0} className="overflow-x-auto rounded-control bg-muted p-4">
             <pre className="text-corps-s whitespace-pre-wrap text-ink tabular-nums">{rapport.texte}</pre>
           </div>
-          {/* Étapes avec et sans lieu vérifié : sur la page seulement, jamais dans le texte copié (0117 § 4). */}
-          <p className="text-corps-s text-ink tabular-nums">
-            {rapport.etapes === null
-              ? t.rapport.etapesNonRelevees
-              : format(t.rapport.etapes, { avec: rapport.etapes.avecPlaceId, sans: rapport.etapes.sansPlaceId })}
-          </p>
+          {/* Étapes avec et sans lieu vérifié (0117 § 4), puis étapes avec site (lot 2a, 0122 § 2.3, hors du contrat
+              `RapportPage`) : sur la page seulement, jamais dans le texte copié ; regroupées (revue de #694, mineur UX). */}
+          <div className="flex flex-col gap-1">
+            <p className="text-corps-s text-ink tabular-nums">
+              {rapport.etapes === null
+                ? t.rapport.etapesNonRelevees
+                : format(t.rapport.etapes, { avec: rapport.etapes.avecPlaceId, sans: rapport.etapes.sansPlaceId })}
+            </p>
+            {etapesAvecSite === undefined ? null : (
+              <p className="text-corps-s text-ink tabular-nums">
+                {etapesAvecSite === null ? t.rapport.etapesAvecSiteNonRelevees : format(t.rapport.etapesAvecSite, { n: etapesAvecSite })}
+              </p>
+            )}
+          </div>
           <Button type="button" variant="secondary" className="w-full" onClick={() => void copier(rapport.texte)}>
             {t.rapport.copier}
           </Button>

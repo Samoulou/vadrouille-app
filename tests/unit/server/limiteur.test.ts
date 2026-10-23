@@ -345,7 +345,8 @@ describe("module de journal", () => {
   });
 
   // Décision 0116 § 4.4 et verdict 0117 § 4 : compteurs maison de `p0.programme_written`, des entiers positifs ou nuls.
-  it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap"])(
+  // Lot 2a (décision 0121 § 2.3, verdict 0122 § 2.1) : `sites*`, même règle.
+  it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap", "sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked"])(
     "décision 0116 : %s, entier positif ou nul, admis sur p0.programme_written ; négatif, chaîne, non-entier ou nom retirés",
     (champ) => {
       const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { [champ]: valeur }, "info")) as Record<string, unknown>;
@@ -363,6 +364,18 @@ describe("module de journal", () => {
       formatLogLine("p0.programme_written", { days: 3, verified: 4, verifies: 4, introuvables: 1, notFound: 1, fermes: 1, closed: 1, horsZone: 1, outOfZone: 1 }, "info"),
     ) as Record<string, unknown>;
     expect(ligne).toEqual({ level: "info", event: "p0.programme_written", days: 3, dropped: 8 });
+  });
+
+  // Verdict 0122 § 2.1 point 4 : aucun compteur par motif, aucune adresse ni aucun statut sur la ligne des sites.
+  it("journal: sites sans motif, adresse, hôte ni statut (champs inconnus retirés)", () => {
+    const ligne = JSON.parse(
+      formatLogLine(
+        "p0.programme_written",
+        { sitesProposed: 3, sitesChecked: 2, sitesRemoved: 1, sitesUnchecked: 1, sitesBlocked: 1, sitesTimeout: 1, sitesRedirect: 1, httpStatus: 403, site: "https://lieu.example.org/", host: "lieu.example.org" },
+        "info",
+      ),
+    ) as Record<string, unknown>;
+    expect(ligne).toEqual({ level: "info", event: "p0.programme_written", sitesProposed: 3, sitesChecked: 2, sitesRemoved: 1, sitesUnchecked: 1, dropped: 6 });
   });
 
   it("errorNameOf ne lit que error.name, jamais message, code ni cause", () => {
@@ -394,6 +407,10 @@ describe("module de journal", () => {
       "p0.programme_written",
       // Décision 0074 : branchement de la lecture des programmes réels impossible, nom d'erreur seulement.
       "p0.read_unavailable",
+      // Décision 0124 § 2 : branchement du cookie de déblocage de l'essai impossible, nom d'erreur seulement.
+      "essai.unlock_unavailable",
+      // Décision 0125 § 2 : branchement de la création d'un voyage d'essai impossible, nom d'erreur seulement.
+      "essai.creation_unavailable",
       // B3b : adresse refusée, envoi désactivé, journal de Better Auth, échec d'une opération ou de la purge (aucune valeur).
       "email.address_refused",
       "email.transport_disabled",

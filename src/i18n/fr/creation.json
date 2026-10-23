@@ -22,7 +22,8 @@
         "none": "Pas encore"
       },
       "nomAdresse": "Nom ou adresse du logement",
-      "quartier": "Quartier"
+      "quartier": "Quartier",
+      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée. Ce nom est envoyé au fournisseur d'IA (hors UE) avec ton brief, et à Google pour le placer sur la carte. Nous le conservons 29 jours, puis le supprimons. N'y mets ni e-mail, ni numéro de téléphone."
     },
     "villes": {
       "titre": "Autres villes",
@@ -73,7 +74,10 @@
       "date": "Indique la date.",
       "dateHorsVoyage": "La date doit être comprise dans les dates du voyage.",
       "debut": "Indique l'heure de début.",
-      "fin": "L'heure de fin doit suivre l'heure de début."
+      "fin": "L'heure de fin doit suivre l'heure de début.",
+      "villeInconnue": "Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.",
+      "uneSeuleVille": "Une seule ville sur le site d'essai : retire cette ville.",
+      "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée."
     }
   },
   "ecran2": {
@@ -82,11 +86,14 @@
       "aide": "Qui part, ce qui te fait envie, ce que tu préfères éviter, ton budget pour les repas.",
       "compteur": "{n} sur {max} caractères",
       "preparer": "Préparer mon brief",
+      "verifier": "Vérifier mon brief",
       "remplirMoiMeme": "Remplir moi-même",
       "attente": "On prépare ton brief…",
       "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
       "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
-      "reessayer": "Réessayer"
+      "reessayer": "Réessayer",
+      "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés au fournisseur d'IA (hors UE), qui écrit ton programme. Nous les conservons 29 jours, puis les supprimons. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée.",
+      "essaiVerification": "Tu vérifies ensuite ton brief toi-même."
     },
     "verification": {
       "titre": "Vérifie ton brief",
@@ -165,7 +172,8 @@
     "aucunQuartier": "Aucun quartier à te proposer pour l'instant.",
     "echec": "Impossible de chercher un quartier pour le moment.",
     "reessayer": "Réessayer",
-    "continuerSansLogement": "Continuer sans logement"
+    "continuerSansLogement": "Continuer sans logement",
+    "essai": "Pas de suggestion de logement sur le site d'essai. Ton programme partira du centre-ville."
   },
   "lancement": {
     "titre": "On crée ton voyage",
@@ -173,7 +181,20 @@
     "conflit": "Tu as déjà des propositions en préparation.",
     "voirConflit": "Voir ces propositions",
     "echec": "Impossible de créer ton voyage pour le moment. Ton brouillon est conservé.",
-    "reessayer": "Réessayer"
+    "reessayer": "Réessayer",
+    "essai": {
+      "titre": "Ton brouillon est prêt",
+      "acces": {
+        "titre": "Ton code d'accès",
+        "aide": "Sur le site d'essai, le code d'accès remplace la connexion. Il ouvre l'accès pour 12 heures dans ce navigateur. Ton brouillon est conservé."
+      },
+      "recit": "Ton récit contient une adresse e-mail ou un numéro de téléphone. Retire-les, puis reprends ton brief. Ton brouillon est conservé.",
+      "champ": "Une information de ton voyage n'est pas acceptée sur le site d'essai. Corrige-la, puis reprends ton brief. Ton brouillon est conservé.",
+      "corrigerVoyage": "Corriger mon voyage",
+      "plafond": "Le plafond des essais est atteint. Réessaie plus tard ; ton brouillon est conservé dans cet onglet.",
+      "accesOuvert": "Accès ouvert pour 12 heures dans ce navigateur.",
+      "ferme": "Le lancement n'est pas ouvert sur ce site. Ton brouillon est conservé dans cet onglet. Ouvre le site d'essai depuis le lien qu'on t'a donné."
+    }
   },
   "ecran5": {
     "titre": "On prépare tes premières propositions",
@@ -195,6 +216,15 @@
     "reessayer": "Réessayer",
     "voirMesVoyages": "Voir mes voyages",
     "voirPropositions": "Voir mes propositions",
-    "passer": "Passer, voir le programme"
+    "passer": "Passer, voir le programme",
+    "essai": {
+      "relance": "On relance la préparation de ton voyage…",
+      "relanceEchec": "Impossible de relancer la préparation pour le moment. Réessaie dans un instant.",
+      "plafond": "Le plafond des essais est atteint. Réessaie plus tard.",
+      "acces": {
+        "titre": "Ton code d'accès",
+        "aide": "Ton accès au site d'essai a expiré. Saisis ton code pour relancer la préparation de ton voyage."
+      }
+    }
   }
 }

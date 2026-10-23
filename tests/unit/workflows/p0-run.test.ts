@@ -5,7 +5,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FatalError } from "workflow";
 
-import { DUREE_MAX_EXECUTION_MS, etapeClore, etapeProgramme, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, etapeClore, etapeProgramme, etapeRevision, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
 
 /**
  * Workflow `p0Run` (P0r3c-4, décisions 0009, 0055 et 0063 ; depuis la décision 0116 § 3, une seule étape de travail
@@ -354,6 +354,11 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
+        // Lot 2a (0121 § 2.3, § 4.3) : aucun site proposé, aucun soumis.
+        sitesProposed: 0,
+        sitesChecked: 0,
+        sitesRemoved: 0,
+        sitesUnchecked: 0,
       },
     ]);
     const texte = JSON.stringify(lignes);
@@ -381,6 +386,10 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
+        sitesProposed: 0,
+        sitesChecked: 0,
+        sitesRemoved: 0,
+        sitesUnchecked: 0,
         errorName: "ErreurOpenRouter",
       },
     ]);
@@ -401,14 +410,18 @@ describe("p0Run : forme du module (décision 0063 ; décision 0116 § 3.1)", () 
   const index = readFileSync(path.join(process.cwd(), "src/workflows/index.ts"), "utf8");
 
   it("aucune étape relancée (maxRetries = 0)", () => {
-    for (const etape of [etapeProgramme, etapeClore]) expect((etape as unknown as { maxRetries: number }).maxRetries).toBe(0);
+    for (const etape of [etapeProgramme, etapeRevision, etapeClore]) expect((etape as unknown as { maxRetries: number }).maxRetries).toBe(0);
   });
 
   it("workflows: p0Run réduit à etapeProgramme puis etapeClore ; ni webhook ni hook dans src/workflows", () => {
-    expect(source.match(/^\s*"use workflow";$/gm)).toHaveLength(1);
-    expect(source.match(/^\s*"use step";$/gm)).toHaveLength(2);
-    const corps = source.slice(source.indexOf("export async function p0Run("));
+    // Décision 0126 § 1 : `p0Revision` (etapeRevision puis etapeClore) s'ajoute, même forme.
+    expect(source.match(/^\s*"use workflow";$/gm)).toHaveLength(2);
+    expect(source.match(/^\s*"use step";$/gm)).toHaveLength(3);
+    const debutRevision = source.indexOf("export async function p0Revision(");
+    const corps = source.slice(source.indexOf("export async function p0Run("), debutRevision);
     expect([...corps.matchAll(/await (etape\w+)\(/g)].map((m) => m[1])).toEqual(["etapeProgramme", "etapeClore"]);
+    const corpsRevision = source.slice(debutRevision);
+    expect([...corpsRevision.matchAll(/await (etape\w+)\(/g)].map((m) => m[1])).toEqual(["etapeRevision", "etapeClore"]);
     for (const ancienne of ["etapeRecherche", "etapeAncrage", "etapeFinale"]) expect(source).not.toMatch(new RegExp(`export async function ${ancienne}\\(`));
     // P0r3d : `complet.ts`, l'interrupteur de démarrage seul (une constante, aucune directive, aucun import hors server-only).
     const complet = readFileSync(path.join(process.cwd(), "src/workflows/complet.ts"), "utf8");

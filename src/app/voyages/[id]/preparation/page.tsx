@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getTripReader } from "@/adapters";
+import { getTripReader, isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { contexteFacultatif, exigerSession } from "@/features/compte/session";
 import { creationRoutes } from "@/features/creation/routes";
@@ -52,5 +52,6 @@ export default async function PreparationPage({ params }: { params: Params }) {
     if (status.error.code === "not_found") notFound();
     throw new Error("avancement de la génération illisible");
   }
-  return <PreparationView tripId={id} initial={status.value} recorderKind={devPagesEnabled() ? "console" : "none"} />;
+  // Site d'essai (adaptateur `prototype` ; E2E-essai, lot 3) : « Réessayer » relance le brief saisi (décision 0125 § 4).
+  return <PreparationView tripId={id} initial={status.value} recorderKind={devPagesEnabled() ? "console" : "none"} essai={isPrototypeAdapter()} />;
 }

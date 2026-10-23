@@ -94,4 +94,24 @@ describe("p0: formulaire de saisie du code d'accès", () => {
     expect(screen.getByRole("heading", { level: 1, name: t.titre })).toHaveFocus();
     expect(screen.queryByLabelText(t.libelle)).toBeNull();
   });
+
+  it("dans le parcours de création : acceptée, `surAcces` est appelée et le titre de la saisie ne prend pas le focus", async () => {
+    action.mockResolvedValue({ statut: "accepte" });
+    const surAcces = vi.fn();
+    render(<SaisieCodeAcces ouverte={false} parcours={{ titre: "Titre du parcours", aide: "Aide du parcours", surAcces }} />);
+    await act(async () => {
+      fireEvent.submit(formulaire());
+    });
+    expect(surAcces).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).not.toHaveFocus();
+  });
+
+  it("dans le parcours : le titre reçoit le focus à l'affichage avec `focusAuMontage`, jamais sans", () => {
+    const parcours = { titre: "Titre du parcours", aide: "Aide du parcours", surAcces: vi.fn() };
+    const { unmount } = render(<SaisieCodeAcces ouverte={false} parcours={parcours} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).not.toHaveFocus();
+    unmount();
+    render(<SaisieCodeAcces ouverte={false} parcours={{ ...parcours, focusAuMontage: true }} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).toHaveFocus();
+  });
 });

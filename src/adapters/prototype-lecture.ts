@@ -40,8 +40,12 @@ import type { ConserverTrajets, ProgrammeReelLu, SourceProgrammesReels, TrajetsC
  *   journalisées.
  * - **Schéma unique** : `ProgrammeEcritSchema` (`src/prototype/programme-reduit.ts`, partagé avec le rapport), puis
  *   `trip.id` égal à l'identifiant demandé. Un contenu refusé n'est jamais servi ni journalisé.
- * - **Identifiant en double** : deux programmes portant le même `trip.id` (impossible par construction, 0071) ne sont
- *   servis ni par la liste ni par la page du voyage : le voyage est absent des deux, de façon cohérente.
+ * - **Versions d'un voyage** (décision 0126 § 1) : une révision après le tri écrit un nouveau programme sous le **même**
+ *   `trip.id` ; la liste et la page servent la **version servie**, celle de l'exécution commencée la dernière (jointure
+ *   sur `prototype.runs`, une ligne par voyage). Les versions précédentes restent en base jusqu'à leur expiration, jamais
+ *   servies. Le SQL ne rend donc qu'une ligne par voyage (`DISTINCT ON` pour la liste, `LIMIT 1` pour la page) ; le
+ *   code garde sa défense, vérifiée sur un client simulé seulement : une source qui rendrait deux lignes pour un même
+ *   voyage n'en servirait aucune.
  *
  * - **Temps de trajet conservés** (décision 0092 § 4, prototype seulement) : lus **avec le programme**, dans la même
  *   transaction, une requête pour tous les programmes lus (comme les positions), dans `prototype.trajets` (lignes non
@@ -89,12 +93,20 @@ export const SQL_DELAI = `SET LOCAL statement_timeout = ${DELAI_LECTURE_MS}`;
 /** Programmes listés au plus ; au-delà, la lecture échoue fermée (jamais une liste tronquée en silence). */
 export const PROGRAMMES_MAX = 200;
 
-/** Contenus des programmes non expirés, pour « Mes voyages » : une seule requête (`PROGRAMMES_MAX` + 1 lignes au plus). */
-export const SQL_LISTE = `SELECT id, contenu FROM prototype.programmes
-WHERE expires_at > pg_catalog.now() ORDER BY contenu #>> '{trip,id}' LIMIT ${PROGRAMMES_MAX + 1}`;
-/** Contenu du programme d'un voyage, s'il n'est pas expiré (deux lignes au plus, pour détecter un doublon). */
-export const SQL_PROGRAMME = `SELECT id, contenu FROM prototype.programmes
-WHERE contenu #>> '{trip,id}' = $1::text AND expires_at > pg_catalog.now() LIMIT 2`;
+/**
+ * Contenus des programmes non expirés, pour « Mes voyages » : une seule requête (`PROGRAMMES_MAX` + 1 lignes au plus),
+ * **une ligne par voyage**, sa version servie (décision 0126 § 1 : le programme de l'exécution commencée la dernière).
+ */
+export const SQL_LISTE = `SELECT DISTINCT ON (p.contenu #>> '{trip,id}') p.id, p.contenu
+FROM prototype.programmes AS p JOIN prototype.runs AS r ON r.id = p.run_id
+WHERE p.expires_at > pg_catalog.now() ORDER BY p.contenu #>> '{trip,id}', r.started_at DESC, r.id DESC LIMIT ${PROGRAMMES_MAX + 1}`;
+/**
+ * Contenu de la version servie d'un voyage, si elle n'est pas expirée (décision 0126 § 1) : parmi les programmes qui
+ * portent cet identifiant (premier programme et révisions), celui de l'exécution commencée la dernière ; une ligne au plus.
+ */
+export const SQL_PROGRAMME = `SELECT p.id, p.contenu FROM prototype.programmes AS p JOIN prototype.runs AS r ON r.id = p.run_id
+WHERE p.contenu #>> '{trip,id}' = $1::text AND p.expires_at > pg_catalog.now()
+ORDER BY r.started_at DESC, r.id DESC LIMIT 1`;
 /**
  * Positions non expirées des lieux demandés (`place_coordinates`, 0011 § 6) : la politique de `vadrouille_prototype` ne
  * rend que celles d'`org_prototype` ; `expires_at > now()` est aussi écrit ici. Identifiants en tableau lié.

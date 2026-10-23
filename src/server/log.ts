@@ -34,10 +34,18 @@ export const LOG_EVENTS = [
   // Décision 0116 § 4.4 et verdict 0117 § 4 : fin de l'étape `etapeProgramme` de `p0Run`, compteurs **maison** seulement
   // (`days`, `slots`, `placesToVerify`, `daysRemoved`, `slotsRemoved`, `fieldsRemoved`, `textsCut`, `modelCalls`,
   // `unverifiedForCap`), des nombres ; jamais un compteur de verdict de vérification (vérifiés, introuvables, fermés,
-  // hors zone), ni nom, ni texte, ni donnée Google. Écrite aussi quand l'étape lève (`errorName`, `warn`).
+  // hors zone), ni nom, ni texte, ni donnée Google. Écrite aussi quand l'étape lève (`errorName`, `warn`). Lot 2a
+  // (décision 0121 § 2.3, verdict 0122 § 2.1) : `sitesProposed`, `sitesChecked`, `sitesRemoved`, `sitesUnchecked`,
+  // nombres de nos propres vérifications des sites proposés par l'IA ; ni adresse, ni nom d'hôte, ni motif, ni statut.
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
+  // Décision 0124 § 2 (spécification E2E-essai, lot 1) : branchement du cookie de déblocage de l'essai impossible au
+  // démarrage ; `errorName` seulement (ni cookie, ni clé, ni identifiant de voyage). Seul le droit simulé de la portée reste.
+  "essai.unlock_unavailable",
+  // Décision 0125 § 2 (spécification E2E-essai, lot 3) : branchement de la création d'un voyage d'essai impossible au
+  // démarrage ; `errorName` seulement (ni brouillon, ni brief, ni récit). L'étape de lancement rend alors une erreur.
+  "essai.creation_unavailable",
   // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
   // l'implémentation désactivée du port, journal de Better Auth (niveau seulement, jamais le message ni ses
   // arguments), échec d'une opération de la liste blanche et de la purge technique (`action` et `errorName`
@@ -174,6 +182,14 @@ export type LogFields = {
   readonly slotsRemoved?: number;
   readonly modelCalls?: number;
   readonly unverifiedForCap?: number;
+  /**
+   * Sites proposés par l'IA (lot 2a, § 11.5 ; 0122 § 2.1) : adresses distinctes de forme valide, soumises, refusées,
+   * jamais soumises. Entiers positifs ou nuls ; aucun compteur par motif, aucune adresse.
+   */
+  readonly sitesProposed?: number;
+  readonly sitesChecked?: number;
+  readonly sitesRemoved?: number;
+  readonly sitesUnchecked?: number;
   /** Raison fermée d'une lecture de voyage en échec (B6a point 10) : `LOG_READ_REASONS`. Jamais une valeur. */
   readonly reason?: string;
   /** Identifiant interne d'un voyage (`uuid`), jamais un nom ni une destination (B6a point 10). */
@@ -593,6 +609,10 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["slotsRemoved", entierPositif],
   ["modelCalls", entierPositif],
   ["unverifiedForCap", entierPositif],
+  ["sitesProposed", entierPositif],
+  ["sitesChecked", entierPositif],
+  ["sitesRemoved", entierPositif],
+  ["sitesUnchecked", entierPositif],
   ["tripId", (v) => chaine(v) && UUID.test(v)],
   ["version", entierStrict],
   ["dayIndex", entierStrict],

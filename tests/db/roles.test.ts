@@ -54,10 +54,12 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
     ...Object.fromEntries(
-      ["trips", "briefs", "generation_runs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
+      ["trips", "briefs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],
       ),
     ),
+    // Migration 0016_restriction_update_generation_runs (décision 0120 S8) : `UPDATE` de table retiré, accordé par colonnes.
+    generation_runs: ["SELECT", "INSERT"],
     checkouts: ["SELECT", "INSERT"],
     trip_versions: ["SELECT", "INSERT"],
     usage_ledger: ["SELECT", "INSERT"],
@@ -115,6 +117,11 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     preference_signals: { UPDATE: ["cancel_request_id", "cancelled_at", "previous_status", "status"] },
     preference_prompts: { UPDATE: ["answer_signal_id", "state", "updated_at"] },
     deck_closures: { UPDATE: [] },
+    // 0120 S8 (migration 0016) : colonnes écrites par les `UPDATE` de `src/` ; ni `base_version`, ni `deck_closure_id`,
+    // ni `kind`, `organization_id`, `trip_id`, `request_id`, `started_at` ou `id`.
+    generation_runs: {
+      UPDATE: ["finished_at", "last_version", "person_retry_request_ids", "phase", "step", "step_seq", "stop_reason", "studio_retries", "updated_at", "workflow_run_id"],
+    },
   },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },
@@ -365,7 +372,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       }
       // Schéma prototype (0046) : aucune politique ne vise vadrouille_owner, même avec le contexte d'org_prototype.
       await migrator.query("SELECT set_config('app.organization_id', $1, true)", [PROTOTYPE_ORG_ID]);
-      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs"]) {
+      for (const table of ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs", "run_briefs"]) {
         expect(Number((await migrator.query(`SELECT count(*) AS n FROM prototype.${table}`)).rows[0].n), `prototype.${table}`).toBe(0);
       }
       await migrator.query("RESET ROLE");
@@ -454,7 +461,8 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
   // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
   // `run_secteurs` : plan de secteurs d'une exécution (décision 0094 § 1 point 5, migration 0013_secteurs_prototype).
-  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_candidates", "run_secteurs", "runs", "trajets"];
+  // `run_briefs` : brief saisi dans l'app d'une exécution (décision 0125 § 1, migration 0017_brief_saisi_prototype).
+  const PROTOTYPE_TABLES = ["forfaits", "jugements", "programmes", "purges", "run_attempts", "run_briefs", "run_candidates", "run_secteurs", "runs", "trajets"];
   const EXPECTED_PROTOTYPE: Record<string, Record<string, string[]>> = {
     vadrouille_prototype: {
       runs: ["SELECT"],
@@ -465,6 +473,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_candidates: ["SELECT", "DELETE"],
       // Sans UPDATE : remplacé par suppression puis insertion (0103, question 1).
       run_secteurs: ["SELECT", "DELETE"],
+      // Ni UPDATE ni DELETE : écrit une fois avec l'exécution, supprimé par la purge seulement (0125 § 1).
+      run_briefs: ["SELECT"],
       purges: ["SELECT"],
       // Ni UPDATE ni DELETE (0092 § 3).
       trajets: ["SELECT"],
@@ -475,6 +485,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: ["DELETE"],
       run_candidates: ["DELETE"],
       run_secteurs: ["DELETE"],
+      run_briefs: ["DELETE"],
       purges: ["INSERT", "DELETE"],
       trajets: ["DELETE"],
     },
@@ -504,6 +515,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_candidates: { INSERT: ["candidat", "cle", "place_id", "run_id"], UPDATE: [] },
       // Sans id, organization_id ni expires_at, posés par le déclencheur (0103, question 1).
       run_secteurs: { INSERT: ["run_id", "secteurs"], UPDATE: [] },
+      // Sans id, organization_id ni expires_at, posés par le déclencheur (0125 § 1).
+      run_briefs: { INSERT: ["brief", "request_id", "run_id"], UPDATE: [] },
       purges: { INSERT: [], UPDATE: [] },
       // Sans id, organization_id ni expires_at, posés par le déclencheur (0092 § 3).
       trajets: { INSERT: ["destination", "minutes", "mode", "origine", "programme_id"], UPDATE: [] },
@@ -514,6 +527,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { SELECT: ["expires_at"] },
       run_candidates: { SELECT: ["expires_at"] },
       run_secteurs: { SELECT: ["expires_at"] },
+      run_briefs: { SELECT: ["expires_at"] },
       purges: { SELECT: ["purged_at"] },
       runs: { SELECT: [] },
       forfaits: { SELECT: [] },
@@ -529,6 +543,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       run_attempts: { SELECT: [] },
       run_candidates: { SELECT: [] },
       run_secteurs: { SELECT: [] },
+      run_briefs: { SELECT: [] },
       purges: { SELECT: [] },
       trajets: { SELECT: [] },
     },

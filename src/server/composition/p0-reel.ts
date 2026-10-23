@@ -5,6 +5,7 @@ import { createOpenRouterClient } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { creerNoterCandidats, type NoterCandidats } from "@/ai/noter-candidats";
 import { creerRedigerProgramme, type RedigerProgramme } from "@/ai/rediger-programme";
+import { creerRedigerRevision, type RedigerRevision } from "@/ai/rediger-revision";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -12,7 +13,7 @@ import { createPlacesClient } from "@/grounding/places-client";
 import { creerCadence, type Cadence } from "@/grounding/budget-routes";
 import { createRoutesClient } from "@/grounding/routes-client";
 import { moteurRechercheWebAttendu, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
-import { creerLecteurPages, type LecteurPages } from "@/research/fetch-page";
+import { creerLecteurPages, creerVerificateurStatut, type LecteurPages, type VerificateurStatut } from "@/research/fetch-page";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
 import { createUndiciTransport } from "@/research/undici-transport";
 import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
@@ -39,7 +40,10 @@ import { horlogeSysteme, type ContexteAppel, type Fournisseur, type Horloge, typ
  *     ne passent pas d'une étape à l'autre, amendement A3 de 0055 § 3 point 5) ;
  *   - `programme()` (décision 0116 § 3, seule famille appelée par `p0Run` depuis le lot 1 du programme écrit par l'IA) :
  *     `redigerProgramme` (une requête `programme`, jamais le client brut ni la recherche web), `textSearch`, fiches
- *     Place Details, `detailsLogement` et Routes. Les trois familles précédentes restent pour leurs tests (0116 § 7).
+ *     Place Details, `detailsLogement`, Routes et, depuis le lot 2a, `verifierSite` (vérification de statut des sites
+ *     proposés par l'IA, `creerVerificateurStatut` sur le transport réel, derrière sa barrière de sortie ; 0121 § 3.4,
+ *     0122 § 1 condition 11 : la seule famille qui la reçoit). Les trois familles précédentes restent pour leurs tests
+ *     (0116 § 7).
  * - **Port de consommation** : chaque client reçoit le port et les plafonds du mode (réservation avant chaque appel) ;
  *   le contexte de chaque appel porte l'exécution de la garde et les périodes du fournisseur (D20), calculées à l'appel.
  */
@@ -98,15 +102,19 @@ export type CapacitesEtapeFinale = {
 
 /**
  * Capacités de l'étape `etapeProgramme` (décision 0116 § 3 et § 4) : rédaction du programme (une requête `programme`),
- * Text Search restreint à la zone (masque `id`), fiches Place Details, fiche des logements du brief et Routes. Ni client
- * de modèles brut, ni recherche web, ni lecture de pages.
+ * Text Search restreint à la zone (masque `id`), fiches Place Details, fiche des logements du brief, Routes et
+ * vérification de statut des sites (lot 2a). Ni client de modèles brut, ni recherche web, ni lecture de pages.
  */
 export type CapacitesProgramme = {
   readonly redigerProgramme: RedigerProgramme;
+  /** Révision après le tri (E2E-essai, lot 4 ; décision 0126) : une requête, même modèle et même routage `zdr`. */
+  readonly redigerRevision: RedigerRevision;
   readonly textSearch: CapacitesAncrage["textSearch"];
   readonly places: Pick<ClientPlaces, "details">;
   readonly detailsLogement: CapacitesAncrage["detailsLogement"];
   readonly routes: ClientRoutes;
+  /** Vérification de statut des sites (lot 2a) : `GET` borné, corps jamais lu, résultat fermé (0122 § 1). */
+  readonly verifierSite: VerificateurStatut;
 };
 
 export type CompositionP0Reel = {
@@ -176,13 +184,18 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
     programme() {
       const places = createPlacesClient(google);
       const { textSearch, detailsLogement } = capacitesAncrage(places);
-      // `creerRedigerProgramme` pose `zdr: true` et `data_collection: "deny"` (verdict S5 de 0117, 0116 § 2.2).
+      // `creerRedigerProgramme` et `creerRedigerRevision` posent `zdr: true` et `data_collection: "deny"` (verdict S5 de
+      // 0117, 0116 § 2.2). Un seul client pour les deux : une étape n'appelle que l'un d'eux.
+      const client = modeles();
+      const reglage = { modele: options.modeles.programme.modele, routage: options.modeles.routage };
       return {
-        redigerProgramme: creerRedigerProgramme(modeles(), { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+        redigerProgramme: creerRedigerProgramme(client, reglage),
+        redigerRevision: creerRedigerRevision(client, reglage),
         textSearch,
         places: { details: (placeId) => places.details(placeId) },
         detailsLogement,
         routes: createRoutesClient(google),
+        verifierSite: creerVerificateurStatut(createUndiciTransport()),
       };
     },
   };

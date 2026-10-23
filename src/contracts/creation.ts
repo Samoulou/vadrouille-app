@@ -271,6 +271,11 @@ export const TripRequestSchema = z.strictObject({
   requestId: z.uuid(),
   draft: TripDraftSchema,
   brief: BriefSchema,
+  /**
+   * Récit saisi à l'écran 2, facultatif (décision 0125 § 1, spécification E2E-essai lot 3) : seul l'adaptateur
+   * `prototype` le lit (il le transmet au brief de la chaîne inversée) ; `mock` et `api` l'ignorent.
+   */
+  story: text(STORY_LENGTH).optional(),
 });
 export type TripRequest = z.infer<typeof TripRequestSchema>;
 

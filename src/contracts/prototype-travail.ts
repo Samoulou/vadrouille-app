@@ -12,14 +12,31 @@
 export const MODES_EXECUTION = ["reel", "essai"] as const;
 export type ModeExecution = (typeof MODES_EXECUTION)[number];
 
+/**
+ * Marqueur d'une exécution lancée depuis l'app sur un brief saisi (spécification E2E-essai, lot 3 ; décision 0125 § 1) :
+ * valeur de `prototype.runs.brief` à la place d'un nom de fichier (`runs_brief_check`) ; le brief lui-même est dans
+ * `prototype.run_briefs`, relu par l'étape (`lireBriefSaisi`).
+ */
+export const BRIEF_SAISI = "saisi";
+
 /** Exécution en cours, relue par une étape : jamais de donnée Google ni de texte libre. */
 export type ExecutionEnCours = {
   readonly mode: ModeExecution;
-  /** Nom de fichier de `prototype/briefs/` (`CHECK` de `prototype.runs.brief`). */
+  /** Nom de fichier de `prototype/briefs/`, ou `BRIEF_SAISI` (`CHECK` de `prototype.runs.brief`, décision 0125 § 1). */
   readonly brief: string;
   readonly variante: "A" | "B";
   /** Coût des modèles déjà compté par les étapes précédentes, en micro-USD (arrondi au cent supérieur, D24). */
   readonly coutModelesMicros: number;
+  /**
+   * Forfait de coût des modèles réservé au lancement (`prototype.forfaits.models_cost_micros`, micro-USD), relu en base :
+   * plafond de l'étape sous le fusible du mode (décision 0126 § 2). Absent si la ligne n'en porte pas.
+   */
+  readonly forfaitModelesMicros?: number;
+  /**
+   * Plafonds Google réservés au lancement (`prototype.forfaits`, requêtes et éléments Routes), relus en base : l'étape ne
+   * les dépasse jamais (décision 0126 § 2, plafonds d'une révision). Absent si la ligne n'en porte pas.
+   */
+  readonly forfaitGoogle?: { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
   /** Jour de quota de l'exécution (`prototype.runs.quota_day`, posé par la base, S1), `AAAA-MM-JJ`. */
   readonly jourQuota: string;
   /**

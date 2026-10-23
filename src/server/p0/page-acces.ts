@@ -7,7 +7,7 @@ import type { ExecutionSuivie, LigneDecompte, ModeleLancementP0, RapportPage, Su
 import { etatPageAcces, NOM_COOKIE_ACCES, type EtatPageAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { COMPTEES_MAX, decompte, RELANCES_MAX } from "@/server/p0/decompte";
-import { criteresDuRapport, etapesDuRapport, texteDuRapport } from "@/server/p0/rapport";
+import { criteresDuRapport, etapesAvecSiteDuRapport, etapesDuRapport, liensSitesDuRapport, texteDuRapport } from "@/server/p0/rapport";
 import { NOMS_BRIEFS } from "@/workflows";
 
 /**
@@ -27,7 +27,15 @@ export async function etatPageExecutionsP0(): Promise<EtatPageAcces> {
   return etatPageAcces(cookie);
 }
 
-export type PageExecutionsP0 = { readonly etat: "fermee" | "saisie" } | { readonly etat: "ouverte"; readonly modele: ModeleLancementP0 };
+/**
+ * `etapesAvecSite` (lot 2a) : nombre d'étapes avec site du programme stocké de la dernière exécution finie, **sur la page
+ * seulement** (`specs/P0-programme-par-ia.md` § 11.4 et A24, amendement 3 ; 0122 § 2.3 conditions 1, 3 et 4), passé à
+ * côté du modèle et non dans le contrat `RapportPage` : le § 11.4 dit « Aucune modification de `src/contracts` ».
+ * `null` : non relevé (aucune exécution finie, exécution arrêtée, programme purgé ou hors schéma).
+ */
+export type PageExecutionsP0 =
+  | { readonly etat: "fermee" | "saisie" }
+  | { readonly etat: "ouverte"; readonly modele: ModeleLancementP0; readonly etapesAvecSite: number | null };
 
 const VARIANTES = ["B", "A"] as const;
 
@@ -39,8 +47,10 @@ async function suiviOuNul(): Promise<SuiviPrototype | null> {
   }
 }
 
-async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: string | null): Promise<RapportPage | null> {
-  if (execution === undefined) return null;
+type RapportEtSites = { readonly rapport: RapportPage | null; readonly etapesAvecSite: number | null };
+
+async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: string | null): Promise<RapportEtSites> {
+  if (execution === undefined) return { rapport: null, etapesAvecSite: null };
   let contenu: unknown = null;
   if (execution.statut === "programme_ecrit") {
     try {
@@ -52,11 +62,21 @@ async function rapportDe(execution: ExecutionSuivie | undefined, dernierePurge: 
   const criteres = criteresDuRapport(execution, contenu);
   // Étapes avec et sans `placeId` : calculées à chaque affichage depuis le programme stocké (0116 § 4.4, 0117 § 4),
   // `null` sans programme écrit ; jamais dans le texte de « Copier le rapport » (`texteDuRapport` ne les reçoit pas).
-  return { execution, criteres, texte: texteDuRapport(execution, criteres, dernierePurge), etapes: etapesDuRapport(contenu) };
+  // Lot 2a : ligne oui ou non « liens vers les sites affichés » (source seule) dans le texte copié ; nombre d'étapes avec
+  // site sur la page seulement, hors du contrat (0122 § 2.3 ; amendement 3, § 11.4).
+  return {
+    rapport: {
+      execution,
+      criteres,
+      texte: texteDuRapport(execution, criteres, dernierePurge, liensSitesDuRapport(execution, contenu)),
+      etapes: etapesDuRapport(contenu),
+    },
+    etapesAvecSite: execution.statut === "programme_ecrit" ? etapesAvecSiteDuRapport(contenu) : null,
+  };
 }
 
 /** Modèle du lancement : lu seulement si la page est ouverte. */
-async function modeleLancement(): Promise<ModeleLancementP0> {
+async function modeleLancement(): Promise<{ readonly modele: ModeleLancementP0; readonly etapesAvecSite: number | null }> {
   const suivi = await suiviOuNul();
   const lignes =
     suivi === null
@@ -70,16 +90,19 @@ async function modeleLancement(): Promise<ModeleLancementP0> {
             ...decompte(suivi.executions, brief, variante),
           })),
         );
-  const rapport = suivi === null ? null : await rapportDe(
+  const { rapport, etapesAvecSite } =
+    suivi === null
+      ? { rapport: null, etapesAvecSite: null }
+      : await rapportDe(
           suivi.executions.find((execution) => execution.statut !== "en_cours"),
           suivi.dernierePurge,
         );
-  return { briefs: NOMS_BRIEFS, suivi, decompte: lignes, rapport };
+  return { modele: { briefs: NOMS_BRIEFS, suivi, decompte: lignes, rapport }, etapesAvecSite };
 }
 
 /** Page des exécutions : fermée (404), saisie du code, ou ouverte avec le modèle du lancement. */
 export async function pageExecutionsP0(): Promise<PageExecutionsP0> {
   const etat = await etatPageExecutionsP0();
   if (etat !== "ouverte") return { etat };
-  return { etat, modele: await modeleLancement() };
+  return { etat, ...(await modeleLancement()) };
 }

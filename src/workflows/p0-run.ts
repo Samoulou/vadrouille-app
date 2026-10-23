@@ -3,10 +3,12 @@ import "server-only";
 import { FatalError } from "workflow";
 
 import { ecrireProgramme } from "@/adapters/prototype-ecriture";
-import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireExecution } from "@/adapters/prototype-travail";
+import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireBriefSaisi, lireExecution, lireVersionCourante } from "@/adapters/prototype-travail";
+import type { ReponseModele } from "@/ai/client";
 import { MAX_RESULTATS_WEB } from "@/ai/client";
-import { lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
-import type { ExecutionEnCours, PhaseTravail } from "@/contracts/prototype-travail";
+import { lireProgramme, lieuxDuProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
+import { TRIP_ID_PATTERN } from "@/contracts/values";
+import { BRIEF_SAISI, type ExecutionEnCours, type PhaseTravail } from "@/contracts/prototype-travail";
 import { lieuxHorsPartTextSearch } from "@/grounding/ancrage";
 import { ancrerLogementsDuSejour, verifierLieuxDuProgramme, type ControleAppel } from "@/grounding/ancrage-zone";
 import { blocsDeTrajets, creerCadence, planRoutes, trajetsConsecutifs } from "@/grounding/budget-routes";
@@ -26,9 +28,10 @@ import {
   type ConfigRecherche,
 } from "@/prototype/config";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { trajetsAConserver } from "@/prototype/programme-reduit";
+import { ProgrammeEcritSchema, trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
-import { composerP0Reel, type CompositionP0Reel } from "@/server/composition/p0-reel";
+import { reduireSite } from "@/research/fetch-page";
+import { composerP0Reel, type CapacitesProgramme, type CompositionP0Reel } from "@/server/composition/p0-reel";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, pointsDeTrajet } from "@/server/p0/assemblage";
 import {
@@ -38,8 +41,12 @@ import {
   entreeProgrammeDepuisBrief,
 } from "@/server/p0/vers-couche-ia";
 import { poolPrototype } from "@/server/p0/base";
+import { entreeRevisionDepuisProgramme, nomsEcartes, retirerEtapesEcartees } from "@/server/p0/revision";
+import { ID_ETAPE_REVISION, CHOIX_REVISION_MAX } from "@/ai/entree-revision";
+import { avecSiteGarde, compteursNonSoumis, sitesDuProgramme, verifierSites, SITES_DUREE_MAX_MS, type CompteursSites, type ResultatSites } from "@/server/p0/sites";
 import { verifierGardeEtape, type GardeOuverte } from "@/server/p0/garde";
-import { identifiantDuVoyage, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
+import type { BriefEssai } from "@/server/p0/depuis-formulaire";
+import { identifiantDuVoyage, identifiantDuVoyageSaisi, joursDuSejour, lireClassement } from "@/server/p0/moteur-final";
 import { briefDepuisBrief, demandesDuSejour, engagementsDepuisBrief, modeDeTrajet, nuitsDepuisBrief } from "@/server/p0/vers-moteur";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 import { forfaitExecution, forfaitRelecture, LIMITES_PROTOTYPE, QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, type Forfait, type PlafondsRelecture, type SkusForfait } from "@/server/usage/forfait";
@@ -190,6 +197,49 @@ function briefDe(nom: string): Brief {
   return lu.data;
 }
 
+/**
+ * Forme du brief converti du formulaire (`src/server/p0/depuis-formulaire.ts`, décision 0125 § 3) tenue égale à celle de
+ * `BriefSchema` : mêmes clés, et tout brief valide a la forme recopiée (contrôle de type seul, aucune valeur).
+ */
+type MemesCles<A, B> = [Exclude<keyof A, keyof B>, Exclude<keyof B, keyof A>] extends [never, never] ? true : false;
+const FORME_BRIEF_ESSAI: MemesCles<Brief, BriefEssai> = true;
+const briefVersForme = (brief: Brief): BriefEssai => brief;
+void FORME_BRIEF_ESSAI;
+void briefVersForme;
+
+/** Champ du formulaire de l'app qui porte chaque clé du brief saisi refusée par `BriefSchema` (décision 0125 § 3). */
+const CHAMP_DU_FORMULAIRE: Readonly<Partial<Record<string, string>>> = {
+  destination: "draft.destination",
+  arrivee: "draft.start",
+  depart: "draft.end",
+  logements: "draft.lodging",
+  engagements: "draft.commitments",
+  recit: "story",
+};
+
+/** Brief saisi validé, ou le champ du formulaire refusé (absent si le refus ne vient d'aucun champ saisi). */
+export type BriefSaisiValide = { readonly ok: true; readonly brief: Brief } | { readonly ok: false; readonly champ?: string };
+
+/**
+ * Brief saisi dans l'app (spécification E2E-essai, lot 3 ; décision 0125 § 3), validé par `BriefSchema` comme un brief
+ * commité : au lancement, avant toute réservation, puis dans l'étape. Un refus ne rend que le chemin du champ (jamais la
+ * valeur ni le message, qui pourraient citer le récit) : un e-mail ou un téléphone dans le récit rend `story`.
+ */
+export function validerBriefSaisi(brut: unknown): BriefSaisiValide {
+  const lu = BriefSchema.safeParse(brut);
+  if (lu.success) return { ok: true, brief: lu.data };
+  const cle = lu.error.issues[0]?.path[0];
+  const champ = typeof cle === "string" ? CHAMP_DU_FORMULAIRE[cle] : undefined;
+  return champ === undefined ? { ok: false } : { ok: false, champ };
+}
+
+/** Brief saisi relu par l'étape : refusé, `brief_invalid` (avant tout appel), comme un fichier refusé. */
+function briefSaisiDe(brut: unknown): Brief {
+  const lu = validerBriefSaisi(brut);
+  if (!lu.ok) throw new ArretEtape("brief_invalid");
+  return lu.brief;
+}
+
 /** Brief admis et valide (`BriefSchema`) : contrôlé au lancement, avant toute réservation (P0r3d). */
 export function briefLancable(nom: string): boolean {
   try {
@@ -219,6 +269,76 @@ export const SKUS_FORFAIT: SkusForfait = Object.freeze({
 export type LancementDuMode = { readonly forfait: Forfait; readonly regles: ReglesForfait };
 
 /**
+ * Sorte d'exécution, pour la part du fusible d'IA qu'elle réserve (décision 0126 § 2 ; Q601, réponse de Samuel du
+ * 2026-10-22 : « même fusible de 2 USD d'IA par voyage ») :
+ * - `fichier` : brief commité (`/prototype/executions`), fusible entier du mode, comme avant ;
+ * - `saisi` : premier programme d'un voyage de l'app, fusible du mode **moins** `PART_HORS_PREMIER_PROGRAMME_MICROS` ;
+ * - `revision` : une révision après le tri, `PART_REVISION_MICROS`.
+ * Ainsi la somme des forfaits de modèles d'un voyage de l'app (premier programme et révisions) ne dépasse jamais le
+ * fusible du mode : le coût réel d'une exécution finie n'est pas conservé (S4 de 0046), le forfait réservé est la seule
+ * mesure durable, et chaque exécution est comptée à son forfait quelle que soit sa fin (D13 point 3).
+ */
+export type SorteExecution = "fichier" | "saisi" | "revision";
+
+/** Révisions au plus par voyage de l'app (décision 0126 § 2, réponse de Samuel du 2026-10-23) : une seule, après le tri. */
+export const REVISIONS_PAR_VOYAGE = 1;
+/**
+ * Part du fusible d'IA d'une révision (décision 0126 § 2), en micro-USD : 0,25 USD, plus de dix fois le coût estimé d'une
+ * requête `programme` (`coutsEstimesMicros.requeteModele`, 0,02 USD).
+ */
+export const PART_REVISION_MICROS = 250_000;
+/**
+ * Part du fusible tenue hors du premier programme d'un voyage de l'app (décision 0126 § 2), en micro-USD : 0,50 USD.
+ * Premier programme : 2 − 0,50 = 1,50 USD avec le fusible de 2 USD de l'essai (0093 point 5), gardé par Samuel le
+ * 2026-10-23 avec une seule révision de 0,25 USD ; le reste (0,25 USD) n'est réservé par aucune exécution.
+ */
+export const PART_HORS_PREMIER_PROGRAMME_MICROS = 500_000;
+
+/** Plafond du coût des modèles réservé par une exécution de cette sorte (micro-USD), sous le fusible du mode. */
+export function plafondModelesMicros(coutUsd: number, sorte: SorteExecution): number {
+  const fusible = Math.round(coutUsd * 1_000_000);
+  if (sorte === "fichier") return fusible;
+  if (sorte === "revision") return Math.min(PART_REVISION_MICROS, fusible);
+  return Math.max(0, fusible - PART_HORS_PREMIER_PROGRAMME_MICROS);
+}
+
+/** Plafonds Google d'une exécution, par méthode (requêtes, éléments Routes). */
+export type PlafondsGoogle = { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
+
+/**
+ * Plafonds Google d'une **révision** (décision 0126 § 2 ; mineur 9 de la revue de la PR 717, décision du CEO) : le
+ * besoin de la version servie, qu'une révision réécrit étape pour étape, plus une marge, jamais au-delà du mode.
+ * - Text Search et fiches : un appel par logement du brief et par lieu distinct de la version servie (comme
+ *   `etapeProgramme`), plus la marge des fiches du mode (`fiches.margeMinimum`, `fiches.margePart`) ;
+ * - Routes : les blocs que `trajetsConsecutifs` demanderait pour des journées de même forme (logement, étapes, logement),
+ *   chaque lieu compté comme distinct (`blocsDeTrajets`), plus la même marge.
+ * Toute la version est encore vérifiée (les étapes gardées aussi) : ne vérifier que les étapes nouvelles demanderait de
+ * relire positions et temps de la version précédente (0126, limites). `null` si la version n'est pas un programme écrit
+ * de ce voyage.
+ */
+export function plafondsGoogleRevision(mode: ExecutionEnCours["mode"], version: unknown, tripId: string, logements: number): PlafondsGoogle | null {
+  if (mode !== "reel" && mode !== "essai") return null;
+  const lue = ProgrammeEcritSchema.safeParse(version);
+  if (!lue.success || lue.data.trip.id !== tripId) return null;
+  const config = configurationDuMode(mode);
+  const marge = (besoin: number) => besoin + Math.max(config.fiches.margeMinimum, Math.ceil(besoin * config.fiches.margePart));
+  const jours = [...lue.data.trip.days].sort((a, b) => a.index - b.index);
+  const noms = jours.map((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop.name.trim().toLowerCase()] : [])));
+  const lieux = new Set(noms.flat()).size;
+  // Chaque étape a son propre point (pire cas : toutes remplacées par des lieux distincts) ; logement en tête et en fin.
+  let rang = 0;
+  const chaines = noms.map((etapes) => ["logement", ...etapes.map(() => `etape-${(rang += 1)}`), "logement"]);
+  const blocs = blocsDeTrajets(chaines);
+  const elements = blocs.reduce((total, bloc) => total + bloc.origines.length * bloc.destinations.length, 0);
+  return {
+    textSearch: Math.min(config.placesTextSearch, marge(logements + lieux)),
+    details: Math.min(config.placesDetails, marge(logements + lieux)),
+    routesRequetes: Math.min(config.routesRequetes, marge(blocs.length)),
+    routesElements: Math.min(config.routesElements, marge(elements)),
+  };
+}
+
+/**
  * Forfait et règles de la réservation d'une exécution du mode (P0r3d), calculés comme les étapes lisent leur
  * configuration ; `null` si la configuration du mode, celle de l'agent, celle du classement ou la table de prix est
  * refusée : le lancement est alors refusé **avant** la réservation, sans consommer le jour (une étape l'arrêterait
@@ -234,7 +354,7 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
  * - Durée des orphelines : `DUREE_MAX_EXECUTION_MS`, la même pour tous les modes (plus de durée par mode depuis 0102).
  */
-export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode | null {
+export function lancementDuMode(mode: ExecutionEnCours["mode"], sorte: SorteExecution = "fichier", plafondsGoogle?: PlafondsGoogle): LancementDuMode | null {
   if (mode !== "reel" && mode !== "essai") return null;
   const table = TablePrixGoogleSchema.safeParse(prixGoogle);
   if (!table.success) return null;
@@ -244,11 +364,18 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"]): LancementDuMode
     const config = configurationDuMode(mode);
     configurationAgent(mode, config);
     if (lireClassement(configClassement) === undefined) return null;
+    // Révision (décision 0126 § 2) : plafonds Google réduits au besoin de la version servie, jamais au-delà du mode.
+    const borne = (valeur: number | undefined, duMode: number) => (valeur === undefined ? duMode : Math.min(duMode, Math.max(0, valeur)));
     const forfait = forfaitExecution(
       table.data,
       SKUS_FORFAIT,
-      { placesTextSearch: config.placesTextSearch, placesDetails: config.placesDetails, routesRequetes: config.routesRequetes, routesElements: config.routesElements },
-      Math.round(config.coutUsd * 1_000_000),
+      {
+        placesTextSearch: borne(plafondsGoogle?.textSearch, config.placesTextSearch),
+        placesDetails: borne(plafondsGoogle?.details, config.placesDetails),
+        routesRequetes: borne(plafondsGoogle?.routesRequetes, config.routesRequetes),
+        routesElements: borne(plafondsGoogle?.routesElements, config.routesElements),
+      },
+      plafondModelesMicros(config.coutUsd, sorte),
     );
     return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: DUREE_MAX_EXECUTION_MS } };
   } catch {
@@ -350,8 +477,19 @@ export function bornesRechercheDuBriefPourTests(mode: ExecutionEnCours["mode"], 
  */
 export function briefTientDansLeMode(mode: ExecutionEnCours["mode"], nom: string): boolean {
   try {
+    return briefSaisiTientDansLeMode(mode, briefDe(nom));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Même contrôle pour un brief déjà validé (brief saisi dans l'app, décision 0125 § 3 ; même garde que
+ * `/prototype/executions`) : plan Routes, première série et plafond de recherche du mode.
+ */
+export function briefSaisiTientDansLeMode(mode: ExecutionEnCours["mode"], brief: Brief): boolean {
+  try {
     if (mode !== "reel" && mode !== "essai") return false;
-    const brief = briefDe(nom);
     const config = configurationDuMode(mode);
     // Repères distincts par logement (aucun identifiant de lieu n'existe avant l'ancrage). Limite connue (mineur 9 du
     // head `cd614d4`) : si deux logements du brief s'ancraient au même lieu, l'étape finale verrait un seul logement les
@@ -399,13 +537,20 @@ function configurationAgent(mode: ExecutionEnCours["mode"], config: ConfigModeRe
 type PartEtape = { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
 
 function forfaitDeLEtape(config: ConfigModeReel, execution: ExecutionEnCours, part: PartEtape): Forfait {
-  const resteModeles = Math.max(0, Math.round(config.coutUsd * 1_000_000) - execution.coutModelesMicros);
+  // Forfait de modèles réservé au lancement (décision 0126 § 2 : part d'un voyage de l'app ou d'une révision), relu en
+  // base ; jamais plus que le fusible du mode. Absent (exécution d'avant 0126 relue sans forfait) : le fusible du mode.
+  const fusible = Math.round(config.coutUsd * 1_000_000);
+  const plafond = execution.forfaitModelesMicros === undefined ? fusible : Math.min(fusible, execution.forfaitModelesMicros);
+  const resteModeles = Math.max(0, plafond - execution.coutModelesMicros);
+  // Plafonds Google réservés (décision 0126 § 2, révision) : l'étape ne dépasse jamais ce que la réservation a compté.
+  const reserve = execution.forfaitGoogle;
+  const sous = (valeur: number, plafondReserve: number | undefined) => Math.max(0, plafondReserve === undefined ? valeur : Math.min(valeur, plafondReserve));
   return {
     nature: "execution",
-    textSearchRequetes: Math.max(0, part.textSearch),
-    placeDetailsRequetes: Math.max(0, part.details),
-    routesRequetes: Math.max(0, part.routesRequetes),
-    routesElements: Math.max(0, part.routesElements),
+    textSearchRequetes: sous(part.textSearch, reserve?.textSearch),
+    placeDetailsRequetes: sous(part.details, reserve?.details),
+    routesRequetes: sous(part.routesRequetes, reserve?.routesRequetes),
+    routesElements: sous(part.routesElements, reserve?.routesElements),
     coutGoogleMicros: 0,
     coutModelesMicros: resteModeles,
   };
@@ -441,7 +586,8 @@ async function ouvrirEtape(runId: string, phase: PhaseTravail): Promise<Contexte
   const debut = Date.now();
   const execution = await lireExecution(poolPrototype(), ouverte.garde.runId);
   const config = configurationDuMode(execution.mode);
-  const brief = briefDe(execution.brief);
+  // Brief saisi dans l'app (décision 0125 § 1) : relu en base et validé comme un fichier ; sinon, le fichier commité.
+  const brief = execution.brief === BRIEF_SAISI ? briefSaisiDe(await lireBriefSaisi(poolPrototype(), ouverte.garde.runId)) : briefDe(execution.brief);
   await ecrirePhase(poolPrototype(), ouverte.garde.runId, phase);
   const echeance = debut + LIMITE_FONCTION_MS - MARGE_FIN_ETAPE_MS;
   return { garde: ouverte.garde, execution, config, brief, echeance };
@@ -560,7 +706,10 @@ async function etape(
  */
 export const CODE_PROGRAMME_ILLISIBLE = "model_output_invalid";
 
-/** Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : des nombres, aucun verdict. */
+/**
+ * Compteurs maison de `p0.programme_written` (décision 0116 § 4.4, verdict 0117 § 4) : des nombres, aucun verdict.
+ * Lot 2a (0121 § 2.3, 0122 § 2.1) : `sites*`, sortie de l'IA et nos propres requêtes vers des hôtes non Google.
+ */
 type CompteursProgramme = {
   days: number;
   slots: number;
@@ -571,7 +720,7 @@ type CompteursProgramme = {
   textsCut: number;
   modelCalls: number;
   unverifiedForCap: number;
-};
+} & CompteursSites;
 
 /**
  * Ligne de journal fermée de fin d'étape (`p0.programme_written`) : compteurs maison seulement (sortie de l'IA, nos
@@ -590,6 +739,15 @@ function configurationModeles(): ConfigModeles {
   return modeles.data;
 }
 
+/** Rédaction d'une version du programme : requête unique, filet éventuel après lecture, identifiant du voyage écrit. */
+type Redaction = {
+  /** Une seule requête de modèle (`programme` ou `revision`), jamais une donnée Google. */
+  readonly rediger: (capacites: CapacitesProgramme) => Promise<ReponseModele>;
+  /** Révision seulement : retire de la sortie relue les étapes écartées (décision 0126 § 4). */
+  readonly filtrer?: (programme: ProgrammeIa) => { readonly programme: ProgrammeIa; readonly retires: number };
+  readonly tripId: string;
+};
+
 /**
  * Étape unique de travail de `p0Run` (décision 0116 § 3 ; décision 0115 § 3 ; spécification `P0-programme-par-ia` § 0),
  * dans cet ordre, le programme de l'IA, les identifiants, les fiches et les durées restant **en mémoire** jusqu'à
@@ -601,7 +759,9 @@ function configurationModeles(): ConfigModeles {
  * 2. phase `ancrage` : logements (une recherche et une fiche chacun, zone du séjour), puis **vérification** des lieux
  *    distincts dans l'ordre écrit (`verifierLieuxDuProgramme`, un appel d'ancrage par lieu) ; part et échéance contrôlées
  *    **avant chaque appel**, l'échéance moins la **réserve de trajets** (requêtes Routes prévues × 10 s, 0116 § 3.5) ;
- *    non tenu : lieux restants sans `placeId`, programme entier écrit ; rien n'est écrit dans cette phase ;
+ *    non tenu : lieux restants sans `placeId`, programme entier écrit ; en parallèle, **vérification des sites**
+ *    proposés par l'IA (lot 2a, `verifierSites`, 0121 § 2), adresses en mémoire seulement ; rien n'est écrit dans cette
+ *    phase ;
  * 3. repère `planification` (journal seulement : `ecrirePhase` exige la phase précédente de `PHASES`, et `notation` n'est
  *    plus écrite) : **trajets** entre points consécutifs avec identifiant de chaque jour (`pointsDeTrajet`), sous la part
  *    Routes et l'échéance ; manque : trajets sans durée, jamais inventés (0092 § 4) ;
@@ -611,118 +771,228 @@ function configurationModeles(): ConfigModeles {
  */
 export async function etapeProgramme(entree: EtatP0Run): Promise<EtatP0Run> {
   "use step";
-  return etape(entree.runId, "recherche", async (contexte, marquerAppels, noterPhase) => {
-    const { brief, config, execution, garde } = contexte;
-    const passerA = async (phase: PhaseTravail) => {
-      await ecrirePhase(poolPrototype(), garde.runId, phase);
-      noterPhase(phase);
-    };
-    const modeles = configurationModeles();
-    // Forfait entier de l'exécution (0116 § 3.5) : la part des lieux de l'IA est ce qui reste après les logements.
-    const forfait = forfaitDeLEtape(config, execution, {
-      textSearch: config.placesTextSearch,
-      details: config.placesDetails,
-      routesRequetes: config.routesRequetes,
-      routesElements: config.routesElements,
-    });
-    // Réserve de trajets (0116 § 3.5) : posée pendant la vérification seulement, retirée avant les trajets.
-    let reserveTrajetsMs = 0;
-    const registre = registreDeLEtape(forfait, contexte, (methode) => (methode === "places_text_search" || methode === "places_details" ? reserveTrajetsMs : 0));
-    const capacites = composer(contexte, forfait, registre, modeles).programme();
-    marquerAppels();
-    const compteurs: CompteursProgramme = { days: 0, slots: 0, placesToVerify: 0, daysRemoved: 0, slotsRemoved: 0, fieldsRemoved: 0, textsCut: 0, modelCalls: 0, unverifiedForCap: 0 };
-    const cout = memoireDuCout(contexte, registre);
-    try {
-      await cout.terminer(async () => {
-        // 1. Rédaction et lecture tolérante ; ordre écrit fixé une fois, avant toute vérification.
-        compteurs.modelCalls += 1;
-        const reponse = await capacites.redigerProgramme(entreeProgrammeDepuisBrief(brief));
-        await cout.ecrire();
-        const lecture = lireProgramme(reponse.texte, { arrivee: brief.arrivee, depart: brief.depart });
-        compteurs.daysRemoved = lecture.joursRetires;
-        compteurs.slotsRemoved = lecture.creneauxRetires;
-        compteurs.fieldsRemoved = lecture.champsRetires;
-        compteurs.textsCut = lecture.textesCoupes;
-        if (lecture.valeur === null) throw new ArretEtape(codePersiste(CODE_PROGRAMME_ILLISIBLE, true));
-        const programme = ordreEcrit(lecture.valeur);
-        compteurs.days = programme.jours.length;
-        compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
-
-        // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit, part et échéance contrôlées avant chaque appel.
-        await passerA("ancrage");
-        const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: capacites.detailsLogement });
-        const idsLogements = logements.map((logement) => logement.placeId);
-        const { lieux, cleDe } = lieuxDuProgramme(programme, brief.destination);
-        compteurs.placesToVerify = lieux.length;
-        // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
-        compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
-        const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined) =>
-          programme.jours.map((jour, indiceJour) => ({
-            date: jour.date,
-            ...(jour.titre === undefined ? {} : { titre: jour.titre }),
-            creneaux: jour.creneaux.map((creneau, rang) => ({ ...creneau, placeId: placeIdDe(indiceJour, rang) })),
-          }));
-        // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
-        const requetesPrevues = Math.min(config.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
-        reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;
-        const controle: ControleAppel = async (methode) => {
-          const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
-          // Marge de ticket 407 reprise (justifiée, revue 1 mineur 8) : le registre refait ce contrôle quelques ms plus
-          // tard ; sans elle, un appel admis ici serait refusé par le registre (pipeline_failed) au lieu d'arrêter la
-          // vérification et d'écrire les lieux restants sans `placeId` (0116 § 3.5).
-          if (Date.now() + delaiDeLAppel(methodeGoogle) + MARGE_VERIFICATION_AGENT_MS > contexte.echeance - reserveTrajetsMs) return "temps";
-          const consomme = await registre.consumption(null, { methode: methodeGoogle });
-          const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
-          return consomme.requetes + 1 > plafond ? "part" : "ok";
-        };
-        const issue = await verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle);
-
-        // 3. Trajets entre points consécutifs avec identifiant (ordre écrit), sous la part Routes et l'échéance seule.
-        noterPhase("planification");
-        reserveTrajetsMs = 0;
-        const jours = joursAvec((jour, rang) => {
-          const cle = cleDe(jour, rang);
-          return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
-        });
-        const mode = modeDeTrajet(brief);
-        const cadence = creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, {
-          maintenant: () => Date.now(),
-          attendre: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        });
-        const trajets = await trajetsConsecutifs(
-          capacites.routes,
-          pointsDeTrajet({ brief, logements: idsLogements, jours }),
-          mode,
-          { requetes: config.routesRequetes, elements: config.routesElements },
-          cadence,
-        );
-
-        // 4. Assemblage sans replanification, réduction et écriture, ensemble ou pas du tout.
-        noterPhase("ecriture");
-        const complet = assemblerProgrammeIa({
-          tripId: identifiantDuVoyage(brief.destination, execution.jourQuota, execution.numeroDuJour),
-          brief,
-          jours,
-          bonsPlans: programme.bonsPlans,
-          logements: idsLogements,
-          configuration: CONFIGURATION_MOTEUR,
-          mode,
-          trajets,
-        });
-        const positions = new Map<string, Position>([...logements, ...issue.fiches.values()].map((ancrage) => [ancrage.placeId, ancrage.position]));
-        const reduit = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
-        const decoupe = decouperProgramme(reduit);
-        const conserves = trajetsAConserver(decoupe.contenu, mode, (paire) => trajets(paire.origine, paire.destination));
-        await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, mode, trajets: conserves }, poolPrototype());
-      });
-    } catch (erreur) {
-      journaliserProgramme(compteurs, { erreur });
-      throw erreur;
-    }
-    journaliserProgramme(compteurs);
-  });
+  return etape(entree.runId, "recherche", (contexte, marquerAppels, noterPhase) =>
+    ecrireVersion(contexte, marquerAppels, noterPhase, {
+      rediger: (capacites) => capacites.redigerProgramme(entreeProgrammeDepuisBrief(contexte.brief)),
+      tripId:
+        contexte.execution.brief === BRIEF_SAISI
+          ? identifiantDuVoyageSaisi(contexte.brief.destination, contexte.garde.runId)
+          : identifiantDuVoyage(contexte.brief.destination, contexte.execution.jourQuota, contexte.execution.numeroDuJour),
+    }),
+  );
 }
 etapeProgramme.maxRetries = 0;
+
+/**
+ * Corps commun de `etapeProgramme` et `etapeRevision` (décision 0126 § 1) : rédaction, lecture tolérante, vérification
+ * Google, trajets, assemblage et écriture, tels que décrits sur `etapeProgramme`.
+ */
+async function ecrireVersion(
+  contexte: ContexteEtape,
+  marquerAppels: () => void,
+  noterPhase: (phase: PhaseJournal) => void,
+  redaction: Redaction,
+): Promise<void> {
+  const { brief, config, execution, garde } = contexte;
+  const passerA = async (phase: PhaseTravail) => {
+    await ecrirePhase(poolPrototype(), garde.runId, phase);
+    noterPhase(phase);
+  };
+  const modeles = configurationModeles();
+  // Forfait entier de l'exécution (0116 § 3.5) : la part des lieux de l'IA est ce qui reste après les logements.
+  const forfait = forfaitDeLEtape(config, execution, {
+    textSearch: config.placesTextSearch,
+    details: config.placesDetails,
+    routesRequetes: config.routesRequetes,
+    routesElements: config.routesElements,
+  });
+  // Réserve de trajets (0116 § 3.5) : posée pendant la vérification seulement, retirée avant les trajets.
+  let reserveTrajetsMs = 0;
+  const registre = registreDeLEtape(forfait, contexte, (methode) => (methode === "places_text_search" || methode === "places_details" ? reserveTrajetsMs : 0));
+  const capacites = composer(contexte, forfait, registre, modeles).programme();
+  marquerAppels();
+  const compteurs: CompteursProgramme = {
+    days: 0,
+    slots: 0,
+    placesToVerify: 0,
+    daysRemoved: 0,
+    slotsRemoved: 0,
+    fieldsRemoved: 0,
+    textsCut: 0,
+    modelCalls: 0,
+    unverifiedForCap: 0,
+    ...compteursNonSoumis(0),
+  };
+  const cout = memoireDuCout(contexte, registre);
+  try {
+    await cout.terminer(async () => {
+      // 1. Rédaction et lecture tolérante ; ordre écrit fixé une fois, avant toute vérification.
+      compteurs.modelCalls += 1;
+      const reponse = await redaction.rediger(capacites);
+      await cout.ecrire();
+      const lecture = lireProgramme(reponse.texte, { arrivee: brief.arrivee, depart: brief.depart });
+      compteurs.daysRemoved = lecture.joursRetires;
+      compteurs.slotsRemoved = lecture.creneauxRetires;
+      compteurs.fieldsRemoved = lecture.champsRetires;
+      compteurs.textsCut = lecture.textesCoupes;
+      if (lecture.valeur === null) throw new ArretEtape(codePersiste(CODE_PROGRAMME_ILLISIBLE, true));
+      // Révision (décision 0126 § 4) : filet du code, les étapes écartées par la personne sont retirées de la sortie.
+      const filtre = redaction.filtrer === undefined ? { programme: lecture.valeur, retires: 0 } : redaction.filtrer(lecture.valeur);
+      compteurs.slotsRemoved += filtre.retires;
+      if (filtre.retires > 0 && filtre.programme.jours.every((jour) => jour.creneaux.length === 0)) throw new ArretEtape(codePersiste(CODE_PROGRAMME_ILLISIBLE, true));
+      const programme = ordreEcrit(filtre.programme);
+      compteurs.days = programme.jours.length;
+      compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
+      // Sites proposés (lot 2a, 0121 § 2.1 point 1) : adresses réduites distinctes en ordre écrit, en mémoire seulement ;
+      // une forme refusée est un champ retiré (§ 11.3 point 1).
+      const sites = sitesDuProgramme(programme, reduireSite);
+      compteurs.fieldsRemoved += sites.formesRefusees;
+      Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
+
+      // 2. Vérification : logements, puis lieux distincts dans l'ordre écrit, part et échéance contrôlées avant chaque appel.
+      await passerA("ancrage");
+      const { logements, zone } = await ancrerLogementsDuSejour(brief, { detailsLogement: capacites.detailsLogement });
+      const idsLogements = logements.map((logement) => logement.placeId);
+      const { lieux, cleDe } = lieuxDuProgramme(programme, brief.destination);
+      compteurs.placesToVerify = lieux.length;
+      // `unverifiedForCap` (0117 § 4) : calculé avant la boucle, des seuls nombres (lieux, part Text Search, logements).
+      compteurs.unverifiedForCap = lieuxHorsPartTextSearch(lieux.length, forfait.textSearchRequetes, brief.logements.length);
+      // Le `site` lu ne passe jamais tel quel : seule l'adresse réduite gardée est remise au créneau (0121 § 2.1 point 3).
+      const joursAvec = (placeIdDe: (jour: number, rang: number) => string | undefined, gardees: ReadonlySet<string> = new Set()) =>
+        programme.jours.map((jour, indiceJour) => ({
+          date: jour.date,
+          ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+          creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), gardees), placeId: placeIdDe(indiceJour, rang) })),
+        }));
+      // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
+      const requetesPrevues = Math.min(forfait.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
+      reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;
+      const controle: ControleAppel = async (methode) => {
+        const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
+        // Marge de ticket 407 reprise (justifiée, revue 1 mineur 8) : le registre refait ce contrôle quelques ms plus
+        // tard ; sans elle, un appel admis ici serait refusé par le registre (pipeline_failed) au lieu d'arrêter la
+        // vérification et d'écrire les lieux restants sans `placeId` (0116 § 3.5).
+        if (Date.now() + delaiDeLAppel(methodeGoogle) + MARGE_VERIFICATION_AGENT_MS > contexte.echeance - reserveTrajetsMs) return "temps";
+        const consomme = await registre.consumption(null, { methode: methodeGoogle });
+        const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
+        return consomme.requetes + 1 > plafond ? "part" : "ok";
+      };
+      // Sites (lot 2a, 0121 § 2.1 points 2 et 4) : en parallèle de la vérification des lieux, sans donnée commune
+      // (PPI-PO-10) ; borne : 60 s, jamais au-delà de l'échéance moins la réserve de trajets. Si la vérification des
+      // lieux lève, les vérifications de sites en cours sont abandonnées et attendues avant de journaliser.
+      const abandonSites = new AbortController();
+      const debutSites = Date.now();
+      const verificationSites = verifierSites(sites.adresses, capacites.verifierSite, {
+        limite: Math.min(debutSites + SITES_DUREE_MAX_MS, contexte.echeance - reserveTrajetsMs),
+        maintenant: () => Date.now(),
+        signal: abandonSites.signal,
+      });
+      const verificationLieux = verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle).catch((erreur: unknown) => {
+        abandonSites.abort();
+        throw erreur;
+      });
+      const [issueLieux, issueSites] = await Promise.allSettled([verificationLieux, verificationSites]);
+      const resultatSites: ResultatSites =
+        issueSites.status === "fulfilled" ? issueSites.value : { gardees: new Set(), compteurs: compteursNonSoumis(sites.adresses.length) };
+      Object.assign(compteurs, resultatSites.compteurs);
+      if (issueLieux.status === "rejected") throw issueLieux.reason;
+      const issue = issueLieux.value;
+
+      // 3. Trajets entre points consécutifs avec identifiant (ordre écrit), sous la part Routes et l'échéance seule.
+      noterPhase("planification");
+      reserveTrajetsMs = 0;
+      const jours = joursAvec((jour, rang) => {
+        const cle = cleDe(jour, rang);
+        return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
+      }, resultatSites.gardees);
+      const mode = modeDeTrajet(brief);
+      const cadence = creerCadence(QUOTA_ROUTES_ELEMENTS_PAR_MINUTE, {
+        maintenant: () => Date.now(),
+        attendre: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      });
+      const trajets = await trajetsConsecutifs(
+        capacites.routes,
+        pointsDeTrajet({ brief, logements: idsLogements, jours }),
+        mode,
+        // Part Routes de l'étape (plafonds du mode, ou ceux réservés pour une révision : décision 0126 § 2).
+        { requetes: forfait.routesRequetes, elements: forfait.routesElements },
+        cadence,
+      );
+
+      // 4. Assemblage sans replanification, réduction et écriture, ensemble ou pas du tout.
+      noterPhase("ecriture");
+      const complet = assemblerProgrammeIa({
+        // Brief saisi : identifiant connu dès le lancement, celui que suit l'écran 5 (décision 0125 § 2) ; révision :
+        // celui du voyage révisé (décision 0126 § 1).
+        tripId: redaction.tripId,
+        brief,
+        jours,
+        bonsPlans: programme.bonsPlans,
+        logements: idsLogements,
+        configuration: CONFIGURATION_MOTEUR,
+        mode,
+        trajets,
+      });
+      const positions = new Map<string, Position>([...logements, ...issue.fiches.values()].map((ancrage) => [ancrage.placeId, ancrage.position]));
+      const reduit = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
+      const decoupe = decouperProgramme(reduit);
+      const conserves = trajetsAConserver(decoupe.contenu, mode, (paire) => trajets(paire.origine, paire.destination));
+      await ecrireProgramme({ runId: garde.runId, programme: decoupe.contenu, positions: decoupe.positions, mode, trajets: conserves }, poolPrototype());
+    });
+  } catch (erreur) {
+    journaliserProgramme(compteurs, { erreur });
+    throw erreur;
+  }
+  journaliserProgramme(compteurs);
+}
+
+/**
+ * Entrée du workflow `p0Revision` (spécification E2E-essai, lot 4 ; décision 0126 § 1) : l'identifiant de l'exécution de
+ * révision, celui du voyage révisé et les choix du tri, **identifiants maison seulement** (`j<jour>-<rang>`) : ni nom, ni
+ * texte, ni donnée Google (0011 § 3). Le brief est relu en base (`run_briefs`), la version précédente aussi.
+ */
+export type EtatP0Revision = EtatP0Run & { readonly tripId: string; readonly pasPourMoi: readonly string[]; readonly jAime: readonly string[] };
+
+/** Choix bien formés : voyage, au moins une étape écartée, identifiants maison, sans doublon ni recouvrement. */
+export function choixRevisionValides(entree: { readonly tripId: unknown; readonly pasPourMoi: unknown; readonly jAime: unknown }): boolean {
+  const { tripId, pasPourMoi, jAime } = entree;
+  const ids = (valeur: unknown, min: number): valeur is string[] =>
+    Array.isArray(valeur) &&
+    valeur.length >= min &&
+    valeur.length <= CHOIX_REVISION_MAX &&
+    valeur.every((id) => typeof id === "string" && ID_ETAPE_REVISION.test(id)) &&
+    new Set(valeur).size === valeur.length;
+  if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId) || !ids(pasPourMoi, 1) || !ids(jAime, 0)) return false;
+  const ecartees = new Set(pasPourMoi);
+  return jAime.every((id) => !ecartees.has(id));
+}
+
+/**
+ * Étape de révision (décision 0126) : version servie du voyage relue en base (`lireVersionCourante`, validée par
+ * `ProgrammeEcritSchema`, même destination que le brief), entrée de la révision tirée de ses seuls textes d'IA
+ * (`entreeRevisionDepuisProgramme`, aucun identifiant de lieu, position, temps, badge ni verdict), puis **le même corps**
+ * que `etapeProgramme` (`ecrireVersion`) : une requête `revision` (`zdr`), lecture tolérante, étapes écartées retirées
+ * par le code, même vérification Google, mêmes trajets, écriture d'une nouvelle version sous le **même** identifiant de
+ * voyage. Choix mal formés, version absente ou expirée, autre destination, aucune étape écartée dans la version :
+ * `brief_invalid`, avant tout appel.
+ */
+export async function etapeRevision(entree: EtatP0Revision): Promise<EtatP0Run> {
+  "use step";
+  return etape(entree.runId, "recherche", async (contexte, marquerAppels, noterPhase) => {
+    if (!choixRevisionValides(entree)) throw new ArretEtape("brief_invalid");
+    const lue = ProgrammeEcritSchema.safeParse(await lireVersionCourante(poolPrototype(), entree.tripId));
+    if (!lue.success || lue.data.trip.id !== entree.tripId || lue.data.trip.destination !== contexte.brief.destination) throw new ArretEtape("brief_invalid");
+    const revision = entreeRevisionDepuisProgramme(lue.data, contexte.brief, entree);
+    if (revision.choix.pasPourMoi.length === 0) throw new ArretEtape("brief_invalid");
+    const noms = nomsEcartes(lue.data, revision.choix.pasPourMoi);
+    await ecrireVersion(contexte, marquerAppels, noterPhase, {
+      rediger: (capacites) => capacites.redigerRevision(revision),
+      filtrer: (programme) => retirerEtapesEcartees(programme, noms),
+      tripId: entree.tripId,
+    });
+  });
+}
+etapeRevision.maxRetries = 0;
 
 /**
  * Clôture d'une exécution arrêtée (garde revérifiée) : candidats supprimés, `arretee` et code persisté (S4). Garde
@@ -751,6 +1021,22 @@ export async function p0Run(entree: EtatP0Run): Promise<EtatP0Run> {
   const runId = entree.runId;
   try {
     await etapeProgramme({ runId });
+  } catch (erreur) {
+    const code = (erreur as { message?: unknown } | null)?.message;
+    await etapeClore({ runId, code: estCodeArret(code) ? code : "pipeline_failed" });
+  }
+  return { runId };
+}
+
+/**
+ * Workflow de révision (décision 0126 § 1) : `etapeRevision` (nouvelle version écrite), puis `etapeClore` seulement en cas
+ * d'arrêt, comme `p0Run`. Une révision arrêtée laisse la version précédente servie.
+ */
+export async function p0Revision(entree: EtatP0Revision): Promise<EtatP0Run> {
+  "use workflow";
+  const runId = entree.runId;
+  try {
+    await etapeRevision({ runId, tripId: entree.tripId, pasPourMoi: [...entree.pasPourMoi], jAime: [...entree.jAime] });
   } catch (erreur) {
     const code = (erreur as { message?: unknown } | null)?.message;
     await etapeClore({ runId, code: estCodeArret(code) ? code : "pipeline_failed" });

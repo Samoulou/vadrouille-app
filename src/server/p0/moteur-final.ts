@@ -4,7 +4,7 @@ import type { Pace, TripCommitment } from "@/contracts";
 import { classer, ConfigClassementSchema, type ConfigClassement, type ParametresClassement } from "@/domain/classement";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatEvenement, CandidatMoteur } from "@/domain/entrees";
-import { identifiantVoyage } from "@/domain/identifiant";
+import { identifiantVoyage, identifiantVoyageSaisi } from "@/domain/identifiant";
 import { planifier, type JourPlanifie } from "@/domain/planification";
 import type { ModeTrajet, Relectures } from "@/domain/relectures";
 import { squelette, type JourSquelette } from "@/domain/squelette";
@@ -91,4 +91,12 @@ export function planifierLeJour(entree: EntreeJour): JourPlanifie {
  */
 export function identifiantDuVoyage(destination: string, jourQuota: string, numeroDuJour: number): string {
   return identifiantVoyage(destination, jourQuota, numeroDuJour);
+}
+
+/**
+ * Identifiant du voyage d'une exécution lancée depuis l'app sur un brief saisi (décision 0125 § 2) :
+ * `proto_<destination>_<uuid de l'exécution>`, le même au lancement (écran 5) et à l'écriture du programme.
+ */
+export function identifiantDuVoyageSaisi(destination: string, runId: string): string {
+  return identifiantVoyageSaisi(destination, runId);
 }

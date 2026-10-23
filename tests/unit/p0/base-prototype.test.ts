@@ -48,6 +48,26 @@ describe("ancrage: masques de champs exacts", () => {
   });
 });
 
+// A22 sous son nom (`specs/P0-programme-par-ia.md` § 11.6 ; 0122 § 2.2 point 6 : « masque `MASQUE_TEXT_SEARCH` et
+// masques de fiches inchangés (test `places: masque de champ inchangé`, A22, à créer) »). Le lot 2a ne lit jamais le site
+// web de Places : aucun masque ne le demande, aucun fichier de `src/` ne nomme le champ.
+describe("places: masque de champ inchangé", () => {
+  it("places: masque de champ inchangé (A22 ; aucun champ de site web de Places lu)", () => {
+    const source = lire("src/grounding/places-client.ts") ?? "";
+    const masques = [...source.matchAll(/^export const (MASQUE_[A-Z_]+) = "([^"]*)";$/gm)].map((m) => [m[1], m[2]]);
+    expect(Object.fromEntries(masques)).toEqual({
+      MASQUE_TEXT_SEARCH: "places.id",
+      MASQUE_DETAILS: "id,businessStatus,location,regularOpeningHours",
+      MASQUE_POSITION: "id,location",
+      MASQUE_IDENTIFIANT: "id",
+    });
+    const champ = ["website", "Uri"].join("");
+    for (const [, valeur] of masques) expect(valeur).not.toMatch(/website/i);
+    const nommant = fichiers().filter((f) => f.startsWith("src/") && TEXTE.test(f) && (lire(f) ?? "").includes(champ));
+    expect(nommant).toEqual([]);
+  });
+});
+
 describe("imports: table des temps de trajet nommée par deux modules seulement (décision 0092 § 5)", () => {
   /** Seuls modules hors de `db/` et `tests/db/` qui nomment la table : l'écriture et la lecture des programmes réels. */
   const ADMIS = ["src/adapters/prototype-ecriture.ts", "src/adapters/prototype-lecture.ts"];
@@ -260,6 +280,8 @@ describe("ci: garde du dépôt (identifiants de lieu Google, coordonnées, URL d
   const COORDONNEES_ADMISES = [
     "prototype/fixtures/places/edimbourg.json",
     "prototype/programmes-test/proto_test_20261012_1.json",
+    // Ticket 691 (spécification E2E-essai, lot 1) : copie des positions fictives du programme de test ci-dessus.
+    "prototype/programmes-essai/proto_essai_20271010_1.json",
     "src/components/carte/AreaMap.test.tsx",
     "src/components/carte/simulated-model.test.ts",
     "src/grounding/places-client.test.ts",

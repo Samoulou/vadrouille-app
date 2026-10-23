@@ -9,9 +9,13 @@ import { verifierSortie, type CodeRefusSortie } from "@/server/env/egress";
 
 /**
  * Transport réel de la lecture des pages (spécification de P0r1, « P0, suite : exécutions réelles », « Lecture des
- * pages » ; module de capacité réseau, exception nominative de 0031 § 5 ; client proposé par D12). Injecté dans
- * `fetch-page.ts`, qui garde toute la logique de la garde (validation, redirections, limites, décompression) ;
- * **branché à aucun point d'entrée** (P0r1).
+ * pages » ; module de capacité réseau, exception nominative de 0031 § 5 ; client proposé par D12) **et de la
+ * vérification de statut des sites** proposés par l'IA dans `p0Run` (lot 2a : la spécification P0-programme-par-ia § 11.3 ;
+ * décision 0121 § 3.7 ; verdict 0122 § 1 conditions 1, 5 et 13). Injecté dans `fetch-page.ts`, qui garde toute la logique
+ * de la garde (validation, redirections, limites, décompression) et reste le seul appelant de cette `CoucheHttp`
+ * (`lire` et `creerVerificateurStatut`) ; branché par la composition du mode réel seule (`src/server/composition/p0-reel.ts`,
+ * famille `programme()` pour la vérification de statut). Même `Agent` par saut, même méthode `GET` fixe, mêmes trois
+ * en-têtes admis pour les deux usages : la vérification de statut n'ajoute ni capacité ni paramètre de méthode.
  *
  * - Résolveur réel : `lookup` de `node:dns/promises` avec `all: true` ; la garde vérifie **toutes** les adresses.
  * - Épinglage : un `Agent` **par saut**, dont `connect.lookup` renvoie l'adresse déjà vérifiée (aucune seconde

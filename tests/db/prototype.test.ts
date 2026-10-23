@@ -6,8 +6,13 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PROTOTYPE_USER_ID } from "@/adapters/context";
+import { ecrireProgramme } from "@/adapters/prototype-ecriture";
+import { lireContenuProgramme } from "@/adapters/prototype-suivi";
 import { CandidatSchema } from "@/prototype/candidat";
-import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+import { decouperProgramme } from "@/prototype/decoupage";
+import { PROTOTYPE_ORG_ID, ProgrammeEcritSchema, ProgrammeReduitSchema } from "@/prototype/programme-reduit";
+import { sourceDuSite } from "@/server/p0/assemblage";
+import type { ClientSql, PoolSql } from "@/server/usage/neon";
 import { jourDeQuotaGoogle } from "@/server/usage/periodes";
 
 import { INSTANTS_JOUR_GOOGLE } from "../support/instants-d20";
@@ -28,7 +33,8 @@ const MIGRATION_COORDONNEES = readFileSync(path.join(RACINE, "db/migrations/0002
 
 // `trajets` : décision 0092 (migration 0011_trajets_prototype), éprouvée en détail par `trajets-prototype.test.ts`.
 // `run_secteurs` : décision 0094 § 1 point 5 (migration 0013_secteurs_prototype), éprouvée par `secteurs-prototype.test.ts`.
-const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs"] as const;
+// `run_briefs` : décision 0125 § 1 (migration 0017_brief_saisi_prototype), éprouvée par `brief-saisi-prototype.test.ts`.
+const TABLES = ["runs", "forfaits", "programmes", "jugements", "run_attempts", "run_candidates", "purges", "trajets", "run_secteurs", "run_briefs"] as const;
 const SHA = "a".repeat(40);
 const SIGNATURE_POSITIONS = "store_prototype_coordinates(uuid,text,double precision,double precision)";
 const CANDIDAT = { id: "c_001", nom: "Musée", resume: "Un musée.", aReserver: false };
@@ -602,6 +608,8 @@ describe("invariants et contenus (0046 D24, S4)", () => {
     expect(await colonnes("purges")).toEqual(["id", "purged_at"]);
     // Plan de secteurs : des noms et des listes, rien de Google (0103, question 1).
     expect(await colonnes("run_secteurs")).toEqual(["id", "organization_id", "run_id", "secteurs", "expires_at"]);
+    // Brief saisi dans l'app : texte maison du formulaire, rien de Google (0125 § 1).
+    expect(await colonnes("run_briefs")).toEqual(["id", "organization_id", "run_id", "request_id", "brief", "expires_at"]);
     // Seule table du schéma prototype qui porte une donnée dérivée de Routes (décision 0092 § 3, exception de Samuel à
     // 0011 et 0027) : temps en minutes entières entre deux lieux d'un programme, rien d'autre (ni distance, ni condition).
     expect(await colonnes("trajets")).toEqual(["id", "organization_id", "programme_id", "mode", "origine", "destination", "minutes", "expires_at"]);
@@ -716,5 +724,58 @@ describe("purge du prototype (0046 D16)", () => {
     expect(await compter("SELECT count(*) AS n FROM prototype.purges WHERE id = $1", [ancienne])).toBe(0);
     expect(await compter("SELECT count(*) AS n FROM prototype.purges WHERE id = $1", [recente])).toBe(1);
     expect(await compter("SELECT count(*) AS n FROM prototype.purges WHERE purged_at < pg_catalog.now() - interval '30 days'")).toBe(0);
+  });
+});
+
+/**
+ * A21, base jetable (`specs/P0-programme-par-ia.md` § 11.6 ; 0121 § 5, ligne A21 : « `tests/db/prototype.test.ts` (base
+ * jetable) » ; 0122 § 2.2 points 2 et 4) : un site gardé devient `Stop.source = { label: hôte sans www., url: adresse
+ * réduite }`, écrit par le module d'écriture sous `vadrouille_prototype` et relu tel quel, sans `verifiedAt` ; une étape
+ * sans site n'a pas de `source`. Le site est déjà vérifié (vérificateur simulé des tests unitaires) : aucune requête ici.
+ */
+describe("p0: source écrite depuis le site vérifié (A21, base migrée)", () => {
+  const SOURCE_PROGRAMME = readFileSync(path.join(RACINE, "prototype/programmes-test/proto_test_20261012_1.json"), "utf8");
+
+  /** Pool minimal du module sur une connexion de test (comme `trajets-prototype.test.ts`). */
+  const pool = (client: DbClient): PoolSql => ({
+    connect: async (): Promise<ClientSql> => ({
+      query: async (texte, valeurs) => client.query(texte, valeurs ? [...valeurs] : undefined),
+      release: () => undefined,
+    }),
+  });
+
+  it("p0: source écrite depuis le site vérifié, relue sans verifiedAt ; étape sans site sans source", async () => {
+    await admin.query("BEGIN");
+    let runId: string;
+    try {
+      runId = await poserExecution(admin, { organisation: PROTOTYPE_ORG_ID });
+      await admin.query("COMMIT");
+    } catch (error) {
+      await admin.query("ROLLBACK");
+      throw error;
+    }
+    const prefixe = `S${unique()}_`;
+    const tripId = `proto_si${unique()}_1`;
+    const programme = ProgrammeReduitSchema.parse(JSON.parse(SOURCE_PROGRAMME.replaceAll("SENTINELLE_PLACE_ID_", prefixe).replaceAll("proto_test_20261012_1", tripId)));
+    const { contenu, positions } = decouperProgramme(programme);
+    // Comme l'assemblage de `p0Run` : `source` seulement pour l'étape au site gardé, aucune pour les autres.
+    const etapes = contenu.trip.days.flatMap((jour) => jour.items).flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : []));
+    expect(etapes.length).toBeGreaterThan(1);
+    const source = sourceDuSite("https://www.colosseo.it/");
+    expect(source).toEqual({ label: "colosseo.it", url: "https://www.colosseo.it/" });
+    for (const [rang, etape] of etapes.entries()) {
+      if (rang === 0) (etape as { source?: unknown }).source = source;
+      else delete (etape as { source?: unknown }).source;
+    }
+
+    await ecrireProgramme({ runId, programme: contenu, positions, mode: "walk", trajets: new Map() }, pool(proto));
+
+    const relu = ProgrammeEcritSchema.parse(await lireContenuProgramme(pool(proto), runId));
+    const relues = relu.trip.days.flatMap((jour) => jour.items).flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : []));
+    expect(relues[0]?.source).toEqual({ label: "colosseo.it", url: "https://www.colosseo.it/" });
+    for (const etape of relues.slice(1)) expect(etape.source).toBeUndefined();
+    const brut = JSON.stringify((await admin.query("SELECT contenu FROM prototype.programmes WHERE run_id = $1", [runId])).rows[0].contenu);
+    expect(brut).not.toContain("verifiedAt");
+    expect(brut).toContain('"url":"https://www.colosseo.it/"');
   });
 });

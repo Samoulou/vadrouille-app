@@ -5,7 +5,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { lireProgramme, ordreEcrit, type CreneauIa, type JourIa, type ProgrammeIa } from "@/ai/sorties";
+import { CATEGORIES, type Category } from "@/contracts";
 import { BriefSchema, type Brief } from "@/prototype/brief";
+import { reduireSite } from "@/research/fetch-page";
+import { entreeProgrammeDepuisBrief } from "@/server/p0/vers-couche-ia";
+import { sitesDuProgramme } from "@/server/p0/sites";
 
 /**
  * Jeu d'évaluation hors réseau du lot 1 du programme par l'IA (spécification P0-programme-par-ia § 5, critères A1 à A6 ;
@@ -35,6 +39,11 @@ type Config = {
   pourquoiPartMin: number;
   conseilPartMin: number;
   parCas: Record<string, { apero?: { partMin: number; joursEntiersSeulement?: boolean }; incontournables: ConfigIncontournables }>;
+  aEviter: {
+    jeux: string[];
+    controle: { jeu: string; aEviter: Category[] };
+    reperes: Record<Category, { natures: string[]; motsCles: string[] }>;
+  };
 };
 
 const CONFIG = lireJson("evals/programme/config.json") as Config;
@@ -168,6 +177,26 @@ describe("evals: programme par l'IA, sorties simulées de rome-1 et edimbourg-1 
     }
   });
 
+  it("evals: sites proposés lus et réduits, aucune donnée Google (lot 2a, A13 et A14 ; 0121 § 4.2)", () => {
+    for (const id of CAS) {
+      const { programme } = charger(id);
+      const fichier = lireJson(`evals/programme/${id}.json`) as { cas: string; attendu: { sitesProposes: number; sitesFormeInvalide: number } };
+      expect(fichier.cas, id).toContain("prompt programme v2");
+      const sites = sitesDuProgramme(programme, reduireSite);
+      expect({ sitesProposes: sites.adresses.length, sitesFormeInvalide: sites.formesRefusees }, id).toEqual(fichier.attendu);
+      expect(new Set(sites.adresses).size, id).toBe(sites.adresses.length);
+      for (const adresse of sites.adresses) {
+        expect(adresse, id).toMatch(/^https:\/\/[^/?#]+\.[^/?#]+\//);
+        expect(adresse, id).not.toMatch(/[?#]/);
+        expect(adresse, id).not.toMatch(/google|goo\.gl|g\.page|g\.co\//i);
+      }
+      // Le jeu porte des cas refusés à la forme et au moins un site cité par plusieurs créneaux (dédoublonnage).
+      expect(sites.formesRefusees, id).toBeGreaterThan(0);
+      const cites = programme.jours.flatMap((jour, j) => jour.creneaux.map((_, rang) => sites.adresseDe(j, rang))).filter((a) => a !== undefined);
+      if (id === "rome-1") expect(cites.length, id).toBeGreaterThan(sites.adresses.length);
+    }
+  });
+
   it("evals: les seuils et les incontournables ne sont ni dans le prompt ni dans le code de production", () => {
     const prompt = readFileSync(path.join(RACINE, "src/ai/prompts/programme.ts"), "utf8");
     const production = ["src/ai/sorties.ts", "src/ai/rediger-programme.ts", "src/workflows/p0-run.ts", "src/server/p0/assemblage.ts"].map((fichier) => readFileSync(path.join(RACINE, fichier), "utf8"));
@@ -177,5 +206,66 @@ describe("evals: programme par l'IA, sorties simulées de rome-1 et edimbourg-1 
       }
       expect(texte).not.toContain(CONFIG.finDuJourMin);
     }
+  });
+});
+
+/**
+ * Lot 5 de la spécification E2E-essai : « à éviter » transmis à l'IA. Sortie **simulée** du prompt `programme` v3 pour un
+ * brief qui porte `aEviter` (`evals/programme/rome-a-eviter-1.json`, brief de rome-1 modifié) : l'entrée du prompt porte
+ * les catégories, et aucune étape de la sortie n'en relève. Une étape relève d'une catégorie par sa nature ou par un mot
+ * entier du nom du lieu (repères de `config.json`, jamais dans le prompt ni le code). Le contrôle (rome-1, qui a des
+ * musées et des apéros) prouve que la mesure mord. Aucune donnée Google.
+ */
+describe("evals: programme par l'IA, « à éviter » (E2E-essai, lot 5)", () => {
+  // Repères en lettres et espaces seulement (`config.json`) : aucun échappement nécessaire.
+  const motEntier = (texte: string, mot: string) => new RegExp(`(^|[^a-z0-9])${normaliser(mot)}($|[^a-z0-9])`).test(normaliser(texte));
+  /** Étapes du programme qui relèvent d'une des catégories, avec leur catégorie. */
+  const etapesAEviter = (programme: ProgrammeIa, categories: readonly Category[]) =>
+    programme.jours.flatMap((jour) =>
+      jour.creneaux.flatMap((creneau) =>
+        categories
+          .filter((categorie) => {
+            const repere = CONFIG.aEviter.reperes[categorie];
+            return repere.natures.includes(creneau.nature) || (creneau.lieu !== undefined && repere.motsCles.some((mot) => motEntier(creneau.lieu!, mot)));
+          })
+          .map((categorie) => `${jour.date} ${creneau.debut} ${categorie}`),
+      ),
+    );
+
+  function chargerAvecAEviter(id: string): Cas & { aEviter: Category[] } {
+    const fichier = lireJson(`evals/programme/${id}.json`) as { id: string; brief: string; briefModifie: Record<string, unknown>; cas: string; sortie: unknown };
+    expect(fichier.id).toBe(id);
+    expect(fichier.cas, id).toContain("prompt programme v3");
+    const brief = BriefSchema.parse({ ...(lireJson(`prototype/briefs/${fichier.brief}.json`) as object), ...fichier.briefModifie });
+    expect(brief.aEviter, id).toBeDefined();
+    const lecture = lireProgramme(JSON.stringify(fichier.sortie), { arrivee: brief.arrivee, depart: brief.depart });
+    expect(lecture, id).toMatchObject({ illisible: false, joursRetires: 0, creneauxRetires: 0, champsRetires: 0, textesCoupes: 0 });
+    return { id, brief, programme: ordreEcrit(lecture.valeur!), aEviter: brief.aEviter! };
+  }
+
+  it("evals: chaque catégorie a ses repères", () => {
+    expect(Object.keys(CONFIG.aEviter.reperes).sort()).toEqual([...CATEGORIES].sort());
+    for (const categorie of CATEGORIES) {
+      const repere = CONFIG.aEviter.reperes[categorie];
+      expect(repere.natures.length + repere.motsCles.length, categorie).toBeGreaterThan(0);
+    }
+  });
+
+  it("programme: l'entrée porte `aEviter` quand le brief en porte, et aucune étape n'en relève", () => {
+    expect(CONFIG.aEviter.jeux.length).toBeGreaterThan(0);
+    for (const id of CONFIG.aEviter.jeux) {
+      const cas = chargerAvecAEviter(id);
+      expect(entreeProgrammeDepuisBrief(cas.brief).aEviter, id).toEqual(cas.aEviter);
+      expect(cas.programme.jours.flatMap(avecLieu).length, id).toBeGreaterThan(0);
+      expect(etapesAEviter(cas.programme, cas.aEviter), id).toEqual([]);
+    }
+  });
+
+  it("evals: la mesure mord (contrôle : rome-1, sans « à éviter », a des étapes de ces catégories)", () => {
+    const controle = charger(CONFIG.aEviter.controle.jeu);
+    expect(controle.brief.aEviter).toBeUndefined();
+    expect(entreeProgrammeDepuisBrief(controle.brief)).not.toHaveProperty("aEviter");
+    const trouvees = etapesAEviter(controle.programme, CONFIG.aEviter.controle.aEviter);
+    for (const categorie of CONFIG.aEviter.controle.aEviter) expect(trouvees.some((etape) => etape.endsWith(` ${categorie}`)), categorie).toBe(true);
   });
 });

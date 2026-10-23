@@ -8,6 +8,7 @@ import { FatalError } from "workflow";
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { creerModelesSimules } from "@/ai/modeles.simule";
 import { creerRedigerProgramme } from "@/ai/rediger-programme";
+import { creerRedigerRevision } from "@/ai/rediger-revision";
 import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { PhaseTravail } from "@/contracts/prototype-travail";
 import { capacitesAncrage } from "@/grounding/ancrage-zone";
@@ -17,9 +18,12 @@ import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { zoneDuSejour } from "@/grounding/zone";
 import { SQL_TRAJET } from "@/adapters/prototype-ecriture";
-import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme } from "@/prototype/programme-reduit";
+import { cleTrajet, pairesDistinctes, pairesDuProgramme, placeIdsDuProgramme, ProgrammeEcritSchema } from "@/prototype/programme-reduit";
 import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, type PortConsommation } from "@/server/usage/port";
-import { DUREE_MAX_EXECUTION_MS, etapeProgramme, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Run } from "@/workflows/p0-run";
+import { DELAI_SITE_MS, MARGE_SITE_MS, SITES_DUREE_MAX_MS, type VerificateurSites } from "@/server/p0/sites";
+import { DELAI_REQUETE_MS } from "@/server/usage/port";
+import { identifiantVoyageSaisi } from "@/domain/identifiant";
+import { DUREE_MAX_EXECUTION_MS, etapeProgramme, etapeRevision, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Revision, p0Run, plafondsGoogleRevision } from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
 import { clesDe, CLES_INTERDITES, sentinelles } from "../p0/harnais";
@@ -65,8 +69,16 @@ const d = vi.hoisted(() => ({
     ageMs: 0,
     /** Temps passé (horloge simulée) pendant la relecture de l'exécution, à l'ouverture d'une étape. */
     avanceALaLectureMs: 0,
+    /** Plafonds Google réservés relus avec l'exécution (révision, décision 0126 § 2) ; absents par défaut. */
+    forfaitGoogle: undefined as undefined | { textSearch: number; details: number; routesRequetes: number; routesElements: number },
   },
   requetesSql: [] as { texte: string; valeurs: readonly unknown[] | undefined }[],
+  /** Brief saisi servi par `lireBriefSaisi` (E2E-essai, lot 3) et exécutions dont il a été lu. */
+  briefSaisi: null as unknown,
+  briefSaisiLus: [] as string[],
+  /** Version servie du voyage (lot 4, décision 0126) : contenu relu par `lireVersionCourante`, et voyages demandés. */
+  versionServie: null as unknown,
+  versionsLues: [] as string[],
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
@@ -140,7 +152,15 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
     lireExecution: async () => {
       enCours();
       if (d.etat.avanceALaLectureMs > 0) vi.setSystemTime(Date.now() + d.etat.avanceALaLectureMs);
-      return { mode: d.etat.mode, brief: d.etat.brief, variante: "B", coutModelesMicros: d.etat.cout, jourQuota: "2026-10-12", numeroDuJour: 2 };
+      return {
+        mode: d.etat.mode,
+        brief: d.etat.brief,
+        variante: "B",
+        coutModelesMicros: d.etat.cout,
+        jourQuota: "2026-10-12",
+        numeroDuJour: 2,
+        ...(d.etat.forfaitGoogle === undefined ? {} : { forfaitGoogle: d.etat.forfaitGoogle }),
+      };
     },
     ecrirePhase: async (_pool: unknown, _runId: string, phase: PhaseTravail) => {
       enCours();
@@ -152,6 +172,15 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
     ecrireCoutModeles: async (_pool: unknown, _runId: string, micros: number) => {
       enCours();
       d.etat.cout = Math.max(d.etat.cout, Math.ceil(micros / 10_000) * 10_000);
+    },
+    lireBriefSaisi: async (_pool: unknown, runId: string) => {
+      enCours();
+      d.briefSaisiLus.push(runId);
+      return structuredClone(d.briefSaisi);
+    },
+    lireVersionCourante: async (_pool: unknown, tripId: string) => {
+      d.versionsLues.push(tripId);
+      return structuredClone(d.versionServie);
     },
     cloreExecution: async (_pool: unknown, _runId: string, code: string) => {
       if (d.etat.statut !== "en_cours") return;
@@ -202,6 +231,13 @@ type Retouches = {
   textSearch?: (requete: Parameters<ClientPlaces["textSearch"]>[0], reponse: () => ReturnType<ClientPlaces["textSearch"]>) => ReturnType<ClientPlaces["textSearch"]>;
 };
 let retouches: Retouches = {};
+
+/**
+ * Vérificateur de sites simulé (lot 2a ; 0121 § 4.3) : par défaut, il refuse tout **sans appel** (la sortie simulée
+ * d'`edimbourg-1` n'a aucun site) ; un test des sites le remplace. Chaque adresse soumise est capturée.
+ */
+let sitesSoumis: string[] = [];
+let verificateurSites: VerificateurSites = { barriereFermee: false, verifier: async () => ({ ok: false }) };
 
 /**
  * Composition sur les doubles du mode simulé, de même forme que la vraie : chaque appel payant est **réservé** auprès
@@ -269,10 +305,20 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
   return {
     programme: () => ({
       redigerProgramme: creerRedigerProgramme(modeles, { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+      redigerRevision: creerRedigerRevision(modeles, { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
       textSearch: capacitesAncrage(places).textSearch,
       places: { details: (placeId: string) => places.details(placeId) },
       detailsLogement: capacitesAncrage(places).detailsLogement,
       routes,
+      verifierSite: {
+        get barriereFermee() {
+          return verificateurSites.barriereFermee;
+        },
+        verifier: (adresse: string, signal?: AbortSignal) => {
+          sitesSoumis.push(adresse);
+          return verificateurSites.verifier(adresse, signal);
+        },
+      },
     }),
   };
 }
@@ -287,8 +333,12 @@ function reinitialiser(): void {
   d.modeReel = structuredClone(MODE_REEL);
   d.modeles = structuredClone(MODELES);
   d.programme = structuredClone(fixtures.modeles.programme);
-  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0 });
+  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0, forfaitGoogle: undefined });
   d.requetesSql.length = 0;
+  d.briefSaisi = null;
+  d.briefSaisiLus.length = 0;
+  d.versionServie = null;
+  d.versionsLues.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
   d.tablePresente = true;
@@ -297,6 +347,8 @@ function reinitialiser(): void {
   derniere = undefined;
   latences = undefined;
   retouches = {};
+  sitesSoumis = [];
+  verificateurSites = { barriereFermee: false, verifier: async () => ({ ok: false }) };
   capture = captureVide();
 }
 
@@ -459,7 +511,8 @@ describe("p0Run, etapeProgramme de bout en bout sur les doubles (décision 0116 
     for (const texte of [contenu, ...sorties]) expect(texte.replaceAll('"unverifiedForCap"', "").replace(/comptoir introuvable du double/gi, "")).not.toMatch(/verifi(?:ed|es)|introuvable|ferme_definitivement|CLOSED_PERMANENTLY|hors_?zone|notFound|outOfZone/i);
     const fin = sorties.map((ligne) => JSON.parse(ligne) as Record<string, unknown>).find((ligne) => ligne.event === "p0.programme_written");
     expect(Object.keys(fin ?? {}).sort()).toEqual(
-      ["days", "daysRemoved", "event", "fieldsRemoved", "level", "modelCalls", "placesToVerify", "slots", "slotsRemoved", "textsCut", "unverifiedForCap"].sort(),
+      // Lot 2a (0121 § 2.3, § 4.3) : les quatre compteurs `sites*` s'ajoutent (des nombres de nos propres requêtes).
+      ["days", "daysRemoved", "event", "fieldsRemoved", "level", "modelCalls", "placesToVerify", "slots", "slotsRemoved", "textsCut", "unverifiedForCap", "sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked"].sort(),
     );
     expect(fin).toMatchObject({ days: 6, placesToVerify: LIEUX_FIXTURE.length, unverifiedForCap: 0, modelCalls: 1 });
   });
@@ -1091,5 +1144,384 @@ describe("p0Run, journal p0.step_failed de etape() (ticket 493, décision 0090 �
     const lignes = espionnerJournal();
     expect(await etapeProgramme({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
     expect(lignes).toEqual([]);
+  });
+});
+
+/** Sites ajoutés à la sortie simulée d'`edimbourg-1` (lot 2a) : adresses fictives, dont des cas refusés. */
+const SITES_FIXTURE: Readonly<Record<string, string>> = {
+  "Forteresse du rocher": "https://www.forteresse.example.org/visite?utm=ia#billets",
+  "Palais au bout de la grande rue": "https://palais.example.org/",
+  // Cité deux fois (midi le premier jour, soir le cinquième) : vérifié une fois.
+  "Taverne aux tourtes": "https://taverne.example.org/",
+  // Forme refusée (http) : champ retiré, compté dans fieldsRemoved.
+  "Grande rue pavée de la vieille ville": "http://grande-rue.example.org/",
+  // Refusé par la vérification (statut hors 2xx simulé).
+  "Colline aux trois belvédères": "https://colline.example.org/",
+  // Lieu introuvable par Text Search : son site vérifié est gardé quand même (PPI-PO-10).
+  "Comptoir introuvable du double": "https://comptoir.example.org/",
+};
+const SITES_GARDES = ["https://www.forteresse.example.org/visite", "https://palais.example.org/", "https://taverne.example.org/", "https://comptoir.example.org/"];
+
+function avecSites(): void {
+  const programme = d.programme as { jours: { creneaux: { lieu?: string; site?: string }[] }[] };
+  for (const jour of programme.jours) for (const creneau of jour.creneaux) if (creneau.lieu !== undefined && creneau.lieu in SITES_FIXTURE) creneau.site = SITES_FIXTURE[creneau.lieu];
+  verificateurSites = { barriereFermee: false, verifier: async (adresse) => ({ ok: !adresse.includes("colline") }) };
+}
+
+/** Journal capturé : chaque ligne écrite par `console.log`, lue en JSON (gardée après la restauration de l'espion). */
+function capturerJournal() {
+  const lignes: Record<string, unknown>[] = [];
+  const espion = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void lignes.push(JSON.parse(String(args[0])) as Record<string, unknown>));
+  return { lignes, espion, mockRestore: () => espion.mockRestore(), mockClear: () => void lignes.splice(0) };
+}
+const lignesJournal = (journal: { lignes: Record<string, unknown>[] }) => journal.lignes;
+
+describe("p0Run, etapeProgramme : sites de l'activité (lot 2a, spécification § 11 ; 0121 § 2 ; 0122)", () => {
+  it("p0: source écrite depuis le site vérifié (adresse réduite de l'IA, libellé sans www., aucun verifiedAt)", async () => {
+    avecSites();
+    const journal = capturerJournal();
+    try {
+      await etapeProgramme({ runId: RUN_ID });
+    } finally {
+      journal.mockRestore();
+    }
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect([...sitesSoumis].sort()).toEqual([...SITES_GARDES, "https://colline.example.org/"].sort());
+    const sources = new Map(etapesEcrites().map((stop) => [String(stop.name), stop.source]));
+    expect(sources.get("Forteresse du rocher")).toEqual({ label: "forteresse.example.org", url: "https://www.forteresse.example.org/visite" });
+    expect(sources.get("Palais au bout de la grande rue")).toEqual({ label: "palais.example.org", url: "https://palais.example.org/" });
+    expect(etapeNommee("Taverne aux tourtes").map((stop) => stop.source)).toEqual([
+      { label: "taverne.example.org", url: "https://taverne.example.org/" },
+      { label: "taverne.example.org", url: "https://taverne.example.org/" },
+    ]);
+    expect(sources.get("Grande rue pavée de la vieille ville")).toBeUndefined();
+    expect(sources.get("Colline aux trois belvédères")).toBeUndefined();
+    const comptoir = etapeNommee("Comptoir introuvable du double")[0]!;
+    expect(comptoir.placeId).toBeUndefined();
+    expect(comptoir.source).toEqual({ label: "comptoir.example.org", url: "https://comptoir.example.org/" });
+    for (const stop of etapesEcrites()) expect(stop).not.toHaveProperty("verifiedAt");
+    // Contrôle final (0122 § 2.2 point 4) : le contenu écrit passe le schéma unique du programme écrit, sources comprises.
+    const relu = ProgrammeEcritSchema.parse(programmeEcrit().contenu);
+    expect(relu.trip.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop.source ? [ligne.stop.source.url] : []))).sort()).toEqual(
+      ["https://www.forteresse.example.org/visite", "https://palais.example.org/", "https://taverne.example.org/", "https://taverne.example.org/", "https://comptoir.example.org/"].sort(),
+    );
+    // Seules les étapes avec un site gardé ont une source ; aucune autre étape n'en reçoit.
+    expect(etapesEcrites().filter((stop) => stop.source !== undefined)).toHaveLength(5);
+    const fin = lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written");
+    expect(fin).toMatchObject({ sitesProposed: 5, sitesChecked: 5, sitesRemoved: 1, sitesUnchecked: 0 });
+  });
+
+  it("journal: compteurs de sites indépendants de l'ancrage (A20, extension du test 0117)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const journal = capturerJournal();
+    const executer = async (aucunTrouve: boolean) => {
+      reinitialiser();
+      avecSites();
+      journal.mockClear();
+      vi.setSystemTime(Date.parse("2026-10-15T10:00:00Z"));
+      let rang = 0;
+      if (aucunTrouve) retouches.textSearch = async (_requete, reponse) => (rang++ === 0 ? reponse() : { placeIds: [] });
+      await etapeProgramme({ runId: RUN_ID });
+      expect(d.etat.statut).toBe("programme_ecrit");
+      return {
+        ligne: lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written"),
+        soumis: [...sitesSoumis].sort(),
+        sources: etapesEcrites().map((stop) => [stop.name, stop.source ?? null]),
+        avecPlaceId: etapesEcrites().filter((stop) => stop.placeId !== undefined).length,
+      };
+    };
+    try {
+      const tous = await executer(false);
+      const aucun = await executer(true);
+      expect(tous.avecPlaceId).toBeGreaterThan(0);
+      expect(aucun.avecPlaceId).toBe(0);
+      // Mêmes requêtes de sites, mêmes source écrites, mêmes compteurs sites* (et relations).
+      expect(aucun.soumis).toEqual(tous.soumis);
+      expect(aucun.sources).toEqual(tous.sources);
+      for (const champ of ["sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked", "fieldsRemoved"]) expect(aucun.ligne?.[champ], champ).toEqual(tous.ligne?.[champ]);
+      const c = tous.ligne as Record<string, number>;
+      expect(c.sitesProposed).toBe(c.sitesChecked! + c.sitesUnchecked!);
+      expect(c.sitesRemoved).toBeLessThanOrEqual(c.sitesChecked!);
+    } finally {
+      journal.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("sites: aucune réponse stockée ni journalisée (programme, journal, état, prompts)", async () => {
+    avecSites();
+    const SENTINELLE = "SENTINELLE-REPONSE-SITE";
+    // Vérificateur fautif qui rendrait statut, en-têtes et adresse de redirection : rien de tout cela ne sort.
+    verificateurSites = {
+      barriereFermee: false,
+      verifier: async () => ({ ok: true, statut: 299, entetes: { server: SENTINELLE }, location: `https://${SENTINELLE}.example.org/` }) as { ok: boolean },
+    };
+    const sorties: string[] = [];
+    const journal = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void sorties.push(args.map(String).join(" ")));
+    let etat: unknown;
+    try {
+      etat = await etapeProgramme({ runId: RUN_ID });
+    } finally {
+      journal.mockRestore();
+    }
+    expect(etat).toEqual({ runId: RUN_ID });
+    const ecrit = JSON.stringify(d.requetesSql);
+    expect(ecrit).not.toContain(SENTINELLE);
+    expect(ecrit).not.toMatch(/"(statut|status|entetes|headers|location)"/);
+    for (const ligne of sorties) {
+      expect(ligne).not.toContain(SENTINELLE);
+      expect(ligne).not.toMatch(/example\.org|https?:/);
+    }
+    // Le prompt est construit avant toute lecture : aucune adresse de site n'y entre.
+    for (const requete of capture.requetes) expect(JSON.stringify(requete)).not.toMatch(/example\.org/);
+    // L'adresse brute de l'IA (avec paramètres) n'est jamais écrite.
+    expect(ecrit).not.toContain("utm=ia");
+  });
+
+  it("sites: aucune requête hors mode réel (barrière fermée : rien soumis, tout sitesUnchecked, programme entier écrit)", async () => {
+    avecSites();
+    verificateurSites = { barriereFermee: true, verifier: async () => ({ ok: true }) };
+    const journal = capturerJournal();
+    try {
+      await etapeProgramme({ runId: RUN_ID });
+    } finally {
+      journal.mockRestore();
+    }
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(sitesSoumis).toEqual([]);
+    expect(etapesEcrites().every((stop) => stop.source === undefined)).toBe(true);
+    const fin = lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written");
+    expect(fin).toMatchObject({ sitesProposed: 5, sitesChecked: 0, sitesRemoved: 0, sitesUnchecked: 5 });
+  });
+
+  // A19 (`specs/P0-programme-par-ia.md` § 11.3 point 5 et A19, amendement 3) ; 0121 § 2.1 : borne des sites
+  // `limiteSites = min(début + 60 s, échéance − réserve des trajets)`, calculée une fois au lancement ; une adresse n'est
+  // soumise que si `maintenant + 5 s + marge` tient avant elle. Rédaction de 600 s + T ms, logement (Text Search et
+  // fiche) à 15 s chacun : la vérification commence à 630 s + T ; échéance 770 s ; réserve de trajets 10 × 10 s (Routes
+  // prévues d'edimbourg-1 au mode réel) ; borne = 670 s < 630 s + T + 60 s. À T = 34 000 ms, 664 s + 5 s + 1 s = 670 s
+  // tient encore (toutes soumises) ; à T = 34 001 ms, plus rien (toutes `sitesUnchecked`), alors que la borne des 60 s
+  // seule les aurait admises. Programme entier écrit dans les deux cas.
+  it("p0: échéance proche, vérification des sites raccourcie, programme entier écrit", async () => {
+    const T0 = Date.parse("2026-10-15T10:00:00Z");
+    const reserve = 10 * DELAI_REQUETE_MS.routes;
+    const echeance = LIMITE_FONCTION_MS - MARGE_FIN_ETAPE_MS;
+    // Rang exact de l'épreuve : la borne de l'échéance est la plus courte, et la limite tombe sur la dernière milliseconde.
+    expect(echeance - reserve).toBeLessThan(630_000 + 34_000 + SITES_DUREE_MAX_MS);
+    expect(630_000 + 34_000 + DELAI_SITE_MS + MARGE_SITE_MS).toBe(echeance - reserve);
+    const lancer = async (redactionMs: number) => {
+      reinitialiser();
+      avecSites();
+      verificateurSites = { barriereFermee: false, verifier: async () => ({ ok: true }) };
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const journal = capturerJournal();
+      try {
+        vi.setSystemTime(T0);
+        latences = { modele: redactionMs, places: 15_000, routes: 2_000 };
+        expect(await etapeProgramme({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+      } finally {
+        journal.mockRestore();
+        vi.useRealTimers();
+      }
+      expect(d.etat.statut).toBe("programme_ecrit");
+      return lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written") as Record<string, number>;
+    };
+
+    const tient = await lancer(600_000 + 34_000);
+    expect(sitesSoumis).toHaveLength(5);
+    expect(tient).toMatchObject({ sitesProposed: 5, sitesChecked: 5, sitesRemoved: 0, sitesUnchecked: 0 });
+    expect(etapesEcrites().filter((stop) => stop.source !== undefined).length).toBeGreaterThan(0);
+
+    const raccourcie = await lancer(600_000 + 34_001);
+    expect(sitesSoumis).toEqual([]);
+    expect(raccourcie).toMatchObject({ sitesProposed: 5, sitesChecked: 0, sitesRemoved: 0, sitesUnchecked: 5 });
+    expect(etapesEcrites().every((stop) => stop.source === undefined)).toBe(true);
+    expect(etapesEcrites().length).toBeGreaterThan(0);
+  });
+
+  it("sites: erreur de la vérification des lieux : vérifications de sites abandonnées et attendues, relations vraies dans la ligne d'échec", async () => {
+    avecSites();
+    // Les sites attendent l'abandon ; une fiche lève : l'étape abandonne les sites, puis journalise et s'arrête.
+    verificateurSites = {
+      barriereFermee: false,
+      verifier: (_adresse, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve({ ok: true }), { once: true })),
+    };
+    retouches.details = async () => Promise.reject(Object.assign(new Error(SENTINELLE_ERREUR), { code: "upstream_unavailable" }));
+    const journal = capturerJournal();
+    try {
+      await refus(etapeProgramme({ runId: RUN_ID }));
+    } finally {
+      journal.mockRestore();
+    }
+    expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
+    const fin = lignesJournal(journal).find((ligne) => ligne.event === "p0.programme_written") as Record<string, number> | undefined;
+    expect(fin).toBeDefined();
+    expect(fin!.sitesProposed).toBe(5);
+    expect(fin!.sitesProposed).toBe(fin!.sitesChecked! + fin!.sitesUnchecked!);
+    // En cours à l'abandon : vérifiées et refusées, jamais gardées.
+    expect(fin!.sitesRemoved).toBe(fin!.sitesChecked);
+    expect(JSON.stringify(fin)).not.toContain(SENTINELLE_ERREUR);
+  });
+});
+
+describe("p0Run sur un brief saisi dans l'app (E2E-essai, lot 3, critère 4 ; décision 0125 § 3)", () => {
+  const BRIEF_FICHIER = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/briefs/edimbourg-1.json"), "utf8")) as Record<string, unknown>;
+  const RECIT = "Récit saisi dans l'app : on aime les ruelles médiévales et les pubs où l'on joue de la musique.";
+
+  beforeEach(() => {
+    d.etat.mode = "essai";
+    d.etat.brief = "saisi";
+    d.briefSaisi = { ...BRIEF_FICHIER, recit: RECIT };
+  });
+
+  it("brief lu en base pour cette exécution ; programme écrit sous l'identifiant connu au lancement", async () => {
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.briefSaisiLus.length).toBeGreaterThan(0);
+    expect(new Set(d.briefSaisiLus)).toEqual(new Set([RUN_ID]));
+    expect((programmeEcrit().contenu as { trip: { id: string } }).trip.id).toBe(identifiantVoyageSaisi("Édimbourg", RUN_ID));
+  });
+
+  it("requête programme : le récit saisi entre les bornes de données, zdr et data_collection deny (0117 S5, Q557)", async () => {
+    await etapeProgramme({ runId: RUN_ID });
+    expect(capture.requetes).toHaveLength(1);
+    expect(capture.requetes[0]).toMatchObject({ etape: "programme", routage: { data_collection: "deny", zdr: true } });
+    const contenu = capture.requetes[0]?.messages.map((message) => message.contenu).join("\n") ?? "";
+    expect(contenu).toContain(RECIT);
+  });
+
+  it("aucun appel de l'agent de recherche web pour un brief saisi (revue de la PR 704, Sécurité 3) : seule la capacité programme est lue, une requête programme sans greffon web", async () => {
+    const lues: string[] = [];
+    d.composerP0Reel.mockImplementation((garde: unknown, options: OptionsSimulees) => {
+      const composition = compositionSimulee(garde, options);
+      return {
+        agent: () => {
+          lues.push("agent");
+          throw new Error("l'agent de recherche web ne doit pas être composé pour un brief saisi");
+        },
+        ancrage: () => {
+          lues.push("ancrage");
+          throw new Error("l'ancrage ne doit pas être composé pour un brief saisi");
+        },
+        etapeFinale: () => {
+          lues.push("etapeFinale");
+          throw new Error("l'étape finale ne doit pas être composé pour un brief saisi");
+        },
+        programme: () => (lues.push("programme"), composition.programme()),
+      };
+    });
+    expect(await p0Run({ runId: RUN_ID })).toEqual({ runId: RUN_ID });
+    expect(new Set(lues)).toEqual(new Set(["programme"]));
+    expect(capture.requetes.map((requete) => requete.etape)).toEqual(["programme"]);
+    // Requête de modèle sans aucun champ de recherche web (ni `plugins` ni greffon) : ses clés sont exactement celles de `RequeteModele`.
+    expect(Object.keys(capture.requetes[0] ?? {}).sort()).toEqual(["etape", "messages", "modele", "prompt", "routage"]);
+  });
+
+  it("canari : aucune donnée Google dans le prompt avec un brief saisi", async () => {
+    await etapeProgramme({ runId: RUN_ID });
+    const prompts = JSON.stringify(capture.requetes);
+    for (const valeur of [...IDS_GOOGLE, ...AUTRES_GOOGLE]) expect(prompts).not.toContain(valeur);
+    expect(capture.details.length).toBeGreaterThan(1);
+  });
+
+  it("brief saisi refusé par BriefSchema (e-mail dans le récit) : brief_invalid avant toute composition et tout appel", async () => {
+    d.briefSaisi = { ...BRIEF_FICHIER, recit: "Écrivez-moi à personne@example.com pour tout le séjour." };
+    await refus(etapeProgramme({ runId: RUN_ID }));
+    expect(d.composerP0Reel).not.toHaveBeenCalled();
+    expect(capture.requetes).toHaveLength(0);
+  });
+});
+
+describe("p0Revision : « Pas pour moi » change le programme (E2E-essai, lot 4 ; décision 0126)", () => {
+  const BRIEF_FICHIER = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/briefs/edimbourg-1.json"), "utf8")) as Record<string, unknown>;
+  const TRIP_ID = identifiantVoyageSaisi("Édimbourg", RUN_ID);
+  const ECARTEE = "Forteresse du rocher";
+  const AIMEE = "Taverne aux tourtes";
+  let idEcartee = "";
+  let idAimee = "";
+
+  /** Première version écrite par `etapeProgramme` (brief saisi), servie ensuite comme version courante. */
+  beforeEach(async () => {
+    d.etat.mode = "essai";
+    d.etat.brief = "saisi";
+    d.briefSaisi = structuredClone(BRIEF_FICHIER);
+    await etapeProgramme({ runId: RUN_ID });
+    d.versionServie = programmeEcrit().contenu;
+    idEcartee = String(etapeNommee(ECARTEE)[0]?.id);
+    idAimee = String(etapeNommee(AIMEE)[0]?.id);
+    // Nouvelle exécution de révision (même double de base) : table de travail, capture et SQL remis à zéro.
+    Object.assign(d.etat, { statut: "en_cours", phase: null, cout: 0, clos: undefined });
+    d.requetesSql.length = 0;
+    d.ecrituresPhase.length = 0;
+    capture = captureVide();
+  });
+
+  it("version servie relue ; le lieu « Pas pour moi » est absent de la nouvelle version, écrite sous le même voyage", async () => {
+    expect(idEcartee).toMatch(/^j\d+-\d+$/);
+    expect(await p0Revision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] })).toEqual({ runId: RUN_ID });
+    expect(d.etat.clos).toBeUndefined();
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.versionsLues).toEqual([TRIP_ID]);
+    expect((programmeEcrit().contenu as { trip: { id: string } }).trip.id).toBe(TRIP_ID);
+    // La sortie simulée redonne le lieu écarté : le filet du code le retire (critère « absente de la nouvelle version »).
+    expect(etapeNommee(ECARTEE)).toHaveLength(0);
+    expect(etapeNommee(AIMEE).length).toBeGreaterThan(0);
+    expect(capture.textSearch.some((r) => r.texte.startsWith(`${ECARTEE},`))).toBe(false);
+  });
+
+  it("une requête revision (zdr, data_collection deny) : textes de l'IA et choix, aucune donnée Google ni verdict (canari)", async () => {
+    await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
+    expect(capture.requetes).toHaveLength(1);
+    expect(capture.requetes[0]).toMatchObject({ etape: "programme", prompt: { id: "revision", version: 1 }, routage: { data_collection: "deny", zdr: true } });
+    const contenu = capture.requetes[0]?.messages.map((message) => message.contenu).join("\n") ?? "";
+    expect(contenu).toContain(ECARTEE);
+    expect(contenu).toContain(`"pasPourMoi":["${idEcartee}"]`);
+    const prompts = JSON.stringify(capture.requetes);
+    for (const valeur of [...IDS_GOOGLE, ...AUTRES_GOOGLE]) expect(prompts).not.toContain(valeur);
+    for (const cle of ["placeId", "lat", "lng", "minutes", "exceptions", "toConfirm", "toReserve", "source", "locked", "segment", "durationMinutes"]) {
+      expect(contenu).not.toContain(`"${cle}"`);
+    }
+  });
+
+  it("choix mal formés, version d'un autre voyage ou sans étape écartée : brief_invalid avant toute requête", async () => {
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: ["ChIJ-SENTINELLE"], jAime: [] }));
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idEcartee] }));
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: ["j99-99"], jAime: [] }));
+    d.versionServie = null;
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [] }));
+    expect(capture.requetes).toHaveLength(0);
+    expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
+  });
+
+  it("plafonds Google d'une révision (mineur 9 de la revue de la PR 717) : besoin de la version servie, sous le mode ; la révision tient dedans", async () => {
+    const plafonds = plafondsGoogleRevision("essai", d.versionServie, TRIP_ID, 1);
+    expect(plafonds).not.toBeNull();
+    expect(plafonds!.textSearch).toBeLessThan(90);
+    expect(plafonds!.routesElements).toBeLessThan(840);
+    expect(plafondsGoogleRevision("essai", d.versionServie, "proto_autre_44444444444444448444444444444444", 1)).toBeNull();
+    expect(plafondsGoogleRevision("essai", { trip: { id: TRIP_ID } }, TRIP_ID, 1)).toBeNull();
+    d.etat.forfaitGoogle = plafonds!;
+    await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    // Plafonds de l'étape : ceux réservés, jamais ceux du mode.
+    const lus = derniere?.plafonds ?? [];
+    expect(lus.find((p) => p.methode === "places_text_search")?.maxRequetes).toBe(plafonds!.textSearch);
+    expect(lus.find((p) => p.methode === "routes_matrix")).toMatchObject({ maxRequetes: plafonds!.routesRequetes, maxElements: plafonds!.routesElements });
+    // Toute la version vérifiée sous ces plafonds : aucun lieu laissé sans placeId faute de part.
+    expect(capture.textSearch.length).toBeLessThanOrEqual(plafonds!.textSearch);
+    const elements = capture.matrices.reduce((somme, m) => somme + m.origines.length * m.destinations.length, 0);
+    expect(elements).toBeLessThanOrEqual(plafonds!.routesElements);
+    // Mêmes lieux sans placeId que la première version (vérifiée aux plafonds du mode) : ceux que le double ne trouve pas.
+    const sansPlaceId = (jours: JourEcrit[]) =>
+      jours.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop !== undefined && item.stop.placeId === undefined ? [String(item.stop.name)] : []))).sort();
+    expect(sansPlaceId(joursEcrits())).toEqual(sansPlaceId((d.versionServie as { trip: { days: JourEcrit[] } }).trip.days).filter((nom) => nom !== ECARTEE));
+  });
+
+  it("révision arrêtée : etapeClore, aucune nouvelle version écrite (la précédente reste servie)", async () => {
+    d.programme = { jours: [{ date: "2026-11-23", creneaux: [{ debut: "15:00", nature: "visite", lieu: ECARTEE, pourquoi: "Encore." }] }] };
+    expect(await p0Revision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [] })).toEqual({ runId: RUN_ID });
+    expect(d.etat.statut).toBe("arretee");
+    // Code persisté comme une sortie illisible de `programme` (même règle que `etapeProgramme`).
+    expect(d.etat.clos).toBe("pipeline_failed");
+    expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
   });
 });

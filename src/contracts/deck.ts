@@ -201,3 +201,26 @@ export const PreferenceSignalSchema = z
     }
   });
 export type PreferenceSignal = z.infer<typeof PreferenceSignalSchema>;
+
+/**
+ * Révision d'un voyage d'essai après le tri (spécification E2E-essai, lot 4 ; décision 0126) : à la fin du paquet, les
+ * étapes « Pas pour moi » (`notForMe`, une au moins) et « J'aime » (`liked`) du tri en mémoire, par leur identifiant
+ * d'étape (`Proposal.id`, identifiant maison du programme). Le serveur réécrit le programme sous le même voyage ; il ne
+ * rend qu'un statut fermé, jamais une valeur.
+ */
+export const TRIAL_REVISION_CHOICES_MAX = 120;
+export const TrialRevisionRequestSchema = z.strictObject({
+  tripId: TripIdSchema,
+  notForMe: z.array(ProposalIdSchema).min(1).max(TRIAL_REVISION_CHOICES_MAX),
+  liked: z.array(ProposalIdSchema).max(TRIAL_REVISION_CHOICES_MAX),
+});
+export type TrialRevisionRequest = z.infer<typeof TrialRevisionRequestSchema>;
+
+/**
+ * Statut d'une révision : `started` (la nouvelle version remplacera la version servie une fois écrite), `inProgress` (une
+ * révision de ce voyage est déjà en cours), `exhausted` (le voyage a déjà eu sa révision), `accessExpired` (code
+ * d'accès à saisir de nouveau), `capReached` (plafond des essais atteint), `unavailable` (toute autre cause).
+ */
+export const TRIAL_REVISION_STATUSES = ["started", "inProgress", "exhausted", "accessExpired", "capReached", "unavailable"] as const;
+export const TrialRevisionResultSchema = z.strictObject({ status: z.enum(TRIAL_REVISION_STATUSES) });
+export type TrialRevisionResult = z.infer<typeof TrialRevisionResultSchema>;

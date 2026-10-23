@@ -1,6 +1,6 @@
 "use server";
 
-import { authAdapterChoice, getAuthAdapter, getCreationAdapter, type AdapterContext } from "@/adapters";
+import { authAdapterChoice, getAuthAdapter, getCreationAdapter, isPrototypeAdapter, type AdapterContext } from "@/adapters";
 import { getSimulationScope } from "@/adapters/simulation";
 import {
   BriefRequestSchema,
@@ -42,7 +42,15 @@ import { parseInput } from "../parse-input";
  */
 const STRUCTURE_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["rate_limited", "cost_cap_reached", "provider_error"]);
 
+/*
+ * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, décision D2) : ni structuration du récit ni
+ * suggestion de logement. Les deux actions sont fermées **avant** toute lecture de l'entrée et tout appel à
+ * l'adaptateur (`isPrototypeAdapter()`) : aucun appel de modèle ni de Google. Elles répondent `no_option` (rien à
+ * proposer ici), jamais une panne. L'interface du site d'essai ne les appelle pas ; cette garde couvre un appel direct.
+ */
+
 export async function structureBrief(input: unknown): Promise<Result<InferredBrief>> {
+  if (isPrototypeAdapter()) return fail("no_option");
   const parsed = parseInput(BriefRequestSchema, input);
   if (!parsed.ok) return parsed;
   let result: Result<unknown>;
@@ -65,6 +73,8 @@ const LODGING_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["no_opt
  * par `LodgingSuggestionSchema` (sinon `provider_error`, rien n'est rendu). Aucun journal : ni destination ni ville.
  */
 export async function suggestLodging(input: unknown): Promise<Result<LodgingSuggestion>> {
+  // Site d'essai (D2) : « aucun quartier à proposer », sans appel ; l'écran 3 propose « Continuer sans logement ».
+  if (isPrototypeAdapter()) return fail("no_option");
   const parsed = parseInput(LodgingRequestSchema, input);
   if (!parsed.ok) return parsed;
   let result: Result<unknown>;
@@ -94,6 +104,7 @@ const DAY_MS = 86_400_000;
  * Aucun journal : ni brouillon, ni brief.
  */
 export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
+  if (isPrototypeAdapter()) return createTripEssai(input);
   const scope = await getSimulationScope();
   let session: Session | null;
   try {
@@ -133,6 +144,36 @@ export async function createTrip(input: unknown): Promise<Result<CreatedTrip>> {
   // fuseau du voyage ; seul un champ de la forme de `parseInput` est transmis.
   if (!result.ok && result.error.code === "validation_failed") return fail("validation_failed", fieldOf(result.error));
   if (!result.ok) return fail(CREATE_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
+  const output = CreatedTripSchema.safeParse(result.value);
+  return output.success ? ok(output.data) : fail("provider_error");
+}
+
+/** Erreurs du lancement d'un voyage d'essai transmises telles quelles (décision 0125 § 2) ; toute autre devient `provider_error`. */
+const CREATE_ESSAI_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["unauthenticated", "cost_cap_reached", "provider_error"]);
+
+/**
+ * Lancement sur le site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 3 ; décision 0125 § 2). Pas de
+ * session : le site d'essai n'a pas de compte (contexte `org_prototype` de la phase 0) ; l'accès est le **code d'accès**,
+ * contrôlé par la garde de `p0Run` dans l'adaptateur (cookie `__Host-p0_acces`, `unauthenticated` s'il manque ou a
+ * expiré : l'étape redemande le code). Même `parseInput` et même contrôle de la date d'arrivée que `createTrip`, avant
+ * toute réservation. Le récit (`story`) n'est lu que par l'adaptateur `prototype`. Aucun journal.
+ */
+async function createTripEssai(input: unknown): Promise<Result<CreatedTrip>> {
+  const parsed = parseInput(TripRequestSchema, input);
+  if (!parsed.ok) return parsed;
+  const scope = await getSimulationScope();
+  const earliest = new Date(scope.clock.now() - DAY_MS).toISOString().slice(0, 10);
+  if (parsed.value.draft.start < earliest) return fail("validation_failed", "draft.start");
+  let result: Result<CreatedTrip>;
+  try {
+    const ctx = await contexteFacultatif();
+    if (ctx === null) return fail("provider_error");
+    result = await getCreationAdapter(undefined, { scope }).createTrip(ctx, parsed.value);
+  } catch {
+    return fail("provider_error");
+  }
+  if (!result.ok && result.error.code === "validation_failed") return fail("validation_failed", fieldOf(result.error));
+  if (!result.ok) return fail(CREATE_ESSAI_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
   const output = CreatedTripSchema.safeParse(result.value);
   return output.success ? ok(output.data) : fail("provider_error");
 }
@@ -242,4 +283,32 @@ export async function getFullTripStatus(input: unknown): Promise<Result<FullTrip
   if (!result.ok) return fail(result.error.code === "not_found" ? "not_found" : "provider_error");
   const output = FullTripStatusSchema.safeParse(result.value);
   return output.success && output.data.tripId === parsed.value.tripId ? ok(output.data) : fail("provider_error");
+}
+
+/** Erreurs de « Réessayer » sur le site d'essai transmises telles quelles ; toute autre devient `provider_error`. */
+const RELANCE_ESSAI_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["unauthenticated", "not_found", "cost_cap_reached", "provider_error"]);
+
+/**
+ * « Réessayer » de l'écran 5 sur le site d'essai (décision 0125 § 4) : fermée hors de l'adaptateur `prototype`
+ * (`not_found`, avant toute lecture de l'entrée). Une exécution arrêtée est relancée sur son brief saisi sous un
+ * **nouveau** voyage : à la différence de `retryGeneration`, le `tripId` rendu est **différent** de celui reçu, et
+ * l'écran 5 suit le nouveau. Même garde que le lancement (code d'accès, forfaits). Aucun journal.
+ */
+export async function relancerVoyageEssai(input: unknown): Promise<Result<CreatedTrip>> {
+  if (!isPrototypeAdapter()) return fail("not_found");
+  const parsed = parseInput(RetryGenerationRequestSchema, input);
+  if (!parsed.ok) return parsed;
+  if (parsed.value.kind === "full") return fail("validation_failed", "kind");
+  const scope = await getSimulationScope();
+  let result: Result<CreatedTrip>;
+  try {
+    const ctx = await contexteFacultatif();
+    if (ctx === null) return fail("provider_error");
+    result = await getCreationAdapter(undefined, { scope }).retryGeneration(ctx, parsed.value);
+  } catch {
+    return fail("provider_error");
+  }
+  if (!result.ok) return fail(RELANCE_ESSAI_ERRORS.has(result.error.code) ? result.error.code : "provider_error");
+  const output = CreatedTripSchema.safeParse(result.value);
+  return output.success && output.data.tripId !== parsed.value.tripId ? ok(output.data) : fail("provider_error");
 }

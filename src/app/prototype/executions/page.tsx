@@ -22,5 +22,5 @@ export default async function ExecutionsPage() {
   const page = await pageExecutionsP0();
   if (page.etat === "fermee") notFound();
   if (page.etat !== "ouverte") return <SaisieCodeAcces ouverte={false} />;
-  return <LancementP0 modele={page.modele} />;
+  return <LancementP0 modele={page.modele} etapesAvecSite={page.etapesAvecSite} />;
 }

@@ -96,4 +96,12 @@ describe("/connexion", () => {
     vi.stubEnv("VADROUILLE_ENV", "production");
     await expect(ConnexionPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(/connexion simulée refusée/);
   });
+
+  it("site d'essai (E2E-essai, lot 2, D3) : appelée par la création, R-lancer sans lire l'adaptateur auth ni la session", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    vi.mocked(hasSession).mockClear();
+    await expect(ConnexionPage({ searchParams: Promise.resolve({ suite: "/voyages/nouveau/lancer" }) })).rejects.toThrow("redirect:/voyages/nouveau/lancer");
+    expect(adapters.getAuthAdapter).not.toHaveBeenCalled();
+    expect(hasSession).not.toHaveBeenCalled();
+  });
 });

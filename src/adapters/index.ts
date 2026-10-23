@@ -1,5 +1,6 @@
-import type { RevisionFixtures, Trip } from "@/contracts";
+import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -11,9 +12,9 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { prototypeTripAdapter } from "./prototype-instance";
+import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
-import { adapterChoice, paymentAvailable } from "./payment-guard";
+import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
@@ -53,6 +54,17 @@ export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPT
 }
 
 /**
+ * Garde du site d'essai (spécification E2E-essai, lot 2), pour une page qui n'a rien à lire : faux avec `mock` et `api` ;
+ * avec `prototype`, vrai dans la liste blanche (`prototypeAdapterAllowed`, décision 0032 § A4.2), sinon lève la même
+ * erreur que `getTripAdapter()` (erreur 500), sans construire l'adaptateur ni rien lire.
+ */
+export function siteEssaiAutorise(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  if (adapterChoice(value) !== "prototype") return false;
+  assertPrototypeAllowedOnProcess();
+  return true;
+}
+
+/**
  * Choisit l'adaptateur selon la variable serveur `DATA_ADAPTER`
  * (`mock` par défaut). Sans préfixe `NEXT_PUBLIC_`, elle n'est jamais
  * exposée au navigateur. `prototype` (décision 0032 § A4) lève une erreur hors de la liste blanche
@@ -80,7 +92,8 @@ export function getTripAdapter(value: string | undefined = process.env.DATA_ADAP
  * génération, horloge) vit dans la portée `options.scope` (portée par défaut sinon, § 10) ; `structureBrief` et
  * `suggestLodging` ne gardent rien. Les voyages sont lus par `getTripAdapter()` (voyage jamais lancé dans la portée).
  * `api` (B9e) : garde `assertApiAdapter`, sans repli vers `mock`, puis l'adaptateur branché au démarrage par
- * `src/instrumentation.ts` (`./api-creation-instance.ts`).
+ * `src/instrumentation.ts` (`./api-creation-instance.ts`). `prototype` (site d'essai, lot 3 de E2E-essai) : liste blanche,
+ * puis la création d'un voyage d'essai (`./prototype-creation.ts`).
  */
 export function getCreationAdapter(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): CreationAdapter {
   const choice = adapterChoice(value);
@@ -99,7 +112,9 @@ export function getCreationAdapter(value: string | undefined = process.env.DATA_
       // (`./api-creation-instance.ts`) ; la portée de simulation ne sert pas (l'état vit en base).
       return apiCreationAdapter();
     case "prototype":
-      throw new Error("création indisponible avec l'adaptateur prototype (spécification P0)");
+      // Spécification E2E-essai, lot 3 (décision 0125 § 4) : lancement de `p0Run` sur le brief saisi et avancement, par
+      // le port branché au démarrage ; même liste blanche que la lecture (erreur hors liste blanche, jamais de repli).
+      return prototypeCreationAdapter();
     default:
       throw new Error(`DATA_ADAPTER inconnu : « ${choice} » (valeurs : mock, api, prototype)`);
   }
@@ -181,11 +196,86 @@ export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): 
 export function getTripReader(options: { scope?: SimulationScope } = {}): TripAdapter {
   const base = getTripAdapter();
   if (!paymentAvailable()) return base;
+  if (isPrototypeAdapter()) {
+    // Voyage d'essai (spécification E2E-essai, lot 1) : débloqué par le droit simulé de la portée, ou par le cookie signé
+    // de l'essai (préversion seulement, garde du mode réel ouverte) ; l'adaptateur sert alors toutes ses journées.
+    return prototypeTripAdapter(process.env, async (ctx, tripId) => {
+      const scope = options.scope ?? (await getSimulationScope());
+      if ((await mockPaymentFor(scope).getEntitlement(ctx, tripId)).unlocked) return true;
+      return (await deblocagesEssai()?.lire(ctx))?.has(tripId) === true;
+    });
+  }
   return withSimulatedUnlock(
     base,
     async (ctx, tripId) => mockPaymentFor(options.scope ?? (await getSimulationScope())).getEntitlement(ctx, tripId),
     counterpartOf,
   );
+}
+
+/**
+ * Voyage d'essai (spécification E2E-essai, lot 1 ; décision 0124 § 4) : indicateur décidé par l'adaptateur
+ * (`TripAdapter.isTrialTrip`), seul prédicat que lisent les écrans. Adaptateur sans la méthode (`mock`, `api`) ou
+ * lecture qui lève : `false` (parcours habituel).
+ */
+export async function isTrialTrip(adapter: TripAdapter, ctx: AdapterContext, tripId: string): Promise<boolean> {
+  try {
+    return (await adapter.isTrialTrip?.(ctx, tripId)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Retient le déblocage simulé d'un voyage d'essai (spécification E2E-essai, lot 1) après un paiement simulé réussi :
+ * cookie signé de l'essai, écrit par une action serveur seulement. Sans effet hors adaptateur `prototype`, paiement
+ * simulé indisponible ou cookie non branché (garde du mode réel fermée). Ne lève jamais.
+ */
+export async function retenirDeblocageEssai(ctx: AdapterContext, tripId: string): Promise<void> {
+  if (!isPrototypeAdapter() || !paymentAvailable()) return;
+  try {
+    await deblocagesEssai()?.retenir(ctx, tripId);
+  } catch {
+    // Cookie non écrit : le droit simulé de la portée reste ; la page n'échoue pas.
+  }
+}
+
+/**
+ * Voyage d'essai dont le tri réécrit le programme (spécification E2E-essai, lot 4 ; décision 0126) : voyage lancé depuis
+ * l'app (identifiant `proto_<slug>_<exécution>`, décision 0125 § 2). Les voyages d'un brief commité ne se révisent pas
+ * (leur fusible d'IA est entier, 0126 § 2).
+ */
+export function voyageEssaiRevisable(tripId: string): boolean {
+  // Même motif que `lireIdentifiantVoyageSaisi` (`src/domain/identifiant.ts`), source unique dans `@/contracts`.
+  return APP_TRIAL_TRIP_ID_PATTERN.test(tripId);
+}
+
+/** Statuts du lancement d'une révision ramenés au contrat (décision 0126) ; tout autre devient `unavailable`. */
+const STATUT_REVISION: ReadonlyMap<string, TrialRevisionResult["status"]> = new Map([
+  ["lancee", "started"],
+  ["en_cours", "inProgress"],
+  ["epuisees", "exhausted"],
+  ["acces_refuse", "accessExpired"],
+  ["cap_reached", "capReached"],
+  ["envelope_reached", "capReached"],
+  ["daily_quota_insufficient", "capReached"],
+]);
+
+/**
+ * « Pas pour moi » change le programme d'un voyage d'essai (spécification E2E-essai, lot 4 ; décision 0126) : lance la
+ * révision par le port de création de l'adaptateur `prototype` (même garde que le lancement : code d'accès, forfaits).
+ * Hors adaptateur `prototype`, hors organisation de l'essai ou port non branché : `unavailable`, rien n'est lancé. Ne lève
+ * jamais ; aucun journal.
+ */
+export async function reviserProgrammeEssai(ctx: AdapterContext, demande: TrialRevisionRequest): Promise<TrialRevisionResult> {
+  if (!isPrototypeAdapter() || ctx.organizationId !== PROTOTYPE_ORG_ID) return { status: "unavailable" };
+  try {
+    const reviser = revisionEssai();
+    if (reviser === null) return { status: "unavailable" };
+    const { statut } = await reviser({ tripId: demande.tripId, pasPourMoi: demande.notForMe, jAime: demande.liked });
+    return { status: STATUT_REVISION.get(statut) ?? "unavailable" };
+  } catch {
+    return { status: "unavailable" };
+  }
 }
 
 /**

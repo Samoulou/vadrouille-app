@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { saisirCodeAccesP0 } from "@/server/actions/p0-acces";
+
 import { createMemoryRecorder } from "@/analytics/track";
-import type { Category, Proposal } from "@/contracts";
+import { fail, type Category, type Proposal } from "@/contracts";
 import { apercu, edimbourg, edimbourgDebloque, propositions, propositionsDebloque } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
@@ -11,6 +13,9 @@ import { createLocalDeckActions } from "./actions";
 import { presentationDay } from "./load";
 import { noOptionMessage } from "./contexte";
 import { PresentationScreen, type PresentationScreenProps } from "./PresentationScreen";
+import type { DemanderRevision } from "./revision";
+
+vi.mock("@/server/actions/p0-acces", () => ({ saisirCodeAccesP0: vi.fn() }));
 
 const DAYS = edimbourg.days.map(presentationDay);
 
@@ -622,5 +627,113 @@ describe("PresentationScreen : tri enregistré (B10a point 5, décision 0112 § 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("PresentationScreen : « Pas pour moi » change le programme (E2E-essai, lot 4 ; décision 0126)", () => {
+  const deux = propositions.filter((p) => p.kind === "activity").slice(0, 2);
+  const ok = (status: "started" | "inProgress" | "exhausted" | "accessExpired" | "capReached" | "unavailable") => async () => ({ ok: true as const, value: { status } });
+
+  /** Trie les deux cartes (J'aime puis Pas pour moi, sauf choix contraire) et laisse expirer l'annulation. */
+  async function trier(props: Partial<PresentationScreenProps>, decisions: readonly ("J'aime" | "Pas pour moi")[] = ["J'aime", "Pas pour moi"]) {
+    vi.useFakeTimers();
+    try {
+      setup({ proposals: deux, essai: true, ...props });
+      for (const decision of decisions) await click(decision);
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    await flush();
+    await flush();
+  }
+
+  it("fin du tri avec un « Pas pour moi » : une demande, choix du tri seulement ; message à la place de « choix sans effet »", async () => {
+    const demanderRevision = vi.fn(ok("started"));
+    await trier({ revisable: true, demanderRevision });
+    expect(demanderRevision).toHaveBeenCalledTimes(1);
+    expect(demanderRevision).toHaveBeenCalledWith({ tripId: "mock_trip_edimbourg", notForMe: [deux[1]!.id], liked: [deux[0]!.id] });
+    await waitFor(() => expect(document.querySelector("[data-part='revision']")).toHaveAttribute("data-revision", "started"));
+    expect(screen.getAllByText(/on réécrit ton programme sans les étapes « Pas pour moi »/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Voyage d'essai : tes choix ne changent pas encore ton programme.")).toBeNull();
+  });
+
+  it("aucun « Pas pour moi » : aucune demande", async () => {
+    const demanderRevision = vi.fn(ok("started"));
+    await trier({ revisable: true, demanderRevision }, ["J'aime", "J'aime"]);
+    expect(demanderRevision).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-part='revision']")).toBeNull();
+  });
+
+  it("voyage d'essai non révisable (brief commité) : aucune demande, phrase « choix sans effet » gardée", async () => {
+    const demanderRevision = vi.fn(ok("started"));
+    await trier({ demanderRevision });
+    expect(demanderRevision).not.toHaveBeenCalled();
+    expect(screen.getByText("Voyage d'essai : tes choix ne changent pas encore ton programme.")).toBeInTheDocument();
+  });
+
+  it("échec : message et « Réessayer », qui renvoie la même demande", async () => {
+    const demanderRevision = vi.fn<DemanderRevision>(async () => fail("provider_error"));
+    await trier({ revisable: true, demanderRevision });
+    await waitFor(() => expect(button("Réessayer")).toBeInTheDocument());
+    expect(screen.getAllByText("Impossible de réécrire ton programme pour le moment.").length).toBeGreaterThan(0);
+    demanderRevision.mockImplementation(ok("started"));
+    await click("Réessayer");
+    await flush();
+    expect(demanderRevision).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(document.querySelector("[data-part='revision']")).toHaveAttribute("data-revision", "started"));
+  });
+
+  it("accès expiré : saisie du code en place (titre de niveau 3), puis nouvel envoi et focus rendu au titre de la fin", async () => {
+    const demanderRevision = vi.fn<DemanderRevision>(ok("accessExpired"));
+    await trier({ revisable: true, demanderRevision });
+    await waitFor(() => expect(document.querySelector("[data-part='revision']")).toHaveAttribute("data-revision", "accessExpired"));
+    // Sous le titre de la fin (h2) : la saisie a un h3, jamais un second h1 (mineur 12 de la revue de la PR 717).
+    expect(screen.getByRole("heading", { level: 3, name: "Saisis ton code d'accès" })).toHaveFocus();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    vi.mocked(saisirCodeAccesP0).mockResolvedValue({ statut: "accepte" });
+    demanderRevision.mockImplementation(ok("started"));
+    await act(async () => {
+      fireEvent.submit(screen.getByLabelText("Code d'accès").closest("form") as HTMLFormElement);
+    });
+    await flush();
+    expect(demanderRevision).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(document.querySelector("[data-part='revision']")).toHaveAttribute("data-revision", "started"));
+    // Le focus revient au titre de la fin, jamais sur <body> (mineur 11 de la revue de la PR 717).
+    expect(document.activeElement).toBe(document.getElementById("fin-titre"));
+  });
+
+  it("« Pas pour moi » annulé juste avant l'expiration, puis « J'aime » : aucune demande (mineur 4 de la revue de la PR 717)", async () => {
+    const demanderRevision = vi.fn(ok("started"));
+    vi.useFakeTimers();
+    try {
+      setup({ proposals: deux, essai: true, revisable: true, demanderRevision });
+      await click("J'aime");
+      await click("Pas pour moi");
+      await act(async () => {
+        vi.advanceTimersByTime(4900);
+      });
+      await click("Annuler");
+      expect(cardName()).toBe(deux[1]!.stop.name);
+      await click("J'aime");
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    await flush();
+    await flush();
+    expect(demanderRevision).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-part='revision']")).toBeNull();
+  });
+
+  it("révision épuisée : message, sans « Réessayer » ; accessibilité de la fin", async () => {
+    await trier({ revisable: true, demanderRevision: vi.fn(ok("exhausted")) });
+    await waitFor(() => expect(document.querySelector("[data-part='revision']")).toHaveAttribute("data-revision", "exhausted"));
+    expect(screen.queryByRole("button", { name: "Réessayer" })).toBeNull();
+    expect(await axeViolations(document.body)).toEqual([]);
   });
 });

@@ -229,9 +229,18 @@ export const LECTURES_ENV = [
 
 export const ENV_ENTIER = [
   { fichier: "playwright.config.ts", formes: ["propriete-env:e2ePort"] },
+  // Ticket 691 (spécification E2E-essai, lot 1) : `paymentAvailable` passe aussi son `env` à `prototypeAdapterAllowed`
+  // (paiement simulé d'un voyage d'essai, liste blanche de `prototype`, jamais en production). Verdict Sécurité : approuvé,
+  // PR #696, b5c86d3 (décision 0124 § 1).
   {
     fichier: "src/adapters/payment-guard.ts",
-    formes: ["defaut:paymentDemoAllowed", "defaut:paymentAvailable", "argument:isProductionDeployment", "argument:paymentDemoAllowed"],
+    formes: [
+      "defaut:paymentDemoAllowed",
+      "defaut:paymentAvailable",
+      "argument:isProductionDeployment",
+      "argument:paymentDemoAllowed",
+      "argument:prototypeAdapterAllowed",
+    ],
   },
   // F10c (décision 0039, F10-TL-7) : même forme que `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   {
@@ -275,6 +284,8 @@ export const ENV_ENTIER = [
     formes: ["defaut:prototypeTripAdapter", "defaut:prototypeRelectures", "argument:assertPrototypeAllowed", "argument:prototypeAdapterAllowed"],
   },
   { fichier: "tests/e2e/prototype-helpers.ts", formes: ["propriete-env:e2ePort"] },
+  // Ticket 691 (spécification E2E-essai, lot 1) : port du serveur d'essai, même forme que `prototype-helpers.ts`.
+  { fichier: "tests/e2e/essai-helpers.ts", formes: ["propriete-env:e2ePort"] },
   // Relevé de `f57153c` (T18) : environnement des sous-processus de test.
   { fichier: "tests/unit/ci/techlead-gate-workflow.test.ts", formes: ["etalement"] },
   // B1 (PR 188, après P0c1 ; spécification P0c, section 9). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).

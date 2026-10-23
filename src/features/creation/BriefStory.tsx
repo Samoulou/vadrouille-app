@@ -31,12 +31,20 @@ export function counterText(length: number): string {
   return format(r.compteur, { n: formatNombre(length), max: formatNombre(STORY_LENGTH.max) });
 }
 
+export interface BriefStoryProps extends StageProps {
+  /**
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 1, et D2) : « Préparer mon brief »
+   * mène à la vérification sans appel ni déduction, récit gardé, sans bandeau ; une phrase d'aide le dit.
+   */
+  essai?: boolean;
+}
+
 /**
  * État « Récit » de l'écran 2 (F8-PO-4, 0018 § 16) : zone de texte nommée par le titre, aide, erreur, compteur
  * (dans cet ordre dans `aria-describedby`). « Préparer mon brief » appelle `structureBrief` (simulé en phase 0) ;
  * « Remplir moi-même » passe à la vérification sans appel ni déduction. Le récit reste en mémoire de l'onglet.
  */
-export function BriefStory({ focusTitle, onStageChange }: StageProps) {
+export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefStoryProps) {
   const { state, dispatch } = useDraft();
   const [error, setError] = useState(false);
   const [pending, setPending] = useState(false);
@@ -69,6 +77,11 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
     }
     setError(false);
     setFailed(false);
+    if (essai) {
+      // Site d'essai (D2) : aucune structuration ; le récit, déjà dans le brouillon, ira tel quel à l'IA (lot 3).
+      fillMyself();
+      return;
+    }
     setPending(true);
     attempt.current += 1;
     const current = attempt.current;
@@ -103,9 +116,14 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
         {r.titre}
       </h1>
       <div className="flex flex-col gap-2">
-        <p id={helpId(STORY_ID)} className="text-corps-s text-ink-soft">
-          {r.aide}
-        </p>
+        {/* Site d'essai : l'envoi et la conservation, puis la vérification dans un second paragraphe (une idée par paragraphe). */}
+        <div id={helpId(STORY_ID)} className="flex flex-col gap-2 text-corps-s text-ink-soft">
+          <p>
+            {r.aide}
+            {essai ? ` ${r.essai}` : null}
+          </p>
+          {essai ? <p>{r.essaiVerification}</p> : null}
+        </div>
         <textarea
           ref={areaRef}
           id={STORY_ID}
@@ -152,7 +170,7 @@ export function BriefStory({ focusTitle, onStageChange }: StageProps) {
           aria-disabled={pending || undefined}
           onClick={prepare}
         >
-          {r.preparer}
+          {essai ? r.verifier : r.preparer}
         </Button>
         <p role="status" className={pending ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
           {pending ? r.attente : null}

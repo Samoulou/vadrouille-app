@@ -38,6 +38,12 @@ const PROTOTYPE_DIR = realpathSync(join(__dirname, "prototype", "programmes-test
 // « Mes voyages » vide, aucune connexion, aucun échec de branchement au journal. Port décalé de 2 000.
 const LECTURE_REELLE_PORT = PORT + 2 * PROTOTYPE_PORT_OFFSET;
 
+// Spécification E2E-essai, lot 1 (ticket 691) : sixième serveur sur le même build, adaptateur `prototype` sur un
+// programme d'essai fabriqué à la main **sans propositions enregistrées** (forme écrite par `p0Run`), relecteur simulé :
+// parcours de l'app (premières propositions, tri, déblocage simulé, journées). Port décalé de 5 000.
+const ESSAI_PORT = PORT + 5 * PROTOTYPE_PORT_OFFSET;
+const ESSAI_DIR = realpathSync(join(__dirname, "prototype", "programmes-essai"));
+
 // B3c (spécification B3, B3c point 7 ; B3-TL-8 ; décision 0077 § 5.4) : quatrième serveur sur le même build, connexion
 // réelle (`AUTH_ADAPTER=better-auth`) sur la base du job `db`. Démarré, avec le projet `auth`, seulement quand le job
 // `db` pose la variable d'outillage `E2E_AUTH_SERVER=1` (après les migrations) : sans base, `register()` le refuserait.
@@ -191,6 +197,27 @@ export default defineConfig<{ urlMock: string }>({
         PORT: String(LECTURE_REELLE_PORT),
         HOSTNAME: "127.0.0.1",
         [SERVER_LOG_ENV]: serverLogPath({ port: LECTURE_REELLE_PORT, tmpDir: tmpdir() }),
+      },
+    },
+    {
+      // Même build, programme d'essai sans propositions (spécification E2E-essai, lot 1, `tests/e2e/essai.e2e.spec.ts`).
+      // Paiement simulé ouvert par la liste blanche de `prototype` (`CI=true`, `VADROUILLE_PROTOTYPE=1`), sans drapeau de
+      // démonstration ; pages de développement pour la portée de simulation de chaque test (`R-sim`).
+      command: serve,
+      url: `http://127.0.0.1:${ESSAI_PORT}`,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        DATA_ADAPTER: "prototype",
+        VADROUILLE_PROTOTYPE: "1",
+        CI: "true",
+        VADROUILLE_ENV: "ci",
+        VADROUILLE_PROTOTYPE_DIR: ESSAI_DIR,
+        VADROUILLE_DEV_PAGES: "1",
+        PORT: String(ESSAI_PORT),
+        HOSTNAME: "127.0.0.1",
       },
     },
     ...(AUTH_SERVER

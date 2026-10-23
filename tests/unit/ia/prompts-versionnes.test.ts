@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
+import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
+import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { PROMPT_STRUCTURATION } from "@/ai/prompts/structuration";
 
 /**
@@ -34,9 +36,17 @@ const EMPREINTES: Record<string, Record<number, string>> = {
   structuration: { 1: "e9d62fe8ce071a2c0a3f3b97dd595408eca3f62dd288e84fbcdc76aee13433be" },
   quartier: { 1: "a7d2edb04621223aa702be9058f92cadbd509aa4b3eb99e7f5bea9db7e25355b" },
   "recherche-web": { 2: "5d9657a1e8e78be1e3cfac7dacc9ce26f3667225f3ff5188158a3fe94f7fff49" },
+  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`) ; v3 (E2E-essai, lot 5, « à éviter »).
+  programme: {
+    1: "7f3ac2bcbebf9331d2038fd558d4b8b2b5649fb978b5ca27c82e8b2fd0feea76",
+    2: "236e304ba393a2d4504310f1898eadedda0487e638d558a0ee115d4526c30b80",
+    3: "413eb5e8aacf8c0b3408e2549c7c83668aeaa337548663903c60431143579b59",
+  },
+  // E2E-essai, lot 4 (décision 0126) : révision du programme après le tri « J'aime / Pas pour moi ».
+  revision: { 1: "bf5355ef97edba46b6961a113476e73ae232c22399c1eed0a54501345b071fc1" },
 };
 
-const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB];
+const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB, PROMPT_PROGRAMME, PROMPT_REVISION];
 const empreinte = (texte: string) => createHash("sha256").update(texte, "utf8").digest("hex");
 
 describe("prompts: versionnés", () => {
@@ -51,6 +61,43 @@ describe("prompts: versionnés", () => {
     expect(Object.keys(EMPREINTES).sort()).toEqual(PROMPTS.map((p) => p.id).sort());
     expect(PROMPT_STRUCTURATION.version).toBe(1);
     expect(PROMPT_QUARTIER.version).toBe(1);
+  });
+
+  it("programme: prompt v3 demande le site officiel, sans donnée Google (A13)", () => {
+    expect(PROMPT_PROGRAMME.version).toBe(3);
+    const texte = PROMPT_PROGRAMME.texte;
+    // Le champ `site` est demandé, facultatif, pour le site officiel, en https sans paramètres.
+    expect(texte).toContain('"site" (facultatif)');
+    expect(texte).toMatch(/site officiel/);
+    expect(texte).toMatch(/https complète, sans paramètres/);
+    expect(texte).toMatch(/Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers/);
+    expect(texte).toMatch(/site 300/);
+    // Seule adresse admise : `site` ; aucune adresse d'exemple réelle ni aucune donnée Google dans le texte.
+    expect(texte).toMatch(/la seule adresse admise est le champ/);
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id/i);
+  });
+
+  it("programme: prompt v3 demande qu'aucun créneau ne relève d'une catégorie « à éviter » (E2E-essai, lot 5)", () => {
+    const texte = PROMPT_PROGRAMME.texte;
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).toMatch(/aucun créneau n'en relève, même un incontournable/);
+    // Chaque code de catégorie est nommé, avec le libellé que la personne a coché.
+    for (const code of ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"]) expect(texte).toContain(`${code} = `);
+  });
+
+  it("revision: prompt v1 retire les étapes écartées, garde les aimées, sans donnée Google (E2E-essai, lot 4)", () => {
+    expect(PROMPT_REVISION.version).toBe(1);
+    const texte = PROMPT_REVISION.texte;
+    expect(texte).toContain('"pasPourMoi"');
+    expect(texte).toContain('"jAime"');
+    expect(texte).toMatch(/Retire chaque étape écartée : ni ce lieu ni un lieu équivalent/);
+    expect(texte).toMatch(/Garde les étapes aimées/);
+    // Même forme de sortie que `programme` (relue par `lireProgramme`) et même règle « à éviter ».
+    expect(texte).toContain('"jours": [{"date" (AAAA-MM-JJ)');
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id/i);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {

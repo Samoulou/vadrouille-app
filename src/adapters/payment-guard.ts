@@ -1,4 +1,4 @@
-import { isProductionDeployment } from "@/dev/flags";
+import { isProductionDeployment, prototypeAdapterAllowed } from "@/dev/flags";
 
 /**
  * Garde du paiement simulé (décision 0020 § 2.3), **fermée par défaut**, fonctions pures.
@@ -32,9 +32,16 @@ export function paymentDemoAllowed(env: NodeJS.ProcessEnv = process.env): boolea
 
 /**
  * Seule fonction que consultent les pages, les actions, `DeckEnd` (par sa page) et la section
- * « Démonstration » : `PAYMENT_ADAPTER` vaut `mock`, le paiement simulé est autorisé, et l'adaptateur de
- * données est `mock` (sans quoi `getRequestContext()` lèverait et la page répondrait 500).
+ * « Démonstration » : `PAYMENT_ADAPTER` vaut `mock`, aucun déploiement de production, puis l'un des deux cas :
+ * - adaptateur de données `mock` et paiement simulé autorisé (`paymentDemoAllowed`) ;
+ * - adaptateur de données `prototype` dans sa liste blanche (`prototypeAdapterAllowed` : préversion, `development`,
+ *   `test` ou CI ; jamais la production) : déblocage simulé d'un voyage d'essai (spécification E2E-essai, lot 1), sans
+ *   prestataire, sans e-mail, sans écriture en base.
+ * Toute autre combinaison ferme (sans quoi `getRequestContext()` lèverait et la page répondrait 500).
  */
 export function paymentAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  return adapterChoice(env.PAYMENT_ADAPTER) === "mock" && paymentDemoAllowed(env) && adapterChoice(env.DATA_ADAPTER) === "mock";
+  if (adapterChoice(env.PAYMENT_ADAPTER) !== "mock" || isProductionDeployment(env)) return false;
+  const donnees = adapterChoice(env.DATA_ADAPTER);
+  if (donnees === "mock") return paymentDemoAllowed(env);
+  return donnees === "prototype" && prototypeAdapterAllowed(env);
 }

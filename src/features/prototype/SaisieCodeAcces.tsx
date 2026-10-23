@@ -28,7 +28,21 @@ const BOUTON_EN_COURS = "aria-disabled:cursor-not-allowed aria-disabled:bg-muted
  *   présentes dès l'affichage, vides ; accepté, le focus passe au titre ; refusé, l'erreur est reliée au champ
  *   (`aria-invalid`, `aria-describedby`) et le focus revient au champ.
  */
-export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
+export interface SaisieCodeAccesProps {
+  ouverte: boolean;
+  /**
+   * Saisie dans le parcours de création (spécification E2E-essai, lot 2, D3) : titre et aide propres, rendue sans
+   * `<main>` dans le cadre de l'écran appelant (`CreationShell`) ; `surAcces` est appelée une fois l'accès accepté.
+   * `focusAuMontage` : le titre de la saisie reçoit le focus à l'affichage, quand elle remplace un écran où le focus
+   * était déjà posé (relance de l'écran 5, WCAG 2.4.3) ; jamais au premier affichage d'une page.
+   * `niveauTitre` (1 par défaut) : niveau du titre de la saisie quand elle s'insère sous le titre d'un écran (fin du tri,
+   * E2E-essai, lot 4 : 3, sous le `<h2>` de la fin du paquet ; mineur 12 de la revue de la PR 717).
+   * Absente : page `/prototype/executions`, inchangée.
+   */
+  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void; readonly focusAuMontage?: boolean; readonly niveauTitre?: 1 | 2 | 3 };
+}
+
+export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
   const [etat, envoyer, enCours] = useActionState(saisirCodeAccesP0, ETAT_INITIAL);
   // Posé à l'envoi, avant que `enCours` ne soit rendu : bloque aussi un second envoi dans le même instant.
   const envoiEnVol = useRef(false);
@@ -37,11 +51,22 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
   const acces = ouverte || etat.statut === "accepte";
   const erreur = etat.statut === "invalid_code" || etat.statut === "too_many_attempts" || etat.statut === "erreur" ? t.erreurs[etat.statut] : null;
 
+  const surAcces = parcours?.surAcces;
+  const focusAuMontage = parcours?.focusAuMontage ?? false;
+  useEffect(() => {
+    if (focusAuMontage) titre.current?.focus();
+    // Au montage seulement : un changement ultérieur de la propriété ne déplace pas le focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     envoiEnVol.current = false;
-    if (etat.statut === "accepte") titre.current?.focus();
-    else if (etat.statut !== "attente") champ.current?.focus();
-  }, [etat]);
+    if (etat.statut === "accepte") {
+      // Dans le parcours, l'écran appelant démonte la saisie et focalise son propre titre : un seul focus.
+      if (surAcces) surAcces();
+      else titre.current?.focus();
+    } else if (etat.statut !== "attente") champ.current?.focus();
+  }, [etat, surAcces]);
 
   const surEnvoi = (evenement: FormEvent<HTMLFormElement>) => {
     if (envoiEnVol.current || enCours) {
@@ -51,17 +76,18 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
     envoiEnVol.current = true;
   };
 
-  return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
-      <h1 ref={titre} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
-        {t.titre}
-      </h1>
+  const Titre = (["h1", "h2", "h3"] as const)[(parcours?.niveauTitre ?? 1) - 1] ?? "h1";
+  const contenu = (
+    <>
+      <Titre ref={titre} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
+        {parcours?.titre ?? t.titre}
+      </Titre>
       <p role="status" className={acces ? "text-corps text-ink" : EMPTY_LIVE_REGION_CLASS}>
         {acces ? t.ouverte : null}
       </p>
       {acces ? null : (
         <form action={envoyer} onSubmit={surEnvoi} className="flex flex-col gap-6">
-          <p className="text-corps text-ink-soft">{t.aide}</p>
+          <p className="text-corps text-ink-soft">{parcours?.aide ?? t.aide}</p>
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor={CHAMP_ID}>{t.libelle}</FieldLabel>
             <input
@@ -84,6 +110,8 @@ export function SaisieCodeAcces({ ouverte }: { ouverte: boolean }) {
           </Button>
         </form>
       )}
-    </main>
+    </>
   );
+  if (parcours) return contenu;
+  return <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">{contenu}</main>;
 }

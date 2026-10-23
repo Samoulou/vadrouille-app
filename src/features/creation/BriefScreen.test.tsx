@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMemoryRecorder, type MemoryRecorder } from "@/analytics/track";
 import { fail, ok } from "@/contracts";
+import * as messages from "@/i18n/messages";
 import { MOCK_INFERRED_BRIEF } from "@/mocks/creation-edimbourg";
 import { structureBrief } from "@/server/actions/creation";
 
@@ -371,5 +372,58 @@ describe("BriefScreen : vérification", () => {
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: "Retour" }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau");
+  });
+});
+
+describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () => {
+  function renderEssai(initial: DraftState = ready()) {
+    return render(
+      <DraftProvider initial={initial}>
+        <BriefScreen recorder={recorder} essai />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  it("« Vérifier mon brief » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
+    const { container } = renderEssai();
+    // Information avant la saisie (décision 0125 § 6) : envoi au fournisseur d'IA, 29 jours, ni e-mail ni téléphone ni adresse.
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essai));
+    expect(messages.creation.ecran2.recit.essai).toMatch(/fournisseur d'IA \(hors UE\), qui écrit ton programme\. Nous les conservons 29 jours.*e-mail.*téléphone.*adresse privée/);
+    expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essaiVerification));
+    fireEvent.change(story(), { target: { value: STORY } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+    });
+    expect(screen.queryByRole("button", { name: "Préparer mon brief" })).not.toBeInTheDocument();
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(latest?.stage).toBe("review");
+    expect(latest?.story).toBe(STORY);
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+    expect(screen.queryByText("Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.")).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("récit trop court : même erreur au champ, aucun appel", () => {
+    renderEssai();
+    fireEvent.change(story(), { target: { value: "Trop court." } });
+    fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+    expect(structureBrief).not.toHaveBeenCalled();
+    expect(story()).toHaveAttribute("aria-invalid", "true");
+    expect(latest?.stage).toBe("story");
+  });
+
+  it("écran 1 hors des règles du site d'essai (adresse saisie sans site=essai) : retour à l'écran 1 du site d'essai", async () => {
+    const base = ready();
+    renderEssai({ ...base, trip: { ...base.trip, destination: "Tombouctou" } });
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/voyages/nouveau?site=essai"));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(latest?.tripReady).toBe(true);
+  });
+
+  it("« Retour » mène à l'écran 1 du site d'essai", () => {
+    renderEssai();
+    fireEvent.click(screen.getByRole("button", { name: "Retour" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau?site=essai");
   });
 });

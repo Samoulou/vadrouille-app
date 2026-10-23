@@ -108,5 +108,114 @@
         "aPart": []
       }
     }
+  },
+  "aEviter": {
+    "cas": "Repères d'une étape par catégorie « à éviter » (spécification E2E-essai, lot 5) : nature du créneau ou mot entier dans le nom du lieu ; mesures de la sortie, jamais des règles du prompt ni du code",
+    "jeux": [
+      "rome-a-eviter-1"
+    ],
+    "controle": {
+      "jeu": "rome-1",
+      "aEviter": [
+        "museum",
+        "nightlife"
+      ]
+    },
+    "reperes": {
+      "museum": {
+        "natures": [],
+        "motsCles": [
+          "musee",
+          "musees",
+          "museo",
+          "musei",
+          "museum",
+          "galerie",
+          "galleria",
+          "gallery",
+          "pinacotheque",
+          "pinacoteca"
+        ]
+      },
+      "walk": {
+        "natures": [],
+        "motsCles": [
+          "balade",
+          "promenade",
+          "passeggiata"
+        ]
+      },
+      "nature": {
+        "natures": [],
+        "motsCles": [
+          "parc",
+          "parco",
+          "park",
+          "jardin",
+          "giardino",
+          "villa borghese",
+          "randonnee"
+        ]
+      },
+      "tasting": {
+        "natures": [],
+        "motsCles": [
+          "degustation",
+          "enoteca",
+          "oenotheque",
+          "cave a vin",
+          "wine bar",
+          "distillerie",
+          "distillery"
+        ]
+      },
+      "restaurant": {
+        "natures": [],
+        "motsCles": [
+          "restaurant",
+          "ristorante",
+          "trattoria",
+          "osteria",
+          "brasserie"
+        ]
+      },
+      "heritage": {
+        "natures": [],
+        "motsCles": [
+          "basilique",
+          "basilica",
+          "cathedrale",
+          "chateau",
+          "castle",
+          "palais",
+          "palazzo",
+          "colisee",
+          "forum",
+          "pantheon",
+          "thermes"
+        ]
+      },
+      "market": {
+        "natures": [],
+        "motsCles": [
+          "marche",
+          "mercato",
+          "market"
+        ]
+      },
+      "nightlife": {
+        "natures": [
+          "apero",
+          "soiree"
+        ],
+        "motsCles": [
+          "bar",
+          "pub",
+          "club",
+          "cocktail",
+          "discotheque"
+        ]
+      }
+    }
   }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  paysDeVille,
+  villesAvecPays,
   cleVille,
   controlerVilles,
   dateLocale,
@@ -117,5 +119,19 @@ describe("fuseaux : contrôle des villes d'un voyage", () => {
     expect(controlerVilles(["Paris", "Lyon", "Atlantis"], "2027-07-10", "2027-07-17")).toEqual({ ok: false, indice: 2, raison: "inconnue" });
     expect(controlerVilles(["Atlantis"], "2027-07-10", "2027-07-17")).toEqual({ ok: false, indice: 0, raison: "inconnue" });
     expect(controlerVilles([], "2027-07-10", "2027-07-17")).toEqual({ ok: false, indice: 0, raison: "inconnue" });
+  });
+});
+
+describe("fuseaux : table des pays (spécification E2E-essai, lot 3, D1)", () => {
+  it("mêmes villes que la table des fuseaux, chacune avec un pays non vide", () => {
+    expect([...villesAvecPays()].sort()).toEqual([...villesConnues()].sort());
+    for (const ville of villesAvecPays()) expect(paysDeVille(ville)?.length ?? 0, ville).toBeGreaterThan(0);
+  });
+
+  it("pays des briefs commités, clé normalisée ; ville inconnue : null", () => {
+    expect(paysDeVille("Rome")).toBe("Italie");
+    expect(paysDeVille("Édimbourg")).toBe("Royaume-Uni");
+    expect(paysDeVille("  GENÈVE ")).toBe("Suisse");
+    expect(paysDeVille("Atlantis")).toBeNull();
   });
 });
