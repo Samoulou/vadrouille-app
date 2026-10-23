@@ -8,7 +8,7 @@ import { EntreeRevisionSchema, type EntreeRevision } from "@/ai/entree-revision"
 import { requeteRevision } from "@/ai/requetes";
 import { BriefSchema } from "@/prototype/brief";
 import { entreeRevisionDepuisProgramme, nomNormalise, nomsEcartes, retirerEtapesEcartees, type EntreeRevisionP0 } from "@/server/p0/revision";
-import { choixRevisionValides, PART_REVISION_MICROS, plafondModelesMicros, REVISIONS_PAR_VOYAGE } from "@/workflows/p0-run";
+import { choixRevisionValides, PART_HORS_PREMIER_PROGRAMME_MICROS, PART_REVISION_MICROS, plafondModelesMicros, REVISIONS_PAR_VOYAGE } from "@/workflows/p0-run";
 
 /**
  * Révision après le tri (E2E-essai, lot 4 ; décision 0126) : entrée tirée des seuls textes de l'IA (canari : aucune
@@ -126,9 +126,10 @@ describe("révision : filet du code sur les étapes écartées (décision 0126 �
 });
 
 describe("révision : partage du fusible d'IA d'un voyage (Q601 ; décision 0126 § 2)", () => {
-  it("fichier : fusible entier ; saisi : fusible moins les révisions ; révision : sa part ; somme au plus le fusible", () => {
-    expect(REVISIONS_PAR_VOYAGE).toBe(2);
+  it("fichier : fusible entier ; saisi : 1,50 USD gardé avec une seule révision ; révision : sa part ; somme au plus le fusible", () => {
+    expect(REVISIONS_PAR_VOYAGE).toBe(1);
     expect(PART_REVISION_MICROS).toBe(250_000);
+    expect(PART_HORS_PREMIER_PROGRAMME_MICROS).toBe(500_000);
     expect(plafondModelesMicros(2, "fichier")).toBe(2_000_000);
     expect(plafondModelesMicros(2, "saisi")).toBe(1_500_000);
     expect(plafondModelesMicros(2, "revision")).toBe(250_000);

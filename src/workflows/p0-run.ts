@@ -272,7 +272,7 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  * Sorte d'exécution, pour la part du fusible d'IA qu'elle réserve (décision 0126 § 2 ; Q601, réponse de Samuel du
  * 2026-10-22 : « même fusible de 2 USD d'IA par voyage ») :
  * - `fichier` : brief commité (`/prototype/executions`), fusible entier du mode, comme avant ;
- * - `saisi` : premier programme d'un voyage de l'app, fusible du mode **moins** la part des révisions du voyage ;
+ * - `saisi` : premier programme d'un voyage de l'app, fusible du mode **moins** `PART_HORS_PREMIER_PROGRAMME_MICROS` ;
  * - `revision` : une révision après le tri, `PART_REVISION_MICROS`.
  * Ainsi la somme des forfaits de modèles d'un voyage de l'app (premier programme et révisions) ne dépasse jamais le
  * fusible du mode : le coût réel d'une exécution finie n'est pas conservé (S4 de 0046), le forfait réservé est la seule
@@ -280,21 +280,26 @@ export type LancementDuMode = { readonly forfait: Forfait; readonly regles: Regl
  */
 export type SorteExecution = "fichier" | "saisi" | "revision";
 
-/** Révisions au plus par voyage de l'app (décision 0126 § 2) : une à la fin de l'aperçu, une à la fin de la suite du tri. */
-export const REVISIONS_PAR_VOYAGE = 2;
+/** Révisions au plus par voyage de l'app (décision 0126 § 2, réponse de Samuel du 2026-10-23) : une seule, après le tri. */
+export const REVISIONS_PAR_VOYAGE = 1;
 /**
  * Part du fusible d'IA d'une révision (décision 0126 § 2), en micro-USD : 0,25 USD, plus de dix fois le coût estimé d'une
- * requête `programme` (`coutsEstimesMicros.requeteModele`, 0,02 USD). Premier programme d'un voyage de l'app : 2 − 2 × 0,25
- * = 1,50 USD avec le fusible de 2 USD de l'essai (0093 point 5).
+ * requête `programme` (`coutsEstimesMicros.requeteModele`, 0,02 USD).
  */
 export const PART_REVISION_MICROS = 250_000;
+/**
+ * Part du fusible tenue hors du premier programme d'un voyage de l'app (décision 0126 § 2), en micro-USD : 0,50 USD.
+ * Premier programme : 2 − 0,50 = 1,50 USD avec le fusible de 2 USD de l'essai (0093 point 5), gardé par Samuel le
+ * 2026-10-23 avec une seule révision de 0,25 USD ; le reste (0,25 USD) n'est réservé par aucune exécution.
+ */
+export const PART_HORS_PREMIER_PROGRAMME_MICROS = 500_000;
 
 /** Plafond du coût des modèles réservé par une exécution de cette sorte (micro-USD), sous le fusible du mode. */
 export function plafondModelesMicros(coutUsd: number, sorte: SorteExecution): number {
   const fusible = Math.round(coutUsd * 1_000_000);
   if (sorte === "fichier") return fusible;
   if (sorte === "revision") return Math.min(PART_REVISION_MICROS, fusible);
-  return Math.max(0, fusible - REVISIONS_PAR_VOYAGE * PART_REVISION_MICROS);
+  return Math.max(0, fusible - PART_HORS_PREMIER_PROGRAMME_MICROS);
 }
 
 /** Plafonds Google d'une exécution, par méthode (requêtes, éléments Routes). */
