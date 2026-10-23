@@ -606,3 +606,4 @@
 | Q615 | Lot 5 : préciser dans le prompt `programme` que « à éviter » prime sur les incontournables (mineur 3 de #712) change l'empreinte du prompt. Nouvelle version du prompt ou laisser tel quel jusqu'à l'essai réel de Samuel ? | IA, Product Owner | 2026-10-23 | Rien | Ouverte |
 | Q616 | Bout en bout, lot 4 : textes `fin.revision` et suivi automatique de la nouvelle version après une révision (aujourd'hui, il faut recharger le voyage). | UX/UI | 2026-10-23 | Rien | Ouverte |
 | Q617 | Bout en bout, lot 4 : la spécification dit « à la fin du tri (ou au déblocage) » ; 0126 § 5 exclut le déblocage et « Passer ». Confirmer cet écart. | Product Owner | 2026-10-23 | Rien | Ouverte |
+| Q618 | Next.js : désactiver la route `/_next/image`, que l'app n'utilise pas, avec un test qui prouve qu'elle ne répond plus (avis critique GHSA-2464-fhr4-w9xw, déjà corrigé par 16.4.1) ? | CEO, Sécurité | 2026-10-23 | Rien | Ouverte (proposée par le Tech Lead dans #725) |
