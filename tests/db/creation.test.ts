@@ -275,10 +275,21 @@ describe("création du voyage (B9b)", () => {
           { f: "2027-07-13", t: "2027-07-16" },
           { f: "2027-07-16", t: "2027-07-18" },
         ]);
-        // Le récit n'est pas dans TripRequest : rien n'est écrit ; l'ancienne colonne de mobilité n'est plus écrite.
+        // `briefs.story` n'est jamais écrit par createTrip ; l'ancienne colonne de mobilité n'est plus écrite.
         expect(await compter(org, "briefs", "story IS NULL AND mobility IS NULL AND version = 1")).toBe(1);
       }
     }
+  });
+
+  it("création: TripRequest.story, facultatif, est ignoré par l'adaptateur api (E2E-essai lot 3, critère 7 ; décision 0125 § 5)", async () => {
+    const { adapter } = banc();
+    const org = await nouvelleOrg();
+    const draft: TripDraft = { destination: "Paris", start: "2027-07-10", end: "2027-07-14", lodging: { kind: "none" }, otherCities: [], commitments: [] };
+    const story = "Récit de test : on aime les musées et les terrasses le soir.";
+    const tripId = trip(await adapter.createTrip(contexte(org), { requestId: randomUUID(), draft, brief: BRIEF, story }));
+    const relu = await withOrg(contexte(org), (tx) => lireBrouillon(executeurSql(tx), org.org, tripId));
+    expect(relu).toEqual({ draft, brief: BRIEF, timeZone: "Europe/Paris" });
+    expect(await compter(org, "briefs", "story IS NULL AND version = 1")).toBe(1);
   });
 
   it("création: un aperçu actif à la fois", async () => {

@@ -40,8 +40,11 @@ ALTER TABLE prototype.runs ADD CONSTRAINT runs_brief_check CHECK (brief ~ '^[a-z
 
 -- 2. Brief saisi d'une exécution. Clés de premier niveau de `BriefSchema` (`src/prototype/brief.ts`, test d'égalité de
 -- `tests/db/brief-saisi-prototype.test.ts`) ; le contenu est validé par le lancement et par l'étape (`BriefSchema`), la
--- base n'en ferme que les clés et la taille : un brief admis tient en moins de 8 Kio (récit de 1 000 caractères, 5
--- logements de 120, 10 engagements de 80), 16 Kio stockés au plus.
+-- base n'en ferme que les clés **du premier niveau** (les clés imbriquées de `voyageurs`, `logements`, `engagements` ne
+-- sont fermées que par `BriefSchema`) et la taille : un brief admis tient en moins de 8 Kio (récit de 1 000 caractères,
+-- 5 logements de 120, 10 engagements de 80), 16 Kio stockés au plus. `pg_column_size` mesure la valeur stockée, qui
+-- peut être compressée (TOAST) : la borne vaut pour l'octet stocké, pas pour le texte JSON ; la borne de texte est celle
+-- de `BriefSchema`, contrôlée avant toute écriture (revue de la PR #704, mineur Sécurité 8).
 CREATE TABLE prototype.run_briefs (
   id uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
   organization_id uuid NOT NULL DEFAULT '5e1f0000-0000-4000-8000-000000000001'::uuid REFERENCES public.organizations (id),

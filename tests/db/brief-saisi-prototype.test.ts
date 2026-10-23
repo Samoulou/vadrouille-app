@@ -218,7 +218,13 @@ describe("p0: réservation d'un brief saisi et lectures (0125 § 1, § 2 et § 4
     expect(await compter("SELECT count(*) AS n FROM prototype.forfaits WHERE run_id = $1", [premier.runId])).toBe(1);
     expect((await admin.query("SELECT brief, mode, variant FROM prototype.runs WHERE id = $1", [premier.runId])).rows[0]).toEqual({ brief: "saisi", mode: "essai", variant: "A" });
     const second = await lancerSaisi(requestId);
-    expect(second).toEqual({ ok: true, runId: premier.runId, existante: true });
+    expect(second).toEqual({ ok: true, runId: premier.runId, existante: true, destination: "Rome" });
+    // Rejeu au bord d'un plafond (mineur TL 2 de la revue de #704) : la clé est lue avant le contrôle du forfait.
+    const fermees: ReglesForfait = { ...REGLES, limites: { ...LARGES, quotaJourParMethode: 0, moisGoogleMicros: 0, enveloppeGoogleMicros: 0 } };
+    expect(
+      await reserverExecution(poolReel, { mode: "essai", brief: "saisi", variant: "A", commitSha: SHA, forfait: FORFAIT, briefSaisi: { requestId, contenu: BRIEF } }, fermees),
+    ).toEqual({ ok: true, runId: premier.runId, existante: true, destination: "Rome" });
+    expect((await lancerSaisi(randomUUID())).ok).toBe(true);
     expect(await compter("SELECT count(*) AS n FROM prototype.forfaits WHERE run_id = $1", [premier.runId])).toBe(1);
     // Lecture par l'étape : le brief tel qu'écrit.
     expect(await lireBriefSaisi(poolReel, premier.runId)).toEqual(BRIEF);
