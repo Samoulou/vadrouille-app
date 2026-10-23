@@ -24,12 +24,14 @@ export {
   NOMS_BRIEFS,
   PART_REVISION_MICROS,
   plafondModelesMicros,
+  plafondsGoogleRevision,
   REVISIONS_PAR_VOYAGE,
   relectureDuMode,
   validerBriefSaisi,
   verrouS8Leve,
   type BriefSaisiValide,
   type LancementDuMode,
+  type PlafondsGoogle,
   type SorteExecution,
 } from "./p0-run";
 

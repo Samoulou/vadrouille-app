@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "id": "rome-a-eviter-1",
+  "programme": "rome-a-eviter-1",
+  "cas": "Sortie simulée du prompt revision v1 (spécification E2E-essai, lot 4 ; décision 0126), écrite à la main : version précédente = sortie simulée evals/programme/rome-a-eviter-1.json ; « Pas pour moi » sur le Forum romain et la Trattoria Vecchia Roma, « J'aime » sur le Colisée et le Panthéon ; noms usuels de l'IA, aucune donnée Google",
+  "choix": {
+    "pasPourMoi": ["Forum romain", "Trattoria Vecchia Roma"],
+    "jAime": ["Colisée", "Panthéon"]
+  },
+  "sortie": {
+    "titre": "Rome antique à pied, deux jours sans musée (révisé)",
+    "jours": [
+      {
+        "date": "2027-05-04",
+        "titre": "Monti et le Colisée",
+        "creneaux": [
+          {
+            "debut": "12:00",
+            "fin": "13:00",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "13:30",
+            "fin": "14:15",
+            "nature": "repas_midi",
+            "lieu": "Antico Forno ai Serpenti",
+            "quartier": "Monti",
+            "pourquoi": "Un panini rapide dans ton quartier, parfait pour enchaîner sur les visites.",
+            "conseil": "Prends-le à emporter, il y a peu de places assises.",
+            "aReserver": false,
+            "incontournable": false
+          },
+          {
+            "debut": "14:30",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Colisée",
+            "quartier": "Colisée",
+            "pourquoi": "Le symbole de la Rome antique, à dix minutes de ton logement.",
+            "conseil": "Réserve le créneau horaire en ligne.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "16:45",
+            "fin": "18:15",
+            "nature": "visite",
+            "lieu": "Basilique Saint-Clément",
+            "quartier": "Monti",
+            "pourquoi": "Trois églises superposées, de l'Antiquité au Moyen Âge, à quelques minutes du Colisée.",
+            "conseil": "Prévois un petit billet pour les niveaux souterrains.",
+            "aReserver": false,
+            "incontournable": false
+          },
+          {
+            "debut": "19:00",
+            "fin": "19:45",
+            "nature": "pause",
+            "lieu": "Glace Fatamorgana Monti",
+            "quartier": "Monti",
+            "pourquoi": "Une glace artisanale pour la fin d'après-midi, avant le dîner.",
+            "aReserver": false,
+            "incontournable": false
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:45",
+            "nature": "repas_soir",
+            "lieu": "Osteria da Valentino",
+            "quartier": "Monti",
+            "pourquoi": "Une osteria de quartier pour une cuisine romaine simple, à deux pas de ton logement.",
+            "conseil": "Réserve pour 20:00.",
+            "aReserver": true,
+            "incontournable": false
+          }
+        ]
+      },
+      {
+        "date": "2027-05-05",
+        "titre": "Panthéon et Trevi",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "10:00",
+            "nature": "visite",
+            "lieu": "Panthéon",
+            "quartier": "Centro Storico",
+            "pourquoi": "Le temple le mieux conservé de Rome, sa coupole est à voir de l'intérieur.",
+            "conseil": "Viens à l'ouverture, la file s'allonge vite.",
+            "aReserver": false,
+            "incontournable": true
+          },
+          {
+            "debut": "10:30",
+            "fin": "11:15",
+            "nature": "visite",
+            "lieu": "Fontaine de Trevi",
+            "quartier": "Trevi",
+            "pourquoi": "La fontaine la plus célèbre de Rome, à quelques rues du Panthéon.",
+            "conseil": "Garde une pièce pour la tradition.",
+            "aReserver": false,
+            "incontournable": true
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:00",
+            "nature": "repas_midi",
+            "lieu": "Supplizio",
+            "quartier": "Centro Storico",
+            "pourquoi": "Des supplì croustillants à emporter, une spécialité romaine.",
+            "aReserver": false,
+            "incontournable": false
+          },
+          {
+            "debut": "14:00",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve dès maintenant le Colisée et le Forum romain.",
+      "Achète des billets de bus et de métro valables 24 h."
+    ]
+  }
+}

@@ -43,15 +43,19 @@ WHERE r.id = $1::uuid AND r.brief = 'saisi' AND r.status = 'arretee'`;
  * Brief saisi de l'exécution qui a écrit la **version servie** du voyage (la plus récente non expirée, décision 0126
  * § 1), pour une révision (relu dans la réservation, garde ouverte). Aucune ligne pour un voyage d'un brief commité.
  */
-export const SQL_BRIEF_VERSION = `SELECT b.brief FROM prototype.programmes AS p
+export const SQL_BRIEF_VERSION = `SELECT b.brief, p.contenu FROM prototype.programmes AS p
 JOIN prototype.runs AS r ON r.id = p.run_id
 JOIN prototype.run_briefs AS b ON b.run_id = r.id
 WHERE p.contenu #>> '{trip,id}' = $1::text AND p.expires_at > pg_catalog.now() AND r.brief = 'saisi' AND r.status = 'programme_ecrit'
 ORDER BY r.started_at DESC, r.id DESC LIMIT 1`;
 
-/** Clés de révision déjà écrites parmi celles données (décision 0126 § 2), avec le statut de leur exécution. */
-export const SQL_CLES_REVISION = `SELECT b.request_id::text AS request_id, r.status FROM prototype.run_briefs AS b
-JOIN prototype.runs AS r ON r.id = b.run_id
+/**
+ * Clés de révision déjà écrites parmi celles données (décision 0126 § 2), avec le statut de leur exécution et son
+ * ancienneté, mesurée par l'horloge de la base (révision orpheline : 0126 § 2).
+ */
+export const SQL_CLES_REVISION = `SELECT b.request_id::text AS request_id, r.status,
+  (EXTRACT(EPOCH FROM pg_catalog.now() - r.started_at) * 1000)::bigint AS ecoule_ms
+FROM prototype.run_briefs AS b JOIN prototype.runs AS r ON r.id = b.run_id
 WHERE b.request_id = ANY($1::uuid[])`;
 
 const ETATS: ReadonlySet<string> = new Set(["en_cours", "programme_ecrit", "arretee"]);
@@ -104,7 +108,20 @@ export async function lireBriefVersion(pool: PoolSql, tripId: string): Promise<u
   return (await lireUne(pool, SQL_BRIEF_VERSION, [tripId]))?.brief ?? null;
 }
 
-/** Clés de révision écrites parmi `cles`, avec le statut de leur exécution (lignes mal formées ignorées). */
+/**
+ * Programme de la version servie du voyage `tripId` (même ligne que `lireBriefVersion`), ou `null` : base des plafonds
+ * Google de la révision (décision 0126 § 2.1). Validé par `plafondsGoogleRevision`, jamais rendu ni journalisé.
+ */
+export async function lireProgrammeVersion(pool: PoolSql, tripId: string): Promise<unknown> {
+  if (lireIdentifiantVoyageSaisi(tripId) === null) return null;
+  return (await lireUne(pool, SQL_BRIEF_VERSION, [tripId]))?.contenu ?? null;
+}
+
+/**
+ * Clés de révision écrites parmi `cles`, avec le statut de leur exécution et son ancienneté. Toute clé présente est
+ * rendue, même d'un statut inattendu (elle est alors prise, jamais libre ni « en cours » : mineur 7 de la revue de la
+ * PR 717) ; une ancienneté illisible vaut `null`.
+ */
 export async function lireClesRevision(pool: PoolSql, cles: readonly string[]): Promise<CleRevisionLue[]> {
   const client: ClientSql = await pool.connect();
   let enTransaction = false;
@@ -115,9 +132,11 @@ export async function lireClesRevision(pool: PoolSql, cles: readonly string[]): 
     const lignes = (await client.query(SQL_CLES_REVISION, [[...cles]])).rows;
     await client.query("COMMIT");
     enTransaction = false;
-    return lignes.flatMap((ligne) =>
-      typeof ligne.request_id === "string" && typeof ligne.status === "string" && ETATS.has(ligne.status) ? [{ requestId: ligne.request_id, statut: ligne.status }] : [],
-    );
+    return lignes.flatMap((ligne) => {
+      if (typeof ligne.request_id !== "string") return [];
+      const ecoule = ligne.ecoule_ms === null || ligne.ecoule_ms === undefined ? Number.NaN : Number(ligne.ecoule_ms);
+      return [{ requestId: ligne.request_id, statut: typeof ligne.status === "string" ? ligne.status : "inconnu", ecouleMs: Number.isSafeInteger(ecoule) && ecoule >= 0 ? ecoule : null }];
+    });
   } catch (erreur) {
     if (enTransaction) await client.query("ROLLBACK").catch(() => undefined);
     throw erreur;
@@ -139,7 +158,7 @@ export const creationEssai: PortCreationEssai = {
     return issue(await relancerBriefSaisi(demande, { cookie: await cookieAcces(), pool: poolPrototype, briefArrete: lireBriefArrete }));
   },
   async reviser(demande) {
-    return reviserVoyageSaisi(demande, { cookie: await cookieAcces(), pool: poolPrototype, briefVersion: lireBriefVersion, clesEcrites: lireClesRevision });
+    return reviserVoyageSaisi(demande, { cookie: await cookieAcces(), pool: poolPrototype, briefVersion: lireBriefVersion, clesEcrites: lireClesRevision, versionServie: lireProgrammeVersion });
   },
   async etat(tripId) {
     const pool = await poolLectureProgrammes();

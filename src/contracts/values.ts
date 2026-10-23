@@ -163,6 +163,12 @@ export type PaymentEventStatus = (typeof PAYMENT_EVENT_STATUSES)[number];
 
 /** Identifiant de voyage reçu d'une entrée (règle de 0017 § 1). */
 export const TRIP_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * Identifiant d'un voyage d'essai lancé depuis l'app (spécification E2E-essai, lot 3 ; décision 0125 § 2) :
+ * `proto_<slug>_<uuid de l'exécution sans tirets>` ; groupes : slug, puis les 32 chiffres hexadécimaux. Source unique de
+ * `lireIdentifiantVoyageSaisi` (`src/domain/identifiant.ts`) et de `voyageEssaiRevisable` (`src/adapters`, décision 0126).
+ */
+export const APP_TRIAL_TRIP_ID_PATTERN = /^proto_([a-z0-9-]{1,24})_([0-9a-f]{32})$/;
 
 /**
  * Exceptions montrées par la vue partagée (spécification F10, F10-PO-14 ; décision 0039, F10-TL-1) : « À réserver »

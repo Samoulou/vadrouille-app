@@ -1,4 +1,4 @@
-import type { RevisionFixtures, Trip, TrialRevisionRequest, TrialRevisionResult } from "@/contracts";
+import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { OFFER_CONFIG } from "@/server/config/offer";
@@ -245,22 +245,20 @@ export async function retenirDeblocageEssai(ctx: AdapterContext, tripId: string)
  * (leur fusible d'IA est entier, 0126 § 2).
  */
 export function voyageEssaiRevisable(tripId: string): boolean {
-  return VOYAGE_SAISI.test(tripId);
+  // Même motif que `lireIdentifiantVoyageSaisi` (`src/domain/identifiant.ts`), source unique dans `@/contracts`.
+  return APP_TRIAL_TRIP_ID_PATTERN.test(tripId);
 }
 
-/** Même forme que `lireIdentifiantVoyageSaisi` (`src/domain/identifiant.ts`), que la couche adapters n'importe pas. */
-const VOYAGE_SAISI = /^proto_[a-z0-9-]{1,24}_[0-9a-f]{32}$/;
-
 /** Statuts du lancement d'une révision ramenés au contrat (décision 0126) ; tout autre devient `unavailable`. */
-const STATUT_REVISION: Readonly<Record<string, TrialRevisionResult["status"]>> = {
-  lancee: "started",
-  en_cours: "inProgress",
-  epuisees: "exhausted",
-  acces_refuse: "accessExpired",
-  cap_reached: "capReached",
-  envelope_reached: "capReached",
-  daily_quota_insufficient: "capReached",
-};
+const STATUT_REVISION: ReadonlyMap<string, TrialRevisionResult["status"]> = new Map([
+  ["lancee", "started"],
+  ["en_cours", "inProgress"],
+  ["epuisees", "exhausted"],
+  ["acces_refuse", "accessExpired"],
+  ["cap_reached", "capReached"],
+  ["envelope_reached", "capReached"],
+  ["daily_quota_insufficient", "capReached"],
+]);
 
 /**
  * « Pas pour moi » change le programme d'un voyage d'essai (spécification E2E-essai, lot 4 ; décision 0126) : lance la
@@ -274,7 +272,7 @@ export async function reviserProgrammeEssai(ctx: AdapterContext, demande: TrialR
     const reviser = revisionEssai();
     if (reviser === null) return { status: "unavailable" };
     const { statut } = await reviser({ tripId: demande.tripId, pasPourMoi: demande.notForMe, jAime: demande.liked });
-    return { status: STATUT_REVISION[statut] ?? "unavailable" };
+    return { status: STATUT_REVISION.get(statut) ?? "unavailable" };
   } catch {
     return { status: "unavailable" };
   }

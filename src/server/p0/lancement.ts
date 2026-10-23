@@ -8,7 +8,7 @@ import type { DependancesAcces } from "@/server/p0/acces";
 import { clesRevision } from "@/server/p0/cles-revision";
 import { briefDepuisFormulaire } from "@/server/p0/depuis-formulaire";
 import { ouvrirGardeLancement, type CodeGarde, type CodeRefusAvantReservation, type GardeOuverte } from "@/server/p0/garde";
-import { reserverExecution, type PoolSql } from "@/server/usage/neon";
+import { MARGE_ORPHELINE_MS, reserverExecution, type PoolSql } from "@/server/usage/neon";
 import {
   briefLancable,
   briefSaisiTientDansLeMode,
@@ -19,6 +19,7 @@ import {
   lancementDuMode,
   NOMS_BRIEFS,
   P0RUN_COMPLET,
+  plafondsGoogleRevision,
   REVISIONS_PAR_VOYAGE,
   startWorkflow,
   validerBriefSaisi,
@@ -301,14 +302,28 @@ export type DemandeRevisionSaisi = { readonly tripId: unknown; readonly pasPourM
  */
 export type StatutRevision = StatutLancement | "en_cours" | "epuisees";
 
-/** État d'une clé de révision déjà écrite : statut de son exécution (`en_cours`, `programme_ecrit`, `arretee`). */
-export type CleRevisionLue = { readonly requestId: string; readonly statut: string };
+/**
+ * État d'une clé de révision déjà écrite : statut de son exécution (`en_cours`, `programme_ecrit`, `arretee`, ou tout
+ * autre texte) et son ancienneté en ms (horloge de la base), `null` si illisible.
+ */
+export type CleRevisionLue = { readonly requestId: string; readonly statut: string; readonly ecouleMs: number | null };
+
+/**
+ * Révision **en cours** (décision 0126 § 2) : clé `en_cours` dont l'exécution a moins de `dureeMaxMs` plus la marge des
+ * orphelines (`MARGE_ORPHELINE_MS`). Au-delà, ou d'ancienneté illisible, c'est une orpheline (démarrage puis clôture
+ * échoués, workflow tué) : la clé est prise, mais n'empêche plus une autre révision.
+ */
+export function revisionEnCours(cle: CleRevisionLue, dureeMaxMs: number): boolean {
+  return cle.statut === "en_cours" && cle.ecouleMs !== null && cle.ecouleMs <= dureeMaxMs + MARGE_ORPHELINE_MS;
+}
 
 export type DependancesRevisionSaisi = DependancesLancementP0 & {
   /** Brief saisi de l'exécution qui a écrit la version servie du voyage, ou `null` (voyage d'un brief commité, expiré). */
   readonly briefVersion: (pool: PoolSql, tripId: string) => Promise<unknown>;
   /** Clés de révision déjà écrites parmi celles données, avec le statut de leur exécution. */
   readonly clesEcrites: (pool: PoolSql, cles: readonly string[]) => Promise<readonly CleRevisionLue[]>;
+  /** Version servie du voyage (programme écrit), ou `null` : base des plafonds Google de la révision (0126 § 2). */
+  readonly versionServie: (pool: PoolSql, tripId: string) => Promise<unknown>;
 };
 
 /**
@@ -348,7 +363,7 @@ export async function reviserVoyageSaisi(demande: DemandeRevisionSaisi, dependan
       if (!briefSaisiTientDansLeMode(MODE_LANCEMENT_APP, valide.brief)) return refus("brief_hors_plafonds");
       const cles = clesRevision(choix.tripId, REVISIONS_PAR_VOYAGE);
       const ecrites = await dependances.clesEcrites(pool, cles);
-      if (ecrites.some((cle) => cle.statut === "en_cours")) {
+      if (ecrites.some((cle) => revisionEnCours(cle, lancement.regles.dureeMaxMs))) {
         motif = "en_cours";
         return refus("entree_invalide");
       }
@@ -358,6 +373,10 @@ export async function reviserVoyageSaisi(demande: DemandeRevisionSaisi, dependan
         motif = "epuisees";
         return refus("entree_invalide");
       }
+      // Plafonds Google réduits au besoin de la version servie (0126 § 2) ; version illisible : refus, rien n'est réservé.
+      const plafonds = plafondsGoogleRevision(MODE_LANCEMENT_APP, await dependances.versionServie(pool, choix.tripId), choix.tripId, valide.brief.logements.length);
+      const revision = plafonds === null ? null : lancementDuMode(MODE_LANCEMENT_APP, "revision", plafonds);
+      if (revision === null) return refus("entree_invalide");
       const reservation = await reserverExecution(
         pool,
         {
@@ -365,10 +384,10 @@ export async function reviserVoyageSaisi(demande: DemandeRevisionSaisi, dependan
           brief: BRIEF_SAISI,
           variant: VARIANTE_LANCEMENT_APP,
           commitSha,
-          forfait: lancement.forfait,
+          forfait: revision.forfait,
           briefSaisi: { requestId: libre, contenu: valide.brief },
         },
-        lancement.regles,
+        revision.regles,
       );
       existante = reservation.ok && reservation.existante === true;
       return reservation;

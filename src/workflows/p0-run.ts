@@ -297,6 +297,42 @@ export function plafondModelesMicros(coutUsd: number, sorte: SorteExecution): nu
   return Math.max(0, fusible - REVISIONS_PAR_VOYAGE * PART_REVISION_MICROS);
 }
 
+/** Plafonds Google d'une exécution, par méthode (requêtes, éléments Routes). */
+export type PlafondsGoogle = { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
+
+/**
+ * Plafonds Google d'une **révision** (décision 0126 § 2 ; mineur 9 de la revue de la PR 717, décision du CEO) : le
+ * besoin de la version servie, qu'une révision réécrit étape pour étape, plus une marge, jamais au-delà du mode.
+ * - Text Search et fiches : un appel par logement du brief et par lieu distinct de la version servie (comme
+ *   `etapeProgramme`), plus la marge des fiches du mode (`fiches.margeMinimum`, `fiches.margePart`) ;
+ * - Routes : les blocs que `trajetsConsecutifs` demanderait pour des journées de même forme (logement, étapes, logement),
+ *   chaque lieu compté comme distinct (`blocsDeTrajets`), plus la même marge.
+ * Toute la version est encore vérifiée (les étapes gardées aussi) : ne vérifier que les étapes nouvelles demanderait de
+ * relire positions et temps de la version précédente (0126, limites). `null` si la version n'est pas un programme écrit
+ * de ce voyage.
+ */
+export function plafondsGoogleRevision(mode: ExecutionEnCours["mode"], version: unknown, tripId: string, logements: number): PlafondsGoogle | null {
+  if (mode !== "reel" && mode !== "essai") return null;
+  const lue = ProgrammeEcritSchema.safeParse(version);
+  if (!lue.success || lue.data.trip.id !== tripId) return null;
+  const config = configurationDuMode(mode);
+  const marge = (besoin: number) => besoin + Math.max(config.fiches.margeMinimum, Math.ceil(besoin * config.fiches.margePart));
+  const jours = [...lue.data.trip.days].sort((a, b) => a.index - b.index);
+  const noms = jours.map((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop.name.trim().toLowerCase()] : [])));
+  const lieux = new Set(noms.flat()).size;
+  // Chaque étape a son propre point (pire cas : toutes remplacées par des lieux distincts) ; logement en tête et en fin.
+  let rang = 0;
+  const chaines = noms.map((etapes) => ["logement", ...etapes.map(() => `etape-${(rang += 1)}`), "logement"]);
+  const blocs = blocsDeTrajets(chaines);
+  const elements = blocs.reduce((total, bloc) => total + bloc.origines.length * bloc.destinations.length, 0);
+  return {
+    textSearch: Math.min(config.placesTextSearch, marge(logements + lieux)),
+    details: Math.min(config.placesDetails, marge(logements + lieux)),
+    routesRequetes: Math.min(config.routesRequetes, marge(blocs.length)),
+    routesElements: Math.min(config.routesElements, marge(elements)),
+  };
+}
+
 /**
  * Forfait et règles de la réservation d'une exécution du mode (P0r3d), calculés comme les étapes lisent leur
  * configuration ; `null` si la configuration du mode, celle de l'agent, celle du classement ou la table de prix est
@@ -313,7 +349,7 @@ export function plafondModelesMicros(coutUsd: number, sorte: SorteExecution): nu
  *   Chiffres prouvés par `tests/unit/workflows/p0-run-lancement.test.ts`.
  * - Durée des orphelines : `DUREE_MAX_EXECUTION_MS`, la même pour tous les modes (plus de durée par mode depuis 0102).
  */
-export function lancementDuMode(mode: ExecutionEnCours["mode"], sorte: SorteExecution = "fichier"): LancementDuMode | null {
+export function lancementDuMode(mode: ExecutionEnCours["mode"], sorte: SorteExecution = "fichier", plafondsGoogle?: PlafondsGoogle): LancementDuMode | null {
   if (mode !== "reel" && mode !== "essai") return null;
   const table = TablePrixGoogleSchema.safeParse(prixGoogle);
   if (!table.success) return null;
@@ -323,10 +359,17 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"], sorte: SorteExec
     const config = configurationDuMode(mode);
     configurationAgent(mode, config);
     if (lireClassement(configClassement) === undefined) return null;
+    // Révision (décision 0126 § 2) : plafonds Google réduits au besoin de la version servie, jamais au-delà du mode.
+    const borne = (valeur: number | undefined, duMode: number) => (valeur === undefined ? duMode : Math.min(duMode, Math.max(0, valeur)));
     const forfait = forfaitExecution(
       table.data,
       SKUS_FORFAIT,
-      { placesTextSearch: config.placesTextSearch, placesDetails: config.placesDetails, routesRequetes: config.routesRequetes, routesElements: config.routesElements },
+      {
+        placesTextSearch: borne(plafondsGoogle?.textSearch, config.placesTextSearch),
+        placesDetails: borne(plafondsGoogle?.details, config.placesDetails),
+        routesRequetes: borne(plafondsGoogle?.routesRequetes, config.routesRequetes),
+        routesElements: borne(plafondsGoogle?.routesElements, config.routesElements),
+      },
       plafondModelesMicros(config.coutUsd, sorte),
     );
     return { forfait, regles: { limites: LIMITES_PROTOTYPE, uniteQuotaRoutes: config.uniteQuotaRoutes, dureeMaxMs: DUREE_MAX_EXECUTION_MS } };
@@ -494,12 +537,15 @@ function forfaitDeLEtape(config: ConfigModeReel, execution: ExecutionEnCours, pa
   const fusible = Math.round(config.coutUsd * 1_000_000);
   const plafond = execution.forfaitModelesMicros === undefined ? fusible : Math.min(fusible, execution.forfaitModelesMicros);
   const resteModeles = Math.max(0, plafond - execution.coutModelesMicros);
+  // Plafonds Google réservés (décision 0126 § 2, révision) : l'étape ne dépasse jamais ce que la réservation a compté.
+  const reserve = execution.forfaitGoogle;
+  const sous = (valeur: number, plafondReserve: number | undefined) => Math.max(0, plafondReserve === undefined ? valeur : Math.min(valeur, plafondReserve));
   return {
     nature: "execution",
-    textSearchRequetes: Math.max(0, part.textSearch),
-    placeDetailsRequetes: Math.max(0, part.details),
-    routesRequetes: Math.max(0, part.routesRequetes),
-    routesElements: Math.max(0, part.routesElements),
+    textSearchRequetes: sous(part.textSearch, reserve?.textSearch),
+    placeDetailsRequetes: sous(part.details, reserve?.details),
+    routesRequetes: sous(part.routesRequetes, reserve?.routesRequetes),
+    routesElements: sous(part.routesElements, reserve?.routesElements),
     coutGoogleMicros: 0,
     coutModelesMicros: resteModeles,
   };
@@ -814,7 +860,7 @@ async function ecrireVersion(
           creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), gardees), placeId: placeIdDe(indiceJour, rang) })),
         }));
       // Requêtes Routes prévues si tous les lieux étaient vérifiés (borne haute), au plus la part Routes.
-      const requetesPrevues = Math.min(config.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
+      const requetesPrevues = Math.min(forfait.routesRequetes, blocsDeTrajets(pointsDeTrajet({ brief, logements: idsLogements, jours: joursAvec(cleDe) })).length);
       reserveTrajetsMs = requetesPrevues * DELAI_REQUETE_MS.routes;
       const controle: ControleAppel = async (methode) => {
         const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
@@ -863,7 +909,8 @@ async function ecrireVersion(
         capacites.routes,
         pointsDeTrajet({ brief, logements: idsLogements, jours }),
         mode,
-        { requetes: config.routesRequetes, elements: config.routesElements },
+        // Part Routes de l'étape (plafonds du mode, ou ceux réservés pour une révision : décision 0126 § 2).
+        { requetes: forfait.routesRequetes, elements: forfait.routesElements },
         cadence,
       );
 

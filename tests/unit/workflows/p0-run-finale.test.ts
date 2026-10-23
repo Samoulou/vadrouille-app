@@ -23,7 +23,7 @@ import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, ty
 import { DELAI_SITE_MS, MARGE_SITE_MS, SITES_DUREE_MAX_MS, type VerificateurSites } from "@/server/p0/sites";
 import { DELAI_REQUETE_MS } from "@/server/usage/port";
 import { identifiantVoyageSaisi } from "@/domain/identifiant";
-import { DUREE_MAX_EXECUTION_MS, etapeProgramme, etapeRevision, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Revision, p0Run } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, etapeProgramme, etapeRevision, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Revision, p0Run, plafondsGoogleRevision } from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
 import { clesDe, CLES_INTERDITES, sentinelles } from "../p0/harnais";
@@ -69,6 +69,8 @@ const d = vi.hoisted(() => ({
     ageMs: 0,
     /** Temps passé (horloge simulée) pendant la relecture de l'exécution, à l'ouverture d'une étape. */
     avanceALaLectureMs: 0,
+    /** Plafonds Google réservés relus avec l'exécution (révision, décision 0126 § 2) ; absents par défaut. */
+    forfaitGoogle: undefined as undefined | { textSearch: number; details: number; routesRequetes: number; routesElements: number },
   },
   requetesSql: [] as { texte: string; valeurs: readonly unknown[] | undefined }[],
   /** Brief saisi servi par `lireBriefSaisi` (E2E-essai, lot 3) et exécutions dont il a été lu. */
@@ -150,7 +152,15 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
     lireExecution: async () => {
       enCours();
       if (d.etat.avanceALaLectureMs > 0) vi.setSystemTime(Date.now() + d.etat.avanceALaLectureMs);
-      return { mode: d.etat.mode, brief: d.etat.brief, variante: "B", coutModelesMicros: d.etat.cout, jourQuota: "2026-10-12", numeroDuJour: 2 };
+      return {
+        mode: d.etat.mode,
+        brief: d.etat.brief,
+        variante: "B",
+        coutModelesMicros: d.etat.cout,
+        jourQuota: "2026-10-12",
+        numeroDuJour: 2,
+        ...(d.etat.forfaitGoogle === undefined ? {} : { forfaitGoogle: d.etat.forfaitGoogle }),
+      };
     },
     ecrirePhase: async (_pool: unknown, _runId: string, phase: PhaseTravail) => {
       enCours();
@@ -323,7 +333,7 @@ function reinitialiser(): void {
   d.modeReel = structuredClone(MODE_REEL);
   d.modeles = structuredClone(MODELES);
   d.programme = structuredClone(fixtures.modeles.programme);
-  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0 });
+  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0, forfaitGoogle: undefined });
   d.requetesSql.length = 0;
   d.briefSaisi = null;
   d.briefSaisiLus.length = 0;
@@ -1480,6 +1490,30 @@ describe("p0Revision : « Pas pour moi » change le programme (E2E-essai, lot 4 
     await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [] }));
     expect(capture.requetes).toHaveLength(0);
     expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
+  });
+
+  it("plafonds Google d'une révision (mineur 9 de la revue de la PR 717) : besoin de la version servie, sous le mode ; la révision tient dedans", async () => {
+    const plafonds = plafondsGoogleRevision("essai", d.versionServie, TRIP_ID, 1);
+    expect(plafonds).not.toBeNull();
+    expect(plafonds!.textSearch).toBeLessThan(90);
+    expect(plafonds!.routesElements).toBeLessThan(840);
+    expect(plafondsGoogleRevision("essai", d.versionServie, "proto_autre_44444444444444448444444444444444", 1)).toBeNull();
+    expect(plafondsGoogleRevision("essai", { trip: { id: TRIP_ID } }, TRIP_ID, 1)).toBeNull();
+    d.etat.forfaitGoogle = plafonds!;
+    await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    // Plafonds de l'étape : ceux réservés, jamais ceux du mode.
+    const lus = derniere?.plafonds ?? [];
+    expect(lus.find((p) => p.methode === "places_text_search")?.maxRequetes).toBe(plafonds!.textSearch);
+    expect(lus.find((p) => p.methode === "routes_matrix")).toMatchObject({ maxRequetes: plafonds!.routesRequetes, maxElements: plafonds!.routesElements });
+    // Toute la version vérifiée sous ces plafonds : aucun lieu laissé sans placeId faute de part.
+    expect(capture.textSearch.length).toBeLessThanOrEqual(plafonds!.textSearch);
+    const elements = capture.matrices.reduce((somme, m) => somme + m.origines.length * m.destinations.length, 0);
+    expect(elements).toBeLessThanOrEqual(plafonds!.routesElements);
+    // Mêmes lieux sans placeId que la première version (vérifiée aux plafonds du mode) : ceux que le double ne trouve pas.
+    const sansPlaceId = (jours: JourEcrit[]) =>
+      jours.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop !== undefined && item.stop.placeId === undefined ? [String(item.stop.name)] : []))).sort();
+    expect(sansPlaceId(joursEcrits())).toEqual(sansPlaceId((d.versionServie as { trip: { days: JourEcrit[] } }).trip.days).filter((nom) => nom !== ECARTEE));
   });
 
   it("révision arrêtée : etapeClore, aucune nouvelle version écrite (la précédente reste servie)", async () => {

@@ -32,6 +32,11 @@ export type ExecutionEnCours = {
    * plafond de l'étape sous le fusible du mode (décision 0126 § 2). Absent si la ligne n'en porte pas.
    */
   readonly forfaitModelesMicros?: number;
+  /**
+   * Plafonds Google réservés au lancement (`prototype.forfaits`, requêtes et éléments Routes), relus en base : l'étape ne
+   * les dépasse jamais (décision 0126 § 2, plafonds d'une révision). Absent si la ligne n'en porte pas.
+   */
+  readonly forfaitGoogle?: { readonly textSearch: number; readonly details: number; readonly routesRequetes: number; readonly routesElements: number };
   /** Jour de quota de l'exécution (`prototype.runs.quota_day`, posé par la base, S1), `AAAA-MM-JJ`. */
   readonly jourQuota: string;
   /**

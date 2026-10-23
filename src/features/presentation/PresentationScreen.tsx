@@ -479,7 +479,19 @@ function Deck({
           tripId={tripId}
           canUnlock={canUnlock}
           choixSansEffet={essai && !revisable && endVariant !== "vide"}
-          revision={revision === null ? null : <EtatRevision etat={revision} onRetry={reviser} />}
+          revision={
+            revision === null ? null : (
+              <EtatRevision
+                etat={revision}
+                onRetry={reviser}
+                onAcces={() => {
+                  // Code accepté : la saisie se démonte (nouvel envoi) ; le focus revient au titre de la fin (WCAG 2.4.3).
+                  reviser();
+                  endTitleRef.current?.focus();
+                }}
+              />
+            )
+          }
           titleRef={endTitleRef}
         />
       )}
@@ -523,12 +535,12 @@ function Deck({
  * État de la réécriture du programme à la fin du tri (lot 4, décision 0126) : message (annoncé par la région
  * `role="status"` de l'écran), « Réessayer » après un échec, saisie du code d'accès s'il a expiré (puis nouvel envoi).
  */
-function EtatRevision({ etat, onRetry }: { etat: "envoi" | TrialRevisionResult["status"] | "erreur"; onRetry: () => void }) {
+function EtatRevision({ etat, onRetry, onAcces }: { etat: "envoi" | TrialRevisionResult["status"] | "erreur"; onRetry: () => void; onAcces: () => void }) {
   const r = t.fin.revision;
   if (etat === "accessExpired") {
     return (
       <div data-part="revision" data-revision="accessExpired">
-        <SaisieCodeAcces ouverte={false} parcours={{ titre: r.acces.titre, aide: r.acces.aide, surAcces: onRetry, focusAuMontage: true }} />
+        <SaisieCodeAcces ouverte={false} parcours={{ titre: r.acces.titre, aide: r.acces.aide, surAcces: onAcces, focusAuMontage: true, niveauTitre: 3 }} />
       </div>
     );
   }

@@ -43,7 +43,9 @@ import type { ConserverTrajets, ProgrammeReelLu, SourceProgrammesReels, TrajetsC
  * - **Versions d'un voyage** (décision 0126 § 1) : une révision après le tri écrit un nouveau programme sous le **même**
  *   `trip.id` ; la liste et la page servent la **version servie**, celle de l'exécution commencée la dernière (jointure
  *   sur `prototype.runs`, une ligne par voyage). Les versions précédentes restent en base jusqu'à leur expiration, jamais
- *   servies. Défense conservée : si la base rendait tout de même deux lignes pour un voyage, aucune ne serait servie.
+ *   servies. Le SQL ne rend donc qu'une ligne par voyage (`DISTINCT ON` pour la liste, `LIMIT 1` pour la page) ; le
+ *   code garde sa défense, vérifiée sur un client simulé seulement : une source qui rendrait deux lignes pour un même
+ *   voyage n'en servirait aucune.
  *
  * - **Temps de trajet conservés** (décision 0092 § 4, prototype seulement) : lus **avec le programme**, dans la même
  *   transaction, une requête pour tous les programmes lus (comme les positions), dans `prototype.trajets` (lignes non

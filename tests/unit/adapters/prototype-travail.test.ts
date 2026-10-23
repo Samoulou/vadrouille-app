@@ -125,10 +125,22 @@ describe("p0: table de travail de p0Run (adaptateur unique)", () => {
   it("lireExecution : forfait de modèles réservé lu quand il existe (décision 0126 § 2), refusé s'il est mal formé", async () => {
     const { pool, requetes } = poolSimule({ execution: { ...EXECUTION, forfait_modeles: "250000" } });
     expect(await lireExecution(pool, RUN_ID)).toMatchObject({ forfaitModelesMicros: 250_000 });
-    expect(requetes[2]?.texte).toContain("SELECT f.models_cost_micros FROM prototype.forfaits AS f WHERE f.run_id = r.id");
+    expect(requetes[2]?.texte).toContain("FROM prototype.runs AS r LEFT JOIN prototype.forfaits AS f ON f.run_id = r.id");
     expect(await lireExecution(poolSimule({ execution: { ...EXECUTION, forfait_modeles: null } }).pool, RUN_ID)).not.toHaveProperty("forfaitModelesMicros");
     for (const mal of ["-1", "1.5", "abc"]) {
       expect((await echec(lireExecution(poolSimule({ execution: { ...EXECUTION, forfait_modeles: mal } }).pool, RUN_ID))).code).toBe("base");
+    }
+  });
+
+  it("lireExecution : plafonds Google réservés lus quand les quatre existent (décision 0126 § 2.1), refusés s'ils sont mal formés", async () => {
+    const plafonds = { forfait_text_search: 39, forfait_details: "39", forfait_routes_requetes: 14, forfait_routes_elements: "192" };
+    expect(await lireExecution(poolSimule({ execution: { ...EXECUTION, ...plafonds } }).pool, RUN_ID)).toMatchObject({
+      forfaitGoogle: { textSearch: 39, details: 39, routesRequetes: 14, routesElements: 192 },
+    });
+    expect(await lireExecution(poolSimule({ execution: { ...EXECUTION, ...plafonds, forfait_details: null } }).pool, RUN_ID)).not.toHaveProperty("forfaitGoogle");
+    expect(await lireExecution(poolSimule({ execution: EXECUTION }).pool, RUN_ID)).not.toHaveProperty("forfaitGoogle");
+    for (const mal of [-1, "1.5", "abc"]) {
+      expect((await echec(lireExecution(poolSimule({ execution: { ...EXECUTION, ...plafonds, forfait_routes_elements: mal } }).pool, RUN_ID))).code).toBe("base");
     }
   });
 

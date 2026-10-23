@@ -74,9 +74,13 @@ vi.mock("@/workflows", () => {
       d.journal.push(`plafonds:${mode}`);
       return d.tient;
     },
-    lancementDuMode: (mode: string, sorte: string) => {
-      d.journal.push(`mode:${mode}:${sorte}`);
-      return { forfait: { nature: mode, sorte }, regles: { dureeMaxMs: 900_000 } };
+    lancementDuMode: (mode: string, sorte: string, plafonds?: unknown) => {
+      d.journal.push(`mode:${mode}:${sorte}${plafonds === undefined ? "" : ":plafonds"}`);
+      return { forfait: { nature: mode, sorte, ...(plafonds === undefined ? {} : { plafonds }) }, regles: { dureeMaxMs: 900_000 } };
+    },
+    plafondsGoogleRevision: (mode: string, version: unknown, tripId: string, logements: number) => {
+      d.journal.push("plafonds");
+      return version === null ? null : { textSearch: 10 + logements, details: 10 + logements, routesRequetes: 4, routesElements: 40, tripId };
     },
     verrouS8Leve: async () => {
       d.journal.push("s8");
@@ -97,6 +101,7 @@ vi.mock("@/workflows", () => {
 });
 vi.mock("@/server/usage/neon", () => ({
   BRIEF_SAISI: "saisi",
+  MARGE_ORPHELINE_MS: 300_000,
   reserverExecution: async (...args: unknown[]) => {
     d.journal.push("reserver");
     d.reserver(...args);
@@ -110,11 +115,12 @@ const pool: PoolSql = {
   },
 };
 
-const BRIEF_VERSION = { destination: "Rome", recit: "brief de la version servie" };
+const BRIEF_VERSION = { destination: "Rome", recit: "brief de la version servie", logements: [{ texte: "Rome", nuits: 4 }] };
 const DEMANDE: DemandeRevisionSaisi = { tripId: TRIP, pasPourMoi: ["j1-2"], jAime: ["j1-1"] };
 const CLES = clesRevision(TRIP, 2);
 
 let briefVersion: unknown;
+let version: unknown;
 let ecrites: CleRevisionLue[];
 const cookieValide = () => valeurCookieAcces(d.jeton, Date.now());
 /** Cookie valide par défaut ; `cookie` passé (même `undefined`) : celui-là. */
@@ -130,6 +136,10 @@ const reviser = (demande: DemandeRevisionSaisi = DEMANDE, ...cookie: [string | u
       d.journal.push(`cles:${cles.length}`);
       return ecrites.filter((cle) => cles.includes(cle.requestId));
     },
+    versionServie: async (_pool, tripId) => {
+      d.journal.push(`servie:${tripId}`);
+      return version;
+    },
   });
 
 beforeEach(() => {
@@ -139,6 +149,7 @@ beforeEach(() => {
   d.reservation = { ok: true, runId: RUN };
   d.demarrage = { ok: true, workflowRunId: "wrun_r" };
   briefVersion = BRIEF_VERSION;
+  version = { trip: { id: TRIP } };
   ecrites = [];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -146,30 +157,74 @@ beforeEach(() => {
 describe("p0: révision d'un voyage de l'app après le tri (E2E-essai, lot 4 ; décision 0126)", () => {
   it("chemin nominal : même garde que le lancement, forfait revision, brief de la version recopié sous la première clé, p0Revision démarré", async () => {
     expect(await reviser()).toEqual({ statut: "lancee" });
-    expect(d.journal).toEqual(["garde", "complet", "mode:essai:revision", "commit", "s8", `version:${TRIP}`, "valider", "plafonds:essai", "cles:2", "reserver", "demarrer"]);
+    expect(d.journal).toEqual([
+      "garde",
+      "complet",
+      "mode:essai:revision",
+      "commit",
+      "s8",
+      `version:${TRIP}`,
+      "valider",
+      "plafonds:essai",
+      "cles:2",
+      `servie:${TRIP}`,
+      "plafonds",
+      "mode:essai:revision:plafonds",
+      "reserver",
+      "demarrer",
+    ]);
   });
 
   it("réservation : nature essai, variante A, brief saisi sous la première clé libre ; démarrage avec les seuls identifiants", async () => {
     await reviser();
     const [, execution] = d.reserver.mock.calls[0] as [unknown, Record<string, unknown>];
-    expect(execution).toMatchObject({ mode: "essai", brief: "saisi", variant: "A", forfait: { sorte: "revision" }, briefSaisi: { requestId: CLES[0], contenu: BRIEF_VERSION } });
+    // Plafonds Google réduits au besoin de la version servie (mineur 9 de la revue de la PR 717 ; 0126 § 2).
+    expect(execution).toMatchObject({
+      mode: "essai",
+      brief: "saisi",
+      variant: "A",
+      forfait: { sorte: "revision", plafonds: { textSearch: 11, details: 11, routesRequetes: 4, routesElements: 40, tripId: TRIP } },
+      briefSaisi: { requestId: CLES[0], contenu: BRIEF_VERSION },
+    });
     const [, choix] = d.demarrer.mock.calls[0] as [unknown, Record<string, unknown>];
     expect(choix).toEqual({ tripId: TRIP, pasPourMoi: ["j1-2"], jAime: ["j1-1"] });
   });
 
   it("une révision terminée : la seconde clé ; deux écrites : epuisees ; une en cours : en_cours ; rien n'est réservé", async () => {
-    ecrites = [{ requestId: CLES[0]!, statut: "programme_ecrit" }];
+    ecrites = [{ requestId: CLES[0]!, statut: "programme_ecrit", ecouleMs: 60_000 }];
     expect(await reviser()).toEqual({ statut: "lancee" });
     expect((d.reserver.mock.calls[0] as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
     d.reserver.mockClear();
     ecrites = [
-      { requestId: CLES[0]!, statut: "programme_ecrit" },
-      { requestId: CLES[1]!, statut: "arretee" },
+      { requestId: CLES[0]!, statut: "programme_ecrit", ecouleMs: 60_000 },
+      { requestId: CLES[1]!, statut: "arretee", ecouleMs: 60_000 },
     ];
     expect(await reviser()).toEqual({ statut: "epuisees" });
-    ecrites = [{ requestId: CLES[0]!, statut: "en_cours" }];
+    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 60_000 }];
     expect(await reviser()).toEqual({ statut: "en_cours" });
     expect(d.reserver).not.toHaveBeenCalled();
+  });
+
+  it("révision orpheline (en_cours au-delà de dureeMaxMs + marge, ou d'âge illisible) : clé prise, la suivante est réservée (bloquant 3 de la revue de la PR 717)", async () => {
+    // Double du mode : dureeMaxMs 900 000 ms ; marge des orphelines 300 000 ms.
+    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 900_000 + 300_000 }];
+    expect(await reviser()).toEqual({ statut: "en_cours" });
+    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 900_000 + 300_001 }];
+    expect(await reviser()).toEqual({ statut: "lancee" });
+    expect((d.reserver.mock.calls.at(-1) as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
+    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: null }];
+    expect(await reviser()).toEqual({ statut: "lancee" });
+    // Deux orphelines : rangs consommés.
+    ecrites = CLES.map((requestId) => ({ requestId, statut: "en_cours", ecouleMs: 10 * 3_600_000 }));
+    expect(await reviser()).toEqual({ statut: "epuisees" });
+  });
+
+  it("statut inattendu d'une clé : prise, jamais « en cours » ni libre (mineur 7 de la revue de la PR 717)", async () => {
+    ecrites = [{ requestId: CLES[0]!, statut: "inconnu", ecouleMs: 1 }];
+    expect(await reviser()).toEqual({ statut: "lancee" });
+    expect((d.reserver.mock.calls.at(-1) as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
+    ecrites = CLES.map((requestId) => ({ requestId, statut: "inconnu", ecouleMs: 1 }));
+    expect(await reviser()).toEqual({ statut: "epuisees" });
   });
 
   it("clé trouvée écrite par la réservation (demande simultanée) : en_cours, jamais redémarrée", async () => {
@@ -199,10 +254,13 @@ describe("p0: révision d'un voyage de l'app après le tri (E2E-essai, lot 4 ; d
     }
     briefVersion = null;
     expect(await reviser()).toEqual({ statut: "entree_invalide" });
-    briefVersion = { destination: "Lisbonne" };
+    briefVersion = { destination: "Lisbonne", logements: [] };
     expect(await reviser()).toEqual({ statut: "entree_invalide" });
-    d.tient = false;
     briefVersion = BRIEF_VERSION;
+    version = null;
+    expect(await reviser()).toEqual({ statut: "entree_invalide" });
+    version = { trip: { id: TRIP } };
+    d.tient = false;
     expect(await reviser()).toEqual({ statut: "brief_hors_plafonds" });
     expect(d.reserver).not.toHaveBeenCalled();
   });

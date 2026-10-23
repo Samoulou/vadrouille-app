@@ -136,6 +136,29 @@ describe("p0Run : pièces du lancement (P0r3d)", () => {
     });
   });
 
+  it("révision (décision 0126 § 2) : plafonds Google donnés, bornés par ceux du mode, coût Google au prix plein de ces plafonds, 0,25 USD de modèles", () => {
+    const revision = lancementDuMode("essai", "revision", { textSearch: 30, details: 30, routesRequetes: 12, routesElements: 120 });
+    // 30 × 0 + 30 × 0,020 + 120 × 0,005 = 0,60 + 0,60 = 1,20 USD.
+    expect(revision?.forfait).toEqual({
+      nature: "execution",
+      textSearchRequetes: 30,
+      placeDetailsRequetes: 30,
+      routesRequetes: 12,
+      routesElements: 120,
+      coutGoogleMicros: 1_200_000,
+      coutModelesMicros: 250_000,
+    });
+    // Jamais au-delà du mode ; négatif ramené à 0.
+    expect(lancementDuMode("essai", "revision", { textSearch: 500, details: 500, routesRequetes: 500, routesElements: 5000 })?.forfait).toMatchObject({
+      textSearchRequetes: 90,
+      placeDetailsRequetes: 90,
+      routesRequetes: 30,
+      routesElements: 840,
+      coutGoogleMicros: 6_000_000,
+    });
+    expect(lancementDuMode("essai", "revision", { textSearch: -1, details: 0, routesRequetes: 0, routesElements: 0 })?.forfait.coutGoogleMicros).toBe(0);
+  });
+
   it("mode inconnu : null (configuration refusée), sans exception", () => {
     expect(lancementDuMode("autre" as "reel")).toBeNull();
   });
