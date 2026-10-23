@@ -11,7 +11,7 @@ Le handover front-end (§ 2) demande la dernière version stable de chaque outil
 |---|---|---|
 | Node.js | 22 (LTS) | Version de la CI (`actions/setup-node`, `node-version: 22`) et de l'image Docker (`node:22-bookworm-slim`) ; `engines.node >= 22.19` (relevé par F12a pour `lighthouse` 13.5.0, décision 0022 § 1) |
 | pnpm | 10.28.0 | Champ `packageManager` |
-| Next.js | 16.4.0 | App Router, `output: "standalone"` |
+| Next.js | ~~16.4.0~~ 16.4.1 | App Router, `output: "standalone"`. **Amendée par 0127** (2026-10-23) : 16.4.1, plus petite version corrigée des avis du 2026-10-22, volontairement une version de correctif derrière `latest` (16.4.2) |
 | React / React DOM | 19.3.0 | |
 | TypeScript | 6.0.3 | **Pas 7.0.2** (dernière) : `typescript-eslint` 8.71 exige `< 6.1.0` ; TypeScript 7 (compilateur natif) n'est pas encore pris en charge par l'outillage ESLint |
 | Tailwind CSS / `@tailwindcss/postcss` | 4.3.3 | |
