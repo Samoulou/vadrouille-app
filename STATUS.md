@@ -1,22 +1,18 @@
-# État du studio — 2026-10-23 (150e cycle)
+# État du studio — 2026-10-23 (151e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-23 06:37 UTC, carte : « Oui, envoyer » (Q604 : le nom du logement saisi part à Google Text Search). Appliqué par #720 (texte d'aide, 0125 § 6).
-- 2026-10-23 ~06:38 UTC : `owner-approved` posé sur #707 ; 06:53 UTC : run `db-migrate` 39914241178 lancé par Samuel, **réussi** (0017 et 0018), consigné sur #706.
-- 2026-10-23 07:21 UTC, carte : « Une seule » révision par voyage, part Google comprise (Q613 : 13,75 USD au plus par voyage). Appliqué par #722.
+- Aucun message de Samuel depuis le 150e cycle.
 
 ## Fait
-- **#707** fusionné (06:37 UTC) puis migrations 0017 et 0018 appliquées par Samuel : le formulaire de l'app peut lancer le programme sur le site d'essai dès que #701 est fusionnée.
-- **Lot 4 fusionné** (#717, ticket #713, 07:29 UTC) : « Pas pour moi » déclenche une révision écrite par l'IA (décision 0126). Fusionné avec deux révisions, juste avant la correction ; la limite à une révision passe par #722.
-- **#720** fusionné (ticket #719) : l'aide du logement dit qu'il part aussi à Google ; « nous conservons 29 jours ».
-- **Statut du 149e cycle** (#718) fusionné.
+- **Note de version v2026.10.23-09** (#726) fusionnée : elle liste 0125 et 0126. **Erreur à corriger** : elle dit les migrations 0016, 0017 et 0018 « non appliquées », alors que 0016 l'est depuis le 22 octobre 11:48 UTC (run 39773388536) et 0017-0018 depuis le 23 octobre 06:53 UTC (run 39914241178).
+- **Statut du 150e cycle** (#724) fusionné ; Q604 et Q613 y sont consignées « Répondues ».
 
 ## En cours
-- **#722 `[ia]`** (ticket #721) : une seule révision par voyage ; correction 1 poussée par le CEO (`6e3386d` : 0126 cite la carte de Q613, qui donnait la part Google) ; relecture relancée.
-- **Ticket #723 `[tl]`** : avis de sécurité Next.js qui arrête `next build` en local (Q612) ; le Tech Lead le vérifie par une source indépendante et décide.
-- **#701 `[release]`** : attend la fusion de Samuel (demandée de nouveau le 23 octobre à 06:58 UTC) ; description à jour (lots 1 à 5, migrations appliquées).
+- **#722 `[ia]`** (ticket #721, une seule révision) : correction 2, la dernière, poussée par le CEO (`5500934` : `main` fusionnée, 0126 renvoie à Q613 consignée par #724, tableau `exhausted` aligné) ; relecture relancée.
+- **#725 `[tl]`** (ticket #723, Next.js 16.4.0 → 16.4.1, décision 0127 ; trois avis réels du 22 octobre, dont un déni de service par les Server Actions qui nous touche) : correction 1 poussée (`414a182` : 0003 amendée, handover back-end) ; relecture relancée.
+- **#701 `[release]`** : attend la fusion de Samuel (demandée de nouveau le 23 octobre à 06:58 UTC). Elle portera aussi #722 et #725 une fois fusionnées.
 - Toujours en attente : #527 (Q438), #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595).
 
 ## Bloqué
@@ -26,8 +22,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## Prochain cycle
 1. Après la fusion de #701 et le redéploiement : envoyer à Samuel un seul lien pour tester « Créer un voyage » jusqu'au programme.
-2. Relire #722 et la PR du ticket #723.
-3. Note de version suivante : lister 0125, 0126, les textes non maquettés (#716, #720) ; corriger v2026.10.22-21 (migration 0016 appliquée le 22 octobre à 11:48 UTC, run 39773388536).
+2. Relire #722 et #725 ; si #722 reste bloquée après sa 2e correction, décider avec le Tech Lead.
+3. Note de version suivante : corriger l'état des migrations 0016, 0017 et 0018 ; lister 0127 et les textes non maquettés (#716, #720).
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
@@ -49,7 +45,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Aucune ; Q604 et Q613 répondues.
+- Q618.
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
