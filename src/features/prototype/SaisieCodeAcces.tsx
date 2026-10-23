@@ -33,9 +33,11 @@ export interface SaisieCodeAccesProps {
   /**
    * Saisie dans le parcours de création (spécification E2E-essai, lot 2, D3) : titre et aide propres, rendue sans
    * `<main>` dans le cadre de l'écran appelant (`CreationShell`) ; `surAcces` est appelée une fois l'accès accepté.
+   * `focusAuMontage` : le titre de la saisie reçoit le focus à l'affichage, quand elle remplace un écran où le focus
+   * était déjà posé (relance de l'écran 5, WCAG 2.4.3) ; jamais au premier affichage d'une page.
    * Absente : page `/prototype/executions`, inchangée.
    */
-  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void };
+  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void; readonly focusAuMontage?: boolean };
 }
 
 export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
@@ -48,6 +50,13 @@ export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
   const erreur = etat.statut === "invalid_code" || etat.statut === "too_many_attempts" || etat.statut === "erreur" ? t.erreurs[etat.statut] : null;
 
   const surAcces = parcours?.surAcces;
+  const focusAuMontage = parcours?.focusAuMontage ?? false;
+  useEffect(() => {
+    if (focusAuMontage) titre.current?.focus();
+    // Au montage seulement : un changement ultérieur de la propriété ne déplace pas le focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     envoiEnVol.current = false;
     if (etat.statut === "accepte") {

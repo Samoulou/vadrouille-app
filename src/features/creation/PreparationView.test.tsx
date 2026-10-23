@@ -289,7 +289,7 @@ describe("PreparationView : site d'essai (E2E-essai, lot 3 ; décision 0125 § 4
   it.each([
     ["provider_error", () => fail("provider_error"), e.relanceEchec],
     ["not_found", () => fail("not_found"), e.relanceEchec],
-    ["cost_cap_reached", () => fail("cost_cap_reached"), messages.creation.lancement.essai.plafond],
+    ["cost_cap_reached", () => fail("cost_cap_reached"), e.plafond],
   ])("relance refusée (%s) : message propre dans l'alerte, « Réessayer » rejoue le même requestId", async (_cas, refus, message) => {
     vi.mocked(relancerVoyageEssai).mockResolvedValue(refus() as never);
     const { container } = renderEssai();
@@ -315,7 +315,7 @@ describe("PreparationView : site d'essai (E2E-essai, lot 3 ; décision 0125 § 4
     vi.mocked(saisirCodeAccesP0).mockResolvedValue({ statut: "accepte" });
     renderEssai();
     await reessayer();
-    expect(screen.getByRole("heading", { level: 1, name: e.acces.titre })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: e.acces.titre })).toHaveFocus();
     expect(screen.getByText(e.acces.aide)).toBeInTheDocument();
     const champ = screen.getByLabelText(messages.prototype.acces.libelle);
     await act(async () => {
