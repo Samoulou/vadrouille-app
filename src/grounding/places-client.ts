@@ -8,6 +8,7 @@ import {
   type AuteurPhotoLieu,
   type ClientPhotosLieu,
   type ClientPlacesMvp,
+  type ClientVilles,
   type Coordonnees,
   type DetailsLieu,
   type PhotoLieu,
@@ -47,6 +48,9 @@ import {
  *   404 de ces trois méthodes (identifiant obsolète, `NOT_FOUND`) lève `ErreurAncrage("place_not_found")`, la même
  *   erreur que le double, après la réservation (requête partie : comptée).
  * - Chaque requête réserve une unité auprès du port de consommation avant l'appel (D13) ; délai de 10 s par requête.
+ * - Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129) : Autocomplete (New) filtré sur `(cities)`, en français, avec un jeton de session (`suggererVilles`), puis
+ *   la fiche de la ville choisie dans la même session (`ficheVille`, masque fermé `id,addressComponents,location`, SKU
+ *   Essentials) : seuls le code ISO du pays et la position en sont lus.
  * Tout ce qui sort est une donnée Google : il reste en mémoire et n'atteint jamais un prompt.
  */
 
@@ -59,7 +63,23 @@ export const MASQUE_POSITION = "id,location";
 /** Masque de `identifiant` (B8a, 0085 § 2 ; B8-PO-12) : l'identifiant seul. */
 export const MASQUE_IDENTIFIANT = "id";
 
+/** Masque des suggestions de ville : identifiant et textes de la suggestion, rien d'autre. */
+export const MASQUE_SUGGESTIONS = "suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat";
+/** Masque de la fiche de la ville choisie : identifiant, composantes d'adresse (pays) et position (SKU Essentials). */
+export const MASQUE_FICHE_VILLE = "id,addressComponents,location";
+
 export const SKU_TEXT_SEARCH = "places_text_search_essentials_ids_only";
+/**
+ * SKU des suggestions : « Autocomplete Requests » (les 12 premières d'une session close par une fiche Essentials ; au-delà,
+ * « Autocomplete Session Usage », gratuit). Réservé au prix plein de chaque requête : estimation haute.
+ */
+export const SKU_SUGGESTIONS = "places_autocomplete_requests";
+/** SKU de la fiche de la ville : « Place Details Essentials ». */
+export const SKU_FICHE_VILLE = "places_details_essentials";
+/** Jeton de session Google (uuid du navigateur, 36 caractères au plus) : contrôlé avant tout envoi. */
+export const JETON_SESSION = /^[A-Za-z0-9_-]{1,36}$/;
+/** Saisie des suggestions : 2 à 80 caractères après retrait des espaces (bornes de la destination). */
+const SAISIE_VILLE = { min: 2, max: 80 } as const;
 export const SKU_DETAILS = "places_details_enterprise";
 /** SKU le moins cher qui contient `location` : « Place Details Essentials » (page de tarifs relevée le 2026-10-17). */
 export const SKU_POSITION = "places_details_essentials";
@@ -83,7 +103,7 @@ export const LARGEUR_PHOTO_MAX_GOOGLE = 4800;
 const PHOTOS_LUES_MAX = 10;
 
 /** Coûts estimés par requête, en micro-USD, au prix plein (Q329) : table `prototype/config/prix-google.json`. */
-export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0, photos: 0, mediaPhoto: 7_000 } as const;
+export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0, suggestions: 2_830, ficheVille: 5_000, photos: 0, mediaPhoto: 7_000 } as const;
 
 /** Identifiant de lieu Google : jamais interpolé dans un chemin sans ce contrôle. */
 const PLACE_ID = PLACE_ID_GOOGLE;
@@ -161,6 +181,28 @@ const PositionSchema = z.object({
 });
 const IdentifiantSchema = z.object({ id: z.string().regex(PLACE_ID) });
 
+const TexteSchema = z.object({ text: z.string().min(1).max(300) });
+const SuggestionsSchema = z.object({
+  suggestions: z
+    .array(
+      z.object({
+        placePrediction: z
+          .object({
+            placeId: z.string().regex(PLACE_ID),
+            structuredFormat: z.object({ mainText: TexteSchema, secondaryText: TexteSchema.optional() }),
+          })
+          .optional(),
+      }),
+    )
+    .max(10)
+    .optional(),
+});
+const FicheVilleSchema = z.object({
+  id: z.string().regex(PLACE_ID),
+  addressComponents: z.array(z.object({ shortText: z.string().max(100).optional(), types: z.array(z.string().max(60)).max(20) })).max(30).optional(),
+  location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
+});
+
 /** Nom de ressource d'une photo du lieu demandé (`places/<placeId>/photos/<référence>`) ; jamais gardé. */
 const REFERENCE_PHOTO = /^[A-Za-z0-9_-]{1,1024}$/;
 
@@ -229,7 +271,7 @@ type Noyau = {
 };
 const NOYAUX = new WeakMap<ClientPlacesMvp, Noyau>();
 
-export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp {
+export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp & ClientVilles {
   const cle = lireCleGoogle(options.environnement, options.execArgv);
   if (!cle.ok) throw new ErreurClientGoogle(cle.code);
   const parametres = { origine: ORIGINE_PLACES, cle: cle.cle, transport };
@@ -247,7 +289,7 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
     throw erreurGoogleDe(issue);
   }
 
-  const client: ClientPlacesMvp = {
+  const client: ClientPlacesMvp & ClientVilles = {
     async textSearch(requete: RequeteTextSearch) {
       const corps: Record<string, unknown> = { textQuery: requete.texte, pageSize: 5 };
       if (requete.restriction !== undefined) {
@@ -313,6 +355,37 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
       const lu = IdentifiantSchema.safeParse(brut);
       if (!lu.success) throw new ErreurClientGoogle("invalid_response");
       return { placeId: lu.data.id };
+    },
+    async suggererVilles(saisie: string, session: string) {
+      const texte = saisie.trim();
+      if (texte.length < SAISIE_VILLE.min || texte.length > SAISIE_VILLE.max || !JETON_SESSION.test(session)) throw new ErreurClientGoogle("invalid_request");
+      const corps = { input: texte, includedPrimaryTypes: ["(cities)"], languageCode: "fr", sessionToken: session };
+      const brut = await appeler(
+        { chemin: "/v1/places:autocomplete", methode: "POST", masque: MASQUE_SUGGESTIONS, corps: JSON.stringify(corps) },
+        demande("places_autocomplete", SKU_SUGGESTIONS, COUT_ESTIME_MICROS.suggestions),
+      );
+      const lu = SuggestionsSchema.safeParse(brut);
+      if (!lu.success) throw new ErreurClientGoogle("invalid_response");
+      return (lu.data.suggestions ?? []).flatMap(({ placePrediction: p }) =>
+        p === undefined ? [] : [{ placeId: p.placeId, principal: p.structuredFormat.mainText.text, secondaire: p.structuredFormat.secondaryText?.text ?? null }],
+      );
+    },
+    async ficheVille(placeId: string, session: string) {
+      if (!PLACE_ID.test(placeId) || !JETON_SESSION.test(session)) throw new ErreurClientGoogle("invalid_request");
+      const brut = await sansIntrouvable(() =>
+        appeler(
+          { chemin: `/v1/places/${placeId}?languageCode=fr&sessionToken=${session}`, methode: "GET", masque: MASQUE_FICHE_VILLE, introuvableSur404: true },
+          demande("places_details", SKU_FICHE_VILLE, COUT_ESTIME_MICROS.ficheVille),
+        ),
+      );
+      const lu = FicheVilleSchema.safeParse(brut);
+      if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
+      const pays = (lu.data.addressComponents ?? []).find((composante) => composante.types.includes("country"))?.shortText;
+      return {
+        placeId: lu.data.id,
+        pays: pays !== undefined && /^[A-Z]{2}$/.test(pays) ? pays : null,
+        position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude },
+      };
     },
   };
   NOYAUX.set(client, { appeler, demande });

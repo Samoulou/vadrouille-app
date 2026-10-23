@@ -94,6 +94,19 @@ describe("p0: appels réels jamais au-delà du forfait", () => {
     expect(await registre.reserve(demande({ ...base, fournisseur: "modeles", methode: "chat", sku: "m", coutEstimeMicros: 1 }))).toEqual({ ok: false, code: "cap_reached" });
   });
 
+  it("recherche de ville (`places_autocomplete`) : toujours refusée par le registre d'une exécution, même forfait vierge (0129 § 1.3)", async () => {
+    // Revue du head de4ab92, mineur 5 : le garde-fou présenté en 0129 § 1.3 est asserté ici.
+    for (const forfait of [FORFAIT, { ...FORFAIT, nature: "relecture" as const, coutModelesMicros: null }]) {
+      const executionId = forfait.nature === "execution" ? "exec-1" : null;
+      const { registre } = monter(forfait, executionId);
+      for (const sku of ["places_autocomplete_requests", "places_autocomplete_session_usage"]) {
+        const recherche = demande({ nature: forfait.nature, executionId, methode: "places_autocomplete", sku, coutEstimeMicros: 2_830 });
+        expect(await registre.reserve(recherche), `${forfait.nature} ${sku}`).toEqual({ ok: false, code: "cap_reached" });
+      }
+      expect(registre.comptees()).toBe(0);
+    }
+  });
+
   it("aucune écriture en base : le registre n'importe ni pg ni db/, ni le port Neon", () => {
     const source = readFileSync(path.join(import.meta.dirname, "registre.ts"), "utf8");
     expect(source).not.toMatch(/from "(pg|.*db\/.*|.*neon.*)"/);

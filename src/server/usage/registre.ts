@@ -75,6 +75,9 @@ export function creerRegistreForfait(forfait: Forfait, executionId: string | nul
         return requetes > forfait.placeDetailsRequetes;
       case "routes_matrix":
         return requetes > forfait.routesRequetes || deja.elements + demande.unites.elements > forfait.routesElements;
+      case "places_autocomplete":
+        // Aucun forfait d'exécution ne porte de recherche de ville (écran 1 du site d'essai) : toujours refusée ici.
+        return true;
       case "chat":
         return forfait.coutModelesMicros === null || deja.coutMicros + demande.coutEstimeMicros > forfait.coutModelesMicros;
     }

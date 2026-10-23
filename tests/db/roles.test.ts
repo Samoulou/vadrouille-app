@@ -498,6 +498,8 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
       },
       forfaits: {
         INSERT: [
+          "acces_empreinte",
+          "autocomplete_requests",
           "google_cost_micros",
           "models_cost_micros",
           "nature",

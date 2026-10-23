@@ -1,17 +1,19 @@
-import type { Brief, BriefRequest, Lodging, TripDraft } from "@/contracts";
+import type { Brief, BriefRequest, DestinationRegion, Lodging, TripDraft } from "@/contracts";
 import {
   ADULTS,
   AREA_LENGTH,
   CHILDREN,
   CITY_NAME_LENGTH,
   COMMITMENT_LABEL_LENGTH,
+  destinationEssaiFiltree,
   DESTINATION_LENGTH,
   KNOWN_LODGING_LENGTH,
   MEAL_BUDGET_CHF,
+  PLACE_ID_MOTIF,
   PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
-import { fuseauDeVille } from "@/lib/fuseaux";
+import { fuseauDeVille, fuseauDuPays, paysParCode, villeDuPays } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -31,8 +33,12 @@ export type FieldError =
   | "outOfTrip"
   | "endTime"
   | "range"
-  // Site d'essai (spécification E2E-essai, lot 2, D1) : ville absente de la table des fuseaux, seconde ville, séjour trop long.
-  | "unknownCity"
+  // Site d'essai (spécification E2E-essai, lot 2, D1 ; demande de Samuel du 23 octobre 2026) : ville à choisir dans
+  // les suggestions, ville hors de la table quand la recherche ne répond pas, nom refusé par `destinationEssaiFiltree`
+  // (décision 0129 § 4), seconde ville, séjour trop long.
+  | "selectCity"
+  | "cityCharacters"
+  | "cityUnavailable"
   | "singleCity"
   | "tooLong";
 
@@ -81,11 +87,34 @@ function joursEntre(start: string, end: string): number {
 
 export interface ValidateTripOptions {
   /**
-   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, connue
-   * de la table des fuseaux (`fuseauDeVille`, aucune donnée Google), et `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la
-   * borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois dans `@/contracts/values`. Refus au champ.
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, et
+   * `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois
+   * dans `@/contracts/values`. La destination est choisie dans les suggestions Google Places (demande de Samuel du
+   * 23 octobre 2026) ; sans choix, seule une ville de la table maison est admise (repli). Refus au champ.
    */
   essai?: boolean;
+  /**
+   * Site d'essai : la recherche de ville a répondu (`true`) : un choix dans les suggestions est exigé, même pour une
+   * ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville de la table suffit.
+   */
+  suggestions?: boolean;
+}
+
+/** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
+export function destinationHorsTable(destination: string): boolean {
+  return textError(destination, DESTINATION_LENGTH) === null && fuseauDeVille(destination) === null;
+}
+
+
+/**
+ * Ville choisie dans les suggestions (site d'essai) : `placeId`, et pays et fuseau maison rendus par le serveur,
+ * revérifiés contre la table des pays (liste fermée) ; `null` sans choix complet.
+ */
+export function destinationRegion(trip: Pick<TripForm, "placeId" | "country" | "timeZone">): DestinationRegion | null {
+  const pays = paysParCode(trip.country || undefined);
+  if (pays === null || !PLACE_ID_MOTIF.test(trip.placeId ?? "")) return null;
+  const timeZone = fuseauDuPays(pays.code, trip.timeZone ?? "");
+  return timeZone === null ? null : { placeId: trip.placeId as string, country: pays.code, timeZone };
 }
 
 /** Erreurs de l'écran 1, dans l'ordre d'affichage des champs (le focus va sur la première). */
@@ -97,7 +126,17 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
 
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
-  push("destination", destinationError ?? (essai && fuseauDeVille(trip.destination) === null ? "unknownCity" : null));
+  push("destination", destinationError);
+  const region = essai && destinationError === null ? destinationRegion(trip) : null;
+  if (essai && destinationError === null && region === null) {
+    // Recherche disponible : choisir dans les suggestions ; sinon (repli sans réseau), une ville de la table suffit.
+    if (options.suggestions === true) push("destination", "selectCity");
+    else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
+  }
+  // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
+  if (region !== null && villeDuPays(trip.destination, region.country) === null && destinationEssaiFiltree(trip.destination) === null) {
+    push("destination", "cityCharacters");
+  }
   const start = isDate(trip.start) ? trip.start : null;
   const end = isDate(trip.end) ? trip.end : null;
   push("start", start === null ? "required" : start < today ? "past" : null);
@@ -184,8 +223,10 @@ export function toTripDraft(trip: TripForm, choices: Readonly<Record<string, Lod
   if (trip.commitments.some((commitment) => commitment.kind === null)) {
     throw new Error("toTripDraft : écran 1 non validé (engagement sans type).");
   }
+  const region = destinationRegion(trip);
   return {
     destination: trip.destination.trim(),
+    ...(region === null ? {} : { destinationRegion: region }),
     start: trip.start,
     end: trip.end,
     lodging: toLodging(trip.lodging, choices[DESTINATION_KEY]),

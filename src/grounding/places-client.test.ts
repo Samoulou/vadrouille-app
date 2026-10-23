@@ -5,7 +5,8 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
+import { CODES_ERREUR_GOOGLE, ErreurClientGoogle, PLACE_ID_GOOGLE } from "@/grounding/enveloppe-google";
 import { ancrerLogement as ancrerLogementP0, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
@@ -17,18 +18,23 @@ import {
   COUT_ESTIME_MICROS,
   createPlacesClient,
   createPlacesPhotosClient,
+  JETON_SESSION,
   MASQUE_DETAILS,
+  MASQUE_FICHE_VILLE,
   MASQUE_MEDIA_PHOTO,
   MASQUE_PHOTOS,
   MASQUE_IDENTIFIANT,
   MASQUE_POSITION,
+  MASQUE_SUGGESTIONS,
   MASQUE_TEXT_SEARCH,
   ORIGINE_PLACES,
   SKU_DETAILS,
+  SKU_FICHE_VILLE,
   SKU_IDENTIFIANT,
   SKU_MEDIA_PHOTO,
   SKU_PHOTOS,
   SKU_POSITION,
+  SKU_SUGGESTIONS,
   SKU_TEXT_SEARCH,
   type OptionsPlaces,
 } from "@/grounding/places-client";
@@ -559,6 +565,120 @@ describe("places: horaires qui passent minuit (B8-PO-17)", () => {
     ]);
     expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440, finLendemain: 120 }]);
     expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440 }]);
+  });
+});
+
+describe("places : recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026)", () => {
+  const SESSION = "jeton-session-1";
+
+  it("motifs recopiés tenus égaux (mineur 16 de la revue du head `aa77422`, décision 0129) : placeId et jeton de session", () => {
+    // `src/grounding` n'importe pas `src/contracts` hors des tests ; les motifs partagés de l'application restent égaux à ceux du client.
+    expect(PLACE_ID_MOTIF.source).toBe(PLACE_ID_GOOGLE.source);
+    expect(PLACE_ID_MOTIF.flags).toBe(PLACE_ID_GOOGLE.flags);
+    expect(JETON_SESSION_MOTIF.source).toBe(JETON_SESSION.source);
+    expect(JETON_SESSION_MOTIF.flags).toBe(JETON_SESSION.flags);
+  });
+
+
+  it("suggestions : POST Autocomplete (New), villes seulement, français, jeton de session, masque fermé ; textes de la suggestion seuls", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json({
+          suggestions: [
+            { placePrediction: { placeId: PLACE_ID, structuredFormat: { mainText: { text: "SENTINELLE-PRINCIPAL" }, secondaryText: { text: "SENTINELLE-SECONDAIRE" } }, types: ["locality"] } },
+            { placePrediction: { placeId: "AUTRE_ID", structuredFormat: { mainText: { text: "SENTINELLE-SEUL" } } } },
+            { queryPrediction: { text: { text: "ignorée" } } },
+          ],
+        }),
+    ]);
+    expect(await client.suggererVilles("  Valen ", SESSION)).toStrictEqual([
+      { placeId: PLACE_ID, principal: "SENTINELLE-PRINCIPAL", secondaire: "SENTINELLE-SECONDAIRE" },
+      { placeId: "AUTRE_ID", principal: "SENTINELLE-SEUL", secondaire: null },
+    ]);
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe("/v1/places:autocomplete");
+    expect(new URL(url).search).toBe("");
+    expect(url).not.toContain(CLE);
+    expect(init.method).toBe("POST");
+    expect(init.cache).toBe("no-store");
+    expect(init.redirect).toBe("manual");
+    const entetes = new Headers(init.headers);
+    expect(entetes.get("x-goog-api-key")).toBe(CLE);
+    expect(entetes.get("x-goog-fieldmask")).toBe(MASQUE_SUGGESTIONS);
+    expect(JSON.parse(String(init.body))).toEqual({ input: "Valen", includedPrimaryTypes: ["(cities)"], languageCode: "fr", sessionToken: SESSION });
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", "places_autocomplete", SKU_SUGGESTIONS, COUT_ESTIME_MICROS.suggestions],
+    ]);
+  });
+
+  it("suggestions : aucune suggestion, liste vide ; saisie trop courte ou trop longue, jeton mal formé : refus sans appel", async () => {
+    const { client, transport } = monter([async () => json({})]);
+    expect(await client.suggererVilles("Zz", SESSION)).toEqual([]);
+    for (const [saisie, session] of [
+      ["V", SESSION],
+      ["x".repeat(81), SESSION],
+      ["Valen", ""],
+      ["Valen", "jeton avec espace"],
+      ["Valen", "x".repeat(37)],
+    ] as const) {
+      expect((await erreurDe(client.suggererVilles(saisie, session))).code, `${saisie} ${session}`).toBe("invalid_request");
+    }
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("suggestions : réponse hors schéma (identifiant mal formé, plus de 10 suggestions) refusée", async () => {
+    const suggestion = { placePrediction: { placeId: PLACE_ID, structuredFormat: { mainText: { text: "x" } } } };
+    const { client } = monter([
+      async () => json({ suggestions: [{ placePrediction: { placeId: "a b", structuredFormat: { mainText: { text: "x" } } } }] }),
+      async () => json({ suggestions: Array.from({ length: 11 }, () => suggestion) }),
+    ]);
+    expect((await erreurDe(client.suggererVilles("Valen", SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.suggererVilles("Valen", SESSION))).code).toBe("invalid_response");
+  });
+
+  it("fiche de la ville : GET Essentials dans la même session, masque fermé ; seuls le code du pays et la position sont rendus", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json({
+          id: PLACE_ID,
+          addressComponents: [
+            { longText: "SENTINELLE-VILLE", shortText: "SENTINELLE-VILLE", types: ["locality", "political"] },
+            { longText: "SENTINELLE-PAYS", shortText: "ES", types: ["country", "political"] },
+          ],
+          location: { latitude: 39.4699, longitude: -0.3763 },
+          displayName: { text: "SENTINELLE-NOM" },
+        }),
+    ]);
+    const fiche = await client.ficheVille(PLACE_ID, SESSION);
+    expect(fiche).toStrictEqual({ placeId: PLACE_ID, pays: "ES", position: { lat: 39.4699, lng: -0.3763 } });
+    expect(JSON.stringify(fiche)).not.toMatch(/SENTINELLE-/);
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe(`/v1/places/${PLACE_ID}`);
+    expect(Object.fromEntries(new URL(url).searchParams)).toEqual({ languageCode: "fr", sessionToken: SESSION });
+    expect(url).not.toContain(CLE);
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+    expect(new Headers(init.headers).get("x-goog-fieldmask")).toBe(MASQUE_FICHE_VILLE);
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku])).toEqual([["confirmee", "places_details", SKU_FICHE_VILLE]]);
+  });
+
+  it("fiche de la ville : pays absent ou mal formé, null ; autre identifiant ou position absente : refus ; entrée mal formée : refus sans appel", async () => {
+    const position = { latitude: 1.5, longitude: 2.5 };
+    const { client, transport } = monter([
+      async () => json({ id: PLACE_ID, location: position }),
+      async () => json({ id: PLACE_ID, addressComponents: [{ shortText: "Espagne", types: ["country"] }], location: position }),
+      async () => json({ id: "AUTRE_ID", location: position }),
+      async () => json({ id: PLACE_ID }),
+    ]);
+    expect((await client.ficheVille(PLACE_ID, SESSION)).pays).toBeNull();
+    expect((await client.ficheVille(PLACE_ID, SESSION)).pays).toBeNull();
+    expect((await erreurDe(client.ficheVille(PLACE_ID, SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.ficheVille(PLACE_ID, SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.ficheVille("a/b", SESSION))).code).toBe("invalid_request");
+    expect((await erreurDe(client.ficheVille(PLACE_ID, "a&b=c"))).code).toBe("invalid_request");
+    expect(transport).toHaveBeenCalledTimes(4);
   });
 });
 

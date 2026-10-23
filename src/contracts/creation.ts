@@ -21,6 +21,7 @@ import {
   MEAL_BUDGET_CHF,
   MOBILITY_MODES,
   PACES,
+  PLACE_ID_MOTIF,
   STORY_LENGTH,
   type BriefField,
 } from "./values";
@@ -97,6 +98,28 @@ function checkCities(
 }
 
 /**
+ * Ville choisie à l'écran 1 du site d'essai dans les suggestions Google (demande de Samuel du 23 octobre 2026 ; ajout
+ * facultatif, par addition) : le `placeId` (seul identifiant Google conservable), et le pays et le fuseau **des tables
+ * maison** retrouvés côté serveur à partir de la fiche (`src/server/composition/villes.ts`). Forme seulement, **déclarée
+ * par le client, bornée par les tables** (décision 0129 § 4) : le code et le fuseau sont bornés côté serveur par la table
+ * maison des pays (`fuseauDuPays` de `src/lib/fuseaux`, liste fermée), jamais repris tels quels ; le `placeId` n'entre
+ * pas dans le brief et n'est pas conservé. Aucun texte Google.
+ */
+export const DestinationRegionSchema = z.strictObject({
+  /** Identifiant de lieu Google de la ville choisie. */
+  placeId: z.string().regex(PLACE_ID_MOTIF),
+  /** Code ISO 3166-1 alpha-2 du pays (table maison). */
+  country: z.string().regex(/^[A-Z]{2}$/),
+  /** Fuseau IANA de la table maison pour ce pays. */
+  timeZone: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_+\-/]+$/),
+});
+export type DestinationRegion = z.infer<typeof DestinationRegionSchema>;
+
+/**
  * Brouillon de l'écran 1 (0017 § 2.2). Les dates de départ de chaque ville ne sont pas stockées : elles se
  * déduisent (`cityRanges` de `src/features/creation/validation.ts`). « Arrivée au plus tôt aujourd'hui »
  * dépend de l'heure et du fuseau : ce n'est pas un raffinement du schéma (vérifié par `createTrip`, F8c).
@@ -104,6 +127,8 @@ function checkCities(
 export const TripDraftSchema = z
   .strictObject({
     destination: text(DESTINATION_LENGTH),
+    /** Facultatif : ville choisie dans les suggestions (site d'essai) : `placeId`, pays et fuseau maison. */
+    destinationRegion: DestinationRegionSchema.optional(),
     start: IsoDateSchema,
     end: IsoDateSchema,
     lodging: LodgingSchema,

@@ -12,6 +12,10 @@ import { draftReducer, initialDraft, type DraftState } from "./draft";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+// Recherche de ville du site d'essai : doubles des actions serveur (aucun appel réel à Google).
+const villes = vi.hoisted(() => ({ suggererVilles: vi.fn(), choisirVille: vi.fn() }));
+vi.mock("@/server/actions/villes-essai", () => villes);
+vi.mock("@/server/actions/p0-acces", () => ({ saisirCodeAccesP0: vi.fn() }));
 
 /** Écran 1 « Ton voyage » (`R1`, F8-PO-3), rendus et textes provisoires (0018 § 15). */
 
@@ -41,6 +45,9 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 7, 1, 8, 0));
   router.push.mockClear();
   latest = null;
+  // Par défaut, la recherche ne répond pas (repli sur la table maison des villes).
+  villes.suggererVilles.mockReset().mockResolvedValue({ statut: "indisponible" });
+  villes.choisirVille.mockReset().mockResolvedValue({ statut: "indisponible" });
 });
 
 afterEach(() => {
@@ -207,17 +214,251 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
   }
 
-  it("ville hors de la table des fuseaux : refus au champ, message relié, focus ; aucune navigation", async () => {
+  // Suggestions fictives (identifiants fictifs : aucun identifiant de lieu Google réel dans le dépôt).
+  const VALENCE = { placeId: "lieu_fictif_valence_es", principal: "Valence", secondaire: "Espagne" };
+  const VALENCE_FR = { placeId: "lieu_fictif_valence_fr", principal: "Valence", secondaire: "France" };
+  const HOI_AN = { placeId: "lieu_fictif_hoi_an", principal: "Hội An", secondaire: "Quảng Nam, Viêt Nam" };
+  const champ = () => screen.getByRole("combobox", { name: "Destination" });
+  const proposer = (suggestions: readonly { placeId: string; principal: string; secondaire: string | null }[]) =>
+    villes.suggererVilles.mockResolvedValue({ statut: "ok", suggestions });
+  const dates = () => {
+    change("Arrivée", "2026-08-29");
+    change("Départ", "2026-09-03");
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+  };
+
+  it("« Valen » : suggestions de villes en liste (combobox ARIA), attribution « Google Maps » non traduite, annonce du nombre", async () => {
+    // Demande de Samuel du 23 octobre 2026 : plus de « Cette ville n'est pas encore disponible… Essaie Rome ou Lisbonne. ».
+    proposer([VALENCE, VALENCE_FR]);
     const { container } = renderEssai();
-    remplir("Atlantide");
+    const destination = champ();
+    expect(destination).toHaveAttribute("aria-expanded", "false");
+    expect(destination).toHaveAccessibleDescription("Commence à taper, puis choisis ta ville dans la liste.");
+    change("Destination", "V");
+    change("Destination", "Valen");
+    await screen.findAllByRole("option");
+    const liste = screen.getByRole("listbox", { name: "Villes suggérées" });
+    // Une seule recherche par pause de frappe, jamais pour moins de deux caractères ; un jeton de session envoyé.
+    expect(villes.suggererVilles).toHaveBeenCalledTimes(1);
+    expect(villes.suggererVilles).toHaveBeenCalledWith({ saisie: "Valen", session: expect.stringMatching(/^[A-Za-z0-9_-]{1,36}$/) });
+    expect(destination).toHaveAttribute("aria-expanded", "true");
+    expect(within(liste).getAllByRole("option").map((o) => o.textContent)).toEqual(["ValenceEspagne", "ValenceFrance"]);
+    const attribution = screen.getByText("Google Maps");
+    expect(attribution).toHaveAttribute("translate", "no");
+    // Mineur 13 de la revue du head de4ab92 : le nombre seul, sans consigne de clavier (écran tactile).
+    expect(screen.getByText("2 villes suggérées.")).toBeInTheDocument();
+    expect(screen.queryByText(/Essaie Rome ou Lisbonne/)).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("clavier : flèches, Entrée choisit Valence (Espagne) ; nom maison, placeId, pays et fuseau gardés ; « Continuer » mène à l'écran 2", async () => {
+    proposer([VALENCE, VALENCE_FR]);
+    villes.choisirVille.mockResolvedValue({
+      statut: "ok",
+      ville: { placeId: VALENCE.placeId, country: "ES", timeZone: "Europe/Madrid", nomPays: "Espagne", nomMaison: "Valence" },
+    });
+    const { container } = renderEssai();
+    change("Destination", "Valen");
+    await screen.findAllByRole("option");
+    const destination = champ();
+    fireEvent.keyDown(destination, { key: "ArrowDown" });
+    fireEvent.keyDown(destination, { key: "ArrowDown" });
+    fireEvent.keyDown(destination, { key: "ArrowUp" });
+    const active = screen.getAllByRole("option")[0]!;
+    expect(destination).toHaveAttribute("aria-activedescendant", active.id);
+    expect(active).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(destination, { key: "Enter" });
+    await waitFor(() => expect(latest?.trip).toMatchObject({ destination: "Valence", placeId: VALENCE.placeId, country: "ES", timeZone: "Europe/Madrid" }));
+    const session = villes.suggererVilles.mock.calls[0]?.[0].session as string;
+    // Même session pour la fiche ; le texte principal sert à la table maison, côté serveur.
+    expect(villes.choisirVille).toHaveBeenCalledWith({ placeId: VALENCE.placeId, session, saisie: "Valen", principal: "Valence" });
+    expect(destination).toHaveValue("Valence");
+    expect(destination).toHaveAttribute("aria-expanded", "false");
+    // Bloquant 8 de la revue du head `aa77422` : le champ porte le nom retenu, et la confirmation visible le nomme.
+    // Mineurs 10 et 11 de la revue du head de4ab92 : ville et pays seulement, précédés d'une coche `line`.
+    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Ville retenue : Valence (Espagne)."));
+    const confirmation = screen.getByText("Ville retenue : Valence (Espagne).");
+    expect(confirmation).toHaveClass("font-semibold", "text-ink");
+    expect(confirmation.querySelector('[data-part="ville-coche"]')).toHaveClass("text-line");
+    expect(confirmation.querySelector('[data-part="ville-coche"]')).toHaveAttribute("aria-hidden", "true");
+    expect(await axeViolations(container)).toEqual([]);
+    dates();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
-    const destination = screen.getByLabelText("Destination", { exact: true });
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("revue du head `aa77422` (bloquants 6 et 7, mineur 11) : états visibles en flux, option active contournée, liste fermée absente", async () => {
+    proposer([VALENCE, VALENCE_FR]);
+    renderEssai();
+    const destination = champ();
+    // Liste fermée : ni liste vide rendue, ni `aria-controls` vers elle.
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(destination).not.toHaveAttribute("aria-controls");
+    change("Destination", "Valen");
+    await screen.findAllByRole("option");
+    expect(destination).toHaveAttribute("aria-controls", screen.getByRole("listbox").id);
+    fireEvent.keyDown(destination, { key: "ArrowDown" });
+    const [premiere, seconde] = screen.getAllByRole("option");
+    expect(premiere).toHaveClass("outline-2", "outline-line", "min-h-(--touch-target)");
+    expect(seconde).not.toHaveClass("outline-2");
+    fireEvent.keyDown(destination, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(destination).not.toHaveAttribute("aria-controls");
+    // Aucune ville : texte visible, en flux, dans la région d'état (jamais en position absolue).
+    villes.suggererVilles.mockResolvedValue({ statut: "ok", suggestions: [] });
+    change("Destination", "Xqzw");
+    const aucune = await screen.findByText("Aucune ville trouvée. Vérifie l'orthographe.");
+    expect(aucune).toHaveAttribute("role", "status");
+    expect(aucune).toHaveClass("text-corps-s", "text-ink-soft");
+    expect(aucune).not.toHaveClass("absolute");
+  });
+
+  it("plafond de la minute (décision 0129 § 3) : « réessaie dans une minute », aucune liste ; « Continuer » garde ce message", async () => {
+    villes.suggererVilles.mockResolvedValue({ statut: "limite" });
+    renderEssai();
+    change("Destination", "Hoi An");
+    const minute = "Trop de recherches de villes en une minute. Réessaie dans une minute.";
+    expect(await screen.findByText(minute)).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    // Mineur 3 de la revue du head de4ab92 : le refus au plafond ne se lit jamais « ne répond pas ».
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(minute));
+    expect(screen.queryByText(/ne répond pas/)).not.toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("plafond du jour (décision 0129 § 3) : message distinct, nom complet ou plus tard ; « Continuer » garde ce message", async () => {
+    villes.suggererVilles.mockResolvedValue({ statut: "limite_jour" });
+    renderEssai();
+    change("Destination", "Hoi An");
+    const jour = "La recherche des villes a atteint sa limite pour aujourd'hui. Écris le nom complet de ta ville, ou réessaie plus tard.";
+    expect(await screen.findByText(jour)).toHaveAttribute("role", "status");
+    expect(screen.queryByText(/une minute/)).not.toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(jour));
+    expect(screen.queryByText(/ne répond pas/)).not.toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("Échap ferme la liste sans choisir ; une nouvelle frappe efface le choix précédent", async () => {
+    proposer([VALENCE]);
+    villes.choisirVille.mockResolvedValue({
+      statut: "ok",
+      ville: { placeId: VALENCE.placeId, country: "ES", timeZone: "Europe/Madrid", nomPays: "Espagne", nomMaison: "Valence" },
+    });
+    renderEssai();
+    change("Destination", "Valen");
+    await screen.findAllByRole("option");
+    fireEvent.keyDown(champ(), { key: "Escape" });
+    expect(champ()).toHaveAttribute("aria-expanded", "false");
+    expect(villes.choisirVille).not.toHaveBeenCalled();
+    fireEvent.keyDown(champ(), { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("option", { name: /Valence/ }));
+    await waitFor(() => expect(latest?.trip.placeId).toBe(VALENCE.placeId));
+    change("Destination", "Valenc");
+    expect(latest?.trip).toMatchObject({ destination: "Valenc", placeId: "", country: "", timeZone: "" });
+  });
+
+  it("recherche disponible, aucune ville choisie : « Continuer » demande de choisir, message relié, focus ; aucune navigation", async () => {
+    proposer([VALENCE]);
+    const { container } = renderEssai();
+    change("Destination", "Valencia");
+    await screen.findAllByRole("option");
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    const destination = champ();
     expect(destination).toHaveAttribute("aria-invalid", "true");
-    expect(destination).toHaveAccessibleDescription("Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.");
+    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions."));
     await waitFor(() => expect(destination).toHaveFocus());
     expect(router.push).not.toHaveBeenCalled();
     expect(latest?.tripReady).toBe(false);
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("ville d'Asie hors de la table (Hoi An) : la destination reste le texte tapé, jamais le libellé Google ; pays et fuseau maison", async () => {
+    proposer([HOI_AN]);
+    villes.choisirVille.mockResolvedValue({
+      statut: "ok",
+      ville: { placeId: HOI_AN.placeId, country: "VN", timeZone: "Asia/Ho_Chi_Minh", nomPays: "Viêt Nam", nomMaison: null },
+    });
+    renderEssai();
+    change("Destination", "Hoi An");
+    fireEvent.click(await screen.findByRole("option", { name: /Hội An/ }));
+    await waitFor(() => expect(latest?.trip).toMatchObject({ destination: "Hoi An", placeId: HOI_AN.placeId, country: "VN", timeZone: "Asia/Ho_Chi_Minh" }));
+    expect(champ()).toHaveValue("Hoi An");
+    expect(screen.getByText("Ville retenue : Hoi An (Viêt Nam).")).toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("pays à plusieurs fuseaux : la confirmation nomme la ville et le pays, le fuseau maison est gardé", async () => {
+    proposer([{ placeId: "lieu_fictif_asheville", principal: "Asheville", secondaire: "Caroline du Nord, États-Unis" }]);
+    villes.choisirVille.mockResolvedValue({
+      statut: "ok",
+      ville: { placeId: "lieu_fictif_asheville", country: "US", timeZone: "America/New_York", nomPays: "États-Unis", nomMaison: null },
+    });
+    renderEssai();
+    change("Destination", "Asheville");
+    fireEvent.click(await screen.findByRole("option", { name: /Asheville/ }));
+    expect(await screen.findByText("Ville retenue : Asheville (États-Unis).")).toBeInTheDocument();
+    expect(latest?.trip).toMatchObject({ country: "US", timeZone: "America/New_York" });
+  });
+
+  it("nom tapé incomplet, ville hors de la table : refusé, le nom complet est demandé (le texte tapé part au programme)", async () => {
+    proposer([HOI_AN]);
+    villes.choisirVille.mockResolvedValue({
+      statut: "ok",
+      ville: { placeId: HOI_AN.placeId, country: "VN", timeZone: "Asia/Ho_Chi_Minh", nomPays: "Viêt Nam", nomMaison: null },
+    });
+    renderEssai();
+    change("Destination", "Hoi");
+    fireEvent.click(await screen.findByRole("option", { name: /Hội An/ }));
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Écris le nom complet de ta ville")));
+    expect(champ()).toHaveAttribute("aria-invalid", "true");
+    expect(latest?.trip.placeId).toBe("");
+  });
+
+  it("pays hors de la table maison : refusé, une autre ville est demandée", async () => {
+    proposer([VALENCE]);
+    villes.choisirVille.mockResolvedValue({ statut: "pays_inconnu" });
+    renderEssai();
+    change("Destination", "Valence");
+    fireEvent.click(await screen.findByRole("option", { name: /Valence/ }));
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Ce pays n'est pas encore disponible")));
+    expect(latest?.trip.placeId).toBe("");
+  });
+
+  it("cookie d'accès absent : saisie du code (titre de niveau 2) hors du formulaire, puis la recherche reprend", async () => {
+    villes.suggererVilles.mockResolvedValueOnce({ statut: "acces" });
+    const { container } = renderEssai();
+    change("Destination", "Valen");
+    const titre = await screen.findByRole("heading", { level: 2, name: "Code d'accès du site d'essai" });
+    expect(screen.getByText("Pour chercher ta ville, saisis d'abord le code d'accès du site d'essai.")).toBeInTheDocument();
+    // Pas de formulaires imbriqués : la saisie du code n'est pas dans le formulaire de l'écran 1.
+    expect(titre.closest("form")?.querySelector("button[type=submit]")?.textContent).not.toBe("Continuer");
+    expect(container.querySelectorAll("form form")).toHaveLength(0);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("recherche indisponible (repli) : une ville de la table est admise sans choix ; hors de la table, message « réessaie »", async () => {
+    const { container } = renderEssai();
+    change("Destination", "Hoi An");
+    expect(await screen.findByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    // Un seul message (mineur 14) : l'erreur du champ reprend le texte de la recherche, la région d'état se tait.
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant."));
+    expect(screen.getAllByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toHaveLength(1);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(await axeViolations(container)).toEqual([]);
+    change("Destination", "Valencia");
+    await waitFor(() => expect(villes.suggererVilles).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+    expect(latest?.trip).toMatchObject({ destination: "Valencia", placeId: "" });
   });
 
   it("logement saisi : aide « pas d'adresse privée » reliée au champ (décision 0125 § 6) ; absente hors du site d'essai", () => {
@@ -244,7 +485,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
       expect(screen.queryByRole("button", { name: "Ajouter une ville" })).not.toBeInTheDocument();
       remplir("Atlantide");
       fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
-      expect(screen.getByLabelText("Destination", { exact: true })).toHaveAttribute("aria-invalid", "true");
+      // Champ de recherche de ville du site d'essai ; recherche indisponible (double) : ville hors table refusée.
+      expect(screen.getByRole("combobox", { name: "Destination" })).toHaveAttribute("aria-invalid", "true");
       expect(router.push).not.toHaveBeenCalled();
     } finally {
       window.history.pushState({}, "", "/");

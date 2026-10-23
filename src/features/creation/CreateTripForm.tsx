@@ -18,12 +18,14 @@ import {
   PROTOTYPE_STAY_DAYS_MAX,
   type CommitmentKind,
 } from "@/contracts/values";
+import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
+import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
 import {
   describedBy,
@@ -52,13 +54,20 @@ const ADD_BUTTON_CLASS =
 
 const length = (bounds: { min: number; max: number }) => format(err.longueur, bounds);
 
+/** Message de « Continuer » quand la recherche de ville ne sert pas : panne, plafond de la minute ou du jour (0129 § 3). */
+const VILLE_NON_SERVIE: Readonly<Record<MotifIndisponible, string>> = { panne: e1.ville.indisponible, minute: e1.ville.limite, jour: e1.ville.limiteJour };
+
 /** Message d'un champ de l'écran 1 (textes provisoires, UX/UI, F8-Q1). */
-function messageFor(field: string, code: FieldError): string {
+function messageFor(field: string, code: FieldError, motif: MotifIndisponible = "panne"): string {
   const last = field.split(".").pop() ?? field;
   const inCity = field.startsWith("otherCities.");
   const inCommitment = field.startsWith("commitments.");
   if (field === "destination") {
-    return code === "length" ? length(DESTINATION_LENGTH) : code === "unknownCity" ? err.villeInconnue : err.destination;
+    if (code === "length") return length(DESTINATION_LENGTH);
+    if (code === "selectCity") return err.villeChoisir;
+    if (code === "cityUnavailable") return VILLE_NON_SERVIE[motif];
+    if (code === "cityCharacters") return err.villeCaracteres;
+    return err.destination;
   }
   if (field === "start") return code === "past" ? err.arriveePassee : err.arrivee;
   if (field === "end") {
@@ -81,11 +90,15 @@ function messageFor(field: string, code: FieldError): string {
 
 export interface CreateTripFormProps {
   /**
-   * Site d'essai (spécification E2E-essai, lot 2, critère 2) : une seule ville, connue de la table des fuseaux, 15 jours
-   * au plus, refusés au champ ; « Autres villes » n'est pas proposé. Absent : lu dans l'adresse (`?site=essai`, voir
+   * Site d'essai (spécification E2E-essai, lot 2, critère 2) : une seule ville, 15 jours au plus, refusés au champ ;
+   * « Autres villes » n'est pas proposé. La destination se choisit dans les suggestions de villes de Google Places
+   * (demande de Samuel du 23 octobre 2026, `DestinationVille`) ; si la recherche ne répond pas, une ville de la table
+   * maison est acceptée sans choix. Absent : lu dans l'adresse (`?site=essai`, voir
    * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
    */
   essai?: boolean;
+  /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
+  villes?: ActionsVilles;
 }
 
 const sansAbonnement = () => () => {};
@@ -99,17 +112,26 @@ function useEssaiDepuisAdresse(): boolean {
 }
 
 /**
- * Écran 1 « Créer le voyage » (`R1`, F8-PO-3 ; rendus et textes provisoires, décision 0018 § 15). Aucun appel
- * serveur : « Continuer » valide, garde la saisie dans le brouillon et mène à l'écran 2. Destination, logement,
- * villes et engagements sont saisis en texte libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
+ * Écran 1 « Créer le voyage » (`R1`, F8-PO-3 ; rendus et textes provisoires, décision 0018 § 15). « Continuer »
+ * valide, garde la saisie dans le brouillon et mène à l'écran 2. Sur le site d'essai, la destination se choisit dans
+ * les suggestions de villes de Google Places (`DestinationVille`, actions serveur derrière la barrière du lancement ;
+ * décision 0129, qui y lève F8-PO-14). Ailleurs, destination, logement, villes et engagements restent saisis en texte
+ * libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
+export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps = {}) {
   const essaiAdresse = useEssaiDepuisAdresse();
   const essai = essaiProp ?? essaiAdresse;
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const { trip } = state;
   const [errors, setErrors] = useState<FormError[]>([]);
+  // Site d'essai : la recherche de ville a répondu (un choix est exigé) ; `false` tant qu'elle n'a pas répondu ou
+  // quand elle ne répond pas (repli sur la table maison des villes).
+  const [rechercheDisponible, setRechercheDisponible] = useState(false);
+  const [motifIndisponible, setMotifIndisponible] = useState<MotifIndisponible>("panne");
+  // Cookie d'accès absent ou expiré pendant la recherche : saisie du code, puis relance de la recherche.
+  const [accesDemande, setAccesDemande] = useState(false);
+  const [relance, setRelance] = useState(0);
   const addCityButton = useRef<HTMLButtonElement>(null);
   const addCommitmentButton = useRef<HTMLButtonElement>(null);
   const focusAfterAdd = useRef<string | null>(null);
@@ -135,7 +157,7 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
       if (found.code === "length") return length(lodging?.answer === "known" ? KNOWN_LODGING_LENGTH : AREA_LENGTH);
       return lodging?.answer === "known" ? err.nomAdresse : err.quartier;
     }
-    return messageFor(field, found.code);
+    return messageFor(field, found.code, motifIndisponible);
   };
   function lodgingAt(field: string): LodgingForm | undefined {
     const match = /^otherCities\.(\d+)\./.exec(field);
@@ -144,7 +166,7 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso(), { essai });
+    const found = validateTrip(trip, todayIso(), { essai, suggestions: rechercheDisponible });
     setErrors(found);
     const first = found[0];
     if (first) {
@@ -207,15 +229,58 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
       </div>
       <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
+      {essai ? (
+        // Hors du `<form>` (décision 0129 § 5) : la saisie du code d'accès est son propre formulaire (pas de formulaires
+        // imbriqués). Ordre de lecture inchangé : titre, Destination (et la saisie du code sous elle), puis le formulaire.
+        // Entrée dans le champ choisit une suggestion et ne soumet rien ; « Continuer » valide la destination comme les
+        // autres champs (erreurs reliées à l'id `destination`, focus par `focusField("destination")`), et le focus revient
+        // à la destination après la saisie du code.
+        <>
+          <DestinationVille
+            value={trip.destination}
+            choisie={trip.placeId && trip.country && trip.timeZone ? { country: trip.country, timeZone: trip.timeZone } : null}
+            error={errorOf("destination")}
+            onSaisie={(destination) => dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } })}
+            onChoix={(choix) => {
+              dispatch({ type: "trip", patch: choix });
+              setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
+            }}
+            onDisponibilite={(disponible, motif) => {
+              setRechercheDisponible(disponible);
+              if (motif) setMotifIndisponible(motif);
+            }}
+            onAcces={() => setAccesDemande(true)}
+            relance={relance}
+            {...(villes ? { actions: villes } : {})}
+          />
+          {accesDemande ? (
+            <SaisieCodeAcces
+              ouverte={false}
+              parcours={{
+                titre: e1.ville.accesTitre,
+                aide: e1.ville.accesAide,
+                niveauTitre: 2,
+                surAcces: () => {
+                  setAccesDemande(false);
+                  setRelance((n) => n + 1);
+                  requestAnimationFrame(() => focusField("destination"));
+                },
+              }}
+            />
+          ) : null}
+        </>
+      ) : null}
       <form noValidate onSubmit={submit} className="flex flex-col gap-6">
-        <TextField
-          field="destination"
-          label={e1.destination}
-          value={trip.destination}
-          maxLength={DESTINATION_LENGTH.max}
-          onChange={(destination) => dispatch({ type: "trip", patch: { destination } })}
-          error={errorOf("destination")}
-        />
+        {essai ? null : (
+          <TextField
+            field="destination"
+            label={e1.destination}
+            value={trip.destination}
+            maxLength={DESTINATION_LENGTH.max}
+            onChange={(destination) => dispatch({ type: "trip", patch: { destination } })}
+            error={errorOf("destination")}
+          />
+        )}
         <FieldRow>
           <TextField
             field="start"

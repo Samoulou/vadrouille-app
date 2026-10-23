@@ -233,6 +233,15 @@ describe("brouillon : écran 3 (F8b, F8-PO-8)", () => {
     expect(state.lodgingCity).toBe(0);
     expect(toTripDraft(state.trip)).toEqual(MOCK_DEMO_TRIP_DRAFT);
   });
+
+  it("ville choisie dans les suggestions : placeId, pays et fuseau maison gardés par le brouillon, aller-retour avec le TripDraft", () => {
+    const placeId = "lieu_fictif_ville_essai_1";
+    const state = run([{ type: "trip", patch: { destination: "Asheville", placeId, country: "US", timeZone: "America/New_York" } }]);
+    expect(state.trip).toMatchObject({ destination: "Asheville", placeId, country: "US", timeZone: "America/New_York" });
+    expect(initialDraft().trip).toMatchObject({ placeId: "", country: "", timeZone: "" });
+    const draft = { ...MOCK_DEMO_TRIP_DRAFT, destination: "Asheville", destinationRegion: { placeId, country: "US", timeZone: "America/New_York" } };
+    expect(toTripDraft(draftForLodging(draft).trip)).toEqual(draft);
+  });
 });
 
 describe("brouillon : lancement (F8c)", () => {

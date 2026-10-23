@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "releve": "2026-10-23",
-  "source": "Page de tarifs Google Maps Platform (developers.google.com/maps/billing-and-pricing/pricing), relevée le 2026-10-13 puis le 2026-10-17 (IDs only de Place Details) par ia-recherche, et le 2026-10-23 (Place Details Photos, mise à jour du 2026-10-21) par front",
+  "source": "Page de tarifs Google Maps Platform (developers.google.com/maps/billing-and-pricing/pricing), relevée le 2026-10-13 puis le 2026-10-17 (IDs only de Place Details) par ia-recherche, et le 2026-10-23 (Place Details Photos et Autocomplete, mise à jour du 2026-10-21) par front",
   "devise": "USD",
   "palierMax": 100000,
   "skus": {
@@ -11,6 +11,8 @@
     "places_details_essentials": { "methode": "places_details", "unite": "requete", "gratuitParMois": 10000, "prixPour1000": 5 },
     "places_details_pro": { "methode": "places_details", "unite": "requete", "gratuitParMois": 5000, "prixPour1000": 17 },
     "places_details_enterprise": { "methode": "places_details", "unite": "requete", "gratuitParMois": 1000, "prixPour1000": 20 },
+    "places_autocomplete_requests": { "methode": "places_autocomplete", "unite": "requete", "gratuitParMois": 10000, "prixPour1000": 2.83 },
+    "places_autocomplete_session_usage": { "methode": "places_autocomplete", "unite": "requete", "gratuitParMois": null, "prixPour1000": 0 },
     "places_details_photos": { "methode": "places_details", "unite": "requete", "gratuitParMois": 1000, "prixPour1000": 7 },
     "routes_matrix_essentials": { "methode": "routes_matrix", "unite": "element", "gratuitParMois": 10000, "prixPour1000": 5 },
     "routes_matrix_pro": { "methode": "routes_matrix", "unite": "element", "gratuitParMois": 5000, "prixPour1000": 10 },

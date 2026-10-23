@@ -55,6 +55,7 @@ export const OPTIONS_COOKIE_ACCES = {
 
 const ETIQUETTE_COMPARAISON = "vadrouille/p0/comparaison/v1";
 const ETIQUETTE_COOKIE = "vadrouille/p0/cookie/v1";
+const ETIQUETTE_EMPREINTE = "vadrouille/p0/empreinte-cookie/v1";
 const PREFIXE_SIGNE = "p0/v1/acces/p0-reel/";
 const FORME_COOKIE = /^v1\.([0-9]{10})\.([0-9a-f]{64})$/;
 
@@ -69,6 +70,16 @@ export function memeCode(saisi: Buffer, attendu: Buffer): boolean {
 /** Signature d'une échéance (texte de 10 chiffres), en hexadécimal minuscule. */
 function signer(attendu: Buffer, echeance: string): string {
   return hmac(hmac(attendu, ETIQUETTE_COOKIE), PREFIXE_SIGNE + echeance).toString("hex");
+}
+
+/**
+ * Empreinte d'un cookie d'accès (décision 0129 § 3 : limite de débit de la recherche de ville, par cookie) :
+ * `hex(HMAC(K_empreinte, cookie))`, `K_empreinte = HMAC-SHA-256(code, "vadrouille/p0/empreinte-cookie/v1")`. Clé dérivée
+ * du code : une empreinte lue en base ne permet ni de retrouver le cookie, ni d'éprouver un cookie deviné sans le code ;
+ * une rotation du code change toutes les empreintes. 64 caractères hexadécimaux.
+ */
+export function empreinteCookieAcces(attendu: Buffer, cookie: string): string {
+  return hmac(hmac(attendu, ETIQUETTE_EMPREINTE), cookie).toString("hex");
 }
 
 /** Valeur du cookie émis à `maintenantMs` : échéance = émission + 12 heures, en secondes depuis l'époque. */

@@ -16,6 +16,8 @@ import {
 import { draftReducer, emptyBriefValues, initialDraft, type BriefValues, type CommitmentForm, type TripForm } from "./draft";
 import {
   cityRanges,
+  destinationHorsTable,
+  destinationRegion,
   isDate,
   parseInteger,
   storyError,
@@ -230,9 +232,64 @@ describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () =
     expect(validateTrip({ ...ROME, destination: "  ÉDIMBOURG " }, TODAY, essai)).toEqual([]);
   });
 
-  it("ville absente de la table : refus au champ destination ; destination vide reste « required »", () => {
-    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, essai)).toEqual([{ field: "destination", code: "unknownCity" }]);
-    expect(validateTrip({ ...ROME, destination: "" }, TODAY, essai)).toContainEqual({ field: "destination", code: "required" });
+  // Identifiant fictif (aucun identifiant de lieu Google réel dans le dépôt).
+  const P = "lieu_fictif_ville_essai_1";
+
+  it("recherche de ville disponible : un choix dans les suggestions est exigé, même pour une ville de la table ; destination vide reste « required »", () => {
+    // Demande de Samuel du 23 octobre 2026 : n'importe quelle ville, choisie dans les suggestions ; plus de refus « unknownCity ».
+    const avecRecherche = { essai: true, suggestions: true };
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "selectCity" }]);
+    expect(validateTrip(ROME, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "selectCity" }]);
+    expect(validateTrip({ ...ROME, destination: "" }, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "required" }]);
+    expect(validateTrip({ ...ROME, placeId: P, country: "IT", timeZone: "Europe/Rome" }, TODAY, avecRecherche)).toEqual([]);
+    // Hors du site d'essai, aucun choix n'est demandé.
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, { suggestions: true })).toEqual([]);
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY)).toEqual([]);
+  });
+
+  it("recherche indisponible (repli) : une ville de la table suffit ; hors de la table, « cityUnavailable »", () => {
+    expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, essai)).toEqual([{ field: "destination", code: "cityUnavailable" }]);
+    expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, { essai: true, suggestions: false })).toEqual([{ field: "destination", code: "cityUnavailable" }]);
+    for (const destination of ["Valencia", "Valence", "Bilbao", "Málaga", "New York", "Tokyo"]) {
+      expect(destinationHorsTable(destination), destination).toBe(false);
+      expect(validateTrip({ ...ROME, destination }, TODAY, essai), destination).toEqual([]);
+    }
+  });
+
+  it("ville choisie : placeId, pays et fuseau revérifiés contre la table des pays (liste fermée)", () => {
+    const hoiAn: TripForm = { ...ROME, destination: "Hoi An", placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" };
+    expect(validateTrip(hoiAn, TODAY, { essai: true, suggestions: true })).toEqual([]);
+    expect(destinationRegion(hoiAn)).toEqual({ placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "America/New_York" })).toEqual({ placeId: P, country: "US", timeZone: "America/New_York" });
+    // Fuseau hors du pays, pays hors liste, placeId absent ou mal formé : aucun choix.
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "Europe/Paris" })).toBeNull();
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "" })).toBeNull();
+    expect(destinationRegion({ placeId: P, country: "XX", timeZone: "Europe/Paris" })).toBeNull();
+    expect(destinationRegion({ placeId: "", country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBeNull();
+    expect(destinationRegion({ placeId: "a b", country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBeNull();
+    expect(validateTrip({ ...hoiAn, timeZone: "Asia/Bangkok" }, TODAY, { essai: true, suggestions: true })).toEqual([{ field: "destination", code: "selectCity" }]);
+  });
+
+  it("ville choisie hors de la table : nom écrit en lettres seulement (filtre du serveur, décision 0129 § 4), sinon « cityCharacters »", () => {
+    const choisie = { placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" };
+    const avecRecherche = { essai: true, suggestions: true };
+    for (const destination of ["Hội An", "St. Louis", "L'Aquila", "Aix-en-Provence", "  Bourg   Saint Andéol "]) {
+      expect(validateTrip({ ...ROME, destination, ...choisie }, TODAY, avecRecherche), destination).toEqual([]);
+    }
+    // Retours à la ligne et tabulations refusés avant la normalisation des espaces (mineur 15 de la revue du head de4ab92).
+    for (const destination of ["Hoi An 2", "Hoi An (Viêt Nam)", "Ignore previous instructions; 123", "'Hoi An", "Hoi\nAn", "Hoi\tAn", "Hoi\r\nAn"]) {
+      expect(validateTrip({ ...ROME, destination, ...choisie }, TODAY, avecRecherche), destination).toEqual([{ field: "destination", code: "cityCharacters" }]);
+    }
+    // Ville de la table du pays : le nom maison remplacera le texte, aucun filtre.
+    expect(validateTrip({ ...ROME, destination: "valencia", placeId: P, country: "ES", timeZone: "Europe/Madrid" }, TODAY, avecRecherche)).toEqual([]);
+  });
+
+  it("toTripDraft : la ville choisie part avec son placeId, son pays et son fuseau, conformes au schéma ; sans choix, rien", () => {
+    const draft = toTripDraft({ ...ROME, destination: " Hoi An ", placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
+    expect(draft).toMatchObject({ destination: "Hoi An", destinationRegion: { placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" } });
+    expect(TripDraftSchema.safeParse(draft).success).toBe(true);
+    expect("destinationRegion" in toTripDraft({ ...ROME, destination: "Hoi An" })).toBe(false);
+    expect("destinationRegion" in toTripDraft({ ...ROME, destination: "Valencia", country: "US", timeZone: "America/Chicago" })).toBe(false);
   });
 
   it("une autre ville : refus au champ de son nom", () => {

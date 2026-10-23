@@ -155,6 +155,11 @@ const COMPOSITION_B9E =
 const COMPOSITION_B9C =
   "composition de la génération (B9c, décisions 0081 B9-TL-1, B9-TL-3 et B9-TL-8) : câblage seul des capacités à types neutres, du forfait, " +
   "des fixtures d'Édimbourg de la variante simulée et des modules de capacité de la variante réelle ; verdict Sécurité : attendu";
+const COMPOSITION_VILLES =
+  "recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026 ; décision 0129) : câblage seul du client " +
+  "Places des villes, de la barrière d'accès du lancement (0055 section 2 point 5), des tables maison des pays et des villes (aucune donnée " +
+  "Google conservée hors du `placeId`, 0011 et 0027), d'un port en mémoire et du plafond persistant (ligne `ville` de `prototype.forfaits`, " +
+  "empreinte du cookie, table de prix ; 0129 § 3) ; verdict Sécurité : 0129 § 9, dans la revue de la PR 732";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -464,6 +469,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   // Mineur 7 de la revue du head `7b69742` : prédicat de déploiement partagé avec la barrière (fonction pure, aucune lecture d'environnement).
   { fichier: "src/server/composition/fixtures-simulees.ts", specificateur: "@/server/config/generation", noms: ["deploiementTraiteCommeProduction"], motif: COMPOSITION_B9C },
   { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
+  // Recherche de ville du site d'essai : les lignes que l'analyseur relève pour `villes.ts`, et rien d'autre.
+  { fichier: "src/server/composition/villes.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["fuseauParPosition", "paysParCode", "villeDuPays"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/acces", noms: ["cookieAccesValide", "empreinteCookieAcces", "ouvertureP0", "type:DependancesAcces"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/base", noms: ["poolPrototype"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/cout-google", noms: ["TablePrixGoogleSchema"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/neon", noms: ["reserverVille", "type:DemandeVille", "type:LimitesVille", "type:ResultatVille"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "../../../prototype/config/prix-google.json", noms: ["default"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:PortConsommation"], motif: COMPOSITION_VILLES },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
