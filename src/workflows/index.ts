@@ -8,7 +8,7 @@ import type { EtatComplet, EtatEtape, EtatLot } from "@/server/generation/etat";
 
 import { generatePreview } from "./apercu";
 import { P0RUN_COMPLET } from "./complet";
-import { p0Run } from "./p0-run";
+import { choixRevisionValides, p0Revision, p0Run } from "./p0-run";
 import { batchRecompute } from "./recalcul";
 import { generateFullTrip } from "./voyage-complet";
 
@@ -18,14 +18,19 @@ export {
   briefLancable,
   briefSaisiTientDansLeMode,
   briefTientDansLeMode,
+  choixRevisionValides,
   cloreExecutionNonDemarree,
   lancementDuMode,
   NOMS_BRIEFS,
+  PART_REVISION_MICROS,
+  plafondModelesMicros,
+  REVISIONS_PAR_VOYAGE,
   relectureDuMode,
   validerBriefSaisi,
   verrouS8Leve,
   type BriefSaisiValide,
   type LancementDuMode,
+  type SorteExecution,
 } from "./p0-run";
 
 /**
@@ -61,6 +66,28 @@ export async function startWorkflow(nom: NomWorkflow, garde: GardeOuverte): Prom
   let workflowRunId: unknown;
   try {
     const run = await start(p0Run, [{ runId: garde.runId }], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
+}
+
+/** Choix d'une révision passés au workflow (décision 0126 § 1) : identifiants maison seulement. */
+export type ChoixDemarrageRevision = { readonly tripId: string; readonly pasPourMoi: readonly string[]; readonly jAime: readonly string[] };
+
+/**
+ * Démarre `p0Revision` (spécification E2E-essai, lot 4 ; décision 0126) pour l'exécution de révision réservée par la
+ * garde : entrée `{ runId, tripId, pasPourMoi, jAime }` (identifiants maison seulement, `choixRevisionValides`), région
+ * `fra1`. Même interrupteur que `p0Run` (`P0RUN_COMPLET`) ; une erreur du SDK rend `start_failed`, jamais son message.
+ */
+export async function demarrerRevision(garde: GardeOuverte, choix: ChoixDemarrageRevision): Promise<ResultatDemarrage> {
+  if (!P0RUN_COMPLET) return { ok: false, code: "real_mode_unavailable" };
+  const entree = { runId: garde.runId, tripId: choix.tripId, pasPourMoi: [...choix.pasPourMoi], jAime: [...choix.jAime] };
+  if (!choixRevisionValides(entree)) return { ok: false, code: "start_failed" };
+  let workflowRunId: unknown;
+  try {
+    const run = await start(p0Revision, [entree], { region: REGION_WORKFLOWS });
     workflowRunId = run.runId;
   } catch {
     return { ok: false, code: "start_failed" };

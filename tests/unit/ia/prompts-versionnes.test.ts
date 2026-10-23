@@ -10,6 +10,7 @@ import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
+import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { PROMPT_STRUCTURATION } from "@/ai/prompts/structuration";
 
 /**
@@ -41,9 +42,11 @@ const EMPREINTES: Record<string, Record<number, string>> = {
     2: "236e304ba393a2d4504310f1898eadedda0487e638d558a0ee115d4526c30b80",
     3: "413eb5e8aacf8c0b3408e2549c7c83668aeaa337548663903c60431143579b59",
   },
+  // E2E-essai, lot 4 (décision 0126) : révision du programme après le tri « J'aime / Pas pour moi ».
+  revision: { 1: "bf5355ef97edba46b6961a113476e73ae232c22399c1eed0a54501345b071fc1" },
 };
 
-const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB, PROMPT_PROGRAMME];
+const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB, PROMPT_PROGRAMME, PROMPT_REVISION];
 const empreinte = (texte: string) => createHash("sha256").update(texte, "utf8").digest("hex");
 
 describe("prompts: versionnés", () => {
@@ -81,6 +84,20 @@ describe("prompts: versionnés", () => {
     expect(texte).toMatch(/aucun créneau n'en relève, même un incontournable/);
     // Chaque code de catégorie est nommé, avec le libellé que la personne a coché.
     for (const code of ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"]) expect(texte).toContain(`${code} = `);
+  });
+
+  it("revision: prompt v1 retire les étapes écartées, garde les aimées, sans donnée Google (E2E-essai, lot 4)", () => {
+    expect(PROMPT_REVISION.version).toBe(1);
+    const texte = PROMPT_REVISION.texte;
+    expect(texte).toContain('"pasPourMoi"');
+    expect(texte).toContain('"jAime"');
+    expect(texte).toMatch(/Retire chaque étape écartée : ni ce lieu ni un lieu équivalent/);
+    expect(texte).toMatch(/Garde les étapes aimées/);
+    // Même forme de sortie que `programme` (relue par `lireProgramme`) et même règle « à éviter ».
+    expect(texte).toContain('"jours": [{"date" (AAAA-MM-JJ)');
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id/i);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {

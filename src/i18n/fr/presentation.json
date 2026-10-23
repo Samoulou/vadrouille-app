@@ -86,6 +86,19 @@
     "vide": "Aucune proposition à trier",
     "clos": "Tu as fini ce tri.",
     "choixSansEffet": "Voyage d'essai : tes choix ne changent pas encore ton programme.",
+    "revision": {
+      "envoi": "On réécrit ton programme sans les étapes « Pas pour moi »…",
+      "started": "C'est noté : on réécrit ton programme sans les étapes « Pas pour moi ». La nouvelle version remplace celle-ci dans quelques minutes.",
+      "inProgress": "Ton programme est déjà en train d'être réécrit. La nouvelle version arrive dans quelques minutes.",
+      "exhausted": "Ce programme a déjà été réécrit deux fois : tes nouveaux choix ne le changent plus.",
+      "capReached": "Le plafond des essais est atteint : ton programme ne peut pas être réécrit pour le moment.",
+      "unavailable": "Impossible de réécrire ton programme pour le moment.",
+      "reessayer": "Réessayer",
+      "acces": {
+        "titre": "Saisis ton code d'accès",
+        "aide": "Ton accès a expiré. Saisis le code pour que tes choix « Pas pour moi » changent ton programme."
+      }
+    },
     "debloquer": "Débloquer",
     "programme": "Voir le programme"
   },

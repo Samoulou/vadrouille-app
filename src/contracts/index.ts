@@ -128,6 +128,10 @@ export {
   PreferencePromptSchema,
   PreferenceReasonSchema,
   PreferenceSignalSchema,
+  TRIAL_REVISION_CHOICES_MAX,
+  TRIAL_REVISION_STATUSES,
+  TrialRevisionRequestSchema,
+  TrialRevisionResultSchema,
   UndoDecisionRequestSchema,
   UndoDecisionResultSchema,
 } from "./deck";
@@ -144,6 +148,8 @@ export type {
   PreferencePrompt,
   PreferenceReason,
   PreferenceSignal,
+  TrialRevisionRequest,
+  TrialRevisionResult,
   UndoDecisionRequest,
   UndoDecisionResult,
 } from "./deck";

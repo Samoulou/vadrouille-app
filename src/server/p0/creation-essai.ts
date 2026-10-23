@@ -7,7 +7,7 @@ import { lireIdentifiantVoyageSaisi, slugDestination } from "@/domain/identifian
 import { joursEntre } from "@/domain/temps";
 import { NOM_COOKIE_ACCES } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
-import { lancerBriefSaisi, relancerBriefSaisi, type IssueLancementSaisi } from "@/server/p0/lancement";
+import { lancerBriefSaisi, relancerBriefSaisi, reviserVoyageSaisi, type CleRevisionLue, type IssueLancementSaisi } from "@/server/p0/lancement";
 import { poolLectureProgrammes } from "@/server/p0/lecture-programmes";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -18,6 +18,8 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * l'adaptateur n'importe ni la base, ni la garde, ni les workflows.
  *
  * - `lancer` et `relancer` : `lancerBriefSaisi` et `relancerBriefSaisi` (même garde que `/prototype/executions`) ;
+ * - `reviser` : `reviserVoyageSaisi` (décision 0126), même garde ; brief de la version servie et clés de révision lus
+ *   dans la réservation ;
  * - `etat` : barrière de la lecture des programmes (garde ouverte **et** cookie d'accès valide, sinon `null` sans
  *   connexion), puis l'état de l'exécution du voyage (`en_cours`, `programme_ecrit`, `arretee`) et le nombre de jours du
  *   séjour, lus en lecture seule ; un identifiant qui n'est pas celui d'un voyage de l'app, une exécution inconnue, un
@@ -36,6 +38,21 @@ WHERE r.id = $1::uuid AND r.brief = 'saisi'`;
 /** Brief saisi d'une exécution arrêtée, pour « Réessayer » (relu dans la réservation, garde ouverte). */
 export const SQL_BRIEF_ARRETE = `SELECT b.brief FROM prototype.runs AS r JOIN prototype.run_briefs AS b ON b.run_id = r.id
 WHERE r.id = $1::uuid AND r.brief = 'saisi' AND r.status = 'arretee'`;
+
+/**
+ * Brief saisi de l'exécution qui a écrit la **version servie** du voyage (la plus récente non expirée, décision 0126
+ * § 1), pour une révision (relu dans la réservation, garde ouverte). Aucune ligne pour un voyage d'un brief commité.
+ */
+export const SQL_BRIEF_VERSION = `SELECT b.brief FROM prototype.programmes AS p
+JOIN prototype.runs AS r ON r.id = p.run_id
+JOIN prototype.run_briefs AS b ON b.run_id = r.id
+WHERE p.contenu #>> '{trip,id}' = $1::text AND p.expires_at > pg_catalog.now() AND r.brief = 'saisi' AND r.status = 'programme_ecrit'
+ORDER BY r.started_at DESC, r.id DESC LIMIT 1`;
+
+/** Clés de révision déjà écrites parmi celles données (décision 0126 § 2), avec le statut de leur exécution. */
+export const SQL_CLES_REVISION = `SELECT b.request_id::text AS request_id, r.status FROM prototype.run_briefs AS b
+JOIN prototype.runs AS r ON r.id = b.run_id
+WHERE b.request_id = ANY($1::uuid[])`;
 
 const ETATS: ReadonlySet<string> = new Set(["en_cours", "programme_ecrit", "arretee"]);
 const DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
@@ -81,6 +98,34 @@ export async function lireBriefArrete(pool: PoolSql, tripId: string): Promise<un
   return (await lireUne(pool, SQL_BRIEF_ARRETE, [lu.runId]))?.brief ?? null;
 }
 
+/** Brief saisi de la version servie du voyage `tripId`, ou `null`. */
+export async function lireBriefVersion(pool: PoolSql, tripId: string): Promise<unknown> {
+  if (lireIdentifiantVoyageSaisi(tripId) === null) return null;
+  return (await lireUne(pool, SQL_BRIEF_VERSION, [tripId]))?.brief ?? null;
+}
+
+/** Clés de révision écrites parmi `cles`, avec le statut de leur exécution (lignes mal formées ignorées). */
+export async function lireClesRevision(pool: PoolSql, cles: readonly string[]): Promise<CleRevisionLue[]> {
+  const client: ClientSql = await pool.connect();
+  let enTransaction = false;
+  try {
+    await client.query("BEGIN READ ONLY");
+    enTransaction = true;
+    await client.query(`SET LOCAL statement_timeout = ${DELAI_ETAT_MS}`);
+    const lignes = (await client.query(SQL_CLES_REVISION, [[...cles]])).rows;
+    await client.query("COMMIT");
+    enTransaction = false;
+    return lignes.flatMap((ligne) =>
+      typeof ligne.request_id === "string" && typeof ligne.status === "string" && ETATS.has(ligne.status) ? [{ requestId: ligne.request_id, statut: ligne.status }] : [],
+    );
+  } catch (erreur) {
+    if (enTransaction) await client.query("ROLLBACK").catch(() => undefined);
+    throw erreur;
+  } finally {
+    client.release();
+  }
+}
+
 const issue = (resultat: IssueLancementSaisi): IssueLancementEssai => resultat;
 
 const cookieAcces = async (): Promise<string | undefined> => (await cookies()).get(NOM_COOKIE_ACCES)?.value;
@@ -92,6 +137,9 @@ export const creationEssai: PortCreationEssai = {
   },
   async relancer(demande) {
     return issue(await relancerBriefSaisi(demande, { cookie: await cookieAcces(), pool: poolPrototype, briefArrete: lireBriefArrete }));
+  },
+  async reviser(demande) {
+    return reviserVoyageSaisi(demande, { cookie: await cookieAcces(), pool: poolPrototype, briefVersion: lireBriefVersion, clesEcrites: lireClesRevision });
   },
   async etat(tripId) {
     const pool = await poolLectureProgrammes();

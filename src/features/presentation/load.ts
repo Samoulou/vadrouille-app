@@ -1,4 +1,4 @@
-import { isTrialTrip, type AdapterContext, type TripAdapter } from "@/adapters";
+import { isTrialTrip, voyageEssaiRevisable, type AdapterContext, type TripAdapter } from "@/adapters";
 import type { DeckSession, PreviewSlot, Proposal, Trip } from "@/contracts";
 
 /**
@@ -39,6 +39,12 @@ export interface PresentationData {
    * effet » à la fin du tri. `false` pour tout programme qui porte ses propositions, sur tout adaptateur.
    */
   essai: boolean;
+  /**
+   * Voyage d'essai lancé depuis l'app (identifiant `proto_<slug>_<exécution>`, décision 0125 § 2) : ses « Pas pour moi »
+   * réécrivent le programme à la fin du tri (spécification E2E-essai, lot 4 ; décision 0126). Les voyages d'essai d'un
+   * brief commité (`/prototype/executions`) gardent la phrase « choix sans effet ».
+   */
+  revisable: boolean;
 }
 
 /** Projection d'un jour : étapes de la ligne et événements, `{ id, name }` seulement. */
@@ -78,6 +84,7 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
     ? { proposals: await adapter.listProposals(ctx, tripId), noOptionSlots: [] }
     : fromPreview(await adapter.listPreviewSlots(ctx, tripId));
   const deck = await adapter.getDeckSession(ctx, tripId);
+  const essai = await isTrialTrip(adapter, ctx, tripId);
   const parId = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   return {
     tripId: trip.id,
@@ -87,6 +94,7 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
     days: trip.days.map(presentationDay),
     noOptionSlots,
     deck,
-    essai: await isTrialTrip(adapter, ctx, tripId),
+    essai,
+    revisable: essai && voyageEssaiRevisable(trip.id),
   };
 }

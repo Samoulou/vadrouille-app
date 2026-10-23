@@ -33,6 +33,8 @@ export type IssueLancementEssai = { readonly statut: string; readonly tripId?: s
 export interface PortCreationEssai {
   lancer(demande: { readonly requestId: string; readonly draft: TripDraft; readonly brief: Brief; readonly recit?: string }): Promise<IssueLancementEssai>;
   relancer(demande: { readonly tripId: string; readonly requestId: string }): Promise<IssueLancementEssai>;
+  /** Révision après le tri (spécification E2E-essai, lot 4 ; décision 0126) : statut fermé, sans valeur. */
+  reviser(demande: { readonly tripId: string; readonly pasPourMoi: readonly string[]; readonly jAime: readonly string[] }): Promise<{ readonly statut: string }>;
   etat(tripId: string): Promise<EtatVoyageEssai | null>;
 }
 

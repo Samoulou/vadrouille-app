@@ -13,8 +13,10 @@ import {
   lireCandidats,
   lireExecution,
   lireSecteurs,
+  lireVersionCourante,
   PHASES_TRAVAIL,
   remplacerCandidats,
+  SQL_VERSION_COURANTE,
   SECTEURS_STOCKES_MAX,
   SQL_SECTEURS_PRESENTS,
   SQL_SUPPRIMER_SECTEURS,
@@ -49,6 +51,8 @@ function poolSimule(
     /** Table `run_secteurs` présente (migration 0013 appliquée) ; vrai par défaut. */
     secteursPresents?: boolean;
     secteurs?: Record<string, unknown>[];
+    /** Version servie d'un voyage (lot 4, décision 0126) ; absente : aucune ligne. */
+    version?: unknown;
   } = {},
 ) {
   const requetes: Requete[] = [];
@@ -68,6 +72,7 @@ function poolSimule(
         if (texte.startsWith("SELECT cle")) return { rows: reponses.candidats ?? [] };
         if (texte === SQL_SECTEURS_PRESENTS) return { rows: [{ presente: reponses.secteursPresents ?? true }] };
         if (texte.startsWith("SELECT secteurs")) return { rows: reponses.secteurs ?? [] };
+        if (texte === SQL_VERSION_COURANTE) return { rows: reponses.version === undefined ? [] : [{ contenu: reponses.version }] };
         return { rows: [] };
       },
       release: () => {
@@ -115,6 +120,30 @@ describe("p0: table de travail de p0Run (adaptateur unique)", () => {
     expect(requetes.at(-1)?.texte).toBe("COMMIT");
     expect(liberations()).toBe(1);
     for (const { texte } of requetes) expect(texte).not.toContain(RUN_ID);
+  });
+
+  it("lireExecution : forfait de modèles réservé lu quand il existe (décision 0126 § 2), refusé s'il est mal formé", async () => {
+    const { pool, requetes } = poolSimule({ execution: { ...EXECUTION, forfait_modeles: "250000" } });
+    expect(await lireExecution(pool, RUN_ID)).toMatchObject({ forfaitModelesMicros: 250_000 });
+    expect(requetes[2]?.texte).toContain("SELECT f.models_cost_micros FROM prototype.forfaits AS f WHERE f.run_id = r.id");
+    expect(await lireExecution(poolSimule({ execution: { ...EXECUTION, forfait_modeles: null } }).pool, RUN_ID)).not.toHaveProperty("forfaitModelesMicros");
+    for (const mal of ["-1", "1.5", "abc"]) {
+      expect((await echec(lireExecution(poolSimule({ execution: { ...EXECUTION, forfait_modeles: mal } }).pool, RUN_ID))).code).toBe("base");
+    }
+  });
+
+  it("lireVersionCourante : dernière version non expirée du voyage (début de l'exécution), paramètre lié ; identifiant refusé avant toute requête", async () => {
+    const TRIP = "proto_rome_44444444444444448444444444444444";
+    const { pool, requetes } = poolSimule({ version: { trip: { id: TRIP } } });
+    expect(await lireVersionCourante(pool, TRIP)).toEqual({ trip: { id: TRIP } });
+    const lecture = requetes.find((r) => r.texte === SQL_VERSION_COURANTE);
+    expect(lecture?.valeurs).toEqual([TRIP]);
+    expect(SQL_VERSION_COURANTE).toContain("p.expires_at > pg_catalog.now()");
+    expect(SQL_VERSION_COURANTE).toContain("ORDER BY r.started_at DESC, r.id DESC LIMIT 1");
+    expect(await lireVersionCourante(poolSimule().pool, TRIP)).toBeNull();
+    const vide = poolSimule();
+    expect((await echec(lireVersionCourante(vide.pool, "proto_rome_'; DROP"))).code).toBe("entree_refusee");
+    expect(vide.requetes).toHaveLength(0);
   });
 
   it("exécution absente ou plus en cours : execution_absente ; ligne mal formée : base", async () => {

@@ -2,9 +2,10 @@ import "server-only";
 
 import type { Brief as BriefDeLApp, TripDraft } from "@/contracts";
 import { BRIEF_SAISI } from "@/contracts/prototype-travail";
-import { identifiantVoyageSaisi } from "@/domain/identifiant";
+import { identifiantVoyageSaisi, lireIdentifiantVoyageSaisi, slugDestination } from "@/domain/identifiant";
 import { commitDuDeploiement } from "@/server/env/p0";
 import type { DependancesAcces } from "@/server/p0/acces";
+import { clesRevision } from "@/server/p0/cles-revision";
 import { briefDepuisFormulaire } from "@/server/p0/depuis-formulaire";
 import { ouvrirGardeLancement, type CodeGarde, type CodeRefusAvantReservation, type GardeOuverte } from "@/server/p0/garde";
 import { reserverExecution, type PoolSql } from "@/server/usage/neon";
@@ -12,10 +13,13 @@ import {
   briefLancable,
   briefSaisiTientDansLeMode,
   briefTientDansLeMode,
+  choixRevisionValides,
   cloreExecutionNonDemarree,
+  demarrerRevision,
   lancementDuMode,
   NOMS_BRIEFS,
   P0RUN_COMPLET,
+  REVISIONS_PAR_VOYAGE,
   startWorkflow,
   validerBriefSaisi,
   verrouS8Leve,
@@ -189,7 +193,8 @@ export async function lancerBriefSaisi(demande: DemandeLancementSaisi, dependanc
         champ = valide.champ;
         return refus("entree_invalide");
       }
-      const lancement = lancementDuMode(MODE_LANCEMENT_APP);
+      // Premier programme d'un voyage de l'app : fusible du mode moins la part de ses révisions (décision 0126 § 2).
+      const lancement = lancementDuMode(MODE_LANCEMENT_APP, "saisi");
       const commitSha = commitDuDeploiement(dependances.env);
       if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
       if (!briefSaisiTientDansLeMode(MODE_LANCEMENT_APP, valide.brief)) return refus("brief_hors_plafonds");
@@ -249,7 +254,8 @@ export async function relancerBriefSaisi(demande: DemandeRelanceSaisi, dependanc
     cookie: dependances.cookie,
     async reserver() {
       if (!P0RUN_COMPLET) return refus("real_mode_unavailable");
-      const lancement = lancementDuMode(MODE_LANCEMENT_APP);
+      // Nouveau voyage : même part que le premier programme d'un voyage de l'app (décision 0126 § 2).
+      const lancement = lancementDuMode(MODE_LANCEMENT_APP, "saisi");
       const commitSha = commitDuDeploiement(dependances.env);
       if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
       // Relance : le brief vient de la base, une connexion est donc nécessaire ; le verrou S8 est contrôlé d'abord (revue
@@ -284,4 +290,102 @@ export async function relancerBriefSaisi(demande: DemandeRelanceSaisi, dependanc
   if (existante) return { statut: "lancee", tripId };
   const statut = await demarrer(garde.garde, dependances);
   return statut === "lancee" ? { statut, tripId } : { statut };
+}
+
+/** Révision d'un voyage de l'app après le tri (non fiable) : voyage et identifiants des étapes triées. */
+export type DemandeRevisionSaisi = { readonly tripId: unknown; readonly pasPourMoi: unknown; readonly jAime: unknown };
+
+/**
+ * Issue d'une révision : `lancee` (révision démarrée), `en_cours` (une révision de ce voyage est déjà en cours, rien
+ * n'est réservé), `epuisees` (le voyage a déjà eu ses `REVISIONS_PAR_VOYAGE` révisions), ou un statut du lancement.
+ */
+export type StatutRevision = StatutLancement | "en_cours" | "epuisees";
+
+/** État d'une clé de révision déjà écrite : statut de son exécution (`en_cours`, `programme_ecrit`, `arretee`). */
+export type CleRevisionLue = { readonly requestId: string; readonly statut: string };
+
+export type DependancesRevisionSaisi = DependancesLancementP0 & {
+  /** Brief saisi de l'exécution qui a écrit la version servie du voyage, ou `null` (voyage d'un brief commité, expiré). */
+  readonly briefVersion: (pool: PoolSql, tripId: string) => Promise<unknown>;
+  /** Clés de révision déjà écrites parmi celles données, avec le statut de leur exécution. */
+  readonly clesEcrites: (pool: PoolSql, cles: readonly string[]) => Promise<readonly CleRevisionLue[]>;
+};
+
+/**
+ * « Pas pour moi » change le programme (spécification E2E-essai, lot 4 ; décision 0126) : à la fin du tri d'un voyage de
+ * l'app, une **nouvelle exécution liée** (nature `essai`, variante `A`, brief saisi recopié de la version servie) réécrit
+ * le programme par la requête `revision`, puis la même vérification Google et les mêmes trajets, sous le **même**
+ * identifiant de voyage. Même garde que le lancement (code d'accès, `P0RUN_COMPLET`, verrou S8, réservation, plafonds du
+ * mode) ; forfait de modèles : `PART_REVISION_MICROS` (même fusible de 2 USD par voyage, Q601).
+ *
+ * Ordre : garde ; `P0RUN_COMPLET` ; choix (`choixRevisionValides`, voyage de l'app) ; mode et commit ; verrou S8 ; brief de
+ * la version servie (même destination que le voyage), `BriefSchema`, plafonds ; clés de révision du voyage (une
+ * révision en cours : `en_cours` ; toutes écrites : `epuisees`) ; réservation sous la première clé libre ; démarrage
+ * de `p0Revision`. Une clé trouvée écrite par la réservation (demande simultanée) rend `en_cours` sans rien démarrer.
+ * Aucun journal : ni choix, ni brief.
+ */
+export async function reviserVoyageSaisi(demande: DemandeRevisionSaisi, dependances: DependancesRevisionSaisi): Promise<{ readonly statut: StatutRevision }> {
+  let motif: "en_cours" | "epuisees" | undefined;
+  let existante = false;
+  const choix = { tripId: demande.tripId, pasPourMoi: demande.pasPourMoi, jAime: demande.jAime };
+  const garde = await ouvrirGardeLancement({
+    env: dependances.env,
+    execArgv: dependances.execArgv,
+    maintenant: dependances.maintenant,
+    cookie: dependances.cookie,
+    async reserver() {
+      if (!P0RUN_COMPLET) return refus("real_mode_unavailable");
+      if (!choixRevisionValides(choix) || typeof choix.tripId !== "string") return refus("entree_invalide");
+      const voyage = lireIdentifiantVoyageSaisi(choix.tripId);
+      if (voyage === null) return refus("entree_invalide");
+      const lancement = lancementDuMode(MODE_LANCEMENT_APP, "revision");
+      const commitSha = commitDuDeploiement(dependances.env);
+      if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
+      const pool = dependances.pool();
+      if (!(await verrouS8Leve(pool))) return refus("real_mode_unavailable");
+      const valide = validerBriefSaisi(await dependances.briefVersion(pool, choix.tripId));
+      if (!valide.ok || slugDestination(valide.brief.destination) !== voyage.slug) return refus("entree_invalide");
+      if (!briefSaisiTientDansLeMode(MODE_LANCEMENT_APP, valide.brief)) return refus("brief_hors_plafonds");
+      const cles = clesRevision(choix.tripId, REVISIONS_PAR_VOYAGE);
+      const ecrites = await dependances.clesEcrites(pool, cles);
+      if (ecrites.some((cle) => cle.statut === "en_cours")) {
+        motif = "en_cours";
+        return refus("entree_invalide");
+      }
+      const prises = new Set(ecrites.map((cle) => cle.requestId));
+      const libre = cles.find((cle) => !prises.has(cle));
+      if (libre === undefined) {
+        motif = "epuisees";
+        return refus("entree_invalide");
+      }
+      const reservation = await reserverExecution(
+        pool,
+        {
+          mode: MODE_LANCEMENT_APP,
+          brief: BRIEF_SAISI,
+          variant: VARIANTE_LANCEMENT_APP,
+          commitSha,
+          forfait: lancement.forfait,
+          briefSaisi: { requestId: libre, contenu: valide.brief },
+        },
+        lancement.regles,
+      );
+      existante = reservation.ok && reservation.existante === true;
+      return reservation;
+    },
+  });
+  if (!garde.ok) return { statut: motif ?? STATUT_DU_REFUS.get(garde.code) ?? "fermee" };
+  if (existante) return { statut: "en_cours" };
+  const demarrage = await demarrerRevision(garde.garde, {
+    tripId: choix.tripId as string,
+    pasPourMoi: choix.pasPourMoi as string[],
+    jAime: choix.jAime as string[],
+  });
+  if (demarrage.ok) return { statut: "lancee" };
+  try {
+    await cloreExecutionNonDemarree(dependances.pool(), garde.garde);
+  } catch {
+    // Base injoignable : l'exécution reste `en_cours`, sans étape ; close comme orpheline au lancement suivant.
+  }
+  return { statut: "demarrage_impossible" };
 }

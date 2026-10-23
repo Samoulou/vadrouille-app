@@ -90,6 +90,16 @@ export function prototypeCreationAdapter(): CreationAdapter {
   return createPrototypeCreationAdapter({ port: () => holder[INSTANCE_KEY]?.creation ?? null, trips: () => prototypeTripAdapter() });
 }
 
+/**
+ * Révision d'un voyage d'essai après le tri (spécification E2E-essai, lot 4 ; décision 0126), par le port de création
+ * branché au démarrage ; `null` s'il ne l'est pas (rien n'est lancé).
+ */
+export function revisionEssai(): PortCreationEssai["reviser"] | null {
+  assertPrototypeAllowedOnProcess();
+  const port = holder[INSTANCE_KEY]?.creation;
+  return port ? (demande) => port.reviser(demande) : null;
+}
+
 /** Déblocages de l'essai branchés, ou `null` (aucun cookie lu ni écrit). */
 export function deblocagesEssai(): DeblocagesEssai | null {
   return holder[INSTANCE_KEY]?.deblocages ?? null;

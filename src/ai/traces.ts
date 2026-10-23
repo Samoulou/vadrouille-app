@@ -7,6 +7,7 @@ import { CODES_ERREUR_IA, REESSAYABLES, type CodeErreurIa, type ResultatIa } fro
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
 import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
+import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -49,6 +50,7 @@ export const PROMPTS_TRACE = [
   PROMPT_QUARTIER.id,
   PROMPT_RECHERCHE_WEB.id,
   PROMPT_PROGRAMME.id,
+  PROMPT_REVISION.id,
 ] as const;
 export type PromptTrace = (typeof PROMPTS_TRACE)[number];
 
