@@ -12,7 +12,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Statut du 151e cycle** (#727) fusionné.
 
 ## En cours
-- **#527 `[data]`** (`coords-purge` en échec, dernier échec le 23 octobre à 08:33 UTC) : un fil data cherche la cause dans les journaux. Si un environnement ou un secret manque, il s'arrête et le signale (Q438, Samuel).
+- **#527 `[data]`** (`coords-purge` en échec) : cause trouvée dans les journaux, rien à corriger dans le dépôt. Les quatre secrets `COORDS_PURGE_PG*` de l'environnement `coords-purge` sont vides ; les 22 runs ont échoué depuis le 17 octobre, la purge n'a jamais tourné. Bloqué sur Q438 (Samuel).
 - **#701 `[release]`** : attend la fusion de Samuel. Elle porte désormais aussi #722 et #725 (`main` = `ced0695`).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618.
 
@@ -23,7 +23,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## Prochain cycle
 1. Après la fusion de #701 et le redéploiement : envoyer à Samuel un seul lien pour tester « Créer un voyage » jusqu'au programme.
-2. Suivre #527 ; si la cause est un environnement ou un secret, le reporter à Samuel avec Q438.
+2. #527 : attend Q438 (Samuel) ; à rappeler à Samuel après son test de bout en bout.
 3. Note de version suivante : corriger l'état des migrations 0016, 0017 et 0018 ; lister 0126 (une révision), 0127 et les textes non maquettés (#716, #720).
 
 ## Décisions attendues de Samuel
