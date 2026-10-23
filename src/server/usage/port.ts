@@ -25,8 +25,9 @@ export type Fournisseur = (typeof FOURNISSEURS)[number];
 
 /**
  * Méthodes facturées, une par requête de client (`step` de `usage_ledger`, D13 point 7). `places_autocomplete` : la
- * recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026), hors de tout forfait
- * d'exécution (aucun forfait n'en porte : le registre la refuse).
+ * recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129), hors de tout
+ * forfait d'exécution (aucun forfait n'en porte : le registre la refuse) ; son plafond persistant est la ligne `ville`
+ * de `prototype.forfaits` (0129 § 3).
  */
 export const METHODES = ["chat", "places_text_search", "places_details", "routes_matrix", "places_autocomplete"] as const;
 export type Methode = (typeof METHODES)[number];

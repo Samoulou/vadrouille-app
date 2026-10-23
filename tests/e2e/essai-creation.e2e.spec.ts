@@ -46,12 +46,15 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   // Places. Garde du mode réel fermée sur ce serveur : la recherche répond « indisponible » sans aucun appel à Google, et
   // l'écran se replie sur la table maison des villes (Rome admise ; Hoi An, hors de la table, attend la recherche).
   await fillTrip(page, { ...ROME, destination: "Hoi An" });
-  await expect(page.getByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeAttached();
+  // Décision 0129 : l'e2e ne couvre que ce repli ; la recherche réelle est « À tester par Samuel ».
+  await expect(page.getByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeVisible();
   await continueButton(page).click();
   const destination = page.getByRole("combobox", { name: "Destination" });
   await expect(destination).toHaveAttribute("aria-invalid", "true");
   await expect(destination).toBeFocused();
-  await expect(page.getByText("La recherche des villes ne répond pas pour le moment : réessaie dans un instant.")).toBeVisible();
+  // Un seul message : l'erreur du champ reprend le texte de la recherche, la région d'état se tait.
+  await expect(page.getByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toHaveCount(1);
+  await expect(page.getByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeVisible();
   await expect(page.getByText("Essaie Rome ou Lisbonne", { exact: false })).toHaveCount(0);
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await sansViolation(page);

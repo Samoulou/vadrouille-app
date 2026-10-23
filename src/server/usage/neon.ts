@@ -251,3 +251,92 @@ export async function reserverRelecture(pool: PoolSql, forfait: Forfait, regles:
   );
   return "refus" in resultat ? { ok: false, code: resultat.refus } : { ok: true };
 }
+
+/**
+ * Recherche de ville du site d'essai (décision 0129 § 3) : une ligne `forfaits` de nature `ville` par action, **avant**
+ * tout appel Google. Suggestions : `autocomplete_requests` = 1 ; choix : `place_details_requests` = 1 (fiche Essentials).
+ * Coût au prix plein de la table de prix, compté dans le mois Google des sommes ci-dessus (`google_cost_micros`).
+ */
+export type DemandeVille = {
+  readonly action: "suggestions" | "choix";
+  /** Empreinte du cookie d'accès (`empreinteCookieAcces`), 64 caractères hexadécimaux. */
+  readonly empreinte: string;
+  /** Coût de l'action au prix plein, en micro-USD (table de prix). */
+  readonly coutGoogleMicros: number;
+};
+
+/** Limites de la recherche de ville (décision 0129 § 3). */
+export type LimitesVille = {
+  /** Suggestions par jour de quota Google (Pacifique, `prototype.quota_day_at`). */
+  readonly suggestionsParJour: number;
+  /** Choix (fiches) par jour de quota Google. */
+  readonly choixParJour: number;
+  /** Actions (suggestions et choix) d'un même cookie par minute glissante. */
+  readonly actionsParMinuteEtCookie: number;
+};
+
+/** Refus de la recherche de ville : plafond du jour, débit du cookie, ou base indisponible (échec fermé). */
+export type CodeRefusVille = "ville_jour_atteint" | "ville_debit_atteint" | "usage_unavailable";
+export type ResultatVille = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefusVille };
+
+const FORME_EMPREINTE = /^[0-9a-f]{64}$/;
+
+const SQL_SOMMES_VILLE = `SELECT
+  COALESCE(SUM(f.autocomplete_requests) FILTER (WHERE f.quota_day = prototype.quota_day_at(pg_catalog.now())), 0) AS jour_suggestions,
+  COALESCE(SUM(f.place_details_requests) FILTER (WHERE f.quota_day = prototype.quota_day_at(pg_catalog.now())), 0) AS jour_choix,
+  pg_catalog.count(*) FILTER (WHERE f.acces_empreinte = $1 AND f.created_at > pg_catalog.now() - pg_catalog.make_interval(secs => 60)) AS minute_cookie
+FROM prototype.forfaits AS f WHERE f.nature = 'ville'`;
+
+const SQL_INSERER_VILLE = `INSERT INTO prototype.forfaits
+  (nature, run_id, text_search_requests, place_details_requests, routes_requests, routes_elements, google_cost_micros, models_cost_micros,
+   autocomplete_requests, acces_empreinte)
+  VALUES ('ville', NULL, 0, $1, 0, 0, $2, NULL, $3, $4)`;
+
+/**
+ * Réservation d'une action de recherche de ville : même transaction que les autres forfaits (contexte d'organisation,
+ * verrou consultatif du port), puis sommes du jour de quota et débit du cookie ; au plafond, refus sans rien écrire.
+ * Toute erreur (base absente, migration 0019 non appliquée) rend `usage_unavailable` : aucun appel Google ne suit.
+ */
+export async function reserverVille(pool: PoolSql, demande: DemandeVille, limites: LimitesVille): Promise<ResultatVille> {
+  if (!FORME_EMPREINTE.test(demande.empreinte) || !Number.isSafeInteger(demande.coutGoogleMicros) || demande.coutGoogleMicros < 0) {
+    return { ok: false, code: "usage_unavailable" };
+  }
+  let client: ClientSql;
+  try {
+    client = await pool.connect();
+  } catch {
+    return { ok: false, code: "usage_unavailable" };
+  }
+  let enTransaction = false;
+  try {
+    await client.query("BEGIN");
+    enTransaction = true;
+    await client.query("SELECT pg_catalog.set_config('app.organization_id', $1, true)", [ORGANISATION_PROTOTYPE]);
+    await client.query("SELECT pg_catalog.pg_advisory_xact_lock($1)", [CLE_VERROU_FORFAIT]);
+    const ligne = (await client.query(SQL_SOMMES_VILLE, [demande.empreinte])).rows[0];
+    const suggestions = nombre(ligne?.jour_suggestions);
+    const choix = nombre(ligne?.jour_choix);
+    const minute = nombre(ligne?.minute_cookie);
+    const refus: CodeRefusVille | null =
+      minute >= limites.actionsParMinuteEtCookie
+        ? "ville_debit_atteint"
+        : (demande.action === "suggestions" ? suggestions >= limites.suggestionsParJour : choix >= limites.choixParJour)
+          ? "ville_jour_atteint"
+          : null;
+    if (refus !== null) {
+      await client.query("ROLLBACK");
+      enTransaction = false;
+      return { ok: false, code: refus };
+    }
+    const estChoix = demande.action === "choix";
+    await client.query(SQL_INSERER_VILLE, [estChoix ? 1 : 0, demande.coutGoogleMicros, estChoix ? 0 : 1, demande.empreinte]);
+    await client.query("COMMIT");
+    enTransaction = false;
+    return { ok: true };
+  } catch {
+    if (enTransaction) await client.query("ROLLBACK").catch(() => undefined);
+    return { ok: false, code: "usage_unavailable" };
+  } finally {
+    client.release();
+  }
+}

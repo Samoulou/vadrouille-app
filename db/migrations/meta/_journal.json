@@ -134,6 +134,13 @@
       "when": 1792833483820,
       "tag": "0018_brief_saisi_a_eviter",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792919883820,
+      "tag": "0019_recherche_ville_prototype",
+      "breakpoints": true
     }
   ]
 }

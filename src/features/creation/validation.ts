@@ -5,13 +5,15 @@ import {
   CHILDREN,
   CITY_NAME_LENGTH,
   COMMITMENT_LABEL_LENGTH,
+  DESTINATION_ESSAI_MOTIF,
   DESTINATION_LENGTH,
   KNOWN_LODGING_LENGTH,
   MEAL_BUDGET_CHF,
+  PLACE_ID_MOTIF,
   PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
-import { fuseauDeVille, fuseauDuPays, paysParCode } from "@/lib/fuseaux";
+import { fuseauDeVille, fuseauDuPays, paysParCode, villeDuPays } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -32,8 +34,10 @@ export type FieldError =
   | "endTime"
   | "range"
   // Site d'essai (spécification E2E-essai, lot 2, D1 ; demande de Samuel du 23 octobre 2026) : ville à choisir dans
-  // les suggestions, ville hors de la table quand la recherche ne répond pas, seconde ville, séjour trop long.
+  // les suggestions, ville hors de la table quand la recherche ne répond pas, nom hors de `DESTINATION_ESSAI_MOTIF`
+  // (décision 0129 § 4), seconde ville, séjour trop long.
   | "selectCity"
+  | "cityCharacters"
   | "cityUnavailable"
   | "singleCity"
   | "tooLong";
@@ -101,7 +105,6 @@ export function destinationHorsTable(destination: string): boolean {
   return textError(destination, DESTINATION_LENGTH) === null && fuseauDeVille(destination) === null;
 }
 
-const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 
 /**
  * Ville choisie dans les suggestions (site d'essai) : `placeId`, et pays et fuseau maison rendus par le serveur,
@@ -109,7 +112,7 @@ const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
  */
 export function destinationRegion(trip: Pick<TripForm, "placeId" | "country" | "timeZone">): DestinationRegion | null {
   const pays = paysParCode(trip.country || undefined);
-  if (pays === null || !PLACE_ID.test(trip.placeId ?? "")) return null;
+  if (pays === null || !PLACE_ID_MOTIF.test(trip.placeId ?? "")) return null;
   const timeZone = fuseauDuPays(pays.code, trip.timeZone ?? "");
   return timeZone === null ? null : { placeId: trip.placeId as string, country: pays.code, timeZone };
 }
@@ -124,10 +127,15 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
   push("destination", destinationError);
-  if (essai && destinationError === null && destinationRegion(trip) === null) {
+  const region = essai && destinationError === null ? destinationRegion(trip) : null;
+  if (essai && destinationError === null && region === null) {
     // Recherche disponible : choisir dans les suggestions ; sinon (repli sans réseau), une ville de la table suffit.
     if (options.suggestions === true) push("destination", "selectCity");
     else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
+  }
+  // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
+  if (region !== null && villeDuPays(trip.destination, region.country) === null && !DESTINATION_ESSAI_MOTIF.test(trip.destination.trim().replace(/\s+/gu, " "))) {
+    push("destination", "cityCharacters");
   }
   const start = isDate(trip.start) ? trip.start : null;
   const end = isDate(trip.end) ? trip.end : null;

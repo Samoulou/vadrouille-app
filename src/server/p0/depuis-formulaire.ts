@@ -1,10 +1,10 @@
 import "server-only";
 
 import type { Brief as BriefDeLApp, Lodging, TripCommitment, TripDraft } from "@/contracts";
-import { PROTOTYPE_STAY_DAYS_MAX } from "@/contracts/values";
+import { DESTINATION_ESSAI_MOTIF, PROTOTYPE_STAY_DAYS_MAX } from "@/contracts/values";
 import { heuresDeVol } from "@/domain/squelette";
 import { joursEntre, versHeure } from "@/domain/temps";
-import { fuseauDeVille, fuseauDuPays, paysDeVille, paysParCode } from "@/lib/fuseaux";
+import { fuseauDeVille, fuseauDuPays, paysDeVille, paysParCode, villeDuPays } from "@/lib/fuseaux";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 
 /**
@@ -16,10 +16,15 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
  * par un contrôle de type du pont, `src/workflows/p0-run.ts`).
  *
  * Pays et fuseau : ceux de la ville choisie à l'écran 1 dans les suggestions (`draft.destinationRegion`, demande de
- * Samuel du 23 octobre 2026), **revérifiés** contre la table maison des pays (`fuseauDuPays`, liste fermée) : le brief
+ * Samuel du 23 octobre 2026), **bornés** par la table maison des pays (`fuseauDuPays`, liste fermée) : le brief
  * reçoit le nom et le fuseau de la table, jamais la chaîne reçue ; sans choix valide (recherche indisponible), ceux de
- * la table maison des villes. La destination reste le texte du brouillon (tapé, ou nom maison) ; le `placeId` n'entre
- * pas dans le brief.
+ * la table maison des villes. La région est **déclarée par le client, bornée par les tables** (décision 0129 § 4) : rien
+ * ne prouve que le `placeId` désigne la destination, qui n'entre pas dans le brief.
+ *
+ * Destination d'une ville choisie (décision 0129 § 4, écart avec 0125 § 3 « texte du formulaire ») : le **nom maison**
+ * de la table des villes de ce pays, ou, hors de la table, le texte tapé **filtré** (`DESTINATION_ESSAI_MOTIF` : lettres,
+ * espaces, apostrophes, tirets et points, 80 caractères au plus, espaces répétés réduits) ; tout autre texte est refusé.
+ * Sans région, la destination est une clé de la table des villes, donc déjà bornée.
  *
  * Refus, chacun sur son champ de la forme de `parseInput`, avant toute réservation : ville absente de la table des
  * villes sans ville choisie, ou ville choisie hors des tables maison (`draft.destination`), plus de `PROTOTYPE_STAY_DAYS_MAX` jours (`draft.end`), une autre ville
@@ -92,16 +97,23 @@ function engagementsDuBrief(commitments: readonly TripCommitment[]): NonNullable
   );
 }
 
-/** Fuseau et pays de la destination : la ville choisie, revérifiée, sinon la table des villes ; `null` sinon. */
-function lieuDeLaDestination(destination: string, region: TripDraft["destinationRegion"]): { fuseau: string; pays: string } | null {
+/**
+ * Destination, fuseau et pays : la ville choisie, revérifiée (nom maison, ou texte tapé filtré), sinon la table des
+ * villes ; `null` sinon.
+ */
+function lieuDeLaDestination(saisie: string, region: TripDraft["destinationRegion"]): { destination: string; fuseau: string; pays: string } | null {
   if (region !== undefined) {
     const fuseau = fuseauDuPays(region.country, region.timeZone);
     const pays = paysParCode(region.country)?.nom;
-    return fuseau === null || pays === undefined ? null : { fuseau, pays };
+    if (fuseau === null || pays === undefined) return null;
+    const maison = villeDuPays(saisie, region.country);
+    if (maison !== null) return { destination: maison.nom, fuseau, pays };
+    const filtre = saisie.replace(/\s+/gu, " ");
+    return DESTINATION_ESSAI_MOTIF.test(filtre) ? { destination: filtre, fuseau, pays } : null;
   }
-  const fuseauVille = fuseauDeVille(destination);
-  const paysVille = paysDeVille(destination);
-  return fuseauVille === null || paysVille === null ? null : { fuseau: fuseauVille, pays: paysVille };
+  const fuseauVille = fuseauDeVille(saisie);
+  const paysVille = paysDeVille(saisie);
+  return fuseauVille === null || paysVille === null ? null : { destination: saisie, fuseau: fuseauVille, pays: paysVille };
 }
 
 /**
@@ -110,10 +122,9 @@ function lieuDeLaDestination(destination: string, region: TripDraft["destination
  * sont contrôlées ici.
  */
 export function briefDepuisFormulaire(draft: TripDraft, brief: BriefDeLApp, recit: string | undefined): ResultatConversion {
-  const destination = draft.destination.trim();
-  const lieu = lieuDeLaDestination(destination, draft.destinationRegion);
+  const lieu = lieuDeLaDestination(draft.destination.trim(), draft.destinationRegion);
   if (lieu === null) return { ok: false, champ: "draft.destination" };
-  const { fuseau, pays } = lieu;
+  const { destination, fuseau, pays } = lieu;
   if (draft.otherCities.length > 0) return { ok: false, champ: "draft.otherCities" };
   const nuits = joursEntre(draft.start, draft.end);
   if (nuits > PROTOTYPE_STAY_DAYS_MAX - 1) return { ok: false, champ: "draft.end" };

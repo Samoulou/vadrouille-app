@@ -30,6 +30,14 @@ const TEST: TablePrixGoogle = {
 };
 
 describe("p0: table de prix Google", () => {
+  it("recherche de ville (décision 0129, mineur 22 de la revue du head `aa77422`) : les deux SKU facturés, et la session sans tranche gratuite (`gratuitParMois: null`), admise par le schéma", () => {
+    expect(TABLE_REELLE.skus.places_autocomplete_requests).toEqual({ methode: "places_autocomplete", unite: "requete", gratuitParMois: 10_000, prixPour1000: 2.83 });
+    expect(TABLE_REELLE.skus.places_details_essentials).toMatchObject({ methode: "places_details", unite: "requete", prixPour1000: 5 });
+    expect(TABLE_REELLE.skus.places_autocomplete_session_usage).toEqual({ methode: "places_autocomplete", unite: "requete", gratuitParMois: null, prixPour1000: 0 });
+    // Sans tranche gratuite et à prix nul : un mois de sessions coûte 0.
+    expect(coutSku(TABLE_REELLE, { sku: "places_autocomplete_session_usage", quantite: 10_000 })).toBe(0);
+  });
+
   it("la table commitée est valide, datée, et couvre les SKU des clients réels", () => {
     // B8a (0085 § 2) : relevé du 2026-10-17, qui ajoute la ligne « IDs only » de Place Details ; relevé du 2026-10-23
     // (recherche de ville du site d'essai, demande de Samuel) : lignes Autocomplete (requêtes et session).

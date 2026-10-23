@@ -1,25 +1,34 @@
 import "server-only";
 
+import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
 import { fuseauParPosition, paysParCode, villeDuPays } from "@/lib/fuseaux";
 import { creerClientVilles, type OptionsClientsGoogle } from "@/server/composition/clients-google";
-import { cookieAccesValide, ouvertureP0, type DependancesAcces } from "@/server/p0/acces";
+import { cookieAccesValide, empreinteCookieAcces, ouvertureP0, type DependancesAcces } from "@/server/p0/acces";
+import { poolPrototype } from "@/server/p0/base";
+import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
+import { reserverVille, type DemandeVille, type LimitesVille, type ResultatVille } from "@/server/usage/neon";
 import { periodesDe } from "@/server/usage/periodes";
 import { horlogeSysteme, type PortConsommation } from "@/server/usage/port";
 
+import prixGoogle from "../../../prototype/config/prix-google.json";
+
 /**
- * Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, fil Routine cycle du studio :
- * « un autocomplete avec google maps et on sélectionne » ; soumise aux verdicts de la Sécurité et du Tech Lead).
+ * Recherche de ville de l'écran 1 du site d'essai (décision 0129 ; demande de Samuel du 2026-10-23, fil « Routine cycle
+ * du studio »).
  *
  * - **Même barrière que le lancement** : garde du mode réel ouverte (`ouvertureP0` : conditions (1) à (7), jamais en
- *   production) **et** cookie d'accès valide (`cookieAccesValide`). Garde fermée : `indisponible`, aucune clé lue, aucun
- *   appel ; cookie absent ou expiré : `acces`, aucun appel.
+ *   production) **et** cookie d'accès valide (`cookieAccesValide`). Garde fermée : `indisponible`, aucune clé lue, aucune
+ *   connexion, aucun appel ; cookie absent ou expiré : `acces`, aucun appel.
+ * - **Plafond persistant** (0129 § 3) : avant tout appel Google, une ligne `prototype.forfaits` de nature `ville` est
+ *   réservée (`reserverVille`) sous les limites `LIMITES_VILLE` (par jour de quota, et par cookie et par minute) ; au
+ *   plafond, `limite` ; base indisponible ou migration 0019 absente : `indisponible` (échec fermé). Le coût de chaque
+ *   action, au prix plein, entre dans le mois Google des forfaits.
  * - **Un appel Google par action**, au plus : port de consommation en mémoire borné à une réservation (`portUnAppel`) ;
  *   la clé serveur est lue par le client réel, après la barrière de sortie, jamais envoyée au navigateur.
  * - **Données Google** : les suggestions (textes affichés avec l'attribution « Google Maps ») passent par le navigateur
  *   sans être stockées ; de la fiche, seuls le code ISO du pays et la position sont lus, en mémoire. Le navigateur ne
- *   reçoit que des valeurs **maison** : code du pays de la table maison, fuseau et nom du pays de la table, nom maison de
- *   la ville s'il est dans la table, et le `placeId` (seul identifiant Google conservable). Rien n'atteint un prompt :
- *   la destination envoyée au modèle reste le texte tapé par la personne, ou le nom maison.
+ *   reçoit que des valeurs **maison** et le `placeId` (seul identifiant Google conservable). Rien n'atteint un prompt :
+ *   la destination envoyée au modèle est le nom maison, ou le texte tapé filtré (`briefDepuisFormulaire`, 0129 § 4).
  * Aucune donnée Google ni saisie n'est journalisée.
  */
 
@@ -34,15 +43,20 @@ type ClientVilles = {
   ficheVille(placeId: string, session: string): Promise<{ readonly placeId: string; readonly pays: string | null; readonly position: { lat: number; lng: number } }>;
 };
 
-/** Identifiant de lieu Google et jeton de session, contrôlés avant tout appel (mêmes formes que le client réel). */
-const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
-const SESSION = /^[A-Za-z0-9_-]{1,36}$/;
 const SAISIE = { min: 2, max: 80 } as const;
 const TEXTE_SUGGESTION_MAX = 300;
 
+/**
+ * Limites de la recherche de ville (décision 0129 § 3) : 150 suggestions et 40 choix par jour de quota Google, et
+ * 20 actions par cookie d'accès et par minute. Au prix plein (2,83 USD les 1 000 suggestions, 5 USD les 1 000 fiches
+ * Essentials), un jour au plafond coûte 0,6245 USD, un mois de 31 jours 19,36 USD : sous le plafond Google de 20 USD par
+ * mois de 0027 § 2 même sans tranche gratuite ; dans les tranches gratuites (10 000 par mois chacune), 0 USD.
+ */
+export const LIMITES_VILLE: LimitesVille = { suggestionsParJour: 150, choixParJour: 40, actionsParMinuteEtCookie: 20 };
+
 export type IssueSuggestions =
   | { readonly statut: "ok"; readonly suggestions: readonly SuggestionVille[] }
-  | { readonly statut: "acces" | "indisponible" | "entree_invalide" };
+  | { readonly statut: "acces" | "indisponible" | "limite" | "entree_invalide" };
 
 /** Ville choisie : valeurs maison seulement, et le `placeId`. */
 export type VilleChoisie = {
@@ -59,13 +73,15 @@ export type VilleChoisie = {
 
 export type IssueChoix =
   | { readonly statut: "ok"; readonly ville: VilleChoisie }
-  | { readonly statut: "acces" | "indisponible" | "entree_invalide" | "pays_inconnu" };
+  | { readonly statut: "acces" | "indisponible" | "limite" | "entree_invalide" | "pays_inconnu" };
 
 export type DependancesVilles = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête. */
   readonly cookie: string | undefined;
   /** Fabrique du client (doubles des tests) ; par défaut le client Places réel (`creerClientVilles`). */
   readonly client?: (options: OptionsClientsGoogle) => ClientVilles;
+  /** Réservation de l'action (doubles des tests) ; par défaut `reserverVille` sur `poolPrototype()`, sous `LIMITES_VILLE`. */
+  readonly reserver?: (demande: DemandeVille) => Promise<ResultatVille>;
 };
 
 /** Port en mémoire borné à **une** requête : chaque action ne peut appeler Google qu'une fois. */
@@ -88,13 +104,42 @@ function portUnAppel(): PortConsommation {
   };
 }
 
-/** Barrière : `null` si ouverte, sinon le statut à rendre (aucun appel). */
-function barriere(dependances: DependancesVilles): "acces" | "indisponible" | null {
+/** Barrière : l'empreinte du cookie si elle est ouverte, sinon le statut à rendre (aucune connexion, aucun appel). */
+function barriere(dependances: DependancesVilles): { readonly empreinte: string } | { readonly refus: "acces" | "indisponible" } {
   // Sans journal `p0.guard_closed` : la recherche part à chaque pause de frappe ; le lancement le journalise déjà.
   const ouverture = ouvertureP0(dependances, false);
-  if (!ouverture.ok) return "indisponible";
+  if (!ouverture.ok) return { refus: "indisponible" };
   const maintenant = (dependances.maintenant ?? Date.now)();
-  return cookieAccesValide(dependances.cookie, ouverture.attendu, maintenant) ? null : "acces";
+  const cookie = dependances.cookie;
+  if (cookie === undefined || !cookieAccesValide(cookie, ouverture.attendu, maintenant)) return { refus: "acces" };
+  return { empreinte: empreinteCookieAcces(ouverture.attendu, cookie) };
+}
+
+/**
+ * Coût au prix plein d'une action, en micro-USD (table de prix commitée) ; `null` si la table est illisible. SKU facturés
+ * (ceux du client réel, `SKU_SUGGESTIONS` et `SKU_FICHE_VILLE` de `places-client.ts`) : `places_autocomplete_requests`
+ * pour les suggestions, `places_details_essentials` pour le choix.
+ */
+function coutDe(action: DemandeVille["action"]): number | null {
+  const table = TablePrixGoogleSchema.safeParse(prixGoogle);
+  if (!table.success) return null;
+  const ligne = action === "suggestions" ? table.data.skus.places_autocomplete_requests : table.data.skus.places_details_essentials;
+  return ligne === undefined ? null : Math.ceil(ligne.prixPour1000 * 1_000);
+}
+
+/** Réservation de l'action : `null` si elle est accordée, sinon le statut à rendre (aucun appel Google). */
+async function reserver(action: DemandeVille["action"], empreinte: string, dependances: DependancesVilles): Promise<"limite" | "indisponible" | null> {
+  const coutGoogleMicros = coutDe(action);
+  if (coutGoogleMicros === null) return "indisponible";
+  const reserve = dependances.reserver ?? ((demande: DemandeVille) => reserverVille(poolPrototype(), demande, LIMITES_VILLE));
+  let resultat: ResultatVille;
+  try {
+    resultat = await reserve({ action, empreinte, coutGoogleMicros });
+  } catch {
+    return "indisponible";
+  }
+  if (resultat.ok) return null;
+  return resultat.code === "usage_unavailable" ? "indisponible" : "limite";
 }
 
 function client(dependances: DependancesVilles): ClientVilles {
@@ -102,7 +147,8 @@ function client(dependances: DependancesVilles): ClientVilles {
   const horloge = horlogeSysteme;
   return fabrique({
     usage: portUnAppel(),
-    // Aucune nature nouvelle (`NATURES` du port reste fermé) : comme les actions sans compte, nature `execution` sans exécution.
+    // Aucune nature nouvelle au port de consommation (`NATURES` reste fermé) : comme les actions sans compte, nature
+    // `execution` sans exécution ; le plafond persistant est la ligne `ville` réservée avant l'appel.
     contexte: () => ({ nature: "execution", executionId: null, periodes: periodesDe("google", horloge) }),
     plafonds: [],
     horloge,
@@ -115,8 +161,10 @@ const texte = (valeur: unknown, max: number): string | null => (typeof valeur ==
 export async function suggererVillesEssai(entree: { readonly saisie: unknown; readonly session: unknown }, dependances: DependancesVilles): Promise<IssueSuggestions> {
   const saisie = texte(entree.saisie, 200)?.trim() ?? "";
   const session = texte(entree.session, 36);
-  if (saisie.length < SAISIE.min || saisie.length > SAISIE.max || session === null || !SESSION.test(session)) return { statut: "entree_invalide" };
-  const refus = barriere(dependances);
+  if (saisie.length < SAISIE.min || saisie.length > SAISIE.max || session === null || !JETON_SESSION_MOTIF.test(session)) return { statut: "entree_invalide" };
+  const ouverte = barriere(dependances);
+  if ("refus" in ouverte) return { statut: ouverte.refus };
+  const refus = await reserver("suggestions", ouverte.empreinte, dependances);
   if (refus !== null) return { statut: refus };
   try {
     return { statut: "ok", suggestions: await client(dependances).suggererVilles(saisie, session) };
@@ -138,10 +186,17 @@ export async function choisirVilleEssai(
   const session = texte(entree.session, 36);
   const saisie = texte(entree.saisie, 200)?.trim() ?? "";
   const principal = texte(entree.principal, TEXTE_SUGGESTION_MAX) ?? "";
-  if (placeId === null || !PLACE_ID.test(placeId) || session === null || !SESSION.test(session) || saisie.length < SAISIE.min || saisie.length > SAISIE.max) {
-    return { statut: "entree_invalide" };
-  }
-  const refus = barriere(dependances);
+  const entreeValide =
+    placeId !== null &&
+    PLACE_ID_MOTIF.test(placeId) &&
+    session !== null &&
+    JETON_SESSION_MOTIF.test(session) &&
+    saisie.length >= SAISIE.min &&
+    saisie.length <= SAISIE.max;
+  if (!entreeValide) return { statut: "entree_invalide" };
+  const ouverte = barriere(dependances);
+  if ("refus" in ouverte) return { statut: ouverte.refus };
+  const refus = await reserver("choix", ouverte.empreinte, dependances);
   if (refus !== null) return { statut: refus };
   let fiche;
   try {

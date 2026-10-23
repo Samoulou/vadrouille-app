@@ -60,7 +60,7 @@ const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RE
  */
 const CLIENTS_GOOGLE = "src/server/composition/clients-google.ts";
 const COMPOSITION_LECTURE = "src/server/composition/lecture.ts";
-// Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, verdicts Sécurité et TL demandés).
+// Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
 const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [COMPOSITION_LECTURE, "src/server/composition/generation.ts", "src/server/composition/villes.ts"];
 const CAPACITES_GOOGLE = ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"];
 

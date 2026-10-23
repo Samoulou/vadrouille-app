@@ -148,8 +148,8 @@ const COMPOSITION_LECTURE = "src/server/composition/lecture";
 export const IMPORTATEURS_RELECTURE = ["src/server/composition/generation.ts", "src/server/composition/lecture.ts"];
 /**
  * Importateurs admis de la fabrique commune des clients Google hors des tests : les deux compositions, et la composition
- * de la recherche de ville de l'écran 1 du site d'essai (`villes.ts`, demande de Samuel du 23 octobre 2026, soumise aux
- * verdicts de la Sécurité et du Tech Lead), qui n'importe pas `@/server/relecture`.
+ * de la recherche de ville de l'écran 1 du site d'essai (`villes.ts`, demande de Samuel du 23 octobre 2026, décision
+ * 0129), qui n'importe pas `@/server/relecture`.
  */
 export const IMPORTATEURS_CLIENTS_GOOGLE = [...IMPORTATEURS_RELECTURE, "src/server/composition/villes.ts"];
 /**

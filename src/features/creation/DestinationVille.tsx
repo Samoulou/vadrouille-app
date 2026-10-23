@@ -7,7 +7,7 @@ import * as messages from "@/i18n/messages";
 import { cleVille, paysParCode } from "@/lib/fuseaux";
 import { choisirVille, suggererVilles } from "@/server/actions/villes-essai";
 
-import { describedBy, EMPTY_LIVE_REGION_CLASS, errorId, FieldHelp, FieldLabel, FieldMessage, fieldId, helpId, INPUT_CLASS } from "./fields";
+import { describedBy, errorId, FieldHelp, FieldLabel, FieldMessage, fieldId, helpId, INPUT_CLASS } from "./fields";
 
 const e1 = messages.creation.ecran1;
 const v = e1.ville;
@@ -23,7 +23,11 @@ type Suggestion = { readonly placeId: string; readonly principal: string; readon
 /** Ville choisie, valeurs maison et `placeId` : seules valeurs remontées au brouillon. */
 export type ChoixVille = { readonly destination: string; readonly placeId: string; readonly country: string; readonly timeZone: string };
 
-type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible" | "choix" | "choisie";
+/** Actions serveur de la recherche (`src/server/actions/villes-essai.ts`) ; doublées par les tests et les captures. */
+export type ActionsVilles = { readonly suggerer: typeof suggererVilles; readonly choisir: typeof choisirVille };
+const ACTIONS_SERVEUR: ActionsVilles = { suggerer: suggererVilles, choisir: choisirVille };
+
+type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible" | "limite" | "choix" | "choisie";
 
 export interface DestinationVilleProps {
   value: string;
@@ -40,6 +44,8 @@ export interface DestinationVilleProps {
   onAcces: () => void;
   /** Incrémenté par l'appelant après la saisie du code : la recherche est relancée. */
   relance: number;
+  /** Actions de la recherche ; par défaut les actions serveur. */
+  actions?: ActionsVilles;
 }
 
 /** Nom tapé incomplet : préfixe strict du texte principal de la suggestion (comparaison en mémoire seulement). */
@@ -50,14 +56,21 @@ function nomIncomplet(saisie: string, principal: string): boolean {
 }
 
 /**
- * Champ « Destination » du site d'essai (demande de Samuel du 23 octobre 2026) : liste de suggestions de villes de
- * Google Places, motif « combobox » de l'APG WAI-ARIA 1.2 (liste en flux sous le champ, option active par
- * `aria-activedescendant`, flèches, Entrée, Échap ; chaque option est aussi cliquable, cible de 44 px au moins). Les
- * suggestions s'affichent avec l'attribution textuelle « Google Maps » (règles de Google pour des données Places sans
- * carte). Seuls le `placeId` et les valeurs maison rendues par le serveur sont remontés ; la destination reste le texte
- * tapé, ou le nom maison de la table des villes. Annonces dans une région `status` présente dès l'affichage.
+ * Champ « Destination » du site d'essai (décision 0129 § 5) : liste de suggestions de villes de Google Places, motif
+ * « combobox » de l'APG WAI-ARIA 1.2 (liste en flux sous le champ, rendue seulement quand elle est ouverte ; option
+ * active par `aria-activedescendant`, contour `line` de 2 px ; flèches, Entrée, Échap ; chaque option est aussi
+ * cliquable, cible tactile de `--touch-target`). Les suggestions s'affichent avec l'attribution textuelle « Google Maps »
+ * (règles de Google pour des données Places sans carte), seulement quand elles sont visibles.
+ *
+ * Au choix, le champ est **rempli** avec le nom retenu : le nom maison de la table des villes, ou le texte tapé si la
+ * ville est hors de la table ; une ligne le confirme (« Ville retenue : Valence (Espagne) »). Seuls le `placeId` et les
+ * valeurs maison rendues par le serveur sont remontés.
+ *
+ * États (recherche, aucune ville, indisponible, limite, accès) : texte visible en flux sous le champ, dans une région
+ * `status` présente dès l'affichage. Aucun état sans issue : sans réponse de la recherche, une ville de la table maison
+ * est acceptée (repli) ; sans cookie, la saisie du code s'affiche sous le champ.
  */
-export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onDisponibilite, onAcces, relance }: DestinationVilleProps) {
+export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onDisponibilite, onAcces, relance, actions = ACTIONS_SERVEUR }: DestinationVilleProps) {
   const id = fieldId("destination");
   const listeId = `${id}-liste`;
   const statutId = `${id}-statut`;
@@ -89,7 +102,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     setEtat("recherche");
     let issue: Awaited<ReturnType<typeof suggererVilles>>;
     try {
-      issue = await suggererVilles({ saisie, session: session.current });
+      issue = await actions.suggerer({ saisie, session: session.current });
     } catch {
       issue = { statut: "indisponible" };
     }
@@ -100,15 +113,15 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       setOuverte(issue.suggestions.length > 0);
       setEtat(issue.suggestions.length > 0 ? "liste" : "aucune");
       onDisponibilite(true);
-    } else if (issue.statut === "acces") {
-      setSuggestions([]);
-      setOuverte(false);
+      return;
+    }
+    setSuggestions([]);
+    setOuverte(false);
+    if (issue.statut === "acces") {
       setEtat("acces");
       onAcces();
     } else {
-      setSuggestions([]);
-      setOuverte(false);
-      setEtat("indisponible");
+      setEtat(issue.statut === "limite" ? "limite" : "indisponible");
       onDisponibilite(false);
     }
   }
@@ -142,7 +155,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     session.current = null;
     let issue: Awaited<ReturnType<typeof choisirVille>>;
     try {
-      issue = await choisirVille({ placeId: suggestion.placeId, session: jeton, saisie: value, principal: suggestion.principal });
+      issue = await actions.choisir({ placeId: suggestion.placeId, session: jeton, saisie: value, principal: suggestion.principal });
     } catch {
       issue = { statut: "indisponible" };
     }
@@ -164,7 +177,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       setEtat("acces");
       onAcces();
     } else {
-      setEtat("indisponible");
+      setEtat(issue.statut === "limite" ? "limite" : "indisponible");
       onDisponibilite(false);
     }
   }
@@ -191,26 +204,22 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
 
   const pays = choisie ? paysParCode(choisie.country) : null;
   const region = pays && pays.fuseaux.length > 1 ? pays.fuseaux.find((fuseau) => fuseau.zone === choisie?.timeZone)?.region : undefined;
-  const confirmation = pays ? (region ? format(v.choisieRegion, { pays: pays.nom, region }) : format(v.choisie, { pays: pays.nom })) : null;
+  const ville = value.trim();
+  const confirmation = pays ? (region ? format(v.choisieRegion, { ville, pays: pays.nom, region }) : format(v.choisie, { ville, pays: pays.nom })) : null;
   const message = error ?? erreurChoix;
-  const statut =
-    etat === "recherche"
-      ? v.recherche
-      : etat === "liste"
-        ? suggestions.length === 1
-          ? v.uneSuggestion
-          : format(v.suggestions, { n: suggestions.length })
-        : etat === "aucune"
-          ? v.aucune
-          : etat === "indisponible"
-            ? v.indisponible
-            : etat === "acces"
-              ? v.acces
-              : etat === "choix"
-                ? v.choix
-                : etat === "choisie"
-                  ? confirmation
-                  : null;
+  const textes: Partial<Record<Etat, string>> = {
+    recherche: v.recherche,
+    liste: suggestions.length === 1 ? v.uneSuggestion : format(v.suggestions, { n: suggestions.length }),
+    aucune: v.aucune,
+    indisponible: v.indisponible,
+    limite: v.limite,
+    acces: v.acces,
+    choix: v.choix,
+  };
+  // Ville choisie (à l'instant, ou gardée dans le brouillon) : la confirmation, en `ink` semi-gras ; sinon l'état. Une
+  // erreur affichée remplace l'état (même texte qu'« indisponible » au repli : une seule ligne, jamais deux).
+  const montrerConfirmation = confirmation !== null && message === null && (etat === "choisie" || etat === "repos");
+  const statut = message !== null ? null : montrerConfirmation ? confirmation : (textes[etat] ?? null);
   const visible = ouverte && suggestions.length > 0;
 
   return (
@@ -223,10 +232,10 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={visible}
-        aria-controls={listeId}
+        aria-controls={visible ? listeId : undefined}
         aria-activedescendant={visible && active >= 0 ? `${listeId}-${active}` : undefined}
         aria-invalid={message ? true : undefined}
-        aria-describedby={describedBy(helpId(id), message && errorId(id), confirmation && !message && `${id}-confirmation`)}
+        aria-describedby={describedBy(helpId(id), message && errorId(id), montrerConfirmation && statutId)}
         autoComplete="off"
         maxLength={80}
         value={value}
@@ -240,42 +249,35 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
         className={INPUT_CLASS}
       />
       <FieldMessage id={errorId(id)} message={message} />
-      {confirmation && !message ? (
-        <p id={`${id}-confirmation`} className="text-corps-s text-ink-soft">
-          {confirmation}
-        </p>
-      ) : null}
-      <div id={statutId} role="status" className={EMPTY_LIVE_REGION_CLASS}>
-        {etat === "choisie" ? null : statut}
-      </div>
-      {/* Liste toujours rendue (cible d'`aria-controls`), vide et masquée quand elle est fermée. */}
-      <div className={visible ? "flex flex-col gap-2 rounded-block border border-outline bg-raised py-1" : "hidden"}>
-        <ul id={listeId} role="listbox" aria-label={v.liste} className="flex flex-col">
-          {visible
-            ? suggestions.map((suggestion, index) => (
-                <li
-                  key={suggestion.placeId}
-                  id={`${listeId}-${index}`}
-                  role="option"
-                  aria-selected={index === active}
-                  // Le focus reste dans le champ : la liste se ferme sinon avant le clic.
-                  onMouseDown={(evenement) => evenement.preventDefault()}
-                  onClick={() => void choisir(index)}
-                  className={`flex min-h-11 cursor-pointer flex-col justify-center px-4 py-2 ${index === active ? "bg-muted" : ""}`}
-                >
-                  <span className="text-corps text-ink">{suggestion.principal}</span>
-                  {suggestion.secondaire ? <span className="text-corps-s text-ink-soft">{suggestion.secondaire}</span> : null}
-                </li>
-              ))
-            : null}
-        </ul>
-        {/* Attribution des données Places sans carte Google : texte « Google Maps », non traduit (règles de Google). */}
-        {visible ? (
+      {/* Région présente dès l'affichage ; texte en flux, masqué pour les yeux seulement quand elle est vide. */}
+      <p id={statutId} role="status" className={montrerConfirmation ? "text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
+        {statut}
+      </p>
+      {visible ? (
+        <div className="flex flex-col gap-2 rounded-block border border-outline bg-raised py-1">
+          <ul id={listeId} role="listbox" aria-label={v.liste} className="flex flex-col">
+            {suggestions.map((suggestion, index) => (
+              <li
+                key={suggestion.placeId}
+                id={`${listeId}-${index}`}
+                role="option"
+                aria-selected={index === active}
+                // Le focus reste dans le champ : la liste se fermerait sinon avant le clic.
+                onMouseDown={(evenement) => evenement.preventDefault()}
+                onClick={() => void choisir(index)}
+                className={`flex min-h-(--touch-target) cursor-pointer flex-col justify-center px-4 py-2 ${index === active ? "bg-muted outline-2 -outline-offset-2 outline-line" : ""}`}
+              >
+                <span className="text-corps text-ink">{suggestion.principal}</span>
+                {suggestion.secondaire ? <span className="text-corps-s text-ink-soft">{suggestion.secondaire}</span> : null}
+              </li>
+            ))}
+          </ul>
+          {/* Attribution des données Places sans carte Google : texte « Google Maps », non traduit, sans retour à la ligne. */}
           <p translate="no" className="px-4 pb-1 text-legende font-normal whitespace-nowrap text-ink-soft">
             {v.attribution}
           </p>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

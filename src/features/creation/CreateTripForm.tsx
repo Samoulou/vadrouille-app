@@ -18,14 +18,14 @@ import {
   PROTOTYPE_STAY_DAYS_MAX,
   type CommitmentKind,
 } from "@/contracts/values";
+import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
-import { DestinationVille } from "./DestinationVille";
+import { DestinationVille, type ActionsVilles } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
 import {
   describedBy,
@@ -62,7 +62,8 @@ function messageFor(field: string, code: FieldError): string {
   if (field === "destination") {
     if (code === "length") return length(DESTINATION_LENGTH);
     if (code === "selectCity") return err.villeChoisir;
-    if (code === "cityUnavailable") return err.villeIndisponible;
+    if (code === "cityUnavailable") return e1.ville.indisponible;
+    if (code === "cityCharacters") return err.villeCaracteres;
     return err.destination;
   }
   if (field === "start") return code === "past" ? err.arriveePassee : err.arrivee;
@@ -93,6 +94,8 @@ export interface CreateTripFormProps {
    * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
    */
   essai?: boolean;
+  /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
+  villes?: ActionsVilles;
 }
 
 const sansAbonnement = () => () => {};
@@ -107,12 +110,12 @@ function useEssaiDepuisAdresse(): boolean {
 
 /**
  * Écran 1 « Créer le voyage » (`R1`, F8-PO-3 ; rendus et textes provisoires, décision 0018 § 15). « Continuer »
- * valide, garde la saisie dans le brouillon et mène à l'écran 2. Destination, logement, villes et engagements sont
- * saisis en texte libre, sans autocomplétion (aucune donnée Google, F8-PO-14), sauf sur le site d'essai : la
- * destination s'y choisit dans les suggestions de villes de Google Places (`DestinationVille`, actions serveur derrière
- * la barrière du lancement ; demande de Samuel du 23 octobre 2026).
+ * valide, garde la saisie dans le brouillon et mène à l'écran 2. Sur le site d'essai, la destination se choisit dans
+ * les suggestions de villes de Google Places (`DestinationVille`, actions serveur derrière la barrière du lancement ;
+ * décision 0129, qui y lève F8-PO-14). Ailleurs, destination, logement, villes et engagements restent saisis en texte
+ * libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
+export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps = {}) {
   const essaiAdresse = useEssaiDepuisAdresse();
   const essai = essaiProp ?? essaiAdresse;
   const router = useRouter();
@@ -223,7 +226,11 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
       <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
       {essai ? (
-        // Hors du `<form>` : la saisie du code d'accès est son propre formulaire (pas de formulaires imbriqués).
+        // Hors du `<form>` (décision 0129 § 5) : la saisie du code d'accès est son propre formulaire (pas de formulaires
+        // imbriqués). Ordre de lecture inchangé : titre, Destination (et la saisie du code sous elle), puis le formulaire.
+        // Entrée dans le champ choisit une suggestion et ne soumet rien ; « Continuer » valide la destination comme les
+        // autres champs (erreurs reliées à l'id `destination`, focus par `focusField("destination")`), et le focus revient
+        // à la destination après la saisie du code.
         <>
           <DestinationVille
             value={trip.destination}
@@ -237,6 +244,7 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
             onDisponibilite={setRechercheDisponible}
             onAcces={() => setAccesDemande(true)}
             relance={relance}
+            {...(villes ? { actions: villes } : {})}
           />
           {accesDemande ? (
             <SaisieCodeAcces

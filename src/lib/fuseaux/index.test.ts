@@ -263,6 +263,35 @@ describe("fuseaux : ville choisie dans les suggestions (demande de Samuel du 23 
     expect(fuseauParPosition("US", { lat: Number.NaN, lng: 0 })).toBeNull();
   });
 
+  it("fuseauParPosition, cas limites des pays à plusieurs fuseaux (mineur 19 de la revue du head `aa77422`, décision 0129)", () => {
+    const cas: [string, string, number, number, string][] = [
+      // États-Unis : villes proches d'une limite de fuseau.
+      ["El Paso", "US", 31.76, -106.49, "America/Denver"],
+      ["Detroit", "US", 42.33, -83.05, "America/New_York"],
+      ["Indianapolis", "US", 39.77, -86.16, "America/New_York"],
+      ["Louisville", "US", 38.25, -85.76, "America/New_York"],
+      ["Knoxville", "US", 35.96, -83.92, "America/New_York"],
+      ["Nashville", "US", 36.16, -86.78, "America/Chicago"],
+      ["Pensacola", "US", 30.42, -87.22, "America/Chicago"],
+      // Texas du nord (heure du Centre) : repères d'Amarillo et de Lubbock, sans quoi Denver serait le plus proche.
+      ["Amarillo", "US", 35.22, -101.83, "America/Chicago"],
+      ["Lubbock", "US", 33.58, -101.85, "America/Chicago"],
+      ["Boise", "US", 43.62, -116.2, "America/Denver"],
+      ["Phoenix", "US", 33.45, -112.07, "America/Phoenix"],
+      // Autres pays à plusieurs fuseaux.
+      ["Thunder Bay", "CA", 48.38, -89.25, "America/Toronto"],
+      ["Regina", "CA", 50.45, -104.61, "America/Regina"],
+      ["Broken Hill", "AU", -31.95, 141.45, "Australia/Adelaide"],
+      ["Darwin", "AU", -12.46, 130.84, "Australia/Darwin"],
+      ["Cancún", "MX", 21.16, -86.85, "America/Cancun"],
+      ["Tijuana", "MX", 32.51, -117.04, "America/Tijuana"],
+      ["Manaus", "BR", -3.12, -60.02, "America/Manaus"],
+      ["Kaliningrad", "RU", 54.71, 20.51, "Europe/Kaliningrad"],
+      ["Iekaterinbourg", "RU", 56.84, 60.6, "Asia/Yekaterinburg"],
+    ];
+    for (const [ville, pays, lat, lng, zone] of cas) expect(fuseauParPosition(pays, { lat, lng }), ville).toBe(zone);
+  });
+
   it("chaque pays à plusieurs fuseaux a au moins un repère par fuseau ; un repère est une position valide", () => {
     for (const pays of listeDesPays()) {
       if (pays.fuseaux.length < 2) continue;

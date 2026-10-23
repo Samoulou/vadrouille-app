@@ -45,8 +45,7 @@ import {
  *   404 de ces trois méthodes (identifiant obsolète, `NOT_FOUND`) lève `ErreurAncrage("place_not_found")`, la même
  *   erreur que le double, après la réservation (requête partie : comptée).
  * - Chaque requête réserve une unité auprès du port de consommation avant l'appel (D13) ; délai de 10 s par requête.
- * - Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, soumise au verdict de la
- *   Sécurité) : Autocomplete (New) filtré sur `(cities)`, en français, avec un jeton de session (`suggererVilles`), puis
+ * - Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129) : Autocomplete (New) filtré sur `(cities)`, en français, avec un jeton de session (`suggererVilles`), puis
  *   la fiche de la ville choisie dans la même session (`ficheVille`, masque fermé `id,addressComponents,location`, SKU
  *   Essentials) : seuls le code ISO du pays et la position en sont lus.
  * Tout ce qui sort est une donnée Google : il reste en mémoire et n'atteint jamais un prompt.

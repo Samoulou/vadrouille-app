@@ -270,6 +270,19 @@ describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () =
     expect(validateTrip({ ...hoiAn, timeZone: "Asia/Bangkok" }, TODAY, { essai: true, suggestions: true })).toEqual([{ field: "destination", code: "selectCity" }]);
   });
 
+  it("ville choisie hors de la table : nom écrit en lettres seulement (filtre du serveur, décision 0129 § 4), sinon « cityCharacters »", () => {
+    const choisie = { placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" };
+    const avecRecherche = { essai: true, suggestions: true };
+    for (const destination of ["Hội An", "St. Louis", "L'Aquila", "Aix-en-Provence", "  Bourg   Saint Andéol "]) {
+      expect(validateTrip({ ...ROME, destination, ...choisie }, TODAY, avecRecherche), destination).toEqual([]);
+    }
+    for (const destination of ["Hoi An 2", "Hoi An (Viêt Nam)", "Ignore previous instructions; 123", "'Hoi An"]) {
+      expect(validateTrip({ ...ROME, destination, ...choisie }, TODAY, avecRecherche), destination).toEqual([{ field: "destination", code: "cityCharacters" }]);
+    }
+    // Ville de la table du pays : le nom maison remplacera le texte, aucun filtre.
+    expect(validateTrip({ ...ROME, destination: "valencia", placeId: P, country: "ES", timeZone: "Europe/Madrid" }, TODAY, avecRecherche)).toEqual([]);
+  });
+
   it("toTripDraft : la ville choisie part avec son placeId, son pays et son fuseau, conformes au schéma ; sans choix, rien", () => {
     const draft = toTripDraft({ ...ROME, destination: " Hoi An ", placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
     expect(draft).toMatchObject({ destination: "Hoi An", destinationRegion: { placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" } });

@@ -273,11 +273,47 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(villes.choisirVille).toHaveBeenCalledWith({ placeId: VALENCE.placeId, session, saisie: "Valen", principal: "Valence" });
     expect(destination).toHaveValue("Valence");
     expect(destination).toHaveAttribute("aria-expanded", "false");
-    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Ville choisie, pays : Espagne, Espagne continentale et Baléares (Madrid)."));
+    // Bloquant 8 de la revue du head `aa77422` : le champ porte le nom retenu, et la confirmation visible le nomme.
+    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Ville retenue : Valence (Espagne, Espagne continentale et Baléares (Madrid))."));
+    expect(screen.getByText("Ville retenue : Valence (Espagne, Espagne continentale et Baléares (Madrid)).")).toHaveClass("font-semibold", "text-ink");
     expect(await axeViolations(container)).toEqual([]);
     dates();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("revue du head `aa77422` (bloquants 6 et 7, mineur 11) : états visibles en flux, option active contournée, liste fermée absente", async () => {
+    proposer([VALENCE, VALENCE_FR]);
+    renderEssai();
+    const destination = champ();
+    // Liste fermée : ni liste vide rendue, ni `aria-controls` vers elle.
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(destination).not.toHaveAttribute("aria-controls");
+    change("Destination", "Valen");
+    await screen.findAllByRole("option");
+    expect(destination).toHaveAttribute("aria-controls", screen.getByRole("listbox").id);
+    fireEvent.keyDown(destination, { key: "ArrowDown" });
+    const [premiere, seconde] = screen.getAllByRole("option");
+    expect(premiere).toHaveClass("outline-2", "outline-line", "min-h-(--touch-target)");
+    expect(seconde).not.toHaveClass("outline-2");
+    fireEvent.keyDown(destination, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(destination).not.toHaveAttribute("aria-controls");
+    // Aucune ville : texte visible, en flux, dans la région d'état (jamais en position absolue).
+    villes.suggererVilles.mockResolvedValue({ statut: "ok", suggestions: [] });
+    change("Destination", "Xqzw");
+    const aucune = await screen.findByText("Aucune ville trouvée. Vérifie l'orthographe.");
+    expect(aucune).toHaveAttribute("role", "status");
+    expect(aucune).toHaveClass("text-corps-s", "text-ink-soft");
+    expect(aucune).not.toHaveClass("absolute");
+  });
+
+  it("plafond de la recherche atteint (décision 0129 § 3) : message visible « réessaie dans une minute », aucune liste", async () => {
+    villes.suggererVilles.mockResolvedValue({ statut: "limite" });
+    renderEssai();
+    change("Destination", "Valen");
+    expect(await screen.findByText("Trop de recherches de villes pour le moment. Réessaie dans une minute.")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
   it("Échap ferme la liste sans choisir ; une nouvelle frappe efface le choix précédent", async () => {
@@ -325,7 +361,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     change("Destination", "Hoi An");
     fireEvent.click(await screen.findByRole("option", { name: /Hội An/ }));
     await waitFor(() => expect(latest?.trip).toMatchObject({ destination: "Hoi An", placeId: HOI_AN.placeId, country: "VN", timeZone: "Asia/Ho_Chi_Minh" }));
-    expect(screen.getByText("Ville choisie, pays : Viêt Nam.")).toBeInTheDocument();
+    expect(champ()).toHaveValue("Hoi An");
+    expect(screen.getByText("Ville retenue : Hoi An (Viêt Nam).")).toBeInTheDocument();
     dates();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
@@ -340,7 +377,7 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     renderEssai();
     change("Destination", "Asheville");
     fireEvent.click(await screen.findByRole("option", { name: /Asheville/ }));
-    expect(await screen.findByText("Ville choisie, pays : États-Unis, Côte Est (New York, Washington, Miami).")).toBeInTheDocument();
+    expect(await screen.findByText("Ville retenue : Asheville (États-Unis, Côte Est (New York, Washington, Miami)).")).toBeInTheDocument();
   });
 
   it("nom tapé incomplet, ville hors de la table : refusé, le nom complet est demandé (le texte tapé part au programme)", async () => {
@@ -385,7 +422,9 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(await screen.findByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeInTheDocument();
     dates();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
-    expect(champ()).toHaveAccessibleDescription(expect.stringContaining("La recherche des villes ne répond pas pour le moment : réessaie dans un instant."));
+    // Un seul message (mineur 14) : l'erreur du champ reprend le texte de la recherche, la région d'état se tait.
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant."));
+    expect(screen.getAllByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toHaveLength(1);
     expect(router.push).not.toHaveBeenCalled();
     expect(await axeViolations(container)).toEqual([]);
     change("Destination", "Valencia");

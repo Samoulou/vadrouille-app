@@ -5,7 +5,8 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
+import { CODES_ERREUR_GOOGLE, ErreurClientGoogle, PLACE_ID_GOOGLE } from "@/grounding/enveloppe-google";
 import { ancrerLogement as ancrerLogementP0, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
@@ -16,6 +17,7 @@ import { zoneDuSejour } from "@/grounding/zone";
 import {
   COUT_ESTIME_MICROS,
   createPlacesClient,
+  JETON_SESSION,
   MASQUE_DETAILS,
   MASQUE_FICHE_VILLE,
   MASQUE_IDENTIFIANT,
@@ -563,6 +565,15 @@ describe("places: horaires qui passent minuit (B8-PO-17)", () => {
 
 describe("places : recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026)", () => {
   const SESSION = "jeton-session-1";
+
+  it("motifs recopiés tenus égaux (mineur 16 de la revue du head `aa77422`, décision 0129) : placeId et jeton de session", () => {
+    // `src/grounding` n'importe pas `src/contracts` hors des tests ; les motifs partagés de l'application restent égaux à ceux du client.
+    expect(PLACE_ID_MOTIF.source).toBe(PLACE_ID_GOOGLE.source);
+    expect(PLACE_ID_MOTIF.flags).toBe(PLACE_ID_GOOGLE.flags);
+    expect(JETON_SESSION_MOTIF.source).toBe(JETON_SESSION.source);
+    expect(JETON_SESSION_MOTIF.flags).toBe(JETON_SESSION.flags);
+  });
+
 
   it("suggestions : POST Autocomplete (New), villes seulement, français, jeton de session, masque fermé ; textes de la suggestion seuls", async () => {
     const { client, appels, port } = monter([

@@ -1906,14 +1906,20 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
- * demande de Samuel du 23 octobre 2026 ; soumis aux verdicts du Tech Lead et de la Sécurité) : tables maison, pont des
- * clients Google, barrière d'accès et port de consommation, jamais un paquet client (`server-only`).
+ * demande de Samuel du 23 octobre 2026, décision 0129) : motifs des contrats, tables maison, pont des clients Google,
+ * barrière d'accès, plafond persistant (pool du prototype, table de prix, `reserverVille`) et port de consommation,
+ * jamais un paquet client (`server-only`).
  */
 const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "server-only",
+  "../../../prototype/config/prix-google.json",
+  "@/contracts/values",
   "@/lib/fuseaux",
   "@/server/composition/clients-google",
   "@/server/p0/acces",
+  "@/server/p0/base",
+  "@/server/usage/cout-google",
+  "@/server/usage/neon",
   "@/server/usage/periodes",
   "@/server/usage/port",
 ];
@@ -1950,17 +1956,17 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
  * aucune clé de service ni `process.env` (ses deux importeurs sont fixés par `ligne/server-env-imports`). Sécurité :
  * approuvé, revue du head d50acfa (PR 582).
  *
- * Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, branche `claude/e2e-ville-libre`) : entrée
+ * Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129) : entrée
  * `src/server/actions/villes-essai.ts` (même propriété que la saisie du code : `"use server"`) et terminal
  * `src/server/composition/villes.ts`, admis sans être parcouru au-delà d'une entrée seulement, s'il importe
  * `server-only`, ne porte aucune directive et si ses imports exécutés sont ceux d'`IMPORTS_TERMINAL_VILLES`. Verdicts
- * Tech Lead et Sécurité demandés dans la PR.
+ * Tech Lead et Sécurité : décision 0129 (définitive à la fusion, 0093).
  */
 const FRONTIERE_P0R3B = {
   entrees: [
     { fichier: "src/server/actions/p0-acces.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
-    // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026) : verdicts Tech Lead et Sécurité demandés.
+    // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
     { fichier: "src/server/actions/villes-essai.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
