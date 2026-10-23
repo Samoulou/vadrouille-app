@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Brief as BriefDeLApp, Lodging, TripCommitment, TripDraft } from "@/contracts";
-import { DESTINATION_ESSAI_MOTIF, PROTOTYPE_STAY_DAYS_MAX } from "@/contracts/values";
+import { destinationEssaiFiltree, PROTOTYPE_STAY_DAYS_MAX } from "@/contracts/values";
 import { heuresDeVol } from "@/domain/squelette";
 import { joursEntre, versHeure } from "@/domain/temps";
 import { fuseauDeVille, fuseauDuPays, paysDeVille, paysParCode, villeDuPays } from "@/lib/fuseaux";
@@ -22,8 +22,9 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
  * ne prouve que le `placeId` désigne la destination, qui n'entre pas dans le brief.
  *
  * Destination d'une ville choisie (décision 0129 § 4, écart avec 0125 § 3 « texte du formulaire ») : le **nom maison**
- * de la table des villes de ce pays, ou, hors de la table, le texte tapé **filtré** (`DESTINATION_ESSAI_MOTIF` : lettres,
- * espaces, apostrophes, tirets et points, 80 caractères au plus, espaces répétés réduits) ; tout autre texte est refusé.
+ * de la table des villes de ce pays, ou, hors de la table, le texte tapé **filtré** (`destinationEssaiFiltree` : aucun
+ * retour à la ligne ni tabulation, puis lettres, espaces, apostrophes, tirets et points, 80 caractères au plus, espaces
+ * répétés réduits) ; tout autre texte est refusé.
  * Sans région, la destination est une clé de la table des villes, donc déjà bornée.
  *
  * Refus, chacun sur son champ de la forme de `parseInput`, avant toute réservation : ville absente de la table des
@@ -108,8 +109,8 @@ function lieuDeLaDestination(saisie: string, region: TripDraft["destinationRegio
     if (fuseau === null || pays === undefined) return null;
     const maison = villeDuPays(saisie, region.country);
     if (maison !== null) return { destination: maison.nom, fuseau, pays };
-    const filtre = saisie.replace(/\s+/gu, " ");
-    return DESTINATION_ESSAI_MOTIF.test(filtre) ? { destination: filtre, fuseau, pays } : null;
+    const filtre = destinationEssaiFiltree(saisie);
+    return filtre === null ? null : { destination: filtre, fuseau, pays };
   }
   const fuseauVille = fuseauDeVille(saisie);
   const paysVille = paysDeVille(saisie);

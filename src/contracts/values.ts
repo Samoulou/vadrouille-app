@@ -229,6 +229,18 @@ export const DESTINATION_LENGTH = { min: 2, max: 80 } as const;
  * des apostrophes, des tirets et des points, commence par une lettre et compte 80 caractères au plus.
  */
 export const DESTINATION_ESSAI_MOTIF = /^\p{L}[\p{L}\p{M} '’.-]{0,79}$/u;
+/** Retours à la ligne, tabulations et séparateurs de ligne : refusés **avant** la normalisation des espaces (0129 § 4.3). */
+const CONTROLES_DESTINATION = /[\r\n\t\v\f\u0085\u2028\u2029]/u;
+/**
+ * Texte tapé d'une ville choisie hors de la table, filtré (décision 0129 § 4.3 ; revue du head de4ab92, mineur 15) :
+ * `null` s'il contient un retour à la ligne ou une tabulation, sinon le texte aux espaces normalisés s'il suit
+ * `DESTINATION_ESSAI_MOTIF`, sinon `null`. Même règle pour l'écran 1 et le serveur.
+ */
+export function destinationEssaiFiltree(saisie: string): string | null {
+  if (CONTROLES_DESTINATION.test(saisie)) return null;
+  const filtre = saisie.trim().replace(/ +/gu, " ");
+  return DESTINATION_ESSAI_MOTIF.test(filtre) ? filtre : null;
+}
 /**
  * Identifiant de lieu Google (base64url, 256 caractères au plus) : même forme que `PLACE_ID_GOOGLE` de
  * `src/grounding/enveloppe-google.ts` (égalité gardée par `src/grounding/places-client.test.ts`), lue ici par le contrat,

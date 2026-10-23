@@ -25,7 +25,7 @@ import * as messages from "@/i18n/messages";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
-import { DestinationVille, type ActionsVilles } from "./DestinationVille";
+import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
 import {
   describedBy,
@@ -54,15 +54,18 @@ const ADD_BUTTON_CLASS =
 
 const length = (bounds: { min: number; max: number }) => format(err.longueur, bounds);
 
+/** Message de « Continuer » quand la recherche de ville ne sert pas : panne, plafond de la minute ou du jour (0129 § 3). */
+const VILLE_NON_SERVIE: Readonly<Record<MotifIndisponible, string>> = { panne: e1.ville.indisponible, minute: e1.ville.limite, jour: e1.ville.limiteJour };
+
 /** Message d'un champ de l'écran 1 (textes provisoires, UX/UI, F8-Q1). */
-function messageFor(field: string, code: FieldError): string {
+function messageFor(field: string, code: FieldError, motif: MotifIndisponible = "panne"): string {
   const last = field.split(".").pop() ?? field;
   const inCity = field.startsWith("otherCities.");
   const inCommitment = field.startsWith("commitments.");
   if (field === "destination") {
     if (code === "length") return length(DESTINATION_LENGTH);
     if (code === "selectCity") return err.villeChoisir;
-    if (code === "cityUnavailable") return e1.ville.indisponible;
+    if (code === "cityUnavailable") return VILLE_NON_SERVIE[motif];
     if (code === "cityCharacters") return err.villeCaracteres;
     return err.destination;
   }
@@ -125,6 +128,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   // Site d'essai : la recherche de ville a répondu (un choix est exigé) ; `false` tant qu'elle n'a pas répondu ou
   // quand elle ne répond pas (repli sur la table maison des villes).
   const [rechercheDisponible, setRechercheDisponible] = useState(false);
+  const [motifIndisponible, setMotifIndisponible] = useState<MotifIndisponible>("panne");
   // Cookie d'accès absent ou expiré pendant la recherche : saisie du code, puis relance de la recherche.
   const [accesDemande, setAccesDemande] = useState(false);
   const [relance, setRelance] = useState(0);
@@ -153,7 +157,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
       if (found.code === "length") return length(lodging?.answer === "known" ? KNOWN_LODGING_LENGTH : AREA_LENGTH);
       return lodging?.answer === "known" ? err.nomAdresse : err.quartier;
     }
-    return messageFor(field, found.code);
+    return messageFor(field, found.code, motifIndisponible);
   };
   function lodgingAt(field: string): LodgingForm | undefined {
     const match = /^otherCities\.(\d+)\./.exec(field);
@@ -241,7 +245,10 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
               dispatch({ type: "trip", patch: choix });
               setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
             }}
-            onDisponibilite={setRechercheDisponible}
+            onDisponibilite={(disponible, motif) => {
+              setRechercheDisponible(disponible);
+              if (motif) setMotifIndisponible(motif);
+            }}
             onAcces={() => setAccesDemande(true)}
             relance={relance}
             {...(villes ? { actions: villes } : {})}

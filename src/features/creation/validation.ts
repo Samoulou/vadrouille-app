@@ -5,7 +5,7 @@ import {
   CHILDREN,
   CITY_NAME_LENGTH,
   COMMITMENT_LABEL_LENGTH,
-  DESTINATION_ESSAI_MOTIF,
+  destinationEssaiFiltree,
   DESTINATION_LENGTH,
   KNOWN_LODGING_LENGTH,
   MEAL_BUDGET_CHF,
@@ -34,7 +34,7 @@ export type FieldError =
   | "endTime"
   | "range"
   // Site d'essai (spécification E2E-essai, lot 2, D1 ; demande de Samuel du 23 octobre 2026) : ville à choisir dans
-  // les suggestions, ville hors de la table quand la recherche ne répond pas, nom hors de `DESTINATION_ESSAI_MOTIF`
+  // les suggestions, ville hors de la table quand la recherche ne répond pas, nom refusé par `destinationEssaiFiltree`
   // (décision 0129 § 4), seconde ville, séjour trop long.
   | "selectCity"
   | "cityCharacters"
@@ -134,7 +134,7 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
     else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
   }
   // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
-  if (region !== null && villeDuPays(trip.destination, region.country) === null && !DESTINATION_ESSAI_MOTIF.test(trip.destination.trim().replace(/\s+/gu, " "))) {
+  if (region !== null && villeDuPays(trip.destination, region.country) === null && destinationEssaiFiltree(trip.destination) === null) {
     push("destination", "cityCharacters");
   }
   const start = isDate(trip.start) ? trip.start : null;

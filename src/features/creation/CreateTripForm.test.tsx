@@ -245,7 +245,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(within(liste).getAllByRole("option").map((o) => o.textContent)).toEqual(["ValenceEspagne", "ValenceFrance"]);
     const attribution = screen.getByText("Google Maps");
     expect(attribution).toHaveAttribute("translate", "no");
-    expect(screen.getByText("2 villes suggérées. Flèches haut et bas pour parcourir, Entrée pour choisir.")).toBeInTheDocument();
+    // Mineur 13 de la revue du head de4ab92 : le nombre seul, sans consigne de clavier (écran tactile).
+    expect(screen.getByText("2 villes suggérées.")).toBeInTheDocument();
     expect(screen.queryByText(/Essaie Rome ou Lisbonne/)).not.toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
   });
@@ -274,8 +275,12 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(destination).toHaveValue("Valence");
     expect(destination).toHaveAttribute("aria-expanded", "false");
     // Bloquant 8 de la revue du head `aa77422` : le champ porte le nom retenu, et la confirmation visible le nomme.
-    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Ville retenue : Valence (Espagne, Espagne continentale et Baléares (Madrid))."));
-    expect(screen.getByText("Ville retenue : Valence (Espagne, Espagne continentale et Baléares (Madrid)).")).toHaveClass("font-semibold", "text-ink");
+    // Mineurs 10 et 11 de la revue du head de4ab92 : ville et pays seulement, précédés d'une coche `line`.
+    expect(destination).toHaveAccessibleDescription(expect.stringContaining("Ville retenue : Valence (Espagne)."));
+    const confirmation = screen.getByText("Ville retenue : Valence (Espagne).");
+    expect(confirmation).toHaveClass("font-semibold", "text-ink");
+    expect(confirmation.querySelector('[data-part="ville-coche"]')).toHaveClass("text-line");
+    expect(confirmation.querySelector('[data-part="ville-coche"]')).toHaveAttribute("aria-hidden", "true");
     expect(await axeViolations(container)).toEqual([]);
     dates();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
@@ -308,12 +313,33 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(aucune).not.toHaveClass("absolute");
   });
 
-  it("plafond de la recherche atteint (décision 0129 § 3) : message visible « réessaie dans une minute », aucune liste", async () => {
+  it("plafond de la minute (décision 0129 § 3) : « réessaie dans une minute », aucune liste ; « Continuer » garde ce message", async () => {
     villes.suggererVilles.mockResolvedValue({ statut: "limite" });
     renderEssai();
-    change("Destination", "Valen");
-    expect(await screen.findByText("Trop de recherches de villes pour le moment. Réessaie dans une minute.")).toHaveAttribute("role", "status");
+    change("Destination", "Hoi An");
+    const minute = "Trop de recherches de villes en une minute. Réessaie dans une minute.";
+    expect(await screen.findByText(minute)).toHaveAttribute("role", "status");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    // Mineur 3 de la revue du head de4ab92 : le refus au plafond ne se lit jamais « ne répond pas ».
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(minute));
+    expect(screen.queryByText(/ne répond pas/)).not.toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("plafond du jour (décision 0129 § 3) : message distinct, nom complet ou plus tard ; « Continuer » garde ce message", async () => {
+    villes.suggererVilles.mockResolvedValue({ statut: "limite_jour" });
+    renderEssai();
+    change("Destination", "Hoi An");
+    const jour = "La recherche des villes a atteint sa limite pour aujourd'hui. Écris le nom complet de ta ville, ou réessaie plus tard.";
+    expect(await screen.findByText(jour)).toHaveAttribute("role", "status");
+    expect(screen.queryByText(/une minute/)).not.toBeInTheDocument();
+    dates();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(jour));
+    expect(screen.queryByText(/ne répond pas/)).not.toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("Échap ferme la liste sans choisir ; une nouvelle frappe efface le choix précédent", async () => {
@@ -368,7 +394,7 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
   });
 
-  it("pays à plusieurs fuseaux : la région maison est annoncée avec le pays", async () => {
+  it("pays à plusieurs fuseaux : la confirmation nomme la ville et le pays, le fuseau maison est gardé", async () => {
     proposer([{ placeId: "lieu_fictif_asheville", principal: "Asheville", secondaire: "Caroline du Nord, États-Unis" }]);
     villes.choisirVille.mockResolvedValue({
       statut: "ok",
@@ -377,7 +403,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     renderEssai();
     change("Destination", "Asheville");
     fireEvent.click(await screen.findByRole("option", { name: /Asheville/ }));
-    expect(await screen.findByText("Ville retenue : Asheville (États-Unis, Côte Est (New York, Washington, Miami)).")).toBeInTheDocument();
+    expect(await screen.findByText("Ville retenue : Asheville (États-Unis).")).toBeInTheDocument();
+    expect(latest?.trip).toMatchObject({ country: "US", timeZone: "America/New_York" });
   });
 
   it("nom tapé incomplet, ville hors de la table : refusé, le nom complet est demandé (le texte tapé part au programme)", async () => {

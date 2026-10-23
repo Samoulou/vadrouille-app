@@ -102,6 +102,11 @@ describe("p0: conversion du formulaire vers le brief de l'essai (E2E-essai, lot 
       "https://exemple.invalid",
       "'Rome",
       "É".repeat(81),
+      // Mineur 15 de la revue du head de4ab92 : refusés avant la normalisation des espaces, jamais réduits en « Hoi An ».
+      "Hoi\nAn",
+      "Hoi\r\nAn",
+      "Hoi\tAn",
+      "Hoi\u2028An",
     ]) {
       expect(briefDepuisFormulaire({ ...DRAFT, destination, destinationRegion: region("FR", "Europe/Paris") }, BRIEF, undefined), JSON.stringify(destination)).toEqual({
         ok: false,

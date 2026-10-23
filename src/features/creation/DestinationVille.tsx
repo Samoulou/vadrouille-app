@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { format } from "@/i18n";
+import { IconCoche } from "@/components/ligne/icons";
 import * as messages from "@/i18n/messages";
 import { cleVille, paysParCode } from "@/lib/fuseaux";
 import { choisirVille, suggererVilles } from "@/server/actions/villes-essai";
@@ -27,7 +28,20 @@ export type ChoixVille = { readonly destination: string; readonly placeId: strin
 export type ActionsVilles = { readonly suggerer: typeof suggererVilles; readonly choisir: typeof choisirVille };
 const ACTIONS_SERVEUR: ActionsVilles = { suggerer: suggererVilles, choisir: choisirVille };
 
-type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible" | "limite" | "choix" | "choisie";
+type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible" | "limite" | "limiteJour" | "choix" | "choisie";
+
+/**
+ * Pourquoi la recherche ne sert pas (revue du head de4ab92, mineur 3) : elle ne répond pas (`panne`), ou elle refuse au
+ * plafond de la minute (`minute`) ou du jour (`jour`). L'appelant en tire le message de « Continuer ».
+ */
+export type MotifIndisponible = "panne" | "minute" | "jour";
+
+/** Statut de refus du serveur → état affiché et motif remonté. */
+function refusDe(statut: "indisponible" | "limite" | "limite_jour" | "entree_invalide" | "pays_inconnu"): { readonly etat: Etat; readonly motif: MotifIndisponible } {
+  if (statut === "limite") return { etat: "limite", motif: "minute" };
+  if (statut === "limite_jour") return { etat: "limiteJour", motif: "jour" };
+  return { etat: "indisponible", motif: "panne" };
+}
 
 export interface DestinationVilleProps {
   value: string;
@@ -38,8 +52,11 @@ export interface DestinationVilleProps {
   /** Texte tapé : le choix précédent est effacé par l'appelant. */
   onSaisie: (destination: string) => void;
   onChoix: (choix: ChoixVille) => void;
-  /** La recherche a répondu (un choix devient obligatoire) ou ne répond pas (repli sur la table maison). */
-  onDisponibilite: (disponible: boolean) => void;
+  /**
+   * La recherche a répondu (un choix devient obligatoire) ou ne sert pas (repli sur la table maison), avec le motif :
+   * panne, plafond de la minute ou plafond du jour.
+   */
+  onDisponibilite: (disponible: boolean, motif?: MotifIndisponible) => void;
   /** Cookie d'accès absent ou expiré : l'appelant affiche la saisie du code. */
   onAcces: () => void;
   /** Incrémenté par l'appelant après la saisie du code : la recherche est relancée. */
@@ -63,10 +80,11 @@ function nomIncomplet(saisie: string, principal: string): boolean {
  * (règles de Google pour des données Places sans carte), seulement quand elles sont visibles.
  *
  * Au choix, le champ est **rempli** avec le nom retenu : le nom maison de la table des villes, ou le texte tapé si la
- * ville est hors de la table ; une ligne le confirme (« Ville retenue : Valence (Espagne) »). Seuls le `placeId` et les
+ * ville est hors de la table ; une ligne le confirme, précédée d'une coche `line` (« Ville retenue : Valence
+ * (Espagne). »). Seuls le `placeId` et les
  * valeurs maison rendues par le serveur sont remontés.
  *
- * États (recherche, aucune ville, indisponible, limite, accès) : texte visible en flux sous le champ, dans une région
+ * États (recherche, aucune ville, indisponible, limite de la minute, limite du jour, accès) : texte visible en flux sous le champ, dans une région
  * `status` présente dès l'affichage. Aucun état sans issue : sans réponse de la recherche, une ville de la table maison
  * est acceptée (repli) ; sans cookie, la saisie du code s'affiche sous le champ.
  */
@@ -121,8 +139,9 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       setEtat("acces");
       onAcces();
     } else {
-      setEtat(issue.statut === "limite" ? "limite" : "indisponible");
-      onDisponibilite(false);
+      const refus = refusDe(issue.statut);
+      setEtat(refus.etat);
+      onDisponibilite(false, refus.motif);
     }
   }
 
@@ -177,8 +196,9 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       setEtat("acces");
       onAcces();
     } else {
-      setEtat(issue.statut === "limite" ? "limite" : "indisponible");
-      onDisponibilite(false);
+      const refus = refusDe(issue.statut);
+      setEtat(refus.etat);
+      onDisponibilite(false, refus.motif);
     }
   }
 
@@ -203,9 +223,8 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
   }
 
   const pays = choisie ? paysParCode(choisie.country) : null;
-  const region = pays && pays.fuseaux.length > 1 ? pays.fuseaux.find((fuseau) => fuseau.zone === choisie?.timeZone)?.region : undefined;
-  const ville = value.trim();
-  const confirmation = pays ? (region ? format(v.choisieRegion, { ville, pays: pays.nom, region }) : format(v.choisie, { ville, pays: pays.nom })) : null;
+  // Ville et pays seulement (revue du head de4ab92, mineur 10) : le fuseau, valeur maison, n'est pas répété ici.
+  const confirmation = pays ? format(v.choisie, { ville: value.trim(), pays: pays.nom }) : null;
   const message = error ?? erreurChoix;
   const textes: Partial<Record<Etat, string>> = {
     recherche: v.recherche,
@@ -213,6 +232,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     aucune: v.aucune,
     indisponible: v.indisponible,
     limite: v.limite,
+    limiteJour: v.limiteJour,
     acces: v.acces,
     choix: v.choix,
   };
@@ -250,11 +270,13 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       />
       <FieldMessage id={errorId(id)} message={message} />
       {/* Région présente dès l'affichage ; texte en flux, masqué pour les yeux seulement quand elle est vide. */}
-      <p id={statutId} role="status" className={montrerConfirmation ? "text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
+      <p id={statutId} role="status" className={montrerConfirmation ? "flex items-start gap-2 text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
+        {/* Coche `line` (revue du head de4ab92, mineur 11) : la confirmation ne se lit pas comme l'erreur du champ. */}
+        {montrerConfirmation ? <IconCoche data-part="ville-coche" className="size-5 text-line" /> : null}
         {statut}
       </p>
       {visible ? (
-        <div className="flex flex-col gap-2 rounded-block border border-outline bg-raised py-1">
+        <div className="flex flex-col gap-2 overflow-hidden rounded-block border border-outline bg-raised py-1">
           <ul id={listeId} role="listbox" aria-label={v.liste} className="flex flex-col">
             {suggestions.map((suggestion, index) => (
               <li
@@ -272,8 +294,9 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
               </li>
             ))}
           </ul>
-          {/* Attribution des données Places sans carte Google : texte « Google Maps », non traduit, sans retour à la ligne. */}
-          <p translate="no" className="px-4 pb-1 text-legende font-normal whitespace-nowrap text-ink-soft">
+          {/* Attribution des données Places sans carte Google : texte « Google Maps », non traduit, sans retour à la ligne,
+              en `ink` (0129 § 5.7). */}
+          <p translate="no" className="px-4 pb-1 text-legende font-normal whitespace-nowrap text-ink">
             {v.attribution}
           </p>
         </div>

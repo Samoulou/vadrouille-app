@@ -196,29 +196,42 @@ describe("recherche de ville : plafond persistant (décision 0129 § 3)", () => 
     expect(autre.mock.calls[0]?.[0].empreinte).not.toBe(suggestions?.empreinte);
   });
 
-  it("Nème appel refusé sans appel Google : au-delà du plafond du jour, « limite », le client n'est plus appelé", async () => {
+  it("Nème appel refusé sans appel Google : au-delà du plafond du jour, « limite_jour », le client n'est plus appelé", async () => {
     const { client, fabrique } = doubles();
     let accordees = 0;
     const plafond = 3;
     const reserver = vi.fn(async (): Promise<ResultatVille> => (accordees < plafond ? (accordees++, { ok: true }) : { ok: false, code: "ville_jour_atteint" }));
     const dep = dependances(fabrique, { reserver });
     for (let i = 0; i < plafond; i++) expect((await suggererVillesEssai({ saisie: "Valen", session: SESSION }, dep)).statut).toBe("ok");
-    expect(await suggererVillesEssai({ saisie: "Valen", session: SESSION }, dep)).toEqual({ statut: "limite" });
-    expect(await choisirVilleEssai({ placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" }, dep)).toEqual({ statut: "limite" });
+    expect(await suggererVillesEssai({ saisie: "Valen", session: SESSION }, dep)).toEqual({ statut: "limite_jour" });
+    expect(await choisirVilleEssai({ placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" }, dep)).toEqual({ statut: "limite_jour" });
     expect(client.suggererVilles).toHaveBeenCalledTimes(plafond);
     expect(client.ficheVille).not.toHaveBeenCalled();
-    expect(fabrique).toHaveBeenCalledTimes(plafond);
   });
 
-  it("débit du cookie atteint : « limite », sans appel", async () => {
-    const { fabrique } = doubles();
+  it("débit du cookie atteint : « limite » (minute), distinct du plafond du jour, sans appel", async () => {
+    const { client, fabrique } = doubles();
     const reserver = vi.fn(async (): Promise<ResultatVille> => ({ ok: false, code: "ville_debit_atteint" }));
     expect(await suggererVillesEssai({ saisie: "Valen", session: SESSION }, dependances(fabrique, { reserver }))).toEqual({ statut: "limite" });
-    expect(fabrique).not.toHaveBeenCalled();
+    expect(await choisirVilleEssai({ placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" }, dependances(fabrique, { reserver }))).toEqual({ statut: "limite" });
+    expect(client.suggererVilles).not.toHaveBeenCalled();
+    expect(client.ficheVille).not.toHaveBeenCalled();
+  });
+
+  it("clé absente ou sortie refusée (construction du client en erreur) : « indisponible », sans réservation ni appel", async () => {
+    const reserver = accordee();
+    const fabrique = vi.fn<NonNullable<DependancesVilles["client"]>>(() => {
+      throw new Error("SENTINELLE");
+    });
+    expect(await suggererVillesEssai({ saisie: "Valen", session: SESSION }, dependances(fabrique, { reserver }))).toEqual({ statut: "indisponible" });
+    expect(await choisirVilleEssai({ placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" }, dependances(fabrique, { reserver }))).toEqual({
+      statut: "indisponible",
+    });
+    expect(reserver).not.toHaveBeenCalled();
   });
 
   it("échec fermé : base indisponible (migration 0019 absente comprise) ou réservation en erreur, « indisponible », sans appel", async () => {
-    const { fabrique } = doubles();
+    const { client, fabrique } = doubles();
     for (const reserver of [
       vi.fn(async (): Promise<ResultatVille> => ({ ok: false, code: "usage_unavailable" })),
       vi.fn(async (): Promise<ResultatVille> => {
@@ -230,7 +243,8 @@ describe("recherche de ville : plafond persistant (décision 0129 § 3)", () => 
         statut: "indisponible",
       });
     }
-    expect(fabrique).not.toHaveBeenCalled();
+    expect(client.suggererVilles).not.toHaveBeenCalled();
+    expect(client.ficheVille).not.toHaveBeenCalled();
   });
 
   it("limites : un jour au plafond, au prix plein, reste sous 20 USD sur un mois de 31 jours (0027 § 2)", () => {

@@ -21,7 +21,8 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
  *   connexion, aucun appel ; cookie absent ou expiré : `acces`, aucun appel.
  * - **Plafond persistant** (0129 § 3) : avant tout appel Google, une ligne `prototype.forfaits` de nature `ville` est
  *   réservée (`reserverVille`) sous les limites `LIMITES_VILLE` (par jour de quota, et par cookie et par minute) ; au
- *   plafond, `limite` ; base indisponible ou migration 0019 absente : `indisponible` (échec fermé). Le coût de chaque
+ *   plafond de la minute, `limite`, au plafond du jour, `limite_jour` ; le client (clé serveur) est construit avant la
+ *   réservation, clé absente : `indisponible` sans unité consommée ; base indisponible ou migration 0019 absente : `indisponible` (échec fermé). Le coût de chaque
  *   action, au prix plein, entre dans le mois Google des forfaits.
  * - **Un appel Google par action**, au plus : port de consommation en mémoire borné à une réservation (`portUnAppel`) ;
  *   la clé serveur est lue par le client réel, après la barrière de sortie, jamais envoyée au navigateur.
@@ -56,7 +57,7 @@ export const LIMITES_VILLE: LimitesVille = { suggestionsParJour: 150, choixParJo
 
 export type IssueSuggestions =
   | { readonly statut: "ok"; readonly suggestions: readonly SuggestionVille[] }
-  | { readonly statut: "acces" | "indisponible" | "limite" | "entree_invalide" };
+  | { readonly statut: "acces" | "indisponible" | "limite" | "limite_jour" | "entree_invalide" };
 
 /** Ville choisie : valeurs maison seulement, et le `placeId`. */
 export type VilleChoisie = {
@@ -73,7 +74,7 @@ export type VilleChoisie = {
 
 export type IssueChoix =
   | { readonly statut: "ok"; readonly ville: VilleChoisie }
-  | { readonly statut: "acces" | "indisponible" | "limite" | "entree_invalide" | "pays_inconnu" };
+  | { readonly statut: "acces" | "indisponible" | "limite" | "limite_jour" | "entree_invalide" | "pays_inconnu" };
 
 export type DependancesVilles = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête. */
@@ -128,7 +129,7 @@ function coutDe(action: DemandeVille["action"]): number | null {
 }
 
 /** Réservation de l'action : `null` si elle est accordée, sinon le statut à rendre (aucun appel Google). */
-async function reserver(action: DemandeVille["action"], empreinte: string, dependances: DependancesVilles): Promise<"limite" | "indisponible" | null> {
+async function reserver(action: DemandeVille["action"], empreinte: string, dependances: DependancesVilles): Promise<"limite" | "limite_jour" | "indisponible" | null> {
   const coutGoogleMicros = coutDe(action);
   if (coutGoogleMicros === null) return "indisponible";
   const reserve = dependances.reserver ?? ((demande: DemandeVille) => reserverVille(poolPrototype(), demande, LIMITES_VILLE));
@@ -139,7 +140,8 @@ async function reserver(action: DemandeVille["action"], empreinte: string, depen
     return "indisponible";
   }
   if (resultat.ok) return null;
-  return resultat.code === "usage_unavailable" ? "indisponible" : "limite";
+  if (resultat.code === "usage_unavailable") return "indisponible";
+  return resultat.code === "ville_jour_atteint" ? "limite_jour" : "limite";
 }
 
 function client(dependances: DependancesVilles): ClientVilles {
@@ -155,6 +157,19 @@ function client(dependances: DependancesVilles): ClientVilles {
   });
 }
 
+/**
+ * Client construit **avant** la réservation (revue du head de4ab92, mineur 16) : la construction lit la clé serveur
+ * après la barrière de sortie, sans appel ; clé absente ou sortie refusée, `indisponible` sans consommer d'unité du
+ * plafond.
+ */
+function construire(dependances: DependancesVilles): ClientVilles | null {
+  try {
+    return client(dependances);
+  } catch {
+    return null;
+  }
+}
+
 const texte = (valeur: unknown, max: number): string | null => (typeof valeur === "string" && valeur.length <= max ? valeur : null);
 
 /** Suggestions de villes pour la saisie (Autocomplete (New), `(cities)`, en français, jeton de session). */
@@ -164,10 +179,12 @@ export async function suggererVillesEssai(entree: { readonly saisie: unknown; re
   if (saisie.length < SAISIE.min || saisie.length > SAISIE.max || session === null || !JETON_SESSION_MOTIF.test(session)) return { statut: "entree_invalide" };
   const ouverte = barriere(dependances);
   if ("refus" in ouverte) return { statut: ouverte.refus };
+  const places = construire(dependances);
+  if (places === null) return { statut: "indisponible" };
   const refus = await reserver("suggestions", ouverte.empreinte, dependances);
   if (refus !== null) return { statut: refus };
   try {
-    return { statut: "ok", suggestions: await client(dependances).suggererVilles(saisie, session) };
+    return { statut: "ok", suggestions: await places.suggererVilles(saisie, session) };
   } catch {
     return { statut: "indisponible" };
   }
@@ -196,11 +213,13 @@ export async function choisirVilleEssai(
   if (!entreeValide) return { statut: "entree_invalide" };
   const ouverte = barriere(dependances);
   if ("refus" in ouverte) return { statut: ouverte.refus };
+  const places = construire(dependances);
+  if (places === null) return { statut: "indisponible" };
   const refus = await reserver("choix", ouverte.empreinte, dependances);
   if (refus !== null) return { statut: refus };
   let fiche;
   try {
-    fiche = await client(dependances).ficheVille(placeId, session);
+    fiche = await places.ficheVille(placeId, session);
   } catch {
     return { statut: "indisponible" };
   }

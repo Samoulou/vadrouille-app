@@ -293,6 +293,37 @@ describe("fuseaux : ville choisie dans les suggestions (demande de Samuel du 23 
     for (const [ville, pays, lat, lng, zone] of cas) expect(fuseauParPosition(pays, { lat, lng }), ville).toBe(zone);
   });
 
+  it("fuseauParPosition, positions hors repère près d'une limite (mineur 6 de la revue du head de4ab92)", () => {
+    // Aucune de ces positions n'est un repère : le repère le plus proche doit tomber du bon côté de la limite. Panama
+    // City (Chicago), Tallahassee et Apalachicola (New York), Mildura (Sydney) et Mount Gambier (Adélaïde) sont des repères
+    // ajoutés pour ces limites.
+    const cas: [string, string, number, number, string][] = [
+      ["Evansville", "US", 37.97, -87.57, "America/Chicago"],
+      ["Odessa (Texas)", "US", 31.85, -102.37, "America/Chicago"],
+      ["Cincinnati", "US", 39.1, -84.51, "America/New_York"],
+      ["Chattanooga", "US", 35.05, -85.31, "America/New_York"],
+      ["Huntsville", "US", 34.73, -86.59, "America/Chicago"],
+      ["Columbus (Géorgie)", "US", 32.46, -84.99, "America/New_York"],
+      ["Dothan", "US", 31.22, -85.39, "America/Chicago"],
+      ["Marianna", "US", 30.77, -85.23, "America/Chicago"],
+      ["Quincy (Floride)", "US", 30.59, -84.58, "America/New_York"],
+      ["Port St. Joe", "US", 29.81, -85.3, "America/New_York"],
+      ["Destin", "US", 30.39, -86.5, "America/Chicago"],
+      ["Rapid City", "US", 44.08, -103.23, "America/Denver"],
+      ["Spokane", "US", 47.66, -117.43, "America/Los_Angeles"],
+      ["Sault Ste. Marie (Ontario)", "CA", 46.52, -84.35, "America/Toronto"],
+      ["Kenora", "CA", 49.77, -94.49, "America/Winnipeg"],
+      ["Robinvale", "AU", -34.58, 142.77, "Australia/Sydney"],
+      ["Naracoorte", "AU", -36.96, 140.74, "Australia/Adelaide"],
+      ["Tennant Creek", "AU", -19.65, 134.19, "Australia/Darwin"],
+    ];
+    const reperes = new Set(listeDesPays().flatMap((pays) => pays.fuseaux.flatMap((fuseau) => (fuseau.reperes ?? []).map((repere) => repere.join(",")))));
+    for (const [ville, pays, lat, lng, zone] of cas) {
+      expect(reperes.has(`${lat},${lng}`), `${ville} n'est pas un repère`).toBe(false);
+      expect(fuseauParPosition(pays, { lat, lng }), ville).toBe(zone);
+    }
+  });
+
   it("chaque pays à plusieurs fuseaux a au moins un repère par fuseau ; un repère est une position valide", () => {
     for (const pays of listeDesPays()) {
       if (pays.fuseaux.length < 2) continue;
