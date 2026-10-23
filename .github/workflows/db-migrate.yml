@@ -111,6 +111,7 @@ jobs:
             "0015_recalcul_lot 167240921a3bfc87e5c087bccbd5c33d6e33e5d604f7686f1e6711597bff9026"
             "0016_restriction_update_generation_runs f2f36d78483151ff7553cd507e328d1c7508a599cbd6c64c02a484ca415edea5"
             "0017_brief_saisi_prototype 72a428bfc9305b380f74870953f3106b356eff47811b785f928c58ead7927376"
+            "0018_brief_saisi_a_eviter 4f35ef1f3e72026a12eee137a9f3cb90ebf88b582f7a8b6283b7aba65b07e3c2"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
