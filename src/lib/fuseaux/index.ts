@@ -1,5 +1,6 @@
 import PAYS from "./pays.json";
 import VILLES from "./villes.json";
+import VILLES_MVP from "./villes-mvp.json";
 
 /**
  * Table maison des villes et de leur fuseau IANA, et règle « même décalage pendant les dates du voyage » (décision 0087
@@ -39,6 +40,14 @@ const PAYS_PAR_CODE: ReadonlyMap<string, PaysDeLaTable> = new Map(
 const TABLE: ReadonlyMap<string, readonly [zone: string, pays: string, nom: string]> = new Map(
   Object.entries(VILLES as Record<string, string[]>).map(([cle, [zone = "", pays = "", nom = ""]]) => [cle, [zone, pays, nom]] as const),
 );
+
+/**
+ * Table des villes du **MVP** (adaptateur `api`, `createTrip`, B9-PO-18 et 0087 § 5) : les 62 clés d'origine et leur
+ * fuseau, **inchangées** par l'élargissement du site d'essai (décision 0129 § 8, bloquant 2 de la revue du head
+ * `de4ab92`). Seul `controlerVilles` la lit ; tout élargissement du MVP viendra d'une décision du Product Owner à part.
+ * Chaque clé a le même fuseau dans la table élargie (test).
+ */
+const TABLE_MVP: ReadonlyMap<string, string> = new Map(Object.entries(VILLES_MVP as Record<string, string>));
 
 const QUART_D_HEURE_MS = 15 * 60_000;
 const JOUR_MS = 86_400_000;
@@ -94,6 +103,17 @@ export function fuseauReconnu(zone: string): boolean {
 export function fuseauDeVille(nom: string): string | null {
   const zone = TABLE.get(cleVille(nom))?.[0];
   return zone !== undefined && fuseauReconnu(zone) ? zone : null;
+}
+
+/** Fuseau d'une ville de la table du MVP (62 clés d'origine), ou `null` : seule table de `controlerVilles` (0129 § 8). */
+function fuseauDeVilleMvp(nom: string): string | null {
+  const zone = TABLE_MVP.get(cleVille(nom));
+  return zone !== undefined && fuseauReconnu(zone) ? zone : null;
+}
+
+/** Clés de la table des villes du MVP (tests). */
+export function villesDuMvp(): readonly string[] {
+  return [...TABLE_MVP.keys()];
 }
 
 /** Pays d'une ville de la table (nom français, table maison), ou `null` pour une ville inconnue. */
@@ -182,14 +202,14 @@ export type ControleVilles =
 
 /**
  * Contrôle des villes d'un voyage (B9-PO-18, 0087 § 5) : `villes[0]` est la destination, les suivantes les autres villes
- * dans l'ordre du brouillon. Chaque ville doit être connue de la table, et chaque autre ville avoir le même décalage
+ * dans l'ordre du brouillon. Chaque ville doit être connue de la table **du MVP** (62 clés d'origine, 0129 § 8), et chaque autre ville avoir le même décalage
  * que la destination pendant tout le voyage (`arrivee` à `depart`, dates locales de la destination). Le fuseau du voyage
  * est celui de la destination ; chaque ville garde son identifiant (`event_occurrences.timezone`).
  */
 export function controlerVilles(villes: readonly string[], arrivee: string, depart: string): ControleVilles {
   const fuseaux: string[] = [];
   for (const [indice, nom] of villes.entries()) {
-    const zone = fuseauDeVille(nom);
+    const zone = fuseauDeVilleMvp(nom);
     if (zone === null) return { ok: false, indice, raison: "inconnue" };
     fuseaux.push(zone);
   }

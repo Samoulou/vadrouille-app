@@ -95,6 +95,25 @@ export interface ClientVilles {
   ficheVille(placeId: string, session: string): Promise<FicheVille>;
 }
 
+/**
+ * Photo d'un lieu pour le tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23) : **donnée Google
+ * chargée à la demande**, jamais stockée (ni l'adresse, ni le nom de ressource, ni l'image) ni mise dans un prompt ou un
+ * journal. `uri` : adresse courte de l'image (`photoUri` de Place Photos (New), hôte `googleusercontent.com`) ; auteurs
+ * (`authorAttributions`) et lien de la photo sur Google Maps (`googleMapsUri`), à afficher avec elle (conditions de
+ * Places API, « Display author attributions »). Les liens ne sont gardés que s'ils sont en `https` sur un hôte Google.
+ */
+export type AuteurPhotoLieu = { readonly nom: string; readonly lien?: string };
+export type PhotoLieu = { readonly uri: string; readonly auteurs: readonly AuteurPhotoLieu[]; readonly lienGoogleMaps?: string };
+
+/**
+ * Client des photos de lieu (décision 0128) : une fiche au masque `photos` (SKU « Place Details Essentials (IDs Only) »),
+ * puis le média de la **première** photo (`skipHttpRedirect`, SKU « Place Details Photos »). Aucune photo : `null`, sans
+ * second appel. Rien d'autre de Places : ni position, ni horaires, ni Text Search.
+ */
+export interface ClientPhotosLieu {
+  photo(placeId: string, largeurMaxPx: number): Promise<PhotoLieu | null>;
+}
+
 export const MODES_ROUTES = ["walk", "transit", "car"] as const;
 export type ModeRoutes = (typeof MODES_ROUTES)[number];
 

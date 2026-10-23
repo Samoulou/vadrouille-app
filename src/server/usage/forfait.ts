@@ -145,6 +145,24 @@ export function forfaitRelecture(table: TablePrixGoogle, skus: Pick<SkusForfait,
   };
 }
 
+/**
+ * Forfait d'une photo du tri (décision 0128) : de nature `relecture` (aucune nouvelle nature, `NATURES` du port reste
+ * fermé), deux fiches au plus (la liste des photos au SKU `skus.liste`, puis le média au SKU `skus.media`, tous deux de la
+ * méthode `places_details`), au prix plein ; ni Text Search, ni Routes, ni modèle. Le registre en mémoire borne les appels
+ * à ces deux fiches.
+ */
+export function forfaitPhoto(table: TablePrixGoogle, skus: { readonly liste: string; readonly media: string }): Forfait {
+  return {
+    nature: "relecture",
+    textSearchRequetes: 0,
+    placeDetailsRequetes: 2,
+    routesRequetes: 0,
+    routesElements: 0,
+    coutGoogleMicros: prixPlein(table, skus.liste, "places_details", "requete", 1) + prixPlein(table, skus.media, "places_details", "requete", 1),
+    coutModelesMicros: null,
+  };
+}
+
 /** Sommes des forfaits déjà réservés, lues en base dans la transaction de réservation. */
 export type SommesForfaits = {
   readonly jour: { readonly textSearchRequetes: number; readonly placeDetailsRequetes: number; readonly routesRequetes: number; readonly routesElements: number };

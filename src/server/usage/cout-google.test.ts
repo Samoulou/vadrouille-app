@@ -39,8 +39,8 @@ describe("p0: table de prix Google", () => {
   });
 
   it("la table commitée est valide, datée, et couvre les SKU des clients réels", () => {
-    // B8a (0085 § 2) : relevé du 2026-10-17, qui ajoute la ligne « IDs only » de Place Details ; relevé du 2026-10-23
-    // (recherche de ville du site d'essai, demande de Samuel) : lignes Autocomplete (requêtes et session).
+    // B8a (0085 § 2) : relevé du 2026-10-17, qui ajoute la ligne « IDs only » de Place Details ; relevé du 2026-10-23,
+    // qui ajoute « Place Details Photos » (décision 0128, photos du tri) et les lignes Autocomplete (décision 0129).
     expect(TABLE_REELLE.releve).toBe("2026-10-23");
     for (const sku of [
       "places_text_search_essentials_ids_only",
@@ -50,6 +50,7 @@ describe("p0: table de prix Google", () => {
       "routes_matrix_essentials",
       "places_autocomplete_requests",
       "places_autocomplete_session_usage",
+      "places_details_photos",
     ]) {
       expect(Object.keys(TABLE_REELLE.skus)).toContain(sku);
     }

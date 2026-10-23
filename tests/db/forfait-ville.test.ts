@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { type ClientSql, type DemandeVille, type LimitesVille, type PoolSql, reserverVille } from "@/server/usage/neon";
+import type { Forfait } from "@/server/usage/forfait";
+import { type ClientSql, type DemandeVille, type LimitesVille, type PoolSql, type ReglesForfait, reserverPhoto, reserverVille } from "@/server/usage/neon";
 
 import { closeAll, connect, type DbClient } from "./helpers";
 
@@ -142,5 +143,33 @@ describe("p0: recherche de ville, forfait `ville` en base (0129 § 3)", () => {
         await proto.query("ROLLBACK");
       }
     }
+  });
+
+  it("cadence des photos du tri (0128 § 4) : les lignes `ville` n'y comptent pas, même de la forme d'une photo", async () => {
+    const photo: Forfait = { nature: "relecture", textSearchRequetes: 0, placeDetailsRequetes: 2, routesRequetes: 0, routesElements: 0, coutGoogleMicros: 7_000, coutModelesMicros: null };
+    const regles: ReglesForfait = {
+      limites: { quotaJourParMethode: 1_000_000_000, moisGoogleMicros: Number.MAX_SAFE_INTEGER, enveloppeGoogleMicros: Number.MAX_SAFE_INTEGER, moisModelesMicros: Number.MAX_SAFE_INTEGER, enveloppeModelesMicros: Number.MAX_SAFE_INTEGER },
+      uniteQuotaRoutes: "requetes",
+      dureeMaxMs: 900_000,
+    };
+    await annulee(async (pool) => {
+      const deja = Number(
+        (
+          await proto.query(
+            "SELECT count(*) AS n FROM prototype.forfaits WHERE nature = 'relecture' AND place_details_requests = 2 AND routes_requests = 0 AND google_cost_micros = 7000 AND created_at > now() - interval '1 hour'",
+          )
+        ).rows[0].n,
+      );
+      // Trois lignes `ville` aux compteurs et au coût d'une photo : la cadence des photos les ignore (`nature = 'relecture'`).
+      for (let i = 0; i < 3; i++) {
+        await proto.query(
+          `INSERT INTO prototype.forfaits (nature, run_id, text_search_requests, place_details_requests, routes_requests, routes_elements,
+             google_cost_micros, models_cost_micros, autocomplete_requests, acces_empreinte) VALUES ('ville', NULL, 0, 2, 0, 0, 7000, NULL, 0, $1)`,
+          [empreinte()],
+        );
+      }
+      expect(await reserverPhoto(pool, photo, regles, deja + 1)).toEqual({ ok: true });
+      expect(await reserverPhoto(pool, photo, regles, deja + 1)).toEqual({ ok: false, code: "cap_reached" });
+    });
   });
 });

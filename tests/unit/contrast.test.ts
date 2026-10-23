@@ -55,6 +55,7 @@ const TEXT_PAIRS: [ColorToken, ColorToken][] = [
   ["on-line", "ink"], // coche de la case faite de ChecklistRow (F5c)
   ["line", "muted"], // lien « Itinéraire » dans le bloc « Prochaine étape » de l'écran 15 (F10a)
   // ActionBanner (bandeau « À réserver » de l'écran 15, F10a) : `ink` sur `quai`, déjà dans la liste.
+  ["ink-2", "raised"], // vignette opaque du crédit d'une photo sur la carte du tri (décision 0128) : jamais sur la photo
 ];
 
 describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {

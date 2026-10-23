@@ -14,7 +14,8 @@
 --    ailleurs) ; la fiche du choix est comptée dans `place_details_requests` ;
 -- 3. colonne `acces_empreinte` : HMAC du cookie d'accès (`empreinteCookieAcces` de `src/server/p0/acces.ts`, clé dérivée du
 --    code), renseignée si et seulement si la nature est `ville` ; ni le cookie, ni le code, ni une adresse ;
--- 4. index partiel pour le débit par cookie (lignes `ville` de la dernière minute) ;
+-- 4. index partiel des lignes `ville` par jour de quota et empreinte : les sommes de `reserverVille` ne lisent que le jour
+--    de quota courant et la veille (plafond du jour, débit du cookie sur la dernière minute) ;
 -- 5. `INSERT` des deux colonnes pour `vadrouille_prototype` (droits par colonne, comme 0003_prototype § 4.9).
 -- Aucune donnée Google : ni `placeId`, ni texte, ni position.
 --
@@ -42,7 +43,7 @@ ALTER TABLE prototype.forfaits ADD CONSTRAINT forfaits_ville_check CHECK (autoco
     AND ((acces_empreinte IS NOT NULL) = (nature = 'ville'))
     AND (acces_empreinte IS NULL OR acces_empreinte ~ '^[0-9a-f]{64}$'));
 --> statement-breakpoint
-CREATE INDEX forfaits_ville_empreinte_idx ON prototype.forfaits (acces_empreinte, created_at) WHERE nature = 'ville';
+CREATE INDEX forfaits_ville_jour_idx ON prototype.forfaits (quota_day, acces_empreinte) WHERE nature = 'ville';
 --> statement-breakpoint
 GRANT INSERT (autocomplete_requests, acces_empreinte) ON prototype.forfaits TO vadrouille_prototype;
 --> statement-breakpoint

@@ -99,6 +99,15 @@ async function brancherLecturePrototype(
   } catch (error) {
     logEvent("essai.creation_unavailable", { errorName: errorNameOf(error) }, "error");
   }
+  try {
+    // Décision 0128 : photos des cartes du tri d'un voyage d'essai (Places, à la demande, même barrière que la relecture,
+    // forfait réservé par photo ; rien n'est lu ici). Échec : les cartes gardent leur emplacement « photo ».
+    const { brancherPhotosEssai } = await import("@/adapters/prototype-instance");
+    const { creerPhotosEssai } = await import("@/server/p0/photos");
+    brancherPhotosEssai(creerPhotosEssai());
+  } catch (error) {
+    logEvent("essai.photo_unavailable", { errorName: errorNameOf(error) }, "error");
+  }
 }
 
 /** Branche la connexion réelle sur l'adaptateur `better-auth` (spécification B3, B3c point 1). */

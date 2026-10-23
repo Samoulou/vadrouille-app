@@ -388,7 +388,8 @@ export function lancementDuMode(mode: ExecutionEnCours["mode"], sorte: SorteExec
  * 0053) : 40 requêtes de matrice et 40 éléments. Le relecteur fait une requête par lieu de départ et un élément par
  * trajet distinct de la journée : 40 couvre toute journée du prototype (une vingtaine de trajets au plus). Forfait au
  * prix plein : 40 × 0,005 = **0,20 USD** réservés, alors que le coût réel est d'un élément par trajet (tranche gratuite
- * de 10 000 éléments par mois non déduite, Q329). Constante, comme l'exige S4 : le forfait ne dépend que de la nature.
+ * de 10 000 éléments par mois non déduite, Q329). Constante, comme l'exige S4 : le forfait ne dépend que de la nature et
+ * de la forme de forfait (décision 0128 § 4 : la photo du tri est une seconde forme, constante, de la nature `relecture`).
  */
 export const PLAFONDS_RELECTURE: PlafondsRelecture = Object.freeze({ placesTextSearch: 0, placesDetails: 0, routesRequetes: 40, routesElements: 40 });
 

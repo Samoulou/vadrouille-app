@@ -21,6 +21,7 @@ import {
   memeDecalage,
   minuitLocal,
   villesConnues,
+  villesDuMvp,
 } from "./index";
 
 const QUART_D_HEURE_MS = 15 * 60_000;
@@ -305,6 +306,20 @@ describe("fuseaux : ville choisie dans les suggestions (demande de Samuel du 23 
         const [lat = Number.NaN, lng = Number.NaN] = fuseau.reperes?.[0] ?? [];
         expect(fuseauParPosition(pays.code, { lat, lng }), `${pays.code} ${fuseau.zone}`).toBe(fuseau.zone);
       }
+    }
+  });
+});
+
+describe("fuseaux : table du MVP isolée de la table élargie (décision 0129 § 8)", () => {
+  it("les 62 clés d'origine, chacune au même fuseau dans la table élargie ; `controlerVilles` ne lit qu'elles", () => {
+    const mvp = villesDuMvp();
+    expect(mvp).toHaveLength(62);
+    for (const cle of mvp) expect(villesConnues(), cle).toContain(cle);
+    for (const cle of mvp) expect(controlerVilles([cle], "2027-07-10", "2027-07-12").ok, cle).toBe(true);
+    // Villes de la seule table élargie (site d'essai) : inconnues du MVP.
+    for (const ville of ["Valence", "Bilbao", "Kyoto", "Tokyo", "New York"]) {
+      expect(fuseauDeVille(ville), ville).not.toBeNull();
+      expect(controlerVilles([ville], "2027-07-10", "2027-07-12"), ville).toEqual({ ok: false, indice: 0, raison: "inconnue" });
     }
   });
 });

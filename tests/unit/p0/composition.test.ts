@@ -20,7 +20,7 @@ import { ConfigRechercheSchema } from "@/prototype/config";
 import { exemptionDuPlan, FENETRE_RECIT_CARACTERES, LONGUEUR_FRAGMENT_MIN, MOTS_RECIT_FENETRE, requeteSansDonneeDuBrief } from "@/research/agent";
 import type { LecteurPages, VerificateurStatut } from "@/research/fetch-page";
 import { nettoyerRequeteWeb, type ClientRechercheWeb } from "@/ai/recherche-web";
-import { composerP0Reel, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type CapacitesProgramme, type OptionsComposition } from "@/server/composition/p0-reel";
+import { composerP0Reel, composerPhotos, composerRelecture, type CapacitesAgent, type CapacitesEtapeFinale, type CapacitesProgramme, type OptionsComposition } from "@/server/composition/p0-reel";
 import type { GardeOuverte, GardeRelecture } from "@/server/p0/garde";
 import { entreeModelesDepuisBrief, entreeProgrammeDepuisBrief } from "@/server/p0/vers-couche-ia";
 
@@ -52,7 +52,12 @@ const IMPORTATEUR_COMPOSITION = "src/workflows/p0-run.ts";
  * `composerRelecture` (client Routes seul, garde de relecture exigée) ; lui-même importé par `src/instrumentation.ts` seul.
  */
 const RELECTEUR_REEL = "src/server/p0/relecture.ts";
-const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RELECTEUR_REEL];
+/**
+ * Troisième importateur admis (décision 0128, photos du tri d'un voyage d'essai) : le service des photos, qui n'en lit que
+ * `composerPhotos` (client des photos seul, garde de relecture exigée) ; lui-même importé par `src/instrumentation.ts` seul.
+ */
+const PHOTOS_ESSAI = "src/server/p0/photos.ts";
+const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RELECTEUR_REEL, PHOTOS_ESSAI];
 /**
  * Fabrique commune des clients Google (B8b, décision 0100 § 5.2, qui amende 0081 B9-TL-2 point 1) : seul importateur des
  * modules de capacité Google (`places-client.ts`, `routes-client.ts`) hors de la composition du prototype, importée par la
@@ -259,6 +264,10 @@ describe("p0: modules de capacité importés par la seule composition", () => {
     expect(importateurs(DEPOT, RELECTEUR_REEL)).toEqual(["src/instrumentation.ts"]);
     // Le relecteur n'utilise de la composition que la relecture (jamais `composerP0Reel`).
     expect(lireDepot(RELECTEUR_REEL)).not.toContain("composerP0Reel");
+    // Décision 0128 : le service des photos, par l'instrumentation seule, n'utilise que `composerPhotos`.
+    expect(importateurs(DEPOT, PHOTOS_ESSAI)).toEqual(["src/instrumentation.ts"]);
+    expect(lireDepot(PHOTOS_ESSAI)).not.toContain("composerP0Reel");
+    expect(lireDepot(PHOTOS_ESSAI)).not.toContain("composerRelecture");
     for (const interdit of ["src/app/", "src/features/", "src/server/actions/", "src/adapters/index.ts"]) {
       expect(trouves.some((f) => f.startsWith(interdit))).toBe(false);
     }
@@ -1079,5 +1088,13 @@ describe("p0: non-confusion des preuves de la garde (P0r4, décision 0079)", () 
     expect(() => composerRelecture(mixte, relecture)).toThrow("garde de relecture attendue");
     // Preuve de relecture valide : seule l'absence de clé Google (environnement des tests) arrête la construction.
     expect(() => composerRelecture(RELECTURE, relecture)).not.toThrow("garde de relecture attendue");
+  });
+
+  it("décision 0128 : une preuve d'exécution n'ouvre pas les photos du tri (avant le client des photos et sa clé)", () => {
+    const photos = { usage: options.usage, plafonds: [] };
+    expect(() => composerPhotos(OUVERTE as unknown as GardeRelecture, photos)).toThrow("garde de relecture attendue");
+    const mixte = Object.freeze({ runId: "x", relecture: true }) as unknown as GardeRelecture;
+    expect(() => composerPhotos(mixte, photos)).toThrow("garde de relecture attendue");
+    expect(() => composerPhotos(RELECTURE, photos)).not.toThrow("garde de relecture attendue");
   });
 });

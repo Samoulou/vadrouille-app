@@ -10,7 +10,7 @@ SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
 REVOKE INSERT (autocomplete_requests, acces_empreinte) ON prototype.forfaits FROM vadrouille_prototype;
 --> statement-breakpoint
-DROP INDEX prototype.forfaits_ville_empreinte_idx;
+DROP INDEX prototype.forfaits_ville_jour_idx;
 --> statement-breakpoint
 ALTER TABLE prototype.forfaits DROP CONSTRAINT forfaits_ville_check;
 --> statement-breakpoint
