@@ -1,36 +1,31 @@
-# État du studio — 2026-10-23 (155e cycle)
+# État du studio — 2026-10-23 (156e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 154e cycle.
+- Aucun message de Samuel depuis le 155e cycle.
 
 ## Fait
-- **Statut du 154e cycle** (#730) fusionné.
+- **#731 `[front]`** fusionnée (photos sur les cartes du tri, décision 0128) après la correction 1 : photo seulement pour un lieu du voyage, au plus 40 photos par heure, en échec fermé. Restes F13a notés dans 0128.
+- **Statut du 155e cycle** (#733) fusionné.
 
 ## En cours
-- **#732 `[front]`** (ville au choix par l'autocomplétion de Google, demande de Samuel du 23 octobre à 15:17 et 15:23 UTC). Première revue sur `aa77422` : changements demandés par le TL, la Sécurité et l'UX, 9 bloquants. Correction 1 lancée. Choix du CEO :
-  - écrire la décision 0129 ;
-  - plafond persistant par jour dans `prototype.forfaits` et limite par cookie, en échec fermé ;
-  - destination limitée au nom maison ou au texte tapé filtré côté serveur ;
-  - champ rempli avec le nom retenu.
-- **#731 `[front]`** (photos sur les cartes du tri, demande de Samuel du 23 octobre à 15:23 UTC, décision 0128 proposée). Première revue sur `8232ddb` : 6 bloquants du TL et 1 de la Sécurité, UX approuvée avec réserves. Correction 1 lancée. Choix du CEO :
-  - tableau F13 « repris / remplacé / reporté » dans 0128 ;
-  - contrôle que le lieu appartient au voyage ;
-  - au plus 40 photos par heure et par session, en échec fermé ;
-  - `alt=""` comme le demande F13.
-- Les deux PR touchent `prototype/config/prix-google.json` : la seconde à fusionner reprendra `main` par un commit de fusion. Ensuite, PR de release `main` → `p0-reel`, puis un seul lien pour Samuel.
+- **#732 `[front]`** (ville au choix par l'autocomplétion de Google, décision 0129). Revue de `de4ab92` : Sécurité favorable, UX conforme avec réserves, Tech Lead 2 bloquants. Correction 2 (la dernière) lancée. Choix du CEO :
+  - fusionner `main` (conflits avec #731) ;
+  - isoler la table élargie (778 villes) du chemin MVP : `creer-voyage` garde les 62 villes d'origine, avec un test ;
+  - traiter les mineurs 3 à 10, 12, 13 et 15 à 19.
+- La migration 0019 (plafond des recherches de ville) devra être ajoutée à la liste des migrations approuvées par une PR de workflow (`owner-approved` de Samuel), puis appliquée par Samuel ; d'ici là, la recherche réelle reste fermée et le formulaire se rabat sur la table. Ensuite, PR de release `main` → `p0-reel`, puis un seul lien pour Samuel.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
-- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13 (réponses de Samuel du 12 octobre, signalées par la revue de #731).
+- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
 ## Bloqué
 - **Ancienne chaîne en préversion** : Q538, Q551, Q556 sans objet pour le test de bout en bout ; à revoir pour le MVP.
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Relire les PR de l'autocomplétion et des photos (verdicts Sécurité et Tech Lead sur les conditions Google), puis préparer une PR de release `main` → `p0-reel` et envoyer à Samuel un seul lien.
+1. Après la correction 2 de #732 et sa fusion : PR de workflow pour la migration 0019 (Q623), PR de release `main` → `p0-reel`, puis un seul lien pour Samuel.
 2. #527 : rappeler Q438 à Samuel après ses tests.
-3. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126, 0127, #716, #720.
+3. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126, 0127, 0128, 0129, #716, #720.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).
