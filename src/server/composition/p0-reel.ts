@@ -8,8 +8,8 @@ import { creerRedigerProgramme, type RedigerProgramme } from "@/ai/rediger-progr
 import { creerRedigerRevision, type RedigerRevision } from "@/ai/rediger-revision";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
-import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
-import { createPlacesClient } from "@/grounding/places-client";
+import type { ClientPhotosLieu, ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
+import { createPlacesClient, createPlacesPhotosClient } from "@/grounding/places-client";
 import { creerCadence, type Cadence } from "@/grounding/budget-routes";
 import { createRoutesClient } from "@/grounding/routes-client";
 import { moteurRechercheWebAttendu, type MoteurRechercheWeb, type Routage } from "@/prototype/config";
@@ -219,6 +219,18 @@ export function composerRelecture(garde: GardeRelecture, options: OptionsRelectu
   const horloge = options.horloge ?? horlogeSysteme;
   const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
   return { routes: createRoutesClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge }) };
+}
+
+/**
+ * Photos du tri d'un voyage d'essai (décision 0128) : le seul client des photos de lieu, rien d'autre (ni fiche complète,
+ * ni Text Search, ni Routes, ni modèle). Exige une `GardeRelecture` (barrière du mode réel et cookie d'accès, forfait de
+ * la photo réservé, `src/server/p0/photos.ts`) ; contexte de nature `relecture`, sans exécution, périodes Google à l'appel.
+ */
+export function composerPhotos(garde: GardeRelecture, options: OptionsRelecture): { readonly photos: ClientPhotosLieu } {
+  if (garde.relecture !== true || "runId" in garde) throw new RangeError("composition : garde de relecture attendue");
+  const horloge = options.horloge ?? horlogeSysteme;
+  const contexte = (): ContexteAppel => ({ nature: "relecture", executionId: null, periodes: periodesDe("google", horloge) });
+  return { photos: createPlacesPhotosClient({ usage: options.usage, contexte, plafonds: options.plafonds, horloge }) };
 }
 
 /**

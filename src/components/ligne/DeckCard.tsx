@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import type { Exception, Proposal } from "@/contracts";
+import type { PlacePhoto } from "@/contracts/photo";
 import { DETOUR_THRESHOLD_MINUTES } from "@/contracts/values";
 import {
   MAX_ROTATION,
@@ -45,6 +46,20 @@ export function deckCardLabels(proposal: Proposal, isLastOption = false): Record
   return { like: t.actions.like, dislike: t.actions.dislike };
 }
 
+/**
+ * Crédit d'une photo (F13 : « Google Maps · Photo : {auteur} » ; conditions de Places API) : « Google Maps » d'abord, jamais
+ * coupé ni traduit (`translate="no"`), puis les auteurs nommés ; sans auteur nommé, « Google Maps » seul.
+ */
+export function CreditPhoto({ photo }: { photo: PlacePhoto }) {
+  const authors = photo.authors.map((author) => author.name).join(", ");
+  return (
+    <>
+      <span translate="no">{t.carte.photoGoogle}</span>
+      {authors === "" ? null : format(t.carte.photoAuteurs, { authors })}
+    </>
+  );
+}
+
 export interface DeckCardProps {
   proposal: Proposal;
   /**
@@ -54,6 +69,13 @@ export interface DeckCardProps {
   context?: string | null;
   /** Repas : dernière option du créneau (F6-PO-7). */
   isLastOption?: boolean;
+  /**
+   * Photo du lieu (voyage d'essai, décision 0128), chargée à la demande par l'écran ; absente ou `null` : l'emplacement
+   * « photo » reste. Affichée avec ses auteurs et « Google Maps » (conditions de Places API).
+   */
+  photo?: PlacePhoto | null;
+  /** Photo demandée, pas encore arrivée : l'emplacement reste, sans icône ni libellé (aucun clignotement d'une carte à l'autre). */
+  photoEnAttente?: boolean;
   /** « J'aime » ou « Je choisis ». */
   onLike: (gesture: Gesture) => void;
   /** « Pas pour moi » ou « Option suivante ». */
@@ -73,6 +95,8 @@ export function DeckCard({
   proposal,
   context = null,
   isLastOption = false,
+  photo = null,
+  photoEnAttente = false,
   onLike,
   onDislike,
   onOpen,
@@ -86,6 +110,8 @@ export function DeckCard({
         key={proposal.id}
         proposal={proposal}
         context={context}
+        photo={photo}
+        photoEnAttente={photoEnAttente}
         labels={labels}
         onDecide={(decision) => (decision === "like" ? onLike("swipe") : onDislike("swipe"))}
         onOpen={onOpen}
@@ -147,6 +173,8 @@ function prefersReducedMotion(): boolean {
 function SwipeCard({
   proposal,
   context,
+  photo,
+  photoEnAttente,
   labels,
   onDecide,
   onOpen,
@@ -154,6 +182,8 @@ function SwipeCard({
 }: {
   proposal: Proposal;
   context: string | null;
+  photo: PlacePhoto | null;
+  photoEnAttente: boolean;
   labels: Record<Decision, string>;
   onDecide: (decision: Decision) => void;
   onOpen: () => void;
@@ -167,6 +197,9 @@ function SwipeCard({
   const [reduced, setReduced] = useState(false);
   const [width, setWidth] = useState(0);
   const [exit, setExit] = useState<"slide" | "fade" | null>(null);
+  // Image en échec (adresse expirée, réseau) : l'emplacement « photo » revient, sans message.
+  const [imageEnEchec, setImageEnEchec] = useState<string | null>(null);
+  const image = photo !== null && imageEnEchec !== photo.url ? photo : null;
 
   const { stop } = proposal;
   const faits = formatFaits(stop.facts);
@@ -186,6 +219,7 @@ function SwipeCard({
     travel && proposal.detour ? id("detour") : null,
     stop.reason ? id("raison") : null,
     tag ? id("tag") : null,
+    image ? id("credit") : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -302,13 +336,43 @@ function SwipeCard({
         !dragging && "transition-transform duration-200 ease-out motion-reduce:transition-none",
       )}
     >
-      <span
-        aria-hidden="true"
-        className="flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink flex-col items-center justify-center gap-1 self-stretch bg-muted text-legende text-ink-soft"
-      >
-        <IconPhoto className="size-(--ligne-deck-icone-photo)" />
-        {t.carte.photo}
-      </span>
+      {image ? (
+        // Même boîte que l'emplacement : aucune hauteur ne change à l'arrivée de la photo (aucun saut de mise en page).
+        <span data-part="photo" className="relative flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink self-stretch overflow-hidden bg-muted">
+          {/* Décorative (F13) : le nom du lieu est déjà le nom accessible de la carte ; le crédit est dans sa description. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- image de Google servie telle quelle, ni optimisée ni gardée par Next.js (décision 0128) */}
+          <img
+            src={image.url}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            draggable={false}
+            onError={() => setImageEnEchec(image.url)}
+            className="pointer-events-none absolute inset-0 size-full object-cover"
+          />
+          <span
+            id={id("credit")}
+            data-part="credit"
+            className="absolute bottom-2 left-2 line-clamp-2 max-w-[calc(100%-1rem)] rounded-control bg-raised px-2 py-0.5 text-legende text-ink-2"
+          >
+            <CreditPhoto photo={image} />
+          </span>
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          data-part="emplacement-photo"
+          className="flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink flex-col items-center justify-center gap-1 self-stretch bg-muted text-legende text-ink-soft"
+        >
+          {photoEnAttente ? null : (
+            <>
+              <IconPhoto className="size-(--ligne-deck-icone-photo)" />
+              {t.carte.photo}
+            </>
+          )}
+        </span>
+      )}
       <span className="flex shrink-0 flex-col gap-1 p-4">
         <span className="flex items-center gap-2 text-corps-s text-ink-soft tabular-nums">
           <span id={id("moment")} className="flex items-center gap-2">

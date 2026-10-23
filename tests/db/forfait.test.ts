@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { codePersiste, type Phase } from "@/prototype/arret";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { type Forfait, LIMITES_PROTOTYPE, type LimitesForfait } from "@/server/usage/forfait";
-import { type ClientSql, type PoolSql, type ReglesForfait, reserverExecution, reserverRelecture } from "@/server/usage/neon";
+import { type ClientSql, type PoolSql, type ReglesForfait, reserverExecution, reserverPhoto, reserverRelecture } from "@/server/usage/neon";
 
 import { closeAll, connect, type DbClient } from "./helpers";
 
@@ -31,6 +31,16 @@ const FORFAIT_RELECTURE: Forfait = {
   routesRequetes: 60,
   routesElements: 60,
   coutGoogleMicros: 300,
+  coutModelesMicros: null,
+};
+/** Forfait d'une photo du tri (décision 0128 § 4 ; `forfaitPhoto`, deux fiches, 0,007 USD). */
+const FORFAIT_PHOTO: Forfait = {
+  nature: "relecture",
+  textSearchRequetes: 0,
+  placeDetailsRequetes: 2,
+  routesRequetes: 0,
+  routesElements: 0,
+  coutGoogleMicros: 7_000,
   coutModelesMicros: null,
 };
 /** Limites larges : les cas qui n'éprouvent pas un plafond ne dépendent pas des forfaits déjà validés dans la base. */
@@ -230,6 +240,34 @@ describe("p0: forfait réservé en base, plusieurs exécutions par jour (0071)",
       "SELECT pg_catalog.has_table_privilege('vadrouille_prototype', 'public.usage_ledger', 'INSERT') OR pg_catalog.has_any_column_privilege('vadrouille_prototype', 'public.usage_ledger', 'INSERT') AS insert",
     );
     expect(droits.rows[0].insert).toBe(false);
+  });
+});
+
+describe("p0: cadence des photos du tri comptée en base (décision 0128 § 4, F13-TL-2)", () => {
+  it("photos de l'heure comptées sous le verrou : la Nème refusée (cap_reached) sans rien écrire ; les relectures Routes ne comptent pas", async () => {
+    await annulee(async (pool) => {
+      const avant = Number((await proto.query("SELECT count(*) AS n FROM prototype.forfaits")).rows[0].n);
+      const dejaDansLHeure = Number(
+        (
+          await proto.query(
+            "SELECT count(*) AS n FROM prototype.forfaits WHERE nature = 'relecture' AND place_details_requests = 2 AND routes_requests = 0 AND google_cost_micros = 7000 AND created_at > now() - interval '1 hour'",
+          )
+        ).rows[0].n,
+      );
+      const max = dejaDansLHeure + 3;
+      expect((await reserverRelecture(pool, FORFAIT_RELECTURE, REGLES)).ok).toBe(true);
+      for (let i = 0; i < 3; i++) expect(await reserverPhoto(pool, FORFAIT_PHOTO, REGLES, max)).toEqual({ ok: true });
+      expect(await reserverPhoto(pool, FORFAIT_PHOTO, REGLES, max)).toEqual({ ok: false, code: "cap_reached" });
+      expect(Number((await proto.query("SELECT count(*) AS n FROM prototype.forfaits")).rows[0].n)).toBe(avant + 4);
+    });
+  });
+
+  it("forfait qui n'est pas celui d'une photo : refus fermé sans connexion", async () => {
+    let connexions = 0;
+    const compte: PoolSql = { connect: async () => (connexions++, Promise.reject(new Error("inattendu"))) };
+    expect(await reserverPhoto(compte, FORFAIT_EXECUTION, REGLES, 40)).toEqual({ ok: false, code: "usage_unavailable" });
+    expect(await reserverPhoto(compte, FORFAIT_RELECTURE, REGLES, 40)).toEqual({ ok: false, code: "usage_unavailable" });
+    expect(connexions).toBe(0);
   });
 });
 

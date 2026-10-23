@@ -251,3 +251,49 @@ export async function reserverRelecture(pool: PoolSql, forfait: Forfait, regles:
   );
   return "refus" in resultat ? { ok: false, code: resultat.refus } : { ok: true };
 }
+
+/**
+ * Photos du tri inscrites dans la dernière heure (décision 0128 § 4) : forfaits de relecture **de la forme d'une photo**
+ * (mêmes compteurs et même coût que le forfait demandé ; un forfait de relecture Routes porte des compteurs Routes et
+ * aucune fiche, il n'est donc jamais compté). Heure calculée par la base, lue sous le verrou de la réservation.
+ */
+const SQL_PHOTOS_DE_L_HEURE = `SELECT pg_catalog.count(*) AS n FROM prototype.forfaits
+WHERE nature = 'relecture' AND run_id IS NULL
+  AND text_search_requests = $1 AND place_details_requests = $2 AND routes_requests = $3 AND routes_elements = $4
+  AND google_cost_micros = $5 AND created_at > pg_catalog.now() - interval '1 hour'`;
+
+/**
+ * Début d'une photo du tri (décision 0128 § 4, F13-TL-2) : forfait de photo réservé comme une relecture (aucune ligne
+ * `runs`), **après** la borne de cadence : `maxParHeure` photos au plus par heure glissante, comptées en base sous le
+ * verrou de la réservation (deux demandes simultanées ne la franchissent pas). Au-delà : `cap_reached`, rien n'est écrit
+ * et aucun appel ne suit. La borne compte **toutes les sessions d'accès confondues** (le code d'accès est unique et la
+ * table ne garde aucun identifiant de session) : elle est donc au moins aussi stricte que « 40 par heure et par session »
+ * de F13-TL-2. Base injoignable ou erreur : `usage_unavailable` (échec fermé).
+ */
+export async function reserverPhoto(pool: PoolSql, forfait: Forfait, regles: ReglesForfait, maxParHeure: number): Promise<ResultatRelecture> {
+  if (forfait.nature !== "relecture" || forfait.placeDetailsRequetes <= 0 || !Number.isSafeInteger(maxParHeure) || maxParHeure < 0) {
+    return { ok: false, code: "usage_unavailable" };
+  }
+  const resultat = await reserver(
+    pool,
+    forfait,
+    regles,
+    async (client) => {
+      const { rows } = await client.query(SQL_PHOTOS_DE_L_HEURE, [
+        forfait.textSearchRequetes,
+        forfait.placeDetailsRequetes,
+        forfait.routesRequetes,
+        forfait.routesElements,
+        forfait.coutGoogleMicros,
+      ]);
+      const n = Number(rows[0]?.n);
+      if (!Number.isFinite(n)) throw new Error("forfait: photos de l'heure absentes");
+      return n >= maxParHeure ? "cap_reached" : null;
+    },
+    async (client) => {
+      await client.query(SQL_INSERER_FORFAIT, valeursForfait(forfait, null));
+      return { inscrit: true as const };
+    },
+  );
+  return "refus" in resultat ? { ok: false, code: resultat.refus } : { ok: true };
+}
