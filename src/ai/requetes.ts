@@ -243,7 +243,7 @@ export function requeteQuartier(entree: EntreeQuartier, resultats: readonly Resu
 }
 
 /**
- * Programme complet du prototype (prompt `programme` v1, décision 0115 § 3 étape 1) : le brief entier en **projection**
+ * Programme complet du prototype (prompt `programme` v3, décision 0115 § 3 étape 1) : le brief entier en **projection**
  * champ par champ (`EntreeProgramme`, toutes les saisies du questionnaire, récit et logement compris) ; aucun autre champ
  * d'un objet reçu n'atteint le prompt, et aucun champ n'existe pour une donnée Google (0011). Une seule requête, sans
  * outil ni recherche web (verdict 0117 § 1).
@@ -260,6 +260,7 @@ export function requeteProgramme(entree: EntreeProgramme, modele: string, routag
       voyageurs: { adultes: entree.voyageurs.adultes, enfants: entree.voyageurs.enfants },
       rythme: entree.rythme,
       envies: [...entree.envies],
+      ...(entree.aEviter === undefined ? {} : { aEviter: [...entree.aEviter] }),
       deplacements: [...entree.deplacements],
       ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
       logements: entree.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),

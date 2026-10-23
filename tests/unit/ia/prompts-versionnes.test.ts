@@ -35,10 +35,11 @@ const EMPREINTES: Record<string, Record<number, string>> = {
   structuration: { 1: "e9d62fe8ce071a2c0a3f3b97dd595408eca3f62dd288e84fbcdc76aee13433be" },
   quartier: { 1: "a7d2edb04621223aa702be9058f92cadbd509aa4b3eb99e7f5bea9db7e25355b" },
   "recherche-web": { 2: "5d9657a1e8e78be1e3cfac7dacc9ce26f3667225f3ff5188158a3fe94f7fff49" },
-  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`).
+  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`) ; v3 (E2E-essai, lot 5, « à éviter »).
   programme: {
     1: "7f3ac2bcbebf9331d2038fd558d4b8b2b5649fb978b5ca27c82e8b2fd0feea76",
     2: "236e304ba393a2d4504310f1898eadedda0487e638d558a0ee115d4526c30b80",
+    3: "413eb5e8aacf8c0b3408e2549c7c83668aeaa337548663903c60431143579b59",
   },
 };
 
@@ -59,8 +60,8 @@ describe("prompts: versionnés", () => {
     expect(PROMPT_QUARTIER.version).toBe(1);
   });
 
-  it("programme: prompt v2 demande le site officiel, sans donnée Google (A13)", () => {
-    expect(PROMPT_PROGRAMME.version).toBe(2);
+  it("programme: prompt v3 demande le site officiel, sans donnée Google (A13)", () => {
+    expect(PROMPT_PROGRAMME.version).toBe(3);
     const texte = PROMPT_PROGRAMME.texte;
     // Le champ `site` est demandé, facultatif, pour le site officiel, en https sans paramètres.
     expect(texte).toContain('"site" (facultatif)');
@@ -72,6 +73,14 @@ describe("prompts: versionnés", () => {
     expect(texte).toMatch(/la seule adresse admise est le champ/);
     expect(texte).not.toMatch(/https?:\/\//);
     expect(texte).not.toMatch(/google|placeId|place_id/i);
+  });
+
+  it("programme: prompt v3 demande qu'aucun créneau ne relève d'une catégorie « à éviter » (E2E-essai, lot 5)", () => {
+    const texte = PROMPT_PROGRAMME.texte;
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).toMatch(/aucun créneau n'en relève, même un incontournable/);
+    // Chaque code de catégorie est nommé, avec le libellé que la personne a coché.
+    for (const code of ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"]) expect(texte).toContain(`${code} = `);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {

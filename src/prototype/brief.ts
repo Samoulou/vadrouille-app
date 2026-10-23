@@ -55,6 +55,15 @@ export const BriefSchema = z
       .array(CategorySchema)
       .min(1)
       .refine((valeurs) => new Set(valeurs).size === valeurs.length, "envies sans doublon"),
+    /**
+     * Catégories « à éviter » saisies par la personne (`limits` du brief de l'app ; spécification E2E-essai, lot 5) :
+     * facultatif, absent quand rien n'est coché, sans doublon et jamais une envie (même règle que `checkLimits`).
+     */
+    aEviter: z
+      .array(CategorySchema)
+      .min(1)
+      .refine((valeurs) => new Set(valeurs).size === valeurs.length, "à éviter sans doublon")
+      .optional(),
     deplacements: z
       .array(z.enum(MODES_DEPLACEMENT))
       .min(1)
@@ -90,6 +99,10 @@ export const BriefSchema = z
     const nuits = brief.logements.reduce((total, logement) => total + logement.nuits, 0);
     if (nuits !== jours) {
       ctx.addIssue({ code: "custom", message: "les nuits des logements couvrent le séjour", path: ["logements"] });
+    }
+    const envies = new Set<string>(brief.envies);
+    if ((brief.aEviter ?? []).some((categorie) => envies.has(categorie))) {
+      ctx.addIssue({ code: "custom", message: "à éviter commun avec les envies", path: ["aEviter"] });
     }
     for (const engagement of brief.engagements ?? []) {
       if (engagement.date < brief.arrivee || engagement.date > brief.depart) {

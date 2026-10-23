@@ -113,8 +113,8 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
 
     expect(journal.requetes).toHaveLength(1);
     const [requete] = journal.requetes;
-    expect(requete?.prompt).toEqual({ id: "programme", version: 2 });
-    expect(PROMPT_PROGRAMME.version).toBe(2);
+    expect(requete?.prompt).toEqual({ id: "programme", version: 3 });
+    expect(PROMPT_PROGRAMME.version).toBe(3);
     expect(journal.texte()).toContain('\\"site\\" (facultatif)');
     expect(sentinellesPresentes(journal.texte(), sentinelles)).toEqual([]);
     for (const cle of ["placeId", "place_id", "websiteUri", "lat", "lng"]) {
@@ -122,11 +122,23 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
       expect(journal.texte(), cle).not.toContain(`\\"${cle}\\"`);
     }
 
+    // Lot 5 de E2E-essai : sans « à éviter » saisi, aucun champ `aEviter` dans l'entrée ; avec, le champ est transmis
+    // (catégories maison seulement) et la requête reste sans sentinelle Google.
+    expect(brief.aEviter).toBeUndefined();
+    expect(journal.texte()).not.toContain('\\"aEviter\\":');
+    const aEviter = (["nightlife", "market", "nature", "museum"] as const).filter((categorie) => !brief.envies.includes(categorie)).slice(0, 2);
+    expect(aEviter.length).toBeGreaterThan(0);
+    await rediger(entreeProgrammeDepuisBrief({ ...brief, aEviter }));
+    expect(journal.requetes).toHaveLength(2);
+    const avecAEviter = JSON.stringify(journal.requetes[1]);
+    expect(avecAEviter).toContain(`\\"aEviter\\":${JSON.stringify(JSON.stringify(aEviter)).slice(1, -1)}`);
+    expect(sentinellesPresentes(avecAEviter, sentinelles)).toEqual([]);
+
     // Une donnée Google glissée dans l'entrée (clé en trop) : refusée par le schéma strict, aucune requête de plus.
     const placeId = Object.values(fixtures.places.lieux)[0]?.placeId;
     expect(placeId).toBeDefined();
     const glissee = { ...entreeProgrammeDepuisBrief(brief), placeId } as Parameters<typeof rediger>[0];
     await expect(rediger(glissee)).rejects.toBeInstanceOf(RangeError);
-    expect(journal.requetes).toHaveLength(1);
+    expect(journal.requetes).toHaveLength(2);
   });
 });

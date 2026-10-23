@@ -199,6 +199,7 @@ export type EntreeProgrammeP0 = {
   voyageurs: { adultes: number; enfants: number };
   rythme: Rythme;
   envies: Category[];
+  aEviter?: Category[];
   deplacements: MobilityMode[];
   budgetRepas?: 1 | 2 | 3;
   logements: { texte: string; nuits: number }[];
@@ -209,7 +210,8 @@ export type EntreeProgrammeP0 = {
 /**
  * Entrée du prompt `programme` depuis le brief de P0 (décision 0115 § 2 ; décision de Samuel du 2026-10-21 : l'IA reçoit
  * **toutes** les saisies du questionnaire, récit et logement compris, **jamais une donnée Google**). Copie champ par
- * champ : ni fuseau (aucun usage par le modèle), ni `schema`. Seul chemin de construction, pour `p0Run`.
+ * champ : ni fuseau (aucun usage par le modèle), ni `schema`. Les catégories « à éviter » (`aEviter`, lot 5 de
+ * E2E-essai) sont recopiées quand la personne en a saisi, absentes sinon. Seul chemin de construction, pour `p0Run`.
  */
 export function entreeProgrammeDepuisBrief(brief: Brief): EntreeProgrammeP0 {
   return {
@@ -222,6 +224,7 @@ export function entreeProgrammeDepuisBrief(brief: Brief): EntreeProgrammeP0 {
     voyageurs: { adultes: brief.voyageurs.adultes, enfants: brief.voyageurs.enfants },
     rythme: brief.rythme,
     envies: [...brief.envies],
+    ...(brief.aEviter === undefined ? {} : { aEviter: [...brief.aEviter] }),
     deplacements: [...brief.deplacements],
     ...(brief.budgetRepas === undefined ? {} : { budgetRepas: brief.budgetRepas }),
     logements: brief.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),

@@ -18,7 +18,7 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
  * Refus, chacun sur son champ de la forme de `parseInput`, avant toute réservation : ville absente de la table des
  * fuseaux ou des pays (`draft.destination`), plus de `PROTOTYPE_STAY_DAYS_MAX` jours (`draft.end`), une autre ville
  * (`draft.otherCities`). Le refus du récit (e-mail ou téléphone, `story`) est celui de `BriefSchema`, rendu par le pont.
- * Les catégories « à éviter » (`limits`) ne sont pas transmises (lot 5).
+ * Les catégories « à éviter » (`limits`) sont recopiées dans `aEviter` (lot 5), absent quand rien n'est coché.
  */
 
 /** Rythme du brief de l'essai (`RYTHMES` de `src/prototype/brief.ts`). */
@@ -37,6 +37,7 @@ export type BriefEssai = {
   readonly voyageurs: { readonly adultes: number; readonly enfants: number };
   readonly rythme: RythmeEssai;
   readonly envies: BriefDeLApp["wishes"];
+  readonly aEviter?: BriefDeLApp["limits"];
   readonly deplacements: BriefDeLApp["mobility"];
   readonly budgetRepas?: 1 | 2 | 3;
   readonly logements: readonly { readonly texte: string; readonly nuits: number }[];
@@ -115,6 +116,7 @@ export function briefDepuisFormulaire(draft: TripDraft, brief: BriefDeLApp, reci
       voyageurs: { adultes: brief.travellers.adults, enfants: brief.travellers.children },
       rythme: RYTHME[brief.pace],
       envies: [...brief.wishes],
+      ...(brief.limits.length > 0 ? { aEviter: [...brief.limits] } : {}),
       deplacements: brief.mobility.length > 0 ? [...brief.mobility] : [...DEPLACEMENTS_PAR_DEFAUT],
       ...(brief.mealBudgetPerPerson === undefined ? {} : { budgetRepas: niveauBudgetRepas(brief.mealBudgetPerPerson) }),
       logements: [{ texte: texteDuLogement(draft.lodging, destination), nuits }],
