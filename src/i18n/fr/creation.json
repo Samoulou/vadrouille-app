@@ -23,7 +23,7 @@
       },
       "nomAdresse": "Nom ou adresse du logement",
       "quartier": "Quartier",
-      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée : il est envoyé au fournisseur d'IA avec ton brief, puis conservé 29 jours et supprimé. N'y mets ni e-mail ni numéro de téléphone."
+      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée : il est envoyé au fournisseur d'IA (hors UE) avec ton brief, puis conservé 29 jours et supprimé. N'y mets ni e-mail, ni numéro de téléphone."
     },
     "villes": {
       "titre": "Autres villes",
@@ -93,7 +93,7 @@
       "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
       "reessayer": "Réessayer",
       "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés au fournisseur d'IA (hors UE) qui écrit ton programme, puis conservés 29 jours et supprimés. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée.",
-      "essaiVerification": "Ensuite, tu complètes toi-même la vérification de ton brief."
+      "essaiVerification": "Tu vérifies ensuite ton brief toi-même."
     },
     "verification": {
       "titre": "Vérifie ton brief",

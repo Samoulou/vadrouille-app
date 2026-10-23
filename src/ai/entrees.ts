@@ -171,10 +171,10 @@ export function versEntreeQuartier(demande: LodgingRequest): EntreeQuartier {
  * Entrée de l'étape `programme` du prototype (décision 0115 § 2 et § 3 étape 1 ; spécification P0-programme-par-ia § 0
  * point 1) : **toutes les saisies du questionnaire** du brief de P0 (décision de Samuel du 2026-10-21) : destination et
  * pays, dates et heures d'arrivée et de départ, voyageurs, rythme (libellé de P0), envies, catégories « à éviter »
- * (lot 5 de E2E-essai), déplacements, budget des repas, logements (texte saisi et nuits), billets à heure fixe et récit. Type distinct d'`EntreeModeles` (qui reste
- * sans récit ni logement pour le MVP, B7-PO-1) ; construit par `src/server/p0/vers-couche-ia.ts` seul. **Aucun champ**
- * pour une donnée Google (identifiant, nom, adresse, position, horaire, statut, durée, verdict) : schéma strict, une clé
- * en trop est refusée avant toute requête.
+ * (lot 5 de E2E-essai), déplacements, budget des repas, logements (texte saisi et nuits), billets à heure fixe et
+ * récit. Type distinct d'`EntreeModeles` (qui reste sans récit ni logement pour le MVP, B7-PO-1) ; construit par
+ * `src/server/p0/vers-couche-ia.ts` seul. **Aucun champ** pour une donnée Google (identifiant, nom, adresse, position,
+ * horaire, statut, durée, verdict) : schéma strict, une clé en trop est refusée avant toute requête.
  */
 const texteBrief = (max: number) => z.string().trim().min(1).max(max);
 export const EntreeProgrammeSchema = z
