@@ -232,38 +232,50 @@ describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () =
     expect(validateTrip({ ...ROME, destination: "  ÉDIMBOURG " }, TODAY, essai)).toEqual([]);
   });
 
-  it("ville absente de la table, sans pays : plus de refus de la ville, le champ « Pays » est demandé ; destination vide reste « required »", () => {
-    // Demande de Samuel du 23 octobre 2026 : n'importe quelle ville ; l'ancien refus « unknownCity » au champ destination disparaît.
-    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, essai)).toEqual([{ field: "country", code: "country" }]);
-    expect(validateTrip({ ...ROME, destination: "" }, TODAY, essai)).toEqual([{ field: "destination", code: "required" }]);
-    // Hors du site d'essai, aucun pays n'est demandé.
+  // Identifiant fictif (aucun identifiant de lieu Google réel dans le dépôt).
+  const P = "lieu_fictif_ville_essai_1";
+
+  it("recherche de ville disponible : un choix dans les suggestions est exigé, même pour une ville de la table ; destination vide reste « required »", () => {
+    // Demande de Samuel du 23 octobre 2026 : n'importe quelle ville, choisie dans les suggestions ; plus de refus « unknownCity ».
+    const avecRecherche = { essai: true, suggestions: true };
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "selectCity" }]);
+    expect(validateTrip(ROME, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "selectCity" }]);
+    expect(validateTrip({ ...ROME, destination: "" }, TODAY, avecRecherche)).toEqual([{ field: "destination", code: "required" }]);
+    expect(validateTrip({ ...ROME, placeId: P, country: "IT", timeZone: "Europe/Rome" }, TODAY, avecRecherche)).toEqual([]);
+    // Hors du site d'essai, aucun choix n'est demandé.
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, { suggestions: true })).toEqual([]);
     expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY)).toEqual([]);
   });
 
-  it("ville absente de la table : pays à un fuseau admis ; pays à plusieurs fuseaux demande sa région ; code hors liste refusé", () => {
-    const hoiAn: TripForm = { ...ROME, destination: "Hoi An", country: "VN", timeZone: "" };
-    expect(validateTrip(hoiAn, TODAY, essai)).toEqual([]);
-    expect(destinationRegion(hoiAn)).toEqual({ country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
-    const asheville: TripForm = { ...ROME, destination: "Asheville", country: "US", timeZone: "" };
-    expect(validateTrip(asheville, TODAY, essai)).toEqual([{ field: "timeZone", code: "timeZone" }]);
-    expect(validateTrip({ ...asheville, timeZone: "Europe/Paris" }, TODAY, essai)).toEqual([{ field: "timeZone", code: "timeZone" }]);
-    expect(validateTrip({ ...asheville, timeZone: "America/New_York" }, TODAY, essai)).toEqual([]);
-    expect(validateTrip({ ...hoiAn, country: "XX" }, TODAY, essai)).toEqual([{ field: "country", code: "country" }]);
-  });
-
-  it("Valencia et les villes de la table : aucun pays demandé, aucun pays transmis (la table fait foi)", () => {
+  it("recherche indisponible (repli) : une ville de la table suffit ; hors de la table, « cityUnavailable »", () => {
+    expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, essai)).toEqual([{ field: "destination", code: "cityUnavailable" }]);
+    expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, { essai: true, suggestions: false })).toEqual([{ field: "destination", code: "cityUnavailable" }]);
     for (const destination of ["Valencia", "Valence", "Bilbao", "Málaga", "New York", "Tokyo"]) {
       expect(destinationHorsTable(destination), destination).toBe(false);
       expect(validateTrip({ ...ROME, destination }, TODAY, essai), destination).toEqual([]);
     }
-    expect("destinationRegion" in toTripDraft({ ...ROME, destination: "Valencia", country: "US", timeZone: "America/Chicago" })).toBe(false);
   });
 
-  it("toTripDraft : pays et fuseau résolus d'une ville hors de la table, conformes au schéma", () => {
-    const draft = toTripDraft({ ...ROME, destination: " Hoi An ", country: "VN", timeZone: "" });
-    expect(draft).toMatchObject({ destination: "Hoi An", destinationRegion: { country: "VN", timeZone: "Asia/Ho_Chi_Minh" } });
+  it("ville choisie : placeId, pays et fuseau revérifiés contre la table des pays (liste fermée)", () => {
+    const hoiAn: TripForm = { ...ROME, destination: "Hoi An", placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" };
+    expect(validateTrip(hoiAn, TODAY, { essai: true, suggestions: true })).toEqual([]);
+    expect(destinationRegion(hoiAn)).toEqual({ placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "America/New_York" })).toEqual({ placeId: P, country: "US", timeZone: "America/New_York" });
+    // Fuseau hors du pays, pays hors liste, placeId absent ou mal formé : aucun choix.
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "Europe/Paris" })).toBeNull();
+    expect(destinationRegion({ placeId: P, country: "US", timeZone: "" })).toBeNull();
+    expect(destinationRegion({ placeId: P, country: "XX", timeZone: "Europe/Paris" })).toBeNull();
+    expect(destinationRegion({ placeId: "", country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBeNull();
+    expect(destinationRegion({ placeId: "a b", country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBeNull();
+    expect(validateTrip({ ...hoiAn, timeZone: "Asia/Bangkok" }, TODAY, { essai: true, suggestions: true })).toEqual([{ field: "destination", code: "selectCity" }]);
+  });
+
+  it("toTripDraft : la ville choisie part avec son placeId, son pays et son fuseau, conformes au schéma ; sans choix, rien", () => {
+    const draft = toTripDraft({ ...ROME, destination: " Hoi An ", placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" });
+    expect(draft).toMatchObject({ destination: "Hoi An", destinationRegion: { placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" } });
     expect(TripDraftSchema.safeParse(draft).success).toBe(true);
     expect("destinationRegion" in toTripDraft({ ...ROME, destination: "Hoi An" })).toBe(false);
+    expect("destinationRegion" in toTripDraft({ ...ROME, destination: "Valencia", country: "US", timeZone: "America/Chicago" })).toBe(false);
   });
 
   it("une autre ville : refus au champ de son nom", () => {

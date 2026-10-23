@@ -1,7 +1,7 @@
 import "server-only";
 
 import { erreurGoogleDe } from "@/grounding/enveloppe-google";
-import type { ClientPlacesMvp, ClientRoutes } from "@/grounding/interfaces";
+import type { ClientPlacesMvp, ClientRoutes, ClientVilles } from "@/grounding/interfaces";
 import { COUT_ESTIME_MICROS, createPlacesClient, SKU_DETAILS, SKU_IDENTIFIANT, SKU_POSITION, SKU_TEXT_SEARCH } from "@/grounding/places-client";
 import { COUT_ELEMENT_MICROS, createRoutesClient, SKU_MATRICE } from "@/grounding/routes-client";
 import { avecReservation, DELAI_REQUETE_MS, demandeDe, horlogeSysteme, type AppelFacture, type ContexteAppel, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
@@ -41,6 +41,16 @@ export type ClientsGoogle = {
 export function creerClientsGoogle(options: OptionsClientsGoogle): ClientsGoogle {
   const commun = { usage: options.usage, contexte: options.contexte, plafonds: options.plafonds, horloge: options.horloge ?? horlogeSysteme };
   return { places: createPlacesClient(commun), routes: createRoutesClient(commun) };
+}
+
+/**
+ * Client de la recherche de ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026) : les deux seules
+ * méthodes `suggererVilles` et `ficheVille` du client Places réel, pour la composition `villes.ts` seule. Même port,
+ * mêmes plafonds, même barrière de sortie et même clé que les autres clients ; lève de même avant toute requête.
+ */
+export function creerClientVilles(options: OptionsClientsGoogle): ClientVilles {
+  const places = createPlacesClient({ usage: options.usage, contexte: options.contexte, plafonds: options.plafonds, horloge: options.horloge ?? horlogeSysteme });
+  return { suggererVilles: (saisie, session) => places.suggererVilles(saisie, session), ficheVille: (placeId, session) => places.ficheVille(placeId, session) };
 }
 
 /**

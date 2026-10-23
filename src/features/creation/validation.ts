@@ -31,10 +31,10 @@ export type FieldError =
   | "outOfTrip"
   | "endTime"
   | "range"
-  // Site d'essai (spécification E2E-essai, lot 2, D1) : pays ou région manquants d'une ville absente de la table des
-  // villes (demande de Samuel du 23 octobre 2026), seconde ville, séjour trop long.
-  | "country"
-  | "timeZone"
+  // Site d'essai (spécification E2E-essai, lot 2, D1 ; demande de Samuel du 23 octobre 2026) : ville à choisir dans
+  // les suggestions, ville hors de la table quand la recherche ne répond pas, seconde ville, séjour trop long.
+  | "selectCity"
+  | "cityUnavailable"
   | "singleCity"
   | "tooLong";
 
@@ -83,30 +83,35 @@ function joursEntre(start: string, end: string): number {
 
 export interface ValidateTripOptions {
   /**
-   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville ; une
-   * destination absente de la table des villes (`fuseauDeVille`, aucune donnée Google) demande son pays, et sa région
-   * pour un pays à plusieurs fuseaux (table maison des pays, demande de Samuel du 23 octobre 2026) ; et
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, et
    * `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois
-   * dans `@/contracts/values`. Refus au champ.
+   * dans `@/contracts/values`. La destination est choisie dans les suggestions Google Places (demande de Samuel du
+   * 23 octobre 2026) ; sans choix, seule une ville de la table maison est admise (repli). Refus au champ.
    */
   essai?: boolean;
+  /**
+   * Site d'essai : la recherche de ville a répondu (`true`) : un choix dans les suggestions est exigé, même pour une
+   * ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville de la table suffit.
+   */
+  suggestions?: boolean;
 }
 
-/** Vrai si la destination saisie (non vide) est absente de la table maison des villes : l'écran 1 demande alors son pays. */
+/** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
 export function destinationHorsTable(destination: string): boolean {
   return textError(destination, DESTINATION_LENGTH) === null && fuseauDeVille(destination) === null;
 }
 
+const PLACE_ID = /^[A-Za-z0-9_-]{1,256}$/;
+
 /**
- * Pays et fuseau choisis pour une destination hors de la table des villes, résolus contre la table des pays (un pays à un
- * seul fuseau n'en demande pas) ; `null` si la destination est dans la table, ou si le choix est incomplet ou hors liste.
+ * Ville choisie dans les suggestions (site d'essai) : `placeId`, et pays et fuseau maison rendus par le serveur,
+ * revérifiés contre la table des pays (liste fermée) ; `null` sans choix complet.
  */
-export function destinationRegion(trip: Pick<TripForm, "destination" | "country" | "timeZone">): DestinationRegion | null {
-  if (!destinationHorsTable(trip.destination)) return null;
+export function destinationRegion(trip: Pick<TripForm, "placeId" | "country" | "timeZone">): DestinationRegion | null {
   const pays = paysParCode(trip.country || undefined);
-  if (pays === null) return null;
-  const timeZone = fuseauDuPays(pays.code, pays.fuseaux.length === 1 ? undefined : (trip.timeZone ?? ""));
-  return timeZone === null ? null : { country: pays.code, timeZone };
+  if (pays === null || !PLACE_ID.test(trip.placeId ?? "")) return null;
+  const timeZone = fuseauDuPays(pays.code, trip.timeZone ?? "");
+  return timeZone === null ? null : { placeId: trip.placeId as string, country: pays.code, timeZone };
 }
 
 /** Erreurs de l'écran 1, dans l'ordre d'affichage des champs (le focus va sur la première). */
@@ -119,10 +124,10 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
   push("destination", destinationError);
-  if (essai && destinationHorsTable(trip.destination) && destinationRegion(trip) === null) {
-    // Pays absent ou hors liste : le champ « Pays » ; pays à plusieurs fuseaux sans région : le champ « Fuseau horaire ».
-    const code = paysParCode(trip.country || undefined) === null ? "country" : "timeZone";
-    push(code, code);
+  if (essai && destinationError === null && destinationRegion(trip) === null) {
+    // Recherche disponible : choisir dans les suggestions ; sinon (repli sans réseau), une ville de la table suffit.
+    if (options.suggestions === true) push("destination", "selectCity");
+    else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
   }
   const start = isDate(trip.start) ? trip.start : null;
   const end = isDate(trip.end) ? trip.end : null;

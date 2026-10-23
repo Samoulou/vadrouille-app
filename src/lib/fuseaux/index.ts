@@ -13,7 +13,12 @@ import VILLES from "./villes.json";
 export interface PaysDeLaTable {
   readonly code: string;
   readonly nom: string;
-  readonly fuseaux: readonly { readonly zone: string; readonly region?: string }[];
+  /**
+   * Fuseaux du pays ; pour un pays à plusieurs fuseaux, chacun a une région lisible et des repères maison (latitude,
+   * longitude de villes du fuseau, valeurs maison, jamais Google) : la position d'une ville choisie est rattachée au
+   * fuseau du repère le plus proche (`fuseauParPosition`).
+   */
+  readonly fuseaux: readonly { readonly zone: string; readonly region?: string; readonly reperes?: readonly (readonly number[])[] }[];
 }
 
 /**
@@ -31,8 +36,8 @@ const PAYS_PAR_CODE: ReadonlyMap<string, PaysDeLaTable> = new Map(
  * Le pays rendu est le nom français de la table des pays, comme le champ `pays` d'un brief du prototype
  * (`prototype/briefs/`).
  */
-const TABLE: ReadonlyMap<string, readonly [zone: string, pays: string]> = new Map(
-  Object.entries(VILLES as Record<string, string[]>).map(([cle, [zone = "", pays = ""]]) => [cle, [zone, pays]] as const),
+const TABLE: ReadonlyMap<string, readonly [zone: string, pays: string, nom: string]> = new Map(
+  Object.entries(VILLES as Record<string, string[]>).map(([cle, [zone = "", pays = "", nom = ""]]) => [cle, [zone, pays, nom]] as const),
 );
 
 const QUART_D_HEURE_MS = 15 * 60_000;
@@ -194,6 +199,46 @@ export function controlerVilles(villes: readonly string[], arrivee: string, depa
     if (indice > 0 && !memeDecalage(fuseau, zone, arrivee, depart)) return { ok: false, indice, raison: "decalage" };
   }
   return { ok: true, fuseau, fuseauxDesVilles: fuseaux };
+}
+
+/**
+ * Ville de la table dans un pays donné (code ISO) : nom maison (nom français de la table) et fuseau, ou `null`. Sert à
+ * retrouver le nom maison et le fuseau d'une ville choisie dans les suggestions Google (le nom Google n'est jamais repris).
+ */
+export function villeDuPays(nom: string, code: string): { readonly nom: string; readonly zone: string } | null {
+  const ligne = TABLE.get(cleVille(nom));
+  if (ligne === undefined || ligne[1] !== code || !fuseauReconnu(ligne[0])) return null;
+  return { nom: ligne[2], zone: ligne[0] };
+}
+
+const RAYON_TERRE_KM = 6371;
+const radians = (degres: number) => (degres * Math.PI) / 180;
+
+/** Distance du grand cercle entre deux points, en kilomètres (haversine). */
+export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dLat = radians(b.lat - a.lat);
+  const dLng = radians(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(radians(a.lat)) * Math.cos(radians(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * RAYON_TERRE_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Fuseau d'un pays de la table pour une position (celle de la ville choisie, lue en mémoire) : le seul fuseau du pays,
+ * ou celui du repère maison le plus proche pour un pays à plusieurs fuseaux. Valeur **de la table**, jamais reçue ; `null`
+ * pour un code inconnu ou une position invalide. Approximation près des limites de fuseau (signalée dans la PR).
+ */
+export function fuseauParPosition(code: string, position: { lat: number; lng: number }): string | null {
+  const pays = paysParCode(code);
+  if (pays === null || !Number.isFinite(position.lat) || !Number.isFinite(position.lng)) return null;
+  let meilleur: { zone: string; distance: number } | null = null;
+  for (const fuseau of pays.fuseaux) {
+    if (pays.fuseaux.length === 1) return fuseauReconnu(fuseau.zone) ? fuseau.zone : null;
+    for (const [lat = Number.NaN, lng = Number.NaN] of fuseau.reperes ?? []) {
+      const distance = distanceKm(position, { lat, lng });
+      if (meilleur === null || distance < meilleur.distance) meilleur = { zone: fuseau.zone, distance };
+    }
+  }
+  return meilleur !== null && fuseauReconnu(meilleur.zone) ? meilleur.zone : null;
 }
 
 /** Clés de la table (tests). */

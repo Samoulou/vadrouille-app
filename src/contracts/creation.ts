@@ -97,15 +97,18 @@ function checkCities(
 }
 
 /**
- * Pays, et fuseau du pays, choisis à l'écran 1 pour une destination absente de la table maison des villes (site d'essai,
- * demande de Samuel du 23 octobre 2026 ; ajout facultatif, par addition). Forme seulement : le code et le fuseau sont
- * revérifiés côté serveur contre la table maison des pays (`fuseauDuPays` de `src/lib/fuseaux`, liste fermée), jamais
- * repris tels quels. Aucune donnée Google.
+ * Ville choisie à l'écran 1 du site d'essai dans les suggestions Google (demande de Samuel du 23 octobre 2026 ; ajout
+ * facultatif, par addition) : le `placeId` (seul identifiant Google conservable), et le pays et le fuseau **des tables
+ * maison** retrouvés côté serveur à partir de la fiche (`src/server/composition/villes.ts`). Forme seulement : le code
+ * et le fuseau sont revérifiés côté serveur contre la table maison des pays (`fuseauDuPays` de `src/lib/fuseaux`, liste
+ * fermée), jamais repris tels quels. Aucun texte Google.
  */
 export const DestinationRegionSchema = z.strictObject({
+  /** Identifiant de lieu Google de la ville choisie. */
+  placeId: z.string().regex(/^[A-Za-z0-9_-]{1,256}$/),
   /** Code ISO 3166-1 alpha-2 du pays (table maison). */
   country: z.string().regex(/^[A-Z]{2}$/),
-  /** Fuseau IANA choisi parmi ceux du pays (table maison). */
+  /** Fuseau IANA de la table maison pour ce pays. */
   timeZone: z
     .string()
     .min(1)
@@ -122,7 +125,7 @@ export type DestinationRegion = z.infer<typeof DestinationRegionSchema>;
 export const TripDraftSchema = z
   .strictObject({
     destination: text(DESTINATION_LENGTH),
-    /** Facultatif : pays et fuseau d'une destination hors de la table des villes (site d'essai). */
+    /** Facultatif : ville choisie dans les suggestions (site d'essai) : `placeId`, pays et fuseau maison. */
     destinationRegion: DestinationRegionSchema.optional(),
     start: IsoDateSchema,
     end: IsoDateSchema,

@@ -76,23 +76,133 @@
     "fuseaux": [
       {
         "zone": "Australia/Sydney",
-        "region": "Est (Sydney, Melbourne, Canberra, Tasmanie)"
+        "region": "Est (Sydney, Melbourne, Canberra, Tasmanie)",
+        "reperes": [
+          [
+            -33.87,
+            151.21
+          ],
+          [
+            -37.81,
+            144.96
+          ],
+          [
+            -35.28,
+            149.13
+          ],
+          [
+            -42.88,
+            147.33
+          ],
+          [
+            -32.93,
+            151.78
+          ],
+          [
+            -41.43,
+            147.14
+          ],
+          [
+            -36.76,
+            144.28
+          ],
+          [
+            -30.3,
+            153.11
+          ]
+        ]
       },
       {
         "zone": "Australia/Brisbane",
-        "region": "Queensland (Brisbane, Cairns)"
+        "region": "Queensland (Brisbane, Cairns)",
+        "reperes": [
+          [
+            -27.47,
+            153.03
+          ],
+          [
+            -16.92,
+            145.77
+          ],
+          [
+            -19.26,
+            146.82
+          ],
+          [
+            -28.02,
+            153.4
+          ],
+          [
+            -20.27,
+            148.72
+          ],
+          [
+            -26.65,
+            153.07
+          ]
+        ]
       },
       {
         "zone": "Australia/Adelaide",
-        "region": "Australie-Méridionale (Adélaïde)"
+        "region": "Australie-Méridionale (Adélaïde)",
+        "reperes": [
+          [
+            -34.93,
+            138.6
+          ],
+          [
+            -31.95,
+            141.45
+          ],
+          [
+            -35.75,
+            137.3
+          ]
+        ]
       },
       {
         "zone": "Australia/Darwin",
-        "region": "Territoire du Nord (Darwin, Uluru)"
+        "region": "Territoire du Nord (Darwin, Uluru)",
+        "reperes": [
+          [
+            -12.46,
+            130.84
+          ],
+          [
+            -23.7,
+            133.88
+          ],
+          [
+            -25.34,
+            131.04
+          ],
+          [
+            -14.47,
+            132.26
+          ]
+        ]
       },
       {
         "zone": "Australia/Perth",
-        "region": "Australie-Occidentale (Perth)"
+        "region": "Australie-Occidentale (Perth)",
+        "reperes": [
+          [
+            -31.95,
+            115.86
+          ],
+          [
+            -17.96,
+            122.24
+          ],
+          [
+            -33.95,
+            115.07
+          ],
+          [
+            -28.77,
+            114.61
+          ]
+        ]
       }
     ]
   },
@@ -205,19 +315,115 @@
     "fuseaux": [
       {
         "zone": "America/Sao_Paulo",
-        "region": "Brasília (Rio de Janeiro, São Paulo, Salvador)"
+        "region": "Brasília (Rio de Janeiro, São Paulo, Salvador)",
+        "reperes": [
+          [
+            -23.55,
+            -46.63
+          ],
+          [
+            -22.91,
+            -43.17
+          ],
+          [
+            -12.97,
+            -38.5
+          ],
+          [
+            -15.79,
+            -47.88
+          ],
+          [
+            -8.05,
+            -34.88
+          ],
+          [
+            -3.73,
+            -38.52
+          ],
+          [
+            -1.46,
+            -48.5
+          ],
+          [
+            -30.03,
+            -51.23
+          ],
+          [
+            -27.6,
+            -48.55
+          ],
+          [
+            -25.43,
+            -49.27
+          ],
+          [
+            -19.92,
+            -43.94
+          ],
+          [
+            -5.79,
+            -35.21
+          ],
+          [
+            -25.55,
+            -54.59
+          ],
+          [
+            -23.22,
+            -44.71
+          ]
+        ]
       },
       {
         "zone": "America/Manaus",
-        "region": "Amazonie (Manaus)"
+        "region": "Amazonie (Manaus)",
+        "reperes": [
+          [
+            -3.12,
+            -60.02
+          ],
+          [
+            -15.6,
+            -56.1
+          ],
+          [
+            -8.76,
+            -63.9
+          ],
+          [
+            -20.47,
+            -54.62
+          ],
+          [
+            2.82,
+            -60.67
+          ]
+        ]
       },
       {
         "zone": "America/Rio_Branco",
-        "region": "Acre (Rio Branco)"
+        "region": "Acre (Rio Branco)",
+        "reperes": [
+          [
+            -9.97,
+            -67.81
+          ],
+          [
+            -7.63,
+            -72.67
+          ]
+        ]
       },
       {
         "zone": "America/Noronha",
-        "region": "Fernando de Noronha"
+        "region": "Fernando de Noronha",
+        "reperes": [
+          [
+            -3.85,
+            -32.42
+          ]
+        ]
       }
     ]
   },
@@ -266,31 +472,153 @@
     "fuseaux": [
       {
         "zone": "America/St_Johns",
-        "region": "Terre-Neuve (St. John's)"
+        "region": "Terre-Neuve (St. John's)",
+        "reperes": [
+          [
+            47.56,
+            -52.71
+          ],
+          [
+            48.95,
+            -57.95
+          ]
+        ]
       },
       {
         "zone": "America/Halifax",
-        "region": "Atlantique (Halifax)"
+        "region": "Atlantique (Halifax)",
+        "reperes": [
+          [
+            44.65,
+            -63.57
+          ],
+          [
+            46.09,
+            -64.78
+          ],
+          [
+            46.24,
+            -63.13
+          ],
+          [
+            45.27,
+            -66.06
+          ]
+        ]
       },
       {
         "zone": "America/Toronto",
-        "region": "Est (Toronto, Montréal, Québec, Ottawa)"
+        "region": "Est (Toronto, Montréal, Québec, Ottawa)",
+        "reperes": [
+          [
+            43.65,
+            -79.38
+          ],
+          [
+            45.5,
+            -73.57
+          ],
+          [
+            46.81,
+            -71.21
+          ],
+          [
+            45.42,
+            -75.7
+          ],
+          [
+            43.09,
+            -79.08
+          ],
+          [
+            46.49,
+            -80.99
+          ],
+          [
+            48.38,
+            -89.25
+          ]
+        ]
       },
       {
         "zone": "America/Winnipeg",
-        "region": "Centre (Winnipeg)"
+        "region": "Centre (Winnipeg)",
+        "reperes": [
+          [
+            49.9,
+            -97.14
+          ],
+          [
+            58.77,
+            -94.17
+          ]
+        ]
       },
       {
         "zone": "America/Regina",
-        "region": "Saskatchewan (Regina)"
+        "region": "Saskatchewan (Regina)",
+        "reperes": [
+          [
+            50.45,
+            -104.61
+          ],
+          [
+            52.13,
+            -106.67
+          ]
+        ]
       },
       {
         "zone": "America/Edmonton",
-        "region": "Rocheuses (Calgary, Banff, Edmonton)"
+        "region": "Rocheuses (Calgary, Banff, Edmonton)",
+        "reperes": [
+          [
+            51.05,
+            -114.07
+          ],
+          [
+            53.55,
+            -113.49
+          ],
+          [
+            51.18,
+            -115.57
+          ],
+          [
+            52.87,
+            -118.08
+          ],
+          [
+            62.45,
+            -114.37
+          ]
+        ]
       },
       {
         "zone": "America/Vancouver",
-        "region": "Pacifique (Vancouver, Whistler)"
+        "region": "Pacifique (Vancouver, Whistler)",
+        "reperes": [
+          [
+            49.28,
+            -123.12
+          ],
+          [
+            48.43,
+            -123.37
+          ],
+          [
+            50.12,
+            -122.95
+          ],
+          [
+            49.89,
+            -119.5
+          ],
+          [
+            53.92,
+            -122.75
+          ]
+        ]
       }
     ]
   },
@@ -299,11 +627,47 @@
     "fuseaux": [
       {
         "zone": "Africa/Kinshasa",
-        "region": "Ouest (Kinshasa)"
+        "region": "Ouest (Kinshasa)",
+        "reperes": [
+          [
+            -4.32,
+            15.31
+          ],
+          [
+            0.05,
+            18.26
+          ],
+          [
+            -5.82,
+            13.46
+          ]
+        ]
       },
       {
         "zone": "Africa/Lubumbashi",
-        "region": "Est (Lubumbashi, Goma)"
+        "region": "Est (Lubumbashi, Goma)",
+        "reperes": [
+          [
+            -11.66,
+            27.48
+          ],
+          [
+            -1.68,
+            29.22
+          ],
+          [
+            0.52,
+            25.19
+          ],
+          [
+            -6.13,
+            23.6
+          ],
+          [
+            -2.5,
+            28.86
+          ]
+        ]
       }
     ]
   },
@@ -352,15 +716,69 @@
     "fuseaux": [
       {
         "zone": "America/Santiago",
-        "region": "Centre (Santiago, Valparaíso, Atacama)"
+        "region": "Centre (Santiago, Valparaíso, Atacama)",
+        "reperes": [
+          [
+            -33.45,
+            -70.67
+          ],
+          [
+            -33.05,
+            -71.62
+          ],
+          [
+            -22.91,
+            -68.2
+          ],
+          [
+            -41.47,
+            -72.94
+          ],
+          [
+            -36.83,
+            -73.05
+          ],
+          [
+            -29.9,
+            -71.25
+          ],
+          [
+            -23.65,
+            -70.4
+          ],
+          [
+            -39.82,
+            -73.25
+          ]
+        ]
       },
       {
         "zone": "America/Punta_Arenas",
-        "region": "Magallanes (Punta Arenas, Torres del Paine)"
+        "region": "Magallanes (Punta Arenas, Torres del Paine)",
+        "reperes": [
+          [
+            -53.16,
+            -70.92
+          ],
+          [
+            -51.73,
+            -72.51
+          ],
+          [
+            -50.94,
+            -73.41
+          ]
+        ]
       },
       {
         "zone": "Pacific/Easter",
-        "region": "Île de Pâques"
+        "region": "Île de Pâques",
+        "reperes": [
+          [
+            -27.11,
+            -109.35
+          ]
+        ]
       }
     ]
   },
@@ -489,11 +907,35 @@
     "fuseaux": [
       {
         "zone": "America/Guayaquil",
-        "region": "Continent (Quito, Guayaquil)"
+        "region": "Continent (Quito, Guayaquil)",
+        "reperes": [
+          [
+            -0.18,
+            -78.47
+          ],
+          [
+            -2.19,
+            -79.89
+          ],
+          [
+            -2.9,
+            -79.0
+          ]
+        ]
       },
       {
         "zone": "Pacific/Galapagos",
-        "region": "Îles Galápagos"
+        "region": "Îles Galápagos",
+        "reperes": [
+          [
+            -0.74,
+            -90.31
+          ],
+          [
+            -0.9,
+            -89.61
+          ]
+        ]
       }
     ]
   },
@@ -526,11 +968,67 @@
     "fuseaux": [
       {
         "zone": "Europe/Madrid",
-        "region": "Espagne continentale et Baléares (Madrid)"
+        "region": "Espagne continentale et Baléares (Madrid)",
+        "reperes": [
+          [
+            40.42,
+            -3.7
+          ],
+          [
+            41.39,
+            2.17
+          ],
+          [
+            37.39,
+            -5.98
+          ],
+          [
+            39.57,
+            2.65
+          ],
+          [
+            43.26,
+            -2.93
+          ],
+          [
+            36.72,
+            -4.42
+          ],
+          [
+            42.88,
+            -8.54
+          ],
+          [
+            35.89,
+            -5.32
+          ]
+        ]
       },
       {
         "zone": "Atlantic/Canary",
-        "region": "Îles Canaries (Tenerife)"
+        "region": "Îles Canaries (Tenerife)",
+        "reperes": [
+          [
+            28.46,
+            -16.25
+          ],
+          [
+            28.12,
+            -15.43
+          ],
+          [
+            28.96,
+            -13.55
+          ],
+          [
+            28.5,
+            -13.86
+          ],
+          [
+            28.68,
+            -17.76
+          ]
+        ]
       }
     ]
   },
@@ -763,15 +1261,81 @@
     "fuseaux": [
       {
         "zone": "Asia/Jakarta",
-        "region": "Ouest : Java et Sumatra (Jakarta)"
+        "region": "Ouest : Java et Sumatra (Jakarta)",
+        "reperes": [
+          [
+            -6.2,
+            106.85
+          ],
+          [
+            3.59,
+            98.67
+          ],
+          [
+            -7.25,
+            112.75
+          ],
+          [
+            -7.8,
+            110.36
+          ],
+          [
+            -0.03,
+            109.33
+          ],
+          [
+            -2.99,
+            104.76
+          ]
+        ]
       },
       {
         "zone": "Asia/Makassar",
-        "region": "Centre : Bali, Lombok, Sulawesi (Makassar)"
+        "region": "Centre : Bali, Lombok, Sulawesi (Makassar)",
+        "reperes": [
+          [
+            -5.14,
+            119.42
+          ],
+          [
+            -8.65,
+            115.22
+          ],
+          [
+            -8.58,
+            116.12
+          ],
+          [
+            -1.27,
+            116.83
+          ],
+          [
+            1.47,
+            124.84
+          ],
+          [
+            -8.5,
+            119.88
+          ]
+        ]
       },
       {
         "zone": "Asia/Jayapura",
-        "region": "Est : Moluques et Papouasie (Jayapura)"
+        "region": "Est : Moluques et Papouasie (Jayapura)",
+        "reperes": [
+          [
+            -2.53,
+            140.72
+          ],
+          [
+            -3.7,
+            128.18
+          ],
+          [
+            -0.86,
+            134.06
+          ]
+        ]
       }
     ]
   },
@@ -1164,19 +1728,115 @@
     "fuseaux": [
       {
         "zone": "America/Mexico_City",
-        "region": "Centre (Mexico, Oaxaca, Guadalajara)"
+        "region": "Centre (Mexico, Oaxaca, Guadalajara)",
+        "reperes": [
+          [
+            19.43,
+            -99.13
+          ],
+          [
+            20.67,
+            -103.35
+          ],
+          [
+            17.07,
+            -96.73
+          ],
+          [
+            25.69,
+            -100.32
+          ],
+          [
+            20.97,
+            -89.62
+          ],
+          [
+            19.04,
+            -98.21
+          ],
+          [
+            20.62,
+            -105.23
+          ],
+          [
+            16.74,
+            -92.64
+          ],
+          [
+            28.63,
+            -106.07
+          ],
+          [
+            19.2,
+            -96.13
+          ]
+        ]
       },
       {
         "zone": "America/Cancun",
-        "region": "Quintana Roo (Cancún, Tulum)"
+        "region": "Quintana Roo (Cancún, Tulum)",
+        "reperes": [
+          [
+            21.16,
+            -86.85
+          ],
+          [
+            20.21,
+            -87.47
+          ],
+          [
+            18.5,
+            -88.3
+          ],
+          [
+            20.63,
+            -87.08
+          ]
+        ]
       },
       {
         "zone": "America/Mazatlan",
-        "region": "Pacifique (Mazatlán, Los Cabos)"
+        "region": "Pacifique (Mazatlán, Los Cabos)",
+        "reperes": [
+          [
+            23.25,
+            -106.41
+          ],
+          [
+            24.14,
+            -110.31
+          ],
+          [
+            22.89,
+            -109.92
+          ],
+          [
+            29.07,
+            -110.96
+          ],
+          [
+            24.8,
+            -107.39
+          ]
+        ]
       },
       {
         "zone": "America/Tijuana",
-        "region": "Basse-Californie du Nord (Tijuana)"
+        "region": "Basse-Californie du Nord (Tijuana)",
+        "reperes": [
+          [
+            32.51,
+            -117.04
+          ],
+          [
+            32.62,
+            -115.45
+          ],
+          [
+            31.87,
+            -116.6
+          ]
+        ]
       }
     ]
   },
@@ -1305,11 +1965,39 @@
     "fuseaux": [
       {
         "zone": "Pacific/Tahiti",
-        "region": "Îles de la Société (Tahiti, Bora-Bora)"
+        "region": "Îles de la Société (Tahiti, Bora-Bora)",
+        "reperes": [
+          [
+            -17.65,
+            -149.43
+          ],
+          [
+            -16.5,
+            -151.74
+          ],
+          [
+            -17.53,
+            -149.83
+          ],
+          [
+            -14.97,
+            -147.65
+          ]
+        ]
       },
       {
         "zone": "Pacific/Marquesas",
-        "region": "Îles Marquises"
+        "region": "Îles Marquises",
+        "reperes": [
+          [
+            -8.91,
+            -140.1
+          ],
+          [
+            -9.8,
+            -139.03
+          ]
+        ]
       }
     ]
   },
@@ -1366,11 +2054,43 @@
     "fuseaux": [
       {
         "zone": "Europe/Lisbon",
-        "region": "Portugal continental et Madère (Lisbonne)"
+        "region": "Portugal continental et Madère (Lisbonne)",
+        "reperes": [
+          [
+            38.72,
+            -9.14
+          ],
+          [
+            41.15,
+            -8.61
+          ],
+          [
+            37.02,
+            -7.93
+          ],
+          [
+            32.65,
+            -16.91
+          ]
+        ]
       },
       {
         "zone": "Atlantic/Azores",
-        "region": "Açores (Ponta Delgada)"
+        "region": "Açores (Ponta Delgada)",
+        "reperes": [
+          [
+            37.74,
+            -25.67
+          ],
+          [
+            38.53,
+            -28.63
+          ],
+          [
+            38.66,
+            -27.22
+          ]
+        ]
       }
     ]
   },
@@ -1427,51 +2147,219 @@
     "fuseaux": [
       {
         "zone": "Europe/Kaliningrad",
-        "region": "Kaliningrad"
+        "region": "Kaliningrad",
+        "reperes": [
+          [
+            54.71,
+            20.51
+          ]
+        ]
       },
       {
         "zone": "Europe/Moscow",
-        "region": "Moscou et Saint-Pétersbourg"
+        "region": "Moscou et Saint-Pétersbourg",
+        "reperes": [
+          [
+            55.76,
+            37.62
+          ],
+          [
+            59.93,
+            30.36
+          ],
+          [
+            55.79,
+            49.12
+          ],
+          [
+            43.6,
+            39.73
+          ],
+          [
+            68.97,
+            33.07
+          ],
+          [
+            64.54,
+            40.54
+          ],
+          [
+            47.24,
+            39.71
+          ],
+          [
+            48.71,
+            44.51
+          ]
+        ]
       },
       {
         "zone": "Europe/Samara",
-        "region": "Samara"
+        "region": "Samara",
+        "reperes": [
+          [
+            53.2,
+            50.15
+          ],
+          [
+            54.31,
+            48.4
+          ],
+          [
+            56.85,
+            53.2
+          ]
+        ]
       },
       {
         "zone": "Asia/Yekaterinburg",
-        "region": "Oural (Iekaterinbourg)"
+        "region": "Oural (Iekaterinbourg)",
+        "reperes": [
+          [
+            56.84,
+            60.6
+          ],
+          [
+            55.16,
+            61.4
+          ],
+          [
+            58.0,
+            56.25
+          ],
+          [
+            57.15,
+            65.53
+          ],
+          [
+            61.0,
+            69.0
+          ]
+        ]
       },
       {
         "zone": "Asia/Omsk",
-        "region": "Omsk"
+        "region": "Omsk",
+        "reperes": [
+          [
+            54.99,
+            73.37
+          ]
+        ]
       },
       {
         "zone": "Asia/Novosibirsk",
-        "region": "Novossibirsk"
+        "region": "Novossibirsk",
+        "reperes": [
+          [
+            55.03,
+            82.92
+          ],
+          [
+            53.35,
+            83.78
+          ],
+          [
+            56.5,
+            84.97
+          ]
+        ]
       },
       {
         "zone": "Asia/Krasnoyarsk",
-        "region": "Krasnoïarsk"
+        "region": "Krasnoïarsk",
+        "reperes": [
+          [
+            56.01,
+            92.89
+          ],
+          [
+            53.72,
+            91.43
+          ],
+          [
+            69.35,
+            88.2
+          ]
+        ]
       },
       {
         "zone": "Asia/Irkutsk",
-        "region": "Irkoutsk et lac Baïkal"
+        "region": "Irkoutsk et lac Baïkal",
+        "reperes": [
+          [
+            52.29,
+            104.3
+          ],
+          [
+            51.83,
+            107.58
+          ],
+          [
+            56.15,
+            101.63
+          ]
+        ]
       },
       {
         "zone": "Asia/Yakutsk",
-        "region": "Iakoutsk"
+        "region": "Iakoutsk",
+        "reperes": [
+          [
+            62.03,
+            129.73
+          ],
+          [
+            52.03,
+            113.5
+          ],
+          [
+            50.27,
+            127.53
+          ]
+        ]
       },
       {
         "zone": "Asia/Vladivostok",
-        "region": "Vladivostok"
+        "region": "Vladivostok",
+        "reperes": [
+          [
+            43.12,
+            131.89
+          ],
+          [
+            48.48,
+            135.08
+          ]
+        ]
       },
       {
         "zone": "Asia/Magadan",
-        "region": "Magadan"
+        "region": "Magadan",
+        "reperes": [
+          [
+            59.56,
+            150.8
+          ],
+          [
+            46.96,
+            142.73
+          ]
+        ]
       },
       {
         "zone": "Asia/Kamchatka",
-        "region": "Kamtchatka"
+        "region": "Kamtchatka",
+        "reperes": [
+          [
+            53.02,
+            158.65
+          ],
+          [
+            64.73,
+            177.5
+          ]
+        ]
       }
     ]
   },
@@ -1752,31 +2640,249 @@
     "fuseaux": [
       {
         "zone": "America/New_York",
-        "region": "Côte Est (New York, Washington, Miami)"
+        "region": "Côte Est (New York, Washington, Miami)",
+        "reperes": [
+          [
+            40.71,
+            -74.01
+          ],
+          [
+            25.76,
+            -80.19
+          ],
+          [
+            33.75,
+            -84.39
+          ],
+          [
+            42.36,
+            -71.06
+          ],
+          [
+            42.33,
+            -83.05
+          ],
+          [
+            38.9,
+            -77.04
+          ],
+          [
+            28.54,
+            -81.38
+          ],
+          [
+            35.23,
+            -80.84
+          ],
+          [
+            39.77,
+            -86.16
+          ],
+          [
+            24.56,
+            -81.78
+          ],
+          [
+            44.48,
+            -73.21
+          ],
+          [
+            43.66,
+            -70.26
+          ]
+        ]
       },
       {
         "zone": "America/Chicago",
-        "region": "Centre (Chicago, La Nouvelle-Orléans, Texas)"
+        "region": "Centre (Chicago, La Nouvelle-Orléans, Texas)",
+        "reperes": [
+          [
+            41.88,
+            -87.63
+          ],
+          [
+            32.78,
+            -96.8
+          ],
+          [
+            29.76,
+            -95.37
+          ],
+          [
+            29.95,
+            -90.07
+          ],
+          [
+            44.98,
+            -93.27
+          ],
+          [
+            36.16,
+            -86.78
+          ],
+          [
+            30.27,
+            -97.74
+          ],
+          [
+            29.42,
+            -98.49
+          ],
+          [
+            38.63,
+            -90.2
+          ],
+          [
+            39.1,
+            -94.58
+          ],
+          [
+            35.15,
+            -90.05
+          ],
+          [
+            46.88,
+            -96.79
+          ]
+        ]
       },
       {
         "zone": "America/Denver",
-        "region": "Montagnes (Denver, Salt Lake City)"
+        "region": "Montagnes (Denver, Salt Lake City)",
+        "reperes": [
+          [
+            39.74,
+            -104.99
+          ],
+          [
+            40.76,
+            -111.89
+          ],
+          [
+            35.08,
+            -106.65
+          ],
+          [
+            31.76,
+            -106.49
+          ],
+          [
+            43.62,
+            -116.2
+          ],
+          [
+            46.59,
+            -112.04
+          ],
+          [
+            41.14,
+            -104.82
+          ],
+          [
+            43.48,
+            -110.76
+          ]
+        ]
       },
       {
         "zone": "America/Phoenix",
-        "region": "Arizona (Phoenix, Grand Canyon)"
+        "region": "Arizona (Phoenix, Grand Canyon)",
+        "reperes": [
+          [
+            33.45,
+            -112.07
+          ],
+          [
+            32.22,
+            -110.97
+          ],
+          [
+            35.2,
+            -111.65
+          ],
+          [
+            36.06,
+            -112.14
+          ]
+        ]
       },
       {
         "zone": "America/Los_Angeles",
-        "region": "Côte Ouest (Los Angeles, San Francisco, Las Vegas, Seattle)"
+        "region": "Côte Ouest (Los Angeles, San Francisco, Las Vegas, Seattle)",
+        "reperes": [
+          [
+            34.05,
+            -118.24
+          ],
+          [
+            37.77,
+            -122.42
+          ],
+          [
+            32.72,
+            -117.16
+          ],
+          [
+            47.61,
+            -122.33
+          ],
+          [
+            36.17,
+            -115.14
+          ],
+          [
+            45.52,
+            -122.68
+          ],
+          [
+            38.58,
+            -121.49
+          ],
+          [
+            37.75,
+            -119.59
+          ]
+        ]
       },
       {
         "zone": "America/Anchorage",
-        "region": "Alaska (Anchorage)"
+        "region": "Alaska (Anchorage)",
+        "reperes": [
+          [
+            61.22,
+            -149.9
+          ],
+          [
+            64.84,
+            -147.72
+          ],
+          [
+            58.3,
+            -134.42
+          ]
+        ]
       },
       {
         "zone": "Pacific/Honolulu",
-        "region": "Hawaï (Honolulu)"
+        "region": "Hawaï (Honolulu)",
+        "reperes": [
+          [
+            21.31,
+            -157.86
+          ],
+          [
+            19.72,
+            -155.08
+          ],
+          [
+            20.89,
+            -156.47
+          ],
+          [
+            22.08,
+            -159.32
+          ]
+        ]
       }
     ]
   },

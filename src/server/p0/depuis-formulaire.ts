@@ -15,12 +15,14 @@ import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
  * `p0Run` valide ensuite (l'application n'importe pas `src/prototype`, 0048 § 1 : le type est recopié ici et tenu égal
  * par un contrôle de type du pont, `src/workflows/p0-run.ts`).
  *
- * Pays et fuseau : ceux de la table maison des villes quand la destination y est (le serveur fait foi) ; sinon ceux
- * choisis à l'écran 1 (`draft.destinationRegion`, demande de Samuel du 23 octobre 2026), **revérifiés** contre la table
- * maison des pays (`fuseauDuPays`, liste fermée) : le brief reçoit le nom et le fuseau de la table, jamais la chaîne reçue.
+ * Pays et fuseau : ceux de la ville choisie à l'écran 1 dans les suggestions (`draft.destinationRegion`, demande de
+ * Samuel du 23 octobre 2026), **revérifiés** contre la table maison des pays (`fuseauDuPays`, liste fermée) : le brief
+ * reçoit le nom et le fuseau de la table, jamais la chaîne reçue ; sans choix valide (recherche indisponible), ceux de
+ * la table maison des villes. La destination reste le texte du brouillon (tapé, ou nom maison) ; le `placeId` n'entre
+ * pas dans le brief.
  *
  * Refus, chacun sur son champ de la forme de `parseInput`, avant toute réservation : ville absente de la table des
- * villes sans pays et fuseau valides de la table des pays (`draft.destination`), plus de `PROTOTYPE_STAY_DAYS_MAX` jours (`draft.end`), une autre ville
+ * villes sans ville choisie, ou ville choisie hors des tables maison (`draft.destination`), plus de `PROTOTYPE_STAY_DAYS_MAX` jours (`draft.end`), une autre ville
  * (`draft.otherCities`). Le refus du récit (e-mail ou téléphone, `story`) est celui de `BriefSchema`, rendu par le pont.
  * Les catégories « à éviter » (`limits`) sont recopiées dans `aEviter` (lot 5), absent quand rien n'est coché.
  */
@@ -90,14 +92,16 @@ function engagementsDuBrief(commitments: readonly TripCommitment[]): NonNullable
   );
 }
 
-/** Fuseau et pays de la destination : table des villes, sinon le choix de l'écran 1 revérifié ; `null` sinon. */
+/** Fuseau et pays de la destination : la ville choisie, revérifiée, sinon la table des villes ; `null` sinon. */
 function lieuDeLaDestination(destination: string, region: TripDraft["destinationRegion"]): { fuseau: string; pays: string } | null {
+  if (region !== undefined) {
+    const fuseau = fuseauDuPays(region.country, region.timeZone);
+    const pays = paysParCode(region.country)?.nom;
+    return fuseau === null || pays === undefined ? null : { fuseau, pays };
+  }
   const fuseauVille = fuseauDeVille(destination);
   const paysVille = paysDeVille(destination);
-  if (fuseauVille !== null && paysVille !== null) return { fuseau: fuseauVille, pays: paysVille };
-  const fuseau = fuseauDuPays(region?.country, region?.timeZone);
-  const pays = paysParCode(region?.country)?.nom;
-  return fuseau === null || pays === undefined ? null : { fuseau, pays };
+  return fuseauVille === null || paysVille === null ? null : { fuseau: fuseauVille, pays: paysVille };
 }
 
 /**

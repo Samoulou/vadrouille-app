@@ -77,16 +77,19 @@ describe("TripDraftSchema", () => {
     expect(TripDraftSchema.safeParse({ ...DRAFT, end: DRAFT.start }).success).toBe(false);
   });
 
-  it("destinationRegion facultatif (ville hors de la table) : code à deux lettres, fuseau de forme IANA, objet strict", () => {
+  it("destinationRegion facultatif (ville choisie) : placeId, code à deux lettres, fuseau de forme IANA, objet strict sans texte Google", () => {
+    const P = "lieu_fictif_ville_essai_1";
     const avec = (destinationRegion: unknown) => TripDraftSchema.safeParse({ ...DRAFT, destination: "Hoi An", destinationRegion }).success;
-    expect(avec({ country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBe(true);
-    expect(avec({ country: "US", timeZone: "America/Argentina/Buenos_Aires" })).toBe(true);
-    expect(avec({ country: "vn", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
-    expect(avec({ country: "VNM", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
-    expect(avec({ country: "VN", timeZone: "" })).toBe(false);
-    expect(avec({ country: "VN", timeZone: "Asia/Ho Chi Minh; drop" })).toBe(false);
-    expect(avec({ country: "VN", timeZone: "a".repeat(65) })).toBe(false);
-    expect(avec({ country: "VN", timeZone: "Asia/Ho_Chi_Minh", nom: "Viêt Nam" })).toBe(false);
+    expect(avec({ placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBe(true);
+    expect(avec({ placeId: P, country: "US", timeZone: "America/Argentina/Buenos_Aires" })).toBe(true);
+    expect(avec({ country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ placeId: "places/abc", country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ placeId: P, country: "vn", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ placeId: P, country: "VNM", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ placeId: P, country: "VN", timeZone: "" })).toBe(false);
+    expect(avec({ placeId: P, country: "VN", timeZone: "Asia/Ho Chi Minh; drop" })).toBe(false);
+    expect(avec({ placeId: P, country: "VN", timeZone: "a".repeat(65) })).toBe(false);
+    expect(avec({ placeId: P, country: "VN", timeZone: "Asia/Ho_Chi_Minh", libelle: "Hội An, Quảng Nam" })).toBe(false);
   });
 
   it("autres villes : arrivées strictement croissantes, strictement entre l'arrivée et le départ", () => {

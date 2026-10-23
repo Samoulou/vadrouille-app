@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   codePaysDeVille,
+  distanceKm,
+  fuseauParPosition,
+  villeDuPays,
   fuseauDuPays,
   fuseauxDesPays,
   listeDesPays,
@@ -182,7 +185,7 @@ describe("fuseaux : villes du monde entier (demande de Samuel du 23 octobre 2026
     }
   });
 
-  it("plusieurs centaines de villes ; Hoi An reste hors de la table (scénario « choisir le pays »)", () => {
+  it("plusieurs centaines de villes ; Hoi An reste hors de la table (scénario « ville choisie dans les suggestions »)", () => {
     expect(new Set(villesConnues().map((ville) => `${fuseauDeVille(ville)}|${paysDeVille(ville)}`)).size).toBeGreaterThan(100);
     expect(villesConnues().length).toBeGreaterThan(500);
     expect(fuseauDeVille("Hoi An")).toBeNull();
@@ -211,7 +214,8 @@ describe("fuseaux : table des pays (ville hors de la table)", () => {
 
   it("pays à plusieurs fuseaux : États-Unis, Canada, Brésil, Australie, Russie, Mexique, Indonésie", () => {
     for (const code of ["US", "CA", "BR", "AU", "RU", "MX", "ID"]) expect(paysParCode(code)?.fuseaux.length ?? 0, code).toBeGreaterThan(1);
-    expect(paysParCode("US")?.fuseaux[0]).toEqual({ zone: "America/New_York", region: "Côte Est (New York, Washington, Miami)" });
+    // Repères maison (positions de villes, pour `fuseauParPosition`) en plus : la zone et la région restent celles-ci.
+    expect(paysParCode("US")?.fuseaux[0]).toMatchObject({ zone: "America/New_York", region: "Côte Est (New York, Washington, Miami)" });
   });
 
   it("fuseauDuPays : liste fermée ; rend la valeur de la table, jamais la chaîne reçue", () => {
@@ -226,5 +230,52 @@ describe("fuseaux : table des pays (ville hors de la table)", () => {
     expect(fuseauDuPays(undefined)).toBeNull();
     expect(paysParCode("VN")?.nom).toBe("Viêt Nam");
     expect(paysParCode("XX")).toBeNull();
+  });
+});
+
+describe("fuseaux : ville choisie dans les suggestions (demande de Samuel du 23 octobre 2026)", () => {
+  it("villeDuPays : nom maison et fuseau d'une ville de la table, dans ce pays seulement", () => {
+    expect(villeDuPays("valencia", "ES")).toEqual({ nom: "Valence", zone: "Europe/Madrid" });
+    expect(villeDuPays("València", "ES")?.nom).toBe("Valence");
+    // Même nom, autre pays (Valencia, Venezuela) : la table ne s'applique pas, la destination reste le texte tapé.
+    expect(villeDuPays("Valencia", "VE")).toBeNull();
+    expect(villeDuPays("Hoi An", "VN")).toBeNull();
+    expect(villeDuPays("Rome", "XX")).toBeNull();
+  });
+
+  it("distanceKm : grand cercle (Paris–Londres, environ 344 km ; nulle pour un même point)", () => {
+    const paris = { lat: 48.857, lng: 2.352 };
+    expect(distanceKm(paris, paris)).toBe(0);
+    expect(distanceKm(paris, { lat: 51.507, lng: -0.128 })).toBeGreaterThan(330);
+    expect(distanceKm(paris, { lat: 51.507, lng: -0.128 })).toBeLessThan(360);
+  });
+
+  it("fuseauParPosition : seul fuseau du pays, ou repère maison le plus proche ; valeurs de la table", () => {
+    expect(fuseauParPosition("VN", { lat: 15.88, lng: 108.33 })).toBe("Asia/Ho_Chi_Minh");
+    expect(fuseauParPosition("FR", { lat: 0, lng: 0 })).toBe("Europe/Paris");
+    expect(fuseauParPosition("US", { lat: 35.6, lng: -82.55 })).toBe("America/New_York");
+    expect(fuseauParPosition("US", { lat: 30.27, lng: -97.74 })).toBe("America/Chicago");
+    expect(fuseauParPosition("US", { lat: 37.77, lng: -122.42 })).toBe("America/Los_Angeles");
+    expect(fuseauParPosition("AU", { lat: -31.95, lng: 115.86 })).toBe("Australia/Perth");
+    expect(fuseauParPosition("ES", { lat: 28.29, lng: -16.63 })).toBe("Atlantic/Canary");
+    expect(fuseauParPosition("ES", { lat: 39.47, lng: -0.38 })).toBe("Europe/Madrid");
+    expect(fuseauParPosition("XX", { lat: 0, lng: 0 })).toBeNull();
+    expect(fuseauParPosition("US", { lat: Number.NaN, lng: 0 })).toBeNull();
+  });
+
+  it("chaque pays à plusieurs fuseaux a au moins un repère par fuseau ; un repère est une position valide", () => {
+    for (const pays of listeDesPays()) {
+      if (pays.fuseaux.length < 2) continue;
+      for (const fuseau of pays.fuseaux) {
+        expect(fuseau.reperes?.length ?? 0, `${pays.code} ${fuseau.zone}`).toBeGreaterThan(0);
+        for (const [lat = Number.NaN, lng = Number.NaN] of fuseau.reperes ?? []) {
+          expect(Math.abs(lat), `${pays.code} ${fuseau.zone}`).toBeLessThanOrEqual(90);
+          expect(Math.abs(lng), `${pays.code} ${fuseau.zone}`).toBeLessThanOrEqual(180);
+        }
+        // Le repère d'un fuseau le désigne lui-même.
+        const [lat = Number.NaN, lng = Number.NaN] = fuseau.reperes?.[0] ?? [];
+        expect(fuseauParPosition(pays.code, { lat, lng }), `${pays.code} ${fuseau.zone}`).toBe(fuseau.zone);
+      }
+    }
   });
 });

@@ -136,6 +136,7 @@ describe("lint: src/server/relecture importé par les deux compositions seulemen
     "src/server/composition/p0-reel.ts",
     "src/server/composition/autre.ts",
     "src/server/composition/clients-google.ts",
+    "src/server/composition/villes.ts",
     "src/server/actions/voyage.ts",
     "src/server/voyages/lecture.ts",
     "src/workflows/generation.ts",
@@ -175,7 +176,14 @@ describe("lint: composition de la lecture (0100 § 5.2) : fabrique des clients G
     expect(await signalements(imp("./clients-google"), "src/server/composition/autre.ts", RELECTURE)).not.toHaveLength(0);
   });
 
-  it.each(["src/server/composition/lecture.ts", "src/server/composition/generation.ts", "src/server/composition/clients-google.test.ts", "tests/unit/exemple.test.ts"])(
+  it.each([
+    "src/server/composition/lecture.ts",
+    "src/server/composition/generation.ts",
+    // Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026).
+    "src/server/composition/villes.ts",
+    "src/server/composition/clients-google.test.ts",
+    "tests/unit/exemple.test.ts",
+  ])(
     "%s : import de la fabrique commune des clients Google admis",
     async (fichier) => {
       expect(await signalements(imp("@/server/composition/clients-google"), fichier, RELECTURE)).toHaveLength(0);

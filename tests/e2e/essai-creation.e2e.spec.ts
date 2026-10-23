@@ -42,20 +42,20 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);
 
-  // Écran 1 : une ville hors de la table n'est plus refusée, son pays est demandé (demande de Samuel du 23 octobre
-  // 2026) ; une ville de la table (Rome) n'en demande pas.
+  // Écran 1 (demande de Samuel du 23 octobre 2026) : la destination se choisit dans les suggestions de villes de Google
+  // Places. Garde du mode réel fermée sur ce serveur : la recherche répond « indisponible » sans aucun appel à Google, et
+  // l'écran se replie sur la table maison des villes (Rome admise ; Hoi An, hors de la table, attend la recherche).
   await fillTrip(page, { ...ROME, destination: "Hoi An" });
+  await expect(page.getByText("La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.")).toBeAttached();
   await continueButton(page).click();
-  const pays = page.getByRole("combobox", { name: "Pays" });
-  await expect(pays).toHaveAttribute("aria-invalid", "true");
-  await expect(pays).toBeFocused();
-  await expect(field(page, "Destination")).not.toHaveAttribute("aria-invalid", "true");
+  const destination = page.getByRole("combobox", { name: "Destination" });
+  await expect(destination).toHaveAttribute("aria-invalid", "true");
+  await expect(destination).toBeFocused();
+  await expect(page.getByText("La recherche des villes ne répond pas pour le moment : réessaie dans un instant.")).toBeVisible();
   await expect(page.getByText("Essaie Rome ou Lisbonne", { exact: false })).toHaveCount(0);
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await sansViolation(page);
-  await field(page, "Destination").fill(ROME.destination);
-  await field(page, "Destination").blur();
-  await expect(pays).toHaveCount(0);
+  await destination.fill(ROME.destination);
   await continueButton(page).click();
   await expectPath(page, R2);
 
@@ -95,7 +95,7 @@ test("site d'essai : écran 1 ouvert sans site=essai, un écran 1 hors règles e
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(field(page, "Destination")).toHaveValue("Atlantide");
   await continueButton(page).click();
-  // Ville hors de la table : son pays est demandé (demande de Samuel du 23 octobre 2026), la ville n'est plus refusée.
-  await expect(page.getByRole("combobox", { name: "Pays" })).toHaveAttribute("aria-invalid", "true");
+  // Ville hors de la table, recherche de ville indisponible (garde fermée sur ce serveur) : refus au champ.
+  await expect(page.getByRole("combobox", { name: "Destination" })).toHaveAttribute("aria-invalid", "true");
   await sansViolation(page);
 });
