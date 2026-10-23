@@ -1,25 +1,27 @@
-# État du studio — 2026-10-23 (154e cycle)
+# État du studio — 2026-10-23 (155e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 14:34 UTC « on est où ? » : réponse, il ne manquait que la fusion de #701.
-- 14:35 UTC : Samuel a fusionné **#701** (`main` → `p0-reel`, déploiement prêt à 14:40 UTC) ; lien de test envoyé.
-- 14:44 UTC « pourquoi je peux pas mettre n'importe quelle ville ? » (Valencia refusée) : en mode essai, l'écran 1 n'accepte que les 62 noms de la table `src/lib/fuseaux/villes.json` (`validation.ts:100`, `depuis-formulaire.ts:96`) ; liste des villes envoyée.
-- 14:59 UTC : coûts de son premier essai réel depuis l'app (Lisbonne) : environ 2,46 USD au prix plein (fiches Enterprise 49, éléments Routes 288, IA 0,03 USD), environ 0,03 USD réel avec la part gratuite de Google.
-- 15:17 UTC : choisir la destination par **l'autocomplétion de Google**. Règle gardée par le CEO : seul le `placeId` est gardé, le pays et le fuseau viennent de nos tables, l'IA reçoit le texte tapé, jamais le libellé de Google.
-- 15:23 UTC, priorités des prochains cycles : (1) **photos sur les cartes « J'aime / J'aime pas »** ; (2) **toutes les villes du monde par l'autocomplétion de Google**. Les photos sont chargées à l'affichage (non stockables) : exception à sa règle « aucun appel Google à l'affichage », limitée au tri, signalée à Samuel.
-- 15:33 UTC « comment saisir le code ? » : il est demandé à l'écran « Ton brouillon est prêt », au lancement.
+- Aucun message de Samuel depuis le 154e cycle.
 
 ## Fait
-- **#701** fusionnée : les lots 1 à 5 du parcours de bout en bout, #722 et #725 sont sur le site d'essai. Premier essai réel de Samuel depuis l'app (Lisbonne).
-- **Statut du 153e cycle** (#729) fusionné.
+- **Statut du 154e cycle** (#730) fusionné.
 
 ## En cours
-- **Ville au choix par l'autocomplétion de Google** (`[front]`, branche `claude/e2e-ville-libre`) : en cours d'écriture, pas encore de PR.
-- **Photos du tri** (`[front]`, branche `claude/e2e-photos-tri`) : en cours d'écriture, pas encore de PR ; décision 0128 possible (exception d'affichage).
-- **#527 `[data]`** (`coords-purge`) : les secrets `COORDS_PURGE_PG*` sont vides, la purge n'a jamais tourné. Bloqué sur Q438 (Samuel).
-- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618.
+- **#732 `[front]`** (ville au choix par l'autocomplétion de Google, demande de Samuel du 23 octobre à 15:17 et 15:23 UTC). Première revue sur `aa77422` : changements demandés par le TL, la Sécurité et l'UX, 9 bloquants. Correction 1 lancée. Choix du CEO :
+  - écrire la décision 0129 ;
+  - plafond persistant par jour dans `prototype.forfaits` et limite par cookie, en échec fermé ;
+  - destination limitée au nom maison ou au texte tapé filtré côté serveur ;
+  - champ rempli avec le nom retenu.
+- **#731 `[front]`** (photos sur les cartes du tri, demande de Samuel du 23 octobre à 15:23 UTC, décision 0128 proposée). Première revue sur `8232ddb` : 6 bloquants du TL et 1 de la Sécurité, UX approuvée avec réserves. Correction 1 lancée. Choix du CEO :
+  - tableau F13 « repris / remplacé / reporté » dans 0128 ;
+  - contrôle que le lieu appartient au voyage ;
+  - au plus 40 photos par heure et par session, en échec fermé ;
+  - `alt=""` comme le demande F13.
+- Les deux PR touchent `prototype/config/prix-google.json` : la seconde à fusionner reprendra `main` par un commit de fusion. Ensuite, PR de release `main` → `p0-reel`, puis un seul lien pour Samuel.
+- **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
+- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13 (réponses de Samuel du 12 octobre, signalées par la revue de #731).
 
 ## Bloqué
 - **Ancienne chaîne en préversion** : Q538, Q551, Q556 sans objet pour le test de bout en bout ; à revoir pour le MVP.
