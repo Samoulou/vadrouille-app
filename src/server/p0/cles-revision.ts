@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 
 /**
  * Clés d'idempotence des révisions d'un voyage de l'app (spécification E2E-essai, lot 4 ; décision 0126 § 2) : la k-ième
- * révision d'un voyage a **toujours** la même clé `request_id` (`prototype.run_briefs`, unique par organisation), tirée
- * de l'identifiant du voyage et du rang. La base garde donc au plus une exécution par rang : un voyage n'a jamais plus de
+ * révision d'un voyage (une seule aujourd'hui, décision 0126 § 2) a **toujours** la même clé `request_id`
+ * (`prototype.run_briefs`, unique par organisation), tirée de l'identifiant du voyage et du rang. La base garde donc au plus une exécution par rang : un voyage n'a jamais plus de
  * `nombre` révisions, même arrêtées, et deux demandes simultanées du même rang se résolvent par l'idempotence de la
  * réservation (la seconde trouve l'exécution de la première). Pur, sans lecture ni réseau.
  *

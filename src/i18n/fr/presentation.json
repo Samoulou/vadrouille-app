@@ -90,7 +90,7 @@
       "envoi": "On réécrit ton programme sans les étapes « Pas pour moi »…",
       "started": "C'est noté : on réécrit ton programme sans les étapes « Pas pour moi ». Dans quelques minutes, ouvre ou recharge ton programme pour voir la nouvelle version ; d'ici là, il montre encore l'ancienne.",
       "inProgress": "Ton programme est déjà en train d'être réécrit. Dans quelques minutes, ouvre ou recharge ton programme pour voir la nouvelle version.",
-      "exhausted": "Ce programme a déjà été réécrit deux fois : tes nouveaux choix ne le changent plus.",
+      "exhausted": "Ce programme ne peut plus être réécrit : tes nouveaux choix ne le changent plus.",
       "capReached": "Le plafond des essais est atteint : ton programme ne peut pas être réécrit pour le moment. Réessaie plus tard.",
       "unavailable": "Impossible de réécrire ton programme pour le moment.",
       "reessayer": "Réessayer",
