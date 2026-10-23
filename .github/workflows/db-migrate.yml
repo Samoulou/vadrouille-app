@@ -110,6 +110,7 @@ jobs:
             "0014_tri_enregistre 0fc7b497a023c71d5bce285961745e6a095aad157198f593241a2a56ee1d1088"
             "0015_recalcul_lot 167240921a3bfc87e5c087bccbd5c33d6e33e5d604f7686f1e6711597bff9026"
             "0016_restriction_update_generation_runs f2f36d78483151ff7553cd507e328d1c7508a599cbd6c64c02a484ca415edea5"
+            "0017_brief_saisi_prototype 72a428bfc9305b380f74870953f3106b356eff47811b785f928c58ead7927376"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
