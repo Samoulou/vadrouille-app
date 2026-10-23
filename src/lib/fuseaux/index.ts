@@ -9,14 +9,31 @@ import VILLES from "./villes.json";
  * foi, F8-PO-17). Aucune donnée Google : le fuseau d'un voyage n'est jamais tiré d'une réponse Google (B9-PO-3).
  */
 
-const TABLE: ReadonlyMap<string, string> = new Map(Object.entries(VILLES as Record<string, string>));
+/** Pays de la table maison : code ISO 3166-1 alpha-2, nom français, fuseaux (une région lisible quand il y en a plusieurs). */
+export interface PaysDeLaTable {
+  readonly code: string;
+  readonly nom: string;
+  readonly fuseaux: readonly { readonly zone: string; readonly region?: string }[];
+}
 
 /**
- * Table maison ville → pays (spécification E2E-essai, lot 3, décision D1 : jamais Google, jamais demandé à la personne),
- * mêmes clés que la table des fuseaux (test d'égalité) ; nom du pays en français, comme le champ `pays` d'un brief du
- * prototype (`prototype/briefs/`).
+ * Table maison des pays (demande de Samuel du 23 octobre 2026 : n'importe quelle ville sur le site d'essai) : nom
+ * français et fuseaux IANA du pays, liste fermée. Une ville absente de la table des villes est acceptée avec un pays (et,
+ * pour un pays à plusieurs fuseaux, une région) choisis dans cette liste ; jamais une donnée Google ni un appel réseau.
  */
-const PAYS_PAR_VILLE: ReadonlyMap<string, string> = new Map(Object.entries(PAYS as Record<string, string>));
+const PAYS_PAR_CODE: ReadonlyMap<string, PaysDeLaTable> = new Map(
+  Object.entries(PAYS as Record<string, Omit<PaysDeLaTable, "code">>).map(([code, pays]) => [code, { code, ...pays }]),
+);
+
+/**
+ * Table maison ville → fuseau IANA et code du pays (spécification E2E-essai, lot 3, décision D1 : jamais Google) : villes
+ * touristiques du monde entier, avec leurs noms courants (français, local, anglais), clés normalisées par `cleVille`.
+ * Le pays rendu est le nom français de la table des pays, comme le champ `pays` d'un brief du prototype
+ * (`prototype/briefs/`).
+ */
+const TABLE: ReadonlyMap<string, readonly [zone: string, pays: string]> = new Map(
+  Object.entries(VILLES as Record<string, string[]>).map(([cle, [zone = "", pays = ""]]) => [cle, [zone, pays]] as const),
+);
 
 const QUART_D_HEURE_MS = 15 * 60_000;
 const JOUR_MS = 86_400_000;
@@ -70,18 +87,41 @@ export function fuseauReconnu(zone: string): boolean {
  * traité comme inconnu, 0087 § 4.1).
  */
 export function fuseauDeVille(nom: string): string | null {
-  const zone = TABLE.get(cleVille(nom));
+  const zone = TABLE.get(cleVille(nom))?.[0];
   return zone !== undefined && fuseauReconnu(zone) ? zone : null;
 }
 
 /** Pays d'une ville de la table (nom français, table maison), ou `null` pour une ville inconnue. */
 export function paysDeVille(nom: string): string | null {
-  return PAYS_PAR_VILLE.get(cleVille(nom)) ?? null;
+  const code = TABLE.get(cleVille(nom))?.[1];
+  return code === undefined ? null : (PAYS_PAR_CODE.get(code)?.nom ?? null);
 }
 
-/** Clés de la table des pays (tests). */
+/** Clés de la table des villes qui ont un pays de la table des pays (tests). */
 export function villesAvecPays(): readonly string[] {
-  return [...PAYS_PAR_VILLE.keys()];
+  return [...TABLE.entries()].filter(([, [, code]]) => PAYS_PAR_CODE.has(code)).map(([cle]) => cle);
+}
+
+/** Pays de la table, triés par nom dans l'ordre français (liste « Pays » de l'écran 1). */
+export function listeDesPays(): readonly PaysDeLaTable[] {
+  return [...PAYS_PAR_CODE.values()].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+}
+
+/** Pays de la table par son code, ou `null` (code inconnu ou absent). */
+export function paysParCode(code: string | undefined): PaysDeLaTable | null {
+  return code === undefined ? null : (PAYS_PAR_CODE.get(code) ?? null);
+}
+
+/**
+ * Fuseau d'un pays choisi par la personne (liste fermée, revérifiée par le serveur) : la valeur **de la table** si
+ * `zone` est l'un des fuseaux du pays, ou si le pays n'a qu'un fuseau et que `zone` est absent ; sinon `null`. Une
+ * chaîne reçue n'est jamais rendue telle quelle.
+ */
+export function fuseauDuPays(code: string | undefined, zone?: string): string | null {
+  const pays = paysParCode(code);
+  if (pays === null) return null;
+  const trouve = zone === undefined ? (pays.fuseaux.length === 1 ? pays.fuseaux[0] : undefined) : pays.fuseaux.find((f) => f.zone === zone);
+  return trouve !== undefined && fuseauReconnu(trouve.zone) ? trouve.zone : null;
 }
 
 /** Décalage UTC du fuseau à l'instant donné, en minutes (à la seconde près). */
@@ -161,7 +201,17 @@ export function villesConnues(): readonly string[] {
   return [...TABLE.keys()];
 }
 
-/** Fuseaux distincts de la table (tests). */
+/** Fuseaux distincts de la table des villes (tests). */
 export function fuseauxDeLaTable(): readonly string[] {
-  return [...new Set(TABLE.values())];
+  return [...new Set([...TABLE.values()].map(([zone]) => zone))];
+}
+
+/** Fuseaux distincts de la table des pays (tests). */
+export function fuseauxDesPays(): readonly string[] {
+  return [...new Set([...PAYS_PAR_CODE.values()].flatMap((pays) => pays.fuseaux.map((f) => f.zone)))];
+}
+
+/** Code du pays d'une ville de la table, ou `null` (tests). */
+export function codePaysDeVille(nom: string): string | null {
+  return TABLE.get(cleVille(nom))?.[1] ?? null;
 }

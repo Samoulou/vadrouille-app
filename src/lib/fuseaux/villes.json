@@ -1,64 +1,4418 @@
 {
-  "amsterdam": "Europe/Amsterdam",
-  "andorre la vieille": "Europe/Andorra",
-  "athenes": "Europe/Athens",
-  "barcelone": "Europe/Madrid",
-  "belgrade": "Europe/Belgrade",
-  "berlin": "Europe/Berlin",
-  "berne": "Europe/Zurich",
-  "bratislava": "Europe/Bratislava",
-  "bruxelles": "Europe/Brussels",
-  "bucarest": "Europe/Bucharest",
-  "budapest": "Europe/Budapest",
-  "chisinau": "Europe/Chisinau",
-  "copenhague": "Europe/Copenhagen",
-  "dublin": "Europe/Dublin",
-  "edimbourg": "Europe/London",
-  "edinburgh": "Europe/London",
-  "florence": "Europe/Rome",
-  "geneve": "Europe/Zurich",
-  "glasgow": "Europe/London",
-  "helsinki": "Europe/Helsinki",
-  "kiev": "Europe/Kyiv",
-  "kyiv": "Europe/Kyiv",
-  "la valette": "Europe/Malta",
-  "lausanne": "Europe/Zurich",
-  "lisbonne": "Europe/Lisbon",
-  "ljubljana": "Europe/Ljubljana",
-  "londres": "Europe/London",
-  "luxembourg": "Europe/Luxembourg",
-  "lyon": "Europe/Paris",
-  "madrid": "Europe/Madrid",
-  "marseille": "Europe/Paris",
-  "milan": "Europe/Rome",
-  "minsk": "Europe/Minsk",
-  "monaco": "Europe/Monaco",
-  "naples": "Europe/Rome",
-  "nice": "Europe/Paris",
-  "oslo": "Europe/Oslo",
-  "paris": "Europe/Paris",
-  "podgorica": "Europe/Podgorica",
-  "porto": "Europe/Lisbon",
-  "prague": "Europe/Prague",
-  "reykjavik": "Atlantic/Reykjavik",
-  "riga": "Europe/Riga",
-  "rome": "Europe/Rome",
-  "saint marin": "Europe/San_Marino",
-  "sarajevo": "Europe/Sarajevo",
-  "seville": "Europe/Madrid",
-  "skopje": "Europe/Skopje",
-  "sofia": "Europe/Sofia",
-  "stockholm": "Europe/Stockholm",
-  "tallinn": "Europe/Tallinn",
-  "tirana": "Europe/Tirane",
-  "vaduz": "Europe/Vaduz",
-  "varsovie": "Europe/Warsaw",
-  "vatican": "Europe/Vatican",
-  "venise": "Europe/Rome",
-  "vienne": "Europe/Vienna",
-  "vilnius": "Europe/Vilnius",
-  "zagreb": "Europe/Zagreb",
-  "zakynthos": "Europe/Athens",
-  "zante": "Europe/Athens",
-  "zurich": "Europe/Zurich"
+  "a coruna": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "aachen": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "aarhus": [
+    "Europe/Copenhagen",
+    "DK"
+  ],
+  "abidjan": [
+    "Africa/Abidjan",
+    "CI"
+  ],
+  "abou dabi": [
+    "Asia/Dubai",
+    "AE"
+  ],
+  "abu dhabi": [
+    "Asia/Dubai",
+    "AE"
+  ],
+  "abuja": [
+    "Africa/Lagos",
+    "NG"
+  ],
+  "accra": [
+    "Africa/Accra",
+    "GH"
+  ],
+  "acores": [
+    "Atlantic/Azores",
+    "PT"
+  ],
+  "addis ababa": [
+    "Africa/Addis_Ababa",
+    "ET"
+  ],
+  "addis abeba": [
+    "Africa/Addis_Ababa",
+    "ET"
+  ],
+  "adelaide": [
+    "Australia/Adelaide",
+    "AU"
+  ],
+  "agadir": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "agra": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "aix en provence": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "aix la chapelle": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "ajaccio": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "akureyri": [
+    "Atlantic/Reykjavik",
+    "IS"
+  ],
+  "al ula": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "alacant": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "albi": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "albufeira": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "alesund": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "alexandria": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "alexandrie": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "algarve": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "alger": [
+    "Africa/Algiers",
+    "DZ"
+  ],
+  "algiers": [
+    "Africa/Algiers",
+    "DZ"
+  ],
+  "alicante": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "alice springs": [
+    "Australia/Darwin",
+    "AU"
+  ],
+  "almaty": [
+    "Asia/Almaty",
+    "KZ"
+  ],
+  "almeria": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "alula": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "amalfi": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "amalfi coast": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "amboise": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "amiens": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "amman": [
+    "Asia/Amman",
+    "JO"
+  ],
+  "amritsar": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "amsterdam": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "anchorage": [
+    "America/Anchorage",
+    "US"
+  ],
+  "andalousie": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "andalucia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "andalusia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "andorra la vella": [
+    "Europe/Andorra",
+    "AD"
+  ],
+  "andorre la vieille": [
+    "Europe/Andorra",
+    "AD"
+  ],
+  "angers": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "angkor": [
+    "Asia/Phnom_Penh",
+    "KH"
+  ],
+  "ankara": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "annecy": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "antalya": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "antananarivo": [
+    "Indian/Antananarivo",
+    "MG"
+  ],
+  "antibes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "antigua guatemala": [
+    "America/Guatemala",
+    "GT"
+  ],
+  "antwerp": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "antwerpen": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "anvers": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "apia": [
+    "Pacific/Apia",
+    "WS"
+  ],
+  "apulia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "aqaba": [
+    "Asia/Amman",
+    "JO"
+  ],
+  "arequipa": [
+    "America/Lima",
+    "PE"
+  ],
+  "arles": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "arusha": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "assise": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "assisi": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "assouan": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "astana": [
+    "Asia/Almaty",
+    "KZ"
+  ],
+  "asuncion": [
+    "America/Asuncion",
+    "PY"
+  ],
+  "aswan": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "athenes": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "athens": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "athina": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "atlanta": [
+    "America/New_York",
+    "US"
+  ],
+  "auckland": [
+    "Pacific/Auckland",
+    "NZ"
+  ],
+  "austin": [
+    "America/Chicago",
+    "US"
+  ],
+  "aveiro": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "avignon": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "ayers rock": [
+    "Australia/Darwin",
+    "AU"
+  ],
+  "ayutthaya": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "azores": [
+    "Atlantic/Azores",
+    "PT"
+  ],
+  "baden baden": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "bagan": [
+    "Asia/Yangon",
+    "MM"
+  ],
+  "baie d along": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "baie d halong": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "baile atha cliath": [
+    "Europe/Dublin",
+    "IE"
+  ],
+  "bakou": [
+    "Asia/Baku",
+    "AZ"
+  ],
+  "baku": [
+    "Asia/Baku",
+    "AZ"
+  ],
+  "bale": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "bali": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "baltimore": [
+    "America/New_York",
+    "US"
+  ],
+  "bamako": [
+    "Africa/Bamako",
+    "ML"
+  ],
+  "bamberg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "bandar seri begawan": [
+    "Asia/Brunei",
+    "BN"
+  ],
+  "banff": [
+    "America/Edmonton",
+    "CA"
+  ],
+  "bangalore": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "bangkok": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "barcelona": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "barcelone": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "bari": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bariloche": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "basel": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "bastia": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bath": [
+    "Europe/London",
+    "GB"
+  ],
+  "batoumi": [
+    "Asia/Tbilisi",
+    "GE"
+  ],
+  "batumi": [
+    "Asia/Tbilisi",
+    "GE"
+  ],
+  "bayeux": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bayonne": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "beaune": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "beijing": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "beirut": [
+    "Asia/Beirut",
+    "LB"
+  ],
+  "belem": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "belfast": [
+    "Europe/London",
+    "GB"
+  ],
+  "belgrade": [
+    "Europe/Belgrade",
+    "RS"
+  ],
+  "benares": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "bengaluru": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "benidorm": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "beograd": [
+    "Europe/Belgrade",
+    "RS"
+  ],
+  "berat": [
+    "Europe/Tirane",
+    "AL"
+  ],
+  "bergame": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bergamo": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bergen": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "berlin": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "bern": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "berne": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "besancon": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bethleem": [
+    "Asia/Hebron",
+    "PS"
+  ],
+  "bethlehem": [
+    "Asia/Hebron",
+    "PS"
+  ],
+  "beyrouth": [
+    "Asia/Beirut",
+    "LB"
+  ],
+  "biarritz": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bichkek": [
+    "Asia/Bishkek",
+    "KG"
+  ],
+  "bilbao": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "bilbo": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "birmingham": [
+    "Europe/London",
+    "GB"
+  ],
+  "bishkek": [
+    "Asia/Bishkek",
+    "KG"
+  ],
+  "bled": [
+    "Europe/Ljubljana",
+    "SI"
+  ],
+  "blois": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bodrum": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "bogota": [
+    "America/Bogota",
+    "CO"
+  ],
+  "bologna": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bologne": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bolzano": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "bombay": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "bonifacio": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bonn": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "bora bora": [
+    "Pacific/Tahiti",
+    "PF"
+  ],
+  "boracay": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "bordeaux": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "boston": [
+    "America/New_York",
+    "US"
+  ],
+  "boukhara": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "bourgas": [
+    "Europe/Sofia",
+    "BG"
+  ],
+  "bozen": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "braga": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "brasilia": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "brasov": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "bratislava": [
+    "Europe/Bratislava",
+    "SK"
+  ],
+  "breme": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "bremen": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "brest": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "bridgetown": [
+    "America/Barbados",
+    "BB"
+  ],
+  "brighton": [
+    "Europe/London",
+    "GB"
+  ],
+  "brisbane": [
+    "Australia/Brisbane",
+    "AU"
+  ],
+  "bristol": [
+    "Europe/London",
+    "GB"
+  ],
+  "brno": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "bruges": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "brugge": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "brussel": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "brussels": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "bruxelles": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "bucarest": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "bucharest": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "bucuresti": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "budapest": [
+    "Europe/Budapest",
+    "HU"
+  ],
+  "budva": [
+    "Europe/Podgorica",
+    "ME"
+  ],
+  "buenos aires": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "bukhara": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "burgas": [
+    "Europe/Sofia",
+    "BG"
+  ],
+  "burgos": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "busan": [
+    "Asia/Seoul",
+    "KR"
+  ],
+  "cabo san lucas": [
+    "America/Mazatlan",
+    "MX"
+  ],
+  "caceres": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "cadix": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "cadiz": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "caen": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cagliari": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "caire": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "cairns": [
+    "Australia/Brisbane",
+    "AU"
+  ],
+  "cairo": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "calcutta": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "calgary": [
+    "America/Edmonton",
+    "CA"
+  ],
+  "cali": [
+    "America/Bogota",
+    "CO"
+  ],
+  "calvi": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cambridge": [
+    "Europe/London",
+    "GB"
+  ],
+  "canarias": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "canaries": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "canberra": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "cancun": [
+    "America/Cancun",
+    "MX"
+  ],
+  "cannes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "canterbury": [
+    "Europe/London",
+    "GB"
+  ],
+  "canton": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "cantorbery": [
+    "Europe/London",
+    "GB"
+  ],
+  "cape town": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "cappadoce": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "cappadocia": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "capri": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "caracas": [
+    "America/Caracas",
+    "VE"
+  ],
+  "carcassonne": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cardiff": [
+    "Europe/London",
+    "GB"
+  ],
+  "carlsbad": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "cartagena de indias": [
+    "America/Bogota",
+    "CO"
+  ],
+  "carthagene des indes": [
+    "America/Bogota",
+    "CO"
+  ],
+  "casablanca": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "cascais": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "catane": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "catania": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "cayenne": [
+    "America/Cayenne",
+    "GF"
+  ],
+  "cebu": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "cephalonia": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "cephalonie": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "cesky krumlov": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "chamonix": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "chamonix mont blanc": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "chania": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "charleston": [
+    "America/New_York",
+    "US"
+  ],
+  "charm el cheikh": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "chartres": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "chefchaouen": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "chengdu": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "chennai": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "chiang mai": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "chiang rai": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "chicago": [
+    "America/Chicago",
+    "US"
+  ],
+  "chiraz": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "chisinau": [
+    "Europe/Chisinau",
+    "MD"
+  ],
+  "chongqing": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "christchurch": [
+    "Pacific/Auckland",
+    "NZ"
+  ],
+  "chutes du niagara": [
+    "America/Toronto",
+    "CA"
+  ],
+  "chutes victoria": [
+    "Africa/Harare",
+    "ZW"
+  ],
+  "chypre": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "cinque terre": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "cite du vatican": [
+    "Europe/Vatican",
+    "VA"
+  ],
+  "citta del vaticano": [
+    "Europe/Vatican",
+    "VA"
+  ],
+  "ciudad de guatemala": [
+    "America/Guatemala",
+    "GT"
+  ],
+  "ciudad de mexico": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "ciudad de panama": [
+    "America/Panama",
+    "PA"
+  ],
+  "clermont ferrand": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cluj": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "cluj napoca": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "cochin": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "coimbra": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "collioure": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "colmar": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cologne": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "colombo": [
+    "Asia/Colombo",
+    "LK"
+  ],
+  "colonia del sacramento": [
+    "America/Montevideo",
+    "UY"
+  ],
+  "como": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "compostelle": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "copenhagen": [
+    "Europe/Copenhagen",
+    "DK"
+  ],
+  "copenhague": [
+    "Europe/Copenhagen",
+    "DK"
+  ],
+  "cordoba": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "cordoue": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "corfou": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "corfu": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "cork": [
+    "Europe/Dublin",
+    "IE"
+  ],
+  "cornouailles": [
+    "Europe/London",
+    "GB"
+  ],
+  "cornwall": [
+    "Europe/London",
+    "GB"
+  ],
+  "corse": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "corsica": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "costa brava": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "costiera amalfitana": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "cote amalfitaine": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "cotonou": [
+    "Africa/Porto-Novo",
+    "BJ"
+  ],
+  "courchevel": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "cracovie": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "crete": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "cusco": [
+    "America/Lima",
+    "PE"
+  ],
+  "cuzco": [
+    "America/Lima",
+    "PE"
+  ],
+  "cyprus": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "da nang": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "dacca": [
+    "Asia/Dhaka",
+    "BD"
+  ],
+  "dakar": [
+    "Africa/Dakar",
+    "SN"
+  ],
+  "dallas": [
+    "America/Chicago",
+    "US"
+  ],
+  "dantzig": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "dar es salaam": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "darjeeling": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "darwin": [
+    "Australia/Darwin",
+    "AU"
+  ],
+  "deauville": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "delft": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "delhi": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "delphes": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "delphi": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "den haag": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "denpasar": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "denver": [
+    "America/Denver",
+    "US"
+  ],
+  "detroit": [
+    "America/New_York",
+    "US"
+  ],
+  "dhaka": [
+    "Asia/Dhaka",
+    "BD"
+  ],
+  "dijon": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "djeddah": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "djerba": [
+    "Africa/Tunis",
+    "TN"
+  ],
+  "doha": [
+    "Asia/Qatar",
+    "QA"
+  ],
+  "dolomites": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "dolomiti": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "donostia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "douala": [
+    "Africa/Douala",
+    "CM"
+  ],
+  "dresde": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "dresden": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "dubai": [
+    "Asia/Dubai",
+    "AE"
+  ],
+  "dublin": [
+    "Europe/Dublin",
+    "IE"
+  ],
+  "dubrovnik": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "durban": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "dusseldorf": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "easter island": [
+    "Pacific/Easter",
+    "CL"
+  ],
+  "ecosse": [
+    "Europe/London",
+    "GB"
+  ],
+  "edimbourg": [
+    "Europe/London",
+    "GB"
+  ],
+  "edinburgh": [
+    "Europe/London",
+    "GB"
+  ],
+  "edmonton": [
+    "America/Edmonton",
+    "CA"
+  ],
+  "efes": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "eilat": [
+    "Asia/Jerusalem",
+    "IL"
+  ],
+  "eivissa": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "el calafate": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "el nido": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "epernay": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "ephese": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "ephesus": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "erevan": [
+    "Asia/Yerevan",
+    "AM"
+  ],
+  "essaouira": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "etretat": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "evora": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "faro": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "fernando de noronha": [
+    "America/Noronha",
+    "BR"
+  ],
+  "fes": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "fethiye": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "fez": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "firenze": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "florence": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "florianopolis": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "formentera": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "fort de france": [
+    "America/Martinique",
+    "MQ"
+  ],
+  "fortaleza": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "foz do iguacu": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "francfort": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "frankfurt": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "frankfurt am main": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "freiburg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "freiburg im breisgau": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "freiburg im uechtland": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "fribourg": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "fribourg en brisgau": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "fuerteventura": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "fukuoka": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "funchal": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "gaborone": [
+    "Africa/Gaborone",
+    "BW"
+  ],
+  "galapagos": [
+    "Pacific/Galapagos",
+    "EC"
+  ],
+  "galle": [
+    "Asia/Colombo",
+    "LK"
+  ],
+  "galway": [
+    "Europe/Dublin",
+    "IE"
+  ],
+  "gand": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "gdansk": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "genes": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "geneva": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "geneve": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "genf": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "genoa": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "genova": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "gent": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "george town": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "gerone": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "ghent": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "gibraltar": [
+    "Europe/Gibraltar",
+    "GI"
+  ],
+  "ginevra": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "girona": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "giza": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "gizeh": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "glasgow": [
+    "Europe/London",
+    "GB"
+  ],
+  "goa": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "gold coast": [
+    "Australia/Brisbane",
+    "AU"
+  ],
+  "goma": [
+    "Africa/Lubumbashi",
+    "CD"
+  ],
+  "gordes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "goteborg": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "gothenburg": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "gozo": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "gran canaria": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "granada": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "grand canyon": [
+    "America/Phoenix",
+    "US"
+  ],
+  "grande canarie": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "graz": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "grenade": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "grenoble": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "grindelwald": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "guadalajara": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "guanajuato": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "guangzhou": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "guatemala": [
+    "America/Guatemala",
+    "GT"
+  ],
+  "guatemala city": [
+    "America/Guatemala",
+    "GT"
+  ],
+  "guayaquil": [
+    "America/Guayaquil",
+    "EC"
+  ],
+  "guilin": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "għawdex": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "ha long": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "ha noi": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "haarlem": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "haifa": [
+    "Asia/Jerusalem",
+    "IL"
+  ],
+  "hakone": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "halifax": [
+    "America/Halifax",
+    "CA"
+  ],
+  "hallstatt": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "halong bay": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "hambourg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "hamburg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "hammamet": [
+    "Africa/Tunis",
+    "TN"
+  ],
+  "hangzhou": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "hania": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "hannover": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "hanoi": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "hanovre": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "harare": [
+    "Africa/Harare",
+    "ZW"
+  ],
+  "havana": [
+    "America/Havana",
+    "CU"
+  ],
+  "havane": [
+    "America/Havana",
+    "CU"
+  ],
+  "hawai": [
+    "Pacific/Honolulu",
+    "US"
+  ],
+  "hawaii": [
+    "Pacific/Honolulu",
+    "US"
+  ],
+  "heidelberg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "helsingfors": [
+    "Europe/Helsinki",
+    "FI"
+  ],
+  "helsinki": [
+    "Europe/Helsinki",
+    "FI"
+  ],
+  "heraklion": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "hiroshima": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "ho chi minh": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "ho chi minh city": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "ho chi minh ville": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "hobart": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "honfleur": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "hong kong": [
+    "Asia/Hong_Kong",
+    "HK"
+  ],
+  "honolulu": [
+    "Pacific/Honolulu",
+    "US"
+  ],
+  "houston": [
+    "America/Chicago",
+    "US"
+  ],
+  "hue": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "hurghada": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "hvar": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "hyderabad": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "ibiza": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "iekaterinbourg": [
+    "Asia/Yekaterinburg",
+    "RU"
+  ],
+  "iguazu": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "ile de la reunion": [
+    "Indian/Reunion",
+    "RE"
+  ],
+  "ile de paques": [
+    "Pacific/Easter",
+    "CL"
+  ],
+  "ile de skye": [
+    "Europe/London",
+    "GB"
+  ],
+  "ile maurice": [
+    "Indian/Mauritius",
+    "MU"
+  ],
+  "iles canaries": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "iles galapagos": [
+    "Pacific/Galapagos",
+    "EC"
+  ],
+  "iles lofoten": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "innsbruck": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "interlaken": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "inverness": [
+    "Europe/London",
+    "GB"
+  ],
+  "iraklio": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "irkoutsk": [
+    "Asia/Irkutsk",
+    "RU"
+  ],
+  "irkutsk": [
+    "Asia/Irkutsk",
+    "RU"
+  ],
+  "iruna": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "isfahan": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "islamabad": [
+    "Asia/Karachi",
+    "PK"
+  ],
+  "isle of skye": [
+    "Europe/London",
+    "GB"
+  ],
+  "ispahan": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "istanbul": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "izmir": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "jaipur": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "jaisalmer": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "jakarta": [
+    "Asia/Jakarta",
+    "ID"
+  ],
+  "jasper": [
+    "America/Edmonton",
+    "CA"
+  ],
+  "jeddah": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "jeju": [
+    "Asia/Seoul",
+    "KR"
+  ],
+  "jerusalem": [
+    "Asia/Jerusalem",
+    "IL"
+  ],
+  "jodhpur": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "jogjakarta": [
+    "Asia/Jakarta",
+    "ID"
+  ],
+  "johannesburg": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "kaapstad": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "kaliningrad": [
+    "Europe/Kaliningrad",
+    "RU"
+  ],
+  "kampala": [
+    "Africa/Kampala",
+    "UG"
+  ],
+  "kanazawa": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "kandy": [
+    "Asia/Colombo",
+    "LK"
+  ],
+  "kaohsiung": [
+    "Asia/Taipei",
+    "TW"
+  ],
+  "kapadokya": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "karlovy vary": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "kathmandu": [
+    "Asia/Kathmandu",
+    "NP"
+  ],
+  "katmandou": [
+    "Asia/Kathmandu",
+    "NP"
+  ],
+  "kaunas": [
+    "Europe/Vilnius",
+    "LT"
+  ],
+  "kazan": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "kefalonia": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "kerala": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "kerkyra": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "key west": [
+    "America/New_York",
+    "US"
+  ],
+  "khiva": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "kichinev": [
+    "Europe/Chisinau",
+    "MD"
+  ],
+  "kiev": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "kigali": [
+    "Africa/Kigali",
+    "RW"
+  ],
+  "kiiv": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "kilimandjaro": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "kilimanjaro": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "killarney": [
+    "Europe/Dublin",
+    "IE"
+  ],
+  "kingston": [
+    "America/Jamaica",
+    "JM"
+  ],
+  "kinshasa": [
+    "Africa/Kinshasa",
+    "CD"
+  ],
+  "kiruna": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "ko pha ngan": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "ko samui": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "ko tao": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "kochi": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "koh phangan": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "koh samui": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "koh tao": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "kolkata": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "koln": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "komodo": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "kosice": [
+    "Europe/Bratislava",
+    "SK"
+  ],
+  "kota kinabalu": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "kotor": [
+    "Europe/Podgorica",
+    "ME"
+  ],
+  "koweit": [
+    "Asia/Kuwait",
+    "KW"
+  ],
+  "krabi": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "krakow": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "kriti": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "kruger": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "kuala lumpur": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "kuching": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "kunming": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "kuwait city": [
+    "Asia/Kuwait",
+    "KW"
+  ],
+  "kyiv": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "kyoto": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "københavn": [
+    "Europe/Copenhagen",
+    "DK"
+  ],
+  "la canee": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "la corogne": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "la coruna": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "la habana": [
+    "America/Havana",
+    "CU"
+  ],
+  "la havane": [
+    "America/Havana",
+    "CU"
+  ],
+  "la haye": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "la nouvelle orleans": [
+    "America/Chicago",
+    "US"
+  ],
+  "la paz": [
+    "America/La_Paz",
+    "BO"
+  ],
+  "la reunion": [
+    "Indian/Reunion",
+    "RE"
+  ],
+  "la rochelle": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "la valette": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "labuan bajo": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "lac de bled": [
+    "Europe/Ljubljana",
+    "SI"
+  ],
+  "lac de come": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lac de garde": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lago di como": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lago di garda": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lahore": [
+    "Asia/Karachi",
+    "PK"
+  ],
+  "lake como": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lake garda": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lalibela": [
+    "Africa/Addis_Ababa",
+    "ET"
+  ],
+  "langkawi": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "lanzarote": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "larnaca": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "las palmas": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "las palmas de gran canaria": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "las vegas": [
+    "America/Los_Angeles",
+    "US"
+  ],
+  "lausanne": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "le caire": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "le cap": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "le havre": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "le mont saint michel": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "lecce": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lefkosia": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "leipzig": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "lemberg": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "lens": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "letzebuerg": [
+    "Europe/Luxembourg",
+    "LU"
+  ],
+  "lhasa": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "lhassa": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "libreville": [
+    "Africa/Libreville",
+    "GA"
+  ],
+  "liege": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "lille": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "lima": [
+    "America/Lima",
+    "PE"
+  ],
+  "limassol": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "limoges": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "linz": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "lisboa": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "lisbon": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "lisbonne": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "liverpool": [
+    "Europe/London",
+    "GB"
+  ],
+  "livingstone": [
+    "Africa/Lusaka",
+    "ZM"
+  ],
+  "ljubljana": [
+    "Europe/Ljubljana",
+    "SI"
+  ],
+  "locarno": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "lofoten": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "lombok": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "lome": [
+    "Africa/Lome",
+    "TG"
+  ],
+  "london": [
+    "Europe/London",
+    "GB"
+  ],
+  "londres": [
+    "Europe/London",
+    "GB"
+  ],
+  "los angeles": [
+    "America/Los_Angeles",
+    "US"
+  ],
+  "los cabos": [
+    "America/Mazatlan",
+    "MX"
+  ],
+  "lourdes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "louxor": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "luanda": [
+    "Africa/Luanda",
+    "AO"
+  ],
+  "luang prabang": [
+    "Asia/Vientiane",
+    "LA"
+  ],
+  "lubeck": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "lubumbashi": [
+    "Africa/Lubumbashi",
+    "CD"
+  ],
+  "lucca": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lucerne": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "lucques": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "lugano": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "luik": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "lusaka": [
+    "Africa/Lusaka",
+    "ZM"
+  ],
+  "luxembourg": [
+    "Europe/Luxembourg",
+    "LU"
+  ],
+  "luxor": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "luzern": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "lviv": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "lvov": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "lyon": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "maasai mara": [
+    "Africa/Nairobi",
+    "KE"
+  ],
+  "maastricht": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "macao": [
+    "Asia/Macau",
+    "MO"
+  ],
+  "macau": [
+    "Asia/Macau",
+    "MO"
+  ],
+  "machu picchu": [
+    "America/Lima",
+    "PE"
+  ],
+  "madeira": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "madere": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "madras": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "madrid": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "mahe": [
+    "Indian/Mahe",
+    "SC"
+  ],
+  "majorca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "majorque": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "malacca": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "malaga": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "male": [
+    "Indian/Maldives",
+    "MV"
+  ],
+  "mallorca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "malmo": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "malta": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "malte": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "managua": [
+    "America/Managua",
+    "NI"
+  ],
+  "manama": [
+    "Asia/Bahrain",
+    "BH"
+  ],
+  "manaus": [
+    "America/Manaus",
+    "BR"
+  ],
+  "manchester": [
+    "Europe/London",
+    "GB"
+  ],
+  "mandalay": [
+    "Asia/Yangon",
+    "MM"
+  ],
+  "manila": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "manille": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "mantoue": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "mantova": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "maputo": [
+    "Africa/Maputo",
+    "MZ"
+  ],
+  "marbella": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "marrakech": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "marrakesh": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "marseille": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "masai mara": [
+    "Africa/Nairobi",
+    "KE"
+  ],
+  "mascate": [
+    "Asia/Muscat",
+    "OM"
+  ],
+  "matera": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "maui": [
+    "Pacific/Honolulu",
+    "US"
+  ],
+  "maun": [
+    "Africa/Gaborone",
+    "BW"
+  ],
+  "mauritius": [
+    "Indian/Mauritius",
+    "MU"
+  ],
+  "mazatlan": [
+    "America/Mazatlan",
+    "MX"
+  ],
+  "medellin": [
+    "America/Bogota",
+    "CO"
+  ],
+  "megeve": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "meknes": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "melaka": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "melbourne": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "memphis": [
+    "America/Chicago",
+    "US"
+  ],
+  "mendoza": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "menorca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "menton": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "merida": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "meteora": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "meteores": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "metz": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "mexico": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "mexico city": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "miami": [
+    "America/New_York",
+    "US"
+  ],
+  "milan": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "milano": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "milos": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "mindelo": [
+    "Atlantic/Cape_Verde",
+    "CV"
+  ],
+  "minneapolis": [
+    "America/Chicago",
+    "US"
+  ],
+  "minorca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "minorque": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "minsk": [
+    "Europe/Minsk",
+    "BY"
+  ],
+  "mo orea": [
+    "Pacific/Tahiti",
+    "PF"
+  ],
+  "modena": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "modene": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "mombasa": [
+    "Africa/Nairobi",
+    "KE"
+  ],
+  "monaco": [
+    "Europe/Monaco",
+    "MC"
+  ],
+  "mont saint michel": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "monte carlo": [
+    "Europe/Monaco",
+    "MC"
+  ],
+  "montego bay": [
+    "America/Jamaica",
+    "JM"
+  ],
+  "monterrey": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "montevideo": [
+    "America/Montevideo",
+    "UY"
+  ],
+  "montpellier": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "montreal": [
+    "America/Toronto",
+    "CA"
+  ],
+  "montreux": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "moorea": [
+    "Pacific/Tahiti",
+    "PF"
+  ],
+  "moscou": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "moscow": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "moskva": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "mostar": [
+    "Europe/Sarajevo",
+    "BA"
+  ],
+  "mumbai": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "munchen": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "munich": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "murcia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "murcie": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "muscat": [
+    "Asia/Muscat",
+    "OM"
+  ],
+  "mykonos": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "nadi": [
+    "Pacific/Fiji",
+    "FJ"
+  ],
+  "nafplio": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "nagoya": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "naha": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "nairobi": [
+    "Africa/Nairobi",
+    "KE"
+  ],
+  "namur": [
+    "Europe/Brussels",
+    "BE"
+  ],
+  "nancy": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "nantes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "naples": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "napoli": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "nara": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "nashville": [
+    "America/Chicago",
+    "US"
+  ],
+  "nassau": [
+    "America/Nassau",
+    "BS"
+  ],
+  "nauplie": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "naxos": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "nerja": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "neuchatel": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "new delhi": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "new orleans": [
+    "America/Chicago",
+    "US"
+  ],
+  "new york": [
+    "America/New_York",
+    "US"
+  ],
+  "new york city": [
+    "America/New_York",
+    "US"
+  ],
+  "nha trang": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "niagara falls": [
+    "America/Toronto",
+    "CA"
+  ],
+  "nice": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "nicosia": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "nicosie": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "nikko": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "nimes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "nosy be": [
+    "Indian/Antananarivo",
+    "MG"
+  ],
+  "noumea": [
+    "Pacific/Noumea",
+    "NC"
+  ],
+  "nouvelle orleans": [
+    "America/Chicago",
+    "US"
+  ],
+  "novi sad": [
+    "Europe/Belgrade",
+    "RS"
+  ],
+  "novosibirsk": [
+    "Asia/Novosibirsk",
+    "RU"
+  ],
+  "novossibirsk": [
+    "Asia/Novosibirsk",
+    "RU"
+  ],
+  "nuremberg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "nurnberg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "nuuk": [
+    "America/Nuuk",
+    "GL"
+  ],
+  "nyc": [
+    "America/New_York",
+    "US"
+  ],
+  "oaxaca": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "obidos": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "odense": [
+    "Europe/Copenhagen",
+    "DK"
+  ],
+  "odesa": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "odessa": [
+    "Europe/Kyiv",
+    "UA"
+  ],
+  "ohrid": [
+    "Europe/Skopje",
+    "MK"
+  ],
+  "okinawa": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "olbia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "oporto": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "oran": [
+    "Africa/Algiers",
+    "DZ"
+  ],
+  "oranjestad": [
+    "America/Aruba",
+    "AW"
+  ],
+  "orlando": [
+    "America/New_York",
+    "US"
+  ],
+  "orleans": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "osaka": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "oslo": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "ottawa": [
+    "America/Toronto",
+    "CA"
+  ],
+  "ouagadougou": [
+    "Africa/Ouagadougou",
+    "BF"
+  ],
+  "ouarzazate": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "oulan bator": [
+    "Asia/Ulaanbaatar",
+    "MN"
+  ],
+  "oviedo": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "oxford": [
+    "Europe/London",
+    "GB"
+  ],
+  "padoue": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "padova": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "padua": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "palawan": [
+    "Asia/Manila",
+    "PH"
+  ],
+  "palerme": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "palermo": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "palma": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "palma de majorque": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "palma de mallorca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "pampelune": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "pamplona": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "pamukkale": [
+    "Europe/Istanbul",
+    "TR"
+  ],
+  "panama": [
+    "America/Panama",
+    "PA"
+  ],
+  "panama city": [
+    "America/Panama",
+    "PA"
+  ],
+  "papeete": [
+    "Pacific/Tahiti",
+    "PF"
+  ],
+  "paphos": [
+    "Asia/Nicosia",
+    "CY"
+  ],
+  "paramaribo": [
+    "America/Paramaribo",
+    "SR"
+  ],
+  "paraty": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "parc kruger": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "paris": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "parma": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "parme": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "paro": [
+    "Asia/Thimphu",
+    "BT"
+  ],
+  "paros": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "pattaya": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "pau": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "pekin": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "peking": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "penang": [
+    "Asia/Kuala_Lumpur",
+    "MY"
+  ],
+  "perouse": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "perpignan": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "perth": [
+    "Australia/Perth",
+    "AU"
+  ],
+  "perugia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "petra": [
+    "Asia/Amman",
+    "JO"
+  ],
+  "philadelphia": [
+    "America/New_York",
+    "US"
+  ],
+  "philadelphie": [
+    "America/New_York",
+    "US"
+  ],
+  "phnom penh": [
+    "Asia/Phnom_Penh",
+    "KH"
+  ],
+  "phoenix": [
+    "America/Phoenix",
+    "US"
+  ],
+  "phu quoc": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "phuket": [
+    "Asia/Bangkok",
+    "TH"
+  ],
+  "piran": [
+    "Europe/Ljubljana",
+    "SI"
+  ],
+  "pisa": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "pise": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "pittsburgh": [
+    "America/New_York",
+    "US"
+  ],
+  "playa del carmen": [
+    "America/Cancun",
+    "MX"
+  ],
+  "plitvice": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "plovdiv": [
+    "Europe/Sofia",
+    "BG"
+  ],
+  "podgorica": [
+    "Europe/Podgorica",
+    "ME"
+  ],
+  "pointe a pitre": [
+    "America/Guadeloupe",
+    "GP"
+  ],
+  "poitiers": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "pokhara": [
+    "Asia/Kathmandu",
+    "NP"
+  ],
+  "pondicherry": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "pondichery": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "ponta delgada": [
+    "Atlantic/Azores",
+    "PT"
+  ],
+  "port au prince": [
+    "America/Port-au-Prince",
+    "HT"
+  ],
+  "port louis": [
+    "Indian/Mauritius",
+    "MU"
+  ],
+  "port vila": [
+    "Pacific/Efate",
+    "VU"
+  ],
+  "porto": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "porto vecchio": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "portofino": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "positano": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "potsdam": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "pouilles": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "poznan": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "prague": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "praha": [
+    "Europe/Prague",
+    "CZ"
+  ],
+  "praia": [
+    "Atlantic/Cape_Verde",
+    "CV"
+  ],
+  "pretoria": [
+    "Africa/Johannesburg",
+    "ZA"
+  ],
+  "prishtina": [
+    "Europe/Belgrade",
+    "XK"
+  ],
+  "pristina": [
+    "Europe/Belgrade",
+    "XK"
+  ],
+  "puducherry": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "puebla": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "puerto iguazu": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "puerto natales": [
+    "America/Punta_Arenas",
+    "CL"
+  ],
+  "puerto vallarta": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "puglia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "pula": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "puno": [
+    "America/Lima",
+    "PE"
+  ],
+  "punta arenas": [
+    "America/Punta_Arenas",
+    "CL"
+  ],
+  "punta cana": [
+    "America/Santo_Domingo",
+    "DO"
+  ],
+  "punta del este": [
+    "America/Montevideo",
+    "UY"
+  ],
+  "pusan": [
+    "Asia/Seoul",
+    "KR"
+  ],
+  "quebec": [
+    "America/Toronto",
+    "CA"
+  ],
+  "quebec city": [
+    "America/Toronto",
+    "CA"
+  ],
+  "queenstown": [
+    "Pacific/Auckland",
+    "NZ"
+  ],
+  "quimper": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "quito": [
+    "America/Guayaquil",
+    "EC"
+  ],
+  "rabat": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "rangoon": [
+    "Asia/Yangon",
+    "MM"
+  ],
+  "rangoun": [
+    "Asia/Yangon",
+    "MM"
+  ],
+  "rapa nui": [
+    "Pacific/Easter",
+    "CL"
+  ],
+  "rarotonga": [
+    "Pacific/Rarotonga",
+    "CK"
+  ],
+  "ravenna": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "ravenne": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "recife": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "reims": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "rennes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "reunion": [
+    "Indian/Reunion",
+    "RE"
+  ],
+  "reykjavik": [
+    "Atlantic/Reykjavik",
+    "IS"
+  ],
+  "rhodes": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "riga": [
+    "Europe/Riga",
+    "LV"
+  ],
+  "rimini": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "rio": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "rio de janeiro": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "rishikesh": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "riyad": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "riyadh": [
+    "Asia/Riyadh",
+    "SA"
+  ],
+  "roatan": [
+    "America/Tegucigalpa",
+    "HN"
+  ],
+  "rodos": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "roma": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "rome": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "ronda": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "rothenburg": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "rothenburg ob der tauber": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "rotorua": [
+    "Pacific/Auckland",
+    "NZ"
+  ],
+  "rotterdam": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "rouen": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "rovaniemi": [
+    "Europe/Helsinki",
+    "FI"
+  ],
+  "rovinj": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "sa pa": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "saigon": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "saint domingue": [
+    "America/Santo_Domingo",
+    "DO"
+  ],
+  "saint jacques de compostelle": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "saint jean de luz": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "saint malo": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "saint marin": [
+    "Europe/San_Marino",
+    "SM"
+  ],
+  "saint moritz": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "saint petersbourg": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "saint petersburg": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "saint sebastien": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "saint tropez": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "salamanca": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "salamanque": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "salar d uyuni": [
+    "America/La_Paz",
+    "BO"
+  ],
+  "salt lake city": [
+    "America/Denver",
+    "US"
+  ],
+  "salta": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "salvador da bahia": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "salvador de bahia": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "salzbourg": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "salzburg": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "samarcande": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "samarkand": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "san antonio": [
+    "America/Chicago",
+    "US"
+  ],
+  "san carlos de bariloche": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "san cristobal de las casas": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "san diego": [
+    "America/Los_Angeles",
+    "US"
+  ],
+  "san francisco": [
+    "America/Los_Angeles",
+    "US"
+  ],
+  "san jose": [
+    "America/Costa_Rica",
+    "CR"
+  ],
+  "san juan": [
+    "America/Puerto_Rico",
+    "PR"
+  ],
+  "san marino": [
+    "Europe/San_Marino",
+    "SM"
+  ],
+  "san miguel de allende": [
+    "America/Mexico_City",
+    "MX"
+  ],
+  "san pedro de atacama": [
+    "America/Santiago",
+    "CL"
+  ],
+  "san salvador": [
+    "America/El_Salvador",
+    "SV"
+  ],
+  "san sebastian": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "sankt moritz": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "sankt peterburg": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "santa cruz de tenerife": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "santander": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "santiago": [
+    "America/Santiago",
+    "CL"
+  ],
+  "santiago de chile": [
+    "America/Santiago",
+    "CL"
+  ],
+  "santiago de compostela": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "santiago de cuba": [
+    "America/Havana",
+    "CU"
+  ],
+  "santiago du chili": [
+    "America/Santiago",
+    "CL"
+  ],
+  "santo domingo": [
+    "America/Santo_Domingo",
+    "DO"
+  ],
+  "santorin": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "santorini": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "sao paulo": [
+    "America/Sao_Paulo",
+    "BR"
+  ],
+  "sapa": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ],
+  "sapporo": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "saragosse": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "sarajevo": [
+    "Europe/Sarajevo",
+    "BA"
+  ],
+  "saranda": [
+    "Europe/Tirane",
+    "AL"
+  ],
+  "sarande": [
+    "Europe/Tirane",
+    "AL"
+  ],
+  "sardaigne": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sardegna": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sardinia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sarlat": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "sarlat la caneda": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "savannah": [
+    "America/New_York",
+    "US"
+  ],
+  "scotland": [
+    "Europe/London",
+    "GB"
+  ],
+  "seattle": [
+    "America/Los_Angeles",
+    "US"
+  ],
+  "sedona": [
+    "America/Phoenix",
+    "US"
+  ],
+  "segovia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "segovie": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "seoul": [
+    "Asia/Seoul",
+    "KR"
+  ],
+  "serengeti": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "sete": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "sevilla": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "seville": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "shanghai": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "sharm el sheikh": [
+    "Africa/Cairo",
+    "EG"
+  ],
+  "shenzhen": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "shiraz": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "sibiu": [
+    "Europe/Bucharest",
+    "RO"
+  ],
+  "sicile": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sicilia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sicily": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "siem reap": [
+    "Asia/Phnom_Penh",
+    "KH"
+  ],
+  "siena": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sienne": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sigiriya": [
+    "Asia/Colombo",
+    "LK"
+  ],
+  "singapore": [
+    "Asia/Singapore",
+    "SG"
+  ],
+  "singapour": [
+    "Asia/Singapore",
+    "SG"
+  ],
+  "sintra": [
+    "Europe/Lisbon",
+    "PT"
+  ],
+  "sion": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "siracusa": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sitges": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "sitten": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "skopje": [
+    "Europe/Skopje",
+    "MK"
+  ],
+  "skye": [
+    "Europe/London",
+    "GB"
+  ],
+  "sochi": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "sofia": [
+    "Europe/Sofia",
+    "BG"
+  ],
+  "sorrente": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sorrento": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "sotchi": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "sousse": [
+    "Africa/Tunis",
+    "TN"
+  ],
+  "split": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "st petersburg": [
+    "Europe/Moscow",
+    "RU"
+  ],
+  "st. moritz": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "stavanger": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "stockholm": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "stone town": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "strasbourg": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "stuttgart": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "sucre": [
+    "America/La_Paz",
+    "BO"
+  ],
+  "suva": [
+    "Pacific/Fiji",
+    "FJ"
+  ],
+  "suzhou": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "swakopmund": [
+    "Africa/Windhoek",
+    "NA"
+  ],
+  "sydney": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "syracuse": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "tachkent": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "tahiti": [
+    "Pacific/Tahiti",
+    "PF"
+  ],
+  "tainan": [
+    "Asia/Taipei",
+    "TW"
+  ],
+  "taipeh": [
+    "Asia/Taipei",
+    "TW"
+  ],
+  "taipei": [
+    "Asia/Taipei",
+    "TW"
+  ],
+  "tallinn": [
+    "Europe/Tallinn",
+    "EE"
+  ],
+  "tananarive": [
+    "Indian/Antananarivo",
+    "MG"
+  ],
+  "tanger": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "tangier": [
+    "Africa/Casablanca",
+    "MA"
+  ],
+  "taormina": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "taormine": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "tarragona": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "tarragone": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "tartu": [
+    "Europe/Tallinn",
+    "EE"
+  ],
+  "tashkent": [
+    "Asia/Tashkent",
+    "UZ"
+  ],
+  "tasmania": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "tasmanie": [
+    "Australia/Sydney",
+    "AU"
+  ],
+  "tbilisi": [
+    "Asia/Tbilisi",
+    "GE"
+  ],
+  "tbilissi": [
+    "Asia/Tbilisi",
+    "GE"
+  ],
+  "tegucigalpa": [
+    "America/Tegucigalpa",
+    "HN"
+  ],
+  "teheran": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "tehran": [
+    "Asia/Tehran",
+    "IR"
+  ],
+  "tel aviv": [
+    "Asia/Jerusalem",
+    "IL"
+  ],
+  "tel aviv jaffa": [
+    "Asia/Jerusalem",
+    "IL"
+  ],
+  "tenerife": [
+    "Atlantic/Canary",
+    "ES"
+  ],
+  "the hague": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "thessaloniki": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "thessalonique": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "thimphou": [
+    "Asia/Thimphu",
+    "BT"
+  ],
+  "thimphu": [
+    "Asia/Thimphu",
+    "BT"
+  ],
+  "thira": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "tijuana": [
+    "America/Tijuana",
+    "MX"
+  ],
+  "tirana": [
+    "Europe/Tirane",
+    "AL"
+  ],
+  "tirane": [
+    "Europe/Tirane",
+    "AL"
+  ],
+  "tokyo": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "tolede": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "toledo": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "torino": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "toronto": [
+    "America/Toronto",
+    "CA"
+  ],
+  "torres del paine": [
+    "America/Punta_Arenas",
+    "CL"
+  ],
+  "torshavn": [
+    "Atlantic/Faroe",
+    "FO"
+  ],
+  "toscana": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "toscane": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "toulouse": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "tours": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "tozeur": [
+    "Africa/Tunis",
+    "TN"
+  ],
+  "trente": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "trento": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "trieste": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "tromso": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "tromsø": [
+    "Europe/Oslo",
+    "NO"
+  ],
+  "tulum": [
+    "America/Cancun",
+    "MX"
+  ],
+  "tunis": [
+    "Africa/Tunis",
+    "TN"
+  ],
+  "turin": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "turku": [
+    "Europe/Helsinki",
+    "FI"
+  ],
+  "tuscany": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "ubud": [
+    "Asia/Makassar",
+    "ID"
+  ],
+  "udaipur": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "ulaanbaatar": [
+    "Asia/Ulaanbaatar",
+    "MN"
+  ],
+  "ulan bator": [
+    "Asia/Ulaanbaatar",
+    "MN"
+  ],
+  "uluru": [
+    "Australia/Darwin",
+    "AU"
+  ],
+  "uppsala": [
+    "Europe/Stockholm",
+    "SE"
+  ],
+  "ushuaia": [
+    "America/Argentina/Buenos_Aires",
+    "AR"
+  ],
+  "utrecht": [
+    "Europe/Amsterdam",
+    "NL"
+  ],
+  "uyuni": [
+    "America/La_Paz",
+    "BO"
+  ],
+  "uzes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "vaduz": [
+    "Europe/Vaduz",
+    "LI"
+  ],
+  "val d isere": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "valence": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "valencia": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "valletta": [
+    "Europe/Malta",
+    "MT"
+  ],
+  "valparaiso": [
+    "America/Santiago",
+    "CL"
+  ],
+  "vancouver": [
+    "America/Vancouver",
+    "CA"
+  ],
+  "vannes": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "varadero": [
+    "America/Havana",
+    "CU"
+  ],
+  "varanasi": [
+    "Asia/Kolkata",
+    "IN"
+  ],
+  "varna": [
+    "Europe/Sofia",
+    "BG"
+  ],
+  "varsovie": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "vatican": [
+    "Europe/Vatican",
+    "VA"
+  ],
+  "vatican city": [
+    "Europe/Vatican",
+    "VA"
+  ],
+  "venezia": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "venice": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "venise": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "verbier": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "verona": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "verone": [
+    "Europe/Rome",
+    "IT"
+  ],
+  "versailles": [
+    "Europe/Paris",
+    "FR"
+  ],
+  "victoria falls": [
+    "Africa/Harare",
+    "ZW"
+  ],
+  "vienna": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "vienne": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "vientiane": [
+    "Asia/Vientiane",
+    "LA"
+  ],
+  "vigo": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "ville de quebec": [
+    "America/Toronto",
+    "CA"
+  ],
+  "vilnius": [
+    "Europe/Vilnius",
+    "LT"
+  ],
+  "vladivostok": [
+    "Asia/Vladivostok",
+    "RU"
+  ],
+  "wadi rum": [
+    "Asia/Amman",
+    "JO"
+  ],
+  "warsaw": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "warszawa": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "washington": [
+    "America/New_York",
+    "US"
+  ],
+  "washington dc": [
+    "America/New_York",
+    "US"
+  ],
+  "weimar": [
+    "Europe/Berlin",
+    "DE"
+  ],
+  "wellington": [
+    "Pacific/Auckland",
+    "NZ"
+  ],
+  "whistler": [
+    "America/Vancouver",
+    "CA"
+  ],
+  "wien": [
+    "Europe/Vienna",
+    "AT"
+  ],
+  "willemstad": [
+    "America/Curacao",
+    "CW"
+  ],
+  "windhoek": [
+    "Africa/Windhoek",
+    "NA"
+  ],
+  "winnipeg": [
+    "America/Winnipeg",
+    "CA"
+  ],
+  "wroclaw": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "wrocław": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "xi an": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "xian": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "yangon": [
+    "Asia/Yangon",
+    "MM"
+  ],
+  "yangshuo": [
+    "Asia/Shanghai",
+    "CN"
+  ],
+  "yaounde": [
+    "Africa/Douala",
+    "CM"
+  ],
+  "yekaterinburg": [
+    "Asia/Yekaterinburg",
+    "RU"
+  ],
+  "yerevan": [
+    "Asia/Yerevan",
+    "AM"
+  ],
+  "yogyakarta": [
+    "Asia/Jakarta",
+    "ID"
+  ],
+  "yokohama": [
+    "Asia/Tokyo",
+    "JP"
+  ],
+  "york": [
+    "Europe/London",
+    "GB"
+  ],
+  "zadar": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "zagreb": [
+    "Europe/Zagreb",
+    "HR"
+  ],
+  "zakopane": [
+    "Europe/Warsaw",
+    "PL"
+  ],
+  "zakynthos": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "zante": [
+    "Europe/Athens",
+    "GR"
+  ],
+  "zanzibar": [
+    "Africa/Dar_es_Salaam",
+    "TZ"
+  ],
+  "zaragoza": [
+    "Europe/Madrid",
+    "ES"
+  ],
+  "zermatt": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "zurich": [
+    "Europe/Zurich",
+    "CH"
+  ],
+  "đa nang": [
+    "Asia/Ho_Chi_Minh",
+    "VN"
+  ]
 }

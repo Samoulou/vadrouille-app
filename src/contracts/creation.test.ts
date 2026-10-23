@@ -77,6 +77,18 @@ describe("TripDraftSchema", () => {
     expect(TripDraftSchema.safeParse({ ...DRAFT, end: DRAFT.start }).success).toBe(false);
   });
 
+  it("destinationRegion facultatif (ville hors de la table) : code à deux lettres, fuseau de forme IANA, objet strict", () => {
+    const avec = (destinationRegion: unknown) => TripDraftSchema.safeParse({ ...DRAFT, destination: "Hoi An", destinationRegion }).success;
+    expect(avec({ country: "VN", timeZone: "Asia/Ho_Chi_Minh" })).toBe(true);
+    expect(avec({ country: "US", timeZone: "America/Argentina/Buenos_Aires" })).toBe(true);
+    expect(avec({ country: "vn", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ country: "VNM", timeZone: "Asia/Ho_Chi_Minh" })).toBe(false);
+    expect(avec({ country: "VN", timeZone: "" })).toBe(false);
+    expect(avec({ country: "VN", timeZone: "Asia/Ho Chi Minh; drop" })).toBe(false);
+    expect(avec({ country: "VN", timeZone: "a".repeat(65) })).toBe(false);
+    expect(avec({ country: "VN", timeZone: "Asia/Ho_Chi_Minh", nom: "Viêt Nam" })).toBe(false);
+  });
+
   it("autres villes : arrivées strictement croissantes, strictement entre l'arrivée et le départ", () => {
     const city = (name: string, arrival: string) => ({ name, arrival, lodging: { kind: "none" as const } });
     expect(TripDraftSchema.safeParse({ ...DRAFT, otherCities: [city("Glasgow", "2026-09-01")] }).success).toBe(true);

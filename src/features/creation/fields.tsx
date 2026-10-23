@@ -68,6 +68,7 @@ export interface TextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   type?: "text" | "date" | "time";
   help?: string;
   error?: string | null;
@@ -82,6 +83,7 @@ export function TextField({
   label,
   value,
   onChange,
+  onBlur,
   type = "text",
   help,
   error = null,
@@ -105,10 +107,53 @@ export function TextField({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(help && helpId(id), error && errorId(id))}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         // Date et heure : la tabulation atteint aussi le bouton interne du calendrier, que seul `:focus-within` voit
         // sur le champ ; le contour de focus commun (2 px `line`, décalé de 2 px) y est donc aussi posé.
         className={cn(INPUT_CLASS, type !== "text" && "tabular-nums focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-line")}
       />
+      <FieldMessage id={errorId(id)} message={error} />
+    </div>
+  );
+}
+
+export interface SelectFieldProps {
+  field: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  /** Première option, vide (« Choisis un pays ») : rien n'est choisi d'office. */
+  placeholder: string;
+  options: readonly { value: string; label: string }[];
+  help?: string;
+  error?: string | null;
+}
+
+/**
+ * Liste de choix native (`select`), même rendu et mêmes règles que `TextField` : libellé visible au-dessus, aide puis
+ * message d'erreur reliés par `aria-describedby`, `aria-invalid` ; le clavier et les lecteurs d'écran en ont l'usage natif.
+ */
+export function SelectField({ field, label, value, onChange, placeholder, options, help, error = null }: SelectFieldProps) {
+  const id = fieldId(field);
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {help ? <FieldHelp id={helpId(id)}>{help}</FieldHelp> : null}
+      <select
+        id={id}
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(help && helpId(id), error && errorId(id))}
+        onChange={(event) => onChange(event.target.value)}
+        className={INPUT_CLASS}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
       <FieldMessage id={errorId(id)} message={error} />
     </div>
   );

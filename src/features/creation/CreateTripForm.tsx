@@ -20,6 +20,7 @@ import {
 } from "@/contracts/values";
 import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
+import { listeDesPays, paysParCode } from "@/lib/fuseaux";
 import * as messages from "@/i18n/messages";
 
 import { CreationShell, TITLE_CLASS } from "./CreationShell";
@@ -34,10 +35,11 @@ import {
   FieldRow,
   fieldId,
   focusField,
+  SelectField,
   TextField,
 } from "./fields";
 import { creationRoutes, ESSAI_PARAM } from "./routes";
-import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
+import { cityRanges, destinationHorsTable, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
 const e1 = t.ecran1;
@@ -45,6 +47,8 @@ const err = e1.erreurs;
 
 const LODGING_OPTIONS = LODGING_ANSWERS.map((value) => ({ value, label: e1.logement.options[value] }));
 const KIND_OPTIONS = COMMITMENT_KINDS.map((value) => ({ value, label: e1.engagements.types[value] }));
+/** Pays de la table maison (noms français, ordre français) : aucune donnée Google, aucun appel réseau. */
+const PAYS_OPTIONS = listeDesPays().map((pays) => ({ value: pays.code, label: pays.nom }));
 
 /** « Ajouter une ville » ou « Ajouter un engagement » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
 const ADD_BUTTON_CLASS =
@@ -57,9 +61,9 @@ function messageFor(field: string, code: FieldError): string {
   const last = field.split(".").pop() ?? field;
   const inCity = field.startsWith("otherCities.");
   const inCommitment = field.startsWith("commitments.");
-  if (field === "destination") {
-    return code === "length" ? length(DESTINATION_LENGTH) : code === "unknownCity" ? err.villeInconnue : err.destination;
-  }
+  if (field === "destination") return code === "length" ? length(DESTINATION_LENGTH) : err.destination;
+  if (field === "country") return err.pays;
+  if (field === "timeZone") return err.fuseau;
   if (field === "start") return code === "past" ? err.arriveePassee : err.arrivee;
   if (field === "end") {
     if (code === "tooLong") return format(err.tropLong, { max: PROTOTYPE_STAY_DAYS_MAX });
@@ -81,8 +85,9 @@ function messageFor(field: string, code: FieldError): string {
 
 export interface CreateTripFormProps {
   /**
-   * Site d'essai (spécification E2E-essai, lot 2, critère 2) : une seule ville, connue de la table des fuseaux, 15 jours
-   * au plus, refusés au champ ; « Autres villes » n'est pas proposé. Absent : lu dans l'adresse (`?site=essai`, voir
+   * Site d'essai (spécification E2E-essai, lot 2, critère 2) : une seule ville, 15 jours au plus, refusés au champ ;
+   * « Autres villes » n'est pas proposé. Une destination absente de la table des villes demande son pays (et sa région
+   * pour un pays à plusieurs fuseaux), dans la table maison des pays (demande de Samuel du 23 octobre 2026). Absent : lu dans l'adresse (`?site=essai`, voir
    * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
    */
   essai?: boolean;
@@ -110,6 +115,11 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
   const { state, dispatch } = useDraft();
   const { trip } = state;
   const [errors, setErrors] = useState<FormError[]>([]);
+  // Site d'essai : « Pays » s'affiche quand la personne quitte le champ « Destination » (ou appuie sur « Continuer ») sur
+  // une ville hors de la table, jamais pendant la frappe ; un pays déjà choisi le garde affiché.
+  const [paysDemande, setPaysDemande] = useState(false);
+  const paysVisible = essai && destinationHorsTable(trip.destination) && (paysDemande || Boolean(trip.country));
+  const paysChoisi = paysParCode(trip.country || undefined);
   const addCityButton = useRef<HTMLButtonElement>(null);
   const addCommitmentButton = useRef<HTMLButtonElement>(null);
   const focusAfterAdd = useRef<string | null>(null);
@@ -144,6 +154,7 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    setPaysDemande(true);
     const found = validateTrip(trip, todayIso(), { essai });
     setErrors(found);
     const first = found[0];
@@ -213,9 +224,39 @@ export function CreateTripForm({ essai: essaiProp }: CreateTripFormProps = {}) {
           label={e1.destination}
           value={trip.destination}
           maxLength={DESTINATION_LENGTH.max}
-          onChange={(destination) => dispatch({ type: "trip", patch: { destination } })}
+          onChange={(destination) => {
+            dispatch({ type: "trip", patch: { destination } });
+            setPaysDemande(false);
+          }}
+          onBlur={() => setPaysDemande(true)}
           error={errorOf("destination")}
         />
+        {paysVisible ? (
+          <>
+            <SelectField
+              field="country"
+              label={e1.pays.libelle}
+              help={format(e1.pays.aide, { destination: trip.destination.trim() })}
+              placeholder={e1.pays.choisir}
+              options={PAYS_OPTIONS}
+              value={trip.country ?? ""}
+              onChange={(country) => dispatch({ type: "trip", patch: { country, timeZone: "" } })}
+              error={errorOf("country")}
+            />
+            {paysChoisi && paysChoisi.fuseaux.length > 1 ? (
+              <SelectField
+                field="timeZone"
+                label={e1.pays.fuseau}
+                help={format(e1.pays.fuseauAide, { pays: paysChoisi.nom })}
+                placeholder={e1.pays.fuseauChoisir}
+                options={paysChoisi.fuseaux.map((fuseau) => ({ value: fuseau.zone, label: fuseau.region ?? fuseau.zone }))}
+                value={trip.timeZone ?? ""}
+                onChange={(timeZone) => dispatch({ type: "trip", patch: { timeZone } })}
+                error={errorOf("timeZone")}
+              />
+            ) : null}
+          </>
+        ) : null}
         <FieldRow>
           <TextField
             field="start"

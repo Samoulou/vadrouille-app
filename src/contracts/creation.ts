@@ -97,6 +97,24 @@ function checkCities(
 }
 
 /**
+ * Pays, et fuseau du pays, choisis à l'écran 1 pour une destination absente de la table maison des villes (site d'essai,
+ * demande de Samuel du 23 octobre 2026 ; ajout facultatif, par addition). Forme seulement : le code et le fuseau sont
+ * revérifiés côté serveur contre la table maison des pays (`fuseauDuPays` de `src/lib/fuseaux`, liste fermée), jamais
+ * repris tels quels. Aucune donnée Google.
+ */
+export const DestinationRegionSchema = z.strictObject({
+  /** Code ISO 3166-1 alpha-2 du pays (table maison). */
+  country: z.string().regex(/^[A-Z]{2}$/),
+  /** Fuseau IANA choisi parmi ceux du pays (table maison). */
+  timeZone: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_+\-/]+$/),
+});
+export type DestinationRegion = z.infer<typeof DestinationRegionSchema>;
+
+/**
  * Brouillon de l'écran 1 (0017 § 2.2). Les dates de départ de chaque ville ne sont pas stockées : elles se
  * déduisent (`cityRanges` de `src/features/creation/validation.ts`). « Arrivée au plus tôt aujourd'hui »
  * dépend de l'heure et du fuseau : ce n'est pas un raffinement du schéma (vérifié par `createTrip`, F8c).
@@ -104,6 +122,8 @@ function checkCities(
 export const TripDraftSchema = z
   .strictObject({
     destination: text(DESTINATION_LENGTH),
+    /** Facultatif : pays et fuseau d'une destination hors de la table des villes (site d'essai). */
+    destinationRegion: DestinationRegionSchema.optional(),
     start: IsoDateSchema,
     end: IsoDateSchema,
     lodging: LodgingSchema,

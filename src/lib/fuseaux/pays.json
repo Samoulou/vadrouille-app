@@ -1,64 +1,1895 @@
 {
-  "amsterdam": "Pays-Bas",
-  "andorre la vieille": "Andorre",
-  "athenes": "Grèce",
-  "barcelone": "Espagne",
-  "belgrade": "Serbie",
-  "berlin": "Allemagne",
-  "berne": "Suisse",
-  "bratislava": "Slovaquie",
-  "bruxelles": "Belgique",
-  "bucarest": "Roumanie",
-  "budapest": "Hongrie",
-  "chisinau": "Moldavie",
-  "copenhague": "Danemark",
-  "dublin": "Irlande",
-  "edimbourg": "Royaume-Uni",
-  "edinburgh": "Royaume-Uni",
-  "florence": "Italie",
-  "geneve": "Suisse",
-  "glasgow": "Royaume-Uni",
-  "helsinki": "Finlande",
-  "kiev": "Ukraine",
-  "kyiv": "Ukraine",
-  "la valette": "Malte",
-  "lausanne": "Suisse",
-  "lisbonne": "Portugal",
-  "ljubljana": "Slovénie",
-  "londres": "Royaume-Uni",
-  "luxembourg": "Luxembourg",
-  "lyon": "France",
-  "madrid": "Espagne",
-  "marseille": "France",
-  "milan": "Italie",
-  "minsk": "Biélorussie",
-  "monaco": "Monaco",
-  "naples": "Italie",
-  "nice": "France",
-  "oslo": "Norvège",
-  "paris": "France",
-  "podgorica": "Monténégro",
-  "porto": "Portugal",
-  "prague": "Tchéquie",
-  "reykjavik": "Islande",
-  "riga": "Lettonie",
-  "rome": "Italie",
-  "saint marin": "Saint-Marin",
-  "sarajevo": "Bosnie-Herzégovine",
-  "seville": "Espagne",
-  "skopje": "Macédoine du Nord",
-  "sofia": "Bulgarie",
-  "stockholm": "Suède",
-  "tallinn": "Estonie",
-  "tirana": "Albanie",
-  "vaduz": "Liechtenstein",
-  "varsovie": "Pologne",
-  "vatican": "Vatican",
-  "venise": "Italie",
-  "vienne": "Autriche",
-  "vilnius": "Lituanie",
-  "zagreb": "Croatie",
-  "zakynthos": "Grèce",
-  "zante": "Grèce",
-  "zurich": "Suisse"
+  "AD": {
+    "nom": "Andorre",
+    "fuseaux": [
+      {
+        "zone": "Europe/Andorra"
+      }
+    ]
+  },
+  "AE": {
+    "nom": "Émirats arabes unis",
+    "fuseaux": [
+      {
+        "zone": "Asia/Dubai"
+      }
+    ]
+  },
+  "AF": {
+    "nom": "Afghanistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Kabul"
+      }
+    ]
+  },
+  "AG": {
+    "nom": "Antigua-et-Barbuda",
+    "fuseaux": [
+      {
+        "zone": "America/Antigua"
+      }
+    ]
+  },
+  "AL": {
+    "nom": "Albanie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Tirane"
+      }
+    ]
+  },
+  "AM": {
+    "nom": "Arménie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Yerevan"
+      }
+    ]
+  },
+  "AO": {
+    "nom": "Angola",
+    "fuseaux": [
+      {
+        "zone": "Africa/Luanda"
+      }
+    ]
+  },
+  "AR": {
+    "nom": "Argentine",
+    "fuseaux": [
+      {
+        "zone": "America/Argentina/Buenos_Aires"
+      }
+    ]
+  },
+  "AT": {
+    "nom": "Autriche",
+    "fuseaux": [
+      {
+        "zone": "Europe/Vienna"
+      }
+    ]
+  },
+  "AU": {
+    "nom": "Australie",
+    "fuseaux": [
+      {
+        "zone": "Australia/Sydney",
+        "region": "Est (Sydney, Melbourne, Canberra, Tasmanie)"
+      },
+      {
+        "zone": "Australia/Brisbane",
+        "region": "Queensland (Brisbane, Cairns)"
+      },
+      {
+        "zone": "Australia/Adelaide",
+        "region": "Australie-Méridionale (Adélaïde)"
+      },
+      {
+        "zone": "Australia/Darwin",
+        "region": "Territoire du Nord (Darwin, Uluru)"
+      },
+      {
+        "zone": "Australia/Perth",
+        "region": "Australie-Occidentale (Perth)"
+      }
+    ]
+  },
+  "AW": {
+    "nom": "Aruba",
+    "fuseaux": [
+      {
+        "zone": "America/Aruba"
+      }
+    ]
+  },
+  "AZ": {
+    "nom": "Azerbaïdjan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Baku"
+      }
+    ]
+  },
+  "BA": {
+    "nom": "Bosnie-Herzégovine",
+    "fuseaux": [
+      {
+        "zone": "Europe/Sarajevo"
+      }
+    ]
+  },
+  "BB": {
+    "nom": "Barbade",
+    "fuseaux": [
+      {
+        "zone": "America/Barbados"
+      }
+    ]
+  },
+  "BD": {
+    "nom": "Bangladesh",
+    "fuseaux": [
+      {
+        "zone": "Asia/Dhaka"
+      }
+    ]
+  },
+  "BE": {
+    "nom": "Belgique",
+    "fuseaux": [
+      {
+        "zone": "Europe/Brussels"
+      }
+    ]
+  },
+  "BF": {
+    "nom": "Burkina Faso",
+    "fuseaux": [
+      {
+        "zone": "Africa/Ouagadougou"
+      }
+    ]
+  },
+  "BG": {
+    "nom": "Bulgarie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Sofia"
+      }
+    ]
+  },
+  "BH": {
+    "nom": "Bahreïn",
+    "fuseaux": [
+      {
+        "zone": "Asia/Bahrain"
+      }
+    ]
+  },
+  "BI": {
+    "nom": "Burundi",
+    "fuseaux": [
+      {
+        "zone": "Africa/Bujumbura"
+      }
+    ]
+  },
+  "BJ": {
+    "nom": "Bénin",
+    "fuseaux": [
+      {
+        "zone": "Africa/Porto-Novo"
+      }
+    ]
+  },
+  "BN": {
+    "nom": "Brunei",
+    "fuseaux": [
+      {
+        "zone": "Asia/Brunei"
+      }
+    ]
+  },
+  "BO": {
+    "nom": "Bolivie",
+    "fuseaux": [
+      {
+        "zone": "America/La_Paz"
+      }
+    ]
+  },
+  "BR": {
+    "nom": "Brésil",
+    "fuseaux": [
+      {
+        "zone": "America/Sao_Paulo",
+        "region": "Brasília (Rio de Janeiro, São Paulo, Salvador)"
+      },
+      {
+        "zone": "America/Manaus",
+        "region": "Amazonie (Manaus)"
+      },
+      {
+        "zone": "America/Rio_Branco",
+        "region": "Acre (Rio Branco)"
+      },
+      {
+        "zone": "America/Noronha",
+        "region": "Fernando de Noronha"
+      }
+    ]
+  },
+  "BS": {
+    "nom": "Bahamas",
+    "fuseaux": [
+      {
+        "zone": "America/Nassau"
+      }
+    ]
+  },
+  "BT": {
+    "nom": "Bhoutan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Thimphu"
+      }
+    ]
+  },
+  "BW": {
+    "nom": "Botswana",
+    "fuseaux": [
+      {
+        "zone": "Africa/Gaborone"
+      }
+    ]
+  },
+  "BY": {
+    "nom": "Biélorussie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Minsk"
+      }
+    ]
+  },
+  "BZ": {
+    "nom": "Belize",
+    "fuseaux": [
+      {
+        "zone": "America/Belize"
+      }
+    ]
+  },
+  "CA": {
+    "nom": "Canada",
+    "fuseaux": [
+      {
+        "zone": "America/St_Johns",
+        "region": "Terre-Neuve (St. John's)"
+      },
+      {
+        "zone": "America/Halifax",
+        "region": "Atlantique (Halifax)"
+      },
+      {
+        "zone": "America/Toronto",
+        "region": "Est (Toronto, Montréal, Québec, Ottawa)"
+      },
+      {
+        "zone": "America/Winnipeg",
+        "region": "Centre (Winnipeg)"
+      },
+      {
+        "zone": "America/Regina",
+        "region": "Saskatchewan (Regina)"
+      },
+      {
+        "zone": "America/Edmonton",
+        "region": "Rocheuses (Calgary, Banff, Edmonton)"
+      },
+      {
+        "zone": "America/Vancouver",
+        "region": "Pacifique (Vancouver, Whistler)"
+      }
+    ]
+  },
+  "CD": {
+    "nom": "République démocratique du Congo",
+    "fuseaux": [
+      {
+        "zone": "Africa/Kinshasa",
+        "region": "Ouest (Kinshasa)"
+      },
+      {
+        "zone": "Africa/Lubumbashi",
+        "region": "Est (Lubumbashi, Goma)"
+      }
+    ]
+  },
+  "CF": {
+    "nom": "République centrafricaine",
+    "fuseaux": [
+      {
+        "zone": "Africa/Bangui"
+      }
+    ]
+  },
+  "CG": {
+    "nom": "Congo",
+    "fuseaux": [
+      {
+        "zone": "Africa/Brazzaville"
+      }
+    ]
+  },
+  "CH": {
+    "nom": "Suisse",
+    "fuseaux": [
+      {
+        "zone": "Europe/Zurich"
+      }
+    ]
+  },
+  "CI": {
+    "nom": "Côte d'Ivoire",
+    "fuseaux": [
+      {
+        "zone": "Africa/Abidjan"
+      }
+    ]
+  },
+  "CK": {
+    "nom": "Îles Cook",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Rarotonga"
+      }
+    ]
+  },
+  "CL": {
+    "nom": "Chili",
+    "fuseaux": [
+      {
+        "zone": "America/Santiago",
+        "region": "Centre (Santiago, Valparaíso, Atacama)"
+      },
+      {
+        "zone": "America/Punta_Arenas",
+        "region": "Magallanes (Punta Arenas, Torres del Paine)"
+      },
+      {
+        "zone": "Pacific/Easter",
+        "region": "Île de Pâques"
+      }
+    ]
+  },
+  "CM": {
+    "nom": "Cameroun",
+    "fuseaux": [
+      {
+        "zone": "Africa/Douala"
+      }
+    ]
+  },
+  "CN": {
+    "nom": "Chine",
+    "fuseaux": [
+      {
+        "zone": "Asia/Shanghai"
+      }
+    ]
+  },
+  "CO": {
+    "nom": "Colombie",
+    "fuseaux": [
+      {
+        "zone": "America/Bogota"
+      }
+    ]
+  },
+  "CR": {
+    "nom": "Costa Rica",
+    "fuseaux": [
+      {
+        "zone": "America/Costa_Rica"
+      }
+    ]
+  },
+  "CU": {
+    "nom": "Cuba",
+    "fuseaux": [
+      {
+        "zone": "America/Havana"
+      }
+    ]
+  },
+  "CV": {
+    "nom": "Cap-Vert",
+    "fuseaux": [
+      {
+        "zone": "Atlantic/Cape_Verde"
+      }
+    ]
+  },
+  "CW": {
+    "nom": "Curaçao",
+    "fuseaux": [
+      {
+        "zone": "America/Curacao"
+      }
+    ]
+  },
+  "CY": {
+    "nom": "Chypre",
+    "fuseaux": [
+      {
+        "zone": "Asia/Nicosia"
+      }
+    ]
+  },
+  "CZ": {
+    "nom": "Tchéquie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Prague"
+      }
+    ]
+  },
+  "DE": {
+    "nom": "Allemagne",
+    "fuseaux": [
+      {
+        "zone": "Europe/Berlin"
+      }
+    ]
+  },
+  "DJ": {
+    "nom": "Djibouti",
+    "fuseaux": [
+      {
+        "zone": "Africa/Djibouti"
+      }
+    ]
+  },
+  "DK": {
+    "nom": "Danemark",
+    "fuseaux": [
+      {
+        "zone": "Europe/Copenhagen"
+      }
+    ]
+  },
+  "DM": {
+    "nom": "Dominique",
+    "fuseaux": [
+      {
+        "zone": "America/Dominica"
+      }
+    ]
+  },
+  "DO": {
+    "nom": "République dominicaine",
+    "fuseaux": [
+      {
+        "zone": "America/Santo_Domingo"
+      }
+    ]
+  },
+  "DZ": {
+    "nom": "Algérie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Algiers"
+      }
+    ]
+  },
+  "EC": {
+    "nom": "Équateur",
+    "fuseaux": [
+      {
+        "zone": "America/Guayaquil",
+        "region": "Continent (Quito, Guayaquil)"
+      },
+      {
+        "zone": "Pacific/Galapagos",
+        "region": "Îles Galápagos"
+      }
+    ]
+  },
+  "EE": {
+    "nom": "Estonie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Tallinn"
+      }
+    ]
+  },
+  "EG": {
+    "nom": "Égypte",
+    "fuseaux": [
+      {
+        "zone": "Africa/Cairo"
+      }
+    ]
+  },
+  "ER": {
+    "nom": "Érythrée",
+    "fuseaux": [
+      {
+        "zone": "Africa/Asmara"
+      }
+    ]
+  },
+  "ES": {
+    "nom": "Espagne",
+    "fuseaux": [
+      {
+        "zone": "Europe/Madrid",
+        "region": "Espagne continentale et Baléares (Madrid)"
+      },
+      {
+        "zone": "Atlantic/Canary",
+        "region": "Îles Canaries (Tenerife)"
+      }
+    ]
+  },
+  "ET": {
+    "nom": "Éthiopie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Addis_Ababa"
+      }
+    ]
+  },
+  "FI": {
+    "nom": "Finlande",
+    "fuseaux": [
+      {
+        "zone": "Europe/Helsinki"
+      }
+    ]
+  },
+  "FJ": {
+    "nom": "Fidji",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Fiji"
+      }
+    ]
+  },
+  "FM": {
+    "nom": "Micronésie",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Pohnpei"
+      }
+    ]
+  },
+  "FO": {
+    "nom": "Îles Féroé",
+    "fuseaux": [
+      {
+        "zone": "Atlantic/Faroe"
+      }
+    ]
+  },
+  "FR": {
+    "nom": "France",
+    "fuseaux": [
+      {
+        "zone": "Europe/Paris"
+      }
+    ]
+  },
+  "GA": {
+    "nom": "Gabon",
+    "fuseaux": [
+      {
+        "zone": "Africa/Libreville"
+      }
+    ]
+  },
+  "GB": {
+    "nom": "Royaume-Uni",
+    "fuseaux": [
+      {
+        "zone": "Europe/London"
+      }
+    ]
+  },
+  "GD": {
+    "nom": "Grenade (Antilles)",
+    "fuseaux": [
+      {
+        "zone": "America/Grenada"
+      }
+    ]
+  },
+  "GE": {
+    "nom": "Géorgie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Tbilisi"
+      }
+    ]
+  },
+  "GF": {
+    "nom": "Guyane",
+    "fuseaux": [
+      {
+        "zone": "America/Cayenne"
+      }
+    ]
+  },
+  "GH": {
+    "nom": "Ghana",
+    "fuseaux": [
+      {
+        "zone": "Africa/Accra"
+      }
+    ]
+  },
+  "GI": {
+    "nom": "Gibraltar",
+    "fuseaux": [
+      {
+        "zone": "Europe/Gibraltar"
+      }
+    ]
+  },
+  "GL": {
+    "nom": "Groenland",
+    "fuseaux": [
+      {
+        "zone": "America/Nuuk"
+      }
+    ]
+  },
+  "GM": {
+    "nom": "Gambie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Banjul"
+      }
+    ]
+  },
+  "GN": {
+    "nom": "Guinée",
+    "fuseaux": [
+      {
+        "zone": "Africa/Conakry"
+      }
+    ]
+  },
+  "GP": {
+    "nom": "Guadeloupe",
+    "fuseaux": [
+      {
+        "zone": "America/Guadeloupe"
+      }
+    ]
+  },
+  "GQ": {
+    "nom": "Guinée équatoriale",
+    "fuseaux": [
+      {
+        "zone": "Africa/Malabo"
+      }
+    ]
+  },
+  "GR": {
+    "nom": "Grèce",
+    "fuseaux": [
+      {
+        "zone": "Europe/Athens"
+      }
+    ]
+  },
+  "GT": {
+    "nom": "Guatemala",
+    "fuseaux": [
+      {
+        "zone": "America/Guatemala"
+      }
+    ]
+  },
+  "GU": {
+    "nom": "Guam",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Guam"
+      }
+    ]
+  },
+  "GW": {
+    "nom": "Guinée-Bissau",
+    "fuseaux": [
+      {
+        "zone": "Africa/Bissau"
+      }
+    ]
+  },
+  "GY": {
+    "nom": "Guyana",
+    "fuseaux": [
+      {
+        "zone": "America/Guyana"
+      }
+    ]
+  },
+  "HK": {
+    "nom": "Hong Kong",
+    "fuseaux": [
+      {
+        "zone": "Asia/Hong_Kong"
+      }
+    ]
+  },
+  "HN": {
+    "nom": "Honduras",
+    "fuseaux": [
+      {
+        "zone": "America/Tegucigalpa"
+      }
+    ]
+  },
+  "HR": {
+    "nom": "Croatie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Zagreb"
+      }
+    ]
+  },
+  "HT": {
+    "nom": "Haïti",
+    "fuseaux": [
+      {
+        "zone": "America/Port-au-Prince"
+      }
+    ]
+  },
+  "HU": {
+    "nom": "Hongrie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Budapest"
+      }
+    ]
+  },
+  "ID": {
+    "nom": "Indonésie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Jakarta",
+        "region": "Ouest : Java et Sumatra (Jakarta)"
+      },
+      {
+        "zone": "Asia/Makassar",
+        "region": "Centre : Bali, Lombok, Sulawesi (Makassar)"
+      },
+      {
+        "zone": "Asia/Jayapura",
+        "region": "Est : Moluques et Papouasie (Jayapura)"
+      }
+    ]
+  },
+  "IE": {
+    "nom": "Irlande",
+    "fuseaux": [
+      {
+        "zone": "Europe/Dublin"
+      }
+    ]
+  },
+  "IL": {
+    "nom": "Israël",
+    "fuseaux": [
+      {
+        "zone": "Asia/Jerusalem"
+      }
+    ]
+  },
+  "IN": {
+    "nom": "Inde",
+    "fuseaux": [
+      {
+        "zone": "Asia/Kolkata"
+      }
+    ]
+  },
+  "IQ": {
+    "nom": "Irak",
+    "fuseaux": [
+      {
+        "zone": "Asia/Baghdad"
+      }
+    ]
+  },
+  "IR": {
+    "nom": "Iran",
+    "fuseaux": [
+      {
+        "zone": "Asia/Tehran"
+      }
+    ]
+  },
+  "IS": {
+    "nom": "Islande",
+    "fuseaux": [
+      {
+        "zone": "Atlantic/Reykjavik"
+      }
+    ]
+  },
+  "IT": {
+    "nom": "Italie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Rome"
+      }
+    ]
+  },
+  "JM": {
+    "nom": "Jamaïque",
+    "fuseaux": [
+      {
+        "zone": "America/Jamaica"
+      }
+    ]
+  },
+  "JO": {
+    "nom": "Jordanie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Amman"
+      }
+    ]
+  },
+  "JP": {
+    "nom": "Japon",
+    "fuseaux": [
+      {
+        "zone": "Asia/Tokyo"
+      }
+    ]
+  },
+  "KE": {
+    "nom": "Kenya",
+    "fuseaux": [
+      {
+        "zone": "Africa/Nairobi"
+      }
+    ]
+  },
+  "KG": {
+    "nom": "Kirghizistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Bishkek"
+      }
+    ]
+  },
+  "KH": {
+    "nom": "Cambodge",
+    "fuseaux": [
+      {
+        "zone": "Asia/Phnom_Penh"
+      }
+    ]
+  },
+  "KI": {
+    "nom": "Kiribati",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Tarawa"
+      }
+    ]
+  },
+  "KM": {
+    "nom": "Comores",
+    "fuseaux": [
+      {
+        "zone": "Indian/Comoro"
+      }
+    ]
+  },
+  "KN": {
+    "nom": "Saint-Christophe-et-Niévès",
+    "fuseaux": [
+      {
+        "zone": "America/St_Kitts"
+      }
+    ]
+  },
+  "KP": {
+    "nom": "Corée du Nord",
+    "fuseaux": [
+      {
+        "zone": "Asia/Pyongyang"
+      }
+    ]
+  },
+  "KR": {
+    "nom": "Corée du Sud",
+    "fuseaux": [
+      {
+        "zone": "Asia/Seoul"
+      }
+    ]
+  },
+  "KW": {
+    "nom": "Koweït",
+    "fuseaux": [
+      {
+        "zone": "Asia/Kuwait"
+      }
+    ]
+  },
+  "KZ": {
+    "nom": "Kazakhstan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Almaty"
+      }
+    ]
+  },
+  "LA": {
+    "nom": "Laos",
+    "fuseaux": [
+      {
+        "zone": "Asia/Vientiane"
+      }
+    ]
+  },
+  "LB": {
+    "nom": "Liban",
+    "fuseaux": [
+      {
+        "zone": "Asia/Beirut"
+      }
+    ]
+  },
+  "LC": {
+    "nom": "Sainte-Lucie",
+    "fuseaux": [
+      {
+        "zone": "America/St_Lucia"
+      }
+    ]
+  },
+  "LI": {
+    "nom": "Liechtenstein",
+    "fuseaux": [
+      {
+        "zone": "Europe/Vaduz"
+      }
+    ]
+  },
+  "LK": {
+    "nom": "Sri Lanka",
+    "fuseaux": [
+      {
+        "zone": "Asia/Colombo"
+      }
+    ]
+  },
+  "LR": {
+    "nom": "Liberia",
+    "fuseaux": [
+      {
+        "zone": "Africa/Monrovia"
+      }
+    ]
+  },
+  "LS": {
+    "nom": "Lesotho",
+    "fuseaux": [
+      {
+        "zone": "Africa/Maseru"
+      }
+    ]
+  },
+  "LT": {
+    "nom": "Lituanie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Vilnius"
+      }
+    ]
+  },
+  "LU": {
+    "nom": "Luxembourg",
+    "fuseaux": [
+      {
+        "zone": "Europe/Luxembourg"
+      }
+    ]
+  },
+  "LV": {
+    "nom": "Lettonie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Riga"
+      }
+    ]
+  },
+  "LY": {
+    "nom": "Libye",
+    "fuseaux": [
+      {
+        "zone": "Africa/Tripoli"
+      }
+    ]
+  },
+  "MA": {
+    "nom": "Maroc",
+    "fuseaux": [
+      {
+        "zone": "Africa/Casablanca"
+      }
+    ]
+  },
+  "MC": {
+    "nom": "Monaco",
+    "fuseaux": [
+      {
+        "zone": "Europe/Monaco"
+      }
+    ]
+  },
+  "MD": {
+    "nom": "Moldavie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Chisinau"
+      }
+    ]
+  },
+  "ME": {
+    "nom": "Monténégro",
+    "fuseaux": [
+      {
+        "zone": "Europe/Podgorica"
+      }
+    ]
+  },
+  "MG": {
+    "nom": "Madagascar",
+    "fuseaux": [
+      {
+        "zone": "Indian/Antananarivo"
+      }
+    ]
+  },
+  "MH": {
+    "nom": "Îles Marshall",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Majuro"
+      }
+    ]
+  },
+  "MK": {
+    "nom": "Macédoine du Nord",
+    "fuseaux": [
+      {
+        "zone": "Europe/Skopje"
+      }
+    ]
+  },
+  "ML": {
+    "nom": "Mali",
+    "fuseaux": [
+      {
+        "zone": "Africa/Bamako"
+      }
+    ]
+  },
+  "MM": {
+    "nom": "Birmanie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Yangon"
+      }
+    ]
+  },
+  "MN": {
+    "nom": "Mongolie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Ulaanbaatar"
+      }
+    ]
+  },
+  "MO": {
+    "nom": "Macao",
+    "fuseaux": [
+      {
+        "zone": "Asia/Macau"
+      }
+    ]
+  },
+  "MQ": {
+    "nom": "Martinique",
+    "fuseaux": [
+      {
+        "zone": "America/Martinique"
+      }
+    ]
+  },
+  "MR": {
+    "nom": "Mauritanie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Nouakchott"
+      }
+    ]
+  },
+  "MT": {
+    "nom": "Malte",
+    "fuseaux": [
+      {
+        "zone": "Europe/Malta"
+      }
+    ]
+  },
+  "MU": {
+    "nom": "Maurice",
+    "fuseaux": [
+      {
+        "zone": "Indian/Mauritius"
+      }
+    ]
+  },
+  "MV": {
+    "nom": "Maldives",
+    "fuseaux": [
+      {
+        "zone": "Indian/Maldives"
+      }
+    ]
+  },
+  "MW": {
+    "nom": "Malawi",
+    "fuseaux": [
+      {
+        "zone": "Africa/Blantyre"
+      }
+    ]
+  },
+  "MX": {
+    "nom": "Mexique",
+    "fuseaux": [
+      {
+        "zone": "America/Mexico_City",
+        "region": "Centre (Mexico, Oaxaca, Guadalajara)"
+      },
+      {
+        "zone": "America/Cancun",
+        "region": "Quintana Roo (Cancún, Tulum)"
+      },
+      {
+        "zone": "America/Mazatlan",
+        "region": "Pacifique (Mazatlán, Los Cabos)"
+      },
+      {
+        "zone": "America/Tijuana",
+        "region": "Basse-Californie du Nord (Tijuana)"
+      }
+    ]
+  },
+  "MY": {
+    "nom": "Malaisie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Kuala_Lumpur"
+      }
+    ]
+  },
+  "MZ": {
+    "nom": "Mozambique",
+    "fuseaux": [
+      {
+        "zone": "Africa/Maputo"
+      }
+    ]
+  },
+  "NA": {
+    "nom": "Namibie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Windhoek"
+      }
+    ]
+  },
+  "NC": {
+    "nom": "Nouvelle-Calédonie",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Noumea"
+      }
+    ]
+  },
+  "NE": {
+    "nom": "Niger",
+    "fuseaux": [
+      {
+        "zone": "Africa/Niamey"
+      }
+    ]
+  },
+  "NG": {
+    "nom": "Nigeria",
+    "fuseaux": [
+      {
+        "zone": "Africa/Lagos"
+      }
+    ]
+  },
+  "NI": {
+    "nom": "Nicaragua",
+    "fuseaux": [
+      {
+        "zone": "America/Managua"
+      }
+    ]
+  },
+  "NL": {
+    "nom": "Pays-Bas",
+    "fuseaux": [
+      {
+        "zone": "Europe/Amsterdam"
+      }
+    ]
+  },
+  "NO": {
+    "nom": "Norvège",
+    "fuseaux": [
+      {
+        "zone": "Europe/Oslo"
+      }
+    ]
+  },
+  "NP": {
+    "nom": "Népal",
+    "fuseaux": [
+      {
+        "zone": "Asia/Kathmandu"
+      }
+    ]
+  },
+  "NR": {
+    "nom": "Nauru",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Nauru"
+      }
+    ]
+  },
+  "NZ": {
+    "nom": "Nouvelle-Zélande",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Auckland"
+      }
+    ]
+  },
+  "OM": {
+    "nom": "Oman",
+    "fuseaux": [
+      {
+        "zone": "Asia/Muscat"
+      }
+    ]
+  },
+  "PA": {
+    "nom": "Panama",
+    "fuseaux": [
+      {
+        "zone": "America/Panama"
+      }
+    ]
+  },
+  "PE": {
+    "nom": "Pérou",
+    "fuseaux": [
+      {
+        "zone": "America/Lima"
+      }
+    ]
+  },
+  "PF": {
+    "nom": "Polynésie française",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Tahiti",
+        "region": "Îles de la Société (Tahiti, Bora-Bora)"
+      },
+      {
+        "zone": "Pacific/Marquesas",
+        "region": "Îles Marquises"
+      }
+    ]
+  },
+  "PG": {
+    "nom": "Papouasie-Nouvelle-Guinée",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Port_Moresby"
+      }
+    ]
+  },
+  "PH": {
+    "nom": "Philippines",
+    "fuseaux": [
+      {
+        "zone": "Asia/Manila"
+      }
+    ]
+  },
+  "PK": {
+    "nom": "Pakistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Karachi"
+      }
+    ]
+  },
+  "PL": {
+    "nom": "Pologne",
+    "fuseaux": [
+      {
+        "zone": "Europe/Warsaw"
+      }
+    ]
+  },
+  "PR": {
+    "nom": "Porto Rico",
+    "fuseaux": [
+      {
+        "zone": "America/Puerto_Rico"
+      }
+    ]
+  },
+  "PS": {
+    "nom": "Palestine",
+    "fuseaux": [
+      {
+        "zone": "Asia/Hebron"
+      }
+    ]
+  },
+  "PT": {
+    "nom": "Portugal",
+    "fuseaux": [
+      {
+        "zone": "Europe/Lisbon",
+        "region": "Portugal continental et Madère (Lisbonne)"
+      },
+      {
+        "zone": "Atlantic/Azores",
+        "region": "Açores (Ponta Delgada)"
+      }
+    ]
+  },
+  "PW": {
+    "nom": "Palaos",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Palau"
+      }
+    ]
+  },
+  "PY": {
+    "nom": "Paraguay",
+    "fuseaux": [
+      {
+        "zone": "America/Asuncion"
+      }
+    ]
+  },
+  "QA": {
+    "nom": "Qatar",
+    "fuseaux": [
+      {
+        "zone": "Asia/Qatar"
+      }
+    ]
+  },
+  "RE": {
+    "nom": "La Réunion",
+    "fuseaux": [
+      {
+        "zone": "Indian/Reunion"
+      }
+    ]
+  },
+  "RO": {
+    "nom": "Roumanie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Bucharest"
+      }
+    ]
+  },
+  "RS": {
+    "nom": "Serbie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Belgrade"
+      }
+    ]
+  },
+  "RU": {
+    "nom": "Russie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Kaliningrad",
+        "region": "Kaliningrad"
+      },
+      {
+        "zone": "Europe/Moscow",
+        "region": "Moscou et Saint-Pétersbourg"
+      },
+      {
+        "zone": "Europe/Samara",
+        "region": "Samara"
+      },
+      {
+        "zone": "Asia/Yekaterinburg",
+        "region": "Oural (Iekaterinbourg)"
+      },
+      {
+        "zone": "Asia/Omsk",
+        "region": "Omsk"
+      },
+      {
+        "zone": "Asia/Novosibirsk",
+        "region": "Novossibirsk"
+      },
+      {
+        "zone": "Asia/Krasnoyarsk",
+        "region": "Krasnoïarsk"
+      },
+      {
+        "zone": "Asia/Irkutsk",
+        "region": "Irkoutsk et lac Baïkal"
+      },
+      {
+        "zone": "Asia/Yakutsk",
+        "region": "Iakoutsk"
+      },
+      {
+        "zone": "Asia/Vladivostok",
+        "region": "Vladivostok"
+      },
+      {
+        "zone": "Asia/Magadan",
+        "region": "Magadan"
+      },
+      {
+        "zone": "Asia/Kamchatka",
+        "region": "Kamtchatka"
+      }
+    ]
+  },
+  "RW": {
+    "nom": "Rwanda",
+    "fuseaux": [
+      {
+        "zone": "Africa/Kigali"
+      }
+    ]
+  },
+  "SA": {
+    "nom": "Arabie saoudite",
+    "fuseaux": [
+      {
+        "zone": "Asia/Riyadh"
+      }
+    ]
+  },
+  "SB": {
+    "nom": "Îles Salomon",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Guadalcanal"
+      }
+    ]
+  },
+  "SC": {
+    "nom": "Seychelles",
+    "fuseaux": [
+      {
+        "zone": "Indian/Mahe"
+      }
+    ]
+  },
+  "SD": {
+    "nom": "Soudan",
+    "fuseaux": [
+      {
+        "zone": "Africa/Khartoum"
+      }
+    ]
+  },
+  "SE": {
+    "nom": "Suède",
+    "fuseaux": [
+      {
+        "zone": "Europe/Stockholm"
+      }
+    ]
+  },
+  "SG": {
+    "nom": "Singapour",
+    "fuseaux": [
+      {
+        "zone": "Asia/Singapore"
+      }
+    ]
+  },
+  "SI": {
+    "nom": "Slovénie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Ljubljana"
+      }
+    ]
+  },
+  "SK": {
+    "nom": "Slovaquie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Bratislava"
+      }
+    ]
+  },
+  "SL": {
+    "nom": "Sierra Leone",
+    "fuseaux": [
+      {
+        "zone": "Africa/Freetown"
+      }
+    ]
+  },
+  "SM": {
+    "nom": "Saint-Marin",
+    "fuseaux": [
+      {
+        "zone": "Europe/San_Marino"
+      }
+    ]
+  },
+  "SN": {
+    "nom": "Sénégal",
+    "fuseaux": [
+      {
+        "zone": "Africa/Dakar"
+      }
+    ]
+  },
+  "SO": {
+    "nom": "Somalie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Mogadishu"
+      }
+    ]
+  },
+  "SR": {
+    "nom": "Suriname",
+    "fuseaux": [
+      {
+        "zone": "America/Paramaribo"
+      }
+    ]
+  },
+  "SS": {
+    "nom": "Soudan du Sud",
+    "fuseaux": [
+      {
+        "zone": "Africa/Juba"
+      }
+    ]
+  },
+  "ST": {
+    "nom": "Sao Tomé-et-Principe",
+    "fuseaux": [
+      {
+        "zone": "Africa/Sao_Tome"
+      }
+    ]
+  },
+  "SV": {
+    "nom": "Salvador",
+    "fuseaux": [
+      {
+        "zone": "America/El_Salvador"
+      }
+    ]
+  },
+  "SY": {
+    "nom": "Syrie",
+    "fuseaux": [
+      {
+        "zone": "Asia/Damascus"
+      }
+    ]
+  },
+  "SZ": {
+    "nom": "Eswatini",
+    "fuseaux": [
+      {
+        "zone": "Africa/Mbabane"
+      }
+    ]
+  },
+  "TD": {
+    "nom": "Tchad",
+    "fuseaux": [
+      {
+        "zone": "Africa/Ndjamena"
+      }
+    ]
+  },
+  "TG": {
+    "nom": "Togo",
+    "fuseaux": [
+      {
+        "zone": "Africa/Lome"
+      }
+    ]
+  },
+  "TH": {
+    "nom": "Thaïlande",
+    "fuseaux": [
+      {
+        "zone": "Asia/Bangkok"
+      }
+    ]
+  },
+  "TJ": {
+    "nom": "Tadjikistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Dushanbe"
+      }
+    ]
+  },
+  "TL": {
+    "nom": "Timor oriental",
+    "fuseaux": [
+      {
+        "zone": "Asia/Dili"
+      }
+    ]
+  },
+  "TM": {
+    "nom": "Turkménistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Ashgabat"
+      }
+    ]
+  },
+  "TN": {
+    "nom": "Tunisie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Tunis"
+      }
+    ]
+  },
+  "TO": {
+    "nom": "Tonga",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Tongatapu"
+      }
+    ]
+  },
+  "TR": {
+    "nom": "Turquie",
+    "fuseaux": [
+      {
+        "zone": "Europe/Istanbul"
+      }
+    ]
+  },
+  "TT": {
+    "nom": "Trinité-et-Tobago",
+    "fuseaux": [
+      {
+        "zone": "America/Port_of_Spain"
+      }
+    ]
+  },
+  "TV": {
+    "nom": "Tuvalu",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Funafuti"
+      }
+    ]
+  },
+  "TW": {
+    "nom": "Taïwan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Taipei"
+      }
+    ]
+  },
+  "TZ": {
+    "nom": "Tanzanie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Dar_es_Salaam"
+      }
+    ]
+  },
+  "UA": {
+    "nom": "Ukraine",
+    "fuseaux": [
+      {
+        "zone": "Europe/Kyiv"
+      }
+    ]
+  },
+  "UG": {
+    "nom": "Ouganda",
+    "fuseaux": [
+      {
+        "zone": "Africa/Kampala"
+      }
+    ]
+  },
+  "US": {
+    "nom": "États-Unis",
+    "fuseaux": [
+      {
+        "zone": "America/New_York",
+        "region": "Côte Est (New York, Washington, Miami)"
+      },
+      {
+        "zone": "America/Chicago",
+        "region": "Centre (Chicago, La Nouvelle-Orléans, Texas)"
+      },
+      {
+        "zone": "America/Denver",
+        "region": "Montagnes (Denver, Salt Lake City)"
+      },
+      {
+        "zone": "America/Phoenix",
+        "region": "Arizona (Phoenix, Grand Canyon)"
+      },
+      {
+        "zone": "America/Los_Angeles",
+        "region": "Côte Ouest (Los Angeles, San Francisco, Las Vegas, Seattle)"
+      },
+      {
+        "zone": "America/Anchorage",
+        "region": "Alaska (Anchorage)"
+      },
+      {
+        "zone": "Pacific/Honolulu",
+        "region": "Hawaï (Honolulu)"
+      }
+    ]
+  },
+  "UY": {
+    "nom": "Uruguay",
+    "fuseaux": [
+      {
+        "zone": "America/Montevideo"
+      }
+    ]
+  },
+  "UZ": {
+    "nom": "Ouzbékistan",
+    "fuseaux": [
+      {
+        "zone": "Asia/Tashkent"
+      }
+    ]
+  },
+  "VA": {
+    "nom": "Vatican",
+    "fuseaux": [
+      {
+        "zone": "Europe/Vatican"
+      }
+    ]
+  },
+  "VC": {
+    "nom": "Saint-Vincent-et-les-Grenadines",
+    "fuseaux": [
+      {
+        "zone": "America/St_Vincent"
+      }
+    ]
+  },
+  "VE": {
+    "nom": "Venezuela",
+    "fuseaux": [
+      {
+        "zone": "America/Caracas"
+      }
+    ]
+  },
+  "VN": {
+    "nom": "Viêt Nam",
+    "fuseaux": [
+      {
+        "zone": "Asia/Ho_Chi_Minh"
+      }
+    ]
+  },
+  "VU": {
+    "nom": "Vanuatu",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Efate"
+      }
+    ]
+  },
+  "WS": {
+    "nom": "Samoa",
+    "fuseaux": [
+      {
+        "zone": "Pacific/Apia"
+      }
+    ]
+  },
+  "XK": {
+    "nom": "Kosovo",
+    "fuseaux": [
+      {
+        "zone": "Europe/Belgrade"
+      }
+    ]
+  },
+  "YE": {
+    "nom": "Yémen",
+    "fuseaux": [
+      {
+        "zone": "Asia/Aden"
+      }
+    ]
+  },
+  "YT": {
+    "nom": "Mayotte",
+    "fuseaux": [
+      {
+        "zone": "Indian/Mayotte"
+      }
+    ]
+  },
+  "ZA": {
+    "nom": "Afrique du Sud",
+    "fuseaux": [
+      {
+        "zone": "Africa/Johannesburg"
+      }
+    ]
+  },
+  "ZM": {
+    "nom": "Zambie",
+    "fuseaux": [
+      {
+        "zone": "Africa/Lusaka"
+      }
+    ]
+  },
+  "ZW": {
+    "nom": "Zimbabwe",
+    "fuseaux": [
+      {
+        "zone": "Africa/Harare"
+      }
+    ]
+  }
 }

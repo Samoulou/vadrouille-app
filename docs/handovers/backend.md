@@ -561,6 +561,9 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `TripRequest.brief` | stocké | Voir `Brief.*` ; `briefs`, version 1 (B9-PO-1) |
 | `TripRequest.story` | stocké | Facultatif (décision 0125 § 1) : adaptateur `prototype` seulement, dans le brief saisi de `prototype.run_briefs` (`recit`), purgé avec le programme (29 jours) ; envoyé tel quel au fournisseur de modèles avec `zdr` (Q557) ; ignoré par `mock` et `api` |
 | `TripDraft.destination` | stocké | `trips.destination`, saisie par la personne |
+| `TripDraft.destinationRegion` | calculé | Facultatif (demande de Samuel du 23 octobre 2026) : pays et fuseau choisis à l'écran 1 pour une destination hors de la table maison des villes ; adaptateur `prototype` seulement, revérifiés contre la table maison des pays (`fuseauDuPays`, liste fermée) puis écrits dans le brief saisi (`pays`, `fuseau`) ; ignoré par `mock` et `api` |
+| `DestinationRegion.country` | calculé | Code ISO 3166-1 alpha-2 de la table maison des pays (`src/lib/fuseaux/pays.json`) ; le brief reçoit le nom français de la table |
+| `DestinationRegion.timeZone` | calculé | Un des fuseaux du pays dans la table maison ; le brief reçoit la valeur de la table, jamais la chaîne reçue |
 | `TripDraft.start` | stocké | `trips.start_date` ; « arrivée au plus tôt aujourd'hui » revérifiée par `createTrip` dans le fuseau du voyage |
 | `TripDraft.end` | stocké | `trips.end_date` |
 | `TripDraft.lodging` | stocké | Voir `Lodging.*` ; `stays` de la destination (B9-PO-1) |

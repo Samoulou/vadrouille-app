@@ -42,13 +42,20 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);
 
-  // Écran 1 : une ville hors table est refusée au champ ; Rome est admise.
-  await fillTrip(page, { ...ROME, destination: "Atlantide" });
+  // Écran 1 : une ville hors de la table n'est plus refusée, son pays est demandé (demande de Samuel du 23 octobre
+  // 2026) ; une ville de la table (Rome) n'en demande pas.
+  await fillTrip(page, { ...ROME, destination: "Hoi An" });
   await continueButton(page).click();
-  await expect(field(page, "Destination")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByText("Cette ville n'est pas encore disponible sur le site d'essai.", { exact: false })).toBeVisible();
+  const pays = page.getByRole("combobox", { name: "Pays" });
+  await expect(pays).toHaveAttribute("aria-invalid", "true");
+  await expect(pays).toBeFocused();
+  await expect(field(page, "Destination")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("Essaie Rome ou Lisbonne", { exact: false })).toHaveCount(0);
   await expect(page).toHaveURL(`${R1}?site=essai`);
+  await sansViolation(page);
   await field(page, "Destination").fill(ROME.destination);
+  await field(page, "Destination").blur();
+  await expect(pays).toHaveCount(0);
   await continueButton(page).click();
   await expectPath(page, R2);
 
@@ -88,6 +95,7 @@ test("site d'essai : écran 1 ouvert sans site=essai, un écran 1 hors règles e
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(field(page, "Destination")).toHaveValue("Atlantide");
   await continueButton(page).click();
-  await expect(field(page, "Destination")).toHaveAttribute("aria-invalid", "true");
+  // Ville hors de la table : son pays est demandé (demande de Samuel du 23 octobre 2026), la ville n'est plus refusée.
+  await expect(page.getByRole("combobox", { name: "Pays" })).toHaveAttribute("aria-invalid", "true");
   await sansViolation(page);
 });

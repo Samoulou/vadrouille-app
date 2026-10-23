@@ -1,4 +1,4 @@
-import type { Brief, BriefRequest, Lodging, TripDraft } from "@/contracts";
+import type { Brief, BriefRequest, DestinationRegion, Lodging, TripDraft } from "@/contracts";
 import {
   ADULTS,
   AREA_LENGTH,
@@ -11,7 +11,7 @@ import {
   PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
-import { fuseauDeVille } from "@/lib/fuseaux";
+import { fuseauDeVille, fuseauDuPays, paysParCode } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -31,8 +31,10 @@ export type FieldError =
   | "outOfTrip"
   | "endTime"
   | "range"
-  // Site d'essai (spécification E2E-essai, lot 2, D1) : ville absente de la table des fuseaux, seconde ville, séjour trop long.
-  | "unknownCity"
+  // Site d'essai (spécification E2E-essai, lot 2, D1) : pays ou région manquants d'une ville absente de la table des
+  // villes (demande de Samuel du 23 octobre 2026), seconde ville, séjour trop long.
+  | "country"
+  | "timeZone"
   | "singleCity"
   | "tooLong";
 
@@ -81,11 +83,30 @@ function joursEntre(start: string, end: string): number {
 
 export interface ValidateTripOptions {
   /**
-   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, connue
-   * de la table des fuseaux (`fuseauDeVille`, aucune donnée Google), et `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la
-   * borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois dans `@/contracts/values`. Refus au champ.
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville ; une
+   * destination absente de la table des villes (`fuseauDeVille`, aucune donnée Google) demande son pays, et sa région
+   * pour un pays à plusieurs fuseaux (table maison des pays, demande de Samuel du 23 octobre 2026) ; et
+   * `PROTOTYPE_STAY_DAYS_MAX` jours au plus, la borne de `BriefSchema` (`src/prototype/brief.ts`), écrite une seule fois
+   * dans `@/contracts/values`. Refus au champ.
    */
   essai?: boolean;
+}
+
+/** Vrai si la destination saisie (non vide) est absente de la table maison des villes : l'écran 1 demande alors son pays. */
+export function destinationHorsTable(destination: string): boolean {
+  return textError(destination, DESTINATION_LENGTH) === null && fuseauDeVille(destination) === null;
+}
+
+/**
+ * Pays et fuseau choisis pour une destination hors de la table des villes, résolus contre la table des pays (un pays à un
+ * seul fuseau n'en demande pas) ; `null` si la destination est dans la table, ou si le choix est incomplet ou hors liste.
+ */
+export function destinationRegion(trip: Pick<TripForm, "destination" | "country" | "timeZone">): DestinationRegion | null {
+  if (!destinationHorsTable(trip.destination)) return null;
+  const pays = paysParCode(trip.country || undefined);
+  if (pays === null) return null;
+  const timeZone = fuseauDuPays(pays.code, pays.fuseaux.length === 1 ? undefined : (trip.timeZone ?? ""));
+  return timeZone === null ? null : { country: pays.code, timeZone };
 }
 
 /** Erreurs de l'écran 1, dans l'ordre d'affichage des champs (le focus va sur la première). */
@@ -97,7 +118,12 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
 
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
-  push("destination", destinationError ?? (essai && fuseauDeVille(trip.destination) === null ? "unknownCity" : null));
+  push("destination", destinationError);
+  if (essai && destinationHorsTable(trip.destination) && destinationRegion(trip) === null) {
+    // Pays absent ou hors liste : le champ « Pays » ; pays à plusieurs fuseaux sans région : le champ « Fuseau horaire ».
+    const code = paysParCode(trip.country || undefined) === null ? "country" : "timeZone";
+    push(code, code);
+  }
   const start = isDate(trip.start) ? trip.start : null;
   const end = isDate(trip.end) ? trip.end : null;
   push("start", start === null ? "required" : start < today ? "past" : null);
@@ -184,8 +210,10 @@ export function toTripDraft(trip: TripForm, choices: Readonly<Record<string, Lod
   if (trip.commitments.some((commitment) => commitment.kind === null)) {
     throw new Error("toTripDraft : écran 1 non validé (engagement sans type).");
   }
+  const region = destinationRegion(trip);
   return {
     destination: trip.destination.trim(),
+    ...(region === null ? {} : { destinationRegion: region }),
     start: trip.start,
     end: trip.end,
     lodging: toLodging(trip.lodging, choices[DESTINATION_KEY]),

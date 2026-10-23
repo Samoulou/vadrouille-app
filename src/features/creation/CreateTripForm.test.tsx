@@ -207,17 +207,72 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
   }
 
-  it("ville hors de la table des fuseaux : refus au champ, message relié, focus ; aucune navigation", async () => {
+  it("ville hors de la table, « Continuer » : la ville n'est plus refusée, « Pays » demandé, message relié, focus ; aucune navigation", async () => {
+    // Demande de Samuel du 23 octobre 2026 : plus de « Cette ville n'est pas encore disponible… Essaie Rome ou Lisbonne. ».
     const { container } = renderEssai();
-    remplir("Atlantide");
+    remplir("Hoi An");
+    expect(screen.queryByRole("combobox", { name: "Pays" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     const destination = screen.getByLabelText("Destination", { exact: true });
-    expect(destination).toHaveAttribute("aria-invalid", "true");
-    expect(destination).toHaveAccessibleDescription("Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.");
-    await waitFor(() => expect(destination).toHaveFocus());
+    expect(destination).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByText(/Essaie Rome ou Lisbonne/)).not.toBeInTheDocument();
+    const pays = screen.getByRole("combobox", { name: "Pays" });
+    expect(pays).toHaveAttribute("aria-invalid", "true");
+    expect(pays).toHaveAccessibleDescription(
+      "Hoi An n'est pas encore dans notre liste de villes : choisis son pays, pour caler ton programme sur l'heure locale. Choisis le pays de ta destination.",
+    );
+    await waitFor(() => expect(pays).toHaveFocus());
     expect(router.push).not.toHaveBeenCalled();
     expect(latest?.tripReady).toBe(false);
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("ville hors de la table : « Pays » s'affiche en quittant le champ, pas pendant la frappe ; un pays à un fuseau suffit, gardé dans le brouillon", () => {
+    renderEssai();
+    const destination = screen.getByLabelText("Destination", { exact: true });
+    change("Destination", "Hoi");
+    expect(screen.queryByRole("combobox", { name: "Pays" })).not.toBeInTheDocument();
+    change("Destination", "Hoi An");
+    fireEvent.blur(destination);
+    const pays = screen.getByRole("combobox", { name: "Pays" });
+    // Liste maison en français, première option vide.
+    expect(within(pays).getAllByRole("option")[0]).toHaveTextContent("Choisis un pays");
+    expect(within(pays).getByRole("option", { name: "Viêt Nam" })).toBeInTheDocument();
+    fireEvent.change(pays, { target: { value: "VN" } });
+    expect(screen.queryByRole("combobox", { name: "Région" })).not.toBeInTheDocument();
+    change("Arrivée", "2026-08-29");
+    change("Départ", "2026-09-03");
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+    expect(latest?.trip).toMatchObject({ destination: "Hoi An", country: "VN" });
+  });
+
+  it("pays à plusieurs fuseaux : « Région » demandée (régions lisibles), puis admis", async () => {
+    renderEssai();
+    remplir("Asheville");
+    fireEvent.blur(screen.getByLabelText("Destination", { exact: true }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Pays" }), { target: { value: "US" } });
+    const region = screen.getByRole("combobox", { name: "Région" });
+    expect(region).toHaveAccessibleDescription("États-Unis a plusieurs fuseaux horaires : choisis la région de ta destination.");
+    expect(within(region).getByRole("option", { name: "Côte Est (New York, Washington, Miami)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(region).toHaveAttribute("aria-invalid", "true");
+    await waitFor(() => expect(region).toHaveFocus());
+    expect(router.push).not.toHaveBeenCalled();
+    fireEvent.change(region, { target: { value: "America/New_York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+    expect(latest?.trip).toMatchObject({ country: "US", timeZone: "America/New_York" });
+  });
+
+  it("Valencia (table des villes) : admise sans « Pays »", () => {
+    renderEssai();
+    remplir("Valencia");
+    fireEvent.blur(screen.getByLabelText("Destination", { exact: true }));
+    expect(screen.queryByRole("combobox", { name: "Pays" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
   });
 
   it("logement saisi : aide « pas d'adresse privée » reliée au champ (décision 0125 § 6) ; absente hors du site d'essai", () => {
@@ -244,7 +299,7 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
       expect(screen.queryByRole("button", { name: "Ajouter une ville" })).not.toBeInTheDocument();
       remplir("Atlantide");
       fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
-      expect(screen.getByLabelText("Destination", { exact: true })).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByRole("combobox", { name: "Pays" })).toHaveAttribute("aria-invalid", "true");
       expect(router.push).not.toHaveBeenCalled();
     } finally {
       window.history.pushState({}, "", "/");

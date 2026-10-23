@@ -67,11 +67,29 @@ describe("p0: conversion du formulaire vers le brief de l'essai (E2E-essai, lot 
   });
 
   it.each([
-    ["ville absente de la table", { ...DRAFT, destination: "Atlantide" }, "draft.destination"],
+    ["ville absente de la table, sans pays", { ...DRAFT, destination: "Atlantide" }, "draft.destination"],
+    ["ville absente de la table, pays inconnu", { ...DRAFT, destination: "Atlantide", destinationRegion: { country: "XX", timeZone: "Europe/Paris" } }, "draft.destination"],
+    ["ville absente de la table, fuseau hors du pays", { ...DRAFT, destination: "Hoi An", destinationRegion: { country: "VN", timeZone: "Europe/Paris" } }, "draft.destination"],
+    ["ville absente de la table, fuseau inventé", { ...DRAFT, destination: "Hoi An", destinationRegion: { country: "US", timeZone: "America/Atlantis" } }, "draft.destination"],
     ["une autre ville", { ...DRAFT, otherCities: [{ name: "Florence", arrival: "2027-05-06" }] }, "draft.otherCities"],
     ["plus de 15 jours", { ...DRAFT, end: `2027-05-${String(4 + PROTOTYPE_STAY_DAYS_MAX).padStart(2, "0")}` }, "draft.end"],
   ] as const)("refus (%s) : son champ", (_cas, draft, champ) => {
     expect(briefDepuisFormulaire(draft as TripDraft, BRIEF, undefined)).toEqual({ ok: false, champ });
+  });
+
+  it("ville absente de la table avec pays et fuseau de la table des pays : admise, nom et fuseau de la table, validée par BriefSchema", () => {
+    const hoiAn = briefDepuisFormulaire({ ...DRAFT, destination: " Hoi An ", destinationRegion: { country: "VN", timeZone: "Asia/Ho_Chi_Minh" } }, BRIEF, undefined);
+    if (!hoiAn.ok) throw new Error("conversion refusée");
+    expect(hoiAn.brief).toMatchObject({ destination: "Hoi An", pays: "Viêt Nam", fuseau: "Asia/Ho_Chi_Minh" });
+    expect(validerBriefSaisi(hoiAn.brief)).toEqual({ ok: true, brief: hoiAn.brief });
+    // Pays à plusieurs fuseaux : la région choisie.
+    const asheville = briefDepuisFormulaire({ ...DRAFT, destination: "Asheville", destinationRegion: { country: "US", timeZone: "America/New_York" } }, BRIEF, undefined);
+    expect(asheville.ok && asheville.brief).toMatchObject({ pays: "États-Unis", fuseau: "America/New_York" });
+  });
+
+  it("ville de la table : la table fait foi, le pays reçu est ignoré", () => {
+    const valencia = briefDepuisFormulaire({ ...DRAFT, destination: "Valencia", destinationRegion: { country: "US", timeZone: "America/Chicago" } }, BRIEF, undefined);
+    expect(valencia.ok && valencia.brief).toMatchObject({ destination: "Valencia", pays: "Espagne", fuseau: "Europe/Madrid" });
   });
 
   it(`${PROTOTYPE_STAY_DAYS_MAX} jours tout juste : admis`, () => {
