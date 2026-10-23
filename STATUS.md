@@ -1,15 +1,13 @@
-# État du studio — 2026-10-23 (152e cycle)
+# État du studio — 2026-10-23 (153e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 151e cycle.
+- Aucun message de Samuel depuis le 152e cycle.
 
 ## Fait
-- **#722 `[ia]`** (ticket #721) fusionnée le 23 octobre à 10:32 UTC : une seule révision par voyage après « Pas pour moi » (Q613), plafond d'environ 13,75 USD par voyage.
-- **#725 `[tl]`** (ticket #723) fusionnée à 10:33 UTC : Next.js 16.4.1 (décision 0127), trois avis de sécurité du 22 octobre corrigés.
-- Les cinq lots de la spécification de bout en bout sont sur `main` (`ced0695`). Les tickets #687 et #692 restent ouverts avec `in-progress` alors que leurs PR sont fusionnées : à fermer par le nettoyage d'après fusion.
-- **Statut du 151e cycle** (#727) fusionné.
+- **Statut du 152e cycle** (#728) fusionné. Rien d'autre depuis : aucune PR ouverte hormis #701.
+- La routine Release a republié dans #studio la note v2026.10.23-09, qui dit encore les migrations 0016 à 0018 « non appliquées » et #722, #725 « en attente » ; les trois migrations sont appliquées et les deux PR fusionnées. À corriger dans la prochaine note.
 
 ## En cours
 - **#527 `[data]`** (`coords-purge` en échec) : cause trouvée dans les journaux, rien à corriger dans le dépôt. Les quatre secrets `COORDS_PURGE_PG*` de l'environnement `coords-purge` sont vides ; les 22 runs ont échoué depuis le 17 octobre, la purge n'a jamais tourné. Bloqué sur Q438 (Samuel).
