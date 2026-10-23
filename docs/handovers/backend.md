@@ -76,8 +76,8 @@ Décision 0006. Versions vérifiées sur les registres le 2026-10-08 ; la tâche
 
 | Domaine | Choix | Version | Décision |
 |---|---|---|---|
-| Entrée serveur de l'interface | Actions serveur Next.js (environnement `nodejs`) dans `src/server/actions/` | Next.js 16.4.0 | 0003, 0006, 0017 § 3 |
-| Routes HTTP | Route handlers seulement pour le webhook Stripe, le webhook simulé et le suivi de génération ; **aucune route Better Auth exposée** | Next.js 16.4.0 | 0006, 0008 |
+| Entrée serveur de l'interface | Actions serveur Next.js (environnement `nodejs`) dans `src/server/actions/` | Next.js 16.4.1 | 0003, 0006, 0017 § 3, 0127 |
+| Routes HTTP | Route handlers seulement pour le webhook Stripe, le webhook simulé et le suivi de génération ; **aucune route Better Auth exposée** | Next.js 16.4.1 | 0006, 0008, 0127 |
 | Accès aux données | Drizzle ORM, pilote `pg` | 0.45.4 ; `pg` 8.23.1 | 0006 |
 | Migrations | drizzle-kit, migrations SQL relues dans `db/migrations/` | 0.31.11 | 0006 |
 | Base | Postgres 17 ; en local Docker Compose, en CI conteneur de service ; aucun compte externe | `postgres:17.11` | 0006 |
