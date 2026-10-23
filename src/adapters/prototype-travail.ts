@@ -1,6 +1,7 @@
 import "server-only";
 
 import { BRIEF_SAISI, type CodeEchecTravail, type ContenuSecteurs, type ExecutionEnCours, type LigneCandidat, type PhaseTravail } from "@/contracts/prototype-travail";
+import { TRIP_ID_PATTERN } from "@/contracts/values";
 import { PLACE_ID_PATTERN, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import type { ClientSql, PoolSql } from "@/server/usage/neon";
 
@@ -46,9 +47,12 @@ const CENT_MICROS = 10_000;
 
 const SQL_CONTEXTE = "SELECT pg_catalog.set_config('app.organization_id', $1, true)";
 const SQL_EXECUTION = `SELECT r.mode, r.brief, r.variant, r.cost_models_micros, pg_catalog.to_char(r.quota_day, 'YYYY-MM-DD') AS jour_quota,
+  f.models_cost_micros AS forfait_modeles, f.text_search_requests AS forfait_text_search, f.place_details_requests AS forfait_details,
+  f.routes_requests AS forfait_routes_requetes, f.routes_elements AS forfait_routes_elements,
   (SELECT pg_catalog.count(*) FROM prototype.runs AS a
     WHERE a.quota_day = r.quota_day AND a.mode IN ('reel', 'essai') AND (a.started_at, a.id) <= (r.started_at, r.id)) AS numero_jour
-FROM prototype.runs AS r WHERE r.id = $1::uuid AND r.status = 'en_cours'`;
+FROM prototype.runs AS r LEFT JOIN prototype.forfaits AS f ON f.run_id = r.id
+WHERE r.id = $1::uuid AND r.status = 'en_cours'`;
 const SQL_PHASE_EN_COURS = `SELECT phase FROM prototype.runs WHERE id = $1::uuid AND status = 'en_cours' FOR UPDATE`;
 const SQL_PHASE = `UPDATE prototype.runs SET phase = $2 WHERE id = $1::uuid AND status = 'en_cours' RETURNING id`;
 const JOUR = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
@@ -170,7 +174,27 @@ export async function lireExecution(pool: PoolSql, runId: string): Promise<Execu
     ) {
       throw new EchecTravail("base");
     }
-    return { mode, brief, variante: variant, coutModelesMicros: cout, jourQuota, numeroDuJour: numero };
+    // Forfait de modèles réservé (décision 0126 § 2) : absent de la ligne ou nul, la valeur n'est pas rendue (fusible du mode).
+    const forfait = ligne.forfait_modeles === null || ligne.forfait_modeles === undefined ? undefined : Number(ligne.forfait_modeles);
+    if (forfait !== undefined && (!Number.isSafeInteger(forfait) || forfait < 0)) throw new EchecTravail("base");
+    // Plafonds Google réservés (décision 0126 § 2) : rendus seulement si les quatre sont présents ; mal formés : base.
+    const plafonds = [ligne.forfait_text_search, ligne.forfait_details, ligne.forfait_routes_requetes, ligne.forfait_routes_elements];
+    let forfaitGoogle: ExecutionEnCours["forfaitGoogle"];
+    if (plafonds.every((valeur) => valeur !== null && valeur !== undefined)) {
+      const [textSearch, details, routesRequetes, routesElements] = plafonds.map(Number) as [number, number, number, number];
+      if (![textSearch, details, routesRequetes, routesElements].every((valeur) => Number.isSafeInteger(valeur) && valeur >= 0)) throw new EchecTravail("base");
+      forfaitGoogle = { textSearch, details, routesRequetes, routesElements };
+    }
+    return {
+      mode,
+      brief,
+      variante: variant,
+      coutModelesMicros: cout,
+      jourQuota,
+      numeroDuJour: numero,
+      ...(forfait === undefined ? {} : { forfaitModelesMicros: forfait }),
+      ...(forfaitGoogle === undefined ? {} : { forfaitGoogle }),
+    };
   });
 }
 
@@ -191,6 +215,24 @@ export async function lireBriefSaisi(pool: PoolSql, runId: string): Promise<unkn
     const ligne = (await client.query(SQL_BRIEF_SAISI, [id, BRIEF_SAISI])).rows[0];
     if (ligne === undefined) throw new EchecTravail("execution_absente");
     return ligne.brief as unknown;
+  });
+}
+
+/**
+ * Version servie d'un voyage (spécification E2E-essai, lot 4 ; décision 0126 § 1) : contenu du programme non expiré le
+ * plus récent qui porte cet identifiant de voyage (exécution commencée la dernière), comme la lecture de l'app
+ * (`src/adapters/prototype-lecture.ts`). Rendu **non validé** (l'étape le valide par `ProgrammeEcritSchema`) ; `null`
+ * s'il n'y en a aucun. Lu par l'étape de révision seulement ; jamais journalisé.
+ */
+export const SQL_VERSION_COURANTE = `SELECT p.contenu FROM prototype.programmes AS p JOIN prototype.runs AS r ON r.id = p.run_id
+WHERE p.contenu #>> '{trip,id}' = $1::text AND p.expires_at > pg_catalog.now()
+ORDER BY r.started_at DESC, r.id DESC LIMIT 1`;
+
+export async function lireVersionCourante(pool: PoolSql, tripId: string): Promise<unknown> {
+  if (typeof tripId !== "string" || !TRIP_ID_PATTERN.test(tripId)) throw new EchecTravail("entree_refusee");
+  return transaction(pool, async (client) => {
+    const ligne = (await client.query(SQL_VERSION_COURANTE, [tripId])).rows[0];
+    return ligne === undefined ? null : (ligne.contenu as unknown);
   });
 }
 

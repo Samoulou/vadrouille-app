@@ -10,6 +10,7 @@ import { DEBUT_DONNEES } from "@/ai/requetes";
 import { lirePlan, lireTour, PLAN_VIDE, type PlanRecherche } from "@/ai/sorties";
 import type { EntreeNotation, NoterCandidats } from "@/ai/noter-candidats";
 import type { RedigerProgramme } from "@/ai/rediger-programme";
+import type { RedigerRevision } from "@/ai/rediger-revision";
 import type { EntreeRaisons, RedigerRaisons } from "@/ai/rediger-raisons";
 import type { CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -345,7 +346,9 @@ describe("p0: séparation des capacités de la composition (types)", () => {
   // Décision 0116 § 3 : famille unique de `etapeProgramme`, ni client de modèles brut, ni recherche web, ni pages.
   it("programme : redigerProgramme, textSearch, places (fiches), detailsLogement, routes ; ni modèles bruts, ni recherche web, ni pages", () => {
     // Lot 2a (0121 § 3.4, 0122 § 1 condition 11) : `verifierSite`, vérification de statut des sites, famille programme() seule.
-    expectTypeOf<keyof CapacitesProgramme>().toEqualTypeOf<"redigerProgramme" | "textSearch" | "places" | "detailsLogement" | "routes" | "verifierSite">();
+    // E2E-essai, lot 4 (décision 0126) : `redigerRevision`, une requête de révision, même routage `zdr` que `redigerProgramme`.
+    expectTypeOf<keyof CapacitesProgramme>().toEqualTypeOf<"redigerProgramme" | "redigerRevision" | "textSearch" | "places" | "detailsLogement" | "routes" | "verifierSite">();
+    expectTypeOf<CapacitesProgramme["redigerRevision"]>().toEqualTypeOf<RedigerRevision>();
     expectTypeOf<CapacitesProgramme["verifierSite"]>().toEqualTypeOf<VerificateurStatut>();
     expectTypeOf<CapacitesEtapeFinale>().not.toHaveProperty("verifierSite");
     expectTypeOf<CapacitesAncrage>().not.toHaveProperty("verifierSite");
@@ -608,7 +611,7 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     const { composition, appels } = monter([async () => reponseModele({ content: '{"jours":[]}' })]);
     const programme = composition.programme();
     // Lot 2a (0121 § 3.4) : `verifierSite` s'ajoute (vérification de statut des sites, barrière de sortie du transport).
-    expect(Object.keys(programme).sort()).toEqual(["detailsLogement", "places", "redigerProgramme", "routes", "textSearch", "verifierSite"]);
+    expect(Object.keys(programme).sort()).toEqual(["detailsLogement", "places", "redigerProgramme", "redigerRevision", "routes", "textSearch", "verifierSite"]);
     // Hors mode réel (tests, CI) : barrière fermée, aucune adresse ne serait soumise.
     expect(programme.verifierSite.barriereFermee).toBe(true);
     expect(Object.keys(programme.places)).toEqual(["details"]);

@@ -5,6 +5,7 @@ import { createOpenRouterClient } from "@/ai/openrouter-client";
 import { creerRechercheWebReelle } from "@/ai/recherche-web-reelle";
 import { creerNoterCandidats, type NoterCandidats } from "@/ai/noter-candidats";
 import { creerRedigerProgramme, type RedigerProgramme } from "@/ai/rediger-programme";
+import { creerRedigerRevision, type RedigerRevision } from "@/ai/rediger-revision";
 import { creerRedigerRaisons, type RedigerRaisons } from "@/ai/rediger-raisons";
 import { capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import type { ClientPlaces, ClientRoutes } from "@/grounding/interfaces";
@@ -106,6 +107,8 @@ export type CapacitesEtapeFinale = {
  */
 export type CapacitesProgramme = {
   readonly redigerProgramme: RedigerProgramme;
+  /** Révision après le tri (E2E-essai, lot 4 ; décision 0126) : une requête, même modèle et même routage `zdr`. */
+  readonly redigerRevision: RedigerRevision;
   readonly textSearch: CapacitesAncrage["textSearch"];
   readonly places: Pick<ClientPlaces, "details">;
   readonly detailsLogement: CapacitesAncrage["detailsLogement"];
@@ -181,9 +184,13 @@ export function composerP0Reel(garde: GardeOuverte, options: OptionsComposition)
     programme() {
       const places = createPlacesClient(google);
       const { textSearch, detailsLogement } = capacitesAncrage(places);
-      // `creerRedigerProgramme` pose `zdr: true` et `data_collection: "deny"` (verdict S5 de 0117, 0116 § 2.2).
+      // `creerRedigerProgramme` et `creerRedigerRevision` posent `zdr: true` et `data_collection: "deny"` (verdict S5 de
+      // 0117, 0116 § 2.2). Un seul client pour les deux : une étape n'appelle que l'un d'eux.
+      const client = modeles();
+      const reglage = { modele: options.modeles.programme.modele, routage: options.modeles.routage };
       return {
-        redigerProgramme: creerRedigerProgramme(modeles(), { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+        redigerProgramme: creerRedigerProgramme(client, reglage),
+        redigerRevision: creerRedigerRevision(client, reglage),
         textSearch,
         places: { details: (placeId) => places.details(placeId) },
         detailsLogement,

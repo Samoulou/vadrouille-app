@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  *    fichier hors des dossiers serveur, `db/`, `scripts/` et des tests, sous toutes les formes de chargement
  *    (import statique ou de type, réexport, `import()`, `next/dynamic`, `require()`) ; seul un bloc de la
  *    configuration la règle, aucun bloc plus bas ne la remplace ;
- * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés (26 depuis B7a, ticket 423 ; 27 depuis le prompt `programme`, décision 0115) ; un 21e fichier sans
+ * 2. liste fermée : seuls les 20 modules de phase 0 venus de `main` sont exemptés (26 depuis B7a, ticket 423 ; 27 depuis le prompt `programme`, décision 0115 ; 28 depuis le prompt `revision`, décision 0126) ; un 21e fichier sans
  *    `import "server-only"` est refusé.
  * Configuration réelle du projet.
  */
@@ -201,6 +201,7 @@ const EXEMPTED = [
   "src/ai/prompts/notation.ts",
   "src/ai/prompts/plan.ts",
   "src/ai/prompts/programme.ts",
+  "src/ai/prompts/revision.ts",
   "src/ai/prompts/quartier.ts",
   "src/ai/prompts/raisons.ts",
   "src/ai/prompts/recherche.ts",
@@ -234,12 +235,12 @@ function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   });
 }
 
-describe("exception de server-only : liste fermée de 27 fichiers (20 de B1, puis B7a, puis le prompt programme)", () => {
+describe("exception de server-only : liste fermée de 28 fichiers (20 de B1, puis B7a, puis les prompts programme et revision)", () => {
   const WITHOUT = "export const x = 1;\n";
 
-  it("la liste compte exactement 27 fichiers, tous présents dans le dépôt", () => {
-    expect(EXEMPTED).toHaveLength(27);
-    expect(new Set(EXEMPTED).size).toBe(27);
+  it("la liste compte exactement 28 fichiers, tous présents dans le dépôt", () => {
+    expect(EXEMPTED).toHaveLength(28);
+    expect(new Set(EXEMPTED).size).toBe(28);
     const present = ["src/ai", "src/research", "src/grounding"].flatMap((dir) => sourceFiles(dir));
     for (const filePath of EXEMPTED) expect(present, filePath).toContain(filePath);
   });

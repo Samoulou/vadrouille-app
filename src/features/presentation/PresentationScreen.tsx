@@ -23,8 +23,9 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal } from "@/contracts";
+import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult } from "@/contracts";
 import { weekdayOf } from "@/contracts/values";
+import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
@@ -41,6 +42,7 @@ import {
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
 import type { NoOptionSlot, PresentationDay } from "./load";
+import { choixDuTri, demanderRevision as demanderRevisionServeur, type DemanderRevision } from "./revision";
 import { createServerDeckActions } from "./server-actions";
 
 /**
@@ -87,6 +89,14 @@ export interface PresentationScreenProps {
    * programme. Faux par défaut.
    */
   essai?: boolean;
+  /**
+   * Voyage d'essai lancé depuis l'app (spécification E2E-essai, lot 4 ; décision 0126) : à la fin du paquet, s'il y a au
+   * moins un « Pas pour moi », le programme est réécrit sans ces étapes (`reviserVoyageEssai`) ; la phrase « choix sans
+   * effet » laisse place à l'état de la réécriture. Faux par défaut.
+   */
+  revisable?: boolean;
+  /** Demande de révision injectée (tests) ; par défaut, l'action serveur. */
+  demanderRevision?: DemanderRevision;
   /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3). */
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
@@ -151,6 +161,8 @@ function Deck({
   canUnlock = true,
   placesFromGoogle = false,
   essai = false,
+  revisable = false,
+  demanderRevision = demanderRevisionServeur,
   actions: injected,
   deck = null,
   track,
@@ -182,6 +194,11 @@ function Deck({
    * et montre le refus dans un bandeau annoncé ; effacé à la réponse suivante ou à la fermeture de la feuille.
    */
   const [refusReponse, setRefusReponse] = useState<Exclude<RefusDuTri, "dejaDecidee"> | null>(null);
+
+  /** Réécriture du programme après le tri (lot 4, décision 0126) : en cours d'envoi, statut rendu, ou échec réseau. */
+  const [revision, setRevision] = useState<"envoi" | TrialRevisionResult["status"] | "erreur" | null>(null);
+  /** Une seule demande par paquet terminé : « Réessayer » et la saisie du code la relancent explicitement. */
+  const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
   const position = offset + state.index + 1;
@@ -260,6 +277,31 @@ function Deck({
     // `complete` ne dépend que de `actions`, fixé au montage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, state.prompt, state.pending, state.undo, offset, state.decisions.length, state.keptDays.length]);
+
+  /** Envoie les choix du tri pour réécrire le programme (lot 4) : seulement s'il y a au moins un « Pas pour moi ». */
+  function reviser() {
+    const { notForMe, liked } = choixDuTri(state.decisions);
+    if (notForMe.length === 0) return;
+    setRevision("envoi");
+    setAnnouncement(t.fin.revision.envoi);
+    void demanderRevision({ tripId, notForMe, liked })
+      .then((resultat) => (resultat.ok ? resultat.value.status : "erreur"))
+      .catch(() => "erreur" as const)
+      .then((statut) => {
+        setRevision(statut);
+        setAnnouncement(statut === "accessExpired" ? t.fin.revision.acces.aide : t.fin.revision[statut === "erreur" ? "unavailable" : statut]);
+      });
+  }
+
+  // Fin du paquet devenue définitive (plus d'annulation possible, aucune question ouverte) : la révision part une fois.
+  useEffect(() => {
+    if (!revisable || revisionDemandeeRef.current || card || state.prompt || state.pending || state.undo) return;
+    if (!state.decisions.some(({ decision }) => decision === "dislike")) return;
+    revisionDemandeeRef.current = true;
+    // Hors du rendu de l'effet (l'envoi pose un état) ; `reviser` lit l'état courant, seule la fin du paquet l'envoie.
+    queueMicrotask(reviser);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisable, card, state.prompt, state.pending, state.undo, state.decisions]);
 
   function passer() {
     track({ name: "deck_skipped", properties: { position, scope: "all" } });
@@ -430,7 +472,28 @@ function Deck({
           </Button>
         </div>
       ) : (
-        <DeckEnd variant={endVariant} closed={closedAtLoad} notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0} tripId={tripId} canUnlock={canUnlock} choixSansEffet={essai && endVariant !== "vide"} titleRef={endTitleRef} />
+        <DeckEnd
+          variant={endVariant}
+          closed={closedAtLoad}
+          notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0}
+          tripId={tripId}
+          canUnlock={canUnlock}
+          choixSansEffet={essai && !revisable && endVariant !== "vide"}
+          revision={
+            revision === null ? null : (
+              <EtatRevision
+                etat={revision}
+                onRetry={reviser}
+                onAcces={() => {
+                  // Code accepté : la saisie se démonte (nouvel envoi) ; le focus revient au titre de la fin (WCAG 2.4.3).
+                  reviser();
+                  endTitleRef.current?.focus();
+                }}
+              />
+            )
+          }
+          titleRef={endTitleRef}
+        />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
       <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
@@ -465,5 +528,31 @@ function Deck({
         </Suspense>
       ) : null}
     </main>
+  );
+}
+
+/**
+ * État de la réécriture du programme à la fin du tri (lot 4, décision 0126) : message (annoncé par la région
+ * `role="status"` de l'écran), « Réessayer » après un échec, saisie du code d'accès s'il a expiré (puis nouvel envoi).
+ */
+function EtatRevision({ etat, onRetry, onAcces }: { etat: "envoi" | TrialRevisionResult["status"] | "erreur"; onRetry: () => void; onAcces: () => void }) {
+  const r = t.fin.revision;
+  if (etat === "accessExpired") {
+    return (
+      <div data-part="revision" data-revision="accessExpired">
+        <SaisieCodeAcces ouverte={false} parcours={{ titre: r.acces.titre, aide: r.acces.aide, surAcces: onAcces, focusAuMontage: true, niveauTitre: 3 }} />
+      </div>
+    );
+  }
+  const echec = etat === "erreur" || etat === "unavailable";
+  return (
+    <div data-part="revision" data-revision={etat} className="flex flex-col gap-3">
+      <p className={echec || etat === "capReached" ? "text-corps text-ink" : "text-corps text-ink-2"}>{r[etat === "erreur" ? "unavailable" : etat]}</p>
+      {echec ? (
+        <Button variant="secondary" onClick={onRetry} className="self-start">
+          {r.reessayer}
+        </Button>
+      ) : null}
+    </div>
   );
 }

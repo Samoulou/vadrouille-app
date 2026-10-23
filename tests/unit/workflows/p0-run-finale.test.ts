@@ -8,6 +8,7 @@ import { FatalError } from "workflow";
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { creerModelesSimules } from "@/ai/modeles.simule";
 import { creerRedigerProgramme } from "@/ai/rediger-programme";
+import { creerRedigerRevision } from "@/ai/rediger-revision";
 import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { PhaseTravail } from "@/contracts/prototype-travail";
 import { capacitesAncrage } from "@/grounding/ancrage-zone";
@@ -22,7 +23,7 @@ import { demandeDe, type AppelFacture, type DemandeReservation, type Plafond, ty
 import { DELAI_SITE_MS, MARGE_SITE_MS, SITES_DUREE_MAX_MS, type VerificateurSites } from "@/server/p0/sites";
 import { DELAI_REQUETE_MS } from "@/server/usage/port";
 import { identifiantVoyageSaisi } from "@/domain/identifiant";
-import { DUREE_MAX_EXECUTION_MS, etapeProgramme, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Run } from "@/workflows/p0-run";
+import { DUREE_MAX_EXECUTION_MS, etapeProgramme, etapeRevision, LIMITE_FONCTION_MS, MARGE_FIN_ETAPE_MS, MARGE_VERIFICATION_AGENT_MS, p0Revision, p0Run, plafondsGoogleRevision } from "@/workflows/p0-run";
 
 import { lireFixtures } from "../../../scripts/p0/fichiers";
 import { clesDe, CLES_INTERDITES, sentinelles } from "../p0/harnais";
@@ -68,11 +69,16 @@ const d = vi.hoisted(() => ({
     ageMs: 0,
     /** Temps passé (horloge simulée) pendant la relecture de l'exécution, à l'ouverture d'une étape. */
     avanceALaLectureMs: 0,
+    /** Plafonds Google réservés relus avec l'exécution (révision, décision 0126 § 2) ; absents par défaut. */
+    forfaitGoogle: undefined as undefined | { textSearch: number; details: number; routesRequetes: number; routesElements: number },
   },
   requetesSql: [] as { texte: string; valeurs: readonly unknown[] | undefined }[],
   /** Brief saisi servi par `lireBriefSaisi` (E2E-essai, lot 3) et exécutions dont il a été lu. */
   briefSaisi: null as unknown,
   briefSaisiLus: [] as string[],
+  /** Version servie du voyage (lot 4, décision 0126) : contenu relu par `lireVersionCourante`, et voyages demandés. */
+  versionServie: null as unknown,
+  versionsLues: [] as string[],
   ecrituresPhase: [] as string[],
   composerP0Reel: vi.fn(),
   echecEcritureProgramme: false,
@@ -146,7 +152,15 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
     lireExecution: async () => {
       enCours();
       if (d.etat.avanceALaLectureMs > 0) vi.setSystemTime(Date.now() + d.etat.avanceALaLectureMs);
-      return { mode: d.etat.mode, brief: d.etat.brief, variante: "B", coutModelesMicros: d.etat.cout, jourQuota: "2026-10-12", numeroDuJour: 2 };
+      return {
+        mode: d.etat.mode,
+        brief: d.etat.brief,
+        variante: "B",
+        coutModelesMicros: d.etat.cout,
+        jourQuota: "2026-10-12",
+        numeroDuJour: 2,
+        ...(d.etat.forfaitGoogle === undefined ? {} : { forfaitGoogle: d.etat.forfaitGoogle }),
+      };
     },
     ecrirePhase: async (_pool: unknown, _runId: string, phase: PhaseTravail) => {
       enCours();
@@ -163,6 +177,10 @@ vi.mock("@/adapters/prototype-travail", async (importOriginal) => {
       enCours();
       d.briefSaisiLus.push(runId);
       return structuredClone(d.briefSaisi);
+    },
+    lireVersionCourante: async (_pool: unknown, tripId: string) => {
+      d.versionsLues.push(tripId);
+      return structuredClone(d.versionServie);
     },
     cloreExecution: async (_pool: unknown, _runId: string, code: string) => {
       if (d.etat.statut !== "en_cours") return;
@@ -287,6 +305,7 @@ function compositionSimulee(_garde: unknown, options: OptionsSimulees) {
   return {
     programme: () => ({
       redigerProgramme: creerRedigerProgramme(modeles, { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
+      redigerRevision: creerRedigerRevision(modeles, { modele: options.modeles.programme.modele, routage: options.modeles.routage }),
       textSearch: capacitesAncrage(places).textSearch,
       places: { details: (placeId: string) => places.details(placeId) },
       detailsLogement: capacitesAncrage(places).detailsLogement,
@@ -314,10 +333,12 @@ function reinitialiser(): void {
   d.modeReel = structuredClone(MODE_REEL);
   d.modeles = structuredClone(MODELES);
   d.programme = structuredClone(fixtures.modeles.programme);
-  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0 });
+  Object.assign(d.etat, { mode: "reel", brief: "edimbourg-1.json", statut: "en_cours", phase: null, cout: 0, clos: undefined, ageMs: 0, avanceALaLectureMs: 0, forfaitGoogle: undefined });
   d.requetesSql.length = 0;
   d.briefSaisi = null;
   d.briefSaisiLus.length = 0;
+  d.versionServie = null;
+  d.versionsLues.length = 0;
   d.ecrituresPhase.length = 0;
   d.echecEcritureProgramme = false;
   d.tablePresente = true;
@@ -1407,5 +1428,100 @@ describe("p0Run sur un brief saisi dans l'app (E2E-essai, lot 3, critère 4 ; d�
     await refus(etapeProgramme({ runId: RUN_ID }));
     expect(d.composerP0Reel).not.toHaveBeenCalled();
     expect(capture.requetes).toHaveLength(0);
+  });
+});
+
+describe("p0Revision : « Pas pour moi » change le programme (E2E-essai, lot 4 ; décision 0126)", () => {
+  const BRIEF_FICHIER = JSON.parse(readFileSync(path.join(process.cwd(), "prototype/briefs/edimbourg-1.json"), "utf8")) as Record<string, unknown>;
+  const TRIP_ID = identifiantVoyageSaisi("Édimbourg", RUN_ID);
+  const ECARTEE = "Forteresse du rocher";
+  const AIMEE = "Taverne aux tourtes";
+  let idEcartee = "";
+  let idAimee = "";
+
+  /** Première version écrite par `etapeProgramme` (brief saisi), servie ensuite comme version courante. */
+  beforeEach(async () => {
+    d.etat.mode = "essai";
+    d.etat.brief = "saisi";
+    d.briefSaisi = structuredClone(BRIEF_FICHIER);
+    await etapeProgramme({ runId: RUN_ID });
+    d.versionServie = programmeEcrit().contenu;
+    idEcartee = String(etapeNommee(ECARTEE)[0]?.id);
+    idAimee = String(etapeNommee(AIMEE)[0]?.id);
+    // Nouvelle exécution de révision (même double de base) : table de travail, capture et SQL remis à zéro.
+    Object.assign(d.etat, { statut: "en_cours", phase: null, cout: 0, clos: undefined });
+    d.requetesSql.length = 0;
+    d.ecrituresPhase.length = 0;
+    capture = captureVide();
+  });
+
+  it("version servie relue ; le lieu « Pas pour moi » est absent de la nouvelle version, écrite sous le même voyage", async () => {
+    expect(idEcartee).toMatch(/^j\d+-\d+$/);
+    expect(await p0Revision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] })).toEqual({ runId: RUN_ID });
+    expect(d.etat.clos).toBeUndefined();
+    expect(d.etat.statut).toBe("programme_ecrit");
+    expect(d.versionsLues).toEqual([TRIP_ID]);
+    expect((programmeEcrit().contenu as { trip: { id: string } }).trip.id).toBe(TRIP_ID);
+    // La sortie simulée redonne le lieu écarté : le filet du code le retire (critère « absente de la nouvelle version »).
+    expect(etapeNommee(ECARTEE)).toHaveLength(0);
+    expect(etapeNommee(AIMEE).length).toBeGreaterThan(0);
+    expect(capture.textSearch.some((r) => r.texte.startsWith(`${ECARTEE},`))).toBe(false);
+  });
+
+  it("une requête revision (zdr, data_collection deny) : textes de l'IA et choix, aucune donnée Google ni verdict (canari)", async () => {
+    await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
+    expect(capture.requetes).toHaveLength(1);
+    expect(capture.requetes[0]).toMatchObject({ etape: "programme", prompt: { id: "revision", version: 1 }, routage: { data_collection: "deny", zdr: true } });
+    const contenu = capture.requetes[0]?.messages.map((message) => message.contenu).join("\n") ?? "";
+    expect(contenu).toContain(ECARTEE);
+    expect(contenu).toContain(`"pasPourMoi":["${idEcartee}"]`);
+    const prompts = JSON.stringify(capture.requetes);
+    for (const valeur of [...IDS_GOOGLE, ...AUTRES_GOOGLE]) expect(prompts).not.toContain(valeur);
+    for (const cle of ["placeId", "lat", "lng", "minutes", "exceptions", "toConfirm", "toReserve", "source", "locked", "segment", "durationMinutes"]) {
+      expect(contenu).not.toContain(`"${cle}"`);
+    }
+  });
+
+  it("choix mal formés, version d'un autre voyage ou sans étape écartée : brief_invalid avant toute requête", async () => {
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: ["ChIJ-SENTINELLE"], jAime: [] }));
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idEcartee] }));
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: ["j99-99"], jAime: [] }));
+    d.versionServie = null;
+    await refus(etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [] }));
+    expect(capture.requetes).toHaveLength(0);
+    expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
+  });
+
+  it("plafonds Google d'une révision (mineur 9 de la revue de la PR 717) : besoin de la version servie, sous le mode ; la révision tient dedans", async () => {
+    const plafonds = plafondsGoogleRevision("essai", d.versionServie, TRIP_ID, 1);
+    expect(plafonds).not.toBeNull();
+    expect(plafonds!.textSearch).toBeLessThan(90);
+    expect(plafonds!.routesElements).toBeLessThan(840);
+    expect(plafondsGoogleRevision("essai", d.versionServie, "proto_autre_44444444444444448444444444444444", 1)).toBeNull();
+    expect(plafondsGoogleRevision("essai", { trip: { id: TRIP_ID } }, TRIP_ID, 1)).toBeNull();
+    d.etat.forfaitGoogle = plafonds!;
+    await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
+    expect(d.etat.statut).toBe("programme_ecrit");
+    // Plafonds de l'étape : ceux réservés, jamais ceux du mode.
+    const lus = derniere?.plafonds ?? [];
+    expect(lus.find((p) => p.methode === "places_text_search")?.maxRequetes).toBe(plafonds!.textSearch);
+    expect(lus.find((p) => p.methode === "routes_matrix")).toMatchObject({ maxRequetes: plafonds!.routesRequetes, maxElements: plafonds!.routesElements });
+    // Toute la version vérifiée sous ces plafonds : aucun lieu laissé sans placeId faute de part.
+    expect(capture.textSearch.length).toBeLessThanOrEqual(plafonds!.textSearch);
+    const elements = capture.matrices.reduce((somme, m) => somme + m.origines.length * m.destinations.length, 0);
+    expect(elements).toBeLessThanOrEqual(plafonds!.routesElements);
+    // Mêmes lieux sans placeId que la première version (vérifiée aux plafonds du mode) : ceux que le double ne trouve pas.
+    const sansPlaceId = (jours: JourEcrit[]) =>
+      jours.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop !== undefined && item.stop.placeId === undefined ? [String(item.stop.name)] : []))).sort();
+    expect(sansPlaceId(joursEcrits())).toEqual(sansPlaceId((d.versionServie as { trip: { days: JourEcrit[] } }).trip.days).filter((nom) => nom !== ECARTEE));
+  });
+
+  it("révision arrêtée : etapeClore, aucune nouvelle version écrite (la précédente reste servie)", async () => {
+    d.programme = { jours: [{ date: "2026-11-23", creneaux: [{ debut: "15:00", nature: "visite", lieu: ECARTEE, pourquoi: "Encore." }] }] };
+    expect(await p0Revision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [] })).toEqual({ runId: RUN_ID });
+    expect(d.etat.statut).toBe("arretee");
+    // Code persisté comme une sortie illisible de `programme` (même règle que `etapeProgramme`).
+    expect(d.etat.clos).toBe("pipeline_failed");
+    expect(d.requetesSql.some((r) => r.texte.startsWith("INSERT INTO prototype.programmes"))).toBe(false);
   });
 });

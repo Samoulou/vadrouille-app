@@ -1,5 +1,6 @@
-import type { RevisionFixtures, Trip } from "@/contracts";
+import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -11,7 +12,7 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeCreationAdapter, prototypeTripAdapter } from "./prototype-instance";
+import { assertPrototypeAllowedOnProcess, deblocagesEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { shareAvailable } from "./share-guard";
@@ -235,6 +236,45 @@ export async function retenirDeblocageEssai(ctx: AdapterContext, tripId: string)
     await deblocagesEssai()?.retenir(ctx, tripId);
   } catch {
     // Cookie non écrit : le droit simulé de la portée reste ; la page n'échoue pas.
+  }
+}
+
+/**
+ * Voyage d'essai dont le tri réécrit le programme (spécification E2E-essai, lot 4 ; décision 0126) : voyage lancé depuis
+ * l'app (identifiant `proto_<slug>_<exécution>`, décision 0125 § 2). Les voyages d'un brief commité ne se révisent pas
+ * (leur fusible d'IA est entier, 0126 § 2).
+ */
+export function voyageEssaiRevisable(tripId: string): boolean {
+  // Même motif que `lireIdentifiantVoyageSaisi` (`src/domain/identifiant.ts`), source unique dans `@/contracts`.
+  return APP_TRIAL_TRIP_ID_PATTERN.test(tripId);
+}
+
+/** Statuts du lancement d'une révision ramenés au contrat (décision 0126) ; tout autre devient `unavailable`. */
+const STATUT_REVISION: ReadonlyMap<string, TrialRevisionResult["status"]> = new Map([
+  ["lancee", "started"],
+  ["en_cours", "inProgress"],
+  ["epuisees", "exhausted"],
+  ["acces_refuse", "accessExpired"],
+  ["cap_reached", "capReached"],
+  ["envelope_reached", "capReached"],
+  ["daily_quota_insufficient", "capReached"],
+]);
+
+/**
+ * « Pas pour moi » change le programme d'un voyage d'essai (spécification E2E-essai, lot 4 ; décision 0126) : lance la
+ * révision par le port de création de l'adaptateur `prototype` (même garde que le lancement : code d'accès, forfaits).
+ * Hors adaptateur `prototype`, hors organisation de l'essai ou port non branché : `unavailable`, rien n'est lancé. Ne lève
+ * jamais ; aucun journal.
+ */
+export async function reviserProgrammeEssai(ctx: AdapterContext, demande: TrialRevisionRequest): Promise<TrialRevisionResult> {
+  if (!isPrototypeAdapter() || ctx.organizationId !== PROTOTYPE_ORG_ID) return { status: "unavailable" };
+  try {
+    const reviser = revisionEssai();
+    if (reviser === null) return { status: "unavailable" };
+    const { statut } = await reviser({ tripId: demande.tripId, pasPourMoi: demande.notForMe, jAime: demande.liked });
+    return { status: STATUT_REVISION.get(statut) ?? "unavailable" };
+  } catch {
+    return { status: "unavailable" };
   }
 }
 

@@ -611,6 +611,8 @@ export default defineConfig([
       "src/ai/prompts/programme.ts",
       "src/ai/prompts/raisons.ts",
       "src/ai/prompts/recherche.ts",
+      // Décision 0126 (E2E-essai, lot 4) : prompt `revision`, chargé par `requetes.ts` (même justification).
+      "src/ai/prompts/revision.ts",
       "src/ai/requetes.ts",
       "src/ai/sorties.ts",
       "src/grounding/ancrage.ts",

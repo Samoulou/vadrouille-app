@@ -35,9 +35,11 @@ export interface SaisieCodeAccesProps {
    * `<main>` dans le cadre de l'écran appelant (`CreationShell`) ; `surAcces` est appelée une fois l'accès accepté.
    * `focusAuMontage` : le titre de la saisie reçoit le focus à l'affichage, quand elle remplace un écran où le focus
    * était déjà posé (relance de l'écran 5, WCAG 2.4.3) ; jamais au premier affichage d'une page.
+   * `niveauTitre` (1 par défaut) : niveau du titre de la saisie quand elle s'insère sous le titre d'un écran (fin du tri,
+   * E2E-essai, lot 4 : 3, sous le `<h2>` de la fin du paquet ; mineur 12 de la revue de la PR 717).
    * Absente : page `/prototype/executions`, inchangée.
    */
-  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void; readonly focusAuMontage?: boolean };
+  parcours?: { readonly titre: string; readonly aide: string; readonly surAcces: () => void; readonly focusAuMontage?: boolean; readonly niveauTitre?: 1 | 2 | 3 };
 }
 
 export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
@@ -74,11 +76,12 @@ export function SaisieCodeAcces({ ouverte, parcours }: SaisieCodeAccesProps) {
     envoiEnVol.current = true;
   };
 
+  const Titre = (["h1", "h2", "h3"] as const)[(parcours?.niveauTitre ?? 1) - 1] ?? "h1";
   const contenu = (
     <>
-      <h1 ref={titre} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
+      <Titre ref={titre} tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
         {parcours?.titre ?? t.titre}
-      </h1>
+      </Titre>
       <p role="status" className={acces ? "text-corps text-ink" : EMPTY_LIVE_REGION_CLASS}>
         {acces ? t.ouverte : null}
       </p>

@@ -225,6 +225,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; ticket 624, décisions 0115 et 0116 § 2 ; verdict Sécurité : approuvé sur le head `05eec13` (PR 632)",
   },
+  // Lot 4 du bout en bout (ticket 713, décision 0126) : entrée et rédaction de la révision après le tri, même régime que
+  // `rediger-programme.ts`. Verdict Sécurité demandé dans la PR du ticket 713.
+  ...["src/ai/entree-revision.ts", "src/ai/rediger-revision.ts"].map((fichier) => ({
+    fichier,
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) d'un nouveau module de `src/ai` du mode réel, exigé par `ligne/require-server-only` " +
+      "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; ticket 713, décision 0126 ; verdict Sécurité demandé (PR du ticket 713)",
+  })),
   // P0r3c-5 (ticket 352) : capacité de notation de l'étape finale (réponse 1 du Tech Lead à la revue de la PR 348 ;
   // amendement A3 de 0055 § 3 point 5). Verdict Sécurité demandé dans la PR du ticket 352.
   {

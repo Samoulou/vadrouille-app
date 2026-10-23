@@ -77,6 +77,19 @@ describe("essai: un seul prédicat, décidé par l'adaptateur (décision 0124 §
   it("mock : jamais « essai » (méthode absente)", async () => {
     const adapter = createMockTripAdapter();
     const [premier] = await adapter.listTrips({ organizationId: "mock_org_personnelle", userId: "u", role: "owner" });
-    expect((await loadPresentation(adapter, { organizationId: "mock_org_personnelle", userId: "u", role: "owner" }, premier!.id))?.essai).toBe(false);
+    const charge = await loadPresentation(adapter, { organizationId: "mock_org_personnelle", userId: "u", role: "owner" }, premier!.id);
+    expect(charge?.essai).toBe(false);
+    expect(charge?.revisable).toBe(false);
+  });
+
+  it("révisable (E2E-essai, lot 4 ; décision 0126) : voyage d'essai lancé depuis l'app seulement", async () => {
+    const commite = programme("programmes-essai", "proto_essai_20271010_1");
+    const deLApp = structuredClone(commite);
+    deLApp.trip.id = "proto_essai_0123abcd45674890a123456789abcdef";
+    const test = programme("programmes-test", "proto_test_20261012_1");
+    const adapter = createPrototypeAdapter({ programmes: source(commite, deLApp, test), relecteurs: { trajets: relecteur } });
+    expect(await loadPresentation(adapter, ctx, deLApp.trip.id)).toMatchObject({ essai: true, revisable: true });
+    expect(await loadPresentation(adapter, ctx, commite.trip.id)).toMatchObject({ essai: true, revisable: false });
+    expect(await loadPresentation(adapter, ctx, test.trip.id)).toMatchObject({ essai: false, revisable: false });
   });
 });

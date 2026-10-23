@@ -46,7 +46,10 @@ describe("src/workflows/index.ts", () => {
     expect(source).toContain("start(generateFullTrip, [entree], { region: REGION_WORKFLOWS })");
     // B10b : le quatrième est celui du recalcul d'un tri (`batchRecompute`, 0119 § 1.5 point 1), région fra1, même état.
     expect(source).toContain("start(batchRecompute, [entree], { region: REGION_WORKFLOWS })");
-    expect(source.match(/\bstart\(/g)).toHaveLength(4);
+    // Lot 4 du bout en bout (décision 0126 § 1) : le cinquième est celui de la révision d'un voyage d'essai (`p0Revision`),
+    // région fra1, entrée réduite à des identifiants maison.
+    expect(source).toContain("start(p0Revision, [entree], { region: REGION_WORKFLOWS })");
+    expect(source.match(/\bstart\(/g)).toHaveLength(5);
   });
 
   it("getRun : statut seul, ni entrée ni sortie relue", async () => {

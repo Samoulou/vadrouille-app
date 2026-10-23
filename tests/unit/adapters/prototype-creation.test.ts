@@ -32,6 +32,7 @@ function adaptateur(options: { port?: PortCreationEssai | null; etat?: EtatVoyag
   const port: PortCreationEssai = {
     lancer: vi.fn(async () => options.issue ?? { statut: "lancee", tripId: TRIP }),
     relancer: vi.fn(async () => options.issue ?? { statut: "lancee", tripId: TRIP }),
+    reviser: vi.fn(async () => ({ statut: "lancee" })),
     etat: vi.fn(async () => (options.etat === undefined ? { etat: "en_cours" as const, jours: 6 } : options.etat)),
   };
   const getTrip = vi.fn(async () => (options.jours === null ? null : { days: options.jours ?? JOURS }));

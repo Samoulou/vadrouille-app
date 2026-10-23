@@ -1,4 +1,4 @@
-import { TRIP_ID_PATTERN } from "@/contracts";
+import { APP_TRIAL_TRIP_ID_PATTERN, TRIP_ID_PATTERN } from "@/contracts";
 
 /**
  * Identifiant d'un voyage du prototype : `proto_<slug>_<AAAAMMJJ>_<n>` (spécification P0, « Sortie 1 »).
@@ -34,7 +34,7 @@ export function identifiantVoyage(destination: string, dateExecution: string, nu
  * trois chiffres au plus) des essais de `/prototype/executions`.
  */
 const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const VOYAGE_SAISI = /^proto_([a-z0-9-]{1,24})_([0-9a-f]{32})$/;
+const VOYAGE_SAISI = APP_TRIAL_TRIP_ID_PATTERN;
 
 export function identifiantVoyageSaisi(destination: string, runId: string): string {
   if (!RUN_ID.test(runId)) throw new RangeError("identifiant d'exécution non conforme");
