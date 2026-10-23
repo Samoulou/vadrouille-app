@@ -144,7 +144,7 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
       setRelance({ kind: "code" });
       return;
     }
-    setRelance({ kind: "echec", message: code === "cost_cap_reached" ? messages.creation.lancement.essai.plafond : e.relanceEchec });
+    setRelance({ kind: "echec", message: code === "cost_cap_reached" ? e.plafond : e.relanceEchec });
   }
 
   function surAcces() {
@@ -156,7 +156,8 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
   if (relance.kind === "code") {
     return (
       <CreationShell backHref={mesVoyagesRoute()}>
-        <SaisieCodeAcces ouverte={false} parcours={{ titre: e.acces.titre, aide: e.acces.aide, surAcces }} />
+        {/* Ouverte après l'appui sur « Réessayer » : le titre démonté perdait le focus, il passe au titre de la saisie (WCAG 2.4.3). */}
+        <SaisieCodeAcces ouverte={false} parcours={{ titre: e.acces.titre, aide: e.acces.aide, surAcces, focusAuMontage: true }} />
       </CreationShell>
     );
   }

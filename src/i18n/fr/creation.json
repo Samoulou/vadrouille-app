@@ -23,7 +23,7 @@
       },
       "nomAdresse": "Nom ou adresse du logement",
       "quartier": "Quartier",
-      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée : il est envoyé au fournisseur d'IA avec ton brief."
+      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée : il est envoyé au fournisseur d'IA avec ton brief, puis conservé 29 jours et supprimé. N'y mets ni e-mail ni numéro de téléphone."
     },
     "villes": {
       "titre": "Autres villes",
@@ -92,7 +92,8 @@
       "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
       "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
       "reessayer": "Réessayer",
-      "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés tels quels au fournisseur d'IA qui écrit ton programme, puis conservés 29 jours et supprimés. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée. Tu complètes toi-même la vérification."
+      "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés au fournisseur d'IA (hors UE) qui écrit ton programme, puis conservés 29 jours et supprimés. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée.",
+      "essaiVerification": "Ensuite, tu complètes toi-même la vérification de ton brief."
     },
     "verification": {
       "titre": "Vérifie ton brief",
@@ -219,6 +220,7 @@
     "essai": {
       "relance": "On relance la préparation de ton voyage…",
       "relanceEchec": "Impossible de relancer la préparation pour le moment. Réessaie dans un instant.",
+      "plafond": "Le plafond des essais est atteint. Réessaie plus tard.",
       "acces": {
         "titre": "Ton code d'accès",
         "aide": "Ton accès au site d'essai a expiré. Saisis ton code pour relancer la préparation de ton voyage."

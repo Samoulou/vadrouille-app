@@ -5,7 +5,16 @@ import path from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ComplementP0 } from "@/ai/complement-p0";
-import { CandidatPourModeleSchema, EntreeModelesSchema, LieuRetenuSchema, type CandidatPourModele, type EntreeModeles, type LieuRetenu } from "@/ai/entrees";
+import {
+  CandidatPourModeleSchema,
+  EntreeModelesSchema,
+  EntreeProgrammeSchema,
+  LieuRetenuSchema,
+  type CandidatPourModele,
+  type EntreeModeles,
+  type EntreeProgramme,
+  type LieuRetenu,
+} from "@/ai/entrees";
 import type { EntreeNotation } from "@/ai/noter-candidats";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
@@ -25,9 +34,11 @@ import {
   complementDepuisBrief,
   donneesProtegeesDepuisBrief,
   entreeModelesDepuisBrief,
+  entreeProgrammeDepuisBrief,
   lieuRetenuDepuisCandidat,
   type BornesRechercheP0,
   type CandidatPourModeleP0,
+  type EntreeProgrammeP0,
   type ComplementP0Structurel,
   type DonneesProtegeesP0,
   type EntreeModelesP0,
@@ -126,6 +137,24 @@ describe("p0: adaptateur vers la couche IA (vers-couche-ia.ts)", () => {
     expectTypeOf<ComplementP0Structurel>().toEqualTypeOf<ComplementP0>();
     expectTypeOf<BornesRechercheP0>().toEqualTypeOf<Omit<BornesRecherche, "delaiMs">>();
     expectTypeOf<DonneesProtegeesP0>().toEqualTypeOf<DonneesProtegees>();
+    expectTypeOf<EntreeProgrammeP0>().toEqualTypeOf<EntreeProgramme>();
+  });
+
+  it("programme (E2E-essai, lot 5) : `aEviter` transmis quand le brief en porte, absent sinon ; entrée valide", () => {
+    const [, brief] = BRIEFS[0] ?? [];
+    if (brief === undefined) throw new Error("aucun brief");
+    expect(brief.aEviter).toBeUndefined();
+    const sans = entreeProgrammeDepuisBrief(brief);
+    expect(sans).not.toHaveProperty("aEviter");
+    expect(EntreeProgrammeSchema.safeParse(sans).success).toBe(true);
+    const aEviter = (["nightlife", "market", "nature"] as const).filter((categorie) => !brief.envies.includes(categorie));
+    const avecBrief = BriefSchema.parse({ ...brief, aEviter });
+    const avec = entreeProgrammeDepuisBrief(avecBrief);
+    expect(avec.aEviter).toEqual(aEviter);
+    expect(EntreeProgrammeSchema.safeParse(avec).success).toBe(true);
+    // Une catégorie à la fois envie et « à éviter » est refusée par le brief et par l'entrée.
+    expect(BriefSchema.safeParse({ ...brief, aEviter: [brief.envies[0]] }).success).toBe(false);
+    expect(EntreeProgrammeSchema.safeParse({ ...sans, aEviter: [brief.envies[0]] }).success).toBe(false);
   });
 
   it("garde-fou du complément : les types dérivés par Parameters<…> restent exactement ComplementP0 (revue du head 5a955f8, mineur 7)", () => {

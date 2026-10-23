@@ -170,8 +170,8 @@ export function versEntreeQuartier(demande: LodgingRequest): EntreeQuartier {
 /**
  * Entrée de l'étape `programme` du prototype (décision 0115 § 2 et § 3 étape 1 ; spécification P0-programme-par-ia § 0
  * point 1) : **toutes les saisies du questionnaire** du brief de P0 (décision de Samuel du 2026-10-21) : destination et
- * pays, dates et heures d'arrivée et de départ, voyageurs, rythme (libellé de P0), envies, déplacements, budget des
- * repas, logements (texte saisi et nuits), billets à heure fixe et récit. Type distinct d'`EntreeModeles` (qui reste
+ * pays, dates et heures d'arrivée et de départ, voyageurs, rythme (libellé de P0), envies, catégories « à éviter »
+ * (lot 5 de E2E-essai), déplacements, budget des repas, logements (texte saisi et nuits), billets à heure fixe et récit. Type distinct d'`EntreeModeles` (qui reste
  * sans récit ni logement pour le MVP, B7-PO-1) ; construit par `src/server/p0/vers-couche-ia.ts` seul. **Aucun champ**
  * pour une donnée Google (identifiant, nom, adresse, position, horaire, statut, durée, verdict) : schéma strict, une clé
  * en trop est refusée avant toute requête.
@@ -188,6 +188,8 @@ export const EntreeProgrammeSchema = z
     voyageurs: z.strictObject({ adultes: z.number().int().min(1).max(9), enfants: z.number().int().min(0).max(9) }),
     rythme: z.enum(["tranquille", "equilibre", "intense"]),
     envies: z.array(CategorySchema).min(1).refine(sansDoublon, "envies sans doublon"),
+    /** Catégories « à éviter » saisies (lot 5 de E2E-essai), absentes quand rien n'est coché. */
+    aEviter: z.array(CategorySchema).min(1).refine(sansDoublon, "à éviter sans doublon").optional(),
     deplacements: z.array(MobilityModeSchema).min(1).refine(sansDoublon, "déplacements sans doublon"),
     budgetRepas: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
     logements: z.array(z.strictObject({ texte: texteBrief(120), nuits: z.number().int().min(1).max(60) })).min(1).max(5),
@@ -199,5 +201,9 @@ export const EntreeProgrammeSchema = z
   })
   .superRefine((entree, ctx) => {
     if (entree.depart < entree.arrivee) ctx.addIssue({ code: "custom", path: ["depart"], message: "départ avant l'arrivée" });
+    const envies = new Set<string>(entree.envies);
+    if ((entree.aEviter ?? []).some((categorie) => envies.has(categorie))) {
+      ctx.addIssue({ code: "custom", path: ["aEviter"], message: "à éviter commun avec les envies" });
+    }
   });
 export type EntreeProgramme = z.infer<typeof EntreeProgrammeSchema>;

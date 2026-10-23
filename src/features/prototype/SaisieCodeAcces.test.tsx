@@ -105,4 +105,13 @@ describe("p0: formulaire de saisie du code d'accès", () => {
     expect(surAcces).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).not.toHaveFocus();
   });
+
+  it("dans le parcours : le titre reçoit le focus à l'affichage avec `focusAuMontage`, jamais sans", () => {
+    const parcours = { titre: "Titre du parcours", aide: "Aide du parcours", surAcces: vi.fn() };
+    const { unmount } = render(<SaisieCodeAcces ouverte={false} parcours={parcours} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).not.toHaveFocus();
+    unmount();
+    render(<SaisieCodeAcces ouverte={false} parcours={{ ...parcours, focusAuMontage: true }} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Titre du parcours" })).toHaveFocus();
+  });
 });

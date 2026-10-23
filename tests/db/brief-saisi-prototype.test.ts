@@ -36,7 +36,7 @@ const BRIEF = {
   recit: "On aime la Rome antique.",
 };
 /** Clés de premier niveau de `BriefSchema` (`src/prototype/brief.ts`), celles que la contrainte admet. */
-const CLES_BRIEF = ["schema", "destination", "pays", "fuseau", "arrivee", "depart", "heureArrivee", "heureDepart", "voyageurs", "rythme", "envies", "deplacements", "budgetRepas", "logements", "engagements", "recit"];
+const CLES_BRIEF = ["schema", "destination", "pays", "fuseau", "arrivee", "depart", "heureArrivee", "heureDepart", "voyageurs", "rythme", "envies", "aEviter", "deplacements", "budgetRepas", "logements", "engagements", "recit"];
 
 const FORFAIT: Forfait = {
   nature: "execution",
@@ -134,7 +134,8 @@ describe("p0: brief saisi, une exécution porte un fichier ou un brief saisi (01
       ] as const) {
         expect((await inserer(await executionSaisi(), contenu)).code, libelle).toBe("23514");
       }
-      const toutes = { ...BRIEF, budgetRepas: 2, engagements: [] };
+      // `aEviter` admise depuis 0018_brief_saisi_a_eviter (E2E-essai, lot 5).
+      const toutes = { ...BRIEF, budgetRepas: 2, engagements: [], aEviter: ["nightlife"] };
       expect(Object.keys(toutes).sort()).toEqual([...CLES_BRIEF].sort());
       const run = await executionSaisi();
       expect((await inserer(run, toutes)).code).toBeUndefined();
@@ -224,7 +225,12 @@ describe("p0: réservation d'un brief saisi et lectures (0125 § 1, § 2 et § 4
     expect(
       await reserverExecution(poolReel, { mode: "essai", brief: "saisi", variant: "A", commitSha: SHA, forfait: FORFAIT, briefSaisi: { requestId, contenu: BRIEF } }, fermees),
     ).toEqual({ ok: true, runId: premier.runId, existante: true, destination: "Rome" });
-    expect((await lancerSaisi(randomUUID())).ok).toBe(true);
+    // Contre-épreuve : une clé nouvelle, sous les mêmes limites fermées, est bien refusée et rien n'est écrit pour elle.
+    const nouvelle = randomUUID();
+    expect(
+      await reserverExecution(poolReel, { mode: "essai", brief: "saisi", variant: "A", commitSha: SHA, forfait: FORFAIT, briefSaisi: { requestId: nouvelle, contenu: BRIEF } }, fermees),
+    ).toEqual({ ok: false, code: "daily_quota_insufficient" });
+    expect(await compter(`SELECT count(*) AS n FROM ${TABLE} WHERE request_id = $1`, [nouvelle])).toBe(0);
     expect(await compter("SELECT count(*) AS n FROM prototype.forfaits WHERE run_id = $1", [premier.runId])).toBe(1);
     // Lecture par l'étape : le brief tel qu'écrit.
     expect(await lireBriefSaisi(poolReel, premier.runId)).toEqual(BRIEF);
