@@ -48,7 +48,11 @@ export interface DeblocagesEssai {
  * `src/instrumentation.ts`. Ce module n'en lit ni la base, ni le cookie, ni la clé. Non branché : aucune photo.
  */
 export interface PhotosEssaiBranchees {
-  photo(placeId: string): Promise<PlacePhoto | null>;
+  /**
+   * Photo du lieu que rend `lieu` (le lieu d'une proposition du voyage demandé, lu par l'adaptateur), ou `null`. `lieu`
+   * n'est appelé qu'une fois la garde et le cookie d'accès vérifiés, avant toute réservation ; `null` : aucun appel.
+   */
+  photo(lieu: () => Promise<string | null>): Promise<PlacePhoto | null>;
 }
 
 interface Instance {

@@ -97,23 +97,41 @@ describe("ProposalDetailSheet", () => {
     };
     const { baseElement } = render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} photo={photo} />);
     const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
-    expect(within(dialog).getByRole("img", { name: `Photo de ${distillerie.stop.name}` })).toHaveAttribute("src", photo.url);
-    const auteur = within(dialog).getByRole("link", { name: "Ana" });
+    // Décorative (F13, mineur 13) : le titre de la feuille nomme déjà le lieu.
+    const image = dialog.querySelector("figure img")!;
+    expect(image).toHaveAttribute("src", photo.url);
+    expect(image).toHaveAttribute("alt", "");
+    // Liens externes annoncés « s'ouvre dans un nouvel onglet » (mineur 10).
+    const auteur = within(dialog).getByRole("link", { name: /^Ana\s*\(s'ouvre dans un nouvel onglet\)$/ });
     expect(auteur).toHaveAttribute("href", "https://maps.google.com/maps/contrib/1");
     expect(auteur).toHaveAttribute("rel", "noopener noreferrer");
-    expect(within(dialog).getByRole("link", { name: "voir sur Google Maps" })).toHaveAttribute("href", photo.mapsUrl);
+    expect(within(dialog).getByRole("link", { name: /^voir sur Google Maps\s*\(s'ouvre dans un nouvel onglet\)$/ })).toHaveAttribute("href", photo.mapsUrl);
     expect(within(dialog).queryByRole("link", { name: "Luís" })).toBeNull();
-    expect(dialog.querySelector("figcaption")?.textContent).toBe(`${messages.presentation.detail.photoPar}Ana, Luís · voir sur Google Maps`);
+    const nouvelOnglet = messages.presentation.detail.nouvelOnglet;
+    expect(dialog.querySelector("figcaption")?.textContent).toBe(`${messages.presentation.detail.photoPar}Ana${nouvelOnglet}, Luís · voir sur Google Maps${nouvelOnglet}`);
     expect(await axeViolations(baseElement)).toEqual([]);
   });
 
-  it("ProposalDetailSheet: photo sans lien Google Maps ni auteur : « Photo : Google Maps » ; image en échec : rien", () => {
+  it("ProposalDetailSheet: photo sans lien Google Maps ni auteur : « Photo : Google Maps » ; image en échec : la boîte reste, vide", () => {
     const photo = { url: "https://lh3.googleusercontent.com/place-photos/test", authors: [] };
     render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} photo={photo} />);
     const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
     expect(dialog.querySelector("figcaption")?.textContent).toBe(`${messages.presentation.detail.photoPar}Google Maps`);
     fireEvent.error(dialog.querySelector("img")!);
     expect(dialog.querySelector("figure")).toBeNull();
+    expect(dialog.querySelector("img")).toBeNull();
+    // Même boîte 4:3 qu'avec la photo : aucun saut de mise en page (mineur 7).
+    expect(dialog.querySelector("[data-part=boite-photo]")?.className).toContain("aspect-[4/3]");
+  });
+
+  it("ProposalDetailSheet: photo en attente : boîte réservée dès l'ouverture, sans image ni crédit (mineur 7)", () => {
+    render(<ProposalDetailSheet proposal={distillerie} weekday="mer." onClose={() => {}} onReturnFocus={() => {}} photoEnAttente />);
+    const dialog = screen.getByRole("dialog", { name: distillerie.stop.name });
+    const boite = dialog.querySelector("[data-part=boite-photo]")!;
+    expect(boite).toHaveAttribute("aria-hidden", "true");
+    expect(boite.className).toContain("aspect-[4/3]");
+    expect(dialog.querySelector("img")).toBeNull();
+    expect(dialog.querySelector("figcaption")).toBeNull();
   });
 
   it("ProposalDetailSheet: sans site, aucune ligne de source", () => {

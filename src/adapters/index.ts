@@ -283,15 +283,42 @@ export async function reviserProgrammeEssai(ctx: AdapterContext, demande: TrialR
 const PLACE_ID_PHOTO = /^[A-Za-z0-9_-]{1,256}$/;
 
 /**
+ * Lieu d'une proposition **du voyage demandé**, parmi les cartes que l'écran montre (`loadPresentation`) : l'aperçu
+ * (`listPreviewSlots`) d'un voyage d'essai non débloqué, ses propositions (`listProposals`) sinon. Voyage inconnu ou
+ * d'une autre organisation (les deux lectures rendent une liste vide), proposition absente ou sans lieu : `null`.
+ */
+async function lieuDeLaProposition(lecteur: TripAdapter, ctx: AdapterContext, tripId: string, proposalId: string): Promise<string | null> {
+  // L'aperçu d'abord : vide sans recomposition pour un voyage débloqué ou un programme qui porte ses propositions, qui
+  // passent alors par `listProposals` ; une seule recomposition des journées dans tous les cas.
+  const apercu = (await lecteur.listPreviewSlots(ctx, tripId)).flatMap((slot) => (slot.type === "proposal" ? [slot.proposal] : []));
+  const proposals = apercu.length > 0 ? apercu : await lecteur.listProposals(ctx, tripId);
+  return proposals.find((proposal) => proposal.id === proposalId)?.stop.placeId ?? null;
+}
+
+/**
  * Photo d'une carte du tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23 15:23 UTC), chargée à la
  * demande par les photos branchées sur l'adaptateur `prototype` (`src/server/p0/photos.ts` : garde du mode réel, cookie
- * d'accès, forfait réservé). Hors adaptateur `prototype`, hors organisation de l'essai, identifiant mal formé ou photos
- * non branchées : `null`, aucun appel. Ne lève jamais ; rien n'est stocké.
+ * d'accès, cadence et forfait réservé). **Le lieu n'est jamais pris de l'entrée** : il est lu sur la proposition
+ * `proposalId` du voyage `tripId`, dans le contexte d'organisation de la requête (F13-TL-2 : une proposition du voyage du
+ * demandeur seulement). Hors adaptateur `prototype`, hors organisation de l'essai, photos non branchées, voyage inconnu,
+ * proposition d'un autre voyage ou sans lieu, identifiant mal formé : `null`, aucun appel. Ne lève jamais ; rien n'est
+ * stocké.
  */
-export async function photoLieuEssai(ctx: AdapterContext, placeId: string): Promise<PlacePhoto | null> {
-  if (!isPrototypeAdapter() || ctx.organizationId !== PROTOTYPE_ORG_ID || !PLACE_ID_PHOTO.test(placeId)) return null;
+export async function photoLieuEssai(
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly proposalId: string },
+  lecteur: () => TripAdapter = getTripReader,
+): Promise<PlacePhoto | null> {
+  if (!isPrototypeAdapter() || ctx.organizationId !== PROTOTYPE_ORG_ID) return null;
   try {
-    return (await photosEssai()?.photo(placeId)) ?? null;
+    const photos = photosEssai();
+    if (photos === null) return null;
+    // Le voyage n'est lu qu'après la garde et le cookie d'accès (`src/server/p0/photos.ts`) : sans code d'accès, aucune lecture.
+    const lieu = async () => {
+      const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
+      return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
+    };
+    return (await photos.photo(lieu)) ?? null;
   } catch {
     return null;
   }

@@ -8,7 +8,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import type { PlacePhoto } from "@/contracts/photo";
 
-import { creditPhoto, DeckCard, deckCardTag } from "./DeckCard";
+import { CreditPhoto, DeckCard, deckCardTag } from "./DeckCard";
 
 const byId = (id: string) => propositions.find((p) => p.id === id)!;
 const chateau = byId("prop-j1-chateau");
@@ -64,16 +64,21 @@ describe("DeckCard", () => {
     mapsUrl: "https://www.google.com/maps/photo",
   };
 
-  it("DeckCard: photo du lieu dans la même boîte, crédit « Photo : auteurs · Google Maps » annoncé, aucun lien dans la carte", async () => {
+  it("DeckCard: photo décorative (alt vide, F13) dans la même boîte, crédit « Google Maps · Photo : auteurs » en description, aucun lien", async () => {
     const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
     const { container } = render(<DeckCard proposal={chateau} context={CONTEXTE} photo={PHOTO} {...handlers} />);
     const card = screen.getByRole("button", { name: `Voir le détail de ${chateau.stop.name}` });
     const image = card.querySelector("img")!;
     expect(image).toHaveAttribute("src", PHOTO.url);
-    expect(image).toHaveAttribute("alt", `Photo de ${chateau.stop.name}`);
+    // Le nom du lieu est le nom accessible de la carte : l'image ne le répète pas (mineur 13 de la revue du head `8232ddb`).
+    expect(image).toHaveAttribute("alt", "");
     expect(image).toHaveAttribute("loading", "lazy");
     expect(image).toHaveAttribute("referrerpolicy", "no-referrer");
-    const credit = within(card).getByText("Photo : Ana, Luís · Google Maps");
+    const credit = container.querySelector<HTMLElement>("[data-part=credit]")!;
+    expect(credit.textContent).toBe("Google Maps · Photo\u00a0: Ana, Luís");
+    expect(credit.querySelector("[translate=no]")?.textContent).toBe("Google Maps");
+    // Au plus deux lignes, quel que soit le nombre d'auteurs (mineur 9).
+    expect(credit.className).toContain("line-clamp-2");
     expect(card.getAttribute("aria-describedby")?.split(" ")).toContain(credit.id);
     expect(within(card).queryByText("Photo du lieu")).toBeNull();
     expect(card.querySelector("a")).toBeNull();
@@ -82,8 +87,25 @@ describe("DeckCard", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it("DeckCard: crédit sans auteur nommé : « Photo : Google Maps »", () => {
-    expect(creditPhoto({ url: PHOTO.url, authors: [] })).toBe("Photo\u00a0: Google Maps");
+  it("DeckCard: crédit sans auteur nommé : « Google Maps » seul", () => {
+    const { container } = render(<CreditPhoto photo={{ url: PHOTO.url, authors: [] }} />);
+    expect(container.textContent).toBe("Google Maps");
+  });
+
+  it("DeckCard: photo en attente : l'emplacement garde sa boîte, sans icône ni libellé (mineur 8) ; même hauteur avec et sans photo", () => {
+    const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
+    const attente = render(<DeckCard proposal={chateau} photoEnAttente {...handlers} />);
+    const emplacement = attente.container.querySelector("[data-part=emplacement-photo]")!;
+    expect(emplacement.textContent).toBe("");
+    expect(emplacement.querySelector("svg")).toBeNull();
+    const boite = emplacement.className.split(" ").filter((c) => c.startsWith("h-") || c.startsWith("min-h-"));
+    attente.unmount();
+    const avec = render(<DeckCard proposal={chateau} photo={PHOTO} {...handlers} />);
+    const photo = avec.container.querySelector("[data-part=photo]")!;
+    expect(photo.className.split(" ").filter((c) => c.startsWith("h-") || c.startsWith("min-h-"))).toEqual(boite);
+    avec.unmount();
+    const sans = render(<DeckCard proposal={chateau} {...handlers} />);
+    expect(sans.getByText("Photo du lieu")).toBeInTheDocument();
   });
 
   it("DeckCard: image en échec : l'emplacement « Photo du lieu » revient, sans message", () => {

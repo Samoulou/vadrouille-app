@@ -42,7 +42,7 @@ import {
 } from "./deck";
 import { DeckEnd, type DeckEndVariant } from "./DeckEnd";
 import type { NoOptionSlot, PresentationDay } from "./load";
-import { usePhotoLieu } from "./photo";
+import { usePhotoCarte, type DemanderPhoto } from "./photo";
 import { choixDuTri, demanderRevision as demanderRevisionServeur, type DemanderRevision } from "./revision";
 import { createServerDeckActions } from "./server-actions";
 
@@ -98,6 +98,8 @@ export interface PresentationScreenProps {
   revisable?: boolean;
   /** Demande de révision injectée (tests) ; par défaut, l'action serveur. */
   demanderRevision?: DemanderRevision;
+  /** Demande de photo d'une carte injectée (tests, décision 0128) ; par défaut, l'action serveur. */
+  demanderPhoto?: DemanderPhoto;
   /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3). */
   recorderKind?: RecorderKind;
   /** Enregistreur injecté (tests) ; prime sur `recorderKind`. */
@@ -164,6 +166,7 @@ function Deck({
   essai = false,
   revisable = false,
   demanderRevision = demanderRevisionServeur,
+  demanderPhoto,
   actions: injected,
   deck = null,
   track,
@@ -202,10 +205,10 @@ function Deck({
   const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
-  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, données de lieux Google), puis celle du détail
-  // ouvert, servie par la même demande de la page.
-  const photoCarte = usePhotoLieu(card?.stop.placeId, placesFromGoogle);
-  const photoDetail = usePhotoLieu(detail?.stop.placeId, placesFromGoogle);
+  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, données de lieux Google ; jamais la carte
+  // suivante en avance), puis celle du détail ouvert, servie par la même demande de la page.
+  const photoCarte = usePhotoCarte(tripId, card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
+  const photoDetail = usePhotoCarte(tripId, detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
   const position = offset + state.index + 1;
   const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
@@ -462,7 +465,8 @@ function Deck({
           <DeckCard
             className="contents"
             proposal={card}
-            photo={photoCarte}
+            photo={photoCarte.photo}
+            photoEnAttente={photoCarte.attente}
             context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
             isLastOption={isLastOption(state)}
             cardRef={cardRef}
@@ -530,7 +534,8 @@ function Deck({
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
             placesFromGoogle={placesFromGoogle}
-            photo={photoDetail}
+            photo={photoDetail.photo}
+            photoEnAttente={photoDetail.attente}
           />
         </Suspense>
       ) : null}

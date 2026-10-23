@@ -10,7 +10,7 @@ import type { composerPhotos } from "@/server/composition/p0-reel";
 import { errorNameOf, logEvent } from "@/server/log";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 import { forfaitPhoto, type Forfait } from "@/server/usage/forfait";
-import { reserverRelecture, type PoolSql, type ReglesForfait } from "@/server/usage/neon";
+import { reserverPhoto, type PoolSql, type ReglesForfait } from "@/server/usage/neon";
 import { horlogeSysteme, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
 import { creerRegistreForfait } from "@/server/usage/registre";
 
@@ -25,19 +25,28 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
  * À **chaque** photo, dans cet ordre, le premier refus l'emportant (refus : `null`, aucun appel ; la carte garde son
  * emplacement « photo ») :
  * 1. **même barrière que la relecture** : garde du mode réel ouverte (déploiement autre que la production, préversion de
- *    `p0-reel`) et cookie d'accès valide ; sinon aucune connexion à la base ;
- * 2. **réservation** d'un forfait de photo (`forfaitPhoto`, nature `relecture`, une ligne dans `prototype.forfaits` :
- *    deux fiches au prix plein, 0,007 USD) par `reserverRelecture`, sous les limites du prototype (`relectureDuMode`) ;
- *    aucun contrôle de la purge (0046 D16 point 8 vise ce qui est stocké ; une photo ne l'est jamais) ;
- * 3. **appels** : le client des photos de la composition (`composerPhotos`), borné par le registre en mémoire du forfait.
+ *    `p0-reel`) et cookie d'accès valide ; sinon aucune connexion à la base, aucune lecture du voyage ;
+ * 2. **appartenance au voyage** (F13-TL-2) : le lieu est celui que rend `lieu`, c'est-à-dire, pour `photoLieuEssai`
+ *    (`src/adapters/index.ts`), le lieu d'une proposition du voyage demandé ; `null` (carte d'un autre voyage, sans
+ *    lieu) : refus sans réservation ni journal ;
+ * 3. **cadence et réservation** (`reserverPhoto`, sous le verrou des forfaits) : 40 photos au plus par heure glissante,
+ *    comptées en base (`MAX_PHOTOS_PAR_HEURE`, F13-TL-2), puis un forfait de photo (`forfaitPhoto`, nature `relecture`,
+ *    une ligne dans `prototype.forfaits` : deux fiches au prix plein, 0,007 USD) sous les limites du prototype
+ *    (`relectureDuMode`). **Aucun contrôle de la purge** : `ouvrirGardeRelecture` ne la lit pas (c'est le relecteur
+ *    Routes qui la contrôle dans son `reserver`), et 0128 § 5 consigne cette dérogation à 0046 D16 point 8 ;
+ * 4. **appels** : le client des photos de la composition (`composerPhotos`), borné par le registre en mémoire du forfait.
  *
- * La photo est une **donnée Google** : rendue à la route seulement, jamais stockée, journalisée ni mise en cache par ce
+ * La photo est une **donnée Google** : rendue à l'action seulement, jamais stockée, journalisée ni mise en cache par ce
  * module. Un échec après la garde écrit `essai.photo_unavailable` avec un nom fermé seulement (`ReservationImpossible`,
- * `PlafondAtteint`, ou le nom de l'erreur du client), jamais un identifiant de lieu, une adresse ni un message.
+ * `PlafondAtteint`, ou le nom de l'erreur du client), jamais un identifiant de lieu, une adresse ni un message. Un lieu
+ * introuvable chez Google (404, `place_not_found`) vaut « aucune photo », sans journal.
  */
 
 /** Client des photos tel que la composition le rend (`ClientPhotosLieu` de `@/grounding/interfaces`). */
 export type ClientPhotos = ReturnType<typeof composerPhotos>["photos"];
+
+/** Photos au plus par heure glissante, toutes sessions d'accès confondues (F13-TL-2 : 40 par heure et par session). */
+export const MAX_PHOTOS_PAR_HEURE = 40;
 
 /** Largeur demandée au média : la carte fait au plus 358 px de large à 390 px d'écran ; × 2,2 pour les écrans denses. */
 export const LARGEUR_PHOTO_PX = 800;
@@ -47,8 +56,11 @@ export const SKUS_PHOTO = { liste: "places_details_essentials_ids_only", media: 
 
 /** Photos d'un voyage d'essai, branchées sur l'adaptateur `prototype` (`src/adapters/prototype-instance.ts`). */
 export interface PhotosEssai {
-  /** Photo du lieu, ou `null` (garde fermée, aucune photo, quota, erreur). Ne lève jamais. */
-  photo(placeId: string): Promise<PlacePhoto | null>;
+  /**
+   * Photo du lieu que rend `lieu` (appelé garde ouverte et cookie valide seulement, avant la réservation), ou `null`
+   * (garde fermée, lieu absent, cadence, aucune photo, quota, erreur). Ne lève jamais.
+   */
+  photo(lieu: () => Promise<string | null>): Promise<PlacePhoto | null>;
 }
 
 export type DependancesPhotos = DependancesAcces & {
@@ -86,7 +98,7 @@ const codeDe = (erreur: unknown): string | undefined => {
   return typeof code === "string" ? code : undefined;
 };
 
-/** Contrat de la route (`PlacePhoto`) : noms anglais, liens facultatifs ; une forme invalide vaut « aucune photo ». */
+/** Contrat de l'action (`PlacePhoto`) : noms anglais, liens facultatifs ; une forme invalide vaut « aucune photo ». */
 function versContrat(photo: Awaited<ReturnType<ClientPhotos["photo"]>>): PlacePhoto | null {
   if (photo === null) return null;
   const lu = PlacePhotoSchema.safeParse({
@@ -110,7 +122,7 @@ export function creerPhotosEssai(dependances: DependancesPhotos = {}): PhotosEss
     });
 
   return {
-    async photo(placeId) {
+    async photo(lieu) {
       let cookie: string | undefined;
       try {
         cookie = await lireCookie();
@@ -119,18 +131,28 @@ export function creerPhotosEssai(dependances: DependancesPhotos = {}): PhotosEss
         return null;
       }
       let choisi: Awaited<ReturnType<typeof reglage>> = null;
+      let placeId: string | null = null;
+      let horsVoyage = false;
       const garde = await ouvrirGardeRelecture({
         env: dependances.env,
         execArgv: dependances.execArgv,
         maintenant: dependances.maintenant,
         cookie,
         async reserver() {
+          // Garde ouverte et cookie valide : le voyage est lu ici seulement, avant toute réservation.
+          placeId = await lieu();
+          if (placeId === null) {
+            horsVoyage = true;
+            return { ok: false, code: "usage_unavailable" };
+          }
           choisi = await reglage();
           if (choisi === null) return { ok: false, code: "usage_unavailable" };
-          return reserverRelecture(pool(), choisi.forfait, choisi.regles);
+          return reserverPhoto(pool(), choisi.forfait, choisi.regles, MAX_PHOTOS_PAR_HEURE);
         },
       });
       if (!garde.ok) {
+        // Lieu hors du voyage demandé (ou sans lieu) : refus sans journal, comme une carte sans photo.
+        if (horsVoyage) return null;
         // Garde fermée ou cookie absent : rien n'est journalisé (comme la relecture) ; refus après la garde : un nom fermé.
         if (PLAFONDS_ATTEINTS.has(garde.code)) logEvent("essai.photo_unavailable", { errorName: "PlafondAtteint" }, "warn");
         else if (garde.code === "usage_unavailable" || garde.code === "daily_quota_insufficient") {
@@ -139,12 +161,15 @@ export function creerPhotosEssai(dependances: DependancesPhotos = {}): PhotosEss
         return null;
       }
       const { forfait } = choisi!;
+      const lieuServi = placeId!;
       try {
         const registre = creerRegistreForfait(forfait, null, horloge);
         const client = await photos(garde.garde, registre, plafondsDu(forfait));
-        return versContrat(await client.photo(placeId, LARGEUR_PHOTO_PX));
+        return versContrat(await client.photo(lieuServi, LARGEUR_PHOTO_PX));
       } catch (erreur) {
         const code = codeDe(erreur);
+        // Lieu introuvable chez Google : « aucune photo », attendu, sans journal (mineur 17 de la revue du head `8232ddb`).
+        if (code === "place_not_found") return null;
         logEvent("essai.photo_unavailable", { errorName: code !== undefined && PLAFONDS_ATTEINTS.has(code) ? "PlafondAtteint" : errorNameOf(erreur) }, "warn");
         return null;
       }
