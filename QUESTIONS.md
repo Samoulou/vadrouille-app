@@ -613,3 +613,6 @@
 | Q622 | Ville par autocomplétion (0129) : poser un quota Autocomplete dans la console Google, en plus du plafond du studio (150 suggestions et 40 choix par jour). | Samuel | 2026-10-23 | Rien | Ouverte |
 | Q623 | Ville par autocomplétion (0129) : la migration 0019 doit entrer dans `MIGRATIONS_APPROUVEES` par une PR de workflow (`owner-approved`), puis être appliquée par Samuel ; sans elle, la recherche réelle reste fermée. | Samuel | 2026-10-23 | La recherche réelle de ville sur le site d'essai | Ouverte (PR préparée après la fusion de #732) |
 | Q624 | Ville par autocomplétion (0129) : passer les noms des pays (`pays.json`) dans `src/i18n` ? | UX/UI | 2026-10-23 | Rien | Ouverte |
+| Q625 | Ville par autocomplétion (0129) : conservation de l'empreinte du cookie (`acces_empreinte`) jusqu'à la fin de la phase 0 (forfaits en ajout seul, 0046) ; une durée plus courte demanderait d'amender 0046. | Sécurité | 2026-10-23 | Rien | Ouverte (signalée dans #732) |
+| Q626 | Élargir un jour les villes du MVP au-delà des 62 d'origine ? Décision à part, qui amenderait B9-PO-18 et `specs/B9-generation.md`. | Product Owner | 2026-10-23 | Rien | Ouverte |
+| Q627 | Retirer le `placeId` du contrat de lancement du site d'essai (envoyé mais inutilisé en aval) dans une PR à part ? | Tech Lead | 2026-10-23 | Rien | Ouverte |
