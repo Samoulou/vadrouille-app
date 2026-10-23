@@ -1,6 +1,6 @@
 # 0126 — Bout en bout, lot 4 : « Pas pour moi » change le programme (révision = nouvelle exécution liée, entrée sans donnée Google)
 
-Statut : **proposée** par le rôle IA (ticket #713), décision déléguée du **Tech Lead** (architecture, tests : « Qui décide quoi » de `docs/CONTEXT.md`), **à valider en revue** ; définitive à sa fusion, sans délai de veto (décision 0093). Verdict **Sécurité** : approuvé (revue consolidée de la PR #717, head `a3a0866`). Dépense : la part **modèles** d'une révision reste sous le fusible de 2 USD par voyage (réponse de Samuel à Q601) ; la part **Google** d'une révision est un forfait nouveau, réduit au besoin de la version servie (§ 2.1), dont le coût maximal est écrit ci-dessous. **Une seule révision par voyage**, part Google comprise : réponse de Samuel du 2026-10-23, 07:21 UTC (Q613, carte du projet, § 2). Aucune migration. Elle ne supprime ni ne désactive aucun test.
+Statut : **proposée** par le rôle IA (ticket #713), décision déléguée du **Tech Lead** (architecture, tests : « Qui décide quoi » de `docs/CONTEXT.md`), **à valider en revue** ; définitive à sa fusion, sans délai de veto (décision 0093). Verdict **Sécurité** : approuvé (revue consolidée de la PR #717, head `a3a0866`). Dépense : la part **modèles** d'une révision reste sous le fusible de 2 USD par voyage (réponse de Samuel à Q601) ; la part **Google** d'une révision est un forfait nouveau, réduit au besoin de la version servie (§ 2.1), dont le coût maximal est écrit ci-dessous. **Une seule révision par voyage**, part Google comprise : réponse de Samuel du 2026-10-23, 07:21 UTC (Q613, carte du projet, § 2 ; consignée dans `QUESTIONS.md`, Q613, « Répondue », par la PR « chore: status » #724). Aucune migration. Elle ne supprime ni ne désactive aucun test.
 
 Date : 2026-10-23 · Décideur : Tech Lead (proposée par IA) · Ticket : #713 · Spécification : `specs/E2E-essai-bout-en-bout.md`, lot 4 ; D4 et D5 · Décisions liées : 0009, 0011 (§ 1, § 3), 0046 (S4, D13), 0093, 0117 (§ 3, S5), 0123, 0124, 0125
 
@@ -110,7 +110,7 @@ Le déclenchement a lieu à la fin du paquet, une fois l'annulation expirée, sa
 | --- | --- |
 | `started` | Message de confirmation |
 | `inProgress` | Message : réécriture déjà en cours |
-| `exhausted` | Message : programme déjà réécrit une fois |
+| `exhausted` | Message : le programme ne peut plus être réécrit |
 | `capReached` | Message : plafond des essais atteint |
 | Échec | Bouton « Réessayer » |
 | `accessExpired` | Saisie du code d'accès en place |
