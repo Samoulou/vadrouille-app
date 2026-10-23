@@ -218,7 +218,7 @@ export type TrialRevisionRequest = z.infer<typeof TrialRevisionRequestSchema>;
 
 /**
  * Statut d'une révision : `started` (la nouvelle version remplacera la version servie une fois écrite), `inProgress` (une
- * révision de ce voyage est déjà en cours), `exhausted` (le voyage a eu toutes ses révisions), `accessExpired` (code
+ * révision de ce voyage est déjà en cours), `exhausted` (le voyage a déjà eu sa révision), `accessExpired` (code
  * d'accès à saisir de nouveau), `capReached` (plafond des essais atteint), `unavailable` (toute autre cause).
  */
 export const TRIAL_REVISION_STATUSES = ["started", "inProgress", "exhausted", "accessExpired", "capReached", "unavailable"] as const;

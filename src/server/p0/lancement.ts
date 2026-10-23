@@ -194,7 +194,7 @@ export async function lancerBriefSaisi(demande: DemandeLancementSaisi, dependanc
         champ = valide.champ;
         return refus("entree_invalide");
       }
-      // Premier programme d'un voyage de l'app : fusible du mode moins la part de ses révisions (décision 0126 § 2).
+      // Premier programme d'un voyage de l'app : fusible du mode moins PART_HORS_PREMIER_PROGRAMME_MICROS, 1,50 USD (décision 0126 § 2).
       const lancement = lancementDuMode(MODE_LANCEMENT_APP, "saisi");
       const commitSha = commitDuDeploiement(dependances.env);
       if (lancement === null || commitSha === null) return refus("real_mode_unavailable");
@@ -298,7 +298,7 @@ export type DemandeRevisionSaisi = { readonly tripId: unknown; readonly pasPourM
 
 /**
  * Issue d'une révision : `lancee` (révision démarrée), `en_cours` (une révision de ce voyage est déjà en cours, rien
- * n'est réservé), `epuisees` (le voyage a déjà eu ses `REVISIONS_PAR_VOYAGE` révisions), ou un statut du lancement.
+ * n'est réservé), `epuisees` (le voyage a déjà eu sa révision, `REVISIONS_PAR_VOYAGE` = 1), ou un statut du lancement.
  */
 export type StatutRevision = StatutLancement | "en_cours" | "epuisees";
 
@@ -335,7 +335,7 @@ export type DependancesRevisionSaisi = DependancesLancementP0 & {
  *
  * Ordre : garde ; `P0RUN_COMPLET` ; choix (`choixRevisionValides`, voyage de l'app) ; mode et commit ; verrou S8 ; brief de
  * la version servie (même destination que le voyage), `BriefSchema`, plafonds ; clés de révision du voyage (une
- * révision en cours : `en_cours` ; toutes écrites : `epuisees`) ; réservation sous la première clé libre ; démarrage
+ * révision en cours : `en_cours` ; clé écrite, orpheline comprise : `epuisees`) ; réservation sous la première clé libre ; démarrage
  * de `p0Revision`. Une clé trouvée écrite par la réservation (demande simultanée) rend `en_cours` sans rien démarrer.
  * Aucun journal : ni choix, ni brief.
  */

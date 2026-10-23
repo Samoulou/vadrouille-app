@@ -61,7 +61,7 @@ vi.mock("@/workflows", () => {
       d.journal.push("complet");
       return d.complet;
     },
-    REVISIONS_PAR_VOYAGE: 2,
+    REVISIONS_PAR_VOYAGE: 1,
     NOMS_BRIEFS: [],
     briefLancable: () => false,
     briefTientDansLeMode: () => false,
@@ -117,7 +117,7 @@ const pool: PoolSql = {
 
 const BRIEF_VERSION = { destination: "Rome", recit: "brief de la version servie", logements: [{ texte: "Rome", nuits: 4 }] };
 const DEMANDE: DemandeRevisionSaisi = { tripId: TRIP, pasPourMoi: ["j1-2"], jAime: ["j1-1"] };
-const CLES = clesRevision(TRIP, 2);
+const CLES = clesRevision(TRIP, 1);
 
 let briefVersion: unknown;
 let version: unknown;
@@ -166,7 +166,7 @@ describe("p0: révision d'un voyage de l'app après le tri (E2E-essai, lot 4 ; d
       `version:${TRIP}`,
       "valider",
       "plafonds:essai",
-      "cles:2",
+      "cles:1",
       `servie:${TRIP}`,
       "plafonds",
       "mode:essai:revision:plafonds",
@@ -190,41 +190,32 @@ describe("p0: révision d'un voyage de l'app après le tri (E2E-essai, lot 4 ; d
     expect(choix).toEqual({ tripId: TRIP, pasPourMoi: ["j1-2"], jAime: ["j1-1"] });
   });
 
-  it("une révision terminée : la seconde clé ; deux écrites : epuisees ; une en cours : en_cours ; rien n'est réservé", async () => {
-    ecrites = [{ requestId: CLES[0]!, statut: "programme_ecrit", ecouleMs: 60_000 }];
-    expect(await reviser()).toEqual({ statut: "lancee" });
-    expect((d.reserver.mock.calls[0] as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
-    d.reserver.mockClear();
-    ecrites = [
-      { requestId: CLES[0]!, statut: "programme_ecrit", ecouleMs: 60_000 },
-      { requestId: CLES[1]!, statut: "arretee", ecouleMs: 60_000 },
-    ];
-    expect(await reviser()).toEqual({ statut: "epuisees" });
+  it("une seule révision par voyage (réponse de Samuel du 2026-10-23) : clé terminée ou arrêtée : epuisees ; en cours : en_cours ; rien n'est réservé", async () => {
+    expect(CLES).toHaveLength(1);
+    for (const statut of ["programme_ecrit", "arretee"]) {
+      ecrites = [{ requestId: CLES[0]!, statut, ecouleMs: 60_000 }];
+      expect(await reviser()).toEqual({ statut: "epuisees" });
+    }
     ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 60_000 }];
     expect(await reviser()).toEqual({ statut: "en_cours" });
     expect(d.reserver).not.toHaveBeenCalled();
   });
 
-  it("révision orpheline (en_cours au-delà de dureeMaxMs + marge, ou d'âge illisible) : clé prise, la suivante est réservée (bloquant 3 de la revue de la PR 717)", async () => {
+  it("révision orpheline (en_cours au-delà de dureeMaxMs + marge, ou d'âge illisible) : clé prise, plus « en cours » : epuisees (bloquant 3 de la revue de la PR 717)", async () => {
     // Double du mode : dureeMaxMs 900 000 ms ; marge des orphelines 300 000 ms.
     ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 900_000 + 300_000 }];
     expect(await reviser()).toEqual({ statut: "en_cours" });
     ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: 900_000 + 300_001 }];
-    expect(await reviser()).toEqual({ statut: "lancee" });
-    expect((d.reserver.mock.calls.at(-1) as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
-    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: null }];
-    expect(await reviser()).toEqual({ statut: "lancee" });
-    // Deux orphelines : rangs consommés.
-    ecrites = CLES.map((requestId) => ({ requestId, statut: "en_cours", ecouleMs: 10 * 3_600_000 }));
     expect(await reviser()).toEqual({ statut: "epuisees" });
+    ecrites = [{ requestId: CLES[0]!, statut: "en_cours", ecouleMs: null }];
+    expect(await reviser()).toEqual({ statut: "epuisees" });
+    expect(d.reserver).not.toHaveBeenCalled();
   });
 
   it("statut inattendu d'une clé : prise, jamais « en cours » ni libre (mineur 7 de la revue de la PR 717)", async () => {
     ecrites = [{ requestId: CLES[0]!, statut: "inconnu", ecouleMs: 1 }];
-    expect(await reviser()).toEqual({ statut: "lancee" });
-    expect((d.reserver.mock.calls.at(-1) as [unknown, { briefSaisi: { requestId: string } }])[1].briefSaisi.requestId).toBe(CLES[1]);
-    ecrites = CLES.map((requestId) => ({ requestId, statut: "inconnu", ecouleMs: 1 }));
     expect(await reviser()).toEqual({ statut: "epuisees" });
+    expect(d.reserver).not.toHaveBeenCalled();
   });
 
   it("clé trouvée écrite par la réservation (demande simultanée) : en_cours, jamais redémarrée", async () => {
@@ -284,11 +275,13 @@ describe("p0: révision d'un voyage de l'app après le tri (E2E-essai, lot 4 ; d
 
 describe("p0: clés de révision déterministes (décision 0126 § 5)", () => {
   it("une clé UUID par rang, stable pour un voyage, différente d'un voyage à l'autre", () => {
-    expect(CLES).toHaveLength(2);
-    expect(new Set(CLES).size).toBe(2);
-    for (const cle of CLES) expect(cle).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(clesRevision(TRIP, 2)).toEqual(CLES);
-    expect(clesRevision("proto_rome_55555555555555558555555555555555", 2)).not.toContain(CLES[0]);
-    expect(clesRevision(TRIP, 1)).toEqual([CLES[0]]);
+    const deux = clesRevision(TRIP, 2);
+    expect(deux).toHaveLength(2);
+    expect(new Set(deux).size).toBe(2);
+    for (const cle of deux) expect(cle).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(clesRevision(TRIP, 2)).toEqual(deux);
+    expect(clesRevision("proto_rome_55555555555555558555555555555555", 2)).not.toContain(deux[0]);
+    expect(clesRevision(TRIP, 1)).toEqual([deux[0]]);
+    expect(CLES).toEqual([deux[0]]);
   });
 });
