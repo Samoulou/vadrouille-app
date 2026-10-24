@@ -633,6 +633,50 @@ describe("p0: composition, appel de modèle par le client réel de modèles (S-3
     expect(corps.plugins).toBeUndefined();
     expect(corps.provider).toEqual({ data_collection: "deny", zdr: true });
   });
+
+  // Décision 0130 § 1 : le raisonnement est borné sur la rédaction **et** sur la révision (0126 § 4), à travers la
+  // composition réelle et le client réel (fetch double) : `redigerRevision` est la capacité qu'appelle `etapeRevision`.
+  it("0130 : redigerProgramme et redigerRevision envoient reasoning.max_tokens, max_tokens et le routage zdr ; notation et raisons n'en envoient pas", async () => {
+    cles.google.present = true;
+    const reponses = [
+      async () => reponseModele({ content: '{"jours":[]}' }),
+      async () => reponseModele({ content: '{"jours":[]}' }),
+      async () => reponseModele({ content: '{"notes":[]}' }),
+      async () => reponseModele({ content: '{"raisons":[]}' }),
+    ];
+    const { composition, appels } = monter(reponses, { data_collection: "deny", zdr: true });
+    const brief = JSON.parse(readFileSync(path.join(RACINE, "prototype/briefs/edimbourg-1.json"), "utf8")) as Brief;
+    const programme = composition.programme();
+    await programme.redigerProgramme(entreeProgrammeDepuisBrief(brief));
+    const entreeRevision = {
+      brief: entreeProgrammeDepuisBrief(brief),
+      programme: { jours: [{ date: "2026-11-23", etapes: [{ id: "j1-1", debut: "10:00", repas: false, lieu: "Musée maison" }, { id: "j1-2", debut: "12:30", repas: true, lieu: "Taverne maison" }] }] },
+      choix: { pasPourMoi: ["j1-1"], jAime: ["j1-2"] },
+    };
+    await programme.redigerRevision(entreeRevision as Parameters<RedigerRevision>[0]);
+    const entree = entreeModelesDepuisBrief(brief);
+    await composition.etapeFinale().noterCandidats({ entree, lot: [] });
+    await composition.etapeFinale().redigerRaisons({ entree, retenus: [] });
+    expect(appels).toHaveLength(4);
+    const corps = appels.map((appel) => JSON.parse(String(appel.init.body)) as { reasoning?: unknown; max_tokens?: unknown; provider?: unknown; messages?: { content?: unknown }[] });
+    for (const requete of corps.slice(0, 2)) {
+      expect(requete.reasoning).toEqual({ max_tokens: 8_000 });
+      expect(requete.max_tokens).toBe(32_000);
+      expect(requete.provider).toEqual({ data_collection: "deny", zdr: true });
+    }
+    // La seconde requête est bien la révision (prompt distinct, choix de la personne dans les données).
+    expect(JSON.stringify(corps[1]?.messages)).toContain("pasPourMoi");
+    for (const requete of corps.slice(2)) {
+      expect(requete.reasoning).toBeUndefined();
+      expect(requete.max_tokens).toBeUndefined();
+    }
+  });
+
+  // Décision 0130 § 1.4 : `reasoning` n'est admis que pour le modèle que 0130 nomme ; en changer demande de revoir 0130.
+  it("0130 : le modèle de la rédaction reste celui pour lequel le raisonnement borné a été décidé", () => {
+    const config = JSON.parse(lireDepot("prototype/config/modeles.json")) as { etapes: { programme?: string } };
+    expect(config.etapes.programme).toBe("deepseek/deepseek-v4.1-flash");
+  });
 });
 
 // --- Bloquant 1d de la PR 326 : requête web sans logement ni texte libre du brief --------------------------------------

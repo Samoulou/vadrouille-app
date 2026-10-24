@@ -4,7 +4,7 @@ import { FatalError } from "workflow";
 
 import { ecrireProgramme } from "@/adapters/prototype-ecriture";
 import { cloreExecution, ecrireCoutModeles, ecrirePhase, lireBriefSaisi, lireExecution, lireVersionCourante } from "@/adapters/prototype-travail";
-import type { ReponseModele } from "@/ai/client";
+import type { FinModele, ReponseModele } from "@/ai/client";
 import { MAX_RESULTATS_WEB } from "@/ai/client";
 import { lireProgramme, lieuxDuProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
@@ -721,6 +721,10 @@ type CompteursProgramme = {
   textsCut: number;
   modelCalls: number;
   unverifiedForCap: number;
+  /** Raison de fin fermée et jetons de la requête de rédaction (client réel seulement), jamais le texte (décision 0130 § 2). */
+  finishReason?: FinModele;
+  inputTokens?: number;
+  outputTokens?: number;
 } & CompteursSites;
 
 /**
@@ -830,6 +834,12 @@ async function ecrireVersion(
       // 1. Rédaction et lecture tolérante ; ordre écrit fixé une fois, avant toute vérification.
       compteurs.modelCalls += 1;
       const reponse = await redaction.rediger(capacites);
+      // Diagnostic (décision 0130 § 2) : raison de fin fermée et jetons, posés avant la lecture.
+      if (reponse.fin !== undefined) compteurs.finishReason = reponse.fin;
+      if (reponse.tokens !== undefined) {
+        compteurs.inputTokens = reponse.tokens.entree;
+        compteurs.outputTokens = reponse.tokens.sortie;
+      }
       await cout.ecrire();
       const lecture = lireProgramme(reponse.texte, { arrivee: brief.arrivee, depart: brief.depart });
       compteurs.daysRemoved = lecture.joursRetires;
