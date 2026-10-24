@@ -46,6 +46,10 @@ export const LOG_EVENTS = [
   // Décision 0125 § 2 (spécification E2E-essai, lot 3) : branchement de la création d'un voyage d'essai impossible au
   // démarrage ; `errorName` seulement (ni brouillon, ni brief, ni récit). L'étape de lancement rend alors une erreur.
   "essai.creation_unavailable",
+  // Décision 0128 (photos du tri d'un voyage d'essai) : photo non servie après la garde (réservation refusée, plafond,
+  // erreur du client Places), ou branchement impossible au démarrage ; `errorName` seulement (nom fermé ou nom de classe) :
+  // ni identifiant de lieu, ni adresse d'image, ni auteur, ni message. La carte garde son emplacement « photo ».
+  "essai.photo_unavailable",
   // B3b (spécification B3, B3b point 2) : adresse refusée par le contrôle refait avant l'envoi, envoi refusé par
   // l'implémentation désactivée du port, journal de Better Auth (niveau seulement, jamais le message ni ses
   // arguments), échec d'une opération de la liste blanche et de la purge technique (`action` et `errorName`

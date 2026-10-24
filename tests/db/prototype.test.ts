@@ -600,6 +600,9 @@ describe("invariants et contenus (0046 D24, S4)", () => {
       "google_cost_micros",
       "models_cost_micros",
       "created_at",
+      // 0019 (décision 0129 § 3) : suggestions de ville comptées, et empreinte HMAC du cookie d'accès (aucune donnée Google).
+      "autocomplete_requests",
+      "acces_empreinte",
     ]);
     expect(await colonnes("run_candidates")).toEqual(["id", "organization_id", "run_id", "cle", "candidat", "place_id", "expires_at"]);
     expect(await colonnes("programmes")).toEqual(["id", "organization_id", "run_id", "contenu", "expires_at"]);

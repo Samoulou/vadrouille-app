@@ -134,7 +134,9 @@ describe("usage: configuration des plafonds (B7c point 3)", () => {
     expect(() => chargerPlafondsUsage({ ...PLAFONDS_USAGE_TEST, skus: { ...PLAFONDS_USAGE_TEST.skus, details: "place_details_pro" } })).toThrow();
     expect(() => chargerPlafondsUsage({ ...PLAFONDS_USAGE_TEST, skus: { ...PLAFONDS_USAGE_TEST.skus, matrice: "places_details_pro" } })).toThrow();
     // Chaque SKU de la table de prix porte le préfixe de sa méthode ; la migration filtre sur ces mêmes préfixes.
-    const prefixeDe: Record<string, string> = { places_text_search: PREFIXES_SKU_QUOTA.textSearch, places_details: PREFIXES_SKU_QUOTA.details, routes_matrix: PREFIXES_SKU_QUOTA.matrice };
+    const prefixeDe: Record<string, string> = { places_text_search: PREFIXES_SKU_QUOTA.textSearch, places_details: PREFIXES_SKU_QUOTA.details, routes_matrix: PREFIXES_SKU_QUOTA.matrice,
+      // Recherche de ville du site d'essai : hors de tout forfait (le registre la refuse), préfixe propre à sa méthode.
+      places_autocomplete: "places_autocomplete" };
     for (const [nom, sku] of Object.entries(TABLE.skus)) expect(nom.startsWith(prefixeDe[sku.methode] ?? "?"), nom).toBe(true);
     const migration = readFileSync(path.join(RACINE, "db/migrations/0010_usage_forfait.sql"), "utf8");
     expect(migration).toContain(`starts_with(u.sku, '${PREFIXES_SKU_QUOTA.textSearch}')`);

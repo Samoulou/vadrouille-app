@@ -43,8 +43,24 @@ describe("ancrage: masques de champs exacts", () => {
     // et `identifiant` (`id`) en plus ; la composition de P0 ne les appelle pas (`tests/unit/p0/b8a-isolement.test.ts`).
     expect(constante("MASQUE_POSITION")).toBe("id,location");
     expect(constante("MASQUE_IDENTIFIANT")).toBe("id");
+    // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, soumise au verdict de la Sécurité) :
+    // suggestions (identifiant et textes de la suggestion seulement) et fiche Essentials de la ville choisie (pays et position).
+    expect(constante("MASQUE_SUGGESTIONS")).toBe("suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat");
+    expect(constante("MASQUE_FICHE_VILLE")).toBe("id,addressComponents,location");
+    // Décision 0128 (photos du tri) : la liste des photos (`photos`, SKU « IDs Only ») et le média (`photoUri`).
+    expect(constante("MASQUE_PHOTOS")).toBe("photos");
+    expect(constante("MASQUE_MEDIA_PHOTO")).toBe("photoUri");
     // Le client Places n'envoie aucun autre masque.
-    expect([...source.matchAll(/masque: ([A-Za-z_]+)/g)].map((m) => m[1])).toEqual(["MASQUE_TEXT_SEARCH", "MASQUE_DETAILS", "MASQUE_POSITION", "MASQUE_IDENTIFIANT"]);
+    expect([...source.matchAll(/masque: ([A-Za-z_]+)/g)].map((m) => m[1])).toEqual([
+      "MASQUE_TEXT_SEARCH",
+      "MASQUE_DETAILS",
+      "MASQUE_POSITION",
+      "MASQUE_IDENTIFIANT",
+      "MASQUE_SUGGESTIONS",
+      "MASQUE_FICHE_VILLE",
+      "MASQUE_PHOTOS",
+      "MASQUE_MEDIA_PHOTO",
+    ]);
   });
 });
 
@@ -60,6 +76,11 @@ describe("places: masque de champ inchangé", () => {
       MASQUE_DETAILS: "id,businessStatus,location,regularOpeningHours",
       MASQUE_POSITION: "id,location",
       MASQUE_IDENTIFIANT: "id",
+      // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, soumise au verdict de la Sécurité).
+      MASQUE_SUGGESTIONS: "suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat",
+      MASQUE_FICHE_VILLE: "id,addressComponents,location",
+      MASQUE_PHOTOS: "photos",
+      MASQUE_MEDIA_PHOTO: "photoUri",
     });
     const champ = ["website", "Uri"].join("");
     for (const [, valeur] of masques) expect(valeur).not.toMatch(/website/i);

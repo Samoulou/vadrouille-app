@@ -1905,6 +1905,26 @@ function importsExecutesDe(fichier: string, source: string): string[] {
 const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./recalcul", "./voyage-complet"];
 
 /**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
+ * demande de Samuel du 23 octobre 2026, décision 0129) : motifs des contrats, tables maison, pont des clients Google,
+ * barrière d'accès, plafond persistant (pool du prototype, table de prix, `reserverVille`) et port de consommation,
+ * jamais un paquet client (`server-only`).
+ */
+const IMPORTS_TERMINAL_VILLES: readonly string[] = [
+  "server-only",
+  "../../../prototype/config/prix-google.json",
+  "@/contracts/values",
+  "@/lib/fuseaux",
+  "@/server/composition/clients-google",
+  "@/server/p0/acces",
+  "@/server/p0/base",
+  "@/server/usage/cout-google",
+  "@/server/usage/neon",
+  "@/server/usage/periodes",
+  "@/server/usage/port",
+];
+
+/**
  * Exception nominative (P0r3b, ticket 311 ; décision 0055, section 1 point 2 et section 2 point 5). Deux entrées
  * nommées, chacune admise **seulement si** sa propriété est vérifiée sur le fichier réel (arbre syntaxique) :
  * - l'action serveur de la saisie du code (`src/server/actions/p0-acces.ts`), si son prologue porte `"use server"` : vue
@@ -1935,11 +1955,19 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
  * ajouté pour le webhook, est donc aussi admis derrière les entrées de P0, qui ne l'importent pas aujourd'hui ; il ne lit
  * aucune clé de service ni `process.env` (ses deux importeurs sont fixés par `ligne/server-env-imports`). Sécurité :
  * approuvé, revue du head d50acfa (PR 582).
+ *
+ * Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129) : entrée
+ * `src/server/actions/villes-essai.ts` (même propriété que la saisie du code : `"use server"`) et terminal
+ * `src/server/composition/villes.ts`, admis sans être parcouru au-delà d'une entrée seulement, s'il importe
+ * `server-only`, ne porte aucune directive et si ses imports exécutés sont ceux d'`IMPORTS_TERMINAL_VILLES`. Verdicts
+ * Tech Lead et Sécurité : décision 0129 (définitive à la fusion, 0093).
  */
 const FRONTIERE_P0R3B = {
   entrees: [
     { fichier: "src/server/actions/p0-acces.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
+    { fichier: "src/server/actions/villes-essai.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -1967,6 +1995,14 @@ const FRONTIERE_P0R3B = {
         // Non parcouru : ses imports exécutés sont bornés par nom (mineur 16 de la revue du head `193603d`).
         const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_WORKFLOWS.includes(i));
         return directives.length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
+    {
+      // Recherche de ville du site d'essai : non parcouru, imports exécutés bornés par nom (`IMPORTS_TERMINAL_VILLES`).
+      fichier: "src/server/composition/villes.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_VILLES.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
       },
     },
   ],
@@ -2151,11 +2187,12 @@ describe("p0: clé côté serveur seulement", () => {
     expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).toEqual([
       "src/server/actions/p0-acces.ts",
       "src/server/actions/p0-lancement.ts",
+      "src/server/actions/villes-essai.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
-    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts"]);
+    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts", "src/server/composition/villes.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
     expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
@@ -2217,6 +2254,39 @@ describe("p0: clé côté serveur seulement", () => {
       "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/p0-run.ts → src/ai/client.ts",
       "src/features/Lancement.tsx → src/server/actions/p0-lancement.ts → src/server/p0/lancement.ts → src/workflows/p0-run.ts → src/server/composition/p0-reel.ts",
     ]);
+  });
+
+  it("terminal de la recherche de ville (src/server/composition/villes.ts) : admis au-delà de l'action villes-essai seulement, avec server-only, sans directive, imports bornés", () => {
+    const resoudreFictif = (depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const SERVEUR = 'import "server-only";\n';
+    const VILLES = 'import { a } from "@/lib/fuseaux";\nimport { b } from "@/server/composition/clients-google";\n';
+    const depot = (villes: string, action = '"use server";\nimport { v } from "@/server/composition/villes";\n', depart = '"use client";\nimport { s } from "@/server/actions/villes-essai";\n') =>
+      new Map<string, string>([
+        ["src/features/Ville.tsx", depart],
+        ["src/server/actions/villes-essai.ts", action],
+        ["src/server/composition/villes.ts", villes],
+        ["src/server/composition/clients-google.ts", `${SERVEUR}import { c } from "@/grounding/client-fictif";\n`],
+        ["src/grounding/client-fictif.ts", `${SERVEUR}import { k } from "@/server/env/grounding";\n`],
+      ]);
+    const violations = (...args: Parameters<typeof depot>) => {
+      const d = depot(...args);
+      return atteintsServeurSeulement(["src/features/Ville.tsx"], (f) => d.get(f) ?? "", resoudreFictif).sort();
+    };
+    const PARCOURU = "src/features/Ville.tsx → src/server/actions/villes-essai.ts → src/server/composition/villes.ts";
+    // Propriété vérifiée : arrêt au terminal, rien au-delà.
+    expect(violations(`${SERVEUR}${VILLES}`)).toEqual([]);
+    // Sans server-only, avec une directive, ou un import exécuté hors de la liste bornée : fichier ordinaire, refusé.
+    for (const villes of [VILLES, `"use client";\n${SERVEUR}${VILLES}`, `${SERVEUR}${VILLES}import { g } from "@/grounding/client-fictif";\n`]) {
+      expect(violations(villes), JSON.stringify(villes)).toEqual([PARCOURU]);
+    }
+    // Action sans "use server", ou terminal atteint directement par un composant client : refusé.
+    expect(violations(`${SERVEUR}${VILLES}`, 'import { v } from "@/server/composition/villes";\n')).toEqual([PARCOURU]);
+    expect(violations(`${SERVEUR}${VILLES}`, undefined, '"use client";\nimport { v } from "@/server/composition/villes";\n')).toEqual([
+      "src/features/Ville.tsx → src/server/composition/villes.ts",
+    ]);
+    // Sur le dépôt : imports exécutés du terminal réel, exactement la liste bornée.
+    expect([...new Set(importsExecutesDe("src/server/composition/villes.ts", lireDepot("src/server/composition/villes.ts")))].sort()).toEqual([...IMPORTS_TERMINAL_VILLES].sort());
   });
 
   /**

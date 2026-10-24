@@ -1,28 +1,28 @@
-# État du studio — 2026-10-23 (153e cycle)
+# État du studio — 2026-10-23 (163e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 152e cycle.
+- Aucun message de Samuel depuis le 162e cycle.
 
 ## Fait
-- **Statut du 152e cycle** (#728) fusionné. Rien d'autre depuis : aucune PR ouverte hormis #701.
-- La routine Release a republié dans #studio la note v2026.10.23-09, qui dit encore les migrations 0016 à 0018 « non appliquées » et #722, #725 « en attente » ; les trois migrations sont appliquées et les deux PR fusionnées. À corriger dans la prochaine note.
+- **Statut du 162e cycle** (#743) fusionné.
+- **#736 `[data]`** (migration 0019 dans `db-migrate`) : revue favorable, `techlead-approved` posé.
 
 ## En cours
-- **#527 `[data]`** (`coords-purge` en échec) : cause trouvée dans les journaux, rien à corriger dans le dépôt. Les quatre secrets `COORDS_PURGE_PG*` de l'environnement `coords-purge` sont vides ; les 22 runs ont échoué depuis le 17 octobre, la purge n'a jamais tourné. Bloqué sur Q438 (Samuel).
-- **#701 `[release]`** : attend la fusion de Samuel. Elle porte désormais aussi #722 et #725 (`main` = `ced0695`).
-- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618.
+- **#737 `[release]`** `main` → `p0-reel` (photos du tri et ville au choix) : lien envoyé à Samuel le 23 octobre à 22:25 UTC, fusion par lui seul (« Create a merge commit »).
+- **#736 `[data]`** : attend `owner-approved` de Samuel (demandé après sa fusion de #737, un seul clic à la fois), puis db-migrate lancé par lui. Sans elle, la recherche Google de ville reste fermée et l'écran 1 se rabat sur la table élargie.
+- **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
+- Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
 ## Bloqué
-- **Test de bout en bout par Samuel** : fusion de #701 seulement.
 - **Ancienne chaîne en préversion** : Q538, Q551, Q556 sans objet pour le test de bout en bout ; à revoir pour le MVP.
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Après la fusion de #701 et le redéploiement : envoyer à Samuel un seul lien pour tester « Créer un voyage » jusqu'au programme.
-2. #527 : attend Q438 (Samuel) ; à rappeler à Samuel après son test de bout en bout.
-3. Note de version suivante : corriger l'état des migrations 0016, 0017 et 0018 ; lister 0126 (une révision), 0127 et les textes non maquettés (#716, #720).
+1. Après la fusion de #737 et le redéploiement : envoyer à Samuel un seul lien pour tester les photos et la ville au choix. Après la revue de #736 : lui demander `owner-approved` puis db-migrate.
+2. #527 : rappeler Q438 à Samuel après ses tests.
+3. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720.
 
 ## Décisions attendues de Samuel
 - **Réponses demandées** : Q509 (fait : 0011 et 0012 appliquées le 2026-10-20), fusion de #580 (`main` → `p0-reel`), Q525 (réserve Google et plafonds Places de la tâche A2), Q527 (barrière des appels réels de l'aperçu), Q529 (option (a) de la question 4 de 0102, refusée par la Sécurité sans amendement de S4), Q506 (fusible de 2 USD aussi en mode réel ?), Q518 et Q519 (tâche C de 0093), Q520 (plafonds de relecture de B8b).

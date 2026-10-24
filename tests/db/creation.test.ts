@@ -338,6 +338,14 @@ describe("création du voyage (B9b)", () => {
       fail("validation_failed", "draft.otherCities.1.name"),
     );
     expect(await adapter.createTrip(contexte(a), demande({ destination: "Atlantis" }))).toEqual(fail("validation_failed", "draft.destination"));
+    // Décision 0129 § 8 (bloquant 2 de la revue du head `de4ab92`) : le MVP garde les 62 villes d'origine ; une ville de
+    // la table élargie du site d'essai (Valence, Bilbao, Kyoto) reste refusée par `createTrip`.
+    for (const destination of ["Valence", "Valencia", "Bilbao", "Kyoto"]) {
+      expect(await adapter.createTrip(contexte(a), demande({ destination })), destination).toEqual(fail("validation_failed", "draft.destination"));
+    }
+    expect(await adapter.createTrip(contexte(a), demande({ otherCities: [ville("Lyon"), ville("Bordeaux", "2027-07-13")] }))).toEqual(
+      fail("validation_failed", "draft.otherCities.1.name"),
+    );
     expect(await adapter.createTrip(contexte(a), demande({ destination: "Lisbonne", otherCities: [ville("Madrid")] }))).toEqual(
       fail("validation_failed", "draft.otherCities.0.name"),
     );

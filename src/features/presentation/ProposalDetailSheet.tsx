@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { Proposal, Weekday } from "@/contracts";
+import type { PlacePhoto } from "@/contracts/photo";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
@@ -35,13 +36,20 @@ export interface ProposalDetailSheetProps {
    * modale recouvre celle du pied du paquet. Absente par défaut.
    */
   placesFromGoogle?: boolean;
+  /**
+   * Photo du lieu (voyage d'essai, décision 0128), la même que celle de la carte : affichée en grand avec l'attribution
+   * complète exigée par Google (auteurs, liens vers leur profil, photo sur Google Maps). Absente ou `null` : rien.
+   */
+  photo?: PlacePhoto | null;
+  /** Photo demandée, pas encore arrivée : sa boîte est réservée dès l'ouverture (aucun saut de mise en page). */
+  photoEnAttente?: boolean;
 }
 
 /**
  * Détail d'une proposition (F6-PO-12, provisoire UX/UI) : feuille modale en lecture seule ; aucune
  * décision ne s'y prend. Quand `ReasonBlock` existera (F5), le détail l'utilisera.
  */
-export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus, placesFromGoogle = false }: ProposalDetailSheetProps) {
+export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus, placesFromGoogle = false, photo = null, photoEnAttente = false }: ProposalDetailSheetProps) {
   const title = useRef<HTMLHeadingElement>(null);
   const stop = proposal?.stop;
   const faits = stop ? formatFaits(stop.facts) : "";
@@ -60,6 +68,7 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
             onReturnFocus();
           }}
         >
+          {photo ? <PhotoDetail photo={photo} /> : photoEnAttente ? <BoitePhoto /> : null}
           <div className="flex flex-col gap-1">
             <p className="text-corps-s text-ink-soft tabular-nums">
               {weekday
@@ -101,5 +110,70 @@ export function ProposalDetailSheet({ proposal, weekday, onClose, onReturnFocus,
         </DialogSheet>
       ) : null}
     </Dialog>
+  );
+}
+
+const LIEN = "font-semibold text-ink underline underline-offset-2";
+
+/** Boîte de la photo du détail (4:3, fond `muted`) : réservée pendant la demande, gardée si l'image échoue. */
+function BoitePhoto({ children }: { children?: ReactNode }) {
+  return (
+    <span data-part="boite-photo" aria-hidden={children ? undefined : true} className="relative block aspect-[4/3] w-full overflow-hidden rounded-block bg-muted">
+      {children}
+    </span>
+  );
+}
+
+/** Lien externe du crédit : nouvel onglet, annoncé aux lecteurs d'écran (mineur 10 de la revue du head `8232ddb`). */
+function LienExterne({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={LIEN}>
+      {children}
+      <span className="sr-only">{t.detail.nouvelOnglet}</span>
+    </a>
+  );
+}
+
+/**
+ * Photo du détail (décision 0128) : « Photo : <auteur> · voir sur Google Maps », chaque auteur lié à son profil s'il est
+ * connu, et la photo source sur Google Maps (conditions de Places API : créditer l'auteur, accès à la photo source).
+ * Image décorative (`alt=""`, F13) : le titre de la feuille nomme le lieu. Image en échec : la boîte reste, vide, et le
+ * crédit disparaît, sans message (aucun saut de mise en page).
+ */
+function PhotoDetail({ photo }: { photo: PlacePhoto }) {
+  const [enEchec, setEnEchec] = useState(false);
+  if (enEchec) return <BoitePhoto />;
+  return (
+    <figure data-part="photo" className="flex flex-col gap-2">
+      <BoitePhoto>
+        {/* eslint-disable-next-line @next/next/no-img-element -- image de Google servie telle quelle, ni optimisée ni gardée par Next.js (décision 0128) */}
+        <img
+          src={photo.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setEnEchec(true)}
+          className="absolute inset-0 size-full object-cover"
+        />
+      </BoitePhoto>
+      <figcaption data-part="credit" className="text-legende text-ink-2">
+        {t.detail.photoPar}
+        {photo.authors.map((author, rang) => (
+          <span key={`${rang}-${author.name}`}>
+            {rang > 0 ? ", " : null}
+            {author.profileUrl ? <LienExterne href={author.profileUrl}>{author.name}</LienExterne> : author.name}
+          </span>
+        ))}
+        {photo.authors.length > 0 ? " · " : null}
+        {photo.mapsUrl ? (
+          <LienExterne href={photo.mapsUrl}>
+            <span translate="no">{t.detail.photoGoogleMaps}</span>
+          </LienExterne>
+        ) : (
+          <span translate="no">{t.detail.photoGoogle}</span>
+        )}
+      </figcaption>
+    </figure>
   );
 }

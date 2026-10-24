@@ -14,7 +14,7 @@ import { creationRoutes } from "./routes";
 import { todayIso, validateTrip, type FieldError } from "./validation";
 
 /** Règles propres au site d'essai (écran 1, D1). */
-const ESSAI_CODES: ReadonlySet<FieldError> = new Set<FieldError>(["unknownCity", "singleCity", "tooLong"]);
+const ESSAI_CODES: ReadonlySet<FieldError> = new Set<FieldError>(["selectCity", "cityUnavailable", "cityCharacters", "singleCity", "tooLong"]);
 
 export interface BriefScreenProps {
   /** Enregistreur des mesures (`brief_completed`) : console en développement et en test, aucun en production. */

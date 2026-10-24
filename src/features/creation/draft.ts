@@ -47,6 +47,14 @@ export interface CommitmentForm {
 
 export interface TripForm {
   destination: string;
+  /**
+   * Site d'essai, ville choisie dans les suggestions Google Places (demande de Samuel du 23 octobre 2026) : le `placeId`
+   * (seul identifiant Google conservable), et le code du pays et le fuseau **maison** rendus par le serveur (« » : aucun
+   * choix). Aucun texte Google n'est gardé dans le brouillon. Effacés dès que la destination est modifiée.
+   */
+  placeId?: string;
+  country?: string;
+  timeZone?: string;
   start: string;
   end: string;
   lodging: LodgingForm;
@@ -151,7 +159,7 @@ const noMarks = (): BriefMarks => ({ travellers: false, pace: false, mealBudget:
 
 export function initialDraft(): DraftState {
   return {
-    trip: { destination: "", start: "", end: "", lodging: emptyLodging(), otherCities: [], commitments: [] },
+    trip: { destination: "", placeId: "", country: "", timeZone: "", start: "", end: "", lodging: emptyLodging(), otherCities: [], commitments: [] },
     tripReady: false,
     stage: "story",
     story: "",
@@ -270,7 +278,7 @@ export function adjacentLodgingCity(trip: TripForm, city: number, direction: 1 |
 }
 
 export type DraftAction =
-  | { type: "trip"; patch: Partial<Pick<TripForm, "destination" | "start" | "end">> }
+  | { type: "trip"; patch: Partial<Pick<TripForm, "destination" | "placeId" | "country" | "timeZone" | "start" | "end">> }
   | { type: "lodging"; city: number; patch: Partial<LodgingForm> }
   | { type: "addCity" }
   | { type: "city"; index: number; patch: Partial<Pick<CityForm, "name" | "arrival">> }
@@ -448,6 +456,9 @@ export function draftForLodging(trip: TripDraft): DraftState {
   }));
   const form: TripForm = {
     destination: trip.destination,
+    placeId: trip.destinationRegion?.placeId ?? "",
+    country: trip.destinationRegion?.country ?? "",
+    timeZone: trip.destinationRegion?.timeZone ?? "",
     start: trip.start,
     end: trip.end,
     lodging: lodgingForm(trip.lodging),

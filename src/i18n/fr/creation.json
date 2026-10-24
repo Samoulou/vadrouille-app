@@ -12,6 +12,23 @@
   "ecran1": {
     "titre": "Ton voyage",
     "destination": "Destination",
+    "ville": {
+      "aide": "Commence à taper, puis choisis ta ville dans la liste.",
+      "liste": "Villes suggérées",
+      "attribution": "Google Maps",
+      "recherche": "Recherche des villes…",
+      "suggestions": "{n} villes suggérées.",
+      "uneSuggestion": "1 ville suggérée.",
+      "aucune": "Aucune ville trouvée. Vérifie l'orthographe.",
+      "choix": "Vérification de la ville…",
+      "choisie": "Ville retenue : {ville} ({pays}).",
+      "acces": "Pour chercher ta ville, saisis d'abord le code d'accès du site d'essai.",
+      "accesTitre": "Code d'accès du site d'essai",
+      "accesAide": "Le code ouvre la recherche des villes, puis le lancement de ton programme.",
+      "indisponible": "La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.",
+      "limite": "Trop de recherches de villes en une minute. Réessaie dans une minute.",
+      "limiteJour": "La recherche des villes a atteint sa limite pour aujourd'hui. Écris le nom complet de ta ville, ou réessaie plus tard."
+    },
     "arrivee": "Arrivée",
     "depart": "Départ",
     "logement": {
@@ -75,7 +92,10 @@
       "dateHorsVoyage": "La date doit être comprise dans les dates du voyage.",
       "debut": "Indique l'heure de début.",
       "fin": "L'heure de fin doit suivre l'heure de début.",
-      "villeInconnue": "Cette ville n'est pas encore disponible sur le site d'essai. Essaie Rome ou Lisbonne.",
+      "villeChoisir": "Choisis ta ville dans la liste des suggestions.",
+      "nomIncomplet": "Écris le nom complet de ta ville, puis choisis-la dans la liste : c'est ce nom qui sert à ton programme.",
+      "paysInconnu": "Ce pays n'est pas encore disponible sur le site d'essai. Choisis une autre ville.",
+      "villeCaracteres": "Écris le nom de ta ville avec des lettres seulement, sans chiffres ni symboles.",
       "uneSeuleVille": "Une seule ville sur le site d'essai : retire cette ville.",
       "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée."
     }

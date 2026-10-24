@@ -5,7 +5,8 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
+import { CODES_ERREUR_GOOGLE, ErreurClientGoogle, PLACE_ID_GOOGLE } from "@/grounding/enveloppe-google";
 import { ancrerLogement as ancrerLogementP0, RAYON_BIAIS_METRES } from "@/grounding/ancrage";
 import { ancrerCandidats, ancrerLogementsSuggeres, verifierLogement, zoneEtDepart } from "@/grounding/ancrage-production";
 import { chargerFiches, ficherSerie, rafraichirPlaceId } from "@/grounding/fiches";
@@ -16,14 +17,24 @@ import { zoneDuSejour } from "@/grounding/zone";
 import {
   COUT_ESTIME_MICROS,
   createPlacesClient,
+  createPlacesPhotosClient,
+  JETON_SESSION,
   MASQUE_DETAILS,
+  MASQUE_FICHE_VILLE,
+  MASQUE_MEDIA_PHOTO,
+  MASQUE_PHOTOS,
   MASQUE_IDENTIFIANT,
   MASQUE_POSITION,
+  MASQUE_SUGGESTIONS,
   MASQUE_TEXT_SEARCH,
   ORIGINE_PLACES,
   SKU_DETAILS,
+  SKU_FICHE_VILLE,
   SKU_IDENTIFIANT,
+  SKU_MEDIA_PHOTO,
+  SKU_PHOTOS,
   SKU_POSITION,
+  SKU_SUGGESTIONS,
   SKU_TEXT_SEARCH,
   type OptionsPlaces,
 } from "@/grounding/places-client";
@@ -554,5 +565,221 @@ describe("places: horaires qui passent minuit (B8-PO-17)", () => {
     ]);
     expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440, finLendemain: 120 }]);
     expect((await client.details(PLACE_ID)).horaires).toEqual([{ jour: 5, debut: 1320, fin: 1440 }]);
+  });
+});
+
+describe("places : recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026)", () => {
+  const SESSION = "jeton-session-1";
+
+  it("motifs recopiés tenus égaux (mineur 16 de la revue du head `aa77422`, décision 0129) : placeId et jeton de session", () => {
+    // `src/grounding` n'importe pas `src/contracts` hors des tests ; les motifs partagés de l'application restent égaux à ceux du client.
+    expect(PLACE_ID_MOTIF.source).toBe(PLACE_ID_GOOGLE.source);
+    expect(PLACE_ID_MOTIF.flags).toBe(PLACE_ID_GOOGLE.flags);
+    expect(JETON_SESSION_MOTIF.source).toBe(JETON_SESSION.source);
+    expect(JETON_SESSION_MOTIF.flags).toBe(JETON_SESSION.flags);
+  });
+
+
+  it("suggestions : POST Autocomplete (New), villes seulement, français, jeton de session, masque fermé ; textes de la suggestion seuls", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json({
+          suggestions: [
+            { placePrediction: { placeId: PLACE_ID, structuredFormat: { mainText: { text: "SENTINELLE-PRINCIPAL" }, secondaryText: { text: "SENTINELLE-SECONDAIRE" } }, types: ["locality"] } },
+            { placePrediction: { placeId: "AUTRE_ID", structuredFormat: { mainText: { text: "SENTINELLE-SEUL" } } } },
+            { queryPrediction: { text: { text: "ignorée" } } },
+          ],
+        }),
+    ]);
+    expect(await client.suggererVilles("  Valen ", SESSION)).toStrictEqual([
+      { placeId: PLACE_ID, principal: "SENTINELLE-PRINCIPAL", secondaire: "SENTINELLE-SECONDAIRE" },
+      { placeId: "AUTRE_ID", principal: "SENTINELLE-SEUL", secondaire: null },
+    ]);
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe("/v1/places:autocomplete");
+    expect(new URL(url).search).toBe("");
+    expect(url).not.toContain(CLE);
+    expect(init.method).toBe("POST");
+    expect(init.cache).toBe("no-store");
+    expect(init.redirect).toBe("manual");
+    const entetes = new Headers(init.headers);
+    expect(entetes.get("x-goog-api-key")).toBe(CLE);
+    expect(entetes.get("x-goog-fieldmask")).toBe(MASQUE_SUGGESTIONS);
+    expect(JSON.parse(String(init.body))).toEqual({ input: "Valen", includedPrimaryTypes: ["(cities)"], languageCode: "fr", sessionToken: SESSION });
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", "places_autocomplete", SKU_SUGGESTIONS, COUT_ESTIME_MICROS.suggestions],
+    ]);
+  });
+
+  it("suggestions : aucune suggestion, liste vide ; saisie trop courte ou trop longue, jeton mal formé : refus sans appel", async () => {
+    const { client, transport } = monter([async () => json({})]);
+    expect(await client.suggererVilles("Zz", SESSION)).toEqual([]);
+    for (const [saisie, session] of [
+      ["V", SESSION],
+      ["x".repeat(81), SESSION],
+      ["Valen", ""],
+      ["Valen", "jeton avec espace"],
+      ["Valen", "x".repeat(37)],
+    ] as const) {
+      expect((await erreurDe(client.suggererVilles(saisie, session))).code, `${saisie} ${session}`).toBe("invalid_request");
+    }
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("suggestions : réponse hors schéma (identifiant mal formé, plus de 10 suggestions) refusée", async () => {
+    const suggestion = { placePrediction: { placeId: PLACE_ID, structuredFormat: { mainText: { text: "x" } } } };
+    const { client } = monter([
+      async () => json({ suggestions: [{ placePrediction: { placeId: "a b", structuredFormat: { mainText: { text: "x" } } } }] }),
+      async () => json({ suggestions: Array.from({ length: 11 }, () => suggestion) }),
+    ]);
+    expect((await erreurDe(client.suggererVilles("Valen", SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.suggererVilles("Valen", SESSION))).code).toBe("invalid_response");
+  });
+
+  it("fiche de la ville : GET Essentials dans la même session, masque fermé ; seuls le code du pays et la position sont rendus", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json({
+          id: PLACE_ID,
+          addressComponents: [
+            { longText: "SENTINELLE-VILLE", shortText: "SENTINELLE-VILLE", types: ["locality", "political"] },
+            { longText: "SENTINELLE-PAYS", shortText: "ES", types: ["country", "political"] },
+          ],
+          location: { latitude: 39.4699, longitude: -0.3763 },
+          displayName: { text: "SENTINELLE-NOM" },
+        }),
+    ]);
+    const fiche = await client.ficheVille(PLACE_ID, SESSION);
+    expect(fiche).toStrictEqual({ placeId: PLACE_ID, pays: "ES", position: { lat: 39.4699, lng: -0.3763 } });
+    expect(JSON.stringify(fiche)).not.toMatch(/SENTINELLE-/);
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe(`/v1/places/${PLACE_ID}`);
+    expect(Object.fromEntries(new URL(url).searchParams)).toEqual({ languageCode: "fr", sessionToken: SESSION });
+    expect(url).not.toContain(CLE);
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+    expect(new Headers(init.headers).get("x-goog-fieldmask")).toBe(MASQUE_FICHE_VILLE);
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku])).toEqual([["confirmee", "places_details", SKU_FICHE_VILLE]]);
+  });
+
+  it("fiche de la ville : pays absent ou mal formé, null ; autre identifiant ou position absente : refus ; entrée mal formée : refus sans appel", async () => {
+    const position = { latitude: 1.5, longitude: 2.5 };
+    const { client, transport } = monter([
+      async () => json({ id: PLACE_ID, location: position }),
+      async () => json({ id: PLACE_ID, addressComponents: [{ shortText: "Espagne", types: ["country"] }], location: position }),
+      async () => json({ id: "AUTRE_ID", location: position }),
+      async () => json({ id: PLACE_ID }),
+    ]);
+    expect((await client.ficheVille(PLACE_ID, SESSION)).pays).toBeNull();
+    expect((await client.ficheVille(PLACE_ID, SESSION)).pays).toBeNull();
+    expect((await erreurDe(client.ficheVille(PLACE_ID, SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.ficheVille(PLACE_ID, SESSION))).code).toBe("invalid_response");
+    expect((await erreurDe(client.ficheVille("a/b", SESSION))).code).toBe("invalid_request");
+    expect((await erreurDe(client.ficheVille(PLACE_ID, "a&b=c"))).code).toBe("invalid_request");
+    expect(transport).toHaveBeenCalledTimes(4);
+  });
+});
+
+// Décision 0128 : photos du tri d'un voyage d'essai (fiche au masque `photos`, puis média sans redirection).
+describe("places: photos du tri (décision 0128)", () => {
+  const NOM_PHOTO = `places/${PLACE_ID}/photos/SENTINELLE_REF_PHOTO`;
+  const IMAGE = "https://lh3.googleusercontent.com/place-photos/SENTINELLE-IMAGE=w800";
+  const FICHE = {
+    photos: [
+      {
+        name: NOM_PHOTO,
+        widthPx: 4000,
+        heightPx: 3000,
+        authorAttributions: [
+          { displayName: "Ana Sentinelle", uri: "https://maps.google.com/maps/contrib/123", photoUri: "https://lh3.googleusercontent.com/a/x" },
+          { displayName: "Luís Sentinelle", uri: "https://evil.example/profil" },
+          { displayName: "   " },
+        ],
+        googleMapsUri: "https://www.google.com/maps/place//data=SENTINELLE",
+      },
+    ],
+  };
+
+  function monterPhotos(reponses: (() => Promise<Response>)[]) {
+    const horloge = creerHorlogeManuelle();
+    const port = creerPortMemoire(horloge);
+    const appels: Appel[] = [];
+    const transport = vi.fn(async (url: string, init: RequestInit) => {
+      appels.push({ url, init });
+      const suivante = reponses.shift();
+      if (suivante === undefined) throw new Error("transport appelé une fois de trop");
+      return suivante();
+    });
+    const client = createPlacesPhotosClient({ usage: port, contexte: CONTEXTE, plafonds: [], horloge, environnement: ENV }, transport);
+    return { client, port, appels };
+  }
+
+  it("fiche au masque photos (IDs only), puis média de la première photo avec skipHttpRedirect ; clé en en-tête seulement", async () => {
+    const { client, appels, port } = monterPhotos([async () => json(FICHE), async () => json({ name: `${NOM_PHOTO}/media`, photoUri: IMAGE })]);
+    const photo = await client.photo(PLACE_ID, 800);
+    expect(photo).toEqual({
+      uri: IMAGE,
+      auteurs: [{ nom: "Ana Sentinelle", lien: "https://maps.google.com/maps/contrib/123" }, { nom: "Luís Sentinelle" }],
+      lienGoogleMaps: "https://www.google.com/maps/place//data=SENTINELLE",
+    });
+    expect(appels).toHaveLength(2);
+    const [fiche, media] = appels as [Appel, Appel];
+    expect(new URL(fiche.url).pathname).toBe(`/v1/places/${PLACE_ID}`);
+    expect(new Headers(fiche.init.headers).get("x-goog-fieldmask")).toBe(MASQUE_PHOTOS);
+    const adresseMedia = new URL(media.url);
+    expect(adresseMedia.origin).toBe(ORIGINE_PLACES);
+    expect(adresseMedia.pathname).toBe(`/v1/${NOM_PHOTO}/media`);
+    expect(Object.fromEntries(adresseMedia.searchParams)).toEqual({ maxWidthPx: "800", skipHttpRedirect: "true" });
+    expect(new Headers(media.init.headers).get("x-goog-fieldmask")).toBe(MASQUE_MEDIA_PHOTO);
+    for (const { url, init } of appels) {
+      expect(url).not.toContain(CLE);
+      expect(new Headers(init.headers).get("x-goog-api-key")).toBe(CLE);
+      expect(init.redirect).toBe("manual");
+      expect(init.cache).toBe("no-store");
+    }
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", "places_details", SKU_PHOTOS, 0],
+      ["confirmee", "places_details", SKU_MEDIA_PHOTO, prixUnitaireMicros(SKU_MEDIA_PHOTO)],
+    ]);
+    expect(prixUnitaireMicros(SKU_PHOTOS)).toBe(0);
+    // Le nom de ressource de la photo ne sort pas du client.
+    expect(JSON.stringify(photo)).not.toContain("SENTINELLE_REF_PHOTO");
+  });
+
+  it("aucune photo, ou seulement celles d'un autre lieu : null, sans appel au média", async () => {
+    for (const fiche of [{}, { photos: [] }, { photos: [{ name: "places/AUTRE_LIEU/photos/REF" }] }, { photos: [{ name: `places/${PLACE_ID}/photos/../x` }] }]) {
+      const { client, appels } = monterPhotos([async () => json(fiche)]);
+      expect(await client.photo(PLACE_ID, 800)).toBeNull();
+      expect(appels).toHaveLength(1);
+    }
+  });
+
+  it("image hors de googleusercontent.com, ou non https : invalid_response ; lien Google Maps non Google écarté", async () => {
+    for (const photoUri of ["https://evil.example/image.jpg", "http://lh3.googleusercontent.com/x", "https://googleusercontent.com.evil.example/x"]) {
+      const { client } = monterPhotos([async () => json(FICHE), async () => json({ photoUri })]);
+      expect((await erreurDe(client.photo(PLACE_ID, 800))).code).toBe("invalid_response");
+    }
+    const autre = { photos: [{ name: NOM_PHOTO, googleMapsUri: "https://evil.example/maps" }] };
+    const { client } = monterPhotos([async () => json(autre), async () => json({ photoUri: IMAGE })]);
+    expect(await client.photo(PLACE_ID, 800)).toEqual({ uri: IMAGE, auteurs: [] });
+  });
+
+  it("identifiant mal formé ou largeur hors de 1 à 4 800 : invalid_request, sans appel", async () => {
+    for (const [placeId, largeur] of [["a/b", 800], [PLACE_ID, 0], [PLACE_ID, 4801], [PLACE_ID, 1.5]] as const) {
+      const { client, appels } = monterPhotos([]);
+      expect((await erreurDe(client.photo(placeId, largeur))).code).toBe("invalid_request");
+      expect(appels).toHaveLength(0);
+    }
+  });
+
+  it("404 de la fiche : place_not_found ; 429 du média : upstream_rate_limited ; aucune sentinelle dans l'erreur", async () => {
+    const { client } = monterPhotos([async () => json({}, 404)]);
+    await expect(client.photo(PLACE_ID, 800)).rejects.toBeInstanceOf(ErreurAncrage);
+    const { client: limite } = monterPhotos([async () => json(FICHE), async () => json({ error: "SENTINELLE-FOURNISSEUR" }, 429)]);
+    const erreur = await erreurDe(limite.photo(PLACE_ID, 800));
+    expect(erreur.code).toBe("upstream_rate_limited");
+    for (const sentinelle of ["SENTINELLE-FOURNISSEUR", CLE, PLACE_ID]) expect(`${erreur.message}${String(erreur.stack)}`).not.toContain(sentinelle);
   });
 });
