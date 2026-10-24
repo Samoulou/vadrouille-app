@@ -1,14 +1,13 @@
-# État du studio — 2026-10-24 (166e cycle)
+# État du studio — 2026-10-24 (167e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Fil « Routine cycle du studio », 2026-10-24 : « c'est merge » (15:07 UTC, mise en ligne #750 fusionnée) : site d'essai redéployé, lien envoyé.
+- Aucun message de Samuel depuis le 166e cycle.
 
 ## Fait
-- **Statut du 165e cycle** (#748) fusionné.
-- **#749 `[ia]`** (raisonnement coupé pour la rédaction du programme, amendement 1 de 0130) fusionnée à 14:37 UTC ; mise en ligne **#750** fusionnée par Samuel à 15:07 UTC (d873688), déploiement prêt.
-- **Essai de Samuel du 2026-10-24 à 15:24 UTC réussi à l'étape du programme** : 8 jours, 53 créneaux, 49 lieux à vérifier, `finishReason` « stop », 1 169 jetons d'entrée, 7 970 de sortie ; aucune erreur ensuite dans le journal. La cause est confirmée et levée.
+- **Statut du 166e cycle** (#751) fusionné.
+- Rappel : l'essai de Samuel du 2026-10-24 à 15:24 UTC a écrit son programme (8 jours) sans erreur, après #749 et #750.
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
