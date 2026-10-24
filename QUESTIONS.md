@@ -616,3 +616,5 @@
 | Q625 | Ville par autocomplétion (0129) : conservation de l'empreinte du cookie (`acces_empreinte`) jusqu'à la fin de la phase 0 (forfaits en ajout seul, 0046) ; une durée plus courte demanderait d'amender 0046. | Sécurité | 2026-10-23 | Rien | Ouverte (signalée dans #732) |
 | Q626 | Élargir un jour les villes du MVP au-delà des 62 d'origine ? Décision à part, qui amenderait B9-PO-18 et `specs/B9-generation.md`. | Product Owner | 2026-10-23 | Rien | Ouverte |
 | Q627 | Retirer le `placeId` du contrat de lancement du site d'essai (envoyé mais inutilisé en aval) dans une PR à part ? | Tech Lead | 2026-10-23 | Rien | Ouverte |
+| Q628 | Programme illisible (#745) : porter `JETONS_SORTIE_MAX_PROGRAMME` à 40 000 pour garder 32 000 jetons à la réponse (réserve 0,11 USD au lieu de 0,09, sous le fusible) ? La limite de sortie du fournisseur pour ce modèle n'est pas connue. | Tech Lead | 2026-10-24 | Rien | Ouverte |
+| Q629 | Programme illisible (#745) : journaliser aussi les jetons de raisonnement ? 0096 § 2 point 6 limite la lecture de `usage` aux jetons d'entrée et de sortie ; il faudrait une décision écrite. | Tech Lead | 2026-10-24 | Rien | Ouverte |
