@@ -118,6 +118,18 @@ type GreffonWeb = { readonly moteur: MoteurGreffonWeb; readonly maxResultats: nu
 export const JETONS_SORTIE_MAX_PROGRAMME = 32_000;
 export const COUT_ESTIME_PROGRAMME_MICROS = 90_000;
 
+/**
+ * Budget de raisonnement de la requête `programme` (révision comprise, même nature) : `reasoning.max_tokens` d'OpenRouter.
+ * Chez la plupart des fournisseurs, `max_tokens` couvre **le raisonnement et la réponse ensemble** ; sans borne, un modèle
+ * qui raisonne (`deepseek/deepseek-v4.1-flash`) peut consommer tout `JETONS_SORTIE_MAX_PROGRAMME` et rendre un texte vide
+ * (`finish_reason: "length"`), lu comme programme illisible (`model_output_invalid`, essais du 2026-10-24, cause
+ * déduite, le texte n'étant jamais journalisé). 8 000 jetons laissent au moins 24 000 jetons à la réponse JSON ; un
+ * modèle qui ne prend qu'un niveau d'effort reçoit le niveau correspondant (environ un quart de `max_tokens`, selon la
+ * documentation d'OpenRouter). Le plafond total ne change pas : le pire cas réservé (`COUT_ESTIME_PROGRAMME_MICROS`,
+ * jetons de raisonnement facturés comme jetons de sortie) reste le même.
+ */
+export const JETONS_RAISONNEMENT_MAX_PROGRAMME = 8_000;
+
 const CorpsSchema = z.object({ provider: z.object({ data_collection: z.literal("deny") }), plugins: z.unknown().optional() });
 /** Seul greffon admis, et seulement pour `rechercherWeb` : `web`, son moteur fixé (littéral) et son nombre de résultats. */
 const GreffonsWebSchema = z.tuple([
@@ -262,6 +274,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
     const modele = fournisseur.chat(requete.modele, {
       provider: { data_collection: "deny", ...(requete.routage.zdr === undefined ? {} : { zdr: requete.routage.zdr }) },
       usage: { include: true },
+      ...(programme ? { reasoning: { max_tokens: JETONS_RAISONNEMENT_MAX_PROGRAMME } } : {}),
       ...(greffonWeb === null ? {} : { plugins: [{ id: "web" as const, engine: greffonWeb.moteur, max_results: greffonWeb.maxResultats }] }),
     });
     let etat: EtatAppel | undefined;

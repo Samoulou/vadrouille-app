@@ -354,6 +354,8 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
+        // Raison de fin fermée de la rédaction (programme illisible du 2026-10-24) ; jetons absents du double.
+        finishReason: "stop",
         // Lot 2a (0121 § 2.3, § 4.3) : aucun site proposé, aucun soumis.
         sitesProposed: 0,
         sitesChecked: 0,
@@ -365,6 +367,20 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     for (const interdit of ["Taverne maison", "Forteresse", SENTINELLE_GOOGLE]) expect(texte).not.toContain(interdit);
     // Aucun compteur de verdict (0117 § 4) : la liste exacte des clés est vérifiée ci-dessus ; aucune n'en est un.
     for (const cle of ["verified", "verifies", "notFound", "introuvables", "closed", "fermes", "outOfZone", "horsZone"]) expect(lignes[0]).not.toHaveProperty(cle);
+    info.mockRestore();
+  });
+
+  it("programme illisible (raisonnement qui épuise le plafond) : raison de fin et jetons journalisés, jamais le texte", async () => {
+    const info = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    d.redigerProgramme.mockResolvedValue({ texte: `SENTINELLE-TEXTE ${SENTINELLE_GOOGLE}`, coutUsd: 0.08, fin: "length", tokens: { entree: 9000, sortie: 32000 } });
+    expect((await refus(etapeProgramme({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+    const lignes = lignesDuJournal(info, "p0.programme_written");
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0]).toMatchObject({ level: "warn", days: 0, slots: 0, modelCalls: 1, finishReason: "length", inputTokens: 9000, outputTokens: 32000, errorName: "ArretEtape" });
+    expect(lignes[0]).not.toHaveProperty("dropped");
+    const texte = JSON.stringify(lignes);
+    for (const interdit of ["SENTINELLE-TEXTE", SENTINELLE_GOOGLE]) expect(texte).not.toContain(interdit);
+    expect(d.ecrireProgramme).not.toHaveBeenCalled();
     info.mockRestore();
   });
 

@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent } from "@/server/log";
+import { FINS_MODELE } from "@/ai/client";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent } from "@/server/log";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 
 /**
@@ -346,7 +347,8 @@ describe("module de journal", () => {
 
   // Décision 0116 § 4.4 et verdict 0117 § 4 : compteurs maison de `p0.programme_written`, des entiers positifs ou nuls.
   // Lot 2a (décision 0121 § 2.3, verdict 0122 § 2.1) : `sites*`, même règle.
-  it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap", "sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked"])(
+  // Programme illisible du 2026-10-24 : `inputTokens` et `outputTokens` de la rédaction, même règle.
+  it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap", "sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked", "inputTokens", "outputTokens"])(
     "décision 0116 : %s, entier positif ou nul, admis sur p0.programme_written ; négatif, chaîne, non-entier ou nom retirés",
     (champ) => {
       const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { [champ]: valeur }, "info")) as Record<string, unknown>;
@@ -357,6 +359,16 @@ describe("module de journal", () => {
       }
     },
   );
+
+  // Programme illisible du 2026-10-24 : raison de fin de la rédaction, liste fermée copiée de `FINS_MODELE`.
+  it("journal: finishReason, liste fermée égale à FINS_MODELE ; toute autre valeur retirée", () => {
+    expect([...LOG_FINISH_REASONS]).toEqual([...FINS_MODELE]);
+    const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { finishReason: valeur }, "warn")) as Record<string, unknown>;
+    for (const fin of FINS_MODELE) expect(ligne(fin)).toEqual({ level: "warn", event: "p0.programme_written", finishReason: fin });
+    for (const refusee of ["max_tokens", "LENGTH", "Colisée", "", 1, null]) {
+      expect(ligne(refusee), String(refusee)).toEqual({ level: "warn", event: "p0.programme_written", dropped: 1 });
+    }
+  });
 
   // Verdict 0117 § 4 : aucun compteur de verdict de vérification n'est admis par le journal.
   it("journal: aucun compteur de verdict (verifies, introuvables, fermes, horsZone retirés)", () => {
