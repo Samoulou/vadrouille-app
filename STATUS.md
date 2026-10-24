@@ -1,12 +1,12 @@
-# État du studio — 2026-10-24 (167e cycle)
+# État du studio — 2026-10-24 (168e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 166e cycle.
+- Aucun message de Samuel depuis le 167e cycle.
 
 ## Fait
-- **Statut du 166e cycle** (#751) fusionné.
+- **Statut du 167e cycle** (#752) fusionné.
 - Rappel : l'essai de Samuel du 2026-10-24 à 15:24 UTC a écrit son programme (8 jours) sans erreur, après #749 et #750.
 
 ## En cours
