@@ -8,7 +8,7 @@ import {
   COUT_ESTIME_PROGRAMME_MICROS,
   createOpenRouterClient,
   ErreurOpenRouter,
-  JETONS_RAISONNEMENT_MAX_PROGRAMME,
+  RAISONNEMENT_PROGRAMME,
   JETONS_SORTIE_MAX_PROGRAMME,
   ORIGINE_MODELES,
   type OptionsOpenRouter,
@@ -428,8 +428,8 @@ describe("programme: plafond de jetons de sortie et réservation (revue 1 de la 
   });
 });
 
-describe("programme: raisonnement borné par hypothèse (décision 0130 § 1)", () => {
-  it("programme: reasoning.max_tokens demandé pour la requête programme (prompts programme et revision), routage inchangé ; aucune autre requête", async () => {
+describe("programme: raisonnement coupé (décision 0130, amendement 1)", () => {
+  it("programme: reasoning coupé (enabled: false, effort: none) pour la requête programme (prompts programme et revision), routage inchangé ; aucune autre requête", async () => {
     const { client, appels } = monter([async () => reponseOk(), async () => reponseOk(), async () => reponseOk()]);
     await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
     // Révision : même nature de requête (`etape: "programme"`, prompt distinct).
@@ -437,15 +437,16 @@ describe("programme: raisonnement borné par hypothèse (décision 0130 § 1)", 
     await client.envoyer(requete());
     const corps = appels.map((appel) => JSON.parse(String(appel.init.body)) as { max_tokens?: number; reasoning?: unknown; provider?: unknown });
     for (const programme of corps.slice(0, 2)) {
-      expect(programme.reasoning).toEqual({ max_tokens: JETONS_RAISONNEMENT_MAX_PROGRAMME });
+      expect(programme.reasoning).toEqual({ enabled: false, effort: "none" });
       expect(programme.provider).toEqual({ data_collection: "deny", zdr: true });
     }
     expect(corps[2]?.reasoning).toBeUndefined();
-    // Plafond total inchangé (réservation inchangée) ; budget demandé sous ce plafond. Ce que le fournisseur en fait n'est
-    // pas vérifiable ici (0130 § 1.2) : aucun nombre de jetons n'est garanti à la réponse.
+    // Plafond total inchangé (réservation inchangée), sur les deux requêtes. Ce que le fournisseur fait du réglage n'est
+    // pas vérifiable ici (0130 § 1.2 et amendement 1) : aucun nombre de jetons n'est garanti à la réponse.
     expect(corps[0]?.max_tokens).toBe(JETONS_SORTIE_MAX_PROGRAMME);
-    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBe(8_000);
-    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBeLessThan(JETONS_SORTIE_MAX_PROGRAMME);
+    expect(corps[1]?.max_tokens).toBe(JETONS_SORTIE_MAX_PROGRAMME);
+    expect(RAISONNEMENT_PROGRAMME).toEqual({ enabled: false, effort: "none" });
+    expect(Object.keys(RAISONNEMENT_PROGRAMME)).not.toContain("max_tokens");
   });
 
   it("programme: raisonnement qui épuise le plafond, texte vide, fin `length` et jetons rendus (jamais le texte)", async () => {
