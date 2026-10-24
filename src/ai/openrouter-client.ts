@@ -119,14 +119,13 @@ export const JETONS_SORTIE_MAX_PROGRAMME = 32_000;
 export const COUT_ESTIME_PROGRAMME_MICROS = 90_000;
 
 /**
- * Budget de raisonnement de la requête `programme` (révision comprise, même nature) : `reasoning.max_tokens` d'OpenRouter.
- * Chez la plupart des fournisseurs, `max_tokens` couvre **le raisonnement et la réponse ensemble** ; sans borne, un modèle
- * qui raisonne (`deepseek/deepseek-v4.1-flash`) peut consommer tout `JETONS_SORTIE_MAX_PROGRAMME` et rendre un texte vide
- * (`finish_reason: "length"`), lu comme programme illisible (`model_output_invalid`, essais du 2026-10-24, cause
- * déduite, le texte n'étant jamais journalisé). 8 000 jetons laissent au moins 24 000 jetons à la réponse JSON ; un
- * modèle qui ne prend qu'un niveau d'effort reçoit le niveau correspondant (environ un quart de `max_tokens`, selon la
- * documentation d'OpenRouter). Le plafond total ne change pas : le pire cas réservé (`COUT_ESTIME_PROGRAMME_MICROS`,
- * jetons de raisonnement facturés comme jetons de sortie) reste le même.
+ * Budget de raisonnement de la requête `programme`, révision comprise (même nature) : `reasoning.max_tokens` d'OpenRouter
+ * (décision 0130 § 1). **Posé par hypothèse** : la cause des programmes illisibles du 2026-10-24 (un raisonnement qui
+ * épuiserait `JETONS_SORTIE_MAX_PROGRAMME` et laisserait un texte vide) est déduite, pas établie, et la répartition entre
+ * raisonnement et réponse **dépend du fournisseur** (prise en compte de `reasoning.max_tokens`, raisonnement compté ou
+ * non dans `max_tokens`, conversion en niveau d'effort) : aucun nombre de jetons n'est garanti à la réponse. Admis pour
+ * le seul modèle nommé par 0130 (garde dans `tests/unit/p0/composition.test.ts`). Plafond total et réservation
+ * (`COUT_ESTIME_PROGRAMME_MICROS`) inchangés. À revoir sur `finishReason` et `outputTokens` du journal (0130, « Quand revoir »).
  */
 export const JETONS_RAISONNEMENT_MAX_PROGRAMME = 8_000;
 

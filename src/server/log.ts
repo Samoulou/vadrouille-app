@@ -37,8 +37,8 @@ export const LOG_EVENTS = [
   // hors zone), ni nom, ni texte, ni donnée Google. Écrite aussi quand l'étape lève (`errorName`, `warn`). Lot 2a
   // (décision 0121 § 2.3, verdict 0122 § 2.1) : `sitesProposed`, `sitesChecked`, `sitesRemoved`, `sitesUnchecked`,
   // nombres de nos propres vérifications des sites proposés par l'IA ; ni adresse, ni nom d'hôte, ni motif, ni statut.
-  // Programme illisible du 2026-10-24 : `finishReason` (raison de fin de la requête de rédaction, liste fermée
-  // `LOG_FINISH_REASONS`), `inputTokens` et `outputTokens` (jetons rendus par le client réel), absents sinon ; jamais le texte.
+  // Décision 0130 § 2 : `finishReason` (raison de fin de la requête de rédaction, liste fermée `LOG_FINISH_REASONS`),
+  // `inputTokens` et `outputTokens` (jetons rendus par le client réel, bornés), absents sinon ; jamais le texte.
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   "p0.read_unavailable",
@@ -189,9 +189,11 @@ export type LogFields = {
   readonly modelCalls?: number;
   readonly unverifiedForCap?: number;
   /**
-   * Diagnostic de la requête de rédaction de `p0.programme_written` (programme illisible du 2026-10-24) : raison de fin
-   * fermée (`LOG_FINISH_REASONS`, jamais la raison brute du fournisseur) et jetons d'entrée et de sortie rendus par le
-   * client réel (entiers positifs ou nuls ; décision 0096 § 2 point 6). Jamais le texte du modèle.
+   * Diagnostic de la requête de rédaction de `p0.programme_written` (décision 0130 § 2) : raison de fin fermée et jetons
+   * d'entrée et de sortie rendus par le client réel (entiers de 0 à `MAX_JETONS_JOURNAL` ; décision 0096 § 2 point 6).
+   * Jamais le texte du modèle. `finishReason` est typé `string`, plus large que `FinModele`, **à dessein** : comme tout
+   * champ de ce module, la liste fermée est contrôlée à l'exécution (`LOG_FINISH_REASONS`), et ce module n'importe pas
+   * les types de `@/ai/client`.
    */
   readonly finishReason?: string;
   readonly inputTokens?: number;
@@ -534,9 +536,11 @@ export const LOG_ALERT_CODES: readonly string[] = [
   "dispute",
 ];
 const CODES_ALERTE: ReadonlySet<string> = new Set(LOG_ALERT_CODES);
-/** Raisons de fin d'une génération (copie de `FINS_MODELE` de `@/ai/client`, égalité vérifiée par le test du journal). */
+/** Raisons de fin d'une génération (copie de `FINS_MODELE` de `@/ai/client`, égalité vérifiée par le test du journal ; 0130 § 2). */
 export const LOG_FINISH_REASONS: readonly string[] = ["stop", "length", "content-filter", "tool-calls", "error", "other"];
 const RAISONS_FIN: ReadonlySet<string> = new Set(LOG_FINISH_REASONS);
+/** Borne des jetons journalisés (copie de `MAX_TOKENS` de `@/ai/client`, égalité vérifiée par le test du journal ; 0130 § 2). */
+export const MAX_JETONS_JOURNAL = 10_000_000;
 /** Types de `PaymentEvent` (copie de `PAYMENT_EVENT_TYPES`, égalité vérifiée par le test du journal). */
 export const LOG_PAYMENT_EVENT_TYPES: readonly string[] = [
   "checkoutCompleted",
@@ -627,8 +631,8 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["modelCalls", entierPositif],
   ["unverifiedForCap", entierPositif],
   ["finishReason", (v) => chaine(v) && RAISONS_FIN.has(v)],
-  ["inputTokens", entierPositif],
-  ["outputTokens", entierPositif],
+  ["inputTokens", (v) => entierPositif(v) && v <= MAX_JETONS_JOURNAL],
+  ["outputTokens", (v) => entierPositif(v) && v <= MAX_JETONS_JOURNAL],
   ["sitesProposed", entierPositif],
   ["sitesChecked", entierPositif],
   ["sitesRemoved", entierPositif],

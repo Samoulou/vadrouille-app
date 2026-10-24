@@ -721,7 +721,7 @@ type CompteursProgramme = {
   textsCut: number;
   modelCalls: number;
   unverifiedForCap: number;
-  /** Raison de fin fermée et jetons de la requête de rédaction (client réel seulement), jamais le texte. */
+  /** Raison de fin fermée et jetons de la requête de rédaction (client réel seulement), jamais le texte (décision 0130 § 2). */
   finishReason?: FinModele;
   inputTokens?: number;
   outputTokens?: number;
@@ -834,7 +834,7 @@ async function ecrireVersion(
       // 1. Rédaction et lecture tolérante ; ordre écrit fixé une fois, avant toute vérification.
       compteurs.modelCalls += 1;
       const reponse = await redaction.rediger(capacites);
-      // Diagnostic (programme illisible du 2026-10-24) : raison de fin fermée et jetons, posés avant la lecture.
+      // Diagnostic (décision 0130 § 2) : raison de fin fermée et jetons, posés avant la lecture.
       if (reponse.fin !== undefined) compteurs.finishReason = reponse.fin;
       if (reponse.tokens !== undefined) {
         compteurs.inputTokens = reponse.tokens.entree;

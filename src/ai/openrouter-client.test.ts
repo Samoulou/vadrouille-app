@@ -428,8 +428,8 @@ describe("programme: plafond de jetons de sortie et réservation (revue 1 de la 
   });
 });
 
-describe("programme: place réservée à la réponse (raisonnement borné, programme illisible du 2026-10-24)", () => {
-  it("programme: reasoning.max_tokens borné pour la requête programme, sous max_tokens ; routage inchangé ; aucune autre requête", async () => {
+describe("programme: raisonnement borné par hypothèse (décision 0130 § 1)", () => {
+  it("programme: reasoning.max_tokens demandé pour la requête programme (prompts programme et revision), routage inchangé ; aucune autre requête", async () => {
     const { client, appels } = monter([async () => reponseOk(), async () => reponseOk(), async () => reponseOk()]);
     await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
     // Révision : même nature de requête (`etape: "programme"`, prompt distinct).
@@ -441,8 +441,11 @@ describe("programme: place réservée à la réponse (raisonnement borné, progr
       expect(programme.provider).toEqual({ data_collection: "deny", zdr: true });
     }
     expect(corps[2]?.reasoning).toBeUndefined();
-    // Au moins 24 000 jetons restent à la réponse JSON, quel que soit le raisonnement.
-    expect(JETONS_SORTIE_MAX_PROGRAMME - JETONS_RAISONNEMENT_MAX_PROGRAMME).toBeGreaterThanOrEqual(24_000);
+    // Plafond total inchangé (réservation inchangée) ; budget demandé sous ce plafond. Ce que le fournisseur en fait n'est
+    // pas vérifiable ici (0130 § 1.2) : aucun nombre de jetons n'est garanti à la réponse.
+    expect(corps[0]?.max_tokens).toBe(JETONS_SORTIE_MAX_PROGRAMME);
+    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBe(8_000);
+    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBeLessThan(JETONS_SORTIE_MAX_PROGRAMME);
   });
 
   it("programme: raisonnement qui épuise le plafond, texte vide, fin `length` et jetons rendus (jamais le texte)", async () => {

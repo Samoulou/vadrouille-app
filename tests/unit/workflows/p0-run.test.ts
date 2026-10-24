@@ -5,7 +5,8 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FatalError } from "workflow";
 
-import { DUREE_MAX_EXECUTION_MS, etapeClore, etapeProgramme, etapeRevision, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
+import { codePersiste } from "@/prototype/arret";
+import { CODE_PROGRAMME_ILLISIBLE, DUREE_MAX_EXECUTION_MS, etapeClore, etapeProgramme, etapeRevision, NOMS_BRIEFS, p0Run } from "@/workflows/p0-run";
 
 /**
  * Workflow `p0Run` (P0r3c-4, décisions 0009, 0055 et 0063 ; depuis la décision 0116 § 3, une seule étape de travail
@@ -354,7 +355,7 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
         textsCut: 0,
         modelCalls: 1,
         unverifiedForCap: 0,
-        // Raison de fin fermée de la rédaction (programme illisible du 2026-10-24) ; jetons absents du double.
+        // Raison de fin fermée de la rédaction (décision 0130 § 2) ; jetons absents du double.
         finishReason: "stop",
         // Lot 2a (0121 § 2.3, § 4.3) : aucun site proposé, aucun soumis.
         sitesProposed: 0,
@@ -370,10 +371,12 @@ describe("p0Run : état sérialisé réduit à l'identifiant d'exécution (0009 
     info.mockRestore();
   });
 
-  it("programme illisible (raisonnement qui épuise le plafond) : raison de fin et jetons journalisés, jamais le texte", async () => {
+  it("décision 0130 § 2 : programme illisible (raisonnement qui épuiserait le plafond) : raison de fin et jetons journalisés, jamais le texte", async () => {
     const info = vi.spyOn(console, "log").mockImplementation(() => undefined);
     d.redigerProgramme.mockResolvedValue({ texte: `SENTINELLE-TEXTE ${SENTINELLE_GOOGLE}`, coutUsd: 0.08, fin: "length", tokens: { entree: 9000, sortie: 32000 } });
-    expect((await refus(etapeProgramme({ runId: RUN_ID }))).message).toBe("pipeline_failed");
+    // Symptôme du 2026-10-24 (décision 0130) : programme illisible, code persisté de `CODE_PROGRAMME_ILLISIBLE`.
+    expect(codePersiste(CODE_PROGRAMME_ILLISIBLE, true)).toBe("pipeline_failed");
+    expect((await refus(etapeProgramme({ runId: RUN_ID }))).message).toBe(codePersiste(CODE_PROGRAMME_ILLISIBLE, true));
     const lignes = lignesDuJournal(info, "p0.programme_written");
     expect(lignes).toHaveLength(1);
     expect(lignes[0]).toMatchObject({ level: "warn", days: 0, slots: 0, modelCalls: 1, finishReason: "length", inputTokens: 9000, outputTokens: 32000, errorName: "ArretEtape" });

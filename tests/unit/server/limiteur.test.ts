@@ -3,10 +3,10 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { FINS_MODELE, MAX_TOKENS } from "@/ai/client";
 import type { RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { FINS_MODELE } from "@/ai/client";
-import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent } from "@/server/log";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 
 /**
@@ -347,7 +347,7 @@ describe("module de journal", () => {
 
   // Décision 0116 § 4.4 et verdict 0117 § 4 : compteurs maison de `p0.programme_written`, des entiers positifs ou nuls.
   // Lot 2a (décision 0121 § 2.3, verdict 0122 § 2.1) : `sites*`, même règle.
-  // Programme illisible du 2026-10-24 : `inputTokens` et `outputTokens` de la rédaction, même règle.
+  // Décision 0130 § 2 : `inputTokens` et `outputTokens` de la rédaction, même règle (bornés en plus, test suivant).
   it.each(["days", "slots", "placesToVerify", "daysRemoved", "slotsRemoved", "modelCalls", "unverifiedForCap", "sitesProposed", "sitesChecked", "sitesRemoved", "sitesUnchecked", "inputTokens", "outputTokens"])(
     "décision 0116 : %s, entier positif ou nul, admis sur p0.programme_written ; négatif, chaîne, non-entier ou nom retirés",
     (champ) => {
@@ -360,7 +360,17 @@ describe("module de journal", () => {
     },
   );
 
-  // Programme illisible du 2026-10-24 : raison de fin de la rédaction, liste fermée copiée de `FINS_MODELE`.
+  // Décision 0130 § 2 : jetons bornés par la même valeur que le client (`MAX_TOKENS`).
+  it("journal: inputTokens et outputTokens au plus MAX_TOKENS ; au-delà, retirés", () => {
+    expect(MAX_JETONS_JOURNAL).toBe(MAX_TOKENS);
+    for (const champ of ["inputTokens", "outputTokens"]) {
+      const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { [champ]: valeur }, "warn")) as Record<string, unknown>;
+      expect(ligne(MAX_TOKENS)).toEqual({ level: "warn", event: "p0.programme_written", [champ]: MAX_TOKENS });
+      expect(ligne(MAX_TOKENS + 1)).toEqual({ level: "warn", event: "p0.programme_written", dropped: 1 });
+    }
+  });
+
+  // Décision 0130 § 2 : raison de fin de la rédaction, liste fermée copiée de `FINS_MODELE`.
   it("journal: finishReason, liste fermée égale à FINS_MODELE ; toute autre valeur retirée", () => {
     expect([...LOG_FINISH_REASONS]).toEqual([...FINS_MODELE]);
     const ligne = (valeur: unknown) => JSON.parse(formatLogLine("p0.programme_written", { finishReason: valeur }, "warn")) as Record<string, unknown>;
