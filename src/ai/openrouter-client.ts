@@ -119,15 +119,16 @@ export const JETONS_SORTIE_MAX_PROGRAMME = 32_000;
 export const COUT_ESTIME_PROGRAMME_MICROS = 90_000;
 
 /**
- * Budget de raisonnement de la requête `programme`, révision comprise (même nature) : `reasoning.max_tokens` d'OpenRouter
- * (décision 0130 § 1). **Posé par hypothèse** : la cause des programmes illisibles du 2026-10-24 (un raisonnement qui
- * épuiserait `JETONS_SORTIE_MAX_PROGRAMME` et laisserait un texte vide) est déduite, pas établie, et la répartition entre
- * raisonnement et réponse **dépend du fournisseur** (prise en compte de `reasoning.max_tokens`, raisonnement compté ou
- * non dans `max_tokens`, conversion en niveau d'effort) : aucun nombre de jetons n'est garanti à la réponse. Admis pour
- * le seul modèle nommé par 0130 (garde dans `tests/unit/p0/composition.test.ts`). Plafond total et réservation
- * (`COUT_ESTIME_PROGRAMME_MICROS`) inchangés. À revoir sur `finishReason` et `outputTokens` du journal (0130, « Quand revoir »).
+ * Raisonnement de la requête `programme`, révision comprise (même nature) : **coupé** (décision 0130, amendement 1).
+ * Le budget `reasoning.max_tokens: 8000` de 0130 § 1 n'a pas été tenu : au lancement réel du 2026-10-24 à 13:59:42 UTC,
+ * `finishReason: "length"` et `outputTokens: 32000` pour un séjour de 2 jours. `enabled: false` est l'interrupteur
+ * d'OpenRouter ; le type de `@openrouter/ai-sdk-provider` 3.1.0 exige en plus `effort` ou `max_tokens`, d'où
+ * `effort: "none"`, qui dit la même chose. Le fournisseur transmet l'objet tel quel dans le corps. Ce que le modèle en
+ * fait n'est pas vérifiable sans appel réel. Admis pour le seul modèle nommé par 0130 (garde dans
+ * `tests/unit/p0/composition.test.ts`). Plafond total et réservation (`COUT_ESTIME_PROGRAMME_MICROS`) inchangés. À
+ * revoir sur `finishReason` et `outputTokens` du journal (0130, amendement 1, « Quand revoir »).
  */
-export const JETONS_RAISONNEMENT_MAX_PROGRAMME = 8_000;
+export const RAISONNEMENT_PROGRAMME = { enabled: false, effort: "none" } as const;
 
 const CorpsSchema = z.object({ provider: z.object({ data_collection: z.literal("deny") }), plugins: z.unknown().optional() });
 /** Seul greffon admis, et seulement pour `rechercherWeb` : `web`, son moteur fixé (littéral) et son nombre de résultats. */
@@ -273,7 +274,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
     const modele = fournisseur.chat(requete.modele, {
       provider: { data_collection: "deny", ...(requete.routage.zdr === undefined ? {} : { zdr: requete.routage.zdr }) },
       usage: { include: true },
-      ...(programme ? { reasoning: { max_tokens: JETONS_RAISONNEMENT_MAX_PROGRAMME } } : {}),
+      ...(programme ? { reasoning: { ...RAISONNEMENT_PROGRAMME } } : {}),
       ...(greffonWeb === null ? {} : { plugins: [{ id: "web" as const, engine: greffonWeb.moteur, max_results: greffonWeb.maxResultats }] }),
     });
     let etat: EtatAppel | undefined;

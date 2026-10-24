@@ -60,3 +60,36 @@ C'est le profil observé : un appel, aucun JSON, aucun champ retiré. La release
   - `finishReason: "stop"`, `days: 0` : la réponse est terminée mais n'est pas du JSON lisible. La cause est ailleurs (prompt ou lecture tolérante), et ce réglage n'est pas en cause.
   - Refus 400 (`upstream_error`) dès l'appel : le modèle refuse `reasoning`. Retirer le réglage par une nouvelle décision.
 - Changement du modèle `etapes.programme` dans `prototype/config/modeles.json` (§ 1.4).
+
+## Amendement 1, 2026-10-24 — raisonnement coupé
+
+Statut : **proposé** par le rôle IA (branche `claude/programme-sans-raisonnement`). Même décideur que 0130 : le **Tech Lead** (réglages des modèles et outillage du prototype). L'amendement est accepté quand le Tech Lead approuve sa PR et devient définitif à sa fusion, sans délai de veto (décision 0093). Il n'engage pas d'argent, aucun compte externe, aucune donnée nouvelle envoyée au fournisseur, et ne supprime ni ne désactive aucun test.
+
+### Constat
+
+Après la fusion de 0130 (#745), le lancement réel suivant de Samuel, sur `p0-reel` au head `88d076b`, a échoué à **13:59:42 UTC**. La ligne `p0.programme_written` porte : `days: 0`, `slots: 0`, `modelCalls: 1`, `finishReason: "length"`, `inputTokens: 1195`, `outputTokens: 32000`, `errorName: "ArretEtape"`.
+
+- La première moitié de l'hypothèse de 0130 est **confirmée** : la sortie atteint le plafond de 32 000 jetons et rien n'est lisible.
+- Le budget `reasoning.max_tokens: 8000` (§ 1.1) **n'a pas été tenu** : un séjour de 2 jours ne demande jamais 32 000 jetons de réponse. Soit le fournisseur ignore ce réglage pour `deepseek/deepseek-v4.1-flash` routé en `zdr`, soit le modèle boucle. Le journal ne permet pas de trancher (les jetons de raisonnement ne sont pas lus, § 2.1).
+
+### Réglage
+
+1. La requête de nature `programme`, rédaction **et** révision, porte désormais `reasoning: { enabled: false, effort: "none" }` (`RAISONNEMENT_PROGRAMME` de `src/ai/openrouter-client.ts`) au lieu de `reasoning: { max_tokens: 8000 }`. Cela remplace § 1.1 ; la constante `JETONS_RAISONNEMENT_MAX_PROGRAMME` est retirée.
+   - `enabled: false` est l'interrupteur de la documentation d'OpenRouter (« Reasoning tokens » : `enabled`, `effort`, `max_tokens`, `exclude`).
+   - Le type `OpenRouterProviderOptions.reasoning` de `@openrouter/ai-sdk-provider` 3.1.0 (version installée, lue dans `node_modules`) exige en plus `max_tokens` ou `effort`. `effort: "none"` y figure et dit la même chose. Le fournisseur recopie l'objet tel quel dans le champ `reasoning` du corps (`dist/index.js`, construction des arguments).
+2. Inchangés : `max_tokens: 32000`, routage `data_collection: "deny"` et `zdr: true` (échec fermé, 0117 § 5), aucune autre requête ne porte `reasoning`, garde du modèle nommé (§ 1.4).
+3. **Coût** : `COUT_ESTIME_PROGRAMME_MICROS` reste 90 000. Le plafond total ne change pas ; c'est toujours une borne haute valable (§ 1.3).
+4. **Non vérifiable sans appel réel** : que le modèle routé en `zdr` honore `enabled: false` ou `effort: "none"`, et qu'il ne refuse pas le réglage. Un refus 400 sortirait en code fermé `upstream_error`, sans second appel.
+
+### Quand revoir
+
+- **Au prochain lancement réel de Samuel**, lire `finishReason` et `outputTokens` sur `p0.programme_written` :
+  - `finishReason: "stop"`, `outputTokens` de quelques milliers, programme lisible : le raisonnement était en cause ; rien à changer.
+  - `finishReason: "length"` encore, `outputTokens` proche de 32 000 : le réglage n'est pas honoré ou le modèle boucle sans raisonner. L'étape suivante est un **changement de modèle** pour `etapes.programme`, décidé par le **Tech Lead**, Samuel informé du coût (et décideur si le coût ou le fournisseur change le budget, « Qui décide quoi »). Il emporte la révision de cette décision (§ 1.4).
+  - `finishReason: "stop"`, `days: 0` : la réponse est terminée mais illisible ; la cause est dans le prompt ou la lecture, pas dans ce réglage.
+  - Refus 400 (`upstream_error`) dès l'appel : le modèle refuse ce réglage ; retirer `reasoning` ou changer de modèle, par une nouvelle décision du Tech Lead.
+
+### Tests (doubles seulement)
+
+- `src/ai/openrouter-client.test.ts` : corps de la requête `programme` (prompts `programme` et `revision`) avec `reasoning: { enabled: false, effort: "none" }`, `max_tokens` 32 000 et routage inchangé ; requête ordinaire sans `reasoning`.
+- `tests/unit/p0/composition.test.ts` : à travers `composerP0Reel` et le client réel sur un `fetch` double, `redigerProgramme` et `redigerRevision` envoient le réglage coupé ; notation et raisons n'en envoient pas ; garde du modèle nommé.
