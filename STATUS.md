@@ -1,12 +1,12 @@
-# État du studio — 2026-10-23 (158e cycle)
+# État du studio — 2026-10-23 (159e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 157e cycle.
+- Aucun message de Samuel depuis le 158e cycle.
 
 ## Fait
-- **Statut du 157e cycle** (#738) fusionné.
+- **Statut du 158e cycle** (#739) fusionné. Le résumé Slack du 158e cycle n'a pas été posté (Slack indisponible) ; il est repris dans celui du 159e.
 - **#736 `[data]`** (migration 0019 dans `db-migrate`) : revue favorable, `techlead-approved` posé.
 
 ## En cours
