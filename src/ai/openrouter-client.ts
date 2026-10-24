@@ -118,6 +118,17 @@ type GreffonWeb = { readonly moteur: MoteurGreffonWeb; readonly maxResultats: nu
 export const JETONS_SORTIE_MAX_PROGRAMME = 32_000;
 export const COUT_ESTIME_PROGRAMME_MICROS = 90_000;
 
+/**
+ * Budget de raisonnement de la requête `programme`, révision comprise (même nature) : `reasoning.max_tokens` d'OpenRouter
+ * (décision 0130 § 1). **Posé par hypothèse** : la cause des programmes illisibles du 2026-10-24 (un raisonnement qui
+ * épuiserait `JETONS_SORTIE_MAX_PROGRAMME` et laisserait un texte vide) est déduite, pas établie, et la répartition entre
+ * raisonnement et réponse **dépend du fournisseur** (prise en compte de `reasoning.max_tokens`, raisonnement compté ou
+ * non dans `max_tokens`, conversion en niveau d'effort) : aucun nombre de jetons n'est garanti à la réponse. Admis pour
+ * le seul modèle nommé par 0130 (garde dans `tests/unit/p0/composition.test.ts`). Plafond total et réservation
+ * (`COUT_ESTIME_PROGRAMME_MICROS`) inchangés. À revoir sur `finishReason` et `outputTokens` du journal (0130, « Quand revoir »).
+ */
+export const JETONS_RAISONNEMENT_MAX_PROGRAMME = 8_000;
+
 const CorpsSchema = z.object({ provider: z.object({ data_collection: z.literal("deny") }), plugins: z.unknown().optional() });
 /** Seul greffon admis, et seulement pour `rechercherWeb` : `web`, son moteur fixé (littéral) et son nombre de résultats. */
 const GreffonsWebSchema = z.tuple([
@@ -262,6 +273,7 @@ export function createOpenRouterClient(options: OptionsOpenRouter, transport: Tr
     const modele = fournisseur.chat(requete.modele, {
       provider: { data_collection: "deny", ...(requete.routage.zdr === undefined ? {} : { zdr: requete.routage.zdr }) },
       usage: { include: true },
+      ...(programme ? { reasoning: { max_tokens: JETONS_RAISONNEMENT_MAX_PROGRAMME } } : {}),
       ...(greffonWeb === null ? {} : { plugins: [{ id: "web" as const, engine: greffonWeb.moteur, max_results: greffonWeb.maxResultats }] }),
     });
     let etat: EtatAppel | undefined;

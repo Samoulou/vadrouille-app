@@ -4,7 +4,15 @@ import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RequeteModele } from "@/ai/client";
-import { COUT_ESTIME_PROGRAMME_MICROS, createOpenRouterClient, ErreurOpenRouter, JETONS_SORTIE_MAX_PROGRAMME, ORIGINE_MODELES, type OptionsOpenRouter } from "@/ai/openrouter-client";
+import {
+  COUT_ESTIME_PROGRAMME_MICROS,
+  createOpenRouterClient,
+  ErreurOpenRouter,
+  JETONS_RAISONNEMENT_MAX_PROGRAMME,
+  JETONS_SORTIE_MAX_PROGRAMME,
+  ORIGINE_MODELES,
+  type OptionsOpenRouter,
+} from "@/ai/openrouter-client";
 import { CODE_CLE_ABSENTE, CODES_ERREUR_OPENROUTER } from "@/ai/erreurs";
 
 import { creerHorlogeManuelle } from "../../tests/support/horloge-manuelle";
@@ -417,6 +425,45 @@ describe("programme: plafond de jetons de sortie et réservation (revue 1 de la 
     // Sous le plafond de 3 USD par exécution, avec une seule requête programme.
     expect(COUT_ESTIME_PROGRAMME_MICROS).toBe(90_000);
     expect(COUT_ESTIME_PROGRAMME_MICROS).toBeLessThan(3_000_000);
+  });
+});
+
+describe("programme: raisonnement borné par hypothèse (décision 0130 § 1)", () => {
+  it("programme: reasoning.max_tokens demandé pour la requête programme (prompts programme et revision), routage inchangé ; aucune autre requête", async () => {
+    const { client, appels } = monter([async () => reponseOk(), async () => reponseOk(), async () => reponseOk()]);
+    await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    // Révision : même nature de requête (`etape: "programme"`, prompt distinct).
+    await client.envoyer(requete({ etape: "programme", prompt: { id: "revision", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    await client.envoyer(requete());
+    const corps = appels.map((appel) => JSON.parse(String(appel.init.body)) as { max_tokens?: number; reasoning?: unknown; provider?: unknown });
+    for (const programme of corps.slice(0, 2)) {
+      expect(programme.reasoning).toEqual({ max_tokens: JETONS_RAISONNEMENT_MAX_PROGRAMME });
+      expect(programme.provider).toEqual({ data_collection: "deny", zdr: true });
+    }
+    expect(corps[2]?.reasoning).toBeUndefined();
+    // Plafond total inchangé (réservation inchangée) ; budget demandé sous ce plafond. Ce que le fournisseur en fait n'est
+    // pas vérifiable ici (0130 § 1.2) : aucun nombre de jetons n'est garanti à la réponse.
+    expect(corps[0]?.max_tokens).toBe(JETONS_SORTIE_MAX_PROGRAMME);
+    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBe(8_000);
+    expect(JETONS_RAISONNEMENT_MAX_PROGRAMME).toBeLessThan(JETONS_SORTIE_MAX_PROGRAMME);
+  });
+
+  it("programme: raisonnement qui épuise le plafond, texte vide, fin `length` et jetons rendus (jamais le texte)", async () => {
+    const epuise = async () =>
+      new Response(
+        JSON.stringify({
+          id: "gen-2",
+          object: "chat.completion",
+          created: 1,
+          model: "fournisseur/modele-test",
+          choices: [{ index: 0, message: { role: "assistant", content: "" }, finish_reason: "length" }],
+          usage: { prompt_tokens: 9000, completion_tokens: 32000, total_tokens: 41000, cost: 0.08 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    const { client } = monter([epuise]);
+    const reponse = await client.envoyer(requete({ etape: "programme", prompt: { id: "programme", version: 1 }, routage: { data_collection: "deny", zdr: true } }));
+    expect(reponse).toEqual({ texte: "", coutUsd: 0.08, fin: "length", tokens: { entree: 9000, sortie: 32000 } });
   });
 });
 
