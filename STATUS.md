@@ -1,17 +1,17 @@
-# État du studio — 2026-10-23 (157e cycle)
+# État du studio — 2026-10-23 (158e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 156e cycle.
+- Aucun message de Samuel depuis le 157e cycle.
 
 ## Fait
-- **#732 `[front]`** fusionnée (n'importe quelle ville sur le site d'essai, décision 0129) après la correction 2 : `main` fusionnée, table élargie (778 villes, 214 pays) réservée au site d'essai, le MVP garde les 62 villes d'origine (`villes-mvp.json`, testé). Captures 0129 à refaire en fr-CH (Suites de 0129).
-- **#735 `[release]`** note de version v2026.10.23-21 fusionnée. **Statut du 156e cycle** (#734) fusionné.
+- **Statut du 157e cycle** (#738) fusionné.
+- **#736 `[data]`** (migration 0019 dans `db-migrate`) : revue favorable, `techlead-approved` posé.
 
 ## En cours
-- **#737 `[release]`** `main` → `p0-reel` (photos du tri et ville au choix) : lien envoyé à Samuel, fusion par lui seul (« Create a merge commit »).
-- **#736 `[data]`** approuve la migration 0019 dans `db-migrate` (Q623) : en relecture ; ensuite `owner-approved` de Samuel, puis db-migrate lancé par lui. Sans elle, la recherche Google de ville reste fermée et l'écran 1 se rabat sur la table élargie.
+- **#737 `[release]`** `main` → `p0-reel` (photos du tri et ville au choix) : lien envoyé à Samuel le 23 octobre à 22:25 UTC, fusion par lui seul (« Create a merge commit »).
+- **#736 `[data]`** : attend `owner-approved` de Samuel (demandé après sa fusion de #737, un seul clic à la fois), puis db-migrate lancé par lui. Sans elle, la recherche Google de ville reste fermée et l'écran 1 se rabat sur la table élargie.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
