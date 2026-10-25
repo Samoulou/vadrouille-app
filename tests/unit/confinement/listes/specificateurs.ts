@@ -472,6 +472,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   // Recherche de ville du site d'essai : les lignes que l'analyseur relève pour `villes.ts`, et rien d'autre.
   { fichier: "src/server/composition/villes.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["fuseauParPosition", "paysParCode", "villeDuPays"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent", "type:LogFields"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/acces", noms: ["cookieAccesValide", "empreinteCookieAcces", "ouvertureP0", "type:DependancesAcces"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/base", noms: ["poolPrototype"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/cout-google", noms: ["TablePrixGoogleSchema"], motif: COMPOSITION_VILLES },

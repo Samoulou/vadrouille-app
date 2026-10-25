@@ -89,6 +89,11 @@ export const LOG_EVENTS = [
   // aucune donnée Google, aucun identifiant de lieu ni d'exécution. Niveau `warn` pour un arrêt attendu par plafond,
   // `error` sinon (`src/server/p0/journal-etape.ts`).
   "p0.step_failed",
+  // Constat de Samuel du 2026-10-25 (recherche de ville muette) : refus d'une action de la recherche de ville de l'écran 1
+  // du site d'essai (`suggererVillesEssai`, `choisirVilleEssai`). Champs : `reason` (`LOG_VILLE_REASONS`), `action`
+  // (`suggestions` ou `choix`), `guard` (garde fermée), `googleCode` (`LOG_GOOGLE_CODES`), `httpStatus` (code HTTP d'une
+  // réponse de Google autre que 200), `errorName`. Jamais le texte tapé, un `placeId`, un texte Google, le cookie ni une clé.
+  "p0.ville_refusee",
   // B4a (spécification B4, B4-PO-12 ; décision 0097 B4-TL-13 et B4-TL-11 point 1.1) : alerte de paiement (niveau `error`,
   // champs `eventId`, `eventType`, `alertCode`, `checkoutId` seulement), échec de la suite après un droit validé (`warn`,
   // `errorName` seulement), configuration invalide sur le webhook simulé (`warn`, `rule` et `variable` seulement). Ni
@@ -232,6 +237,10 @@ export type LogFields = {
   readonly generationRunId?: string;
   /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
   readonly stopReason?: string;
+  /** Code fermé d'une erreur d'un client Google (`p0.ville_refusee`) : `LOG_GOOGLE_CODES`, jamais un message. */
+  readonly googleCode?: string;
+  /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`) : entier de 100 à 599, jamais le corps. */
+  readonly httpStatus?: number;
 };
 
 /**
@@ -432,6 +441,51 @@ const RAISONS_FICHES: ReadonlySet<string> = new Set(LOG_FICHES_REASONS);
 export const LOG_POSITIONS_REASONS: readonly string[] = ["perimees", "base", "exception"];
 const RAISONS_POSITIONS: ReadonlySet<string> = new Set(LOG_POSITIONS_REASONS);
 /**
+ * Motifs de `p0.ville_refusee` (constat du 2026-10-25) : entrée refusée, garde du mode réel fermée, cookie d'accès
+ * absent ou expiré, client Places non construit (clé absente, sortie refusée), table de prix illisible, réservation en
+ * erreur, réservation refusée par la base (`usage_unavailable`), plafond de la minute ou du jour, erreur de Google,
+ * pays hors table maison, exception attrapée par l'action serveur.
+ */
+export const LOG_VILLE_REASONS: readonly string[] = [
+  "entree_invalide",
+  "garde",
+  "acces",
+  "client",
+  "prix",
+  "reservation",
+  "usage_unavailable",
+  "limite",
+  "limite_jour",
+  "google_erreur",
+  "pays_inconnu",
+  "exception",
+];
+const RAISONS_VILLE: ReadonlySet<string> = new Set(LOG_VILLE_REASONS);
+/**
+ * Codes admis dans `googleCode` : copie de `CODES_ERREUR_GOOGLE` (`src/grounding/enveloppe-google.ts`, que ce module
+ * n'importe pas) et `place_not_found` (`ErreurAncrage` d'une fiche introuvable) ; égalité vérifiée par le test du journal.
+ */
+export const LOG_GOOGLE_CODES: readonly string[] = [
+  "production_refused",
+  "proxy_env_refused",
+  "tls_env_refused",
+  CODE_CLE_ABSENTE,
+  "cap_reached",
+  "envelope_reached",
+  "daily_quota_insufficient",
+  "usage_unavailable",
+  "invalid_request",
+  "upstream_redirect",
+  "upstream_unavailable",
+  "upstream_timeout",
+  "upstream_rate_limited",
+  "upstream_error",
+  "invalid_response",
+  "upstream_not_found",
+  "place_not_found",
+];
+const CODES_GOOGLE: ReadonlySet<string> = new Set(LOG_GOOGLE_CODES);
+/**
  * Liste de `reason` admise **par événement** (mineur 3 de la revue du head 244b81a) : une raison d'un autre événement est
  * retirée. Un événement absent de la table n'admet aucune `reason`.
  */
@@ -440,6 +494,7 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["voyages.relecture_refused", RAISONS_LECTURE],
   ["voyages.fiches_non_relues", RAISONS_FICHES],
   ["voyages.positions_non_ecrites", RAISONS_POSITIONS],
+  ["p0.ville_refusee", RAISONS_VILLE],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -651,6 +706,16 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["stopReason", (v) => chaine(v) && CODES_ARRET_GENERATION.has(v)],
 ]);
 
+/**
+ * Champs propres à un seul événement (constat du 2026-10-25) : `googleCode` et `httpStatus` ne sont admis que sur
+ * `p0.ville_refusee` ; sur tout autre événement, ils sont retirés (verdict 0122 § 2.1 point 4 : aucun statut sur la ligne
+ * des sites).
+ */
+const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenement: string; readonly controle: (valeur: unknown) => boolean }> = new Map([
+  ["googleCode", { evenement: "p0.ville_refusee", controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
+  ["httpStatus", { evenement: "p0.ville_refusee", controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+]);
+
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
 
 /** Nom d'une erreur (`error.name` seulement, jamais `message`, `code` ni `cause`), ou `undefined`. */
@@ -669,7 +734,13 @@ export function formatLogLine(event: string, fields: object = {}, level: LogLeve
   const ligne: Record<string, unknown> = { level, event: EVENEMENTS.has(event) ? event : "log.unknown_event" };
   let retires = 0;
   for (const [cle, valeur] of Object.entries(fields)) {
-    const controle = cle === "reason" ? (v: unknown) => chaine(v) && (RAISONS_PAR_EVENEMENT.get(event)?.has(v) ?? false) : CONTROLES.get(cle);
+    const propre = CHAMPS_PAR_EVENEMENT.get(cle);
+    const controle =
+      cle === "reason"
+        ? (v: unknown) => chaine(v) && (RAISONS_PAR_EVENEMENT.get(event)?.has(v) ?? false)
+        : propre !== undefined
+          ? (v: unknown) => event === propre.evenement && propre.controle(v)
+          : CONTROLES.get(cle);
     if (controle !== undefined && controle(valeur)) ligne[cle] = valeur;
     else retires += 1;
   }

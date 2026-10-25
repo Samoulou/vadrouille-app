@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CODES_ERREUR_GOOGLE } from "@/grounding/enveloppe-google";
+import { LOG_GOOGLE_CODES } from "@/server/log";
 import { choisirVilleEssai, LIMITES_VILLE, suggererVillesEssai, type DependancesVilles } from "@/server/composition/villes";
 import { valeurCookieAcces } from "@/server/p0/acces";
 import type { DemandeVille, ResultatVille } from "@/server/usage/neon";
@@ -251,5 +253,118 @@ describe("recherche de ville : plafond persistant (décision 0129 § 3)", () => 
     const jourMicros = LIMITES_VILLE.suggestionsParJour * 2_830 + LIMITES_VILLE.choixParJour * 5_000;
     expect(jourMicros).toBe(624_500);
     expect(jourMicros * 31).toBeLessThan(20_000_000);
+  });
+});
+
+describe("recherche de ville : chaque refus est journalisé (constat du 2026-10-25), sans saisie ni donnée Google", () => {
+  /** Lignes `p0.ville_refusee` écrites pendant `corps`. */
+  async function journal(corps: () => Promise<unknown>): Promise<Record<string, unknown>[]> {
+    const sortie = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await corps();
+      return [...sortie.mock.calls, ...erreurs.mock.calls]
+        .map(([ligne]) => JSON.parse(String(ligne)) as Record<string, unknown>)
+        .filter((ligne) => ligne.event === "p0.ville_refusee");
+    } finally {
+      sortie.mockRestore();
+      erreurs.mockRestore();
+    }
+  }
+  const SECRETS = ["Tro", "Valen", "Valence", "Espagne", P, SESSION, "SENTINELLE", COOKIE_VALIDE, CODE.toString("hex")];
+  const sansSecret = (lignes: unknown[]) => {
+    const texte = JSON.stringify(lignes);
+    for (const secret of SECRETS) expect(texte).not.toContain(secret);
+  };
+
+  it("entrée, garde, accès, client, réservation, base, plafonds : un motif fermé par refus", async () => {
+    const { fabrique } = doubles();
+    const cas: [string, () => Promise<unknown>, Record<string, unknown>][] = [
+      ["entrée", () => suggererVillesEssai({ saisie: "T", session: SESSION }, dependances(fabrique)), { reason: "entree_invalide", action: "suggestions" }],
+      [
+        "garde",
+        () => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { env: { ...ENV, P0_REAL_RUNS: undefined } })),
+        { reason: "garde", action: "suggestions" },
+      ],
+      ["accès", () => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { cookie: undefined })), { reason: "acces" }],
+      [
+        "client",
+        () =>
+          suggererVillesEssai(
+            { saisie: "Tro", session: SESSION },
+            dependances(() => {
+              throw Object.assign(new Error("SENTINELLE"), { name: "ErreurClientGoogle", code: "proxy_env_refused" });
+            }),
+          ),
+        { reason: "client", googleCode: "proxy_env_refused", errorName: "ErreurClientGoogle" },
+      ],
+      [
+        "réservation",
+        () =>
+          suggererVillesEssai(
+            { saisie: "Tro", session: SESSION },
+            dependances(fabrique, {
+              reserver: async () => {
+                throw new Error("SENTINELLE");
+              },
+            }),
+          ),
+        { reason: "reservation", errorName: "Error" },
+      ],
+      [
+        "base",
+        () => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { reserver: async () => ({ ok: false, code: "usage_unavailable" }) })),
+        { reason: "usage_unavailable" },
+      ],
+      [
+        "minute",
+        () => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { reserver: async () => ({ ok: false, code: "ville_debit_atteint" }) })),
+        { reason: "limite" },
+      ],
+      [
+        "jour",
+        () =>
+          choisirVilleEssai(
+            { placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" },
+            dependances(fabrique, { reserver: async () => ({ ok: false, code: "ville_jour_atteint" }) }),
+          ),
+        { reason: "limite_jour", action: "choix" },
+      ],
+    ];
+    for (const [nom, appel, attendu] of cas) {
+      const lignes = await journal(appel);
+      expect(lignes, nom).toHaveLength(1);
+      expect(lignes[0], nom).toMatchObject(attendu);
+      expect(lignes[0]?.dropped, nom).toBeUndefined();
+      sansSecret(lignes);
+    }
+  });
+
+  it("garde fermée : le code fermé de la garde est écrit", async () => {
+    const { fabrique } = doubles();
+    const lignes = await journal(() => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { env: { ...ENV, VERCEL_ENV: "production" } })));
+    expect(lignes).toHaveLength(1);
+    expect(typeof lignes[0]?.guard).toBe("string");
+    expect(lignes[0]?.dropped).toBeUndefined();
+  });
+
+  it("erreur de Google : code fermé et code HTTP seulement ; pays inconnu : motif seul", async () => {
+    const { client, fabrique } = doubles();
+    client.suggererVilles.mockRejectedValueOnce(Object.assign(new Error("SENTINELLE Tro"), { name: "ErreurClientGoogle", code: "upstream_error", status: 403 }));
+    const lignes = await journal(() => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique)));
+    expect(lignes).toEqual([{ level: "warn", event: "p0.ville_refusee", reason: "google_erreur", action: "suggestions", googleCode: "upstream_error", httpStatus: 403, errorName: "ErreurClientGoogle" }]);
+    sansSecret(lignes);
+    client.ficheVille.mockResolvedValueOnce({ placeId: P, pays: "ZZ", position: { lat: 0, lng: 0 } });
+    const pays = await journal(() => choisirVilleEssai({ placeId: P, session: SESSION, saisie: "Valen", principal: "Valence" }, dependances(fabrique)));
+    expect(pays).toEqual([{ level: "warn", event: "p0.ville_refusee", reason: "pays_inconnu", action: "choix" }]);
+  });
+
+  it("codes Google admis au journal : ceux du client, et `place_not_found`", () => {
+    expect([...LOG_GOOGLE_CODES]).toEqual([...CODES_ERREUR_GOOGLE, "place_not_found"]);
+  });
+
+  it("succès : aucune ligne", async () => {
+    const { fabrique } = doubles();
+    expect(await journal(() => suggererVillesEssai({ saisie: "Valen", session: SESSION }, dependances(fabrique)))).toEqual([]);
   });
 });

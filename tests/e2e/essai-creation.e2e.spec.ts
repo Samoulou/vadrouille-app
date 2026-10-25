@@ -91,11 +91,12 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expectPath(page, R3);
 });
 
-test("site d'essai : écran 1 ouvert sans site=essai, un écran 1 hors règles est renvoyé par l'écran 2, saisie gardée", async ({ page }) => {
+// Constat de Samuel du 2026-10-25 : ouvert sans `site=essai`, l'écran 1 montrait le champ texte libre, sans recherche de
+// ville ni état. L'écran 1 lit désormais la garde du site d'essai côté serveur : la recherche de ville est montée d'emblée.
+test("site d'essai : écran 1 ouvert sans site=essai, la recherche de ville est montée d'emblée", async ({ page }) => {
   await page.goto(R1);
+  await expect(page.getByRole("combobox", { name: "Destination" })).toBeVisible();
   await fillTrip(page, { ...ROME, destination: "Atlantide" });
-  await continueButton(page).click();
-  await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(field(page, "Destination")).toHaveValue("Atlantide");
   await continueButton(page).click();
   // Ville hors de la table, recherche de ville indisponible (garde fermée sur ce serveur) : refus au champ.
