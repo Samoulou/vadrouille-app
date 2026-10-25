@@ -38,7 +38,7 @@ async function sansViolation(page: import("@playwright/test").Page) {
 test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'erreur ni détour", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Créer un voyage" }).click();
-  // Écran 1 prérendu (décision 0032 § A6.2) : le site d'essai lui est dit par l'adresse.
+  // L'accueil mène à l'écran 1 avec `site=essai` ; l'écran 1 lit aussi la garde côté serveur (décision 0131).
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);
 
@@ -91,11 +91,12 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
   await expectPath(page, R3);
 });
 
-test("site d'essai : écran 1 ouvert sans site=essai, un écran 1 hors règles est renvoyé par l'écran 2, saisie gardée", async ({ page }) => {
+// Constat de Samuel du 2026-10-25 : ouvert sans `site=essai`, l'écran 1 montrait le champ texte libre, sans recherche de
+// ville ni état. L'écran 1 lit désormais la garde du site d'essai côté serveur : la recherche de ville est montée d'emblée.
+test("site d'essai : écran 1 ouvert sans site=essai, la recherche de ville est montée d'emblée", async ({ page }) => {
   await page.goto(R1);
+  await expect(page.getByRole("combobox", { name: "Destination" })).toBeVisible();
   await fillTrip(page, { ...ROME, destination: "Atlantide" });
-  await continueButton(page).click();
-  await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(field(page, "Destination")).toHaveValue("Atlantide");
   await continueButton(page).click();
   // Ville hors de la table, recherche de ville indisponible (garde fermée sur ce serveur) : refus au champ.

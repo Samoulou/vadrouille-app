@@ -637,6 +637,20 @@ describe("places : recherche de ville du site d'essai (demande de Samuel du 23 o
     expect((await erreurDe(client.suggererVilles("Valen", SESSION))).code).toBe("invalid_response");
   });
 
+  it("suggestions : réponse autre que 200, le code HTTP seul est gardé dans l'erreur (journal du 2026-10-25), jamais le corps", async () => {
+    const { client } = monter([
+      async () => json({ error: { message: `SENTINELLE-FOURNISSEUR ${CLE}` } }, 403),
+      async () => {
+        throw new TypeError("SENTINELLE-FOURNISSEUR");
+      },
+    ]);
+    const refus = await erreurDe(client.suggererVilles("Valen", SESSION));
+    expect([refus.code, refus.status]).toEqual(["upstream_error", 403]);
+    expect(JSON.stringify(refus)).not.toContain("SENTINELLE-FOURNISSEUR");
+    const transport = await erreurDe(client.suggererVilles("Valen", SESSION));
+    expect([transport.code, transport.status]).toEqual(["upstream_unavailable", undefined]);
+  });
+
   it("fiche de la ville : GET Essentials dans la même session, masque fermé ; seuls le code du pays et la position sont rendus", async () => {
     const { client, appels, port } = monter([
       async () =>

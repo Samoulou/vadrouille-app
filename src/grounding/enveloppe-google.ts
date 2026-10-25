@@ -54,11 +54,17 @@ const REESSAYABLES: ReadonlySet<CodeErreurGoogle> = new Set(["upstream_unavailab
 export class ErreurClientGoogle extends Error {
   readonly code: CodeErreurGoogle;
   readonly retryable: boolean;
-  constructor(code: CodeErreurGoogle) {
+  /**
+   * Code HTTP d'une réponse de Google autre que 200 (entier de 100 à 599), seul diagnostic gardé de la réponse (journal
+   * `p0.ville_refusee`, constat du 2026-10-25) ; jamais le corps. Absent pour toute autre erreur.
+   */
+  readonly status: number | undefined;
+  constructor(code: CodeErreurGoogle, status?: number) {
     super(code);
     this.code = code;
     this.retryable = REESSAYABLES.has(code);
     this.name = "ErreurClientGoogle";
+    this.status = status !== undefined && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
   }
 }
 
@@ -69,7 +75,7 @@ export class ErreurClientGoogle extends Error {
  */
 export function erreurGoogleDe(issue: { readonly code: CodeErreurGoogle } | { readonly erreur: unknown }): ErreurClientGoogle {
   if ("code" in issue) return new ErreurClientGoogle(issue.code);
-  return new ErreurClientGoogle(issue.erreur instanceof ErreurClientGoogle ? issue.erreur.code : "upstream_error");
+  return issue.erreur instanceof ErreurClientGoogle ? new ErreurClientGoogle(issue.erreur.code, issue.erreur.status) : new ErreurClientGoogle("upstream_error");
 }
 
 export type RequeteGoogle = {
@@ -133,14 +139,14 @@ export async function envoyerGoogle(
   }
   if (reponse.type === "opaqueredirect" || (reponse.status >= 300 && reponse.status < 400)) {
     await abandonnerCorps(reponse);
-    throw new ErreurClientGoogle("upstream_redirect");
+    throw new ErreurClientGoogle("upstream_redirect", reponse.status);
   }
   if (reponse.status !== 200) {
     await abandonnerCorps(reponse);
-    if (reponse.status === 429) throw new ErreurClientGoogle("upstream_rate_limited");
-    if (reponse.status >= 500) throw new ErreurClientGoogle("upstream_unavailable");
-    if (reponse.status === 404 && requete.introuvableSur404 === true) throw new ErreurClientGoogle("upstream_not_found");
-    throw new ErreurClientGoogle("upstream_error");
+    if (reponse.status === 429) throw new ErreurClientGoogle("upstream_rate_limited", reponse.status);
+    if (reponse.status >= 500) throw new ErreurClientGoogle("upstream_unavailable", reponse.status);
+    if (reponse.status === 404 && requete.introuvableSur404 === true) throw new ErreurClientGoogle("upstream_not_found", reponse.status);
+    throw new ErreurClientGoogle("upstream_error", reponse.status);
   }
   try {
     return (await reponse.json()) as unknown;

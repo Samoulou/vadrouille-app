@@ -388,6 +388,18 @@ describe("module de journal", () => {
     expect(ligne).toEqual({ level: "info", event: "p0.programme_written", days: 3, dropped: 8 });
   });
 
+  // Constat du 2026-10-25 : `googleCode` et `httpStatus` admis sur `p0.ville_refusee` seulement, listes fermées.
+  it("journal: p0.ville_refusee, motif, code Google et code HTTP fermés ; ailleurs retirés", () => {
+    const ligne = JSON.parse(
+      formatLogLine("p0.ville_refusee", { reason: "google_erreur", action: "suggestions", googleCode: "upstream_error", httpStatus: 403, saisie: "Tro" }, "warn"),
+    ) as Record<string, unknown>;
+    expect(ligne).toEqual({ level: "warn", event: "p0.ville_refusee", reason: "google_erreur", action: "suggestions", googleCode: "upstream_error", httpStatus: 403, dropped: 1 });
+    const refus = JSON.parse(formatLogLine("p0.ville_refusee", { reason: "Tro", googleCode: "SENTINELLE", httpStatus: 42 }, "warn")) as Record<string, unknown>;
+    expect(refus).toEqual({ level: "warn", event: "p0.ville_refusee", dropped: 3 });
+    const ailleurs = JSON.parse(formatLogLine("p0.step_failed", { googleCode: "upstream_error", httpStatus: 403, reason: "garde" }, "warn")) as Record<string, unknown>;
+    expect(ailleurs).toEqual({ level: "warn", event: "p0.step_failed", dropped: 3 });
+  });
+
   // Verdict 0122 § 2.1 point 4 : aucun compteur par motif, aucune adresse ni aucun statut sur la ligne des sites.
   it("journal: sites sans motif, adresse, hôte ni statut (champs inconnus retirés)", () => {
     const ligne = JSON.parse(
@@ -449,6 +461,7 @@ describe("module de journal", () => {
       "voyages.action_failed",
       // Ticket 493 : arrêt d'une étape de p0Run, phase, classe et code fermés seulement (verdict Sécurité S4 attendu).
       "p0.step_failed",
+      "p0.ville_refusee",
       // B4a (décision 0097 B4-TL-11 point 1 et B4-TL-13 point 4) : alertes de paiement, échec de la suite, webhook fermé
       // par une configuration invalide (identifiants internes et codes fermés seulement).
       "payment.alert",
