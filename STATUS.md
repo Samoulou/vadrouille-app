@@ -1,17 +1,17 @@
-# État du studio — 2026-10-25 (175e cycle)
+# État du studio — 2026-10-25 (176e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 174e cycle.
+- Fil « Routine cycle du studio », 2026-10-25 : demande du code pour db-migrate (10:24 UTC, donné), « c'est fait » (10:40, migration 0019 appliquée), « pas d'auto complete » et remarques sur la lenteur (10:54-10:56, correctif #763 lancé ; circuit court proposé pour les petites fonctions du site d'essai, réponse attendue), code d'accès introuvable (11:44-11:47, page des lancements indiquée).
 
 ## Fait
-- **Statut du 174e cycle** (#760) fusionné.
+- **Statut du 175e cycle** (#762) fusionné.
 - Rappel : l'essai de Samuel du 2026-10-24 à 15:24 UTC a écrit son programme (8 jours) sans erreur, après #749 et #750.
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Migration 0019 (recherche de ville)** : #736 fusionnée le 2026-10-24 à 22:14 UTC après l'`owner-approved` de Samuel ; reste à Samuel de lancer db-migrate une fois. D'ici là, l'écran 1 se rabat sur la table élargie.
+- **Recherche de ville Google** : migration 0019 appliquée par Samuel (db-migrate, 2026-10-25 10:25 UTC). Au test, aucune suggestion : la recherche n'est montée qu'avec `?site=essai` dans l'adresse (cause déduite du code). Correctif #763 `[back]` (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`) : changements demandés (décision écrite + mineurs), correction 1 en cours. Samuel teste avec `?site=essai` ; la case du code d'accès sous la destination ne lui apparaît pas (à comprendre).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
@@ -20,7 +20,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Après le lancement de db-migrate par Samuel, vérifier la recherche Google de ville sur le site d'essai. Note de version : 0130 et son amendement 1.
+1. #763 : après la correction 1 et la revue, fusion puis mise en ligne vers p0-reel ; un seul lien à Samuel. Comprendre la case du code d'accès manquante sous la destination. Note de version : 0130 et son amendement 1.
 2. Zakynthos : après la capture de Samuel, corriger la cause (par exemple afficher les voyages masqués avec leur raison).
 3. #527 : rappeler Q438 à Samuel après ses tests.
 4. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720.
