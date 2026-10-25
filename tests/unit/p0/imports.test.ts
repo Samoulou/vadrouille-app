@@ -1916,6 +1916,7 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "@/contracts/values",
   "@/lib/fuseaux",
   "@/server/composition/clients-google",
+  "@/server/log",
   "@/server/p0/acces",
   "@/server/p0/base",
   "@/server/usage/cout-google",

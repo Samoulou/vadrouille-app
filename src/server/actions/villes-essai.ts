@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 
-import { choisirVilleEssai, suggererVillesEssai, type IssueChoix, type IssueSuggestions } from "@/server/composition/villes";
+import { choisirVilleEssai, journaliserException, suggererVillesEssai, type IssueChoix, type IssueSuggestions } from "@/server/composition/villes";
 import { NOM_COOKIE_ACCES } from "@/server/p0/acces";
 
 /**
@@ -20,7 +20,8 @@ async function cookieAcces(): Promise<string | undefined> {
 export async function suggererVilles(entree: { readonly saisie: string; readonly session: string }): Promise<IssueSuggestions> {
   try {
     return await suggererVillesEssai({ saisie: entree?.saisie, session: entree?.session }, { cookie: await cookieAcces() });
-  } catch {
+  } catch (erreur) {
+    journaliserException("suggestions", erreur);
     return { statut: "indisponible" };
   }
 }
@@ -37,7 +38,8 @@ export async function choisirVille(entree: {
       { placeId: entree?.placeId, session: entree?.session, saisie: entree?.saisie, principal: entree?.principal },
       { cookie: await cookieAcces() },
     );
-  } catch {
+  } catch (erreur) {
+    journaliserException("choix", erreur);
     return { statut: "indisponible" };
   }
 }

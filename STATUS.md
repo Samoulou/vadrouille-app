@@ -1,19 +1,17 @@
-# État du studio — 2026-10-24 (165e cycle)
+# État du studio — 2026-10-25 (177e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Fil « Routine cycle du studio », 2026-10-24 : « c'est merge » (13:33 UTC, mise en ligne #747 fusionnée) : site d'essai redéployé, lien envoyé. « erreur à nouveau » (14:02 UTC) : journal lu, cause confirmée, nouvelle correction lancée, Samuel prié de ne pas relancer.
+- Aucun message de Samuel depuis le 176e cycle.
 
 ## Fait
-- **Statut du 164e cycle** (#746) fusionné.
-- **#745 `[ia]`** (décision 0130 : raisonnement borné à 8 000 jetons, raison de fin et jetons journalisés) fusionnée à 12:52 UTC après la correction 1 ; mise en ligne **#747** `main` → `p0-reel` fusionnée par Samuel à 13:33 UTC (88d076b), déploiement prêt.
+- **Statut du 176e cycle** (#764) fusionné.
+- Rappel : l'essai de Samuel du 2026-10-24 à 15:24 UTC a écrit son programme (8 jours) sans erreur, après #749 et #750.
 
 ## En cours
-- **Essai de Samuel du 2026-10-24 à 13:59 UTC** (après #747) : encore arrêté à l'étape du programme. Le journal ajouté par 0130 confirme la cause : `finishReason` « length », 1 195 jetons d'entrée, 32 000 jetons de sortie, aucun programme lisible. La borne de raisonnement de 8 000 jetons n'a pas été respectée par le fournisseur. Coût d'un essai raté : environ 0,08 USD.
-- **Correction suivante `[ia]`** (branche `claude/programme-sans-raisonnement`) : raisonnement coupé pour la rédaction et la révision, amendement 1 de 0130 ; en cours. Si l'essai suivant finit encore en « length » : changement de modèle, décidé par le Tech Lead, coût annoncé à Samuel.
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **#736 `[data]`** : attend `owner-approved` de Samuel (demandé après son essai, un seul clic à la fois), puis db-migrate lancé par lui. Sans elle, la recherche Google de ville reste fermée et l'écran 1 se rabat sur la table élargie.
+- **Recherche de ville Google** : migration 0019 appliquée par Samuel (db-migrate, 2026-10-25 10:25 UTC). Au test, aucune suggestion : la recherche n'est montée qu'avec `?site=essai` dans l'adresse (cause déduite du code). Correctif #763 `[back]` (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`) : correction 1 (décision 0131) puis correction 2 (renvois de 0131 vers 0129), revue relancée. Samuel teste avec `?site=essai` ; la case du code d'accès sous la destination ne lui apparaît pas (à comprendre).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
@@ -22,7 +20,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Après la fusion de la correction « raisonnement coupé » : mise en ligne `main` → `p0-reel`, un seul lien à Samuel ; lire `finishReason` et `outputTokens` de son essai suivant (0130, amendement 1). Ensuite seulement : lui demander `owner-approved` sur #736 puis db-migrate.
+1. #763 : après la correction 1 et la revue, fusion puis mise en ligne vers p0-reel ; un seul lien à Samuel. Comprendre la case du code d'accès manquante sous la destination. Note de version : 0130 et son amendement 1.
 2. Zakynthos : après la capture de Samuel, corriger la cause (par exemple afficher les voyages masqués avec leur raison).
 3. #527 : rappeler Q438 à Samuel après ses tests.
 4. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720.
