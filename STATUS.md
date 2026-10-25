@@ -1,19 +1,19 @@
-# État du studio — 2026-10-25 (180e cycle)
+# État du studio — 2026-10-25 (181e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun message de Samuel depuis le 179e cycle (le seul message de #studio est la revue hebdomadaire du studio, #769).
+- Aucun message de Samuel depuis le 180e cycle.
 
 ## Fait
-- **Statut du 179e cycle** (#768) fusionné.
+- **Statut du 180e cycle** (#770) fusionné.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
 - Rappel : l'essai de Samuel du 2026-10-24 à 15:24 UTC a écrit son programme (8 jours) sans erreur, après #749 et #750.
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Recherche de ville Google** : attend le test de Samuel ; aucun refus journalisé depuis la mise en ligne (journal Vercel lu à 16:12, 18:11 et 20:11 UTC). Si la case du code d'accès n'apparaît toujours pas, le journal en donnera la raison.
+- **Recherche de ville Google** : attend le test de Samuel ; aucun refus journalisé depuis la mise en ligne (journal Vercel lu à 16:12, 18:11, 20:11 et 22:10 UTC). Si la case du code d'accès n'apparaît toujours pas, le journal en donnera la raison.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
