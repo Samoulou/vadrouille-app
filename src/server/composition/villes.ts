@@ -3,7 +3,7 @@ import "server-only";
 import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
 import { fuseauParPosition, paysParCode, villeDuPays } from "@/lib/fuseaux";
 import { creerClientVilles, type OptionsClientsGoogle } from "@/server/composition/clients-google";
-import { errorNameOf, logEvent, type LogFields } from "@/server/log";
+import { errorNameOf, logEvent, type LogFields, type LogVilleReason } from "@/server/log";
 import { cookieAccesValide, empreinteCookieAcces, ouvertureP0, type DependancesAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
@@ -88,26 +88,17 @@ export type DependancesVilles = DependancesAcces & {
   readonly reserver?: (demande: DemandeVille) => Promise<ResultatVille>;
 };
 
-/** Motif d'un refus (`LOG_VILLE_REASONS` de `@/server/log`). */
-export type MotifRefus =
-  | "entree_invalide"
-  | "garde"
-  | "acces"
-  | "client"
-  | "prix"
-  | "reservation"
-  | "usage_unavailable"
-  | "limite"
-  | "limite_jour"
-  | "google_erreur"
-  | "pays_inconnu"
-  | "exception";
+/** Motif d'un refus : dérivé de la liste fermée du journal (`LOG_VILLE_REASONS`), jamais recopié. */
+export type MotifRefus = LogVilleReason;
 
 type Action = DemandeVille["action"];
 
+/** Motifs écrits au niveau `info` : possibles à chaque pause de frappe, par tout appelant (décision 0131, volume). */
+const MOTIFS_INFO: ReadonlySet<MotifRefus> = new Set<MotifRefus>(["entree_invalide", "acces", "garde"]);
+
 /** Journal d'un refus : champs fermés seulement (le journal retire toute valeur hors liste). */
-export function journaliserRefus(action: Action, motif: MotifRefus, details: Omit<LogFields, "reason" | "action"> = {}): void {
-  logEvent("p0.ville_refusee", { reason: motif, action, ...details } as LogFields, motif === "entree_invalide" || motif === "acces" ? "info" : "warn");
+export function journaliserRefus(action: Action, motif: MotifRefus, details: Pick<LogFields, "guard" | "googleCode" | "httpStatus" | "errorName"> = {}): void {
+  logEvent("p0.ville_refusee", { reason: motif, action, ...details }, MOTIFS_INFO.has(motif) ? "info" : "warn");
 }
 
 /** Exception attrapée par l'action serveur : nom de classe seulement. */
@@ -116,7 +107,11 @@ export function journaliserException(action: Action, erreur: unknown): void {
   journaliserRefus(action, "exception", errorName !== undefined ? { errorName } : {});
 }
 
-/** Diagnostic fermé d'une erreur levée par un client Google : code, code HTTP, nom de classe ; jamais le message. */
+/**
+ * Diagnostic fermé d'une erreur levée par un client Google : code, code HTTP, nom de classe ; jamais le message.
+ * `status` n'existe que sur une `ErreurClientGoogle` née d'une réponse autre que 200 : une fiche introuvable
+ * (`ErreurAncrage("place_not_found")`, 404 traduit par le client) n'a pas de `httpStatus`, seulement son code.
+ */
 function diagnosticGoogle(erreur: unknown): Pick<LogFields, "googleCode" | "httpStatus" | "errorName"> {
   const lu = typeof erreur === "object" && erreur !== null ? (erreur as { code?: unknown; status?: unknown }) : {};
   return {

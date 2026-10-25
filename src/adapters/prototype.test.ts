@@ -350,10 +350,10 @@ describe("adaptateurs: prototype sans cache", () => {
   });
 
   // Décision 0032 § A6.2 : seuls `src/app/layout.tsx` et `src/app/voyages/layout.tsx` n'exportaient pas la constante.
-  // Depuis F8a (après 0032), le layout de la création non plus : statique, sans lecture de données. L'écran 1 est de
-  // nouveau dynamique depuis le 2026-10-25 : il lit la garde du site d'essai (`siteEssaiAutorise`) pour monter la
-  // recherche de ville sans dépendre de `?site=essai`. Liste fermée : une nouvelle page sans l'export fait échouer le test ; un fichier de la liste ne lit
-  // aucune donnée (ni `@/adapters`, ni chargeur de `src/features`). F10b ajoute la page de repli hors ligne,
+  // Depuis F8a (après 0032), le layout de la création non plus : statique, sans lecture de données. L'écran 1 est
+  // dynamique depuis la décision 0131 : il lit la garde du site d'essai (`siteEssaiAutorise`) pour monter la
+  // recherche de ville sans dépendre de `?site=essai`. Liste fermée : une nouvelle page sans l'export fait échouer
+  // le test ; un fichier de la liste ne lit aucune donnée (ni `@/adapters`, ni chargeur de `src/features`). F10b ajoute la page de repli hors ligne,
   // rendue statiquement à la construction sans aucune donnée (`force-static`, F10-TL-4).
   const SANS_EXPORT = [
     "src/app/(creation)/layout.tsx",
@@ -372,9 +372,11 @@ describe("adaptateurs: prototype sans cache", () => {
     for (const fichier of sansExport) expect(lireCode(join(ROOT, fichier)), fichier).not.toMatch(lecture);
   });
 
-  it("écran 1 : le site d'essai est lu côté serveur, pas seulement dans l'adresse (constat du 2026-10-25)", () => {
+  it("écran 1 : le site d'essai est lu côté serveur, pas seulement dans l'adresse (décision 0131)", () => {
     const code = lireCode(join(ROOT, "src/app/(creation)/voyages/nouveau/page.tsx"));
-    expect(code).toMatch(/siteEssaiAutorise\(\) \? \{ essai: true \}/);
+    expect(code).toMatch(/import \{[^}]*\bsiteEssaiAutorise\b[^}]*\} from "@\/adapters"/);
+    expect(code).toMatch(/\bsiteEssaiAutorise\(\)/);
+    expect(code).toMatch(/export const dynamic = "force-dynamic";/);
   });
 
   it("next.config.ts n'active ni cacheComponents ni le prérendu partiel", () => {

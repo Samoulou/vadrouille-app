@@ -446,7 +446,7 @@ const RAISONS_POSITIONS: ReadonlySet<string> = new Set(LOG_POSITIONS_REASONS);
  * erreur, réservation refusée par la base (`usage_unavailable`), plafond de la minute ou du jour, erreur de Google,
  * pays hors table maison, exception attrapée par l'action serveur.
  */
-export const LOG_VILLE_REASONS: readonly string[] = [
+export const LOG_VILLE_REASONS = [
   "entree_invalide",
   "garde",
   "acces",
@@ -459,8 +459,9 @@ export const LOG_VILLE_REASONS: readonly string[] = [
   "google_erreur",
   "pays_inconnu",
   "exception",
-];
-const RAISONS_VILLE: ReadonlySet<string> = new Set(LOG_VILLE_REASONS);
+] as const;
+export type LogVilleReason = (typeof LOG_VILLE_REASONS)[number];
+const RAISONS_VILLE: ReadonlySet<string> = new Set<string>(LOG_VILLE_REASONS);
 /**
  * Codes admis dans `googleCode` : copie de `CODES_ERREUR_GOOGLE` (`src/grounding/enveloppe-google.ts`, que ce module
  * n'importe pas) et `place_not_found` (`ErreurAncrage` d'une fiche introuvable) ; égalité vérifiée par le test du journal.

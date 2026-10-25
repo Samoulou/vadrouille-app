@@ -2,9 +2,9 @@ import { randomBytes } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CODES_ERREUR_GOOGLE } from "@/grounding/enveloppe-google";
+import { CODES_ERREUR_GOOGLE, ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { LOG_GOOGLE_CODES } from "@/server/log";
-import { choisirVilleEssai, LIMITES_VILLE, suggererVillesEssai, type DependancesVilles } from "@/server/composition/villes";
+import { choisirVilleEssai, journaliserException, LIMITES_VILLE, suggererVillesEssai, type DependancesVilles } from "@/server/composition/villes";
 import { valeurCookieAcces } from "@/server/p0/acces";
 import type { DemandeVille, ResultatVille } from "@/server/usage/neon";
 
@@ -350,7 +350,7 @@ describe("recherche de ville : chaque refus est journalisé (constat du 2026-10-
 
   it("erreur de Google : code fermé et code HTTP seulement ; pays inconnu : motif seul", async () => {
     const { client, fabrique } = doubles();
-    client.suggererVilles.mockRejectedValueOnce(Object.assign(new Error("SENTINELLE Tro"), { name: "ErreurClientGoogle", code: "upstream_error", status: 403 }));
+    client.suggererVilles.mockRejectedValueOnce(new ErreurClientGoogle("upstream_error", 403));
     const lignes = await journal(() => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique)));
     expect(lignes).toEqual([{ level: "warn", event: "p0.ville_refusee", reason: "google_erreur", action: "suggestions", googleCode: "upstream_error", httpStatus: 403, errorName: "ErreurClientGoogle" }]);
     sansSecret(lignes);
@@ -361,6 +361,15 @@ describe("recherche de ville : chaque refus est journalisé (constat du 2026-10-
 
   it("codes Google admis au journal : ceux du client, et `place_not_found`", () => {
     expect([...LOG_GOOGLE_CODES]).toEqual([...CODES_ERREUR_GOOGLE, "place_not_found"]);
+  });
+
+  it("exception attrapée par l'action serveur : motif `exception`, nom de classe seul ; garde fermée en `info`", async () => {
+    const lignes = await journal(async () => journaliserException("choix", new TypeError("SENTINELLE Tro")));
+    expect(lignes).toEqual([{ level: "warn", event: "p0.ville_refusee", reason: "exception", action: "choix", errorName: "TypeError" }]);
+    sansSecret(lignes);
+    const { fabrique } = doubles();
+    const garde = await journal(() => suggererVillesEssai({ saisie: "Tro", session: SESSION }, dependances(fabrique, { env: { ...ENV, P0_REAL_RUNS: undefined } })));
+    expect(garde[0]?.level).toBe("info");
   });
 
   it("succès : aucune ligne", async () => {
