@@ -1,12 +1,12 @@
-# État du studio — 2026-10-26 (187e cycle)
+# État du studio — 2026-10-26 (188e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-26 10:10 UTC, fil du cycle : « J'ai choisi Biarritz, fait toute la description et au moment de la génération de l'IA ça a planté ». Traité : la ville passe, l'échec est à la génération ; le journal Vercel n'a gardé qu'une heure (essai de 08:00 UTC effacé), enquête dans le code lancée sur le chemin d'une ville choisie par la recherche Google.
+- Aucun nouveau message depuis le 187e cycle.
 
 ## Fait
-- **Statut du 186e cycle** (#777) fusionné.
+- **Statut du 187e cycle** (#778) fusionné.
 - **Note de version v2026.10.25-21** (#771) publiée. Erreur relevée : elle dit la migration 0019 non appliquée et demande à Samuel de lancer `db-migrate` ; c'est faux, Samuel l'a appliquée le 2026-10-25 à 10:25 UTC (run 40184687008). À corriger dans la prochaine note.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
@@ -14,7 +14,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Essai Biarritz de Samuel en échec** (2026-10-26 vers 08:00 UTC) : ville choisie par la recherche Google, échec à la génération IA. Journal effacé (rétention d'une heure constatée à 10:11 UTC) ; enquête dans le code en cours. Si rien n'est trouvé : Samuel relance pendant que le studio lit le journal en direct.
+- **Essai Biarritz de Samuel en échec** (2026-10-26 vers 08:00 UTC) : ville choisie par la recherche Google, échec à la génération IA. Journal effacé (rétention d'une heure). Enquête dans le code terminée : la ville n'est pas en cause (Biarritz est dans la table maison, même brief qu'une ville de l'ancienne liste) ; cause la plus probable : programme de l'IA illisible (même panne que la décision 0130), sinon erreur ou délai d'OpenRouter. Samuel invité à relancer (lien envoyé à 10:20 UTC) ; le studio lit le journal dans l'heure. Aucun lancement dans le journal à 12:25 UTC.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
@@ -23,7 +23,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Essai Biarritz : lire le journal (`p0.ville_refusee`, puis les événements du lancement) de 08:00 UTC environ, trouver la cause, corriger, mettre en ligne, un seul lien à Samuel.
+1. Essai Biarritz : dès la relance de Samuel, lire `p0.programme_written` (`finishReason`, `outputTokens`) et `p0.step_failed` dans l'heure ; si `length`, décision du Tech Lead sur le modèle `programme` (amendement 1 de 0130) ; puis un seul lien à Samuel.
 2. Zakynthos : après la capture de Samuel, corriger la cause (par exemple afficher les voyages masqués avec leur raison).
 3. #527 : rappeler Q438 à Samuel après ses tests.
 4. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720. Corriger aussi l'état de la migration 0019 (appliquée le 2026-10-25 à 10:25 UTC, pas « à lancer »).
