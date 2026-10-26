@@ -1,12 +1,12 @@
-# État du studio — 2026-10-26 (186e cycle)
+# État du studio — 2026-10-26 (187e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-26 08:07 UTC, fil du cycle : « J'ai testé un voyage sur Biarritz et ça n'a pas marché ». Traité : le CEO lui a demandé à quelle étape (pas de ville proposée, erreur au lancement, autre) ; l'accès au journal Vercel du site d'essai est coupé côté studio à 08:12 UTC, relecture dès son retour (journal gardé un jour).
+- 2026-10-26 10:10 UTC, fil du cycle : « J'ai choisi Biarritz, fait toute la description et au moment de la génération de l'IA ça a planté ». Traité : la ville passe, l'échec est à la génération ; le journal Vercel n'a gardé qu'une heure (essai de 08:00 UTC effacé), enquête dans le code lancée sur le chemin d'une ville choisie par la recherche Google.
 
 ## Fait
-- **Statut du 185e cycle** (#776) fusionné.
+- **Statut du 186e cycle** (#777) fusionné.
 - **Note de version v2026.10.25-21** (#771) publiée. Erreur relevée : elle dit la migration 0019 non appliquée et demande à Samuel de lancer `db-migrate` ; c'est faux, Samuel l'a appliquée le 2026-10-25 à 10:25 UTC (run 40184687008). À corriger dans la prochaine note.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
@@ -14,7 +14,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Essai Biarritz de Samuel en échec** (2026-10-26 vers 08:00 UTC) : étape inconnue ; on attend sa précision et le retour de l'accès au journal Vercel pour trouver la cause, puis correctif et un seul lien.
+- **Essai Biarritz de Samuel en échec** (2026-10-26 vers 08:00 UTC) : ville choisie par la recherche Google, échec à la génération IA. Journal effacé (rétention d'une heure constatée à 10:11 UTC) ; enquête dans le code en cours. Si rien n'est trouvé : Samuel relance pendant que le studio lit le journal en direct.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
