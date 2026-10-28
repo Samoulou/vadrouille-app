@@ -37,7 +37,7 @@ async function sansViolation(page: import("@playwright/test").Page) {
 
 test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'erreur ni détour", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Créer un voyage" }).click();
+  await page.getByRole("link", { name: "Créer un voyage" }).first().click();
   // L'accueil mène à l'écran 1 avec `site=essai` ; l'écran 1 lit aussi la garde côté serveur (décision 0131).
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);

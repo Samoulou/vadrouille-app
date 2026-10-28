@@ -140,8 +140,9 @@ describe("accueil : autre adaptateur", () => {
     await expect(HomePage()).resolves.toBeTruthy();
     await renderHome();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
-    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
-    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; ticket 802 : rappelé en fin de page
+    // sous le même nom ; aucun autre lien.
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
     expect(screen.getByRole("heading", { level: 1, name: PRODUCT_NAME })).toBeInTheDocument();
     expect(screen.getByText(messages.produit.promesse)).toBeInTheDocument();
     expect(adapters.getTripAdapter).not.toHaveBeenCalled();
@@ -152,7 +153,8 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
   it.each([undefined, "mock", "api"])("DATA_ADAPTER=%j : lien vers l'écran 1, après la promesse, avant toute section", async (value) => {
     vi.stubEnv("DATA_ADAPTER", value);
     await renderHome();
-    const link = screen.getByRole("link", { name: "Créer un voyage" });
+    // Ticket 802 : le même lien est rappelé en fin de page ; le premier suit la promesse.
+    const [link] = screen.getAllByRole("link", { name: "Créer un voyage" }) as [HTMLElement];
     expect(link).toHaveAttribute("href", "/voyages/nouveau");
     expect(link).toHaveAccessibleName(messages.accueil.creer);
     // Ordre de lecture : nom, promesse, « Créer un voyage », puis la section « Démonstration » s'il y en a une.
@@ -164,6 +166,42 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
     expect(link.className).toMatch(/\bw-full\b/);
     expect(link.className).toMatch(/\bbg-line\b/);
     expect(link.className).not.toMatch(/\[/);
+  });
+});
+
+describe("accueil : page qui donne envie (ticket 802)", () => {
+  it("journée d'exemple, trois étapes, ce que l'on reçoit, puis le bouton rappelé en fin de page", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await renderHome();
+    const a = messages.accueil;
+    expect(screen.getByText(a.accroche)).toBeInTheDocument();
+    expect(screen.getByText(a.offert)).toBeInTheDocument();
+    const exemple = screen.getByRole("figure", { name: a.exemple.titre });
+    expect(within(exemple).getByText(a.exemple.legende)).toBeInTheDocument();
+    // Illustration seulement : aucune étape n'est un lien.
+    expect(within(exemple).queryAllByRole("link")).toEqual([]);
+    const etapes = within(screen.getByRole("region", { name: a.etapes.titre })).getAllByRole("listitem");
+    expect(etapes).toHaveLength(3);
+    // « Ce que tu reçois » : les lignes de l'offre de « Débloquer », mot pour mot (une seule source de vérité).
+    const offre = messages.debloquer.offre.inclus;
+    const inclus = within(screen.getByRole("region", { name: a.inclus.titre })).getAllByRole("listitem").map((li) => li.textContent);
+    expect(inclus).toEqual([offre.mealsAndEvenings, offre.events, offre.replacements, offre.checklist, offre.calendarAndSharing]);
+    // Une seule plaque de destination, aucune exception (pas de jaune : aucune action requise sur l'accueil).
+    expect(document.querySelectorAll("[data-destination-plate]")).toHaveLength(1);
+    expect(screen.queryByText("À réserver")).toBeNull();
+    // Une action, un nom (handover, règle d'or 9) : le bouton de fin de page porte le même libellé et la même adresse.
+    const liens = screen.getAllByRole("link", { name: a.creer });
+    expect(liens.map((lien) => lien.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
+    const final = within(screen.getByRole("region", { name: a.final.titre })).getByRole("link", { name: a.creer });
+    expect(final).toBe(liens[1]);
+  });
+
+  it("Démonstration (données simulées) après le dernier bouton", async () => {
+    vi.stubEnv("DATA_ADAPTER", "mock");
+    await renderHome();
+    const final = within(screen.getByRole("region", { name: messages.accueil.final.titre })).getByRole("link", { name: messages.accueil.creer });
+    const demo = screen.getByRole("region", { name: t.titre });
+    expect(final.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -181,5 +219,12 @@ describe("accueil : aucune destination en dur", () => {
     expect(sources.length).toBeGreaterThan(0);
     const offenders = sources.filter((path) => /dimbourg/i.test(readFileSync(path, "utf8")));
     expect(offenders).toEqual([]);
+  });
+
+  it("journée d'exemple sans lieu réel nommé (règle d'or 2, décision 0132)", () => {
+    const exemple = JSON.stringify(messages.accueil.exemple);
+    for (const lieu of ["Lisbonne", "Alfama", "Baixa", "Belém", "Bairro Alto", "fado", "dimbourg"]) {
+      expect(exemple).not.toContain(lieu);
+    }
   });
 });
