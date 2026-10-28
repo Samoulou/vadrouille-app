@@ -31,6 +31,10 @@
     },
     "arrivee": "Arrivée",
     "depart": "Départ",
+    "duree": {
+      "une": "1 nuit",
+      "plusieurs": "{n} nuits"
+    },
     "logement": {
       "question": "As-tu déjà un logement ?",
       "options": {

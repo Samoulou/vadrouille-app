@@ -70,6 +70,8 @@ test("presentation: aucune violation axe, fin de l'aperçu", async ({ page }) =>
   await openDeck(page);
   for (const day of [1, 2, 4, 5]) await press(page, `Tout garder pour le jour ${day}`);
   await expect(page.getByRole("heading", { name: "Tu as vu tes premières propositions" })).toBeVisible();
+  // Bandeau des cases `noOption` (B2-PO-9, décision 0133) : rendu sous le titre de fin, couvert par axe ici.
+  await expect(page.locator("[data-deck-end] [data-kind='noOption']")).toBeVisible();
   await expectNoViolations(page);
 });
 
