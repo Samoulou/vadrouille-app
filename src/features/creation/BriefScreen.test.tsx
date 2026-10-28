@@ -59,7 +59,7 @@ const story = () => screen.getByRole("textbox", { name: "Raconte ton voyage en q
 async function prepare() {
   fireEvent.change(story(), { target: { value: STORY } });
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
   });
 }
 
@@ -97,12 +97,42 @@ describe("BriefScreen : récit", () => {
   it("récit de moins de 20 caractères : erreur entre l'aide et le compteur, focus sur le récit, aucun appel", () => {
     renderScreen();
     fireEvent.change(story(), { target: { value: "Trop court." } });
-    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
     expect(structureBrief).not.toHaveBeenCalled();
     expect(story()).toHaveAttribute("aria-invalid", "true");
     expect(story()).toHaveAttribute("aria-describedby", "champ-story-aide champ-story-erreur champ-story-compteur");
-    expect(screen.getByText("Écris au moins une phrase, ou remplis le brief toi-même.")).toBeInTheDocument();
+    expect(screen.getByText("Écris au moins une phrase, ou remplis tes envies toi-même.")).toBeInTheDocument();
     expect(story()).toHaveFocus();
+  });
+
+  it("étape 2 sur 3 à droite de « Retour », lue avant le titre ; 2 sur 2 quand aucune ville n'attend l'écran 3", () => {
+    const { unmount } = renderScreen();
+    const etape = screen.getByText("Étape 2 sur 3");
+    const titre = screen.getByRole("heading", { level: 1 });
+    expect(etape.compareDocumentPosition(titre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(etape.closest("div")).toContainElement(screen.getByRole("button", { name: "Retour" }));
+    unmount();
+    const connu = ready();
+    renderScreen({ ...connu, trip: { ...connu.trip, lodging: { answer: "known", label: "Hôtel du Parc" } } });
+    expect(screen.getByText("Étape 2 sur 2")).toBeInTheDocument();
+  });
+
+  it("exemple en texte indicatif ; une idée ajoute sa phrase au récit, puis la retire ; axe", async () => {
+    const { container } = renderScreen();
+    expect(story()).toHaveAttribute("placeholder", messages.creation.ecran2.recit.exemple);
+    const idees = screen.getByRole("group", { name: "Idées à ajouter" });
+    expect(idees).toHaveAccessibleDescription("Touche une idée pour l'ajouter à ton récit, touche-la encore pour la retirer.");
+    const deux = within(idees).getByRole("button", { name: "À deux" });
+    expect(deux).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(deux);
+    expect(story()).toHaveValue("On part à deux.");
+    expect(deux).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(idees).getByRole("button", { name: "Bonnes tables" }));
+    expect(story()).toHaveValue("On part à deux. On aime bien manger, surtout la cuisine locale.");
+    fireEvent.click(deux);
+    expect(story()).toHaveValue("On aime bien manger, surtout la cuisine locale.");
+    expect(deux).toHaveAttribute("aria-pressed", "false");
+    expect(await axeViolations(container)).toEqual([]);
   });
 
   it("compteur : annoncé poliment à 900 et 1 000 caractères seulement", () => {
@@ -119,22 +149,22 @@ describe("BriefScreen : récit", () => {
     expect(live.textContent).toBe(`${MILLE} sur ${MILLE} caractères`);
   });
 
-  it("« Préparer mon brief » : attente annoncée, puis vérification, focus sur son titre", async () => {
+  it("« Continuer avec mon récit » : attente annoncée, puis vérification, focus sur son titre", async () => {
     let resolve: (value: Awaited<ReturnType<typeof structureBrief>>) => void = () => {};
     vi.mocked(structureBrief).mockReturnValue(new Promise((r) => (resolve = r)));
     renderScreen();
     fireEvent.change(story(), { target: { value: STORY } });
-    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
-    expect(screen.getByRole("status")).toHaveTextContent("On prépare ton brief…");
-    expect(screen.getByRole("button", { name: "Préparer mon brief" })).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
+    expect(screen.getByRole("status")).toHaveTextContent("On lit ton récit…");
+    expect(screen.getByRole("button", { name: "Continuer avec mon récit" })).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
     expect(structureBrief).toHaveBeenCalledTimes(1);
     expect(structureBrief).toHaveBeenCalledWith({
       story: STORY,
       trip: { destination: "Édimbourg", start: "2026-08-29", end: "2026-09-03", otherCities: [] },
     });
     await act(async () => resolve(ok(MOCK_INFERRED_BRIEF)));
-    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toHaveFocus());
   });
 
   it.each(["rate_limited", "cost_cap_reached", "provider_error"] as const)(
@@ -144,7 +174,7 @@ describe("BriefScreen : récit", () => {
       const { container } = renderScreen();
       await prepare();
       const alert = screen.getByRole("alert");
-      expect(alert).toHaveTextContent("Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.");
+      expect(alert).toHaveTextContent("Impossible de lire ton récit pour le moment. Tu peux remplir tes envies toi-même.");
       expect(within(alert).getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
       expect(within(alert).getByRole("button", { name: "Remplir moi-même" })).toBeInTheDocument();
       expect(story()).toHaveValue(STORY);
@@ -155,7 +185,7 @@ describe("BriefScreen : récit", () => {
       await act(async () => {
         fireEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
       });
-      expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeInTheDocument();
     },
   );
 
@@ -164,9 +194,9 @@ describe("BriefScreen : récit", () => {
     vi.mocked(structureBrief).mockReturnValue(new Promise((r) => (resolve = r)));
     const { container } = renderScreen();
     fireEvent.change(story(), { target: { value: STORY } });
-    fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
     fireEvent.click(screen.getByRole("button", { name: "Remplir moi-même" }));
-    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeInTheDocument();
     await act(async () => resolve(ok(MOCK_INFERRED_BRIEF)));
     expect(container.querySelector("[data-inferred]")).toBeNull();
     expect(screen.getAllByRole("radio").filter((radio) => radio.getAttribute("aria-checked") === "true")).toEqual([]);
@@ -177,7 +207,7 @@ describe("BriefScreen : récit", () => {
     vi.mocked(structureBrief).mockRejectedValue(new Error("réseau"));
     renderScreen();
     await prepare();
-    expect(screen.getByRole("alert")).toHaveTextContent("Impossible de préparer ton brief pour le moment.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Impossible de lire ton récit pour le moment.");
   });
 });
 
@@ -362,7 +392,7 @@ describe("BriefScreen : vérification", () => {
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Raconte ton voyage en quelques phrases" })).toHaveFocus());
     expect(story()).toHaveValue(STORY);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Préparer mon brief" }));
+      fireEvent.click(screen.getByRole("button", { name: "Continuer avec mon récit" }));
     });
     expect(screen.getByRole("radio", { name: "Intense" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "Intense" })).not.toHaveAttribute("data-inferred");
@@ -385,7 +415,7 @@ describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () =>
     );
   }
 
-  it("« Vérifier mon brief » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
+  it("« Vérifier mes envies » mène à la vérification, récit gardé, sans appel ni bandeau ; axe", async () => {
     const { container } = renderEssai();
     // Information avant la saisie (décision 0125 § 6) : envoi au fournisseur d'IA, 29 jours, ni e-mail ni téléphone ni adresse.
     expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essai));
@@ -393,21 +423,21 @@ describe("BriefScreen : site d'essai (E2E-essai, lot 2, critère 1 ; D2)", () =>
     expect(story()).toHaveAccessibleDescription(expect.stringContaining(messages.creation.ecran2.recit.essaiVerification));
     fireEvent.change(story(), { target: { value: STORY } });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+      fireEvent.click(screen.getByRole("button", { name: "Vérifier mes envies" }));
     });
-    expect(screen.queryByRole("button", { name: "Préparer mon brief" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continuer avec mon récit" })).not.toBeInTheDocument();
     expect(structureBrief).not.toHaveBeenCalled();
     expect(latest?.stage).toBe("review");
     expect(latest?.story).toBe(STORY);
-    expect(screen.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeInTheDocument();
-    expect(screen.queryByText("Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeInTheDocument();
+    expect(screen.queryByText("Impossible de lire ton récit pour le moment. Tu peux remplir tes envies toi-même.")).not.toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
   });
 
   it("récit trop court : même erreur au champ, aucun appel", () => {
     renderEssai();
     fireEvent.change(story(), { target: { value: "Trop court." } });
-    fireEvent.click(screen.getByRole("button", { name: "Vérifier mon brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vérifier mes envies" }));
     expect(structureBrief).not.toHaveBeenCalled();
     expect(story()).toHaveAttribute("aria-invalid", "true");
     expect(latest?.stage).toBe("story");

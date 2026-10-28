@@ -118,7 +118,7 @@ test("connexion: retour vers la création", async ({ page }) => {
   await expect(heading(page)).toHaveText("Où loger à Édimbourg");
   await button(page, "Retour").click();
   await expectPath(page, R2);
-  await expect(heading(page)).toHaveText("Vérifie ton brief");
+  await expect(heading(page)).toHaveText("Vérifie tes envies");
   await button(page, "Continuer").click();
   await expectPath(page, R3);
   await button(page, "Partir du quartier, choisir plus tard").click();
@@ -135,7 +135,7 @@ test("connexion: retour vers la création", async ({ page }) => {
   await expectPath(page, R4_LANCER);
   await button(page, "Retour").click();
   await expectPath(page, R2);
-  await expect(heading(page)).toHaveText("Vérifie ton brief");
+  await expect(heading(page)).toHaveText("Vérifie tes envies");
   expect(visited).not.toContain(R_LANCER);
 
   // Ouvert hors création : « Retour » mène à « Mes voyages ».

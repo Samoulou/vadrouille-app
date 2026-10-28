@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ligne/Button";
+import { Chip } from "@/components/ligne/Chip";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { STORY_LENGTH } from "@/contracts/values";
 import { format } from "@/i18n";
@@ -26,6 +27,25 @@ const COUNTER_ID = `${STORY_ID}-compteur`;
 /** Seuils où le compteur est annoncé (0018, « Compteur de caractères ») : 90 % du plafond, puis le plafond. */
 const ANNOUNCED_LENGTHS = new Set([STORY_LENGTH.max * 0.9, STORY_LENGTH.max]);
 
+const IDEAS_ID = "recit-idees";
+
+/** Le récit contient-il déjà la phrase de cette idée ? */
+export function hasIdea(story: string, phrase: string): boolean {
+  return story.includes(phrase);
+}
+
+/**
+ * Ajoute la phrase d'une idée à la fin du récit (une espace avant si besoin), ou la retire si elle y est déjà. Rien
+ * n'est ajouté si le récit dépasserait le plafond de caractères.
+ */
+export function toggleIdea(story: string, phrase: string): string {
+  if (hasIdea(story, phrase)) {
+    return story.replace(phrase, "").replace(/ {2,}/g, " ").trim();
+  }
+  const joined = story.trim() === "" ? phrase : `${story.trimEnd()} ${phrase}`;
+  return joined.length > STORY_LENGTH.max ? story : joined;
+}
+
 /** Texte du compteur, « {n} sur 1 000 caractères », nombres au format suisse. */
 export function counterText(length: number): string {
   return format(r.compteur, { n: formatNombre(length), max: formatNombre(STORY_LENGTH.max) });
@@ -33,7 +53,7 @@ export function counterText(length: number): string {
 
 export interface BriefStoryProps extends StageProps {
   /**
-   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 1, et D2) : « Préparer mon brief »
+   * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 1, et D2) : « Continuer avec mon récit »
    * mène à la vérification sans appel ni déduction, récit gardé, sans bandeau ; une phrase d'aide le dit.
    */
   essai?: boolean;
@@ -41,7 +61,7 @@ export interface BriefStoryProps extends StageProps {
 
 /**
  * État « Récit » de l'écran 2 (F8-PO-4, 0018 § 16) : zone de texte nommée par le titre, aide, erreur, compteur
- * (dans cet ordre dans `aria-describedby`). « Préparer mon brief » appelle `structureBrief` (simulé en phase 0) ;
+ * (dans cet ordre dans `aria-describedby`). « Continuer avec mon récit » appelle `structureBrief` (simulé en phase 0) ;
  * « Remplir moi-même » passe à la vérification sans appel ni déduction. Le récit reste en mémoire de l'onglet.
  */
 export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefStoryProps) {
@@ -133,8 +153,9 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
           aria-labelledby={TITLE_ID}
           aria-describedby={describedBy(helpId(STORY_ID), error && errorId(STORY_ID), COUNTER_ID)}
           aria-invalid={error || undefined}
+          placeholder={r.exemple}
           onChange={(event) => dispatch({ type: "story", story: event.target.value })}
-          className={cn(INPUT_CLASS, "h-auto min-h-40 resize-none py-3")}
+          className={cn(INPUT_CLASS, "h-auto min-h-40 resize-none py-3 placeholder:text-ink-soft")}
         />
         <FieldMessage id={errorId(STORY_ID)} message={error ? r.erreur : null} />
         <p id={COUNTER_ID} className="self-end text-legende text-ink-soft tabular-nums">
@@ -144,6 +165,25 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
         <p aria-live="polite" className="sr-only">
           {ANNOUNCED_LENGTHS.has(length) ? counterText(length) : null}
         </p>
+      </div>
+      {/* Idées (décision 0134) : chaque chip ajoute sa phrase au récit, ou la retire ; état « choisi » = phrase présente. */}
+      <div role="group" aria-labelledby={IDEAS_ID} aria-describedby={helpId(IDEAS_ID)} className="flex flex-col gap-2">
+        <h2 id={IDEAS_ID} className="text-corps font-semibold text-ink">
+          {r.idees.titre}
+        </h2>
+        <p id={helpId(IDEAS_ID)} className="text-corps-s text-ink-soft">
+          {r.idees.aide}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {r.idees.liste.map((idea) => (
+            <Chip
+              key={idea.label}
+              label={idea.label}
+              selected={hasIdea(state.story, idea.phrase)}
+              onSelectedChange={() => dispatch({ type: "story", story: toggleIdea(state.story, idea.phrase) })}
+            />
+          ))}
+        </div>
       </div>
       <div role="alert" className={failed ? undefined : EMPTY_LIVE_REGION_CLASS}>
         {failed ? (

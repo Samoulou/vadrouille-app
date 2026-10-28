@@ -23,7 +23,7 @@ import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
-import { CreationShell, TITLE_CLASS } from "./CreationShell";
+import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
@@ -48,7 +48,7 @@ const err = e1.erreurs;
 const LODGING_OPTIONS = LODGING_ANSWERS.map((value) => ({ value, label: e1.logement.options[value] }));
 const KIND_OPTIONS = COMMITMENT_KINDS.map((value) => ({ value, label: e1.engagements.types[value] }));
 
-/** « Ajouter une ville » ou « Ajouter un engagement » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
+/** « Ajouter une ville » ou « Ajouter une réservation » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
 const ADD_BUTTON_CLASS =
   "self-start aria-disabled:cursor-not-allowed aria-disabled:border-muted aria-disabled:bg-muted aria-disabled:text-ink-soft";
 
@@ -233,7 +233,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   const commitmentsFull = trip.commitments.length >= MAX_COMMITMENTS;
 
   return (
-    <CreationShell backHref={creationRoutes.mesVoyages()}>
+    <CreationShell backHref={creationRoutes.mesVoyages()} step={{ current: 1, total: stepTotal(trip) }}>
       {/* Bloc `muted` du brouillon perdu : région présente dès le chargement, texte écrit ensuite (0018 § 14). */}
       <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
         {state.noticeVisible ? t.brouillonPerdu : null}

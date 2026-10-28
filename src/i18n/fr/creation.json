@@ -2,9 +2,10 @@
   "retour": "Retour",
   "brouillonPerdu": "Ton brouillon n'a pas été conservé. Recommence à partir de la destination.",
   "continuer": "Continuer",
+  "etape": "Étape {n} sur {total}",
   "titreDocument": {
     "nouveau": "Nouveau voyage · Destination et dates",
-    "brief": "Nouveau voyage · Ton brief",
+    "brief": "Nouveau voyage · Tes envies",
     "logement": "Nouveau voyage · Où loger",
     "lancement": "Nouveau voyage · Création",
     "preparation": "{destination} · Préparation"
@@ -44,7 +45,7 @@
       },
       "nomAdresse": "Nom ou adresse du logement",
       "quartier": "Quartier",
-      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée. Ce nom est envoyé au fournisseur d'IA (hors UE) avec ton brief, et à Google pour le placer sur la carte. Nous le conservons 29 jours, puis le supprimons. N'y mets ni e-mail, ni numéro de téléphone."
+      "aideEssai": "Sur le site d'essai, indique le nom d'un hôtel ou un quartier, pas une adresse privée. Ce nom est envoyé au fournisseur d'IA (hors UE) avec ton récit, et à Google pour le placer sur la carte. Nous le conservons 29 jours, puis le supprimons. N'y mets ni e-mail, ni numéro de téléphone."
     },
     "villes": {
       "titre": "Autres villes",
@@ -58,15 +59,15 @@
       "plage": "{nom} : {debut} – {fin}"
     },
     "engagements": {
-      "titre": "Engagements déjà pris",
-      "aide": "Ils seront gardés tels quels dans ton programme.",
-      "ajouter": "Ajouter un engagement",
-      "maximum": "Au plus {max} engagements.",
-      "engagement": "Engagement {n}",
-      "type": "Type d'engagement",
+      "titre": "Déjà réservé",
+      "aide": "Un vol, une table, un billet : on les garde tels quels dans ton programme.",
+      "ajouter": "Ajouter une réservation",
+      "maximum": "Au plus {max} réservations.",
+      "engagement": "Réservation {n}",
+      "type": "Type de réservation",
       "types": {
         "flight": "Vol",
-        "booking": "Réservation",
+        "booking": "Table ou activité",
         "ticket": "Billet"
       },
       "libelle": "Libellé",
@@ -108,19 +109,34 @@
     "recit": {
       "titre": "Raconte ton voyage en quelques phrases",
       "aide": "Qui part, ce qui te fait envie, ce que tu préfères éviter, ton budget pour les repas.",
+      "exemple": "Par exemple : on part à deux, on aime marcher et goûter la cuisine locale. Pas trop de musées, des soirées tranquilles, environ 40 CHF par repas.",
+      "idees": {
+        "titre": "Idées à ajouter",
+        "aide": "Touche une idée pour l'ajouter à ton récit, touche-la encore pour la retirer.",
+        "liste": [
+          { "label": "À deux", "phrase": "On part à deux." },
+          { "label": "En famille", "phrase": "On part en famille, avec des enfants." },
+          { "label": "Entre amis", "phrase": "On part entre amis." },
+          { "label": "Rythme tranquille", "phrase": "On veut un rythme tranquille, sans courir." },
+          { "label": "Bonnes tables", "phrase": "On aime bien manger, surtout la cuisine locale." },
+          { "label": "Balades et nature", "phrase": "On aime marcher et voir de la nature." },
+          { "label": "Musées et patrimoine", "phrase": "On aime les musées et les vieux quartiers." },
+          { "label": "Soirées animées", "phrase": "On aime sortir le soir." }
+        ]
+      },
       "compteur": "{n} sur {max} caractères",
-      "preparer": "Préparer mon brief",
-      "verifier": "Vérifier mon brief",
+      "preparer": "Continuer avec mon récit",
+      "verifier": "Vérifier mes envies",
       "remplirMoiMeme": "Remplir moi-même",
-      "attente": "On prépare ton brief…",
-      "erreur": "Écris au moins une phrase, ou remplis le brief toi-même.",
-      "echec": "Impossible de préparer ton brief pour le moment. Tu peux le remplir toi-même.",
+      "attente": "On lit ton récit…",
+      "erreur": "Écris au moins une phrase, ou remplis tes envies toi-même.",
+      "echec": "Impossible de lire ton récit pour le moment. Tu peux remplir tes envies toi-même.",
       "reessayer": "Réessayer",
       "essai": "Sur le site d'essai, ton récit et ton logement sont envoyés au fournisseur d'IA (hors UE), qui écrit ton programme. Nous les conservons 29 jours, puis les supprimons. N'y mets ni e-mail, ni numéro de téléphone, ni adresse privée.",
-      "essaiVerification": "Tu vérifies ensuite ton brief toi-même."
+      "essaiVerification": "Tu vérifies ensuite tes envies toi-même."
     },
     "verification": {
-      "titre": "Vérifie ton brief",
+      "titre": "Vérifie tes envies",
       "aide": "En pointillé : ce qu'on a compris de ton récit. Touche pour corriger.",
       "revenirRecit": "Revenir à mon récit",
       "facultatif": "Facultatif",
@@ -212,8 +228,8 @@
         "titre": "Ton code d'accès",
         "aide": "Sur le site d'essai, le code d'accès remplace la connexion. Il ouvre l'accès pour 12 heures dans ce navigateur. Ton brouillon est conservé."
       },
-      "recit": "Ton récit contient une adresse e-mail ou un numéro de téléphone. Retire-les, puis reprends ton brief. Ton brouillon est conservé.",
-      "champ": "Une information de ton voyage n'est pas acceptée sur le site d'essai. Corrige-la, puis reprends ton brief. Ton brouillon est conservé.",
+      "recit": "Ton récit contient une adresse e-mail ou un numéro de téléphone. Retire-les de ton récit, puis réessaie. Ton brouillon est conservé.",
+      "champ": "Une information de ton voyage n'est pas acceptée sur le site d'essai. Corrige-la, puis réessaie. Ton brouillon est conservé.",
       "corrigerVoyage": "Corriger mon voyage",
       "plafond": "Le plafond des essais est atteint. Réessaie plus tard ; ton brouillon est conservé dans cet onglet.",
       "accesOuvert": "Accès ouvert pour 12 heures dans ce navigateur.",

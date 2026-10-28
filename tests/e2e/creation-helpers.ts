@@ -60,11 +60,11 @@ export async function reachBrief(page: Page, trip: TripInput = EDIMBOURG) {
 
 export const storyField = (page: Page) => page.getByRole("textbox", { name: "Raconte ton voyage en quelques phrases" });
 
-/** Récit simulé, « Préparer mon brief », vérification affichée. */
+/** Récit simulé, « Continuer avec mon récit », vérification affichée. */
 export async function reachReview(page: Page) {
   await storyField(page).fill(STORY);
-  await page.getByRole("button", { name: "Préparer mon brief" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
+  await page.getByRole("button", { name: "Continuer avec mon récit" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeFocused();
 }
 
 /** Dates du voyage à partir d'aujourd'hui (mesures sans horloge installée) : arrivée dans 30 jours, 5 nuits. */
