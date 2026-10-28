@@ -1,12 +1,12 @@
-# État du studio — 2026-10-28 (209e cycle)
+# État du studio — 2026-10-28 (210e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- 2026-10-28 05:45 UTC, fil du cycle : « on laisse tomber Biarritz, on continue d'améliorer l'algorithme, j'ai toujours pas les sites web de chaque activité dans le détail, aussi il faut mieux optimiser les déplacements, pas faire des aller-retour pour rien, c'est du réglage fin, c'est assez bien en l'état ». Traité : enquête Biarritz close, carte de décision retirée ; ticket #800 ouvert (réglages fins du programme : site web de chaque étape demandé à l'IA et affiché dans le détail même sans raison, journées en ordre de marche sans allers-retours ; amendement court de la spécification, décision 0123) ; agent ia au travail sur `claude/800-reglages-programme`.
+- Aucun nouveau message depuis le 209e cycle (le message du 2026-10-28 05:45 UTC est traité : ticket #800, PR #809).
 
 ## Fait
-- **Statut du 208e cycle** (#799) fusionné.
+- **Statut du 209e cycle** (#806) fusionné.
 - **Note de version v2026.10.25-21** (#771) publiée. Erreur relevée : elle dit la migration 0019 non appliquée et demande à Samuel de lancer `db-migrate` ; c'est faux, Samuel l'a appliquée le 2026-10-25 à 10:25 UTC (run 40184687008). À corriger dans la prochaine note.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
@@ -14,7 +14,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. Constat : le prompt ne demande le champ `site` que « si tu connais l'adresse » (`src/ai/prompts/programme.ts`, `revision.ts`) et le détail de l'étape ne l'affiche que si `stop.reason` existe (`StopSheet.tsx`) ; aucune règle d'ordre des étapes dans la journée au-delà d'« un ou deux quartiers voisins ». Code en cours (prompts programme et révision, lecture tolérante, bloc « site officiel » du détail, amendement de `specs/P0-programme-par-ia.md`) ; PR attendue ce cycle. Essai Biarritz abandonné par Samuel (cause probable notée : programme de l'IA illisible, décision 0130).
+- **Audit UX « séduire les nouveaux clients »** (fil projet de Samuel, 2026-10-28 05:47 UTC, fil « Rendre l'app séduisante pour les nouveaux clients », hors routine du cycle) : fusionnés #805 (écran 1, calendriers bornés, #801), #810 (page d'accueil, #802), #811 (« Mes voyages », bouton « Créer un voyage », #803), #812 (tri, première carte d'abord, #804), #814 (formulaire guidé, #813) ; #808 (CI : Ubuntu 24.04 épinglé, #807, owner-approved par Samuel). Ces changements ne sont pas encore sur le site d'essai `p0-reel` : la prochaine note de version les emportera avec #809.
+- **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. PR #809 (`claude/800-reglages-programme`) : prompts programme v4 et révision v2 (champ `site` demandé pour chaque étape avec un lieu, règle de parcours sans allers-retours, `quartier` par lieu), section « Site officiel » du détail de l'étape même sans raison, compteur `retoursDeQuartier` (mesure seule), amendement 4 de `specs/P0-programme-par-ia.md` (A25 à A27). Revue consolidée du 06:16 UTC : Tech Lead, Sécurité et UX/UI approuvent, aucun bloquant, 10 mineurs (capture de la section « Site officiel » à produire, 0122 § 2.2 condition 5 à compléter d'une phrase, composant lien partagé). CI du premier head rouge à cause du runner Ubuntu 26.04 (corrigé par #808) ; main fusionnée dans la branche à 08:20 UTC, fusion automatique armée. Questions : S-800-1, T-800-1, T-800-2, PO-800-1 (voir QUESTIONS.md au prochain cycle).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
