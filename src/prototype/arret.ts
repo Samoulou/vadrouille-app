@@ -32,12 +32,16 @@ export type CodeArret = (typeof CODES_ARRET)[number];
 
 /**
  * Correspondance des codes du journal (`scripts/p0/journal.ts`) qui ne sont pas eux-mêmes des codes persistés
- * (D24) : `brief_not_found` et `brief_name_invalid` deviennent `brief_invalid`. Tout autre code absent de
- * `CODES_ARRET` devient `pipeline_failed` (repli par défaut).
+ * (D24) : `brief_not_found` et `brief_name_invalid` deviennent `brief_invalid` ; `upstream_rate_limited` (code d'un
+ * client Google) devient `upstream_unavailable` (ticket 826). Tout autre code absent de `CODES_ARRET` devient
+ * `pipeline_failed` (repli par défaut).
  */
 const ALIAS: ReadonlyMap<string, CodeArret> = new Map([
   ["brief_not_found", "brief_invalid"],
   ["brief_name_invalid", "brief_invalid"],
+  // Ticket #826 (soumis au verdict de la Sécurité, S4) : un refus de Google pour limite atteinte (429) est un arrêt
+  // externe, comme une indisponibilité (5xx) ; écrit `upstream_unavailable`, qui ne dit ni l'étape ni le fournisseur.
+  ["upstream_rate_limited", "upstream_unavailable"],
 ]);
 
 /**

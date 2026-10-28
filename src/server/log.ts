@@ -41,6 +41,8 @@ export const LOG_EVENTS = [
   // `inputTokens` et `outputTokens` (jetons rendus par le client réel, bornés), absents sinon ; jamais le texte.
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
+  // Relecture Routes refusée ou en échec (`src/server/p0/relecture.ts`) : `errorName` et, pour une erreur d'un client
+  // Google, son code fermé dans `failureCode` (ticket 826, champ déjà admis sur tout événement : `LOG_STEP_FAILURE_CODES`).
   "p0.read_unavailable",
   // Décision 0124 § 2 (spécification E2E-essai, lot 1) : branchement du cookie de déblocage de l'essai impossible au
   // démarrage ; `errorName` seulement (ni cookie, ni clé, ni identifiant de voyage). Seul le droit simulé de la portée reste.
