@@ -422,7 +422,9 @@ function Deck({
       {generatingDays.map((day) => (
         <StatusBanner key={day} kind="generating" message={format(t.generation, { n: day })} className="shrink-0" />
       ))}
-      {noOptionSlots.length > 0 ? (
+      {/* Cases `noOption` (B2-PO-9, rendu UX/UI, ticket 804) : en fin de paquet seulement, au-dessus de l'écran de fin ;
+          jamais au-dessus de la première carte, pour que le tri s'ouvre sur une proposition. */}
+      {noOptionSlots.length > 0 && !card ? (
         <StatusBanner kind="noOption" message={noOptionMessage(noOptionSlots)} className="shrink-0" />
       ) : null}
       {/* Refus du tri enregistré : annoncé par la région `role="status"` ci-dessous (bandeau sans rôle propre, 0018). */}

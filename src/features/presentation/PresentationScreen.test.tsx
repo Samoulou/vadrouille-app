@@ -396,15 +396,20 @@ describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () =>
   const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal] : []));
   const sansOption = apercu.flatMap((slot) => (slot.type === "noOption" ? [{ day: slot.day, time: slot.time, kind: slot.kind }] : []));
 
-  it("presentation: les cases noOption ne sont pas des cartes", async () => {
+  it("presentation: les cases noOption ne sont pas des cartes ; leur bandeau attend la fin du paquet (ticket 804)", async () => {
     const { container } = setup({ proposals: cartes, noOptionSlots: sansOption });
     expect(sansOption.length).toBeGreaterThan(0);
+    // Le tri s'ouvre sur la première carte, sans bandeau au-dessus.
+    expect(container.querySelector('[data-kind="noOption"]')).toBeNull();
+    expect(progress()).toHaveAccessibleName(`Proposition 1 sur ${cartes.length}`);
+    expect(cartes).toHaveLength(7);
+    for (let i = 0; i < cartes.length; i += 1) {
+      await click(screen.getByRole("button", { name: /^(J'aime|Je choisis)$/ }).textContent ?? "J'aime");
+    }
     const banner = container.querySelector('[data-kind="noOption"]');
     expect(banner).toHaveTextContent(noOptionMessage(sansOption));
     expect(banner).toHaveTextContent("le jour 4, vers 16:00 (activité)");
     expect(banner).toHaveAttribute("role", "status");
-    expect(progress()).toHaveAccessibleName(`Proposition 1 sur ${cartes.length}`);
-    expect(cartes).toHaveLength(7);
     expect(await axeViolations(container)).toEqual([]);
   });
 
