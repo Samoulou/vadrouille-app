@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { isPrototypeAdapter } from "@/adapters";
 import { loadSharedDay } from "@/features/partage/load";
 import { SharedDayScreen } from "@/features/partage/SharedDayScreen";
 import { SharedShell } from "@/features/partage/SharedShell";
@@ -32,9 +33,10 @@ export default async function SharedDayPage({ params }: { params: Params }) {
   const data = await loadSharedDay(token, n);
   const day = data?.view.trip.days.find((candidate) => candidate.index === data.view.dayIndex);
   if (!data || !day) notFound();
-  // Partage ouvert avec l'adaptateur `mock` seulement (`shareAvailable()`, décision 0039) : aucune donnée de lieux
-  // Google n'y est lue. B12 reprend cette valeur avec l'adaptateur réel.
-  const placesFromGoogle = false;
+  // Noms et positions des lieux : données Google avec l'adaptateur `prototype` (partage réel du site d'essai, décision
+  // 0135), montrées seulement sur la carte Google de `DayMap` (sinon l'état de remplacement, sans carte) avec la mention
+  // de leur source ; aucune avec l'adaptateur `mock`.
+  const placesFromGoogle = isPrototypeAdapter();
   return (
     <SharedShell
       token={data.token}

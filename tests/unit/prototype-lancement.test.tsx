@@ -67,6 +67,14 @@ describe("p0: interface de la page de lancement", () => {
     expect(Object.keys(t.suivi.codesArret)).toEqual([...CODES_ARRET]);
   });
 
+  it("causes d'arrêt : fragments en minuscule, sans point final (décision 0137 § 1)", () => {
+    for (const libelle of Object.values(t.suivi.codesArret)) {
+      expect(libelle.charAt(0), libelle).toBe(libelle.charAt(0).toLowerCase());
+      expect(libelle, libelle).not.toMatch(/[.!?]\s*$/);
+    }
+    expect(t.suivi.codesArret.upstream_unavailable).toBe("service externe indisponible ou limite de débit du service");
+  });
+
   it("régions d'annonce présentes dès l'affichage, vides ; aucun choix invalide", () => {
     render(<LancementP0 modele={modele()} />);
     const statuts = screen.getAllByRole("status");

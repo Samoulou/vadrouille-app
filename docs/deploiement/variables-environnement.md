@@ -43,7 +43,7 @@ Aucune valeur par défaut d'`SMTP_URL` dans le code, `.env.example` ou les scrip
 | Variable | Valeur | Où la poser |
 |---|---|---|
 | `DATA_ADAPTER` | `prototype` | `.env.local` du poste (avec `pnpm dev`) ; le second serveur de `playwright.config.ts`. Jamais en production. |
-| `VADROUILLE_PROTOTYPE_DIR` | chemin **absolu et canonique** du dossier des programmes (sans lien symbolique : `realpath` du chemin égal au chemin donné), lu une fois au démarrage | `.env.local` ; `playwright.config.ts` (programme de test `prototype/programmes-test/`). Absente ou vide : la section « Prototype » de l'accueil est absente, sans erreur. |
+| `VADROUILLE_PROTOTYPE_DIR` | chemin **absolu et canonique** du dossier des programmes (sans lien symbolique : `realpath` du chemin égal au chemin donné), lu une fois au démarrage | `.env.local` ; `playwright.config.ts` (programme de test `prototype/programmes-test/`). Absente ou vide : la section « Prototype » de l'accueil est absente, sans erreur. **Jamais sur Vercel** (ni préversion, ni production) : en mode dossier, le partage réel crée un lien sans code d'accès (décision 0135 § 2). |
 | `VADROUILLE_PROTOTYPE` | `1`, avec `CI=true` | **En CI seulement** : `playwright.config.ts`, pour les tests sur le build de production. |
 
 **Liste blanche** (`prototypeAdapterAllowed`, `src/dev/flags.ts`) : l'adaptateur et son contexte (`org_prototype`) ne s'ouvrent que si aucun déploiement de production n'est détecté (`VADROUILLE_ENV` et `VERCEL_ENV` différents de `production`, même en majuscules ou avec des espaces), si `VADROUILLE_ENV` est absente, `local` ou `ci`, **et** dans l'un de ces trois cas :
