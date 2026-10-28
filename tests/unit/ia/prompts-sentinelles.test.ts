@@ -97,9 +97,10 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
     for (const requete of journal.requetes) expect(sentinellesPresentes(JSON.stringify(requete), sentinelles), requete.etape).toEqual([]);
   });
 
-  // A13 (`specs/P0-programme-par-ia.md` § 11.6, amendement 2 ; 0121 § 5 ; 0122 § 3 : « le prompt `programme` v2 ne reçoit
-  // toujours que le brief ») : la requête `programme` (v4 aujourd'hui ; la citation date de la v2) envoyée par la capacité de `p0Run` ne porte aucune valeur rendue
-  // par les clients Google, même appelés avant elle ; une entrée à clé Google glissée est refusée sans requête.
+  // A13 (`specs/P0-programme-par-ia.md` § 11.6, amendement 2 ; 0121 § 5 ; 0122 § 3, écrite au temps de la v2 : « le prompt
+  // `programme` v2 ne reçoit toujours que le brief », règle tenue à l'identique par la v4) : la requête du prompt `programme`
+  // v4 envoyée par la capacité de `p0Run` ne porte aucune valeur rendue par les clients Google, même appelés avant elle ;
+  // une entrée à clé Google glissée est refusée sans requête.
   it("programme: prompt v4 demande le site officiel, sans donnée Google (A13) : requête journalisée sans sentinelle", async () => {
     const { brief, fixtures } = charger();
     const sentinelles = avecSentinellesGoogle({ places: creerPlacesSimule(fixtures.places), routes: creerRoutesSimule(fixtures.routes) });
