@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { DayLineItem } from "@/contracts";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import {
   cleTrajet,
@@ -68,23 +67,14 @@ import type { ConserverTrajets, ProgrammeReelLu, SourceProgrammesReels, TrajetsC
  * affiche l'état d'erreur existant.
  */
 
-/** Badges d'une étape au plus (`Stop.exceptions`, `.max(2)` du contrat). */
-const BADGES_MAX = 2;
-
 /**
  * Badge « à confirmer » calculé à la lecture (décision 0116 § 5.1 ; 0011 § 5), au lot 1 : pur, sans donnée Google,
- * sans appel, rien d'écrit en base. Une étape (`type: "stop"`) sans `placeId` est relue avec `exceptions` contenant
- * `"toConfirm"`, ajouté à ses badges existants dans la limite de 2 de `Stop.exceptions` (une étape qui en porte déjà deux,
- * `toReserve` et `unconfirmed`, reste telle quelle : rien n'est retiré ni inventé) ; arrivée et départ (`terminus`), pause `free`, repas ouvert et trajets ne sont jamais badgés. La forme
- * réduite continue de refuser `toConfirm` à l'écriture (`StopReduitSchema`, décision 0032 A3.3) : le badge n'existe
- * qu'à l'affichage. Le badge « fermé ce jour-là » (relecture des horaires, T8) sort du lot 1 (future décision 0118).
+ * sans appel, rien d'écrit en base. Règle écrite une seule fois dans `src/domain/apercu.ts` (`avecBadgeSansLieu`,
+ * décision 0136 § 1.7, M1a-1), réexportée sous son nom du site d'essai. La forme réduite continue de refuser `toConfirm`
+ * à l'écriture (`StopReduitSchema`, décision 0032 A3.3) : le badge n'existe qu'à l'affichage. Le badge « fermé ce
+ * jour-là » (relecture des horaires, T8) sort du lot 1 (future décision 0118).
  */
-export function avecBadgeALaLecture(ligne: DayLineItem): DayLineItem {
-  if (ligne.type !== "stop") return ligne;
-  const { stop } = ligne;
-  if (stop.placeId !== undefined || stop.exceptions.includes("toConfirm") || stop.exceptions.length >= BADGES_MAX) return ligne;
-  return { type: "stop", stop: { ...stop, exceptions: [...stop.exceptions, "toConfirm"] } };
-}
+export { avecBadgeSansLieu as avecBadgeALaLecture } from "@/server/programme/apercu";
 
 /** Délai maximal d'une requête de lecture (millisecondes), posé dans la transaction. */
 export const DELAI_LECTURE_MS = 5000;
