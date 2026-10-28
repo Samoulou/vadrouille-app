@@ -6,7 +6,8 @@ import { element } from "@/domain/tables";
  * Règles de l'aperçu, écrites une seule fois (décision 0136 § 1.7) : fonctions pures, sans lecture ni réseau, partagées
  * par le site d'essai (adaptateurs `prototype-parcours.ts` et `prototype-lecture.ts`, par la réexportation
  * `src/server/programme/apercu.ts`) et la vraie app (`src/server`, directement). Déplacées de ces deux adaptateurs par
- * M1a-1, sans changement de comportement. N'importe que `@/contracts` (règle « src/domain sans entrée-sortie »).
+ * M1a-1, sans changement de comportement. N'importe que `@/contracts` et `@/domain/tables` (règle « src/domain sans
+ * entrée-sortie »).
  *
  * - « Tes premières propositions » : les étapes du programme, dans son ordre, la première journée puis le début de la
  *   deuxième, `MAX_PREVIEW_SLOTS` (8) au plus (cadrage D11) ; engagements exclus ;
