@@ -9,6 +9,7 @@
     "copier": "Copier le lien",
     "envoyer": "Envoyer…",
     "copieMaintenant": "Copie-le maintenant : il ne pourra plus s'afficher.",
+    "lienStable": "Ce lien reste le même pour ce voyage : « Créer un lien » te le redonnera.",
     "valable": "Valable jusqu'au {date}.",
     "actif": "Un lien est actif depuis le {date}.",
     "nouveau": "Créer un nouveau lien",

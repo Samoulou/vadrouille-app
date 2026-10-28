@@ -251,7 +251,7 @@ export const ENV_ENTIER = [
       "argument:isProductionDeployment",
       "argument:shareDemoAvailable",
       // Décision 0135 : partage réel du site d'essai, même forme que `payment-guard.ts` (liste blanche de `prototype`,
-      // jamais en production). Verdict Sécurité à rendre (PR du ticket 825).
+      // jamais en production). Verdict Sécurité : approuvé (revue consolidée du head 0849bf1, PR #827).
       "defaut:realShareAvailable",
       "argument:realShareAvailable",
       "argument:prototypeAdapterAllowed",

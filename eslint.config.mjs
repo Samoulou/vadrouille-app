@@ -418,6 +418,7 @@ export default defineConfig([
       "src/adapters/signed-share.ts",
       "src/adapters/share-signed-token.ts",
       "src/adapters/share-views.ts",
+      "src/server/essai/partage.ts",
     ],
     rules: { "no-console": "error" },
   },

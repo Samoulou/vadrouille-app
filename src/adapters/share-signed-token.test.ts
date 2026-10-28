@@ -58,6 +58,17 @@ describe("signShareToken et verifyShareToken", () => {
     expect(() => signShareToken(Buffer.alloc(16, 7), PAYLOAD)).toThrow();
   });
 
+  it("charge la plus longue (voyage et organisation de 64 caractères) : 234 caractères, forme admise ; plus court : 19 caractères de charge", () => {
+    const longest = signShareToken(KEY, { tripId: "t".repeat(64), organizationId: "o".repeat(64), expiresOn: "2027-06-13" });
+    expect(longest).toHaveLength(234);
+    expect(longest).toMatch(SIGNED_SHARE_TOKEN_PATTERN);
+    expect(verifyShareToken(KEY, longest)).not.toBeNull();
+    const shortest = signShareToken(KEY, { tripId: "t", organizationId: "o", expiresOn: "2027-06-13" });
+    expect(shortest.split(".")[1]).toHaveLength(19);
+    expect(SIGNED_SHARE_TOKEN_PATTERN.test(`v1.${"A".repeat(188)}.${"A".repeat(43)}`)).toBe(false);
+    expect(SIGNED_SHARE_TOKEN_PATTERN.test(`v1.${"A".repeat(18)}.${"A".repeat(43)}`)).toBe(false);
+  });
+
   it("charge signée mais mal formée (date impossible, séparateur en trop, voyage hors motif) : refusée à la signature", () => {
     for (const payload of [
       { ...PAYLOAD, expiresOn: "2027-02-30" },

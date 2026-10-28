@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 
-import { brancherPartageEssai, clePartageEssai, prototypeSharedReader, sessionPartageEssaiVerifiee } from "./prototype-instance";
+import {
+  brancherPartageEssai,
+  clePartageEssai,
+  debrancherPartageEssaiPourTests,
+  PartageDejaBrancheError,
+  prototypeSharedReader,
+  sessionPartageEssaiVerifiee,
+} from "./prototype-instance";
 import type { AdapterContext } from "./types";
 
 /** Partage réel, programmes réels en base (décision 0135 § 3 et § 5) : clé, session et barrière viennent du port branché. */
@@ -13,6 +20,7 @@ const VISITEUR: AdapterContext = { organizationId: PROTOTYPE_ORG_ID, userId: "li
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  debrancherPartageEssaiPourTests();
 });
 
 describe("partage réel, programmes réels", () => {
@@ -33,6 +41,16 @@ describe("partage réel, programmes réels", () => {
     expect(await sessionPartageEssaiVerifiee()).toBe(true);
     expect(await prototypeSharedReader(ESSAI_ID).getTrip(VISITEUR, ESSAI_ID)).toBeNull();
     expect(barriere).toHaveBeenCalledTimes(1);
+  });
+
+  it("second branchement : refusé, le premier port reste en place (clé inchangée)", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    const cle = Buffer.alloc(32, 5);
+    brancherPartageEssai({ cle: () => cle, sessionVerifiee: async () => true, barriereLecture: async () => null });
+    expect(() => brancherPartageEssai({ cle: () => Buffer.alloc(32, 9), sessionVerifiee: async () => true, barriereLecture: async () => null })).toThrow(
+      PartageDejaBrancheError,
+    );
+    expect(clePartageEssai()).toBe(cle);
   });
 
   it("session du port qui lève : non vérifiée", async () => {

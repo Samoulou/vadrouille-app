@@ -149,9 +149,30 @@ export function brancherPhotosEssai(photos: PhotosEssaiBranchees): void {
   holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], photos };
 }
 
-/** Branche le partage réel du site d'essai (décision 0135 ; appelé une fois, au démarrage, par `src/instrumentation.ts`). */
+/** Second branchement du partage réel : refusé, le port déjà branché reste en place. */
+export class PartageDejaBrancheError extends Error {
+  override name = "PartageDejaBrancheError";
+
+  constructor() {
+    super("Partage réel déjà branché.");
+  }
+}
+
+/**
+ * Branche le partage réel du site d'essai (décision 0135 ; appelé une fois, au démarrage, par `src/instrumentation.ts`).
+ * Le port fournit la clé de signature des liens : un second branchement lève `PartageDejaBrancheError` sans rien
+ * remplacer (modèle du branchement de la connexion réelle de `better-auth.ts`, PR 452), si bien qu'un module chargé après le démarrage ne peut pas
+ * substituer sa clé, sa session ou sa barrière à celles du serveur.
+ */
 export function brancherPartageEssai(partage: PartageEssaiBranche): void {
+  if (holder[INSTANCE_KEY]?.partage !== undefined) throw new PartageDejaBrancheError();
   holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], partage };
+}
+
+/** Remise à zéro du branchement du partage réel, **réservée aux tests** ; le serveur ne l'appelle jamais. */
+export function debrancherPartageEssaiPourTests(): void {
+  const etat = holder[INSTANCE_KEY];
+  if (etat) delete etat.partage;
 }
 
 /** Photos branchées, ou `null` (aucune photo, aucun appel). */

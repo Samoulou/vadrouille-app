@@ -19,8 +19,12 @@ import { SIGNED_SHARE_TOKEN_PATTERN, TRIP_ID_PATTERN } from "@/contracts/values"
  */
 
 const PREFIXE_SIGNE = "vadrouille/partage/v1.";
-/** Organisation : identifiant technique (uuid en base, `mock_org_…` en simulation), même alphabet que le voyage. */
-const ORGANISATION = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * Organisation : identifiant technique (uuid en base, `mock_org_…` en simulation), contrôlé par le motif de l'identifiant
+ * de voyage (même alphabet, 64 caractères au plus) : une seule source, qui fixe aussi la longueur maximale du jeton
+ * (`SIGNED_SHARE_TOKEN_PATTERN`).
+ */
+const ORGANISATION = TRIP_ID_PATTERN;
 const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
 const SEPARATEUR = "~";
 /** Longueur minimale de la clé : 32 octets (même seuil que `decodeSecret`, `src/server/env`). */
