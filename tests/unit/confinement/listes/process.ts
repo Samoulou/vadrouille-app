@@ -96,7 +96,7 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/payment-guard.ts", noms: ["VADROUILLE_DEMO_PAYMENT", "PAYMENT_ADAPTER", "DATA_ADAPTER"] },
   // B4b (ticket 831 ; spécification B4, B4b point 5 ; amendement B4-TL-14 de 0020 § 2.3) : garde élargie à `simulated`,
   // noms non secrets lus par propriété littérale et comparés à une valeur exacte, jamais rendus (jamais
-  // `SIMULATED_WEBHOOK_SECRET`). Verdict Sécurité : à rendre dans la revue de la PR de B4b.
+  // `SIMULATED_WEBHOOK_SECRET`). Verdict Sécurité : approuvé (revue de la PR #836, a1a61d7).
   { fichier: "src/adapters/payment-guard.ts", noms: ["AUTH_ADAPTER", "SIMULATED_WEBHOOK_ENABLED"] },
   // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
@@ -245,7 +245,7 @@ export const ENV_ENTIER = [
       "argument:paymentDemoAllowed",
       "argument:prototypeAdapterAllowed",
       // B4b (ticket 831 ; spécification B4, B4b point 5) : webhook simulé ouvert seulement en `local` ou `ci`. Verdict
-      // Sécurité : à rendre dans la revue de la PR de B4b.
+      // Sécurité : approuvé (revue de la PR #836, a1a61d7).
       "argument:betterAuthAllowed",
       // B4b : choix `simulated` lu par `src/instrumentation.ts` pour brancher la composition du paiement simulé.
       "defaut:simulatedPaymentChosen",

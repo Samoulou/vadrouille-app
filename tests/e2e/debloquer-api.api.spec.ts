@@ -20,7 +20,7 @@ import { sheet } from "./sejour-helpers";
  * le seul voyage non débloqué de ses quatre voyages (pendant d'Édimbourg, lien `…/presentation` de « Mes voyages ») est
  * débloqué une fois, sans toucher aux organisations des scénarios de lecture. Sur un poste, rejouer demande une base
  * neuve (le droit reste en base). Les lignes `checkouts`, `billing` et `entitlements` sont vérifiées en base par
- * `tests/db/paiement.test.ts` ; ici, leurs effets à l'écran. Aucune trace (cookies).
+ * `tests/db/deblocage-api.test.ts` ; ici, leurs effets à l'écran. Aucune trace (cookies).
  */
 const test = base.extend<{ urlMock: string }>({
   urlMock: ["", { option: true }],

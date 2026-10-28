@@ -161,7 +161,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (B4b, ticket 831 ; spécification B4, B4b point 1), modèle accepté par 0040 D4 ; verdict Sécurité : à rendre dans la revue de la PR de B4b"
+      "ecart": "ligne ordinaire de portée application (B4b, ticket 831 ; spécification B4, B4b point 1), modèle accepté par 0040 D4 ; verdict Sécurité : approuvé (revue de la PR #836, a1a61d7)"
     },
     {
       "fichier": "src/adapters/prototype.test.ts",
