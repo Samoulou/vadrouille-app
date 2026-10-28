@@ -140,8 +140,9 @@ describe("accueil : autre adaptateur", () => {
     await expect(HomePage()).resolves.toBeTruthy();
     await renderHome();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
-    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; aucun autre lien.
-    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau"]);
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; ticket #802 : rappelé en fin de page
+    // (« Commencer mon voyage ») ; aucun autre lien.
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
     expect(screen.getByRole("heading", { level: 1, name: PRODUCT_NAME })).toBeInTheDocument();
     expect(screen.getByText(messages.produit.promesse)).toBeInTheDocument();
     expect(adapters.getTripAdapter).not.toHaveBeenCalled();
@@ -164,6 +165,35 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
     expect(link.className).toMatch(/\bw-full\b/);
     expect(link.className).toMatch(/\bbg-line\b/);
     expect(link.className).not.toMatch(/\[/);
+  });
+});
+
+describe("accueil : page qui donne envie (ticket #802)", () => {
+  it("journée d'exemple, trois étapes, ce que l'on reçoit, puis le bouton rappelé en fin de page", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await renderHome();
+    const a = messages.accueil;
+    expect(screen.getByText(a.accroche)).toBeInTheDocument();
+    expect(screen.getByText(a.offert)).toBeInTheDocument();
+    const exemple = screen.getByRole("figure", { name: a.exemple.titre });
+    expect(within(exemple).getByText(a.exemple.legende)).toBeInTheDocument();
+    // Illustration seulement : aucune étape n'est un lien.
+    expect(within(exemple).queryAllByRole("link")).toEqual([]);
+    const etapes = within(screen.getByRole("region", { name: a.etapes.titre })).getAllByRole("listitem");
+    expect(etapes).toHaveLength(3);
+    expect(within(screen.getByRole("region", { name: a.inclus.titre })).getAllByRole("listitem")).toHaveLength(a.inclus.liste.length);
+    const final = screen.getByRole("link", { name: a.final.bouton });
+    expect(final).toHaveAttribute("href", "/voyages/nouveau");
+    const premier = screen.getByRole("link", { name: a.creer });
+    expect(premier.compareDocumentPosition(final) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Démonstration (données simulées) après le dernier bouton", async () => {
+    vi.stubEnv("DATA_ADAPTER", "mock");
+    await renderHome();
+    const final = screen.getByRole("link", { name: messages.accueil.final.bouton });
+    const demo = screen.getByRole("region", { name: t.titre });
+    expect(final.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

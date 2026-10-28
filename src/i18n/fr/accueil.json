@@ -31,5 +31,71 @@
     }
   },
   "creer": "Créer un voyage",
-  "mesVoyages": "Mes voyages"
+  "mesVoyages": "Mes voyages",
+  "accroche": "Chaque journée de ton voyage, prête avant de partir.",
+  "offert": "Tes premières propositions sont offertes.",
+  "exemple": {
+    "titre": "Une journée de ton programme",
+    "legende": "Exemple de journée, pour illustrer.",
+    "ville": "Lisbonne",
+    "infos": "Exemple · 5 jours · 2 adultes",
+    "hotel": "ton hôtel",
+    "etapes": {
+      "belvedere": {
+        "nom": "Belvédère au-dessus des toits",
+        "secteur": "Alfama",
+        "raison": "Tu aimes marcher : la vue au calme, avant la foule"
+      },
+      "dejeuner": {
+        "nom": "Déjeuner dans une adresse simple",
+        "secteur": "Baixa"
+      },
+      "jardin": {
+        "nom": "Jardins et monastère au bord du fleuve",
+        "secteur": "Belém"
+      },
+      "diner": {
+        "nom": "Dîner et concert de fado",
+        "secteur": "Bairro Alto",
+        "raison": "Le concert a lieu ce soir-là"
+      }
+    }
+  },
+  "etapes": {
+    "titre": "Comment ça marche",
+    "liste": [
+      {
+        "titre": "Raconte ton voyage",
+        "texte": "Ta destination, tes dates et tes envies, en quelques phrases."
+      },
+      {
+        "titre": "Choisis ce qui te plaît",
+        "texte": "J'aime ou Pas pour moi : tu gardes seulement ce qui te ressemble."
+      },
+      {
+        "titre": "Pars avec ton programme",
+        "texte": "Chaque jour, de l'hôtel à la soirée, avec les trajets et ce qu'il faut réserver."
+      }
+    ]
+  },
+  "inclus": {
+    "titre": "Ce que tu reçois",
+    "liste": [
+      "Des journées sans trou, à ton rythme",
+      "Les repas et les soirées, pas seulement les visites",
+      "Les événements qui ont lieu pendant ton séjour",
+      "Le temps de trajet entre chaque étape",
+      "La liste de ce qu'il faut réserver avant de partir",
+      "Ton programme à partager avec tes proches"
+    ]
+  },
+  "fiable": {
+    "titre": "Aucun lieu inventé",
+    "texte": "Chaque adresse est vérifiée avant d'entrer dans ton programme. Ce qui reste incertain est signalé, jamais caché."
+  },
+  "final": {
+    "titre": "Prêt à partir ?",
+    "texte": "Quelques minutes suffisent pour lancer ton voyage.",
+    "bouton": "Commencer mon voyage"
+  }
 }
