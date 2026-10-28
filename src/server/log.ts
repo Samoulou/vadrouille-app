@@ -41,6 +41,8 @@ export const LOG_EVENTS = [
   // `inputTokens` et `outputTokens` (jetons rendus par le client réel, bornés), absents sinon ; jamais le texte.
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
+  // Relecture Routes refusée ou en échec (`src/server/p0/relecture.ts`) : `errorName` et, pour une erreur d'un client
+  // Google, son code fermé dans `failureCode` (ticket #826, décision 0137 § 2 : `LOG_STEP_FAILURE_CODES`).
   "p0.read_unavailable",
   // Décision 0124 § 2 (spécification E2E-essai, lot 1) : branchement du cookie de déblocage de l'essai impossible au
   // démarrage ; `errorName` seulement (ni cookie, ni clé, ni identifiant de voyage). Seul le droit simulé de la portée reste.
@@ -221,7 +223,10 @@ export type LogFields = {
   readonly dayIndex?: number;
   /** Phase d'une étape de `p0Run` arrêtée (`p0.step_failed`, ticket 493) : `LOG_STEP_PHASES`. */
   readonly phase?: string;
-  /** Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) : `LOG_STEP_FAILURE_CODES`, jamais un message. */
+  /**
+   * Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) ou de l'erreur Google d'une relecture refusée
+   * (`p0.read_unavailable`, décision 0137 § 2) : `LOG_STEP_FAILURE_CODES`, jamais un message ; retiré sur tout autre événement.
+   */
   readonly failureCode?: string;
   /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
   readonly eventId?: string;
@@ -697,7 +702,6 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["version", entierStrict],
   ["dayIndex", entierStrict],
   ["phase", (v) => chaine(v) && PHASES_ETAPE.has(v)],
-  ["failureCode", (v) => chaine(v) && CODES_ETAPE.has(v)],
   ["eventId", (v) => chaine(v) && ID_EVENEMENT_PAIEMENT.test(v)],
   ["eventType", (v) => chaine(v) && TYPES_EVENEMENT_PAIEMENT.has(v)],
   ["alertCode", (v) => chaine(v) && CODES_ALERTE.has(v)],
@@ -708,13 +712,14 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 ]);
 
 /**
- * Champs propres à un seul événement (constat du 2026-10-25) : `googleCode` et `httpStatus` ne sont admis que sur
- * `p0.ville_refusee` ; sur tout autre événement, ils sont retirés (verdict 0122 § 2.1 point 4 : aucun statut sur la ligne
- * des sites).
+ * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
+ * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
+ * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement.
  */
-const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenement: string; readonly controle: (valeur: unknown) => boolean }> = new Map([
-  ["googleCode", { evenement: "p0.ville_refusee", controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
-  ["httpStatus", { evenement: "p0.ville_refusee", controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
+  ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
+  ["httpStatus", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+  ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
@@ -740,7 +745,7 @@ export function formatLogLine(event: string, fields: object = {}, level: LogLeve
       cle === "reason"
         ? (v: unknown) => chaine(v) && (RAISONS_PAR_EVENEMENT.get(event)?.has(v) ?? false)
         : propre !== undefined
-          ? (v: unknown) => event === propre.evenement && propre.controle(v)
+          ? (v: unknown) => propre.evenements.has(event) && propre.controle(v)
           : CONTROLES.get(cle);
     if (controle !== undefined && controle(valeur)) ligne[cle] = valeur;
     else retires += 1;
