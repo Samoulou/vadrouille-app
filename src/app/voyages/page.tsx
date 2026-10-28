@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
-import { getTripReader } from "@/adapters";
+import { getTripReader, siteEssaiAutorise } from "@/adapters";
 import { PRODUCT_NAME } from "@/config/site";
 import { exigerSession } from "@/features/compte/session";
 import { TripsScreen } from "@/features/compte/TripsScreen";
+import { creationRoutes } from "@/features/creation/routes";
 import { mesVoyagesRoute } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -22,12 +23,12 @@ export const metadata: Metadata = {
  * apparaît débloqué, décision 0021 § 2) ; aucun jour, aucune proposition, aucune position. Le classement est
  * fait par l'écran, dans le navigateur (décision 0021 § 3).
  *
- * « Créer un voyage » n'est pas encore proposé : l'écran 1 (`/voyages/nouveau`) existe depuis F8a, et le lien sera
- * ajouté par la première PR qui touche `R17` (F11-PO-4).
+ * « Créer un voyage » (F11-PO-4) : l'écran 1 existe depuis F8a ; lien ajouté par le ticket 803 (audit UX du
+ * 2026-10-28), avec `?site=essai` sur le site d'essai, comme l'accueil.
  *
  * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
 export default async function MesVoyagesPage() {
   const trips = await getTripReader().listTrips(await exigerSession(mesVoyagesRoute()));
-  return <TripsScreen trips={trips} />;
+  return <TripsScreen trips={trips} createHref={creationRoutes.nouveau({ essai: siteEssaiAutorise() })} />;
 }
