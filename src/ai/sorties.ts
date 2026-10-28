@@ -849,3 +849,31 @@ export function lieuxDuProgramme(
   });
   return { lieux, cleDe: (jour, rang) => parCreneau.get(`${jour}:${rang}`) };
 }
+
+/**
+ * **Retours de quartier** d'un programme **déjà dans l'ordre écrit** (`ordreEcrit`) : mesure de la règle « les étapes
+ * d'un même quartier se suivent » du prompt `programme` v4 et `revision` v2 (amendement 4 de
+ * la spécification P0-programme-par-ia, ticket #800). Pour chaque journée, on suit les créneaux d'étape (avec `lieu` et
+ * `quartier`, ni arrivée ni départ) ; un retour est compté chaque fois qu'un créneau revient dans un quartier (même
+ * `cleDeNom`) que la journée a déjà quitté (A, B, A : 1 retour). Un créneau sans quartier n'interrompt rien.
+ *
+ * Mesure seulement, jamais un contrôle : aucun créneau n'est retiré ni déplacé, rien n'est journalisé (la liste fermée
+ * de `p0.programme_written` est inchangée). Elle ne lit que les textes de l'IA : aucune coordonnée, aucun temps de
+ * trajet, aucune donnée Google. Rend le nombre de retours par journée, dans l'ordre des journées.
+ */
+export function retoursDeQuartier(programme: Pick<ProgrammeIa, "jours">): number[] {
+  return programme.jours.map((jour) => {
+    const quittes = new Set<string>();
+    let courant: string | undefined;
+    let retours = 0;
+    for (const creneau of jour.creneaux) {
+      if (creneau.lieu === undefined || creneau.quartier === undefined || NATURES_TERMINUS.has(creneau.nature)) continue;
+      const cle = cleDeNom(creneau.quartier);
+      if (cle === "" || cle === courant) continue;
+      if (quittes.has(cle)) retours += 1;
+      if (courant !== undefined) quittes.add(courant);
+      courant = cle;
+    }
+    return retours;
+  });
+}

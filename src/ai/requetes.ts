@@ -245,7 +245,7 @@ export function requeteQuartier(entree: EntreeQuartier, resultats: readonly Resu
 }
 
 /**
- * Programme complet du prototype (prompt `programme` v3, décision 0115 § 3 étape 1) : le brief entier en **projection**
+ * Programme complet du prototype (prompt `programme` v4, décision 0115 § 3 étape 1) : le brief entier en **projection**
  * champ par champ (`EntreeProgramme`, toutes les saisies du questionnaire, récit et logement compris) ; aucun autre champ
  * d'un objet reçu n'atteint le prompt, et aucun champ n'existe pour une donnée Google (0011). Une seule requête, sans
  * outil ni recherche web (verdict 0117 § 1).
@@ -278,7 +278,7 @@ function projectionBrief(entree: EntreeProgramme) {
 }
 
 /**
- * Révision du programme d'un voyage d'essai après le tri (prompt `revision` v1, spécification E2E-essai, lot 4 ; décision
+ * Révision du programme d'un voyage d'essai après le tri (prompt `revision` v2, spécification E2E-essai, lot 4 ; décision
  * 0126 § 3) : le brief (même projection que `programme`), les textes de l'IA de la version précédente et les choix, champ
  * par champ (`EntreeRevision`) ; aucun champ n'existe pour une donnée Google ni pour un verdict d'ancrage. Même étape de
  * requête que `programme` (`etape: "programme"` : même délai de 300 s, même routage `zdr`), prompt distinct.
