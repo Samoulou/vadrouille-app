@@ -37,9 +37,10 @@ test.afterEach(() => {
 test("presentation: ordre et filtrage du paquet", async ({ page }) => {
   await openDeck(page);
   await expect(page.getByRole("heading", { level: 1, name: "Tes premières propositions" })).toBeAttached();
-  // Aperçu (B2-PO-9) : les cases `proposal` dans l'ordre ; la case `noOption` est nommée par le bandeau, pas une carte.
+  // Aperçu (B2-PO-9) : les cases `proposal` dans l'ordre ; la case `noOption` est nommée par le bandeau, pas une carte,
+  // et ce bandeau n'est rendu qu'en fin de paquet (ticket 804) : le tri s'ouvre sur la première carte.
   const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal.stop.name] : []));
-  await expect(page.locator("[data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
+  await expect(page.locator("[data-kind='noOption']")).toHaveCount(0);
   const seen: string[] = [];
   for (let i = 0; i < cartes.length; i += 1) {
     seen.push(await cardName(page));
@@ -48,6 +49,7 @@ test("presentation: ordre et filtrage du paquet", async ({ page }) => {
   }
   expect(seen).toEqual(cartes);
   await expect(page.getByRole("heading", { name: "Tu as vu tes premières propositions" })).toBeVisible();
+  await expect(page.locator("[data-deck-end] [data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
 });
 
 test("presentation: 404 hors organisation", async ({ page }) => {
