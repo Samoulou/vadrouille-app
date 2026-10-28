@@ -61,6 +61,11 @@ describe("p0: stop_code et phase selon S4", () => {
     }
   });
 
+  it("ticket n° 826 (décision 0137 § 1) : refus de Google pour limite de débit (429) écrit comme arrêt externe, avant comme après un appel payant", () => {
+    expect(codePersiste("upstream_rate_limited", false)).toBe("upstream_unavailable");
+    expect(codePersiste("upstream_rate_limited", true)).toBe("upstream_unavailable");
+  });
+
   it("ancrage, planification, plafonds, délai, modèles et erreurs internes : pipeline_failed", () => {
     for (const code of [
       "lodging_unresolved",

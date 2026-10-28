@@ -409,15 +409,25 @@ export default defineConfig([
     rules: { "no-console": "error" },
   },
   {
-    // F10c (F10-TL-5) : aucun journal dans le partage (le jeton n'est jamais journalisé, F10-PO-17).
-    files: ["src/server/actions/partage.ts", "src/adapters/mock-share.ts", "src/adapters/share-guard.ts"],
+    // F10c (F10-TL-5) : aucun journal dans le partage (le jeton n'est jamais journalisé, F10-PO-17) ; de même dans le
+    // partage réel du site d'essai (décision 0135).
+    files: [
+      "src/server/actions/partage.ts",
+      "src/adapters/mock-share.ts",
+      "src/adapters/share-guard.ts",
+      "src/adapters/signed-share.ts",
+      "src/adapters/share-signed-token.ts",
+      "src/adapters/share-views.ts",
+      "src/server/essai/partage.ts",
+    ],
     rules: { "no-console": "error" },
   },
   {
     // F9a : horloge injectée, jamais l'horloge système dans l'adaptateur de paiement simulé (0017 § 10.1, 0020 § 2.2) ;
     // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5) ; F8b : de même dans la connexion simulée
     // et la création simulée (0017 § 10.1).
-    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts"],
+    // Décision 0135 : de même dans l'adaptateur de partage réel (horloge de la portée).
+    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
