@@ -140,7 +140,7 @@ describe("accueil : autre adaptateur", () => {
     await expect(HomePage()).resolves.toBeTruthy();
     await renderHome();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
-    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; ticket #802 : rappelé en fin de page
+    // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; ticket 802 : rappelé en fin de page
     // (« Commencer mon voyage ») ; aucun autre lien.
     expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
     expect(screen.getByRole("heading", { level: 1, name: PRODUCT_NAME })).toBeInTheDocument();
@@ -168,7 +168,7 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
   });
 });
 
-describe("accueil : page qui donne envie (ticket #802)", () => {
+describe("accueil : page qui donne envie (ticket 802)", () => {
   it("journée d'exemple, trois étapes, ce que l'on reçoit, puis le bouton rappelé en fin de page", async () => {
     vi.stubEnv("DATA_ADAPTER", "api");
     await renderHome();
