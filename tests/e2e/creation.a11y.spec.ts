@@ -86,7 +86,7 @@ test("creation: aucune violation axe, écran 1 avec une ville et un engagement",
   await page.getByRole("button", { name: "Ajouter une ville" }).click();
   await page.getByLabel("Nom de la ville").fill("Glasgow");
   await page.getByLabel("Arrivée dans cette ville").fill("2026-09-01");
-  await page.getByRole("button", { name: "Ajouter un engagement" }).click();
+  await page.getByRole("button", { name: "Ajouter une réservation" }).click();
   await expect(page.getByRole("list", { name: "Tes villes" })).toBeVisible();
   await expectAccessible(page);
 });
@@ -105,8 +105,8 @@ test("brief: aucune violation axe, récit", async ({ page }) => {
 
 test("brief: aucune violation axe, récit avec erreur", async ({ page }) => {
   await reachBrief(page);
-  await page.getByRole("button", { name: "Préparer mon brief" }).click();
-  await expect(page.getByText("Écris au moins une phrase, ou remplis le brief toi-même.")).toBeVisible();
+  await page.getByRole("button", { name: "Continuer avec mon récit" }).click();
+  await expect(page.getByText("Écris au moins une phrase, ou remplis tes envies toi-même.")).toBeVisible();
   await expectAccessible(page);
 });
 

@@ -84,7 +84,7 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
   await continueButton(page).click();
   await expectPath(page, R2);
   await page.getByRole("button", { name: "Remplir moi-même" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeFocused();
   // Brief des tests de l'aperçu (`BRIEF_EDIMBOURG`, `tests/support/banc-apercu.ts`) : rythme, quatre envies, deux modes. Au moins
   // un mode de déplacement est nécessaire : la recherche de l'aperçu en demande un (entrée des modèles, `deplacements`).
   await page.getByRole("radio", { name: "Équilibré" }).click();

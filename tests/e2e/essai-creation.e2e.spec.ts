@@ -64,8 +64,8 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
 
   // Écran 2 : le bouton principal mène à la vérification, récit gardé, sans bandeau.
   await storyField(page).fill(RECIT);
-  await page.getByRole("button", { name: "Vérifier mon brief" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
+  await page.getByRole("button", { name: "Vérifier mes envies" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeFocused();
   await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await page.getByRole("radio", { name: "Équilibré" }).click();
   await page.getByRole("group", { name: "Envies" }).getByRole("button", { name: "Musées", exact: true }).click();
