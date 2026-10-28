@@ -422,11 +422,6 @@ function Deck({
       {generatingDays.map((day) => (
         <StatusBanner key={day} kind="generating" message={format(t.generation, { n: day })} className="shrink-0" />
       ))}
-      {/* Cases `noOption` (B2-PO-9, rendu UX/UI, ticket 804) : en fin de paquet seulement, au-dessus de l'écran de fin ;
-          jamais au-dessus de la première carte, pour que le tri s'ouvre sur une proposition. */}
-      {noOptionSlots.length > 0 && !card ? (
-        <StatusBanner kind="noOption" message={noOptionMessage(noOptionSlots)} className="shrink-0" />
-      ) : null}
       {/* Refus du tri enregistré : annoncé par la région `role="status"` ci-dessous (bandeau sans rôle propre, 0018). */}
       {refus ? (
         <StatusBanner
@@ -486,6 +481,11 @@ function Deck({
       ) : (
         <DeckEnd
           variant={endVariant}
+          notice={
+            // Cases `noOption` (B2-PO-9, rendu UX/UI, décision 0133) : sous le titre de fin seulement, jamais au-dessus
+            // de la première carte, pour que le tri s'ouvre sur une proposition. Lu après le titre, qui reçoit le focus.
+            noOptionSlots.length > 0 ? <StatusBanner kind="noOption" message={noOptionMessage(noOptionSlots)} announce={false} /> : null
+          }
           closed={closedAtLoad}
           notAllSorted={state.keptDays.length > 0 || state.removedByAnswer > 0}
           tripId={tripId}

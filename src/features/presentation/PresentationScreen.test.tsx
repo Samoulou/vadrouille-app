@@ -396,21 +396,43 @@ describe("PresentationScreen : aperçu avec des cases noOption (B2-PO-9)", () =>
   const cartes = apercu.flatMap((slot) => (slot.type === "proposal" ? [slot.proposal] : []));
   const sansOption = apercu.flatMap((slot) => (slot.type === "noOption" ? [{ day: slot.day, time: slot.time, kind: slot.kind }] : []));
 
+  /** Garde chaque carte ; la dernière option d'un créneau s'appelle « Je choisis » (F6-PO-3). */
+  async function garder() {
+    await click(screen.queryByRole("button", { name: "Je choisis" }) ? "Je choisis" : "J'aime");
+  }
+
   it("presentation: les cases noOption ne sont pas des cartes ; leur bandeau attend la fin du paquet (ticket 804)", async () => {
     const { container } = setup({ proposals: cartes, noOptionSlots: sansOption });
     expect(sansOption.length).toBeGreaterThan(0);
-    // Le tri s'ouvre sur la première carte, sans bandeau au-dessus.
+    // Le tri s'ouvre sur la première carte, sans bandeau au-dessus, et n'en montre pas en cours de paquet.
     expect(container.querySelector('[data-kind="noOption"]')).toBeNull();
     expect(progress()).toHaveAccessibleName(`Proposition 1 sur ${cartes.length}`);
     expect(cartes).toHaveLength(7);
-    for (let i = 0; i < cartes.length; i += 1) {
-      await click(screen.getByRole("button", { name: /^(J'aime|Je choisis)$/ }).textContent ?? "J'aime");
-    }
-    const banner = container.querySelector('[data-kind="noOption"]');
+    await garder();
+    expect(container.querySelector('[data-kind="noOption"]')).toBeNull();
+    while (document.querySelector("[data-part='carte']")) await garder();
+    // Fin du paquet (décision 0133) : le bandeau suit le titre, qui reçoit le focus ; sans rôle propre, il est lu
+    // après le titre et n'est pas annoncé une seconde fois.
+    const fin = container.querySelector("[data-deck-end]")!;
+    const titre = within(fin as HTMLElement).getByRole("heading", { level: 2 });
+    const banner = fin.querySelector('[data-kind="noOption"]');
+    expect(document.activeElement).toBe(titre);
+    expect(titre.nextElementSibling).toBe(banner);
+    expect(container.querySelectorAll('[data-kind="noOption"]')).toHaveLength(1);
     expect(banner).toHaveTextContent(noOptionMessage(sansOption));
     expect(banner).toHaveTextContent("le jour 4, vers 16:00 (activité)");
-    expect(banner).toHaveAttribute("role", "status");
+    expect(banner).not.toHaveAttribute("role");
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("annuler la dernière carte retire le bandeau noOption (ticket 804)", async () => {
+    const { container } = setup({ proposals: cartes, noOptionSlots: sansOption });
+    while (document.querySelector("[data-part='carte']")) await garder();
+    expect(container.querySelector('[data-kind="noOption"]')).not.toBeNull();
+    fireEvent.click(within(toast() as HTMLElement).getByRole("button", { name: "Annuler" }));
+    await flush();
+    expect(document.querySelector("[data-part='carte']")).not.toBeNull();
+    expect(container.querySelector('[data-kind="noOption"]')).toBeNull();
   });
 
   it("sans case noOption : aucun bandeau", () => {

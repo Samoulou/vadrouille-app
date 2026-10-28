@@ -49,7 +49,7 @@ test("presentation: ordre et filtrage du paquet", async ({ page }) => {
   }
   expect(seen).toEqual(cartes);
   await expect(page.getByRole("heading", { name: "Tu as vu tes premières propositions" })).toBeVisible();
-  await expect(page.locator("[data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
+  await expect(page.locator("[data-deck-end] [data-kind='noOption']")).toHaveText("Pas de proposition pour le jour 4, vers 16:00 (activité). Ton programme reste ouvert à cet endroit.");
 });
 
 test("presentation: 404 hors organisation", async ({ page }) => {
