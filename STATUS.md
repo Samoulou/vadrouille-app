@@ -14,6 +14,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
+- **Audit UX « séduire les nouveaux clients »** (fil projet de Samuel, 2026-10-28 05:47 UTC, fil « Rendre l'app séduisante pour les nouveaux clients », hors routine du cycle) : tickets #801 (écran 1, calendriers bornés ; PR #805 en revue), #802 (page d'accueil), #803 (« Mes voyages » : bouton « Créer un voyage »), #804 (tri : première carte d'abord). Fichiers distincts de #800 ; le CEO veille à ce que deux fils ne touchent pas les mêmes écrans.
 - **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. Constat : le prompt ne demande le champ `site` que « si tu connais l'adresse » (`src/ai/prompts/programme.ts`, `revision.ts`) et le détail de l'étape ne l'affiche que si `stop.reason` existe (`StopSheet.tsx`) ; aucune règle d'ordre des étapes dans la journée au-delà d'« un ou deux quartiers voisins ». Code en cours (prompts programme et révision, lecture tolérante, bloc « site officiel » du détail, amendement de `specs/P0-programme-par-ia.md`) ; PR attendue ce cycle. Essai Biarritz abandonné par Samuel (cause probable notée : programme de l'IA illisible, décision 0130).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
