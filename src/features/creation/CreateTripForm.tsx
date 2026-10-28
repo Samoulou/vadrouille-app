@@ -23,7 +23,7 @@ import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
-import { CreationShell, TITLE_CLASS } from "./CreationShell";
+import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
@@ -39,7 +39,7 @@ import {
   TextField,
 } from "./fields";
 import { creationRoutes, ESSAI_PARAM } from "./routes";
-import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
+import { cityRanges, nightsOf, todayIso, tripDateBounds, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
 const e1 = t.ecran1;
@@ -48,7 +48,7 @@ const err = e1.erreurs;
 const LODGING_OPTIONS = LODGING_ANSWERS.map((value) => ({ value, label: e1.logement.options[value] }));
 const KIND_OPTIONS = COMMITMENT_KINDS.map((value) => ({ value, label: e1.engagements.types[value] }));
 
-/** « Ajouter une ville » ou « Ajouter un engagement » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
+/** « Ajouter une ville » ou « Ajouter une réservation » : au plafond, indisponible comme une `Chip` (`aria-disabled`). */
 const ADD_BUTTON_CLASS =
   "self-start aria-disabled:cursor-not-allowed aria-disabled:border-muted aria-disabled:bg-muted aria-disabled:text-ink-soft";
 
@@ -102,6 +102,14 @@ export interface CreateTripFormProps {
 }
 
 const sansAbonnement = () => () => {};
+/**
+ * Date du jour de l'appareil, lue après l'hydratation (`null` au prérendu) : le serveur, en UTC, peut être la veille
+ * ou le lendemain de la personne, et les bornes des calendriers différeraient entre le HTML et la page.
+ */
+function useAujourdhui(): string | null {
+  return useSyncExternalStore(sansAbonnement, () => todayIso(), () => null);
+}
+
 /** `site=essai` dans l'adresse, lu après l'hydratation (faux au prérendu : même HTML pour tous les adaptateurs). */
 function useEssaiDepuisAdresse(): boolean {
   return useSyncExternalStore(
@@ -178,6 +186,9 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   }
 
   const ranges = trip.otherCities.length > 0 ? cityRanges(trip) : null;
+  const today = useAujourdhui();
+  const bounds = today === null ? { start: {}, end: {}, city: {}, commitment: {} } : tripDateBounds(trip, today, essai);
+  const nights = nightsOf(trip);
 
   function lodgingFields(lodging: LodgingForm, city: number, base: string) {
     const groupError = errorOf(base);
@@ -222,7 +233,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   const commitmentsFull = trip.commitments.length >= MAX_COMMITMENTS;
 
   return (
-    <CreationShell backHref={creationRoutes.mesVoyages()}>
+    <CreationShell backHref={creationRoutes.mesVoyages()} step={{ current: 1, total: stepTotal(trip) }}>
       {/* Bloc `muted` du brouillon perdu : région présente dès le chargement, texte écrit ensuite (0018 § 14). */}
       <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
         {state.noticeVisible ? t.brouillonPerdu : null}
@@ -281,24 +292,33 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             error={errorOf("destination")}
           />
         )}
-        <FieldRow>
-          <TextField
-            field="start"
-            type="date"
-            label={e1.arrivee}
-            value={trip.start}
-            onChange={(start) => dispatch({ type: "trip", patch: { start } })}
-            error={errorOf("start")}
-          />
-          <TextField
-            field="end"
-            type="date"
-            label={e1.depart}
-            value={trip.end}
-            onChange={(end) => dispatch({ type: "trip", patch: { end } })}
-            error={errorOf("end")}
-          />
-        </FieldRow>
+        <div className="flex flex-col gap-2">
+          <FieldRow>
+            <TextField
+              field="start"
+              type="date"
+              label={e1.arrivee}
+              value={trip.start}
+              {...bounds.start}
+              onChange={(start) => dispatch({ type: "trip", patch: { start } })}
+              error={errorOf("start")}
+            />
+            <TextField
+              field="end"
+              type="date"
+              label={e1.depart}
+              value={trip.end}
+              {...bounds.end}
+              onChange={(end) => dispatch({ type: "trip", patch: { end } })}
+              error={errorOf("end")}
+            />
+          </FieldRow>
+          {/* Durée du séjour (ticket 801) : région live polie toujours rendue (0018 § 14), le texte y est écrit quand les deux
+              dates sont cohérentes et annoncé à chaque changement ; sans rôle `status`, la région d'avis de l'écran reste unique. */}
+          <p aria-live="polite" data-part="duree" className={nights !== null ? "text-corps-s text-ink-soft tabular-nums" : EMPTY_LIVE_REGION_CLASS}>
+            {nights === null ? null : nights === 1 ? e1.duree.une : format(e1.duree.plusieurs, { n: nights })}
+          </p>
+        </div>
         {lodgingFields(trip.lodging, 0, "lodging")}
 
         {/* Site d'essai : une seule ville, « Autres villes » n'est pas proposé (une ville déjà saisie reste, pour être retirée). */}
@@ -348,6 +368,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                     type="date"
                     label={e1.villes.arrivee}
                     value={city.arrival}
+                    {...bounds.city}
                     onChange={(arrival) => dispatch({ type: "city", index, patch: { arrival } })}
                     error={errorOf(`${base}.arrival`)}
                   />
@@ -453,6 +474,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                   type="date"
                   label={e1.engagements.date}
                   value={commitment.date}
+                  {...bounds.commitment}
                   onChange={(date) => dispatch({ type: "commitment", index, patch: { date } })}
                   error={errorOf(`${base}.date`)}
                 />

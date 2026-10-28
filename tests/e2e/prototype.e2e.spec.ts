@@ -32,7 +32,7 @@ test("parcours prototype : accueil sans section « Prototype », « Mes voyages 
   await expect(prototypeSection(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Prototype" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Démonstration" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveAttribute("href", "/voyages/nouveau?site=essai");
+  await expect(page.getByRole("link", { name: "Créer un voyage" }).first()).toHaveAttribute("href", "/voyages/nouveau?site=essai");
 
   await page.getByRole("link", { name: "Mes voyages" }).click();
   await expect(page).toHaveURL("/voyages");

@@ -58,14 +58,14 @@ test.afterEach(() => {
 
 const heading = (page: Page) => page.getByRole("heading", { level: 1 });
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
-// Bloc d'engagement par position : son nom suit le libellé saisi (« Engagement 1 », puis « [Tattoo] »).
-const commitment = (page: Page, n: number) => page.getByRole("region", { name: "Engagements déjà pris" }).getByRole("region").nth(n - 1);
+// Bloc d'engagement par position : son nom suit le libellé saisi (« Réservation 1 », puis « [Tattoo] »).
+const commitment = (page: Page, n: number) => page.getByRole("region", { name: "Déjà réservé" }).getByRole("region").nth(n - 1);
 
 test("creation: créer un voyage sans hôtel", async ({ page }) => {
   await page.goto(R1);
   await expect(page).toHaveTitle("Nouveau voyage · Destination et dates");
   await fillTrip(page, EDIMBOURG);
-  await button(page, "Ajouter un engagement").click();
+  await button(page, "Ajouter une réservation").click();
   const block = commitment(page, 1);
   await block.getByRole("radio", { name: "Billet" }).click();
   await block.getByLabel("Libellé").fill("[Tattoo]");
@@ -73,7 +73,7 @@ test("creation: créer un voyage sans hôtel", async ({ page }) => {
   await block.getByLabel("Heure de début").fill("21:30");
   await continueButton(page).click();
   await expectPath(page, R2);
-  await expect(page).toHaveTitle("Nouveau voyage · Ton brief");
+  await expect(page).toHaveTitle("Nouveau voyage · Tes envies");
 });
 
 test("creation: validation de l'écran 1", async ({ page }) => {
@@ -99,7 +99,7 @@ test("creation: validation de l'écran 1", async ({ page }) => {
   await expect(field(page, "Départ")).toHaveAccessibleDescription("Le départ doit suivre l'arrivée d'au moins une nuit.");
 
   await field(page, "Départ").fill("2026-09-03");
-  await button(page, "Ajouter un engagement").click();
+  await button(page, "Ajouter une réservation").click();
   const block = commitment(page, 1);
   await block.getByRole("radio", { name: "Vol" }).click();
   await block.getByLabel("Libellé").fill("Vol retour");
@@ -140,12 +140,12 @@ test("creation: villes, récapitulatif et maximums", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(field(page, "Nom de la ville")).toHaveCount(3);
   await expect(page.getByText("Au plus 4 villes en tout, destination comprise.")).toBeVisible();
-  for (let i = 0; i < 10; i++) await button(page, "Ajouter un engagement").click();
-  await expect(button(page, "Ajouter un engagement")).toHaveAttribute("aria-disabled", "true");
-  await button(page, "Ajouter un engagement").focus();
+  for (let i = 0; i < 10; i++) await button(page, "Ajouter une réservation").click();
+  await expect(button(page, "Ajouter une réservation")).toHaveAttribute("aria-disabled", "true");
+  await button(page, "Ajouter une réservation").focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("region", { name: "Engagements déjà pris" }).getByRole("region")).toHaveCount(10);
-  await expect(page.getByRole("region", { name: /^Engagement \d+$/ })).toHaveCount(10);
+  await expect(page.getByRole("region", { name: "Déjà réservé" }).getByRole("region")).toHaveCount(10);
+  await expect(page.getByRole("region", { name: /^Réservation \d+$/ })).toHaveCount(10);
 });
 
 test("creation: brouillon en mémoire", async ({ page }) => {
@@ -182,9 +182,9 @@ test("brief: récit, erreur et compteur", async ({ page }) => {
   await expect(page.locator("#champ-story-compteur")).toHaveText(`0 sur ${MILLE} caractères`);
   await expect(story).toHaveAttribute("aria-describedby", "champ-story-aide champ-story-compteur");
   await story.fill("Trop court.");
-  await button(page, "Préparer mon brief").click();
+  await button(page, "Continuer avec mon récit").click();
   await expect(story).toBeFocused();
-  await expect(page.getByText("Écris au moins une phrase, ou remplis le brief toi-même.")).toBeVisible();
+  await expect(page.getByText("Écris au moins une phrase, ou remplis tes envies toi-même.")).toBeVisible();
   await expect(story).toHaveAttribute("aria-describedby", "champ-story-aide champ-story-erreur champ-story-compteur");
   await expect(heading(page)).toHaveText("Raconte ton voyage en quelques phrases");
 
@@ -197,6 +197,31 @@ test("brief: récit, erreur et compteur", async ({ page }) => {
   await story.fill("a".repeat(1200));
   await expect(story).toHaveValue("a".repeat(1000));
   await expect(live).toHaveText(`${MILLE} sur ${MILLE} caractères`);
+});
+
+test("creation: étape visible et idées du récit (décision 0134)", async ({ page }) => {
+  await page.goto(R1);
+  const etape = page.locator('[data-part="etape"]');
+  await expect(etape).toHaveText("Étape 1 sur 3");
+  await fillTrip(page, { ...EDIMBOURG, lodging: "Oui" });
+  await expect(etape).toHaveText("Étape 1 sur 2");
+  await lodgingGroup(page).getByRole("radio", { name: "Pas encore" }).click();
+  await expect(etape).toHaveText("Étape 1 sur 3");
+  await continueButton(page).click();
+  await expectPath(page, R2);
+  await expect(etape).toHaveText("Étape 2 sur 3");
+
+  const story = storyField(page);
+  const idees = page.getByRole("group", { name: "Idées à ajouter" });
+  const deux = idees.getByRole("button", { name: "À deux" });
+  await deux.click();
+  await expect(story).toHaveValue("On part à deux.");
+  await expect(deux).toHaveAttribute("aria-pressed", "true");
+  await idees.getByRole("button", { name: "Bonnes tables" }).click();
+  await expect(story).toHaveValue("On part à deux. On aime bien manger, surtout la cuisine locale.");
+  await deux.click();
+  await expect(story).toHaveValue("On aime bien manger, surtout la cuisine locale.");
+  await expect(deux).toHaveAttribute("aria-pressed", "false");
 });
 
 test("brief: déductions visibles", async ({ page }) => {
@@ -252,7 +277,7 @@ test("brief: remplir moi-même", async ({ page }) => {
   const events = collectEvents(page);
   await reachBrief(page);
   await button(page, "Remplir moi-même").click();
-  await expect(heading(page)).toHaveText("Vérifie ton brief");
+  await expect(heading(page)).toHaveText("Vérifie tes envies");
   await expect(heading(page)).toBeFocused();
   await expect(page.locator("[data-inferred]")).toHaveCount(0);
   await expect(page.getByRole("radiogroup", { name: "Rythme" }).getByRole("radio", { checked: true })).toHaveCount(0);
@@ -321,8 +346,8 @@ test("brief: revenir au récit ou à l'écran 1", async ({ page }) => {
   await expect(heading(page)).toHaveText("Raconte ton voyage en quelques phrases");
   await expect(heading(page)).toBeFocused();
   await expect(storyField(page)).toHaveValue(STORY);
-  await button(page, "Préparer mon brief").click();
-  await expect(heading(page)).toHaveText("Vérifie ton brief");
+  await button(page, "Continuer avec mon récit").click();
+  await expect(heading(page)).toHaveText("Vérifie tes envies");
   await expect(page.getByRole("radio", { name: "Intense" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "Intense" })).not.toHaveAttribute("data-inferred");
 
@@ -351,7 +376,7 @@ test("creation: aucune donnée persistée ni exposée", async ({ page, context, 
 
   await reachBrief(page);
   await storyField(page).fill("Court.");
-  await button(page, "Préparer mon brief").click();
+  await button(page, "Continuer avec mon récit").click();
   await reachReview(page);
   await continueButton(page).click();
   // F8b : écrans 3 et 4 compris ; ni adresse ni code dans une adresse, la console, les mesures ou le serveur.

@@ -8,7 +8,7 @@ import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/
 
 import { BriefReview } from "./BriefReview";
 import { BriefStory } from "./BriefStory";
-import { CreationShell } from "./CreationShell";
+import { CreationShell, stepTotal } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { creationRoutes } from "./routes";
 import { todayIso, validateTrip, type FieldError } from "./validation";
@@ -63,7 +63,7 @@ function BriefContent({ essai }: { essai: boolean }) {
   if (!valid) return null;
 
   return (
-    <CreationShell backHref={creationRoutes.nouveau({ essai })}>
+    <CreationShell backHref={creationRoutes.nouveau({ essai })} step={{ current: 2, total: stepTotal(state.trip) }}>
       {state.stage === "story" ? <BriefStory {...stage} essai={essai} /> : <BriefReview {...stage} />}
     </CreationShell>
   );

@@ -8,6 +8,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import { CreateTripForm } from "./CreateTripForm";
 import { DraftProvider, useDraft } from "./DraftProvider";
+import { fieldId } from "./fields";
 import { draftReducer, initialDraft, type DraftState } from "./draft";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -91,8 +92,8 @@ describe("CreateTripForm", () => {
     change("Arrivée", "2026-08-29");
     change("Départ", "2026-09-03");
     fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un engagement" }));
-    const block = screen.getByRole("region", { name: "Engagement 1" });
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter une réservation" }));
+    const block = screen.getByRole("region", { name: "Réservation 1" });
     fireEvent.click(within(block).getByRole("radio", { name: "Billet" }));
     change("Libellé", "[Tattoo]");
     change("Date", "2026-08-29");
@@ -113,6 +114,20 @@ describe("CreateTripForm", () => {
     change("Départ", "2026-08-29");
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(screen.getByText("Le départ doit suivre l'arrivée d'au moins une nuit.")).toBeInTheDocument();
+  });
+
+  it("étape 1 sur 3 tant qu'une ville peut attendre l'écran 3 ; 1 sur 2 si chaque ville a son logement (0134)", () => {
+    renderForm();
+    expect(screen.getByText("Étape 1 sur 3")).toBeInTheDocument();
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Oui" }));
+    expect(screen.getByText("Étape 1 sur 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter une ville" }));
+    expect(screen.getByText("Étape 1 sur 3")).toBeInTheDocument();
+    const ville = screen.getAllByRole("radiogroup", { name: "As-tu déjà un logement ?" })[1]!;
+    fireEvent.click(within(ville).getByRole("radio", { name: "Un quartier" }));
+    expect(screen.getByText("Étape 1 sur 2")).toBeInTheDocument();
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+    expect(screen.getByText("Étape 1 sur 3")).toBeInTheDocument();
   });
 
   it("« Oui » demande le nom ou l'adresse ; « Un quartier » le quartier", () => {
@@ -160,8 +175,8 @@ describe("CreateTripForm", () => {
     change("Arrivée", "2026-08-29");
     change("Départ", "2026-09-03");
     fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un engagement" }));
-    fireEvent.click(within(screen.getByRole("region", { name: "Engagement 1" })).getByRole("radio", { name: "Vol" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter une réservation" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Réservation 1" })).getByRole("radio", { name: "Vol" }));
     change("Libellé", "Vol retour");
     change("Date", "2026-09-04");
     change("Heure de début", "10:00");
@@ -173,17 +188,17 @@ describe("CreateTripForm", () => {
   it(`une ${MAX_CITIES + 1}e ville et un ${MAX_COMMITMENTS + 1}e engagement ne peuvent pas être ajoutés`, () => {
     renderForm();
     for (let i = 0; i < MAX_CITIES - 1; i++) fireEvent.click(screen.getByRole("button", { name: "Ajouter une ville" }));
-    for (let i = 0; i < MAX_COMMITMENTS; i++) fireEvent.click(screen.getByRole("button", { name: "Ajouter un engagement" }));
+    for (let i = 0; i < MAX_COMMITMENTS; i++) fireEvent.click(screen.getByRole("button", { name: "Ajouter une réservation" }));
     // Au plafond : `aria-disabled` (atteignable au clavier, comme les `Chip`), un clic de plus n'ajoute rien.
     const addCity = screen.getByRole("button", { name: "Ajouter une ville" });
     expect(addCity).toHaveAttribute("aria-disabled", "true");
     expect(addCity).not.toBeDisabled();
     expect(addCity).toHaveAccessibleDescription("Au plus 4 villes en tout, destination comprise.");
     fireEvent.click(addCity);
-    const addCommitment = screen.getByRole("button", { name: "Ajouter un engagement" });
+    const addCommitment = screen.getByRole("button", { name: "Ajouter une réservation" });
     expect(addCommitment).toHaveAttribute("aria-disabled", "true");
     expect(addCommitment).not.toBeDisabled();
-    expect(addCommitment).toHaveAccessibleDescription("Au plus 10 engagements.");
+    expect(addCommitment).toHaveAccessibleDescription("Au plus 10 réservations.");
     fireEvent.click(addCommitment);
     expect(latest?.trip.otherCities).toHaveLength(MAX_CITIES - 1);
     expect(latest?.trip.commitments).toHaveLength(MAX_COMMITMENTS);
@@ -496,6 +511,8 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
   it("plus de 15 jours : refus au départ ; Rome sur 15 jours : écran 2", () => {
     renderEssai();
     remplir("Rome", "2026-09-13");
+    // Le calendrier du départ s'arrête au 15e jour ; la saisie au clavier reste refusée par la validation.
+    expect(screen.getByLabelText("Départ", { exact: true })).toHaveAttribute("max", "2026-09-12");
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(screen.getByLabelText("Départ", { exact: true })).toHaveAccessibleDescription(
       "15 jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée.",
@@ -511,5 +528,52 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     remplir("Atlantide");
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
+  });
+
+  it("calendriers bornés : arrivée dès aujourd'hui, départ dès le lendemain de l'arrivée, durée annoncée", async () => {
+    const { container } = renderForm();
+    const arrivee = screen.getByLabelText("Arrivée", { exact: true });
+    const depart = screen.getByLabelText("Départ", { exact: true });
+    const duree = container.querySelector("[data-part='duree']")!;
+    // Région live rendue dès l'affichage, vide tant que les deux dates ne sont pas cohérentes (0018 § 14).
+    expect(duree).toHaveAttribute("aria-live", "polite");
+    expect(duree).toBeEmptyDOMElement();
+    expect(arrivee).toHaveAttribute("min", "2026-08-01");
+    expect(depart).toHaveAttribute("min", "2026-08-02");
+    expect(depart).not.toHaveAttribute("max");
+    change("Arrivée", "2026-08-29");
+    expect(depart).toHaveAttribute("min", "2026-08-30");
+    change("Départ", "2026-08-30");
+    expect(duree).toHaveTextContent(/^1 nuit$/);
+    change("Départ", "2026-09-03");
+    expect(duree).toHaveTextContent(/^5 nuits$/);
+    expect(await axeViolations(container)).toEqual([]);
+    // Arrivée déplacée après le départ : le départ saisi n'est jamais effacé, « Continuer » le refuse.
+    change("Arrivée", "2026-09-10");
+    expect(depart).toHaveValue("2026-09-03");
+    expect(depart).toHaveAttribute("min", "2026-09-11");
+    expect(duree).toBeEmptyDOMElement();
+    change("Destination", "Édimbourg");
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(depart).toHaveAttribute("aria-invalid", "true");
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("calendriers bornés : autres villes et engagements dans les dates du voyage", () => {
+    renderForm();
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter une ville" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter une réservation" }));
+    const ville = () => document.getElementById(fieldId("otherCities.0.arrival"));
+    const engagement = () => document.getElementById(fieldId("commitments.0.date"));
+    expect(ville()).toHaveAttribute("min", "2026-08-02");
+    expect(engagement()).toHaveAttribute("min", "2026-08-01");
+    change("Arrivée", "2026-08-29");
+    expect(ville()).toHaveAttribute("min", "2026-08-30");
+    expect(ville()).not.toHaveAttribute("max");
+    expect(engagement()).toHaveAttribute("min", "2026-08-29");
+    change("Départ", "2026-09-03");
+    expect(ville()).toHaveAttribute("max", "2026-09-02");
+    expect(engagement()).toHaveAttribute("max", "2026-09-03");
   });
 });

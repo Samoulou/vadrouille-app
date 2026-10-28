@@ -76,6 +76,7 @@ describe("LodgingScreen : suggestion", () => {
     vi.mocked(suggestLodging).mockReturnValue(new Promise(() => {}));
     const { container } = renderScreen();
     expect(screen.getByRole("heading", { level: 1, name: "Où loger à Édimbourg" })).toBeInTheDocument();
+    expect(screen.getByText("Étape 3 sur 3")).toBeInTheDocument();
     expect(screenStatus()).toHaveTextContent(t.attente);
     expect(screen.getByRole("alert")).toBeEmptyDOMElement();
     expect(container.querySelector('[data-part="squelette"]')).toHaveAttribute("aria-hidden", "true");

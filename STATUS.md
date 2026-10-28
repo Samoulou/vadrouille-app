@@ -1,12 +1,12 @@
-# État du studio — 2026-10-28 (208e cycle)
+# État du studio — 2026-10-28 (209e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 207e cycle. La carte de décision du 2026-10-27 15:12 UTC (« Juste relancer », recommandé, ou « Garder la raison ») est sans réponse.
+- 2026-10-28 05:45 UTC, fil du cycle : « on laisse tomber Biarritz, on continue d'améliorer l'algorithme, j'ai toujours pas les sites web de chaque activité dans le détail, aussi il faut mieux optimiser les déplacements, pas faire des aller-retour pour rien, c'est du réglage fin, c'est assez bien en l'état ». Traité : enquête Biarritz close, carte de décision retirée ; ticket #800 ouvert (réglages fins du programme : site web de chaque étape demandé à l'IA et affiché dans le détail même sans raison, journées en ordre de marche sans allers-retours ; amendement court de la spécification, décision 0123) ; agent ia au travail sur `claude/800-reglages-programme`.
 
 ## Fait
-- **Statut du 207e cycle** (#798) fusionné.
+- **Statut du 208e cycle** (#799) fusionné.
 - **Note de version v2026.10.25-21** (#771) publiée. Erreur relevée : elle dit la migration 0019 non appliquée et demande à Samuel de lancer `db-migrate` ; c'est faux, Samuel l'a appliquée le 2026-10-25 à 10:25 UTC (run 40184687008). À corriger dans la prochaine note.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
@@ -14,7 +14,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
-- **Essai Biarritz de Samuel en échec** (2026-10-26 vers 08:00 UTC) : ville choisie par la recherche Google, échec à la génération IA. Journal effacé (rétention d'une heure). Enquête dans le code terminée : la ville n'est pas en cause (Biarritz est dans la table maison, même brief qu'une ville de l'ancienne liste) ; cause la plus probable : programme de l'IA illisible (même panne que la décision 0130), sinon erreur ou délai d'OpenRouter. Samuel invité à relancer (lien envoyé à 10:20 UTC) ; le studio lit le journal dans l'heure. Accès au journal Vercel revenu ; aucun lancement dans le journal le 2026-10-28 à 04:14 UTC ni message de Samuel annonçant une relance.
+- **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. Constat : le prompt ne demande le champ `site` que « si tu connais l'adresse » (`src/ai/prompts/programme.ts`, `revision.ts`) et le détail de l'étape ne l'affiche que si `stop.reason` existe (`StopSheet.tsx`) ; aucune règle d'ordre des étapes dans la journée au-delà d'« un ou deux quartiers voisins ». Code en cours (prompts programme et révision, lecture tolérante, bloc « site officiel » du détail, amendement de `specs/P0-programme-par-ia.md`) ; PR attendue ce cycle. Essai Biarritz abandonné par Samuel (cause probable notée : programme de l'IA illisible, décision 0130).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
@@ -23,7 +23,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Essai Biarritz : dès la relance de Samuel, lire `p0.programme_written` (`finishReason`, `outputTokens`) et `p0.step_failed` dans l'heure ; si `length`, décision du Tech Lead sur le modèle `programme` (amendement 1 de 0130) ; puis un seul lien à Samuel.
+1. #800 : revue de la PR, corrections (deux au plus), puis note de version main → p0-reel et un seul lien à Samuel (`/voyages/nouveau`).
 2. Zakynthos : après la capture de Samuel, corriger la cause (par exemple afficher les voyages masqués avec leur raison).
 3. #527 : rappeler Q438 à Samuel après ses tests.
 4. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720. Corriger aussi l'état de la migration 0019 (appliquée le 2026-10-25 à 10:25 UTC, pas « à lancer »).

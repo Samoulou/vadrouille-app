@@ -50,8 +50,12 @@ describe("accueil : site d'essai, une seule app", () => {
     expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
     expect(screen.queryByText("Voyage : Ville de test")).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute()]);
-    expect(screen.getByRole("link", { name: messages.accueil.creer })).toHaveAttribute("href", creationRoutes.nouveau({ essai: true }));
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute(), creationRoutes.nouveau({ essai: true })]);
+    // Ticket 802 : « Créer un voyage » est rappelé en fin de page, même nom, même adresse.
+    expect(screen.getAllByRole("link", { name: messages.accueil.creer }).map((link) => link.getAttribute("href"))).toEqual([
+      creationRoutes.nouveau({ essai: true }),
+      creationRoutes.nouveau({ essai: true }),
+    ]);
     expect(screen.getByRole("link", { name: messages.accueil.mesVoyages })).toHaveAttribute("href", mesVoyagesRoute());
     expect(listTrips).not.toHaveBeenCalled();
     // Garde nommée (`siteEssaiAutorise`) : l'adaptateur n'est pas construit depuis l'accueil.
@@ -61,7 +65,7 @@ describe("accueil : site d'essai, une seule app", () => {
   it("répertoire de programmes absent : même accueil, sans erreur", async () => {
     avecProgrammes(createProgrammeLoader({ dossier: join(DOSSIER_TEST, "absent") }));
     render(await HomePage());
-    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute()]);
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute(), creationRoutes.nouveau({ essai: true })]);
   });
 
   it("adaptateur mock : ni section « Prototype » ni lien secondaire « Mes voyages » hors de la démonstration", async () => {
@@ -71,7 +75,7 @@ describe("accueil : site d'essai, une seule app", () => {
     expect(screen.queryByRole("heading", { name: "Prototype" })).not.toBeInTheDocument();
     const demo = screen.getByRole("region", { name: messages.accueil.demo.titre });
     const horsDemo = screen.getAllByRole("link").filter((link) => !demo.contains(link));
-    expect(horsDemo.map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau()]);
+    expect(horsDemo.map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau(), creationRoutes.nouveau()]);
   });
 
   it.each([["VERCEL_ENV"], ["VADROUILLE_ENV"]])("%s=production : la page lève (erreur 500), aucune section", async (name) => {

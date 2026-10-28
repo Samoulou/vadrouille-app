@@ -26,6 +26,6 @@ export const creationRoutes = {
   lancer: () => "/voyages/nouveau/lancer",
   /** `R5`, écran 5 « Propositions prêtes » du voyage créé (F8c), hors du groupe `(creation)` ; identifiant encodé. */
   preparation: (tripId: string) => `/voyages/${encodeURIComponent(tripId)}/preparation`,
-  /** Niveau supérieur de l'écran 1 : « Mes voyages » (F11a, 404 d'ici là). */
+  /** Niveau supérieur de l'écran 1 : « Mes voyages » (F11a). */
   mesVoyages: () => "/voyages",
 } as const;
