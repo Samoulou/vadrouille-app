@@ -10,9 +10,9 @@ import type { PaymentAdapter, PaymentSimulator } from "./types";
  * les lectures, handover § 11), et `PaymentSimulator` en déléguant au prestataire simulé, qui signe et livre l'événement
  * au webhook simulé : seul ce dernier accorde le droit (B4-PO-2).
  *
- * **Non branché en B4a** : créé seulement par sa fabrique (suite de contrat et tests de base) et par la composition
- * (`src/server/payment/composition.ts`) ; `getPaymentAdapter()`, `getPaymentSimulator()`, `getTripReader()` et
- * `paymentAvailable()` ne changent pas (B4b, B4-TL-14).
+ * Créé par sa fabrique (suite de contrat et tests de base) et par la composition (`src/server/payment/composition.ts`),
+ * que `src/instrumentation.ts` branche sur `./simulated-payment-instance.ts` quand `PAYMENT_ADAPTER` vaut `simulated` ;
+ * `getPaymentAdapter()` et `getPaymentSimulator()` le rendent alors (B4b, amendement B4-TL-14 de 0020 § 2.3).
  */
 export type OptionsPaiementSimule = DependancesPaiement & {
   readonly prestataire: PrestataireSimule;

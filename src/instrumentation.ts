@@ -40,6 +40,14 @@
  * `DATA_ADAPTER=api`, les cas d'usage du tri enregistré (`src/server/presentation/tri.ts`) sont branchés sur
  * `src/adapters/api-tri-instance.ts`. Rien n'est lu ni connecté ici. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement-tri`) sans arrêter le serveur : chaque action du tri rend `internal`.
+ *
+ * B4b (spécification B4, B4b point 1 ; décision 0097 B4-TL-5, sur le modèle de B10a) : environnement valide et
+ * `PAYMENT_ADAPTER=simulated` (admis par `parseServerEnv` en `local` et `ci` seulement, avec `DATA_ADAPTER=api`,
+ * `AUTH_ADAPTER=better-auth` et le webhook simulé ouvert, B4-TL-7), la composition du paiement simulé
+ * (`composerPaiementSimule`) est branchée sur `src/adapters/simulated-payment-instance.ts` ; elle n'est appelée qu'au
+ * premier usage (rien n'est lu ni connecté ici, la clé n'est lue qu'à la construction). Un échec du branchement est
+ * journalisé (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur : chaque action du paiement
+ * rend `provider_error`.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -54,6 +62,7 @@ export async function register(): Promise<void> {
       await brancherLectureApi(logEvent, errorNameOf);
       await brancherCreationApi(logEvent, errorNameOf);
       await brancherTriApi(logEvent, errorNameOf);
+      await brancherPaiementSimule(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -177,5 +186,22 @@ async function brancherTriApi(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-tri", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche la composition du paiement simulé (spécification B4, B4b point 1 ; décision 0097 B4-TL-5). */
+async function brancherPaiementSimule(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { simulatedPaymentChosen } = await import("@/adapters/payment-guard");
+    if (!simulatedPaymentChosen()) return;
+    const { brancherPaiementSimule: brancher } = await import("@/adapters/simulated-payment-instance");
+    const { composerPaiementSimule } = await import("@/server/payment/composition");
+    brancher(() => composerPaiementSimule());
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }

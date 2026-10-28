@@ -16,8 +16,8 @@ import { transportHttp } from "./transport-http";
  * Composition de l'adaptateur de paiement `simulated` (décision 0097 B4-TL-3 point 5 et B4-TL-5) : seul lieu, avec le
  * webhook simulé, où la clé de signature est lue (`cleWebhookSimule`), **à la construction** de l'adaptateur, jamais à
  * l'import d'un module ; elle n'est gardée que dans la fermeture du prestataire. La composition ne rend que l'adaptateur.
- * **Non branchée en B4a** : `getPaymentAdapter()` et `getPaymentSimulator()` restent fermés à `simulated` jusqu'à B4b
- * (B4-TL-14). Lève si le webhook simulé n'est pas ouvert (`PAYMENT_ADAPTER=simulated` et ses gardes, B4-TL-7).
+ * Branchée par `src/instrumentation.ts` sur `src/adapters/simulated-payment-instance.ts` (B4b), qui l'appelle une fois,
+ * au premier usage. Lève si le webhook simulé n'est pas ouvert (`PAYMENT_ADAPTER=simulated` et ses gardes, B4-TL-7).
  */
 export function composerPaiementSimule(): PaymentAdapter & PaymentSimulator {
   const env = serverEnv();
