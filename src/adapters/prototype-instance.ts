@@ -1,9 +1,18 @@
+import { randomBytes } from "node:crypto";
+
 import { prototypeAdapterAllowed } from "@/dev/flags";
 import { createRelecteurSimule, type RelecteurSimule } from "@/mocks/prototype-relecteur";
 import type { PlacePhoto } from "@/contracts/photo";
 import type { PoolSql } from "@/server/usage/neon";
 
-import { createPrototypeAdapter, createPrototypeAdapterReel, type LecteurDeblocage, type RelecteurTrajets } from "./prototype";
+import {
+  createPrototypeAdapter,
+  createPrototypeAdapterReel,
+  type LecteurDeblocage,
+  type RelecteurTrajets,
+  type SourceProgrammes,
+  type SourceProgrammesReels,
+} from "./prototype";
 import { createPrototypeCreationAdapter, type PortCreationEssai } from "./prototype-creation";
 import { createSourceProgrammesReels } from "./prototype-lecture";
 import { createProgrammeLoader } from "./prototype-loader";
@@ -55,10 +64,28 @@ export interface PhotosEssaiBranchees {
   photo(lieu: () => Promise<string | null>): Promise<PlacePhoto | null>;
 }
 
+/**
+ * Partage réel d'un voyage du site d'essai (décision 0135), branché au démarrage par `src/instrumentation.ts`
+ * (`src/server/essai/partage.ts`). Ce module n'en lit ni le code d'accès, ni le cookie, ni la base. Non branché (tests,
+ * garde fermée, autre runtime) : aucune clé, donc aucun lien créé et tout lien répond 404.
+ */
+export interface PartageEssaiBranche {
+  /** Clé de signature des liens (32 octets), tirée du code d'accès ; `null` garde du mode réel fermée. */
+  cle(): Buffer | null;
+  /** Session vérifiée de la requête courante (cookie d'accès valide) : exigée pour créer un lien. */
+  sessionVerifiee(): Promise<boolean>;
+  /** Barrière de la **vue partagée** : pool si la garde du mode réel est ouverte, **sans** cookie d'accès ; sinon `null`. */
+  barriereLecture: BarriereLectureProgrammes;
+}
+
 interface Instance {
   /** Adaptateur de la requête : la source (index, relecteur) est partagée, seul le lecteur du déblocage change. */
   fabrique: (deblocage?: LecteurDeblocage) => TripAdapter;
   relecteur: RelecteurSimule;
+  /** Lecteur de la vue partagée d'un seul voyage (décision 0135 § 5). */
+  partage: (tripId: string) => TripAdapter;
+  /** Dossier de programmes (local, CI) : clé de partage tirée au hasard par processus, sans session à vérifier. */
+  dossier: boolean;
 }
 
 /** État du module sur `globalThis` : l'instance (créée à la demande) et la barrière branchée au démarrage. */
@@ -69,6 +96,9 @@ interface Etat {
   deblocages?: DeblocagesEssai;
   creation?: PortCreationEssai;
   photos?: PhotosEssaiBranchees;
+  partage?: PartageEssaiBranche;
+  /** Clé de partage du mode « dossier » : 32 octets aléatoires, en mémoire du processus seulement. */
+  clePartageLocale?: Buffer;
 }
 
 const INSTANCE_KEY = Symbol.for("vadrouille.prototype");
@@ -119,6 +149,11 @@ export function brancherPhotosEssai(photos: PhotosEssaiBranchees): void {
   holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], photos };
 }
 
+/** Branche le partage réel du site d'essai (décision 0135 ; appelé une fois, au démarrage, par `src/instrumentation.ts`). */
+export function brancherPartageEssai(partage: PartageEssaiBranche): void {
+  holder[INSTANCE_KEY] = { ...holder[INSTANCE_KEY], partage };
+}
+
 /** Photos branchées, ou `null` (aucune photo, aucun appel). */
 export function photosEssai(): PhotosEssaiBranchees | null {
   return holder[INSTANCE_KEY]?.photos ?? null;
@@ -161,19 +196,114 @@ export function prototypeTripAdapter(env: NodeJS.ProcessEnv = process.env, deblo
   if (!etat.instance) {
     const dossier = env.VADROUILLE_PROTOTYPE_DIR?.trim();
     const relecteur = createRelecteurSimule();
-    const fabrique = dossier
+    const sources = dossier
       ? (() => {
           const programmes = createProgrammeLoader({ dossier });
-          return (lecteur?: LecteurDeblocage) => createPrototypeAdapter({ programmes, relecteurs: { trajets: relecteur }, deblocage: lecteur });
+          return {
+            fabrique: (lecteur?: LecteurDeblocage) => createPrototypeAdapter({ programmes, relecteurs: { trajets: relecteur }, deblocage: lecteur }),
+            partage: (tripId: string) =>
+              createPrototypeAdapter({ programmes: unSeulProgramme(programmes, tripId), relecteurs: { trajets: relecteur }, deblocage: seulementCeVoyage(tripId) }),
+          };
         })()
       : (() => {
           const programmes = createSourceProgrammesReels({ pool: poolLectureProgrammes });
-          return (lecteur?: LecteurDeblocage) => createPrototypeAdapterReel({ programmes, relecteurs: { trajets: relecteurReel }, deblocage: lecteur });
+          const programmesPartages = createSourceProgrammesReels({ pool: poolLecturePartage });
+          return {
+            fabrique: (lecteur?: LecteurDeblocage) => createPrototypeAdapterReel({ programmes, relecteurs: { trajets: relecteurReel }, deblocage: lecteur }),
+            partage: (tripId: string) =>
+              createPrototypeAdapterReel({
+                programmes: unSeulProgrammeReel(programmesPartages, tripId),
+                relecteurs: { trajets: RELECTEUR_REFUSE },
+                deblocage: seulementCeVoyage(tripId),
+              }),
+          };
         })();
-    etat.instance = { fabrique, relecteur };
+    etat.instance = { ...sources, relecteur, dossier: Boolean(dossier) };
     holder[INSTANCE_KEY] = etat;
   }
   return etat.instance.fabrique(deblocage);
+}
+
+/** Instance du processus, créée au besoin sous la liste blanche (même erreur que `prototypeTripAdapter` hors liste blanche). */
+function instanceCourante(): Instance {
+  prototypeTripAdapter();
+  const instance = holder[INSTANCE_KEY]?.instance;
+  if (!instance) throw new Error(REFUS_HORS_LISTE);
+  return instance;
+}
+
+// --- Partage réel du site d'essai (décision 0135) ------------------------------------------------------------------
+
+/** Barrière de la vue partagée, branchée au démarrage ; non branchée : `null` (aucune connexion, aucun programme). */
+const poolLecturePartage: BarriereLectureProgrammes = async () => (await holder[INSTANCE_KEY]?.partage?.barriereLecture()) ?? null;
+
+/** Vue partagée : jamais de relecture Routes (payante) pour un visiteur ; les paires sans temps conservé restent « à confirmer ». */
+const RELECTEUR_REFUSE: RelecteurTrajets = { relireJournee: async () => ({ ok: false, raison: "unavailable" }) };
+
+/**
+ * Déblocage de la vue partagée : vrai pour le seul voyage du lien. Le lien n'a été émis que pour un voyage débloqué
+ * pour la personne qui l'a créé (session vérifiée, `signed-share.ts`) ; le visiteur n'a ni son cookie ni sa portée.
+ */
+const seulementCeVoyage =
+  (tripId: string): LecteurDeblocage =>
+  async (_ctx, candidat) =>
+    candidat === tripId;
+
+/** Source réduite au seul voyage du lien, **sans `conserver`** : la vue partagée n'écrit jamais en base. */
+function unSeulProgrammeReel(source: SourceProgrammesReels, tripId: string): SourceProgrammesReels {
+  return {
+    lister: async () => [],
+    async lire(id) {
+      if (id !== tripId) return null;
+      const lu = await source.lire(id);
+      return lu ? { programme: lu.programme, trajets: lu.trajets } : null;
+    },
+  };
+}
+
+/** Index de fichiers réduit au seul voyage du lien (mode « dossier », local et CI). */
+function unSeulProgramme(source: SourceProgrammes, tripId: string): SourceProgrammes {
+  return {
+    ids: async () => ((await source.ids()).includes(tripId) ? [tripId] : []),
+    lire: async (id) => (id === tripId ? source.lire(id) : null),
+  };
+}
+
+/**
+ * Lecteur de la vue partagée d'un seul voyage (décision 0135 § 5) : programme lu **sans le cookie d'accès** du visiteur
+ * (garde du mode réel ouverte seulement), en lecture seule, sans relecture Routes, servi débloqué. Même liste blanche que
+ * l'adaptateur.
+ */
+export function prototypeSharedReader(tripId: string): TripAdapter {
+  return instanceCourante().partage(tripId);
+}
+
+/**
+ * Clé de signature des liens partagés : mode « dossier », 32 octets aléatoires tirés une fois par processus (un lien
+ * meurt au redémarrage) ; programmes réels, clé tirée du code d'accès par le port branché, ou `null`.
+ */
+export function clePartageEssai(): Buffer | null {
+  const courante = instanceCourante();
+  const etat = holder[INSTANCE_KEY] ?? {};
+  if (courante.dossier) {
+    etat.clePartageLocale ??= randomBytes(32);
+    holder[INSTANCE_KEY] = etat;
+    return etat.clePartageLocale;
+  }
+  return etat.partage?.cle() ?? null;
+}
+
+/**
+ * Session vérifiée pour créer un lien : mode « dossier » (local, CI, sans code d'accès), vraie ; programmes réels,
+ * cookie d'accès valide (port branché), sinon fausse.
+ */
+export async function sessionPartageEssaiVerifiee(): Promise<boolean> {
+  if (instanceCourante().dossier) return true;
+  try {
+    return (await holder[INSTANCE_KEY]?.partage?.sessionVerifiee()) === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

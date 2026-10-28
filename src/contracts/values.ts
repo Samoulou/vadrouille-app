@@ -181,6 +181,14 @@ export type SharedException = (typeof SHARED_EXCEPTIONS)[number];
 export const SHARE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /**
+ * Jeton de partage **signé, sans stockage** (décision 0135, partage d'un voyage réel du site d'essai) :
+ * `v1.<charge>.<mac>`, `charge` = base64url de `voyage~organisation~dernier jour` (140 octets au plus), `mac` =
+ * HMAC-SHA-256 en base64url (43 caractères). Seconde forme lue par `parseShareToken` ; la forme et la signature sont
+ * vérifiées par `src/adapters/share-signed-token.ts`, jamais par le navigateur.
+ */
+export const SIGNED_SHARE_TOKEN_PATTERN = /^v1\.[A-Za-z0-9_-]{8,200}\.[A-Za-z0-9_-]{43}$/;
+
+/**
  * Codes d'erreur des actions serveur (format commun de 0017 § 4, `snake_case`). F9a a créé les trois
  * premiers ; F8a ajoute ceux de `structureBrief` (0017 § 4) ; F8b, F8c et B6 l'étendent sans renommer.
  */
