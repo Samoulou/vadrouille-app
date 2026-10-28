@@ -15,8 +15,12 @@ import {
 
 import { draftReducer, emptyBriefValues, initialDraft, type BriefValues, type CommitmentForm, type TripForm } from "./draft";
 import {
+  ajouterJoursIso,
   cityRanges,
   destinationHorsTable,
+  endAfterStartChange,
+  nightsOf,
+  tripDateBounds,
   destinationRegion,
   isDate,
   parseInteger,
@@ -305,5 +309,54 @@ describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () =
     expect(validateTrip({ ...ROME, end: "2026-09-12" }, TODAY, essai)).toEqual([]);
     expect(validateTrip({ ...ROME, end: "2026-09-13" }, TODAY, essai)).toEqual([{ field: "end", code: "tooLong" }]);
     expect(validateTrip({ ...ROME, end: "2026-09-13" }, TODAY)).toEqual([]);
+  });
+});
+
+describe("calendriers bornés de l'écran 1 (demande de Samuel du 2026-10-28)", () => {
+  const today = "2026-08-01";
+
+  it("ajouterJoursIso traverse les mois et les années", () => {
+    expect(ajouterJoursIso("2026-08-31", 1)).toBe("2026-09-01");
+    expect(ajouterJoursIso("2026-12-31", 1)).toBe("2027-01-01");
+    expect(ajouterJoursIso("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("sans dates : arrivée dès aujourd'hui, départ dès demain", () => {
+    const bounds = tripDateBounds({ start: "", end: "" }, today);
+    expect(bounds.start).toEqual({ min: "2026-08-01" });
+    expect(bounds.end).toEqual({ min: "2026-08-02" });
+  });
+
+  it("arrivée choisie : le départ commence le lendemain ; site d'essai, il s'arrête à la durée maximale", () => {
+    expect(tripDateBounds({ start: "2026-08-29", end: "" }, today).end).toEqual({ min: "2026-08-30" });
+    expect(tripDateBounds({ start: "2026-08-29", end: "" }, today, true).end).toEqual({ min: "2026-08-30", max: "2026-09-12" });
+  });
+
+  it("chaque borne correspond à ce que validateTrip accepte", () => {
+    const base = { ...initialDraft().trip, destination: "Édimbourg", lodging: { answer: "none" as const, label: "" } };
+    const max = tripDateBounds({ start: "2026-08-29", end: "" }, today, true).end.max!;
+    expect(validateTrip({ ...base, start: "2026-08-29", end: max }, today, { essai: true }).map((e) => e.field)).not.toContain("end");
+    const after = ajouterJoursIso(max, 1);
+    expect(validateTrip({ ...base, start: "2026-08-29", end: after }, today, { essai: true })).toContainEqual({ field: "end", code: "tooLong" });
+  });
+
+  it("autres villes entre le lendemain de l'arrivée et la veille du départ ; engagements dans le voyage", () => {
+    const bounds = tripDateBounds({ start: "2026-08-29", end: "2026-09-03" }, today);
+    expect(bounds.city).toEqual({ min: "2026-08-30", max: "2026-09-02" });
+    expect(bounds.commitment).toEqual({ min: "2026-08-29", max: "2026-09-03" });
+  });
+
+  it("arrivée déplacée : un départ devenu impossible est vidé, un départ encore possible est gardé", () => {
+    expect(endAfterStartChange("2026-09-05", "2026-09-03")).toBe("");
+    expect(endAfterStartChange("2026-09-03", "2026-09-03")).toBe("");
+    expect(endAfterStartChange("2026-08-28", "2026-09-03")).toBe("2026-09-03");
+    expect(endAfterStartChange("2026-08-01", "2026-09-03", true)).toBe("");
+    expect(endAfterStartChange("", "2026-09-03")).toBe("2026-09-03");
+  });
+
+  it("nuits sur place", () => {
+    expect(nightsOf({ start: "2026-08-29", end: "2026-09-03" })).toBe(5);
+    expect(nightsOf({ start: "2026-08-29", end: "2026-08-29" })).toBeNull();
+    expect(nightsOf({ start: "", end: "2026-08-29" })).toBeNull();
   });
 });

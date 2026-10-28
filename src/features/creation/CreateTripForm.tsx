@@ -39,7 +39,7 @@ import {
   TextField,
 } from "./fields";
 import { creationRoutes, ESSAI_PARAM } from "./routes";
-import { cityRanges, todayIso, validateTrip, type FieldError, type FormError } from "./validation";
+import { cityRanges, endAfterStartChange, nightsOf, todayIso, tripDateBounds, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
 const e1 = t.ecran1;
@@ -102,6 +102,14 @@ export interface CreateTripFormProps {
 }
 
 const sansAbonnement = () => () => {};
+/**
+ * Date du jour de l'appareil, lue après l'hydratation (`null` au prérendu) : le serveur, en UTC, peut être la veille
+ * ou le lendemain de la personne, et les bornes des calendriers différeraient entre le HTML et la page.
+ */
+function useAujourdhui(): string | null {
+  return useSyncExternalStore(sansAbonnement, () => todayIso(), () => null);
+}
+
 /** `site=essai` dans l'adresse, lu après l'hydratation (faux au prérendu : même HTML pour tous les adaptateurs). */
 function useEssaiDepuisAdresse(): boolean {
   return useSyncExternalStore(
@@ -178,6 +186,9 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   }
 
   const ranges = trip.otherCities.length > 0 ? cityRanges(trip) : null;
+  const today = useAujourdhui();
+  const bounds = today === null ? { start: {}, end: {}, city: {}, commitment: {} } : tripDateBounds(trip, today, essai);
+  const nights = nightsOf(trip);
 
   function lodgingFields(lodging: LodgingForm, city: number, base: string) {
     const groupError = errorOf(base);
@@ -287,7 +298,8 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             type="date"
             label={e1.arrivee}
             value={trip.start}
-            onChange={(start) => dispatch({ type: "trip", patch: { start } })}
+            {...bounds.start}
+            onChange={(start) => dispatch({ type: "trip", patch: { start, end: endAfterStartChange(start, trip.end, essai) } })}
             error={errorOf("start")}
           />
           <TextField
@@ -295,10 +307,16 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             type="date"
             label={e1.depart}
             value={trip.end}
+            {...bounds.end}
             onChange={(end) => dispatch({ type: "trip", patch: { end } })}
             error={errorOf("end")}
           />
         </FieldRow>
+        {nights !== null ? (
+          <p className="-mt-3 text-corps-s text-ink-soft tabular-nums">
+            {nights === 1 ? e1.duree.une : format(e1.duree.plusieurs, { n: nights })}
+          </p>
+        ) : null}
         {lodgingFields(trip.lodging, 0, "lodging")}
 
         {/* Site d'essai : une seule ville, « Autres villes » n'est pas proposé (une ville déjà saisie reste, pour être retirée). */}
@@ -348,6 +366,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                     type="date"
                     label={e1.villes.arrivee}
                     value={city.arrival}
+                    {...bounds.city}
                     onChange={(arrival) => dispatch({ type: "city", index, patch: { arrival } })}
                     error={errorOf(`${base}.arrival`)}
                   />
@@ -453,6 +472,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                   type="date"
                   label={e1.engagements.date}
                   value={commitment.date}
+                  {...bounds.commitment}
                   onChange={(date) => dispatch({ type: "commitment", index, patch: { date } })}
                   error={errorOf(`${base}.date`)}
                 />

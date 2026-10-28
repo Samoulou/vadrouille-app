@@ -72,6 +72,9 @@ export interface TextFieldProps {
   help?: string;
   error?: string | null;
   maxLength?: number;
+  /** Calendrier : premières et dernières dates proposées (`AAAA-MM-JJ`). */
+  min?: string;
+  max?: string;
   autoComplete?: string;
   inputRef?: Ref<HTMLInputElement>;
   className?: string;
@@ -86,6 +89,8 @@ export function TextField({
   help,
   error = null,
   maxLength,
+  min,
+  max,
   autoComplete = "off",
   inputRef,
   className,
@@ -101,6 +106,8 @@ export function TextField({
         type={type}
         value={value}
         maxLength={maxLength}
+        min={min}
+        max={max}
         autoComplete={autoComplete}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(help && helpId(id), error && errorId(id))}

@@ -85,6 +85,54 @@ function joursEntre(start: string, end: string): number {
   return (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000;
 }
 
+/** Date `AAAA-MM-JJ` décalée de `jours` jours (calcul en UTC, sans heure d'été). */
+export function ajouterJoursIso(date: string, jours: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + jours * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Bornes `min` et `max` d'un calendrier (`undefined` : pas de borne). */
+export interface DateBounds {
+  min?: string;
+  max?: string;
+}
+
+/**
+ * Bornes des calendriers de l'écran 1 (demande de Samuel du 2026-10-28) : le calendrier ne propose que les dates que
+ * `validateTrip` accepte. Arrivée dès aujourd'hui ; départ au moins une nuit après l'arrivée (site d'essai :
+ * `PROTOTYPE_STAY_DAYS_MAX` jours au plus) ; ville suivante entre l'arrivée et la veille du départ ; engagement dans les
+ * dates du voyage. La validation reste la garde (saisie au clavier, navigateurs sans calendrier).
+ */
+export function tripDateBounds(trip: Pick<TripForm, "start" | "end">, today: string, essai = false) {
+  const start = isDate(trip.start) && trip.start >= today ? trip.start : null;
+  const end = isDate(trip.end) && start !== null && trip.end > start ? trip.end : null;
+  const startBounds: DateBounds = { min: today };
+  const endBounds: DateBounds = {
+    min: ajouterJoursIso(start ?? today, 1),
+    ...(essai && start !== null ? { max: ajouterJoursIso(start, PROTOTYPE_STAY_DAYS_MAX - 1) } : {}),
+  };
+  const cityBounds: DateBounds =
+    start !== null && end !== null ? { min: ajouterJoursIso(start, 1), max: ajouterJoursIso(end, -1) } : { min: ajouterJoursIso(today, 1) };
+  const commitmentBounds: DateBounds = start !== null && end !== null ? { min: start, max: end } : { min: today };
+  return { start: startBounds, end: endBounds, city: cityBounds, commitment: commitmentBounds };
+}
+
+/** Nuits entre l'arrivée et le départ, `null` tant que les deux dates ne sont pas cohérentes. */
+export function nightsOf(trip: Pick<TripForm, "start" | "end">): number | null {
+  return isDate(trip.start) && isDate(trip.end) && trip.end > trip.start ? joursEntre(trip.start, trip.end) : null;
+}
+
+/**
+ * Arrivée changée : un départ devenu impossible (avant ou le jour de l'arrivée, ou au-delà de la durée maximale du
+ * site d'essai) est vidé, pour que le calendrier du départ s'ouvre sur le mois de l'arrivée au lieu de garder une date
+ * refusée.
+ */
+export function endAfterStartChange(start: string, end: string, essai = false): string {
+  if (!isDate(start) || !isDate(end)) return end;
+  if (end <= start) return "";
+  if (essai && joursEntre(start, end) > PROTOTYPE_STAY_DAYS_MAX - 1) return "";
+  return end;
+}
+
 export interface ValidateTripOptions {
   /**
    * Site d'essai (adaptateur `prototype` ; spécification E2E-essai, lot 2, critère 2, et D1) : une seule ville, et

@@ -512,4 +512,21 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(router.push).toHaveBeenCalledWith("/voyages/nouveau/brief");
   });
+
+  it("calendriers bornés : arrivée dès aujourd'hui, départ dès le lendemain de l'arrivée, durée affichée", () => {
+    renderForm();
+    const arrivee = screen.getByLabelText("Arrivée", { exact: true });
+    const depart = screen.getByLabelText("Départ", { exact: true });
+    expect(arrivee).toHaveAttribute("min", "2026-08-01");
+    expect(depart).toHaveAttribute("min", "2026-08-02");
+    change("Arrivée", "2026-08-29");
+    expect(depart).toHaveAttribute("min", "2026-08-30");
+    change("Départ", "2026-09-03");
+    expect(screen.getByText("5 nuits sur place")).toBeInTheDocument();
+    // Arrivée déplacée après le départ : le départ est vidé, son calendrier s'ouvre au lendemain de la nouvelle arrivée.
+    change("Arrivée", "2026-09-10");
+    expect(depart).toHaveValue("");
+    expect(depart).toHaveAttribute("min", "2026-09-11");
+    expect(screen.queryByText(/nuits? sur place/)).not.toBeInTheDocument();
+  });
 });
