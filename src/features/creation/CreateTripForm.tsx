@@ -39,7 +39,7 @@ import {
   TextField,
 } from "./fields";
 import { creationRoutes, ESSAI_PARAM } from "./routes";
-import { cityRanges, endAfterStartChange, nightsOf, todayIso, tripDateBounds, validateTrip, type FieldError, type FormError } from "./validation";
+import { cityRanges, nightsOf, todayIso, tripDateBounds, validateTrip, type FieldError, type FormError } from "./validation";
 
 const t = messages.creation;
 const e1 = t.ecran1;
@@ -292,31 +292,33 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             error={errorOf("destination")}
           />
         )}
-        <FieldRow>
-          <TextField
-            field="start"
-            type="date"
-            label={e1.arrivee}
-            value={trip.start}
-            {...bounds.start}
-            onChange={(start) => dispatch({ type: "trip", patch: { start, end: endAfterStartChange(start, trip.end, essai) } })}
-            error={errorOf("start")}
-          />
-          <TextField
-            field="end"
-            type="date"
-            label={e1.depart}
-            value={trip.end}
-            {...bounds.end}
-            onChange={(end) => dispatch({ type: "trip", patch: { end } })}
-            error={errorOf("end")}
-          />
-        </FieldRow>
-        {nights !== null ? (
-          <p className="-mt-3 text-corps-s text-ink-soft tabular-nums">
-            {nights === 1 ? e1.duree.une : format(e1.duree.plusieurs, { n: nights })}
+        <div className="flex flex-col gap-2">
+          <FieldRow>
+            <TextField
+              field="start"
+              type="date"
+              label={e1.arrivee}
+              value={trip.start}
+              {...bounds.start}
+              onChange={(start) => dispatch({ type: "trip", patch: { start } })}
+              error={errorOf("start")}
+            />
+            <TextField
+              field="end"
+              type="date"
+              label={e1.depart}
+              value={trip.end}
+              {...bounds.end}
+              onChange={(end) => dispatch({ type: "trip", patch: { end } })}
+              error={errorOf("end")}
+            />
+          </FieldRow>
+          {/* Durée du séjour (ticket 801) : région live polie toujours rendue (0018 § 14), le texte y est écrit quand les deux
+              dates sont cohérentes et annoncé à chaque changement ; sans rôle `status`, la région d'avis de l'écran reste unique. */}
+          <p aria-live="polite" data-part="duree" className={nights !== null ? "text-corps-s text-ink-soft tabular-nums" : EMPTY_LIVE_REGION_CLASS}>
+            {nights === null ? null : nights === 1 ? e1.duree.une : format(e1.duree.plusieurs, { n: nights })}
           </p>
-        ) : null}
+        </div>
         {lodgingFields(trip.lodging, 0, "lodging")}
 
         {/* Site d'essai : une seule ville, « Autres villes » n'est pas proposé (une ville déjà saisie reste, pour être retirée). */}

@@ -18,7 +18,6 @@ import {
   ajouterJoursIso,
   cityRanges,
   destinationHorsTable,
-  endAfterStartChange,
   nightsOf,
   tripDateBounds,
   destinationRegion,
@@ -346,15 +345,13 @@ describe("calendriers bornés de l'écran 1 (demande de Samuel du 2026-10-28)", 
     expect(bounds.commitment).toEqual({ min: "2026-08-29", max: "2026-09-03" });
   });
 
-  it("arrivée déplacée : un départ devenu impossible est vidé, un départ encore possible est gardé", () => {
-    expect(endAfterStartChange("2026-09-05", "2026-09-03")).toBe("");
-    expect(endAfterStartChange("2026-09-03", "2026-09-03")).toBe("");
-    expect(endAfterStartChange("2026-08-28", "2026-09-03")).toBe("2026-09-03");
-    expect(endAfterStartChange("2026-08-01", "2026-09-03", true)).toBe("");
-    expect(endAfterStartChange("", "2026-09-03")).toBe("2026-09-03");
+  it("arrivée seule : villes et engagements partent déjà d'elle, sans maximum", () => {
+    const bounds = tripDateBounds({ start: "2026-08-29", end: "" }, today);
+    expect(bounds.city).toEqual({ min: "2026-08-30" });
+    expect(bounds.commitment).toEqual({ min: "2026-08-29" });
   });
 
-  it("nuits sur place", () => {
+  it("nuits du séjour", () => {
     expect(nightsOf({ start: "2026-08-29", end: "2026-09-03" })).toBe(5);
     expect(nightsOf({ start: "2026-08-29", end: "2026-08-29" })).toBeNull();
     expect(nightsOf({ start: "", end: "2026-08-29" })).toBeNull();
