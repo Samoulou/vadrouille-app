@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { createLink, demoLinks, demoSection } from "./accueil-helpers";
+import { createLink, demoLinks, demoSection, finalCreateLink } from "./accueil-helpers";
 import { blockGoogle } from "./carte-helpers";
 
 /**
@@ -127,10 +127,10 @@ test("accueil: contour de focus 2 px line décalé de 2 px sur chaque lien", asy
   const line = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-line").trim());
   await page.keyboard.press("Tab");
   // Ticket #259 : « Créer un voyage » précède la section « Démonstration » (vérifié dans son propre test) ; ticket 802 :
-  // « Commencer mon voyage », en fin de page, aussi. L'exemple de journée n'a aucun lien.
+  // le même lien rappelé en fin de page, aussi. L'exemple de journée n'a aucun lien.
   await expect(createLink(page)).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Commencer mon voyage" })).toBeFocused();
+  await expect(finalCreateLink(page)).toBeFocused();
   await page.keyboard.press("Tab");
   for (let index = 0; index < ARRIVALS.length; index += 1) {
     const link = demoLinks(page).nth(index);

@@ -33,7 +33,7 @@ const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
       key: "belvedere",
       name: e.belvedere.nom,
       start: "09:15",
-      facts: { durationMinutes: 45, costPerPerson: 0, area: e.belvedere.secteur },
+      facts: { durationMinutes: 45, area: e.belvedere.secteur },
       reason: e.belvedere.raison,
       exceptions: [],
     },
@@ -45,7 +45,7 @@ const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
       key: "dejeuner",
       name: e.dejeuner.nom,
       start: "12:30",
-      facts: { durationMinutes: 60, costPerPerson: 18, area: e.dejeuner.secteur },
+      facts: { durationMinutes: 60, area: e.dejeuner.secteur },
       exceptions: [],
     },
   },
@@ -56,7 +56,7 @@ const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
       key: "jardin",
       name: e.jardin.nom,
       start: "14:30",
-      facts: { durationMinutes: 150, costPerPerson: 12, area: e.jardin.secteur },
+      facts: { durationMinutes: 150, area: e.jardin.secteur },
       exceptions: [],
     },
   },
@@ -67,7 +67,7 @@ const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
       key: "diner",
       name: e.diner.nom,
       start: "20:00",
-      facts: { durationMinutes: 150, costPerPerson: 45, area: e.diner.secteur },
+      facts: { durationMinutes: 150, area: e.diner.secteur },
       reason: e.diner.raison,
       exceptions: [],
     },
@@ -147,7 +147,7 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
       </Section>
 
       <Section id="inclus-titre" title={t.inclus.titre}>
-        <ul className="flex flex-col">
+        <ul role="list" className="flex flex-col">
           {INCLUS.map((ligne) => (
             <li key={ligne} className="flex items-start gap-3 border-b border-hairline py-3 last:border-b-0">
               <IconCoche aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ink" />
@@ -167,7 +167,7 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
         </h2>
         <p className="text-corps text-ink-2">{t.final.texte}</p>
         <Button asChild className="mt-2 w-full">
-          <Link href={createHref}>{t.final.bouton}</Link>
+          <Link href={createHref}>{t.creer}</Link>
         </Button>
       </section>
       {footer}

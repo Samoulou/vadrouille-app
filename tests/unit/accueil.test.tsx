@@ -141,7 +141,7 @@ describe("accueil : autre adaptateur", () => {
     await renderHome();
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
     // Ticket #259 : « Créer un voyage » est affiché quel que soit l'adaptateur ; ticket 802 : rappelé en fin de page
-    // (« Commencer mon voyage ») ; aucun autre lien.
+    // sous le même nom ; aucun autre lien.
     expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
     expect(screen.getByRole("heading", { level: 1, name: PRODUCT_NAME })).toBeInTheDocument();
     expect(screen.getByText(messages.produit.promesse)).toBeInTheDocument();
@@ -153,7 +153,8 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
   it.each([undefined, "mock", "api"])("DATA_ADAPTER=%j : lien vers l'écran 1, après la promesse, avant toute section", async (value) => {
     vi.stubEnv("DATA_ADAPTER", value);
     await renderHome();
-    const link = screen.getByRole("link", { name: "Créer un voyage" });
+    // Ticket 802 : le même lien est rappelé en fin de page ; le premier suit la promesse.
+    const [link] = screen.getAllByRole("link", { name: "Créer un voyage" }) as [HTMLElement];
     expect(link).toHaveAttribute("href", "/voyages/nouveau");
     expect(link).toHaveAccessibleName(messages.accueil.creer);
     // Ordre de lecture : nom, promesse, « Créer un voyage », puis la section « Démonstration » s'il y en a une.
@@ -188,16 +189,17 @@ describe("accueil : page qui donne envie (ticket 802)", () => {
     // Une seule plaque de destination, aucune exception (pas de jaune : aucune action requise sur l'accueil).
     expect(document.querySelectorAll("[data-destination-plate]")).toHaveLength(1);
     expect(screen.queryByText("À réserver")).toBeNull();
-    const final = screen.getByRole("link", { name: a.final.bouton });
-    expect(final).toHaveAttribute("href", "/voyages/nouveau");
-    const premier = screen.getByRole("link", { name: a.creer });
-    expect(premier.compareDocumentPosition(final) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Une action, un nom (handover, règle d'or 9) : le bouton de fin de page porte le même libellé et la même adresse.
+    const liens = screen.getAllByRole("link", { name: a.creer });
+    expect(liens.map((lien) => lien.getAttribute("href"))).toEqual(["/voyages/nouveau", "/voyages/nouveau"]);
+    const final = within(screen.getByRole("region", { name: a.final.titre })).getByRole("link", { name: a.creer });
+    expect(final).toBe(liens[1]);
   });
 
   it("Démonstration (données simulées) après le dernier bouton", async () => {
     vi.stubEnv("DATA_ADAPTER", "mock");
     await renderHome();
-    const final = screen.getByRole("link", { name: messages.accueil.final.bouton });
+    const final = within(screen.getByRole("region", { name: messages.accueil.final.titre })).getByRole("link", { name: messages.accueil.creer });
     const demo = screen.getByRole("region", { name: t.titre });
     expect(final.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

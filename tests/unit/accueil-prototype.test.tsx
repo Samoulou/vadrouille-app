@@ -51,9 +51,11 @@ describe("accueil : site d'essai, une seule app", () => {
     expect(screen.queryByRole("heading", { name: "Démonstration" })).not.toBeInTheDocument();
     expect(screen.queryByText("Voyage : Ville de test")).not.toBeInTheDocument();
     expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([creationRoutes.nouveau({ essai: true }), mesVoyagesRoute(), creationRoutes.nouveau({ essai: true })]);
-    expect(screen.getByRole("link", { name: messages.accueil.creer })).toHaveAttribute("href", creationRoutes.nouveau({ essai: true }));
-    // Ticket 802 : le bouton est rappelé en fin de page, vers la même adresse.
-    expect(screen.getByRole("link", { name: messages.accueil.final.bouton })).toHaveAttribute("href", creationRoutes.nouveau({ essai: true }));
+    // Ticket 802 : « Créer un voyage » est rappelé en fin de page, même nom, même adresse.
+    expect(screen.getAllByRole("link", { name: messages.accueil.creer }).map((link) => link.getAttribute("href"))).toEqual([
+      creationRoutes.nouveau({ essai: true }),
+      creationRoutes.nouveau({ essai: true }),
+    ]);
     expect(screen.getByRole("link", { name: messages.accueil.mesVoyages })).toHaveAttribute("href", mesVoyagesRoute());
     expect(listTrips).not.toHaveBeenCalled();
     // Garde nommée (`siteEssaiAutorise`) : l'adaptateur n'est pas construit depuis l'accueil.

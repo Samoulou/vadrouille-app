@@ -12,9 +12,9 @@ Demande de Samuel du 2026-10-28 (fil « Rendre l'app séduisante pour les nouvea
    - « Comment ça marche » : trois étapes numérotées dans un anneau `ink` (raconter, trier, recevoir) ;
    - « Ce que tu reçois » : les lignes de l'offre affichée sur « Débloquer » qui ne dépendent pas des dates du voyage, lues dans les mêmes clés (`debloquer.offre.inclus.*`, une seule source de vérité) (coche `ink`) ;
    - « Aucun lieu inventé » (principe produit 2) ;
-   - bloc `muted` « Prêt à partir ? » avec « Commencer mon voyage » (même adresse que « Créer un voyage », libellé distinct pour que deux liens n'aient pas le même nom) ;
+   - bloc `muted` « Prêt à partir ? » avec « Créer un voyage », rappelé (même adresse, même nom : une action garde le même nom partout, handover règle d'or 9, WCAG 3.2.4) ;
    - section « Démonstration » (adaptateur `mock` seulement, spécification D1) en fin de page, après le dernier bouton.
-2. Aucun prix sur l'accueil : l'offre et le prix restent à Samuel ; seul le principe « premières propositions offertes » du cadrage est rappelé.
+2. Aucun prix sur l'accueil, exemple de journée compris (aucun coût par personne sur ses étapes) : l'offre et le prix restent à Samuel ; seul le principe « premières propositions offertes » du cadrage est rappelé.
 3. Ligne respectée : le bleu seulement pour la ligne de l'exemple et les boutons ; aucun jaune (aucune action requise sur cet écran) ; interlettrage par les jetons de Ligne ; ni ombre, ni emoji, ni capitales.
 
 ## Conséquences
