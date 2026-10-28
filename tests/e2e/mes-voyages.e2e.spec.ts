@@ -169,15 +169,15 @@ test("mes-voyages: « Retour » du Séjour de chaque voyage mène à /voyages (2
   await expect(page.getByRole("button", { name: "Retour" })).toHaveCount(0);
 });
 
-test("mes-voyages: aucun lien vers une 404 aux trois dates ; « Créer un voyage » pas encore ajouté (F11-PO-4)", async ({ page }) => {
-  // L'écran 1 existe depuis F8a ; le lien « Créer un voyage » sera ajouté par la première PR qui touche R17 (F11-PO-4).
+test("mes-voyages: aucun lien vers une 404 aux trois dates ; « Créer un voyage » mène à l'écran 1 (F11-PO-4)", async ({ page }) => {
+  // L'écran 1 existe depuis F8a ; le lien « Créer un voyage » est ajouté par le ticket 803 (F11-PO-4).
   const created = await page.request.get("/voyages/nouveau");
   expect(created.status()).toBe(200);
   await setClock(page, DATES.avant);
   for (const iso of Object.values(DATES)) {
     await page.clock.setSystemTime(new Date(iso));
     await openTrips(page);
-    await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Créer un voyage" })).toHaveAttribute("href", "/voyages/nouveau");
     const targets = await linkTargets(page);
     expect(targets.length).toBeGreaterThan(0);
     for (const target of new Set(targets)) {

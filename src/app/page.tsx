@@ -9,8 +9,8 @@ import {
   siteEssaiAutorise,
 } from "@/adapters";
 import { Button } from "@/components/ligne/Button";
-import { PRODUCT_NAME } from "@/config/site";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
+import { Landing } from "@/features/accueil/Landing";
 import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
@@ -41,7 +41,7 @@ function demoLinks(): DemoLink[] {
 }
 
 /**
- * Page d'accueil : nom, promesse et « Créer un voyage » (`Button` `primary` en pleine largeur, lien vers l'écran 1
+ * Page d'accueil (ticket #802, décision 0132 : `Landing`) : nom, promesse et « Créer un voyage » (`Button` `primary` en pleine largeur, lien vers l'écran 1
  * `/voyages/nouveau` ; demande de Samuel transmise par le CEO, ticket #259), quel que soit l'adaptateur. Avec
  * l'adaptateur `mock` seulement, section « Démonstration » vers les parcours simulés (spécification D1, D1-PO-1) ; elle disparaît d'elle-même avec `DATA_ADAPTER=api`.
  * Site d'essai (adaptateur `prototype`) : une seule app (spécification E2E-essai, lot 2) ; la section « Prototype » de
@@ -57,22 +57,16 @@ export default async function HomePage() {
   // Site d'essai : garde explicite de la liste blanche (décision 0032 § A4.2), qui lève hors de la préversion sans rien lire.
   const essai = siteEssaiAutorise();
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5 py-10">
-      <h1 className="text-destination font-extrabold tracking-[-0.02em] text-ink">{PRODUCT_NAME}</h1>
-      <p className="text-corps text-ink-soft">{messages.produit.promesse}</p>
-      <Button asChild className="mt-6 w-full">
-        <Link href={creationRoutes.nouveau({ essai })}>{messages.accueil.creer}</Link>
-      </Button>
-      {demo ? (
-        <div className="mt-6">
-          <DemoSection destination={demo.destination} links={demoLinks()} />
-        </div>
-      ) : null}
-      {essai ? (
-        <Button asChild variant="secondary" className="w-full">
-          <Link href={mesVoyagesRoute()}>{messages.accueil.mesVoyages}</Link>
-        </Button>
-      ) : null}
-    </main>
+    <Landing
+      createHref={creationRoutes.nouveau({ essai })}
+      secondary={
+        essai ? (
+          <Button asChild variant="secondary" className="w-full">
+            <Link href={mesVoyagesRoute()}>{messages.accueil.mesVoyages}</Link>
+          </Button>
+        ) : null
+      }
+      footer={demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null}
+    />
   );
 }

@@ -335,7 +335,7 @@ Préconisation d'affectation :
 - **Mise en page :** fond `page`, une colonne, marges `space-5`, largeur bornée comme l'accueil.
 - **« Retour » :** `IconButton` carré en haut à gauche (règles communes), absent de l'écran 5 tant que « Mes voyages » n'existe pas.
 - **Titre de niveau 1 :** `titre-jour` 800 (approche `--ligne-titre-jour-approche`).
-- **Pas d'indicateur « étape {n} sur {total} » :** le nombre d'écrans varie.
+- **Pas d'indicateur « étape {n} sur {total} » :** le nombre d'écrans varie. *Remplacé par la décision 0134 § 1 (2026-10-28) : « Étape {n} sur {total} » sur les écrans 1 à 3.*
 - **Titres du document :** ceux de la spécification, retenus.
 - **Brouillon perdu.** « Ton brouillon n'a pas été conservé. Recommence à partir de la destination. »
   - Visible en tête de l'écran 1 : bloc `muted`, coins `radius-block`, marge `space-4`, `corps-s` `ink-2`.

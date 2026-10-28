@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { lireProgramme, ordreEcrit, type CreneauIa, type JourIa, type ProgrammeIa } from "@/ai/sorties";
+import { lireProgramme, ordreEcrit, retoursDeQuartier, type CreneauIa, type JourIa, type ProgrammeIa } from "@/ai/sorties";
 import { CATEGORIES, type Category } from "@/contracts";
 import { BriefSchema, type Brief } from "@/prototype/brief";
 import { reduireSite } from "@/research/fetch-page";
@@ -165,6 +165,32 @@ describe("evals: programme par l'IA, sorties simulées de rome-1 et edimbourg-1 
         const quartiers = new Set(avecLieu(jour).flatMap((creneau) => (creneau.ville === undefined && creneau.quartier !== undefined ? [normaliser(creneau.quartier)] : [])));
         expect(quartiers.size, `${cas.id} ${jour.date}`).toBeLessThanOrEqual(CONFIG.quartiersMaxParJour);
       }
+    }
+  });
+
+  // Ticket #800 (amendement 4) : la règle « étapes d'un même quartier consécutives » des prompts `programme` v4 et
+  // `revision` v2 se mesure ici. Les sorties simulées sont celles du prompt v2 (écrites à la main avant la règle) : la
+  // mesure mord (contrôle) ; regrouper chaque journée par quartier, sans rien retirer, la ramène à zéro. Aucun seuil sur
+  // la sortie réelle : la part se lit sur l'essai de Samuel.
+  it("evals: retours de quartier mesurés (contrôle sur les sorties v2) et nuls une fois chaque journée regroupée", () => {
+    const attendus = new Map<string, number[]>([
+      ["rome-1", [1, 2, 3, 0, 0]],
+      ["edimbourg-1", [0, 0, 0, 0, 3, 0]],
+    ]);
+    for (const cas of jeux) {
+      expect(retoursDeQuartier(cas.programme), cas.id).toEqual(attendus.get(cas.id));
+      const regroupe = {
+        jours: cas.programme.jours.map((jour) => {
+          const ordre: string[] = [];
+          for (const creneau of jour.creneaux) if (creneau.quartier !== undefined && !ordre.includes(normaliser(creneau.quartier))) ordre.push(normaliser(creneau.quartier));
+          const rangDe = (creneau: CreneauIa) => (creneau.quartier === undefined ? -1 : ordre.indexOf(normaliser(creneau.quartier)));
+          const avec = jour.creneaux.filter((creneau) => rangDe(creneau) >= 0);
+          const groupes = [...avec].sort((a, b) => rangDe(a) - rangDe(b));
+          return { ...jour, creneaux: jour.creneaux.map((creneau) => (rangDe(creneau) >= 0 ? groupes.shift()! : creneau)) };
+        }),
+      };
+      expect(regroupe.jours.flatMap((jour) => jour.creneaux).length, cas.id).toBe(cas.programme.jours.flatMap((jour) => jour.creneaux).length);
+      expect(retoursDeQuartier(regroupe).every((retours) => retours === 0), cas.id).toBe(true);
     }
   });
 

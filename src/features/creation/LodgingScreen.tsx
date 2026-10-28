@@ -70,7 +70,7 @@ export function LodgingScreen({ essai = false }: { essai?: boolean } = {}) {
   const name = city === 0 ? state.trip.destination.trim() : (state.trip.otherCities[city - 1]?.name.trim() ?? "");
 
   return (
-    <CreationShell onBack={back}>
+    <CreationShell onBack={back} step={{ current: 3, total: 3 }}>
       <LodgingCity
         key={cityKey(state.trip, city)}
         city={city}

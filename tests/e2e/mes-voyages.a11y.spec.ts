@@ -39,7 +39,10 @@ test("mes-voyages: cibles de 44 px et contour de focus de Ligne, plaque comprise
   await setClock(page, DATES.avant);
   await openTrips(page);
   await expectTouchTargets(page);
-  // La plaque est le premier élément atteint au clavier ; son contour est hors de l'aplat (décalé de 2 px).
+  // « Créer un voyage » (F11-PO-4, ticket 803) puis la plaque sont les premiers éléments atteints au clavier ; le
+  // contour de la plaque est hors de l'aplat (décalé de 2 px).
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("main").getByRole("link", { name: "Créer un voyage" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(plate(page)).toBeFocused();
   await page.locator("body").click({ position: { x: 1, y: 1 } });

@@ -21,6 +21,8 @@ for (const [name, iso] of Object.entries(DATES)) {
 test("mes-voyages : plaque au focus", async ({ page }) => {
   await setClock(page, DATES.avant);
   await openTrips(page);
+  // « Créer un voyage » (F11-PO-4) est atteint en premier, la plaque ensuite.
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect(plate(page)).toBeFocused();
   await page.evaluate(() => document.fonts.ready);

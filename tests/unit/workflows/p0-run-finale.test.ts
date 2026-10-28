@@ -1471,7 +1471,7 @@ describe("p0Revision : « Pas pour moi » change le programme (E2E-essai, lot 4 
   it("une requête revision (zdr, data_collection deny) : textes de l'IA et choix, aucune donnée Google ni verdict (canari)", async () => {
     await etapeRevision({ runId: RUN_ID, tripId: TRIP_ID, pasPourMoi: [idEcartee], jAime: [idAimee] });
     expect(capture.requetes).toHaveLength(1);
-    expect(capture.requetes[0]).toMatchObject({ etape: "programme", prompt: { id: "revision", version: 1 }, routage: { data_collection: "deny", zdr: true } });
+    expect(capture.requetes[0]).toMatchObject({ etape: "programme", prompt: { id: "revision", version: 2 }, routage: { data_collection: "deny", zdr: true } });
     const contenu = capture.requetes[0]?.messages.map((message) => message.contenu).join("\n") ?? "";
     expect(contenu).toContain(ECARTEE);
     expect(contenu).toContain(`"pasPourMoi":["${idEcartee}"]`);

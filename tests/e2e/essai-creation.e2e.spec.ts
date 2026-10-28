@@ -37,7 +37,7 @@ async function sansViolation(page: import("@playwright/test").Page) {
 
 test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'erreur ni détour", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Créer un voyage" }).click();
+  await page.getByRole("link", { name: "Créer un voyage" }).first().click();
   // L'accueil mène à l'écran 1 avec `site=essai` ; l'écran 1 lit aussi la garde côté serveur (décision 0131).
   await expect(page).toHaveURL(`${R1}?site=essai`);
   await expect(page.getByRole("button", { name: "Ajouter une ville" })).toHaveCount(0);
@@ -64,8 +64,8 @@ test("site d'essai : de l'accueil au lancement, écrans 1 à 3 sans message d'er
 
   // Écran 2 : le bouton principal mène à la vérification, récit gardé, sans bandeau.
   await storyField(page).fill(RECIT);
-  await page.getByRole("button", { name: "Vérifier mon brief" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Vérifie ton brief" })).toBeFocused();
+  await page.getByRole("button", { name: "Vérifier mes envies" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Vérifie tes envies" })).toBeFocused();
   await expect(page.getByRole("main").getByRole("alert").filter({ hasText: /.+/ })).toHaveCount(0);
   await page.getByRole("radio", { name: "Équilibré" }).click();
   await page.getByRole("group", { name: "Envies" }).getByRole("button", { name: "Musées", exact: true }).click();

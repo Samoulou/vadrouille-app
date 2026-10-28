@@ -132,6 +132,34 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
     expect(screen.queryByText(/Source consultée le/)).toBeNull();
   });
 
+  // Ticket #800 (amendement 4 de P0-programme-par-ia) : le site vérifié s'affiche même sans raison.
+  it("StopSheet: site sans raison : bloc « Site officiel », lien du site, sans date de consultation", async () => {
+    const { container } = renderFiche(2, "j2-dean-village", { reason: undefined, source: { label: "colosseo.it", url: "https://colosseo.it/" }, verifiedAt: undefined });
+    const bloc = screen.getByRole("region", { name: "Site officiel" });
+    const lien = within(bloc).getByRole("link", { name: "colosseo.it" });
+    expect(lien).toHaveAttribute("href", "https://colosseo.it/");
+    expect(lien).toHaveAttribute("target", "_blank");
+    expect(lien).toHaveAttribute("rel", "noopener noreferrer");
+    expect(container.querySelector("[data-part='raison']")).toBeNull();
+    expect(container.querySelector("[data-part='raison-simple']")).toBeNull();
+    expect(container).not.toHaveTextContent(/consultée|vérifiée? le/i);
+    const ordre = [...container.querySelectorAll("[data-part]")].map((node) => node.getAttribute("data-part"));
+    expect(ordre.indexOf("site")).toBeLessThan(ordre.indexOf("actions"));
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("StopSheet: site sans raison avec date de vérification : « Source consultée le … » sous le lien", () => {
+    const { container } = renderFiche(2, "j2-dean-village", { reason: undefined, source: { label: "colosseo.it", url: "https://colosseo.it/" }, verifiedAt: "2026-08-15" });
+    expect(within(screen.getByRole("region", { name: "Site officiel" })).getByText("Source consultée le 15 août 2026")).toBeInTheDocument();
+    expect(container.querySelector("[data-part='raison']")).toBeNull();
+  });
+
+  it("StopSheet: raison et site : ReasonBlock seul, pas de second bloc « Site officiel »", () => {
+    renderFiche(5, "j5-distillerie");
+    expect(screen.getByText("Pourquoi pour toi")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Site officiel" })).toBeNull();
+  });
+
   it("étape sans raison ni source : ni bloc ni texte", () => {
     const { container } = renderFiche(2, "j2-dean-village", { reason: undefined });
     expect(container.querySelector("[data-part='raison']")).toBeNull();

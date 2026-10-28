@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # B3a (décision 0050, P2 point 1) : environnement du serveur `ci` pour tout le job (build, e2e, tests de base).
     # Aucun secret de B3 n'est tiré ici ni écrit dans $GITHUB_ENV (0051 point 6.4.4) : playwright.config.ts et
     # scripts/test-db.mjs les tirent pour leur seul processus enfant.
@@ -107,7 +107,7 @@ jobs:
   # amorçage avec l'utilisateur administrateur du conteneur, migrations sous vadrouille_migrator (deux fois : la
   # seconde ne fait rien), puis `pnpm test:db`, dont chaque test se connecte avec le rôle qu'il éprouve.
   db:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # B3a (décision 0050, P2 point 1) : environnement `ci` ; le secret du limiteur vient de scripts/test-db.mjs.
     env:
       VADROUILLE_ENV: ci
@@ -200,7 +200,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with: { fetch-depth: 0 }

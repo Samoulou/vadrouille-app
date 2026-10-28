@@ -41,8 +41,8 @@ test("creation: écran 1 avec une ville et un engagement", async ({ page }) => {
   await page.getByRole("button", { name: "Ajouter une ville" }).click();
   await page.getByLabel("Nom de la ville").fill("Glasgow");
   await page.getByLabel("Arrivée dans cette ville").fill("2026-09-01");
-  await page.getByRole("button", { name: "Ajouter un engagement" }).click();
-  const block = page.getByRole("region", { name: "Engagements déjà pris" }).getByRole("region").first();
+  await page.getByRole("button", { name: "Ajouter une réservation" }).click();
+  const block = page.getByRole("region", { name: "Déjà réservé" }).getByRole("region").first();
   await block.getByRole("radio", { name: "Billet" }).click();
   await block.getByLabel("Libellé").fill("[Tattoo]");
   await block.getByLabel("Date", { exact: true }).fill("2026-08-29");
@@ -64,8 +64,8 @@ test("brief: récit", async ({ page }) => {
 
 test("brief: récit avec erreur", async ({ page }) => {
   await reachBrief(page);
-  await page.getByRole("button", { name: "Préparer mon brief" }).click();
-  await expect(page.getByText("Écris au moins une phrase, ou remplis le brief toi-même.")).toBeVisible();
+  await page.getByRole("button", { name: "Continuer avec mon récit" }).click();
+  await expect(page.getByText("Écris au moins une phrase, ou remplis tes envies toi-même.")).toBeVisible();
   await capture(page, "brief-recit-erreur.png");
 });
 
@@ -74,8 +74,8 @@ test("brief: récit, bandeau d'erreur de la préparation", async ({ page }) => {
   // Appel de l'action serveur interrompu (même bandeau qu'une erreur de structuration).
   await page.route("**/voyages/nouveau/brief", (route) => (route.request().method() === "POST" ? route.abort() : route.continue()));
   await page.getByRole("textbox", { name: "Raconte ton voyage en quelques phrases" }).fill(STORY);
-  await page.getByRole("button", { name: "Préparer mon brief" }).click();
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("Impossible de préparer ton brief pour le moment.");
+  await page.getByRole("button", { name: "Continuer avec mon récit" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Impossible de lire ton récit pour le moment.");
   await capture(page, "brief-recit-bandeau-erreur.png");
 });
 
