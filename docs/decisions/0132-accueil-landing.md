@@ -7,15 +7,15 @@ Demande de Samuel du 2026-10-28 (fil « Rendre l'app séduisante pour les nouvea
 
 ## Décision
 1. L'accueil (`src/app/page.tsx`) rend `Landing` (`src/features/accueil/Landing.tsx`), composant serveur sans JavaScript client, dans cet ordre :
-   - en-tête : nom (`h1`, style `destination`), accroche (`titre-fiche` 800), promesse (`produit.promesse`, inchangée), « Créer un voyage » (`Button` principal), « Tes premières propositions sont offertes. » (principe du cadrage : 8 propositions offertes avant de payer), puis « Mes voyages » sur le site d'essai ;
-   - « Une journée de ton programme » : une seule plaque de destination (`azulejo`, « Exemple ») et la vraie `DayLine` sur une journée écrite à la main, sans lieu nommé ni donnée Google ; aucune étape n'est un lien ; légende « Exemple de journée, pour illustrer. » ;
-   - « Comment ça marche » : trois étapes numérotées dans un anneau `line` (raconter, trier, recevoir) ;
-   - « Ce que tu reçois » : six lignes reprises de l'offre affichée sur « Débloquer » (coche `ink`) ;
+   - en-tête : nom (`h1`, style `destination`), accroche (`titre-jour` 800, un niveau sous le nom), promesse (`produit.promesse`, inchangée), « Créer un voyage » (`Button` principal), « Tes premières propositions sont offertes. » (principe du cadrage : 8 propositions offertes avant de payer), puis « Mes voyages » sur le site d'essai ;
+   - « Une journée de ton programme » : une seule plaque de destination (`azulejo`, « Ta destination », « Exemple ») et la vraie `DayLine` sur une journée écrite à la main : destination et secteurs génériques, aucun lieu réel nommé ni événement daté (règle d'or 2 du handover frontend), aucune donnée Google ; aucune étape n'est un lien ni ne porte d'exception ; légende « Exemple de journée, pour illustrer. » ;
+   - « Comment ça marche » : trois étapes numérotées dans un anneau `ink` (raconter, trier, recevoir) ;
+   - « Ce que tu reçois » : les lignes de l'offre affichée sur « Débloquer » qui ne dépendent pas des dates du voyage, lues dans les mêmes clés (`debloquer.offre.inclus.*`, une seule source de vérité) (coche `ink`) ;
    - « Aucun lieu inventé » (principe produit 2) ;
    - bloc `muted` « Prêt à partir ? » avec « Commencer mon voyage » (même adresse que « Créer un voyage », libellé distinct pour que deux liens n'aient pas le même nom) ;
    - section « Démonstration » (adaptateur `mock` seulement, spécification D1) en fin de page, après le dernier bouton.
 2. Aucun prix sur l'accueil : l'offre et le prix restent à Samuel ; seul le principe « premières propositions offertes » du cadrage est rappelé.
-3. Ligne respectée : le bleu seulement pour la ligne, les anneaux d'étapes et les boutons ; le jaune seulement sur le tag « À réserver » de l'exemple ; ni ombre, ni emoji, ni capitales.
+3. Ligne respectée : le bleu seulement pour la ligne de l'exemple et les boutons ; aucun jaune (aucune action requise sur cet écran) ; interlettrage par les jetons de Ligne ; ni ombre, ni emoji, ni capitales.
 
 ## Conséquences
 - Capture de référence `accueil.png` (visuel D1) à régénérer.

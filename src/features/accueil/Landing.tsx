@@ -10,11 +10,19 @@ import * as messages from "@/i18n/messages";
 
 const t = messages.accueil;
 const e = t.exemple.etapes;
+const offre = messages.debloquer.offre.inclus;
 
 /**
- * Journée d'exemple de l'accueil (ticket #802) : illustration écrite à la main, sans lieu nommé ni donnée Google
- * (CLAUDE.md, « Jamais ») ; aucune étape n'est un lien. La ligne est celle du programme (`DayLine`), pour montrer
- * le vrai rendu.
+ * « Ce que tu reçois » : lignes de l'offre affichée sur « Débloquer », reprises telles quelles (une seule source de
+ * vérité, contenu de Samuel) ; seules les lignes sans date propre au voyage sont reprises.
+ */
+const INCLUS = [offre.mealsAndEvenings, offre.events, offre.replacements, offre.checklist, offre.calendarAndSharing] as const;
+
+/**
+ * Journée d'exemple de l'accueil (ticket 802, décision 0132) : illustration écrite à la main, destination et secteurs
+ * génériques, sans lieu réel nommé ni événement daté (règle d'or 2 du handover frontend), sans donnée Google ; aucune
+ * étape n'est un lien ni ne porte d'exception (pas de jaune sur un écran sans action à faire). La ligne est celle du
+ * programme (`DayLine`), pour montrer le vrai rendu.
  */
 const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
   { type: "terminus", role: "start", time: "09:00", label: t.exemple.hotel },
@@ -49,7 +57,7 @@ const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
       name: e.jardin.nom,
       start: "14:30",
       facts: { durationMinutes: 150, costPerPerson: 12, area: e.jardin.secteur },
-      exceptions: ["toReserve"],
+      exceptions: [],
     },
   },
   { type: "segment", segment: { mode: "transit", minutes: 30, estimated: false } },
@@ -96,8 +104,8 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-10 px-5 pt-10 pb-16">
       <header className="flex flex-col gap-4">
-        <h1 className="text-destination font-extrabold tracking-[-0.02em] text-ink">{PRODUCT_NAME}</h1>
-        <p className="text-titre-fiche font-extrabold tracking-[-0.02em] text-ink">{t.accroche}</p>
+        <h1 className="text-destination font-extrabold tracking-(--ligne-destination-approche) text-ink">{PRODUCT_NAME}</h1>
+        <p className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{t.accroche}</p>
         <p className="text-corps text-ink-soft">{messages.produit.promesse}</p>
         <div className="mt-2 flex flex-col gap-3">
           <Button asChild className="w-full">
@@ -120,12 +128,12 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
       </figure>
 
       <Section id="etapes-titre" title={t.etapes.titre}>
-        <ol className="flex flex-col gap-5">
+        <ol role="list" className="flex flex-col gap-5">
           {t.etapes.liste.map((etape, index) => (
             <li key={etape.titre} className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-x-3">
               <span
                 aria-hidden="true"
-                className="flex size-10 items-center justify-center rounded-full border-(length:--ligne-stop-ring) border-line bg-raised text-corps font-extrabold text-ink tabular-nums"
+                className="flex size-10 items-center justify-center rounded-full border-(length:--ligne-stop-ring) border-ink bg-raised text-corps font-extrabold text-ink tabular-nums"
               >
                 {index + 1}
               </span>
@@ -140,7 +148,7 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
 
       <Section id="inclus-titre" title={t.inclus.titre}>
         <ul className="flex flex-col">
-          {t.inclus.liste.map((ligne) => (
+          {INCLUS.map((ligne) => (
             <li key={ligne} className="flex items-start gap-3 border-b border-hairline py-3 last:border-b-0">
               <IconCoche aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ink" />
               <span className="text-corps text-ink">{ligne}</span>

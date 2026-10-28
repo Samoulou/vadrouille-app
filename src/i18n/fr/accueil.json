@@ -37,27 +37,27 @@
   "exemple": {
     "titre": "Une journée de ton programme",
     "legende": "Exemple de journée, pour illustrer.",
-    "ville": "Lisbonne",
+    "ville": "Ta destination",
     "infos": "Exemple · 5 jours · 2 adultes",
     "hotel": "ton hôtel",
     "etapes": {
       "belvedere": {
-        "nom": "Belvédère au-dessus des toits",
-        "secteur": "Alfama",
+        "nom": "Belvédère sur la vieille ville",
+        "secteur": "Vieille ville",
         "raison": "Tu aimes marcher : la vue au calme, avant la foule"
       },
       "dejeuner": {
         "nom": "Déjeuner dans une adresse simple",
-        "secteur": "Baixa"
+        "secteur": "Centre"
       },
       "jardin": {
-        "nom": "Jardins et monastère au bord du fleuve",
-        "secteur": "Belém"
+        "nom": "Jardin botanique",
+        "secteur": "Bord de l'eau"
       },
       "diner": {
-        "nom": "Dîner et concert de fado",
-        "secteur": "Bairro Alto",
-        "raison": "Le concert a lieu ce soir-là"
+        "nom": "Dîner dans une table de quartier",
+        "secteur": "Quartier animé",
+        "raison": "Tu as demandé une soirée tranquille"
       }
     }
   },
@@ -79,23 +79,15 @@
     ]
   },
   "inclus": {
-    "titre": "Ce que tu reçois",
-    "liste": [
-      "Des journées sans trou, à ton rythme",
-      "Les repas et les soirées, pas seulement les visites",
-      "Les événements qui ont lieu pendant ton séjour",
-      "Le temps de trajet entre chaque étape",
-      "La liste de ce qu'il faut réserver avant de partir",
-      "Ton programme à partager avec tes proches"
-    ]
+    "titre": "Ce que tu reçois"
   },
   "fiable": {
     "titre": "Aucun lieu inventé",
-    "texte": "Chaque adresse est vérifiée avant d'entrer dans ton programme. Ce qui reste incertain est signalé, jamais caché."
+    "texte": "Chaque lieu de ton programme vient de sources vérifiables. Ce qui reste incertain est signalé, jamais caché."
   },
   "final": {
     "titre": "Prêt à partir ?",
-    "texte": "Quelques minutes suffisent pour lancer ton voyage.",
+    "texte": "Raconte ton voyage, on s'occupe du reste.",
     "bouton": "Commencer mon voyage"
   }
 }

@@ -181,7 +181,13 @@ describe("accueil : page qui donne envie (ticket 802)", () => {
     expect(within(exemple).queryAllByRole("link")).toEqual([]);
     const etapes = within(screen.getByRole("region", { name: a.etapes.titre })).getAllByRole("listitem");
     expect(etapes).toHaveLength(3);
-    expect(within(screen.getByRole("region", { name: a.inclus.titre })).getAllByRole("listitem")).toHaveLength(a.inclus.liste.length);
+    // « Ce que tu reçois » : les lignes de l'offre de « Débloquer », mot pour mot (une seule source de vérité).
+    const offre = messages.debloquer.offre.inclus;
+    const inclus = within(screen.getByRole("region", { name: a.inclus.titre })).getAllByRole("listitem").map((li) => li.textContent);
+    expect(inclus).toEqual([offre.mealsAndEvenings, offre.events, offre.replacements, offre.checklist, offre.calendarAndSharing]);
+    // Une seule plaque de destination, aucune exception (pas de jaune : aucune action requise sur l'accueil).
+    expect(document.querySelectorAll("[data-destination-plate]")).toHaveLength(1);
+    expect(screen.queryByText("À réserver")).toBeNull();
     const final = screen.getByRole("link", { name: a.final.bouton });
     expect(final).toHaveAttribute("href", "/voyages/nouveau");
     const premier = screen.getByRole("link", { name: a.creer });
@@ -211,5 +217,12 @@ describe("accueil : aucune destination en dur", () => {
     expect(sources.length).toBeGreaterThan(0);
     const offenders = sources.filter((path) => /dimbourg/i.test(readFileSync(path, "utf8")));
     expect(offenders).toEqual([]);
+  });
+
+  it("journée d'exemple sans lieu réel nommé (règle d'or 2, décision 0132)", () => {
+    const exemple = JSON.stringify(messages.accueil.exemple);
+    for (const lieu of ["Lisbonne", "Alfama", "Baixa", "Belém", "Bairro Alto", "fado", "dimbourg"]) {
+      expect(exemple).not.toContain(lieu);
+    }
   });
 });
