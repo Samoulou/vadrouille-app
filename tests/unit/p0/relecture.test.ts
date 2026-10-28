@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createPrototypeAdapterReel, type PaireRelecture, type SourceProgrammesReels } from "@/adapters/prototype";
+import { segmentLabel } from "@/components/ligne/DayLine";
 import { TripSchema } from "@/contracts";
+import { daySummary, dayTravelLine } from "@/features/sejour/travel";
 import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
 import { cleTrajet, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { valeurCookieAcces } from "@/server/p0/acces";
@@ -380,7 +382,7 @@ describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed
   });
 });
 
-describe("p0: Google indisponible à la lecture (ticket 826)", () => {
+describe("p0: Google indisponible à la lecture (ticket n° 826, décision 0136)", () => {
   const TRIP_ID = "proto_test_20261012_1";
   const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owner" as const };
   const DOSSIER = realpathSync(join(process.cwd(), "prototype", "programmes-test"));
@@ -403,8 +405,8 @@ describe("p0: Google indisponible à la lecture (ticket 826)", () => {
     async (code) => {
       const { relecteur: r } = relecteur({ pool: () => poolSimule().pool }, routesRefusees(code));
       expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
-      expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "ErreurClientGoogle", failureCode: code }, "warn");
-      expect(JSON.stringify(logEvent.mock.calls)).not.toMatch(/lieu_|429/);
+      // Appel exact et unique : ni statut HTTP, ni message, ni lieu, aucun autre champ.
+      expect(logEvent.mock.calls).toEqual([["p0.read_unavailable", { errorName: "ErreurClientGoogle", failureCode: code }, "warn"]]);
     },
   );
 
@@ -420,6 +422,15 @@ describe("p0: Google indisponible à la lecture (ticket 826)", () => {
     const { relecteur: r } = relecteur({ pool: () => poolSimule().pool }, { client: { matrice: async () => Promise.reject(autre) }, requetes: [] });
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
     expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "ErreurInterne" }, "warn");
+  });
+
+  it("décision 0136 § 2 : `failureCode` admis sur `p0.read_unavailable` et `p0.step_failed` seulement, retiré ailleurs", async () => {
+    const { formatLogLine } = await vi.importActual<typeof import("@/server/log")>("@/server/log");
+    const ligne = (evenement: string) => JSON.parse(formatLogLine(evenement, { errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }, "warn")) as unknown;
+    expect(ligne("p0.step_failed")).toEqual({ level: "warn", event: "p0.step_failed", errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" });
+    for (const evenement of ["p0.programme_written", "p0.ville_refusee", "p0.research_done", "voyages.action_failed"]) {
+      expect(ligne(evenement)).toEqual({ level: "warn", event: evenement, errorName: "ErreurClientGoogle", dropped: 1 });
+    }
   });
 
   it("voyage existant : séjour, journées et carte servis avec ce qui est en base ; durées non conservées absentes, rien d'écrit", async () => {
@@ -439,6 +450,10 @@ describe("p0: Google indisponible à la lecture (ticket 826)", () => {
 
     const trip = await adapter.getTrip(ctx, TRIP_ID);
     expect(trip).not.toBeNull();
+    // Une relecture par journée qui a des paires manquantes, chacune refusée et journalisée une fois : d'où plusieurs
+    // lignes `p0.read_unavailable` par page dans le journal du 2026-10-28, sans page d'erreur.
+    expect(logEvent.mock.calls.length).toBeGreaterThan(1);
+    expect(logEvent.mock.calls.every(([evenement, champs]) => evenement === "p0.read_unavailable" && JSON.stringify(champs) === JSON.stringify({ errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }))).toBe(true);
     expect(TripSchema.safeParse(trip).success).toBe(true);
     expect(trip!.days).toHaveLength(programme.trip.days.length);
     const segments = trip!.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "segment" ? [ligne.segment] : [])));
@@ -451,6 +466,11 @@ describe("p0: Google indisponible à la lecture (ticket 826)", () => {
     const jour = await adapter.getDay(ctx, TRIP_ID, programme.trip.days[0]!.index);
     expect(jour).not.toBeNull();
     expect(jour!.travelMinutes).toBeNull();
+    // Ce que voit la personne : la journée, avec « à confirmer » à la place des durées manquantes (décision 0095).
+    expect(dayTravelLine(jour!)).toMatch(/^Temps de trajet à confirmer/);
+    expect(daySummary(jour!)).toMatch(/temps de trajet à confirmer$/);
+    const sansDuree = jour!.items.find((ligne) => ligne.type === "segment" && ligne.segment.minutes === null);
+    expect(sansDuree?.type === "segment" ? segmentLabel(sansDuree.segment) : null).toMatch(/, durée à confirmer$/);
     // Positions lues en base (aucun appel Google) : la carte reste servie, carte Google seulement.
     const carte = await adapter.getDayMap(ctx, TRIP_ID, programme.trip.days[0]!.index);
     expect(carte?.points.length).toBeGreaterThan(0);

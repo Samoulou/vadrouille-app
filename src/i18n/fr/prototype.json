@@ -82,7 +82,7 @@
         "config_invalid": "configuration invalide",
         "data_collection_missing": "réglage de non-collecte des données absent",
         "model_id_invalid": "modèle invalide",
-        "upstream_unavailable": "Google ou le fournisseur d'IA n'a pas répondu, ou a refusé nos demandes (limite atteinte). Réessaie plus tard.",
+        "upstream_unavailable": "service externe indisponible ou limite de débit du service",
         "upstream_redirect": "redirection d'un service externe",
         "usage_unavailable": "base d'usage indisponible",
         "pipeline_failed": "échec du traitement"
