@@ -1,7 +1,8 @@
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { formatDateLongue } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+
+import { DateConsultation, LienSource } from "./LienSource";
 
 const t = messages.ligne.raison;
 
@@ -28,21 +29,9 @@ export function ReasonBlock({ text, sourceLabel, sourceUrl, verifiedAt, classNam
           {t.titre}
         </p>
         <p className="text-corps text-ink-2">{text}</p>
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-part="source"
-          className="flex min-h-(--touch-target) items-center self-start text-corps-s font-semibold text-ink underline underline-offset-2"
-        >
-          {format(t.source, { label: sourceLabel })}
-        </a>
+        <LienSource href={sourceUrl}>{format(t.source, { label: sourceLabel })}</LienSource>
       </div>
-      {verifiedAt ? (
-        <p data-part="consultee" className="text-legende text-ink-soft tabular-nums">
-          {format(t.consultee, { date: formatDateLongue(verifiedAt) })}
-        </p>
-      ) : null}
+      <DateConsultation verifiedAt={verifiedAt} />
     </div>
   );
 }

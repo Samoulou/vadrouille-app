@@ -7,13 +7,12 @@ import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { IconButton } from "@/components/ligne/IconButton";
 import { IconCroix } from "@/components/ligne/icons";
+import { DateConsultation, LienSource } from "@/components/ligne/LienSource";
 import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
-import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { formatDateLongue } from "@/lib/dates";
 import { formatFaits } from "@/lib/faits";
 
 import { PLACES_FROM_GOOGLE } from "./constants";
@@ -22,7 +21,6 @@ import type { TripRoutes } from "./routes";
 import { pathTo, pathToLabel } from "./travel";
 
 const t = messages.sejour.fiche;
-const tRaison = messages.ligne.raison;
 
 export interface StopSheetProps extends FicheTarget {
   day: Day;
@@ -143,20 +141,10 @@ export function StopSheet({
           <h2 id={`${titleId}-site`} className="text-corps-s font-bold text-ink-2">
             {t.siteOfficiel}
           </h2>
-          <a
-            href={stop.source.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-part="source"
-            className="flex min-h-(--touch-target) items-center self-start text-corps-s font-semibold text-ink underline underline-offset-2"
-          >
+          <LienSource href={stop.source.url} nouvelOnglet={messages.presentation.detail.nouvelOnglet}>
             {stop.source.label}
-          </a>
-          {stop.verifiedAt ? (
-            <p data-part="consultee" className="text-legende text-ink-soft tabular-nums">
-              {format(tRaison.consultee, { date: formatDateLongue(stop.verifiedAt) })}
-            </p>
-          ) : null}
+          </LienSource>
+          <DateConsultation verifiedAt={stop.verifiedAt} />
         </section>
       ) : null}
 

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Day, Stop } from "@/contracts";
+import * as messages from "@/i18n/messages";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
@@ -136,7 +137,11 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
   it("StopSheet: site sans raison : bloc « Site officiel », lien du site, sans date de consultation", async () => {
     const { container } = renderFiche(2, "j2-dean-village", { reason: undefined, source: { label: "colosseo.it", url: "https://colosseo.it/" }, verifiedAt: undefined });
     const bloc = screen.getByRole("region", { name: "Site officiel" });
-    const lien = within(bloc).getByRole("link", { name: "colosseo.it" });
+    // Ticket #822 : nouvel onglet annoncé aux technologies d'assistance, nom d'hôte long coupé plutôt que débordant.
+    const lien = within(bloc).getByRole("link", { name: /^colosseo\.it\s*\(s'ouvre dans un nouvel onglet\)$/ });
+    expect(lien.querySelector(".sr-only")).toHaveTextContent(messages.presentation.detail.nouvelOnglet.trim());
+    expect(lien).toHaveTextContent("colosseo.it");
+    expect(lien).toHaveClass("wrap-anywhere");
     expect(lien).toHaveAttribute("href", "https://colosseo.it/");
     expect(lien).toHaveAttribute("target", "_blank");
     expect(lien).toHaveAttribute("rel", "noopener noreferrer");

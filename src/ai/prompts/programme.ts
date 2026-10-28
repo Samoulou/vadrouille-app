@@ -43,6 +43,9 @@ export const PROMPT_PROGRAMME = {
     "Aucune URL, aucun nom de site web, aucune balise dans les textes ; la seule adresse admise est le champ \"site\" d'un créneau.",
     "Le champ \"site\" : pour chaque créneau avec un lieu, donne l'adresse du site officiel dès qu'il en existe un : le sien, ou sinon celui de l'institution qui le gère (par exemple la ville pour une place, un parc ou un marché). Omets le champ seulement pour un créneau sans lieu ou si tu ne connais aucun site officiel ; n'invente jamais une adresse. Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers. Une adresse https complète, sans paramètres.",
     "Réponds uniquement par un objet JSON, sans bloc de code ni texte autour : {\"titre\", \"jours\": [{\"date\" (AAAA-MM-JJ), \"titre\", \"creneaux\": [...]}], \"bonsPlans\": [texte]}.",
+    // « quartier (pour chaque lieu) » est une consigne à l'IA, pas une obligation de la lecture : `src/ai/sorties.ts`
+    // garde `quartier` facultatif (`CHAMPS_FACULTATIFS_CRENEAU`, amendement 4 de la spécification P0-programme-par-ia). Ne pas
+    // resserrer le schéma de lecture sur la foi de ce texte ; ce commentaire ne change pas l'empreinte du prompt.
     "Chaque créneau : {\"debut\" (HH:MM), \"fin\" (HH:MM, facultatif), \"nature\" (\"arrivee\", \"visite\", \"repas_midi\", \"repas_soir\", \"apero\", \"soiree\", \"pause\" ou \"depart\"), \"lieu\", \"ville\" (facultatif), \"quartier\" (pour chaque lieu), \"pourquoi\", \"conseil\" (facultatif), \"prix\" (facultatif), \"horaires\" (facultatif), \"aReserver\" (booléen), \"incontournable\" (booléen), \"site\" (facultatif)}.",
     "Longueurs : titre 120 caractères, titre du jour 80, lieu 80, ville et quartier 60, pourquoi 280, conseil 160, prix 60, horaires 120, bon plan 200, site 300.",
   ].join("\n"),
