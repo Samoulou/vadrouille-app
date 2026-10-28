@@ -1,0 +1,82 @@
+# 0135 — Partage d'un voyage réel du site d'essai par lien signé, sans connexion
+
+Statut : **acceptée**, décision **déléguée du Tech Lead** (architecture, outillage, tests : `docs/CONTEXT.md`, « Qui décide quoi »), définitive à sa fusion, sans délai de veto (0093). À lister dans la prochaine note de version (« Décisions prises par le studio »), avec les risques du point 11. Verdicts de la Sécurité et de l'UX/UI dans la revue consolidée de la PR de code (0123, points 2 et 3).
+
+Date : 2026-10-28 · Décideur : Tech Lead · Ticket : #825 · Décisions liées : 0039 (F10-TL-7, F10-TL-8, F10-TL-10, F10-TL-14), 0123, 0124 § 2, 0055 (code d'accès), 0074, 0092, 0109, 0034, 0027, 0011, 0046 (D16), 0093.
+
+Numérotation : `main` porte 0001 à 0134 à l'ouverture de la PR, aucune PR ouverte ne crée de décision ; numéro libre suivant : 0135.
+
+## Contexte
+Samuel veut partager « rapidement » un voyage réel du site d'essai (branche `p0-reel`, adaptateur `prototype`, base Neon, schéma `prototype`) à une amie, par un lien lisible sans connexion ni code d'accès. Aujourd'hui `shareAvailable()` n'est vraie qu'avec l'adaptateur `mock` (0039, F10-TL-7 : « B12 amende cette garde avec la session vérifiée de B3 »). B12 (liens en base) demande une migration, que Samuel seul applique (délai inconnu).
+
+**Une table n'est pas indispensable** pour ce besoin : un jeton signé côté serveur porte tout ce qu'il faut pour relire le voyage. Ce qu'une table apporterait (désactiver un lien à la fois, savoir qu'un lien existe) est hors périmètre du ticket et reste à B12 (point 7).
+
+## Décision
+
+### 1. Champ
+Adaptateur de données **`prototype` seulement** : programmes réels de `p0-reel`, et dossier de programmes (`VADROUILLE_PROTOTYPE_DIR`) en local et en CI. L'adaptateur `api` reste fermé (B12). Jamais en production (Q101, point 10).
+
+### 2. Garde (amende 0039, F10-TL-7)
+- `shareAvailable(env)` = démonstration simulée (`shareDemoAvailable` et `DATA_ADAPTER=mock`, inchangée, `VADROUILLE_DEMO_SHARE` reste son drapeau) **ou** `realShareAvailable(env)` ; toujours fausse sur un déploiement de production (`isProductionDeployment`).
+- `realShareAvailable(env)` = pas un déploiement de production **et** `DATA_ADAPTER=prototype` **et** `prototypeAdapterAllowed(env)` (liste blanche de 0032 § A4.2). Fonction pure, lue sur l'environnement seulement.
+- **Session vérifiée pour créer le lien** (et lire son état) : exigée par l'adaptateur, à chaque appel. Sur le site d'essai, l'authentification n'est pas `better-auth` (refusée hors `local` et `ci`, B3-TL-2) ; la seule session vérifiée est le **cookie d'accès** `__Host-p0_acces` valide (0055, D19), celui qui ouvre déjà la lecture des programmes. Sans lui : `unauthenticated`. En mode dossier (local, CI, aucun code d'accès) : vraie. **`VADROUILLE_PROTOTYPE_DIR` ne se pose jamais sur Vercel** (ni préversion, ni production) : en mode dossier, la session est toujours vraie et la clé est tirée au hasard, donc un lien s'y créerait sans code d'accès (consigne écrite aussi dans `docs/deploiement/variables-environnement.md`, comme celle de 0074 pour la préversion de `p0-reel`).
+- Bouton « Partager » : voyage débloqué, partage pas terminé (inchangé), et en plus, pour le partage réel, clé présente et session vérifiée.
+- Test amendé par écrit : la ligne `{ NODE_ENV: "test", DATA_ADAPTER: "prototype" } → false` de `src/adapters/share-guard.test.ts` devient `true` ; des lignes sont ajoutées pour la production, `staging` et l'absence de liste blanche. Aucun test retiré.
+
+### 3. Clé de signature
+- **Retenu** : `K = HMAC-SHA-256(code d'accès, "vadrouille/p0/partage/v1")`, dérivée par `src/server/essai/partage.ts` des octets `attendu` rendus par `ouvertureP0` (la variable `P0_RUN_TOKEN` n'est jamais lue par ce module), **sur le modèle exact de la clé du cookie de déblocage** (0124 § 2), avec une étiquette distincte. C'est la **seconde exception** à l'en-tête de `src/server/p0/acces.ts` (« seul module » qui manipule le code), écrite ici. Garde du mode réel fermée : aucune clé, aucun lien, tout lien répond 404.
+- **Pourquoi c'est acceptable** : `P0_RUN_TOKEN` compte 32 octets au moins, non triviaux (`decodeSecret`, 16 octets distincts au moins) : un jeton public ne permet pas de deviner la clé, ni le code par recherche hors ligne ; HMAC est à sens unique (une fuite de `K` ne révèle pas le code) ; l'étiquette sépare les usages (cookie d'accès, comparaison, déblocage, partage). **Aucune variable nouvelle** : c'est ce qui rend le partage disponible dès la mise en ligne, sans action de Samuel sur Vercel. Contrepartie : une rotation du code d'accès invalide d'un coup tous les liens (c'est aussi la révocation de secours, point 7).
+- **Non retenu** : `BETTER_AUTH_SECRET`. Il n'est pas posé sur les préversions du site d'essai (`better-auth` y est refusé), et lier la sécurité des sessions à celle des liens publics mélangerait deux usages : une fuite ou une rotation de l'un toucherait l'autre.
+- **Variable dédiée, nommée, non lue par cette PR** : `VADROUILLE_SHARE_SECRET` (32 octets au moins, règles de `decodeSecret`), pour B12 et l'adaptateur `api`, ou plus tôt **si la Sécurité l'exige à la revue**. Le studio ne la pose pas : Samuel, ou une décision à part. Le passage est un changement de quelques lignes du port `cle()`.
+- **Sécurité** (revue consolidée du head `0849bf1`) : dérivation depuis `P0_RUN_TOKEN` acceptée ; aucune variable dédiée exigée avant la mise en ligne.
+
+### 4. Jeton signé, sans stockage
+- Forme : `v1.<charge>.<mac>` (`SIGNED_SHARE_TOKEN_PATTERN`, ajouté à `src/contracts/values.ts` : changement de contrat couvert par la présente décision, 0123 point 2). `charge` = base64url de `<voyage>~<organisation>~<dernier jour>` ; `mac` = base64url de `HMAC-SHA-256(K, "vadrouille/partage/v1." + charge)` (la charge encodée est signée telle quelle). Vérification de la signature **en temps constant, avant** le décodage de la charge ; encodages stricts ; charge contrôlée (motifs, date ISO réelle ; l'organisation suit `TRIP_ID_PATTERN`). Charge de 19 à 187 caractères (14 à 140 octets), jeton de **234 caractères au plus**, longueurs fixées par le motif.
+- Le jeton de l'adaptateur simulé (`SHARE_TOKEN_PATTERN`, 43 caractères) ne change pas ; `CreatedShareLinkSchema` admet l'une ou l'autre forme ; `parseShareToken` aussi (404 sans lecture sinon).
+- Contenu : identifiant du voyage, identifiant technique de l'organisation, dernier jour. **Aucune identité** (ni personne, ni nom, ni adresse électronique). La charge n'est pas chiffrée : ces deux identifiants techniques sont lisibles par qui a le lien (l'identifiant du voyage figure déjà dans les adresses de la personne).
+- Même voyage, même clé, même fin de voyage : **même jeton** (déterministe). Rien n'est stocké, rien n'est journalisé (lint `no-console` sur les modules du partage) ; seuls les modules serveur voient la clé.
+
+### 5. Lecture de la vue partagée
+- **Dans l'organisation du jeton**, jamais celle de la requête du visiteur : contexte `{ organizationId: <jeton>, userId: "lien-partage", role: "member" }` (aucune personne).
+- Par un **lecteur du seul voyage du lien** (`prototypeSharedReader(tripId)`) : source réduite à ce voyage ; **lecture seule** (la source n'a pas `conserver` : aucune écriture, même des temps relus, 0109) ; **aucune relecture Routes** (payante) pour un visiteur : les paires sans temps conservé restent « durée à confirmer » (0092 § 4, 0095) ; programme lu **sans le cookie d'accès** du visiteur, derrière une barrière propre (`barriereLecture` : garde du mode réel ouverte, déploiement autre que la production), appelée seulement **après** la vérification de la signature.
+- **Voyages du prototype et `unlocked`** : un programme de test (avec propositions) porte `unlocked: true` ; un voyage d'essai (sans propositions, 0124 § 4) n'est débloqué que par le déblocage **simulé** de la personne (droit de la portée ou cookie `__Host-p0_debloque`), que le visiteur n'a pas. Règle : le lien n'est créé que pour un voyage **débloqué pour la personne qui partage** (session vérifiée) ; le lecteur du lien sert ensuite **ce seul voyage** débloqué (toutes ses journées). Le déblocage du site d'essai étant simulé (aucun argent), le lien vaut attestation de ce déblocage pour sa durée. Un voyage d'essai non débloqué n'a pas de bouton « Partager » et ne peut pas recevoir de lien.
+- Projection, schémas stricts et pages `RP`/`RPJ` : ceux de F10c, sans changement (une seule implémentation des vues, `src/adapters/share-views.ts`, partagée avec l'adaptateur simulé).
+
+### 6. Expiration (F10-TL-7 point 2)
+Un lien est valable tant que `localDateAt(now, trip.timeZone) <= expiresOn`, `expiresOn = accessUntil(trip.end, accessDaysAfterReturn)`, `now` étant l'horloge de la portée. Le dernier jour **signé** et celui du voyage **tel qu'il est lu** sont tous deux appliqués (le plus tôt l'emporte). Un jeton expiré dans tout fuseau (date de UTC−12 postérieure au dernier jour) est refusé sans lire la base. Un programme purgé (0046 D16, 30 jours) répond 404.
+
+### 7. Ce qui diffère de F10c, et révocation
+- Le serveur ne connaît pas les liens émis : `getStatus` rend toujours `{ active: false }` (la feuille propose « Créer un lien ») ; `revokeLink` rend `not_found` (la feuille ne propose pas l'action, faute de lien actif connu). F10-PO-18 (« un seul lien actif par voyage », « Créer un nouveau lien » désactive l'ancien) ne s'applique pas au partage réel : un voyage a un seul jeton, stable.
+- Feuille « Partager » : pour un jeton signé, « Copie-le maintenant : il ne pourra plus s'afficher. » (inexact : le jeton est stable) est remplacé par « Ce lien reste le même pour ce voyage : « Créer un lien » te le redonnera. » (texte provisoire, UX/UI).
+- **Révocation d'un lien depuis l'interface : hors périmètre.** Elle viendra avec B12 : table des liens (empreinte SHA-256 seule, F10-TL-7), migration appliquée par Samuel, adaptateur réel qui vérifie la signature **puis** l'empreinte. D'ici là, **révocation de secours** : rotation de `P0_RUN_TOKEN` par Samuel (invalide tous les liens, avec les cookies d'accès et de déblocage), ou fin du programme (purge).
+
+### 8. Carte de la vue partagée (règles Google de `CLAUDE.md`)
+- `DayMap` n'a qu'un rendu, Google (`GoogleMapRenderer`) ; la carte simulée n'est injectée que par les tests. Avec l'adaptateur `prototype`, `placesFromGoogle` vaut vrai dans `RP` et `RPJ` (noms et positions des lieux viennent de Google) : mention « Données de lieux : Google ». Configuration absente, clé refusée ou hors ligne : état de remplacement (`MapFallback`), **vue sans carte**, jamais une autre carte.
+- La clé Maps est celle des pages du voyage du même site (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`) ; `/p/` est sur le même domaine, `Referrer-Policy: strict-origin` (F10-TL-8) : une restriction par référent qui laisse passer le Séjour laisse passer la vue partagée. Si elle ne passe pas, la vue s'affiche sans carte : on n'attend pas F10-TL-8 (clé de production, Q101).
+- Rien de Google n'est stocké : les positions sont lues dans le cache serveur `place_coordinates` (0027, 0011) pour l'affichage seulement, réponses `private, no-store` (F10-TL-8). Aucune donnée Google dans un prompt.
+
+### 9. Protection Vercel des préversions
+Les préversions sont derrière la protection Vercel (0034). **Sans contournement, l'amie ne peut pas ouvrir le lien.** Le contournement (lien de partage du déploiement, réglage de la protection) est un réglage d'un compte externe : **Samuel** (nouvelle question, point 11). Le studio n'y touche pas.
+
+### 10. Réservé
+- **Sécurité (revue consolidée)** : clé dérivée de `P0_RUN_TOKEN` ou variable dédiée (point 3) ; barrière sans cookie d'accès pour un voyage, après signature (point 5) ; lisibilité de la charge (point 4) ; seconde exception à l'en-tête de `acces.ts` ; charge de lecture (une transaction de lecture Neon par vue, aucun appel Routes) ; effet d'un contournement de la protection Vercel sur le reste du déploiement (point 9).
+- **Samuel** : production (Q101 : rien n'est ouvert en production) ; protection Vercel ; pose éventuelle de `VADROUILLE_SHARE_SECRET` ; rotation du code d'accès.
+
+### 11. Risques (à lister dans la note de version)
+- **Liens déterministes, non révocables un par un** : même voyage, même lien ; aucun lien ne se désactive seul. Secours : rotation de `P0_RUN_TOKEN` par Samuel (tous les liens, cookies d'accès et de déblocage compris) ou purge du programme (point 7).
+- **Contournement de la protection Vercel** (point 9) : un lien de partage du déploiement ouvre **tout** le déploiement, pas la seule vue partagée ; un contournement ciblé (chemins `/p/` seulement), s'il existe, est préférable. Réglage de Samuel.
+- **Rotation future vers `VADROUILLE_SHARE_SECRET`** (point 3) : invaliderait tous les liens émis ; la prévoir avec une période où l'ancienne et la nouvelle clé sont acceptées à la vérification.
+
+## Textes amendés
+- 0039, F10-TL-7 : la garde « fermée avec des données réelles jusqu'à B12 » s'ouvre pour l'adaptateur `prototype` selon le point 2 ; le jeton « 32 octets aléatoires, empreinte gardée » vaut pour l'adaptateur simulé et pour B12, le jeton signé du point 4 pour le partage réel du site d'essai ; F10-PO-18 : point 7.
+- `specs/F10-pendant-le-voyage.md`, l. 209 (« Copie-le maintenant : il ne pourra plus s'afficher. ») : vaut pour le jeton aléatoire de l'adaptateur simulé ; texte du jeton signé au point 7.
+- `specs/F10-pendant-le-voyage.md`, l. 226 (« en phase 0, `shareAvailable()` est faux dès que `DATA_ADAPTER` n'est pas `mock` ; B12 [...] ne l'ouvre qu'avec la session vérifiée de B3 ») : `shareAvailable()` est aussi vraie pour l'adaptateur `prototype` (point 2) ; la session vérifiée du site d'essai est le cookie d'accès (point 2), pas celle de B3 ; l'adaptateur `api` reste fermé jusqu'à B12.
+- `specs/F10-pendant-le-voyage.md`, l. 263 (« En phase 0, `placesFromGoogle` vaut `false` : la mention n'est rendue nulle part ») : avec l'adaptateur `prototype`, `placesFromGoogle` vaut vrai dans `RP` et `RPJ` et la mention y est rendue (point 8) ; « `shareAvailable()` est faux dès que `DATA_ADAPTER` n'est pas `mock` », même ligne : amendé comme la ligne 226. La consigne « `VADROUILLE_DEMO_SHARE` ne se pose jamais sur un environnement qui a des données réelles » reste entière : le partage réel n'en dépend pas.
+- Commentaires des pages `RP` et `RPJ` (`placesFromGoogle = false` « B12 reprend cette valeur ») : point 8.
+- En-tête de `src/server/p0/acces.ts` : seconde exception (point 3), écrite ici, comme la première l'est dans 0124 § 2 (`acces.ts` n'est pas modifié).
+
+## Conséquences pour le code (PR de #825)
+`src/adapters/share-guard.ts` (`realShareAvailable`, `shareAvailable`), `src/adapters/share-signed-token.ts`, `src/adapters/signed-share.ts`, `src/adapters/share-views.ts` (vues communes, reprises par `mock-share.ts`), `src/adapters/prototype-instance.ts` (`brancherPartageEssai`, qui refuse un second branchement, `prototypeSharedReader`, `clePartageEssai`, `sessionPartageEssaiVerifiee`), `src/adapters/index.ts` (`getShareAdapter`, `shareButtonVisible`), `src/server/essai/partage.ts` et son branchement dans `src/instrumentation.ts`, `src/contracts/values.ts` et `src/contracts/share.ts`, `src/features/partage/routes.ts`, `src/features/partage/ShareSheet.tsx` et `src/i18n/fr/partage.json` (texte du lien stable, point 7), pages `src/app/p/[token]/page.tsx` et `src/app/p/[token]/jour/[n]/page.tsx`, `eslint.config.mjs` (`no-console`, horloge injectée), `tests/unit/confinement/listes/process.ts` (trois formes « environnement entier » de `share-guard.ts`, même forme que `payment-guard.ts` : approuvée par la Sécurité, revue consolidée du head `0849bf1`), `tests/unit/server/instrumentation.test.ts` (double et test du branchement). Un échec du branchement écrit `p0.read_unavailable` (nom d'erreur seulement), sans événement nouveau. Aucune migration, aucune écriture en base, aucun secret, aucune dépendance, aucune destination réseau nouvelle.
+
+## Quand revoir
+À B12 (liens en base, révocation), à la décision de Samuel sur la production (Q101), ou si la Sécurité exige une variable dédiée.

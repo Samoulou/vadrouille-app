@@ -245,7 +245,17 @@ export const ENV_ENTIER = [
   // F10c (décision 0039, F10-TL-7) : même forme que `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   {
     fichier: "src/adapters/share-guard.ts",
-    formes: ["defaut:shareDemoAvailable", "defaut:shareAvailable", "argument:isProductionDeployment", "argument:shareDemoAvailable"],
+    formes: [
+      "defaut:shareDemoAvailable",
+      "defaut:shareAvailable",
+      "argument:isProductionDeployment",
+      "argument:shareDemoAvailable",
+      // Décision 0135 : partage réel du site d'essai, même forme que `payment-guard.ts` (liste blanche de `prototype`,
+      // jamais en production). Verdict Sécurité : approuvé (revue consolidée du head 0849bf1, PR #827).
+      "defaut:realShareAvailable",
+      "argument:realShareAvailable",
+      "argument:prototypeAdapterAllowed",
+    ],
   },
   // F8b (décision 0017 § 11.2, F8-TL-10) : même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
   {

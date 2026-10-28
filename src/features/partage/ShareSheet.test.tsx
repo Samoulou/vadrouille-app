@@ -127,6 +127,24 @@ describe("lien actif, création, copie (C28)", () => {
     expect(await axeViolations(dialog)).toEqual([]);
   });
 
+  it("partage réel (jeton signé, décision 0135 § 7) : le lien est stable, « Copie-le maintenant » n'est pas affiché", async () => {
+    const signed = `v1.${"B".repeat(40)}.${"C".repeat(43)}`;
+    const injected = actions({
+      getShareStatus: vi.fn(async () => NONE),
+      createShareLink: vi.fn(
+        async (): Promise<Result<CreatedShareLink>> => ({ ok: true, value: { token: signed, createdAt: "2026-08-30T09:40:00.000Z", expiresOn: "2026-10-03" } }),
+      ),
+    });
+    const { dialog } = renderSheet(injected);
+    await loaded();
+    fireEvent.click(button("Créer un lien"));
+    const field = await within(dialog).findByRole("textbox", { name: "Lien de partage" });
+    expect(field).toHaveValue(`${window.location.origin}/p/${signed}`);
+    expect(screen.getByText("Ce lien reste le même pour ce voyage : « Créer un lien » te le redonnera.")).toBeVisible();
+    expect(screen.queryByText("Copie-le maintenant : il ne pourra plus s'afficher.")).toBeNull();
+    expect(await axeViolations(dialog)).toEqual([]);
+  });
+
   it("« Copier le lien » écrit l'adresse dans le presse-papiers et annonce « Lien copié. »", async () => {
     const writeText = vi.fn(async () => {});
     stubNavigator({ clipboard: { writeText } });

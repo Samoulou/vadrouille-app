@@ -13,10 +13,21 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { assertPrototypeAllowedOnProcess, deblocagesEssai, photosEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
+import {
+  assertPrototypeAllowedOnProcess,
+  clePartageEssai,
+  deblocagesEssai,
+  photosEssai,
+  prototypeCreationAdapter,
+  prototypeSharedReader,
+  prototypeTripAdapter,
+  revisionEssai,
+  sessionPartageEssaiVerifiee,
+} from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
-import { shareAvailable } from "./share-guard";
+import { realShareAvailable, shareAvailable } from "./share-guard";
+import { createSignedShareAdapter } from "./signed-share";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
@@ -41,7 +52,7 @@ export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-gu
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
-export { shareAvailable, shareDemoAvailable } from "./share-guard";
+export { realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
@@ -342,14 +353,26 @@ export async function getRevisionFixtures(
 /**
  * Adaptateur de partage (spécification F10, F10-TL-7 ; décision 0039), simulé dans la portée de la requête : liens en
  * mémoire de la portée, voyages lus par `getTripReader()` de la même portée, durée du partage lue dans la
- * configuration serveur. **Filet de sécurité** : lève une erreur si `shareAvailable()` est faux ; les pages et les
- * actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
+ * configuration serveur. **Partage réel du site d'essai** (`realShareAvailable`, décision 0135) : jeton signé sans
+ * stockage, lien créé depuis la session vérifiée (`getTripReader()` de la requête), vue partagée lue par un lecteur du
+ * seul voyage du lien, dans l'organisation du jeton. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
+ * faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
  */
 export function getShareAdapter(options: { scope?: SimulationScope } = {}): ShareAdapter {
   if (!shareAvailable()) {
     throw new Error("partage indisponible : shareAvailable() est faux (spécification F10, F10-TL-7)");
   }
   const scope = options.scope ?? defaultScope();
+  if (realShareAvailable()) {
+    return createSignedShareAdapter({
+      creatorTrips: getTripReader({ scope }),
+      sharedTrips: (tripId) => prototypeSharedReader(tripId),
+      key: () => clePartageEssai(),
+      sessionVerified: () => sessionPartageEssaiVerifiee(),
+      now: () => scope.clock.now(),
+      accessDaysAfterReturn: OFFER_CONFIG.accessDaysAfterReturn,
+    });
+  }
   return createMockShareAdapter({
     trips: getTripReader({ scope }),
     now: () => scope.clock.now(),
@@ -360,10 +383,12 @@ export function getShareAdapter(options: { scope?: SimulationScope } = {}): Shar
 
 /**
  * Bouton « Partager » du Séjour et de la Journée (F10-PO-13, F10-PO-21) : partage disponible, voyage débloqué et fin
- * du partage pas encore passée à l'horloge de la portée de la requête. Rien n'est lu si la garde est fermée.
+ * du partage pas encore passée à l'horloge de la portée de la requête. Partage réel (décision 0135) : en plus, clé de
+ * signature présente et session vérifiée. Rien n'est lu si la garde est fermée.
  */
 export async function shareButtonVisible(trip: Pick<Trip, "unlocked" | "end" | "timeZone">): Promise<boolean> {
   if (!shareAvailable() || !trip.unlocked) return false;
+  if (realShareAvailable() && (clePartageEssai() === null || !(await sessionPartageEssaiVerifiee()))) return false;
   const scope = await getSimulationScope();
   return !shareEnded(trip, scope.clock.now(), OFFER_CONFIG.accessDaysAfterReturn);
 }
