@@ -15,7 +15,7 @@ import { estAncre, type Ancrage, type AncrageResolu, type Position, type Trajets
 import type { Brief } from "@/prototype/brief";
 import type { Candidat, CandidatNote } from "@/prototype/candidat";
 import { CONFIG_SCHEMA, modelesDeLaVariante, RoutageSchema, type Variante } from "@/prototype/config";
-import type { ProgrammeReduit } from "@/prototype/programme-reduit";
+import { PROTOTYPE_ORG_ID, type ProgrammeReduit } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { chercherCandidats, type CompteursAgent } from "@/research/agent";
 import { RAISONS_REFUS_PAGE, type LecteurPages } from "@/research/fetch-page";
@@ -493,7 +493,7 @@ export async function executerProgramme(entree: EntreePipeline): Promise<Resulta
     journal.ecrire("planning_done", { jours: jours.length });
 
     // 4. Assemblage sans replanification, réduction.
-    const complet = assemblerProgrammeIa({ tripId, brief, jours, bonsPlans: ecrit.bonsPlans, logements: idsLogements, configuration: configuration.moteur, mode, trajets });
+    const complet = assemblerProgrammeIa({ tripId, organizationId: PROTOTYPE_ORG_ID, brief, jours, bonsPlans: ecrit.bonsPlans, logements: idsLogements, configuration: configuration.moteur, mode, trajets });
     const positions = new Map<string, Position>([...logements, ...fiches.values()].map((ancrage) => [ancrage.placeId, ancrage.position]));
     programme = reduireProgramme(complet, { positions, terminus: complet.terminus, justifications: complet.justifications });
     for (const jour of programme.trip.days) {

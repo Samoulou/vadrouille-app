@@ -390,6 +390,15 @@ const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossi
 const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts", "src/server/p0/vers-couche-ia.ts"];
 const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", "candidat");
 
+/**
+ * Décision 0136 § 1.5 (M1a-1) : code partagé de la chaîne inversée que `pnpm p0` charge sous Node nu, parce que
+ * `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts` le réexportent. Contrôlé par la liste d'autorisation de A3.2
+ * comme les fichiers de P0 ; `@/contracts`, `src/domain` et les autres fichiers de cette liste seulement, aucun module
+ * externe (ni `src/prototype`, ni `src/server/p0`). `brief.ts`, `sites.ts` et `apercu.ts` du même dossier ne sont chargés
+ * que sous Next.js.
+ */
+const MODULES_PROGRAMME_P0: readonly string[] = ["src/server/programme/forme.ts", "src/server/programme/entree.ts", "src/server/programme/assemblage.ts"];
+
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
 const contrats = sous("src/contracts");
@@ -485,13 +494,18 @@ function regleDe(fichier: string): Regle | undefined {
 }
 
 function regleDeBase(fichier: string): Regle | undefined {
+  if (MODULES_PROGRAMME_P0.includes(fichier)) {
+    // Décision 0136 § 1.5 (b) : `@/contracts`, `src/domain` et les autres fichiers de `MODULES_PROGRAMME_P0` ; aucun module
+    // externe (ni `src/prototype`, ni `src/server/p0`).
+    return { projet: (c) => contrats(c) || sous("src/domain")(c) || (MODULES_PROGRAMME_P0.includes(c) && c !== fichier), externes: [] };
+  }
   if (MODULES_SERVEUR_P0.includes(fichier)) {
-    // Revue 1 de #632, bloquant 4 (lot 1 du programme par l'IA) : l'assemblage réutilise `rythmeVersPace` de
-    // l'adaptateur du moteur au lieu d'une copie. Arête unique entre deux modules de cette même liste, soumis à la même
-    // règle (aucune capacité nouvelle n'est atteinte).
-    const voisins = fichier === "src/server/p0/assemblage.ts" ? ["src/server/p0/vers-moteur.ts"] : [];
+    // Décision 0136 § 1.5 : `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts` réexportent
+    // `@/server/programme/{forme,entree,assemblage}` (code déplacé, aucune capacité nouvelle). L'arête de l'assemblage
+    // vers `vers-moteur.ts` (revue 1 de #632, `rythmeVersPace`) est retirée : la fonction est dans `src/server/programme`.
     return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...voisins].includes(c),
+      projet: (c) =>
+        contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...MODULES_PROGRAMME_P0].includes(c),
       externes: [],
     };
   }
@@ -659,7 +673,7 @@ function fichierAdmis(fichier: string): boolean {
 
 /** Tous les fichiers présents des six dossiers (sur-ensemble des fichiers suivis). */
 const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
-const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0];
+const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0, ...MODULES_PROGRAMME_P0];
 const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
 /** Imports de chaque fichier, analysés une seule fois pour tous les graphes du fichier de test (durée, P0r1). */
