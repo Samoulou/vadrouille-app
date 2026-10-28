@@ -135,6 +135,23 @@ describe("BriefScreen : récit", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it("idées « qui part » exclusives ; près du plafond, les idées qui ne tiennent plus sont indisponibles et décrites", () => {
+    renderScreen();
+    const idees = screen.getByRole("group", { name: "Idées à ajouter" });
+    fireEvent.click(within(idees).getByRole("button", { name: "À deux" }));
+    fireEvent.click(within(idees).getByRole("button", { name: "Entre amis" }));
+    expect(story()).toHaveValue("On part entre amis.");
+    expect(within(idees).getByRole("button", { name: "À deux" })).toHaveAttribute("aria-pressed", "false");
+    const plein = "a".repeat(990);
+    fireEvent.change(story(), { target: { value: plein } });
+    const deux = within(idees).getByRole("button", { name: "À deux" });
+    expect(deux).toHaveAttribute("aria-disabled", "true");
+    expect(deux).toHaveAccessibleDescription("Ton récit est trop long pour ajouter une autre idée.");
+    expect(screen.getByText("Ton récit est trop long pour ajouter une autre idée.")).toBeVisible();
+    fireEvent.click(deux);
+    expect(story()).toHaveValue(plein);
+  });
+
   it("compteur : annoncé poliment à 900 et 1 000 caractères seulement", () => {
     const { container } = renderScreen();
     const live = container.querySelector('[aria-live="polite"]')!;

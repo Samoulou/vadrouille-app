@@ -4,7 +4,7 @@ Ticket : #813 · Rôle : UX/UI · Origine : demande de Samuel du 2026-10-28 (fil
 
 ## Comportement
 1. Écrans 1, 2 et 3 : « Étape {n} sur {total} » à droite de « Retour » ; `total` = 3 si une ville peut encore passer par « Où loger », 2 sinon.
-2. Écran 2, récit : exemple en texte indicatif ; groupe « Idées à ajouter » de huit chips qui ajoutent ou retirent une phrase du récit, sans dépasser 1 000 caractères.
+2. Écran 2, récit : exemple en texte indicatif ; groupe « Idées à ajouter » de huit chips qui ajoutent ou retirent une phrase du récit ; « À deux », « En famille », « Entre amis » exclusives ; au plafond de 1 000 caractères, les idées qui ne tiennent plus sont indisponibles et un message le dit.
 3. Plus de « brief » dans les textes de la création ; « Engagements déjà pris » devient « Déjà réservé ».
 
 ## Écarts avec la maquette
@@ -14,7 +14,7 @@ Référence : `docs/ux/captures/F8a/` (`docs/ux/maquettes/` est vide).
 - Textes changés (décision 0134 § 4 et § 5).
 
 ## Captures (390 × 844)
-`docs/ux/captures/813/` : `ecran1-etape`, `ecran2-recit-vide`, `ecran2-recit-idees`, `ecran1-deja-reserve`.
+`docs/ux/captures/813/` : `ecran1-etape`, `ecran1-deja-reserve` (page entière), `ecran2-recit-vide`, `ecran2-recit-idees`, `ecran2-verification`, `ecran3-etape`.
 
 ## Question
 - Product Owner : passer à 2 adultes par défaut (la plupart des voyages se font à deux) ?

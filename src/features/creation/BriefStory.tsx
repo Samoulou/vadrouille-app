@@ -28,21 +28,50 @@ const COUNTER_ID = `${STORY_ID}-compteur`;
 const ANNOUNCED_LENGTHS = new Set([STORY_LENGTH.max * 0.9, STORY_LENGTH.max]);
 
 const IDEAS_ID = "recit-idees";
+const IDEAS_FULL_ID = `${IDEAS_ID}-plein`;
+const IDEAS: readonly Idea[] = r.idees.liste;
+
+/** Une idée du récit (`creation.ecran2.recit.idees.liste`) ; `groupe` : idées exclusives (« qui part »). */
+export interface Idea {
+  label: string;
+  phrase: string;
+  groupe?: string;
+}
 
 /** Le récit contient-il déjà la phrase de cette idée ? */
 export function hasIdea(story: string, phrase: string): boolean {
   return story.includes(phrase);
 }
 
+/** Retire la première occurrence de la phrase et l'espace qui la sépare du reste ; le reste du récit est intact. */
+export function removePhrase(story: string, phrase: string): string {
+  const at = story.indexOf(phrase);
+  if (at < 0) return story;
+  let start = at;
+  let end = at + phrase.length;
+  if (story[start - 1] === " ") start -= 1;
+  else if (story[end] === " ") end += 1;
+  return story.slice(0, start) + story.slice(end);
+}
+
+/** Ajoute la phrase à la fin du récit, après une espace si le récit ne finit pas déjà par un blanc. */
+function appendPhrase(story: string, phrase: string): string {
+  if (story.trim() === "") return phrase;
+  return /\s$/.test(story) ? `${story}${phrase}` : `${story} ${phrase}`;
+}
+
 /**
- * Ajoute la phrase d'une idée à la fin du récit (une espace avant si besoin), ou la retire si elle y est déjà. Rien
- * n'est ajouté si le récit dépasserait le plafond de caractères.
+ * Touche d'une idée (décision 0134 § 3) : retire sa phrase si elle est dans le récit ; sinon l'ajoute à la fin, après
+ * avoir retiré celles des autres idées du même groupe (on part à deux, en famille ou entre amis, pas les trois). Rien
+ * ne change si le récit dépasserait le plafond de caractères.
  */
-export function toggleIdea(story: string, phrase: string): string {
-  if (hasIdea(story, phrase)) {
-    return story.replace(phrase, "").replace(/ {2,}/g, " ").trim();
-  }
-  const joined = story.trim() === "" ? phrase : `${story.trimEnd()} ${phrase}`;
+export function toggleIdea(story: string, idea: Idea, ideas: readonly Idea[] = []): string {
+  if (hasIdea(story, idea.phrase)) return removePhrase(story, idea.phrase);
+  const others = idea.groupe ? ideas.filter((other) => other !== idea && other.groupe === idea.groupe) : [];
+  const joined = appendPhrase(
+    others.reduce((current, other) => removePhrase(current, other.phrase), story),
+    idea.phrase,
+  );
   return joined.length > STORY_LENGTH.max ? story : joined;
 }
 
@@ -87,6 +116,7 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
   );
 
   const length = state.story.length;
+  const ideasFull = IDEAS.some((idea) => !hasIdea(state.story, idea.phrase) && toggleIdea(state.story, idea, IDEAS) === state.story);
 
   async function prepare() {
     if (pending) return;
@@ -166,24 +196,35 @@ export function BriefStory({ focusTitle, onStageChange, essai = false }: BriefSt
           {ANNOUNCED_LENGTHS.has(length) ? counterText(length) : null}
         </p>
       </div>
-      {/* Idées (décision 0134) : chaque chip ajoute sa phrase au récit, ou la retire ; état « choisi » = phrase présente. */}
+      {/* Idées (décision 0134 § 3) : chaque chip ajoute sa phrase au récit, ou la retire ; état « choisi » = phrase présente.
+          Une idée qui ne tiendrait plus dans le récit est indisponible et décrite par le message « plein ». */}
       <div role="group" aria-labelledby={IDEAS_ID} aria-describedby={helpId(IDEAS_ID)} className="flex flex-col gap-2">
-        <h2 id={IDEAS_ID} className="text-corps font-semibold text-ink">
+        <h2 id={IDEAS_ID} className="text-section font-extrabold text-ink">
           {r.idees.titre}
         </h2>
         <p id={helpId(IDEAS_ID)} className="text-corps-s text-ink-soft">
           {r.idees.aide}
         </p>
         <div className="flex flex-wrap gap-2">
-          {r.idees.liste.map((idea) => (
-            <Chip
-              key={idea.label}
-              label={idea.label}
-              selected={hasIdea(state.story, idea.phrase)}
-              onSelectedChange={() => dispatch({ type: "story", story: toggleIdea(state.story, idea.phrase) })}
-            />
-          ))}
+          {IDEAS.map((idea) => {
+            const selected = hasIdea(state.story, idea.phrase);
+            const next = toggleIdea(state.story, idea, IDEAS);
+            const unavailable = !selected && next === state.story;
+            return (
+              <Chip
+                key={idea.label}
+                label={idea.label}
+                selected={selected}
+                aria-disabled={unavailable || undefined}
+                aria-describedby={unavailable ? IDEAS_FULL_ID : undefined}
+                onSelectedChange={() => dispatch({ type: "story", story: next })}
+              />
+            );
+          })}
         </div>
+        <p id={IDEAS_FULL_ID} className={ideasFull ? "text-corps-s text-ink-soft" : "hidden"}>
+          {r.idees.plein}
+        </p>
       </div>
       <div role="alert" className={failed ? undefined : EMPTY_LIVE_REGION_CLASS}>
         {failed ? (

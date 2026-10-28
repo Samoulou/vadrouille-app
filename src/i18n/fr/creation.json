@@ -60,14 +60,14 @@
     },
     "engagements": {
       "titre": "Déjà réservé",
-      "aide": "Un vol, une table, un billet : on les garde tels quels dans ton programme.",
+      "aide": "Un vol, une sortie, un billet : on les garde tels quels dans ton programme.",
       "ajouter": "Ajouter une réservation",
       "maximum": "Au plus {max} réservations.",
       "engagement": "Réservation {n}",
       "type": "Type de réservation",
       "types": {
         "flight": "Vol",
-        "booking": "Table ou activité",
+        "booking": "Sortie",
         "ticket": "Billet"
       },
       "libelle": "Libellé",
@@ -113,10 +113,11 @@
       "idees": {
         "titre": "Idées à ajouter",
         "aide": "Touche une idée pour l'ajouter à ton récit, touche-la encore pour la retirer.",
+        "plein": "Ton récit est trop long pour ajouter une autre idée.",
         "liste": [
-          { "label": "À deux", "phrase": "On part à deux." },
-          { "label": "En famille", "phrase": "On part en famille, avec des enfants." },
-          { "label": "Entre amis", "phrase": "On part entre amis." },
+          { "label": "À deux", "phrase": "On part à deux.", "groupe": "qui" },
+          { "label": "En famille", "phrase": "On part en famille, avec des enfants.", "groupe": "qui" },
+          { "label": "Entre amis", "phrase": "On part entre amis.", "groupe": "qui" },
           { "label": "Rythme tranquille", "phrase": "On veut un rythme tranquille, sans courir." },
           { "label": "Bonnes tables", "phrase": "On aime bien manger, surtout la cuisine locale." },
           { "label": "Balades et nature", "phrase": "On aime marcher et voir de la nature." },

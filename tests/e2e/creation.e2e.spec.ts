@@ -199,6 +199,31 @@ test("brief: récit, erreur et compteur", async ({ page }) => {
   await expect(live).toHaveText(`${MILLE} sur ${MILLE} caractères`);
 });
 
+test("creation: étape visible et idées du récit (décision 0134)", async ({ page }) => {
+  await page.goto(R1);
+  const etape = page.locator('[data-part="etape"]');
+  await expect(etape).toHaveText("Étape 1 sur 3");
+  await fillTrip(page, { ...EDIMBOURG, lodging: "Oui" });
+  await expect(etape).toHaveText("Étape 1 sur 2");
+  await lodgingGroup(page).getByRole("radio", { name: "Pas encore" }).click();
+  await expect(etape).toHaveText("Étape 1 sur 3");
+  await continueButton(page).click();
+  await expectPath(page, R2);
+  await expect(etape).toHaveText("Étape 2 sur 3");
+
+  const story = storyField(page);
+  const idees = page.getByRole("group", { name: "Idées à ajouter" });
+  const deux = idees.getByRole("button", { name: "À deux" });
+  await deux.click();
+  await expect(story).toHaveValue("On part à deux.");
+  await expect(deux).toHaveAttribute("aria-pressed", "true");
+  await idees.getByRole("button", { name: "Bonnes tables" }).click();
+  await expect(story).toHaveValue("On part à deux. On aime bien manger, surtout la cuisine locale.");
+  await deux.click();
+  await expect(story).toHaveValue("On aime bien manger, surtout la cuisine locale.");
+  await expect(deux).toHaveAttribute("aria-pressed", "false");
+});
+
 test("brief: déductions visibles", async ({ page }) => {
   await reachBrief(page);
   await reachReview(page);
