@@ -170,6 +170,7 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
   // « Créer un voyage » (F11-PO-4, ticket 803) : même adresse des deux côtés, ce n'est pas un voyage.
   const CREER = "/voyages/nouveau";
   expect(liensApi.filter((href) => href === CREER)).toEqual(liensMock.filter((href) => href === CREER));
+  expect(liensApi.indexOf(CREER)).toBe(liensMock.indexOf(CREER));
   const correspondance = new Map<string, string>();
   liensMock.forEach((href, i) => {
     if (href === CREER) return;

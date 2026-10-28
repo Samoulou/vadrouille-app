@@ -23,8 +23,8 @@ export const metadata: Metadata = {
  * apparaît débloqué, décision 0021 § 2) ; aucun jour, aucune proposition, aucune position. Le classement est
  * fait par l'écran, dans le navigateur (décision 0021 § 3).
  *
- * « Créer un voyage » (F11-PO-4) : l'écran 1 existe depuis F8a ; lien ajouté par le ticket 803 (audit UX du
- * 2026-10-28), avec `?site=essai` sur le site d'essai, comme l'accueil.
+ * « Créer un voyage » (F11-PO-4, C13/C14) : vers l'écran 1 (F8a), avec `?site=essai` sur le site d'essai, comme
+ * l'accueil.
  *
  * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
