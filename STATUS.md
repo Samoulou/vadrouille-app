@@ -1,12 +1,14 @@
-# État du studio — 2026-10-28 (210e cycle)
+# État du studio — 2026-10-28 (211e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
 ## Messages de Samuel traités (projet)
-- Aucun nouveau message depuis le 209e cycle (le message du 2026-10-28 05:45 UTC est traité : ticket #800, PR #809).
+- 2026-10-28 09:59 UTC « la page pour saisir le token ? » : répondu dans le fil du cycle (page `/prototype/executions` du site d'essai, ou le champ « Code d'accès du site d'essai » sous Destination sur `/voyages/nouveau`).
+- 2026-10-28 10:03 UTC « j'arrive pas à faire le voyage à Oslo, et j'ai pas l'historique des voyages » : cause trouvée dans les journaux Vercel, Samuel était sur l'aperçu de `main` (lien envoyé par le fil UX), dont la page `/connexion` refuse la connexion simulée (décision 0017 § 11.2) ; répondu avec le lien du site d'essai `p0-reel`. Règle : ne jamais envoyer à Samuel un lien d'aperçu de `main` pour un essai de bout en bout.
 
 ## Fait
-- **Statut du 209e cycle** (#806) fusionné.
+- **Statut du 210e cycle** (#815) fusionné.
+- **Note de version v2026.10.28-10** (#817, `docs/releases/v2026.10.28-10.md`) publiée par la routine Release ; mise en ligne main → p0-reel = PR #816, en attente de la fusion par Samuel.
 - **Note de version v2026.10.25-21** (#771) publiée. Erreur relevée : elle dit la migration 0019 non appliquée et demande à Samuel de lancer `db-migrate` ; c'est faux, Samuel l'a appliquée le 2026-10-25 à 10:25 UTC (run 40184687008). À corriger dans la prochaine note.
 - **Revue hebdomadaire, semaine 43** (#769, `docs/releases/hebdo-2026-43.md`) fusionnée et postée dans #studio.
 - **Recherche de ville Google** : #763 `[back]` fusionnée (recherche toujours montée sur le site d'essai, refus journalisés `p0.ville_refusee`, décision 0131) ; report #766 fusionné par Samuel (2026-10-25 15:22 UTC) ; page `/voyages/nouveau` du site d'essai vérifiée à 15:23 UTC (champ de recherche présent sans paramètre). Lien de test envoyé à Samuel.
@@ -15,7 +17,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
 - **Audit UX « séduire les nouveaux clients »** (fil projet de Samuel, 2026-10-28 05:47 UTC, fil « Rendre l'app séduisante pour les nouveaux clients », hors routine du cycle) : fusionnés #805 (écran 1, calendriers bornés, #801), #810 (page d'accueil, #802), #811 (« Mes voyages », bouton « Créer un voyage », #803), #812 (tri, première carte d'abord, #804), #814 (formulaire guidé, #813) ; #808 (CI : Ubuntu 24.04 épinglé, #807, owner-approved par Samuel). Ces changements ne sont pas encore sur le site d'essai `p0-reel` : la prochaine note de version les emportera avec #809.
-- **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. PR #809 (`claude/800-reglages-programme`) : prompts programme v4 et révision v2 (champ `site` demandé pour chaque étape avec un lieu, règle de parcours sans allers-retours, `quartier` par lieu), section « Site officiel » du détail de l'étape même sans raison, compteur `retoursDeQuartier` (mesure seule), amendement 4 de `specs/P0-programme-par-ia.md` (A25 à A27). Revue consolidée du 06:16 UTC : Tech Lead, Sécurité et UX/UI approuvent, aucun bloquant, 10 mineurs (capture de la section « Site officiel » à produire, 0122 § 2.2 condition 5 à compléter d'une phrase, composant lien partagé). CI du premier head rouge à cause du runner Ubuntu 26.04 (corrigé par #808) ; main fusionnée dans la branche à 08:20 UTC, fusion automatique armée. Questions : S-800-1, T-800-1, T-800-2, PO-800-1 (voir QUESTIONS.md au prochain cycle).
+- **Réglages fins du programme (#800)** : demande de Samuel du 2026-10-28 05:45 UTC. PR #809 (`claude/800-reglages-programme`) : prompts programme v4 et révision v2 (champ `site` demandé pour chaque étape avec un lieu, règle de parcours sans allers-retours, `quartier` par lieu), section « Site officiel » du détail de l'étape même sans raison, compteur `retoursDeQuartier` (mesure seule), amendement 4 de `specs/P0-programme-par-ia.md` (A25 à A27). Revue consolidée du 06:16 UTC : Tech Lead, Sécurité et UX/UI approuvent, aucun bloquant, 10 mineurs (capture de la section « Site officiel » à produire, 0122 § 2.2 condition 5 à compléter d'une phrase, composant lien partagé). CI du premier head rouge à cause du runner Ubuntu 26.04 (corrigé par #808) ; main fusionnée dans la branche à 08:20 UTC, **PR #809 fusionnée à 08:40 UTC** (main cdec347). Mise en ligne #816 (main → p0-reel, 96 fichiers, aucune migration) envoyée à Samuel avec la marche à suivre, pas encore fusionnée. Lancement de Samuel à 10:06 UTC sur le site d'essai, encore avec l'ancien prompt : 6 jours, 39 créneaux, 1 seul site proposé et retiré à la vérification, ce qui confirme sa remarque ; le nouveau prompt attend la fusion de #816. Questions : S-800-1, T-800-1, T-800-2, PO-800-1 (voir QUESTIONS.md au prochain cycle).
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel).
 - Toujours en attente : #583 (Q538), #500 gelée, #534/#547 (Q518-Q519), #664 et B10c/B10d, densité (Q595), Q618. Q261 et Q262 sont à réconcilier avec F13.
 
@@ -24,7 +26,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. #800 : revue de la PR, corrections (deux au plus), puis note de version main → p0-reel et un seul lien à Samuel (`/voyages/nouveau`).
+1. #816 : dès la fusion par Samuel, vérifier le déploiement `p0-reel`, lui envoyer un seul lien (`/voyages/nouveau`), puis lire le journal de son lancement (sites proposés, vérifiés, retirés). Ensuite les 10 mineurs de #809 et les questions S-800-1, T-800-1, T-800-2, PO-800-1 dans QUESTIONS.md.
 2. Zakynthos : après la capture de Samuel, corriger la cause (par exemple afficher les voyages masqués avec leur raison).
 3. #527 : rappeler Q438 à Samuel après ses tests.
 4. Note de version suivante : corriger l'état des migrations 0016 à 0018 ; lister 0126 à 0129, #716, #720. Corriger aussi l'état de la migration 0019 (appliquée le 2026-10-25 à 10:25 UTC, pas « à lancer »).
