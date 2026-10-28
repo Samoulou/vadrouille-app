@@ -27,7 +27,7 @@ export { BETTER_AUTH_CONFIG };
  */
 
 /** Échec d'une opération de la liste blanche (forme de `AuthFailure`, `src/server/auth`). */
-export type EchecConnexion = { readonly ok: false; readonly code: "invalid_code" | "code_expired" | "too_many_attempts" | "unauthenticated" | "provider_error" };
+export type EchecConnexion = { readonly ok: false; readonly code: "invalid_code" | "code_expired" | "too_many_attempts" | "unauthenticated" | "provider_error" | "email_cap_reached" };
 export type SessionOuverte = { readonly sessionId: string; readonly userId: string; readonly organizationId: string; readonly role: MemberRole };
 
 /** Opérations de la liste blanche (forme de `AuthOperations`, `src/server/auth`) : seules celles que l'adaptateur appelle. */
@@ -79,8 +79,13 @@ function enTetesRetenus(source: Headers, noms: readonly string[]): Headers {
 /** `provider_error` porte toujours `retryable: true` (B3-PO-4). */
 const REFUS_FOURNISSEUR = Object.freeze({ ok: false, error: Object.freeze({ code: "provider_error", retryable: true }) }) as Result<never>;
 
+/** `email_cap_reached` porte toujours `retryable: false` (spécification B3d, point 4 ; règle d'`ApiErrorSchema`). */
+const REFUS_PLAFOND = Object.freeze({ ok: false, error: Object.freeze({ code: "email_cap_reached", retryable: false }) }) as Result<never>;
+
 function echec<T>(failure: EchecConnexion): Result<T> {
-  return failure.code === "provider_error" ? REFUS_FOURNISSEUR : fail(failure.code);
+  if (failure.code === "provider_error") return REFUS_FOURNISSEUR;
+  if (failure.code === "email_cap_reached") return REFUS_PLAFOND;
+  return fail(failure.code);
 }
 
 /** Copie fermée de la session : identifiants seulement, jamais le jeton ni le rôle (B3-PO-9). */

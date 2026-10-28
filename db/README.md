@@ -11,7 +11,7 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 
 | Chemin | Rôle |
 | --- | --- |
-| `db/bootstrap/roles.sql` | Amorçage idempotent des 18 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`) et de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/bootstrap/roles.sql` | Amorçage idempotent des 19 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`), de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`) et de B3d (`vadrouille_mail_counter`, décision 0138 § 11, migration `0020_plafond_emails`), une fois par base, avant les migrations. Aucun mot de passe. |
 | `db/maintenance/coords-purge-repli.sql` | Repli manuel de la purge du MVP (0060 § 3.5), exécuté par Samuel seul dans la console Neon quand `coords-purge.yml` ne peut pas réussir ; jamais par le studio (section 4). |
 | `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
@@ -111,6 +111,7 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | `0017_brief_saisi_prototype` | `0017_brief_saisi_prototype.down.sql` (partielle) | Règle du rôle `data` : aucune suppression de données. La migration inverse rétablit seulement la contrainte de nom de fichier de `prototype.runs` de 0003_prototype, en `NOT VALID` : les exécutions `saisi` déjà écrites ne sont ni lues, ni modifiées, ni supprimées ; un nouveau lancement depuis l'app est refusé par la base (`23514`) dans la transaction de réservation, sans rien écrire. `prototype.run_briefs`, ses droits, ses politiques, ses déclencheurs et la purge de 0017 restent : le code d'avant 0017 ne nomme pas la table, dont les lignes expirent avec le programme (29 jours) et sont purgées. Supprimer la table demanderait une exception écrite à la règle du rôle `data`, comme 0092 pour `prototype.trajets`. Descente à jouer hors de toute exécution `saisi` en cours. |
 | `0018_brief_saisi_a_eviter` | `0018_brief_saisi_a_eviter.down.sql` | Contrainte seulement (spécification E2E-essai, lot 5) : la migration inverse rétablit la contrainte de clés de `prototype.run_briefs` de 0017, sans `aEviter`, en `NOT VALID` : les briefs déjà écrits avec `aEviter` ne sont ni lus, ni modifiés, ni supprimés, et expirent avec leur programme (29 jours) ; un nouveau lancement avec des catégories « à éviter » est refusé par la base (`23514`) sans rien écrire. Aucune donnée supprimée. Dans le sens montant, l'`ADD CONSTRAINT` validé prend un verrou `ACCESS EXCLUSIVE` avec balayage complet de `prototype.run_briefs` (table petite, purgée à 29 jours : durée négligeable) ; 0018 est rejouable après sa descente (G6). |
 | `0019_recherche_ville_prototype` | `0019_recherche_ville_prototype.down.sql` (partielle) | Plafond persistant de la recherche de ville du site d'essai (décision 0129 § 3) : nature `ville` de `prototype.forfaits`, colonnes `autocomplete_requests` et `acces_empreinte` (HMAC du cookie d'accès), contrainte `forfaits_ville_check`, index partiel et `INSERT` des deux colonnes pour `vadrouille_prototype`. Règle du rôle `data` : aucune suppression de données. La migration inverse retire le droit, l'index et la contrainte, puis rétablit les contraintes de nature et de coût des modèles de 0003 en `NOT VALID` ; les colonnes et les lignes `ville` restent (le code d'avant 0019 ne les nomme pas). **0019 ne se rejoue pas** après sa descente (son `ADD COLUMN` échouerait) : un retour passe par une migration corrective vers l'avant. Sans 0019, la recherche de ville échoue fermée (« indisponible », aucun appel Google). |
+| `0020_plafond_emails` | `0020_plafond_emails.down.sql` (partielle) | Plafond global quotidien des e-mails (B3d ; décision 0138 § 11, T1) : table `email_daily_counts` (un jour UTC, une colonne par usage, aucune donnée d'une personne ni d'une organisation), RLS activée et forcée, politique et droits de `vadrouille_mail_counter` (`SELECT`, `INSERT`, `UPDATE (connexion, notification)`, `DELETE`). Prérequis : `db/bootstrap/roles.sql` rejoué (rôle `vadrouille_mail_counter`). Règle du rôle `data` : aucune suppression de données. La migration inverse retire les droits et la politique du rôle ; la table et ses compteurs restent, sans accès applicatif : la réservation échoue fermée (aucun envoi par Resend). **0020 ne se rejoue pas** après sa descente (son `CREATE TABLE` échouerait) : un retour passe par une migration corrective vers l'avant. |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :
@@ -188,7 +189,7 @@ spécification B1).
 Console Neon, projet de staging, branche principale, **SQL Editor**, base de l'application : coller le contenu de
 `db/bootstrap/roles.sql` et l'exécuter. Il peut être rejoué sans effet.
 
-Contrôle (17 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
+Contrôle (19 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
 `vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge` et
 `vadrouille_coords_purge`) :
 
@@ -198,7 +199,7 @@ FROM pg_catalog.pg_roles WHERE rolname LIKE 'vadrouille\_%' ORDER BY rolname;
 ```
 
 Contrôle des appartenances (attendu : `vadrouille_app` membre de `vadrouille_share`, `vadrouille_webhook`,
-`vadrouille_account_admin`, `vadrouille_limiter` avec `inherit = false` ; `vadrouille_migrator` membre de
+`vadrouille_account_admin`, `vadrouille_limiter`, `vadrouille_mail_counter` avec `inherit = false` ; `vadrouille_migrator` membre de
 `vadrouille_owner` avec `inherit = true`, et des six `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
 `set = false` ; décision 0036, B1-TL-2. La ligne `ADMIN` seule du rôle d'amorçage sur chaque `vadrouille_fn_*`,
 créée par Postgres 16 et suivants quand il n'est pas superutilisateur, est admise ; elle n'apparaît pas ici) :

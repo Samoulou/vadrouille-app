@@ -11,6 +11,7 @@ import { serverEnv } from "@/server/env";
 import { errorNameOf, logEvent } from "@/server/log";
 import { disabledCodeMailer } from "@/server/mail/disabled";
 import type { CodeMailer } from "@/server/mail/port";
+import { createResendCodeMailer } from "@/server/mail/resend";
 import { createSmtpCodeMailer } from "@/server/mail/smtp";
 import { creerAuth, type InstanceAuth, OrganisationEnSuppressionError } from "@/tenancy/auth";
 import { avecAdresse } from "@/tenancy/code-otp";
@@ -19,7 +20,7 @@ import { CODE_CONNEXION, type EnteteIpDeConfiance, type EnvironnementAuth } from
 import { adhesion, organisationPersonnelle } from "@/tenancy/organisations";
 
 import { envoyerCodeRecu } from "./envoi";
-import { type AuthFailureCode, codeEchec } from "./erreurs";
+import { type AuthFailureCode, codeEchec, codeEchecEnvoi } from "./erreurs";
 import { reprendreSuppression } from "./reprise";
 
 /**
@@ -232,6 +233,10 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     } catch (erreur) {
       // Envoi refusé ou en panne : aucun code utilisable ne reste en base.
       await database.execute(sql`DELETE FROM verifications WHERE identifier = ${identifiant}`).catch(() => undefined);
+      // Plafond des envois atteint (B3d, point 4) : reconnu avant `journaliserEchec`, sans `auth.operation_failed` (le
+      // port a déjà écrit `email.cap_reached` ou `email.provider_refused`) ; toute autre erreur reste `provider_error`.
+      const codeEnvoi = codeEchecEnvoi(erreur);
+      if (codeEnvoi !== undefined) return echec(codeEnvoi);
       return journaliserEchec("request-code", erreur);
     }
   }
@@ -342,7 +347,8 @@ let parDefaut: AuthOperations | undefined;
  * Opérations du serveur : configuration de `serverEnv()` (`AUTH_ADAPTER=better-auth`, admis en `local` et `ci`
  * seulement, B3-TL-2), pools `vadrouille_auth` de `db/index.ts`, port d'envoi désactivé (`disabledCodeMailer`)
  * sans `EMAIL_TRANSPORT`, SMTP vers Mailpit (`createSmtpCodeMailer`, B3b-envoi, décision 0098) avec
- * `EMAIL_TRANSPORT=smtp`. Lève une `ServerEnvError` (sans valeur) si la configuration est refusée ou si l'adaptateur
+ * `EMAIL_TRANSPORT=smtp`, Resend (`createResendCodeMailer`, B3d, décision 0138) avec `EMAIL_TRANSPORT=resend` dans le
+ * seul cas admis (jamais atteint avant M1h : `better-auth` y est refusé). Lève une `ServerEnvError` (sans valeur) si la configuration est refusée ou si l'adaptateur
  * n'est pas `better-auth`.
  */
 export function authOperations(): AuthOperations {
@@ -357,7 +363,12 @@ export function authOperations(): AuthOperations {
     trustedIpHeader: env.trustedIpHeader,
     database: createDatabase("vadrouille_auth", undefined, POOL_OPERATIONS),
     verrous: createDatabase("vadrouille_auth", undefined, POOL_VERROUS),
-    mailer: env.smtp === null ? disabledCodeMailer : createSmtpCodeMailer(env.smtp),
+    mailer:
+      env.emailTransport === "resend"
+        ? createResendCodeMailer()
+        : env.emailTransport === "smtp" && env.smtp !== null
+          ? createSmtpCodeMailer(env.smtp)
+          : disabledCodeMailer,
   });
   return parDefaut;
 }

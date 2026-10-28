@@ -696,6 +696,21 @@
         }
       ],
       "ecart": "B7c (ticket 449 ; spécification B7, critère « evals: aucune donnée Google dans les jeux d'évaluation » ; CLAUDE.md, « Jamais ») : motif et sentinelle d'un contrôle négatif, sur le modèle de `tests/e2e/carte.e2e.spec.ts` et `tests/unit/p0/pipeline.test.ts` : ligne ordinaire B, 0040 D4 ; verdict Sécurité demandé (PR 454)"
+    },
+    {
+      "fichier": "src/server/mail/resend.ts",
+      "portee": "application",
+      "usage": "adresse figée de l'API d'envoi de Resend (B3d, M2a), seule origine du transport ; aucune variable d'environnement",
+      "capacites": [
+        {
+          "capacite": "hote:api.resend.com",
+          "formes": [
+            "https://api.resend.com/emails"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "module d'envoi réel de B3d (décision 0138 § 1.1) : verdict Sécurité : approuvé par 0138, à confirmer au head de la PR de M2a"
     }
   ]
 }

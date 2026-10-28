@@ -8,7 +8,7 @@ import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
 import { isProductionDeployment } from "@/dev/flags";
 import * as route from "@/app/api/v1/webhooks/simulated/route";
 import * as moduleEnv from "@/server/env";
-import { assertServerProcessEnv, parseServerEnv, rateLimitSettings, SERVER_ENV_VARIABLES, ServerEnvError, type ServerEnvRule, type ServerEnvVariable } from "@/server/env";
+import { assertServerProcessEnv, parseServerEnv, rateLimitSettings, resendAdmis, SERVER_ENV_VARIABLES, ServerEnvError, type ServerEnvRule, type ServerEnvVariable } from "@/server/env";
 import { resolveServerEnvironment, ServerEnvironmentUndeclaredError } from "@/server/env/resolve";
 import { formatLogLine, LOG_VARIABLES } from "@/server/log";
 import type { DependancesPaiement } from "@/server/payment/dependances";
@@ -490,8 +490,8 @@ describe("env: gardes de configuration (B3b-envoi : EMAIL_TRANSPORT et SMTP_URL,
     }
   });
 
-  it("EMAIL_TRANSPORT : exactement `smtp` après trim() ; SMTP, ses, resend, vide → refus", () => {
-    for (const valeur of ["ses", "resend", "SMTP", "Smtp", "", "   ", "smtp,ses", `smtp${SENTINELLE}`, SENTINELLE]) {
+  it("EMAIL_TRANSPORT : exactement `smtp` après trim() ; SMTP, ses, Resend, vide → refus (resend : forbidden en local et ci, 0138 § 10.4)", () => {
+    for (const valeur of ["ses", "Resend", "RESEND", "SMTP", "Smtp", "", "   ", "smtp,ses", `smtp${SENTINELLE}`, SENTINELLE]) {
       refus(smtp("smtp://127.0.0.1:1025", "ci", { [TRANSPORT]: valeur }), TRANSPORT, "invalid_value");
       // Une valeur inconnue passe avant le contrôle de l'adresse du transport.
       refus(smtp(undefined, "ci", { [TRANSPORT]: valeur }), TRANSPORT, "invalid_value");
@@ -667,6 +667,7 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
       "authAdapter",
       "betterAuth",
       "dataAdapter",
+      "emailTransport",
       "environment",
       "paymentAdapter",
       "rateLimitHmacSecret",
@@ -692,6 +693,7 @@ describe("env: modules d'environnement", () => {
       "authAdapter",
       "betterAuth",
       "dataAdapter",
+      "emailTransport",
       "environment",
       "paymentAdapter",
       "rateLimitHmacSecret",
@@ -1123,3 +1125,133 @@ describe("paiement: réponses du webhook simulé (A24)", () => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("env: gardes de l'envoi réel (B3d, R1 ; décision 0138 § 2, § 3 et § 10)", () => {
+  const TRANSPORT = NOM.EMAIL_TRANSPORT;
+  const CLE_RESEND = NOM.RESEND_API_KEY;
+  /** Sentinelle de la clé, de la forme admise (0138 § 2.3), manifestement fausse. */
+  const CLE = `re_SENTINELLE_${SENTINELLE}`;
+  /** Cas admis de 0138 § 3 : Vercel, préversion, aucune déclaration de l'opérateur. */
+  const admis = (extra: Env = {}): Env => vercel("preview", { ...connexionReelle(), [TRANSPORT]: "resend", [CLE_RESEND]: CLE, ...extra });
+
+  /** Refus avec journaux capturés : ni la sentinelle, ni la clé, ni une valeur reçue n'y figurent. */
+  function refus(env: Env, variable: ServerEnvVariable, rule: ServerEnvRule): void {
+    const espions = [vi.spyOn(console, "log"), vi.spyOn(console, "error"), vi.spyOn(console, "warn")];
+    try {
+      attendreRefus(
+        () => parseServerEnv(env),
+        variable,
+        rule,
+        [CLE, ...Object.values(env).filter((v): v is string => v !== undefined && v.length >= 8 && !NOMS_ENVIRONNEMENT.has(v.trim().toLowerCase()))],
+      );
+      const ecrit = espions.flatMap((espion) => espion.mock.calls.flat()).map(String).join("\n");
+      expect(ecrit).not.toContain(SENTINELLE);
+    } finally {
+      for (const espion of espions) espion.mockRestore();
+    }
+  }
+
+  it("prédicat du cas admis : vrai seulement sur Vercel en préversion, sans déclaration de VADROUILLE_ENV", () => {
+    for (const env of [vercel("preview"), vercel(" Preview "), vercel("PREVIEW"), vercel("preview", { VADROUILLE_ENV: "" }), vercel("preview", { VADROUILLE_ENV: "   " }), vercel("preview", { VERCEL_TARGET_ENV: "preview" }), vercel("preview", { VERCEL: " 1 " })]) {
+      expect(resendAdmis(env), JSON.stringify(env)).toBe(true);
+    }
+    const refuses: Env[] = [
+      vercel("production"),
+      vercel("development"),
+      vercel("staging"),
+      { VERCEL_ENV: "preview" },
+      { VERCEL_ENV: "preview", VERCEL: "0" },
+      { VADROUILLE_ENV: "staging" },
+      { VADROUILLE_ENV: "local" },
+      { VADROUILLE_ENV: "ci" },
+      { VADROUILLE_ENV: "production" },
+      vercel("preview", { VADROUILLE_ENV: "staging" }),
+      vercel("preview", { VADROUILLE_ENV: "ci" }),
+      vercel("preview", { VADROUILLE_ENV: "local" }),
+      vercel("preview", { VADROUILLE_ENV: "production" }),
+      vercel("preview", { VERCEL_TARGET_ENV: "" }),
+      vercel("preview", { VERCEL_TARGET_ENV: "  " }),
+      vercel("preview", { VERCEL_TARGET_ENV: " Preview " }),
+      vercel("preview", { VERCEL_TARGET_ENV: "mvp-essai" }),
+      vercel("preview", { VERCEL_TARGET_ENV: "production" }),
+      {},
+    ];
+    for (const env of refuses) expect(resendAdmis(env), JSON.stringify(env)).toBe(false);
+  });
+
+  it("état de M2a : cas admis, clé valide, better-auth → AUTH_ADAPTER forbidden (B3-TL-2 inchangé, M1h)", () => {
+    refus(admis(), NOM.AUTH_ADAPTER, "forbidden");
+    refus(admis({ VERCEL_ENV: " Preview " }), NOM.AUTH_ADAPTER, "forbidden");
+    refus(admis({ VERCEL_TARGET_ENV: "preview", VADROUILLE_ENV: "" }), NOM.AUTH_ADAPTER, "forbidden");
+    refus(admis({ [TRANSPORT]: "  resend  " }), NOM.AUTH_ADAPTER, "forbidden");
+  });
+
+  it("cas admis : clé absente → missing ; de forme invalide → invalid_value (jugée avant AUTH_ADAPTER)", () => {
+    refus(admis({ [CLE_RESEND]: undefined }), CLE_RESEND, "missing");
+    const invalides = ["", "   ", ` ${CLE}`, `${CLE} `, "re_court", `rk_SENTINELLE_${SENTINELLE}`, `re_${"é".repeat(20)}`, `re_${"a".repeat(126)}`, `re_SENTINELLE ${SENTINELLE}`, SENTINELLE];
+    for (const valeur of invalides) refus(admis({ [CLE_RESEND]: valeur }), CLE_RESEND, "invalid_value");
+  });
+
+  it("EMAIL_TRANSPORT=resend refusé hors du cas admis : local, ci, staging hors Vercel, production, préversion mal déclarée", () => {
+    for (const environnement of ["local", "ci"]) {
+      refus({ VADROUILLE_ENV: environnement, ...connexionReelle(), [TRANSPORT]: "resend" }, TRANSPORT, "forbidden");
+      refus({ VADROUILLE_ENV: environnement, ...connexionReelle(), [TRANSPORT]: "resend", [CLE_RESEND]: CLE }, CLE_RESEND, "forbidden");
+    }
+    const deploiements: Env[] = [
+      { VADROUILLE_ENV: "staging" },
+      { VADROUILLE_ENV: "production" },
+      vercel("production"),
+      vercel("development"),
+      { VERCEL_ENV: "preview", VADROUILLE_ENV: "staging" },
+      vercel("preview", { VADROUILLE_ENV: "staging" }),
+      vercel("preview", { VADROUILLE_ENV: "ci" }),
+      vercel("preview", { VERCEL_TARGET_ENV: "" }),
+      vercel("preview", { VERCEL_TARGET_ENV: " Preview " }),
+      vercel("preview", { VERCEL_TARGET_ENV: "mvp-essai" }),
+    ];
+    for (const base of deploiements) {
+      refus({ ...base, ...connexionReelle(), [TRANSPORT]: "resend", [CLE_RESEND]: CLE }, TRANSPORT, "forbidden");
+      refus({ ...base, [TRANSPORT]: "resend" }, TRANSPORT, "forbidden");
+    }
+  });
+
+  it("cas admis : AUTH_ADAPTER=mock → EMAIL_TRANSPORT forbidden ; Resend, RESEND, smtp → forbidden ; SMTP_URL avec resend → forbidden", () => {
+    refus(admis({ AUTH_ADAPTER: "mock" }), TRANSPORT, "forbidden");
+    refus(admis({ AUTH_ADAPTER: undefined }), TRANSPORT, "forbidden");
+    for (const valeur of ["Resend", "RESEND", "smtp", "", "resend,smtp"]) refus(admis({ [TRANSPORT]: valeur }), TRANSPORT, "forbidden");
+    refus(admis({ [NOM.SMTP_URL]: "smtp://127.0.0.1:1025" }), NOM.SMTP_URL, "forbidden");
+    refus(admis({ [NOM.SMTP_URL]: "" }), NOM.SMTP_URL, "forbidden");
+  });
+
+  it("clé présente sans EMAIL_TRANSPORT=resend → forbidden, partout, vide comprise", () => {
+    for (const valeur of [CLE, "", "   ", SENTINELLE]) {
+      refus(ci({ [CLE_RESEND]: valeur }), CLE_RESEND, "forbidden");
+      refus({ VADROUILLE_ENV: "local", [CLE_RESEND]: valeur }, CLE_RESEND, "forbidden");
+      refus(ci({ ...connexionReelle(), [TRANSPORT]: "smtp", [NOM.SMTP_URL]: "smtp://127.0.0.1:1025", [CLE_RESEND]: valeur }), CLE_RESEND, "forbidden");
+      refus({ VADROUILLE_ENV: "staging", [CLE_RESEND]: valeur }, CLE_RESEND, "forbidden");
+      refus({ VADROUILLE_ENV: "production", [CLE_RESEND]: valeur }, CLE_RESEND, "forbidden");
+      refus(vercel("preview", { [CLE_RESEND]: valeur }), CLE_RESEND, "forbidden");
+      refus(vercel("production", { [CLE_RESEND]: valeur }), CLE_RESEND, "forbidden");
+    }
+  });
+
+  it("variable de préfixe NEXT_PUBLIC_ dont le nom contient RESEND (casse ignorée) → forbidden partout, libellé fixe", () => {
+    const noms = Object.keys({ NEXT_PUBLIC_RESEND_API_KEY: 0, NEXT_PUBLIC_resend: 0, NEXT_PUBLIC_MON_ReSeNd_X: 0 });
+    for (const nom of noms) {
+      for (const base of [ci(), { VADROUILLE_ENV: "local" }, { VADROUILLE_ENV: "production" }, vercel("preview")]) {
+        for (const valeur of [CLE, ""]) refus({ ...base, [nom]: valeur }, NOM["NEXT_PUBLIC_*RESEND*"], "forbidden");
+      }
+    }
+    // Hors du préfixe exact : non concernées par cette garde.
+    expect(parseServerEnv(ci(Object.fromEntries(Object.keys({ NEXT_PUBLIC_RESENT: 0, MON_NEXT_PUBLIC_RESEND: 0 }).map((nom) => [nom, "1"])))).environment).toBe("ci");
+  });
+
+  it("champ du transport : disabled sans EMAIL_TRANSPORT, smtp avec Mailpit ; aucun champ ne porte la clé", () => {
+    expect(parseServerEnv(ci()).emailTransport).toBe("disabled");
+    expect(parseServerEnv({ VADROUILLE_ENV: "production" }).emailTransport).toBe("disabled");
+    const config = parseServerEnv(ci({ ...connexionReelle(), [TRANSPORT]: "smtp", [NOM.SMTP_URL]: "smtp://127.0.0.1:1025" }));
+    expect(config.emailTransport).toBe("smtp");
+    expect(Object.keys(config)).not.toContain("resendApiKey");
+    expect(inspect(config, { depth: 5 })).not.toContain("re_");
+  });
+});

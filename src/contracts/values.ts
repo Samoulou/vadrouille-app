@@ -217,6 +217,9 @@ export const API_ERROR_CODES = [
   // B10a (décision 0112 § 1.6 ; B10-PO-14) : écriture du tri refusée pendant un recalcul du voyage, `retryable` vrai ;
   // état `generating` du handover § 4. Ajouté à la fin, sans renommer ni réordonner.
   "generation_in_progress",
+  // B3d (spécification B3d, point 4 ; décision 0138 T4) : plafond global des e-mails du jour atteint, ou quota du
+  // fournisseur ; `retryable` faux (la personne réessaie demain). Ajouté à la fin, sans renommer ni réordonner.
+  "email_cap_reached",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

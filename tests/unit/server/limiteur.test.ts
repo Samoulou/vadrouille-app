@@ -451,6 +451,11 @@ describe("module de journal", () => {
       "email.transport_disabled",
       // B3b-envoi : enveloppe refusée avant l'envoi (aucune valeur).
       "email.envelope_refused",
+      // B3d (M2a) : envoi réel accepté, plafond du jour atteint, refus de Resend, refus avant le transport (codes fermés).
+      "email.sent",
+      "email.cap_reached",
+      "email.provider_refused",
+      "email.transport_refused",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",

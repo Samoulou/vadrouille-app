@@ -811,6 +811,11 @@ export default defineConfig([
       "src/server/auth/**/*.ts",
       "src/server/mail/port.ts",
       "src/server/mail/disabled.ts",
+      // B3d (M2a ; décision 0138 § 9, ligne 8) : implémentation Resend, plafond, tableau des réponses, clé.
+      "src/server/mail/resend.ts",
+      "src/server/mail/plafond.ts",
+      "src/server/mail/reponses-resend.ts",
+      "src/server/env/cle-resend.ts",
       "src/server/session.ts",
       "src/server/with-org.ts",
       "src/tenancy/**/*.ts",

@@ -21,7 +21,7 @@ import { parseInput } from "../parse-input";
  * (`retryable` compris) ; toute autre erreur, garde fermée comprise, devient `provider_error`, sans détail.
  */
 
-const REQUEST_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["validation_failed", "rate_limited", "provider_error"]);
+const REQUEST_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(["validation_failed", "rate_limited", "provider_error", "email_cap_reached"]);
 const VERIFY_ERRORS: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
   "validation_failed",
   "rate_limited",

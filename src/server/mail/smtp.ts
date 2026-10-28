@@ -10,7 +10,7 @@ import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 import { logEvent } from "@/server/log";
 
 import { checkEnvelope } from "./enveloppe";
-import type { CodeMailer, LoginCodeMessage } from "./port";
+import { type CodeMailer, CodeMailerRefusalError, type LoginCodeMessage } from "./port";
 
 /**
  * Implémentation SMTP du port d'envoi du code, **vers Mailpit seulement** (spécification B3b-envoi, points 3 à 5 ;
@@ -87,14 +87,8 @@ export function creerTransportSmtp(cible: SmtpTarget): TransportSmtp {
   return createTransport(optionsTransport(cible));
 }
 
-/** Message du port refusé avant tout appel du transport ; ne porte aucune valeur (ni adresse, ni code). */
-export class CodeMailerRefusalError extends Error {
-  override name = "CodeMailerRefusalError";
-
-  constructor() {
-    super("Envoi du code refusé avant le transport.");
-  }
-}
+/** Message du port refusé avant tout appel du transport (défini dans `./port.ts`, partagé avec `./resend.ts`). */
+export { CodeMailerRefusalError };
 
 /** Panne du transport SMTP ; ne porte aucune valeur ni cause (le message de la bibliothèque est perdu à dessein). */
 export class SmtpEnvoiError extends Error {

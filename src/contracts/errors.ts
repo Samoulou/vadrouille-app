@@ -42,6 +42,10 @@ export const ApiErrorSchema = z
     if (error.code === "generation_in_progress" && error.retryable !== true) {
       ctx.addIssue({ code: "custom", message: "generation_in_progress : retryable vaut true", path: ["retryable"] });
     }
+    // B3d (spécification B3d, point 4) : plafond du jour atteint ; réessayer tout de suite ne sert à rien.
+    if (error.code === "email_cap_reached" && error.retryable !== false) {
+      ctx.addIssue({ code: "custom", message: "email_cap_reached : retryable vaut false", path: ["retryable"] });
+    }
     if ((error.code === "active_preview_exists") !== (error.activeTripId !== undefined)) {
       ctx.addIssue({
         code: "custom",

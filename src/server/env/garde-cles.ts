@@ -9,7 +9,7 @@
  * valeur qu'il rende.
  */
 
-export type CleDeService = "modeles" | "google" | "passerelle" | "oidc";
+export type CleDeService = "modeles" | "google" | "passerelle" | "oidc" | "envoi";
 
 export function clesDeServicePosees(env: Readonly<Record<string, string | undefined>> = process.env): readonly CleDeService[] {
   const posees: CleDeService[] = [];
@@ -17,5 +17,7 @@ export function clesDeServicePosees(env: Readonly<Record<string, string | undefi
   if (env.GOOGLE_MAPS_SERVER_KEY !== undefined && env.GOOGLE_MAPS_SERVER_KEY !== "") posees.push("google");
   if (env.AI_GATEWAY_API_KEY !== undefined && env.AI_GATEWAY_API_KEY !== "") posees.push("passerelle");
   if (env.VERCEL_OIDC_TOKEN !== undefined && env.VERCEL_OIDC_TOKEN !== "") posees.push("oidc");
+  // B3d (M2a ; décision 0138 § 2.6) : clé de l'API de Resend, présence seulement.
+  if (env.RESEND_API_KEY !== undefined && env.RESEND_API_KEY !== "") posees.push("envoi");
   return posees;
 }
