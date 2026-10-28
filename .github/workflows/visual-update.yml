@@ -26,7 +26,7 @@ jobs:
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'claude/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -68,7 +68,7 @@ jobs:
 
   publish:
     needs: regenerate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
@@ -211,7 +211,7 @@ jobs:
     needs: [regenerate, publish]
     # S'exécute dès que `regenerate` a été lancé (garde-fous remplis), quel que soit le résultat.
     if: always() && needs.regenerate.result != 'skipped'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       pull-requests: write
