@@ -36,6 +36,7 @@
     "pourYAllerDepuis": "{mode}, {duree} depuis {origin}",
     "pourYAllerDepuisEstime": "{mode}, environ {duree} (estimation) depuis {origin}",
     "pourYAllerDepuisSansDuree": "{mode} depuis {origin}, durée à confirmer",
+    "siteOfficiel": "Site officiel",
     "actions": "Actions",
     "remplacer": "Remplacer",
     "deplacer": "Déplacer",

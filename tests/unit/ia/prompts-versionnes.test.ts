@@ -36,14 +36,20 @@ const EMPREINTES: Record<string, Record<number, string>> = {
   structuration: { 1: "e9d62fe8ce071a2c0a3f3b97dd595408eca3f62dd288e84fbcdc76aee13433be" },
   quartier: { 1: "a7d2edb04621223aa702be9058f92cadbd509aa4b3eb99e7f5bea9db7e25355b" },
   "recherche-web": { 2: "5d9657a1e8e78be1e3cfac7dacc9ce26f3667225f3ff5188158a3fe94f7fff49" },
-  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`) ; v3 (E2E-essai, lot 5, « à éviter »).
+  // Décision 0121 § 4.3 : v1 (lot 1, historique des mesures) et v2 (lot 2a, champ `site`) ; v3 (E2E-essai, lot 5, « à éviter ») ; v4 (#800).
   programme: {
     1: "7f3ac2bcbebf9331d2038fd558d4b8b2b5649fb978b5ca27c82e8b2fd0feea76",
     2: "236e304ba393a2d4504310f1898eadedda0487e638d558a0ee115d4526c30b80",
     3: "413eb5e8aacf8c0b3408e2549c7c83668aeaa337548663903c60431143579b59",
+    // Ticket #800 (amendement 4) : site pour chaque lieu dès qu'un site officiel existe, journées sans allers-retours.
+    4: "851f7045685335f9269630cb8e959d3ec5b12c392e8e0385af5b61c1cfa7831d",
   },
   // E2E-essai, lot 4 (décision 0126) : révision du programme après le tri « J'aime / Pas pour moi ».
-  revision: { 1: "bf5355ef97edba46b6961a113476e73ae232c22399c1eed0a54501345b071fc1" },
+  // v2 (ticket #800, amendement 4 de P0-programme-par-ia) : mêmes règles de site et de parcours que `programme` v4.
+  revision: {
+    1: "bf5355ef97edba46b6961a113476e73ae232c22399c1eed0a54501345b071fc1",
+    2: "674314914e797f7e2f937b01e00fbfa1db26cf2dbb59bef09b13b371549b2254",
+  },
 };
 
 const PROMPTS = [PROMPT_PLAN, PROMPT_RECHERCHE, PROMPT_NOTATION, PROMPT_RAISONS, PROMPT_STRUCTURATION, PROMPT_QUARTIER, PROMPT_RECHERCHE_WEB, PROMPT_PROGRAMME, PROMPT_REVISION];
@@ -63,8 +69,8 @@ describe("prompts: versionnés", () => {
     expect(PROMPT_QUARTIER.version).toBe(1);
   });
 
-  it("programme: prompt v3 demande le site officiel, sans donnée Google (A13)", () => {
-    expect(PROMPT_PROGRAMME.version).toBe(3);
+  it("programme: prompt v4 demande le site officiel, sans donnée Google (A13)", () => {
+    expect(PROMPT_PROGRAMME.version).toBe(4);
     const texte = PROMPT_PROGRAMME.texte;
     // Le champ `site` est demandé, facultatif, pour le site officiel, en https sans paramètres.
     expect(texte).toContain('"site" (facultatif)');
@@ -78,7 +84,7 @@ describe("prompts: versionnés", () => {
     expect(texte).not.toMatch(/google|placeId|place_id/i);
   });
 
-  it("programme: prompt v3 demande qu'aucun créneau ne relève d'une catégorie « à éviter » (E2E-essai, lot 5)", () => {
+  it("programme: prompt v4 demande qu'aucun créneau ne relève d'une catégorie « à éviter » (E2E-essai, lot 5)", () => {
     const texte = PROMPT_PROGRAMME.texte;
     expect(texte).toContain('Si le brief porte "aEviter"');
     expect(texte).toMatch(/aucun créneau n'en relève, même un incontournable/);
@@ -86,8 +92,8 @@ describe("prompts: versionnés", () => {
     for (const code of ["museum", "walk", "nature", "tasting", "restaurant", "heritage", "market", "nightlife"]) expect(texte).toContain(`${code} = `);
   });
 
-  it("revision: prompt v1 retire les étapes écartées, garde les aimées, sans donnée Google (E2E-essai, lot 4)", () => {
-    expect(PROMPT_REVISION.version).toBe(1);
+  it("revision: prompt v2 retire les étapes écartées, garde les aimées, sans donnée Google (E2E-essai, lot 4)", () => {
+    expect(PROMPT_REVISION.version).toBe(2);
     const texte = PROMPT_REVISION.texte;
     expect(texte).toContain('"pasPourMoi"');
     expect(texte).toContain('"jAime"');
@@ -98,6 +104,32 @@ describe("prompts: versionnés", () => {
     expect(texte).toContain('Si le brief porte "aEviter"');
     expect(texte).not.toMatch(/https?:\/\//);
     expect(texte).not.toMatch(/google|placeId|place_id/i);
+  });
+
+  // Ticket #800 (amendement 4 de `specs/P0-programme-par-ia.md`) : mêmes règles dans les deux prompts.
+  it.each([
+    ["programme", PROMPT_PROGRAMME],
+    ["revision", PROMPT_REVISION],
+  ] as const)("%s : site demandé pour chaque lieu dès qu'un site officiel existe, mêmes interdits", (_id, prompt) => {
+    const texte = prompt.texte;
+    expect(texte).toMatch(/pour chaque créneau avec un lieu, donne l'adresse du site officiel dès qu'il en existe un/);
+    expect(texte).toMatch(/celui de l'institution qui le gère/);
+    expect(texte).toMatch(/n'invente jamais une adresse/);
+    expect(texte).toMatch(/Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers/);
+    expect(texte).toMatch(/https complète, sans paramètres/);
+    expect(texte).toContain('"quartier" (pour chaque lieu)');
+    expect(texte).not.toMatch(/https?:\/\//);
+  });
+
+  it.each([
+    ["programme", PROMPT_PROGRAMME],
+    ["revision", PROMPT_REVISION],
+  ] as const)("%s : journées sans allers-retours, sans coordonnée ni temps de trajet", (_id, prompt) => {
+    const texte = prompt.texte;
+    expect(texte).toMatch(/dans l'ordre d'une marche ou d'un trajet, sans revenir sur ses pas ni traverser la ville deux fois/);
+    expect(texte).toMatch(/Les étapes d'un même quartier se suivent/);
+    expect(texte).toMatch(/La première étape part du logement quand le brief le donne ; la dernière finit près de lui ou dans le quartier du dîner/);
+    expect(texte).not.toMatch(/latitude|longitude|coordonn|\blat\b|\blng\b|minutes de trajet|google|placeId|place_id/i);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {
