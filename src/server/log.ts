@@ -42,7 +42,7 @@ export const LOG_EVENTS = [
   "p0.programme_written",
   // Décision 0074 : branchement de la lecture des programmes réels impossible au démarrage ; `errorName` seulement.
   // Relecture Routes refusée ou en échec (`src/server/p0/relecture.ts`) : `errorName` et, pour une erreur d'un client
-  // Google, son code fermé dans `failureCode` (ticket #826, décision 0136 § 2 : `LOG_STEP_FAILURE_CODES`).
+  // Google, son code fermé dans `failureCode` (ticket #826, décision 0137 § 2 : `LOG_STEP_FAILURE_CODES`).
   "p0.read_unavailable",
   // Décision 0124 § 2 (spécification E2E-essai, lot 1) : branchement du cookie de déblocage de l'essai impossible au
   // démarrage ; `errorName` seulement (ni cookie, ni clé, ni identifiant de voyage). Seul le droit simulé de la portée reste.
@@ -225,7 +225,7 @@ export type LogFields = {
   readonly phase?: string;
   /**
    * Code fermé de la cause d'arrêt d'une étape (`p0.step_failed`) ou de l'erreur Google d'une relecture refusée
-   * (`p0.read_unavailable`, décision 0136 § 2) : `LOG_STEP_FAILURE_CODES`, jamais un message ; retiré sur tout autre événement.
+   * (`p0.read_unavailable`, décision 0137 § 2) : `LOG_STEP_FAILURE_CODES`, jamais un message ; retiré sur tout autre événement.
    */
   readonly failureCode?: string;
   /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
@@ -714,7 +714,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 /**
  * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
  * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
- * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0136 § 2) seulement.
+ * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement.
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
   ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],

@@ -382,7 +382,7 @@ describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed
   });
 });
 
-describe("p0: Google indisponible à la lecture (ticket n° 826, décision 0136)", () => {
+describe("p0: Google indisponible à la lecture (ticket n° 826, décision 0137)", () => {
   const TRIP_ID = "proto_test_20261012_1";
   const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owner" as const };
   const DOSSIER = realpathSync(join(process.cwd(), "prototype", "programmes-test"));
@@ -424,7 +424,7 @@ describe("p0: Google indisponible à la lecture (ticket n° 826, décision 0136)
     expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "ErreurInterne" }, "warn");
   });
 
-  it("décision 0136 § 2 : `failureCode` admis sur `p0.read_unavailable` et `p0.step_failed` seulement, retiré ailleurs", async () => {
+  it("décision 0137 § 2 : `failureCode` admis sur `p0.read_unavailable` et `p0.step_failed` seulement, retiré ailleurs", async () => {
     const { formatLogLine } = await vi.importActual<typeof import("@/server/log")>("@/server/log");
     const ligne = (evenement: string) => JSON.parse(formatLogLine(evenement, { errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }, "warn")) as unknown;
     expect(ligne("p0.step_failed")).toEqual({ level: "warn", event: "p0.step_failed", errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" });

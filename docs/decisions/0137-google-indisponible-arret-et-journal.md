@@ -1,4 +1,4 @@
-# 0136 — Google indisponible : 429 écrit comme arrêt externe, code Google dans `p0.read_unavailable`
+# 0137 — Google indisponible : 429 écrit comme arrêt externe, code Google dans `p0.read_unavailable`
 
 Statut : **acceptée à sa fusion** (0093 : sans délai de veto) · Date : 2026-10-28 · Décideur : Tech Lead (table des codes d'arrêt de 0046 D24 et contenu du journal : architecture, « Qui décide quoi » de `docs/CONTEXT.md`), sur le **verdict favorable de la Sécurité du 2026-10-28** (revue consolidée de la PR #828, head `56673c5` : S4 et champ du journal) · Rédaction : backend · Ticket : #826 · PR : #828. À lister dans la prochaine note de version (« Décisions prises par le studio »).
 

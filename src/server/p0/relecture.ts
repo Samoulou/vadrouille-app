@@ -40,7 +40,7 @@ import { creerRegistreForfait } from "@/server/usage/registre";
  * cache (pages `force-dynamic` : Next.js répond `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
  * vérifié par `tests/e2e/lecture-reelle.e2e.spec.ts`). Un refus après la garde écrit `p0.read_unavailable`
  * avec un nom fermé seulement (`PurgeAncienne`, `PlafondAtteint`, `ReservationImpossible`, ou le nom de l'erreur du
- * client : `ErreurClientGoogle`, avec alors son code fermé dans `failureCode`, ticket #826, décision 0136 § 2), jamais une durée, un
+ * client : `ErreurClientGoogle`, avec alors son code fermé dans `failureCode`, ticket #826, décision 0137 § 2), jamais une durée, un
  * identifiant de lieu ni un message.
  *
  * **Google indisponible** (ticket #826 : 429, 5xx, délai) : seul Routes est appelé à la lecture ; les positions des lieux
@@ -109,7 +109,7 @@ async function purgeRecente(pool: PoolSql): Promise<boolean> {
 /**
  * Nom de l'erreur des clients Google (`ErreurClientGoogle` de `src/grounding/enveloppe-google.ts`, non importé ici : la
  * composition reste chargée à la demande ; même lecture structurelle que `codeDe` de `src/server/p0/photos.ts`).
- * Comparaison de nom plutôt qu'`instanceof` (décision 0136 § 2) ; le journal filtre de toute façon `failureCode` par liste
+ * Comparaison de nom plutôt qu'`instanceof` (décision 0137 § 2) ; le journal filtre de toute façon `failureCode` par liste
  * fermée.
  */
 const NOM_ERREUR_GOOGLE = "ErreurClientGoogle";
@@ -216,7 +216,7 @@ export function creerRelecteurReel(dependances: DependancesRelecteur = {}): Rele
         const code = codeDe(erreur);
         if (code !== undefined && PLAFONDS_ATTEINTS.has(code)) return refus("quota_reached");
         const errorName = errorNameOf(erreur);
-        // Ticket #826, décision 0136 § 2 : code fermé de l'erreur du client Google (`upstream_rate_limited` pour un 429, par
+        // Ticket #826, décision 0137 § 2 : code fermé de l'erreur du client Google (`upstream_rate_limited` pour un 429, par
         // exemple) dans `failureCode`, admis sur `p0.read_unavailable` par le journal (`LOG_STEP_FAILURE_CODES`) ; jamais
         // le message ni le statut HTTP. Aucun code pour une autre erreur. La page est servie sans ces durées.
         const failureCode = errorName === NOM_ERREUR_GOOGLE ? code : undefined;
