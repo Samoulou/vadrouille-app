@@ -5,7 +5,7 @@ Statut : **acceptée à sa fusion** (0093 : sans délai de veto) · Date : 2026-
 **Amende, à la date du 2026-10-28** :
 - **0046 D24**, liste « `stop_code` », puce « correspondance avec `scripts/p0/journal.ts` » : ajout de l'alias `upstream_rate_limited` → `upstream_unavailable` (§ 1) ;
 - **0079 § 6** (journal de la relecture) : `p0.read_unavailable` porte aussi `failureCode` pour une erreur d'un client Google (§ 2) ;
-- **0092 § 4** (relecture refusée : page servie sans les temps manquants) : précisé pour un refus de Google (§ 5), sans changer la règle.
+- **0092 § 4** (relecture refusée : page servie sans les temps manquants) : précisé pour un refus de Google (§ 5), sans changer la règle. Ce § 5 est seulement descriptif : le verdict Sécurité cité porte sur les § 1 et § 2, pas sur lui.
 
 ## Contexte
 Incident du 2026-10-28 sur le site d'essai : à partir de 19:13 UTC, Google répond 429 à tous les appels. Un lancement arrêté par ce 429 s'affichait « échec du traitement », comme une panne interne, et le journal de la relecture ne disait pas quelle erreur Google était survenue.
@@ -40,6 +40,7 @@ Incident du 2026-10-28 sur le site d'essai : à partir de 19:13 UTC, Google rép
 - Un `stop_code` propre à la limite Google (migration du `CHECK`, approbation de Samuel) : question de la PR #828.
 
 ## Tests
+- `tests/unit/prototype-lancement.test.tsx` : causes d'arrêt en fragments minuscules sans point final, libellé de `upstream_unavailable` épinglé.
 - `tests/unit/p0/arret.test.ts` : `codePersiste("upstream_rate_limited", false | true) === "upstream_unavailable"`.
 - `tests/unit/p0/relecture.test.ts` :
   - appel exact et unique de `p0.read_unavailable` avec `failureCode` pour trois codes Google ;
