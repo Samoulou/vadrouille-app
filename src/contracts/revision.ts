@@ -204,26 +204,34 @@ export type ApplyResult = { ok: true; version: number } | { ok: false; error: "c
 
 /**
  * Remplacement d'une étape sur l'adaptateur `api` (tâche M1g, ticket 869 ; plan `docs/plans/mvp-etapes-1-9.md`, étape 1) :
- * réponses des actions serveur, **jamais stockées**. La proposition vient des lignes `proposals` du voyage (une
- * proposition déjà vérifiée, avec `placeId`), jamais d'un appel Google ou Routes ; le serveur ne garde aucun aperçu.
+ * réponses des actions serveur, **jamais stockées**. Le candidat vient des propositions déjà vérifiées du voyage (ligne
+ * `proposals` liée à sa ligne `candidates`), jamais d'un appel de modèle ; le serveur ne garde aucun aperçu.
  *
- * - `offer` : l'étape proposée (`stop.id` = identifiant de l'étape créée à l'application, `start` et `end` du créneau
- *   remplacé), la proposition choisie (`proposals.id`) et la version courante sur laquelle elle a été calculée ;
- * - `noOption` : aucune proposition compatible (même nature, lieu absent du programme, non écartée au tri) ;
- * - `conflict` : la version de base n'est plus la version courante ; `lockedStop` : l'étape est verrouillée.
+ * - `offer` : brouillon calculé par le moteur (`appliquerPatch`, opération `replace`) sur la version `version` : jours
+ *   touchés recomposés comme une lecture (durées comprises), changements, étape proposée ; `candidateId` est l'identifiant
+ *   du candidat (`candidates.id`) que l'application reprend. Brouillon **non raffiné** : un jour touché peut garder un
+ *   engagement intact (question au Tech Lead, PR 869) ;
+ * - `noOption` : aucune proposition compatible, ou le moteur refuse ; `conflict` : la version de base n'est plus la
+ *   version courante ; `lockedStop` : l'étape est verrouillée.
  */
-export type ReplacementOffer =
-  | { status: "offer"; version: number; proposalId: string; stop: z.infer<typeof StopSchema> }
-  | { status: "noOption" }
-  | { status: "conflict"; currentVersion: number }
-  | { status: "lockedStop" };
+const VersionReponseSchema = z.number().int().nonnegative();
+
+export const ReplacementOfferSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("offer"), version: VersionReponseSchema, candidateId: IdSchema, draft: ReplacementDraftBaseSchema }),
+  z.strictObject({ status: z.literal("noOption") }),
+  z.strictObject({ status: z.literal("conflict"), currentVersion: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("lockedStop") }),
+]);
+export type ReplacementOffer = z.infer<typeof ReplacementOfferSchema>;
 
 /**
  * Écriture d'un remplacement (`applied`) ou de son annulation (`undone`, opération `revert` de `TripPatch`) : nouvelle
  * version courante ; sinon refus sans rien écrire (`conflict`, `noOption`, `lockedStop`).
  */
-export type ReplacementWrite =
-  | { status: "applied" | "undone"; version: number }
-  | { status: "conflict"; currentVersion: number }
-  | { status: "noOption" }
-  | { status: "lockedStop" };
+export const ReplacementWriteSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.enum(["applied", "undone"]), version: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("conflict"), currentVersion: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("noOption") }),
+  z.strictObject({ status: z.literal("lockedStop") }),
+]);
+export type ReplacementWrite = z.infer<typeof ReplacementWriteSchema>;

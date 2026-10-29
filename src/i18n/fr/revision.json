@@ -18,6 +18,7 @@
   "appliquer": "Appliquer",
   "annuler": "Annuler",
   "annulee": "Modification annulée.",
+  "annulationEchouee": "L'annulation n'a pas abouti. Ta modification est toujours là.",
   "remplacer": {
     "titre": "Remplacer {name}",
     "verrouillee": "Cette étape est verrouillée. Retire le verrou depuis sa fiche pour la remplacer.",

@@ -679,3 +679,90 @@ function logementsDesJours(jours: readonly DaySnapshot[], logements: readonly (s
     return [logements[depart] ?? null, logements[arrivee] ?? null];
   });
 }
+
+// --- Révision enregistrée (M1g, PR 869) ---------------------------------------------------------------------------
+
+/**
+ * Ce qu'une révision lit comme la lecture (tâche M1g, PR 869 : `src/server/versions/remplacement.ts`) : version courante et
+ * sa chaîne, séjour de chaque nuit, modes admis. Mêmes requêtes et mêmes erreurs fermées que `lireEtat` ; **aucun** appel du
+ * port ici (il se fait hors de la transaction, par `relireRevision`).
+ */
+export type BaseDeRevision = {
+  readonly tripId: string;
+  readonly start: string;
+  readonly end: string;
+  readonly timeZone: string;
+  readonly version: number;
+  readonly snapshot: TripSnapshot;
+  readonly chaine: readonly VersionDeChaine[];
+  readonly sejours: readonly SejourDeNuit[];
+  readonly modes: readonly ModeTrajet[];
+  readonly nuits: number;
+};
+
+export async function lireBaseDeRevision(executeur: ExecuteurLecture, ctx: AdapterContext, tripId: string): Promise<BaseDeRevision | null> {
+  const etat = await lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true });
+  if (etat === null) return null;
+  const contexte = { tripId, version: etat.enTete.version };
+  return {
+    tripId,
+    start: etat.enTete.start,
+    end: etat.enTete.end,
+    timeZone: etat.enTete.timeZone,
+    version: etat.enTete.version,
+    snapshot: etat.snapshot,
+    chaine: etat.chaine,
+    sejours: sejoursDe(etat, contexte),
+    modes: modesDe(etat, contexte),
+    nuits: nombreDeNuits(etat.enTete.start, etat.enTete.end),
+  };
+}
+
+/** Un appel du port pour une révision : même contexte de session, même portée (`jour`) et mêmes erreurs fermées que la lecture. */
+export async function relireRevision(
+  source: SourceRelectures,
+  ctx: Pick<AdapterContext, "organizationId" | "userId">,
+  base: BaseDeRevision,
+  demande: DemandeRelectures,
+): Promise<Relectures> {
+  const contexte = { tripId: base.tripId, version: base.version };
+  let reponse: Awaited<ReturnType<SourceRelectures["pour"]>>;
+  try {
+    reponse = await source.pour(
+      {
+        logementsParNuit: base.sejours.map((sejour) => sejour.placeId),
+        contexte: { organizationId: ctx.organizationId, userId: ctx.userId, tripId: base.tripId },
+        portee: "jour",
+        sejoursParNuit: base.sejours,
+      },
+      demande,
+    );
+  } catch {
+    throw echec("unavailable", contexte);
+  }
+  if (!reponse.ok) throw echec(reponse.refus === "quota_reached" ? "quota_reached" : "unavailable", contexte);
+  return reponse.relectures;
+}
+
+/**
+ * Jour d'une révision recomposé comme la lecture d'une Journée (durées, budget, `toConfirm`, `verifiedAt`), sur la chaîne
+ * `chaine` (version de la révision en tête). Rien n'est écrit ; les durées ne sortent que dans la réponse.
+ */
+export function recomposerJourDeRevision(
+  base: BaseDeRevision,
+  jour: DaySnapshot,
+  relectures: Relectures,
+  chaine: readonly VersionDeChaine[],
+  chaineDApercu: ChaineApercu = CHAINE_APERCU,
+): Day {
+  const resultat = recomposerJour(jour, {
+    nombreDeNuits: base.nuits,
+    generating: false,
+    relectures,
+    modes: base.modes,
+    verification: datesDeVerification(chaine, base.timeZone),
+    ...(chaineDApercu === "inversee" ? { badgeSansLieu: true } : {}),
+  });
+  if (!resultat.ok) throw echec(resultat.raison, { tripId: base.tripId, version: base.version, dayIndex: jour.index });
+  return resultat.valeur;
+}

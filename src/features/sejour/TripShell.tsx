@@ -58,6 +58,8 @@ interface ToastState {
   message: string;
   /** Appelé après l'annulation (par exemple pour rendre le focus au bouton d'origine). */
   afterUndo?: () => void;
+  /** Toast revenu après une annulation qui n'a pas abouti : « Annuler » reprend le focus. */
+  refocus?: boolean;
 }
 
 /** Fiche fermée dont le lien d'origine doit reprendre le focus (handover § 7). */
@@ -496,11 +498,19 @@ export function TripShell({
     try {
       await actions.undo();
     } catch {
-      // Annulation refusée ou réseau perdu (révision enregistrée) : rien n'est annoncé, le programme reste celui du serveur.
+      // Annulation refusée ou réseau perdu (révision enregistrée, PR 869) : la modification reste, et reste annulable. Le
+      // toast revient avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
+      toastId.current += 1;
+      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current?.afterUndo, refocus: true });
       return;
     }
     current?.afterUndo?.();
   }, [actions, toast, clearHighlight]);
+  // Focus rendu à « Annuler » du toast revenu après un échec (le bouton cliqué a quitté le DOM avec l'ancien toast).
+  useEffect(() => {
+    if (!toast?.refocus) return;
+    document.querySelector<HTMLButtonElement>("[data-undo-toast] button")?.focus();
+  }, [toast]);
 
   const [replaceOrigin, setReplaceOrigin] = useState<string | null>(null);
   const markReplaceOrigin = useCallback((href: string | null) => setReplaceOrigin(href), []);

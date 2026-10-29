@@ -37,6 +37,14 @@ export type DemandeVersion = {
   readonly patch?: unknown;
 };
 
+/**
+ * Écriture refusée par la garde du patch (`HAVING max(version) = baseVersion`) : la dernière version du voyage n'est plus la
+ * `baseVersion` du patch ; rien n'est écrit. L'appelant la rend en conflit (`conflict`), jamais en `internal`.
+ */
+export class BaseDeVersionDepassee extends Error {
+  override name = "BaseDeVersionDepassee";
+}
+
 export type VersionEcrite = { readonly version: number; readonly creee: boolean; readonly instantane: TripSnapshot };
 
 const SQL_EXISTANTE = `SELECT version FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3`;
@@ -74,7 +82,7 @@ export async function ecrireVersion(executeur: ExecuteurVersions, demande: Deman
     ])
   ).rows[0];
   // Avec un patch, aucune ligne : la dernière version n'est pas sa `baseVersion` (rien n'est écrit).
-  if (ecrite === undefined) throw new Error("versions: aucune ligne écrite");
+  if (ecrite === undefined) throw new BaseDeVersionDepassee("versions: aucune ligne écrite");
   const version = Number(ecrite.version);
   await executeur.query(SQL_COURANTE, [demande.organizationId, demande.tripId, version]);
   return { version, creee: true, instantane };

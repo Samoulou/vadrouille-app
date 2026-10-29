@@ -14,7 +14,7 @@ import { sheet } from "./sejour-helpers";
  * réelles (`DATA_ADAPTER=api`, double de relectures), sur la base du job `db` ; organisation propre au scénario
  * (`tests/support/bout-en-bout-api.ts`, données écrites par `pnpm test:db`). Le dîner du J1 d'Édimbourg est remplacé
  * par son option déjà vérifiée « [Bistrot de Victoria Street] » (version 2, `TripPatch` en base), puis rétabli par
- * « Annuler » dans le toast (version 3) ; chaque étape est relue sur le serveur. Les versions et le patch sont vérifiés
+ * « Annuler » dans le toast (version 3, après un premier essai coupé) ; chaque étape est relue sur le serveur. Les versions et le patch sont vérifiés
  * en base par `tests/db/remplacement.test.ts`. Sur un poste, rejouer demande une base neuve (les versions restent).
  */
 const test = base.extend<{ urlMock: string }>({
@@ -63,11 +63,17 @@ async function connecter(page: Page, request: APIRequestContext, adresse: string
   await expect(page).toHaveURL((url) => url.pathname === R17);
 }
 
-/** Identifiant du voyage d'Édimbourg non débloqué (seul lien `/voyages/<uuid>/presentation` de l'écran 17). */
+/**
+ * Identifiant du voyage d'Édimbourg non débloqué (seule carte « Édimbourg … Non débloqué » de l'écran 17). Son lien porte
+ * `/presentation` tant que le voyage est à venir, et plus une fois passé (dates du jeu simulé) : les deux formes sont admises.
+ */
 async function edimbourg(page: Page): Promise<string> {
   await expect(page.getByRole("heading", { level: 1, name: "Mes voyages" })).toBeVisible();
-  const liens = await page.getByRole("main").getByRole("link").evaluateAll((e) => e.map((l) => l.getAttribute("href") ?? ""));
-  const ids = [...new Set(liens.flatMap((href) => new RegExp(`^/voyages/(${UUID})/presentation$`).exec(href)?.[1] ?? []))];
+  const liens = await page
+    .getByRole("main")
+    .getByRole("link")
+    .evaluateAll((e) => e.filter((l) => /Édimbourg/.test(l.textContent ?? "") && /Non débloqué/.test(l.textContent ?? "")).map((l) => l.getAttribute("href") ?? ""));
+  const ids = [...new Set(liens.flatMap((href) => new RegExp(`^/voyages/(${UUID})(?:/presentation)?$`).exec(href)?.[1] ?? []))];
   expect(ids, "données de bout en bout absentes : pnpm test:db les écrit sur une base neuve").toHaveLength(1);
   return ids[0] as string;
 }
@@ -96,7 +102,22 @@ test("PR 869 : remplacer le dîner du J1 sur api, relu sur le serveur, puis annu
   await expect(etape(page, NOUVEAU)).toBeVisible();
   await expect(etape(page, ANCIEN)).toHaveCount(0);
 
-  // « Annuler » dans les 5 s : la version 3 rétablit le dîner, relue sur le serveur.
+  // Échec de l'annulation (requête de l'action serveur coupée une fois) : annoncé, focus sur « Annuler », rien de perdu.
+  let coupee = false;
+  await page.route("**/*", async (route) => {
+    const requete = route.request();
+    if (!coupee && requete.method() === "POST" && requete.headers()["next-action"] !== undefined) {
+      coupee = true;
+      await route.abort();
+    } else await route.continue();
+  });
+  await toast(page).getByRole("button", { name: "Annuler" }).click();
+  await expect(toast(page)).toContainText("L'annulation n'a pas abouti. Ta modification est toujours là.");
+  await expect(toast(page).getByRole("button", { name: "Annuler" })).toBeFocused();
+  await expect(etape(page, NOUVEAU)).toBeVisible();
+  await page.unroute("**/*");
+
+  // « Annuler » à nouveau : la version 3 rétablit le dîner, relue sur le serveur.
   await toast(page).getByRole("button", { name: "Annuler" }).click();
   await expect(page.locator("[data-part='annonce-annulation']")).toHaveText("Modification annulée.");
   await expect(etape(page, ANCIEN)).toBeVisible();

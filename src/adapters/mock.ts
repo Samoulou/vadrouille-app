@@ -134,6 +134,9 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
   };
 
   return {
+    // Révision enregistrée (M1g) : absente de `mock`, qui sert son jeu simulé (`getRevisionFixtures`). Clé déclarée pour
+    // que `mock` et `api` exposent la même surface (test « la fabrique de mock reste celle de la suite »).
+    revision: undefined,
     async listTrips(ctx) {
       return entries
         .filter((entry) => entry.trip.organizationId === ctx.organizationId)

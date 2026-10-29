@@ -1,4 +1,4 @@
-import type { ApplyResult, Change, Day, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult, Stop } from "@/contracts";
+import type { ApplyResult, Day, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult, Stop } from "@/contracts";
 import { applyReplacement, previewReplacement, undoReplacement } from "@/server/actions/remplacement";
 
 import type { MemoryProgramme, ProgrammeActions } from "./programme";
@@ -10,28 +10,16 @@ import { abortReason, type RevisionActions } from "./revision";
  * courante du voyage (`revisionVersion` non nul, adaptateur `api`). N'importe de `src/server` que
  * `@/server/actions/remplacement`. Le reste (verrous, liste « À faire », déplacement) reste l'implémentation en mémoire.
  *
- * - Aperçu : le serveur choisit la proposition (déjà vérifiée, rien n'est écrit) ; l'aperçu (jour, changements) est
- *   composé ici depuis le jour affiché, sans aucune durée inventée : les trajets qui touchent l'étape proposée sont
- *   « sans durée » (`null`) jusqu'à la relecture du voyage.
- * - « Appliquer » : nouvelle version ; le jour du brouillon s'affiche aussitôt (surlignage, focus), puis la mise en page
- *   relit le voyage (`afterWrite`), dont la lecture remplace le brouillon.
- * - « Annuler » (toast de 5 s) : une version de plus, identique à la version de base ; le jour d'avant s'affiche aussitôt,
- *   puis la relecture. Seule la dernière modification s'annule : poser un verrou rend le remplacement définitif.
+ * - Aperçu : le serveur choisit la proposition (déjà vérifiée, rien n'est écrit) et rend le brouillon du moteur : jours
+ *   touchés recomposés comme une lecture (durées du port de relectures, budget), changements (trajets compris).
+ * - « Appliquer » : nouvelle version ; les jours du brouillon s'affichent aussitôt (surlignage, focus), puis la mise en
+ *   page relit le voyage (`afterWrite`), dont la lecture remplace le brouillon.
+ * - « Annuler » (toast de 5 s) : une version de plus, identique à la version de base ; les jours d'avant s'affichent
+ *   aussitôt, puis la relecture. Un refus ou une panne lève une erreur : la modification reste annulable (rien n'est
+ *   oublié), l'écran l'annonce. Seule la dernière modification s'annule : poser un verrou rend le remplacement définitif.
  *
  * Rien n'est écrit dans le navigateur ; un `requestId` par écriture (idempotence côté serveur).
  */
-
-/** Jour où l'étape `stopId` est remplacée par `stop` : même place, trajets voisins sans durée, total inconnu. */
-export function jourRemplace(day: Day, stopId: Stop["id"], stop: Stop): Day {
-  const rang = day.items.findIndex((item) => item.type === "stop" && item.stop.id === stopId);
-  if (rang < 0) return day;
-  const items = day.items.map((item, index) => {
-    if (index === rang) return { type: "stop" as const, stop };
-    if (item.type === "segment" && (index === rang - 1 || index === rang + 1)) return { ...item, segment: { ...item.segment, minutes: null } };
-    return item;
-  });
-  return { ...day, items, travelMinutes: null };
-}
 
 /**
  * Jour montré dans l'aperçu : le jour du brouillon, sans le champ `commitment` des engagements qui ne bougent pas
@@ -51,18 +39,10 @@ export function jourDApercu(day: Day): Day {
   };
 }
 
-/** « Ce qui change » d'un remplacement : l'étape remplacée, puis les autres étapes du jour, qui ne bougent pas. */
-export function changementsDuRemplacement(day: Day, ancienne: Stop, nouvelle: Stop): Change[] {
-  const inchangees = day.items.flatMap((item): Change[] =>
-    item.type === "stop" && item.stop.id !== ancienne.id ? [{ type: "unchanged", label: item.stop.name, time: item.stop.start }] : [],
-  );
-  return [{ type: "replaced", time: ancienne.start, before: ancienne.name, after: nouvelle.name }, ...inchangees];
-}
-
 /** Aperçu servi, gardé pour « Appliquer » : la demande à rejouer et les jours avant et après. */
 type ApercuEnAttente = {
   readonly stopId: string;
-  readonly proposalId: string;
+  readonly candidateId: string;
   readonly baseVersion: number;
   readonly avant: readonly Day[];
   readonly apres: readonly Day[];
@@ -131,9 +111,10 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
         await memory.undo();
         return;
       }
-      store.last = null;
       const result = await calls.undoReplacement({ tripId, requestId: newRequestId(), version: last.version });
+      // Refus ou panne : rien n'est oublié (la même annulation peut être redemandée) ; l'appelant l'annonce.
       if (!result.ok || result.value.status !== "undone") throw new Error("annulation refusée");
+      store.last = null;
       store.version = result.value.version;
       options.showDays(last.avant);
       options.afterWrite();
@@ -142,29 +123,30 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
     version: () => store.version,
     async previewReplacement(request, { signal }) {
       if (signal.aborted) throw abortReason(signal);
-      const day = options.currentDays().find((candidate) => candidate.items.some((item) => item.type === "stop" && item.stop.id === request.stopId));
-      const ancienne = day?.items.flatMap((item) => (item.type === "stop" && item.stop.id === request.stopId ? [item.stop] : []))[0];
       const result = await calls.previewReplacement({ tripId, ...request });
       if (signal.aborted) throw abortReason(signal);
       if (!result.ok) return { ok: false, error: "error" };
       const offer = result.value;
       if (offer.status !== "offer") return { ok: false, error: offer.status };
-      if (!day || !ancienne) return { ok: false, error: "conflict" };
-      const apres = jourRemplace(day, ancienne.id, offer.stop);
+      const { draft } = offer;
+      const jours = new Set(draft.days.map((day) => day.index));
+      const avant = options.currentDays().filter((day) => jours.has(day.index));
+      if (avant.length !== jours.size) return { ok: false, error: "conflict" };
       store.serial += 1;
       const preview: RevisionPreview = {
         kind: "replace",
         id: `remplacement-${store.serial}`,
         baseVersion: offer.version,
-        days: [jourDApercu(apres)],
-        changes: changementsDuRemplacement(day, ancienne, offer.stop),
-        changedStopIds: [offer.stop.id],
-        targetStopId: offer.stop.id,
-        proposal: offer.stop,
-        // Proposition déjà vérifiée du voyage, sans nouvelle recherche.
-        fromReserve: true,
+        days: draft.days.map(jourDApercu),
+        changes: draft.changes,
+        changedStopIds: draft.changedStopIds,
+        targetStopId: draft.targetStopId,
+        proposal: draft.proposal,
+        fromReserve: draft.fromReserve,
       };
-      store.pending.set(preview.id, { stopId: ancienne.id, proposalId: offer.proposalId, baseVersion: offer.version, avant: [day], apres: [apres] });
+      // Un seul aperçu en attente : un aperçu plus récent remplace le précédent (l'écran n'applique que le dernier).
+      store.pending.clear();
+      store.pending.set(preview.id, { stopId: request.stopId, candidateId: offer.candidateId, baseVersion: offer.version, avant, apres: draft.days });
       return { ok: true, preview } satisfies RevisionResult;
     },
     getMoveOptions: (stopId) => memory.getMoveOptions(stopId),
@@ -176,12 +158,15 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
         tripId,
         requestId: newRequestId(),
         stopId: pending.stopId,
-        proposalId: pending.proposalId,
+        candidateId: pending.candidateId,
         baseVersion: pending.baseVersion,
       });
       if (!result.ok) return { ok: false, error: "error" };
       const write = result.value;
-      if (write.status === "conflict" || write.status === "lockedStop") return { ok: false, error: write.status };
+      if (write.status === "conflict" || write.status === "lockedStop") {
+        store.pending.delete(previewId);
+        return { ok: false, error: write.status };
+      }
       if (write.status !== "applied") return { ok: false, error: "error" };
       store.pending.delete(previewId);
       store.version = write.version;

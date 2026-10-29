@@ -11,18 +11,10 @@ import { RevisionPreviewSchema, type Day, type ReplacementOffer, type Replacemen
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, type ProgrammeState } from "./programme";
-import {
-  changementsDuRemplacement,
-  createServerRevision,
-  createServerRevisionStore,
-  jourDApercu,
-  jourRemplace,
-  syncServerRevisionVersion,
-  type ServerRevisionCalls,
-} from "./revision-serveur";
+import { createServerRevision, createServerRevisionStore, jourDApercu, syncServerRevisionVersion, type ServerRevisionCalls } from "./revision-serveur";
 
 /**
- * Révision enregistrée de l'écran 14 sur `api` (tâche M1g, PR 869) : composition de l'aperçu depuis le jour affiché,
+ * Révision enregistrée de l'écran 14 sur `api` (tâche M1g, PR 869) : aperçu repris du brouillon du moteur (serveur),
  * application et annulation par les actions serveur (doublées ici), jours affichés en attendant la relecture.
  */
 
@@ -39,14 +31,46 @@ const NOUVELLE: Stop = {
   exceptions: ["toReserve"],
   locked: false,
 };
-const PROPOSITION = "3f0b7c1e-0000-4000-8000-000000000001";
+const CANDIDAT = "3f0b7c1e-0000-4000-8000-000000000001";
 const ok = <T>(value: T): Result<T> => ({ ok: true, value });
 const signal = () => new AbortController().signal;
 const jour = (n: number): Day => edimbourg.days.find((day) => day.index === n)!;
 
+/** Jour du brouillon du serveur : le dîner remplacé, trajet d'arrivée de 12 minutes (durée du port), Tattoo intact. */
+function jourDuBrouillon(): Day {
+  const avant = jour(1);
+  const rang = avant.items.findIndex((item) => item.type === "stop" && item.stop.id === DINER);
+  return {
+    ...avant,
+    items: avant.items.map((item, i) => {
+      if (i === rang) return { type: "stop" as const, stop: NOUVELLE };
+      if (i === rang - 1 && item.type === "segment") return { ...item, segment: { ...item.segment, minutes: 12 } };
+      return item;
+    }),
+  };
+}
+
+const OFFRE: ReplacementOffer = {
+  status: "offer",
+  version: 1,
+  candidateId: CANDIDAT,
+  draft: {
+    days: [jourDuBrouillon()],
+    changes: [
+      { type: "replaced", time: "18:45", before: "[Bonne table de l'Old Town]", after: NOUVELLE.name },
+      { type: "segment", label: NOUVELLE.name, before: 15, after: 12, estimated: false },
+      { type: "unchanged", label: "[Château d'Édimbourg]", time: "14:00" },
+    ],
+    changedStopIds: [NOUVELLE.id],
+    targetStopId: NOUVELLE.id,
+    proposal: NOUVELLE,
+    fromReserve: true,
+  },
+};
+
 function setup(reponses: { offer?: Result<ReplacementOffer>; apply?: Result<ReplacementWrite>; undo?: Result<ReplacementWrite> } = {}) {
   const calls = {
-    previewReplacement: vi.fn<ServerRevisionCalls["previewReplacement"]>(async () => reponses.offer ?? ok({ status: "offer", version: 1, proposalId: PROPOSITION, stop: NOUVELLE })),
+    previewReplacement: vi.fn<ServerRevisionCalls["previewReplacement"]>(async () => reponses.offer ?? ok(OFFRE)),
     applyReplacement: vi.fn<ServerRevisionCalls["applyReplacement"]>(async () => reponses.apply ?? ok({ status: "applied", version: 2 })),
     undoReplacement: vi.fn<ServerRevisionCalls["undoReplacement"]>(async () => reponses.undo ?? ok({ status: "undone", version: 3 })),
   };
@@ -75,30 +99,24 @@ function setup(reponses: { offer?: Result<ReplacementOffer>; apply?: Result<Repl
 const REQUETE = { stopId: DINER, reason: "notMyStyle", baseVersion: 1 } as const;
 
 describe("révision enregistrée : fonctions pures (PR 869)", () => {
-  it("PR 869 : jourRemplace pose la proposition à la place de l'étape, trajets voisins et total sans durée", () => {
-    const avant = jour(1);
-    const apres = jourRemplace(avant, DINER, NOUVELLE);
-    const rang = avant.items.findIndex((item) => item.type === "stop" && item.stop.id === DINER);
-    expect(apres.items).toHaveLength(avant.items.length);
-    expect(apres.items[rang]).toEqual({ type: "stop", stop: NOUVELLE });
-    for (const voisin of [rang - 1, rang + 1]) {
-      const item = apres.items[voisin];
-      if (item?.type === "segment") expect(item.segment.minutes).toBeNull();
-    }
-    expect(apres.travelMinutes).toBeNull();
-    // Les autres lignes ne changent pas ; une étape absente rend le jour tel quel.
-    expect(apres.items.filter((_, i) => Math.abs(i - rang) > 1)).toEqual(avant.items.filter((_, i) => Math.abs(i - rang) > 1));
-    expect(jourRemplace(avant, "absente", NOUVELLE)).toBe(avant);
-  });
-
-  it("PR 869 : changementsDuRemplacement : l'étape remplacée, puis ce qui ne bouge pas (noms maison seulement)", () => {
-    const avant = jour(1);
-    const ancienne = avant.items.flatMap((item) => (item.type === "stop" && item.stop.id === DINER ? [item.stop] : []))[0]!;
-    const changes = changementsDuRemplacement(avant, ancienne, NOUVELLE);
-    expect(changes[0]).toEqual({ type: "replaced", time: ancienne.start, before: ancienne.name, after: NOUVELLE.name });
-    expect(changes.slice(1).every((change) => change.type === "unchanged")).toBe(true);
-    expect(changes.map((change) => ("label" in change ? change.label : ""))).not.toContain(ancienne.name);
-    expect(JSON.stringify(changes)).not.toContain("placeId");
+  it("PR 869 : jourDApercu retire `commitment` des engagements qui ne bougent pas, et seulement ce champ (comportement fixé, question au Tech Lead)", () => {
+    const brouillon = jourDuBrouillon();
+    const tattoo = (day: Day) => day.items.flatMap((item) => (item.type === "stop" && item.stop.id === "j1-tattoo" ? [item.stop] : []))[0]!;
+    expect(tattoo(brouillon).commitment).toBe("ticket");
+    const apercu = jourDApercu(brouillon);
+    const sansEngagement: Stop = { ...tattoo(brouillon) };
+    delete sansEngagement.commitment;
+    expect(tattoo(apercu)).toEqual(sansEngagement);
+    expect(tattoo(apercu).locked).toBe(true);
+    // Toutes les autres lignes, et le jour lui-même, sont inchangés.
+    expect({ ...apercu, items: apercu.items.filter((i) => !(i.type === "stop" && i.stop.id === "j1-tattoo")) }).toEqual({
+      ...brouillon,
+      items: brouillon.items.filter((i) => !(i.type === "stop" && i.stop.id === "j1-tattoo")),
+    });
+    // Sans lui, le contrat refuse le jour du brouillon (un engagement dans `days`, 0016 § 4.2).
+    const base = { kind: "replace", id: "r", baseVersion: 1, changes: [], changedStopIds: [NOUVELLE.id], targetStopId: NOUVELLE.id, proposal: NOUVELLE, fromReserve: true } as const;
+    expect(RevisionPreviewSchema.safeParse({ ...base, days: [brouillon] }).success).toBe(false);
+    expect(RevisionPreviewSchema.safeParse({ ...base, days: [apercu] }).success).toBe(true);
   });
 
   it("PR 869 : la version relue ne fait jamais reculer celle des écritures", () => {
@@ -111,15 +129,18 @@ describe("révision enregistrée : fonctions pures (PR 869)", () => {
 });
 
 describe("révision enregistrée : aperçu, application et annulation (PR 869)", () => {
-  it("PR 869 : aperçu composé depuis le jour affiché, valide RevisionPreviewSchema, rien n'est affiché ni écrit", async () => {
+  it("PR 869 : aperçu repris du brouillon du moteur (durées, changements), valide RevisionPreviewSchema, rien n'est affiché ni écrit", async () => {
     const { actions, calls, afterWrite, shown } = setup();
     const result = await actions.previewReplacement(REQUETE, { signal: signal() });
     expect(calls.previewReplacement).toHaveBeenCalledWith({ tripId: edimbourg.id, ...REQUETE });
     if (!result.ok) throw new Error(result.error);
     const preview = RevisionPreviewSchema.parse(result.preview);
     expect(preview).toMatchObject({ kind: "replace", baseVersion: 1, targetStopId: NOUVELLE.id, changedStopIds: [NOUVELLE.id], fromReserve: true });
-    // Jour visé entier, sans le champ `commitment` du Tattoo (qui ne bouge pas) : l'aperçu valide son contrat.
-    expect(preview.days).toEqual([jourDApercu(jourRemplace(jour(1), DINER, NOUVELLE))]);
+    // Changements du moteur tels quels (trajet compris) ; jour du brouillon sans le champ `commitment` du Tattoo.
+    expect(preview.changes).toEqual(OFFRE.status === "offer" ? OFFRE.draft.changes : []);
+    expect(preview.days).toEqual([jourDApercu(jourDuBrouillon())]);
+    const segment = preview.days[0]?.items.find((item) => item.type === "segment" && item.segment.minutes === 12);
+    expect(segment).toBeDefined();
     const tattoo = preview.days[0]?.items.find((item) => item.type === "stop" && item.stop.id === "j1-tattoo");
     expect(tattoo?.type === "stop" && tattoo.stop.locked).toBe(true);
     expect(shown()).toBe(edimbourg);
@@ -135,13 +156,14 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
       tripId: edimbourg.id,
       requestId: "00000000-0000-4000-8000-000000000001",
       stopId: DINER,
-      proposalId: PROPOSITION,
+      candidateId: CANDIDAT,
       baseVersion: 1,
     });
     expect(actions.version()).toBe(2);
     expect(store.last?.version).toBe(2);
     expect(afterWrite).toHaveBeenCalledTimes(1);
-    expect(shown().days.find((day) => day.index === 1)).toEqual(jourRemplace(jour(1), DINER, NOUVELLE));
+    // Le jour du brouillon entier (engagement compris, durées du port) : aucune durée « à confirmer » en attendant la relecture.
+    expect(shown().days.find((day) => day.index === 1)).toEqual(jourDuBrouillon());
     // L'aperçu est consommé.
     expect(await actions.apply(result.preview.id)).toEqual({ ok: false, error: "error" });
   });
@@ -175,13 +197,33 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
     expect(chateau?.type === "stop" && chateau.stop.locked).toBe(false);
   });
 
-  it("PR 869 : annulation refusée par le serveur : l'action lève, rien n'est réaffiché", async () => {
-    const { actions, shown } = setup({ undo: ok({ status: "conflict", currentVersion: 4 }) });
+  it.each([
+    ["refus", ok({ status: "conflict", currentVersion: 4 } as const)],
+    ["panne", { ok: false, error: { code: "internal" } } as const],
+  ])("PR 869 : annulation qui n'aboutit pas (%s) : l'action lève, rien n'est réaffiché, et l'annulation reste possible", async (_cas, reponse) => {
+    const { actions, calls, store, shown } = setup({ undo: reponse as Result<ReplacementWrite> });
     const result = await actions.previewReplacement(REQUETE, { signal: signal() });
     if (!result.ok) throw new Error(result.error);
     await actions.apply(result.preview.id);
     await expect(actions.undo()).rejects.toThrow();
-    expect(shown().days.find((day) => day.index === 1)).toEqual(jourRemplace(jour(1), DINER, NOUVELLE));
+    expect(shown().days.find((day) => day.index === 1)).toEqual(jourDuBrouillon());
+    // `last` n'est vidé qu'en cas de succès : la même annulation est redemandée au serveur.
+    expect(store.last?.version).toBe(2);
+    calls.undoReplacement.mockResolvedValueOnce(ok({ status: "undone", version: 3 }));
+    await actions.undo();
+    expect(calls.undoReplacement).toHaveBeenCalledTimes(2);
+    expect(calls.undoReplacement.mock.calls[1]?.[0]).toMatchObject({ version: 2 });
+    expect(store.last).toBeNull();
+    expect(shown().days.find((day) => day.index === 1)).toEqual(jour(1));
+  });
+
+  it("PR 869 : un aperçu plus récent remplace le précédent (un seul en attente)", async () => {
+    const { actions, store } = setup();
+    const premier = await actions.previewReplacement(REQUETE, { signal: signal() });
+    const second = await actions.previewReplacement(REQUETE, { signal: signal() });
+    if (!premier.ok || !second.ok) throw new Error("aperçu");
+    expect([...store.pending.keys()]).toEqual([second.preview.id]);
+    expect(await actions.apply(premier.preview.id)).toEqual({ ok: false, error: "error" });
   });
 
   it.each([

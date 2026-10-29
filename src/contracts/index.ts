@@ -86,6 +86,8 @@ export {
   MoveRequestSchema,
   ReplacementDraftSchema,
   ReplacementFixtureSchema,
+  ReplacementOfferSchema,
+  ReplacementWriteSchema,
   ReplacementRequestSchema,
   RevisionFixturesSchema,
   RevisionPreviewSchema,
