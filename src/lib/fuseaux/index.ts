@@ -231,6 +231,18 @@ export function villeDuPays(nom: string, code: string): { readonly nom: string; 
   return { nom: ligne[2], zone: ligne[0] };
 }
 
+/**
+ * Ville des **62 villes du MVP** dans un pays donné (décision 0141 § 8.2 ; recherche de ville de l'écran 1 de `api`) :
+ * clé de la table du MVP (`villes-mvp.json`, celle de `controlerVilles`), puis ville de la table dans ce pays
+ * (`villeDuPays`) ; `null` sinon (hors des 62, ou ville des 62 dans un autre pays). Le nom rendu est le nom maison, que
+ * `controlerVilles` admet. Aucune table nouvelle : Q626 (élargir les 62) reste au Product Owner.
+ */
+export function villeMvpDuPays(nom: string, code: string): { readonly nom: string; readonly zone: string } | null {
+  if (!TABLE_MVP.has(cleVille(nom))) return null;
+  const ville = villeDuPays(nom, code);
+  return ville !== null && TABLE_MVP.has(cleVille(ville.nom)) ? ville : null;
+}
+
 const RAYON_TERRE_KM = 6371;
 const radians = (degres: number) => (degres * Math.PI) / 180;
 

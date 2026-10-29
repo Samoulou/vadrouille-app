@@ -107,6 +107,14 @@ export const LOG_EVENTS = [
   // (`suggestions` ou `choix`), `guard` (garde fermée), `googleCode` (`LOG_GOOGLE_CODES`), `httpStatus` (code HTTP d'une
   // réponse de Google autre que 200), `errorName`. Jamais le texte tapé, un `placeId`, un texte Google, le cookie ni une clé.
   "p0.ville_refusee",
+  // M1f (décision 0141 § 6.3 point 4) : refus d'une action de la recherche de ville de l'écran 1 de `api`
+  // (`suggererVillesApi`, `choisirVilleApi`). Champs : `reason` (`LOG_VILLE_API_REASONS`), `action` (`suggestions` ou
+  // `choix`), `errorName`, `googleCode` (`LOG_GOOGLE_CODES`) et `httpStatus`, en liste fermée par événement. Niveau `info`
+  // pour ce qu'un visiteur anonyme peut provoquer en rafale, `warn` pour une panne. Jamais la saisie, un `placeId`, un
+  // texte Google, une adresse IP, une clé HMAC ni une clé. `ville.purge_failed` : purge des compteurs du jour en échec,
+  // après l'appel Google, `errorName` seul (`warn`), comme `email.purge_failed`.
+  "ville.refusee",
+  "ville.purge_failed",
   // B4a (spécification B4, B4-PO-12 ; décision 0097 B4-TL-13 et B4-TL-11 point 1.1) : alerte de paiement (niveau `error`,
   // champs `eventId`, `eventType`, `alertCode`, `checkoutId` seulement), échec de la suite après un droit validé (`warn`,
   // `errorName` seulement), configuration invalide sur le webhook simulé (`warn`, `rule` et `variable` seulement). Ni
@@ -268,9 +276,9 @@ export type LogFields = {
   readonly generationRunId?: string;
   /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
   readonly stopReason?: string;
-  /** Code fermé d'une erreur d'un client Google (`p0.ville_refusee`) : `LOG_GOOGLE_CODES`, jamais un message. */
+  /** Code fermé d'une erreur d'un client Google (`p0.ville_refusee`, `ville.refusee`) : `LOG_GOOGLE_CODES`, jamais un message. */
   readonly googleCode?: string;
-  /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`) : entier de 100 à 599, jamais le corps. */
+  /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`, `ville.refusee`) : entier de 100 à 599, jamais le corps. */
   readonly httpStatus?: number;
   /**
    * Usage d'un envoi d'e-mail (`email.sent`, `email.cap_reached`, B3d point 6) : `LOG_EMAIL_USAGES`, copie d'`EMAIL_USAGES`
@@ -503,6 +511,26 @@ export const LOG_VILLE_REASONS = [
 export type LogVilleReason = (typeof LOG_VILLE_REASONS)[number];
 const RAISONS_VILLE: ReadonlySet<string> = new Set<string>(LOG_VILLE_REASONS);
 /**
+ * Motifs de `ville.refusee` (recherche de ville de `api`, décision 0141 § 6.3 point 4) : entrée refusée, seuils non
+ * validés, barrière fermée, client Places non construit, débit du limiteur, plafond du jour, compteur indisponible,
+ * erreur de Google, pays hors table maison, ville hors des 62 villes du MVP, exception attrapée par l'action serveur.
+ */
+export const LOG_VILLE_API_REASONS = [
+  "entree_invalide",
+  "seuils_non_valides",
+  "barriere",
+  "client",
+  "limite",
+  "limite_jour",
+  "compteur_indisponible",
+  "google_erreur",
+  "pays_inconnu",
+  "hors_table",
+  "exception",
+] as const;
+export type LogVilleApiReason = (typeof LOG_VILLE_API_REASONS)[number];
+const RAISONS_VILLE_API: ReadonlySet<string> = new Set<string>(LOG_VILLE_API_REASONS);
+/**
  * Codes admis dans `googleCode` : copie de `CODES_ERREUR_GOOGLE` (`src/grounding/enveloppe-google.ts`, que ce module
  * n'importe pas) et `place_not_found` (`ErreurAncrage` d'une fiche introuvable) ; égalité vérifiée par le test du journal.
  */
@@ -559,6 +587,7 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["voyages.fiches_non_relues", RAISONS_FICHES],
   ["voyages.positions_non_ecrites", RAISONS_POSITIONS],
   ["p0.ville_refusee", RAISONS_VILLE],
+  ["ville.refusee", RAISONS_VILLE_API],
   ["email.provider_refused", new Set(LOG_EMAIL_PROVIDER_REASONS)],
   ["email.transport_refused", new Set(LOG_EMAIL_TRANSPORT_REASONS)],
 ]);
@@ -790,15 +819,16 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 ]);
 
 /**
- * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
- * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
+ * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee` et
+ * `ville.refusee` seulement (constat du 2026-10-25 ; décision 0141 § 6.3 point 4 ; verdict 0122 § 2.1 point 4 : aucun
+ * statut sur la ligne des sites) ; `failureCode`
  * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement ; `usage` sur `email.sent` et
  * `email.cap_reached` seulement (B3d point 6) ; `errorClass` sur `payment.provider_failed` seulement (B4c, décision 0140
  * § 1.2 ; revue de la PR 848, mineur : règle dans cette table, valeur de `LOG_PROVIDER_ERROR_CLASSES`).
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
-  ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
-  ["httpStatus", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+  ["googleCode", { evenements: new Set(["p0.ville_refusee", "ville.refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
+  ["httpStatus", { evenements: new Set(["p0.ville_refusee", "ville.refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
   ["usage", { evenements: new Set(["email.sent", "email.cap_reached"]), controle: (v: unknown) => chaine(v) && USAGES_EMAIL.has(v) }],
   ["errorClass", { evenements: new Set(["payment.provider_failed"]), controle: (v: unknown) => chaine(v) && CLASSES_ERREUR_PRESTATAIRE.has(v) }],
@@ -810,6 +840,9 @@ const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlyS
  * événement que les contrôles globaux (`CONTROLES`) ne donnent pas ; les événements absents de la table ne changent pas.
  */
 export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  // Décision 0141 § 6.3 point 4 (Sécurité, mineur 6) : recherche de ville de `api`, champs fermés seulement.
+  ["ville.refusee", new Set(["reason", "action", "errorName", "googleCode", "httpStatus"])],
+  ["ville.purge_failed", new Set(["errorName"])],
   [
     "generation.programme_written",
     new Set([

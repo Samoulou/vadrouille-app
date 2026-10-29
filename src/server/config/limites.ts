@@ -33,6 +33,10 @@ export const RATE_LIMITS: RateLimitConfig = {
   // de la phase simulée seulement : ils ne valent pas pour `stripe` (B4c, Q86).
   "payment-start": [{ kind: "ip", windowSeconds: 3600, threshold: 20 }],
   "payment-simulate": [{ kind: "ip", windowSeconds: 3600, threshold: 60 }],
+  // M1f (décision 0141 § 4.1) : recherche de ville de l'écran 1 de `api`, suggestions et choix confondus, 20 actions par
+  // minute et par adresse IP (0129 § 3 point 4). Écran anonyme : espèce `ip` seulement ; sans en-tête de confiance,
+  // compartiment commun `no-trusted-ip`. Appelé avant la réservation du jour (§ 4.4).
+  "ville-recherche": [{ kind: "ip", windowSeconds: 60, threshold: 20 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

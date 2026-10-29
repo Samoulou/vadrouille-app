@@ -16,6 +16,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 // Recherche de ville du site d'essai : doubles des actions serveur (aucun appel réel à Google).
 const villes = vi.hoisted(() => ({ suggererVilles: vi.fn(), choisirVille: vi.fn() }));
 vi.mock("@/server/actions/villes-essai", () => villes);
+// Recherche de ville de api (décision 0141) : doubles des actions serveur.
+const villesApi = vi.hoisted(() => ({ suggererVillesApi: vi.fn(), choisirVilleApi: vi.fn() }));
+vi.mock("@/server/actions/villes", () => villesApi);
 vi.mock("@/server/actions/p0-acces", () => ({ saisirCodeAccesP0: vi.fn() }));
 
 /** Écran 1 « Ton voyage » (`R1`, F8-PO-3), rendus et textes provisoires (0018 § 15). */
@@ -49,6 +52,8 @@ beforeEach(() => {
   // Par défaut, la recherche ne répond pas (repli sur la table maison des villes).
   villes.suggererVilles.mockReset().mockResolvedValue({ statut: "indisponible" });
   villes.choisirVille.mockReset().mockResolvedValue({ statut: "indisponible" });
+  villesApi.suggererVillesApi.mockReset().mockResolvedValue({ statut: "indisponible" });
+  villesApi.choisirVilleApi.mockReset().mockResolvedValue({ statut: "indisponible" });
 });
 
 afterEach(() => {
@@ -575,5 +580,83 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
     change("Départ", "2026-09-03");
     expect(ville()).toHaveAttribute("max", "2026-09-02");
     expect(engagement()).toHaveAttribute("max", "2026-09-03");
+  });
+});
+
+// Décision 0141 § 6.3 point 2 et § 8.2 (T20, PR 880) : écran 1 de api, recherche montée par la page.
+describe("écran 1 api", () => {
+  const LISBONNE = { placeId: "lieu_fictif_lisbonne_pt", principal: "Lisbonne", secondaire: "Portugal" };
+  const VALENCE = { placeId: "lieu_fictif_valence_es", principal: "Valence", secondaire: "Espagne" };
+  const champ = () => screen.getByRole("combobox", { name: "Destination" });
+  function renderApi() {
+    return render(
+      <DraftProvider>
+        <CreateTripForm recherche="api" />
+        <Probe />
+      </DraftProvider>,
+    );
+  }
+
+  it("hors_table : erreur cityUnavailable sur le champ ; limite et limite_jour : messages de 0129 ; jamais l'état accès", async () => {
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "ok", suggestions: [VALENCE, LISBONNE] });
+    villesApi.choisirVilleApi.mockResolvedValueOnce({ statut: "hors_table" });
+    const { container } = renderApi();
+    change("Destination", "Vale");
+    await screen.findAllByRole("option");
+    // Les actions de api, jamais celles du site d'essai.
+    expect(villesApi.suggererVillesApi).toHaveBeenCalledWith({ saisie: "Vale", session: expect.stringMatching(/^[A-Za-z0-9_-]{1,36}$/) });
+    expect(villes.suggererVilles).not.toHaveBeenCalled();
+    expect(screen.getByText("Google Maps")).toHaveAttribute("translate", "no");
+    fireEvent.click(screen.getAllByRole("option")[0]!);
+    // `hors_table` : l'erreur existante `cityUnavailable` (texte de 0129, aucun texte nouveau), reliée au champ.
+    const indisponible = "La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.";
+    await waitFor(() => expect(champ()).toHaveAttribute("aria-invalid", "true"));
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(indisponible));
+    expect(latest?.trip).toMatchObject({ destination: "Vale", placeId: "", country: "", timeZone: "" });
+    expect(await axeViolations(container)).toEqual([]);
+    // Une ville des 62 choisie ensuite : l'erreur tombe, le nom maison est retenu.
+    villesApi.choisirVilleApi.mockResolvedValueOnce({
+      statut: "ok",
+      ville: { placeId: LISBONNE.placeId, country: "PT", timeZone: "Europe/Lisbon", nomPays: "Portugal", nomMaison: "Lisbonne" },
+    });
+    change("Destination", "Lisb");
+    expect(champ()).not.toHaveAttribute("aria-invalid");
+    await screen.findAllByRole("option");
+    fireEvent.click(screen.getAllByRole("option")[1]!);
+    await waitFor(() => expect(latest?.trip).toMatchObject({ destination: "Lisbonne", placeId: LISBONNE.placeId, country: "PT", timeZone: "Europe/Lisbon" }));
+    expect(champ()).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByText("Ville retenue : Lisbonne (Portugal).")).toBeInTheDocument();
+
+    // `limite` et `limite_jour` : messages de 0129 § 3 point 2.
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "limite" });
+    change("Destination", "Rom");
+    expect(await screen.findByText("Trop de recherches de villes en une minute. Réessaie dans une minute.")).toHaveAttribute("role", "status");
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "limite_jour" });
+    change("Destination", "Rome");
+    expect(await screen.findByText("La recherche des villes a atteint sa limite pour aujourd'hui. Écris le nom complet de ta ville, ou réessaie plus tard.")).toBeInTheDocument();
+
+    // Jamais l'état « accès » : un statut `acces` (impossible sur api) se replie, sans saisie du code d'accès.
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "acces" });
+    change("Destination", "Pari");
+    expect(await screen.findByText(indisponible)).toHaveAttribute("role", "status");
+    expect(screen.queryByText("Pour chercher ta ville, saisis d'abord le code d'accès du site d'essai.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Code d'accès du site d'essai")).not.toBeInTheDocument();
+    // Les champs de api restent ceux d'aujourd'hui (plusieurs villes : « Ajouter une ville » proposé).
+    expect(screen.getByRole("button", { name: /Ajouter une ville/ })).toBeInTheDocument();
+    expect(villes.suggererVilles).not.toHaveBeenCalled();
+    expect(villes.choisirVille).not.toHaveBeenCalled();
+  });
+
+  it("recherche disponible : « Continuer » exige un choix dans les suggestions ; sans recherche montée, le champ texte d'aujourd'hui", async () => {
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "ok", suggestions: [LISBONNE] });
+    renderApi();
+    change("Destination", "Lisbonne");
+    await screen.findAllByRole("option");
+    change("Arrivée", "2026-08-29");
+    change("Départ", "2026-09-03");
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions.")));
+    expect(router.push).not.toHaveBeenCalled();
   });
 });

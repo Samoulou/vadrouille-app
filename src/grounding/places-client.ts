@@ -11,6 +11,7 @@ import {
   type ClientVilles,
   type Coordonnees,
   type DetailsLieu,
+  type OptionsFicheVille,
   type PhotoLieu,
   type RectangleZone,
   type RequeteTextSearch,
@@ -67,6 +68,12 @@ export const MASQUE_IDENTIFIANT = "id";
 export const MASQUE_SUGGESTIONS = "suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat";
 /** Masque de la fiche de la ville choisie : identifiant, composantes d'adresse (pays) et position (SKU Essentials). */
 export const MASQUE_FICHE_VILLE = "id,addressComponents,location";
+/**
+ * Masque de la fiche de la ville choisie sur `api` (décision 0141 § 6.3 point 3 ; Sécurité, mineur 9, minimisation) :
+ * identifiant et composantes d'adresse (pays) seulement, sans position (le fuseau vient de la table des 62 villes du
+ * MVP) ; même SKU Essentials.
+ */
+export const MASQUE_FICHE_VILLE_SANS_POSITION = "id,addressComponents";
 
 export const SKU_TEXT_SEARCH = "places_text_search_essentials_ids_only";
 /**
@@ -197,11 +204,14 @@ const SuggestionsSchema = z.object({
     .max(10)
     .optional(),
 });
+const ComposantesSchema = z.array(z.object({ shortText: z.string().max(100).optional(), types: z.array(z.string().max(60)).max(20) })).max(30).optional();
 const FicheVilleSchema = z.object({
   id: z.string().regex(PLACE_ID),
-  addressComponents: z.array(z.object({ shortText: z.string().max(100).optional(), types: z.array(z.string().max(60)).max(20) })).max(30).optional(),
+  addressComponents: ComposantesSchema,
   location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
 });
+/** Fiche sans position (0141 § 6.3 point 3) : une position renvoyée malgré le masque n'est pas lue. */
+const FicheVilleSansPositionSchema = z.object({ id: z.string().regex(PLACE_ID), addressComponents: ComposantesSchema });
 
 /** Nom de ressource d'une photo du lieu demandé (`places/<placeId>/photos/<référence>`) ; jamais gardé. */
 const REFERENCE_PHOTO = /^[A-Za-z0-9_-]{1,1024}$/;
@@ -370,22 +380,29 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
         p === undefined ? [] : [{ placeId: p.placeId, principal: p.structuredFormat.mainText.text, secondaire: p.structuredFormat.secondaryText?.text ?? null }],
       );
     },
-    async ficheVille(placeId: string, session: string) {
+    async ficheVille(placeId: string, session: string, options: OptionsFicheVille = {}) {
       if (!PLACE_ID.test(placeId) || !JETON_SESSION.test(session)) throw new ErreurClientGoogle("invalid_request");
+      const avecPosition = options.position !== false;
+      const chemin = `/v1/places/${placeId}?languageCode=fr&sessionToken=${session}`;
+      const reservation = () => demande("places_details", SKU_FICHE_VILLE, COUT_ESTIME_MICROS.ficheVille);
+      // Deux appels littéraux, un masque fermé chacun (le test des masques lit chaque `masque:` du client).
       const brut = await sansIntrouvable(() =>
-        appeler(
-          { chemin: `/v1/places/${placeId}?languageCode=fr&sessionToken=${session}`, methode: "GET", masque: MASQUE_FICHE_VILLE, introuvableSur404: true },
-          demande("places_details", SKU_FICHE_VILLE, COUT_ESTIME_MICROS.ficheVille),
-        ),
+        avecPosition
+          ? appeler({ chemin, methode: "GET", masque: MASQUE_FICHE_VILLE, introuvableSur404: true }, reservation())
+          : appeler({ chemin, methode: "GET", masque: MASQUE_FICHE_VILLE_SANS_POSITION, introuvableSur404: true }, reservation()),
       );
+      const paysDe = (composantes: z.infer<typeof ComposantesSchema>): string | null => {
+        const pays = (composantes ?? []).find((composante) => composante.types.includes("country"))?.shortText;
+        return pays !== undefined && /^[A-Z]{2}$/.test(pays) ? pays : null;
+      };
+      if (!avecPosition) {
+        const lu = FicheVilleSansPositionSchema.safeParse(brut);
+        if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
+        return { placeId: lu.data.id, pays: paysDe(lu.data.addressComponents), position: null };
+      }
       const lu = FicheVilleSchema.safeParse(brut);
       if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
-      const pays = (lu.data.addressComponents ?? []).find((composante) => composante.types.includes("country"))?.shortText;
-      return {
-        placeId: lu.data.id,
-        pays: pays !== undefined && /^[A-Z]{2}$/.test(pays) ? pays : null,
-        position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude },
-      };
+      return { placeId: lu.data.id, pays: paysDe(lu.data.addressComponents), position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude } };
     },
   };
   NOYAUX.set(client, { appeler, demande });

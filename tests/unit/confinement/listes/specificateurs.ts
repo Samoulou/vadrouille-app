@@ -160,6 +160,11 @@ const COMPOSITION_VILLES =
   "Places des villes, de la barrière d'accès du lancement (0055 section 2 point 5), des tables maison des pays et des villes (aucune donnée " +
   "Google conservée hors du `placeId`, 0011 et 0027), d'un port en mémoire et du plafond persistant (ligne `ville` de `prototype.forfaits`, " +
   "empreinte du cookie, table de prix ; 0129 § 3) ; verdict Sécurité : 0129 § 9, dans la revue de la PR 732";
+const COMPOSITION_VILLES_API =
+  "recherche de ville de l'écran 1 de `api` (décision 0141 ; plan du MVP, ligne M1f) : terminal mince sur le cœur commun " +
+  "`src/server/villes/recherche.ts`, garde des seuils non validés (§ 2.3), barrière B9-TL-8 et crochet `accesReelApi` fermé (§ 6.2), " +
+  "limiteur `ville-recherche` (§ 4), compteurs du jour `autocomplete_daily_counts` (§ 5), table des 62 villes du MVP (§ 8.2), " +
+  "fiche sans position (§ 6.3) ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu (S-859-3)";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -499,15 +504,30 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // Recherche de ville du site d'essai : les lignes que l'analyseur relève pour `villes.ts`, et rien d'autre.
   { fichier: "src/server/composition/villes.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["fuseauParPosition", "paysParCode", "villeDuPays"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["villeDuPays"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent", "type:LogFields", "type:LogVilleReason"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/acces", noms: ["cookieAccesValide", "empreinteCookieAcces", "ouvertureP0", "type:DependancesAcces"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/base", noms: ["poolPrototype"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/cout-google", noms: ["TablePrixGoogleSchema"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/neon", noms: ["reserverVille", "type:DemandeVille", "type:LimitesVille", "type:ResultatVille"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "../../../prototype/config/prix-google.json", noms: ["default"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:PortConsommation"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:ClientVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES },
+  // Recherche de ville de `api` (décision 0141 § 11 ligne 4, PR 880) : les lignes que l'analyseur relève pour `villes-api.ts`.
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/lib/fuseaux", noms: ["villeMvpDuPays"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_USAGE"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/config/villes", noms: ["SEUILS_AUTOCOMPLETION_VALIDES"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/generation/acces-reel", noms: ["accesReelApi"], motif: COMPOSITION_VILLES_API },
+  {
+    fichier: "src/server/composition/villes-api.ts",
+    specificateur: "@/server/generation/barriere",
+    noms: ["evaluerBarriere", "plafondsDeGenerationPoses", "type:EtatBarriere"],
+    motif: COMPOSITION_VILLES_API,
+  },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/rate-limit", noms: ["checkRateLimit"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES_API },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({

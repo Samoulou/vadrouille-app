@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
-import { siteEssaiAutorise } from "@/adapters";
+import { isApiAdapter, siteEssaiAutorise } from "@/adapters";
 import { CreateTripForm } from "@/features/creation/CreateTripForm";
 import * as messages from "@/i18n/messages";
+import { rechercheVilleApiOuverte } from "@/server/composition/villes-api";
 
 // Rendue à chaque requête (comme l'accueil) : le site d'essai est lu côté serveur (`DATA_ADAPTER`), plus seulement dans
 // l'adresse. Arrivé sur `/voyages/nouveau` sans `?site=essai` (adresse tapée, favori, retour après un brouillon perdu),
@@ -19,7 +20,13 @@ export const metadata: Metadata = {
  * `R1`, écran 1 « Créer le voyage » (spécification F8). Le brouillon vit dans l'onglet. Site d'essai (adaptateur
  * `prototype`, garde de la liste blanche) : la recherche de ville est montée quelle que soit l'adresse ; ailleurs,
  * `?site=essai` reste lu dans l'adresse (captures et e2e sur données simulées).
+ *
+ * Adaptateur `api` (décision 0141 § 6.4) : la recherche de ville de `api` n'est montée que si `isApiAdapter()` **et**
+ * `rechercheVilleApiOuverte()` (seuils validés par Samuel et barrière réelle, crochet de M1h) ; sinon le champ
+ * d'aujourd'hui (62 villes, sans appel serveur). La page n'importe ni la barrière, ni le crochet, ni la configuration.
  */
-export default function NouveauVoyagePage() {
-  return <CreateTripForm {...(siteEssaiAutorise() ? { essai: true } : {})} />;
+export default async function NouveauVoyagePage() {
+  if (siteEssaiAutorise()) return <CreateTripForm essai />;
+  if (isApiAdapter() && (await rechercheVilleApiOuverte())) return <CreateTripForm recherche="api" />;
+  return <CreateTripForm />;
 }

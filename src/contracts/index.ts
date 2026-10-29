@@ -239,6 +239,17 @@ export type {
 } from "./share";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
+// Recherche de ville de l'écran 1 (décision 0141 § 6.1 point 5) : types par adaptateur.
+export type {
+  IssueChoix,
+  IssueChoixApi,
+  IssueChoixEssai,
+  IssueSuggestions,
+  IssueSuggestionsApi,
+  IssueSuggestionsEssai,
+  SuggestionVille,
+  VilleChoisie,
+} from "./villes";
 // Valeurs sans Zod (décision 0016 § 3.1 règle 1) : `mapPointKey`, `DETOUR_THRESHOLD_MINUTES`, `CATEGORIES`,
 // `PREFERENCE_REASONS` et celles du paiement. Le code serveur continue de les lire ici.
 export * from "./values";

@@ -73,6 +73,19 @@ const SERVER_PATTERN_PAGE_P0 = {
 };
 
 /**
+ * M1f (décision 0141 § 6.4) : exception nominative à F9a pour la seule page de l'écran 1
+ * (`src/app/(creation)/voyages/nouveau/page.tsx`, composant serveur), qui lit `rechercheVilleApiOuverte` par
+ * `@/server/composition/villes-api` (module `server-only` ordinaire : exporté d'une action, ce prédicat serait appelable
+ * par n'importe quel client). Ni la barrière, ni le crochet, ni la configuration : `ligne/creation-imports` refuse
+ * toujours `@/server/generation/*` dans cette page (T23). Tout autre module de `src/server` hors actions reste refusé.
+ */
+const SERVER_PATTERN_PAGE_VILLES = {
+  regex: "^(@/server/(?!actions/[^/]+$|composition/villes-api$)|(\\.{1,2}/)+(.*/)?server/(?!actions/[^/]+$))",
+  message:
+    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) ; la page de l'écran 1 admet en plus @/server/composition/villes-api (rechercheVilleApiOuverte, décision 0141 § 6.4).",
+};
+
+/**
  * F10c (décision 0039, F10-TL-5) : depuis la feuille « Partager » et la vue partagée, seul le module d'actions du
  * partage s'importe de `src/server` ; ni la configuration, ni parse-input, ni les actions d'un autre écran.
  */
@@ -780,6 +793,12 @@ export default defineConfig([
     files: ["src/app/(creation)/**/*.{js,jsx,ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+  },
+  {
+    // M1f (décision 0141 § 6.4) : la page de l'écran 1 lit `rechercheVilleApiOuverte` par `@/server/composition/villes-api`
+    // (SERVER_PATTERN_PAGE_VILLES) ; les autres interdits du bloc précédent tiennent.
+    files: ["src/app/(creation)/voyages/nouveau/page.tsx"],
+    rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN_PAGE_VILLES, SIMULATION_PATTERN),
   },
   {
     // E2E-essai, lot 2 (D3) : `R-lancer` lit l'état de la garde du site d'essai par `@/server/p0/page-acces`, comme

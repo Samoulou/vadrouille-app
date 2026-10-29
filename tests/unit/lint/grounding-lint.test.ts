@@ -171,6 +171,10 @@ describe("lint: composition de la lecture (0100 § 5.2) : fabrique des clients G
     "src/adapters/api.ts",
     "src/workflows/p0-run.ts",
     "src/app/page.tsx",
+    // Décision 0141 § 11 ligne 3 : le cœur commun et l'action de api reçoivent la fabrique, ils ne l'importent pas.
+    "src/server/villes/recherche.ts",
+    "src/server/actions/villes.ts",
+    "src/app/(creation)/voyages/nouveau/page.tsx",
   ])("%s : import de la fabrique commune des clients Google signalé", async (fichier) => {
     expect(await signalements(imp("@/server/composition/clients-google"), fichier, RELECTURE)).not.toHaveLength(0);
     expect(await signalements(imp("./clients-google"), "src/server/composition/autre.ts", RELECTURE)).not.toHaveLength(0);
@@ -181,6 +185,8 @@ describe("lint: composition de la lecture (0100 § 5.2) : fabrique des clients G
     "src/server/composition/generation.ts",
     // Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026).
     "src/server/composition/villes.ts",
+    // Recherche de la ville de l'écran 1 de api (décision 0141 § 11 ligne 3, PR 880).
+    "src/server/composition/villes-api.ts",
     "src/server/composition/clients-google.test.ts",
     "tests/unit/exemple.test.ts",
   ])(

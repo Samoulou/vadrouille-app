@@ -4,9 +4,10 @@ import { randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FINS_MODELE, MAX_TOKENS } from "@/ai/client";
-import type { RateLimitConfig } from "@/server/config/limites";
+import { RATE_LIMITS, type RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_PROVIDER_ERROR_CLASSES, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_VILLE_API_REASONS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_PROVIDER_ERROR_CLASSES, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
+import { NIVEAUX_VILLE_API } from "@/server/composition/villes-api";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 
 /**
@@ -204,6 +205,13 @@ describe("limiteur (sans base)", () => {
     const inconnue = poolSimule({ lignes: -1 });
     await createRateLimiter({ config: CONFIG, env: ENV_CI(), pool: inconnue.pool, rowsAlert: 0 }).check(requete);
     expect(journal.evenements()).toHaveLength(1);
+  });
+});
+
+describe("limiteur: configuration", () => {
+  it("ville-recherche : une règle ip, 60 s, 20", () => {
+    // Recherche de ville de l'écran 1 de `api` (décision 0141 § 4.1, T19 ; PR 880) : suggestions et choix confondus.
+    expect(RATE_LIMITS["ville-recherche"]).toEqual([{ kind: "ip", windowSeconds: 60, threshold: 20 }]);
   });
 });
 
@@ -413,6 +421,72 @@ describe("module de journal", () => {
     expect(ailleurs).toEqual({ level: "warn", event: "p0.step_failed", dropped: 3 });
   });
 
+  // Décision 0141 § 6.3 point 4 (T22, PR 880 ; Sécurité, mineur 6) : tables étendues pour `ville.refusee`.
+  it("journal: ville.refusee › motifs fermés, googleCode et httpStatus admis ; saisie, placeId et adresse retirés ; niveaux info et warn du § 6.3 point 4", () => {
+    expect([...LOG_VILLE_API_REASONS]).toEqual([
+      "entree_invalide",
+      "seuils_non_valides",
+      "barriere",
+      "client",
+      "limite",
+      "limite_jour",
+      "compteur_indisponible",
+      "google_erreur",
+      "pays_inconnu",
+      "hors_table",
+      "exception",
+    ]);
+    for (const reason of LOG_VILLE_API_REASONS) {
+      expect(JSON.parse(formatLogLine("ville.refusee", { reason, action: "choix" }, "info")), reason).toEqual({ level: "info", event: "ville.refusee", reason, action: "choix" });
+    }
+    const ligne = formatLogLine(
+      "ville.refusee",
+      {
+        reason: "google_erreur",
+        action: "suggestions",
+        googleCode: "upstream_error",
+        httpStatus: 403,
+        errorName: "ErreurClientGoogle",
+        saisie: "SENTINELLE-SAISIE",
+        placeId: "SENTINELLE-LIEU",
+        ip: "203.0.113.7",
+        key: "SENTINELLE-CLE",
+        guard: "production",
+      },
+      "warn",
+    );
+    expect(JSON.parse(ligne)).toEqual({
+      level: "warn",
+      event: "ville.refusee",
+      reason: "google_erreur",
+      action: "suggestions",
+      googleCode: "upstream_error",
+      httpStatus: 403,
+      errorName: "ErreurClientGoogle",
+      dropped: 5,
+    });
+    expect(ligne).not.toMatch(/SENTINELLE|203\.0\.113/);
+    // Motifs du site d'essai refusés sur `api`, et inversement ; codes hors liste retirés.
+    for (const reason of ["garde", "acces", "prix", "reservation", "usage_unavailable", "SENTINELLE"]) {
+      expect(JSON.parse(formatLogLine("ville.refusee", { reason }))).toEqual({ level: "info", event: "ville.refusee", dropped: 1 });
+    }
+    expect(JSON.parse(formatLogLine("p0.ville_refusee", { reason: "hors_table" }))).toEqual({ level: "info", event: "p0.ville_refusee", dropped: 1 });
+    expect(JSON.parse(formatLogLine("ville.refusee", { googleCode: "SENTINELLE", httpStatus: 42 }))).toEqual({ level: "info", event: "ville.refusee", dropped: 2 });
+    // Purge en échec : `errorName` seul.
+    expect(JSON.parse(formatLogLine("ville.purge_failed", { errorName: "Error", reason: "barriere", rows: 3 }, "warn"))).toEqual({
+      level: "warn",
+      event: "ville.purge_failed",
+      errorName: "Error",
+      dropped: 2,
+    });
+    // Niveaux du § 6.3 point 4 : écrits par le terminal de api (`tests/unit/composition/villes-api.test.ts`), une seule table.
+    expect(NIVEAUX_VILLE_API).toEqual({
+      info: ["entree_invalide", "seuils_non_valides", "barriere", "limite", "limite_jour", "pays_inconnu", "hors_table"],
+      warn: ["client", "compteur_indisponible", "google_erreur", "exception"],
+    });
+    expect([...NIVEAUX_VILLE_API.info, ...NIVEAUX_VILLE_API.warn].sort()).toEqual([...LOG_VILLE_API_REASONS].sort());
+  });
+
   // Verdict 0122 § 2.1 point 4 : aucun compteur par motif, aucune adresse ni aucun statut sur la ligne des sites.
   it("journal: sites sans motif, adresse, hôte ni statut (champs inconnus retirés)", () => {
     const ligne = JSON.parse(
@@ -482,6 +556,9 @@ describe("module de journal", () => {
       // Ticket 493 : arrêt d'une étape de p0Run, phase, classe et code fermés seulement (verdict Sécurité S4 attendu).
       "p0.step_failed",
       "p0.ville_refusee",
+      // M1f (décision 0141 § 6.3 point 4, PR 880) : recherche de ville de api, refus et purge des compteurs en échec.
+      "ville.refusee",
+      "ville.purge_failed",
       // B4a (décision 0097 B4-TL-11 point 1 et B4-TL-13 point 4) : alertes de paiement, échec de la suite, webhook fermé
       // par une configuration invalide (identifiants internes et codes fermés seulement).
       "payment.alert",
